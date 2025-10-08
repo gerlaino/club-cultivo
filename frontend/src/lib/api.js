@@ -17,3 +17,5 @@ export function createSala(payload) { return api.post("/salas", { sala: payload 
 
 export function listLotes() { return api.get("/lotes") }
 export function createLote(payload) { return api.post("/lotes", { lote: payload }) }
+
+export function getStats() { return api.get("/stats") }

@@ -6,6 +6,7 @@ Rails.application.routes.draw do
 
   get "/health", to: "health#show"
   get "/me",     to: "me#show"
+  get "/stats",  to: "stats#show"
 
   resources :salas
   resources :lotes
