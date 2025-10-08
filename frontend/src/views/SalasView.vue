@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { useSalasStore } from "../stores/salas";
 
 const salas = useSalasStore();
@@ -17,6 +17,63 @@ function stateBadgeColor(state) {
     default: return "secondary";
   }
 }
+
+// ---------- Filtros / Orden ----------
+const q = ref("");                 // búsqueda por nombre/notas
+const filterState = ref("");       // "", "activa", "mantenimiento", "cerrada"
+const sortBy = ref("name_asc");    // "name_asc" | "name_desc" | "pots_desc" | "pots_asc" | "updated_desc" | "updated_asc"
+
+// ---------- Paginación ----------
+const page = ref(1);
+const perPage = ref(6);
+
+const filtered = computed(() => {
+  const query = q.value.trim().toLowerCase();
+  return salas.items.filter(s => {
+    const matchesText =
+      !query ||
+      (s.name || "").toLowerCase().includes(query) ||
+      (s.notes || "").toLowerCase().includes(query);
+    const matchesState = !filterState.value || s.state === filterState.value;
+    return matchesText && matchesState;
+  });
+});
+
+const sorted = computed(() => {
+  const arr = [...filtered.value];
+  const nowSort = sortBy.value;
+  arr.sort((a, b) => {
+    const potsA = Number(a.pots_count ?? 0);
+    const potsB = Number(b.pots_count ?? 0);
+    const nameA = (a.name || "").toLocaleLowerCase();
+    const nameB = (b.name || "").toLocaleLowerCase();
+    const updA = new Date(a.updated_at || a.created_at || 0).getTime();
+    const updB = new Date(b.updated_at || b.created_at || 0).getTime();
+
+    switch (nowSort) {
+      case "name_desc": return nameA < nameB ? 1 : nameA > nameB ? -1 : 0;
+      case "pots_desc": return potsB - potsA;
+      case "pots_asc":  return potsA - potsB;
+      case "updated_desc": return updB - updA;
+      case "updated_asc":  return updA - updB;
+      case "name_asc":
+      default: return nameA > nameB ? 1 : nameA < nameB ? -1 : 0;
+    }
+  });
+  return arr;
+});
+
+const totalItems = computed(() => sorted.value.length);
+const totalPages = computed(() => Math.max(1, Math.ceil(totalItems.value / perPage.value)));
+const paginated = computed(() => {
+  const start = (page.value - 1) * perPage.value;
+  return sorted.value.slice(start, start + perPage.value);
+});
+
+watch([sorted, perPage], () => {
+  // Si el dataset cambió y la página actual queda fuera de rango, volver a 1
+  if (page.value > totalPages.value) page.value = 1;
+});
 
 // ---------- Modal Crear ----------
 const showCreate = ref(false);
@@ -73,19 +130,10 @@ async function submitEdit() {
 // ---------- Confirmación Eliminar ----------
 const showDelete = ref(false);
 const toDelete = ref(null);
-const deletingName = computed(() => toDelete.value?.name || "");
-
-function confirmDelete(s) {
-  toDelete.value = s;
-  showDelete.value = true;
-}
+function confirmDelete(s) { toDelete.value = s; showDelete.value = true; }
 async function doDelete() {
   if (!toDelete.value) return;
-  try {
-    await salas.remove(toDelete.value.id);
-    showDelete.value = false;
-    toDelete.value = null;
-  } catch {}
+  try { await salas.remove(toDelete.value.id); showDelete.value = false; toDelete.value = null; } catch {}
 }
 </script>
 
@@ -96,39 +144,120 @@ async function doDelete() {
       <button class="btn btn-primary" @click="showCreate = true">Nueva sala</button>
     </div>
 
+    <!-- Toolbar filtros/orden -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-md-4">
+            <label class="form-label">Buscar</label>
+            <input
+              type="search"
+              class="form-control"
+              placeholder="Nombre o notas…"
+              v-model.trim="q"
+            />
+          </div>
+
+          <div class="col-6 col-md-3">
+            <label class="form-label">Estado</label>
+            <select class="form-select" v-model="filterState">
+              <option value="">Todos</option>
+              <option value="activa">activa</option>
+              <option value="mantenimiento">mantenimiento</option>
+              <option value="cerrada">cerrada</option>
+            </select>
+          </div>
+
+          <div class="col-6 col-md-3">
+            <label class="form-label">Ordenar por</label>
+            <select class="form-select" v-model="sortBy">
+              <option value="name_asc">Nombre (A→Z)</option>
+              <option value="name_desc">Nombre (Z→A)</option>
+              <option value="pots_desc">Macetas (mayor→menor)</option>
+              <option value="pots_asc">Macetas (menor→mayor)</option>
+              <option value="updated_desc">Recientes</option>
+              <option value="updated_asc">Antiguas</option>
+            </select>
+          </div>
+
+          <div class="col-6 col-md-2">
+            <label class="form-label">Por página</label>
+            <select class="form-select" v-model.number="perPage">
+              <option :value="6">6</option>
+              <option :value="9">9</option>
+              <option :value="12">12</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="small text-muted mt-2">
+          Mostrando {{ paginated.length }} de {{ totalItems }} sala(s)
+        </div>
+      </div>
+    </div>
+
     <!-- Estados generales -->
     <div v-if="salas.loading" class="alert alert-info">Cargando…</div>
     <div v-else-if="salas.error" class="alert alert-danger">{{ salas.error }}</div>
     <div v-else-if="!salas.items.length" class="alert alert-secondary">No hay salas todavía.</div>
 
     <!-- Grid -->
-    <div v-else class="row g-3">
-      <div v-for="s in salas.items" :key="s.id" class="col-12 col-sm-6 col-lg-4">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body d-flex flex-column">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <h5 class="card-title mb-0 text-truncate" :title="s.name">{{ s.name }}</h5>
-              <span class="badge text-capitalize" :class="`text-bg-${stateBadgeColor(s.state)}`">
-                {{ s.state || "—" }}
-              </span>
-            </div>
-            <p class="text-muted mb-2">Macetas: <strong>{{ s.pots_count ?? 0 }}</strong></p>
-            <p class="small text-muted flex-grow-1">{{ s.notes || "Sin notas." }}</p>
+    <div v-else>
+      <div v-if="!paginated.length" class="alert alert-warning">
+        No se encontraron salas con los filtros actuales.
+      </div>
 
-            <div class="d-flex gap-2 mt-auto">
-              <button class="btn btn-outline-primary btn-sm" disabled>Ver</button>
-              <button class="btn btn-outline-secondary btn-sm" @click="startEdit(s)">
-                <span v-if="salas.updating && editForm.id === s.id" class="spinner-border spinner-border-sm me-1"></span>
-                Editar
-              </button>
-              <button class="btn btn-outline-danger btn-sm ms-auto" @click="confirmDelete(s)">
-                <span v-if="salas.removing && toDelete?.id === s.id" class="spinner-border spinner-border-sm me-1"></span>
-                Eliminar
-              </button>
+      <div class="row g-3">
+        <div v-for="s in paginated" :key="s.id" class="col-12 col-sm-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h5 class="card-title mb-0 text-truncate" :title="s.name">{{ s.name }}</h5>
+                <span class="badge text-capitalize" :class="`text-bg-${stateBadgeColor(s.state)}`">
+                  {{ s.state || "—" }}
+                </span>
+              </div>
+
+              <p class="text-muted mb-2">Macetas: <strong>{{ s.pots_count ?? 0 }}</strong></p>
+              <p class="small text-muted flex-grow-1">{{ s.notes || "Sin notas." }}</p>
+
+              <div class="d-flex gap-2 mt-auto">
+                <button class="btn btn-outline-primary btn-sm" disabled>Ver</button>
+                <button class="btn btn-outline-secondary btn-sm" @click="startEdit(s)">
+                  <span v-if="salas.updating && editForm.id === s.id" class="spinner-border spinner-border-sm me-1"></span>
+                  Editar
+                </button>
+                <button class="btn btn-outline-danger btn-sm ms-auto" @click="confirmDelete(s)">
+                  <span v-if="salas.removing && toDelete?.id === s.id" class="spinner-border spinner-border-sm me-1"></span>
+                  Eliminar
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Pagination -->
+      <nav class="mt-3" aria-label="Paginación">
+        <ul class="pagination mb-0">
+          <li class="page-item" :class="{ disabled: page <= 1 }">
+            <button class="page-link" @click="page = Math.max(1, page-1)">Anterior</button>
+          </li>
+
+          <li
+            v-for="p in totalPages"
+            :key="p"
+            class="page-item"
+            :class="{ active: p === page }"
+          >
+            <button class="page-link" @click="page = p">{{ p }}</button>
+          </li>
+
+          <li class="page-item" :class="{ disabled: page >= totalPages }">
+            <button class="page-link" @click="page = Math.min(totalPages, page+1)">Siguiente</button>
+          </li>
+        </ul>
+      </nav>
     </div>
 
     <!-- MODAL Crear -->
@@ -241,7 +370,7 @@ async function doDelete() {
           </div>
           <div class="modal-body">
             <div v-if="salas.removeError" class="alert alert-danger">{{ salas.removeError }}</div>
-            <p>¿Seguro que querés eliminar <strong>{{ deletingName }}</strong>? Esta acción no se puede deshacer.</p>
+            <p>¿Seguro que querés eliminar <strong>{{ toDelete?.name }}</strong>? Esta acción no se puede deshacer.</p>
           </div>
           <div class="modal-footer">
             <button class="btn btn-outline-secondary" :disabled="salas.removing" @click="showDelete = false">Cancelar</button>
@@ -260,3 +389,4 @@ async function doDelete() {
 <style scoped>
 .modal { background: rgba(0,0,0,0.01); }
 </style>
+
