@@ -1,4 +1,3 @@
-<!-- frontend/src/views/DashboardView.vue -->
 <script setup>
 import { ref, onMounted } from "vue"
 import { getStats } from "../lib/api"
@@ -25,46 +24,53 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="p-6 space-y-6">
-    <h1 class="text-2xl font-semibold">Dashboard</h1>
+  <div>
+    <h1 class="h3 mb-4">Dashboard</h1>
 
-    <div v-if="loading">Cargando…</div>
-    <div v-else-if="error" class="text-red-600">{{ error }}</div>
-    <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div class="rounded-xl shadow p-4">
-        <div class="text-sm text-gray-500">Salas (total)</div>
-        <div class="text-3xl font-bold">{{ stats.salas.total }}</div>
-        <div class="mt-2 text-xs text-gray-500">
-          <span v-for="(v, k) in stats.salas.por_estado" :key="k" class="mr-3">
-            {{ k }}: <strong>{{ v }}</strong>
-          </span>
+    <div v-if="loading" class="alert alert-secondary">Cargando…</div>
+    <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
+
+    <div v-else class="row g-3">
+      <div class="col-12 col-md-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="text-uppercase text-muted small mb-1">Salas (total)</div>
+            <div class="display-6 fw-semibold">{{ stats.salas.total }}</div>
+            <div class="mt-2 small text-muted">
+              <span v-for="(v, k) in stats.salas.por_estado" :key="k" class="me-3">
+                {{ k }}: <strong>{{ v }}</strong>
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="rounded-xl shadow p-4">
-        <div class="text-sm text-gray-500">Lotes (total)</div>
-        <div class="text-3xl font-bold">{{ stats.lotes.total }}</div>
-        <div class="mt-2 text-xs text-gray-500">
-          <span v-for="(v, k) in stats.lotes.por_etapa" :key="k" class="mr-3">
-            {{ k }}: <strong>{{ v }}</strong>
-          </span>
+      <div class="col-12 col-md-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="text-uppercase text-muted small mb-1">Lotes (total)</div>
+            <div class="display-6 fw-semibold">{{ stats.lotes.total }}</div>
+            <div class="mt-2 small text-muted">
+              <span v-for="(v, k) in stats.lotes.por_etapa" :key="k" class="me-3">
+                {{ k }}: <strong>{{ v }}</strong>
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="rounded-xl shadow p-4">
-        <div class="text-sm text-gray-500">Ocupación</div>
-        <div class="text-lg">
-          Plantas activas: <strong>{{ stats.ocupacion.plantas_activas }}</strong>
-        </div>
-        <div class="text-lg">
-          Macetas totales: <strong>{{ stats.ocupacion.total_macetas }}</strong>
+      <div class="col-12 col-md-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="text-uppercase text-muted small mb-1">Ocupación</div>
+            <div class="fs-4">Plantas activas: <strong>{{ stats.ocupacion.plantas_activas }}</strong></div>
+            <div class="fs-4">Macetas totales: <strong>{{ stats.ocupacion.total_macetas }}</strong></div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </template>
 
-<style scoped>
-/* simple cards con Tailwind ya que lo tenés habilitado via Vite PostCSS (si no, se ven igual decentes) */
-</style>
+
 

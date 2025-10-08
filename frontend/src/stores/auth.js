@@ -1,23 +1,49 @@
 import { defineStore } from "pinia"
-import { me, signIn, signOut } from "../lib/api"
+import { signIn as apiSignIn, signOut as apiSignOut, me } from "../lib/api"
+import router from "../router"
 
 export const useAuthStore = defineStore("auth", {
-  state: () => ({ user: null, loading: false, error: null }),
+  state: () => ({
+    user: null,
+    loading: false,
+    error: null,
+  }),
+  getters: {
+    isAuthenticated: (s) => !!s.user,
+    email: (s) => s.user?.email || "",
+  },
   actions: {
     async fetchMe() {
-      this.loading = true; this.error = null
-      try { const { data } = await me(); this.user = data }
-      catch (e) { this.user = null }
-      finally { this.loading = false }
+      try {
+        const { data } = await me()
+        this.user = data
+      } catch {
+        this.user = null
+      }
     },
-    async login(email, password) {
+    async signIn(email, password) {
       this.loading = true; this.error = null
-      try { await signIn(email, password); await this.fetchMe() }
-      catch (e) { this.error = "Credenciales inválidas"; throw e }
-      finally { this.loading = false }
+      try {
+        await apiSignIn(email, password)
+        await this.fetchMe()
+        router.push({ name: "dashboard" })
+      } catch (e) {
+        this.error = "Credenciales inválidas"
+        throw e
+      } finally {
+        this.loading = false
+      }
     },
-    async logout() {
-      await signOut(); this.user = null
+    async signOut() {
+      try {
+        await apiSignOut()
+      } catch (_) {
+        // ignoramos errores de signout
+      } finally {
+        this.user = null
+        router.push({ name: "login" })
+      }
     }
   }
 })
+
