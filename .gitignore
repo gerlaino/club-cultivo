@@ -1,0 +1,32 @@
+# Global
+.DS_Store
+*.log
+.env
+.env.*
+.idea/
+
+# Rails (backend)
+backend/.bundle/
+backend/log/*
+!backend/log/.keep
+backend/tmp/*
+!backend/tmp/.keep
+backend/vendor/bundle
+backend/node_modules
+backend/storage/*
+!backend/storage/.keep
+backend/public/assets
+backend/.byebug_history
+backend/coverage
+backend/db/*.sqlite3*
+backend/db/*.sqlite3-journal
+backend/db/schema_cache.yml
+backend/config/master.key
+backend/config/credentials.yml.enc
+
+# Vite/Vue (frontend)
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/.eslintcache
+frontend/.cache
