@@ -3,12 +3,14 @@ import LoginView from "../views/LoginView.vue"
 import DashboardView from "../views/DashboardView.vue"
 import SalasView from "../views/SalasView.vue"
 import LotesView from "../views/LotesView.vue"
+import SalaDetailView from "../views/SalaDetailView.vue"
 import { useAuthStore } from "../stores/auth"
 
 const routes = [
   { path: "/login", name: "login", component: LoginView, meta: { public: true } },
   { path: "/", name: "dashboard", component: DashboardView },
   { path: "/salas", name: "salas", component: SalasView },
+  { path: "/salas/:id", name: "sala-detail", component: SalaDetailView, props: true },
   { path: "/lotes", name: "lotes", component: LotesView },
 ]
 
