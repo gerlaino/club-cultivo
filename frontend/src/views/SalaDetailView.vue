@@ -7,13 +7,11 @@ const route = useRoute();
 const router = useRouter();
 const salas = useSalasStore();
 
-// id reactivo por si cambian la ruta
 const id = computed(() => Number(route.params.id));
 
 const loading = ref(true);
 const error = ref(null);
 
-// fuente de verdad: primero en items; si no, currentSala (si tu store lo usa)
 const sala = computed(() => {
   const fromItems =
     salas.items.find((s) => String(s.id) === String(id.value)) || null;
@@ -23,14 +21,11 @@ const sala = computed(() => {
 async function load() {
   loading.value = true;
   error.value = null;
-
   try {
-    // si no está en items, buscarla
     if (!sala.value) {
       if (typeof salas.fetchSala === "function") {
-        await salas.fetchSala(id.value); // método opcional en tu store
+        await salas.fetchSala(id.value);
       } else {
-        // fallback: si no hay items, cargar lista y tomar la sala
         if (!salas.items.length && typeof salas.fetch === "function") {
           await salas.fetch();
         }
@@ -47,7 +42,6 @@ async function load() {
 onMounted(load);
 watch(id, load);
 
-// helper visual para estado
 function stateBadgeColor(state) {
   switch (state) {
     case "activa":
@@ -61,7 +55,7 @@ function stateBadgeColor(state) {
   }
 }
 
-// ---- sensores (placeholder; luego vendrán de Home Assistant) ----
+// Sensores (placeholder)
 const temp = ref(null);
 const hum = ref(null);
 onMounted(() => {
@@ -69,7 +63,7 @@ onMounted(() => {
   hum.value = 57;
 });
 
-// ---- edición de notas ----
+// Notas
 const editNotes = ref(false);
 const notesDraft = ref("");
 
@@ -83,9 +77,19 @@ async function saveNotes() {
   try {
     await salas.update(sala.value.id, { notes: notesDraft.value });
     editNotes.value = false;
-  } catch {
-    // tu store ya setea updateError; aquí solo dejamos que el alert lo muestre si lo necesitas
-  }
+  } catch {}
+}
+
+// Imagen destacada de planta (usa sala.photo_url o placeholder)
+const plantaImg = computed(() => {
+  return (
+    sala.value?.photo_url ||
+    `https://picsum.photos/seed/sala-${id.value}/800/450`
+  );
+});
+function goToPlantaDetail() {
+  // ruta a definir cuando creemos el módulo de plantas
+  router.push({ name: "planta-detail", params: { salaId: id.value } });
 }
 </script>
 
@@ -133,7 +137,7 @@ async function saveNotes() {
           <div class="col-6 col-md-4">
             <div class="card text-center h-100">
               <div class="card-body">
-                <div class="text-muted small">Macetas</div>
+                <div class="text-muted small">Plantas</div>
                 <div class="display-6 fw-bold">{{ sala.pots_count ?? 0 }}</div>
               </div>
             </div>
@@ -249,7 +253,7 @@ async function saveNotes() {
           </div>
         </div>
 
-        <!-- Info -->
+        <!-- Información -->
         <div class="card mt-3">
           <div class="card-header"><strong>Información</strong></div>
           <div class="card-body small">
@@ -261,6 +265,10 @@ async function saveNotes() {
               ><span class="text-capitalize">{{ sala.state }}</span>
             </div>
             <div class="d-flex justify-content-between border-bottom py-1">
+              <span class="text-muted">Plantas</span
+              ><span>{{ sala.pots_count ?? 0 }}</span>
+            </div>
+            <div class="d-flex justify-content-between border-bottom py-1">
               <span class="text-muted">Creado</span
               ><span>{{ new Date(sala.created_at).toLocaleString() }}</span>
             </div>
@@ -270,10 +278,28 @@ async function saveNotes() {
             </div>
           </div>
         </div>
+
+        <!-- Planta destacada -->
+        <div class="card mt-3">
+          <div class="card-header d-flex justify-content-between">
+            <strong>Planta destacada</strong>
+            <span class="text-muted small">clic para ver detalle</span>
+          </div>
+          <button class="p-0 border-0 bg-transparent" @click="goToPlantaDetail">
+            <img
+              :src="plantaImg"
+              class="img-fluid rounded-bottom"
+              alt="Planta destacada"
+              style="display:block; width:100%;"
+              loading="lazy"
+            />
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
+
 
 
 

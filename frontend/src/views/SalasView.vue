@@ -173,8 +173,8 @@ async function doDelete() {
             <select class="form-select" v-model="sortBy">
               <option value="name_asc">Nombre (A→Z)</option>
               <option value="name_desc">Nombre (Z→A)</option>
-              <option value="pots_desc">Macetas (mayor→menor)</option>
-              <option value="pots_asc">Macetas (menor→mayor)</option>
+              <option value="pots_desc">Plantas (mayor→menor)</option>
+              <option value="pots_asc">Plantas (menor→mayor)</option>
               <option value="updated_desc">Recientes</option>
               <option value="updated_asc">Antiguas</option>
             </select>
@@ -218,7 +218,7 @@ async function doDelete() {
                 </span>
               </div>
 
-              <p class="text-muted mb-2">Macetas: <strong>{{ s.pots_count ?? 0 }}</strong></p>
+              <p class="text-muted mb-2">Plantas: <strong>{{ s.pots_count ?? 0 }}</strong></p>
               <p class="small text-muted flex-grow-1">{{ s.notes || "Sin notas." }}</p>
 
               <!-- dentro del v-for="s in paginated" -->
@@ -294,7 +294,7 @@ async function doDelete() {
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Cantidad de macetas</label>
+              <label class="form-label">Cantidad de plantas</label>
               <input type="number" min="0" step="1" class="form-control" v-model.number="createForm.pots_count" :class="{ 'is-invalid': createErrors.pots_count }" />
               <div class="invalid-feedback">{{ createErrors.pots_count }}</div>
             </div>
@@ -344,7 +344,7 @@ async function doDelete() {
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Cantidad de macetas</label>
+              <label class="form-label">Cantidad de plantas</label>
               <input type="number" min="0" step="1" class="form-control" v-model.number="editForm.pots_count" :class="{ 'is-invalid': editErrors.pots_count }" />
               <div class="invalid-feedback">{{ editErrors.pots_count }}</div>
             </div>
