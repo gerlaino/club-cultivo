@@ -30,5 +30,22 @@ export const getLote     = (id) => api.get(`/lotes/${id}`);
 export const updateLote  = (id, payload) => api.patch(`/lotes/${id}`, { lote: payload });
 export const deleteLote  = (id) => api.delete(`/lotes/${id}`);
 
+// Plantas
+export const listPlantsByLote = (loteId) =>
+  client.get(`/lotes/${loteId}/plants`);
+
+export const createPlantInLote = (loteId, payload) =>
+  client.post(`/lotes/${loteId}/plants`, { plant: payload });
+
+export const getPlant = (id) =>
+  client.get(`/plants/${id}`);
+
+export const updatePlant = (id, payload) =>
+  client.put(`/plants/${id}`, { plant: payload });
+
+export const deletePlant = (id) =>
+  client.delete(`/plants/${id}`);
+
+
 export default api;
 

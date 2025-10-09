@@ -2,11 +2,12 @@
 import { onMounted, ref, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useLotesStore } from "../stores/lotes";
+import { usePlantsStore } from "../stores/plants";
 
+const plants = usePlantsStore();
 const route = useRoute();
 const router = useRouter();
 const lotes = useLotesStore();
-
 const id = Number(route.params.id);
 const error = ref(null);
 const loading = computed(() => lotes.loading);
@@ -17,6 +18,11 @@ onMounted(async () => {
     await lotes.fetchOne(id);
   } catch (e) {
     error.value = "No se pudo cargar el lote.";
+  }
+  try {
+    await plants.fetchByLote(id);
+  } catch (e) {
+    console.warn("No se pudieron cargar plantas del lote", e);
   }
 });
 
@@ -111,6 +117,50 @@ function label(val, fallback = "—") {
             <div class="d-flex justify-content-between py-1" v-if="lote.updated_at">
               <span class="text-muted">Actualizado</span>
               <span>{{ new Date(lote.updated_at).toLocaleString() }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="card mt-3">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Plantas</strong>
+            <RouterLink
+              v-if="lote"
+              class="btn btn-sm btn-outline-secondary"
+              :to="{ name: 'lote-detail', params: { id: lote.id } }">
+              Refrescar
+            </RouterLink>
+          </div>
+          <div class="card-body">
+            <div v-if="plants.loading" class="text-muted">Cargando…</div>
+            <div v-else-if="!plants.byLote(lote.id).length" class="text-muted">Sin plantas.</div>
+            <div v-else class="table-responsive">
+              <table class="table align-middle">
+                <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Código</th>
+                  <th>Genética</th>
+                  <th>Etapa</th>
+                  <th>Salud</th>
+                  <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr v-for="(p, i) in plants.byLote(lote.id)" :key="p.id">
+                  <td>{{ i+1 }}</td>
+                  <td class="text-monospace">{{ p.code || `P${p.id}` }}</td>
+                  <td>{{ p.strain || '—' }}</td>
+                  <td class="text-capitalize">{{ p.stage || '—' }}</td>
+                  <td>{{ p.health || '—' }}</td>
+                  <td class="text-end">
+                    <RouterLink class="btn btn-sm btn-outline-primary"
+                                :to="{ name:'plant-detail', params:{ id: p.id } }">
+                      Ver
+                    </RouterLink>
+                  </td>
+                </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

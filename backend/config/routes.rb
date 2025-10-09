@@ -11,6 +11,9 @@ Rails.application.routes.draw do
   resources :salas do
     resources :lotes, only: [:index, :create]  # /salas/:sala_id/lotes
   end
+
   resources :lotes, only: [:show, :update, :destroy]  # /lotes/:id
+
+  resources :plants, only: [:show, :update, :destroy]
 
 end

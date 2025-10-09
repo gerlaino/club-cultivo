@@ -6,6 +6,7 @@ import LotesView from "../views/LotesView.vue"
 import SalaDetailView from "../views/SalaDetailView.vue"
 import LoteDetailView from "../views/LoteDetailView.vue"
 import { useAuthStore } from "../stores/auth"
+import PlantDetailView from "../views/PlantDetailView.vue";
 
 const routes = [
   { path: "/login", name: "login", component: LoginView, meta: { public: true } },
@@ -14,6 +15,7 @@ const routes = [
   { path: "/salas/:id", name: "sala-detail", component: SalaDetailView, props: (route) => ({ id: Number(route.params.id) }) },
   /*{ path: "/lotes", name: "lotes", component: LotesView },*/
   { path: "/lotes/:id", name: "lote-detail", component: LoteDetailView, props: true },
+  { path: "/plantas/:id", name: "plant-detail", component: PlantDetailView, props: true },
 ]
 
 const router = createRouter({
