@@ -31,21 +31,31 @@ export const updateLote  = (id, payload) => api.patch(`/lotes/${id}`, { lote: pa
 export const deleteLote  = (id) => api.delete(`/lotes/${id}`);
 
 // Plantas
-export const listPlantsByLote = (loteId) =>
-  client.get(`/lotes/${loteId}/plants`);
+export function listPlantsBySala(salaId) {
+  // usa index con filtro por sala, vía ?sala_id=
+  return api.get(`/lotes/0/plants`, { params: { sala_id: salaId } });
+}
 
-export const createPlantInLote = (loteId, payload) =>
-  client.post(`/lotes/${loteId}/plants`, { plant: payload });
+export function listPlantsByLote(loteId) {
+  return api.get(`/lotes/${loteId}/plants`);
+}
 
-export const getPlant = (id) =>
-  client.get(`/plants/${id}`);
+export function getPlant(id) {
+  return api.get(`/plants/${id}`);
+}
 
-export const updatePlant = (id, payload) =>
-  client.put(`/plants/${id}`, { plant: payload });
+export function createPlantInLote(loteId, payload) {
+  // payload: { code?, strain, notes?, stage?, health?, photo_url? }
+  return api.post(`/lotes/${loteId}/plants`, { plant: payload });
+}
 
-export const deletePlant = (id) =>
-  client.delete(`/plants/${id}`);
+export function updatePlant(id, payload) {
+  return api.put(`/plants/${id}`, { plant: payload });
+}
 
+export function deletePlant(id) {
+  return api.delete(`/plants/${id}`);
+}
 
 export default api;
 

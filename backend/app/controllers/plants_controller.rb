@@ -34,7 +34,8 @@ class PlantsController < ApplicationController
   end
 
   def destroy
-    authorize @plant, :destroy?
+    @plant = Plant.find(params[:id])
+    authorize @plant.lote, :update?   # misma policy que para update
     @plant.destroy
     head :no_content
   end
