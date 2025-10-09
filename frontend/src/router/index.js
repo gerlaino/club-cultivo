@@ -12,10 +12,8 @@ const routes = [
   { path: "/", name: "dashboard", component: DashboardView },
   { path: "/salas", name: "salas", component: SalasView },
   { path: "/salas/:id", name: "sala-detail", component: SalaDetailView, props: (route) => ({ id: Number(route.params.id) }) },
-  { path: "/lotes", name: "lotes", component: LotesView },
-  { path: "/lotes/:id", name: "lote-detail", component: LoteDetailView,
-    props: true,
-  },
+  /*{ path: "/lotes", name: "lotes", component: LotesView },*/
+  { path: "/lotes/:id", name: "lote-detail", component: LoteDetailView, props: true },
 ]
 
 const router = createRouter({

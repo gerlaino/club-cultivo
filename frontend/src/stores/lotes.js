@@ -1,9 +1,9 @@
 import { defineStore } from "pinia";
 import {
-  listLotes,                // compat (si alguna parte del código lo usa)
-  listLotesBySala,          // nuevo (usado en SalaDetail)
+  listLotes,                // compat global opcional
+  listLotesBySala,          // lotes de una sala
   createLoteInSala,
-  getLote,
+  getLote,                  // 👈 usamos esto para el detalle
   updateLote,
   deleteLote,
 } from "../lib/api";
@@ -12,6 +12,7 @@ export const useLotesStore = defineStore("lotes", {
   state: () => ({
     items: [],               // compat global
     itemsBySala: new Map(),  // salaId -> array de lotes
+    current: null,           // 👈 detalle de un lote
     loading: false,
     error: null,
     creating: false,
@@ -25,7 +26,7 @@ export const useLotesStore = defineStore("lotes", {
   },
 
   actions: {
-    // --- compat global (si lo necesitas en otro lado) ---
+    // --- compat global ---
     async fetch() {
       this.loading = true; this.error = null;
       try {
@@ -39,7 +40,7 @@ export const useLotesStore = defineStore("lotes", {
       }
     },
 
-    // --- recomendado: por sala ---
+    // --- por sala ---
     async fetchBySala(salaId) {
       this.loading = true; this.error = null;
       try {
@@ -69,6 +70,22 @@ export const useLotesStore = defineStore("lotes", {
       }
     },
 
+    // --- DETALLE ---
+    async fetchOne(id) {
+      this.loading = true; this.error = null; this.current = null;
+      try {
+        const { data } = await getLote(id);
+        this.current = data;
+        return data;
+      } catch (e) {
+        console.error("Lotes.fetchOne", e);
+        this.error = e?.response?.data?.error || e.message;
+        throw e;
+      } finally {
+        this.loading = false;
+      }
+    },
+
     async update(id, payload, salaId = null) {
       this.updating = true; this.error = null;
       try {
@@ -79,6 +96,7 @@ export const useLotesStore = defineStore("lotes", {
         } else {
           this.items = this.items.map(l => (l.id === id ? data : l));
         }
+        if (this.current?.id === id) this.current = data; // mantener detalle al día
         return data;
       } catch (e) {
         console.error("Lotes.update", e);
@@ -99,6 +117,7 @@ export const useLotesStore = defineStore("lotes", {
         } else {
           this.items = this.items.filter(l => l.id !== id);
         }
+        if (this.current?.id === id) this.current = null;
       } catch (e) {
         console.error("Lotes.remove", e);
         this.error = e?.response?.data?.errors?.join(", ") || e.message;
