@@ -221,9 +221,16 @@ async function doDelete() {
               <p class="text-muted mb-2">Macetas: <strong>{{ s.pots_count ?? 0 }}</strong></p>
               <p class="small text-muted flex-grow-1">{{ s.notes || "Sin notas." }}</p>
 
-              <div class="d-flex gap-2 mt-auto">
-                <button class="btn btn-outline-primary btn-sm" disabled>Ver</button>
-                <button class="btn btn-outline-secondary btn-sm" @click="startEdit(s)">
+              <!-- dentro del v-for="s in paginated" -->
+              <RouterLink
+                class="btn btn-sm btn-outline-primary"
+                :to="{ name: 'sala-detail', params: { id: s.id } }"
+              >
+                Ver
+              </RouterLink>
+
+
+              <button class="btn btn-outline-secondary btn-sm"  @click="startEdit(s)">
                   <span v-if="salas.updating && editForm.id === s.id" class="spinner-border spinner-border-sm me-1"></span>
                   Editar
                 </button>
@@ -231,7 +238,6 @@ async function doDelete() {
                   <span v-if="salas.removing && toDelete?.id === s.id" class="spinner-border spinner-border-sm me-1"></span>
                   Eliminar
                 </button>
-              </div>
             </div>
           </div>
         </div>

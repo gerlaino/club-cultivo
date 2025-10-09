@@ -10,7 +10,7 @@ const routes = [
   { path: "/login", name: "login", component: LoginView, meta: { public: true } },
   { path: "/", name: "dashboard", component: DashboardView },
   { path: "/salas", name: "salas", component: SalasView },
-  { path: "/salas/:id", name: "sala-detail", component: SalaDetailView, props: true },
+  { path: "/salas/:id", name: "sala-detail", component: SalaDetailView, props: (route) => ({ id: Number(route.params.id) }) },
   { path: "/lotes", name: "lotes", component: LotesView },
 ]
 
