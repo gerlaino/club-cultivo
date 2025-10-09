@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_10_03_211346) do
+ActiveRecord::Schema[7.2].define(version: 2025_10_09_022301) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -31,6 +31,8 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_03_211346) do
     t.bigint "club_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "grow_type"
+    t.string "light_type"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["sala_id"], name: "index_lotes_on_sala_id"
   end
@@ -43,7 +45,12 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_03_211346) do
     t.bigint "club_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "kind"
+    t.bigint "created_by_id", null: false
+    t.string "camera_stream_url"
+    t.string "camera_snapshot_url"
     t.index ["club_id"], name: "index_salas_on_club_id"
+    t.index ["created_by_id"], name: "index_salas_on_created_by_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -65,5 +72,6 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_03_211346) do
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "salas"
   add_foreign_key "salas", "clubs"
+  add_foreign_key "salas", "users", column: "created_by_id"
   add_foreign_key "users", "clubs"
 end

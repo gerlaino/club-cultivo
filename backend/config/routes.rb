@@ -8,6 +8,9 @@ Rails.application.routes.draw do
   get "/me",     to: "me#show"
   get "/stats",  to: "stats#show"
 
-  resources :salas
-  resources :lotes
+  resources :salas do
+    resources :lotes, only: [:index, :create]  # /salas/:sala_id/lotes
+  end
+  resources :lotes, only: [:show, :update, :destroy]  # /lotes/:id
+
 end

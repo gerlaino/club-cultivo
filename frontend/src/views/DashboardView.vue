@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from "vue";
-import { listSalas, listLotes, me } from "../lib/api";
+import { listSalas, listLotesBySala, me } from "../lib/api";
 
 const loading = ref(true);
 const error = ref("");
@@ -12,7 +12,7 @@ onMounted(async () => {
     const [meRes, salasRes, lotesRes] = await Promise.all([
       me(),
       listSalas().catch(() => ({ data: [] })), // por si aún no hay endpoint
-      listLotes().catch(() => ({ data: [] })),
+      listLotesBySala().catch(() => ({ data: [] })),
     ]);
     user.value = meRes.data;
     totals.value = {

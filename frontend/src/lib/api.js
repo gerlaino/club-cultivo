@@ -1,49 +1,34 @@
-// frontend/src/lib/api.js
 import axios from "axios";
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-export const api = axios.create({
-  baseURL: API_URL,
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001",
   withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
 });
 
-// --- Auth ---
-export function signIn(email, password) {
-  return api.post("/users/sign_in", { user: { email, password } });
-}
-export function signOut() {
-  return api.delete("/users/sign_out");
-}
-export function me() {
-  return api.get("/me");
-}
+// -------- Auth (compat) --------
+export const signIn  = (email, password) => api.post("/users/sign_in", { user: { email, password }});
+export const signOut = () => api.delete("/users/sign_out");
+export const me      = () => api.get("/me");
 
-// --- Salas ---
-export function listSalas() {
-  return api.get("/salas");
-}
-export function getSala(id) {
-  return api.get(`/salas/${id}`);
-}
-export function createSala(payload) {
-  return api.post("/salas", { sala: payload });
-}
-export function updateSala(id, payload) {
-  return api.put(`/salas/${id}`, { sala: payload });
-}
-export function deleteSala(id) {
-  return api.delete(`/salas/${id}`);
-}
+// -------- Salas (compat) --------
+export const listSalas   = () => api.get("/salas");
+export const getSala     = (id) => api.get(`/salas/${id}`);
+export const createSala  = (payload) => api.post("/salas", { sala: payload });
+export const updateSala  = (id, payload) => api.patch(`/salas/${id}`, { sala: payload });
+export const deleteSala  = (id) => api.delete(`/salas/${id}`);
 
-// --- Lotes (si los usás) ---
-export function listLotes() {
-  return api.get("/lotes");
-}
-export function createLote(payload) {
-  return api.post("/lotes", { lote: payload });
-}
+// -------- Lotes (compat + nuevo) --------
+// GLOBAL (compatibilidad con código viejo):
+export const listLotes   = () => api.get("/lotes");            // <- si tu backend no lo expone, no lo uses
+// Lotes por sala (recomendado / usado en SalaDetail):
+export const listLotesBySala  = (salaId) => api.get(`/salas/${salaId}/lotes`);
+export const createLoteInSala = (salaId, payload) =>
+  api.post(`/salas/${salaId}/lotes`, { lote: payload });
+
+// Lote puntual (compat)
+export const getLote     = (id) => api.get(`/lotes/${id}`);
+export const updateLote  = (id, payload) => api.patch(`/lotes/${id}`, { lote: payload });
+export const deleteLote  = (id) => api.delete(`/lotes/${id}`);
+
+export default api;
+

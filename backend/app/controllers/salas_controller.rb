@@ -3,7 +3,7 @@ class SalasController < ApplicationController
   before_action :set_sala, only: [:show, :update, :destroy]
 
   def index
-    @salas = policy_scope(Sala)
+    @salas = Sala.where(club_id: current_user.club_id).order(updated_at: :desc)
     render json: @salas
   end
 
@@ -13,7 +13,10 @@ class SalasController < ApplicationController
   end
 
   def create
-    @sala = Sala.new(sala_params.merge(club_id: current_user.club_id))
+    @sala = Sala.new(sala_params.merge(
+      club_id: current_user.club_id,
+      created_by: current_user
+    ))
     authorize @sala
     if @sala.save
       render json: @sala, status: :created
@@ -38,6 +41,16 @@ class SalasController < ApplicationController
   end
 
   private
-  def set_sala; @sala = Sala.find(params[:id]); end
-  def sala_params; params.require(:sala).permit(:name, :state, :pots_count, :notes); end
+
+  def set_sala
+    @sala = Sala.find(params[:id])
+    raise Pundit::NotAuthorizedError unless @sala.club_id == current_user.club_id
+  end
+
+  def sala_params
+    params.require(:sala).permit(
+      :name, :state, :pots_count, :notes,
+      :kind, :camera_stream_url, :camera_snapshot_url
+    )
+  end
 end

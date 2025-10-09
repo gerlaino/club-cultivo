@@ -28,3 +28,21 @@ Lote.find_or_create_by!(code: "L-001", sala: sala, club: sala.club) do |l|
   l.strain = "OG Kush"
   l.notes = "Primer lote"
 end
+
+user = User.find_by(email: "super@demo.com")
+club = user.club
+
+s1 = Sala.create!(
+  club: club, name: "Sala Norte", state: "activa", kind: "indoor",
+  created_by: user,
+  camera_snapshot_url: "https://picsum.photos/seed/sala-norte/800/450"
+)
+
+s2 = Sala.create!(
+  club: club, name: "Sala Secado", state: "activa", kind: "indoor",
+  created_by: user
+)
+
+Lote.create!(club: club, sala: s1, code: "L-001", plants_count: 24, strain: "OG Kush", start_date: Date.today-30, grow_type: "sustrato", light_type: "LED 480W")
+Lote.create!(club: club, sala: s1, code: "L-002", plants_count: 10, strain: "Blue Dream", start_date: Date.today-10, grow_type: "hidroponia", light_type: "HPS 600W")
+
