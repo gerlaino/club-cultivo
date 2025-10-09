@@ -1,31 +1,45 @@
+# backend/app/controllers/plants_controller.rb
 class PlantsController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_lote, only: [:index, :create]
-  before_action :set_plant, only: [:show, :update, :destroy]
 
+  # GET /lotes/:lote_id/plants  (o con params[:sala_id] ver más abajo)
   def index
-    # GET /lotes/:lote_id/plants
-    authorize @lote, :show?          # o una PlantPolicy index?
-    render json: @lote.plants.order(:id)
-  end
-
-  def create
-    authorize @lote, :update?        # o PlantPolicy :create?
-    plant = @lote.plants.new(plant_params.merge(created_by: current_user))
-    if plant.save
-      render json: plant, status: :created
+    if params[:sala_id].present?
+      # Traer todas las plantas de la sala (join via lotes)
+      @plants = Plant.joins(:lote).where(lotes: { sala_id: params[:sala_id] })
     else
-      render json: { errors: plant.errors.full_messages }, status: :unprocessable_entity
+      @lote = Lote.find(params[:lote_id])
+      authorize @lote, :show?
+      @plants = @lote.plants
     end
+    render json: @plants
   end
 
+  # GET /plants/:id
   def show
-    authorize @plant, :show?
+    @plant = Plant.find(params[:id])
+    authorize @plant.lote, :show?
     render json: @plant
   end
 
+  # POST /lotes/:lote_id/plants
+  def create
+    @lote = Lote.find(params[:lote_id])
+    authorize @lote, :update?
+
+    @plant = @lote.plants.new(plant_params.merge(created_by: current_user))
+    if @plant.save
+      render json: @plant, status: :created
+    else
+      render json: { errors: @plant.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  # PATCH/PUT /plants/:id
   def update
-    authorize @plant, :update?
+    @plant = Plant.find(params[:id])
+    authorize @plant.lote, :update?
+
     if @plant.update(plant_params)
       render json: @plant
     else
@@ -33,6 +47,7 @@ class PlantsController < ApplicationController
     end
   end
 
+  # backend/app/controllers/plants_controller.rb
   def destroy
     @plant = Plant.find(params[:id])
     authorize @plant.lote, :update?   # misma policy que para update
@@ -40,17 +55,11 @@ class PlantsController < ApplicationController
     head :no_content
   end
 
+
   private
-
-  def set_lote
-    @lote = Lote.find(params[:lote_id])
-  end
-
-  def set_plant
-    @plant = Plant.find(params[:id])
-  end
 
   def plant_params
     params.require(:plant).permit(:code, :strain, :stage, :health, :photo_url, :notes)
   end
 end
+

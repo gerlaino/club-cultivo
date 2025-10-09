@@ -1,37 +1,61 @@
+// frontend/src/stores/plants.js
 import { defineStore } from "pinia";
 import {
+  listPlantsBySala,
   listPlantsByLote,
-  createPlantInLote,
   getPlant,
+  createPlantInLote,
   updatePlant,
   deletePlant,
 } from "../lib/api";
 
 export const usePlantsStore = defineStore("plants", {
   state: () => ({
-    itemsByLote: new Map(),  // loteId -> Plant[]
-    current: null,           // detalle
+    items: [],         // listado (por sala o por lote)
+    current: null,     // planta seleccionada
     loading: false,
     error: null,
     creating: false,
     updating: false,
-    removing: false,
   }),
 
-  getters: {
-    byLote: (state) => (loteId) =>
-      state.itemsByLote.get(String(loteId)) || [],
-  },
-
   actions: {
+    async fetchBySala(salaId) {
+      this.loading = true; this.error = null;
+      try {
+        const { data } = await listPlantsBySala(salaId);
+        this.items = data || [];
+      } catch (e) {
+        console.error(e);
+        this.error = "No se pudieron cargar las plantas";
+      } finally {
+        this.loading = false;
+      }
+    },
+
     async fetchByLote(loteId) {
       this.loading = true; this.error = null;
       try {
         const { data } = await listPlantsByLote(loteId);
-        this.itemsByLote.set(String(loteId), data || []);
+        this.items = data || [];
       } catch (e) {
-        console.error("Plants.fetchByLote", e);
-        this.error = e?.response?.data?.error || e.message;
+        console.error(e);
+        this.error = "No se pudieron cargar las plantas";
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async show(id) {
+      this.loading = true; this.error = null;
+      try {
+        const { data } = await getPlant(id);
+        this.current = data;
+        return data;
+      } catch (e) {
+        console.error(e);
+        this.error = "No se pudo cargar la planta";
+        throw e;
       } finally {
         this.loading = false;
       }
@@ -41,64 +65,50 @@ export const usePlantsStore = defineStore("plants", {
       this.creating = true; this.error = null;
       try {
         const { data } = await createPlantInLote(loteId, payload);
-        const arr = this.byLote(loteId);
-        this.itemsByLote.set(String(loteId), [data, ...arr]);
+        // opcional: inserto al principio si la lista actual es de la misma sala/lote
+        this.items = [data, ...this.items];
         return data;
       } catch (e) {
-        this.error = e?.response?.data?.errors?.join(", ") || e.message;
+        console.error(e);
+        this.error = e?.response?.data?.errors?.join(", ") || "No se pudo crear la planta";
         throw e;
       } finally {
         this.creating = false;
       }
     },
 
-    async fetchOne(id) {
-      this.loading = true; this.error = null; this.current = null;
-      try {
-        const { data } = await getPlant(id);
-        this.current = data;
-        return data;
-      } catch (e) {
-        this.error = e?.response?.data?.error || e.message;
-        throw e;
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async update(id, payload, loteId = null) {
+    async update(id, payload) {
       this.updating = true; this.error = null;
       try {
         const { data } = await updatePlant(id, payload);
-        if (loteId) {
-          const arr = this.byLote(loteId).map(p => (p.id === id ? data : p));
-          this.itemsByLote.set(String(loteId), arr);
-        }
-        if (this.current?.id === id) this.current = data;
+        // actualizar current e items
+        if (this.current?.id === data.id) this.current = data;
+        this.items = this.items.map(p => (p.id === data.id ? data : p));
         return data;
       } catch (e) {
-        this.error = e?.response?.data?.errors?.join(", ") || e.message;
+        console.error(e);
+        this.error = e?.response?.data?.errors?.join(", ") || "No se pudo actualizar la planta";
         throw e;
       } finally {
         this.updating = false;
       }
     },
+  },
 
-    async remove(id, loteId = null) {
-      this.removing = true; this.error = null;
-      try {
-        await deletePlant(id);
-        if (loteId) {
-          const arr = this.byLote(loteId).filter(p => p.id !== id);
-          this.itemsByLote.set(String(loteId), arr);
-        }
-        if (this.current?.id === id) this.current = null;
-      } catch (e) {
-        this.error = e?.response?.data?.errors?.join(", ") || e.message;
-        throw e;
-      } finally {
-        this.removing = false;
+  async remove(id, loteId = null) {
+    this.removing = true; this.error = null;
+    try {
+      await deletePlant(id);
+      if (loteId) {
+        const arr = this.byLote(loteId).filter(p => p.id !== id);
+        this.itemsByLote.set(String(loteId), arr);
       }
-    },
+      if (this.current?.id === id) this.current = null;
+    } catch (e) {
+      this.error = e?.response?.data?.errors?.join(", ") || e.message;
+      throw e;
+    } finally {
+      this.removing = false;
+    }
   },
 });

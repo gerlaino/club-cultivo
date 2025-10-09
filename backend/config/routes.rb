@@ -12,7 +12,9 @@ Rails.application.routes.draw do
     resources :lotes, only: [:index, :create]  # /salas/:sala_id/lotes
   end
 
-  resources :lotes, only: [:show, :update, :destroy]  # /lotes/:id
+  resources :lotes, only: [] do
+    resources :plants, only: [:index, :create]  # /lotes/:lote_id/plants
+  end
 
   resources :plants, only: [:show, :update, :destroy]
 

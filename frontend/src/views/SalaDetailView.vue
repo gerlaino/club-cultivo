@@ -3,17 +3,20 @@ import { onMounted, ref, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useSalasStore } from "../stores/salas";
 import { useLotesStore } from "../stores/lotes";
+import { usePlantsStore } from "../stores/plants";
 
 const route = useRoute();
 const router = useRouter();
 
-const salas = useSalasStore();
-const lotes = useLotesStore();
+const salas  = useSalasStore();
+const lotes  = useLotesStore();
+const plants = usePlantsStore();
 
+const placeholder = "https://placehold.co/96x96?text=Planta";
 const salaId = Number(route.params.id);
 
 const loading = ref(true);
-const error = ref(null);
+const error   = ref(null);
 
 // UI: modal crear lote
 const showCreate = ref(false);
@@ -21,16 +24,22 @@ const form = ref({
   grow_type: "sustrato",
   plants_count: 0,
   strain: "",
-  start_date: new Date().toISOString().slice(0,10),
+  start_date: new Date().toISOString().slice(0, 10),
   notes: "",
 });
 
 onMounted(async () => {
+  if (!salaId) {
+    error.value = "ID de sala inválido.";
+    loading.value = false;
+    return;
+  }
   try {
-    // Cargamos detalle + lotes por sala
     await salas.fetchSala(salaId);
     await lotes.fetchBySala(salaId);
+    await plants.fetchBySala(salaId); // ✅ aquí estaba el bug
   } catch (e) {
+    console.error(e);
     error.value = "No se pudo cargar la sala.";
   } finally {
     loading.value = false;
@@ -40,17 +49,17 @@ onMounted(async () => {
 const sala  = computed(() => salas.currentSala);
 const items = computed(() => lotes.bySala(salaId));
 
-// KPI plantas: suma de plants_count de los lotes
+// KPI: suma de plantas por lote
 const totalPlantas = computed(() =>
   items.value.reduce((acc, l) => acc + Number(l.plants_count || 0), 0)
 );
 
 function badge(state) {
   switch (state) {
-    case "activa": return "success";
-    case "mantenimiento": return "warning";
-    case "cerrada": return "secondary";
-    default: return "secondary";
+    case "activa":         return "success";
+    case "mantenimiento":  return "warning";
+    case "cerrada":        return "secondary";
+    default:               return "secondary";
   }
 }
 
@@ -62,14 +71,17 @@ async function createLote() {
       grow_type: "sustrato",
       plants_count: 0,
       strain: "",
-      start_date: new Date().toISOString().slice(0,10),
+      start_date: new Date().toISOString().slice(0, 10),
       notes: "",
     };
-  } catch (e) {
+    // refrescar KPIs/listado
+    await lotes.fetchBySala(salaId);
+  } catch (_) {
     // el store ya setea error
   }
 }
 </script>
+
 
 <template>
   <div class="container py-4">
@@ -109,7 +121,7 @@ async function createLote() {
           <div class="col-6 col-md-4">
             <div class="card text-center h-100">
               <div class="card-body">
-                <div class="text-muted small">Macetas (campo)</div>
+                <div class="text-muted small">Plantas (campo)</div>
                 <div class="display-6 fw-bold">{{ sala.pots_count ?? 0 }}</div>
               </div>
             </div>
@@ -179,6 +191,40 @@ async function createLote() {
             </div>
           </div>
         </div>
+        <!-- dentro del <template> de SalaDetailView.vue, en la columna izquierda o derecha donde prefieras -->
+
+        <div class="card mt-3">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Plantas</strong>
+            <small class="text-muted" v-if="plants.loading">Cargando…</small>
+          </div>
+
+          <div class="card-body">
+            <div v-if="plants.error" class="alert alert-danger">{{ plants.error }}</div>
+            <div v-else-if="!plants.items.length" class="text-muted">Aún no hay plantas en esta sala.</div>
+
+            <div class="row g-3" v-else>
+              <div v-for="p in plants.items" :key="p.id" class="col-12 col-md-6">
+                <div class="d-flex gap-2 align-items-center border rounded p-2">
+                  <img
+                    :src="p.photo_url || placeholder"
+                    alt="planta"
+                    width="56"
+                    height="56"
+                    class="rounded object-fit-cover"
+                  />
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold">{{ p.strain || 'Genética desconocida' }}</div>
+                    <RouterLink class="btn btn-sm btn-outline-primary mt-1" :to="{ name: 'planta-show', params: { id: p.id } }">
+                      Ver
+                    </RouterLink>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
