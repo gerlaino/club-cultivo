@@ -20,4 +20,10 @@ Rails.application.routes.draw do
 
   resources :lotes,  only: [:show, :update, :destroy]
   resources :plants, only: [:show, :update, :destroy]
+
+  resource :profile, only: [:show, :update], controller: "profile" do
+    patch :password   # /profile/password
+    patch :avatar     # /profile/avatar
+  end
+
 end

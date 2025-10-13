@@ -13,6 +13,26 @@ export const useAuthStore = defineStore("auth", {
     isAuthenticated: (s) => !!s.user,
     email: (s) => s.user?.email || "",
     role: (s) => s.role || "",
+    displayName: (s) => {
+      const u = s.user
+      if (!u) return ""
+      const name = [u.first_name, u.last_name].filter(Boolean).join(" ").trim()
+      return name || u.email
+    },
+    isClubAdmin: (s) => {
+      const r = s.user?.role
+      return r === "admin" || r === "super_admin"
+    },
+    avatarUrl: (state) => state.user?.avatar_url || "",  // asegúrate que /me lo devuelva
+    initials: (state) => {
+      const u = state.user
+      const name = [u?.first_name, u?.last_name].filter(Boolean).join(" ").trim() || u?.email || ""
+      return name
+        .split(/\s+/)
+        .slice(0, 2)
+        .map(s => s[0]?.toUpperCase() || "")
+        .join("") || "?"
+    },
   },
   actions: {
     async fetchMe() {

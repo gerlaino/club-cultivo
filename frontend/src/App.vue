@@ -2,6 +2,7 @@
 <script setup>
 import { useAuthStore } from "./stores/auth"
 import { useRouter } from "vue-router"
+import Avatar from "./components/Avatar.vue"
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -65,31 +66,42 @@ const appName = "Cultivo Espacial" // nombre visible cuando NO hay sesión
 
           <!-- Menú de usuario a la derecha -->
           <div class="ms-auto d-flex align-items-center">
-            <div class="dropdown">
+            <div class="dropdown" v-if="auth.isAuthenticated">
               <button
-                class="btn btn-light btn-sm dropdown-toggle"
-                type="button"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
+                class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2"
+                type="button" data-bs-toggle="dropdown" aria-expanded="false"
               >
-                {{
-                  ([auth.user?.first_name, auth.user?.last_name].filter(Boolean).join(' ')
-                    || auth.email
-                    || 'Usuario')
-                }}
+                <Avatar :src="auth.avatarUrl" :name="auth.displayName" :size="28" />
+                <span class="fw-medium">{{ auth.displayName }}</span>
               </button>
-              <ul class="dropdown-menu dropdown-menu-end">
-                <li class="dropdown-header small text-muted px-3">{{ auth.email }}</li>
-                <li><RouterLink class="dropdown-item" to="/perfil">Perfil</RouterLink></li>
-                <li><RouterLink class="dropdown-item" to="/preferencias">Preferencias</RouterLink></li>
+
+              <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                <!-- Cabecera con avatar + nombre + email -->
+                <li class="px-3 py-2 border-bottom small text-muted">
+                  <div class="d-flex align-items-center gap-2">
+                    <Avatar :src="auth.avatarUrl" :name="auth.displayName" :size="36" />
+                    <div>
+                      <div class="fw-semibold text-dark">{{ auth.displayName }}</div>
+                      <div class="text-muted">{{ auth.email }}</div>
+                    </div>
+                  </div>
+                </li>
+
+                <li>
+                  <RouterLink class="dropdown-item py-2" to="/perfil">Perfil</RouterLink>
+                </li>
+                <li v-if="auth.isClubAdmin">
+                  <RouterLink class="dropdown-item py-2" to="/preferencias">Preferencias</RouterLink>
+                </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                  <button class="dropdown-item text-danger" @click="doLogout">
-                    <i class="bi bi-box-arrow-right me-2"></i>Salir
+                  <button class="dropdown-item text-danger d-flex align-items-center gap-2" @click="auth.logOut()">
+                    <i class="bi bi-box-arrow-right"></i> Salir
                   </button>
                 </li>
               </ul>
             </div>
+
           </div>
         </div>
       </div>

@@ -64,5 +64,16 @@ export function getStats() {
 export function listSocios(club_id) {
   return api.get(`/${club_id}/socios`);
 }
+
+// Perfil
+export const getProfile       = ()          => api.get("/profile")
+export const updateProfile    = (payload)   => api.patch("/profile", { user: payload })
+export const updateMyPassword = (payload)   => api.patch("/profile/password", { user: payload })
+export const uploadAvatar     = (file) => {
+  const fd = new FormData()
+  fd.append("avatar", file)
+  return api.patch("/profile/avatar", fd, { headers: { "Content-Type": "multipart/form-data" } })
+}
+
 export default api;
 
