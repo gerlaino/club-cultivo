@@ -57,5 +57,12 @@ export function deletePlant(id) {
   return api.delete(`/plants/${id}`);
 }
 
+export function getStats() {
+  return api.get(`/stats`);
+}
+
+export function listSocios(club_id) {
+  return api.get(`/${club_id}/socios`);
+}
 export default api;
 

@@ -54,3 +54,79 @@
   background: #ffd166; /* amarillo suave */
 }
 .login-aside li + li{ margin-top:.4rem; }
+
+
+/* === DASHBOARD === */
+
+.dashboard {
+  color: var(--brand-ink);
+}
+
+/* KPI cards */
+.kpi {
+  border-radius: 1.25rem;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .04);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
+}
+.kpi .card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: .3rem;
+  padding: 1.25rem 1.5rem;
+}
+.kpi-icon {
+  width: 44px; height: 44px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem;
+  background: color-mix(in srgb, var(--brand-accent, #81c784) 20%, transparent);
+  color: var(--brand-primary, #2e7d32);
+}
+.kpi-label {
+  font-size: .9rem;
+  color: #6b7280;
+  margin-top: .2rem;
+}
+.kpi-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* Cards contenedoras */
+.dashboard .card {
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+/* Headers de card */
+.dashboard .card-header {
+  border: none;
+  background: white;
+  font-weight: 600;
+}
+
+/* Listas */
+.dashboard .list-group-item {
+  border: none;
+  border-bottom: 1px solid rgba(0,0,0,.05);
+  transition: background .1s ease;
+}
+.dashboard .list-group-item:hover {
+  background: rgba(129,199,132,.06);
+}
+
+/* Botones */
+.dashboard .btn-outline-success {
+  --bs-btn-color: var(--brand-primary);
+  --bs-btn-border-color: var(--brand-primary);
+  --bs-btn-hover-bg: var(--brand-primary);
+  --bs-btn-hover-border-color: var(--brand-primary);
+  --bs-btn-hover-color: white;
+}
