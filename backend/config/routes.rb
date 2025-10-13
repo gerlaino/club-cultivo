@@ -26,4 +26,6 @@ Rails.application.routes.draw do
     patch :avatar     # /profile/avatar
   end
 
+  resource :preferences, only: [:show, :update], controller: "clubs"
+
 end

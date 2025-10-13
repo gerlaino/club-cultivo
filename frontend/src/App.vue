@@ -1,18 +1,35 @@
 <!-- src/App.vue -->
 <script setup>
-import { useAuthStore } from "./stores/auth"
+import { watch } from "vue"
 import { useRouter } from "vue-router"
+import { useAuthStore } from "./stores/auth"
+import { useClubStore } from "./stores/club"        // ⬅️ NUEVO
 import Avatar from "./components/Avatar.vue"
 
 const auth = useAuthStore()
+const club = useClubStore()                          // ⬅️ NUEVO
 const router = useRouter()
 
 async function doLogout() {
   await auth.logOut()
+  club.$reset()                                      // ⬅️ limpia nombre/logo del club
   router.replace("/login")
 }
 
-const appName = "Cultivo Espacial" // nombre visible cuando NO hay sesión
+const appName = "Cultivo Espacial"                   // visible cuando NO hay sesión
+
+// Cargar/limpiar preferencias del club según sesión
+watch(
+  () => auth.isAuthenticated,
+  async (logged) => {
+    if (logged) {
+      try { await club.fetch() } catch (e) { /* noop */ }
+    } else {
+      club.$reset()
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -24,9 +41,18 @@ const appName = "Cultivo Espacial" // nombre visible cuando NO hay sesión
       <div class="container-fluid">
         <!-- Brand (no clickeable) -->
         <span class="navbar-brand fw-semibold d-flex align-items-center gap-2 user-select-none">
-      <span class="logo-dot"></span>
-      {{ !auth.isAuthenticated ? 'Cultivo Espacial' : (auth.user?.club_name || 'Cultivo Espacial') }}
-    </span>
+          <!-- Si hay sesión y hay logo del club: mostrarlo. Si no, el puntito -->
+          <img
+            v-if="auth.isAuthenticated && club.logoUrl"
+            :src="club.logoUrl"
+            alt="Logo club"
+            class="brand-logo"
+          />
+          <span v-else class="logo-dot"></span>
+
+          <!-- Nombre del club reactivo; si no hay sesión: nombre de la app -->
+          {{ !auth.isAuthenticated ? appName : (club.name || auth.user?.club_name || appName) }}
+        </span>
 
         <!-- Toggler SOLO en mobile -->
         <button
@@ -95,7 +121,7 @@ const appName = "Cultivo Espacial" // nombre visible cuando NO hay sesión
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                  <button class="dropdown-item text-danger d-flex align-items-center gap-2" @click="auth.logOut()">
+                  <button class="dropdown-item text-danger d-flex align-items-center gap-2" @click="doLogout">
                     <i class="bi bi-box-arrow-right"></i> Salir
                   </button>
                 </li>
@@ -106,7 +132,6 @@ const appName = "Cultivo Espacial" // nombre visible cuando NO hay sesión
         </div>
       </div>
     </nav>
-
 
     <!-- Si la ruta es fullscreen (login), no uses container -->
     <main v-if="$route.meta.fullscreen">
@@ -133,7 +158,16 @@ const appName = "Cultivo Espacial" // nombre visible cuando NO hay sesión
   background: var(--brand-primary, #2e7d32);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #2e7d32) 25%, transparent);
 }
+/* ⬇️ logo del club junto al nombre */
+.brand-logo{
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #2e7d32) 25%, transparent);
+}
 </style>
+
 
 
 

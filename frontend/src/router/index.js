@@ -8,6 +8,7 @@ import LoteDetailView from "../views/LoteDetailView.vue"
 import { useAuthStore } from "../stores/auth"
 import PlantDetailView from "../views/PlantDetailView.vue";
 import PerfilView from "../views/PerfilView.vue"
+import PreferenciasView from "../views/PreferenciasView.vue"
 
 const routes = [
   { path: "/login", name: "login", component: LoginView, meta: { public: true, fullscreen: true } },
@@ -18,6 +19,8 @@ const routes = [
   { path: "/lotes/:id", name: "lote-detail", component: LoteDetailView, props: true },
   { path: "/plantas/:id", name: "plant-detail", component: PlantDetailView, props: true },
   { path: "/perfil/", name: "perfil", component: PerfilView, meta: { requiredAuth: true } },
+  { path: "/preferencias", name: "preferencias", component: PreferenciasView, meta: { requiresAuth: true, adminOnly: true } },
+
 ]
 
 const router = createRouter({

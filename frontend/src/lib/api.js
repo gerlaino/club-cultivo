@@ -75,5 +75,14 @@ export const uploadAvatar     = (file) => {
   return api.patch("/profile/avatar", fd, { headers: { "Content-Type": "multipart/form-data" } })
 }
 
+// --- Preferencias del Club ---
+export const getPreferences   = () => api.get("/preferences");
+export const updatePreferences = (payload) => api.put("/preferences", { club: payload });
+export const uploadClubLogo    = (file) => {
+  const form = new FormData();
+  form.append("logo", file);
+  return api.post("/preferences/logo", form, { headers: { "Content-Type": "multipart/form-data" } });
+};
+
 export default api;
 
