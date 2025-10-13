@@ -26,6 +26,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       RAILS_ENV: development
+      BUNDLE_PATH: /app/vendor/bundle
     ports: ["${BACKEND_PORT:-3000}:3000"]
     volumes:
       - ./backend:/app

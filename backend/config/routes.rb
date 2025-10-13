@@ -12,8 +12,12 @@ Rails.application.routes.draw do
     resources :lotes, only: [:index, :create]  # /salas/:sala_id/lotes
   end
 
-  resources :lotes, only: [:show, :update, :destroy]  # /lotes/:id
+  resources :socios, defaults: { format: :json } do
+    resources :notas, controller: "socio_notas", only: [:index, :create], defaults: { format: :json }
+  end
+  resources :socio_notas, only: [:destroy], defaults: { format: :json }
+  resources :usuarios, defaults: { format: :json }
 
+  resources :lotes,  only: [:show, :update, :destroy]
   resources :plants, only: [:show, :update, :destroy]
-
 end

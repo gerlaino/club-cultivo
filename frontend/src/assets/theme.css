@@ -1,0 +1,56 @@
+:root{
+  --brand-primary: #2e7d32;          /* verde hoja */
+  --brand-primary-600: #276a2b;
+  --brand-accent:  #81c784;          /* verde claro */
+  --brand-ink:     #1f2937;
+  --brand-bg:      #f3f6f4;          /* off-white verdoso */
+}
+
+/* Botón primario/éxito con nuestra paleta */
+.btn-success{
+  background-color: var(--brand-primary);
+  border-color: var(--brand-primary-600);
+}
+.btn-success:hover{ filter: brightness(.95); }
+
+/* ===== Pantalla de login a pantalla completa ===== */
+.route-login body, .route-login #app{
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 85% 10%, color-mix(in srgb, var(--brand-accent) 22%, transparent) 0%, transparent 65%),
+    radial-gradient(900px 500px at 100% 90%, color-mix(in srgb, var(--brand-accent) 14%, transparent) 0%, transparent 70%),
+    var(--brand-bg);
+}
+
+/* Un patrón sutil “orgánico” */
+.route-login body::before{
+  content: "";
+  position: fixed; inset: 0;
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(46,125,50,.045) 0 40%, transparent 45%),
+    radial-gradient(ellipse at 90% 80%, rgba(46,125,50,.035) 0 35%, transparent 40%);
+  pointer-events: none;
+}
+
+/* Tarjeta de login con “glass” suave */
+.login-card{
+  backdrop-filter: saturate(1.1) blur(3px);
+  border-radius: 1.25rem !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,.06);
+}
+
+/* Panel de novedades (lado derecho) */
+.login-aside{
+  width: min(540px, 40vw);
+  background:
+    radial-gradient(110% 120% at 0% 0%, rgba(255,255,255,.08), rgba(255,255,255,0) 60%),
+    linear-gradient(180deg, #2f7a34, #1e5a24 70%, #1b4e1f);
+  color: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0,0,0,.15);
+}
+.login-aside .badge-dot{
+  width: .55rem; height: .55rem; border-radius: 50%; display:inline-block; margin-right:.5rem;
+  background: #ffd166; /* amarillo suave */
+}
+.login-aside li + li{ margin-top:.4rem; }

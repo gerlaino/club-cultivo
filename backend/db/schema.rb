@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_10_09_122307) do
+ActiveRecord::Schema[7.2].define(version: 2025_10_11_143015) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -68,6 +68,42 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_09_122307) do
     t.index ["created_by_id"], name: "index_salas_on_created_by_id"
   end
 
+  create_table "socio_notas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "socio_id", null: false
+    t.text "contenido", null: false
+    t.datetime "deleted_at"
+    t.bigint "created_by_id", null: false
+    t.bigint "deleted_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_socio_notas_on_club_id"
+    t.index ["deleted_at"], name: "index_socio_notas_on_deleted_at"
+    t.index ["socio_id", "created_at"], name: "idx_socio_notas_socio_created_desc", order: { created_at: :desc }
+  end
+
+  create_table "socios", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "nombre", null: false
+    t.string "apellido", null: false
+    t.string "dni", null: false
+    t.string "dni_normalizado", null: false
+    t.date "fecha_nacimiento", null: false
+    t.boolean "es_paciente", default: true, null: false
+    t.datetime "deleted_at"
+    t.bigint "created_by_id", null: false
+    t.bigint "updated_by_id"
+    t.bigint "deleted_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
+    t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
+    t.index ["club_id"], name: "index_socios_on_club_id"
+    t.index ["created_at"], name: "index_socios_on_created_at"
+    t.index ["deleted_at"], name: "index_socios_on_deleted_at"
+    t.index ["dni_normalizado"], name: "index_socios_on_dni_normalizado", unique: true
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
@@ -78,8 +114,12 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_09_122307) do
     t.datetime "updated_at", null: false
     t.bigint "club_id", null: false
     t.string "role", default: "cultivador", null: false
+    t.string "first_name"
+    t.string "last_name"
     t.index ["club_id"], name: "index_users_on_club_id"
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["first_name"], name: "index_users_on_first_name"
+    t.index ["last_name"], name: "index_users_on_last_name"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["role"], name: "index_users_on_role"
   end
@@ -90,5 +130,13 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_09_122307) do
   add_foreign_key "plants", "users", column: "created_by_id"
   add_foreign_key "salas", "clubs"
   add_foreign_key "salas", "users", column: "created_by_id"
+  add_foreign_key "socio_notas", "clubs"
+  add_foreign_key "socio_notas", "socios"
+  add_foreign_key "socio_notas", "users", column: "created_by_id"
+  add_foreign_key "socio_notas", "users", column: "deleted_by_id"
+  add_foreign_key "socios", "clubs"
+  add_foreign_key "socios", "users", column: "created_by_id"
+  add_foreign_key "socios", "users", column: "deleted_by_id"
+  add_foreign_key "socios", "users", column: "updated_by_id"
   add_foreign_key "users", "clubs"
 end

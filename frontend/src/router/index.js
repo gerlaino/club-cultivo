@@ -9,7 +9,7 @@ import { useAuthStore } from "../stores/auth"
 import PlantDetailView from "../views/PlantDetailView.vue";
 
 const routes = [
-  { path: "/login", name: "login", component: LoginView, meta: { public: true } },
+  { path: "/login", name: "login", component: LoginView, meta: { public: true, fullscreen: true } },
   { path: "/", name: "dashboard", component: DashboardView },
   { path: "/salas", name: "salas", component: SalasView },
   { path: "/salas/:id", name: "sala-detail", component: SalaDetailView, props: (route) => ({ id: Number(route.params.id) }) },
@@ -23,17 +23,22 @@ const router = createRouter({
   routes,
 })
 
+router.afterEach((to) => {
+  // Clase para estilos especiales de login
+  document.documentElement.classList.toggle('route-login', !!to.meta.fullscreen)
+})
+
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (auth.user === null && to.meta.public !== true) {
-    // Intentamos recuperar sesión por cookie
+  // si todavía no sabemos el estado, intentamos recuperar sesión
+  if (auth.user === null && to.meta.requiresAuth) {
     await auth.fetchMe()
   }
-  if (!auth.isAuthenticated && to.meta.public !== true) {
-    return { name: "login" }
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
-  if (auth.isAuthenticated && to.name === "login") {
-    return { name: "dashboard" }
+  if (to.path === '/login' && auth.isAuthenticated) {
+    return { path: '/' }
   }
 })
 
