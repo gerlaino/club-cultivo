@@ -9,9 +9,9 @@
           <RouterLink class="btn btn-outline-success btn-sm" to="/salas">+ Nueva Sala</RouterLink>
         </div>
       </div>
-      <small class="text-muted">
-        <i class="bi bi-clock me-1"></i>{{ now }}
-      </small>
+      <!-- <small class="text-muted">
+       <i class="bi bi-clock me-1"></i>{{ now }}
+      </small> -->
     </div>
 
     <!-- KPIs -->
@@ -83,7 +83,7 @@ const displayName = computed(() =>
 const stats = ref({ salas_count: 0, lotes_count: 0, socios_count: 0, users_count: 0 })
 const recientes = ref({ socios: [] })
 const salas = ref([])
-const now = new Date().toLocaleString("es-AR")
+//const now = new Date().toLocaleString("es-AR")
 
 function dt(s){ return s ? new Date(s).toLocaleString("es-AR") : "—" }
 function badge(state){

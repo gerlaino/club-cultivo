@@ -1,10 +1,48 @@
-:root{
-  --brand-primary: #2e7d32;          /* verde hoja */
-  --brand-primary-600: #276a2b;
-  --brand-accent:  #81c784;          /* verde claro */
-  --brand-ink:     #1f2937;
-  --brand-bg:      #f3f6f4;          /* off-white verdoso */
+:root {
+  --brand-primary: #1b5e20;
+  --brand-primary-600: #104417;
+  --brand-accent:  #66bb6a;
+  --brand-ink:     #1a1a1a;
+  --brand-muted:   #60725d;
+  --brand-bg:      #e9f0ea;
+
+  /* bootstrap mapping */
+  --bs-body-bg: var(--brand-bg);
+  --bs-body-color: var(--brand-ink);
+  --bs-primary: var(--brand-primary);
+  --bs-success: var(--brand-primary);
+  --bs-link-color: var(--brand-primary);
+  --bs-link-hover-color: color-mix(in srgb, var(--brand-primary), black 15%);
 }
+
+/* Fondo general y tipografía más suave */
+body {
+  background:
+    radial-gradient(1000px 600px at 70% -150px, rgba(27,94,32,.18), transparent 70%),
+    radial-gradient(900px 600px at -200px 120%, rgba(27,94,32,.12), transparent 75%),
+    var(--brand-bg);
+  color: var(--brand-ink);
+}
+
+/* Botones outline verdes coherentes */
+.btn-outline-success{
+  --bs-btn-color: var(--brand-primary);
+  --bs-btn-border-color: var(--brand-primary);
+  --bs-btn-hover-bg: var(--brand-primary);
+  --bs-btn-hover-border-color: var(--brand-primary);
+  --bs-btn-hover-color: #fff;
+}
+
+/* Badges de estados de salas */
+.badge-activa        { background: #16a34a !important; }
+.badge-mantenimiento { background: #f59e0b !important; color:#111 !important; }
+.badge-cerrada       { background: #9ca3af !important; color:#111 !important; }
+
+/* Cards y listas (matching con Dashboard) */
+.card{ border-radius: 1rem; }
+.list-group-item{ border-bottom: 1px solid rgba(0,0,0,.05); }
+.list-group-item:hover{ background: rgba(129,199,132,.06); }
+
 
 /* Botón primario/éxito con nuestra paleta */
 .btn-success{
@@ -130,3 +168,43 @@
   --bs-btn-hover-border-color: var(--brand-primary);
   --bs-btn-hover-color: white;
 }
+
+.navbar-default {
+  background: #f2f5f2;
+  border-bottom: 1px solid rgba(0,0,0,.05);
+}
+
+/* botones */
+.btn-success {
+  background-color: var(--brand-primary);
+  border-color: var(--brand-primary-600);
+}
+.btn-success:hover {
+  background-color: var(--brand-primary-600);
+}
+
+/* KPIs */
+.kpi {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.04);
+}
+.kpi:hover {
+  box-shadow: 0 10px 25px rgba(16,68,23,.15);
+}
+
+/* cards */
+.card {
+  background: #fdfdfd;
+  border: 1px solid rgba(0,0,0,.05);
+}
+
+/* lista hover */
+.list-group-item:hover {
+  background: rgba(27,94,32,.08);
+}
+
+/* badges de estado */
+.badge-activa        { background: #2e7d32 !important; }
+.badge-mantenimiento { background: #ffca28 !important; color:#111 !important; }
+.badge-cerrada       { background: #9e9e9e !important; color:#fff !important; }
+
