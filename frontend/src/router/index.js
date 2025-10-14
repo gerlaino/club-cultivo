@@ -11,6 +11,8 @@ import PerfilView from "../views/PerfilView.vue"
 import PreferenciasView from "../views/PreferenciasView.vue"
 import SociosView from "../views/SociosView.vue";
 import SocioDetailView from "../views/SocioDetailView.vue";
+import UsuariosView from "../views/UsuariosView.vue";
+import UsuarioDetail from "../views/UsuarioDetail.vue";
 
 const routes = [
   { path: "/login", name: "login", component: LoginView, meta: { public: true, fullscreen: true } },
@@ -24,6 +26,8 @@ const routes = [
   { path: "/preferencias", name: "preferencias", component: PreferenciasView, meta: { requiresAuth: true, adminOnly: true } },
   { path: "/socios", name: "socios", component: SociosView, props: true },
   { path: "/socios/:id", name: "socio-detail", component: SocioDetailView, props: true },
+  { path: "/usuarios", name: "usuarios", compponent: UsuariosView },
+  { path: "/usuarios/:id", name: "usuario-detail", component: UsuarioDetail }
 
 ]
 

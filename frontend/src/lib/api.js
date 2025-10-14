@@ -108,6 +108,15 @@ export const createSocioNota = (socioId, contenido) =>
 export const deleteSocioNota = (notaId) =>
   api.delete(`/socio_notas/${notaId}`);
 
+// --- USUARIOS (administración de equipo del club) ---
+export const listUsers   = (params = {}) => api.get('/usuarios', { params });
+export const getUser     = (id)          => api.get(`/usuarios/${id}`);
+export const createUser  = (payload)     => api.post('/usuarios', { user: payload });
+export const updateUser  = (id, payload) => api.put(`/usuarios/${id}`, { user: payload });
+export const deleteUser  = (id)          => api.delete(`/usuarios/${id}`);
+export const resetUserPassword = (id)    => api.post(`/usuarios/${id}/reset_password`);
+
+
 
 export default api;
 

@@ -28,4 +28,10 @@ Rails.application.routes.draw do
 
   resource :preferences, only: [:show, :update], controller: "clubs"
 
+  resources :usuarios, controller: :club_users, only: [:index, :show, :create, :update, :destroy] do
+    member do
+      post :reset_password   # POST /usuarios/:id/reset_password
+    end
+  end
+
 end
