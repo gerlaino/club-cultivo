@@ -61,10 +61,6 @@ export function getStats() {
   return api.get(`/stats`);
 }
 
-export function listSocios(club_id) {
-  return api.get(`/${club_id}/socios`);
-}
-
 // Perfil
 export const getProfile       = ()          => api.get("/profile")
 export const updateProfile    = (payload)   => api.patch("/profile", { user: payload })
@@ -83,6 +79,35 @@ export const uploadClubLogo    = (file) => {
   form.append("logo", file);
   return api.post("/preferences/logo", form, { headers: { "Content-Type": "multipart/form-data" } });
 };
+
+// --- SOCIOS ---
+
+export const listSocios = (params = {}) =>
+  api.get("/socios", { params });
+
+export const getSocio = (id) =>
+  api.get(`/socios/${id}`);
+
+export const createSocio = (payload) =>
+  // tu backend espera { socio: { ... } }
+  api.post("/socios", { socio: payload });
+
+export const updateSocio = (id, payload) =>
+  api.put(`/socios/${id}`, { socio: payload });
+
+export const deleteSocio = (id) =>
+  api.delete(`/socios/${id}`);
+
+// ----------------- Notas de socio --------------------
+export const listSocioNotas = (socioId) =>
+  api.get(`/socios/${socioId}/notas`);
+
+export const createSocioNota = (socioId, contenido) =>
+  api.post(`/socios/${socioId}/notas`, { nota: { contenido } });
+
+export const deleteSocioNota = (notaId) =>
+  api.delete(`/socio_notas/${notaId}`);
+
 
 export default api;
 

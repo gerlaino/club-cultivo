@@ -109,7 +109,7 @@ async function createLote() {
           <div class="col-6 col-md-4">
             <div class="card text-center h-100">
               <div class="card-body">
-                <div class="text-muted small">Macetas (campo)</div>
+                <div class="text-muted small">Capacidad de la sala (plantas)</div>
                 <div class="display-6 fw-bold">{{ sala.pots_count ?? 0 }}</div>
               </div>
             </div>

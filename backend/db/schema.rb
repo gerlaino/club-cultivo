@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_10_13_160042) do
+ActiveRecord::Schema[7.2].define(version: 2025_10_14_011705) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -106,6 +106,16 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_13_160042) do
     t.index ["created_by_id"], name: "index_salas_on_created_by_id"
   end
 
+  create_table "socio_nota", force: :cascade do |t|
+    t.bigint "socio_id", null: false
+    t.bigint "user_id", null: false
+    t.text "contenido"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["socio_id"], name: "index_socio_nota_on_socio_id"
+    t.index ["user_id"], name: "index_socio_nota_on_user_id"
+  end
+
   create_table "socio_notas", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.bigint "socio_id", null: false
@@ -134,6 +144,8 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_13_160042) do
     t.bigint "deleted_by_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "email"
+    t.string "telefono"
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["club_id"], name: "index_socios_on_club_id"
@@ -173,6 +185,8 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_13_160042) do
   add_foreign_key "plants", "users", column: "created_by_id"
   add_foreign_key "salas", "clubs"
   add_foreign_key "salas", "users", column: "created_by_id"
+  add_foreign_key "socio_nota", "socios"
+  add_foreign_key "socio_nota", "users"
   add_foreign_key "socio_notas", "clubs"
   add_foreign_key "socio_notas", "socios"
   add_foreign_key "socio_notas", "users", column: "created_by_id"

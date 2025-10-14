@@ -9,6 +9,8 @@ import { useAuthStore } from "../stores/auth"
 import PlantDetailView from "../views/PlantDetailView.vue";
 import PerfilView from "../views/PerfilView.vue"
 import PreferenciasView from "../views/PreferenciasView.vue"
+import SociosView from "../views/SociosView.vue";
+import SocioDetailView from "../views/SocioDetailView.vue";
 
 const routes = [
   { path: "/login", name: "login", component: LoginView, meta: { public: true, fullscreen: true } },
@@ -20,6 +22,8 @@ const routes = [
   { path: "/plantas/:id", name: "plant-detail", component: PlantDetailView, props: true },
   { path: "/perfil/", name: "perfil", component: PerfilView, meta: { requiredAuth: true } },
   { path: "/preferencias", name: "preferencias", component: PreferenciasView, meta: { requiresAuth: true, adminOnly: true } },
+  { path: "/socios", name: "socios", component: SociosView, props: true },
+  { path: "/socios/:id", name: "socio-detail", component: SocioDetailView, props: true },
 
 ]
 
