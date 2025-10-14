@@ -1,4 +1,4 @@
-class ClubUsersController < ApplicationController
+class UsuariosController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!
   before_action :set_user, only: [:show, :update, :destroy, :reset_password]
