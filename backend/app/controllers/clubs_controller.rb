@@ -3,6 +3,40 @@ class ClubsController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!
 
+  def create
+    # evitamos duplicar club por usuario
+    if current_user.club.present?
+      render json: { errors: ["Ya tenés un club asignado"] }, status: :unprocessable_entity
+      return
+    end
+
+    club = Club.new
+    p = club_params
+
+    club.assign_attributes(
+      name:        p[:name],
+      legal_name:  p[:legal_name],
+      website:     p[:website],
+      email:       p[:contact_email],
+      phone:       p[:contact_phone],
+      address:     p[:address_line1],
+      city:        p[:city],
+      state:       p[:province],
+      country:     p[:country],
+      timezone:    p[:timezone]
+    )
+
+    club.logo.attach(params[:logo]) if params[:logo].present?
+
+    if club.save
+      # vinculá al usuario actual con este club
+      current_user.update!(club: club)
+      render json: { data: club_payload(club) }, status: :created
+    else
+      render json: { errors: club.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+  
   # GET /preferences
   def show
     render json: { data: club_payload(current_user.club) }
