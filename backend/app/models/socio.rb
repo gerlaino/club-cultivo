@@ -1,0 +1,35 @@
+class Socio < ApplicationRecord
+  acts_as_paranoid
+
+  belongs_to :club
+  belongs_to :created_by, class_name: "User"
+  belongs_to :updated_by, class_name: "User", optional: true
+  belongs_to :deleted_by, class_name: "User", optional: true
+
+  has_many :notas, class_name: "SocioNota", dependent: :destroy
+
+  before_validation :normalize_dni!
+
+  validates :nombre, :apellido, :dni, :dni_normalizado, :fecha_nacimiento, presence: true
+  validates :dni_normalizado, uniqueness: true, format: { with: /\A\d{7,9}\z/, message: "debe tener 7 a 9 dígitos" }
+  validate :fecha_nacimiento_pasada
+
+  scope :for_club, ->(club_id) { where(club_id: club_id) }
+
+  def nombre_completo
+    "#{nombre} #{apellido}"
+  end
+
+  private
+
+  def normalize_dni!
+    return if dni.blank?
+    self.dni_normalizado = dni.gsub(/\D/, "")
+  end
+
+  def fecha_nacimiento_pasada
+    if fecha_nacimiento.present? && fecha_nacimiento >= Date.today
+      errors.add(:fecha_nacimiento, "debe ser una fecha pasada")
+    end
+  end
+end
