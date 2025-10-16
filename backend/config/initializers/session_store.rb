@@ -5,7 +5,8 @@ if Rails.env.production?
                                          key: "_club_session",
                                          same_site: :none,   # obligatorio para cross-site
                                          secure: true,       # obligatorio cuando SameSite=None
-                                         domain: :all        # ok para *.onrender.com
+                                         domain: :all,
+                                         partitioned: true 
 else
   # Desarrollo local (HTTP)
   Rails.application.config.session_store :cookie_store,
