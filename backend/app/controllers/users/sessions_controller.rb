@@ -29,6 +29,9 @@ class Users::SessionsController < Devise::SessionsController
     end
   end
 
+  def new
+    render json: { error: "unauthenticated" }, status: :unauthorized
+  end
 
   private
 
