@@ -11,7 +11,7 @@ api.interceptors.response.use(
   async (err) => {
     if (err?.response?.status === 401) {
       try {
-        const { useAuthStore } = await import("@/stores/auth");
+        const { useAuthStore } = await import("../stores/auth");
         useAuthStore().$reset();
       } catch {}
     }
