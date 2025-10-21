@@ -80,7 +80,6 @@ async function uploadAvatarNow(file){
     const { data } = await uploadAvatar(file)
     me.value = data.data
     okMsg.value = "Avatar actualizado"
-    auth.setUser(me.value)
   } catch (e) {
     error.value = e?.response?.data?.errors?.join(", ") || e.message
   }
