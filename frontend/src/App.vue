@@ -3,27 +3,32 @@
 import { watch } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "./stores/auth"
-import { useClubStore } from "./stores/club"        // ⬅️ NUEVO
+import { useClubStore } from "./stores/club"
 import Avatar from "./components/Avatar.vue"
+import BrandLogo from "./components/BrandLogo.vue" // ⬅️ nuevo componente para el logo dinámico
 
 const auth = useAuthStore()
-const club = useClubStore()                          // ⬅️ NUEVO
+const club = useClubStore()
 const router = useRouter()
 
 async function doLogout() {
   await auth.logOut()
-  club.$reset()                                      // ⬅️ limpia nombre/logo del club
+  club.$reset() // limpia nombre/logo del club
   router.replace("/login")
 }
 
-const appName = "Cultivo Espacial"                   // visible cuando NO hay sesión
+const appName = "Cultivo Espacial"
 
 // Cargar/limpiar preferencias del club según sesión
 watch(
   () => auth.isAuthenticated,
   async (logged) => {
     if (logged) {
-      try { await club.fetch() } catch (e) { /* noop */ }
+      try {
+        await club.fetch()
+      } catch (e) {
+        console.error("Error al cargar preferencias del club:", e)
+      }
     } else {
       club.$reset()
     }
@@ -39,19 +44,10 @@ watch(
       :class="[$route.meta.fullscreen ? 'navbar-login' : 'navbar-default']"
     >
       <div class="container-fluid">
-        <!-- Brand (no clickeable) -->
-        <span class="navbar-brand fw-semibold d-flex align-items-center gap-2 user-select-none">
-          <!-- Si hay sesión y hay logo del club: mostrarlo. Si no, el puntito -->
-          <img
-            v-if="auth.isAuthenticated && club.logoUrl"
-            :src="club.logoUrl"
-            alt="Logo club"
-            class="brand-logo"
-          />
-          <span v-else class="logo-dot"></span>
 
-          <!-- Nombre del club reactivo; si no hay sesión: nombre de la app -->
-          {{ !auth.isAuthenticated ? appName : (club.name || auth.user?.club_name || appName) }}
+        <!-- BRAND (ahora manejado por BrandLogo) -->
+        <span class="navbar-brand fw-semibold d-flex align-items-center gap-2 user-select-none">
+          <BrandLogo />
         </span>
 
         <!-- Toggler SOLO en mobile -->
@@ -74,7 +70,7 @@ watch(
           id="mainNav"
           class="collapse navbar-collapse show"
         >
-          <!-- Links SIEMPRE visibles (pegados al brand) -->
+          <!-- Links -->
           <ul class="navbar-nav align-items-lg-center mb-2 mb-lg-0 ms-3 gap-lg-2">
             <li class="nav-item">
               <RouterLink class="nav-link" to="/">Dashboard</RouterLink>
@@ -90,7 +86,7 @@ watch(
             </li>
           </ul>
 
-          <!-- Menú de usuario a la derecha -->
+          <!-- Menú de usuario -->
           <div class="ms-auto d-flex align-items-center">
             <div class="dropdown" v-if="auth.isAuthenticated">
               <button
@@ -102,7 +98,6 @@ watch(
               </button>
 
               <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                <!-- Cabecera con avatar + nombre + email -->
                 <li class="px-3 py-2 border-bottom small text-muted">
                   <div class="d-flex align-items-center gap-2">
                     <Avatar :src="auth.avatarUrl" :name="auth.displayName" :size="36" />
@@ -121,19 +116,21 @@ watch(
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                  <button class="dropdown-item text-danger d-flex align-items-center gap-2" @click="doLogout">
+                  <button
+                    class="dropdown-item text-danger d-flex align-items-center gap-2"
+                    @click="doLogout"
+                  >
                     <i class="bi bi-box-arrow-right"></i> Salir
                   </button>
                 </li>
               </ul>
             </div>
-
           </div>
         </div>
       </div>
     </nav>
 
-    <!-- Si la ruta es fullscreen (login), no uses container -->
+    <!-- Contenido principal -->
     <main v-if="$route.meta.fullscreen">
       <router-view />
     </main>
@@ -144,29 +141,17 @@ watch(
 </template>
 
 <style scoped>
-.navbar-default{
+.navbar-default {
   background: var(--bs-body-bg);
-  border-bottom: 1px solid rgba(0,0,0,.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
-.navbar-login{
+.navbar-login {
   background: transparent;
   border: 0;
-  padding-top: .75rem;
-}
-.logo-dot{
-  width: .75rem; height: .75rem; display:inline-block; border-radius: 50%;
-  background: var(--brand-primary, #2e7d32);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #2e7d32) 25%, transparent);
-}
-/* ⬇️ logo del club junto al nombre */
-.brand-logo{
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 50%;
-  object-fit: cover;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #2e7d32) 25%, transparent);
+  padding-top: 0.75rem;
 }
 </style>
+
 
 
 

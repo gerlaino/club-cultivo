@@ -1,6 +1,6 @@
 // src/stores/club.js
 import { defineStore } from 'pinia'
-import api from '../lib/api'
+import api, {getPreferences} from '../lib/api'
 
 export const useClubStore = defineStore('club', {
   state: () => ({
@@ -11,7 +11,7 @@ export const useClubStore = defineStore('club', {
   }),
 
   getters: {
-    name: (s) => (s.data?.name || ''),
+    name: (s) => (s.data?.name || 'Cultivo Espacial'),
     logoUrl: (s) => (s.data?.logo_url || ''),
   },
 
@@ -27,11 +27,11 @@ export const useClubStore = defineStore('club', {
       this.loading = true
       this.error = null
       try {
-        const { data } = await api.get('/preferences')
-        this.data = data.data
+        const {data} = await getPreferences()
+        this.data = data
       } catch (e) {
-        this.error = e?.response?.data?.error || e.message
-        throw e
+        this.error = "No se pudieron cargar las preferencias del club"
+        this.data = null
       } finally {
         this.loading = false
       }
