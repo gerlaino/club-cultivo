@@ -60,10 +60,10 @@ async function save() {
     }
     if (editing.value && form.value.id) {
       await store.update(form.value.id, payload)
-      toast.value = { t:"success", m:"Socio actualizado." }
+      toast.value = { t:"success", m:"Paciente actualizado." }
     } else {
       await store.create(payload)
-      toast.value = { t:"success", m:"Socio creado." }
+      toast.value = { t:"success", m:"Paciente creado." }
     }
     showModal.value = false
   } catch (e) {
@@ -75,7 +75,7 @@ async function removeOne(s) {
   if (!confirm(`¿Eliminar a ${s.nombre} ${s.apellido}?`)) return
   try {
     await store.remove(s.id)
-    toast.value = { t:"success", m:"Socio eliminado." }
+    toast.value = { t:"success", m:"Paciente eliminado." }
   } catch (e) {
     toast.value = { t:"danger", m: store.error || "No se pudo eliminar." }
   }
@@ -86,9 +86,9 @@ async function removeOne(s) {
 <template>
   <div>
     <div class="d-flex align-items-center justify-content-between mb-3">
-      <h2 class="mb-0">Socios</h2>
+      <h2 class="mb-0">Pacientes</h2>
       <button class="btn btn-success" @click="startCreate">
-        + Nuevo socio
+        + Nuevo Paciente
       </button>
     </div>
 
@@ -143,7 +143,7 @@ async function removeOne(s) {
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">{{ editing ? 'Editar socio' : 'Nuevo socio' }}</h5>
+            <h5 class="modal-title">{{ editing ? 'Editar paciente' : 'Nuevo paciente' }}</h5>
             <button class="btn-close" @click="showModal=false"></button>
           </div>
 

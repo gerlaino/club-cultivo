@@ -20,7 +20,7 @@ onMounted(async () => {
     await store.fetchOne(socioId)
     await store.fetchNotas(socioId)
   } catch (e) {
-    error.value = store.error || "No se pudo cargar el socio."
+    error.value = store.error || "No se pudo cargar el paciente."
   } finally {
     loading.value = false
   }
@@ -61,7 +61,7 @@ const s = computed(() => store.current)
 
     <div v-if="loading" class="alert alert-info">Cargando…</div>
     <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
-    <div v-else-if="!s" class="alert alert-warning">Socio no encontrado.</div>
+    <div v-else-if="!s" class="alert alert-warning">Paciente no encontrado.</div>
 
     <div v-else class="row g-3">
       <div class="col-12 col-lg-4">

@@ -60,7 +60,7 @@ export const useClubStore = defineStore('club', {
       this.saving = true
       this.error = null
       try {
-        const { data } = await api.put('/preferences', fd, {
+        const { data } = await api.post('/preferences/upload_logo', fd, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
         this.data = data.data

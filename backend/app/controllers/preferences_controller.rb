@@ -18,7 +18,7 @@ class PreferencesController < ApplicationController
     end
   end
 
-  def logo
+  def upload_logo
     authorize @club, :upload_logo?
     unless params[:logo].present?
       return render json: { errors: ["Archivo no recibido"] }, status: :bad_request

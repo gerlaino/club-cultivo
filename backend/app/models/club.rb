@@ -1,5 +1,11 @@
 class Club < ApplicationRecord
   has_many :users, dependent: :restrict_with_error
+  has_many :salas, dependent: :destroy
+  has_many :lotes, dependent: :destroy
+  has_many :socios, dependent: :destroy
+  has_many :geneticas, dependent: :destroy
+  has_many :noticias, dependent: :destroy
+  has_many :eventos, dependent: :destroy
 
   has_one_attached :logo
 

@@ -1,9 +1,19 @@
 # app/models/user.rb
 class User < ApplicationRecord
   belongs_to :club, optional: false
-  devise :database_authenticatable, :recoverable, :rememberable, :validatable
 
-  enum :role, { super_admin: "super_admin", admin: "admin", medico: "medico", cultivador: "cultivador", user: "user" }, prefix: true
+  # Devise modules + JWT
+  devise :database_authenticatable, :recoverable, :rememberable, :validatable,
+         :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
+
+  enum :role, {
+    super_admin: "super_admin",
+    admin: "admin",
+    medico: "medico",
+    cultivador: "cultivador",
+    user: "user"
+  }, prefix: true
+
   validates :role, presence: true
 
   has_one_attached :avatar

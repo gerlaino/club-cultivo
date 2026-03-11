@@ -2,13 +2,23 @@ class StatsController < ApplicationController
   before_action :authenticate_user!
 
   def show
-    club_id = current_user.club_id
+    club = current_user.club
+
     render json: {
-      salas_count:  Sala.where(club_id: club_id).count,
-      lotes_count:  Lote.joins(:sala).where(salas: { club_id: club_id }).count,
-      socios_count: Socio.where(club_id: club_id).count,
-      users_count:  User.where(club_id: club_id).count
+      socios: club.socios.count,
+      plantas: Plant.where(lote_id: club.lotes.pluck(:id)).count,
+      salas: club.salas.count,
+      lotes: club.lotes.count,
+
+      vegetativo: Plant.where(lote_id: club.lotes.pluck(:id), state: 'vegetativo').count,
+      floracion: Plant.where(lote_id: club.lotes.pluck(:id), state: 'floracion').count,
+      secado: Plant.where(lote_id: club.lotes.pluck(:id), state: 'secado').count,
+
+      pacientes: club.socios.count,
+      vencimientos: club.socios.reprocann_por_vencer.count,
+      indicaciones: 0,
+
+      actividad: []
     }
   end
 end
-

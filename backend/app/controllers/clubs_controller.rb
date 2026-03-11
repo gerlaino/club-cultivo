@@ -76,6 +76,17 @@ class ClubsController < ApplicationController
     end
   end
 
+  def upload_logo
+    club = current_user.club
+
+    if params[:logo].present?
+      club.logo.attach(params[:logo])
+      render json: { data: club_payload(club) }
+    else
+      render json: { errors: ["No se recibió archivo de logo."] }, status: :bad_request
+    end
+  end
+
   private
 
   # ⚠️ Permitimos los nombres que manda/espera el FRONT

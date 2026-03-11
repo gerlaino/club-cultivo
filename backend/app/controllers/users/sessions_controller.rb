@@ -9,7 +9,9 @@ class Users::SessionsController < Devise::SessionsController
       id: resource.id,
       email: resource.email,
       role: resource.role,
-      club_id: resource.club_id
+      club_id: resource.club_id,
+      first_name: resource.first_name,
+      last_name: resource.last_name
     }, status: :ok
   end
 
@@ -18,24 +20,8 @@ class Users::SessionsController < Devise::SessionsController
     head :no_content
   end
 
-  def update
-    user = current_user # o User.find(params[:id]) si es admin
-    if user.update(user_params)
-      render json: user.as_json(
-        only: %i[id email role club_id first_name last_name dni birthdate phone avatar_url created_at updated_at]
-      )
-    else
-      render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
-    end
-  end
-
-  def new
-    render json: { error: "unauthenticated" }, status: :unauthorized
-  end
-
   private
 
-  # Devise por JSON: que no redirija en errores
   def respond_to_on_destroy
     head :no_content
   end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_10_14_042154) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_11_212102) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -58,6 +58,45 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_14_042154) do
     t.string "theme_primary"
   end
 
+  create_table "eventos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "titulo", null: false
+    t.text "descripcion"
+    t.datetime "fecha_inicio", null: false
+    t.datetime "fecha_fin"
+    t.string "lugar"
+    t.boolean "activo", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["activo"], name: "index_eventos_on_activo"
+    t.index ["club_id", "activo", "fecha_inicio"], name: "index_eventos_on_club_id_and_activo_and_fecha_inicio"
+    t.index ["club_id"], name: "index_eventos_on_club_id"
+  end
+
+  create_table "geneticas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "nombre", null: false
+    t.text "descripcion"
+    t.decimal "thc", precision: 5, scale: 2
+    t.decimal "cbd", precision: 5, scale: 2
+    t.boolean "disponible", default: true, null: false
+    t.boolean "activa", default: true, null: false
+    t.string "tipo"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["activa"], name: "index_geneticas_on_activa"
+    t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
+    t.index ["club_id"], name: "index_geneticas_on_club_id"
+  end
+
+  create_table "jwt_denylists", force: :cascade do |t|
+    t.string "jti"
+    t.datetime "exp"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["jti"], name: "index_jwt_denylists_on_jti"
+  end
+
   create_table "lotes", force: :cascade do |t|
     t.string "code"
     t.date "start_date"
@@ -71,22 +110,41 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_14_042154) do
     t.datetime "updated_at", null: false
     t.string "grow_type"
     t.string "light_type"
+    t.string "state"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["sala_id"], name: "index_lotes_on_sala_id"
   end
 
-  create_table "plants", force: :cascade do |t|
-    t.bigint "lote_id", null: false
-    t.string "code"
-    t.string "strain"
-    t.string "stage"
-    t.string "health"
-    t.string "photo_url"
-    t.text "notes"
-    t.bigint "created_by_id", null: false
+  create_table "noticias", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "titulo", null: false
+    t.text "contenido", null: false
+    t.string "cover_url"
+    t.boolean "publicada", default: false, null: false
+    t.datetime "publicada_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["created_by_id"], name: "index_plants_on_created_by_id"
+    t.index ["club_id", "publicada", "publicada_at"], name: "index_noticias_on_club_id_and_publicada_and_publicada_at"
+    t.index ["club_id"], name: "index_noticias_on_club_id"
+    t.index ["publicada"], name: "index_noticias_on_publicada"
+  end
+
+  create_table "plants", force: :cascade do |t|
+    t.bigint "lote_id", null: false
+    t.string "codigo_qr"
+    t.string "nombre"
+    t.bigint "genetica_id", null: false
+    t.string "state"
+    t.date "fecha_germinacion"
+    t.date "fecha_vegetativo"
+    t.date "fecha_floracion"
+    t.date "fecha_cosecha"
+    t.decimal "peso_seco"
+    t.text "notas"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["codigo_qr"], name: "index_plants_on_codigo_qr", unique: true
+    t.index ["genetica_id"], name: "index_plants_on_genetica_id"
     t.index ["lote_id"], name: "index_plants_on_lote_id"
   end
 
@@ -148,6 +206,9 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_14_042154) do
     t.datetime "updated_at", null: false
     t.string "email"
     t.string "telefono"
+    t.string "reprocann_numero"
+    t.date "reprocann_vencimiento"
+    t.string "reprocann_adjunto"
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["club_id"], name: "index_socios_on_club_id"
@@ -181,10 +242,13 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_14_042154) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "eventos", "clubs"
+  add_foreign_key "geneticas", "clubs"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "salas"
+  add_foreign_key "noticias", "clubs"
+  add_foreign_key "plants", "geneticas"
   add_foreign_key "plants", "lotes"
-  add_foreign_key "plants", "users", column: "created_by_id"
   add_foreign_key "salas", "clubs"
   add_foreign_key "salas", "users", column: "created_by_id"
   add_foreign_key "socio_nota", "socios"

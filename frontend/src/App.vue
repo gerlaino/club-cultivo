@@ -1,6 +1,6 @@
 <!-- src/App.vue -->
 <script setup>
-import { watch } from "vue"
+import { watch, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "./stores/auth"
 import { useClubStore } from "./stores/club"
@@ -35,6 +35,18 @@ watch(
   },
   { immediate: true }
 )
+
+onMounted(async () => {
+  const auth = useAuthStore();
+  const club = useClubStore();
+
+  await auth.ensureBootstrapped();
+
+  if (auth.isAuthenticated && !club.data) {
+    await club.fetch();
+  }
+});
+
 </script>
 
 <template>
@@ -82,7 +94,16 @@ watch(
               <RouterLink class="nav-link" to="/usuarios">Usuarios</RouterLink>
             </li>
             <li class="nav-item">
-              <RouterLink class="nav-link" to="/socios">Socios</RouterLink>
+              <RouterLink class="nav-link" to="/socios">Pacientes</RouterLink>
+            </li>
+            <li class="nav-item">
+              <RouterLink class="nav-link" to="/">Plantas</RouterLink>
+            </li>
+            <li class="nav-item">
+              <RouterLink class="nav-link" to="/">Legales</RouterLink>
+            </li>
+            <li class="nav-item">
+              <RouterLink class="nav-link" to="/">Salud</RouterLink>
             </li>
           </ul>
 

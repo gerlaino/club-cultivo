@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { signIn, signOut, me } from "../lib/api";
 import router from "../router";
+import { useClubStore } from "../stores/club.js";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -49,18 +50,35 @@ export const useAuthStore = defineStore("auth", {
     // Úsalo para asegurarte de que /me ya se consultó (una sola vez por carga)
     async ensureBootstrapped() {
       if (!this.bootstrapped) {
-        await this.fetchMe();
+        // Solo intentar fetchear si hay token
+        const token = localStorage.getItem('jwt_token');
+        if (token) {
+          await this.fetchMe();
+        } else {
+          this.bootstrapped = true;
+        }
       }
     },
 
     async login(email, password) {
-      this.loading = true; this.error = null;
+      this.loading = true;
+      this.error = null;
+
       try {
         await signIn(email, password);
-        await this.fetchMe();           // carga user
+        await this.fetchMe();
+
+        // ⚡ Cargar preferencias del club tras login
+        const club = useClubStore();
+        await club.fetch();
+
         router.push({ name: "dashboard" });
       } catch (e) {
-        this.error = "Credenciales inválidas";
+        if (e?.response?.status === 401) {
+          this.error = "Credenciales inválidas";
+        } else {
+          this.error = e?.message || "Error al iniciar sesión";
+        }
         throw e;
       } finally {
         this.loading = false;
@@ -79,7 +97,14 @@ export const useAuthStore = defineStore("auth", {
         router.push({ name: "login" });
         this.loading = false;
       }
-    }
+    },
+
+    async refreshUser() {
+      try {
+        const { data } = await me()
+        this.user = data
+      } catch (_) {}
+    },
   }
 });
 

@@ -1,16 +1,19 @@
 <script setup>
 import { onMounted, reactive, ref } from "vue"
 import { getProfile, updateProfile, updateMyPassword, uploadAvatar } from "../lib/api"
+import { useAuthStore } from "../stores/auth"
 
-const me     = ref(null)
+
+const me            = ref(null)
 const avatarPreview = ref(null)
-const loading = ref(false)
-const saving  = ref(false)
-const passSaving = ref(false)
-const error   = ref(null)
-const pError  = ref(null)
-const okMsg   = ref(null)
-const pOkMsg  = ref(null)
+const loading       = ref(false)
+const saving        = ref(false)
+const passSaving    = ref(false)
+const error         = ref(null)
+const pError        = ref(null)
+const okMsg         = ref(null)
+const pOkMsg        = ref(null)
+const auth          = useAuthStore()
 
 const form = reactive({
   first_name: "",
@@ -54,6 +57,7 @@ async function onSave(){
     const { data } = await updateProfile({ ...form })
     me.value = data.data
     okMsg.value = "Perfil actualizado"
+    await auth.refreshUser?.()
   } catch (e) {
     error.value = e?.response?.data?.errors?.join(", ") || e.message
   } finally {
@@ -80,6 +84,7 @@ async function uploadAvatarNow(file){
     const { data } = await uploadAvatar(file)
     me.value = data.data
     okMsg.value = "Avatar actualizado"
+    await auth.refreshUser?.()
   } catch (e) {
     error.value = e?.response?.data?.errors?.join(", ") || e.message
   }

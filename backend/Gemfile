@@ -45,5 +45,6 @@ end
 
 
 gem "devise", "~> 4.9"
+gem 'devise-jwt'
 gem "pundit", "~> 2.5"
 gem "rack-cors", "~> 3.0", require: 'rack/cors'
