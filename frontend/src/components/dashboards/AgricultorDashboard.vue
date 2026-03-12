@@ -113,13 +113,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getStats } from '../../lib/api.js'
+import api from '../../lib/api.js'
 
 const stats = ref({})
 
 onMounted(async () => {
   try {
-    const { data } = await getStats()
+    const { data } = await api.get('/stats')
     stats.value = data
   } catch (error) {
     console.error('Error cargando stats:', error)

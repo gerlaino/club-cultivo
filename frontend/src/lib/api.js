@@ -62,22 +62,31 @@ export const createSala  = (payload) => api.post("/salas", { sala: payload });
 export const updateSala  = (id, payload) => api.patch(`/salas/${id}`, { sala: payload });
 export const deleteSala  = (id) => api.delete(`/salas/${id}`);
 
-// -------- Lotes --------
-export const listLotes         = () => api.get("/lotes");
-export const listLotesBySala   = (salaId) => api.get(`/salas/${salaId}/lotes`);
-export const createLoteInSala  = (salaId, p) => api.post(`/salas/${salaId}/lotes`, { lote: p });
-export const getLote           = (id) => api.get(`/lotes/${id}`);
-export const updateLote        = (id, payload) => api.patch(`/lotes/${id}`, { lote: payload });
-export const deleteLote        = (id) => api.delete(`/lotes/${id}`);
+// -------- LOTES --------
+export const listLotes = () => api.get('/lotes');
+export const getLote = (id) => api.get(`/lotes/${id}`);
+export const createLote = (salaId, payload) => api.post(`/salas/${salaId}/lotes`, { lote: payload });
+export const updateLote = (id, payload) => api.put(`/lotes/${id}`, { lote: payload });
+export const deleteLote = (id) => api.delete(`/lotes/${id}`);
 
-// -------- Plantas --------
-export const listPlantsBySala  = (salaId) => api.get(`/lotes/0/plants`, { params: { sala_id: salaId } });
-export const listPlantsByLote  = (loteId) => api.get(`/lotes/${loteId}/plants`);
-export const getPlant          = (id) => api.get(`/plants/${id}`);
-export const createPlantInLote = (loteId, p) => api.post(`/lotes/${loteId}/plants`, { plant: p });
-export const updatePlant       = (id, p) => api.put(`/plants/${id}`, { plant: p });
-export const deletePlant       = (id) => api.delete(`/plants/${id}`);
-export const getStats          = () => api.get(`/stats`);
+// -------- PLANTAS --------
+export const listPlants = (params = {}) => api.get('/plants', { params });
+export const getPlant = (id) => api.get(`/plants/${id}`);
+export const createPlant = (payload) => api.post('/plants', { plant: payload });
+export const updatePlant = (id, payload) => api.put(`/plants/${id}`, { plant: payload });
+export const deletePlant = (id) => api.delete(`/plants/${id}`);
+
+// -------- PLANT ACTIVITIES --------
+export const listPlantActivities = (plantId) => api.get(`/plants/${plantId}/activities`);
+export const createPlantActivity = (plantId, payload) => api.post(`/plants/${plantId}/activities`, { plant_activity: payload });
+export const deletePlantActivity = (plantId, activityId) => api.delete(`/plants/${plantId}/activities/${activityId}`);
+
+// -------- GENÉTICAS --------
+export const listGeneticas = (params = {}) => api.get('/geneticas', { params });
+export const getGenetica = (id) => api.get(`/geneticas/${id}`);
+export const createGenetica = (payload) => api.post('/geneticas', { genetica: payload });
+export const updateGenetica = (id, payload) => api.put(`/geneticas/${id}`, { genetica: payload });
+export const deleteGenetica = (id) => api.delete(`/geneticas/${id}`);
 
 // -------- Perfil --------
 export const getProfile       = () => api.get("/profile");
@@ -107,6 +116,20 @@ export const deleteSocio     = (id) => api.delete(`/socios/${id}`);
 export const listSocioNotas  = (socioId) => api.get(`/socios/${socioId}/notas`);
 export const createSocioNota = (socioId, c) => api.post(`/socios/${socioId}/notas`, { nota: { contenido: c } });
 export const deleteSocioNota = (notaId) => api.delete(`/socio_notas/${notaId}`);
+
+// -------- INDICACIONES MÉDICAS --------
+export const listIndicaciones = (socioId) => api.get(`/socios/${socioId}/indicaciones`);
+export const getIndicacion = (id) => api.get(`/indicaciones/${id}`);
+export const createIndicacion = (socioId, payload) => api.post(`/socios/${socioId}/indicaciones`, { indicacion_medica: payload });
+export const updateIndicacion = (id, payload) => api.put(`/indicaciones/${id}`, { indicacion_medica: payload });
+export const deleteIndicacion = (id) => api.delete(`/indicaciones/${id}`);
+
+// -------- DISPENSACIONES --------
+export const listDispensaciones = (socioId) => api.get(`/socios/${socioId}/dispensaciones`);
+export const getDispensacion = (id) => api.get(`/dispensaciones/${id}`);
+export const createDispensacion = (socioId, payload) => api.post(`/socios/${socioId}/dispensaciones`, { dispensacion: payload });
+export const updateDispensacion = (id, payload) => api.put(`/dispensaciones/${id}`, { dispensacion: payload });
+export const deleteDispensacion = (id) => api.delete(`/dispensaciones/${id}`);
 
 // -------- USUARIOS (equipo del club) --------
 export const listUsers         = (params = {}) => api.get('/usuarios', { params });

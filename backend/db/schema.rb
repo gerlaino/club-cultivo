@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_11_212102) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_12_204310) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -58,6 +58,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_11_212102) do
     t.string "theme_primary"
   end
 
+  create_table "dispensaciones", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "socio_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "indicacion_medica_id"
+    t.bigint "lote_id"
+    t.decimal "cantidad_gramos", precision: 8, scale: 2, null: false
+    t.string "tipo_producto", default: "flores", null: false
+    t.text "observaciones"
+    t.date "fecha_dispensacion", null: false
+    t.index ["fecha_dispensacion"], name: "index_dispensaciones_on_fecha_dispensacion"
+    t.index ["indicacion_medica_id"], name: "index_dispensaciones_on_indicacion_medica_id"
+    t.index ["lote_id"], name: "index_dispensaciones_on_lote_id"
+    t.index ["socio_id", "fecha_dispensacion"], name: "index_dispensaciones_on_socio_id_and_fecha_dispensacion"
+    t.index ["socio_id"], name: "index_dispensaciones_on_socio_id"
+    t.index ["user_id"], name: "index_dispensaciones_on_user_id"
+  end
+
   create_table "eventos", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.string "titulo", null: false
@@ -87,6 +106,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_11_212102) do
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
     t.index ["club_id"], name: "index_geneticas_on_club_id"
+  end
+
+  create_table "indicacion_medicas", force: :cascade do |t|
+    t.bigint "socio_id", null: false
+    t.bigint "user_id", null: false, comment: "Médico que emite"
+    t.string "patologia", null: false
+    t.text "dosificacion", null: false
+    t.string "via_administracion", null: false
+    t.integer "duracion_dias"
+    t.date "fecha_emision", null: false
+    t.date "fecha_vencimiento"
+    t.boolean "activa", default: true, null: false
+    t.text "observaciones"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["activa"], name: "index_indicacion_medicas_on_activa"
+    t.index ["fecha_vencimiento"], name: "index_indicacion_medicas_on_fecha_vencimiento"
+    t.index ["socio_id"], name: "index_indicacion_medicas_on_socio_id"
+    t.index ["user_id"], name: "index_indicacion_medicas_on_user_id"
   end
 
   create_table "jwt_denylists", force: :cascade do |t|
@@ -129,11 +167,26 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_11_212102) do
     t.index ["publicada"], name: "index_noticias_on_publicada"
   end
 
+  create_table "plant_activities", force: :cascade do |t|
+    t.bigint "plant_id", null: false
+    t.bigint "user_id", null: false
+    t.string "activity_type", null: false
+    t.text "description"
+    t.jsonb "metadata", default: {}
+    t.datetime "occurred_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["activity_type"], name: "index_plant_activities_on_activity_type"
+    t.index ["occurred_at"], name: "index_plant_activities_on_occurred_at"
+    t.index ["plant_id"], name: "index_plant_activities_on_plant_id"
+    t.index ["user_id"], name: "index_plant_activities_on_user_id"
+  end
+
   create_table "plants", force: :cascade do |t|
     t.bigint "lote_id", null: false
     t.string "codigo_qr"
     t.string "nombre"
-    t.bigint "genetica_id", null: false
+    t.bigint "genetica_id"
     t.string "state"
     t.date "fecha_germinacion"
     t.date "fecha_vegetativo"
@@ -242,11 +295,19 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_11_212102) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "dispensaciones", "indicacion_medicas"
+  add_foreign_key "dispensaciones", "lotes"
+  add_foreign_key "dispensaciones", "socios"
+  add_foreign_key "dispensaciones", "users"
   add_foreign_key "eventos", "clubs"
   add_foreign_key "geneticas", "clubs"
+  add_foreign_key "indicacion_medicas", "socios"
+  add_foreign_key "indicacion_medicas", "users"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "salas"
   add_foreign_key "noticias", "clubs"
+  add_foreign_key "plant_activities", "plants"
+  add_foreign_key "plant_activities", "users"
   add_foreign_key "plants", "geneticas"
   add_foreign_key "plants", "lotes"
   add_foreign_key "salas", "clubs"

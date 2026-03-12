@@ -2,9 +2,7 @@
 import { onMounted, ref, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useLotesStore } from "../stores/lotes";
-import { usePlantsStore } from "../stores/plants";
 
-const plants = usePlantsStore();
 const route = useRoute();
 const router = useRouter();
 const lotes = useLotesStore();

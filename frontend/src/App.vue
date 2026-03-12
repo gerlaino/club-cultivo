@@ -1,52 +1,45 @@
-<!-- src/App.vue -->
 <script setup>
-import { watch, onMounted } from "vue"
-import { useRouter } from "vue-router"
-import { useAuthStore } from "./stores/auth"
-import { useClubStore } from "./stores/club"
-import Avatar from "./components/Avatar.vue"
-import BrandLogo from "./components/BrandLogo.vue" // ⬅️ nuevo componente para el logo dinámico
+import { watch, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "./stores/auth";
+import { useClubStore } from "./stores/club";
+import { usePermissions } from "./composables/usePermissions";
+import Avatar from "./components/Avatar.vue";
+import BrandLogo from "./components/BrandLogo.vue";
 
-const auth = useAuthStore()
-const club = useClubStore()
-const router = useRouter()
+const auth = useAuthStore();
+const club = useClubStore();
+const router = useRouter();
+const { can, isAdmin } = usePermissions();
 
 async function doLogout() {
-  await auth.logOut()
-  club.$reset() // limpia nombre/logo del club
-  router.replace("/login")
+  await auth.logOut();
+  club.$reset();
+  router.replace("/login");
 }
 
-const appName = "Cultivo Espacial"
-
-// Cargar/limpiar preferencias del club según sesión
 watch(
   () => auth.isAuthenticated,
   async (logged) => {
     if (logged) {
       try {
-        await club.fetch()
+        await club.fetch();
       } catch (e) {
-        console.error("Error al cargar preferencias del club:", e)
+        console.error("Error al cargar preferencias del club:", e);
       }
     } else {
-      club.$reset()
+      club.$reset();
     }
   },
   { immediate: true }
-)
+);
 
 onMounted(async () => {
-  const auth = useAuthStore();
-  const club = useClubStore();
-
   await auth.ensureBootstrapped();
-
   if (auth.isAuthenticated && !club.data) {
     await club.fetch();
   }
 });
-
 </script>
 
 <template>
@@ -56,54 +49,54 @@ onMounted(async () => {
       :class="[$route.meta.fullscreen ? 'navbar-login' : 'navbar-default']"
     >
       <div class="container-fluid">
-
-        <!-- BRAND (ahora manejado por BrandLogo) -->
-        <span class="navbar-brand fw-semibold d-flex align-items-center gap-2 user-select-none">
+        <!-- BRAND -->
+        <span
+          class="navbar-brand fw-semibold d-flex align-items-center gap-2 user-select-none"
+        >
           <BrandLogo />
         </span>
 
-        <!-- Toggler SOLO en mobile -->
+        <!-- Toggler mobile -->
         <button
           v-if="auth.isAuthenticated && !$route.meta.fullscreen"
           class="navbar-toggler d-lg-none"
           type="button"
           data-bs-toggle="collapse"
           data-bs-target="#mainNav"
-          aria-controls="mainNav"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
         >
           <span class="navbar-toggler-icon"></span>
         </button>
 
-        <!-- Contenido del navbar -->
+        <!-- Contenido navbar -->
         <div
           v-if="auth.isAuthenticated && !$route.meta.fullscreen"
           id="mainNav"
           class="collapse navbar-collapse show"
         >
-          <!-- Links -->
+          <!-- Links con permisos -->
           <ul class="navbar-nav align-items-lg-center mb-2 mb-lg-0 ms-3 gap-lg-2">
             <li class="nav-item">
               <RouterLink class="nav-link" to="/">Dashboard</RouterLink>
             </li>
-            <li class="nav-item">
+
+            <li class="nav-item" v-if="can('salas', 'index')">
               <RouterLink class="nav-link" to="/salas">Salas</RouterLink>
             </li>
-            <li class="nav-item">
+
+            <li class="nav-item" v-if="can('usuarios', 'index')">
               <RouterLink class="nav-link" to="/usuarios">Usuarios</RouterLink>
             </li>
-            <li class="nav-item">
+
+            <li class="nav-item" v-if="can('socios', 'index')">
               <RouterLink class="nav-link" to="/socios">Pacientes</RouterLink>
             </li>
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/">Plantas</RouterLink>
+
+            <li class="nav-item" v-if="can('plantas', 'index')">
+              <RouterLink class="nav-link" to="/plantas">Plantas</RouterLink>
             </li>
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/">Legales</RouterLink>
-            </li>
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/">Salud</RouterLink>
+
+            <li class="nav-item" v-if="can('geneticas', 'index')">
+              <RouterLink class="nav-link" to="/geneticas">Genéticas</RouterLink>
             </li>
           </ul>
 
@@ -112,28 +105,44 @@ onMounted(async () => {
             <div class="dropdown" v-if="auth.isAuthenticated">
               <button
                 class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2"
-                type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                type="button"
+                data-bs-toggle="dropdown"
               >
-                <Avatar :src="auth.avatarUrl" :name="auth.displayName" :size="28" />
+                <Avatar
+                  :src="auth.avatarUrl"
+                  :name="auth.displayName"
+                  :size="28"
+                />
                 <span class="fw-medium">{{ auth.displayName }}</span>
               </button>
 
               <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                 <li class="px-3 py-2 border-bottom small text-muted">
                   <div class="d-flex align-items-center gap-2">
-                    <Avatar :src="auth.avatarUrl" :name="auth.displayName" :size="36" />
+                    <Avatar
+                      :src="auth.avatarUrl"
+                      :name="auth.displayName"
+                      :size="36"
+                    />
                     <div>
-                      <div class="fw-semibold text-dark">{{ auth.displayName }}</div>
+                      <div class="fw-semibold text-dark">
+                        {{ auth.displayName }}
+                      </div>
                       <div class="text-muted">{{ auth.email }}</div>
+                      <div class="badge bg-secondary mt-1">{{ auth.user?.role }}</div>
                     </div>
                   </div>
                 </li>
 
                 <li>
-                  <RouterLink class="dropdown-item py-2" to="/perfil">Perfil</RouterLink>
+                  <RouterLink class="dropdown-item py-2" to="/perfil">
+                    Perfil
+                  </RouterLink>
                 </li>
-                <li v-if="auth.isClubAdmin">
-                  <RouterLink class="dropdown-item py-2" to="/preferencias">Preferencias</RouterLink>
+                <li v-if="isAdmin">
+                  <RouterLink class="dropdown-item py-2" to="/preferencias">
+                    Preferencias
+                  </RouterLink>
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
@@ -172,11 +181,3 @@ onMounted(async () => {
   padding-top: 0.75rem;
 }
 </style>
-
-
-
-
-
-
-
-
