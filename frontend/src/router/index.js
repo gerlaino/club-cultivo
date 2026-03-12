@@ -22,6 +22,7 @@ const routes = [
   { path: "/plantas",     name: "plantas",       component: PlantasView,       meta: { requiresAuth: true } },
   { path: "/plantas/nueva", name: "planta-nueva", component: () => import("../views/PlantaNuevaView.vue"), meta: { requiresAuth: true } },
   { path: "/plantas/:id", name: "planta-detalle", component: () => import("../views/PlantaDetalleView.vue"), meta: { requiresAuth: true } },
+  { path: "/geneticas", name: "geneticas", component: () => import("../views/GeneticasView.vue"), meta: { requiresAuth: true } },
   { path: "/lotes/:id", name: "lote-detail", component: LoteDetailView, props: true },
   { path: "/plantas/:id", name: "plant-detail", component: PlantaDetalleView, props: true },
   { path: "/socios/:id", name: "socio-detail", component: SocioDetailView, props: true },

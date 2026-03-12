@@ -97,13 +97,16 @@ onMounted(async () => {
               <RouterLink class="nav-link" to="/socios">Pacientes</RouterLink>
             </li>
             <li class="nav-item">
-              <RouterLink class="nav-link" to="/">Plantas</RouterLink>
+              <RouterLink class="nav-link" to="/plantas">Plantas</RouterLink>
             </li>
             <li class="nav-item">
-              <RouterLink class="nav-link" to="/">Legales</RouterLink>
+              <RouterLink class="nav-link" to="/geneticas">Genéticas</RouterLink>
             </li>
             <li class="nav-item">
-              <RouterLink class="nav-link" to="/">Salud</RouterLink>
+              <RouterLink class="nav-link" to="/legales">Legales</RouterLink>
+            </li>
+            <li class="nav-item">
+              <RouterLink class="nav-link" to="/salud">Salud</RouterLink>
             </li>
           </ul>
 
@@ -172,11 +175,3 @@ onMounted(async () => {
   padding-top: 0.75rem;
 }
 </style>
-
-
-
-
-
-
-
-
