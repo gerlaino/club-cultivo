@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_12_014924) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_12_121728) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -127,6 +127,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_12_014924) do
     t.index ["club_id", "publicada", "publicada_at"], name: "index_noticias_on_club_id_and_publicada_and_publicada_at"
     t.index ["club_id"], name: "index_noticias_on_club_id"
     t.index ["publicada"], name: "index_noticias_on_publicada"
+  end
+
+  create_table "plant_activities", force: :cascade do |t|
+    t.bigint "plant_id", null: false
+    t.bigint "user_id", null: false
+    t.string "activity_type", null: false
+    t.text "description"
+    t.jsonb "metadata", default: {}
+    t.datetime "occurred_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["activity_type"], name: "index_plant_activities_on_activity_type"
+    t.index ["occurred_at"], name: "index_plant_activities_on_occurred_at"
+    t.index ["plant_id"], name: "index_plant_activities_on_plant_id"
+    t.index ["user_id"], name: "index_plant_activities_on_user_id"
   end
 
   create_table "plants", force: :cascade do |t|
@@ -247,6 +262,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_12_014924) do
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "salas"
   add_foreign_key "noticias", "clubs"
+  add_foreign_key "plant_activities", "plants"
+  add_foreign_key "plant_activities", "users"
   add_foreign_key "plants", "geneticas"
   add_foreign_key "plants", "lotes"
   add_foreign_key "salas", "clubs"

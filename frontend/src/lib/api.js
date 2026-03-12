@@ -76,6 +76,11 @@ export const createPlant = (payload) => api.post('/plants', { plant: payload });
 export const updatePlant = (id, payload) => api.put(`/plants/${id}`, { plant: payload });
 export const deletePlant = (id) => api.delete(`/plants/${id}`);
 
+// -------- PLANT ACTIVITIES --------
+export const listPlantActivities = (plantId) => api.get(`/plants/${plantId}/activities`);
+export const createPlantActivity = (plantId, payload) => api.post(`/plants/${plantId}/activities`, { plant_activity: payload });
+export const deletePlantActivity = (plantId, activityId) => api.delete(`/plants/${plantId}/activities/${activityId}`);
+
 // -------- GENÉTICAS --------
 export const listGeneticas = (params = {}) => api.get('/geneticas', { params });
 export const getGenetica = (id) => api.get(`/geneticas/${id}`);

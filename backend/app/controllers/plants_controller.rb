@@ -34,7 +34,20 @@ class PlantsController < ApplicationController
 
   # PATCH /plants/:id
   def update
+    # Guardar estado anterior ANTES del update
+    old_state = @plant.state
+
     if @plant.update(plant_params)
+      # Crear actividad si cambió el estado
+      if plant_params[:state] && @plant.state != old_state
+        @plant.activities.create!(
+          user: current_user,
+          activity_type: 'state_change',
+          description: "Estado cambiado de #{old_state} a #{@plant.state}",
+          occurred_at: Time.current
+        )
+      end
+
       render json: serialize_plant(@plant)
     else
       render json: { errors: @plant.errors.full_messages }, status: :unprocessable_entity

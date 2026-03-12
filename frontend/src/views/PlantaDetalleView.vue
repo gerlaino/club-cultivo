@@ -215,6 +215,19 @@
         </div>
       </div>
 
+      <!-- Actividades -->
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i class="bi bi-clock-history me-2"></i>
+            Historial de Actividades
+          </h5>
+        </div>
+        <div class="card-body">
+          <PlantActivitiesTimeline :plant-id="plant.id" />
+        </div>
+      </div>
+
       <!-- Columna derecha: Acciones rápidas -->
       <div class="col-lg-4">
         <!-- Cambiar estado -->
@@ -409,6 +422,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getPlant, updatePlant, deletePlant } from '../lib/api.js'
 import { useQRCode } from '../composables/useQRCode.js'
+import PlantActivitiesTimeline from '../components/plants/PlantActivitiesTimeline.vue'
 
 const route = useRoute()
 const router = useRouter()

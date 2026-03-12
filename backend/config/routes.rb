@@ -28,7 +28,10 @@ Rails.application.routes.draw do
     end
 
     resources :lotes, only: [:index, :show, :update, :destroy]
-    resources :plants
+
+    resources :plants, only: [:index, :show, :create, :update, :destroy] do
+      resources :activities, controller: 'plant_activities', only: [:index, :create, :destroy]
+    end
 
     resources :socios do
       resources :notas, controller: "socio_notas", only: [:index, :create]

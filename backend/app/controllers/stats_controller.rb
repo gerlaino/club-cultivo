@@ -7,6 +7,7 @@ class StatsController < ApplicationController
     render json: {
       socios: club.socios.count,
       plantas: Plant.where(lote_id: club.lotes.pluck(:id)).count,
+      plantas_por_genetica: plantas_por_genetica(club),
       salas: club.salas.count,
       lotes: club.lotes.count,
 
@@ -20,5 +21,18 @@ class StatsController < ApplicationController
 
       actividad: []
     }
+  end
+
+  private
+
+  def plantas_por_genetica(club)
+    Genetica.where(club_id: club.id, activa: true).map do |genetica|
+      {
+        id: genetica.id,
+        nombre: genetica.nombre,
+        tipo: genetica.tipo,
+        plantas_count: Plant.joins(:lote).where(lotes: { club_id: club.id }, genetica_id: genetica.id).count
+      }
+    end
   end
 end
