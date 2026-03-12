@@ -51,6 +51,55 @@
       </div>
     </div>
 
+    <!-- Gráficos -->
+    <div class="row g-3 mt-2">
+      <div class="col-lg-6">
+        <div class="card h-100">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="bi bi-pie-chart me-2"></i>
+              Distribución de Plantas por Estado
+            </h6>
+          </div>
+          <div class="card-body">
+            <PlantDistributionChart :data="stats" />
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="card h-100">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="bi bi-activity me-2"></i>
+              Actividad Reciente
+            </h6>
+          </div>
+          <div class="card-body">
+            <div v-if="actividad.length === 0" class="text-center text-muted py-4">
+              <i class="bi bi-inbox display-4"></i>
+              <p class="mt-2 mb-0">No hay actividad reciente</p>
+            </div>
+            <div v-else class="list-group list-group-flush">
+              <div
+                v-for="item in actividad"
+                :key="item.id"
+                class="list-group-item px-0"
+              >
+                <div class="d-flex align-items-start">
+                  <i :class="item.icon" class="me-3 mt-1"></i>
+                  <div class="flex-grow-1">
+                    <div class="mb-0">{{ item.text }}</div>
+                    <small class="text-muted">{{ item.time }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Accesos rápidos -->
     <div class="row g-3 mb-4">
       <div class="col-12">
@@ -115,6 +164,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '../../lib/api.js'
+import PlantDistributionChart from '../charts/PlantDistributionChart.vue'
 
 const stats = ref({})
 const actividad = ref([])
