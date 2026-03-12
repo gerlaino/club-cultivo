@@ -36,9 +36,11 @@ Rails.application.routes.draw do
     resources :socios do
       resources :notas, controller: "socio_notas", only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
+      resources :dispensaciones, only: [:index, :create]
     end
     resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy]
     resources :socio_notas, only: [:destroy]
+    resources :dispensaciones, only: [:show, :update, :destroy]
 
     # Recursos protegidos para admin
     resources :geneticas
