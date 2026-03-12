@@ -408,6 +408,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getPlant, updatePlant, deletePlant } from '../lib/api.js'
+import { useQRCode } from '../composables/useQRCode.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -419,6 +420,10 @@ const updating = ref(false)
 const deleting = ref(false)
 const showEditModal = ref(false)
 const showDeleteConfirm = ref(false)
+
+// QR Code
+const { generateQR, downloadQR } = useQRCode()
+const qrDataUrl = ref(null)
 
 const stateLabel = computed(() => {
   const labels = {
@@ -475,6 +480,26 @@ const loadPlant = async () => {
   }
 }
 
+const loadQR = async () => {
+  if (plant.value?.codigo_qr) {
+    try {
+      qrDataUrl.value = await generateQR(plant.value.codigo_qr)
+    } catch (error) {
+      console.error('Error generando QR:', error)
+    }
+  }
+}
+
+const handleDownloadQR = async () => {
+  if (plant.value?.codigo_qr) {
+    try {
+      await downloadQR(plant.value.codigo_qr, `planta-${plant.value.nombre}-qr.png`)
+    } catch (error) {
+      alert('Error al descargar el QR')
+    }
+  }
+}
+
 const changeState = async (newState) => {
   if (!confirm(`¿Cambiar estado a ${newState}?`)) return
 
@@ -482,15 +507,12 @@ const changeState = async (newState) => {
     updating.value = true
     const payload = { state: newState }
 
-    // Si cambia a vegetativo, poner fecha
     if (newState === 'vegetativo' && !plant.value.fecha_vegetativo) {
       payload.fecha_vegetativo = new Date().toISOString().split('T')[0]
     }
-    // Si cambia a floración, poner fecha
     if (newState === 'floracion' && !plant.value.fecha_floracion) {
       payload.fecha_floracion = new Date().toISOString().split('T')[0]
     }
-    // Si cambia a cosechado, poner fecha
     if (newState === 'cosechado' && !plant.value.fecha_cosecha) {
       payload.fecha_cosecha = new Date().toISOString().split('T')[0]
     }
@@ -529,7 +551,6 @@ const editForm = ref({
   notas: ''
 })
 
-// Watch para llenar el formulario cuando se abre el modal
 watch(showEditModal, (val) => {
   if (val && plant.value) {
     editForm.value = {
@@ -550,7 +571,6 @@ const handleUpdate = async () => {
     updating.value = true
     const payload = { ...editForm.value }
 
-    // Limpiar valores vacíos
     Object.keys(payload).forEach(key => {
       if (payload[key] === '' || payload[key] === null) {
         delete payload[key]
@@ -568,7 +588,10 @@ const handleUpdate = async () => {
   }
 }
 
-onMounted(loadPlant)
+onMounted(async () => {
+  await loadPlant()
+  await loadQR()
+})
 </script>
 
 <style scoped>
