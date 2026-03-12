@@ -124,6 +124,13 @@ export const createIndicacion = (socioId, payload) => api.post(`/socios/${socioI
 export const updateIndicacion = (id, payload) => api.put(`/indicaciones/${id}`, { indicacion_medica: payload });
 export const deleteIndicacion = (id) => api.delete(`/indicaciones/${id}`);
 
+// -------- DISPENSACIONES --------
+export const listDispensaciones = (socioId) => api.get(`/socios/${socioId}/dispensaciones`);
+export const getDispensacion = (id) => api.get(`/dispensaciones/${id}`);
+export const createDispensacion = (socioId, payload) => api.post(`/socios/${socioId}/dispensaciones`, { dispensacion: payload });
+export const updateDispensacion = (id, payload) => api.put(`/dispensaciones/${id}`, { dispensacion: payload });
+export const deleteDispensacion = (id) => api.delete(`/dispensaciones/${id}`);
+
 // -------- USUARIOS (equipo del club) --------
 export const listUsers         = (params = {}) => api.get('/usuarios', { params });
 export const getUser           = (id) => api.get(`/usuarios/${id}`);

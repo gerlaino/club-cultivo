@@ -7,6 +7,7 @@ class Socio < ApplicationRecord
 
   has_many :notas, class_name: "SocioNota", dependent: :destroy
   has_many :indicacion_medicas, dependent: :destroy
+  has_many :dispensaciones, class_name: 'Dispensacion', dependent: :destroy
 
   # Active Storage para adjunto REPROCANN
   has_one_attached :reprocann_documento
