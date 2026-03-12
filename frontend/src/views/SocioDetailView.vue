@@ -3,6 +3,8 @@
 import { ref, onMounted, computed } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useSociosStore } from "../stores/socios"
+import IndicacionesMedicas from '../components/socios/IndicacionesMedicas.vue'
+import Dispensaciones from '../components/socios/Dispensaciones.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -117,6 +119,25 @@ const s = computed(() => store.current)
           </div>
         </div>
       </div>
+
+      <!-- Indicaciones Médicas -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <IndicacionesMedicas :socio-id="s.id" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Dispensaciones -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <Dispensaciones :socio-id="s.id" />
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </template>

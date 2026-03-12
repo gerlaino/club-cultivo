@@ -4,7 +4,10 @@ class Socio < ApplicationRecord
   belongs_to :created_by, class_name: "User"
   belongs_to :updated_by, class_name: "User", optional: true
   belongs_to :deleted_by, class_name: "User", optional: true
+
   has_many :notas, class_name: "SocioNota", dependent: :destroy
+  has_many :indicacion_medicas, dependent: :destroy
+  has_many :dispensaciones, class_name: 'Dispensacion', dependent: :destroy
 
   # Active Storage para adjunto REPROCANN
   has_one_attached :reprocann_documento

@@ -2,6 +2,8 @@ class Plant < ApplicationRecord
   belongs_to :lote
   belongs_to :genetica, optional: true
 
+  has_many :activities, class_name: 'PlantActivity', dependent: :destroy
+
   before_create :generate_codigo_qr
 
   STATES = %w[germinacion vegetativo floracion secado cosechado].freeze
