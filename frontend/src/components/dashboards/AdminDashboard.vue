@@ -128,33 +128,16 @@
       </div>
     </div>
 
-    <!-- Actividad reciente -->
-    <div class="row">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header bg-white">
-            <h5 class="mb-0">Actividad Reciente</h5>
-          </div>
-          <div class="card-body">
-            <div v-if="loading" class="text-center py-4">
-              <div class="spinner-border text-success"></div>
-            </div>
-            <div v-else-if="actividad.length === 0" class="text-center py-4 text-muted">
-              <i class="bi bi-inbox display-4 d-block mb-2"></i>
-              No hay actividad reciente
-            </div>
-            <div v-else class="activity-list">
-              <div v-for="item in actividad" :key="item.id" class="activity-item">
-                <div class="activity-icon">
-                  <i :class="item.icon"></i>
-                </div>
-                <div class="activity-content">
-                  <div class="activity-text">{{ item.text }}</div>
-                  <div class="activity-time text-muted">{{ item.time }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i class="bi bi-bar-chart me-2"></i>
+            Plantas por Genética
+          </h6>
+        </div>
+        <div class="card-body">
+          <PlantsByGeneticaChart :data="plantasPorGenetica" />
         </div>
       </div>
     </div>
@@ -162,13 +145,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import api from '../../lib/api.js'
 import PlantDistributionChart from '../charts/PlantDistributionChart.vue'
+import PlantsByGeneticaChart from '../charts/PlantsByGeneticaChart.vue'
 
 const stats = ref({})
 const actividad = ref([])
 const loading = ref(true)
+const plantasPorGenetica = computed(() => stats.value.plantas_por_genetica || [])
 
 onMounted(async () => {
   try {
