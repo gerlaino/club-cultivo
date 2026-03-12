@@ -5,7 +5,7 @@
       <div class="card-body">
         <h6 class="mb-3">Agregar Actividad</h6>
         <form @submit.prevent="handleSubmit">
-          <div class="row g-2">
+          <div class="row g-2 mb-2">
             <div class="col-md-4">
               <select v-model="form.activity_type" class="form-select form-select-sm" required>
                 <option value="">Tipo de actividad...</option>
@@ -37,6 +37,21 @@
                 Agregar
               </button>
             </div>
+          </div>
+
+          <!-- Templates rápidos -->
+          <div class="quick-templates">
+            <small class="text-muted me-2">Templates:</small>
+            <button
+              v-for="template in quickTemplates"
+              :key="template.type"
+              type="button"
+              @click="useTemplate(template)"
+              class="btn btn-sm btn-outline-secondary me-1 mb-1"
+            >
+              <i :class="template.icon"></i>
+              {{ template.label }}
+            </button>
           </div>
         </form>
       </div>
@@ -110,6 +125,38 @@ const form = ref({
   activity_type: '',
   description: ''
 })
+
+const quickTemplates = [
+  {
+    type: 'watering',
+    label: 'Riego 2L',
+    description: 'Riego con 2L de agua pH 6.0',
+    icon: 'bi bi-droplet-fill'
+  },
+  {
+    type: 'fertilization',
+    label: 'Fertilización NPK',
+    description: 'Fertilización NPK (5-10-5) 2ml/L',
+    icon: 'bi bi-flask'
+  },
+  {
+    type: 'pruning',
+    label: 'Poda hojas',
+    description: 'Poda de hojas bajas',
+    icon: 'bi bi-scissors'
+  },
+  {
+    type: 'measurement',
+    label: 'Medición pH/EC',
+    description: 'Medición: pH 6.0, EC 1.2',
+    icon: 'bi bi-rulers'
+  }
+]
+
+const useTemplate = (template) => {
+  form.value.activity_type = template.type
+  form.value.description = template.description
+}
 
 const getIcon = (type) => {
   const icons = {
