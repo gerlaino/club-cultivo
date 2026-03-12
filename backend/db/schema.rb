@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_12_153251) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_12_204310) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -56,6 +56,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_12_153251) do
     t.string "country"
     t.string "timezone"
     t.string "theme_primary"
+  end
+
+  create_table "dispensaciones", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "socio_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "indicacion_medica_id"
+    t.bigint "lote_id"
+    t.decimal "cantidad_gramos", precision: 8, scale: 2, null: false
+    t.string "tipo_producto", default: "flores", null: false
+    t.text "observaciones"
+    t.date "fecha_dispensacion", null: false
+    t.index ["fecha_dispensacion"], name: "index_dispensaciones_on_fecha_dispensacion"
+    t.index ["indicacion_medica_id"], name: "index_dispensaciones_on_indicacion_medica_id"
+    t.index ["lote_id"], name: "index_dispensaciones_on_lote_id"
+    t.index ["socio_id", "fecha_dispensacion"], name: "index_dispensaciones_on_socio_id_and_fecha_dispensacion"
+    t.index ["socio_id"], name: "index_dispensaciones_on_socio_id"
+    t.index ["user_id"], name: "index_dispensaciones_on_user_id"
   end
 
   create_table "eventos", force: :cascade do |t|
@@ -276,6 +295,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_12_153251) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "dispensaciones", "indicacion_medicas"
+  add_foreign_key "dispensaciones", "lotes"
+  add_foreign_key "dispensaciones", "socios"
+  add_foreign_key "dispensaciones", "users"
   add_foreign_key "eventos", "clubs"
   add_foreign_key "geneticas", "clubs"
   add_foreign_key "indicacion_medicas", "socios"
