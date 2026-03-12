@@ -7,7 +7,7 @@ import SalaDetailView from "../views/SalaDetailView.vue";
 import LoteDetailView from "../views/LoteDetailView.vue";
 import { useAuthStore } from "../stores/auth";
 import PlantasView from "../views/PlantasView.vue";
-import PlantDetailView from "../views/PlantDetailView.vue";
+import PlantaDetalleView from "../views/PlantaDetalleView.vue";
 import PerfilView from "../views/PerfilView.vue";
 import PreferenciasView from "../views/PreferenciasView.vue";
 import SociosView from "../views/SociosView.vue";
@@ -21,8 +21,9 @@ const routes = [
   { path: "/salas/:id", name: "sala-detail", component: SalaDetailView, props: (r) => ({ id: Number(r.params.id) }) },
   { path: "/plantas",     name: "plantas",       component: PlantasView,       meta: { requiresAuth: true } },
   { path: "/plantas/nueva", name: "planta-nueva", component: () => import("../views/PlantaNuevaView.vue"), meta: { requiresAuth: true } },
+  { path: "/plantas/:id", name: "planta-detalle", component: () => import("../views/PlantaDetalleView.vue"), meta: { requiresAuth: true } },
   { path: "/lotes/:id", name: "lote-detail", component: LoteDetailView, props: true },
-  { path: "/plantas/:id", name: "plant-detail", component: PlantDetailView, props: true },
+  { path: "/plantas/:id", name: "plant-detail", component: PlantaDetalleView, props: true },
   { path: "/socios/:id", name: "socio-detail", component: SocioDetailView, props: true },
   { path: "/usuarios/:id", name: "usuario-detail", component: UsuarioDetail },
 
