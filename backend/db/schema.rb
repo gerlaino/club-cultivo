@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_12_133529) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_12_153251) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -87,6 +87,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_12_133529) do
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
     t.index ["club_id"], name: "index_geneticas_on_club_id"
+  end
+
+  create_table "indicacion_medicas", force: :cascade do |t|
+    t.bigint "socio_id", null: false
+    t.bigint "user_id", null: false, comment: "Médico que emite"
+    t.string "patologia", null: false
+    t.text "dosificacion", null: false
+    t.string "via_administracion", null: false
+    t.integer "duracion_dias"
+    t.date "fecha_emision", null: false
+    t.date "fecha_vencimiento"
+    t.boolean "activa", default: true, null: false
+    t.text "observaciones"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["activa"], name: "index_indicacion_medicas_on_activa"
+    t.index ["fecha_vencimiento"], name: "index_indicacion_medicas_on_fecha_vencimiento"
+    t.index ["socio_id"], name: "index_indicacion_medicas_on_socio_id"
+    t.index ["user_id"], name: "index_indicacion_medicas_on_user_id"
   end
 
   create_table "jwt_denylists", force: :cascade do |t|
@@ -259,6 +278,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_12_133529) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "eventos", "clubs"
   add_foreign_key "geneticas", "clubs"
+  add_foreign_key "indicacion_medicas", "socios"
+  add_foreign_key "indicacion_medicas", "users"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "salas"
   add_foreign_key "noticias", "clubs"

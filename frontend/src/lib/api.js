@@ -117,6 +117,13 @@ export const listSocioNotas  = (socioId) => api.get(`/socios/${socioId}/notas`);
 export const createSocioNota = (socioId, c) => api.post(`/socios/${socioId}/notas`, { nota: { contenido: c } });
 export const deleteSocioNota = (notaId) => api.delete(`/socio_notas/${notaId}`);
 
+// -------- INDICACIONES MÉDICAS --------
+export const listIndicaciones = (socioId) => api.get(`/socios/${socioId}/indicaciones`);
+export const getIndicacion = (id) => api.get(`/indicaciones/${id}`);
+export const createIndicacion = (socioId, payload) => api.post(`/socios/${socioId}/indicaciones`, { indicacion_medica: payload });
+export const updateIndicacion = (id, payload) => api.put(`/indicaciones/${id}`, { indicacion_medica: payload });
+export const deleteIndicacion = (id) => api.delete(`/indicaciones/${id}`);
+
 // -------- USUARIOS (equipo del club) --------
 export const listUsers         = (params = {}) => api.get('/usuarios', { params });
 export const getUser           = (id) => api.get(`/usuarios/${id}`);
