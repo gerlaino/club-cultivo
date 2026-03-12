@@ -1,11 +1,9 @@
 <script setup>
 import { onMounted, computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { usePlantsStore } from "../stores/plants";
 
 const route = useRoute();
 const router = useRouter();
-const plants = usePlantsStore();
 
 const id = Number(route.params.id);
 const error = ref(null);

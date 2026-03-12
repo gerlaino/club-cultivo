@@ -6,6 +6,7 @@ import LotesView from "../views/LotesView.vue";
 import SalaDetailView from "../views/SalaDetailView.vue";
 import LoteDetailView from "../views/LoteDetailView.vue";
 import { useAuthStore } from "../stores/auth";
+import PlantasView from "../views/PlantasView.vue";
 import PlantDetailView from "../views/PlantDetailView.vue";
 import PerfilView from "../views/PerfilView.vue";
 import PreferenciasView from "../views/PreferenciasView.vue";
@@ -18,6 +19,8 @@ const routes = [
   { path: "/login", name: "login", component: LoginView, meta: { guestOnly: true, fullscreen: true } },
 
   { path: "/salas/:id", name: "sala-detail", component: SalaDetailView, props: (r) => ({ id: Number(r.params.id) }) },
+  { path: "/plantas",     name: "plantas",       component: PlantasView,       meta: { requiresAuth: true } },
+  { path: "/plantas/nueva", name: "planta-nueva", component: () => import("../views/PlantaNuevaView.vue"), meta: { requiresAuth: true } },
   { path: "/lotes/:id", name: "lote-detail", component: LoteDetailView, props: true },
   { path: "/plantas/:id", name: "plant-detail", component: PlantDetailView, props: true },
   { path: "/socios/:id", name: "socio-detail", component: SocioDetailView, props: true },

@@ -1,8 +1,8 @@
 import { defineStore } from "pinia";
 import {
   listLotes,                // compat global opcional
-  listLotesBySala,          // lotes de una sala
-  createLoteInSala,
+            // lotes de una sala
+  createLote,
   getLote,                  // 👈 usamos esto para el detalle
   updateLote,
   deleteLote,
@@ -44,7 +44,7 @@ export const useLotesStore = defineStore("lotes", {
     async fetchBySala(salaId) {
       this.loading = true; this.error = null;
       try {
-        const { data } = await listLotesBySala(salaId);
+        const { data } = await listLotes();
         this.itemsBySala.set(String(salaId), data || []);
       } catch (e) {
         console.error("Lotes.fetchBySala", e);
@@ -57,7 +57,7 @@ export const useLotesStore = defineStore("lotes", {
     async createInSala(salaId, payload) {
       this.creating = true; this.error = null;
       try {
-        const { data } = await createLoteInSala(salaId, payload);
+        const { data } = await createLote(salaId, payload);
         const arr = this.bySala(salaId);
         this.itemsBySala.set(String(salaId), [data, ...arr]);
         return data;

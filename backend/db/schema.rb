@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_11_212102) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_12_014924) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -133,7 +133,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_11_212102) do
     t.bigint "lote_id", null: false
     t.string "codigo_qr"
     t.string "nombre"
-    t.bigint "genetica_id", null: false
+    t.bigint "genetica_id"
     t.string "state"
     t.date "fecha_germinacion"
     t.date "fecha_vegetativo"

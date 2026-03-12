@@ -62,22 +62,19 @@ export const createSala  = (payload) => api.post("/salas", { sala: payload });
 export const updateSala  = (id, payload) => api.patch(`/salas/${id}`, { sala: payload });
 export const deleteSala  = (id) => api.delete(`/salas/${id}`);
 
-// -------- Lotes --------
-export const listLotes         = () => api.get("/lotes");
-export const listLotesBySala   = (salaId) => api.get(`/salas/${salaId}/lotes`);
-export const createLoteInSala  = (salaId, p) => api.post(`/salas/${salaId}/lotes`, { lote: p });
-export const getLote           = (id) => api.get(`/lotes/${id}`);
-export const updateLote        = (id, payload) => api.patch(`/lotes/${id}`, { lote: payload });
-export const deleteLote        = (id) => api.delete(`/lotes/${id}`);
+// -------- LOTES --------
+export const listLotes = () => api.get('/lotes');
+export const getLote = (id) => api.get(`/lotes/${id}`);
+export const createLote = (salaId, payload) => api.post(`/salas/${salaId}/lotes`, { lote: payload });
+export const updateLote = (id, payload) => api.put(`/lotes/${id}`, { lote: payload });
+export const deleteLote = (id) => api.delete(`/lotes/${id}`);
 
-// -------- Plantas --------
-export const listPlantsBySala  = (salaId) => api.get(`/lotes/0/plants`, { params: { sala_id: salaId } });
-export const listPlantsByLote  = (loteId) => api.get(`/lotes/${loteId}/plants`);
-export const getPlant          = (id) => api.get(`/plants/${id}`);
-export const createPlantInLote = (loteId, p) => api.post(`/lotes/${loteId}/plants`, { plant: p });
-export const updatePlant       = (id, p) => api.put(`/plants/${id}`, { plant: p });
-export const deletePlant       = (id) => api.delete(`/plants/${id}`);
-export const getStats          = () => api.get(`/stats`);
+// -------- PLANTAS --------
+export const listPlants = (params = {}) => api.get('/plants', { params });
+export const getPlant = (id) => api.get(`/plants/${id}`);
+export const createPlant = (payload) => api.post('/plants', { plant: payload });
+export const updatePlant = (id, payload) => api.put(`/plants/${id}`, { plant: payload });
+export const deletePlant = (id) => api.delete(`/plants/${id}`);
 
 // -------- Perfil --------
 export const getProfile       = () => api.get("/profile");

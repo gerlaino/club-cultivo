@@ -114,7 +114,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getStats } from '../../lib/api.js'
+import api from '../../lib/api.js'
 
 const stats = ref({})
 const actividad = ref([])
@@ -122,7 +122,7 @@ const loading = ref(true)
 
 onMounted(async () => {
   try {
-    const { data } = await getStats()
+    const { data } = await api.get('stats')
     stats.value = data
     actividad.value = data.actividad || []
   } catch (error) {
