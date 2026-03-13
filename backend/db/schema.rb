@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_12_204310) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_13_111455) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -136,9 +136,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_12_204310) do
   end
 
   create_table "lotes", force: :cascade do |t|
-    t.string "code"
+    t.string "codigo"
     t.date "start_date"
-    t.string "stage"
     t.integer "plants_count"
     t.string "strain"
     t.text "notes"
@@ -148,8 +147,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_12_204310) do
     t.datetime "updated_at", null: false
     t.string "grow_type"
     t.string "light_type"
-    t.string "state"
+    t.string "estado"
     t.index ["club_id"], name: "index_lotes_on_club_id"
+    t.index ["codigo"], name: "index_lotes_on_codigo"
+    t.index ["estado"], name: "index_lotes_on_estado"
     t.index ["sala_id"], name: "index_lotes_on_sala_id"
   end
 
@@ -202,7 +203,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_12_204310) do
   end
 
   create_table "salas", force: :cascade do |t|
-    t.string "name"
+    t.string "nombre"
     t.string "state"
     t.integer "pots_count"
     t.text "notes"
@@ -215,6 +216,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_12_204310) do
     t.string "camera_snapshot_url"
     t.index ["club_id"], name: "index_salas_on_club_id"
     t.index ["created_by_id"], name: "index_salas_on_created_by_id"
+    t.index ["nombre"], name: "index_salas_on_nombre"
   end
 
   create_table "socio_nota", force: :cascade do |t|

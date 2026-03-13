@@ -1,23 +1,28 @@
 import { defineStore } from "pinia";
 import {
-  listLotes,                // compat global opcional
-            // lotes de una sala
+  listLotes,
   createLote,
-  getLote,                  // 👈 usamos esto para el detalle
+  getLote,
   updateLote,
   deleteLote,
 } from "../lib/api";
 
 export const useLotesStore = defineStore("lotes", {
   state: () => ({
-    items: [],               // compat global
-    itemsBySala: new Map(),  // salaId -> array de lotes
-    current: null,           // 👈 detalle de un lote
+    items: [],
+    itemsBySala: new Map(),
+    current: null,
     loading: false,
     error: null,
+
     creating: false,
+    createError: null,
+
     updating: false,
+    updateError: null,
+
     removing: false,
+    removeError: null,
   }),
 
   getters: {
@@ -26,7 +31,6 @@ export const useLotesStore = defineStore("lotes", {
   },
 
   actions: {
-    // --- compat global ---
     async fetch() {
       this.loading = true; this.error = null;
       try {
@@ -40,11 +44,10 @@ export const useLotesStore = defineStore("lotes", {
       }
     },
 
-    // --- por sala ---
     async fetchBySala(salaId) {
       this.loading = true; this.error = null;
       try {
-        const { data } = await listLotes();
+        const { data } = await listLotes(salaId);
         this.itemsBySala.set(String(salaId), data || []);
       } catch (e) {
         console.error("Lotes.fetchBySala", e);
@@ -55,7 +58,7 @@ export const useLotesStore = defineStore("lotes", {
     },
 
     async createInSala(salaId, payload) {
-      this.creating = true; this.error = null;
+      this.creating = true; this.createError = null;
       try {
         const { data } = await createLote(salaId, payload);
         const arr = this.bySala(salaId);
@@ -63,14 +66,13 @@ export const useLotesStore = defineStore("lotes", {
         return data;
       } catch (e) {
         console.error("Lotes.createInSala", e);
-        this.error = e?.response?.data?.errors?.join(", ") || e.message;
+        this.createError = e?.response?.data?.errors?.join(", ") || "No se pudo crear el lote";
         throw e;
       } finally {
         this.creating = false;
       }
     },
 
-    // --- DETALLE ---
     async fetchOne(id) {
       this.loading = true; this.error = null; this.current = null;
       try {
@@ -87,7 +89,7 @@ export const useLotesStore = defineStore("lotes", {
     },
 
     async update(id, payload, salaId = null) {
-      this.updating = true; this.error = null;
+      this.updating = true; this.updateError = null;
       try {
         const { data } = await updateLote(id, payload);
         if (salaId) {
@@ -96,11 +98,11 @@ export const useLotesStore = defineStore("lotes", {
         } else {
           this.items = this.items.map(l => (l.id === id ? data : l));
         }
-        if (this.current?.id === id) this.current = data; // mantener detalle al día
+        if (this.current?.id === id) this.current = data;
         return data;
       } catch (e) {
         console.error("Lotes.update", e);
-        this.error = e?.response?.data?.errors?.join(", ") || e.message;
+        this.updateError = e?.response?.data?.errors?.join(", ") || "No se pudo actualizar el lote";
         throw e;
       } finally {
         this.updating = false;
@@ -108,7 +110,7 @@ export const useLotesStore = defineStore("lotes", {
     },
 
     async remove(id, salaId = null) {
-      this.removing = true; this.error = null;
+      this.removing = true; this.removeError = null;
       try {
         await deleteLote(id);
         if (salaId) {
@@ -120,7 +122,7 @@ export const useLotesStore = defineStore("lotes", {
         if (this.current?.id === id) this.current = null;
       } catch (e) {
         console.error("Lotes.remove", e);
-        this.error = e?.response?.data?.errors?.join(", ") || e.message;
+        this.removeError = e?.response?.data?.errors?.join(", ") || "No se pudo eliminar el lote";
         throw e;
       } finally {
         this.removing = false;
