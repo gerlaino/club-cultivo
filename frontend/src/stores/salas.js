@@ -6,7 +6,7 @@ import {
 export const useSalasStore = defineStore("salas", {
   state: () => ({
     items: [],
-    currentSala: null,   // detalle
+    currentSala: null,
     loading: false,
     error: null,
 
