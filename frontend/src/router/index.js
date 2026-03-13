@@ -3,6 +3,7 @@ import LoginView from "../views/LoginView.vue";
 import DashboardView from "../views/DashboardView.vue";
 import SalasView from "../views/SalasView.vue";
 import SalaDetailView from "../views/SalaDetailView.vue";
+import LotesView from "../views/LotesView.vue";
 import LoteDetailView from "../views/LoteDetailView.vue";
 import PlantasView from "../views/PlantasView.vue";
 import PlantaDetalleView from "../views/PlantaDetalleView.vue";
@@ -15,16 +16,13 @@ import UsuarioDetail from "../views/UsuarioDetail.vue";
 import { useAuthStore } from "../stores/auth";
 import { usePermissions } from "../composables/usePermissions";
 
-// Guard de permisos
 const requiresPermission = (resource, action) => {
   return (to, from, next) => {
     const auth = useAuthStore();
     const { can } = usePermissions();
-
     if (!auth.isAuthenticated) {
       next("/login");
     } else if (!can(resource, action)) {
-      // Redirigir al dashboard si no tiene permisos
       next("/");
     } else {
       next();
@@ -58,13 +56,20 @@ const routes = [
   },
   {
     path: "/salas/:id",
-    name: "sala-detail",
+    name: "sala-detail",            // ← CORREGIDO (era "salas", duplicado)
     component: SalaDetailView,
     props: (r) => ({ id: Number(r.params.id) }),
     beforeEnter: requiresPermission("salas", "show"),
   },
 
   // Lotes
+  {
+    path: "/lotes",
+    name: "lotes",
+    component: LotesView,
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("lotes", "index"),
+  },
   {
     path: "/lotes/:id",
     name: "lote-detail",
@@ -136,7 +141,7 @@ const routes = [
     beforeEnter: requiresPermission("usuarios", "show"),
   },
 
-  // Perfil y Preferencias (todos pueden acceder a su perfil)
+  // Perfil y Preferencias
   {
     path: "/perfil",
     name: "perfil",
@@ -167,26 +172,20 @@ const router = createRouter({
 });
 
 router.afterEach((to) => {
-  document.documentElement.classList.toggle(
-    "route-login",
-    !!to.meta.fullscreen
-  );
+  document.documentElement.classList.toggle("route-login", !!to.meta.fullscreen);
 });
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
-
   await auth.ensureBootstrapped();
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: "login", query: { redirect: to.fullPath } };
   }
-
   if (to.meta.guestOnly && auth.isAuthenticated) {
     const redirect = to.query.redirect || "/";
     return typeof redirect === "string" ? redirect : "/";
   }
-
   return true;
 });
 

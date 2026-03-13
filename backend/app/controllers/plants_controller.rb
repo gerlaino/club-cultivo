@@ -93,7 +93,7 @@ class PlantsController < ApplicationController
       state: plant.state,
       lote: {
         id: plant.lote.id,
-        code: plant.lote.code
+        codigo: plant.lote.codigo
       },
       genetica: plant.genetica ? {
         id: plant.genetica.id,
@@ -114,7 +114,7 @@ class PlantsController < ApplicationController
       state: plant.state,
       lote: {
         id: plant.lote.id,
-        code: plant.lote.code,
+        codigo: plant.lote.codigo,
         sala: {
           id: plant.lote.sala.id,
           name: plant.lote.sala.name
