@@ -4,10 +4,9 @@ class GeneticasController < ApplicationController
 
   # GET /geneticas
   def index
-    club = current_user.club
+    club      = current_user.club
     geneticas = club.geneticas.where(activa: true).order(:nombre)
-
-    render json: geneticas.map { |g| serialize_genetica(g) }
+    render json: geneticas.map { |g| serialize_genetica(g, club) }
   end
 
   # GET /geneticas/:id
@@ -18,9 +17,8 @@ class GeneticasController < ApplicationController
   # POST /geneticas
   def create
     genetica = current_user.club.geneticas.build(genetica_params)
-
     if genetica.save
-      render json: serialize_genetica(genetica), status: :created
+      render json: serialize_genetica(genetica, current_user.club), status: :created
     else
       render json: { errors: genetica.errors.full_messages }, status: :unprocessable_entity
     end
@@ -29,15 +27,14 @@ class GeneticasController < ApplicationController
   # PATCH /geneticas/:id
   def update
     if @genetica.update(genetica_params)
-      render json: serialize_genetica(@genetica)
+      render json: serialize_genetica(@genetica, current_user.club)
     else
       render json: { errors: @genetica.errors.full_messages }, status: :unprocessable_entity
     end
   end
 
-  # DELETE /geneticas/:id
+  # DELETE /geneticas/:id  →  soft delete
   def destroy
-    # Soft delete - marcar como inactiva
     @genetica.update(activa: false)
     head :no_content
   end
@@ -52,50 +49,51 @@ class GeneticasController < ApplicationController
 
   def genetica_params
     params.require(:genetica).permit(
-      :nombre,
-      :tipo,
-      :thc,
-      :cbd,
-      :descripcion,
-      :origen,
-      :tiempo_floracion,
-      :rendimiento,
-      :altura,
-      :dificultad,
-      :activa,
-      :disponible
+      :nombre, :tipo, :thc, :cbd, :descripcion,
+      :origen, :tiempo_floracion, :rendimiento,
+      :altura, :dificultad, :activa, :disponible
     )
   end
 
-  def serialize_genetica(genetica)
+  def plantas_count(genetica, club)
+    Plant.joins(:lote)
+         .where(lotes: { club_id: club.id }, genetica_id: genetica.id)
+         .count
+  end
+
+  def serialize_genetica(genetica, club)
     {
-      id: genetica.id,
-      nombre: genetica.nombre,
-      tipo: genetica.tipo,
-      thc: genetica.thc,
-      cbd: genetica.cbd,
-      activa: genetica.activa,
-      disponible: genetica.disponible
+      id:          genetica.id,
+      nombre:      genetica.nombre,
+      tipo:        genetica.tipo,
+      thc:         genetica.thc,
+      cbd:         genetica.cbd,
+      dificultad:  genetica.dificultad,
+      disponible:  genetica.disponible,
+      activa:      genetica.activa,
+      plantas_count: plantas_count(genetica, club),
     }
   end
 
   def serialize_genetica_detail(genetica)
+    club = current_user.club
     {
-      id: genetica.id,
-      nombre: genetica.nombre,
-      tipo: genetica.tipo,
-      thc: genetica.thc,
-      cbd: genetica.cbd,
-      descripcion: genetica.descripcion,
-      origen: genetica.origen,
+      id:               genetica.id,
+      nombre:           genetica.nombre,
+      tipo:             genetica.tipo,
+      thc:              genetica.thc,
+      cbd:              genetica.cbd,
+      descripcion:      genetica.descripcion,
+      origen:           genetica.origen,
       tiempo_floracion: genetica.tiempo_floracion,
-      rendimiento: genetica.rendimiento,
-      altura: genetica.altura,
-      dificultad: genetica.dificultad,
-      activa: genetica.activa,
-      disponible: genetica.disponible,
-      created_at: genetica.created_at,
-      updated_at: genetica.updated_at
+      rendimiento:      genetica.rendimiento,
+      altura:           genetica.altura,
+      dificultad:       genetica.dificultad,
+      disponible:       genetica.disponible,
+      activa:           genetica.activa,
+      plantas_count:    plantas_count(genetica, club),
+      created_at:       genetica.created_at,
+      updated_at:       genetica.updated_at,
     }
   end
 end
