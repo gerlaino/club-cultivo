@@ -155,4 +155,16 @@ export const deletePatientDocument  = (socioId, id) => api.delete(`/socios/${soc
 export const firmarDocumento        = (socioId, id, payload) => api.post(`/socios/${socioId}/documents/${id}/firmar`, payload)
 export const archivarDocumento      = (socioId, id) => api.patch(`/socios/${socioId}/documents/${id}/archivar`)
 
+// -------- SEDES --------
+export const listSedes       = ()            => api.get('/sedes')
+export const getSede         = (id)          => api.get(`/sedes/${id}`)
+export const createSede      = (payload)     => api.post('/sedes', { sede: payload })
+export const updateSede      = (id, payload) => api.put(`/sedes/${id}`, { sede: payload })
+export const deleteSede      = (id)          => api.delete(`/sedes/${id}`)
+export const getSedeInventario = (id)        => api.get(`/sedes/${id}/inventario`)
+export const agregarStock    = (id, payload) => api.post(`/sedes/${id}/agregar_stock`, payload)
+
+// -------- PLAN --------
+export const getPlan = () => api.get('/plan')
+
 export default api;

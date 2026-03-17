@@ -76,5 +76,16 @@ Rails.application.routes.draw do
       resources :dispensaciones, only: [:index, :create]
     end
 
+    # Plan info
+    resource :plan, only: [:show], controller: 'plan'
+
+    # Sedes
+    resources :sedes do
+      member do
+        get  :inventario
+        post :agregar_stock
+      end
+    end
+
   end
 end
