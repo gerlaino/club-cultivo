@@ -13,6 +13,8 @@ import SociosView from "../views/SociosView.vue";
 import SocioDetailView from "../views/SocioDetailView.vue";
 import UsuariosView from "../views/UsuariosView.vue";
 import UsuarioDetail from "../views/UsuarioDetail.vue";
+import SedesView from "../views/SedesView.vue";
+import DocumentTemplatesView from "../views/DocumentTemplatesView.vue";
 import { useAuthStore } from "../stores/auth";
 import { usePermissions } from "../composables/usePermissions";
 
@@ -46,6 +48,15 @@ const routes = [
     meta: { requiresAuth: true },
   },
 
+  // Sedes
+  {
+    path: "/sedes",
+    name: "sedes",
+    component: SedesView,
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("sedes", "index"),
+  },
+
   // Salas
   {
     path: "/salas",
@@ -56,7 +67,7 @@ const routes = [
   },
   {
     path: "/salas/:id",
-    name: "sala-detail",            // ← CORREGIDO (era "salas", duplicado)
+    name: "sala-detail",
     component: SalaDetailView,
     props: (r) => ({ id: Number(r.params.id) }),
     beforeEnter: requiresPermission("salas", "show"),
@@ -110,7 +121,7 @@ const routes = [
     beforeEnter: requiresPermission("geneticas", "index"),
   },
 
-  // Socios
+  // Pacientes
   {
     path: "/socios",
     name: "socios",
@@ -155,11 +166,21 @@ const routes = [
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore();
-      if (auth.user?.role === "admin") {
-        next();
-      } else {
-        next("/");
-      }
+      if (auth.user?.role === "admin") next();
+      else next("/");
+    },
+  },
+
+  // Templates de documentos (solo admin)
+  {
+    path: "/documentos/templates",
+    name: "document-templates",
+    component: DocumentTemplatesView,
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (auth.user?.role === "admin") next();
+      else next("/");
     },
   },
 
@@ -190,3 +211,4 @@ router.beforeEach(async (to) => {
 });
 
 export default router;
+

@@ -19,6 +19,7 @@ export function usePermissions() {
       plantas: ['index', 'show', 'create', 'update', 'destroy'],
       lotes: ['index', 'show', 'create', 'update', 'destroy'],
       salas: ['index', 'show', 'create', 'update', 'destroy'],
+      sedes: ['index', 'show', 'create', 'update', 'destroy'],
       geneticas: ['index', 'show'],
       plan_trabajo: ['index', 'show', 'create', 'update'],
       reportes_cultivo: ['index', 'show']
@@ -28,6 +29,7 @@ export function usePermissions() {
       plant_activities: ['index', 'create', 'destroy'],
       lotes: ['index', 'show'],
       salas: ['index', 'show'],
+      sedes: ['index', 'show'],
       mediciones: ['index', 'create']
     },
     abogado: {

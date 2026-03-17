@@ -4,14 +4,17 @@ import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 import { useClubStore } from "./stores/club";
 import { usePermissions } from "./composables/usePermissions";
+import { usePlan } from "./composables/usePlan";
 import Avatar from "./components/Avatar.vue";
 import BrandLogo from "./components/BrandLogo.vue";
+import PlanBadge from "./components/PlanBadge.vue";
 
 const auth   = useAuthStore();
 const club   = useClubStore();
 const router = useRouter();
 const route  = useRoute();
 const { can, isAdmin } = usePermissions();
+const { fetchPlan } = usePlan();
 
 async function doLogout() {
   await auth.logOut();
@@ -19,7 +22,6 @@ async function doLogout() {
   router.replace("/login");
 }
 
-// Cerrar el collapse mobile después de navegar
 function closeNav() {
   const el = document.getElementById("mainNav");
   if (el && el.classList.contains("show")) {
@@ -31,7 +33,10 @@ watch(
   () => auth.isAuthenticated,
   async (logged) => {
     if (logged) {
-      try { await club.fetch(); } catch (e) { console.error("Error club:", e); }
+      try {
+        await club.fetch();
+        await fetchPlan();
+      } catch (e) { console.error("Error club:", e); }
     } else {
       club.$reset();
     }
@@ -43,6 +48,7 @@ onMounted(async () => {
   await auth.ensureBootstrapped();
   if (auth.isAuthenticated && !club.data) {
     await club.fetch();
+    await fetchPlan();
   }
 });
 </script>
@@ -88,9 +94,15 @@ onMounted(async () => {
               </RouterLink>
             </li>
 
+            <li class="nav-item" v-if="can('sedes', 'index')">
+              <RouterLink class="nav-link px-2" to="/sedes" @click="closeNav">
+                <i class="bi bi-building me-1 d-lg-none"></i>Sedes
+              </RouterLink>
+            </li>
+
             <li class="nav-item" v-if="can('salas', 'index')">
               <RouterLink class="nav-link px-2" to="/salas" @click="closeNav">
-                <i class="bi bi-building me-1 d-lg-none"></i>Salas
+                <i class="bi bi-grid me-1 d-lg-none"></i>Salas
               </RouterLink>
             </li>
 
@@ -139,7 +151,7 @@ onMounted(async () => {
                 <span class="fw-medium d-none d-lg-inline">{{ auth.displayName }}</span>
               </button>
 
-              <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="min-width:220px">
+              <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="min-width:240px">
                 <!-- Info usuario -->
                 <li class="px-3 py-2 border-bottom">
                   <div class="d-flex align-items-center gap-2">
@@ -147,7 +159,10 @@ onMounted(async () => {
                     <div class="overflow-hidden">
                       <div class="fw-semibold text-dark text-truncate">{{ auth.displayName }}</div>
                       <div class="text-muted small text-truncate">{{ auth.email }}</div>
-                      <span class="badge bg-secondary mt-1" style="font-size:.7rem">{{ auth.user?.role }}</span>
+                      <div class="d-flex gap-1 mt-1">
+                        <span class="badge bg-secondary" style="font-size:.68rem">{{ auth.user?.role }}</span>
+                        <PlanBadge />
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -160,6 +175,11 @@ onMounted(async () => {
                 <li v-if="isAdmin">
                   <RouterLink class="dropdown-item py-2 d-flex align-items-center gap-2" to="/preferencias" @click="closeNav">
                     <i class="bi bi-gear text-muted"></i> Preferencias
+                  </RouterLink>
+                </li>
+                <li v-if="isAdmin">
+                  <RouterLink class="dropdown-item py-2 d-flex align-items-center gap-2" to="/documentos/templates" @click="closeNav">
+                    <i class="bi bi-file-earmark-text text-muted"></i> Templates
                   </RouterLink>
                 </li>
                 <li><hr class="dropdown-divider my-1" /></li>
@@ -202,8 +222,6 @@ onMounted(async () => {
   border: 0;
   padding-top: 0.75rem;
 }
-
-/* Active link */
 .navbar-nav .nav-link.router-link-active {
   color: var(--brand-primary, #1b5e20);
   font-weight: 600;
@@ -213,3 +231,4 @@ onMounted(async () => {
   font-weight: 600;
 }
 </style>
+

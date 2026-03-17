@@ -6,6 +6,7 @@ class Club < ApplicationRecord
   has_many :geneticas, dependent: :destroy
   has_many :noticias, dependent: :destroy
   has_many :eventos, dependent: :destroy
+  has_many :sedes, dependent: :destroy
 
   has_one_attached :logo
 

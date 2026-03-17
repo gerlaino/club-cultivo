@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_17_172548) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_17_181314) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -56,6 +56,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_172548) do
     t.string "country"
     t.string "timezone"
     t.string "theme_primary"
+    t.string "plan", default: "semilla", null: false
+    t.date "plan_activo_hasta"
+    t.boolean "plan_trial", default: true, null: false
+    t.jsonb "limites_custom", default: {}
+    t.index ["plan"], name: "index_clubs_on_plan"
   end
 
   create_table "dispensaciones", force: :cascade do |t|
@@ -69,9 +74,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_172548) do
     t.string "tipo_producto", default: "flores", null: false
     t.text "observaciones"
     t.date "fecha_dispensacion", null: false
+    t.bigint "sede_id"
     t.index ["fecha_dispensacion"], name: "index_dispensaciones_on_fecha_dispensacion"
     t.index ["indicacion_medica_id"], name: "index_dispensaciones_on_indicacion_medica_id"
     t.index ["lote_id"], name: "index_dispensaciones_on_lote_id"
+    t.index ["sede_id"], name: "index_dispensaciones_on_sede_id"
     t.index ["socio_id", "fecha_dispensacion"], name: "index_dispensaciones_on_socio_id_and_fecha_dispensacion"
     t.index ["socio_id"], name: "index_dispensaciones_on_socio_id"
     t.index ["user_id"], name: "index_dispensaciones_on_user_id"
@@ -149,6 +156,30 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_172548) do
     t.index ["fecha_vencimiento"], name: "index_indicacion_medicas_on_fecha_vencimiento"
     t.index ["socio_id"], name: "index_indicacion_medicas_on_socio_id"
     t.index ["user_id"], name: "index_indicacion_medicas_on_user_id"
+  end
+
+  create_table "inventario_movimientos", force: :cascade do |t|
+    t.bigint "sede_id", null: false
+    t.bigint "club_id", null: false
+    t.bigint "sede_inventario_id", null: false
+    t.bigint "created_by_id", null: false
+    t.bigint "dispensacion_id"
+    t.bigint "lote_id"
+    t.string "tipo", null: false
+    t.decimal "cantidad", precision: 10, scale: 2, null: false
+    t.decimal "stock_anterior", precision: 10, scale: 2, null: false
+    t.decimal "stock_nuevo", precision: 10, scale: 2, null: false
+    t.text "motivo"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_inventario_movimientos_on_club_id"
+    t.index ["created_by_id"], name: "index_inventario_movimientos_on_created_by_id"
+    t.index ["dispensacion_id"], name: "index_inventario_movimientos_on_dispensacion_id"
+    t.index ["lote_id"], name: "index_inventario_movimientos_on_lote_id"
+    t.index ["sede_id", "created_at"], name: "index_inventario_movimientos_on_sede_id_and_created_at"
+    t.index ["sede_id"], name: "index_inventario_movimientos_on_sede_id"
+    t.index ["sede_inventario_id", "created_at"], name: "idx_on_sede_inventario_id_created_at_5eb09e8add"
+    t.index ["sede_inventario_id"], name: "index_inventario_movimientos_on_sede_inventario_id"
   end
 
   create_table "jwt_denylists", force: :cascade do |t|
@@ -270,9 +301,50 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_172548) do
     t.bigint "created_by_id", null: false
     t.string "camera_stream_url"
     t.string "camera_snapshot_url"
+    t.bigint "sede_id"
     t.index ["club_id"], name: "index_salas_on_club_id"
     t.index ["created_by_id"], name: "index_salas_on_created_by_id"
     t.index ["nombre"], name: "index_salas_on_nombre"
+    t.index ["sede_id"], name: "index_salas_on_sede_id"
+  end
+
+  create_table "sede_inventarios", force: :cascade do |t|
+    t.bigint "sede_id", null: false
+    t.bigint "club_id", null: false
+    t.bigint "created_by_id", null: false
+    t.string "producto", null: false
+    t.string "descripcion"
+    t.decimal "stock_gramos", precision: 10, scale: 2, default: "0.0", null: false
+    t.decimal "stock_minimo", precision: 10, scale: 2, default: "0.0"
+    t.bigint "lote_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_sede_inventarios_on_club_id"
+    t.index ["created_by_id"], name: "index_sede_inventarios_on_created_by_id"
+    t.index ["lote_id"], name: "index_sede_inventarios_on_lote_id"
+    t.index ["sede_id", "producto"], name: "index_sede_inventarios_on_sede_id_and_producto"
+    t.index ["sede_id"], name: "index_sede_inventarios_on_sede_id"
+  end
+
+  create_table "sedes", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "created_by_id", null: false
+    t.string "nombre", null: false
+    t.string "tipo", default: "produccion", null: false
+    t.string "direccion"
+    t.string "ciudad"
+    t.string "provincia"
+    t.string "pais", default: "Argentina"
+    t.boolean "activa", default: true, null: false
+    t.boolean "declarada_reprocann", default: false, null: false
+    t.string "reprocann_domicilio_id"
+    t.text "notas"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "activa"], name: "index_sedes_on_club_id_and_activa"
+    t.index ["club_id", "tipo"], name: "index_sedes_on_club_id_and_tipo"
+    t.index ["club_id"], name: "index_sedes_on_club_id"
+    t.index ["created_by_id"], name: "index_sedes_on_created_by_id"
   end
 
   create_table "socio_nota", force: :cascade do |t|
@@ -355,6 +427,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_172548) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "dispensaciones", "indicacion_medicas"
   add_foreign_key "dispensaciones", "lotes"
+  add_foreign_key "dispensaciones", "sedes"
   add_foreign_key "dispensaciones", "socios"
   add_foreign_key "dispensaciones", "users"
   add_foreign_key "document_templates", "clubs"
@@ -363,6 +436,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_172548) do
   add_foreign_key "geneticas", "clubs"
   add_foreign_key "indicacion_medicas", "socios"
   add_foreign_key "indicacion_medicas", "users"
+  add_foreign_key "inventario_movimientos", "clubs"
+  add_foreign_key "inventario_movimientos", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "inventario_movimientos", "lotes"
+  add_foreign_key "inventario_movimientos", "sede_inventarios"
+  add_foreign_key "inventario_movimientos", "sedes"
+  add_foreign_key "inventario_movimientos", "users", column: "created_by_id"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "salas"
   add_foreign_key "noticias", "clubs"
@@ -375,7 +454,14 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_172548) do
   add_foreign_key "plants", "geneticas"
   add_foreign_key "plants", "lotes"
   add_foreign_key "salas", "clubs"
+  add_foreign_key "salas", "sedes"
   add_foreign_key "salas", "users", column: "created_by_id"
+  add_foreign_key "sede_inventarios", "clubs"
+  add_foreign_key "sede_inventarios", "lotes"
+  add_foreign_key "sede_inventarios", "sedes"
+  add_foreign_key "sede_inventarios", "users", column: "created_by_id"
+  add_foreign_key "sedes", "clubs"
+  add_foreign_key "sedes", "users", column: "created_by_id"
   add_foreign_key "socio_nota", "socios"
   add_foreign_key "socio_nota", "users"
   add_foreign_key "socio_notas", "clubs"
