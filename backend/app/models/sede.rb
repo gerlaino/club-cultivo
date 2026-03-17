@@ -3,9 +3,8 @@ class Sede < ApplicationRecord
   belongs_to :created_by, class_name: 'User'
 
   has_many :salas,               dependent: :nullify
-  has_many :inventario_items,    dependent: :destroy
+  has_many :inventarios, class_name: "SedeInventario",    dependent: :destroy
   has_many :inventario_movimientos, dependent: :destroy
-  has_many :dispensaciones,      dependent: :nullify
 
   TIPOS = %w[produccion social mixta].freeze
   TIPO_LABELS = {

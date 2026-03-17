@@ -14,7 +14,7 @@ const club   = useClubStore();
 const router = useRouter();
 const route  = useRoute();
 const { can, isAdmin } = usePermissions();
-const { fetchPlan } = usePlan();
+const { fetchPlan, planData } = usePlan();
 
 async function doLogout() {
   await auth.logOut();
@@ -39,6 +39,7 @@ watch(
       } catch (e) { console.error("Error club:", e); }
     } else {
       club.$reset();
+      planData.value = null
     }
   },
   { immediate: true }

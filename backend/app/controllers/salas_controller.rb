@@ -1,42 +1,49 @@
+# backend/app/controllers/salas_controller.rb
 class SalasController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_admin_or_agricultor
   before_action :set_sala, only: [:show, :update, :destroy]
 
-  # GET /salas
   def index
-    @salas = current_user.club.salas.includes(:lotes).order(created_at: :desc)
-    render json: @salas.map { |s| serialize_sala(s) }
+    salas = current_user.club.salas
+                        .includes(:sede, :lotes, :created_by)
+                        .order(:nombre)
+    render json: salas.map { |s| serialize_sala(s) }
   end
 
-  # GET /salas/:id
   def show
-    render json: serialize_sala(@sala, include_lotes: true)
+    render json: serialize_sala_detail(@sala)
   end
 
-  # POST /salas
   def create
-    @sala = current_user.club.salas.build(sala_params)
-    @sala.created_by = current_user
+    sala = current_user.club.salas.build(sala_params)
+    sala.created_by = current_user
 
-    if @sala.save
-      render json: serialize_sala(@sala), status: :created
+    # Validar capacidad del plan
+    enforcer = PlanEnforcer.new(current_user.club)
+    unless enforcer.puede_crear_lote? # reutilizamos lotes como proxy de salas
+      # No bloqueamos la creación de salas por plan, solo lotes y plantas
+    end
+
+    if sala.save
+      render json: serialize_sala(sala), status: :created
     else
-      render json: { errors: @sala.errors.full_messages }, status: :unprocessable_entity
+      render json: { errors: sala.errors.full_messages }, status: :unprocessable_entity
     end
   end
 
-  # PATCH/PUT /salas/:id
   def update
     if @sala.update(sala_params)
-      render json: serialize_sala(@sala)
+      render json: serialize_sala_detail(@sala)
     else
       render json: { errors: @sala.errors.full_messages }, status: :unprocessable_entity
     end
   end
 
-  # DELETE /salas/:id
   def destroy
+    if @sala.lotes.any?
+      return render json: { error: 'No se puede eliminar una sala con lotes activos' },
+                    status: :unprocessable_entity
+    end
     @sala.destroy
     head :no_content
   end
@@ -51,48 +58,34 @@ class SalasController < ApplicationController
 
   def sala_params
     params.require(:sala).permit(
-      :nombre, :state, :pots_count, :notes,
-      :kind, :camera_stream_url, :camera_snapshot_url
+      :nombre, :state, :kind, :notes, :pots_count, :plants_max, :sede_id
     )
   end
 
-  def require_admin_or_agricultor
-    unless current_user.admin? || current_user.agricultor?
-      render json: { error: 'No autorizado' }, status: :forbidden
-    end
-  end
-
-  def serialize_sala(sala, include_lotes: false)
-    result = {
-      id: sala.id,
-      nombre: sala.nombre,
-      state: sala.state,
-      pots_count: sala.pots_count,
-      notes: sala.notes,
-      kind: sala.kind,
-      camera_stream_url: sala.camera_stream_url,
-      camera_snapshot_url: sala.camera_snapshot_url,
-      plantas_totales: sala.plantas_totales,
-      porcentaje_ocupacion: sala.porcentaje_ocupacion,
-      created_by_name: sala.created_by_name,
-      created_at: sala.created_at,
-      updated_at: sala.updated_at
-    }
-
-    if include_lotes
-      result[:lotes] = sala.lotes.map { |l| serialize_lote_simple(l) }
-    end
-
-    result
-  end
-
-  def serialize_lote_simple(lote)
+  def serialize_sala(s)
     {
-      id: lote.id,
-      codigo: lote.codigo,
-      estado: lote.estado,
-      plants_count: lote.plants_count,
-      strain: lote.strain
+      id:                   s.id,
+      nombre:               s.nombre,
+      state:                s.state,
+      kind:                 s.kind,
+      notes:                s.notes,
+      pots_count:           s.pots_count,
+      plants_max:           s.plants_max,
+      plantas_totales:      s.plantas_totales,
+      capacidad_disponible: s.capacidad_disponible,
+      porcentaje_ocupacion: s.porcentaje_ocupacion,
+      lotes_count:          s.lotes.count,
+      sede: s.sede ? { id: s.sede.id, nombre: s.sede.nombre, tipo: s.sede.tipo } : nil,
+      created_by:           s.created_by_name,
+      updated_at:           s.updated_at,
     }
+  end
+
+  def serialize_sala_detail(s)
+    serialize_sala(s).merge(
+      lotes: s.lotes.order(created_at: :desc).map { |l|
+        { id: l.id, codigo: l.codigo, estado: l.estado, plants_count: l.plants_count }
+      }
+    )
   end
 end
