@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_17_181314) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_17_211802) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -284,9 +284,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_181314) do
     t.text "notas"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "planta_madre_id"
+    t.string "origen", default: "semilla"
     t.index ["codigo_qr"], name: "index_plants_on_codigo_qr", unique: true
     t.index ["genetica_id"], name: "index_plants_on_genetica_id"
     t.index ["lote_id"], name: "index_plants_on_lote_id"
+    t.index ["origen"], name: "index_plants_on_origen"
+    t.index ["planta_madre_id"], name: "index_plants_on_planta_madre_id"
   end
 
   create_table "salas", force: :cascade do |t|
@@ -302,6 +306,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_181314) do
     t.string "camera_stream_url"
     t.string "camera_snapshot_url"
     t.bigint "sede_id"
+    t.integer "plants_max", default: 0
     t.index ["club_id"], name: "index_salas_on_club_id"
     t.index ["created_by_id"], name: "index_salas_on_created_by_id"
     t.index ["nombre"], name: "index_salas_on_nombre"

@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { signIn, signOut, me } from "../lib/api";
 import router from "../router";
 import { useClubStore } from "../stores/club.js";
+import { usePlan } from '../composables/usePlan.js'
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -86,14 +87,16 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async logOut() {
-      this.loading = true; this.error = null;
+      this.loading = true;
+      this.error = null;
       try {
         await signOut();
       } catch (_) {
-        // ignoramos errores de signout
       } finally {
         this.user = null;
-        this.bootstrapped = true; // ya “sabemos” que no hay sesión
+        this.bootstrapped = true;
+        const { planData } = usePlan();
+        planData.value = null;
         router.push({ name: "login" });
         this.loading = false;
       }

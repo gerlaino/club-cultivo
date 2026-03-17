@@ -1,10 +1,10 @@
 <template>
   <div class="dashboard-view">
-    <AdminDashboard v-if="auth.user?.role === 'admin'" />
-    <MedicoDashboard v-else-if="auth.user?.role === 'medico'" />
-    <AgricultorDashboard v-else-if="auth.user?.role === 'agricultor'" />
-    <CultivadorDashboard v-else-if="auth.user?.role === 'cultivador'" />
-    <DefaultDashboard v-else />
+    <AdminDashboard      v-if="auth.user?.role === 'admin'"       :key="auth.user?.id" />
+    <MedicoDashboard     v-else-if="auth.user?.role === 'medico'"      :key="auth.user?.id" />
+    <AgricultorDashboard v-else-if="auth.user?.role === 'agricultor'"  :key="auth.user?.id" />
+    <CultivadorDashboard v-else-if="auth.user?.role === 'cultivador'"  :key="auth.user?.id" />
+    <DefaultDashboard    v-else                                         :key="auth.user?.id" />
   </div>
 </template>
 
