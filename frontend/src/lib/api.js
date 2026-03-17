@@ -139,4 +139,20 @@ export const updateUser        = (id, payload) => api.put(`/usuarios/${id}`, { u
 export const deleteUser        = (id) => api.delete(`/usuarios/${id}`);
 export const resetUserPassword = (id) => api.post(`/usuarios/${id}/reset_password`);
 
+// -------- DOCUMENT TEMPLATES --------
+export const listDocumentTemplates  = ()         => api.get('/document_templates')
+export const getDocumentTemplate    = (id)       => api.get(`/document_templates/${id}`)
+export const createDocumentTemplate = (payload)  => api.post('/document_templates', { document_template: payload })
+export const updateDocumentTemplate = (id, payload) => api.put(`/document_templates/${id}`, { document_template: payload })
+export const deleteDocumentTemplate = (id)       => api.delete(`/document_templates/${id}`)
+
+// -------- PATIENT DOCUMENTS --------
+export const listPatientDocuments   = (socioId)  => api.get(`/socios/${socioId}/documents`)
+export const getPatientDocument     = (socioId, id) => api.get(`/socios/${socioId}/documents/${id}`)
+export const createPatientDocument  = (socioId, payload) => api.post(`/socios/${socioId}/documents`, { document: payload })
+export const updatePatientDocument  = (socioId, id, payload) => api.put(`/socios/${socioId}/documents/${id}`, { document: payload })
+export const deletePatientDocument  = (socioId, id) => api.delete(`/socios/${socioId}/documents/${id}`)
+export const firmarDocumento        = (socioId, id, payload) => api.post(`/socios/${socioId}/documents/${id}/firmar`, payload)
+export const archivarDocumento      = (socioId, id) => api.patch(`/socios/${socioId}/documents/${id}/archivar`)
+
 export default api;

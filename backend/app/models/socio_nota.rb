@@ -1,7 +1,6 @@
 class SocioNota < ApplicationRecord
   acts_as_paranoid
 
-  belongs_to :club
   belongs_to :socio
 
   validates :contenido, presence: true
