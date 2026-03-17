@@ -1,100 +1,52 @@
 <template>
-  <div class="admin-dashboard">
-    <!-- Métricas principales -->
-    <div class="row g-3 mb-4">
-      <div class="col-md-3">
-        <div class="stat-card bg-success text-white">
-          <div class="stat-icon">
-            <i class="bi bi-people-fill"></i>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.socios || 0 }}</div>
-            <div class="stat-label">Socios Activos</div>
-          </div>
-        </div>
-      </div>
+  <div class="container-fluid py-4 px-3 px-md-4">
 
-      <div class="col-md-3">
-        <div class="stat-card bg-primary text-white">
-          <div class="stat-icon">
-            <i class="bi bi-flower2"></i>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.plantas || 0 }}</div>
-            <div class="stat-label">Plantas Activas</div>
-          </div>
-        </div>
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+      <div>
+        <h1 class="h3 fw-bold mb-0">{{ saludo }}, {{ auth.displayName }}</h1>
+        <p class="text-muted small mb-0 text-capitalize">{{ hoy }}</p>
       </div>
-
-      <div class="col-md-3">
-        <div class="stat-card bg-info text-white">
-          <div class="stat-icon">
-            <i class="bi bi-door-open"></i>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.salas || 0 }}</div>
-            <div class="stat-label">Salas</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-3">
-        <div class="stat-card bg-warning text-white">
-          <div class="stat-icon">
-            <i class="bi bi-box-seam"></i>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.lotes || 0 }}</div>
-            <div class="stat-label">Lotes Activos</div>
-          </div>
-        </div>
-      </div>
+      <RouterLink to="/preferencias" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-gear me-1"></i>Preferencias
+      </RouterLink>
     </div>
 
-    <!-- Gráficos -->
-    <div class="row g-3 mt-2">
-      <div class="col-lg-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">
-              <i class="bi bi-pie-chart me-2"></i>
-              Distribución de Plantas por Estado
-            </h6>
-          </div>
+    <!-- KPIs -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="kpi card border-0 h-100">
           <div class="card-body">
-            <PlantDistributionChart :data="stats" />
+            <div class="kpi-icon mb-2" style="background:rgba(27,94,32,.12)">🌱</div>
+            <div class="kpi-value">{{ stats.vegetativo || 0 }}</div>
+            <div class="kpi-label">Plantas vegetativo</div>
           </div>
         </div>
       </div>
-
-      <div class="col-lg-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">
-              <i class="bi bi-activity me-2"></i>
-              Actividad Reciente
-            </h6>
-          </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi card border-0 h-100">
           <div class="card-body">
-            <div v-if="actividad.length === 0" class="text-center text-muted py-4">
-              <i class="bi bi-inbox display-4"></i>
-              <p class="mt-2 mb-0">No hay actividad reciente</p>
-            </div>
-            <div v-else class="list-group list-group-flush">
-              <div
-                v-for="item in actividad"
-                :key="item.id"
-                class="list-group-item px-0"
-              >
-                <div class="d-flex align-items-start">
-                  <i :class="item.icon" class="me-3 mt-1"></i>
-                  <div class="flex-grow-1">
-                    <div class="mb-0">{{ item.text }}</div>
-                    <small class="text-muted">{{ item.time }}</small>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <div class="kpi-icon mb-2" style="background:rgba(255,193,7,.15)">🌸</div>
+            <div class="kpi-value">{{ stats.floracion || 0 }}</div>
+            <div class="kpi-label">Plantas floración</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi card border-0 h-100">
+          <div class="card-body">
+            <div class="kpi-icon mb-2" style="background:rgba(13,110,253,.1)">👥</div>
+            <div class="kpi-value">{{ stats.socios || 0 }}</div>
+            <div class="kpi-label">Socios activos</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi card border-0 h-100">
+          <div class="card-body">
+            <div class="kpi-icon mb-2" style="background:rgba(108,117,125,.1)">📦</div>
+            <div class="kpi-value">{{ stats.lotes || 0 }}</div>
+            <div class="kpi-label">Lotes activos</div>
           </div>
         </div>
       </div>
@@ -103,65 +55,141 @@
     <!-- Accesos rápidos -->
     <div class="row g-3 mb-4">
       <div class="col-12">
-        <h4 class="mb-3">Accesos Rápidos</h4>
+        <p class="fw-semibold text-muted small text-uppercase mb-2" style="letter-spacing:.05em">Accesos rápidos</p>
       </div>
-
-      <div class="col-md-4">
-        <RouterLink to="/socios/nuevo" class="quick-action-card">
-          <i class="bi bi-person-plus-fill"></i>
-          <span>Nuevo Socio</span>
+      <div class="col-6 col-md-3">
+        <RouterLink to="/salas" class="quick-card text-decoration-none">
+          <span class="quick-icon">🏠</span>
+          <span class="quick-label">Salas</span>
         </RouterLink>
       </div>
-
-      <div class="col-md-4">
-        <RouterLink to="/salas/nueva" class="quick-action-card">
-          <i class="bi bi-building-add"></i>
-          <span>Nueva Sala</span>
+      <div class="col-6 col-md-3">
+        <RouterLink to="/lotes" class="quick-card text-decoration-none">
+          <span class="quick-icon">📦</span>
+          <span class="quick-label">Lotes</span>
         </RouterLink>
       </div>
-
-      <div class="col-md-4">
-        <RouterLink to="/usuarios" class="quick-action-card">
-          <i class="bi bi-people"></i>
-          <span>Gestionar Usuarios</span>
+      <div class="col-6 col-md-3">
+        <RouterLink to="/socios" class="quick-card text-decoration-none">
+          <span class="quick-icon">👥</span>
+          <span class="quick-label">Pacientes</span>
+        </RouterLink>
+      </div>
+      <div class="col-6 col-md-3">
+        <RouterLink to="/usuarios" class="quick-card text-decoration-none">
+          <span class="quick-icon">🔑</span>
+          <span class="quick-label">Usuarios</span>
         </RouterLink>
       </div>
     </div>
 
-    <div class="col-lg-6">
-      <div class="card h-100">
-        <div class="card-header">
-          <h6 class="mb-0">
-            <i class="bi bi-bar-chart me-2"></i>
-            Plantas por Genética
-          </h6>
+    <!-- Gráficos -->
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent border-0 pt-3 pb-0">
+            <strong>Distribución de plantas por estado</strong>
+          </div>
+          <div class="card-body">
+            <div v-if="loading" class="text-center py-4 text-muted">
+              <div class="spinner-border spinner-border-sm"></div>
+            </div>
+            <PlantDistributionChart v-else :data="stats" />
+          </div>
         </div>
-        <div class="card-body">
-          <PlantsByGeneticaChart :data="plantasPorGenetica" />
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent border-0 pt-3 pb-0">
+            <strong>Plantas por genética</strong>
+          </div>
+          <div class="card-body">
+            <div v-if="loading" class="text-center py-4 text-muted">
+              <div class="spinner-border spinner-border-sm"></div>
+            </div>
+            <div v-else-if="!plantasPorGenetica.length" class="text-center py-4 text-muted">
+              <div class="fs-2 mb-2">🌿</div>
+              <div class="small">Sin datos de genéticas todavía</div>
+            </div>
+            <PlantsByGeneticaChart v-else :data="plantasPorGenetica" />
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- Alertas + resumen -->
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-transparent border-0 pt-3 pb-0 d-flex align-items-center justify-content-between">
+            <strong>⚠️ Reprocann por vencer</strong>
+            <span class="badge" :class="stats.vencimientos > 0 ? 'text-bg-warning' : 'text-bg-success'">
+              {{ stats.vencimientos || 0 }}
+            </span>
+          </div>
+          <div class="card-body">
+            <div v-if="!stats.vencimientos" class="text-center py-3 text-muted small">
+              <i class="bi bi-check-circle text-success fs-4 d-block mb-1"></i>
+              Sin vencimientos próximos
+            </div>
+            <div v-else class="small text-muted">
+              <span class="text-warning fw-semibold">{{ stats.vencimientos }}</span>
+              {{ stats.vencimientos === 1 ? 'socio tiene' : 'socios tienen' }}
+              Reprocann venciendo en los próximos 30 días.
+              <RouterLink to="/socios" class="ms-1 text-decoration-none">Ver socios →</RouterLink>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-transparent border-0 pt-3 pb-0">
+            <strong>📊 Resumen general</strong>
+          </div>
+          <div class="card-body small">
+            <dl class="row mb-0">
+              <dt class="col-7 fw-normal text-muted">Total plantas activas</dt>
+              <dd class="col-5 fw-semibold">{{ stats.plantas || 0 }}</dd>
+              <dt class="col-7 fw-normal text-muted">Total salas</dt>
+              <dd class="col-5 fw-semibold">{{ stats.salas || 0 }}</dd>
+              <dt class="col-7 fw-normal text-muted">Plantas en secado</dt>
+              <dd class="col-5 fw-semibold">{{ stats.secado || 0 }}</dd>
+              <dt class="col-7 fw-normal text-muted">Socios totales</dt>
+              <dd class="col-5 fw-semibold mb-0">{{ stats.socios || 0 }}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import api from '../../lib/api.js'
+import { useAuthStore } from '../../stores/auth.js'
 import PlantDistributionChart from '../charts/PlantDistributionChart.vue'
 import PlantsByGeneticaChart from '../charts/PlantsByGeneticaChart.vue'
 
-const stats = ref({})
-const actividad = ref([])
+const auth    = useAuthStore()
+const stats   = ref({})
 const loading = ref(true)
+
 const plantasPorGenetica = computed(() => stats.value.plantas_por_genetica || [])
+
+const hora   = new Date().getHours()
+const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
+const hoy    = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
 
 onMounted(async () => {
   try {
-    const { data } = await api.get('stats')
+    const { data } = await api.get('/stats')
     stats.value = data
-    actividad.value = data.actividad || []
-  } catch (error) {
-    console.error('Error cargando stats:', error)
+  } catch (e) {
+    console.error('Error cargando stats:', e)
   } finally {
     loading.value = false
   }
@@ -169,95 +197,27 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.stat-card {
-  border-radius: 12px;
-  padding: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  transition: transform 0.2s;
+.kpi .card-body { padding: 1.25rem 1.5rem; }
+.kpi-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem;
 }
+.kpi-value { font-size: 2rem; font-weight: 700; line-height: 1; color: #1f2937; }
+.kpi-label { font-size: .85rem; color: #6b7280; margin-top: .2rem; }
 
-.stat-card:hover {
+.quick-card {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: .5rem; padding: 1.5rem 1rem;
+  background: white; border: 1.5px solid rgba(0,0,0,.06);
+  border-radius: 1rem; color: #374151; transition: all .15s;
+}
+.quick-card:hover {
+  border-color: var(--brand-primary, #1b5e20);
+  color: var(--brand-primary, #1b5e20);
   transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(27,94,32,.12);
 }
-
-.stat-icon {
-  font-size: 2.5rem;
-  opacity: 0.9;
-}
-
-.stat-value {
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1;
-  margin-bottom: 0.25rem;
-}
-
-.stat-label {
-  font-size: 0.875rem;
-  opacity: 0.9;
-}
-
-.quick-action-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  background: white;
-  border: 2px solid #e9ecef;
-  border-radius: 12px;
-  text-decoration: none;
-  color: #495057;
-  transition: all 0.2s;
-  gap: 0.75rem;
-}
-
-.quick-action-card:hover {
-  border-color: #198754;
-  color: #198754;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(25, 135, 84, 0.15);
-}
-
-.quick-action-card i {
-  font-size: 2.5rem;
-}
-
-.quick-action-card span {
-  font-weight: 600;
-}
-
-.activity-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.activity-item {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  border-radius: 8px;
-  background: #f8f9fa;
-}
-
-.activity-icon {
-  font-size: 1.5rem;
-}
-
-.activity-content {
-  flex: 1;
-}
-
-.activity-text {
-  font-weight: 500;
-  margin-bottom: 0.25rem;
-}
-
-.activity-time {
-  font-size: 0.875rem;
-}
+.quick-icon { font-size: 2rem; }
+.quick-label { font-size: .9rem; font-weight: 600; }
 </style>
