@@ -91,11 +91,11 @@ class SociosController < ApplicationController
     end
   end
 
-  # Con tu migración ya aplicada: email y telefono existen.
   def socio_params
     params.require(:socio).permit(
       :nombre, :apellido, :dni, :fecha_nacimiento, :es_paciente,
-      :email, :telefono
+      :email, :telefono,
+      :reprocann_numero, :reprocann_vencimiento
     )
   end
 end
