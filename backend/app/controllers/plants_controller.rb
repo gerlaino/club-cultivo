@@ -4,11 +4,11 @@ class PlantsController < ApplicationController
 
   # GET /plants
   def index
-    club = current_user.club
+    club   = current_user.club
     plants = Plant.where(lote_id: club.lotes.pluck(:id))
+                  .includes(:lote, :genetica)
 
-    # Filtros opcionales
-    plants = plants.where(state: params[:state]) if params[:state].present?
+    plants = plants.where(state: params[:state])   if params[:state].present?
     plants = plants.where(lote_id: params[:lote_id]) if params[:lote_id].present?
 
     render json: plants.map { |p| serialize_plant(p) }
@@ -21,7 +21,7 @@ class PlantsController < ApplicationController
 
   # POST /plants
   def create
-    lote = current_user.club.lotes.find(params[:plant][:lote_id])
+    lote  = current_user.club.lotes.find(params[:plant][:lote_id])
     plant = lote.plants.build(plant_params)
 
     if plant.save
@@ -34,21 +34,18 @@ class PlantsController < ApplicationController
 
   # PATCH /plants/:id
   def update
-    # Guardar estado anterior ANTES del update
     old_state = @plant.state
 
     if @plant.update(plant_params)
-      # Crear actividad si cambió el estado
-      if plant_params[:state] && @plant.state != old_state
+      if plant_params[:state].present? && @plant.state != old_state
         @plant.activities.create!(
-          user: current_user,
+          user:          current_user,
           activity_type: 'state_change',
-          description: "Estado cambiado de #{old_state} a #{@plant.state}",
-          occurred_at: Time.current
+          description:   "Estado cambiado de #{old_state} a #{@plant.state}",
+          occurred_at:   Time.current
         )
       end
-
-      render json: serialize_plant(@plant)
+      render json: serialize_plant_detail(@plant)
     else
       render json: { errors: @plant.errors.full_messages }, status: :unprocessable_entity
     end
@@ -58,49 +55,46 @@ class PlantsController < ApplicationController
   def destroy
     lote = @plant.lote
     @plant.destroy
-    lote.decrement!(:plants_count) if lote.plants_count > 0
+    lote.decrement!(:plants_count) if lote.plants_count.to_i > 0
     head :no_content
   end
 
   private
 
   def set_plant
-    club = current_user.club
-    @plant = Plant.joins(:lote).where(lotes: { club_id: club.id }).find(params[:id])
+    club   = current_user.club
+    @plant = Plant.joins(:lote)
+                  .where(lotes: { club_id: club.id })
+                  .find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Planta no encontrada' }, status: :not_found
   end
 
   def plant_params
     params.require(:plant).permit(
-      :nombre,
-      :genetica_id,
-      :state,
-      :fecha_germinacion,
-      :fecha_vegetativo,
-      :fecha_floracion,
-      :fecha_cosecha,
-      :peso_seco,
-      :notas
+      :nombre, :genetica_id, :state,
+      :fecha_germinacion, :fecha_vegetativo,
+      :fecha_floracion, :fecha_cosecha,
+      :peso_seco, :notas
     )
   end
 
   def serialize_plant(plant)
     {
-      id: plant.id,
-      nombre: plant.nombre,
-      codigo_qr: plant.codigo_qr,
-      state: plant.state,
+      id:         plant.id,
+      nombre:     plant.nombre,
+      codigo_qr:  plant.codigo_qr,
+      state:      plant.state,
       lote: {
-        id: plant.lote.id,
+        id:     plant.lote.id,
         codigo: plant.lote.codigo
       },
       genetica: plant.genetica ? {
-        id: plant.genetica.id,
+        id:     plant.genetica.id,
         nombre: plant.genetica.nombre,
-        tipo: plant.genetica.tipo
+        tipo:   plant.genetica.tipo
       } : nil,
-      fecha_germinacion: plant.fecha_germinacion,
+      fecha_germinacion:      plant.fecha_germinacion,
       dias_desde_germinacion: plant.fecha_germinacion ? (Date.today - plant.fecha_germinacion).to_i : nil,
       created_at: plant.created_at
     }
@@ -108,34 +102,34 @@ class PlantsController < ApplicationController
 
   def serialize_plant_detail(plant)
     {
-      id: plant.id,
-      nombre: plant.nombre,
+      id:        plant.id,
+      nombre:    plant.nombre,
       codigo_qr: plant.codigo_qr,
-      state: plant.state,
+      state:     plant.state,
       lote: {
-        id: plant.lote.id,
+        id:     plant.lote.id,
         codigo: plant.lote.codigo,
         sala: {
-          id: plant.lote.sala.id,
-          name: plant.lote.sala.name
+          id:     plant.lote.sala.id,
+          nombre: plant.lote.sala.nombre   # ← corregido: era .name
         }
       },
       genetica: plant.genetica ? {
-        id: plant.genetica.id,
+        id:     plant.genetica.id,
         nombre: plant.genetica.nombre,
-        tipo: plant.genetica.tipo,
-        thc: plant.genetica.thc,
-        cbd: plant.genetica.cbd
+        tipo:   plant.genetica.tipo,
+        thc:    plant.genetica.thc,
+        cbd:    plant.genetica.cbd
       } : nil,
-      fecha_germinacion: plant.fecha_germinacion,
-      fecha_vegetativo: plant.fecha_vegetativo,
-      fecha_floracion: plant.fecha_floracion,
-      fecha_cosecha: plant.fecha_cosecha,
-      peso_seco: plant.peso_seco,
-      notas: plant.notas,
+      fecha_germinacion:      plant.fecha_germinacion,
+      fecha_vegetativo:       plant.fecha_vegetativo,
+      fecha_floracion:        plant.fecha_floracion,
+      fecha_cosecha:          plant.fecha_cosecha,
+      peso_seco:              plant.peso_seco,
+      notas:                  plant.notas,
       dias_desde_germinacion: plant.fecha_germinacion ? (Date.today - plant.fecha_germinacion).to_i : nil,
-      dias_en_vegetativo: plant.fecha_vegetativo && plant.fecha_floracion ? (plant.fecha_floracion - plant.fecha_vegetativo).to_i : nil,
-      dias_en_floracion: plant.fecha_floracion && plant.fecha_cosecha ? (plant.fecha_cosecha - plant.fecha_floracion).to_i : nil,
+      dias_en_vegetativo:     (plant.fecha_vegetativo && plant.fecha_floracion) ? (plant.fecha_floracion - plant.fecha_vegetativo).to_i : nil,
+      dias_en_floracion:      (plant.fecha_floracion  && plant.fecha_cosecha)   ? (plant.fecha_cosecha  - plant.fecha_floracion).to_i  : nil,
       created_at: plant.created_at,
       updated_at: plant.updated_at
     }
