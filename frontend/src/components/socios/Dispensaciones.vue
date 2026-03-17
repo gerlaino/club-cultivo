@@ -1,96 +1,218 @@
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useAuthStore } from '../../stores/auth'
+import {
+  listDispensaciones, createDispensacion, updateDispensacion, deleteDispensacion,
+  listIndicaciones, listLotes
+} from '../../lib/api.js'
+
+const props = defineProps({
+  socioId: { type: Number, required: true }
+})
+
+const auth          = useAuthStore()
+const dispensaciones = ref([])
+const indicaciones   = ref([])
+const lotes          = ref([])
+const loading        = ref(true)
+const showModal      = ref(false)
+const editingId      = ref(null)
+const saving         = ref(false)
+const deleting       = ref(false)
+const showDelete     = ref(false)
+const deleteTarget   = ref(null)
+const formError      = ref(null)
+
+const cupoMensual         = ref(40)
+const totalDispensadoMes  = ref(0)
+const cupoDisponible      = ref(40)
+
+const canCreate = computed(() => ['admin', 'medico', 'agricultor'].includes(auth.user?.role))
+const canEdit   = computed(() => ['admin', 'medico', 'agricultor'].includes(auth.user?.role))
+
+const porcentajeCupo = computed(() =>
+    cupoMensual.value ? Math.min(100, (totalDispensadoMes.value / cupoMensual.value) * 100) : 0
+)
+
+const today = new Date().toISOString().split('T')[0]
+
+function emptyForm() {
+  return {
+    cantidad_gramos:     null,
+    tipo_producto:       'flores',
+    fecha_dispensacion:  today,
+    lote_id:             null,
+    indicacion_medica_id: null,
+    observaciones:       '',
+  }
+}
+const form = ref(emptyForm())
+
+function formatDate(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function openCreate() {
+  editingId.value  = null
+  form.value       = emptyForm()
+  formError.value  = null
+  showModal.value  = true
+}
+
+function openEdit(disp) {
+  editingId.value = disp.id
+  form.value = {
+    cantidad_gramos:      disp.cantidad_gramos,
+    tipo_producto:        disp.tipo_producto,
+    fecha_dispensacion:   disp.fecha_dispensacion,
+    lote_id:              disp.lote?.id              || null,
+    indicacion_medica_id: disp.indicacion_medica?.id || null,
+    observaciones:        disp.observaciones         || '',
+  }
+  formError.value = null
+  showModal.value = true
+}
+
+async function loadDispensaciones() {
+  loading.value = true
+  try {
+    const { data } = await listDispensaciones(props.socioId)
+    dispensaciones.value    = data.dispensaciones    || []
+    cupoMensual.value       = data.cupo_mensual      || 40
+    totalDispensadoMes.value = data.total_dispensado_mes || 0
+    cupoDisponible.value    = data.cupo_disponible   || 40
+  } catch (e) {
+    console.error('Error cargando dispensaciones:', e)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleSubmit() {
+  if (!form.value.cantidad_gramos || form.value.cantidad_gramos <= 0) {
+    formError.value = 'La cantidad debe ser mayor a 0'
+    return
+  }
+  saving.value    = true
+  formError.value = null
+  try {
+    const payload = { ...form.value }
+    Object.keys(payload).forEach(k => {
+      if (payload[k] === '' || payload[k] === null) delete payload[k]
+    })
+    if (editingId.value) {
+      await updateDispensacion(editingId.value, payload)
+    } else {
+      await createDispensacion(props.socioId, payload)
+    }
+    await loadDispensaciones()
+    showModal.value = false
+  } catch (e) {
+    formError.value = e.response?.data?.errors?.[0] || 'Error al guardar'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handleDelete() {
+  deleting.value = true
+  try {
+    await deleteDispensacion(deleteTarget.value.id)
+    await loadDispensaciones()
+    showDelete.value = false
+  } catch (e) {
+    console.error('Error eliminando:', e)
+  } finally {
+    deleting.value = false
+  }
+}
+
+onMounted(async () => {
+  const [, indRes, lotesRes] = await Promise.allSettled([
+    loadDispensaciones(),
+    listIndicaciones(props.socioId),
+    listLotes(),
+  ])
+  if (indRes.status   === 'fulfilled') indicaciones.value = (indRes.value.data || []).filter(i => i.activa)
+  if (lotesRes.status === 'fulfilled') lotes.value        = lotesRes.value.data || []
+})
+</script>
+
 <template>
-  <div class="dispensaciones">
+  <div>
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="mb-0">
-        <i class="bi bi-capsule me-2"></i>
-        Dispensaciones
-      </h5>
+      <div>
+        <strong>💊 Dispensaciones</strong>
+        <p class="text-muted small mb-0">Registro de entregas al paciente (máx. {{ cupoMensual }}g/mes)</p>
+      </div>
       <button
-        v-if="canCreate"
-        @click="showModal = true; resetForm()"
-        class="btn btn-sm btn-success"
-        :disabled="!cupoDisponible || cupoDisponible <= 0"
+          v-if="canCreate"
+          class="btn btn-sm btn-success"
+          :disabled="cupoDisponible <= 0"
+          @click="openCreate"
       >
-        <i class="bi bi-plus-circle me-1"></i>
-        Nueva Dispensación
+        <i class="bi bi-plus-circle me-1"></i> Nueva dispensación
       </button>
     </div>
 
     <!-- Cupo mensual -->
-    <div class="card mb-3" :class="{
-      'border-success': porcentajeCupo < 70,
-      'border-warning': porcentajeCupo >= 70 && porcentajeCupo < 90,
-      'border-danger': porcentajeCupo >= 90
-    }">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <small class="text-muted">Cupo Mensual</small>
-          <small class="fw-bold">{{ totalDispensadoMes }}g / {{ cupoMensual }}g</small>
+    <div class="card border-0 mb-3" :class="`border-${porcentajeCupo >= 90 ? 'danger' : porcentajeCupo >= 70 ? 'warning' : 'success'}`"
+         style="border-left-width:4px !important; border-left-style:solid !important">
+      <div class="card-body py-2 px-3 small">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="text-muted">Cupo mensual utilizado</span>
+          <span class="fw-bold">{{ totalDispensadoMes }}g / {{ cupoMensual }}g</span>
         </div>
-        <div class="progress" style="height: 8px;">
+        <div class="progress" style="height:6px">
           <div
-            class="progress-bar"
-            :class="{
-              'bg-success': porcentajeCupo < 70,
-              'bg-warning': porcentajeCupo >= 70 && porcentajeCupo < 90,
-              'bg-danger': porcentajeCupo >= 90
-            }"
-            :style="{ width: porcentajeCupo + '%' }"
+              class="progress-bar"
+              :class="`bg-${porcentajeCupo >= 90 ? 'danger' : porcentajeCupo >= 70 ? 'warning' : 'success'}`"
+              :style="{ width: porcentajeCupo + '%' }"
           ></div>
         </div>
-        <small class="text-muted">Disponible: {{ cupoDisponible }}g</small>
+        <div class="text-muted mt-1">Disponible este mes: <strong>{{ cupoDisponible }}g</strong></div>
       </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="text-center py-4">
+    <div v-if="loading" class="text-center py-3">
       <div class="spinner-border spinner-border-sm text-success"></div>
     </div>
 
-    <!-- Lista vacía -->
-    <div v-else-if="dispensaciones.length === 0" class="text-center py-4 text-muted">
-      <i class="bi bi-capsule display-6"></i>
-      <p class="mt-2 mb-0 small">No hay dispensaciones registradas</p>
+    <!-- Empty -->
+    <div v-else-if="!dispensaciones.length" class="text-center py-4 text-muted">
+      <div class="fs-2 mb-2">💊</div>
+      <div class="small">Sin dispensaciones registradas</div>
     </div>
 
-    <!-- Lista de dispensaciones -->
+    <!-- Tabla -->
     <div v-else class="table-responsive">
-      <table class="table table-sm table-hover">
-        <thead>
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
         <tr>
           <th>Fecha</th>
           <th>Tipo</th>
           <th>Cantidad</th>
           <th>Lote</th>
           <th>Dispensado por</th>
-          <th class="text-end">Acciones</th>
+          <th v-if="canEdit" class="text-end">Acciones</th>
         </tr>
         </thead>
         <tbody>
-        <tr v-for="disp in dispensaciones" :key="disp.id">
-          <td>{{ formatDate(disp.fecha_dispensacion) }}</td>
+        <tr v-for="d in dispensaciones" :key="d.id">
+          <td class="small">{{ formatDate(d.fecha_dispensacion) }}</td>
           <td>
-            <span class="badge bg-secondary text-capitalize">{{ disp.tipo_producto }}</span>
+            <span class="badge text-bg-secondary text-capitalize">{{ d.tipo_producto }}</span>
           </td>
-          <td class="fw-bold">{{ disp.cantidad_gramos }}g</td>
-          <td>
-            <span v-if="disp.lote" class="small">{{ disp.lote.codigo }}</span>
-            <span v-else class="text-muted small">-</span>
-          </td>
-          <td class="small">{{ disp.usuario.nombre }}</td>
-          <td class="text-end">
-            <button
-              v-if="canEdit"
-              @click="editDispensacion(disp)"
-              class="btn btn-sm btn-outline-primary me-1"
-            >
+          <td class="fw-bold small">{{ d.cantidad_gramos }}g</td>
+          <td class="small font-monospace">{{ d.lote?.codigo || '—' }}</td>
+          <td class="small text-muted">{{ d.usuario?.nombre || '—' }}</td>
+          <td v-if="canEdit" class="text-end">
+            <button class="btn btn-sm btn-outline-primary me-1" @click="openEdit(d)">
               <i class="bi bi-pencil"></i>
             </button>
-            <button
-              v-if="canEdit"
-              @click="confirmDelete(disp)"
-              class="btn btn-sm btn-outline-danger"
-            >
+            <button class="btn btn-sm btn-outline-danger" @click="deleteTarget=d; showDelete=true">
               <i class="bi bi-trash"></i>
             </button>
           </td>
@@ -99,118 +221,87 @@
       </table>
     </div>
 
-    <!-- Modal Crear/Editar -->
-    <div v-if="showModal" class="modal show d-block" tabindex="-1">
-      <div class="modal-dialog modal-lg">
+    <!-- ===== MODAL CREAR / EDITAR ===== -->
+    <div v-if="showModal" class="modal fade show d-block" tabindex="-1" aria-modal="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">
-              {{ editingId ? 'Editar' : 'Nueva' }} Dispensación
-            </h5>
-            <button @click="showModal = false" class="btn-close"></button>
+            <h5 class="modal-title">{{ editingId ? 'Editar dispensación' : 'Nueva dispensación' }}</h5>
+            <button class="btn-close" @click="showModal=false"></button>
           </div>
           <div class="modal-body">
-            <form @submit.prevent="handleSubmit">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Cantidad (gramos) *</label>
-                  <input
-                    v-model.number="form.cantidad_gramos"
-                    type="number"
-                    step="0.01"
-                    class="form-control"
-                    placeholder="Ej: 5, 10, 20..."
-                    required
-                  >
-                  <small class="text-muted">Disponible: {{ cupoDisponible }}g</small>
-                </div>
-
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Tipo de Producto *</label>
-                  <select v-model="form.tipo_producto" class="form-select" required>
-                    <option value="flores">Flores</option>
-                    <option value="aceite">Aceite</option>
-                    <option value="extracto">Extracto</option>
-                    <option value="crema">Crema</option>
-                  </select>
-                </div>
+            <div v-if="formError" class="alert alert-danger alert-dismissible d-flex align-items-center gap-2 mb-3">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              <span>{{ formError }}</span>
+              <button class="btn-close" @click="formError=null"></button>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Cantidad (gramos) <span class="text-danger">*</span></label>
+                <input v-model.number="form.cantidad_gramos" type="number" step="0.01" min="0.01"
+                       :max="cupoDisponible" class="form-control" placeholder="Ej: 10" />
+                <div class="form-text">Disponible: {{ cupoDisponible }}g</div>
               </div>
-
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Fecha de Dispensación *</label>
-                  <input
-                    v-model="form.fecha_dispensacion"
-                    type="date"
-                    class="form-control"
-                    :max="new Date().toISOString().split('T')[0]"
-                    required
-                  >
-                </div>
-
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Lote (opcional)</label>
-                  <select v-model="form.lote_id" class="form-select">
-                    <option :value="null">Sin lote asignado</option>
-                    <option v-for="lote in lotes" :key="lote.id" :value="lote.id">
-                      {{ lote.codigo }}
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">Indicación Médica (opcional)</label>
-                <select v-model="form.indicacion_medica_id" class="form-select">
-                  <option :value="null">Sin indicación asociada</option>
-                  <option v-for="ind in indicaciones" :key="ind.id" :value="ind.id">
-                    {{ ind.patologia }}
-                  </option>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Tipo de producto <span class="text-danger">*</span></label>
+                <select v-model="form.tipo_producto" class="form-select">
+                  <option value="flores">Flores</option>
+                  <option value="aceite">Aceite</option>
+                  <option value="extracto">Extracto</option>
+                  <option value="crema">Crema</option>
                 </select>
               </div>
-
-              <div class="mb-3">
-                <label class="form-label">Observaciones</label>
-                <textarea
-                  v-model="form.observaciones"
-                  class="form-control"
-                  rows="3"
-                  placeholder="Notas adicionales..."
-                ></textarea>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Fecha <span class="text-danger">*</span></label>
+                <input v-model="form.fecha_dispensacion" type="date" class="form-control" :max="today" />
               </div>
-            </form>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Lote</label>
+                <select v-model="form.lote_id" class="form-select">
+                  <option :value="null">Sin lote asignado</option>
+                  <option v-for="l in lotes" :key="l.id" :value="l.id">{{ l.codigo }}</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label small fw-semibold">Indicación médica</label>
+                <select v-model="form.indicacion_medica_id" class="form-select">
+                  <option :value="null">Sin indicación asociada</option>
+                  <option v-for="i in indicaciones" :key="i.id" :value="i.id">{{ i.patologia }}</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label small fw-semibold">Observaciones</label>
+                <textarea v-model.trim="form.observaciones" class="form-control" rows="2" placeholder="Notas adicionales…"></textarea>
+              </div>
+            </div>
           </div>
           <div class="modal-footer">
-            <button @click="showModal = false" class="btn btn-secondary">
-              Cancelar
-            </button>
-            <button @click="handleSubmit" class="btn btn-success" :disabled="saving">
+            <button class="btn btn-outline-secondary" :disabled="saving" @click="showModal=false">Cancelar</button>
+            <button class="btn btn-success" :disabled="saving" @click="handleSubmit">
               <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
-              {{ editingId ? 'Guardar' : 'Dispensar' }}
+              {{ editingId ? 'Guardar cambios' : 'Registrar dispensación' }}
             </button>
           </div>
         </div>
       </div>
     </div>
-    <div v-if="showModal" class="modal-backdrop show"></div>
+    <div v-if="showModal" class="modal-backdrop fade show" @click="showModal=false"></div>
 
-    <!-- Modal confirmar eliminación -->
-    <div v-if="deleteConfirm" class="modal show d-block" tabindex="-1">
-      <div class="modal-dialog">
+    <!-- ===== MODAL ELIMINAR ===== -->
+    <div v-if="showDelete" class="modal fade show d-block" tabindex="-1" aria-modal="true">
+      <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Confirmar Eliminación</h5>
-            <button @click="deleteConfirm = null" class="btn-close"></button>
+          <div class="modal-header border-0">
+            <h5 class="modal-title text-danger">⚠️ Eliminar dispensación</h5>
+            <button class="btn-close" @click="showDelete=false"></button>
           </div>
           <div class="modal-body">
-            <p>¿Eliminar dispensación de <strong>{{ deleteConfirm.cantidad_gramos }}g</strong>?</p>
-            <p class="text-muted small mb-0">Esta acción liberará el cupo nuevamente.</p>
+            <p>¿Eliminár la dispensación de <strong>{{ deleteTarget?.cantidad_gramos }}g</strong> del {{ formatDate(deleteTarget?.fecha_dispensacion) }}?</p>
+            <p class="text-muted small mb-0">El cupo se liberará nuevamente.</p>
           </div>
-          <div class="modal-footer">
-            <button @click="deleteConfirm = null" class="btn btn-secondary">
-              Cancelar
-            </button>
-            <button @click="handleDelete" class="btn btn-danger" :disabled="deleting">
+          <div class="modal-footer border-0">
+            <button class="btn btn-outline-secondary" :disabled="deleting" @click="showDelete=false">Cancelar</button>
+            <button class="btn btn-danger" :disabled="deleting" @click="handleDelete">
               <span v-if="deleting" class="spinner-border spinner-border-sm me-2"></span>
               Eliminar
             </button>
@@ -218,184 +309,7 @@
         </div>
       </div>
     </div>
-    <div v-if="deleteConfirm" class="modal-backdrop show"></div>
+    <div v-if="showDelete" class="modal-backdrop fade show" @click="showDelete=false"></div>
+
   </div>
 </template>
-
-<script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useAuthStore } from '../../stores/auth'
-import { listDispensaciones, createDispensacion, updateDispensacion, deleteDispensacion, listIndicaciones } from '../../lib/api.js'
-
-const props = defineProps({
-  socioId: {
-    type: Number,
-    required: true
-  }
-})
-
-const auth = useAuthStore()
-const dispensaciones = ref([])
-const indicaciones = ref([])
-const lotes = ref([])
-const loading = ref(true)
-const showModal = ref(false)
-const editingId = ref(null)
-const saving = ref(false)
-const deleting = ref(false)
-const deleteConfirm = ref(null)
-const cupoMensual = ref(40)
-const totalDispensadoMes = ref(0)
-const cupoDisponible = ref(40)
-
-const canCreate = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'medico' || auth.user?.role === 'agricultor')
-const canEdit = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'medico' || auth.user?.role === 'agricultor')
-
-const porcentajeCupo = computed(() => {
-  if (!cupoMensual.value) return 0
-  return Math.min(100, (totalDispensadoMes.value / cupoMensual.value) * 100)
-})
-
-const form = ref({
-  cantidad_gramos: null,
-  tipo_producto: 'flores',
-  fecha_dispensacion: new Date().toISOString().split('T')[0],
-  lote_id: null,
-  indicacion_medica_id: null,
-  observaciones: ''
-})
-
-const formatDate = (date) => {
-  if (!date) return '-'
-  return new Date(date).toLocaleDateString('es-AR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
-
-const loadDispensaciones = async () => {
-  try {
-    loading.value = true
-    const { data } = await listDispensaciones(props.socioId)
-    dispensaciones.value = data.dispensaciones || []
-    cupoMensual.value = data.cupo_mensual || 40
-    totalDispensadoMes.value = data.total_dispensado_mes || 0
-    cupoDisponible.value = data.cupo_disponible || 40
-  } catch (error) {
-    console.error('Error cargando dispensaciones:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-const loadIndicaciones = async () => {
-  try {
-    const { data } = await listIndicaciones(props.socioId)
-    indicaciones.value = data.filter(ind => ind.activa)
-  } catch (error) {
-    console.error('Error cargando indicaciones:', error)
-  }
-}
-
-const loadLotes = async () => {
-  try {
-    const { data } = await fetch('http://localhost:3001/lotes', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
-        'Content-Type': 'application/json'
-      }
-    }).then(r => r.json())
-    lotes.value = data || []
-  } catch (error) {
-    console.error('Error cargando lotes:', error)
-  }
-}
-
-const resetForm = () => {
-  editingId.value = null
-  form.value = {
-    cantidad_gramos: null,
-    tipo_producto: 'flores',
-    fecha_dispensacion: new Date().toISOString().split('T')[0],
-    lote_id: null,
-    indicacion_medica_id: null,
-    observaciones: ''
-  }
-}
-
-const editDispensacion = (disp) => {
-  editingId.value = disp.id
-  form.value = {
-    cantidad_gramos: disp.cantidad_gramos,
-    tipo_producto: disp.tipo_producto,
-    fecha_dispensacion: disp.fecha_dispensacion,
-    lote_id: disp.lote?.id || null,
-    indicacion_medica_id: disp.indicacion_medica?.id || null,
-    observaciones: disp.observaciones || ''
-  }
-  showModal.value = true
-}
-
-const handleSubmit = async () => {
-  try {
-    saving.value = true
-    const payload = { ...form.value }
-
-    // Limpiar valores vacíos
-    Object.keys(payload).forEach(key => {
-      if (payload[key] === '' || payload[key] === null) {
-        delete payload[key]
-      }
-    })
-
-    if (editingId.value) {
-      await updateDispensacion(editingId.value, payload)
-    } else {
-      await createDispensacion(props.socioId, payload)
-    }
-
-    await loadDispensaciones()
-    showModal.value = false
-    resetForm()
-  } catch (error) {
-    console.error('Error guardando dispensación:', error)
-    const errorMsg = error.response?.data?.errors?.[0] || 'Error al guardar la dispensación'
-    alert(errorMsg)
-  } finally {
-    saving.value = false
-  }
-}
-
-const confirmDelete = (disp) => {
-  deleteConfirm.value = disp
-}
-
-const handleDelete = async () => {
-  try {
-    deleting.value = true
-    await deleteDispensacion(deleteConfirm.value.id)
-    await loadDispensaciones()
-    deleteConfirm.value = null
-  } catch (error) {
-    console.error('Error eliminando dispensación:', error)
-    alert('Error al eliminar la dispensación')
-  } finally {
-    deleting.value = false
-  }
-}
-
-onMounted(async () => {
-  await Promise.all([
-    loadDispensaciones(),
-    loadIndicaciones(),
-    loadLotes()
-  ])
-})
-</script>
-
-<style scoped>
-.modal.show {
-  background: rgba(0,0,0,0.5);
-}
-</style>
