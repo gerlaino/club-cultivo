@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_13_111455) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_17_164032) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -103,6 +103,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_13_111455) do
     t.string "tipo"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "origen"
+    t.integer "tiempo_floracion"
+    t.integer "rendimiento"
+    t.integer "altura"
+    t.string "dificultad"
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
     t.index ["club_id"], name: "index_geneticas_on_club_id"
