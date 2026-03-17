@@ -1,15 +1,16 @@
 <script setup>
 import { watch, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 import { useClubStore } from "./stores/club";
 import { usePermissions } from "./composables/usePermissions";
 import Avatar from "./components/Avatar.vue";
 import BrandLogo from "./components/BrandLogo.vue";
 
-const auth = useAuthStore();
-const club = useClubStore();
+const auth   = useAuthStore();
+const club   = useClubStore();
 const router = useRouter();
+const route  = useRoute();
 const { can, isAdmin } = usePermissions();
 
 async function doLogout() {
@@ -18,15 +19,19 @@ async function doLogout() {
   router.replace("/login");
 }
 
+// Cerrar el collapse mobile después de navegar
+function closeNav() {
+  const el = document.getElementById("mainNav");
+  if (el && el.classList.contains("show")) {
+    el.classList.remove("show");
+  }
+}
+
 watch(
   () => auth.isAuthenticated,
   async (logged) => {
     if (logged) {
-      try {
-        await club.fetch();
-      } catch (e) {
-        console.error("Error al cargar preferencias del club:", e);
-      }
+      try { await club.fetch(); } catch (e) { console.error("Error club:", e); }
     } else {
       club.$reset();
     }
@@ -48,21 +53,22 @@ onMounted(async () => {
       class="navbar navbar-expand-lg"
       :class="[$route.meta.fullscreen ? 'navbar-login' : 'navbar-default']"
     >
-      <div class="container-fluid">
+      <div class="container-fluid px-3 px-md-4">
+
         <!-- BRAND -->
-        <span
-          class="navbar-brand fw-semibold d-flex align-items-center gap-2 user-select-none"
-        >
+        <RouterLink class="navbar-brand fw-semibold d-flex align-items-center gap-2 text-decoration-none" to="/" @click="closeNav">
           <BrandLogo />
-        </span>
+        </RouterLink>
 
         <!-- Toggler mobile -->
         <button
           v-if="auth.isAuthenticated && !$route.meta.fullscreen"
-          class="navbar-toggler d-lg-none"
+          class="navbar-toggler border-0"
           type="button"
           data-bs-toggle="collapse"
           data-bs-target="#mainNav"
+          aria-controls="mainNav"
+          aria-expanded="false"
         >
           <span class="navbar-toggler-icon"></span>
         </button>
@@ -71,86 +77,98 @@ onMounted(async () => {
         <div
           v-if="auth.isAuthenticated && !$route.meta.fullscreen"
           id="mainNav"
-          class="collapse navbar-collapse show"
+          class="collapse navbar-collapse"
         >
-          <!-- Links con permisos -->
-          <ul class="navbar-nav align-items-lg-center mb-2 mb-lg-0 ms-3 gap-lg-2">
+          <!-- Links -->
+          <ul class="navbar-nav align-items-lg-center mb-2 mb-lg-0 ms-3 gap-lg-1">
+
             <li class="nav-item">
-              <RouterLink class="nav-link" to="/">Dashboard</RouterLink>
+              <RouterLink class="nav-link px-2" to="/" @click="closeNav">
+                <i class="bi bi-speedometer2 me-1 d-lg-none"></i>Dashboard
+              </RouterLink>
             </li>
 
             <li class="nav-item" v-if="can('salas', 'index')">
-              <RouterLink class="nav-link" to="/salas">Salas</RouterLink>
+              <RouterLink class="nav-link px-2" to="/salas" @click="closeNav">
+                <i class="bi bi-building me-1 d-lg-none"></i>Salas
+              </RouterLink>
             </li>
 
-            <li class="nav-item" v-if="can('usuarios', 'index')">
-              <RouterLink class="nav-link" to="/usuarios">Usuarios</RouterLink>
-            </li>
-
-            <li class="nav-item" v-if="can('socios', 'index')">
-              <RouterLink class="nav-link" to="/socios">Pacientes</RouterLink>
+            <li class="nav-item" v-if="can('lotes', 'index')">
+              <RouterLink class="nav-link px-2" to="/lotes" @click="closeNav">
+                <i class="bi bi-box-seam me-1 d-lg-none"></i>Lotes
+              </RouterLink>
             </li>
 
             <li class="nav-item" v-if="can('plantas', 'index')">
-              <RouterLink class="nav-link" to="/plantas">Plantas</RouterLink>
+              <RouterLink class="nav-link px-2" to="/plantas" @click="closeNav">
+                <i class="bi bi-flower2 me-1 d-lg-none"></i>Plantas
+              </RouterLink>
+            </li>
+
+            <li class="nav-item" v-if="can('socios', 'index')">
+              <RouterLink class="nav-link px-2" to="/socios" @click="closeNav">
+                <i class="bi bi-people me-1 d-lg-none"></i>Pacientes
+              </RouterLink>
             </li>
 
             <li class="nav-item" v-if="can('geneticas', 'index')">
-              <RouterLink class="nav-link" to="/geneticas">Genéticas</RouterLink>
+              <RouterLink class="nav-link px-2" to="/geneticas" @click="closeNav">
+                <i class="bi bi-diagram-3 me-1 d-lg-none"></i>Genéticas
+              </RouterLink>
             </li>
+
+            <li class="nav-item" v-if="can('usuarios', 'index')">
+              <RouterLink class="nav-link px-2" to="/usuarios" @click="closeNav">
+                <i class="bi bi-person-badge me-1 d-lg-none"></i>Usuarios
+              </RouterLink>
+            </li>
+
           </ul>
 
           <!-- Menú de usuario -->
-          <div class="ms-auto d-flex align-items-center">
-            <div class="dropdown" v-if="auth.isAuthenticated">
+          <div class="ms-auto d-flex align-items-center mt-2 mt-lg-0">
+            <div class="dropdown">
               <button
-                class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2"
+                class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 py-1 px-2"
                 type="button"
                 data-bs-toggle="dropdown"
+                aria-expanded="false"
               >
-                <Avatar
-                  :src="auth.avatarUrl"
-                  :name="auth.displayName"
-                  :size="28"
-                />
-                <span class="fw-medium">{{ auth.displayName }}</span>
+                <Avatar :src="auth.avatarUrl" :name="auth.displayName" :size="26" />
+                <span class="fw-medium d-none d-lg-inline">{{ auth.displayName }}</span>
               </button>
 
-              <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                <li class="px-3 py-2 border-bottom small text-muted">
+              <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="min-width:220px">
+                <!-- Info usuario -->
+                <li class="px-3 py-2 border-bottom">
                   <div class="d-flex align-items-center gap-2">
-                    <Avatar
-                      :src="auth.avatarUrl"
-                      :name="auth.displayName"
-                      :size="36"
-                    />
-                    <div>
-                      <div class="fw-semibold text-dark">
-                        {{ auth.displayName }}
-                      </div>
-                      <div class="text-muted">{{ auth.email }}</div>
-                      <div class="badge bg-secondary mt-1">{{ auth.user?.role }}</div>
+                    <Avatar :src="auth.avatarUrl" :name="auth.displayName" :size="36" />
+                    <div class="overflow-hidden">
+                      <div class="fw-semibold text-dark text-truncate">{{ auth.displayName }}</div>
+                      <div class="text-muted small text-truncate">{{ auth.email }}</div>
+                      <span class="badge bg-secondary mt-1" style="font-size:.7rem">{{ auth.user?.role }}</span>
                     </div>
                   </div>
                 </li>
 
                 <li>
-                  <RouterLink class="dropdown-item py-2" to="/perfil">
-                    Perfil
+                  <RouterLink class="dropdown-item py-2 d-flex align-items-center gap-2" to="/perfil" @click="closeNav">
+                    <i class="bi bi-person text-muted"></i> Mi perfil
                   </RouterLink>
                 </li>
                 <li v-if="isAdmin">
-                  <RouterLink class="dropdown-item py-2" to="/preferencias">
-                    Preferencias
+                  <RouterLink class="dropdown-item py-2 d-flex align-items-center gap-2" to="/preferencias" @click="closeNav">
+                    <i class="bi bi-gear text-muted"></i> Preferencias
                   </RouterLink>
                 </li>
-                <li><hr class="dropdown-divider" /></li>
+                <li><hr class="dropdown-divider my-1" /></li>
                 <li>
                   <button
-                    class="dropdown-item text-danger d-flex align-items-center gap-2"
+                    class="dropdown-item py-2 text-danger d-flex align-items-center gap-2"
                     @click="doLogout"
                   >
-                    <i class="bi bi-box-arrow-right"></i> Salir
+                    <i class="bi bi-box-arrow-right"></i> Cerrar sesión
                   </button>
                 </li>
               </ul>
@@ -164,7 +182,7 @@ onMounted(async () => {
     <main v-if="$route.meta.fullscreen">
       <router-view />
     </main>
-    <main v-else class="container my-4">
+    <main v-else>
       <router-view />
     </main>
   </div>
@@ -172,12 +190,26 @@ onMounted(async () => {
 
 <style scoped>
 .navbar-default {
-  background: var(--bs-body-bg);
+  background: rgba(242, 245, 242, 0.95);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 .navbar-login {
   background: transparent;
   border: 0;
   padding-top: 0.75rem;
+}
+
+/* Active link */
+.navbar-nav .nav-link.router-link-active {
+  color: var(--brand-primary, #1b5e20);
+  font-weight: 600;
+}
+.navbar-nav .nav-link.router-link-exact-active {
+  color: var(--brand-primary, #1b5e20);
+  font-weight: 600;
 }
 </style>

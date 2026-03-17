@@ -1,232 +1,395 @@
-<!-- src/views/PreferenciasView.vue -->
 <script setup>
-import { onMounted, reactive, ref, computed } from 'vue'
+import { onMounted, reactive, ref, computed, watch } from 'vue'
 import { useClubStore } from '../stores/club'
 import Avatar from '../components/Avatar.vue'
 
-const club = useClubStore()
-
-// toast = { type: 'success'|'danger', msg: '...' }
-const toast = ref(null)
+const club     = useClubStore()
+const toast    = ref(null)
 const pristine = ref(true)
+const logoPreview = ref(null)
+let toastTimer = null
 
+// Campos corregidos — coinciden exactamente con el backend
 const form = reactive({
-  name: '',
-  legal_name: '',
-  contact_email: '',
-  contact_phone: '',
-  website: '',
-  address_line1: '',
-  city: '',
-  province: '',
-  country: '',
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  name:          '',
+  legal_name:    '',
+  email:         '',
+  phone:         '',
+  website:       '',
+  address:       '',
+  city:          '',
+  state:         '',
+  country:       'Argentina',
+  timezone:      'America/Argentina/Buenos_Aires',
 })
 
+const formErrors = reactive({
+  name:  '',
+  email: '',
+})
+
+// ── Cargar datos ──────────────────────────────────────────────────────
 onMounted(async () => {
   if (!club.data) {
-    try {
-      await club.fetch()
-    } catch (_) {
-      // si falla, mostramos error cuando haga save/upload
-    }
+    try { await club.fetch() } catch (_) {}
   }
-
-  // cargar valores existentes
-  Object.assign(form, {
-    name: club.data?.name || '',
-    legal_name: club.data?.legal_name || '',
-    contact_email: club.data?.contact_email || '',
-    contact_phone: club.data?.contact_phone || '',
-    website: club.data?.website || '',
-    address_line1: club.data?.address_line1 || '',
-    city: club.data?.city || '',
-    province: club.data?.province || '',
-    country: club.data?.country || '',
-    timezone: club.data?.timezone || form.timezone,
-  })
-
-  pristine.value = true
+  loadFromStore()
 })
 
-function onChange() {
-  pristine.value = false
+watch(() => club.data, loadFromStore)
+
+function loadFromStore() {
+  if (!club.data) return
+  Object.assign(form, {
+    name:       club.data.name       || '',
+    legal_name: club.data.legal_name || '',
+    email:      club.data.email      || '',
+    phone:      club.data.phone      || '',
+    website:    club.data.website    || '',
+    address:    club.data.address    || '',
+    city:       club.data.city       || '',
+    state:      club.data.state      || '',
+    country:    club.data.country    || 'Argentina',
+    timezone:   club.data.timezone   || 'America/Argentina/Buenos_Aires',
+  })
+  logoPreview.value = club.data.logo_url || null
+  pristine.value = true
 }
 
-async function save() {
+// ── Cambios ───────────────────────────────────────────────────────────
+function onChange() { pristine.value = false }
+
+// ── Validación ────────────────────────────────────────────────────────
+function validate() {
+  formErrors.name  = ''
+  formErrors.email = ''
+  let ok = true
   if (!form.name.trim()) {
-    toast.value = { type: 'danger', msg: 'El nombre del club es obligatorio.' }
-    return
+    formErrors.name = 'El nombre del club es obligatorio'
+    ok = false
   }
+  if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    formErrors.email = 'Email inválido'
+    ok = false
+  }
+  return ok
+}
 
+// ── Guardar ───────────────────────────────────────────────────────────
+async function save() {
+  if (!validate()) return
   try {
-    await club.update(form)
+    await club.update({ ...form })
     pristine.value = true
-    toast.value = { type: 'success', msg: 'Preferencias guardadas.' }
-  } catch (e) {
-    toast.value = { type: 'danger', msg: club.error || 'Error al guardar' }
+    showToast('success', '✓ Preferencias guardadas correctamente')
+  } catch (_) {
+    showToast('danger', club.error || 'Error al guardar')
   }
 }
 
-const uploading = computed(() => club.saving)
-
-function onFile(e) {
-  const input = e.target
-  const file = input && input.files && input.files[0]
+// ── Logo ──────────────────────────────────────────────────────────────
+function onLogoFile(e) {
+  const file = e.target?.files?.[0]
   if (!file) return
-
   if (file.size > 5 * 1024 * 1024) {
-    toast.value = { type: 'danger', msg: 'El logo no puede superar 5 MB.' }
-    input.value = '' // reset input
+    showToast('danger', 'El logo no puede superar 5 MB')
+    e.target.value = ''
     return
   }
+  // Preview inmediata
+  const reader = new FileReader()
+  reader.onload = () => { logoPreview.value = reader.result }
+  reader.readAsDataURL(file)
 
   club.uploadLogo(file)
     .then(() => {
-      toast.value = { type: 'success', msg: 'Logo actualizado.' }
-      input.value = ''
+      logoPreview.value = club.logoUrl || logoPreview.value
+      showToast('success', '✓ Logo actualizado')
     })
-    .catch(() => {
-      toast.value = { type: 'danger', msg: club.error || 'No se pudo subir el logo.' }
-      input.value = ''
-    })
+    .catch(() => showToast('danger', club.error || 'Error al subir el logo'))
+    .finally(() => { e.target.value = '' })
 }
 
-function removeLogo() {
-  club.removeLogo()
-    .then(() => {
-      toast.value = { type: 'success', msg: 'Logo eliminado.' }
-    })
-    .catch(() => {
-      toast.value = { type: 'danger', msg: club.error || 'No se pudo eliminar el logo.' }
-    })
+async function removeLogo() {
+  if (!confirm('¿Seguro que querés quitar el logo del club?')) return
+  try {
+    await club.removeLogo()
+    logoPreview.value = null
+    showToast('success', '✓ Logo eliminado')
+  } catch (_) {
+    showToast('danger', club.error || 'Error al eliminar el logo')
+  }
 }
+
+// ── Toast ─────────────────────────────────────────────────────────────
+function showToast(type, msg) {
+  clearTimeout(toastTimer)
+  toast.value = { type, msg }
+  toastTimer = setTimeout(() => { toast.value = null }, 5000)
+}
+
+// ── Timezones AR ──────────────────────────────────────────────────────
+const timezones = [
+  'America/Argentina/Buenos_Aires',
+  'America/Argentina/Cordoba',
+  'America/Argentina/Mendoza',
+  'America/Argentina/Salta',
+  'UTC',
+]
 </script>
 
 <template>
-  <div>
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <div>
-        <h2 class="mb-0">Preferencias del club</h2>
-        <small class="text-muted">Identidad, contacto y domicilio</small>
-      </div>
+  <div class="container-fluid py-4 px-3 px-md-4" style="max-width:960px">
 
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+      <div>
+        <h1 class="h3 fw-bold mb-0">Preferencias del club</h1>
+        <p class="text-muted small mb-0">Identidad, contacto, domicilio legal y configuración</p>
+      </div>
       <button
-        class="btn btn-success"
+        class="btn btn-success px-4"
         :disabled="club.saving || pristine"
         @click="save"
       >
         <span v-if="club.saving" class="spinner-border spinner-border-sm me-2"></span>
-        Guardar cambios
+        <i v-else class="bi bi-check2 me-1"></i>
+        {{ club.saving ? 'Guardando...' : 'Guardar cambios' }}
       </button>
     </div>
 
-    <div v-if="toast" class="alert" :class="toast.type==='success' ? 'alert-success' : 'alert-danger'">
-      {{ toast.msg }}
-    </div>
+    <!-- Toast -->
+    <transition name="fade">
+      <div
+        v-if="toast"
+        class="alert alert-dismissible d-flex align-items-center gap-2 mb-4"
+        :class="toast.type === 'success' ? 'alert-success' : 'alert-danger'"
+        role="alert"
+      >
+        <i :class="toast.type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-triangle-fill'"></i>
+        <span>{{ toast.msg }}</span>
+        <button class="btn-close" @click="toast=null"></button>
+      </div>
+    </transition>
 
-    <div class="row g-3">
-      <!-- Identidad -->
+    <div class="row g-4">
+
+      <!-- ── Col izquierda: identidad visual ── -->
       <div class="col-12 col-lg-4">
-        <div class="card h-100">
-          <div class="card-header fw-semibold">Identidad</div>
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0">
+            <strong>Identidad visual</strong>
+            <p class="text-muted small mb-0">Logo y nombre del club</p>
+          </div>
           <div class="card-body">
-            <div class="text-center mb-3">
-              <img
-                v-if="club.logoUrl"
-                :src="club.logoUrl"
-                alt="logo"
-                class="rounded-circle shadow-sm"
-                style="width:96px;height:96px;object-fit:cover;"
-              />
-              <Avatar v-else :name="form.name || 'Club'" :size="96" />
-            </div>
 
-            <div class="d-grid gap-2 mb-3">
-              <label class="btn btn-outline-secondary">
-                <i class="bi bi-image me-1"></i>
-                Cambiar logo
-                <input
-                  type="file"
-                  class="d-none"
-                  accept="image/*"
-                  :disabled="uploading"
-                  @change="onFile"
+            <!-- Logo -->
+            <div class="text-center mb-4">
+              <div class="logo-wrap mx-auto mb-3">
+                <img
+                  v-if="logoPreview"
+                  :src="logoPreview"
+                  alt="Logo del club"
+                  class="logo-img"
+                />
+                <Avatar v-else :name="form.name || 'Club'" :size="96" />
+                <div v-if="club.saving" class="logo-loading">
+                  <div class="spinner-border spinner-border-sm text-white"></div>
+                </div>
+              </div>
+
+              <div class="d-grid gap-2">
+                <label class="btn btn-outline-secondary btn-sm" :class="{ disabled: club.saving }">
+                  <i class="bi bi-image me-1"></i> Cambiar logo
+                  <input type="file" class="d-none" accept="image/jpeg,image/png,image/webp" :disabled="club.saving" @change="onLogoFile" />
+                </label>
+                <button
+                  class="btn btn-outline-danger btn-sm"
+                  :disabled="!logoPreview || club.saving"
+                  @click="removeLogo"
                 >
-              </label>
-
-              <button
-                class="btn btn-outline-danger"
-                :disabled="!club.logoUrl || uploading"
-                @click="removeLogo"
-              >
-                <i class="bi bi-x-circle me-1"></i>
-                Quitar logo
-              </button>
-
-              <small class="text-muted text-center">JPG/PNG/WebP — máx 5 MB</small>
+                  <i class="bi bi-x-circle me-1"></i> Quitar logo
+                </button>
+              </div>
+              <div class="text-muted mt-2" style="font-size:.72rem">JPG, PNG o WebP · máx 5 MB</div>
             </div>
 
+            <!-- Nombre -->
             <div class="mb-3">
-              <label class="form-label">Nombre del club *</label>
-              <input class="form-control" v-model.trim="form.name" @input="onChange" required>
+              <label class="form-label small fw-semibold">Nombre del club <span class="text-danger">*</span></label>
+              <input
+                class="form-control"
+                :class="{ 'is-invalid': formErrors.name }"
+                v-model.trim="form.name"
+                @input="onChange"
+                placeholder="Ej: Verde Esperanza"
+              />
+              <div class="invalid-feedback">{{ formErrors.name }}</div>
             </div>
+
             <div>
-              <label class="form-label">Razón social (opcional)</label>
-              <input class="form-control" v-model.trim="form.legal_name" @input="onChange">
+              <label class="form-label small fw-semibold">Razón social</label>
+              <input
+                class="form-control"
+                v-model.trim="form.legal_name"
+                @input="onChange"
+                placeholder="Nombre legal (opcional)"
+              />
+              <div class="form-text">Usado en documentos oficiales y trazabilidad Reprocann.</div>
             </div>
+
           </div>
         </div>
       </div>
 
-      <!-- Contacto y domicilio -->
+      <!-- ── Col derecha: contacto + domicilio + config ── -->
       <div class="col-12 col-lg-8">
-        <div class="card h-100">
-          <div class="card-header fw-semibold">Contacto & domicilio</div>
+
+        <!-- Contacto -->
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0">
+            <strong>Contacto</strong>
+            <p class="text-muted small mb-0">Datos de contacto del club (visibles para socios)</p>
+          </div>
           <div class="card-body">
             <div class="row g-3">
               <div class="col-md-6">
-                <label class="form-label">Email de contacto</label>
-                <input type="email" class="form-control" v-model.trim="form.contact_email" @input="onChange">
+                <label class="form-label small fw-semibold">Email de contacto</label>
+                <input
+                  type="email"
+                  class="form-control"
+                  :class="{ 'is-invalid': formErrors.email }"
+                  v-model.trim="form.email"
+                  @input="onChange"
+                  placeholder="contacto@miclub.org"
+                />
+                <div class="invalid-feedback">{{ formErrors.email }}</div>
               </div>
               <div class="col-md-6">
-                <label class="form-label">Teléfono</label>
-                <input type="text" class="form-control" v-model.trim="form.contact_phone" @input="onChange">
+                <label class="form-label small fw-semibold">Teléfono</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model.trim="form.phone"
+                  @input="onChange"
+                  placeholder="+54 11 1234-5678"
+                />
               </div>
-              <div class="col-md-12">
-                <label class="form-label">Website</label>
-                <input type="text" class="form-control" v-model.trim="form.website" placeholder="https://…" @input="onChange">
-              </div>
-              <div class="col-md-8">
-                <label class="form-label">Dirección</label>
-                <input type="text" class="form-control" v-model.trim="form.address_line1" @input="onChange">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Ciudad</label>
-                <input type="text" class="form-control" v-model.trim="form.city" @input="onChange">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Provincia/Estado</label>
-                <input type="text" class="form-control" v-model.trim="form.province" @input="onChange">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">País</label>
-                <input type="text" class="form-control" v-model.trim="form.country" @input="onChange">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Zona horaria</label>
-                <input type="text" class="form-control" v-model.trim="form.timezone" @input="onChange" list="tz-list">
-                <datalist id="tz-list">
-                  <option value="America/Argentina/Buenos_Aires" />
-                  <option value="UTC" />
-                </datalist>
+              <div class="col-12">
+                <label class="form-label small fw-semibold">Sitio web</label>
+                <div class="input-group">
+                  <span class="input-group-text text-muted small">🌐</span>
+                  <input
+                    type="url"
+                    class="form-control"
+                    v-model.trim="form.website"
+                    @input="onChange"
+                    placeholder="https://miclub.org"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <!-- Domicilio legal -->
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0">
+            <strong>Domicilio legal</strong>
+            <p class="text-muted small mb-0">Requerido para informes Reprocann y trazabilidad</p>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label small fw-semibold">Dirección</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model.trim="form.address"
+                  @input="onChange"
+                  placeholder="Av. Corrientes 1234, Piso 2"
+                />
+              </div>
+              <div class="col-md-5">
+                <label class="form-label small fw-semibold">Ciudad</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model.trim="form.city"
+                  @input="onChange"
+                  placeholder="Buenos Aires"
+                />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">Provincia</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model.trim="form.state"
+                  @input="onChange"
+                  placeholder="CABA"
+                />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-semibold">País</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model.trim="form.country"
+                  @input="onChange"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configuración -->
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0">
+            <strong>Configuración regional</strong>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label small fw-semibold">Zona horaria</label>
+                <select class="form-select" v-model="form.timezone" @change="onChange">
+                  <option v-for="tz in timezones" :key="tz" :value="tz">{{ tz }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
 </template>
 
+<style scoped>
+.logo-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+}
+.logo-img {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+.logo-loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.fade-enter-active, .fade-leave-active { transition: opacity .3s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+</style>
 

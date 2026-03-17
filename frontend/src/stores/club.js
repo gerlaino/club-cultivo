@@ -1,6 +1,6 @@
 // src/stores/club.js
 import { defineStore } from 'pinia'
-import api, {getPreferences} from '../lib/api'
+import api from '../lib/api'
 
 export const useClubStore = defineStore('club', {
   state: () => ({
@@ -11,27 +11,28 @@ export const useClubStore = defineStore('club', {
   }),
 
   getters: {
-    name: (s) => (s.data?.name || 'Cultivo Espacial'),
-    logoUrl: (s) => (s.data?.logo_url || ''),
+    name:    (s) => s.data?.name    || 'Cultivo Espacial',
+    logoUrl: (s) => s.data?.logo_url || '',
   },
 
   actions: {
     $reset() {
-      this.data = null
+      this.data    = null
       this.loading = false
-      this.saving = false
-      this.error = null
+      this.saving  = false
+      this.error   = null
     },
 
     async fetch() {
       this.loading = true
-      this.error = null
+      this.error   = null
       try {
-        const {data} = await getPreferences()
+        const { data } = await api.get('/preferences')
+        // El backend ahora devuelve el objeto directamente (sin wrapper data:)
         this.data = data
       } catch (e) {
-        this.error = "No se pudieron cargar las preferencias del club"
-        this.data = null
+        this.error = 'No se pudieron cargar las preferencias del club'
+        this.data  = null
       } finally {
         this.loading = false
       }
@@ -39,11 +40,11 @@ export const useClubStore = defineStore('club', {
 
     async update(payload) {
       this.saving = true
-      this.error = null
+      this.error  = null
       try {
         const { data } = await api.put('/preferences', { club: payload })
-        this.data = data.data
-        return data.data
+        this.data = data
+        return data
       } catch (e) {
         this.error = e?.response?.data?.errors?.join(', ') || e.message
         throw e
@@ -54,16 +55,14 @@ export const useClubStore = defineStore('club', {
 
     async uploadLogo(file) {
       const fd = new FormData()
-      // el backend espera params[:logo]
       fd.append('logo', file)
-
       this.saving = true
-      this.error = null
+      this.error  = null
       try {
         const { data } = await api.post('/preferences/upload_logo', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' }
+          headers: { 'Content-Type': 'multipart/form-data' },
         })
-        this.data = data.data
+        this.data = data
       } catch (e) {
         this.error = e?.response?.data?.errors?.join(', ') || e.message
         throw e
@@ -74,10 +73,10 @@ export const useClubStore = defineStore('club', {
 
     async removeLogo() {
       this.saving = true
-      this.error = null
+      this.error  = null
       try {
         const { data } = await api.put('/preferences', { purge_logo: true })
-        this.data = data.data
+        this.data = data
       } catch (e) {
         this.error = e?.response?.data?.errors?.join(', ') || e.message
         throw e
@@ -87,5 +86,3 @@ export const useClubStore = defineStore('club', {
     },
   },
 })
-
-

@@ -3,30 +3,40 @@ class PreferencesController < ApplicationController
   before_action :authenticate_user!
   before_action :set_club
 
+  # GET /preferences
   def show
     authorize @club, :show?
-    render json: { data: serialize(@club) }
+    render json: serialize(@club)
   end
 
+  # PUT /preferences
   def update
     authorize @club, :update?
+
+    # Purgar logo si se pide
+    if ActiveModel::Type::Boolean.new.cast(params[:purge_logo])
+      @club.logo.purge if @club.logo.attached?
+    end
+
     if @club.update(club_params)
-      # devolvemos datos también para refrescar navbar
-      render json: { data: serialize(@club) }
+      render json: serialize(@club)
     else
       render json: { errors: @club.errors.full_messages }, status: :unprocessable_entity
     end
   end
 
+  # POST /preferences/upload_logo
   def upload_logo
     authorize @club, :upload_logo?
     unless params[:logo].present?
       return render json: { errors: ["Archivo no recibido"] }, status: :bad_request
     end
 
+    @club.logo.purge if @club.logo.attached?
     @club.logo.attach(params[:logo])
+
     if @club.logo.attached?
-      render json: { data: serialize(@club) }
+      render json: serialize(@club)
     else
       render json: { errors: ["No se pudo adjuntar el logo"] }, status: :unprocessable_entity
     end
@@ -47,19 +57,19 @@ class PreferencesController < ApplicationController
 
   def serialize(club)
     {
-      id: club.id,
-      name: club.name,
-      legal_name: club.legal_name,
-      email: club.email,
-      phone: club.phone,
-      website: club.website,
-      address: club.address,
-      city: club.city,
-      state: club.state,
-      country: club.country,
-      timezone: club.timezone,
+      id:            club.id,
+      name:          club.name,
+      legal_name:    club.legal_name,
+      email:         club.email,
+      phone:         club.phone,
+      website:       club.website,
+      address:       club.address,
+      city:          club.city,
+      state:         club.state,
+      country:       club.country,
+      timezone:      club.timezone,
       theme_primary: club.theme_primary,
-      logo_url: club.logo.attached? ? url_for(club.logo) : nil
+      logo_url:      club.logo.attached? ? url_for(club.logo) : nil
     }
   end
 end
