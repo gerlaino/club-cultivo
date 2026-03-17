@@ -59,5 +59,22 @@ Rails.application.routes.draw do
     resources :usuarios, controller: :club_users do
       member { post :reset_password }
     end
+
+    # Templates de documentos (admin)
+    resources :document_templates
+
+    # Documentos por paciente
+    resources :socios do
+      resources :documents, controller: 'patient_documents' do
+        member do
+          post  :firmar
+          patch :archivar
+        end
+      end
+      resources :notas, controller: "socio_notas", only: [:index, :create]
+      resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
+      resources :dispensaciones, only: [:index, :create]
+    end
+
   end
 end

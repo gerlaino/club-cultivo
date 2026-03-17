@@ -12,7 +12,7 @@ class SocioNotasController < ApplicationController
   # POST /socios/:socio_id/notas
   def create
     nota = @socio.notas.build(nota_params)
-    nota.user = current_user
+    nota.user_id = current_user.id
 
     if nota.save
       render json: { data: nota }, status: :created

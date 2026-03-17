@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_17_164032) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_17_172548) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -75,6 +75,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_164032) do
     t.index ["socio_id", "fecha_dispensacion"], name: "index_dispensaciones_on_socio_id_and_fecha_dispensacion"
     t.index ["socio_id"], name: "index_dispensaciones_on_socio_id"
     t.index ["user_id"], name: "index_dispensaciones_on_user_id"
+  end
+
+  create_table "document_templates", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "created_by_id", null: false
+    t.string "nombre", null: false
+    t.string "tipo", null: false
+    t.text "descripcion"
+    t.text "contenido_html"
+    t.jsonb "campos", default: []
+    t.boolean "activo", default: true, null: false
+    t.boolean "requiere_firma_paciente", default: false, null: false
+    t.boolean "requiere_firma_medico", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "activo"], name: "index_document_templates_on_club_id_and_activo"
+    t.index ["club_id", "tipo"], name: "index_document_templates_on_club_id_and_tipo"
+    t.index ["club_id"], name: "index_document_templates_on_club_id"
+    t.index ["created_by_id"], name: "index_document_templates_on_created_by_id"
   end
 
   create_table "eventos", force: :cascade do |t|
@@ -171,6 +190,38 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_164032) do
     t.index ["club_id", "publicada", "publicada_at"], name: "index_noticias_on_club_id_and_publicada_and_publicada_at"
     t.index ["club_id"], name: "index_noticias_on_club_id"
     t.index ["publicada"], name: "index_noticias_on_publicada"
+  end
+
+  create_table "patient_documents", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "socio_id", null: false
+    t.bigint "template_id"
+    t.bigint "created_by_id", null: false
+    t.string "nombre", null: false
+    t.string "tipo", null: false
+    t.string "estado", default: "borrador", null: false
+    t.jsonb "datos", default: {}
+    t.text "contenido_html"
+    t.string "hash_documento"
+    t.string "firma_paciente_nombre"
+    t.string "firma_paciente_dni"
+    t.text "firma_paciente_data"
+    t.datetime "firmado_paciente_at"
+    t.string "firma_medico_nombre"
+    t.string "firma_medico_dni"
+    t.text "firma_medico_data"
+    t.datetime "firmado_medico_at"
+    t.datetime "archivado_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "estado"], name: "index_patient_documents_on_club_id_and_estado"
+    t.index ["club_id", "socio_id"], name: "index_patient_documents_on_club_id_and_socio_id"
+    t.index ["club_id", "tipo"], name: "index_patient_documents_on_club_id_and_tipo"
+    t.index ["club_id"], name: "index_patient_documents_on_club_id"
+    t.index ["created_by_id"], name: "index_patient_documents_on_created_by_id"
+    t.index ["hash_documento"], name: "index_patient_documents_on_hash_documento", unique: true, where: "(hash_documento IS NOT NULL)"
+    t.index ["socio_id"], name: "index_patient_documents_on_socio_id"
+    t.index ["template_id"], name: "index_patient_documents_on_template_id"
   end
 
   create_table "plant_activities", force: :cascade do |t|
@@ -306,6 +357,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_164032) do
   add_foreign_key "dispensaciones", "lotes"
   add_foreign_key "dispensaciones", "socios"
   add_foreign_key "dispensaciones", "users"
+  add_foreign_key "document_templates", "clubs"
+  add_foreign_key "document_templates", "users", column: "created_by_id"
   add_foreign_key "eventos", "clubs"
   add_foreign_key "geneticas", "clubs"
   add_foreign_key "indicacion_medicas", "socios"
@@ -313,6 +366,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_164032) do
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "salas"
   add_foreign_key "noticias", "clubs"
+  add_foreign_key "patient_documents", "clubs"
+  add_foreign_key "patient_documents", "document_templates", column: "template_id"
+  add_foreign_key "patient_documents", "socios"
+  add_foreign_key "patient_documents", "users", column: "created_by_id"
   add_foreign_key "plant_activities", "plants"
   add_foreign_key "plant_activities", "users"
   add_foreign_key "plants", "geneticas"
