@@ -1,10 +1,5 @@
 puts "Iniciando seed..."
 
-conn = ActiveRecord::Base.connection
-
-# Deshabilitar FK constraints temporalmente
-conn.execute("SET session_replication_role = 'replica'")
-
 club_names = [
   'Mitocondria Club',
   'Club Semilla Test',
@@ -13,30 +8,39 @@ club_names = [
   'Club Federacion Test'
 ]
 
-club_ids = Club.where(name: club_names).pluck(:id)
-
-if club_ids.any?
-  ids = club_ids.join(',')
-  conn.execute("DELETE FROM socio_notas WHERE socio_id IN (SELECT id FROM socios WHERE club_id IN (#{ids}))")
-  conn.execute("DELETE FROM patient_documents WHERE socio_id IN (SELECT id FROM socios WHERE club_id IN (#{ids}))") rescue nil
-  conn.execute("DELETE FROM indicacion_medicas WHERE socio_id IN (SELECT id FROM socios WHERE club_id IN (#{ids}))") rescue nil
-  conn.execute("DELETE FROM dispensaciones WHERE socio_id IN (SELECT id FROM socios WHERE club_id IN (#{ids}))") rescue nil
-  conn.execute("DELETE FROM socios WHERE club_id IN (#{ids})")
-  conn.execute("DELETE FROM plant_activities WHERE plant_id IN (SELECT id FROM plants WHERE lote_id IN (SELECT id FROM lotes WHERE club_id IN (#{ids})))") rescue nil
-  conn.execute("DELETE FROM plants WHERE lote_id IN (SELECT id FROM lotes WHERE club_id IN (#{ids}))")
-  conn.execute("DELETE FROM lotes WHERE club_id IN (#{ids})")
-  conn.execute("DELETE FROM salas WHERE club_id IN (#{ids})")
-  conn.execute("DELETE FROM sedes WHERE club_id IN (#{ids})")
-  conn.execute("DELETE FROM geneticas WHERE club_id IN (#{ids})")
-  conn.execute("DELETE FROM document_templates WHERE club_id IN (#{ids})") rescue nil
-  conn.execute("DELETE FROM jwt_denylists WHERE jti IN (SELECT jti FROM users WHERE club_id IN (#{ids}))") rescue nil
-  conn.execute("DELETE FROM users WHERE club_id IN (#{ids})")
-  conn.execute("DELETE FROM clubs WHERE id IN (#{ids})")
-  puts "Eliminados #{club_ids.size} clubs anteriores"
+puts "Limpiando datos anteriores..."
+Club.where(name: club_names).each do |club|
+  cid = club.id
+  socio_ids = ActiveRecord::Base.connection.select_values("SELECT id FROM socios WHERE club_id = #{cid}")
+  if socio_ids.any?
+    sids = socio_ids.join(',')
+    ActiveRecord::Base.connection.execute("DELETE FROM socio_notas WHERE socio_id IN (#{sids})")
+    ActiveRecord::Base.connection.execute("DELETE FROM indicacion_medicas WHERE socio_id IN (#{sids})") rescue nil
+    ActiveRecord::Base.connection.execute("DELETE FROM dispensaciones WHERE socio_id IN (#{sids})") rescue nil
+    ActiveRecord::Base.connection.execute("DELETE FROM socios WHERE club_id = #{cid}")
+  end
+  lote_ids = ActiveRecord::Base.connection.select_values("SELECT id FROM lotes WHERE club_id = #{cid}")
+  if lote_ids.any?
+    lids = lote_ids.join(',')
+    ActiveRecord::Base.connection.execute("DELETE FROM plant_activities WHERE plant_id IN (SELECT id FROM plants WHERE lote_id IN (#{lids}))") rescue nil
+    ActiveRecord::Base.connection.execute("DELETE FROM plants WHERE lote_id IN (#{lids})")
+    ActiveRecord::Base.connection.execute("DELETE FROM lotes WHERE club_id = #{cid}")
+  end
+  sede_ids = ActiveRecord::Base.connection.select_values("SELECT id FROM sedes WHERE club_id = #{cid}")
+  if sede_ids.any?
+    seids = sede_ids.join(',')
+    ActiveRecord::Base.connection.execute("DELETE FROM inventario_movimientos WHERE sede_id IN (#{seids})") rescue nil
+    ActiveRecord::Base.connection.execute("DELETE FROM sede_inventarios WHERE sede_id IN (#{seids})") rescue nil
+    ActiveRecord::Base.connection.execute("UPDATE salas SET sede_id = NULL WHERE sede_id IN (#{seids})") rescue nil
+    ActiveRecord::Base.connection.execute("DELETE FROM sedes WHERE club_id = #{cid}")
+  end
+  ActiveRecord::Base.connection.execute("DELETE FROM salas WHERE club_id = #{cid}")
+  ActiveRecord::Base.connection.execute("DELETE FROM geneticas WHERE club_id = #{cid}") rescue nil
+  ActiveRecord::Base.connection.execute("DELETE FROM document_templates WHERE club_id = #{cid}") rescue nil
+  ActiveRecord::Base.connection.execute("DELETE FROM users WHERE club_id = #{cid}")
+  ActiveRecord::Base.connection.execute("DELETE FROM clubs WHERE id = #{cid}")
+  puts "  Eliminado: #{club.name}"
 end
-
-# Rehabilitar FK constraints
-conn.execute("SET session_replication_role = 'origin'")
 
 def crear_club(name:, plan:, users_data:)
   club = Club.create!(
@@ -131,16 +135,8 @@ puts "\n=============================="
 puts "SEED COMPLETADO"
 puts "=============================="
 puts "Contrasena: 123456Aa"
-puts ""
-puts "MITOCONDRIA (Federacion - acceso total):"
-puts "  admin@mitocondria.com"
-puts "  medico@mitocondria.com"
-puts "  agricultor@mitocondria.com"
-puts "  cultivador@mitocondria.com"
-puts "  abogado@mitocondria.com"
-puts "  auditor@mitocondria.com"
-puts ""
-puts "SEMILLA: admin@semilla.test"
-puts "BROTE:   admin@brote.test"
-puts "COSECHA: admin@cosecha.test"
-puts "FEDERACION: admin@federacion.test"
+puts "admin@mitocondria.com"
+puts "admin@semilla.test"
+puts "admin@brote.test"
+puts "admin@cosecha.test"
+puts "admin@federacion.test"
