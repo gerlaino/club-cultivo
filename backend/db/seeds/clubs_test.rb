@@ -140,4 +140,3 @@ puts "admin@semilla.test"
 puts "admin@brote.test"
 puts "admin@cosecha.test"
 puts "admin@federacion.test"
-
