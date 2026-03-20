@@ -2,12 +2,16 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { useSalasStore } from "../stores/salas";
 import { useAuthStore } from "../stores/auth";
+import { listSedes } from "../lib/api";
 
 const salas = useSalasStore();
 const auth  = useAuthStore();
+const sedes = ref([]);
 
-onMounted(() => {
+onMounted(async () => {
   if (!salas.items.length) salas.fetch();
+  const { data } = await listSedes();
+  sedes.value = data || [];
 });
 
 // ---------- permisos ----------
@@ -104,7 +108,7 @@ const createForm   = ref(emptyForm());
 const createErrors = ref({});
 
 function emptyForm() {
-  return { nombre: "", state: "activa", pots_count: 0, kind: "", notes: "" };
+  return { nombre: "", state: "activa", pots_count: 0, plants_max: 0, kind: "", notes: "", sede_id: null };
 }
 function resetCreate() { createForm.value = emptyForm(); createErrors.value = {}; }
 
@@ -132,7 +136,7 @@ const editForm   = ref({ id: null, ...emptyForm() });
 const editErrors = ref({});
 
 function startEdit(s) {
-  editForm.value   = { id: s.id, nombre: s.nombre||"", state: s.state||"activa", pots_count: s.pots_count??0, kind: s.kind||"", notes: s.notes||"" };
+  editForm.value = { id: s.id, nombre: s.nombre||"", state: s.state||"activa", pots_count: s.pots_count??0, plants_max: s.plants_max??0, kind: s.kind||"", notes: s.notes||"", sede_id: s.sede?.id||null };
   editErrors.value = {};
   showEdit.value   = true;
 }
@@ -291,6 +295,7 @@ async function doDelete() {
               <div class="flex-grow-1 min-w-0">
                 <h5 class="fw-bold mb-0 text-truncate" :title="s.nombre">{{ s.nombre }}</h5>
                 <div class="small text-muted">{{ kindLabel(s.kind) }}</div>
+                <div v-if="s.sede" class="small text-muted"><i class="bi bi-building me-1"></i>{{ s.sede.nombre }}</div>
               </div>
               <span class="badge flex-shrink-0" :class="`text-bg-${stateBadgeColor(s.state)}`">
                 {{ stateIcon(s.state) }} {{ s.state }}
@@ -364,7 +369,7 @@ async function doDelete() {
               <div class="fw-semibold">{{ s.nombre }}</div>
               <div v-if="s.notes" class="small text-muted text-truncate" style="max-width:200px">{{ s.notes }}</div>
             </td>
-            <td><span class="badge text-bg-light text-dark">{{ kindLabel(s.kind) }}</span></td>
+            <td><span class="badge text-bg-light text-dark">{{ kindLabel(s.kind) }}</span><div v-if="s.sede" class="small text-muted">{{ s.sede.nombre }}</div></td>
             <td>
                 <span class="badge" :class="`text-bg-${stateBadgeColor(s.state)}`">
                   {{ stateIcon(s.state) }} {{ s.state }}
@@ -453,6 +458,15 @@ async function doDelete() {
                 <div class="invalid-feedback">{{ createErrors.pots_count }}</div>
               </div>
               <div class="col-12">
+                <label class="form-label">Sede</label>
+                <select class="form-select" v-model="createForm.sede_id">
+                  <option :value="null">Sin sede asignada</option>
+                  <option v-for="sede in sedes" :key="sede.id" :value="sede.id">
+                    {{ sede.nombre }} — {{ sede.tipo_label }}
+                  </option>
+                </select>
+              </div>
+              <div class="col-12">
                 <label class="form-label">Notas</label>
                 <textarea class="form-control" rows="2" v-model.trim="createForm.notes" placeholder="Observaciones opcionales…"></textarea>
               </div>
@@ -511,6 +525,15 @@ async function doDelete() {
                 <input type="number" min="0" max="9999" step="1" class="form-control"
                        v-model.number="editForm.pots_count" :class="{ 'is-invalid': editErrors.pots_count }" />
                 <div class="invalid-feedback">{{ editErrors.pots_count }}</div>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Sede</label>
+                <select class="form-select" v-model="editForm.sede_id">
+                  <option :value="null">Sin sede asignada</option>
+                  <option v-for="sede in sedes" :key="sede.id" :value="sede.id">
+                    {{ sede.nombre }} — {{ sede.tipo_label }}
+                  </option>
+                </select>
               </div>
               <div class="col-12">
                 <label class="form-label">Notas</label>
