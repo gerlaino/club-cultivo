@@ -14,6 +14,7 @@ import SocioDetailView from "../views/SocioDetailView.vue";
 import UsuariosView from "../views/UsuariosView.vue";
 import UsuarioDetail from "../views/UsuarioDetail.vue";
 import SedesView from "../views/SedesView.vue";
+import SedeDetailView from "../views/SedeDetailView.vue";
 import DocumentTemplatesView from "../views/DocumentTemplatesView.vue";
 import { useAuthStore } from "../stores/auth";
 import { usePermissions } from "../composables/usePermissions";
@@ -55,6 +56,14 @@ const routes = [
     component: SedesView,
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("sedes", "index"),
+  },
+  {
+    path: "/sedes/:id",
+    name: "sede-detail",
+    component: SedeDetailView,
+    props: (r) => ({ id: Number(r.params.id) }),
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("sedes", "show"),
   },
 
   // Salas
@@ -211,4 +220,3 @@ router.beforeEach(async (to) => {
 });
 
 export default router;
-
