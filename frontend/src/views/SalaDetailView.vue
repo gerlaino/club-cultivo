@@ -117,8 +117,21 @@ function closeCreate() {
     <!-- ── Breadcrumb + header ── -->
     <nav aria-label="breadcrumb" class="mb-3">
       <ol class="breadcrumb small">
-        <li class="breadcrumb-item"><RouterLink :to="{ name: 'salas' }">Salas</RouterLink></li>
-        <li class="breadcrumb-item active">{{ sala?.nombre || "Detalle" }}</li>
+        <li class="breadcrumb-item">
+          <RouterLink :to="{ name: 'sedes' }">Sedes</RouterLink>
+        </li>
+        <li v-if="sala?.sede" class="breadcrumb-item">
+          <RouterLink :to="{ name: 'sede-detail', params: { id: sala.sede.id } }">
+            {{ sala.sede.nombre }}
+          </RouterLink>
+        </li>
+        <li class="breadcrumb-item" :class="{ active: !sala?.sede }">
+          <RouterLink v-if="!sala?.sede" :to="{ name: 'salas' }">Salas</RouterLink>
+          <span v-else>{{ sala?.nombre || "Detalle" }}</span>
+        </li>
+        <li v-if="sala?.sede" class="breadcrumb-item active">
+          {{ sala?.nombre || "Detalle" }}
+        </li>
       </ol>
     </nav>
 
