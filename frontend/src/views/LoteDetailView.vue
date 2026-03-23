@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useLotesStore }  from "../stores/lotes";
 import { usePlantsStore } from "../stores/plants";
 import { useAuthStore }   from "../stores/auth";
+import { getCostoLote, createCostoLote, updateCostoLote } from "../lib/api";
 
 const route  = useRoute();
 const router = useRouter();
@@ -17,12 +18,79 @@ const loading = computed(() => lotes.loading);
 const lote    = computed(() => lotes.current);
 const canEdit = computed(() => ["admin","agricultor"].includes(auth.role));
 
-onMounted(async () => {
-  try   { await lotes.fetchOne(id); }
-  catch { error.value = "No se pudo cargar el lote."; }
-  try   { await plants.fetchByLote(id); }
-  catch (e) { console.warn("Sin plantas:", e); }
-});
+// ── Costo lote ────────────────────────────────────────────────────────────────
+const costo          = ref(null)
+const showCostoModal = ref(false)
+const savingCosto    = ref(false)
+const costoError     = ref(null)
+
+function emptyCostoForm() {
+  return { costo_insumos: 0, costo_energia: 0, costo_mano_obra: 0,
+    costo_prorrateado: 0, gramos_producidos: null, notas: "" }
+}
+const costoForm = ref(emptyCostoForm())
+
+const costoTotal = computed(() =>
+  (Number(costoForm.value.costo_insumos)     || 0) +
+  (Number(costoForm.value.costo_energia)     || 0) +
+  (Number(costoForm.value.costo_mano_obra)   || 0) +
+  (Number(costoForm.value.costo_prorrateado) || 0)
+)
+const costoPorGramoPreview = computed(() => {
+  const g = Number(costoForm.value.gramos_producidos)
+  if (!g || g <= 0) return null
+  return (costoTotal.value / g).toFixed(2)
+})
+
+function fmt(n) {
+  if (n == null) return "—"
+  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS",
+    minimumFractionDigits: 0 }).format(n)
+}
+
+function openCostoModal() {
+  if (costo.value) {
+    costoForm.value = {
+      costo_insumos:     costo.value.costo_insumos     || 0,
+      costo_energia:     costo.value.costo_energia     || 0,
+      costo_mano_obra:   costo.value.costo_mano_obra   || 0,
+      costo_prorrateado: costo.value.costo_prorrateado || 0,
+      gramos_producidos: costo.value.gramos_producidos || null,
+      notas:             costo.value.notas             || "",
+    }
+  } else {
+    costoForm.value = emptyCostoForm()
+  }
+  costoError.value    = null
+  showCostoModal.value = true
+}
+
+async function submitCosto() {
+  savingCosto.value = true
+  costoError.value  = null
+  try {
+    const payload = { ...costoForm.value }
+    let res
+    if (costo.value) {
+      res = await updateCostoLote(id, payload)
+    } else {
+      res = await createCostoLote(id, payload)
+    }
+    costo.value          = res.data
+    showCostoModal.value = false
+  } catch (e) {
+    costoError.value = e?.response?.data?.errors?.join(", ") || "No se pudo guardar el costo"
+  } finally {
+    savingCosto.value = false
+  }
+}
+
+async function loadCosto() {
+  try {
+    const { data } = await getCostoLote(id)
+    costo.value = data.costo || null
+  } catch { costo.value = null }
+}
 
 // helpers
 const ESTADO_META = {
@@ -40,14 +108,21 @@ function estadoIcon(e) { return em(e).icon; }
 function growLabel(g)  { return { sustrato:"Sustrato", hidroponia:"Hidroponia", aeroponia:"Aeroponia" }[g] || g || "—"; }
 function lightLabel(l) { return { led:"LED", hps:"HPS", cmh:"CMH", natural:"Natural", mixta:"Mixta" }[l] || l || "—"; }
 function plantStateLabel(s) {
-  return { germinacion:"Germinación", vegetativo:"Vegetativo", floracion:"Floración", cosecha:"Cosecha", seco:"Seco" }[s] || s || "—";
+  return { germinacion:"Germinación", vegetativo:"Vegetativo", floracion:"Floración",
+    cosecha:"Cosecha", seco:"Seco" }[s] || s || "—";
 }
 
-// Timeline de ciclo
 const CICLO = ["planificacion","vegetativo","floracion","secado","cosechado","finalizado"];
 const cicloIndex = computed(() => lote.value ? CICLO.indexOf(lote.value.estado) : -1);
+const plantList  = computed(() => plants.byLote(id));
 
-const plantList = computed(() => plants.byLote(id));
+onMounted(async () => {
+  try   { await lotes.fetchOne(id); }
+  catch { error.value = "No se pudo cargar el lote."; }
+  try   { await plants.fetchByLote(id); }
+  catch (e) { console.warn("Sin plantas:", e); }
+  await loadCosto()
+});
 </script>
 
 <template>
@@ -118,7 +193,8 @@ const plantList = computed(() => plants.byLote(id));
       </div>
 
       <div class="row g-4">
-        <!-- Col principal -->
+
+        <!-- ── Col principal ── -->
         <div class="col-12 col-lg-8">
 
           <!-- Imagen placeholder -->
@@ -167,12 +243,13 @@ const plantList = computed(() => plants.byLote(id));
                   <tbody>
                   <tr v-for="(p, i) in plantList" :key="p.id">
                     <td class="text-muted small">{{ i+1 }}</td>
-                    <td class="font-monospace small">{{ p.codigo_qr || `—` }}</td>
+                    <td class="font-monospace small">{{ p.codigo_qr || "—" }}</td>
                     <td>{{ p.nombre || "—" }}</td>
                     <td class="text-capitalize small">{{ plantStateLabel(p.state) }}</td>
                     <td class="small text-muted">{{ p.fecha_germinacion || "—" }}</td>
                     <td class="text-end">
-                      <RouterLink class="btn btn-sm btn-outline-primary" :to="{ name:'planta-detalle', params:{ id: p.id } }">
+                      <RouterLink class="btn btn-sm btn-outline-primary"
+                                  :to="{ name:'planta-detalle', params:{ id: p.id } }">
                         Ver
                       </RouterLink>
                     </td>
@@ -185,8 +262,70 @@ const plantList = computed(() => plants.byLote(id));
 
         </div>
 
-        <!-- Col lateral -->
+        <!-- ── Col lateral ── -->
         <div class="col-12 col-lg-4">
+
+          <!-- ── COSTO DEL LOTE ── -->
+          <div class="card border-0 shadow-sm mb-3"
+               :class="costo ? 'border-success' : 'border-warning'"
+               style="border-left: 4px solid;">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+              <strong>💰 Costo de producción</strong>
+              <button v-if="canEdit" class="btn btn-sm btn-outline-secondary"
+                      @click="openCostoModal">
+                {{ costo ? "✏️ Editar" : "＋ Cargar" }}
+              </button>
+            </div>
+            <div class="card-body small">
+
+              <!-- Sin costo -->
+              <div v-if="!costo" class="text-center py-2 text-muted">
+                <div class="fs-3 mb-1">📊</div>
+                <div>Sin costo calculado</div>
+                <div class="mt-1" style="font-size:.75rem">
+                  Cargá el costo para habilitar el cálculo automático en dispensaciones
+                </div>
+              </div>
+
+              <!-- Con costo -->
+              <template v-else>
+                <dl class="row mb-2">
+                  <dt class="col-7 text-muted fw-normal">Insumos</dt>
+                  <dd class="col-5 text-end">{{ fmt(costo.costo_insumos) }}</dd>
+
+                  <dt class="col-7 text-muted fw-normal">Energía</dt>
+                  <dd class="col-5 text-end">{{ fmt(costo.costo_energia) }}</dd>
+
+                  <dt class="col-7 text-muted fw-normal">Mano de obra</dt>
+                  <dd class="col-5 text-end">{{ fmt(costo.costo_mano_obra) }}</dd>
+
+                  <dt class="col-7 text-muted fw-normal">Prorrateado</dt>
+                  <dd class="col-5 text-end">{{ fmt(costo.costo_prorrateado) }}</dd>
+                </dl>
+
+                <div class="border-top pt-2">
+                  <div class="d-flex justify-content-between fw-semibold">
+                    <span>Total</span>
+                    <span>{{ fmt(costo.costo_total) }}</span>
+                  </div>
+                  <div v-if="costo.gramos_producidos" class="d-flex justify-content-between text-muted mt-1">
+                    <span>Gramos producidos</span>
+                    <span>{{ costo.gramos_producidos }}g</span>
+                  </div>
+                  <div v-if="costo.costo_por_gramo"
+                       class="d-flex justify-content-between mt-1 fw-bold text-success">
+                    <span>Costo / gramo</span>
+                    <span>{{ fmt(costo.costo_por_gramo) }}</span>
+                  </div>
+                </div>
+
+                <div v-if="costo.notas" class="mt-2 text-muted border-top pt-2">
+                  {{ costo.notas }}
+                </div>
+              </template>
+
+            </div>
+          </div>
 
           <!-- Info técnica -->
           <div class="card border-0 shadow-sm mb-3">
@@ -236,10 +375,10 @@ const plantList = computed(() => plants.byLote(id));
                 </dd>
 
                 <dt class="col-5 text-muted fw-normal">Creado</dt>
-                <dd class="col-7">{{ lote.created_at ? new Date(lote.created_at).toLocaleDateString() : "—" }}</dd>
+                <dd class="col-7">{{ lote.created_at ? new Date(lote.created_at).toLocaleDateString("es-AR") : "—" }}</dd>
 
                 <dt class="col-5 text-muted fw-normal">Actualizado</dt>
-                <dd class="col-7 mb-0">{{ lote.updated_at ? new Date(lote.updated_at).toLocaleDateString() : "—" }}</dd>
+                <dd class="col-7 mb-0">{{ lote.updated_at ? new Date(lote.updated_at).toLocaleDateString("es-AR") : "—" }}</dd>
               </dl>
             </div>
           </div>
@@ -253,11 +392,107 @@ const plantList = computed(() => plants.byLote(id));
         </div>
       </div>
     </template>
+
+    <!-- ═══════════════ MODAL COSTO ═══════════════ -->
+    <div class="modal fade" :class="{ show: showCostoModal }"
+         :style="{ display: showCostoModal ? 'block':'none' }" tabindex="-1" aria-modal="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">💰 {{ costo ? "Editar" : "Cargar" }} costo de producción</h5>
+            <button class="btn-close" @click="showCostoModal = false"></button>
+          </div>
+          <div class="modal-body">
+            <div v-if="costoError" class="alert alert-danger">{{ costoError }}</div>
+
+            <div class="row g-3">
+              <div class="col-6">
+                <label class="form-label small">Insumos (ARS)</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">$</span>
+                  <input type="number" min="0" step="0.01" class="form-control"
+                         v-model.number="costoForm.costo_insumos" />
+                </div>
+              </div>
+              <div class="col-6">
+                <label class="form-label small">Energía (ARS)</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">$</span>
+                  <input type="number" min="0" step="0.01" class="form-control"
+                         v-model.number="costoForm.costo_energia" />
+                </div>
+              </div>
+              <div class="col-6">
+                <label class="form-label small">Mano de obra (ARS)</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">$</span>
+                  <input type="number" min="0" step="0.01" class="form-control"
+                         v-model.number="costoForm.costo_mano_obra" />
+                </div>
+              </div>
+              <div class="col-6">
+                <label class="form-label small">Gastos prorrateados (ARS)</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">$</span>
+                  <input type="number" min="0" step="0.01" class="form-control"
+                         v-model.number="costoForm.costo_prorrateado" />
+                </div>
+              </div>
+              <div class="col-12">
+                <label class="form-label small">Gramos producidos</label>
+                <div class="input-group input-group-sm">
+                  <input type="number" min="0.01" step="0.01" class="form-control"
+                         v-model.number="costoForm.gramos_producidos"
+                         placeholder="Ej: 250" />
+                  <span class="input-group-text">g</span>
+                </div>
+              </div>
+
+              <!-- Preview en tiempo real -->
+              <div class="col-12">
+                <div class="card border-0 bg-body-secondary">
+                  <div class="card-body py-2 px-3 small">
+                    <div class="d-flex justify-content-between">
+                      <span class="text-muted">Costo total</span>
+                      <span class="fw-semibold">{{ fmt(costoTotal) }}</span>
+                    </div>
+                    <div v-if="costoPorGramoPreview" class="d-flex justify-content-between mt-1">
+                      <span class="text-muted">Costo / gramo</span>
+                      <span class="fw-bold text-success">{{ fmt(costoPorGramoPreview) }}</span>
+                    </div>
+                    <div v-else class="text-muted mt-1">
+                      Ingresá los gramos producidos para calcular el costo/gramo
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label small">Notas</label>
+                <textarea class="form-control form-control-sm" rows="2"
+                          v-model.trim="costoForm.notas"
+                          placeholder="Observaciones opcionales…"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary" :disabled="savingCosto"
+                    @click="showCostoModal = false">Cancelar</button>
+            <button class="btn btn-success" :disabled="savingCosto" @click="submitCosto">
+              <span v-if="savingCosto" class="spinner-border spinner-border-sm me-2"></span>
+              Guardar costo
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade" :class="{ show: showCostoModal }" v-if="showCostoModal"
+         @click="showCostoModal = false"></div>
+
   </div>
 </template>
 
 <style scoped>
-/* Timeline ciclo */
 .ciclo-timeline { overflow-x: auto; }
 .ciclo-step { min-width: 48px; cursor: default; transition: background .15s; }
 .ciclo-step--done    { background: rgba(25,135,84,.15); color: #198754; }
@@ -266,5 +501,3 @@ const plantList = computed(() => plants.byLote(id));
 .ciclo-connector { width: 16px; height: 2px; background: #dee2e6; flex-shrink: 0; }
 .ciclo-connector--done { background: #198754; }
 </style>
-
-
