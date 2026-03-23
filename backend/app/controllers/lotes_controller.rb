@@ -87,6 +87,8 @@ class LotesController < ApplicationController
       light_type: lote.light_type,
       dias_desde_inicio: lote.dias_desde_inicio,
       progreso_ciclo: lote.progreso_ciclo,
+      costo_por_gramo:   lote.costo_lote&.costo_por_gramo&.to_f,
+      tiene_costo:       lote.costo_lote.present?,
       sala: {
         id: lote.sala.id,
         nombre: lote.sala.nombre
