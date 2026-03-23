@@ -18,6 +18,7 @@ import SedeDetailView from "../views/SedeDetailView.vue";
 import DocumentTemplatesView from "../views/DocumentTemplatesView.vue";
 import { useAuthStore } from "../stores/auth";
 import { usePermissions } from "../composables/usePermissions";
+import ContabilidadView from "../views/ContabilidadView.vue";
 
 const requiresPermission = (resource, action) => {
   return (to, from, next) => {
@@ -64,6 +65,15 @@ const routes = [
     props: (r) => ({ id: Number(r.params.id) }),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("sedes", "show"),
+  },
+
+  // Después de sedes
+  {
+    path: "/contabilidad",
+    name: "contabilidad",
+    component: ContabilidadView,
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("movimientos_contables", "index"),
   },
 
   // Salas

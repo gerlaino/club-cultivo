@@ -6,6 +6,9 @@ class Dispensacion < ApplicationRecord
   belongs_to :indicacion_medica, optional: true
   belongs_to :lote, optional: true
 
+  has_one :movimiento_contable, dependent: :nullify
+  belongs_to :sede, optional: true
+
   TIPOS_PRODUCTO = %w[flores aceite extracto crema].freeze
 
   validates :cantidad_gramos, presence: true, numericality: { greater_than: 0 }

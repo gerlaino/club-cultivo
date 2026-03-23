@@ -36,7 +36,8 @@ export function usePermissions() {
       socios: ['index', 'show'],
       reportes_legales: ['index', 'show'],
       informes_reprocann: ['index', 'show'],
-      trazabilidad: ['index', 'show']
+      trazabilidad: ['index', 'show'],
+      movimientos_contables: ['index', 'show', 'create', 'update', 'destroy'],
     },
     auditor: {
       read_only: true,
@@ -45,7 +46,8 @@ export function usePermissions() {
       trazabilidad: ['index', 'show'],
       plantas: ['index', 'show'],
       lotes: ['index', 'show'],
-      socios: ['index', 'show']
+      socios: ['index', 'show'],
+      movimientos_contables: ['index', 'show'],
     },
     socio: {
       mi_perfil: ['show', 'update'],

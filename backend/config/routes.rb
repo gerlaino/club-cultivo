@@ -27,7 +27,9 @@ Rails.application.routes.draw do
       resources :lotes, only: [:index, :create]
     end
 
-    resources :lotes, only: [:index, :show, :update, :destroy]
+    resources :lotes, only: [:index, :show, :update, :destroy] do
+      resource :costo, controller: :costo_lotes, only: [:show, :create, :update]
+    end
 
     resources :plants, only: [:index, :show, :create, :update, :destroy] do
       resources :activities, controller: 'plant_activities', only: [:index, :create, :destroy]
@@ -84,6 +86,13 @@ Rails.application.routes.draw do
       member do
         get  :inventario
         post :agregar_stock
+      end
+    end
+
+    resources :movimientos_contables, only: [:index, :show, :create, :update, :destroy] do
+      collection do
+        get :dashboard
+        get :export_csv
       end
     end
 

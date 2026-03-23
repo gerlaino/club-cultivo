@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_17_211802) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -63,6 +63,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_211802) do
     t.index ["plan"], name: "index_clubs_on_plan"
   end
 
+  create_table "costo_lotes", force: :cascade do |t|
+    t.bigint "lote_id", null: false
+    t.bigint "club_id", null: false
+    t.decimal "costo_insumos", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "costo_energia", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "costo_mano_obra", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "costo_prorrateado", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "costo_total", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "gramos_producidos", precision: 10, scale: 2
+    t.decimal "costo_por_gramo", precision: 10, scale: 2
+    t.text "notas"
+    t.bigint "calculado_por_id"
+    t.datetime "calculado_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_costo_lotes_on_club_id"
+    t.index ["lote_id"], name: "index_costo_lotes_on_lote_id", unique: true
+  end
+
   create_table "dispensaciones", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -75,6 +94,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_211802) do
     t.text "observaciones"
     t.date "fecha_dispensacion", null: false
     t.bigint "sede_id"
+    t.decimal "aporte_socio_ars", precision: 10, scale: 2
+    t.decimal "costo_por_gramo", precision: 10, scale: 2
+    t.decimal "costo_total_calculado", precision: 10, scale: 2
     t.index ["fecha_dispensacion"], name: "index_dispensaciones_on_fecha_dispensacion"
     t.index ["indicacion_medica_id"], name: "index_dispensaciones_on_indicacion_medica_id"
     t.index ["lote_id"], name: "index_dispensaciones_on_lote_id"
@@ -207,6 +229,35 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_211802) do
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["estado"], name: "index_lotes_on_estado"
     t.index ["sala_id"], name: "index_lotes_on_sala_id"
+  end
+
+  create_table "movimientos_contables", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "sede_id"
+    t.bigint "lote_id"
+    t.bigint "dispensacion_id"
+    t.bigint "created_by_id", null: false
+    t.string "tipo", null: false
+    t.string "categoria", null: false
+    t.string "descripcion", null: false
+    t.decimal "monto_ars", precision: 12, scale: 2, null: false
+    t.date "fecha", null: false
+    t.string "comprobante_numero"
+    t.string "comprobante_tipo"
+    t.string "proveedor"
+    t.boolean "pagado", default: false, null: false
+    t.string "medio_pago"
+    t.text "notas"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "fecha"], name: "index_movimientos_contables_on_club_id_and_fecha"
+    t.index ["club_id", "tipo"], name: "index_movimientos_contables_on_club_id_and_tipo"
+    t.index ["club_id"], name: "index_movimientos_contables_on_club_id"
+    t.index ["dispensacion_id"], name: "index_movimientos_contables_on_dispensacion_id"
+    t.index ["fecha"], name: "index_movimientos_contables_on_fecha"
+    t.index ["lote_id"], name: "index_movimientos_contables_on_lote_id"
+    t.index ["sede_id", "fecha"], name: "index_movimientos_contables_on_sede_id_and_fecha"
+    t.index ["sede_id"], name: "index_movimientos_contables_on_sede_id"
   end
 
   create_table "noticias", force: :cascade do |t|
@@ -430,6 +481,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_211802) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "costo_lotes", "clubs"
+  add_foreign_key "costo_lotes", "lotes"
+  add_foreign_key "costo_lotes", "users", column: "calculado_por_id"
   add_foreign_key "dispensaciones", "indicacion_medicas"
   add_foreign_key "dispensaciones", "lotes"
   add_foreign_key "dispensaciones", "sedes"
@@ -449,6 +503,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_17_211802) do
   add_foreign_key "inventario_movimientos", "users", column: "created_by_id"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "salas"
+  add_foreign_key "movimientos_contables", "clubs"
+  add_foreign_key "movimientos_contables", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "movimientos_contables", "lotes"
+  add_foreign_key "movimientos_contables", "sedes"
+  add_foreign_key "movimientos_contables", "users", column: "created_by_id"
   add_foreign_key "noticias", "clubs"
   add_foreign_key "patient_documents", "clubs"
   add_foreign_key "patient_documents", "document_templates", column: "template_id"

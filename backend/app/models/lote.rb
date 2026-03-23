@@ -1,7 +1,10 @@
 class Lote < ApplicationRecord
   belongs_to :club
   belongs_to :sala
+
   has_many :plants, dependent: :destroy
+  has_one  :costo_lote,            dependent: :destroy
+  has_many :movimientos_contables, dependent: :nullify
 
   ESTADOS = %w[planificacion vegetativo floracion secado cosechado finalizado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
