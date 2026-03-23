@@ -167,4 +167,18 @@ export const agregarStock    = (id, payload) => api.post(`/sedes/${id}/agregar_s
 // -------- PLAN --------
 export const getPlan = () => api.get('/plan')
 
+// ── Contabilidad ──────────────────────────────────────────────────────────────
+export const getContableDashboard  = ()             => api.get('/movimientos_contables/dashboard')
+export const listMovimientos        = (params = {})  => api.get('/movimientos_contables', { params })
+export const getMovimiento          = (id)           => api.get(`/movimientos_contables/${id}`)
+export const createMovimiento       = (payload)      => api.post('/movimientos_contables', { movimiento_contable: payload })
+export const updateMovimiento       = (id, payload)  => api.put(`/movimientos_contables/${id}`, { movimiento_contable: payload })
+export const deleteMovimiento       = (id)           => api.delete(`/movimientos_contables/${id}`)
+export const exportMovimientosCSV   = (params = {})  => api.get('/movimientos_contables/export_csv', { params, responseType: 'blob' })
+
+// ── Costo por lote ────────────────────────────────────────────────────────────
+export const getCostoLote    = (loteId)           => api.get(`/lotes/${loteId}/costo`)
+export const createCostoLote = (loteId, payload)  => api.post(`/lotes/${loteId}/costo`, { costo_lote: payload })
+export const updateCostoLote = (loteId, payload)  => api.put(`/lotes/${loteId}/costo`, { costo_lote: payload })
+
 export default api;

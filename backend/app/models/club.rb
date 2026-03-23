@@ -7,6 +7,8 @@ class Club < ApplicationRecord
   has_many :noticias, dependent: :destroy
   has_many :eventos, dependent: :destroy
   has_many :sedes, dependent: :destroy
+  has_many :movimientos_contables, class_name: "MovimientoContable", dependent: :destroy
+  has_many :costo_lotes, class_name: "CostoLote", dependent: :destroy
 
   has_one_attached :logo
 

@@ -136,6 +136,11 @@ onMounted(async () => {
                 <i class="bi bi-person-badge me-1 d-lg-none"></i>Usuarios
               </RouterLink>
             </li>
+            <li class="nav-item" v-if="can('movimientos_contables', 'index')">
+              <RouterLink class="nav-link px-2" to="/contabilidad" @click="closeNav">
+                <i class="bi bi-cash-stack me-1 d-lg-none"></i>Contabilidad
+              </RouterLink>
+            </li>
 
           </ul>
 
