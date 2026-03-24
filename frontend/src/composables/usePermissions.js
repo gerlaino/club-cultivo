@@ -38,6 +38,7 @@ export function usePermissions() {
       informes_reprocann: ['index', 'show'],
       trazabilidad: ['index', 'show'],
       movimientos_contables: ['index', 'show', 'create', 'update', 'destroy'],
+      informe_semestral: ['show'],
     },
     auditor: {
       read_only: true,
@@ -48,6 +49,7 @@ export function usePermissions() {
       lotes: ['index', 'show'],
       socios: ['index', 'show'],
       movimientos_contables: ['index', 'show'],
+      informe_semestral: ['show'],
     },
     socio: {
       mi_perfil: ['show', 'update'],

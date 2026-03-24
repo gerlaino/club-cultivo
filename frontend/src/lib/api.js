@@ -181,4 +181,7 @@ export const getCostoLote    = (loteId)           => api.get(`/lotes/${loteId}/c
 export const createCostoLote = (loteId, payload)  => api.post(`/lotes/${loteId}/costo`, { costo_lote: payload })
 export const updateCostoLote = (loteId, payload)  => api.put(`/lotes/${loteId}/costo`, { costo_lote: payload })
 
+// ── Informe semestral REPROCANN ───────────────────────────────────────────────
+export const getInformeSemestral = (params = {}) => api.get('/informe_semestral', { params })
+
 export default api;
