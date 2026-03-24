@@ -162,8 +162,15 @@ async function sendReset(u) {
             </div>
 
             <div class="btn-group w-100" role="group">
+              <RouterLink
+                class="btn btn-sm btn-primary"
+                :to="{ name: 'usuario-detail', params: { id: u.id } }"
+                title="Ver detalle"
+              >
+                <i class="bi bi-person-lines-fill"></i>
+              </RouterLink>
               <button
-                class="btn btn-sm btn-outline-primary"
+                class="btn btn-sm btn-outline-secondary"
                 @click="startEdit(u)"
                 title="Editar"
               >
