@@ -19,6 +19,7 @@ import DocumentTemplatesView from "../views/DocumentTemplatesView.vue";
 import { useAuthStore } from "../stores/auth";
 import { usePermissions } from "../composables/usePermissions";
 import ContabilidadView from "../views/ContabilidadView.vue";
+import InformeSemestralView from "../views/InformeSemestralView.vue";
 
 const requiresPermission = (resource, action) => {
   return (to, from, next) => {
@@ -201,6 +202,15 @@ const routes = [
       if (auth.user?.role === "admin") next();
       else next("/");
     },
+  },
+
+  // Informe REPROCANN
+  {
+    path: "/informe-semestral",
+    name: "informe-semestral",
+    component: InformeSemestralView,
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("informe_semestral", "show"),
   },
 
   { path: "/:pathMatch(.*)*", redirect: "/" },

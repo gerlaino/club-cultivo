@@ -96,5 +96,7 @@ Rails.application.routes.draw do
       end
     end
 
+    resource :informe_semestral, only: [:show], controller: :informe_semestral
+
   end
 end

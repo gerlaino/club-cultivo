@@ -142,6 +142,12 @@ onMounted(async () => {
               </RouterLink>
             </li>
 
+            <li class="nav-item" v-if="can('informe_semestral', 'show')">
+              <RouterLink class="nav-link px-2" to="/informe-semestral" @click="closeNav">
+                <i class="bi bi-clipboard-check me-1 d-lg-none"></i>Informe REPROCANN
+              </RouterLink>
+            </li>
+
           </ul>
 
           <!-- Menú de usuario -->
