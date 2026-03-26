@@ -24,6 +24,10 @@ class User < ApplicationRecord
   validates :email, presence: true, uniqueness: true
   validate :acceptable_avatar
 
+  def nombre_completo
+    "#{first_name} #{last_name}".strip
+  end
+
   private
 
   def acceptable_avatar

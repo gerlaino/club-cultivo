@@ -98,5 +98,17 @@ Rails.application.routes.draw do
 
     resource :informe_semestral, only: [:show], controller: :informe_semestral
 
+    resources :tareas do
+      collection do
+        get :dashboard   # GET /api/v1/tareas/dashboard
+        get :kanban      # GET /api/v1/tareas/kanban
+      end
+      member do
+        post :iniciar    # POST /api/v1/tareas/:id/iniciar
+        post :completar  # POST /api/v1/tareas/:id/completar
+        post :cancelar   # POST /api/v1/tareas/:id/cancelar
+      end
+    end
+
   end
 end

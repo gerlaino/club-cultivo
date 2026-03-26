@@ -456,6 +456,38 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
     t.index ["dni_normalizado"], name: "index_socios_on_dni_normalizado", unique: true
   end
 
+  create_table "tareas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "asignada_a_id"
+    t.bigint "creada_por_id", null: false
+    t.bigint "sala_id"
+    t.bigint "lote_id"
+    t.bigint "plant_id"
+    t.string "titulo", null: false
+    t.text "descripcion"
+    t.string "tipo", default: "otro", null: false
+    t.string "estado", default: "pendiente", null: false
+    t.string "prioridad", default: "normal", null: false
+    t.date "fecha_programada"
+    t.datetime "fecha_completada"
+    t.decimal "horas_estimadas", precision: 5, scale: 2
+    t.decimal "horas_reales", precision: 5, scale: 2
+    t.text "notas_completado"
+    t.boolean "horas_aplicadas_al_lote", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["asignada_a_id", "estado"], name: "index_tareas_on_asignada_a_id_and_estado"
+    t.index ["asignada_a_id"], name: "index_tareas_on_asignada_a_id"
+    t.index ["club_id", "estado"], name: "index_tareas_on_club_id_and_estado"
+    t.index ["club_id", "fecha_programada"], name: "index_tareas_on_club_id_and_fecha_programada"
+    t.index ["club_id"], name: "index_tareas_on_club_id"
+    t.index ["creada_por_id"], name: "index_tareas_on_creada_por_id"
+    t.index ["lote_id", "horas_aplicadas_al_lote"], name: "index_tareas_on_lote_id_and_horas_aplicadas_al_lote"
+    t.index ["lote_id"], name: "index_tareas_on_lote_id"
+    t.index ["plant_id"], name: "index_tareas_on_plant_id"
+    t.index ["sala_id"], name: "index_tareas_on_sala_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
@@ -536,5 +568,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
   add_foreign_key "socios", "users", column: "created_by_id"
   add_foreign_key "socios", "users", column: "deleted_by_id"
   add_foreign_key "socios", "users", column: "updated_by_id"
+  add_foreign_key "tareas", "clubs"
+  add_foreign_key "tareas", "lotes"
+  add_foreign_key "tareas", "plants"
+  add_foreign_key "tareas", "salas"
+  add_foreign_key "tareas", "users", column: "asignada_a_id"
+  add_foreign_key "tareas", "users", column: "creada_por_id"
   add_foreign_key "users", "clubs"
 end
