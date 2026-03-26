@@ -23,9 +23,11 @@ async function doLogout() {
 }
 
 function closeNav() {
-  const el = document.getElementById("mainNav");
-  if (el && el.classList.contains("show")) {
-    el.classList.remove("show");
+  // Solo cerrar en mobile (cuando el toggler está visible)
+  const toggler = document.querySelector('.navbar-toggler')
+  if (toggler && getComputedStyle(toggler).display !== 'none') {
+    const el = document.getElementById("mainNav")
+    if (el) el.classList.remove("show")
   }
 }
 
@@ -147,6 +149,10 @@ onMounted(async () => {
                 <i class="bi bi-clipboard-check me-1 d-lg-none"></i>Informe REPROCANN
               </RouterLink>
             </li>
+
+            <router-link to="/tareas" class="nav-link" active-class="active">
+              <i class="bi bi-clipboard-check me-2"></i>Tareas
+            </router-link>
 
           </ul>
 

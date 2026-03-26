@@ -5,6 +5,7 @@ import { useLotesStore }  from "../stores/lotes";
 import { usePlantsStore } from "../stores/plants";
 import { useAuthStore }   from "../stores/auth";
 import { getCostoLote, createCostoLote, updateCostoLote } from "../lib/api";
+import TareasDelLote from '../components/TareasDelLote.vue'
 
 const route  = useRoute();
 const router = useRouter();
@@ -90,6 +91,13 @@ async function loadCosto() {
     const { data } = await getCostoLote(id)
     costo.value = data.costo || null
   } catch { costo.value = null }
+}
+
+function onHorasAplicadas({ horas_total, costo_estimado, tarifa_hora }) {
+  // Mostrar un toast o actualizar CostoLote
+  // Si CostoLote está editable inline, podés pre-rellenar el campo costo_mano_obra:
+  // costoLoteForm.costo_mano_obra = (parseFloat(costoLoteForm.costo_mano_obra) || 0) + costo_estimado
+  showToast(`${horas_total}h aplicadas al lote · +$${costo_estimado.toLocaleString('es-AR')} en mano de obra`)
 }
 
 // helpers
@@ -326,6 +334,12 @@ onMounted(async () => {
 
             </div>
           </div>
+
+          <!-- Tareas -->
+          <TareasDelLote
+            :lote="lote"
+            @horas-aplicadas="onHorasAplicadas"
+          />
 
           <!-- Info técnica -->
           <div class="card border-0 shadow-sm mb-3">

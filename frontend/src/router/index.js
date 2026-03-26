@@ -213,6 +213,14 @@ const routes = [
     beforeEnter: requiresPermission("informe_semestral", "show"),
   },
 
+  // Tareas
+  {
+    path: '/tareas',
+    name: 'tareas',
+    component: () => import('../views/TareasView.vue'),
+    meta: { requiresAuth: true, roles: ['admin', 'agricultor', 'cultivador'] }
+  },
+
   { path: "/:pathMatch(.*)*", redirect: "/" },
 ];
 

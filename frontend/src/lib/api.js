@@ -184,4 +184,17 @@ export const updateCostoLote = (loteId, payload)  => api.put(`/lotes/${loteId}/c
 // ── Informe semestral REPROCANN ───────────────────────────────────────────────
 export const getInformeSemestral = (params = {}) => api.get('/informe_semestral', { params })
 
+// ── Tareas ──────────────────────────────────────────────────────────
+
+export const listTareas        = (params = {}) => api.get('/tareas', { params })
+export const getTareasDashboard = ()            => api.get('/tareas/dashboard')
+export const getTareasKanban   = (params = {}) => api.get('/tareas/kanban', { params })
+export const getTarea          = (id)           => api.get(`/tareas/${id}`)
+export const createTarea       = (payload)      => api.post('/tareas', { tarea: payload })
+export const updateTarea       = (id, payload)  => api.patch(`/tareas/${id}`, { tarea: payload })
+export const deleteTarea       = (id)           => api.delete(`/tareas/${id}`)
+export const iniciarTarea      = (id)           => api.post(`/tareas/${id}/iniciar`)
+export const completarTarea    = (id, data)     => api.post(`/tareas/${id}/completar`, data)
+export const cancelarTarea     = (id)           => api.post(`/tareas/${id}/cancelar`)
+
 export default api;
