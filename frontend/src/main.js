@@ -12,6 +12,9 @@ import "./assets/theme.css";
 import {useAuthStore} from "./stores/auth.js";
 import {useClubStore} from "./stores/club.js";
 
+import { registerSW } from 'virtual:pwa-register'
+registerSW({ immediate: true })
+
 const app = createApp(App);
 
 app.use(createPinia());
