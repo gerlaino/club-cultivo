@@ -25,14 +25,18 @@ Rails.application.routes.draw do
 
     resources :salas do
       resources :lotes, only: [:index, :create]
+      resources :cultivadores, controller: 'sala_cultivadores', only: [:index, :create, :destroy]
     end
 
     resources :lotes, only: [:index, :show, :update, :destroy] do
       resource :costo, controller: :costo_lotes, only: [:show, :create, :update]
+      resources :registros_ambientales, only: [:index, :create, :destroy]
+      resources :lote_eventos,          only: [:index, :create]
+      resources :fotos, only: [:index, :create], controller: 'fotos_lote'
     end
 
-    resources :plants, only: [:index, :show, :create, :update, :destroy] do
-      resources :activities, controller: 'plant_activities', only: [:index, :create, :destroy]
+    resources :plants do
+      resources :plant_activities, only: [:index, :create, :destroy]
     end
 
     resources :socios do
@@ -59,7 +63,15 @@ Rails.application.routes.draw do
     end
 
     resources :usuarios, controller: :club_users do
-      member { post :reset_password }
+      member do
+        post   :reset_password
+        get    :salas_asignadas
+        post   :asignar_sala
+        delete :desasignar_sala
+        get    :sedes_asignadas
+        post   :asignar_sede
+        delete :desasignar_sede
+      end
     end
 
     # Templates de documentos (admin)

@@ -77,9 +77,9 @@ export const updatePlant = (id, payload) => api.put(`/plants/${id}`, { plant: pa
 export const deletePlant = (id) => api.delete(`/plants/${id}`);
 
 // -------- PLANT ACTIVITIES --------
-export const listPlantActivities = (plantId) => api.get(`/plants/${plantId}/activities`);
-export const createPlantActivity = (plantId, payload) => api.post(`/plants/${plantId}/activities`, { plant_activity: payload });
-export const deletePlantActivity = (plantId, activityId) => api.delete(`/plants/${plantId}/activities/${activityId}`);
+export const getPlantActivities = (plantId) => api.get(`/plants/${plantId}/plant_activities`);
+export const createPlantActivity = (plantId, payload) => api.post(`/plants/${plantId}/plant_activities`, { plant_activity: payload });
+export const deletePlantActivity = (plantId, activityId) => api.delete(`/plants/${plantId}/plant_activities/${activityId}`);
 
 // -------- GENÉTICAS --------
 export const listGeneticas = (params = {}) => api.get('/geneticas', { params });
@@ -138,6 +138,9 @@ export const createUser        = (payload) => api.post('/usuarios', { user: payl
 export const updateUser        = (id, payload) => api.put(`/usuarios/${id}`, { user: payload });
 export const deleteUser        = (id) => api.delete(`/usuarios/${id}`);
 export const resetUserPassword = (id) => api.post(`/usuarios/${id}/reset_password`);
+export const getUserSalasAsignadas = (userId) => api.get(`/usuarios/${userId}/salas_asignadas`)
+export const asignarSalaAUsuario   = (userId, salaId) => api.post(`/usuarios/${userId}/asignar_sala`, { sala_id: salaId })
+export const desasignarSalaAUsuario = (userId, salaId) => api.delete(`/usuarios/${userId}/desasignar_sala`, { data: { sala_id: salaId } })
 
 // -------- DOCUMENT TEMPLATES --------
 export const listDocumentTemplates  = ()         => api.get('/document_templates')
@@ -196,5 +199,26 @@ export const deleteTarea       = (id)           => api.delete(`/tareas/${id}`)
 export const iniciarTarea      = (id)           => api.post(`/tareas/${id}/iniciar`)
 export const completarTarea    = (id, data)     => api.post(`/tareas/${id}/completar`, data)
 export const cancelarTarea     = (id)           => api.post(`/tareas/${id}/cancelar`)
+
+// Gestión de cultivadores asignados a salas
+
+export const getSalaCultivadores = (salaId) => api.get(`/salas/${salaId}/cultivadores`)
+
+export const asignarCultivador = (salaId, userId) => api.post(`/salas/${salaId}/cultivadores`, { user_id: userId })
+
+export const desasignarCultivador = (salaId, userId) => api.delete(`/salas/${salaId}/cultivadores/${userId}`)
+export const getUserSedesAsignadas  = (userId)          => api.get(`/usuarios/${userId}/sedes_asignadas`)
+export const asignarSedeAUsuario    = (userId, sedeId)  => api.post(`/usuarios/${userId}/asignar_sede`, { sede_id: sedeId })
+export const desasignarSedeAUsuario = (userId, sedeId)  => api.delete(`/usuarios/${userId}/desasignar_sede`, { data: { sede_id: sedeId } })
+
+export const getRegistrosAmbientales  = (loteId)          => api.get(`/lotes/${loteId}/registros_ambientales`)
+export const createRegistroAmbiental  = (loteId, payload)  => api.post(`/lotes/${loteId}/registros_ambientales`, { registro_ambiental: payload })
+export const deleteRegistroAmbiental  = (loteId, id)       => api.delete(`/lotes/${loteId}/registros_ambientales/${id}`)
+
+export const getLoteEventos    = (loteId)          => api.get(`/lotes/${loteId}/lote_eventos`)
+export const createLoteEvento  = (loteId, payload)  => api.post(`/lotes/${loteId}/lote_eventos`, { lote_evento: payload })
+
+export const getLoteFotos    = (loteId)        => api.get(`/lotes/${loteId}/fotos`)
+export const uploadFotoLote  = (loteId, formData) => api.post(`/lotes/${loteId}/fotos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 
 export default api;

@@ -4,13 +4,13 @@ class PlantsController < ApplicationController
 
   # GET /plants
   def index
-    club   = current_user.club
-    plants = Plant.where(lote_id: club.lotes.pluck(:id))
-                  .includes(:lote, :genetica)
-
-    plants = plants.where(state: params[:state])   if params[:state].present?
-    plants = plants.where(lote_id: params[:lote_id]) if params[:lote_id].present?
-
+    plants = Plant.joins(:lote).where(lotes: { club_id: current_user.club_id })
+    if current_user.cultivador?
+      salas_ids = current_user.salas_ids_asignadas
+      return render json: [] if salas_ids.empty?
+      plants = plants.where(lotes: { sala_id: salas_ids })
+    end
+    plants = plants.includes(:lote, :genetica).order(created_at: :desc)
     render json: plants.map { |p| serialize_plant(p) }
   end
 

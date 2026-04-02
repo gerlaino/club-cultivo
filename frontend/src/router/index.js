@@ -6,7 +6,7 @@ import SalaDetailView from "../views/SalaDetailView.vue";
 import LotesView from "../views/LotesView.vue";
 import LoteDetailView from "../views/LoteDetailView.vue";
 import PlantasView from "../views/PlantasView.vue";
-import PlantaDetalleView from "../views/PlantaDetalleView.vue";
+import PlantaDetailView from "../views/PlantaDetailView.vue";
 import PerfilView from "../views/PerfilView.vue";
 import PreferenciasView from "../views/PreferenciasView.vue";
 import SociosView from "../views/SociosView.vue";
@@ -127,7 +127,7 @@ const routes = [
   {
     path: "/plantas/:id",
     name: "planta-detalle",
-    component: PlantaDetalleView,
+    component: PlantaDetailView,
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("plantas", "show"),
   },
@@ -218,7 +218,8 @@ const routes = [
     path: '/tareas',
     name: 'tareas',
     component: () => import('../views/TareasView.vue'),
-    meta: { requiresAuth: true, roles: ['admin', 'agricultor', 'cultivador'] }
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission('tareas', 'index'),
   },
 
   { path: "/:pathMatch(.*)*", redirect: "/" },

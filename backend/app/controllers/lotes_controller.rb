@@ -6,13 +6,19 @@ class LotesController < ApplicationController
 
   # GET /lotes o GET /salas/:sala_id/lotes
   def index
-    if @sala
-      @lotes = @sala.lotes.order(created_at: :desc)
-    else
-      @lotes = current_user.club.lotes.includes(:sala).order(created_at: :desc)
+    lotes = current_user.club.lotes.includes(:sala)
+
+    # Cultivador solo ve lotes de sus salas asignadas
+    if current_user.cultivador?
+      salas_ids = current_user.salas_ids_asignadas
+      if salas_ids.empty?
+        return render json: []
+      end
+      lotes = lotes.where(sala_id: salas_ids)
     end
 
-    render json: @lotes.map { |l| serialize_lote(l) }
+    lotes = lotes.order(created_at: :desc)
+    render json: lotes.map { |l| serialize_lote(l) }
   end
 
   # GET /lotes/:id
@@ -69,7 +75,7 @@ class LotesController < ApplicationController
   end
 
   def require_admin_or_agricultor
-    unless current_user.admin? || current_user.agricultor?
+    unless current_user.admin? || current_user.agricultor? || current_user.cultivador?
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end
@@ -77,6 +83,7 @@ class LotesController < ApplicationController
   def serialize_lote(lote, include_plants: false)
     result = {
       id: lote.id,
+      sala_id: lote.sala_id,
       codigo: lote.codigo,
       estado: lote.estado,
       start_date: lote.start_date,

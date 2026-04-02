@@ -3,7 +3,10 @@ class Sala < ApplicationRecord
   belongs_to :club
   belongs_to :sede, optional: true
   belongs_to :created_by, class_name: "User", optional: true
+
   has_many :lotes, dependent: :destroy
+  has_many :sala_cultivadores, class_name: 'SalaCultivador', foreign_key: 'sala_id', dependent: :destroy
+  has_many :cultivadores, through: :sala_cultivadores, source: :user
 
   ESTADOS = %w[activa mantenimiento cerrada].freeze
   KINDS   = %w[vegetativo floracion mixta madre clon].freeze

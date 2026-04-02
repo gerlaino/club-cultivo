@@ -1,7 +1,7 @@
 class ClubUsersController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!
-  before_action :set_user, only: [:show, :update, :destroy, :reset_password]
+  before_action :set_user, only: [:show, :update, :destroy, :reset_password, :salas_asignadas, :asignar_sala, :desasignar_sala, :sedes_asignadas, :asignar_sede, :desasignar_sede]
 
   # GET /usuarios
   def index
@@ -71,6 +71,47 @@ class ClubUsersController < ApplicationController
   def reset_password
     @user.send_reset_password_instructions
     head :no_content
+  end
+
+  def salas_asignadas
+    salas = @user.salas_asignadas.includes(:sede)
+    render json: salas.map { |s| { id: s.id, nombre: s.nombre, sede: s.sede&.nombre } }
+  end
+
+  def asignar_sala
+    sala = current_user.club.salas.find(params[:sala_id])
+    SalaCultivador.find_or_create_by!(sala: sala, user: @user)
+    render json: { message: "Sala asignada correctamente" }
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Sala no encontrada' }, status: :not_found
+  end
+
+  def desasignar_sala
+    sala = current_user.club.salas.find(params[:sala_id])
+    SalaCultivador.find_by(sala: sala, user: @user)&.destroy
+    render json: { message: "Sala desasignada correctamente" }
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Sala no encontrada' }, status: :not_found
+  end
+
+  def sedes_asignadas
+    render json: @user.sedes_asignadas.map { |s| { id: s.id, nombre: s.nombre, tipo: s.tipo } }
+  end
+
+  def asignar_sede
+    sede = current_user.club.sedes.find(params[:sede_id])
+    UserSede.find_or_create_by!(sede: sede, user: @user)
+    render json: { message: "Sede asignada correctamente" }
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Sede no encontrada' }, status: :not_found
+  end
+
+  def desasignar_sede
+    sede = current_user.club.sedes.find(params[:sede_id])
+    UserSede.find_by(sede: sede, user: @user)&.destroy
+    render json: { message: "Sede desasignada correctamente" }
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Sede no encontrada' }, status: :not_found
   end
 
   private

@@ -33,7 +33,7 @@ class TareasController < ApplicationController
       tareas = tareas.where('fecha_programada <= ?', params[:fecha_hasta])
     end
 
-    tareas = tareas.por_prioridad.order(fecha_programada: :asc, created_at: :desc)
+    tareas = tareas.order(created_at: :desc)
 
     render json: tareas.map { |t| serialize_tarea(t) }
   end
@@ -44,7 +44,7 @@ class TareasController < ApplicationController
     base = @club.tareas.asignadas_a(current_user.id)
 
     render json: {
-      hoy: base.de_hoy.map { |t| serialize_tarea(t) },
+      hoy: base.de_hoy.order(created_at: :desc).map { |t| serialize_tarea(t) },
       vencidas: base.vencidas.por_prioridad.limit(5).map { |t| serialize_tarea(t) },
       proximas: base.proximas.where.not(fecha_programada: Date.today)
                     .por_prioridad.limit(10).map { |t| serialize_tarea(t) },
