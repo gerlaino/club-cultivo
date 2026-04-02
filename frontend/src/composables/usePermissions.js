@@ -13,6 +13,7 @@ export function usePermissions() {
       socio_notas: ['index', 'create', 'destroy'],
       indicaciones: ['index', 'show', 'create', 'update'],
       dispensaciones: ['index', 'show'],
+      tareas: ['index', 'show'],
       reportes_medicos: ['index', 'show']
     },
     agricultor: {
@@ -22,6 +23,7 @@ export function usePermissions() {
       sedes: ['index', 'show', 'create', 'update', 'destroy'],
       geneticas: ['index', 'show'],
       plan_trabajo: ['index', 'show', 'create', 'update'],
+      tareas: ['index', 'show', 'create', 'update', 'destroy'],
       reportes_cultivo: ['index', 'show']
     },
     cultivador: {
@@ -29,7 +31,6 @@ export function usePermissions() {
       plant_activities: ['index', 'create', 'destroy'],
       lotes: ['index', 'show'],
       salas: ['index', 'show'],
-      sedes: ['index', 'show'],
       mediciones: ['index', 'create']
     },
     abogado: {
@@ -39,6 +40,7 @@ export function usePermissions() {
       trazabilidad: ['index', 'show'],
       movimientos_contables: ['index', 'show', 'create', 'update', 'destroy'],
       informe_semestral: ['show'],
+      tareas: ['index', 'show', 'create', 'update', 'destroy']
     },
     auditor: {
       read_only: true,

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_02_000006) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -212,6 +212,24 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
     t.index ["jti"], name: "index_jwt_denylists_on_jti"
   end
 
+  create_table "lote_eventos", force: :cascade do |t|
+    t.bigint "lote_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "club_id", null: false
+    t.string "tipo", null: false
+    t.string "estado_anterior"
+    t.string "estado_nuevo"
+    t.text "descripcion"
+    t.datetime "registrado_en", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_lote_eventos_on_club_id"
+    t.index ["lote_id"], name: "index_lote_eventos_on_lote_id"
+    t.index ["registrado_en"], name: "index_lote_eventos_on_registrado_en"
+    t.index ["tipo"], name: "index_lote_eventos_on_tipo"
+    t.index ["user_id"], name: "index_lote_eventos_on_user_id"
+  end
+
   create_table "lotes", force: :cascade do |t|
     t.string "codigo"
     t.date "start_date"
@@ -225,6 +243,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
     t.string "grow_type"
     t.string "light_type"
     t.string "estado"
+    t.integer "tamanio_maceta"
+    t.string "sustrato_especifico"
+    t.string "fotoperiodo"
+    t.integer "semanas_floracion"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["estado"], name: "index_lotes_on_estado"
@@ -337,11 +359,60 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
     t.datetime "updated_at", null: false
     t.bigint "planta_madre_id"
     t.string "origen", default: "semilla"
+    t.decimal "altura_actual", precision: 6, scale: 1
+    t.integer "num_colas"
+    t.string "estado_salud"
+    t.string "color_hojas"
     t.index ["codigo_qr"], name: "index_plants_on_codigo_qr", unique: true
     t.index ["genetica_id"], name: "index_plants_on_genetica_id"
     t.index ["lote_id"], name: "index_plants_on_lote_id"
     t.index ["origen"], name: "index_plants_on_origen"
     t.index ["planta_madre_id"], name: "index_plants_on_planta_madre_id"
+  end
+
+  create_table "registros_ambientales", force: :cascade do |t|
+    t.bigint "lote_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "club_id", null: false
+    t.decimal "temperatura", precision: 5, scale: 2
+    t.decimal "humedad", precision: 5, scale: 2
+    t.decimal "vpd", precision: 5, scale: 3
+    t.decimal "co2", precision: 7, scale: 1
+    t.decimal "ph", precision: 4, scale: 2
+    t.decimal "ec", precision: 5, scale: 2
+    t.decimal "horas_luz", precision: 4, scale: 1
+    t.string "espectro_luz"
+    t.string "fase_nutricional"
+    t.decimal "ml_nutrientes_litro", precision: 6, scale: 2
+    t.string "estado_general"
+    t.text "observaciones"
+    t.datetime "registrado_en", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.decimal "temperatura_sustrato", precision: 5, scale: 2
+    t.decimal "ph_runoff", precision: 4, scale: 2
+    t.decimal "ec_runoff", precision: 5, scale: 2
+    t.decimal "ppfd", precision: 7, scale: 1
+    t.string "plagas_observadas"
+    t.text "notas_nutricion"
+    t.string "fuente", default: "manual"
+    t.string "nombre_archivo_csv"
+    t.boolean "fertilizacion", default: false
+    t.text "notas_fertilizacion"
+    t.index ["club_id"], name: "index_registros_ambientales_on_club_id"
+    t.index ["lote_id"], name: "index_registros_ambientales_on_lote_id"
+    t.index ["registrado_en"], name: "index_registros_ambientales_on_registrado_en"
+    t.index ["user_id"], name: "index_registros_ambientales_on_user_id"
+  end
+
+  create_table "sala_cultivadores", force: :cascade do |t|
+    t.bigint "sala_id", null: false
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["sala_id", "user_id"], name: "index_sala_cultivadores_on_sala_id_and_user_id", unique: true
+    t.index ["sala_id"], name: "index_sala_cultivadores_on_sala_id"
+    t.index ["user_id"], name: "index_sala_cultivadores_on_user_id"
   end
 
   create_table "salas", force: :cascade do |t|
@@ -488,6 +559,16 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
     t.index ["sala_id"], name: "index_tareas_on_sala_id"
   end
 
+  create_table "user_sedes", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "sede_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["sede_id"], name: "index_user_sedes_on_sede_id"
+    t.index ["user_id", "sede_id"], name: "index_user_sedes_on_user_id_and_sede_id", unique: true
+    t.index ["user_id"], name: "index_user_sedes_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
@@ -533,6 +614,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
   add_foreign_key "inventario_movimientos", "sede_inventarios"
   add_foreign_key "inventario_movimientos", "sedes"
   add_foreign_key "inventario_movimientos", "users", column: "created_by_id"
+  add_foreign_key "lote_eventos", "clubs"
+  add_foreign_key "lote_eventos", "lotes"
+  add_foreign_key "lote_eventos", "users"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "salas"
   add_foreign_key "movimientos_contables", "clubs"
@@ -549,6 +633,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
   add_foreign_key "plant_activities", "users"
   add_foreign_key "plants", "geneticas"
   add_foreign_key "plants", "lotes"
+  add_foreign_key "registros_ambientales", "clubs"
+  add_foreign_key "registros_ambientales", "lotes"
+  add_foreign_key "registros_ambientales", "users"
+  add_foreign_key "sala_cultivadores", "salas"
+  add_foreign_key "sala_cultivadores", "users"
   add_foreign_key "salas", "clubs"
   add_foreign_key "salas", "sedes"
   add_foreign_key "salas", "users", column: "created_by_id"
@@ -574,5 +663,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_20_000003) do
   add_foreign_key "tareas", "salas"
   add_foreign_key "tareas", "users", column: "asignada_a_id"
   add_foreign_key "tareas", "users", column: "creada_por_id"
+  add_foreign_key "user_sedes", "sedes"
+  add_foreign_key "user_sedes", "users"
   add_foreign_key "users", "clubs"
 end

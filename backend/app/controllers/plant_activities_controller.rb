@@ -1,28 +1,41 @@
 class PlantActivitiesController < ApplicationController
   before_action :authenticate_user!
   before_action :set_plant
+  skip_before_action :require_admin_o_agricultor, raise: false
 
-  # GET /plants/:plant_id/activities
   def index
-    activities = @plant.activities.recent.includes(:user)
-
-    render json: activities.map { |a| serialize_activity(a) }
+    activities = @plant.activities
+                       .order(occurred_at: :desc)
+                       .limit(50)
+    render json: activities.map { |a| serialize(a) }
   end
 
-  # POST /plants/:plant_id/activities
   def create
-    activity = @plant.activities.build(activity_params)
-    activity.user = current_user
-    activity.occurred_at ||= Time.current
+    activity = @plant.activities.build(
+      activity_type: params.dig(:plant_activity, :activity_type),
+      description:   params.dig(:plant_activity, :description),
+      metadata:      params.dig(:plant_activity, :metadata)&.to_unsafe_h || {},
+      user:          current_user,
+      occurred_at:   Time.current
+    )
+
+    # Actualizar campos denormalizados en la planta
+    if activity.activity_type == 'registro_planta' && activity.metadata.present?
+      meta = activity.metadata
+      @plant.altura_actual = meta['altura_cm']    if meta['altura_cm'].present?
+      @plant.num_colas     = meta['num_colas']    if meta['num_colas'].present?
+      @plant.estado_salud  = meta['estado_salud'] if meta['estado_salud'].present?
+      @plant.color_hojas   = meta['color_hojas']  if meta['color_hojas'].present?
+      @plant.save!
+    end
 
     if activity.save
-      render json: serialize_activity(activity), status: :created
+      render json: serialize(activity), status: :created
     else
       render json: { errors: activity.errors.full_messages }, status: :unprocessable_entity
     end
   end
 
-  # DELETE /plants/:plant_id/activities/:id
   def destroy
     activity = @plant.activities.find(params[:id])
     activity.destroy
@@ -32,34 +45,22 @@ class PlantActivitiesController < ApplicationController
   private
 
   def set_plant
-    club = current_user.club
-    @plant = Plant.joins(:lote).where(lotes: { club_id: club.id }).find(params[:plant_id])
+    @plant = Plant.joins(:lote)
+                  .where(lotes: { club_id: current_user.club_id })
+                  .find(params[:plant_id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Planta no encontrada' }, status: :not_found
   end
 
-  def activity_params
-    params.require(:plant_activity).permit(
-      :activity_type,
-      :description,
-      :occurred_at,
-      metadata: {}
-    )
-  end
-
-  def serialize_activity(activity)
+  def serialize(a)
     {
-      id: activity.id,
-      activity_type: activity.activity_type,
-      activity_label: activity.activity_label,
-      description: activity.description,
-      metadata: activity.metadata,
-      occurred_at: activity.occurred_at,
-      user: {
-        id: activity.user.id,
-        name: "#{activity.user.first_name} #{activity.user.last_name}".strip
-      },
-      created_at: activity.created_at
+      id:            a.id,
+      activity_type: a.activity_type,
+      description:   a.description,
+      metadata:      a.metadata,
+      occurred_at:   a.occurred_at,
+      usuario:       a.user.nombre_completo,
+      created_at:    a.created_at
     }
   end
 end

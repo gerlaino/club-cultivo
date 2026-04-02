@@ -90,49 +90,26 @@ onMounted(async () => {
         >
           <!-- Links -->
           <ul class="navbar-nav align-items-lg-center mb-2 mb-lg-0 ms-3 gap-lg-1">
-
             <li class="nav-item">
               <RouterLink class="nav-link px-2" to="/" @click="closeNav">
                 <i class="bi bi-speedometer2 me-1 d-lg-none"></i>Dashboard
               </RouterLink>
             </li>
-
             <li class="nav-item" v-if="can('sedes', 'index')">
               <RouterLink class="nav-link px-2" to="/sedes" @click="closeNav">
                 <i class="bi bi-building me-1 d-lg-none"></i>Sedes
               </RouterLink>
             </li>
-
-            <li class="nav-item" v-if="can('salas', 'index')">
-              <RouterLink class="nav-link px-2" to="/salas" @click="closeNav">
-                <i class="bi bi-grid me-1 d-lg-none"></i>Salas
-              </RouterLink>
-            </li>
-
-            <li class="nav-item" v-if="can('lotes', 'index')">
-              <RouterLink class="nav-link px-2" to="/lotes" @click="closeNav">
-                <i class="bi bi-box-seam me-1 d-lg-none"></i>Lotes
-              </RouterLink>
-            </li>
-
-            <li class="nav-item" v-if="can('plantas', 'index')">
-              <RouterLink class="nav-link px-2" to="/plantas" @click="closeNav">
-                <i class="bi bi-flower2 me-1 d-lg-none"></i>Plantas
-              </RouterLink>
-            </li>
-
             <li class="nav-item" v-if="can('socios', 'index')">
               <RouterLink class="nav-link px-2" to="/socios" @click="closeNav">
                 <i class="bi bi-people me-1 d-lg-none"></i>Pacientes
               </RouterLink>
             </li>
-
             <li class="nav-item" v-if="can('geneticas', 'index')">
               <RouterLink class="nav-link px-2" to="/geneticas" @click="closeNav">
                 <i class="bi bi-diagram-3 me-1 d-lg-none"></i>Genéticas
               </RouterLink>
             </li>
-
             <li class="nav-item" v-if="can('usuarios', 'index')">
               <RouterLink class="nav-link px-2" to="/usuarios" @click="closeNav">
                 <i class="bi bi-person-badge me-1 d-lg-none"></i>Usuarios
@@ -143,17 +120,16 @@ onMounted(async () => {
                 <i class="bi bi-cash-stack me-1 d-lg-none"></i>Contabilidad
               </RouterLink>
             </li>
-
             <li class="nav-item" v-if="can('informe_semestral', 'show')">
               <RouterLink class="nav-link px-2" to="/informe-semestral" @click="closeNav">
-                <i class="bi bi-clipboard-check me-1 d-lg-none"></i>Informe REPROCANN
+                <i class="bi bi-file-earmark-text me-1 d-lg-none"></i>Informe REPROCANN
               </RouterLink>
             </li>
-
-            <router-link to="/tareas" class="nav-link" active-class="active">
-              <i class="bi bi-clipboard-check me-2"></i>Tareas
-            </router-link>
-
+            <li class="nav-item" v-if="can('tareas', 'index')">
+              <RouterLink class="nav-link px-2" to="/tareas" @click="closeNav">
+                <i class="bi bi-clipboard-check me-1 d-lg-none"></i>Tareas
+              </RouterLink>
+            </li>
           </ul>
 
           <!-- Menú de usuario -->

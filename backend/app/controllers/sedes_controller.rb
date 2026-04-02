@@ -4,6 +4,12 @@ class SedesController < ApplicationController
   before_action :set_sede, only: [:show, :update, :destroy]
 
   def index
+    if current_user.cultivador?
+      salas_ids = current_user.salas_ids_asignadas
+      sede_ids = Sala.where(id: salas_ids).pluck(:sede_id).compact.uniq
+      sedes = current_user.club.sedes.activas.where(id: sede_ids).includes(:created_by).order(:nombre)
+      return render json: sedes.map { |s| serialize_sede(s) }
+    end
     sedes = current_user.club.sedes.activas.includes(:created_by).order(:nombre)
     render json: sedes.map { |s| serialize_sede(s) }
   end

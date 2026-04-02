@@ -13,6 +13,7 @@ class PlantActivity < ApplicationRecord
     note
     photo
     other
+    registro_planta
   ].freeze
 
   validates :activity_type, presence: true, inclusion: { in: ACTIVITY_TYPES }
@@ -32,6 +33,7 @@ class PlantActivity < ApplicationRecord
       'measurement' => 'Medición',
       'note' => 'Nota',
       'photo' => 'Foto',
+      'registro_planta' => 'Registro de planta',
       'other' => 'Otro'
     }[activity_type] || activity_type
   end

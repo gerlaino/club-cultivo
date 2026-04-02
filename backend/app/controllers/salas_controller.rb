@@ -7,6 +7,12 @@ class SalasController < ApplicationController
     salas = current_user.club.salas
                         .includes(:sede, :lotes, :created_by)
                         .order(:nombre)
+
+    if current_user.cultivador?
+      salas_ids = current_user.salas_ids_asignadas
+      salas = salas.where(id: salas_ids)
+    end
+
     render json: salas.map { |s| serialize_sala(s) }
   end
 
@@ -76,8 +82,11 @@ class SalasController < ApplicationController
       porcentaje_ocupacion: s.porcentaje_ocupacion,
       lotes_count:          s.lotes.count,
       sede: s.sede ? { id: s.sede.id, nombre: s.sede.nombre, tipo: s.sede.tipo } : nil,
-      created_by:           s.created_by_name,
+      created_at:           s.created_at,
+      created_by_name:      s.created_by_name,
+      lotes_activos:        s.lotes.where(estado: ['vegetativo','floracion']).count,
       updated_at:           s.updated_at,
+      cultivadores: s.cultivadores.map { |c| { id: c.id, nombre: c.nombre_completo } },
     }
   end
 

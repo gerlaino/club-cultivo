@@ -5,6 +5,8 @@ class Sede < ApplicationRecord
   has_many :salas,               dependent: :nullify
   has_many :inventarios, class_name: "SedeInventario",    dependent: :destroy
   has_many :inventario_movimientos, dependent: :destroy
+  has_many :user_sedes, class_name: 'UserSede', foreign_key: 'sede_id', dependent: :destroy
+  has_many :usuarios_asignados, through: :user_sedes, source: :user
 
   TIPOS = %w[produccion social mixta].freeze
   TIPO_LABELS = {

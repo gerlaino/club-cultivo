@@ -10,6 +10,7 @@ class Club < ApplicationRecord
   has_many :movimientos_contables, class_name: "MovimientoContable", dependent: :destroy
   has_many :costo_lotes, class_name: "CostoLote", dependent: :destroy
   has_many :tareas, dependent: :destroy
+  has_many :platns, through: :lotes
 
   has_one_attached :logo
 

@@ -3,6 +3,8 @@ import { ref, computed, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useUsuariosStore } from "../stores/usuarios"
 import { useAuthStore } from "../stores/auth"
+import UsuarioSalasManager from '../components/UsuarioSalasManager.vue'
+import UsuarioSedesManager from "../components/UsuarioSedesManager.vue";
 
 const route  = useRoute()
 const router = useRouter()
@@ -246,6 +248,24 @@ onMounted(async () => {
             </div>
           </div>
 
+          <div v-if="u.role === 'cultivador'" class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-transparent">
+              <strong>🏠 Salas asignadas</strong>
+            </div>
+            <div class="card-body">
+              <UsuarioSalasManager :user-id="userId" />
+              <!-- Sedes asignadas (médico y auditor) -->
+              <div v-if="['medico', 'auditor'].includes(u.role)" class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-transparent">
+                  <strong>🏢 Sedes asignadas</strong>
+                </div>
+                <div class="card-body">
+                  <UsuarioSedesManager :user-id="userId" />
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <!-- Col lateral -->
@@ -289,6 +309,7 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
+
           </div>
 
           <!-- Acceso rápido -->
