@@ -50,6 +50,10 @@ const routes = [
     name: "dashboard",
     component: DashboardView,
     meta: { requiresAuth: true },
+    beforeEnter: () => {
+      const auth = useAuthStore()
+      if (auth.user?.role === 'super_admin') return '/super-admin'
+    },
   },
 
   // Sedes
@@ -234,6 +238,23 @@ const routes = [
     name: 'documentos',
     component: DocumentosView,
     meta: { requiresAuth: true }
+  },
+
+  {
+    path: '/super-admin',
+    component: () => import('../views/superadmin/SuperAdminLayout.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: () => {
+      const auth = useAuthStore()
+      if (auth.user?.role !== 'super_admin') return '/'
+    },
+    children: [
+      { path: '', name: 'sa-dashboard', component: () => import('../views/superadmin/SADashboard.vue') },
+      { path: 'clubs', name: 'sa-clubs', component: () => import('../views/superadmin/SAClubs.vue') },
+      { path: 'clubs/nuevo', name: 'sa-club-nuevo', component: () => import('../views/superadmin/SAClubNuevo.vue') },
+      { path: 'clubs/:id', name: 'sa-club-detail', component: () => import('../views/superadmin/SAClubDetail.vue') },
+      { path: 'usuarios', name: 'sa-usuarios', component: () => import('../views/superadmin/SAUsuarios.vue') },
+    ],
   },
 
   { path: "/:pathMatch(.*)*", redirect: "/" },

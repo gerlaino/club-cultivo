@@ -36,8 +36,10 @@ watch(
   async (logged) => {
     if (logged) {
       try {
-        await club.fetch();
-        await fetchPlan();
+        if (auth.user?.role !== 'super_admin') {
+          await club.fetch();
+          await fetchPlan();
+        }
       } catch (e) { console.error("Error club:", e); }
     } else {
       club.$reset();
@@ -49,7 +51,7 @@ watch(
 
 onMounted(async () => {
   await auth.ensureBootstrapped();
-  if (auth.isAuthenticated && !club.data) {
+  if (auth.isAuthenticated && !club.data && auth.user?.role !== 'super_admin') {
     await club.fetch();
     await fetchPlan();
   }
@@ -71,7 +73,7 @@ onMounted(async () => {
 
         <!-- Toggler mobile -->
         <button
-          v-if="auth.isAuthenticated && !$route.meta.fullscreen"
+          v-if="auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin'"
           class="navbar-toggler border-0"
           type="button"
           data-bs-toggle="collapse"
@@ -84,7 +86,7 @@ onMounted(async () => {
 
         <!-- Contenido navbar -->
         <div
-          v-if="auth.isAuthenticated && !$route.meta.fullscreen"
+          v-if="auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin'"
           id="mainNav"
           class="collapse navbar-collapse"
         >

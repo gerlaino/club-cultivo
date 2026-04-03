@@ -227,4 +227,17 @@ export const createLoteEvento  = (loteId, payload)  => api.post(`/lotes/${loteId
 export const getLoteFotos    = (loteId)        => api.get(`/lotes/${loteId}/fotos`)
 export const uploadFotoLote  = (loteId, formData) => api.post(`/lotes/${loteId}/fotos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 
+// ── Super Admin ──────────────────────────────────────────────────────
+export const getSuperAdminStats  = ()             => api.get('/super_admin/stats')
+export const listSuperAdminClubs = ()             => api.get('/super_admin/clubs')
+export const getSuperAdminClub   = (id)           => api.get(`/super_admin/clubs/${id}`)
+export const createSuperAdminClub = (payload)     => api.post('/super_admin/clubs', { club: payload })
+export const updateSuperAdminClub = (id, payload) => api.put(`/super_admin/clubs/${id}`, { club: payload })
+export const cambiarPlanClub     = (id, payload)  => api.patch(`/super_admin/clubs/${id}/cambiar_plan`, payload)
+export const crearUsuariosDefault = (id)          => api.post(`/super_admin/clubs/${id}/crear_usuarios_default`)
+export const listSuperAdminUsers = ()             => api.get('/super_admin/users')
+export const createSuperAdminUser = (payload)     => api.post('/super_admin/users', { user: payload })
+export const updateSuperAdminUser = (id, payload) => api.put(`/super_admin/users/${id}`, { user: payload })
+export const deleteSuperAdminUser = (id)          => api.delete(`/super_admin/users/${id}`)
+
 export default api;

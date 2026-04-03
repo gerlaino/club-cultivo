@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_02_000007) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_03_131712) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -60,7 +60,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_02_000007) do
     t.date "plan_activo_hasta"
     t.boolean "plan_trial", default: true, null: false
     t.jsonb "limites_custom", default: {}
+    t.string "slug", null: false
     t.index ["plan"], name: "index_clubs_on_plan"
+    t.index ["slug"], name: "index_clubs_on_slug", unique: true
   end
 
   create_table "costo_lotes", force: :cascade do |t|
@@ -582,7 +584,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_02_000007) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["sede_id"], name: "index_user_sedes_on_sede_id"
-    t.index ["user_id", "sede_id"], name: "idx_user_sedes_unique", unique: true
     t.index ["user_id", "sede_id"], name: "index_user_sedes_on_user_id_and_sede_id", unique: true
     t.index ["user_id"], name: "index_user_sedes_on_user_id"
   end
@@ -595,7 +596,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_02_000007) do
     t.datetime "remember_created_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.bigint "club_id", null: false
+    t.bigint "club_id"
     t.string "role", default: "cultivador", null: false
     t.string "first_name"
     t.string "last_name"

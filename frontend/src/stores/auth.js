@@ -10,7 +10,7 @@ export const useAuthStore = defineStore("auth", {
     loading: false,
     error: null,
     redirectTo: null,
-    bootstrapped: false, // ← sabemos si ya se consultó /me
+    bootstrapped: false,
   }),
   getters: {
     isAuthenticated: (s) => !!s.user,
@@ -44,14 +44,12 @@ export const useAuthStore = defineStore("auth", {
         this.user = null;
       } finally {
         this.loading = false;
-        this.bootstrapped = true; // ← marca terminado
+        this.bootstrapped = true;
       }
     },
 
-    // Úsalo para asegurarte de que /me ya se consultó (una sola vez por carga)
     async ensureBootstrapped() {
       if (!this.bootstrapped) {
-        // Solo intentar fetchear si hay token
         const token = localStorage.getItem('jwt_token');
         if (token) {
           await this.fetchMe();
@@ -64,16 +62,17 @@ export const useAuthStore = defineStore("auth", {
     async login(email, password) {
       this.loading = true;
       this.error = null;
-
       try {
         await signIn(email, password);
         await this.fetchMe();
 
-        // ⚡ Cargar preferencias del club tras login
-        const club = useClubStore();
-        await club.fetch();
-
-        router.push({ name: "dashboard" });
+        if (this.user?.role === 'super_admin') {
+          router.push({ path: '/super-admin' });
+        } else {
+          const club = useClubStore();
+          await club.fetch();
+          router.push({ name: "dashboard" });
+        }
       } catch (e) {
         if (e?.response?.status === 401) {
           this.error = "Credenciales inválidas";
@@ -110,5 +109,3 @@ export const useAuthStore = defineStore("auth", {
     },
   }
 });
-
-

@@ -1,6 +1,7 @@
 class PreferencesController < ApplicationController
   include Rails.application.routes.url_helpers
   before_action :authenticate_user!
+  before_action :require_club_user!
   before_action :set_club
 
   # GET /preferences
@@ -13,7 +14,6 @@ class PreferencesController < ApplicationController
   def update
     authorize @club, :update?
 
-    # Purgar logo si se pide
     if ActiveModel::Type::Boolean.new.cast(params[:purge_logo])
       @club.logo.purge if @club.logo.attached?
     end
@@ -43,6 +43,10 @@ class PreferencesController < ApplicationController
   end
 
   private
+
+  def require_club_user!
+    return head :no_content if current_user.super_admin?
+  end
 
   def set_club
     @club = current_user.club
