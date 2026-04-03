@@ -20,6 +20,7 @@ import { useAuthStore } from "../stores/auth";
 import { usePermissions } from "../composables/usePermissions";
 import ContabilidadView from "../views/ContabilidadView.vue";
 import InformeSemestralView from "../views/InformeSemestralView.vue";
+import DocumentosView from "../views/DocumentosView.vue";
 
 const requiresPermission = (resource, action) => {
   return (to, from, next) => {
@@ -150,6 +151,12 @@ const routes = [
     beforeEnter: requiresPermission("socios", "index"),
   },
   {
+    path: "/socios/nuevo",
+    name: "socio-nuevo",
+    component: () => import("../views/SocioNuevoView.vue"),
+    beforeEnter: requiresPermission("socios", "create"),
+  },
+  {
     path: "/socios/:id",
     name: "socio-detail",
     component: SocioDetailView,
@@ -220,6 +227,13 @@ const routes = [
     component: () => import('../views/TareasView.vue'),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission('tareas', 'index'),
+  },
+
+  {
+    path: '/documentos',
+    name: 'documentos',
+    component: DocumentosView,
+    meta: { requiresAuth: true }
   },
 
   { path: "/:pathMatch(.*)*", redirect: "/" },

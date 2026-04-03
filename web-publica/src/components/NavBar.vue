@@ -30,6 +30,9 @@
           <li class="nav-item">
             <RouterLink to="/contacto" class="nav-link">Contacto</RouterLink>
           </li>
+          <li class="nav-item">
+            <RouterLink to="/documentos" class="nav-link">Documentos</RouterLink>
+          </li>
         </ul>
       </div>
     </div>

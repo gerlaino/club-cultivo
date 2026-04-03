@@ -1,695 +1,789 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { useAuthStore } from '../../stores/auth'
+import { ref, computed, onMounted } from 'vue'
 import {
-  listPatientDocuments, createPatientDocument, deletePatientDocument,
-  firmarDocumento, archivarDocumento, listDocumentTemplates
+  listPatientDocuments,
+  uploadPatientDocument,
+  createPatientDocument,
+  deletePatientDocument,
+  archivarDocumento,
+  listDocumentTemplates,
 } from '../../lib/api.js'
+import { useAuthStore } from '../../stores/auth.js'
 
-const props = defineProps({ socioId: { type: Number, required: true } })
-const auth  = useAuthStore()
+const props = defineProps({
+  socioId:     { type: Number, required: true },
+  socioNombre: { type: String, default: '' },
+})
 
+const auth     = useAuthStore()
+const canEdit  = computed(() => ['admin', 'medico'].includes(auth.user?.role))
+
+// ── Estado ────────────────────────────────────────────────────────────
 const docs      = ref([])
 const templates = ref([])
 const loading   = ref(true)
+const uploading = ref(false)
 const saving    = ref(false)
-const formError = ref(null)
+const error     = ref(null)
 
-const showCreate  = ref(false)
-const showViewer  = ref(false)
-const showFirmar  = ref(false)
-const showDelete  = ref(false)
-const currentDoc  = ref(null)
-const deleteTarget = ref(null)
+// Modales
+const showUpload    = ref(false)
+const showTemplate  = ref(false)
+const showDelete    = ref(false)
+const deleteTarget  = ref(null)
 
-// Firma
-const canvasRef    = ref(null)
-const firmante     = ref('medico')   // 'paciente' | 'medico'
-const firmandoDoc  = ref(false)
-let   ctx          = null
-let   drawing      = false
-let   lastX        = 0
-let   lastY        = 0
+// Form upload
+const uploadForm = ref({ nombre: '', tipo: 'reprocann', archivo: null })
+const uploadInput = ref(null)
+const uploadError = ref(null)
 
-const canEdit    = computed(() => ['admin', 'medico'].includes(auth.user?.role))
-const canManage  = computed(() => auth.user?.role === 'admin')
+// Form template
+const templateForm = ref({ template_id: null, nombre: '' })
+const templateError = ref(null)
 
-// ── Form crear documento ──────────────────────────────────────────────
-const form = ref({
-  template_id:    '',
-  nombre:         '',
-  tipo:           'consentimiento_informado',
-  contenido_html: '',
-})
+const TIPOS = [
+  { value: 'reprocann',             label: 'Autorización REPROCANN',         icon: 'bi-patch-check-fill',     color: '#15803d' },
+  { value: 'consentimiento',        label: 'Consentimiento informado',        icon: 'bi-file-earmark-check',   color: '#0369a1' },
+  { value: 'indicacion',            label: 'Indicación médica',               icon: 'bi-file-earmark-medical', color: '#7c3aed' },
+  { value: 'declaracion_jurada',    label: 'Declaración jurada',              icon: 'bi-file-earmark-text',    color: '#b45309' },
+  { value: 'historia_clinica',      label: 'Historia clínica',                icon: 'bi-journal-medical',      color: '#0891b2' },
+  { value: 'otro',                  label: 'Otro',                             icon: 'bi-file-earmark',         color: '#64748b' },
+]
 
-const TIPO_LABELS = {
-  consentimiento_informado: 'Consentimiento Informado Bilateral',
-  indicacion_medica:        'Indicación Médica',
-  declaracion_jurada:       'Declaración Jurada',
-  informe_semestral:        'Informe Semestral',
-  carnet_vinculacion:       'Carnet de Vinculación',
-  otro:                     'Otro',
+const ESTADOS = {
+  borrador:        { label: 'Borrador',           bg: '#f1f5f9', color: '#64748b' },
+  pendiente_firma: { label: 'Pendiente de firma', bg: '#fffbeb', color: '#b45309' },
+  firmado:         { label: 'Firmado',            bg: '#dcfce7', color: '#15803d' },
+  archivado:       { label: 'Archivado',          bg: '#f1f5f9', color: '#94a3b8' },
 }
 
-const ESTADO_META = {
-  borrador:         { label: 'Borrador',          color: 'secondary' },
-  pendiente_firma:  { label: 'Pendiente de firma', color: 'warning'   },
-  firmado:          { label: 'Firmado',            color: 'success'   },
-  archivado:        { label: 'Archivado',          color: 'dark'      },
-}
-
-function estadoMeta(e) { return ESTADO_META[e] || { label: e, color: 'secondary' } }
+function tipoMeta(tipo) { return TIPOS.find(t => t.value === tipo) || TIPOS[TIPOS.length - 1] }
+function estadoMeta(estado) { return ESTADOS[estado] || ESTADOS.borrador }
 
 function formatDate(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-// ── Cargar template al seleccionar ───────────────────────────────────
-watch(() => form.value.template_id, async (id) => {
-  if (!id) return
-  const t = templates.value.find(t => t.id === Number(id))
-  if (t) {
-    form.value.nombre         = t.nombre
-    form.value.tipo           = t.tipo
-    form.value.contenido_html = t.contenido_html || ''
-  }
-})
+function formatDateTime(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
 
-// ── CRUD ──────────────────────────────────────────────────────────────
-async function load() {
-  loading.value = true
+// ── Carga ─────────────────────────────────────────────────────────────
+onMounted(async () => {
   try {
-    const [docsRes, tmplRes] = await Promise.allSettled([
+    const [docsRes, templatesRes] = await Promise.all([
       listPatientDocuments(props.socioId),
       listDocumentTemplates(),
     ])
-    if (docsRes.status === 'fulfilled') docs.value      = docsRes.value.data || []
-    if (tmplRes.status === 'fulfilled') templates.value = tmplRes.value.data || []
+    docs.value      = docsRes.data || []
+    templates.value = (templatesRes.data || []).filter(t => t.activo)
   } catch (e) {
-    console.error('Error cargando documentos:', e)
+    error.value = 'No se pudieron cargar los documentos'
   } finally {
     loading.value = false
   }
+})
+
+// ── Upload archivo ────────────────────────────────────────────────────
+function abrirUpload() {
+  uploadForm.value = { nombre: '', tipo: 'reprocann', archivo: null }
+  uploadError.value = null
+  showUpload.value = true
 }
 
-async function crear() {
-  if (!form.value.nombre.trim() || !form.value.contenido_html.trim()) {
-    formError.value = 'El nombre y el contenido son obligatorios'
-    return
+function handleFileChange(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  uploadForm.value.archivo = file
+  if (!uploadForm.value.nombre) {
+    uploadForm.value.nombre = file.name.replace(/\.[^/.]+$/, '')
   }
-  saving.value    = true
-  formError.value = null
+}
+
+async function confirmarUpload() {
+  if (!uploadForm.value.archivo) { uploadError.value = 'Seleccioná un archivo'; return }
+  if (!uploadForm.value.nombre.trim()) { uploadError.value = 'El nombre es obligatorio'; return }
+
+  uploading.value = true
+  uploadError.value = null
   try {
-    const payload = { ...form.value }
-    if (!payload.template_id) delete payload.template_id
-    const { data } = await createPatientDocument(props.socioId, payload)
+    const fd = new FormData()
+    fd.append('document[nombre]', uploadForm.value.nombre.trim())
+    fd.append('document[tipo]',   uploadForm.value.tipo)
+    fd.append('document[estado]', 'firmado')
+    fd.append('archivo_pdf',      uploadForm.value.archivo)
+    const { data } = await uploadPatientDocument(props.socioId, fd)
     docs.value.unshift(data)
-    showCreate.value = false
-    resetForm()
+    showUpload.value = false
   } catch (e) {
-    formError.value = e.response?.data?.errors?.join(', ') || 'Error al crear el documento'
+    uploadError.value = e?.response?.data?.errors?.join(', ') || 'Error al subir el archivo'
+  } finally {
+    uploading.value = false
+  }
+}
+
+// ── Crear desde template ──────────────────────────────────────────────
+function abrirTemplate() {
+  templateForm.value = { template_id: null, nombre: '' }
+  templateError.value = null
+  showTemplate.value = true
+}
+
+function onTemplateSelect() {
+  const t = templates.value.find(t => t.id === templateForm.value.template_id)
+  if (t && !templateForm.value.nombre) {
+    templateForm.value.nombre = `${t.nombre} — ${props.socioNombre}`
+  }
+}
+
+async function confirmarTemplate() {
+  if (!templateForm.value.template_id) { templateError.value = 'Seleccioná un template'; return }
+  if (!templateForm.value.nombre.trim()) { templateError.value = 'El nombre es obligatorio'; return }
+
+  saving.value = true
+  templateError.value = null
+  try {
+    const { data } = await createPatientDocument(props.socioId, {
+      template_id: templateForm.value.template_id,
+      nombre:      templateForm.value.nombre.trim(),
+      tipo:        templates.value.find(t => t.id === templateForm.value.template_id)?.tipo || 'otro',
+    })
+    docs.value.unshift(data)
+    showTemplate.value = false
+  } catch (e) {
+    templateError.value = e?.response?.data?.errors?.join(', ') || 'Error al crear el documento'
   } finally {
     saving.value = false
   }
 }
 
-function resetForm() {
-  form.value = { template_id: '', nombre: '', tipo: 'consentimiento_informado', contenido_html: '' }
-  formError.value = null
-}
-
-function verDoc(doc) {
-  currentDoc.value = doc
-  showViewer.value = true
-}
-
-function abrirFirmar(doc, quien) {
-  currentDoc.value = doc
-  firmante.value   = quien
-  showFirmar.value = true
-  nextTick(() => initCanvas())
-}
-
-async function doDelete() {
-  try {
-    await deletePatientDocument(props.socioId, deleteTarget.value.id)
-    docs.value     = docs.value.filter(d => d.id !== deleteTarget.value.id)
-    showDelete.value = false
-  } catch (e) {
-    console.error('Error eliminando:', e)
-  }
-}
-
-async function doArchivar(doc) {
+// ── Archivar ──────────────────────────────────────────────────────────
+async function archivar(doc) {
+  if (!confirm(`¿Archivar "${doc.nombre}"? Seguirá disponible pero no aparecerá en los activos.`)) return
   try {
     const { data } = await archivarDocumento(props.socioId, doc.id)
     const idx = docs.value.findIndex(d => d.id === doc.id)
     if (idx !== -1) docs.value[idx] = data
-  } catch (e) {
-    console.error('Error archivando:', e)
-  }
+  } catch {}
 }
 
-// ── Canvas de firma ───────────────────────────────────────────────────
-function initCanvas() {
-  const canvas = canvasRef.value
-  if (!canvas) return
-  ctx = canvas.getContext('2d')
-  ctx.strokeStyle = '#1a1a1a'
-  ctx.lineWidth   = 2.5
-  ctx.lineCap     = 'round'
-  ctx.lineJoin    = 'round'
-  clearCanvas()
-}
-
-function clearCanvas() {
-  if (!ctx || !canvasRef.value) return
-  ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
-  ctx.fillStyle = '#f8f9fa'
-  ctx.fillRect(0, 0, canvasRef.value.width, canvasRef.value.height)
-}
-
-function getPos(e) {
-  const canvas = canvasRef.value
-  const rect   = canvas.getBoundingClientRect()
-  const scaleX = canvas.width  / rect.width
-  const scaleY = canvas.height / rect.height
-  const src    = e.touches ? e.touches[0] : e
-  return {
-    x: (src.clientX - rect.left) * scaleX,
-    y: (src.clientY - rect.top)  * scaleY,
-  }
-}
-
-function startDraw(e) {
-  e.preventDefault()
-  drawing = true
-  const pos = getPos(e)
-  lastX = pos.x; lastY = pos.y
-}
-
-function draw(e) {
-  if (!drawing) return
-  e.preventDefault()
-  const pos = getPos(e)
-  ctx.beginPath()
-  ctx.moveTo(lastX, lastY)
-  ctx.lineTo(pos.x, pos.y)
-  ctx.stroke()
-  lastX = pos.x; lastY = pos.y
-}
-
-function endDraw() { drawing = false }
-
-function canvasIsEmpty() {
-  if (!canvasRef.value || !ctx) return true
-  const data = ctx.getImageData(0, 0, canvasRef.value.width, canvasRef.value.height).data
-  // Si todos los pixels son el color de fondo (#f8f9fa = 248,249,250) está vacío
-  for (let i = 0; i < data.length; i += 4) {
-    if (data[i] !== 248 || data[i+1] !== 249 || data[i+2] !== 250) return false
-  }
-  return true
-}
-
-async function confirmarFirma() {
-  if (canvasIsEmpty()) {
-    alert('Por favor dibujá tu firma antes de confirmar')
-    return
-  }
-  firmandoDoc.value = true
+// ── Eliminar ──────────────────────────────────────────────────────────
+async function confirmarDelete() {
   try {
-    const firmaData = canvasRef.value.toDataURL('image/png')
-    const { data } = await firmarDocumento(props.socioId, currentDoc.value.id, {
-      firmante:   firmante.value,
-      firma_data: firmaData,
-    })
-    const idx = docs.value.findIndex(d => d.id === data.id)
-    if (idx !== -1) docs.value[idx] = data
-    showFirmar.value = false
-  } catch (e) {
-    alert(e.response?.data?.error || 'Error al registrar la firma')
-  } finally {
-    firmandoDoc.value = false
-  }
+    await deletePatientDocument(props.socioId, deleteTarget.value.id)
+    docs.value = docs.value.filter(d => d.id !== deleteTarget.value.id)
+    showDelete.value = false
+  } catch {}
 }
 
-// ── Imprimir / descargar ──────────────────────────────────────────────
-function imprimirDoc(doc) {
-  const ventana = window.open('', '_blank')
-  ventana.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>${doc.nombre}</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 40px; font-size: 13px; }
-        h1 { font-size: 18px; text-align: center; margin-bottom: 8px; }
-        .meta { text-align: center; color: #666; font-size: 11px; margin-bottom: 32px; }
-        .content { line-height: 1.7; }
-        .firmas { margin-top: 60px; display: flex; gap: 80px; }
-        .firma-box { flex: 1; border-top: 1px solid #333; padding-top: 8px; }
-        .firma-img { max-height: 60px; }
-        .hash { margin-top: 40px; font-size: 9px; color: #aaa; word-break: break-all; }
-        @media print { .no-print { display: none; } }
-      </style>
-    </head>
-    <body>
-      <h1>${doc.nombre}</h1>
-      <div class="meta">
-        Generado el ${formatDate(doc.created_at)} · Hash: ${doc.hash_documento?.slice(0, 16) || '—'}
-      </div>
-      <div class="content">${doc.contenido_html || ''}</div>
-      <div class="firmas">
-        ${doc.firma_paciente_nombre ? `
-          <div class="firma-box">
-            ${doc.firma_paciente_data ? `<img src="${doc.firma_paciente_data}" class="firma-img" />` : ''}
-            <div><strong>${doc.firma_paciente_nombre}</strong></div>
-            <div style="font-size:11px;color:#666">${formatDate(doc.firmado_paciente_at)}</div>
-            <div style="font-size:11px">Paciente</div>
-          </div>
-        ` : ''}
-        ${doc.firma_medico_nombre ? `
-          <div class="firma-box">
-            ${doc.firma_medico_data ? `<img src="${doc.firma_medico_data}" class="firma-img" />` : ''}
-            <div><strong>${doc.firma_medico_nombre}</strong></div>
-            <div style="font-size:11px;color:#666">${formatDate(doc.firmado_medico_at)}</div>
-            <div style="font-size:11px">Profesional médico</div>
-          </div>
-        ` : ''}
-      </div>
-      <div class="hash">Integridad: SHA-256 ${doc.hash_documento || '—'}</div>
-      <script>window.onload = () => { window.print(); }<\/script>
-    </body>
-    </html>
-  `)
-  ventana.document.close()
-}
-
-onMounted(load)
+// ── Computed ──────────────────────────────────────────────────────────
+const docsActivos   = computed(() => docs.value.filter(d => d.estado !== 'archivado'))
+const docsArchivados = computed(() => docs.value.filter(d => d.estado === 'archivado'))
+const showArchivados = ref(false)
 </script>
 
 <template>
-  <div>
+  <div class="pd">
+
     <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <div>
-        <strong>📄 Documentos</strong>
-        <p class="text-muted small mb-0">Consentimientos, indicaciones y declaraciones con firma digital</p>
+    <div class="pd__header">
+      <div class="pd__header-left">
+        <div class="pd__header-title">Expediente documental</div>
+        <div class="pd__header-sub">
+          {{ docsActivos.length }} documento{{ docsActivos.length !== 1 ? 's' : '' }} activo{{ docsActivos.length !== 1 ? 's' : '' }}
+        </div>
       </div>
-      <button v-if="canEdit" class="btn btn-sm btn-success" @click="showCreate=true; resetForm()">
-        <i class="bi bi-plus-circle me-1"></i> Nuevo documento
-      </button>
+      <div v-if="canEdit" class="pd__header-actions">
+        <button class="pd__btn-secondary" @click="abrirTemplate" :disabled="!templates.length">
+          <i class="bi bi-file-earmark-plus"></i>
+          Desde template
+          <span v-if="!templates.length" class="pd__btn-hint">Sin templates</span>
+        </button>
+        <button class="pd__btn-primary" @click="abrirUpload">
+          <i class="bi bi-cloud-upload"></i>
+          Subir archivo
+        </button>
+      </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="text-center py-4">
-      <div class="spinner-border spinner-border-sm text-success"></div>
+    <div v-if="loading" class="pd__loading">
+      <div class="pd__ring"></div>
+      <span>Cargando documentos…</span>
+    </div>
+
+    <!-- Error -->
+    <div v-else-if="error" class="pd__alert">
+      <i class="bi bi-exclamation-triangle-fill"></i> {{ error }}
     </div>
 
     <!-- Empty -->
-    <div v-else-if="!docs.length" class="text-center py-5 text-muted">
-      <div class="fs-1 mb-2">📄</div>
-      <div class="small">Sin documentos registrados para este paciente</div>
+    <div v-else-if="!docsActivos.length && !docsArchivados.length" class="pd__empty">
+      <div class="pd__empty-icon">
+        <i class="bi bi-file-earmark-medical"></i>
+      </div>
+      <h3 class="pd__empty-title">Sin documentos todavía</h3>
+      <p class="pd__empty-desc">
+        Subí el certificado REPROCANN, el consentimiento informado o cualquier
+        documento clínico relevante para este paciente.
+      </p>
+      <div v-if="canEdit" class="pd__empty-actions">
+        <button class="pd__btn-primary" @click="abrirUpload">
+          <i class="bi bi-cloud-upload"></i> Subir primer documento
+        </button>
+      </div>
     </div>
 
-    <!-- Lista de documentos -->
-    <div v-else class="doc-list">
-      <div v-for="doc in docs" :key="doc.id" class="doc-item">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-          <div class="flex-grow-1 min-w-0">
-            <div class="d-flex align-items-center gap-2 mb-1">
-              <span class="fw-semibold text-truncate">{{ doc.nombre }}</span>
-              <span class="badge rounded-pill flex-shrink-0" :class="`text-bg-${estadoMeta(doc.estado).color}`">
-                {{ estadoMeta(doc.estado).label }}
-              </span>
+    <!-- Lista documentos activos -->
+    <div v-else>
+      <div class="pd__list">
+        <div
+          v-for="doc in docsActivos"
+          :key="doc.id"
+          class="pd__doc"
+        >
+          <!-- Icono tipo -->
+          <div class="pd__doc-icon"
+               :style="{ background: tipoMeta(doc.tipo).color + '15', color: tipoMeta(doc.tipo).color }">
+            <i :class="['bi', tipoMeta(doc.tipo).icon]"></i>
+          </div>
+
+          <!-- Info -->
+          <div class="pd__doc-body">
+            <div class="pd__doc-nombre">{{ doc.nombre }}</div>
+            <div class="pd__doc-meta">
+              <span class="pd__doc-tipo">{{ tipoMeta(doc.tipo).label }}</span>
+              <span class="pd__meta-dot">·</span>
+              <span>{{ formatDate(doc.created_at) }}</span>
+              <span class="pd__meta-dot">·</span>
+              <span>{{ doc.created_by?.nombre }}</span>
+              <template v-if="doc.template">
+                <span class="pd__meta-dot">·</span>
+                <span class="pd__doc-template">
+                  <i class="bi bi-layout-text-window-reverse"></i>
+                  {{ doc.template.nombre }}
+                </span>
+              </template>
             </div>
-            <div class="small text-muted d-flex flex-wrap gap-3">
-              <span>{{ TIPO_LABELS[doc.tipo] || doc.tipo }}</span>
-              <span><i class="bi bi-person me-1"></i>{{ doc.created_by?.nombre }}</span>
-              <span><i class="bi bi-calendar me-1"></i>{{ formatDate(doc.created_at) }}</span>
-            </div>
-            <!-- Estado de firmas -->
-            <div class="d-flex gap-2 mt-1 flex-wrap">
-              <span class="firma-badge" :class="doc.firmado_paciente_at ? 'firma-badge--ok' : 'firma-badge--pending'">
-                <i class="bi" :class="doc.firmado_paciente_at ? 'bi-pen-fill' : 'bi-pen'"></i>
-                Paciente {{ doc.firmado_paciente_at ? '✓' : 'pendiente' }}
+
+            <!-- Firmas -->
+            <div class="pd__doc-firmas" v-if="doc.firmado_paciente_at || doc.firmado_medico_at">
+              <span v-if="doc.firmado_medico_at" class="pd__firma pd__firma--ok">
+                <i class="bi bi-pen-fill"></i> Médico firmó {{ formatDateTime(doc.firmado_medico_at) }}
               </span>
-              <span class="firma-badge" :class="doc.firmado_medico_at ? 'firma-badge--ok' : 'firma-badge--pending'">
-                <i class="bi" :class="doc.firmado_medico_at ? 'bi-pen-fill' : 'bi-pen'"></i>
-                Médico {{ doc.firmado_medico_at ? '✓' : 'pendiente' }}
+              <span v-else class="pd__firma pd__firma--pending">
+                <i class="bi bi-pen"></i> Pendiente firma médico
+              </span>
+              <span v-if="doc.firmado_paciente_at" class="pd__firma pd__firma--ok">
+                <i class="bi bi-person-check-fill"></i> Paciente firmó {{ formatDateTime(doc.firmado_paciente_at) }}
+              </span>
+              <span v-else class="pd__firma pd__firma--pending">
+                <i class="bi bi-person"></i> Pendiente firma paciente
               </span>
             </div>
           </div>
 
-          <!-- Acciones -->
-          <div class="d-flex gap-1 flex-shrink-0">
-            <button class="btn btn-sm btn-outline-secondary" title="Ver" @click="verDoc(doc)">
-              <i class="bi bi-eye"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-success" title="Imprimir / PDF" @click="imprimirDoc(doc)">
-              <i class="bi bi-printer"></i>
-            </button>
-            <div v-if="canEdit && doc.estado !== 'archivado'" class="dropdown">
-              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                <i class="bi bi-three-dots"></i>
+          <!-- Estado + acciones -->
+          <div class="pd__doc-right">
+            <span class="pd__estado"
+                  :style="{ background: estadoMeta(doc.estado).bg, color: estadoMeta(doc.estado).color }">
+              {{ estadoMeta(doc.estado).label }}
+            </span>
+            <div v-if="canEdit" class="pd__doc-actions">
+              <button
+                v-if="doc.estado !== 'archivado'"
+                class="pd__action-btn"
+                title="Archivar"
+                @click="archivar(doc)"
+              >
+                <i class="bi bi-archive"></i>
               </button>
-              <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                <li v-if="!doc.firmado_paciente_at">
-                  <button class="dropdown-item small" @click="abrirFirmar(doc, 'paciente')">
-                    <i class="bi bi-pen me-2"></i>Firma paciente
-                  </button>
-                </li>
-                <li v-if="!doc.firmado_medico_at">
-                  <button class="dropdown-item small" @click="abrirFirmar(doc, 'medico')">
-                    <i class="bi bi-pen me-2"></i>Firma médico
-                  </button>
-                </li>
-                <li v-if="doc.estado === 'firmado'">
-                  <button class="dropdown-item small" @click="doArchivar(doc)">
-                    <i class="bi bi-archive me-2"></i>Archivar
-                  </button>
-                </li>
-                <li><hr class="dropdown-divider my-1"></li>
-                <li>
-                  <button class="dropdown-item small text-danger" @click="deleteTarget=doc; showDelete=true">
-                    <i class="bi bi-trash me-2"></i>Eliminar
-                  </button>
-                </li>
-              </ul>
+              <button
+                class="pd__action-btn pd__action-btn--danger"
+                title="Eliminar"
+                @click="deleteTarget = doc; showDelete = true"
+              >
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Archivados (colapsable) -->
+      <div v-if="docsArchivados.length" class="pd__archivados">
+        <button class="pd__archivados-toggle" @click="showArchivados = !showArchivados">
+          <i class="bi bi-archive me-1"></i>
+          {{ docsArchivados.length }} documento{{ docsArchivados.length !== 1 ? 's' : '' }} archivado{{ docsArchivados.length !== 1 ? 's' : '' }}
+          <i class="bi" :class="showArchivados ? 'bi-chevron-up' : 'bi-chevron-down'" style="margin-left:.35rem"></i>
+        </button>
+        <div v-if="showArchivados" class="pd__list pd__list--archivados">
+          <div v-for="doc in docsArchivados" :key="doc.id" class="pd__doc pd__doc--archivado">
+            <div class="pd__doc-icon" style="background:#f1f5f9;color:#94a3b8">
+              <i class="bi bi-archive"></i>
+            </div>
+            <div class="pd__doc-body">
+              <div class="pd__doc-nombre" style="color:#94a3b8">{{ doc.nombre }}</div>
+              <div class="pd__doc-meta">{{ formatDate(doc.created_at) }}</div>
+            </div>
+            <div class="pd__doc-right">
+              <span class="pd__estado" style="background:#f1f5f9;color:#94a3b8">Archivado</span>
+              <button v-if="canEdit" class="pd__action-btn pd__action-btn--danger" @click="deleteTarget = doc; showDelete = true">
+                <i class="bi bi-trash"></i>
+              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ===== MODAL CREAR ===== -->
-    <div v-if="showCreate" class="modal fade show d-block" tabindex="-1" aria-modal="true">
-      <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Nuevo documento</h5>
-            <button class="btn-close" @click="showCreate=false; resetForm()"></button>
-          </div>
-          <div class="modal-body">
-
-            <div v-if="formError" class="alert alert-danger d-flex align-items-center gap-2 mb-3">
-              <i class="bi bi-exclamation-triangle-fill"></i>
-              <span>{{ formError }}</span>
-            </div>
-
-            <div class="row g-3 mb-4">
-              <!-- Template -->
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">Usar template</label>
-                <select v-model="form.template_id" class="form-select">
-                  <option value="">— Sin template, crear desde cero —</option>
-                  <option v-for="t in templates" :key="t.id" :value="t.id">
-                    {{ t.nombre }} ({{ TIPO_LABELS[t.tipo] || t.tipo }})
-                  </option>
-                </select>
-                <div class="form-text">Seleccioná un template para pre-cargar el contenido</div>
-              </div>
-
-              <!-- Nombre -->
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">Nombre del documento <span class="text-danger">*</span></label>
-                <input v-model.trim="form.nombre" class="form-control" placeholder="Ej: Consentimiento — Juan Pérez — 2025" />
-              </div>
-
-              <!-- Tipo -->
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">Tipo</label>
-                <select v-model="form.tipo" class="form-select">
-                  <option v-for="(label, key) in TIPO_LABELS" :key="key" :value="key">{{ label }}</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Editor de contenido -->
-            <label class="form-label small fw-semibold">
-              Contenido <span class="text-danger">*</span>
-              <span class="text-muted ms-2" style="font-weight:400">
-                — Usá variables: <code>{{'{{'}}paciente_nombre{{'}}'}}</code>, <code>{{'{{'}}paciente_dni{{'}}'}}</code>, <code>{{'{{'}}fecha_hoy{{'}}'}}</code>, etc.
-              </span>
-            </label>
-            <textarea
-              v-model="form.contenido_html"
-              class="form-control font-monospace"
-              rows="16"
-              placeholder="Escribí el contenido del documento en HTML o texto plano. Las variables {{paciente_nombre}}, {{paciente_dni}}, {{club_nombre}}, {{medico_nombre}}, {{fecha_hoy}} se reemplazarán automáticamente..."
-              style="font-size:.82rem"
-            ></textarea>
-            <div class="form-text">
-              Variables disponibles:
-              <code>{{'{{'}}paciente_nombre{{'}}'}}</code>
-              <code>{{'{{'}}paciente_apellido{{'}}'}}</code>
-              <code>{{'{{'}}paciente_dni{{'}}'}}</code>
-              <code>{{'{{'}}paciente_reprocann{{'}}'}}</code>
-              <code>{{'{{'}}club_nombre{{'}}'}}</code>
-              <code>{{'{{'}}medico_nombre{{'}}'}}</code>
-              <code>{{'{{'}}fecha_hoy{{'}}'}}</code>
-            </div>
-
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-outline-secondary" :disabled="saving" @click="showCreate=false; resetForm()">Cancelar</button>
-            <button class="btn btn-success px-4" :disabled="saving" @click="crear">
-              <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
-              Crear documento
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div v-if="showCreate" class="modal-backdrop fade show" @click="showCreate=false; resetForm()"></div>
-
-    <!-- ===== MODAL VISOR ===== -->
-    <div v-if="showViewer && currentDoc" class="modal fade show d-block" tabindex="-1" aria-modal="true">
-      <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-header">
+    <!-- ══ MODAL SUBIR ARCHIVO ══ -->
+    <Teleport to="body">
+      <div v-if="showUpload" class="pd__overlay" @click.self="showUpload=false">
+        <div class="pd__modal">
+          <div class="pd__modal-header">
             <div>
-              <h5 class="modal-title mb-0">{{ currentDoc.nombre }}</h5>
-              <span class="badge mt-1" :class="`text-bg-${estadoMeta(currentDoc.estado).color}`">
-                {{ estadoMeta(currentDoc.estado).label }}
-              </span>
+              <h3 class="pd__modal-title">Subir documento</h3>
+              <p class="pd__modal-sub">PDF, JPG o PNG · máx. 10MB</p>
             </div>
-            <div class="d-flex gap-2 ms-3">
-              <button class="btn btn-sm btn-outline-secondary" @click="imprimirDoc(currentDoc)" title="Imprimir">
-                <i class="bi bi-printer"></i>
-              </button>
-              <button class="btn-close" @click="showViewer=false"></button>
-            </div>
+            <button class="pd__modal-close" @click="showUpload=false"><i class="bi bi-x-lg"></i></button>
           </div>
-          <div class="modal-body">
+          <div class="pd__modal-body">
+            <div v-if="uploadError" class="pd__alert pd__alert--sm">
+              <i class="bi bi-exclamation-triangle-fill"></i> {{ uploadError }}
+            </div>
 
-            <!-- Contenido del documento -->
-            <div class="doc-preview p-4 mb-4" v-html="currentDoc.contenido_html"></div>
-
-            <!-- Sección de firmas -->
-            <div class="row g-3 mt-2">
-              <div class="col-md-6">
-                <div class="firma-display" :class="currentDoc.firmado_paciente_at ? 'firma-display--ok' : 'firma-display--empty'">
-                  <div class="small fw-semibold mb-2">Firma del paciente</div>
-                  <img v-if="currentDoc.firma_paciente_data" :src="currentDoc.firma_paciente_data" class="firma-img mb-2" />
-                  <div v-else class="firma-placeholder">Sin firma</div>
-                  <div class="small text-muted">
-                    {{ currentDoc.firma_paciente_nombre || '—' }}
-                    <span v-if="currentDoc.firmado_paciente_at"> · {{ formatDate(currentDoc.firmado_paciente_at) }}</span>
-                  </div>
-                </div>
+            <!-- Dropzone -->
+            <div
+              class="pd__dropzone"
+              :class="{ 'pd__dropzone--active': uploadForm.archivo }"
+              @click="uploadInput?.click()"
+            >
+              <input
+                ref="uploadInput"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                style="display:none"
+                @change="handleFileChange"
+              />
+              <div v-if="!uploadForm.archivo" class="pd__dropzone-empty">
+                <i class="bi bi-cloud-upload pd__dropzone-icon"></i>
+                <div class="pd__dropzone-text">Hacé click para seleccionar</div>
+                <div class="pd__dropzone-hint">PDF, JPG o PNG · máx. 10MB</div>
               </div>
-              <div class="col-md-6">
-                <div class="firma-display" :class="currentDoc.firmado_medico_at ? 'firma-display--ok' : 'firma-display--empty'">
-                  <div class="small fw-semibold mb-2">Firma del médico</div>
-                  <img v-if="currentDoc.firma_medico_data" :src="currentDoc.firma_medico_data" class="firma-img mb-2" />
-                  <div v-else class="firma-placeholder">Sin firma</div>
-                  <div class="small text-muted">
-                    {{ currentDoc.firma_medico_nombre || '—' }}
-                    <span v-if="currentDoc.firmado_medico_at"> · {{ formatDate(currentDoc.firmado_medico_at) }}</span>
-                  </div>
-                </div>
+              <div v-else class="pd__dropzone-file">
+                <i class="bi bi-file-earmark-check pd__dropzone-icon" style="color:#15803d"></i>
+                <div class="pd__dropzone-filename">{{ uploadForm.archivo.name }}</div>
+                <div class="pd__dropzone-size">{{ (uploadForm.archivo.size / 1024).toFixed(0) }} KB</div>
               </div>
             </div>
 
-            <!-- Hash integridad -->
-            <div v-if="currentDoc.hash_documento" class="mt-3 p-2 rounded bg-body-secondary">
-              <div class="small text-muted">
-                <i class="bi bi-shield-check me-1 text-success"></i>
-                Integridad SHA-256: <code class="small">{{ currentDoc.hash_documento }}</code>
-              </div>
+            <!-- Nombre -->
+            <div class="pd__field">
+              <label class="pd__label">Nombre del documento <span class="pd__req">*</span></label>
+              <input v-model.trim="uploadForm.nombre" class="pd__input" placeholder="Ej: REPROCANN Juan García 2024" />
             </div>
 
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-outline-secondary" @click="showViewer=false">Cerrar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div v-if="showViewer" class="modal-backdrop fade show" @click="showViewer=false"></div>
-
-    <!-- ===== MODAL FIRMA DIGITAL ===== -->
-    <div v-if="showFirmar && currentDoc" class="modal fade show d-block" tabindex="-1" aria-modal="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              ✍️ Firma digital —
-              {{ firmante === 'paciente' ? 'Paciente' : 'Médico' }}
-            </h5>
-            <button class="btn-close" @click="showFirmar=false"></button>
-          </div>
-          <div class="modal-body">
-            <p class="small text-muted mb-3">
-              Dibujá tu firma en el recuadro. Esta firma quedará vinculada al documento
-              <strong>{{ currentDoc.nombre }}</strong> con fecha y hora registradas.
-            </p>
-
-            <!-- Canvas firma -->
-            <div class="canvas-wrapper mb-3">
-              <canvas
-                ref="canvasRef"
-                width="460"
-                height="180"
-                class="firma-canvas"
-                @mousedown="startDraw"
-                @mousemove="draw"
-                @mouseup="endDraw"
-                @mouseleave="endDraw"
-                @touchstart="startDraw"
-                @touchmove="draw"
-                @touchend="endDraw"
-              ></canvas>
-            </div>
-
-            <div class="d-flex justify-content-between align-items-center">
-              <button class="btn btn-sm btn-outline-secondary" @click="clearCanvas">
-                <i class="bi bi-eraser me-1"></i>Borrar
-              </button>
-              <div class="small text-muted">
-                <i class="bi bi-clock me-1"></i>
-                Se registrará: {{ new Date().toLocaleString('es-AR') }}
-              </div>
-            </div>
-
-            <div class="alert alert-info small mt-3 mb-0 d-flex align-items-start gap-2">
-              <i class="bi bi-info-circle-fill mt-1 flex-shrink-0"></i>
-              <div>
-                Esta firma electrónica tiene validez conforme a la <strong>Ley 25.506</strong> de Firma Digital.
-                Se almacena junto con nombre, DNI, fecha/hora y hash del documento.
+            <!-- Tipo -->
+            <div class="pd__field">
+              <label class="pd__label">Tipo de documento</label>
+              <div class="pd__tipo-grid">
+                <button
+                  v-for="t in TIPOS"
+                  :key="t.value"
+                  type="button"
+                  class="pd__tipo-btn"
+                  :class="{ 'pd__tipo-btn--active': uploadForm.tipo === t.value }"
+                  :style="uploadForm.tipo === t.value ? { borderColor: t.color, background: t.color + '12', color: t.color } : {}"
+                  @click="uploadForm.tipo = t.value"
+                >
+                  <i :class="['bi', t.icon]"></i>
+                  <span>{{ t.label }}</span>
+                </button>
               </div>
             </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-outline-secondary" :disabled="firmandoDoc" @click="showFirmar=false">Cancelar</button>
-            <button class="btn btn-success px-4" :disabled="firmandoDoc" @click="confirmarFirma">
-              <span v-if="firmandoDoc" class="spinner-border spinner-border-sm me-2"></span>
-              <i v-else class="bi bi-pen me-1"></i>
-              Confirmar firma
+          <div class="pd__modal-footer">
+            <button class="pd__btn-ghost" :disabled="uploading" @click="showUpload=false">Cancelar</button>
+            <button class="pd__btn-primary" :disabled="uploading || !uploadForm.archivo" @click="confirmarUpload">
+              <span v-if="uploading" class="pd__spinner"></span>
+              <i v-else class="bi bi-cloud-upload"></i>
+              {{ uploading ? 'Subiendo…' : 'Subir documento' }}
             </button>
           </div>
         </div>
       </div>
-    </div>
-    <div v-if="showFirmar" class="modal-backdrop fade show" @click="showFirmar=false"></div>
+    </Teleport>
 
-    <!-- ===== MODAL ELIMINAR ===== -->
-    <div v-if="showDelete" class="modal fade show d-block" tabindex="-1" aria-modal="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header border-0">
-            <h5 class="modal-title text-danger">⚠️ Eliminar documento</h5>
-            <button class="btn-close" @click="showDelete=false"></button>
+    <!-- ══ MODAL TEMPLATE ══ -->
+    <Teleport to="body">
+      <div v-if="showTemplate" class="pd__overlay" @click.self="showTemplate=false">
+        <div class="pd__modal">
+          <div class="pd__modal-header">
+            <div>
+              <h3 class="pd__modal-title">Crear desde template</h3>
+              <p class="pd__modal-sub">Las variables se interpolan automáticamente con los datos del paciente</p>
+            </div>
+            <button class="pd__modal-close" @click="showTemplate=false"><i class="bi bi-x-lg"></i></button>
           </div>
-          <div class="modal-body">
-            <p>¿Seguro que querés eliminar <strong>{{ deleteTarget?.nombre }}</strong>?</p>
-            <p class="text-muted small mb-0">Se eliminarán también las firmas registradas. Esta acción no se puede deshacer.</p>
+          <div class="pd__modal-body">
+            <div v-if="templateError" class="pd__alert pd__alert--sm">
+              <i class="bi bi-exclamation-triangle-fill"></i> {{ templateError }}
+            </div>
+
+            <div class="pd__field">
+              <label class="pd__label">Template <span class="pd__req">*</span></label>
+              <div class="pd__template-list">
+                <button
+                  v-for="t in templates"
+                  :key="t.id"
+                  type="button"
+                  class="pd__template-btn"
+                  :class="{ 'pd__template-btn--active': templateForm.template_id === t.id }"
+                  @click="templateForm.template_id = t.id; onTemplateSelect()"
+                >
+                  <div class="pd__template-nombre">{{ t.nombre }}</div>
+                  <div class="pd__template-meta">
+                    {{ tipoMeta(t.tipo).label }}
+                    <span v-if="t.requiere_firma_paciente || t.requiere_firma_medico" class="pd__template-firma">
+                      · Requiere firma
+                      <span v-if="t.requiere_firma_medico">médico</span>
+                      <span v-if="t.requiere_firma_paciente && t.requiere_firma_medico"> y </span>
+                      <span v-if="t.requiere_firma_paciente">paciente</span>
+                    </span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div class="pd__field">
+              <label class="pd__label">Nombre del documento <span class="pd__req">*</span></label>
+              <input v-model.trim="templateForm.nombre" class="pd__input" placeholder="Ej: Consentimiento — Juan García" />
+            </div>
           </div>
-          <div class="modal-footer border-0">
-            <button class="btn btn-outline-secondary" @click="showDelete=false">Cancelar</button>
-            <button class="btn btn-danger" @click="doDelete">Eliminar</button>
+          <div class="pd__modal-footer">
+            <button class="pd__btn-ghost" :disabled="saving" @click="showTemplate=false">Cancelar</button>
+            <button class="pd__btn-primary" :disabled="saving || !templateForm.template_id" @click="confirmarTemplate">
+              <span v-if="saving" class="pd__spinner"></span>
+              <i v-else class="bi bi-file-earmark-plus"></i>
+              {{ saving ? 'Creando…' : 'Crear documento' }}
+            </button>
           </div>
         </div>
       </div>
-    </div>
-    <div v-if="showDelete" class="modal-backdrop fade show" @click="showDelete=false"></div>
+    </Teleport>
+
+    <!-- ══ MODAL ELIMINAR ══ -->
+    <Teleport to="body">
+      <div v-if="showDelete" class="pd__overlay" @click.self="showDelete=false">
+        <div class="pd__modal pd__modal--sm">
+          <div class="pd__modal-header">
+            <h3 class="pd__modal-title pd__modal-title--danger">Eliminar documento</h3>
+            <button class="pd__modal-close" @click="showDelete=false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="pd__modal-body">
+            <p style="margin:0 0 .4rem">¿Eliminar <strong>{{ deleteTarget?.nombre }}</strong>?</p>
+            <p style="font-size:.82rem;color:#64748b;margin:0">Esta acción no se puede deshacer.</p>
+          </div>
+          <div class="pd__modal-footer">
+            <button class="pd__btn-ghost" @click="showDelete=false">Cancelar</button>
+            <button class="pd__btn-danger" @click="confirmarDelete">
+              <i class="bi bi-trash"></i> Eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
   </div>
 </template>
 
 <style scoped>
-/* Lista de documentos */
-.doc-list { display: flex; flex-direction: column; gap: .75rem; }
-.doc-item {
-  background: white;
-  border: 1.5px solid rgba(0,0,0,.06);
-  border-radius: 10px;
-  padding: 1rem;
-  transition: border-color .15s;
-}
-.doc-item:hover { border-color: var(--brand-primary, #1b5e20); }
-
-/* Badges de firma */
-.firma-badge {
-  font-size: .72rem;
-  padding: .2rem .5rem;
-  border-radius: 20px;
-  display: inline-flex;
-  align-items: center;
-  gap: .3rem;
-}
-.firma-badge--ok      { background: rgba(25,135,84,.1);  color: #198754; }
-.firma-badge--pending { background: rgba(108,117,125,.1); color: #6c757d; }
-
-/* Preview del documento */
-.doc-preview {
-  background: white;
-  border: 1px solid rgba(0,0,0,.08);
-  border-radius: 8px;
-  min-height: 200px;
-  line-height: 1.7;
-  font-size: .9rem;
+.pd {
+  padding: .25rem 0;
 }
 
-/* Display de firma */
-.firma-display {
-  border-radius: 8px;
-  padding: 1rem;
-  border: 2px solid;
-}
-.firma-display--ok    { border-color: #198754; background: rgba(25,135,84,.04); }
-.firma-display--empty { border-color: #dee2e6; background: #f8f9fa; }
-.firma-img {
-  max-height: 70px;
-  max-width: 100%;
-  display: block;
-  border-bottom: 1px solid #dee2e6;
-  padding-bottom: .5rem;
-}
-.firma-placeholder {
-  height: 50px;
+/* Header */
+.pd__header {
   display: flex;
-  align-items: center;
-  color: #adb5bd;
-  font-size: .85rem;
-  border-bottom: 1px solid #dee2e6;
-  margin-bottom: .5rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.pd__header-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -.02em;
+}
+.pd__header-sub { font-size: .78rem; color: #94a3b8; margin-top: .1rem; }
+.pd__header-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+/* Loading */
+.pd__loading {
+  display: flex; align-items: center; justify-content: center;
+  gap: .75rem; padding: 3rem; color: #94a3b8; font-size: .875rem;
+}
+.pd__ring {
+  width: 20px; height: 20px;
+  border: 2px solid #e2e8f0; border-top-color: #0369a1;
+  border-radius: 50%; animation: pd-spin .7s linear infinite;
+}
+@keyframes pd-spin { to { transform: rotate(360deg); } }
+
+/* Alert */
+.pd__alert {
+  background: #fef2f2; border: 1px solid #fecaca;
+  color: #dc2626; padding: .75rem 1rem; border-radius: 9px;
+  font-size: .85rem; margin-bottom: 1rem;
+  display: flex; gap: .5rem; align-items: flex-start;
+}
+.pd__alert--sm { margin-bottom: 1rem; }
+
+/* Empty */
+.pd__empty {
+  text-align: center; padding: 3.5rem 1rem;
+  background: #fafbfc; border: 1.5px dashed #e2e8f0;
+  border-radius: 14px;
+}
+.pd__empty-icon {
+  font-size: 2.5rem; color: #cbd5e1;
+  margin-bottom: .875rem; display: block;
+}
+.pd__empty-title { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0 0 .4rem; }
+.pd__empty-desc  { font-size: .82rem; color: #94a3b8; margin: 0 0 1.25rem; max-width: 380px; margin-left: auto; margin-right: auto; }
+.pd__empty-actions { display: flex; justify-content: center; gap: .6rem; }
+
+/* Doc list */
+.pd__list { display: flex; flex-direction: column; gap: .6rem; }
+.pd__list--archivados { margin-top: .6rem; opacity: .75; }
+
+.pd__doc {
+  display: flex;
+  align-items: flex-start;
+  gap: .875rem;
+  padding: 1rem 1.1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  transition: box-shadow .15s;
+}
+.pd__doc:hover { box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+.pd__doc--archivado { background: #fafbfc; }
+
+.pd__doc-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; flex-shrink: 0;
+}
+.pd__doc-body { flex: 1; min-width: 0; }
+.pd__doc-nombre {
+  font-size: .9rem; font-weight: 700; color: #0f172a;
+  margin-bottom: .25rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pd__doc-meta {
+  display: flex; align-items: center; gap: .35rem;
+  font-size: .72rem; color: #94a3b8; flex-wrap: wrap;
+}
+.pd__doc-tipo { font-weight: 600; color: #475569; }
+.pd__meta-dot { color: #cbd5e1; }
+.pd__doc-template {
+  display: inline-flex; align-items: center; gap: .25rem;
+  background: #eff6ff; color: #0369a1;
+  padding: .1em .45em; border-radius: 4px;
+  font-size: .68rem; font-weight: 600;
 }
 
-/* Canvas firma */
-.canvas-wrapper {
-  border: 2px dashed #dee2e6;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #f8f9fa;
+/* Firmas */
+.pd__doc-firmas {
+  display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .4rem;
 }
-.firma-canvas {
-  display: block;
-  width: 100%;
-  cursor: crosshair;
-  touch-action: none;
+.pd__firma {
+  display: inline-flex; align-items: center; gap: .25rem;
+  font-size: .68rem; font-weight: 600;
+  padding: .15em .55em; border-radius: 5px;
+}
+.pd__firma--ok      { background: #dcfce7; color: #15803d; }
+.pd__firma--pending { background: #fffbeb; color: #b45309; }
+
+/* Doc right */
+.pd__doc-right {
+  display: flex; flex-direction: column;
+  align-items: flex-end; gap: .5rem; flex-shrink: 0;
+}
+.pd__estado {
+  font-size: .68rem; font-weight: 700;
+  padding: .2em .6em; border-radius: 6px;
+  white-space: nowrap;
+}
+.pd__doc-actions { display: flex; gap: .35rem; }
+.pd__action-btn {
+  width: 28px; height: 28px;
+  border-radius: 7px; border: 1px solid #e2e8f0;
+  background: #f8fafc; color: #64748b;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: .8rem; transition: all .15s;
+}
+.pd__action-btn:hover { background: #e2e8f0; color: #0f172a; }
+.pd__action-btn--danger:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+
+/* Archivados toggle */
+.pd__archivados { margin-top: 1.25rem; }
+.pd__archivados-toggle {
+  display: flex; align-items: center;
+  font-size: .78rem; font-weight: 600; color: #64748b;
+  background: none; border: none; cursor: pointer;
+  padding: .35rem 0; transition: color .15s;
+}
+.pd__archivados-toggle:hover { color: #0f172a; }
+
+/* Buttons */
+.pd__btn-primary {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--brand-primary, #1b5e20); color: #fff;
+  border: none; padding: .55rem 1.1rem; border-radius: 8px;
+  font-size: .82rem; font-weight: 700; cursor: pointer;
+  transition: background .15s, transform .1s; white-space: nowrap;
+}
+.pd__btn-primary:hover:not(:disabled) { background: #144a18; transform: translateY(-1px); }
+.pd__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+.pd__btn-secondary {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: #fff; color: #0369a1;
+  border: 1.5px solid #bfdbfe; padding: .55rem 1rem;
+  border-radius: 8px; font-size: .82rem; font-weight: 600;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+  position: relative;
+}
+.pd__btn-secondary:hover:not(:disabled) { background: #eff6ff; }
+.pd__btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
+.pd__btn-hint {
+  position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+  font-size: .65rem; background: #0f172a; color: #fff;
+  padding: .2em .5em; border-radius: 4px; white-space: nowrap;
+  pointer-events: none; opacity: 0; transition: opacity .15s;
+}
+.pd__btn-secondary:hover .pd__btn-hint { opacity: 1; }
+
+.pd__btn-ghost {
+  background: transparent; color: #64748b;
+  border: 1.5px solid #e2e8f0; padding: .6rem 1.1rem;
+  border-radius: 8px; font-size: .875rem; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.pd__btn-ghost:hover:not(:disabled) { background: #f8fafc; color: #0f172a; }
+.pd__btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
+
+.pd__btn-danger {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: #dc2626; color: #fff; border: none;
+  padding: .6rem 1.25rem; border-radius: 8px;
+  font-size: .875rem; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.pd__btn-danger:hover { background: #b91c1c; }
+
+/* Modal */
+.pd__overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1060; padding: 1rem; backdrop-filter: blur(3px);
+}
+.pd__modal {
+  background: #fff; border-radius: 16px; width: 100%;
+  max-width: 560px; max-height: 90vh; overflow-y: auto;
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0,0,0,.15);
+}
+.pd__modal--sm { max-width: 420px; }
+.pd__modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; padding: 1.4rem 1.4rem 1rem; border-bottom: 1px solid #f1f5f9;
+  position: sticky; top: 0; background: #fff; z-index: 1;
+}
+.pd__modal-title { font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0; }
+.pd__modal-title--danger { color: #dc2626; }
+.pd__modal-sub { font-size: .75rem; color: #64748b; margin: .2rem 0 0; }
+.pd__modal-close {
+  background: #f1f5f9; border: none; width: 30px; height: 30px;
+  border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #64748b; flex-shrink: 0; transition: all .15s;
+}
+.pd__modal-close:hover { background: #e2e8f0; color: #0f172a; }
+.pd__modal-body { padding: 1.25rem 1.4rem; flex: 1; display: flex; flex-direction: column; gap: 1rem; }
+.pd__modal-footer {
+  display: flex; justify-content: flex-end; gap: .75rem;
+  padding: 1rem 1.4rem; border-top: 1px solid #f1f5f9;
+  position: sticky; bottom: 0; background: #fff;
+}
+
+/* Form */
+.pd__field { display: flex; flex-direction: column; gap: .4rem; }
+.pd__label { font-size: .75rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
+.pd__req { color: #dc2626; }
+.pd__input {
+  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px;
+  padding: .65rem .9rem; font-size: .875rem; color: #0f172a;
+  width: 100%; box-sizing: border-box; transition: border .15s, box-shadow .15s;
+}
+.pd__input:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); background: #fff; }
+
+/* Dropzone */
+.pd__dropzone {
+  border: 2px dashed #e2e8f0; border-radius: 12px;
+  padding: 2rem 1rem; text-align: center;
+  cursor: pointer; transition: all .2s; background: #fafbfc;
+}
+.pd__dropzone:hover { border-color: #1b5e20; background: #f0fdf4; }
+.pd__dropzone--active { border-color: #15803d; background: #f0fdf4; border-style: solid; }
+.pd__dropzone-icon { font-size: 2rem; color: #94a3b8; display: block; margin-bottom: .5rem; }
+.pd__dropzone--active .pd__dropzone-icon { color: #15803d; }
+.pd__dropzone-text { font-size: .875rem; font-weight: 600; color: #475569; }
+.pd__dropzone-hint { font-size: .75rem; color: #94a3b8; margin-top: .25rem; }
+.pd__dropzone-file { display: flex; flex-direction: column; align-items: center; gap: .25rem; }
+.pd__dropzone-filename { font-size: .875rem; font-weight: 700; color: #15803d; }
+.pd__dropzone-size { font-size: .72rem; color: #94a3b8; }
+
+/* Tipo grid */
+.pd__tipo-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem;
+}
+@media (max-width: 480px) { .pd__tipo-grid { grid-template-columns: 1fr; } }
+.pd__tipo-btn {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .55rem .75rem; border: 1.5px solid #e2e8f0;
+  border-radius: 9px; background: #f8fafc; color: #475569;
+  font-size: .78rem; font-weight: 600; cursor: pointer;
+  transition: all .15s; text-align: left;
+}
+.pd__tipo-btn:hover { border-color: #94a3b8; background: #f1f5f9; }
+.pd__tipo-btn--active { font-weight: 700; }
+
+/* Template list */
+.pd__template-list { display: flex; flex-direction: column; gap: .5rem; }
+.pd__template-btn {
+  padding: .75rem 1rem; border: 1.5px solid #e2e8f0;
+  border-radius: 10px; background: #f8fafc; text-align: left;
+  cursor: pointer; transition: all .15s; width: 100%;
+}
+.pd__template-btn:hover { border-color: #1b5e20; background: #f0fdf4; }
+.pd__template-btn--active { border-color: #1b5e20; background: #f0fdf4; }
+.pd__template-nombre { font-size: .875rem; font-weight: 700; color: #0f172a; }
+.pd__template-meta { font-size: .72rem; color: #64748b; margin-top: .2rem; }
+.pd__template-firma { color: #b45309; font-weight: 600; }
+
+/* Spinner */
+.pd__spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+  border-radius: 50%; animation: pd-spin .6s linear infinite; flex-shrink: 0;
 }
 </style>

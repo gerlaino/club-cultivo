@@ -41,6 +41,8 @@ class PatientDocumentsController < ApplicationController
     doc.template    = template
     doc.contenido_html = contenido if contenido.present?
     doc.tipo        = template&.tipo || doc.tipo || 'otro'
+    doc.archivo_pdf.attach(params[:archivo_pdf]) if params[:archivo_pdf].present?
+    doc.contenido_html ||= '(documento adjunto)' if params[:archivo_pdf].present?
 
     if doc.save
       render json: serialize_doc(doc), status: :created
@@ -121,7 +123,7 @@ class PatientDocumentsController < ApplicationController
 
   def doc_params
     params.require(:document).permit(
-      :nombre, :tipo, :estado, :contenido_html,
+      :nombre, :tipo, :estado, :contenido_html, :archivo_pdf,
       datos: {}
     )
   end

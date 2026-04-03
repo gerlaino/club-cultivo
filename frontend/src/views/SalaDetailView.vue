@@ -18,7 +18,7 @@ const salaId  = Number(route.params.id) || 0
 const loading = ref(true)
 const error   = ref(null)
 
-const canEdit      = computed(() => ["admin","agricultor"].includes(auth.role))
+const canEdit      = computed(() => auth.role === "admin")
 const isCultivador = computed(() => auth.role === "cultivador")
 
 const lotesExpanded = ref(true)
@@ -321,7 +321,7 @@ function closeCreate() {
           </div>
 
           <!-- Nueva tarea — solo admin/agricultor -->
-          <div v-if="!isCultivador" class="sd__card sd__card--mt sd__card--cta">
+          <div v-if="canEdit" class="sd__card sd__card--mt sd__card--cta">
             <button class="sd__cta" @click="abrirModalTarea">
               <i class="bi bi-plus-circle-fill sd__cta-icon"></i>
               <div>

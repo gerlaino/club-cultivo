@@ -5,16 +5,15 @@ export function usePermissions() {
   const auth = useAuthStore()
 
   const PERMISSIONS = {
-    admin: {
-      all: true
-    },
+    admin: { all: true },
     medico: {
       socios: ['index', 'show', 'create', 'update'],
       socio_notas: ['index', 'create', 'destroy'],
       indicaciones: ['index', 'show', 'create', 'update'],
       dispensaciones: ['index', 'show'],
       tareas: ['index', 'show'],
-      reportes_medicos: ['index', 'show']
+      reportes_medicos: ['index', 'show'],
+      documentos: ['index', 'show', 'create', 'update', 'delete']
     },
     agricultor: {
       plantas: ['index', 'show', 'create', 'update', 'destroy'],
@@ -24,7 +23,8 @@ export function usePermissions() {
       geneticas: ['index', 'show'],
       plan_trabajo: ['index', 'show', 'create', 'update'],
       tareas: ['index', 'show', 'create', 'update', 'destroy'],
-      reportes_cultivo: ['index', 'show']
+      reportes_cultivo: ['index', 'show'],
+      documentos: ['index', 'show', 'create', 'update', 'delete']
     },
     cultivador: {
       plantas: ['index', 'show', 'update'],
@@ -40,7 +40,7 @@ export function usePermissions() {
       trazabilidad: ['index', 'show'],
       movimientos_contables: ['index', 'show', 'create', 'update', 'destroy'],
       informe_semestral: ['show'],
-      tareas: ['index', 'show', 'create', 'update', 'destroy']
+      tareas: ['index', 'show', 'create', 'update', 'destroy'],
     },
     auditor: {
       read_only: true,
@@ -60,17 +60,18 @@ export function usePermissions() {
     }
   }
 
-  const can = (resource, action) => {
-    const userRole = auth.user?.role
-    if (!userRole) return false
-    if (userRole === 'admin') return true
+  const userRole = computed(() => auth.user?.role)
 
-    // Auditor puede ver todo (read-only)
-    if (userRole === 'auditor' && PERMISSIONS.auditor.read_only && action === 'show') {
+  const can = (resource, action) => {
+    const role = userRole.value
+    if (!role) return false
+    if (role === 'admin') return true
+
+    if (role === 'auditor' && PERMISSIONS.auditor.read_only && action === 'show') {
       return true
     }
 
-    const rolePermissions = PERMISSIONS[userRole]
+    const rolePermissions = PERMISSIONS[role]
     if (!rolePermissions) return false
     if (rolePermissions.all) return true
 
@@ -80,13 +81,13 @@ export function usePermissions() {
     return resourcePermissions.includes(action)
   }
 
-  const isAdmin = computed(() => auth.user?.role === 'admin')
-  const isMedico = computed(() => auth.user?.role === 'medico')
-  const isAgricultor = computed(() => auth.user?.role === 'agricultor')
-  const isCultivador = computed(() => auth.user?.role === 'cultivador')
-  const isAbogado = computed(() => auth.user?.role === 'abogado')
-  const isAuditor = computed(() => auth.user?.role === 'auditor')
-  const isSocio = computed(() => auth.user?.role === 'socio')
+  const isAdmin      = computed(() => userRole.value === 'admin')
+  const isMedico     = computed(() => userRole.value === 'medico')
+  const isAgricultor = computed(() => userRole.value === 'agricultor')
+  const isCultivador = computed(() => userRole.value === 'cultivador')
+  const isAbogado    = computed(() => userRole.value === 'abogado')
+  const isAuditor    = computed(() => userRole.value === 'auditor')
+  const isSocio      = computed(() => userRole.value === 'socio')
 
   return {
     can,

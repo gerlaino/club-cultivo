@@ -5,6 +5,7 @@ import { useSociosStore } from '../stores/socios'
 import { useAuthStore } from '../stores/auth'
 import IndicacionesMedicas from '../components/socios/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/socios/Dispensaciones.vue'
+import PatientDocuments from '../components/socios/PacienteDocumentos.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -17,6 +18,10 @@ const error   = ref(null)
 const activeTab = ref('info')
 
 const canEdit = computed(() => ['admin', 'medico'].includes(auth.role))
+
+function openEdit() {
+  router.push({ name: 'socios', query: { editar: socioId } })
+}
 const s       = computed(() => store.current)
 
 // ── Nota ──────────────────────────────────────────────────────────────
@@ -108,9 +113,9 @@ onMounted(async () => {
           </div>
         </div>
         <div class="d-flex gap-2" v-if="canEdit">
-          <RouterLink :to="`/socios/${s.id}/editar`" class="btn btn-sm btn-outline-primary">
+          <button class="btn btn-sm btn-outline-primary" @click="openEdit">
             <i class="bi bi-pencil me-1"></i>Editar
-          </RouterLink>
+          </button>
         </div>
       </div>
 
@@ -334,22 +339,8 @@ onMounted(async () => {
       <!-- ── Tab: Documentos ── -->
       <div v-show="activeTab === 'documentos'">
         <div class="card border-0 shadow-sm">
-          <div class="card-header bg-transparent border-0 pt-3 pb-0 d-flex align-items-center justify-content-between">
-            <div>
-              <strong>📄 Documentos del paciente</strong>
-              <p class="text-muted small mb-0">Consentimientos, indicaciones, declaraciones juradas y adjuntos</p>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="text-center py-5 text-muted">
-              <div class="fs-1 mb-3">📄</div>
-              <h5>Módulo de documentos</h5>
-              <p class="small mb-0">
-                Próximamente: generación de Consentimiento Informado Bilateral,
-                Indicación Médica con firma digital, Declaración Jurada y más
-                según Resolución 1780/2025.
-              </p>
-            </div>
+          <div class="card-body p-0">
+            <PatientDocuments :socio-id="socioId" :socio-nombre="`${s.nombre} ${s.apellido}`" />
           </div>
         </div>
       </div>
@@ -372,7 +363,6 @@ onMounted(async () => {
   font-weight: 700;
   flex-shrink: 0;
 }
-
 .nota-list {
   display: flex;
   flex-direction: column;

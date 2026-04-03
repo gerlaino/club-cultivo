@@ -152,11 +152,17 @@ export const deleteDocumentTemplate = (id)       => api.delete(`/document_templa
 // -------- PATIENT DOCUMENTS --------
 export const listPatientDocuments   = (socioId)  => api.get(`/socios/${socioId}/documents`)
 export const getPatientDocument     = (socioId, id) => api.get(`/socios/${socioId}/documents/${id}`)
+export const uploadPatientDocument  = (socioId, formData) => api.post(`/socios/${socioId}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const createPatientDocument  = (socioId, payload) => api.post(`/socios/${socioId}/documents`, { document: payload })
 export const updatePatientDocument  = (socioId, id, payload) => api.put(`/socios/${socioId}/documents/${id}`, { document: payload })
 export const deletePatientDocument  = (socioId, id) => api.delete(`/socios/${socioId}/documents/${id}`)
 export const firmarDocumento        = (socioId, id, payload) => api.post(`/socios/${socioId}/documents/${id}/firmar`, payload)
 export const archivarDocumento      = (socioId, id) => api.patch(`/socios/${socioId}/documents/${id}/archivar`)
+
+// DOCUMENTOS
+export const getDocumentos    = ()         => api.get('/documentos')
+export const createDocumento  = (formData) => api.post('/documentos', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const deleteDocumento  = (id)       => api.delete(`/documentos/${id}`)
 
 // -------- SEDES --------
 export const listSedes       = ()            => api.get('/sedes')

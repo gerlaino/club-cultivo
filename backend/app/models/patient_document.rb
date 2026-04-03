@@ -18,7 +18,7 @@ class PatientDocument < ApplicationRecord
   validates :nombre,          presence: true
   validates :tipo,            presence: true
   validates :estado,          inclusion: { in: ESTADOS }
-  validates :contenido_html,  presence: true
+  validates :contenido_html, presence: true, unless: -> { archivo_pdf.attached? || archivo_pdf.attachment.present? }
 
   scope :for_club,  ->(club_id) { where(club_id: club_id) }
   scope :for_socio, ->(socio_id) { where(socio_id: socio_id) }

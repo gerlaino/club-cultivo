@@ -436,8 +436,8 @@ const {
   hayVencidas, hoyPendientes, hoyEnProgreso, hoyCompletadas
 } = storeToRefs(tareasStore)
 
-const esAdmin    = computed(() => ['admin', 'agricultor'].includes(authStore.user?.role))
-const puedeCrear = computed(() => ['admin', 'agricultor', 'cultivador'].includes(authStore.user?.role))
+const esAdmin    = computed(() => authStore.user?.role === 'admin')
+const puedeCrear = computed(() => authStore.user?.role === 'admin')
 
 const fechaHoy = computed(() => {
   return new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })

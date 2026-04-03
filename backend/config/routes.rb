@@ -93,6 +93,8 @@ Rails.application.routes.draw do
     # Plan info
     resource :plan, only: [:show], controller: 'plan'
 
+    resources :documentos, only: [:index, :create, :destroy]
+
     # Sedes
     resources :sedes do
       member do

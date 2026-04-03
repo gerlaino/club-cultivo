@@ -1,6 +1,6 @@
 class DocumentTemplatesController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_admin!
+  before_action :require_admin!, except: [:index, :show]
   before_action :set_template, only: [:show, :update, :destroy]
 
   # GET /document_templates
