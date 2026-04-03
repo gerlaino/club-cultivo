@@ -11,6 +11,8 @@ class Club < ApplicationRecord
   has_many :costo_lotes, class_name: "CostoLote", dependent: :destroy
   has_many :tareas, dependent: :destroy
   has_many :platns, through: :lotes
+  has_many :documentos, dependent: :destroy
+  has_many :document_templates, dependent: :destroy
 
   has_one_attached :logo
 

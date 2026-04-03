@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_02_000006) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_02_000007) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -123,6 +123,23 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_02_000006) do
     t.index ["club_id", "tipo"], name: "index_document_templates_on_club_id_and_tipo"
     t.index ["club_id"], name: "index_document_templates_on_club_id"
     t.index ["created_by_id"], name: "index_document_templates_on_created_by_id"
+  end
+
+  create_table "documentos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "user_id", null: false
+    t.string "tipo", null: false
+    t.string "titulo", null: false
+    t.text "descripcion"
+    t.date "fecha_vencimiento"
+    t.string "estado", default: "vigente"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_documentos_on_club_id"
+    t.index ["estado"], name: "index_documentos_on_estado"
+    t.index ["fecha_vencimiento"], name: "index_documentos_on_fecha_vencimiento"
+    t.index ["tipo"], name: "index_documentos_on_tipo"
+    t.index ["user_id"], name: "index_documentos_on_user_id"
   end
 
   create_table "eventos", force: :cascade do |t|
@@ -565,6 +582,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_02_000006) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["sede_id"], name: "index_user_sedes_on_sede_id"
+    t.index ["user_id", "sede_id"], name: "idx_user_sedes_unique", unique: true
     t.index ["user_id", "sede_id"], name: "index_user_sedes_on_user_id_and_sede_id", unique: true
     t.index ["user_id"], name: "index_user_sedes_on_user_id"
   end
@@ -604,6 +622,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_02_000006) do
   add_foreign_key "dispensaciones", "users"
   add_foreign_key "document_templates", "clubs"
   add_foreign_key "document_templates", "users", column: "created_by_id"
+  add_foreign_key "documentos", "clubs"
+  add_foreign_key "documentos", "users"
   add_foreign_key "eventos", "clubs"
   add_foreign_key "geneticas", "clubs"
   add_foreign_key "indicacion_medicas", "socios"

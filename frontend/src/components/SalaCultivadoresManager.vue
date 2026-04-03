@@ -110,7 +110,7 @@ const asignando      = ref(false)
 const errorAsignar   = ref('')
 
 const puedeEditar = computed(() =>
-  ['admin', 'agricultor'].includes(auth.user?.role)
+  auth.user?.role === 'admin'
 )
 
 // Solo mostrar cultivadores que no están ya asignados a esta sala

@@ -10,7 +10,7 @@ const auth  = useAuthStore();
 const sedes = ref([]);
 const lotes = ref([]);
 
-const canEdit = computed(() => ["admin","abogado","auditor"].includes(auth.role));
+const canEdit = computed(() => ["admin","abogado"].includes(auth.role));
 
 // ── Vista activa ──────────────────────────────────────────────────────────────
 const vistaActiva = ref("dashboard"); // "dashboard" | "libro"

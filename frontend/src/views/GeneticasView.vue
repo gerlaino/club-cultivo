@@ -4,7 +4,7 @@ import { listGeneticas, createGenetica, updateGenetica, deleteGenetica } from '.
 import { useAuthStore } from '../stores/auth.js'
 
 const auth    = useAuthStore()
-const canEdit = computed(() => ['admin', 'agricultor'].includes(auth.role))
+const canEdit = computed(() => auth.role === 'admin')
 
 // ── Estado ────────────────────────────────────────────────────────────
 const geneticas    = ref([])

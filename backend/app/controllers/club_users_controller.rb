@@ -58,7 +58,7 @@ class ClubUsersController < ApplicationController
     end
 
     # opcional: impedir borrar super_admin si quien borra no es super_admin
-    if @user.role == 'super_admin' && !current_user.super_admin?
+    if @user.role == 'super_admin' && !current_user.admin?
       return render json: { errors: ['No autorizado para eliminar a un super_admin.'] }, status: :forbidden
     end
 
@@ -121,7 +121,7 @@ class ClubUsersController < ApplicationController
   end
 
   def require_admin!
-    head :forbidden unless current_user.admin? || current_user.super_admin?
+    head :forbidden unless current_user.admin?
   end
 
   # Solo campos que EXISTEN en tu schema

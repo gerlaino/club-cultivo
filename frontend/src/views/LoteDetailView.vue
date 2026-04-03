@@ -21,8 +21,9 @@ const id           = Number(route.params.id)
 const error        = ref(null)
 const loading      = computed(() => lotes.loading)
 const lote         = computed(() => lotes.current)
-const canEdit      = computed(() => ["admin","agricultor"].includes(auth.role))
-const isCultivador = computed(() => auth.role === "cultivador")
+const canEdit      = computed(() => auth.role === "admin")
+const isCultivador  = computed(() => auth.role === "cultivador")
+const isAgricultor  = computed(() => auth.role === "agricultor")
 
 const tareasExpanded    = ref(true)
 const plantasExpanded   = ref(true)
@@ -323,13 +324,13 @@ onMounted(async () => {
           </p>
         </div>
         <div class="ld__hero-actions">
-          <button v-if="canEdit && estadosSiguientes.length > 0" class="ld__btn-ghost-sm" @click="showCicloModal = true">
+          <button v-if="(canEdit || isCultivador) && estadosSiguientes.length > 0" class="ld__btn-ghost-sm" @click="showCicloModal = true">
             <i class="bi bi-arrow-right-circle"></i>Avanzar ciclo
           </button>
           <button class="ld__btn-secondary" @click="abrirRegistroModal">
             <i class="bi bi-clipboard-data"></i>Registrar lote
           </button>
-          <RouterLink v-if="can('plantas','create')" :to="{ name:'planta-nueva', query:{ lote_id:id } }" class="ld__btn-primary">
+          <RouterLink v-if="canEdit || isCultivador" :to="{ name:'planta-nueva', query:{ lote_id:id } }" class="ld__btn-primary">
             <i class="bi bi-plus-lg"></i>Nueva planta
           </RouterLink>
         </div>
@@ -377,7 +378,7 @@ onMounted(async () => {
                 <span class="ld__pill">{{ plantList.length }}</span>
               </div>
               <div class="ld__section-toggle-right">
-                <RouterLink v-if="can('plantas','create')" :to="{ name:'planta-nueva', query:{ lote_id:id } }" class="ld__btn-sm" @click.stop>
+                <RouterLink v-if="canEdit || isCultivador" :to="{ name:'planta-nueva', query:{ lote_id:id } }" class="ld__btn-sm" @click.stop>
                   <i class="bi bi-plus-lg"></i>
                 </RouterLink>
                 <i class="bi ld__chevron" :class="plantasExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -388,7 +389,7 @@ onMounted(async () => {
               <div v-else-if="!plantList.length" class="ld__empty">
                 <div class="ld__empty-icon">🪴</div>
                 <p>Sin plantas registradas en este lote</p>
-                <RouterLink v-if="can('plantas','create')" :to="{ name:'planta-nueva', query:{ lote_id:id } }" class="ld__btn-outline">
+                <RouterLink v-if="canEdit || isCultivador" :to="{ name:'planta-nueva', query:{ lote_id:id } }" class="ld__btn-outline">
                   <i class="bi bi-plus-lg"></i> Agregar primera planta
                 </RouterLink>
               </div>
@@ -517,7 +518,7 @@ onMounted(async () => {
         <div class="ld__aside">
 
           <!-- Costo — solo admin/agricultor -->
-          <div v-if="!isCultivador" class="ld__card" :class="costo ? 'ld__card--ok' : 'ld__card--warn'">
+          <div v-if="canEdit" class="ld__card" :class="costo ? 'ld__card--ok' : 'ld__card--warn'">
             <div class="ld__card-header">
               <span class="ld__card-title">💰 Costo</span>
               <button v-if="canEdit" class="ld__btn-xs" @click="openCostoModal">{{ costo ? "Editar" : "+ Cargar" }}</button>
@@ -544,7 +545,7 @@ onMounted(async () => {
           </div>
 
           <!-- Datos técnicos -->
-          <div class="ld__card" :class="!isCultivador ? 'ld__card--mt' : ''">
+          <div class="ld__card" :class="canEdit ? 'ld__card--mt' : ''">
             <div class="ld__card-header"><span class="ld__card-title">⚙️ Datos técnicos</span></div>
             <dl class="ld__dl">
               <dt>Plantas</dt><dd><strong>{{ lote.plants_count ?? 0 }}</strong></dd>
@@ -560,19 +561,6 @@ onMounted(async () => {
             </dl>
           </div>
 
-          <!-- Información -->
-          <div class="ld__card ld__card--mt">
-            <div class="ld__card-header"><span class="ld__card-title">ℹ️ Información</span></div>
-            <dl class="ld__dl">
-              <dt>Sala</dt>
-              <dd>
-                <RouterLink v-if="lote.sala" :to="{ name:'sala-detail', params:{ id:lote.sala.id } }" class="ld__link">{{ lote.sala.nombre }}</RouterLink>
-                <span v-else>—</span>
-              </dd>
-              <dt>Creado</dt><dd>{{ formatDate(lote.created_at) }}</dd>
-              <dt>Actualizado</dt><dd>{{ formatDate(lote.updated_at) }}</dd>
-            </dl>
-          </div>
 
           <div v-if="lote.notes" class="ld__card ld__card--mt">
             <div class="ld__card-header"><span class="ld__card-title">📋 Notas</span></div>
@@ -774,7 +762,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Costo ══ -->
     <Teleport to="body">
-      <div v-if="showCostoModal && !isCultivador" class="ld__overlay" @click.self="showCostoModal = false">
+      <div v-if="showCostoModal && canEdit" class="ld__overlay" @click.self="showCostoModal = false">
         <div class="ld__modal">
           <div class="ld__modal-header">
             <div>
