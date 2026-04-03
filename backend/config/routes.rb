@@ -125,4 +125,17 @@ Rails.application.routes.draw do
     end
 
   end
+
+  # Super Admin — gestión global
+  namespace :super_admin do
+    resources :clubs, only: [:index, :show, :create, :update] do
+      member do
+        post :crear_usuarios_default
+        patch :cambiar_plan
+      end
+    end
+    resources :users, only: [:index, :create, :update, :destroy]
+    get :stats, to: 'stats#show'
+  end
+
 end
