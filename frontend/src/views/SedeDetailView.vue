@@ -1,295 +1,368 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useAuthStore } from "../stores/auth";
-import { getSede, listSalas } from "../lib/api";
+import { ref, computed, onMounted } from "vue"
+import { useRoute, useRouter } from "vue-router"
+import { useAuthStore } from "../stores/auth"
+import { getSede, listSalas } from "../lib/api"
+import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
 
-const route  = useRoute();
-const router = useRouter();
-const auth   = useAuthStore();
+const route  = useRoute()
+const router = useRouter()
+const auth   = useAuthStore()
 
-const sedeId  = Number(route.params.id);
-const sede    = ref(null);
-const salas   = ref([]);
-const loading = ref(true);
-const error   = ref(null);
+const sedeId        = Number(route.params.id)
+const sede          = ref(null)
+const salas         = ref([])
+const loading       = ref(true)
+const error         = ref(null)
+const showCrearSala = ref(false)
 
-const canEdit = computed(() => ["admin", "agricultor"].includes(auth.role));
+const canEdit = computed(() => ["admin", "agricultor"].includes(auth.role))
 
 const TIPO_META = {
-  produccion: { label: "Producción",           icon: "🌱", color: "success" },
-  social:     { label: "Social / Dispensario", icon: "🏪", color: "primary" },
-  mixta:      { label: "Mixta",                icon: "🔄", color: "purple"  },
-};
-function tipoMeta(tipo) { return TIPO_META[tipo] || TIPO_META.produccion; }
-
-function stateBadge(state) {
-  return { activa: "success", mantenimiento: "warning", cerrada: "secondary" }[state] || "secondary";
+  produccion: { label: "Producción",  icon: "bi-flower2",         color: "#15803d", bg: "rgba(21,128,61,.1)"  },
+  social:     { label: "Dispensario", icon: "bi-shop",             color: "#0369a1", bg: "rgba(3,105,161,.1)"  },
+  mixta:      { label: "Mixta",       icon: "bi-arrow-left-right", color: "#7c3aed", bg: "rgba(124,58,237,.1)" },
 }
-function stateIcon(state) {
-  return { activa: "🟢", mantenimiento: "🟡", cerrada: "⚫" }[state] || "⚪";
+function tipoMeta(tipo) { return TIPO_META[tipo] || TIPO_META.produccion }
+
+const kpis = computed(() => ({
+  total:     salas.value.length,
+  activas:   salas.value.filter(s => s.state === "activa").length,
+  plantas:   salas.value.reduce((a, s) => a + Number(s.plantas_totales || 0), 0),
+  capacidad: salas.value.reduce((a, s) => a + Number(s.pots_count || s.plants_max || 0), 0),
+}))
+
+function ocupacionColor(pct) {
+  if (pct >= 90) return "#dc2626"
+  if (pct >= 70) return "#f59e0b"
+  return "#15803d"
 }
 
-// KPIs de salas de esta sede
-const kpis = computed(() => {
-  const all = salas.value;
-  return {
-    total:     all.length,
-    activas:   all.filter(s => s.state === "activa").length,
-    plantas:   all.reduce((a, s) => a + Number(s.plantas_totales || 0), 0),
-    capacidad: all.reduce((a, s) => a + Number(s.pots_count || 0), 0),
-  };
-});
+function formatDate(d) {
+  if (!d) return "—"
+  return new Date(d).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })
+}
+
+async function recargarSalas() {
+  const r = await listSalas()
+  salas.value = (r.data || []).filter(s => s.sede?.id === sedeId)
+}
+
+function onSalaCreada() {
+  showCrearSala.value = false
+  recargarSalas()
+}
 
 onMounted(async () => {
   try {
-    // Cargamos sede (detail) y todas las salas del club filtradas por sede
-    const [sedeRes, salasRes] = await Promise.all([
-      getSede(sedeId),
-      listSalas(),
-    ]);
-    sede.value  = sedeRes.data;
-    // El index de salas devuelve sede embebida — filtramos por sede_id
-    salas.value = (salasRes.data || []).filter(s => s.sede?.id === sedeId);
+    const [sedeRes, salasRes] = await Promise.all([getSede(sedeId), listSalas()])
+    sede.value  = sedeRes.data
+    salas.value = (salasRes.data || []).filter(s => s.sede?.id === sedeId)
   } catch (e) {
-    error.value = "No se pudo cargar la sede.";
+    error.value = "No se pudo cargar la sede."
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-});
+})
 </script>
 
 <template>
-  <div class="container-fluid py-4 px-3 px-md-4">
+  <div class="sdv">
 
-    <!-- Breadcrumb -->
-    <nav aria-label="breadcrumb" class="mb-3">
-      <ol class="breadcrumb small">
-        <li class="breadcrumb-item">
-          <RouterLink :to="{ name: 'sedes' }">Sedes</RouterLink>
-        </li>
-        <li class="breadcrumb-item active">{{ sede?.nombre || "Detalle" }}</li>
-      </ol>
-    </nav>
-
-    <!-- Loading / Error -->
-    <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border text-primary"></div>
-      <div class="mt-2 text-muted">Cargando sede…</div>
+    <div v-if="loading" class="sdv__loading">
+      <div class="sdv__ring"></div>
+      <span>Cargando sede…</span>
     </div>
-    <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
-    <div v-else-if="!sede" class="alert alert-warning">Sede no encontrada.</div>
 
-    <template v-else>
+    <div v-else-if="error" class="sdv__error">
+      <i class="bi bi-exclamation-triangle-fill"></i> {{ error }}
+    </div>
+
+    <template v-else-if="sede">
+
+      <!-- Breadcrumb -->
+      <div class="sdv__breadcrumb">
+        <RouterLink :to="{ name: 'sedes' }" class="sdv__breadcrumb-link">Sedes</RouterLink>
+        <i class="bi bi-chevron-right sdv__breadcrumb-sep"></i>
+        <span>{{ sede.nombre }}</span>
+      </div>
 
       <!-- Header -->
-      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-        <div>
-          <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-            <span class="fs-3">{{ tipoMeta(sede.tipo).icon }}</span>
-            <h1 class="h3 fw-bold mb-0">{{ sede.nombre }}</h1>
-            <span class="badge text-bg-secondary fs-6">{{ sede.tipo_label }}</span>
-            <span v-if="!sede.activa" class="badge text-bg-warning">Inactiva</span>
-            <span v-if="sede.declarada_reprocann" class="badge text-bg-success">REPROCANN ✓</span>
+      <div class="sdv__header">
+        <div class="sdv__header-left">
+          <div class="sdv__tipo-icon" :style="{ background: tipoMeta(sede.tipo).bg, color: tipoMeta(sede.tipo).color }">
+            <i :class="['bi', tipoMeta(sede.tipo).icon]"></i>
           </div>
-          <p class="text-muted small mb-0">
-            <span v-if="sede.direccion_completa">📍 {{ sede.direccion_completa }}</span>
-          </p>
+          <div>
+            <div class="sdv__title-row">
+              <h1 class="sdv__title">{{ sede.nombre }}</h1>
+              <span class="sdv__tipo-badge" :style="{ background: tipoMeta(sede.tipo).bg, color: tipoMeta(sede.tipo).color }">
+                {{ tipoMeta(sede.tipo).label }}
+              </span>
+              <span v-if="sede.declarada_reprocann" class="sdv__reprocann-badge">
+                <i class="bi bi-patch-check-fill"></i> REPROCANN
+              </span>
+            </div>
+            <p v-if="sede.direccion_completa" class="sdv__subtitle">
+              <i class="bi bi-geo-alt"></i> {{ sede.direccion_completa }}
+            </p>
+          </div>
         </div>
-        <div class="d-flex gap-2">
-          <RouterLink
-            v-if="canEdit"
-            :to="{ name: 'salas', query: { sede_id: sedeId } }"
-            class="btn btn-outline-primary"
-          >
-            + Nueva sala aquí
-          </RouterLink>
-          <button class="btn btn-outline-secondary btn-sm" @click="router.back()">
-            ← Volver
+        <div class="sdv__header-actions">
+          <button v-if="canEdit" class="sdv__btn-primary" @click="showCrearSala = true">
+            <i class="bi bi-plus-lg"></i> Nueva sala aquí
+          </button>
+          <button class="sdv__btn-ghost" @click="router.back()">
+            <i class="bi bi-arrow-left"></i> Volver
           </button>
         </div>
       </div>
 
       <!-- KPIs -->
-      <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-          <div class="card border-0 bg-body-secondary h-100">
-            <div class="card-body py-3 text-center">
-              <div class="text-muted small">Salas totales</div>
-              <div class="h2 fw-bold mb-0">{{ kpis.total }}</div>
-            </div>
-          </div>
+      <div class="sdv__kpis">
+        <div class="sdv__kpi">
+          <div class="sdv__kpi-val">{{ kpis.total }}</div>
+          <div class="sdv__kpi-lbl">Salas totales</div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="card border-0 bg-body-secondary h-100">
-            <div class="card-body py-3 text-center">
-              <div class="text-muted small">Activas</div>
-              <div class="h2 fw-bold mb-0 text-success">{{ kpis.activas }}</div>
-            </div>
-          </div>
+        <div class="sdv__kpi">
+          <div class="sdv__kpi-val" style="color:#15803d">{{ kpis.activas }}</div>
+          <div class="sdv__kpi-lbl">Activas</div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="card border-0 bg-body-secondary h-100">
-            <div class="card-body py-3 text-center">
-              <div class="text-muted small">Plantas totales</div>
-              <div class="h2 fw-bold mb-0">{{ kpis.plantas }}</div>
-            </div>
-          </div>
+        <div class="sdv__kpi">
+          <div class="sdv__kpi-val">{{ kpis.plantas }}</div>
+          <div class="sdv__kpi-lbl">Plantas totales</div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="card border-0 bg-body-secondary h-100">
-            <div class="card-body py-3 text-center">
-              <div class="text-muted small">Capacidad total</div>
-              <div class="h2 fw-bold mb-0">{{ kpis.capacidad }}</div>
-            </div>
-          </div>
+        <div class="sdv__kpi">
+          <div class="sdv__kpi-val">{{ kpis.capacidad }}</div>
+          <div class="sdv__kpi-lbl">Capacidad total</div>
         </div>
       </div>
 
-      <div class="row g-4">
+      <!-- Layout -->
+      <div class="sdv__layout">
 
-        <!-- Col principal: salas -->
-        <div class="col-12 col-lg-8">
-          <div class="card border-0 shadow-sm">
-            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
-              <strong>🏗️ Salas de esta sede</strong>
-              <span class="badge text-bg-secondary">{{ salas.length }}</span>
-            </div>
-            <div class="card-body p-0">
-
-              <!-- Sin salas -->
-              <div v-if="!salas.length" class="p-4 text-center text-muted">
-                <div class="fs-1 mb-2">🏗️</div>
-                <div>Esta sede no tiene salas asignadas todavía.</div>
-                <RouterLink
-                  v-if="canEdit"
-                  :to="{ name: 'salas' }"
-                  class="btn btn-sm btn-outline-primary mt-2"
-                >
-                  Ir a Salas para crear una
-                </RouterLink>
+        <!-- Salas -->
+        <div class="sdv__col-main">
+          <div class="sdv__card">
+            <div class="sdv__card-header">
+              <div class="sdv__card-title-wrap">
+                <span class="sdv__card-icon" style="background:rgba(27,94,32,.1);color:#1b5e20">
+                  <i class="bi bi-grid-3x3-gap"></i>
+                </span>
+                <span class="sdv__card-title">Salas de esta sede</span>
+                <span class="sdv__pill">{{ salas.length }}</span>
               </div>
+              <RouterLink :to="{ name: 'salas' }" class="sdv__card-btn">
+                Ver todas →
+              </RouterLink>
+            </div>
 
-              <!-- Lista de salas -->
-              <div v-else class="list-group list-group-flush">
-                <RouterLink
-                  v-for="s in salas"
-                  :key="s.id"
-                  :to="{ name: 'sala-detail', params: { id: s.id } }"
-                  class="list-group-item list-group-item-action px-3 py-3"
-                >
-                  <div class="d-flex justify-content-between align-items-center gap-2">
-                    <div class="flex-grow-1 min-w-0">
-                      <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                        <span class="fw-semibold text-truncate">{{ s.nombre }}</span>
-                        <span class="badge" :class="`text-bg-${stateBadge(s.state)}`">
-                          {{ stateIcon(s.state) }} {{ s.state }}
-                        </span>
-                        <span v-if="s.kind" class="badge text-bg-light text-dark">{{ s.kind }}</span>
-                      </div>
-                      <div class="small text-muted d-flex gap-3 flex-wrap">
-                        <span>🪴 {{ s.plantas_totales ?? 0 }} plantas</span>
-                        <span>📦 cap. {{ s.pots_count ?? 0 }}</span>
-                        <span v-if="s.lotes_count !== undefined">📋 {{ s.lotes_count }} lotes</span>
-                      </div>
+            <div v-if="!salas.length" class="sdv__empty">
+              <i class="bi bi-building-slash sdv__empty-icon"></i>
+              <p>Esta sede no tiene salas asignadas todavía.</p>
+              <button v-if="canEdit" class="sdv__btn-sm-green" @click="showCrearSala = true">
+                Crear primera sala
+              </button>
+            </div>
+
+            <div v-else class="sdv__salas">
+              <RouterLink
+                v-for="s in salas"
+                :key="s.id"
+                :to="{ name: 'sala-detail', params: { id: s.id } }"
+                class="sdv__sala"
+              >
+                <div class="sdv__sala-state"
+                     :style="{ background: s.state === 'activa' ? '#15803d' : s.state === 'mantenimiento' ? '#f59e0b' : '#94a3b8' }">
+                </div>
+                <div class="sdv__sala-body">
+                  <div class="sdv__sala-header">
+                    <span class="sdv__sala-nombre">{{ s.nombre }}</span>
+                    <div class="sdv__sala-badges">
+                      <span class="sdv__state-badge"
+                            :style="s.state === 'activa' ? 'background:#dcfce7;color:#15803d' : s.state === 'mantenimiento' ? 'background:#fffbeb;color:#b45309' : 'background:#f1f5f9;color:#64748b'">
+                        {{ s.state }}
+                      </span>
+                      <span v-if="s.kind" class="sdv__kind-badge">{{ s.kind }}</span>
                     </div>
-                    <!-- Barra ocupación -->
-                    <div class="d-none d-sm-flex flex-column align-items-end gap-1" style="min-width:80px">
-                      <div class="small text-muted">{{ (s.porcentaje_ocupacion || 0).toFixed(0) }}%</div>
-                      <div class="progress w-100" style="height:6px">
-                        <div
-                          class="progress-bar"
-                          :class="(s.porcentaje_ocupacion||0) >= 90 ? 'bg-danger' : (s.porcentaje_ocupacion||0) >= 70 ? 'bg-warning' : 'bg-success'"
-                          :style="{ width: Math.min(s.porcentaje_ocupacion||0, 100) + '%' }"
-                        ></div>
-                      </div>
-                    </div>
-                    <span class="text-muted ms-2">›</span>
                   </div>
-                </RouterLink>
+                  <div class="sdv__sala-meta">
+                    <span><i class="bi bi-flower1"></i> {{ s.plantas_totales ?? 0 }} plantas</span>
+                    <span><i class="bi bi-box-seam"></i> cap. {{ s.pots_count ?? s.plants_max ?? 0 }}</span>
+                    <span v-if="s.lotes_count !== undefined"><i class="bi bi-collection"></i> {{ s.lotes_count }} lotes</span>
+                  </div>
+                </div>
+                <div class="sdv__sala-ocupacion">
+                  <div class="sdv__ocu-pct" :style="{ color: ocupacionColor(s.porcentaje_ocupacion || 0) }">
+                    {{ (s.porcentaje_ocupacion || 0).toFixed(0) }}%
+                  </div>
+                  <div class="sdv__ocu-bar">
+                    <div class="sdv__ocu-fill"
+                         :style="{ width: Math.min(s.porcentaje_ocupacion || 0, 100) + '%', background: ocupacionColor(s.porcentaje_ocupacion || 0) }">
+                    </div>
+                  </div>
+                  <div class="sdv__ocu-label">ocupación</div>
+                </div>
+                <i class="bi bi-arrow-right sdv__sala-arrow"></i>
+              </RouterLink>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar — solo info -->
+        <div class="sdv__col-side">
+          <div class="sdv__card">
+            <div class="sdv__card-header">
+              <div class="sdv__card-title-wrap">
+                <span class="sdv__card-icon" style="background:rgba(3,105,161,.1);color:#0369a1">
+                  <i class="bi bi-info-circle"></i>
+                </span>
+                <span class="sdv__card-title">Información</span>
               </div>
-
             </div>
+            <dl class="sdv__dl">
+              <dt>Tipo</dt>
+              <dd>
+                <span class="sdv__tipo-badge sdv__tipo-badge--sm"
+                      :style="{ background: tipoMeta(sede.tipo).bg, color: tipoMeta(sede.tipo).color }">
+                  {{ tipoMeta(sede.tipo).label }}
+                </span>
+              </dd>
+              <dt>Estado</dt>
+              <dd>
+                <span class="sdv__state-badge"
+                      :style="sede.activa ? 'background:#dcfce7;color:#15803d' : 'background:#fffbeb;color:#b45309'">
+                  {{ sede.activa ? "Activa" : "Inactiva" }}
+                </span>
+              </dd>
+              <dt>REPROCANN</dt>
+              <dd>
+                <span class="sdv__state-badge"
+                      :style="sede.declarada_reprocann ? 'background:#dcfce7;color:#15803d' : 'background:#f1f5f9;color:#64748b'">
+                  {{ sede.declarada_reprocann ? "Declarada ✓" : "No declarada" }}
+                </span>
+              </dd>
+              <template v-if="sede.direccion">
+                <dt>Dirección</dt><dd>{{ sede.direccion }}</dd>
+              </template>
+              <template v-if="sede.ciudad">
+                <dt>Ciudad</dt><dd>{{ sede.ciudad }}</dd>
+              </template>
+              <template v-if="sede.provincia">
+                <dt>Provincia</dt><dd>{{ sede.provincia }}</dd>
+              </template>
+              <dt>Registrada</dt>
+              <dd>{{ formatDate(sede.created_at) }}</dd>
+            </dl>
+          </div>
+
+          <div v-if="sede.notas" class="sdv__card sdv__card--mt">
+            <div class="sdv__card-header">
+              <div class="sdv__card-title-wrap">
+                <span class="sdv__card-icon" style="background:rgba(180,83,9,.1);color:#b45309">
+                  <i class="bi bi-journal-text"></i>
+                </span>
+                <span class="sdv__card-title">Notas</span>
+              </div>
+            </div>
+            <p class="sdv__notas">{{ sede.notas }}</p>
           </div>
         </div>
 
-        <!-- Col lateral: info -->
-        <div class="col-12 col-lg-4">
-
-          <div class="card border-0 shadow-sm mb-3">
-            <div class="card-header bg-transparent"><strong>ℹ️ Información</strong></div>
-            <div class="card-body small">
-              <dl class="row mb-0">
-                <dt class="col-5 text-muted fw-normal">ID</dt>
-                <dd class="col-7">{{ sede.id }}</dd>
-
-                <dt class="col-5 text-muted fw-normal">Tipo</dt>
-                <dd class="col-7">{{ sede.tipo_label }}</dd>
-
-                <dt class="col-5 text-muted fw-normal">Estado</dt>
-                <dd class="col-7">
-                  <span class="badge" :class="sede.activa ? 'text-bg-success' : 'text-bg-warning'">
-                    {{ sede.activa ? "Activa" : "Inactiva" }}
-                  </span>
-                </dd>
-
-                <dt class="col-5 text-muted fw-normal">REPROCANN</dt>
-                <dd class="col-7">
-                  <span class="badge" :class="sede.declarada_reprocann ? 'text-bg-success' : 'text-bg-light text-dark'">
-                    {{ sede.declarada_reprocann ? "Declarada ✓" : "No declarada" }}
-                  </span>
-                </dd>
-
-                <template v-if="sede.direccion">
-                  <dt class="col-5 text-muted fw-normal">Dirección</dt>
-                  <dd class="col-7">{{ sede.direccion }}</dd>
-                </template>
-
-                <template v-if="sede.ciudad">
-                  <dt class="col-5 text-muted fw-normal">Ciudad</dt>
-                  <dd class="col-7">{{ sede.ciudad }}</dd>
-                </template>
-
-                <template v-if="sede.provincia">
-                  <dt class="col-5 text-muted fw-normal">Provincia</dt>
-                  <dd class="col-7">{{ sede.provincia }}</dd>
-                </template>
-
-                <dt class="col-5 text-muted fw-normal">Creada</dt>
-                <dd class="col-7 mb-0">
-                  {{ sede.created_at ? new Date(sede.created_at).toLocaleDateString("es-AR") : "—" }}
-                </dd>
-              </dl>
-            </div>
-          </div>
-
-          <div v-if="sede.notas" class="card border-0 shadow-sm mb-3">
-            <div class="card-header bg-transparent"><strong>📋 Notas</strong></div>
-            <div class="card-body small">{{ sede.notas }}</div>
-          </div>
-
-          <!-- Acceso rápido -->
-          <div class="card border-0 shadow-sm">
-            <div class="card-header bg-transparent"><strong>🔗 Acceso rápido</strong></div>
-            <div class="list-group list-group-flush">
-              <RouterLink :to="{ name: 'lotes' }" class="list-group-item list-group-item-action small py-2">
-                📦 Ver todos los lotes del club
-              </RouterLink>
-              <RouterLink :to="{ name: 'plantas' }" class="list-group-item list-group-item-action small py-2">
-                🪴 Ver todas las plantas del club
-              </RouterLink>
-              <RouterLink :to="{ name: 'sedes' }" class="list-group-item list-group-item-action small py-2">
-                🏢 Volver a todas las sedes
-              </RouterLink>
-            </div>
-          </div>
-
-        </div>
       </div>
+
     </template>
+
+    <!-- Modal crear sala con sede pre-seleccionada y oculta -->
+    <ModalCrearSala
+      v-if="showCrearSala"
+      :sede-id-fija="sedeId"
+      @close="showCrearSala = false"
+      @created="onSalaCreada"
+    />
+
   </div>
 </template>
 
 <style scoped>
-/* nada extra — todo Bootstrap */
+.sdv { padding: 1.75rem 1.75rem 3rem; max-width: 1200px; margin: 0 auto; }
+@media (max-width: 768px) { .sdv { padding: 1.25rem 1rem 2rem; } }
+
+.sdv__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
+.sdv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: sdv-spin .7s linear infinite; }
+@keyframes sdv-spin { to { transform: rotate(360deg); } }
+.sdv__error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 10px; display: flex; gap: .5rem; align-items: center; }
+
+.sdv__breadcrumb { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: #94a3b8; margin-bottom: 1.25rem; }
+.sdv__breadcrumb-link { color: #0369a1; text-decoration: none; font-weight: 600; }
+.sdv__breadcrumb-link:hover { text-decoration: underline; }
+.sdv__breadcrumb-sep { font-size: .65rem; }
+
+.sdv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
+.sdv__header-left { display: flex; align-items: flex-start; gap: 1rem; }
+.sdv__tipo-icon { width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+.sdv__title-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .25rem; }
+.sdv__title { font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -.03em; }
+.sdv__tipo-badge { font-size: .72rem; font-weight: 700; padding: .2em .65em; border-radius: 6px; }
+.sdv__tipo-badge--sm { font-size: .72rem; font-weight: 700; padding: .2em .55em; border-radius: 5px; }
+.sdv__reprocann-badge { display: inline-flex; align-items: center; gap: .3rem; font-size: .72rem; font-weight: 700; background: #dcfce7; color: #15803d; padding: .2em .6em; border-radius: 6px; }
+.sdv__subtitle { font-size: .83rem; color: #64748b; margin: 0; display: flex; align-items: center; gap: .35rem; }
+.sdv__header-actions { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+
+.sdv__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.75rem; }
+@media (max-width: 640px) { .sdv__kpis { grid-template-columns: repeat(2, 1fr); } }
+.sdv__kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.1rem 1rem; text-align: center; }
+.sdv__kpi-val { font-size: 2rem; font-weight: 800; color: #0f172a; line-height: 1; letter-spacing: -.04em; }
+.sdv__kpi-lbl { font-size: .72rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; margin-top: .35rem; }
+
+.sdv__layout { display: grid; grid-template-columns: 1fr 280px; gap: 1.25rem; align-items: start; }
+@media (max-width: 900px) { .sdv__layout { grid-template-columns: 1fr; } }
+.sdv__col-side { display: flex; flex-direction: column; position: sticky; top: 1.5rem; }
+.sdv__card--mt { margin-top: 1.25rem; }
+
+.sdv__card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
+.sdv__card-header { display: flex; align-items: center; justify-content: space-between; padding: .875rem 1.1rem; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
+.sdv__card-title-wrap { display: flex; align-items: center; gap: .6rem; }
+.sdv__card-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: .8rem; flex-shrink: 0; }
+.sdv__card-title { font-size: .875rem; font-weight: 700; color: #0f172a; }
+.sdv__card-btn { font-size: .78rem; font-weight: 600; color: #0369a1; background: none; border: none; cursor: pointer; padding: 0; text-decoration: none; }
+.sdv__card-btn:hover { text-decoration: underline; }
+.sdv__pill { font-size: .65rem; font-weight: 800; background: #f1f5f9; color: #475569; padding: .15em .5em; border-radius: 999px; }
+
+.sdv__empty { text-align: center; padding: 3rem 1rem; color: #94a3b8; }
+.sdv__empty-icon { font-size: 2.5rem; display: block; margin-bottom: .75rem; opacity: .4; }
+.sdv__empty p { font-size: .875rem; margin: 0 0 .75rem; }
+
+.sdv__salas { display: flex; flex-direction: column; }
+.sdv__sala { display: flex; align-items: center; gap: .875rem; padding: .875rem 1.1rem; border-bottom: 1px solid #f8fafc; text-decoration: none; color: inherit; transition: background .12s; }
+.sdv__sala:last-child { border-bottom: none; }
+.sdv__sala:hover { background: #fafbfc; }
+.sdv__sala-state { width: 3px; height: 40px; border-radius: 999px; flex-shrink: 0; }
+.sdv__sala-body { flex: 1; min-width: 0; }
+.sdv__sala-header { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .25rem; }
+.sdv__sala-nombre { font-size: .9rem; font-weight: 700; color: #0f172a; }
+.sdv__sala-badges { display: flex; gap: .35rem; }
+.sdv__state-badge { font-size: .68rem; font-weight: 700; padding: .2em .5em; border-radius: 5px; }
+.sdv__kind-badge { font-size: .68rem; font-weight: 600; background: #f1f5f9; color: #64748b; padding: .2em .5em; border-radius: 5px; text-transform: capitalize; }
+.sdv__sala-meta { display: flex; gap: .75rem; font-size: .75rem; color: #94a3b8; flex-wrap: wrap; }
+.sdv__sala-meta i { margin-right: .2rem; }
+.sdv__sala-ocupacion { display: flex; flex-direction: column; align-items: flex-end; gap: .2rem; min-width: 70px; flex-shrink: 0; }
+.sdv__ocu-pct { font-size: .78rem; font-weight: 700; }
+.sdv__ocu-bar { width: 70px; height: 4px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.sdv__ocu-fill { height: 100%; border-radius: 999px; transition: width .4s; }
+.sdv__ocu-label { font-size: .62rem; color: #94a3b8; }
+.sdv__sala-arrow { color: #cbd5e1; font-size: .85rem; flex-shrink: 0; transition: color .15s, transform .15s; }
+.sdv__sala:hover .sdv__sala-arrow { color: #0f172a; transform: translateX(2px); }
+
+.sdv__dl { display: grid; grid-template-columns: 100px 1fr; gap: .4rem .5rem; padding: 1rem 1.1rem; margin: 0; }
+.sdv__dl dt { font-size: .75rem; color: #94a3b8; font-weight: 500; display: flex; align-items: center; }
+.sdv__dl dd { font-size: .82rem; color: #0f172a; font-weight: 500; margin: 0; display: flex; align-items: center; }
+.sdv__notas { padding: .875rem 1.1rem; font-size: .85rem; color: #475569; margin: 0; line-height: 1.6; }
+
+.sdv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: var(--brand-primary, #1b5e20); color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 700; cursor: pointer; text-decoration: none; transition: background .15s, transform .1s; white-space: nowrap; }
+.sdv__btn-primary:hover { background: #144a18; transform: translateY(-1px); }
+.sdv__btn-ghost { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .6rem 1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.sdv__btn-ghost:hover { background: #f8fafc; color: #0f172a; }
+.sdv__btn-sm-green { display: inline-flex; align-items: center; gap: .35rem; background: rgba(27,94,32,.08); color: #1b5e20; border: 1.5px solid rgba(27,94,32,.2); padding: .45rem .875rem; border-radius: 7px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.sdv__btn-sm-green:hover { background: rgba(27,94,32,.14); }
 </style>

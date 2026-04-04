@@ -4,13 +4,11 @@ class PreferencesController < ApplicationController
   before_action :require_club_user!
   before_action :set_club
 
-  # GET /preferences
   def show
     authorize @club, :show?
     render json: serialize(@club)
   end
 
-  # PUT /preferences
   def update
     authorize @club, :update?
 
@@ -25,7 +23,6 @@ class PreferencesController < ApplicationController
     end
   end
 
-  # POST /preferences/upload_logo
   def upload_logo
     authorize @club, :upload_logo?
     unless params[:logo].present?
@@ -55,25 +52,31 @@ class PreferencesController < ApplicationController
   def club_params
     params.require(:club).permit(
       :name, :legal_name, :email, :phone, :website,
-      :address, :city, :state, :country, :timezone, :theme_primary
+      :address, :city, :state, :timezone, :theme_primary,
+      :cuit, :numero_igj, :numero_resolucion_reprocann,
+      :fecha_resolucion_reprocann, :tipo_organizacion
     )
   end
 
   def serialize(club)
     {
-      id:            club.id,
-      name:          club.name,
-      legal_name:    club.legal_name,
-      email:         club.email,
-      phone:         club.phone,
-      website:       club.website,
-      address:       club.address,
-      city:          club.city,
-      state:         club.state,
-      country:       club.country,
-      timezone:      club.timezone,
-      theme_primary: club.theme_primary,
-      logo_url:      club.logo.attached? ? url_for(club.logo) : nil
+      id:                           club.id,
+      name:                         club.name,
+      legal_name:                   club.legal_name,
+      email:                        club.email,
+      phone:                        club.phone,
+      website:                      club.website,
+      address:                      club.address,
+      city:                         club.city,
+      state:                        club.state,
+      timezone:                     club.timezone,
+      theme_primary:                club.theme_primary,
+      cuit:                         club.cuit,
+      numero_igj:                   club.numero_igj,
+      numero_resolucion_reprocann:  club.numero_resolucion_reprocann,
+      fecha_resolucion_reprocann:   club.fecha_resolucion_reprocann,
+      tipo_organizacion:            club.tipo_organizacion,
+      logo_url:                     club.logo.attached? ? url_for(club.logo) : nil
     }
   end
 end

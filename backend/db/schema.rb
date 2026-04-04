@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_03_131712) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_03_222256) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -61,6 +61,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_03_131712) do
     t.boolean "plan_trial", default: true, null: false
     t.jsonb "limites_custom", default: {}
     t.string "slug", null: false
+    t.string "cuit"
+    t.string "numero_igj"
+    t.string "numero_resolucion_reprocann"
+    t.date "fecha_resolucion_reprocann"
+    t.string "tipo_organizacion"
     t.index ["plan"], name: "index_clubs_on_plan"
     t.index ["slug"], name: "index_clubs_on_slug", unique: true
   end

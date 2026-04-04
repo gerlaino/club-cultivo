@@ -29,6 +29,16 @@ const sedeActiva     = ref(null)
 const inventarioData = ref([])
 const loadingInv     = ref(false)
 const stockForm = ref({ producto: 'flores', cantidad: null, motivo: '' })
+const PRODUCTOS = [
+  { value: "flores",  label: "Flores",   unidad: "g",  step: 0.1,  placeholder: "100" },
+  { value: "preroll", label: "Pre-roll", unidad: "u",  step: 1,    placeholder: "10" },
+  { value: "aceite",  label: "Aceite",   unidad: "ml", step: 0.1,  placeholder: "50" },
+  { value: "extracto",label: "Extracto", unidad: "ml", step: 0.1,  placeholder: "30" },
+  { value: "capsula", label: "Cápsula",  unidad: "u",  step: 1,    placeholder: "30" },
+  { value: "crema",   label: "Crema",    unidad: "g",  step: 1,    placeholder: "100" },
+  { value: "otro",    label: "Otro",     unidad: "g",  step: 0.1,  placeholder: "100" },
+]
+const productoActual = computed(() => PRODUCTOS.find(p => p.value === stockForm.value.producto) || PRODUCTOS[0])
 
 const CICLO_META = {
   semilla:    { label: 'Semilla',    color: '#a16207', bg: 'rgba(161,98,7,.12)',    dot: '#ca8a04' },
@@ -49,7 +59,7 @@ function cicloMeta(ciclo) { return CICLO_META[ciclo] || CICLO_META.vegetativo }
 
 function emptyForm() {
   return { nombre: '', tipo: 'produccion', direccion: '', ciudad: '',
-    provincia: '', pais: 'Argentina', declarada_reprocann: false, notas: '' }
+    provincia: '', declarada_reprocann: false, notas: '' }
 }
 const form       = ref(emptyForm())
 const formErrors = ref({})
@@ -511,10 +521,6 @@ function tieneActividad(sede) {
                 <label class="form-label">Provincia</label>
                 <input v-model.trim="form.provincia" class="form-input" placeholder="CABA" />
               </div>
-              <div class="form-group">
-                <label class="form-label">País</label>
-                <input v-model.trim="form.pais" class="form-input" />
-              </div>
               <div class="form-group form-group--full">
                 <label class="form-label">Notas</label>
                 <textarea v-model.trim="form.notas" class="form-input form-textarea" rows="2" placeholder="Observaciones, horarios, responsable…"></textarea>
@@ -583,10 +589,33 @@ function tieneActividad(sede) {
               <p class="empty-state__desc">Sin stock en esta sede</p>
             </div>
             <div v-else class="inv-grid">
-              <div v-for="item in inventarioData" :key="item.id" class="inv-card" :class="{ 'inv-card--low': item.stock_bajo }">
+              <div v-for="item in inventarioData" :key="item.id" class="inv-card" :class="{ 'inv-card--low': item.stock_bajo, 'inv-card--ok': !item.stock_bajo }">
+                <div class="inv-card__header">
+                  <div class="inv-card__producto-icon">
+                    <i class="bi" :class="item.producto === 'flores' ? 'bi-flower2' : item.producto === 'aceite' ? 'bi-droplet' : item.producto === 'extracto' ? 'bi-eyedropper' : 'bi-box-seam'"></i>
+                  </div>
+                  <span v-if="item.stock_bajo" class="inv-card__badge inv-card__badge--warn">
+        <i class="bi bi-exclamation-triangle-fill"></i> Stock bajo
+      </span>
+                  <span v-else class="inv-card__badge inv-card__badge--ok">
+        <i class="bi bi-check-circle-fill"></i> OK
+      </span>
+                </div>
                 <div class="inv-card__producto">{{ item.producto_label }}</div>
-                <div class="inv-card__stock">{{ item.stock_gramos }}g</div>
-                <div v-if="item.stock_bajo" class="inv-card__alerta">⚠ Stock bajo</div>
+                <div class="inv-card__stock">
+                  {{ Number(item.stock_gramos).toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}
+                  <span class="inv-card__unit">g</span>
+                </div>
+                <div v-if="item.stock_minimo" class="inv-card__bar-wrap">
+                  <div class="inv-card__bar"
+                       :style="{ width: `${Math.min(100, (item.stock_gramos / item.stock_minimo) * 50)}%` }"
+                       :class="item.stock_bajo ? 'inv-card__bar--low' : 'inv-card__bar--ok'">
+                  </div>
+                </div>
+                <div class="inv-card__meta">
+                  <span v-if="item.stock_minimo">Mínimo: {{ item.stock_minimo }}g</span>
+                  <span>{{ new Date(item.updated_at).toLocaleDateString('es-AR', { day:'numeric', month:'short' }) }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -606,19 +635,37 @@ function tieneActividad(sede) {
           </div>
           <div class="modal-panel__body">
             <div class="form-grid">
-              <div class="form-group">
+              <div class="form-group form-group--full">
                 <label class="form-label">Producto</label>
-                <select v-model="stockForm.producto" class="form-input">
-                  <option value="flores">Flores</option>
-                  <option value="aceite">Aceite</option>
-                  <option value="extracto">Extracto</option>
-                  <option value="crema">Crema</option>
-                  <option value="otro">Otro</option>
-                </select>
+                <div class="stock-productos">
+                  <button
+                    v-for="p in PRODUCTOS" :key="p.value" type="button"
+                    class="stock-producto-btn"
+                    :class="{ 'stock-producto-btn--active': stockForm.producto === p.value }"
+                    @click="stockForm.producto = p.value; stockForm.cantidad = null"
+                  >
+                    <i class="bi" :class="p.value === 'flores' ? 'bi-flower2' : p.value === 'preroll' ? 'bi-cannabis' : p.value === 'aceite' || p.value === 'extracto' ? 'bi-droplet' : p.value === 'capsula' ? 'bi-capsule' : p.value === 'crema' ? 'bi-jar' : 'bi-box-seam'"></i>
+                    {{ p.label }}
+                  </button>
+                </div>
               </div>
-              <div class="form-group">
-                <label class="form-label">Cantidad (gramos)</label>
-                <input v-model.number="stockForm.cantidad" type="number" step="0.1" min="0.1" class="form-input" placeholder="100" />
+              <div class="form-group form-group--full">
+                <label class="form-label">
+                  Cantidad
+                  <span class="stock-unidad-badge">{{ productoActual.unidad }}</span>
+                </label>
+                <div class="stock-cantidad-wrap">
+                  <input
+                    v-model.number="stockForm.cantidad"
+                    type="number"
+                    :step="productoActual.step"
+                    min="0.1"
+                    class="form-input stock-cantidad-input"
+                    :placeholder="productoActual.placeholder"
+                  />
+                  <span class="stock-cantidad-suffix">{{ productoActual.unidad }}</span>
+                </div>
+                <span class="form-hint">{{ productoActual.label }} se mide en {{ productoActual.unidad === 'g' ? 'gramos' : productoActual.unidad === 'ml' ? 'mililitros' : 'unidades' }}</span>
               </div>
               <div class="form-group form-group--full">
                 <label class="form-label">Motivo</label>
@@ -1106,8 +1153,8 @@ function tieneActividad(sede) {
 .page-subtitle { font-size: .875rem; color: #64748b; margin: 0; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .plan-badge { font-size: .7rem; font-weight: 600; padding: .2em .6em; border-radius: 999px; text-transform: uppercase; letter-spacing: .04em; }
 
-.btn-primary-action { display: inline-flex; align-items: center; gap: .4rem; background: #0f172a; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s, transform .1s; text-decoration: none; white-space: nowrap; }
-.btn-primary-action:hover { background: #1e293b; transform: translateY(-1px); }
+.btn-primary-action { display: inline-flex; align-items: center; gap: .4rem; background: var(--brand-primary, #1b5e20); color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s, transform .1s; text-decoration: none; white-space: nowrap; }
+.btn-primary-action:hover { background: #144a18; transform: translateY(-1px); }
 .btn-primary-action--sm { padding: .45rem .9rem; font-size: .8rem; }
 .btn-ghost { background: transparent; color: #64748b; border: 1px solid #e2e8f0; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 500; cursor: pointer; transition: all .15s; }
 .btn-ghost:hover { background: #f8fafc; color: #0f172a; }
@@ -1161,8 +1208,8 @@ function tieneActividad(sede) {
 .sede-card__stat-label { font-size: .72rem; color: #94a3b8; font-weight: 500; }
 .sede-card__actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: auto; }
 .sede-card__btn { display: inline-flex; align-items: center; gap: .35rem; padding: .45rem .8rem; border-radius: 7px; font-size: .78rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; text-decoration: none; white-space: nowrap; }
-.sede-card__btn--primary { background: #0f172a; color: #fff; margin-left: auto; }
-.sede-card__btn--primary:hover { background: #1e293b; }
+.sede-card__btn--primary { background: var(--brand-primary, #1b5e20); color: #fff; margin-left: auto; }
+.sede-card__btn--primary:hover { background: #144a18; }
 .sede-card__btn--secondary { background: #eff6ff; color: #1d4ed8; }
 .sede-card__btn--secondary:hover { background: #dbeafe; }
 .sede-card__btn--ghost { background: #f1f5f9; color: #475569; }
@@ -1194,7 +1241,7 @@ function tieneActividad(sede) {
 .form-label { font-size: .8rem; font-weight: 600; color: #374151; }
 .required { color: #dc2626; }
 .form-input { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .6rem .85rem; font-size: .875rem; color: #0f172a; transition: border .15s, box-shadow .15s; width: 100%; box-sizing: border-box; }
-.form-input:focus { outline: none; border-color: #0f172a; box-shadow: 0 0 0 3px rgba(15,23,42,.08); background: #fff; }
+.form-input:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); background: #fff; }
 .form-input--error { border-color: #dc2626; }
 .form-textarea { resize: vertical; min-height: 70px; }
 .form-error { font-size: .75rem; color: #dc2626; }
@@ -1205,22 +1252,46 @@ function tieneActividad(sede) {
 .form-toggle { display: flex; align-items: center; gap: .75rem; cursor: pointer; }
 .form-toggle__input { display: none; }
 .form-toggle__track { width: 40px; height: 22px; background: #e2e8f0; border-radius: 999px; position: relative; transition: background .2s; flex-shrink: 0; }
-.form-toggle__input:checked + .form-toggle__track { background: #0f172a; }
+.form-toggle__input:checked + .form-toggle__track { background: var(--brand-primary, #1b5e20); }
 .form-toggle__thumb { position: absolute; width: 16px; height: 16px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 .form-toggle__input:checked + .form-toggle__track .form-toggle__thumb { left: 21px; }
 .form-toggle__label { font-size: .875rem; font-weight: 600; color: #0f172a; }
 .form-toggle__hint { font-size: .75rem; color: #94a3b8; }
 
-.inv-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); gap: .75rem; }
-.inv-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; text-align: center; }
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+.inv-card { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 1.1rem; display: flex; flex-direction: column; gap: .5rem; transition: box-shadow .15s; }
+.inv-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.07); }
 .inv-card--low { border-color: #fca5a5; background: #fff5f5; }
-.inv-card__producto { font-size: .75rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .4rem; }
-.inv-card__stock { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
-.inv-card__alerta { font-size: .7rem; color: #dc2626; margin-top: .3rem; }
+.inv-card--ok  { border-color: #bbf7d0; }
+.inv-card__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .25rem; }
+.inv-card__producto-icon { width: 32px; height: 32px; border-radius: 8px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; color: #475569; font-size: .9rem; }
+.inv-card--low .inv-card__producto-icon { background: #fef2f2; color: #dc2626; }
+.inv-card--ok  .inv-card__producto-icon { background: #f0fdf4; color: #15803d; }
+.inv-card__badge { display: inline-flex; align-items: center; gap: .25rem; font-size: .65rem; font-weight: 700; padding: .2em .5em; border-radius: 5px; }
+.inv-card__badge--warn { background: #fef2f2; color: #dc2626; }
+.inv-card__badge--ok   { background: #f0fdf4; color: #15803d; }
+.inv-card__producto { font-size: .72rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.inv-card__stock { font-size: 2rem; font-weight: 800; color: #0f172a; line-height: 1; letter-spacing: -.04em; }
+.inv-card__unit { font-size: 1rem; font-weight: 500; color: #94a3b8; }
+.inv-card__bar-wrap { height: 4px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.inv-card__bar { height: 100%; border-radius: 999px; transition: width .4s; }
+.inv-card__bar--ok  { background: #15803d; }
+.inv-card__bar--low { background: #dc2626; }
+.inv-card__meta { display: flex; justify-content: space-between; font-size: .68rem; color: #94a3b8; margin-top: .1rem; }
 
 .upgrade-body { text-align: center; padding: 1rem; }
 .upgrade-icon { font-size: 3rem; margin-bottom: 1rem; }
 .upgrade-title { font-size: 1.25rem; font-weight: 700; color: #0f172a; margin-bottom: .5rem; }
 .upgrade-desc { color: #64748b; font-size: .875rem; margin-bottom: 1.5rem; }
 .text-muted-sm { font-size: .85rem; color: #64748b; margin-top: .25rem; }
+
+.stock-productos { display: flex; flex-wrap: wrap; gap: .4rem; }
+.stock-producto-btn { display: inline-flex; align-items: center; gap: .35rem; padding: .45rem .8rem; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #f8fafc; color: #475569; font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.stock-producto-btn:hover { border-color: #94a3b8; background: #f1f5f9; }
+.stock-producto-btn--active { border-color: var(--brand-primary, #1b5e20); background: rgba(27,94,32,.08); color: var(--brand-primary, #1b5e20); }
+.stock-unidad-badge { display: inline-block; background: #f1f5f9; color: #475569; font-size: .68rem; font-weight: 700; padding: .15em .5em; border-radius: 5px; margin-left: .4rem; text-transform: uppercase; }
+.stock-cantidad-wrap { display: flex; align-items: center; gap: 0; }
+.stock-cantidad-input { border-radius: 9px 0 0 9px !important; }
+.stock-cantidad-suffix { background: #f1f5f9; border: 1.5px solid #e2e8f0; border-left: none; border-radius: 0 9px 9px 0; padding: .65rem .875rem; font-size: .875rem; font-weight: 700; color: #475569; white-space: nowrap; }
+.form-hint { font-size: .72rem; color: #94a3b8; margin-top: .1rem; }
 </style>
