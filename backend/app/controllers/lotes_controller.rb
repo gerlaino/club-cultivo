@@ -6,14 +6,12 @@ class LotesController < ApplicationController
 
   # GET /lotes o GET /salas/:sala_id/lotes
   def index
-    lotes = current_user.club.lotes.includes(:sala)
+    lotes = current_user.club.lotes.includes(:sala, :genetica)
+    lotes = lotes.where(sala_id: @sala.id) if @sala.present?
 
-    # Cultivador solo ve lotes de sus salas asignadas
     if current_user.cultivador?
       salas_ids = current_user.salas_ids_asignadas
-      if salas_ids.empty?
-        return render json: []
-      end
+      return render json: [] if salas_ids.empty?
       lotes = lotes.where(sala_id: salas_ids)
     end
 
@@ -31,7 +29,6 @@ class LotesController < ApplicationController
     @lote = @sala.lotes.build(lote_params)
     @lote.club = current_user.club
 
-    # Verificar capacidad de la sala si se especifican plantas iniciales
     plantas_iniciales = lote_params[:plants_count].to_i
     if plantas_iniciales > 0 && @sala.plants_max.to_i > 0
       disponible = @sala.capacidad_disponible
@@ -43,7 +40,20 @@ class LotesController < ApplicationController
     end
 
     if @lote.save
-      render json: serialize_lote(@lote), status: :created
+      # Crear registros de plantas automáticamente
+      if plantas_iniciales > 0
+        state_inicial = estado_a_state(@lote.estado)
+        plantas_iniciales.times do |i|
+          numero = (i + 1).to_s.rjust(3, '0')
+          @lote.plants.create!(
+            nombre:    "#{@lote.codigo}-P#{numero}",
+            state:     state_inicial,
+            genetica:  @lote.genetica,
+            )
+        end
+      end
+
+      render json: serialize_lote(@lote, include_plants: true), status: :created
     else
       render json: { errors: @lote.errors.full_messages }, status: :unprocessable_entity
     end
@@ -66,6 +76,17 @@ class LotesController < ApplicationController
 
   private
 
+  def estado_a_state(estado)
+    {
+      'semilla'    => 'germinacion',
+      'vegetativo' => 'vegetativo',
+      'floracion'  => 'floracion',
+      'cosecha'    => 'cosechado',
+      'curado'     => 'cosechado',
+      'finalizado' => 'cosechado',
+    }[estado] || 'vegetativo'
+  end
+
   def set_sala
     @sala = current_user.club.salas.find(params[:sala_id])
   rescue ActiveRecord::RecordNotFound
@@ -81,7 +102,7 @@ class LotesController < ApplicationController
   def lote_params
     params.require(:lote).permit(
       :codigo, :start_date, :estado, :plants_count, :strain, :notes,
-      :grow_type, :light_type
+      :grow_type, :light_type, :genetica_id
     )
   end
 
@@ -93,30 +114,34 @@ class LotesController < ApplicationController
 
   def serialize_lote(lote, include_plants: false)
     result = {
-      id: lote.id,
-      sala_id: lote.sala_id,
-      codigo: lote.codigo,
-      estado: lote.estado,
-      start_date: lote.start_date,
-      plants_count: lote.plants_count,
-      strain: lote.strain,
-      notes: lote.notes,
-      grow_type: lote.grow_type,
-      light_type: lote.light_type,
+      id:                lote.id,
+      sala_id:           lote.sala_id,
+      codigo:            lote.codigo,
+      estado:            lote.estado,
+      start_date:        lote.start_date,
+      plants_count:      lote.plants_count,
+      strain:            lote.strain,
+      notes:             lote.notes,
+      grow_type:         lote.grow_type,
+      light_type:        lote.light_type,
+      genetica_id:       lote.genetica_id,
+      genetica:          lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, registrada_inase: lote.genetica.registrada_inase } : nil,
       dias_desde_inicio: lote.dias_desde_inicio,
-      progreso_ciclo: lote.progreso_ciclo,
+      progreso_ciclo:    lote.progreso_ciclo,
       costo_por_gramo:   lote.costo_lote&.costo_por_gramo&.to_f,
       tiene_costo:       lote.costo_lote.present?,
       sala: {
-        id: lote.sala.id,
-        nombre: lote.sala.nombre
+        id:     lote.sala.id,
+        nombre: lote.sala.nombre,
       },
       created_at: lote.created_at,
-      updated_at: lote.updated_at
+      updated_at: lote.updated_at,
     }
 
     if include_plants
-      result[:plants] = lote.plants.map { |p| { id: p.id, codigo_qr: p.codigo_qr, state: p.state } }
+      result[:plants] = lote.plants.order(:nombre).map { |p|
+        { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, state: p.state }
+      }
     end
 
     result

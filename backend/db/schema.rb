@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_03_222256) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_04_192713) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -180,6 +180,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_03_222256) do
     t.integer "rendimiento"
     t.integer "altura"
     t.string "dificultad"
+    t.boolean "registrada_inase"
+    t.string "criador"
+    t.string "terpenos"
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
     t.index ["club_id"], name: "index_geneticas_on_club_id"
@@ -271,6 +274,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_03_222256) do
     t.string "sustrato_especifico"
     t.string "fotoperiodo"
     t.integer "semanas_floracion"
+    t.integer "genetica_id"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["estado"], name: "index_lotes_on_estado"

@@ -1,8 +1,7 @@
 class Lote < ApplicationRecord
-
   belongs_to :club
   belongs_to :sala
-
+  belongs_to :genetica, optional: true
   has_many :plants,                dependent: :destroy
   has_one  :costo_lote,            dependent: :destroy
   has_many :movimientos_contables, dependent: :nullify
@@ -48,4 +47,18 @@ class Lote < ApplicationRecord
     else 0
     end
   end
+
+  private
+
+  def generar_codigo
+    return if codigo.present?
+    base  = "L"
+    anio  = Date.today.strftime("%y")
+    count = club.lotes.count + 1
+    self.codigo = "#{base}-#{anio}-#{count.to_s.rjust(3, '0')}"
+    while club.lotes.exists?(codigo: self.codigo)
+      count += 1
+      self.codigo = "#{base}-#{anio}-#{count.to_s.rjust(3, '0')}"
+    end
   end
+end

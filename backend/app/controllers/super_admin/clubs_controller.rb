@@ -14,6 +14,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     club = Club.new(club_params)
     if club.save
       usuarios = club.crear_usuarios_default!
+      club.crear_geneticas_default!
       render json: {
         club:     serialize_club_detail(club),
         usuarios: usuarios.map { |u| { id: u.id, email: u.email, role: u.role } }
@@ -32,6 +33,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   end
 
   def crear_usuarios_default
+    @club.crear_geneticas_default!
     usuarios = @club.crear_usuarios_default!
     render json: { usuarios: usuarios.map { |u| { id: u.id, email: u.email, role: u.role } } }
   end
