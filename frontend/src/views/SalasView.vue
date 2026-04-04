@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from "vue";
 import { useSalasStore } from "../stores/salas";
 import { useAuthStore } from "../stores/auth";
 import { listSedes } from "../lib/api";
+import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
 
 const salas = useSalasStore();
 const auth  = useAuthStore();
@@ -170,7 +171,7 @@ async function doDelete() {
         <h1 class="h3 fw-bold mb-1">Salas de cultivo</h1>
         <p class="text-muted small mb-0">Gestioná los espacios físicos del club</p>
       </div>
-      <button v-if="canEdit" class="btn btn-primary d-flex align-items-center gap-2" @click="showCreate = true">
+      <button v-if="canEdit" class="btn btn-success d-flex align-items-center gap-2" @click="showCreate = true">
         <span class="fs-5 lh-1">＋</span> Nueva sala
       </button>
     </div>
@@ -330,7 +331,7 @@ async function doDelete() {
 
             <!-- Acciones -->
             <div class="d-flex gap-2 mt-auto pt-2 border-top">
-              <RouterLink class="btn btn-sm btn-primary flex-fill" :to="{ name: 'sala-detail', params: { id: s.id } }">
+              <RouterLink class="btn btn-sm btn-success flex-fill" :to="{ name: 'sala-detail', params: { id: s.id } }">
                 Ver detalle
               </RouterLink>
               <template v-if="canEdit">
@@ -386,7 +387,7 @@ async function doDelete() {
             <td class="small text-muted">{{ s.created_by_name || "—" }}</td>
             <td class="text-end">
               <div class="d-flex gap-1 justify-content-end">
-                <RouterLink class="btn btn-sm btn-outline-primary" :to="{ name: 'sala-detail', params: { id: s.id } }">Ver</RouterLink>
+                <RouterLink class="btn btn-sm btn-outline-success" :to="{ name: 'sala-detail', params: { id: s.id } }">Ver</RouterLink>
                 <template v-if="canEdit">
                   <button class="btn btn-sm btn-outline-secondary" @click="startEdit(s)">✏️</button>
                   <button class="btn btn-sm btn-outline-danger" @click="confirmDelete(s)">🗑️</button>
@@ -414,74 +415,11 @@ async function doDelete() {
       </ul>
     </nav>
 
-    <!-- ===== MODAL Crear ===== -->
-    <div class="modal fade" :class="{ show: showCreate }" :style="{ display: showCreate ? 'block':'none' }" tabindex="-1" aria-modal="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Nueva sala</h5>
-            <button class="btn-close" @click="showCreate=false; resetCreate()"></button>
-          </div>
-          <div class="modal-body">
-            <div v-if="salas.createError" class="alert alert-danger">{{ salas.createError }}</div>
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label">Nombre <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" v-model.trim="createForm.nombre"
-                       :class="{ 'is-invalid': createErrors.nombre }" placeholder="Ej: Sala A — Vegetativo" />
-                <div class="invalid-feedback">{{ createErrors.nombre }}</div>
-              </div>
-              <div class="col-6">
-                <label class="form-label">Estado</label>
-                <select class="form-select" v-model="createForm.state" :class="{ 'is-invalid': createErrors.state }">
-                  <option value="activa">Activa</option>
-                  <option value="mantenimiento">Mantenimiento</option>
-                  <option value="cerrada">Cerrada</option>
-                </select>
-                <div class="invalid-feedback">{{ createErrors.state }}</div>
-              </div>
-              <div class="col-6">
-                <label class="form-label">Tipo de sala</label>
-                <select class="form-select" v-model="createForm.kind">
-                  <option value="">Sin especificar</option>
-                  <option value="vegetativo">Vegetativo</option>
-                  <option value="floracion">Floración</option>
-                  <option value="mixta">Mixta</option>
-                  <option value="madre">Madres</option>
-                  <option value="clon">Clones</option>
-                </select>
-              </div>
-              <div class="col-12">
-                <label class="form-label">Capacidad máx. (plantas)</label>
-                <input type="number" min="0" max="9999" step="1" class="form-control"
-                       v-model.number="createForm.pots_count" :class="{ 'is-invalid': createErrors.pots_count }" />
-                <div class="invalid-feedback">{{ createErrors.pots_count }}</div>
-              </div>
-              <div class="col-12">
-                <label class="form-label">Sede</label>
-                <select class="form-select" v-model="createForm.sede_id">
-                  <option :value="null">Sin sede asignada</option>
-                  <option v-for="sede in sedes" :key="sede.id" :value="sede.id">
-                    {{ sede.nombre }} — {{ sede.tipo_label }}
-                  </option>
-                </select>
-              </div>
-              <div class="col-12">
-                <label class="form-label">Notas</label>
-                <textarea class="form-control" rows="2" v-model.trim="createForm.notes" placeholder="Observaciones opcionales…"></textarea>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-outline-secondary" :disabled="salas.creating" @click="showCreate=false; resetCreate()">Cancelar</button>
-            <button class="btn btn-primary" :disabled="salas.creating" @click="submitCreate">
-              <span v-if="salas.creating" class="spinner-border spinner-border-sm me-2"></span>Crear sala
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-backdrop fade" :class="{ show: showCreate }" v-if="showCreate" @click="showCreate=false; resetCreate()"></div>
+    <ModalCrearSala
+      v-if="showCreate"
+      @close="showCreate = false; resetCreate()"
+      @created="salas.fetch(); showCreate = false; resetCreate()"
+    />
 
     <!-- ===== MODAL Editar ===== -->
     <div class="modal fade" :class="{ show: showEdit }" :style="{ display: showEdit ? 'block':'none' }" tabindex="-1" aria-modal="true">
@@ -543,7 +481,7 @@ async function doDelete() {
           </div>
           <div class="modal-footer">
             <button class="btn btn-outline-secondary" :disabled="salas.updating" @click="showEdit=false">Cancelar</button>
-            <button class="btn btn-primary" :disabled="salas.updating" @click="submitEdit">
+            <button class="btn btn-success" :disabled="salas.updating" @click="submitEdit">
               <span v-if="salas.updating" class="spinner-border spinner-border-sm me-2"></span>Guardar cambios
             </button>
           </div>

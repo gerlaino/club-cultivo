@@ -31,6 +31,17 @@ class LotesController < ApplicationController
     @lote = @sala.lotes.build(lote_params)
     @lote.club = current_user.club
 
+    # Verificar capacidad de la sala si se especifican plantas iniciales
+    plantas_iniciales = lote_params[:plants_count].to_i
+    if plantas_iniciales > 0 && @sala.plants_max.to_i > 0
+      disponible = @sala.capacidad_disponible
+      if plantas_iniciales > disponible
+        return render json: {
+          errors: ["La sala '#{@sala.nombre}' solo tiene capacidad para #{disponible} plantas más (máx: #{@sala.plants_max})"]
+        }, status: :unprocessable_entity
+      end
+    end
+
     if @lote.save
       render json: serialize_lote(@lote), status: :created
     else

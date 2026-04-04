@@ -22,8 +22,16 @@ class PlantsController < ApplicationController
   # POST /plants
   def create
     lote  = current_user.club.lotes.find(params[:plant][:lote_id])
-    plant = lote.plants.build(plant_params)
+    sala  = lote.sala
 
+    # Verificar capacidad de la sala
+    if sala && sala.capacidad_disponible == 0 && (sala.plants_max.to_i > 0 || sala.pots_count.to_i > 0)
+      return render json: {
+        errors: ["La sala '#{sala.nombre}' está al límite de su capacidad (#{sala.plants_max || sala.pots_count} plantas)"]
+      }, status: :unprocessable_entity
+    end
+
+    plant = lote.plants.build(plant_params)
     if plant.save
       lote.increment!(:plants_count)
       render json: serialize_plant(plant), status: :created
