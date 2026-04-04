@@ -5,8 +5,7 @@ import { useSalasStore } from "../stores/salas"
 import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
 import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
-import ModalTarea from '../components/ModalTarea.vue'
-import { listUsers } from '../lib/api.js'
+import { listGeneticas, updateSala } from '../lib/api.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -22,37 +21,18 @@ const canEdit      = computed(() => auth.role === "admin")
 const isCultivador = computed(() => auth.role === "cultivador")
 
 const lotesExpanded = ref(true)
-const fotosExpanded = ref(false)
 
-const ESTADOS_LOTE = ["planificacion","vegetativo","floracion","secado","cosechado","finalizado"]
-const DIAS_CICLO   = { planificacion:7, vegetativo:45, floracion:65, secado:10, cosechado:0, finalizado:0 }
+const ESTADOS_LOTE = ["semilla","vegetativo","floracion","cosecha","curado","finalizado"]
+const DIAS_CICLO   = { semilla:7, vegetativo:45, floracion:65, cosecha:10, curado:14, finalizado:0 }
 
-const showModalTarea    = ref(false)
-const usuariosParaTarea = ref([])
-const lotesParaTarea    = computed(() => items.value)
-
-async function abrirModalTarea() {
-  showModalTarea.value = true
-  if (usuariosParaTarea.value.length === 0) {
-    try {
-      const res = await listUsers()
-      usuariosParaTarea.value = res.data?.data || []
-    } catch {}
-  }
-}
-const tareaInicialConSala = computed(() => ({ sala_id: salaId }))
-
-function emptyLoteForm() {
-  return { codigo:"", estado:"vegetativo", plants_count:0, start_date:new Date().toISOString().slice(0,10), strain:"", grow_type:"sustrato", light_type:"", notes:"" }
-}
-const showCreate = ref(false)
-const loteForm   = ref(emptyLoteForm())
-const loteErrors = ref({})
-
+// ── Genéticas ──────────────────────────────────────────────
+const geneticas = ref([])
 onMounted(async () => {
   try {
     await salas.fetchSala(salaId)
     await lotes.fetchBySala(salaId)
+    const res = await listGeneticas({ activa: true })
+    geneticas.value = res.data || []
   } catch { error.value = "No se pudo cargar la sala." }
   finally  { loading.value = false }
 })
@@ -60,6 +40,27 @@ onMounted(async () => {
 const sala  = computed(() => salas.currentSala)
 const items = computed(() => lotes.bySala(salaId))
 
+// ── Cambiar estado de sala ──────────────────────────────────
+const cambiandoEstado = ref(false)
+const ESTADOS_SALA = [
+  { value: 'activa',        label: 'Activa',          style: 'background:#dcfce7;color:#15803d' },
+  { value: 'mantenimiento', label: 'En mantenimiento', style: 'background:#fef3c7;color:#b45309' },
+  { value: 'cerrada',       label: 'Cerrada',          style: 'background:#f1f5f9;color:#64748b' },
+]
+async function cambiarEstado(nuevoEstado) {
+  if (!sala.value || sala.value.state === nuevoEstado) return
+  cambiandoEstado.value = true
+  try {
+    await updateSala(salaId, { state: nuevoEstado })
+    await salas.fetchSala(salaId)
+  } catch (e) {
+    console.error('Error cambiando estado:', e)
+  } finally {
+    cambiandoEstado.value = false
+  }
+}
+
+// ── KPIs ───────────────────────────────────────────────────
 const kpis = computed(() => {
   const ls = items.value
   return {
@@ -71,16 +72,16 @@ const kpis = computed(() => {
 })
 
 const ESTADO_META = {
-  semilla:       { label:"Semilla/Esqueje", color:"#64748b", emoji:"📋" },
-  vegetativo:    { label:"Vegetativo",    color:"#16a34a", emoji:"🌱" },
-  floracion:     { label:"Floración",     color:"#d97706", emoji:"🌸" },
-  cosecha:       { label:"Cosecha",        color:"#92400e", emoji:"✂️" },
-  curado:        { label:"Curado",     color:"#2563eb", emoji:"🍂"  },
-  finalizado:    { label:"Finalizado",    color:"#1b5e20", emoji:"✅" },
+  semilla:    { label:"Semilla/Esqueje", color:"#64748b", emoji:"📋" },
+  vegetativo: { label:"Vegetativo",      color:"#16a34a", emoji:"🌱" },
+  floracion:  { label:"Floración",       color:"#d97706", emoji:"🌸" },
+  cosecha:    { label:"Cosecha",         color:"#92400e", emoji:"✂️" },
+  curado:     { label:"Curado",          color:"#2563eb", emoji:"🍂" },
+  finalizado: { label:"Finalizado",      color:"#1b5e20", emoji:"✅" },
 }
 function estadoMeta(e) { return ESTADO_META[e] || { label:e, color:"#64748b", emoji:"📦" } }
 function growLabel(g)  { return { sustrato:"Sustrato", hidroponia:"Hidroponia", aeroponia:"Aeroponia" }[g] || g || "—" }
-function kindLabel(k)  { return { produccion:"Producción", social:"Social", mixta:"Mixta" }[k] || k || "—" }
+function kindLabel(k)  { return { vegetativo:"Vegetativo", floracion:"Floración", mixta:"Mixta", madre:"Madres", clon:"Clones" }[k] || k || "—" }
 
 function salaEstadoStyle(state) {
   return { activa:{bg:"#dcfce7",color:"#15803d"}, mantenimiento:{bg:"#fef3c7",color:"#b45309"}, cerrada:{bg:"#f1f5f9",color:"#64748b"} }[state] || {bg:"#f1f5f9",color:"#64748b"}
@@ -105,7 +106,7 @@ function progresoCiclo(lote) {
 }
 
 const itemsSorted = computed(() => {
-  const order = ["vegetativo","floracion","planificacion","secado","cosechado","finalizado"]
+  const order = ["vegetativo","floracion","semilla","cosecha","curado","finalizado"]
   return [...items.value].sort((a,b) => order.indexOf(a.estado) - order.indexOf(b.estado))
 })
 
@@ -116,20 +117,42 @@ const breadcrumbs = computed(() => {
   return crumbs
 })
 
+// ── Crear lote ─────────────────────────────────────────────
+const showCreate = ref(false)
+const loteForm   = ref(emptyLoteForm())
+const loteErrors = ref({})
+
+function emptyLoteForm() {
+  return { estado:"vegetativo", plants_count:0, start_date:new Date().toISOString().slice(0,10), genetica_id:"", grow_type:"sustrato", light_type:"", tamanio_maceta:"", notes:"" }
+}
+
+// Validación con capacidad de sala
 function validateLote(form) {
   const e = {}
-  if (!form.codigo?.trim()) e.codigo = "El código es obligatorio"
   if (!ESTADOS_LOTE.includes(form.estado)) e.estado = "Estado inválido"
   const n = Number(form.plants_count)
-  if (!Number.isInteger(n) || n < 0 || n > 5000) e.plants_count = "Debe ser 0–5000"
+  if (!Number.isInteger(n) || n < 0 || n > 5000) {
+    e.plants_count = "Debe ser 0–5000"
+  } else if (sala.value && n > 0) {
+    const cap = sala.value.plants_max || sala.value.pots_count || 0
+    const actual = sala.value.plantas_totales ?? kpis.value.totalPlantas
+    const disponible = cap - actual
+    if (cap > 0 && n > disponible) {
+      e.plants_count = `La sala solo tiene capacidad para ${disponible} plantas más (cap: ${cap}, actual: ${actual})`
+    }
+  }
   return e
 }
+
 async function createLote() {
   const e = validateLote(loteForm.value)
   loteErrors.value = e
   if (Object.keys(e).length) return
   try {
-    await lotes.createInSala(salaId, { ...loteForm.value })
+    const payload = { ...loteForm.value }
+    if (!payload.genetica_id) delete payload.genetica_id
+    if (!payload.light_type)  delete payload.light_type
+    await lotes.createInSala(salaId, payload)
     closeCreate()
     lotesExpanded.value = true
   } catch {}
@@ -139,12 +162,21 @@ function closeCreate() {
   loteForm.value   = emptyLoteForm()
   loteErrors.value = {}
 }
+
+// Capacidad disponible para el formulario
+const capacidadDisponible = computed(() => {
+  if (!sala.value) return null
+  const cap = sala.value.plants_max || sala.value.pots_count || 0
+  if (!cap) return null
+  const usadas = sala.value.plantas_totales ?? kpis.value.totalPlantas
+  return cap - usadas
+})
 </script>
 
 <template>
   <div class="sd">
 
-    <!-- Breadcrumb — solo no cultivadores -->
+    <!-- Breadcrumb -->
     <nav v-if="breadcrumbs.length > 0" class="sd__breadcrumb">
       <template v-for="(crumb, i) in breadcrumbs" :key="i">
         <RouterLink :to="crumb.to" class="sd__breadcrumb-link">{{ crumb.label }}</RouterLink>
@@ -164,7 +196,30 @@ function closeCreate() {
         <div class="sd__hero-left">
           <div class="sd__hero-title-row">
             <h1 class="sd__title">{{ sala.nombre }}</h1>
-            <span class="sd__estado-pill" :style="{ background: salaEstadoStyle(sala.state).bg, color: salaEstadoStyle(sala.state).color }">{{ sala.state }}</span>
+            <!-- Estado con dropdown para cambiar -->
+            <div class="sd__estado-wrap" v-if="canEdit">
+              <div class="sd__estado-dropdown">
+                <span class="sd__estado-pill" :style="{ background: salaEstadoStyle(sala.state).bg, color: salaEstadoStyle(sala.state).color }">
+                  {{ sala.state }} <i class="bi bi-chevron-down" style="font-size:.6rem"></i>
+                </span>
+                <div class="sd__estado-menu">
+                  <button
+                    v-for="est in ESTADOS_SALA"
+                    :key="est.value"
+                    class="sd__estado-option"
+                    :class="{ 'sd__estado-option--active': sala.state === est.value }"
+                    :style="sala.state === est.value ? est.style : ''"
+                    @click="cambiarEstado(est.value)"
+                    :disabled="cambiandoEstado"
+                  >
+                    {{ est.label }}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <span v-else class="sd__estado-pill" :style="{ background: salaEstadoStyle(sala.state).bg, color: salaEstadoStyle(sala.state).color }">
+              {{ sala.state }}
+            </span>
           </div>
           <p class="sd__subtitle">
             <span v-if="sala.kind">{{ kindLabel(sala.kind) }}</span>
@@ -179,7 +234,7 @@ function closeCreate() {
         </div>
       </div>
 
-      <!-- KPIs: Ocupación · Lotes activos · Plantas activas · Total lotes -->
+      <!-- KPIs -->
       <div class="sd__kpis">
         <div class="sd__kpi sd__kpi--accent">
           <div class="sd__kpi-icon">📊</div>
@@ -220,7 +275,7 @@ function closeCreate() {
       <div class="sd__layout">
         <div class="sd__main">
 
-          <!-- Lotes collapsable -->
+          <!-- Lotes -->
           <div class="sd__section">
             <button class="sd__section-toggle" @click="lotesExpanded = !lotesExpanded">
               <div class="sd__section-toggle-left">
@@ -268,24 +323,6 @@ function closeCreate() {
             </div>
           </div>
 
-          <!-- Fotos — en construcción -->
-          <div class="sd__section sd__section--mt">
-            <button class="sd__section-toggle" @click="fotosExpanded = !fotosExpanded">
-              <div class="sd__section-toggle-left">
-                <span class="sd__section-emoji">📷</span>
-                <span class="sd__section-title">Fotos de la sala</span>
-              </div>
-              <i class="bi sd__chevron" :class="fotosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-            </button>
-            <div v-show="fotosExpanded" class="sd__section-body">
-              <div class="sd__wip">
-                <div class="sd__wip-icon">🚧</div>
-                <div class="sd__wip-title">Sección en construcción</div>
-                <div class="sd__wip-desc">Las fotos se gestionarán desde cada lote. Próximamente disponible.</div>
-              </div>
-            </div>
-          </div>
-
         </div>
 
         <!-- Aside -->
@@ -295,18 +332,23 @@ function closeCreate() {
           <div class="sd__card">
             <div class="sd__card-header"><span class="sd__card-title">ℹ️ Información</span></div>
             <dl class="sd__dl">
-              <dt>Estado</dt><dd style="text-transform:capitalize">{{ sala.state }}</dd>
+              <dt>Estado</dt>
+              <dd>
+                <span class="sd__inline-badge" :style="salaEstadoStyle(sala.state).bg ? `background:${salaEstadoStyle(sala.state).bg};color:${salaEstadoStyle(sala.state).color}` : ''">
+                  {{ sala.state }}
+                </span>
+              </dd>
               <dt>Tipo</dt><dd>{{ kindLabel(sala.kind) }}</dd>
               <dt>Capacidad</dt><dd>{{ sala.pots_count ?? 0 }} plantas</dd>
               <dt>Sede</dt><dd>{{ sala.sede?.nombre || "—" }}</dd>
-              <dt>A cargo de</dt><dd>{{ sala.cultivadores?.map(c => c.nombre).join(', ') || sala.created_by_name || "—" }}</dd>
+              <dt>A cargo</dt><dd>{{ sala.cultivadores?.map(c => c.nombre).join(', ') || "—" }}</dd>
               <dt>Creado por</dt><dd>{{ sala.created_by_name || "—" }}</dd>
               <dt>Creado</dt><dd>{{ formatDate(sala.created_at) }}</dd>
               <dt>Actualizado</dt><dd>{{ formatDate(sala.updated_at) }}</dd>
             </dl>
           </div>
 
-          <!-- Cultivadores — solo admin/agricultor -->
+          <!-- Cultivadores -->
           <div v-if="!isCultivador" class="sd__card sd__card--mt">
             <div class="sd__card-header"><span class="sd__card-title">👨‍🌾 Cultivadores</span></div>
             <div class="sd__card-body">
@@ -318,18 +360,6 @@ function closeCreate() {
           <div v-if="sala.notes" class="sd__card sd__card--mt">
             <div class="sd__card-header"><span class="sd__card-title">📋 Notas</span></div>
             <div class="sd__card-notes">{{ sala.notes }}</div>
-          </div>
-
-          <!-- Nueva tarea — solo admin/agricultor -->
-          <div v-if="canEdit" class="sd__card sd__card--mt sd__card--cta">
-            <button class="sd__cta" @click="abrirModalTarea">
-              <i class="bi bi-plus-circle-fill sd__cta-icon"></i>
-              <div>
-                <div class="sd__cta-label">Nueva tarea</div>
-                <div class="sd__cta-hint">para esta sala</div>
-              </div>
-              <i class="bi bi-arrow-right sd__cta-arrow"></i>
-            </button>
           </div>
 
         </div>
@@ -349,16 +379,37 @@ function closeCreate() {
           </div>
           <div class="sd__modal-body">
             <div v-if="lotes.createError" class="sd__alert">{{ lotes.createError }}</div>
+
+            <!-- Alerta de capacidad -->
+            <div v-if="capacidadDisponible !== null" class="sd__capacity-bar">
+              <div class="sd__capacity-info">
+                <span>Capacidad disponible:</span>
+                <strong :style="capacidadDisponible <= 0 ? 'color:#dc2626' : capacidadDisponible <= 10 ? 'color:#d97706' : 'color:#16a34a'">
+                  {{ capacidadDisponible }} plantas
+                </strong>
+              </div>
+              <div class="sd__capacity-track">
+                <div class="sd__capacity-fill"
+                     :style="{
+                    width: Math.min(((sala.plantas_totales ?? kpis.totalPlantas) / (sala.plants_max || sala.pots_count)) * 100, 100) + '%',
+                    background: capacidadDisponible <= 0 ? '#dc2626' : capacidadDisponible <= 10 ? '#d97706' : '#16a34a'
+                  }">
+                </div>
+              </div>
+            </div>
+
             <div class="sd__grid">
               <div class="sd__field">
-                <label class="sd__label">Estado</label>
+                <label class="sd__label">Estado inicial</label>
                 <select class="sd__input" v-model="loteForm.estado">
                   <option v-for="e in ESTADOS_LOTE" :key="e" :value="e">{{ estadoMeta(e).label }}</option>
                 </select>
               </div>
               <div class="sd__field">
                 <label class="sd__label">Cantidad de plantas</label>
-                <input type="number" min="0" max="5000" step="1" class="sd__input" :class="{ 'sd__input--err': loteErrors.plants_count }" v-model.number="loteForm.plants_count" />
+                <input type="number" min="0" max="5000" step="1" class="sd__input"
+                       :class="{ 'sd__input--err': loteErrors.plants_count }"
+                       v-model.number="loteForm.plants_count" />
                 <span v-if="loteErrors.plants_count" class="sd__err-msg">{{ loteErrors.plants_count }}</span>
               </div>
               <div class="sd__field">
@@ -366,8 +417,13 @@ function closeCreate() {
                 <input type="date" class="sd__input" v-model="loteForm.start_date" />
               </div>
               <div class="sd__field">
-                <label class="sd__label">Strain / Variedad</label>
-                <input type="text" class="sd__input" v-model.trim="loteForm.strain" placeholder="Ej: OG Kush" />
+                <label class="sd__label">Genética / Variedad</label>
+                <select class="sd__input" v-model="loteForm.genetica_id">
+                  <option value="">Sin especificar</option>
+                  <option v-for="g in geneticas" :key="g.id" :value="g.id">
+                    {{ g.nombre }}{{ g.registrada_inase ? ' 🏛️' : '' }} — {{ g.tipo }}
+                  </option>
+                </select>
               </div>
               <div class="sd__field">
                 <label class="sd__label">Tipo de cultivo</label>
@@ -375,6 +431,21 @@ function closeCreate() {
                   <option value="sustrato">Sustrato</option>
                   <option value="hidroponia">Hidroponia</option>
                   <option value="aeroponia">Aeroponia</option>
+                </select>
+              </div>
+              <div class="sd__field">
+                <label class="sd__label">Tamaño de maceta</label>
+                <select class="sd__input" v-model="loteForm.tamanio_maceta">
+                  <option value="">Sin especificar</option>
+                  <option value="0.5">Vaso (0.5L)</option>
+                  <option value="1">1 litro</option>
+                  <option value="3">3 litros</option>
+                  <option value="5">5 litros</option>
+                  <option value="7">7 litros</option>
+                  <option value="10">10 litros</option>
+                  <option value="12">12 litros</option>
+                  <option value="15">15 litros</option>
+                  <option value="otro">Otro</option>
                 </select>
               </div>
               <div class="sd__field">
@@ -396,7 +467,7 @@ function closeCreate() {
           </div>
           <div class="sd__modal-footer">
             <button class="sd__btn-ghost" :disabled="lotes.creating" @click="closeCreate">Cancelar</button>
-            <button class="sd__btn-primary" :disabled="lotes.creating" @click="createLote">
+            <button class="sd__btn-primary" :disabled="lotes.creating || capacidadDisponible === 0" @click="createLote">
               <div v-if="lotes.creating" class="sd__spinner sd__spinner--sm"></div>
               <i v-else class="bi bi-plus-lg"></i>Crear lote
             </button>
@@ -404,17 +475,6 @@ function closeCreate() {
         </div>
       </div>
     </Teleport>
-
-    <ModalTarea
-      v-if="!isCultivador"
-      :show="showModalTarea"
-      :tarea-inicial="tareaInicialConSala"
-      :salas="sala ? [sala] : []"
-      :lotes="lotesParaTarea"
-      :usuarios="usuariosParaTarea"
-      @cerrar="showModalTarea = false"
-      @guardada="showModalTarea = false"
-    />
 
   </div>
 </template>
@@ -438,10 +498,34 @@ function closeCreate() {
 .sd__hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
 .sd__hero-title-row { display: flex; align-items: center; gap: .65rem; margin-bottom: .3rem; flex-wrap: wrap; }
 .sd__title { font-size: 1.8rem; font-weight: 800; margin: 0; letter-spacing: -.04em; }
-.sd__estado-pill { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; padding: .28em .75em; border-radius: 999px; }
 .sd__subtitle { font-size: .85rem; color: #60725d; margin: 0; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
 .sd__subtitle-sep { color: #cbd5e1; }
 .sd__hero-actions { display: flex; gap: .5rem; }
+
+/* Estado dropdown */
+.sd__estado-wrap { position: relative; }
+.sd__estado-dropdown { position: relative; }
+.sd__estado-dropdown:hover .sd__estado-menu { display: flex; }
+.sd__estado-pill {
+  font-size: .68rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .08em; padding: .28em .75em; border-radius: 999px;
+  cursor: pointer; user-select: none; display: inline-flex; align-items: center; gap: .3rem;
+}
+.sd__estado-menu {
+  display: none; flex-direction: column; position: absolute;
+  top: calc(100% + 4px); left: 0; z-index: 100;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); overflow: hidden; min-width: 160px;
+}
+.sd__estado-option {
+  padding: .6rem 1rem; font-size: .82rem; font-weight: 600;
+  background: transparent; border: none; cursor: pointer;
+  text-align: left; transition: background .12s; color: #475569;
+}
+.sd__estado-option:hover { background: #f8fafc; }
+.sd__estado-option--active { font-weight: 800; }
+.sd__estado-option:disabled { opacity: .5; cursor: not-allowed; }
+.sd__inline-badge { font-size: .72rem; font-weight: 700; padding: .2em .55em; border-radius: 5px; text-transform: capitalize; }
 
 .sd__kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.75rem; }
 @media (max-width: 640px) { .sd__kpis { grid-template-columns: repeat(2,1fr); } }
@@ -460,14 +544,12 @@ function closeCreate() {
 @media (max-width: 900px) { .sd__layout { grid-template-columns: 1fr; } }
 
 .sd__section { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
-.sd__section--mt { margin-top: 1.25rem; }
 .sd__section-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: .9rem 1.1rem; background: transparent; border: none; cursor: pointer; transition: background .15s; text-align: left; }
 .sd__section-toggle:hover { background: #f0fdf4; }
 .sd__section-toggle-left { display: flex; align-items: center; gap: .6rem; }
-.sd__section-toggle-right { display: flex; align-items: center; gap: .5rem; }
 .sd__section-emoji { font-size: 1rem; }
 .sd__section-title { font-size: .9rem; font-weight: 700; color: #1a1a1a; }
-.sd__pill { background: #e8f5e9; color: #1b5e20; font-size: .68rem; font-weight: 700; padding: .15em .55em; border-radius: 999px; min-width: 20px; text-align: center; }
+.sd__pill { background: #e8f5e9; color: #1b5e20; font-size: .68rem; font-weight: 700; padding: .15em .55em; border-radius: 999px; }
 .sd__chevron { color: #60725d; font-size: .75rem; }
 .sd__section-body { border-top: 1px solid #e8f0e9; padding: 1rem 1.1rem; }
 .sd__section-body--flush { padding: 0; border-top: 1px solid #e8f0e9; }
@@ -491,15 +573,8 @@ function closeCreate() {
 .sd__lote-progress-pct { font-size: .65rem; color: #94a3b8; font-weight: 600; flex-shrink: 0; }
 .sd__lote-arrow { color: #a7d7a9; font-size: .75rem; align-self: center; padding-right: 1rem; flex-shrink: 0; }
 
-/* WIP section */
-.sd__wip { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 1rem; text-align: center; gap: .5rem; }
-.sd__wip-icon { font-size: 2rem; }
-.sd__wip-title { font-size: .9rem; font-weight: 700; color: #1a1a1a; }
-.sd__wip-desc { font-size: .8rem; color: #60725d; max-width: 280px; }
-
 .sd__card { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
 .sd__card--mt { margin-top: 1rem; }
-.sd__card--cta { border-style: dashed; }
 .sd__card-header { padding: .8rem 1rem; border-bottom: 1px solid #e8f0e9; }
 .sd__card-title { font-size: .85rem; font-weight: 700; color: #1a1a1a; }
 .sd__card-body { padding: 1rem; }
@@ -509,20 +584,14 @@ function closeCreate() {
 .sd__dl dt { font-size: .75rem; color: #60725d; font-weight: 500; white-space: nowrap; }
 .sd__dl dd { font-size: .8rem; color: #1a1a1a; font-weight: 500; margin: 0; }
 
-.sd__cta { display: flex; align-items: center; gap: .75rem; padding: .9rem 1rem; background: transparent; border: none; width: 100%; cursor: pointer; text-align: left; transition: background .15s; }
-.sd__cta:hover { background: #f0fdf4; }
-.sd__cta-icon { font-size: 1.25rem; color: #1b5e20; flex-shrink: 0; }
-.sd__cta-label { font-size: .85rem; font-weight: 700; color: #1a1a1a; }
-.sd__cta-hint { font-size: .72rem; color: #60725d; }
-.sd__cta-arrow { color: #a7d7a9; margin-left: auto; font-size: .8rem; }
-
 .sd__empty { text-align: center; padding: 2.5rem 1rem; color: #60725d; }
 .sd__empty-icon { font-size: 2.5rem; margin-bottom: .75rem; }
 .sd__empty p { font-size: .875rem; margin: 0 0 .75rem; }
 .sd__placeholder { padding: 1rem 1.1rem; color: #94a3b8; font-size: .875rem; }
 
 .sd__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
-.sd__btn-primary:hover { background: #104417; }
+.sd__btn-primary:hover:not(:disabled) { background: #104417; }
+.sd__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .sd__btn-ghost { background: transparent; color: #60725d; border: 1px solid #d4e6d4; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 500; cursor: pointer; transition: all .15s; }
 .sd__btn-ghost:hover { background: #f0fdf4; color: #1b5e20; }
 .sd__btn-outline { background: transparent; color: #1b5e20; border: 1.5px solid #d4e6d4; padding: .5rem 1.1rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; }
@@ -535,19 +604,24 @@ function closeCreate() {
 .sd__modal-sub { font-size: .78rem; color: #60725d; margin: .2rem 0 0; }
 .sd__modal-close { background: #e8f5e9; border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #60725d; transition: all .15s; flex-shrink: 0; }
 .sd__modal-close:hover { background: #c8e6c9; color: #1b5e20; }
-.sd__modal-body { padding: 1.25rem 1.5rem; flex: 1; }
+.sd__modal-body { padding: 1.25rem 1.5rem; flex: 1; display: flex; flex-direction: column; gap: 1rem; }
 .sd__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1rem 1.5rem; border-top: 1px solid #e8f0e9; position: sticky; bottom: 0; background: #fff; }
+
+/* Capacidad bar */
+.sd__capacity-bar { background: #f0fdf4; border: 1px solid #d4e6d4; border-radius: 9px; padding: .75rem 1rem; }
+.sd__capacity-info { display: flex; justify-content: space-between; font-size: .82rem; margin-bottom: .5rem; color: #475569; }
+.sd__capacity-track { height: 6px; background: #d4e6d4; border-radius: 999px; overflow: hidden; }
+.sd__capacity-fill { height: 100%; border-radius: 999px; transition: width .4s; }
 
 .sd__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 480px) { .sd__grid { grid-template-columns: 1fr; } }
 .sd__field { display: flex; flex-direction: column; gap: .35rem; }
 .sd__field--full { grid-column: 1 / -1; }
 .sd__label { font-size: .8rem; font-weight: 600; color: #374151; }
-.sd__req { color: #dc2626; }
 .sd__input { background: #f4f8f4; border: 1.5px solid #d4e6d4; border-radius: 8px; padding: .6rem .85rem; font-size: .875rem; color: #1a1a1a; width: 100%; box-sizing: border-box; transition: border .15s; }
 .sd__input:focus { outline: none; border-color: #1b5e20; background: #fff; }
 .sd__input--err { border-color: #dc2626; }
 .sd__textarea { resize: vertical; min-height: 70px; }
 .sd__err-msg { font-size: .75rem; color: #dc2626; }
-.sd__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; margin-bottom: 1rem; }
+.sd__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; }
 </style>

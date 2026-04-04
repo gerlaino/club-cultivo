@@ -6,7 +6,7 @@ class CreateTareas < ActiveRecord::Migration[7.2]
       t.references :creada_por,   null: false, foreign_key: { to_table: :users }
       t.references :sala,         null: true,  foreign_key: true
       t.references :lote,         null: true,  foreign_key: true
-      t.references :plant,        null: true,  foreign_key: true
+      t.references :plant,        null: true,  foreign_key: false
 
       t.string   :titulo,            null: false
       t.text     :descripcion

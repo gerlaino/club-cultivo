@@ -37,6 +37,6 @@ class Sala < ApplicationRecord
   end
 
   def created_by_name
-    created_by&.first_name || created_by&.email || "Sistema"
+    [created_by&.first_name, created_by&.last_name].compact.join(" ").presence || created_by&.email || "Sistema"
   end
 end

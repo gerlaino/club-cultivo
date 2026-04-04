@@ -58,7 +58,7 @@ class SalaCultivadoresController < ApplicationController
       id: u.id,
       nombre_completo: u.nombre_completo,
       email: u.email,
-      avatar_url: u.avatar_url
+      avatar_url: nil
     }
   end
 end

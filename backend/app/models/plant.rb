@@ -7,6 +7,7 @@ class Plant < ApplicationRecord
   has_many :activities, class_name: 'PlantActivity', dependent: :destroy
 
   before_create :generate_codigo_qr
+  has_one_attached :foto
 
   STATES = %w[germinacion vegetativo floracion secado cosechado esqueje descartada].freeze
   ORIGENES = %w[semilla esqueje division].freeze

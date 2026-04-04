@@ -63,7 +63,7 @@ export const updateSala  = (id, payload) => api.patch(`/salas/${id}`, { sala: pa
 export const deleteSala  = (id) => api.delete(`/salas/${id}`);
 
 // -------- LOTES --------
-export const listLotes = () => api.get('/lotes');
+export const listLotes = (salaId = null) => salaId ? api.get(`/salas/${salaId}/lotes`) : api.get('/lotes');
 export const getLote = (id) => api.get(`/lotes/${id}`);
 export const createLote = (salaId, payload) => api.post(`/salas/${salaId}/lotes`, { lote: payload });
 export const updateLote = (id, payload) => api.put(`/lotes/${id}`, { lote: payload });

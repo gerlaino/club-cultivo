@@ -1,24 +1,17 @@
 import { defineStore } from "pinia";
 import { listPlants, getPlant } from "../lib/api";
 
-// Campos reales DB Plant:
-// id, lote_id, codigo_qr, nombre, genetica_id, state,
-// fecha_germinacion, fecha_vegetativo, fecha_floracion, fecha_cosecha,
-// peso_seco, notas, created_at, updated_at
-
 export const usePlantsStore = defineStore("plants", {
   state: () => ({
-    itemsByLote: new Map(), // loteId -> array de plants
+    itemsByLote: new Map(),
     current: null,
     loading: false,
     error: null,
   }),
-
   getters: {
     byLote: (state) => (loteId) =>
       state.itemsByLote.get(String(loteId)) || [],
   },
-
   actions: {
     async fetchByLote(loteId) {
       this.loading = true; this.error = null;
@@ -32,7 +25,6 @@ export const usePlantsStore = defineStore("plants", {
         this.loading = false;
       }
     },
-
     async fetchOne(id) {
       this.loading = true; this.error = null; this.current = null;
       try {
@@ -47,6 +39,9 @@ export const usePlantsStore = defineStore("plants", {
         this.loading = false;
       }
     },
+    addToLote(loteId, planta) {
+      const arr = this.itemsByLote.get(String(loteId)) || [];
+      this.itemsByLote.set(String(loteId), [...arr, planta]);
+    },
   },
 });
-
