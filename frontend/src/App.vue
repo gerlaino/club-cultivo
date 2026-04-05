@@ -61,8 +61,8 @@ onMounted(async () => {
 <template>
   <div>
     <nav
-      class="navbar navbar-expand-lg"
-      :class="[$route.meta.fullscreen ? 'navbar-login' : 'navbar-default']"
+      v-if="!$route.meta.fullscreen"
+      class="navbar navbar-expand-lg navbar-default"
     >
       <div class="container-fluid px-3 px-md-4">
 

@@ -1,294 +1,274 @@
 <template>
-  <div class="tareas-view container-fluid py-4">
+  <div class="tv">
+
     <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-      <div>
-        <h2 class="fw-bold mb-1">
-          <i class="bi bi-clipboard-check me-2 text-primary"></i>Tareas
-        </h2>
-        <p class="text-muted mb-0 small">
-          {{ fechaHoy }} · {{ saludo }}
-        </p>
+    <div class="tv__header">
+      <div class="tv__header-left">
+        <h1 class="tv__title">Tareas</h1>
+        <p class="tv__sub">{{ fechaHoy }} · {{ saludo }}</p>
       </div>
-      <div class="d-flex gap-2 align-items-center">
-        <!-- Selector de vista -->
-        <div class="btn-group btn-group-sm">
-          <button
-            class="btn"
-            :class="vistaActiva === 'dashboard' ? 'btn-primary' : 'btn-outline-secondary'"
-            @click="vistaActiva = 'dashboard'"
-          >
-            <i class="bi bi-grid me-1"></i>Mi día
+      <div class="tv__header-right">
+        <div class="tv__tabs">
+          <button class="tv__tab" :class="{ 'tv__tab--active': vistaActiva === 'dashboard' }" @click="vistaActiva = 'dashboard'">
+            <i class="bi bi-grid-1x2"></i> Mi día
           </button>
-          <button
-            class="btn"
-            :class="vistaActiva === 'kanban' ? 'btn-primary' : 'btn-outline-secondary'"
-            @click="cambiarAKanban"
-          >
-            <i class="bi bi-kanban me-1"></i>Kanban
+          <button class="tv__tab" :class="{ 'tv__tab--active': vistaActiva === 'kanban' }" @click="cambiarAKanban">
+            <i class="bi bi-kanban"></i> Kanban
           </button>
         </div>
-        <button
-          v-if="puedeCrear"
-          class="btn btn-primary btn-sm"
-          @click="abrirModalNueva"
-        >
-          <i class="bi bi-plus-lg me-1"></i>Nueva tarea
+        <button v-if="puedeCrear" class="tv__btn-primary" @click="abrirModalNueva">
+          <i class="bi bi-plus-lg"></i> Nueva tarea
         </button>
       </div>
     </div>
 
-    <!-- ═══════════════════════ VISTA: DASHBOARD ═══════════════════════ -->
-    <div v-if="vistaActiva === 'dashboard'">
-
-      <!-- Stats rápidas -->
-      <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-          <div class="stat-card stat-card--pending">
-            <div class="stat-card__number">{{ stats.pendientes || 0 }}</div>
-            <div class="stat-card__label">Pendientes</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="stat-card stat-card--progress">
-            <div class="stat-card__number">{{ stats.en_progreso || 0 }}</div>
-            <div class="stat-card__label">En progreso</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="stat-card stat-card--done">
-            <div class="stat-card__number">{{ stats.completadas_hoy || 0 }}</div>
-            <div class="stat-card__label">Completadas hoy</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="stat-card" :class="stats.vencidas > 0 ? 'stat-card--overdue' : 'stat-card--neutral'">
-            <div class="stat-card__number">{{ stats.vencidas || 0 }}</div>
-            <div class="stat-card__label">Vencidas</div>
-          </div>
-        </div>
+    <!-- KPIs -->
+    <div class="tv__kpis">
+      <div class="tv__kpi">
+        <div class="tv__kpi-val" style="color:#64748b">{{ stats.pendientes || 0 }}</div>
+        <div class="tv__kpi-label">Pendientes</div>
+        <div class="tv__kpi-bar" style="background:#64748b"></div>
       </div>
-
-      <!-- Loading -->
-      <div v-if="loading" class="text-center py-5">
-        <div class="spinner-border text-primary"></div>
-        <p class="text-muted mt-2 small">Cargando tareas...</p>
+      <div class="tv__kpi">
+        <div class="tv__kpi-val" style="color:#d97706">{{ stats.en_progreso || 0 }}</div>
+        <div class="tv__kpi-label">En progreso</div>
+        <div class="tv__kpi-bar" style="background:#d97706"></div>
       </div>
+      <div class="tv__kpi">
+        <div class="tv__kpi-val" style="color:#15803d">{{ stats.completadas_hoy || 0 }}</div>
+        <div class="tv__kpi-label">Completadas hoy</div>
+        <div class="tv__kpi-bar" style="background:#15803d"></div>
+      </div>
+      <div class="tv__kpi" :class="{ 'tv__kpi--alert': stats.vencidas > 0 }">
+        <div class="tv__kpi-val" :style="{ color: stats.vencidas > 0 ? '#dc2626' : '#94a3b8' }">{{ stats.vencidas || 0 }}</div>
+        <div class="tv__kpi-label">Vencidas</div>
+        <div class="tv__kpi-bar" :style="{ background: stats.vencidas > 0 ? '#dc2626' : '#e2e8f0' }"></div>
+      </div>
+    </div>
 
-      <template v-else>
-        <!-- Alerta de vencidas -->
-        <div v-if="hayVencidas" class="alert alert-danger d-flex align-items-center gap-3 mb-4">
-          <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+    <!-- Loading -->
+    <div v-if="loading" class="tv__loading">
+      <div class="tv__ring"></div><span>Cargando tareas…</span>
+    </div>
+
+    <template v-else>
+
+      <!-- ══ DASHBOARD ══ -->
+      <div v-if="vistaActiva === 'dashboard'">
+
+        <!-- Alerta vencidas -->
+        <div v-if="hayVencidas" class="tv__alerta">
+          <i class="bi bi-exclamation-triangle-fill"></i>
           <div>
             <strong>{{ dashboard.vencidas.length }} tarea{{ dashboard.vencidas.length > 1 ? 's' : '' }} vencida{{ dashboard.vencidas.length > 1 ? 's' : '' }}</strong>
-            <div class="small">
-              {{ dashboard.vencidas.map(t => t.titulo).slice(0,2).join(', ') }}
-              <span v-if="dashboard.vencidas.length > 2"> y {{ dashboard.vencidas.length - 2 }} más</span>
-            </div>
+            <span class="tv__alerta-sub">— {{ dashboard.vencidas.slice(0,2).map(t => t.titulo).join(', ') }}<span v-if="dashboard.vencidas.length > 2"> y {{ dashboard.vencidas.length - 2 }} más</span></span>
           </div>
-          <button class="btn btn-outline-danger btn-sm ms-auto" @click="verVencidas">Ver todas</button>
+          <button class="tv__alerta-btn" @click="cambiarAKanban">Ver todas</button>
         </div>
 
         <!-- Tareas de hoy -->
-        <div class="mb-5">
-          <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
-            <span class="badge bg-primary rounded-pill">{{ dashboard.hoy.length }}</span>
-            Tareas de hoy
-          </h5>
-
-          <!-- Estado vacío -->
-          <div v-if="dashboard.hoy.length === 0" class="empty-state">
-            <div class="empty-state__icon">🎉</div>
-            <p class="fw-semibold">Sin tareas programadas para hoy</p>
-            <p class="text-muted small">¡Buen trabajo! O creá una nueva tarea.</p>
+        <div class="tv__section">
+          <div class="tv__section-header">
+            <span class="tv__section-title">Tareas de hoy</span>
+            <span class="tv__section-count">{{ dashboard.hoy?.length || 0 }}</span>
           </div>
 
-          <!-- Mini-kanban de hoy -->
-          <div v-else class="row g-3">
-            <!-- Pendientes -->
-            <div class="col-md-4">
-              <div class="kanban-col">
-                <div class="kanban-col__header kanban-col__header--pending">
-                  <span>Pendiente</span>
-                  <span class="badge rounded-pill bg-secondary">{{ hoyPendientes.length }}</span>
-                </div>
-                <div class="kanban-col__body">
-                  <TareaCard
-                    v-for="t in hoyPendientes"
-                    :key="t.id"
-                    :tarea="t"
-                    class="mb-2"
-                    @click="abrirDetalle(t)"
-                    @iniciar="iniciarTarea(t)"
-                    @completar="abrirModalCompletar(t)"
-                    @editar="abrirModalEditar(t)"
-                    @cancelar="confirmarCancelar(t)"
-                  />
-                  <div v-if="hoyPendientes.length === 0" class="kanban-col__empty">
-                    Sin pendientes 👍
-                  </div>
-                </div>
+          <div v-if="!dashboard.hoy?.length" class="tv__empty">
+            <div class="tv__empty-emoji">🎉</div>
+            <div class="tv__empty-title">Sin tareas para hoy</div>
+            <p class="tv__empty-desc">¡Todo al día! O creá una nueva tarea para organizar el trabajo.</p>
+            <button v-if="puedeCrear" class="tv__btn-primary" @click="abrirModalNueva">
+              <i class="bi bi-plus-lg"></i> Nueva tarea
+            </button>
+          </div>
+
+          <div v-else class="tv__kanban-cols">
+            <!-- Pendiente -->
+            <div class="tv__col">
+              <div class="tv__col-header tv__col-header--pending">
+                <span>Pendiente</span>
+                <span class="tv__col-count">{{ hoyPendientes.length }}</span>
+              </div>
+              <div class="tv__col-body">
+                <TareaCard v-for="t in hoyPendientes" :key="t.id" :tarea="t"
+                           @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
+                           @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
+                           @cancelar="confirmarCancelar(t)" />
+                <div v-if="!hoyPendientes.length" class="tv__col-empty">Sin pendientes 👍</div>
               </div>
             </div>
             <!-- En progreso -->
-            <div class="col-md-4">
-              <div class="kanban-col">
-                <div class="kanban-col__header kanban-col__header--progress">
-                  <span>En progreso</span>
-                  <span class="badge rounded-pill bg-warning text-dark">{{ hoyEnProgreso.length }}</span>
-                </div>
-                <div class="kanban-col__body">
-                  <TareaCard
-                    v-for="t in hoyEnProgreso"
-                    :key="t.id"
-                    :tarea="t"
-                    class="mb-2"
-                    @click="abrirDetalle(t)"
-                    @completar="abrirModalCompletar(t)"
-                    @editar="abrirModalEditar(t)"
-                    @cancelar="confirmarCancelar(t)"
-                  />
-                  <div v-if="hoyEnProgreso.length === 0" class="kanban-col__empty">
-                    Sin tareas activas
-                  </div>
-                </div>
+            <div class="tv__col">
+              <div class="tv__col-header tv__col-header--progress">
+                <span>En progreso</span>
+                <span class="tv__col-count">{{ hoyEnProgreso.length }}</span>
+              </div>
+              <div class="tv__col-body">
+                <TareaCard v-for="t in hoyEnProgreso" :key="t.id" :tarea="t"
+                           @click="abrirDetalle(t)" @completar="abrirModalCompletar(t)"
+                           @editar="abrirModalEditar(t)" @cancelar="confirmarCancelar(t)" />
+                <div v-if="!hoyEnProgreso.length" class="tv__col-empty">Sin tareas activas</div>
               </div>
             </div>
-            <!-- Completadas hoy -->
-            <div class="col-md-4">
-              <div class="kanban-col">
-                <div class="kanban-col__header kanban-col__header--done">
-                  <span>Completadas</span>
-                  <span class="badge rounded-pill bg-success">{{ hoyCompletadas.length }}</span>
-                </div>
-                <div class="kanban-col__body">
-                  <TareaCard
-                    v-for="t in hoyCompletadas"
-                    :key="t.id"
-                    :tarea="t"
-                    class="mb-2"
-                    @click="abrirDetalle(t)"
-                    @editar="abrirModalEditar(t)"
-                  />
-                  <div v-if="hoyCompletadas.length === 0" class="kanban-col__empty">
-                    Aún no hay completadas
-                  </div>
-                </div>
+            <!-- Completadas -->
+            <div class="tv__col">
+              <div class="tv__col-header tv__col-header--done">
+                <span>Completadas</span>
+                <span class="tv__col-count">{{ hoyCompletadas.length }}</span>
+              </div>
+              <div class="tv__col-body">
+                <TareaCard v-for="t in hoyCompletadas" :key="t.id" :tarea="t"
+                           @click="abrirDetalle(t)" @editar="abrirModalEditar(t)" />
+                <div v-if="!hoyCompletadas.length" class="tv__col-empty">Aún no hay completadas</div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Próximas tareas (hasta 7 días) -->
-        <div v-if="dashboard.proximas.length > 0" class="mb-4">
-          <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
-            <span class="badge bg-secondary rounded-pill">{{ dashboard.proximas.length }}</span>
-            Próximos 7 días
-          </h5>
-          <div class="row g-2">
-            <div
-              v-for="t in dashboard.proximas"
-              :key="t.id"
-              class="col-md-6 col-lg-4"
-            >
-              <TareaCard
-                :tarea="t"
-                @click="abrirDetalle(t)"
-                @iniciar="iniciarTarea(t)"
-                @completar="abrirModalCompletar(t)"
-                @editar="abrirModalEditar(t)"
-                @cancelar="confirmarCancelar(t)"
-              />
-            </div>
+        <!-- Próximas -->
+        <div v-if="dashboard.proximas?.length" class="tv__section tv__section--mt">
+          <div class="tv__section-header">
+            <span class="tv__section-title">Próximos 7 días</span>
+            <span class="tv__section-count">{{ dashboard.proximas.length }}</span>
+          </div>
+          <div class="tv__proximas">
+            <TareaCard v-for="t in dashboard.proximas" :key="t.id" :tarea="t"
+                       @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
+                       @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
+                       @cancelar="confirmarCancelar(t)" />
           </div>
         </div>
-      </template>
-    </div>
 
-    <!-- ═══════════════════════ VISTA: KANBAN COMPLETO ═══════════════════════ -->
-    <div v-if="vistaActiva === 'kanban'">
+      </div>
 
-      <!-- Filtros del kanban -->
-      <div class="filtros-bar mb-4">
-        <div class="row g-2 align-items-end">
-          <div class="col-md-3" v-if="esAdmin">
-            <label class="form-label small fw-semibold mb-1">Usuario</label>
-            <select v-model="filtros.asignada_a_id" class="form-select form-select-sm" @change="cargarKanban">
-              <option value="">Todos</option>
-              <option v-for="u in usuarios" :key="u.id" :value="u.id">{{ u.nombre_completo || u.nombre }}</option>
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Sala</label>
-            <select v-model="filtros.sala_id" class="form-select form-select-sm" @change="onFiltroSala">
-              <option value="">Todas</option>
-              <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Lote</label>
-            <select v-model="filtros.lote_id" class="form-select form-select-sm" @change="cargarKanban">
-              <option value="">Todos</option>
-              <option v-for="l in lotesFiltrados" :key="l.id" :value="l.id">{{ l.codigo }}</option>
-            </select>
-          </div>
-          <div class="col-md-3">
-            <button class="btn btn-outline-secondary btn-sm w-100" @click="limpiarFiltros">
-              <i class="bi bi-x-circle me-1"></i>Limpiar filtros
-            </button>
-          </div>
+      <!-- ══ KANBAN COMPLETO ══ -->
+      <div v-if="vistaActiva === 'kanban'">
+
+        <!-- Filtros -->
+        <div class="tv__filtros">
+          <select v-if="esAdmin" v-model="filtros.asignada_a_id" class="tv__filtro-select" @change="cargarKanban">
+            <option value="">Todos los usuarios</option>
+            <option v-for="u in usuarios" :key="u.id" :value="u.id">{{ u.nombre_completo }}</option>
+          </select>
+          <select v-model="filtros.sala_id" class="tv__filtro-select" @change="onFiltroSala">
+            <option value="">Todas las salas</option>
+            <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+          </select>
+          <select v-model="filtros.lote_id" class="tv__filtro-select" @change="cargarKanban">
+            <option value="">Todos los lotes</option>
+            <option v-for="l in lotesFiltrados" :key="l.id" :value="l.id">{{ l.codigo }}</option>
+          </select>
+          <button v-if="filtros.asignada_a_id || filtros.sala_id || filtros.lote_id" class="tv__btn-clear" @click="limpiarFiltros">
+            <i class="bi bi-x-circle"></i> Limpiar
+          </button>
         </div>
-      </div>
 
-      <div v-if="loading" class="text-center py-5">
-        <div class="spinner-border text-primary"></div>
-      </div>
-
-      <!-- Columnas kanban -->
-      <div v-else class="row g-3">
-        <div class="col-md-4" v-for="col in columnas" :key="col.key">
-          <div class="kanban-col">
-            <div class="kanban-col__header" :class="`kanban-col__header--${col.clase}`">
+        <div class="tv__kanban-cols">
+          <div v-for="col in columnas" :key="col.key" class="tv__col">
+            <div class="tv__col-header" :class="`tv__col-header--${col.clase}`">
               <span>{{ col.label }}</span>
-              <span class="badge rounded-pill" :class="col.badgeClass">
-                {{ kanban[col.key]?.length || 0 }}
-              </span>
+              <span class="tv__col-count">{{ kanban[col.key]?.length || 0 }}</span>
             </div>
-            <div class="kanban-col__body">
-              <TareaCard
-                v-for="t in kanban[col.key]"
-                :key="t.id"
-                :tarea="t"
-                class="mb-2"
-                @click="abrirDetalle(t)"
-                @iniciar="iniciarTarea(t)"
-                @completar="abrirModalCompletar(t)"
-                @editar="abrirModalEditar(t)"
-                @cancelar="confirmarCancelar(t)"
-              />
-              <div v-if="!kanban[col.key]?.length" class="kanban-col__empty">
-                Sin tareas
+            <div class="tv__col-body">
+              <TareaCard v-for="t in kanban[col.key]" :key="t.id" :tarea="t"
+                         @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
+                         @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
+                         @cancelar="confirmarCancelar(t)" />
+              <div v-if="!kanban[col.key]?.length" class="tv__col-empty">Sin tareas</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </template>
+
+    <!-- Panel detalle -->
+    <Teleport to="body">
+      <div v-if="tareaDetalle" class="tv__panel-overlay" @click.self="tareaDetalle = null">
+        <div class="tv__panel">
+          <div class="tv__panel-header">
+            <h3 class="tv__panel-title">Detalle de tarea</h3>
+            <button class="tv__panel-close" @click="tareaDetalle = null"><i class="bi bi-x-lg"></i></button>
+          </div>
+
+          <div class="tv__panel-body">
+            <div class="tv__panel-tipo">
+              <span class="tv__tipo-pill">{{ TIPO_META[tareaDetalle.tipo]?.emoji }} {{ TIPO_META[tareaDetalle.tipo]?.label }}</span>
+            </div>
+            <h4 class="tv__panel-nombre">{{ tareaDetalle.titulo }}</h4>
+            <p v-if="tareaDetalle.descripcion" class="tv__panel-desc">{{ tareaDetalle.descripcion }}</p>
+
+            <div class="tv__panel-info">
+              <div class="tv__panel-row">
+                <span class="tv__panel-key">Estado</span>
+                <span class="tv__estado-pill" :style="estadoMeta(tareaDetalle.estado)">{{ tareaDetalle.estado?.replace('_',' ') }}</span>
               </div>
+              <div class="tv__panel-row">
+                <span class="tv__panel-key">Prioridad</span>
+                <span>{{ tareaDetalle.prioridad }}</span>
+              </div>
+              <div v-if="tareaDetalle.asignada_a" class="tv__panel-row">
+                <span class="tv__panel-key">Asignada a</span>
+                <span>{{ tareaDetalle.asignada_a.nombre }}</span>
+              </div>
+              <div v-if="tareaDetalle.sala" class="tv__panel-row">
+                <span class="tv__panel-key">Sala</span>
+                <span>{{ tareaDetalle.sala.nombre }}</span>
+              </div>
+              <div v-if="tareaDetalle.lote" class="tv__panel-row">
+                <span class="tv__panel-key">Lote</span>
+                <RouterLink :to="`/lotes/${tareaDetalle.lote.id}`" class="tv__panel-link">
+                  {{ tareaDetalle.lote.codigo }} <i class="bi bi-arrow-right-short"></i>
+                </RouterLink>
+              </div>
+              <div v-if="tareaDetalle.fecha_programada" class="tv__panel-row">
+                <span class="tv__panel-key">Fecha</span>
+                <span>{{ tareaDetalle.fecha_programada }}</span>
+              </div>
+              <div v-if="tareaDetalle.horas_estimadas" class="tv__panel-row">
+                <span class="tv__panel-key">Hs. estimadas</span>
+                <span>{{ tareaDetalle.horas_estimadas }}h</span>
+              </div>
+              <div v-if="tareaDetalle.horas_reales" class="tv__panel-row">
+                <span class="tv__panel-key">Hs. reales</span>
+                <strong>{{ tareaDetalle.horas_reales }}h</strong>
+              </div>
+            </div>
+
+            <div v-if="tareaDetalle.tiene_horas_para_lote" class="tv__panel-hint">
+              <i class="bi bi-clock-history"></i>
+              <strong>{{ tareaDetalle.horas_reales }}h</strong> disponibles para aplicar al lote.
+              <RouterLink :to="`/lotes/${tareaDetalle.lote.id}`">Ir al lote →</RouterLink>
+            </div>
+
+            <div class="tv__panel-actions">
+              <button v-if="tareaDetalle.estado === 'pendiente'" class="tv__panel-btn tv__panel-btn--ghost" @click="iniciarTarea(tareaDetalle)">
+                <i class="bi bi-play-fill"></i> Iniciar
+              </button>
+              <button v-if="['pendiente','en_progreso'].includes(tareaDetalle.estado)" class="tv__panel-btn tv__panel-btn--primary" @click="abrirModalCompletar(tareaDetalle)">
+                <i class="bi bi-check-circle"></i> Completar
+              </button>
+              <button v-if="puedeEditarTarea(tareaDetalle)" class="tv__panel-btn tv__panel-btn--ghost" @click="abrirModalEditar(tareaDetalle)">
+                <i class="bi bi-pencil"></i> Editar
+              </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </Teleport>
 
-    <!-- ═══════════════════════ MODALS ═══════════════════════ -->
-
-    <!-- Modal crear/editar -->
+    <!-- Modales -->
     <ModalTarea
       :show="showModalTarea"
       :tarea-inicial="tareaEditando"
       :salas="salas"
+      :sedes="sedes"
       :lotes="lotes"
       :usuarios="usuarios"
       @guardada="onTareaGuardada"
       @cerrar="showModalTarea = false"
     />
-
-    <!-- Modal completar -->
     <ModalCompletarTarea
       :show="showModalCompletar"
       :tarea="tareaCompletando"
@@ -296,109 +276,13 @@
       @cerrar="showModalCompletar = false"
     />
 
-    <!-- Modal detalle (panel lateral) -->
-    <div
-      v-if="tareaDetalle"
-      class="tarea-detalle-panel"
-      :class="{ 'tarea-detalle-panel--visible': tareaDetalle }"
-      @click.self="tareaDetalle = null"
-    >
-      <div class="tarea-detalle-panel__content">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-          <h5 class="fw-bold mb-0">Detalle de tarea</h5>
-          <button class="btn btn-sm btn-ghost" @click="tareaDetalle = null">
-            <i class="bi bi-x-lg"></i>
-          </button>
-        </div>
-
-        <div class="mb-3">
-          <span class="badge tipo-badge-lg mb-2">{{ TIPO_LABELS[tareaDetalle.tipo] }}</span>
-          <h4 class="fw-bold">{{ tareaDetalle.titulo }}</h4>
-          <p v-if="tareaDetalle.descripcion" class="text-muted">{{ tareaDetalle.descripcion }}</p>
-        </div>
-
-        <div class="detalle-info">
-          <div class="detalle-info__row">
-            <span class="label">Estado</span>
-            <span class="badge" :class="estadoBadge(tareaDetalle.estado)">{{ tareaDetalle.estado }}</span>
-          </div>
-          <div class="detalle-info__row">
-            <span class="label">Prioridad</span>
-            <span>{{ tareaDetalle.prioridad }}</span>
-          </div>
-          <div class="detalle-info__row" v-if="tareaDetalle.asignada_a">
-            <span class="label">Asignada a</span>
-            <span>{{ tareaDetalle.asignada_a.nombre }}</span>
-          </div>
-          <div class="detalle-info__row" v-if="tareaDetalle.sala">
-            <span class="label">Sala</span>
-            <span>{{ tareaDetalle.sala.nombre }}</span>
-          </div>
-          <div class="detalle-info__row" v-if="tareaDetalle.lote">
-            <span class="label">Lote</span>
-            <router-link :to="`/lotes/${tareaDetalle.lote.id}`">
-              {{ tareaDetalle.lote.codigo }} <i class="bi bi-arrow-right-short"></i>
-            </router-link>
-          </div>
-          <div class="detalle-info__row" v-if="tareaDetalle.fecha_programada">
-            <span class="label">Fecha</span>
-            <span>{{ tareaDetalle.fecha_programada }}</span>
-          </div>
-          <div class="detalle-info__row" v-if="tareaDetalle.horas_estimadas">
-            <span class="label">Hs. estimadas</span>
-            <span>{{ tareaDetalle.horas_estimadas }}h</span>
-          </div>
-          <div class="detalle-info__row" v-if="tareaDetalle.horas_reales">
-            <span class="label">Hs. reales</span>
-            <span class="fw-semibold">{{ tareaDetalle.horas_reales }}h</span>
-          </div>
-          <div class="detalle-info__row" v-if="tareaDetalle.notas_completado">
-            <span class="label">Notas</span>
-            <span>{{ tareaDetalle.notas_completado }}</span>
-          </div>
-        </div>
-
-        <!-- Aviso de horas pendientes de aplicar al lote -->
-        <div v-if="tareaDetalle.tiene_horas_para_lote" class="alert alert-warning mt-3 small">
-          <i class="bi bi-clock-history me-2"></i>
-          <strong>{{ tareaDetalle.horas_reales }}h</strong> disponibles para aplicar al lote.
-          <router-link :to="`/lotes/${tareaDetalle.lote.id}`" class="alert-link ms-1">
-            Ir al lote →
-          </router-link>
-        </div>
-
-        <!-- Acciones del panel -->
-        <div class="mt-4 d-flex flex-column gap-2">
-          <button
-            v-if="tareaDetalle.estado === 'pendiente'"
-            class="btn btn-outline-primary btn-sm"
-            @click="iniciarTarea(tareaDetalle)"
-          >
-            <i class="bi bi-play-fill me-2"></i>Iniciar
-          </button>
-          <button
-            v-if="tareaDetalle.estado === 'pendiente' || tareaDetalle.estado === 'en_progreso'"
-            class="btn btn-success btn-sm"
-            @click="abrirModalCompletar(tareaDetalle)"
-          >
-            <i class="bi bi-check-circle me-2"></i>Completar
-          </button>
-          <button
-            v-if="puedeEditarTarea(tareaDetalle)"
-            class="btn btn-outline-secondary btn-sm"
-            @click="abrirModalEditar(tareaDetalle)"
-          >
-            <i class="bi bi-pencil me-2"></i>Editar
-          </button>
-        </div>
+    <!-- Toast -->
+    <Transition name="tv-toast">
+      <div v-if="toast.visible" class="tv__toast" :class="`tv__toast--${toast.tipo}`">
+        <i :class="toast.icono"></i> {{ toast.mensaje }}
       </div>
-    </div>
+    </Transition>
 
-    <!-- Toast de éxito -->
-    <div v-if="toast.visible" class="toast-custom" :class="`toast-custom--${toast.tipo}`">
-      <i class="bi" :class="toast.icono"></i>
-      {{ toast.mensaje }}
-    </div>
   </div>
 </template>
 
@@ -409,101 +293,93 @@ import { useTareasStore } from '../stores/tareas'
 import TareaCard from '../components/TareaCard.vue'
 import ModalTarea from '../components/ModalTarea.vue'
 import ModalCompletarTarea from '../components/ModalCompletarTarea.vue'
-import { listSalas, listLotes, listUsers } from '../lib/api'
+import { listSalas, listLotes, listUsers, listSedes } from '../lib/api'
 import { storeToRefs } from 'pinia'
 
-// ── Stores ────────────────────────────────────────────────────────
 const authStore   = useAuthStore()
 const tareasStore = useTareasStore()
 
-// ── State de la vista ─────────────────────────────────────────────
-const vistaActiva      = ref('dashboard')
-const showModalTarea   = ref(false)
+const vistaActiva       = ref('dashboard')
+const showModalTarea    = ref(false)
 const showModalCompletar = ref(false)
-const tareaEditando    = ref(null)
-const tareaCompletando = ref(null)
-const tareaDetalle     = ref(null)
-const salas            = ref([])
-const lotes            = ref([])
-const usuarios         = ref([])
-const filtros          = ref({ asignada_a_id: '', sala_id: '', lote_id: '' })
-const toast            = ref({ visible: false, mensaje: '', tipo: 'success', icono: 'bi-check-circle' })
+const tareaEditando     = ref(null)
+const tareaCompletando  = ref(null)
+const tareaDetalle      = ref(null)
+const salas             = ref([])
+const sedes             = ref([])
+const lotes             = ref([])
+const usuarios          = ref([])
+const filtros           = ref({ asignada_a_id: '', sala_id: '', lote_id: '' })
+const toast             = ref({ visible: false, mensaje: '', tipo: 'success', icono: 'bi bi-check-circle-fill' })
 
-// ── Computed ──────────────────────────────────────────────────────
-// storeToRefs preserva la reactividad al desestructurar
-const {
-  loading, dashboard, kanban, stats,
-  hayVencidas, hoyPendientes, hoyEnProgreso, hoyCompletadas
-} = storeToRefs(tareasStore)
+const { loading, dashboard, kanban, stats, hayVencidas, hoyPendientes, hoyEnProgreso, hoyCompletadas } = storeToRefs(tareasStore)
 
 const esAdmin    = computed(() => authStore.user?.role === 'admin')
 const puedeCrear = computed(() => authStore.user?.role === 'admin')
 
-const fechaHoy = computed(() => {
-  return new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
-})
-
+const fechaHoy = computed(() =>
+  new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+)
 const saludo = computed(() => {
-  const hora = new Date().getHours()
-  const nombre = authStore.user?.first_name || authStore.user?.nombre || ''
-  if (hora < 12) return `Buenos días, ${nombre}`
-  if (hora < 19) return `Buenas tardes, ${nombre}`
-  return `Buenas noches, ${nombre}`
+  const h = new Date().getHours()
+  const n = authStore.user?.first_name || ''
+  if (h < 12) return `Buenos días, ${n}`
+  if (h < 19) return `Buenas tardes, ${n}`
+  return `Buenas noches, ${n}`
 })
 
 const lotesFiltrados = computed(() => {
   if (!filtros.value.sala_id) return lotes.value
-  return lotes.value.filter(l => l.sala_id == filtros.value.sala_id)
+  return lotes.value.filter(l => String(l.sala_id) === String(filtros.value.sala_id))
 })
 
 const columnas = [
-  { key: 'pendiente',   label: 'Pendiente',   clase: 'pending',  badgeClass: 'bg-secondary' },
-  { key: 'en_progreso', label: 'En progreso',  clase: 'progress', badgeClass: 'bg-warning text-dark' },
-  { key: 'completada',  label: 'Completadas',  clase: 'done',     badgeClass: 'bg-success' }
+  { key: 'pendiente',   label: 'Pendiente',  clase: 'pending'  },
+  { key: 'en_progreso', label: 'En progreso', clase: 'progress' },
+  { key: 'completada',  label: 'Completadas', clase: 'done'     },
 ]
 
-const TIPO_LABELS = {
-  riego: '💧 Riego', poda: '✂️ Poda', medicion: '📏 Medición',
-  limpieza: '🧹 Limpieza', cosecha: '🌿 Cosecha', transplante: '🪴 Transplante',
-  inspeccion: '🔍 Inspección', otro: '📋 Otro'
+const TIPO_META = {
+  riego:       { label: 'Riego',      emoji: '💧' },
+  poda:        { label: 'Poda',       emoji: '✂️' },
+  medicion:    { label: 'Medición',   emoji: '📏' },
+  limpieza:    { label: 'Limpieza',   emoji: '🧹' },
+  cosecha:     { label: 'Cosecha',    emoji: '🌿' },
+  transplante: { label: 'Trasplante', emoji: '🪴' },
+  inspeccion:  { label: 'Inspección', emoji: '🔍' },
+  otro:        { label: 'Otro',       emoji: '📋' },
 }
 
-// ── Lifecycle ─────────────────────────────────────────────────────
+function estadoMeta(estado) {
+  return {
+    pendiente:   { background: 'rgba(100,116,139,.1)', color: '#475569' },
+    en_progreso: { background: 'rgba(217,119,6,.1)',   color: '#d97706' },
+    completada:  { background: 'rgba(21,128,61,.1)',   color: '#15803d' },
+    cancelada:   { background: 'rgba(220,38,38,.1)',   color: '#dc2626' },
+  }[estado] || { background: '#f1f5f9', color: '#64748b' }
+}
+
 onMounted(async () => {
   await cargarContexto()
   await tareasStore.fetchDashboard()
 })
 
-// ── Carga de datos ────────────────────────────────────────────────
 async function cargarContexto() {
   try {
-    // Médicos y auditores no necesitan el contexto de salas/lotes
-    if (!puedeCrear.value) return
-
-    const [resSalas, resLotes] = await Promise.all([
-      listSalas(),
-      listLotes()
-    ])
+    const [resSalas, resLotes, resSedes] = await Promise.all([listSalas(), listLotes(), listSedes()])
     salas.value = resSalas.data || []
     lotes.value = resLotes.data || []
-
+    sedes.value = resSedes.data || []
     if (esAdmin.value) {
-      const resUsuarios = await listUsers()
-      usuarios.value = (resUsuarios.data?.data || resUsuarios.data || []).map(u => ({
-        ...u,
-        nombre_completo: `${u.first_name} ${u.last_name}`.trim()
+      const resU = await listUsers()
+      usuarios.value = (resU.data?.data || resU.data || []).map(u => ({
+        ...u, nombre_completo: `${u.first_name} ${u.last_name}`.trim()
       }))
     }
-  } catch (e) {
-    console.error('Error cargando contexto:', e)
-  }
+  } catch (e) { console.error('Error cargando contexto:', e) }
 }
 
-async function cambiarAKanban() {
-  vistaActiva.value = 'kanban'
-  await cargarKanban()
-}
-
+async function cambiarAKanban() { vistaActiva.value = 'kanban'; await cargarKanban() }
 async function cargarKanban() {
   const params = {}
   if (filtros.value.asignada_a_id) params.asignada_a_id = filtros.value.asignada_a_id
@@ -511,257 +387,145 @@ async function cargarKanban() {
   if (filtros.value.lote_id)       params.lote_id       = filtros.value.lote_id
   await tareasStore.fetchKanban(params)
 }
+function onFiltroSala() { filtros.value.lote_id = ''; cargarKanban() }
+function limpiarFiltros() { filtros.value = { asignada_a_id: '', sala_id: '', lote_id: '' }; cargarKanban() }
 
-function onFiltroSala() {
-  filtros.value.lote_id = ''
-  cargarKanban()
+function abrirModalNueva() { tareaEditando.value = null; showModalTarea.value = true }
+function abrirModalEditar(t) { tareaEditando.value = t; tareaDetalle.value = null; showModalTarea.value = true }
+function abrirModalCompletar(t) { tareaCompletando.value = t; tareaDetalle.value = null; showModalCompletar.value = true }
+function abrirDetalle(t) { tareaDetalle.value = t }
+
+async function iniciarTarea(t) {
+  try { await tareasStore.iniciar(t.id); if (tareaDetalle.value?.id === t.id) tareaDetalle.value = null; mostrarToast('Tarea iniciada') }
+  catch (e) { mostrarToast(e.response?.data?.error || 'Error al iniciar', 'error') }
 }
-
-function limpiarFiltros() {
-  filtros.value = { asignada_a_id: '', sala_id: '', lote_id: '' }
-  cargarKanban()
+async function confirmarCancelar(t) {
+  if (!confirm(`¿Cancelar la tarea "${t.titulo}"?`)) return
+  try { await tareasStore.cancelar(t.id); tareaDetalle.value = null; mostrarToast('Tarea cancelada', 'warning') }
+  catch (e) { mostrarToast(e.response?.data?.error || 'Error', 'error') }
 }
+function onTareaGuardada() { showModalTarea.value = false; tareaEditando.value = null; mostrarToast(tareaEditando.value ? 'Tarea actualizada' : 'Tarea creada ✓') }
+function onTareaCompletada() { showModalCompletar.value = false; tareaCompletando.value = null; mostrarToast('Tarea completada ✓') }
 
-// ── Acciones ──────────────────────────────────────────────────────
-function abrirModalNueva() {
-  tareaEditando.value  = null
-  showModalTarea.value = true
-}
-
-function abrirModalEditar(tarea) {
-  tareaEditando.value  = tarea
-  tareaDetalle.value   = null
-  showModalTarea.value = true
-}
-
-function abrirModalCompletar(tarea) {
-  tareaCompletando.value  = tarea
-  tareaDetalle.value      = null
-  showModalCompletar.value = true
-}
-
-function abrirDetalle(tarea) {
-  tareaDetalle.value = tarea
-}
-
-async function iniciarTarea(tarea) {
-  try {
-    await tareasStore.iniciar(tarea.id)
-    if (tareaDetalle.value?.id === tarea.id) tareaDetalle.value = null
-    mostrarToast('Tarea iniciada')
-  } catch (e) {
-    mostrarToast(e.response?.data?.error || 'Error al iniciar', 'error')
-  }
-}
-
-async function confirmarCancelar(tarea) {
-  if (!confirm(`¿Cancelar la tarea "${tarea.titulo}"?`)) return
-  try {
-    await tareasStore.cancelar(tarea.id)
-    tareaDetalle.value = null
-    mostrarToast('Tarea cancelada', 'warning')
-  } catch (e) {
-    mostrarToast(e.response?.data?.error || 'Error al cancelar', 'error')
-  }
-}
-
-function onTareaGuardada(tarea) {
-  showModalTarea.value = false
-  mostrarToast(tareaEditando.value ? 'Tarea actualizada' : 'Tarea creada ✓')
-  tareaEditando.value  = null
-}
-
-function onTareaCompletada({ tarea, tiene_horas_para_lote }) {
-  showModalCompletar.value = false
-  tareaCompletando.value   = null
-  mostrarToast('Tarea completada ✓')
-}
-
-function verVencidas() {
-  vistaActiva.value = 'kanban'
-  cargarKanban()
-}
-
-// ── Helpers ───────────────────────────────────────────────────────
 function puedeEditarTarea(t) {
-  const user = authStore.user
-  if (!user) return false
-  return user.role === 'admin' || user.role === 'agricultor' ||
-    (user.role === 'cultivador' && t.asignada_a?.id === user.id)
-}
-
-function estadoBadge(estado) {
-  return {
-    pendiente:   'bg-secondary',
-    en_progreso: 'bg-warning text-dark',
-    completada:  'bg-success',
-    cancelada:   'bg-danger'
-  }[estado] || 'bg-secondary'
+  const u = authStore.user
+  return u?.role === 'admin' || u?.role === 'agricultor' || (u?.role === 'cultivador' && t.asignada_a?.id === u.id)
 }
 
 function mostrarToast(mensaje, tipo = 'success') {
-  const iconos = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', warning: 'bi-exclamation-triangle-fill' }
+  const iconos = { success: 'bi bi-check-circle-fill', error: 'bi bi-x-circle-fill', warning: 'bi bi-exclamation-triangle-fill' }
   toast.value = { visible: true, mensaje, tipo, icono: iconos[tipo] }
   setTimeout(() => { toast.value.visible = false }, 3000)
 }
 </script>
 
 <style scoped>
-/* ── Stat cards ─────────────────────────────────────────────────── */
-.stat-card {
-  background: var(--bs-body-bg);
-  border: 1px solid var(--bs-border-color);
-  border-radius: 12px;
-  padding: 16px 20px;
-  text-align: center;
-}
-.stat-card__number {
-  font-size: 2rem;
-  font-weight: 800;
-  line-height: 1;
-}
-.stat-card__label {
-  font-size: 0.75rem;
-  color: var(--bs-secondary);
-  margin-top: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.stat-card--pending  .stat-card__number { color: #6c757d; }
-.stat-card--progress .stat-card__number { color: #fd7e14; }
-.stat-card--done     .stat-card__number { color: #198754; }
-.stat-card--overdue  .stat-card__number { color: #dc3545; }
-.stat-card--neutral  .stat-card__number { color: #6c757d; }
+.tv { padding: 2rem 1.75rem 3rem; max-width: 1280px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #0f172a; }
+@media (max-width: 768px) { .tv { padding: 1.25rem 1rem 2rem; } }
 
-/* ── Kanban ──────────────────────────────────────────────────────── */
-.kanban-col {
-  background: var(--bs-tertiary-bg, #f8f9fa);
-  border-radius: 12px;
-  overflow: hidden;
-}
-.kanban-col__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.kanban-col__header--pending  { background: rgba(108,117,125,0.1); color: #495057; }
-.kanban-col__header--progress { background: rgba(253,126,20,0.12); color: #b45309; }
-.kanban-col__header--done     { background: rgba(25,135,84,0.1);   color: #146c43; }
+/* Header */
+.tv__header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
+.tv__title { font-size: 1.75rem; font-weight: 800; margin: 0 0 .15rem; letter-spacing: -.04em; }
+.tv__sub { font-size: .82rem; color: #64748b; margin: 0; text-transform: capitalize; }
+.tv__header-right { display: flex; align-items: center; gap: .75rem; }
 
-.kanban-col__body {
-  padding: 10px;
-  min-height: 120px;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-.kanban-col__empty {
-  text-align: center;
-  color: var(--bs-secondary);
-  font-size: 0.8rem;
-  padding: 20px 0;
-}
+/* Tabs */
+.tv__tabs { display: flex; background: #f1f5f9; border-radius: 10px; padding: 3px; }
+.tv__tab { display: flex; align-items: center; gap: .35rem; padding: .5rem .875rem; border-radius: 8px; border: none; background: none; font-size: .8rem; font-weight: 600; color: #64748b; cursor: pointer; transition: all .15s; }
+.tv__tab--active { background: #fff; color: #1b5e20; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
 
-/* ── Filtros bar ──────────────────────────────────────────────────── */
-.filtros-bar {
-  background: var(--bs-body-bg);
-  border: 1px solid var(--bs-border-color);
-  border-radius: 10px;
-  padding: 14px 16px;
-}
+/* KPIs */
+.tv__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.75rem; }
+@media (max-width: 640px) { .tv__kpis { grid-template-columns: 1fr 1fr; } }
+.tv__kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.1rem 1.25rem; position: relative; overflow: hidden; transition: box-shadow .15s; }
+.tv__kpi:hover { box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+.tv__kpi--alert { border-color: #fecaca; }
+.tv__kpi-val { font-size: 1.75rem; font-weight: 900; letter-spacing: -.04em; margin-bottom: .15rem; }
+.tv__kpi-label { font-size: .7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .05em; }
+.tv__kpi-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; }
 
-/* ── Panel de detalle (slide-in) ──────────────────────────────────── */
-.tarea-detalle-panel {
-  position: fixed;
-  inset: 0;
-  z-index: 1040;
-  background: rgba(0,0,0,0.35);
-  display: flex;
-  justify-content: flex-end;
-}
-.tarea-detalle-panel__content {
-  width: min(420px, 100vw);
-  height: 100%;
-  background: var(--bs-body-bg);
-  padding: 28px 24px;
-  overflow-y: auto;
-  animation: slideInRight 0.2s ease;
-}
-@keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
-}
+/* Loading */
+.tv__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
+.tv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: tv-spin .7s linear infinite; }
+@keyframes tv-spin { to { transform: rotate(360deg); } }
 
-.detalle-info {
-  border: 1px solid var(--bs-border-color);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.detalle-info__row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--bs-border-color);
-  font-size: 0.875rem;
-}
-.detalle-info__row:last-child { border-bottom: none; }
-.detalle-info__row .label {
-  color: var(--bs-secondary);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
+/* Alerta */
+.tv__alerta { display: flex; align-items: center; gap: .75rem; background: #fef2f2; border: 1px solid #fecaca; color: #7f1d1d; padding: .875rem 1.1rem; border-radius: 12px; margin-bottom: 1.25rem; font-size: .875rem; flex-wrap: wrap; }
+.tv__alerta i { color: #dc2626; font-size: 1.1rem; flex-shrink: 0; }
+.tv__alerta-sub { color: #991b1b; font-weight: 400; }
+.tv__alerta-btn { margin-left: auto; background: #fff; border: 1.5px solid #fecaca; color: #dc2626; padding: .35rem .875rem; border-radius: 7px; font-size: .78rem; font-weight: 600; cursor: pointer; flex-shrink: 0; }
 
-/* ── Toast ──────────────────────────────────────────────────────── */
-.toast-custom {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 9999;
-  padding: 12px 20px;
-  border-radius: 10px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: fadeInUp 0.2s ease;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-}
-.toast-custom--success { background: #198754; color: white; }
-.toast-custom--error   { background: #dc3545; color: white; }
-.toast-custom--warning { background: #fd7e14; color: white; }
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+/* Secciones */
+.tv__section { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
+.tv__section--mt { margin-top: 1.25rem; }
+.tv__section-header { display: flex; align-items: center; gap: .65rem; padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
+.tv__section-title { font-size: .9rem; font-weight: 700; color: #0f172a; flex: 1; }
+.tv__section-count { background: #e8f5e9; color: #1b5e20; font-size: .68rem; font-weight: 700; padding: .15em .6em; border-radius: 6px; }
 
-.tipo-badge-lg {
-  background: rgba(var(--bs-primary-rgb), 0.12);
-  color: var(--bs-primary);
-  font-size: 0.8rem;
-  padding: 4px 12px;
-  border-radius: 20px;
-}
+/* Kanban cols */
+.tv__kanban-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; padding: 1rem; }
+@media (max-width: 900px) { .tv__kanban-cols { grid-template-columns: 1fr; } }
+.tv__col { background: #f8fafc; border-radius: 12px; overflow: hidden; }
+.tv__col-header { display: flex; align-items: center; justify-content: space-between; padding: .65rem .875rem; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.tv__col-header--pending  { background: rgba(100,116,139,.08); color: #475569; }
+.tv__col-header--progress { background: rgba(217,119,6,.1);   color: #b45309; }
+.tv__col-header--done     { background: rgba(21,128,61,.1);   color: #15803d; }
+.tv__col-count { font-size: .7rem; font-weight: 700; background: rgba(0,0,0,.06); padding: .15em .5em; border-radius: 5px; }
+.tv__col-body { padding: .75rem; min-height: 100px; max-height: 65vh; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; }
+.tv__col-empty { text-align: center; color: #94a3b8; font-size: .8rem; padding: 1.5rem 0; }
 
-.btn-ghost {
-  background: transparent;
-  border: none;
-  color: var(--bs-secondary);
-}
+/* Próximas */
+.tv__proximas { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .75rem; padding: 1rem; }
 
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--bs-secondary);
-}
-.empty-state__icon {
-  font-size: 3rem;
-  margin-bottom: 12px;
-}
+/* Empty */
+.tv__empty { text-align: center; padding: 3.5rem 1rem; color: #94a3b8; }
+.tv__empty-emoji { font-size: 3rem; margin-bottom: .75rem; }
+.tv__empty-title { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin-bottom: .4rem; }
+.tv__empty-desc { font-size: .875rem; margin-bottom: 1.25rem; }
+
+/* Filtros kanban */
+.tv__filtros { display: flex; align-items: center; gap: .65rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.tv__filtro-select { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .6rem .875rem; font-size: .82rem; color: #0f172a; outline: none; cursor: pointer; }
+.tv__filtro-select:focus { border-color: #1b5e20; }
+.tv__btn-clear { display: inline-flex; align-items: center; gap: .3rem; background: none; border: 1.5px solid #e2e8f0; color: #64748b; padding: .55rem .875rem; border-radius: 9px; font-size: .8rem; font-weight: 500; cursor: pointer; }
+.tv__btn-clear:hover { border-color: #dc2626; color: #dc2626; background: #fef2f2; }
+
+/* Panel detalle */
+.tv__panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 1040; display: flex; justify-content: flex-end; }
+.tv__panel { width: min(420px, 100vw); height: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: -8px 0 32px rgba(0,0,0,.12); animation: tv-slide .2s ease; }
+@keyframes tv-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.tv__panel-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; }
+.tv__panel-title { font-size: .95rem; font-weight: 700; margin: 0; }
+.tv__panel-close { background: #f1f5f9; border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b; }
+.tv__panel-close:hover { background: #e2e8f0; }
+.tv__panel-body { padding: 1.5rem; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+.tv__panel-tipo { }
+.tv__tipo-pill { display: inline-flex; align-items: center; gap: .35rem; background: #e8f5e9; color: #1b5e20; font-size: .75rem; font-weight: 700; padding: .25em .75em; border-radius: 6px; }
+.tv__panel-nombre { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -.03em; }
+.tv__panel-desc { font-size: .85rem; color: #64748b; margin: 0; line-height: 1.6; }
+.tv__panel-info { border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden; }
+.tv__panel-row { display: flex; justify-content: space-between; align-items: center; padding: .65rem 1rem; border-bottom: 1px solid #f8fafc; font-size: .82rem; }
+.tv__panel-row:last-child { border-bottom: none; }
+.tv__panel-key { color: #94a3b8; font-size: .72rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.tv__panel-link { color: #1b5e20; text-decoration: none; font-weight: 600; }
+.tv__panel-hint { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; padding: .75rem 1rem; border-radius: 9px; font-size: .82rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.tv__estado-pill { font-size: .7rem; font-weight: 700; padding: .2em .65em; border-radius: 6px; text-transform: capitalize; }
+.tv__panel-actions { display: flex; flex-direction: column; gap: .5rem; padding-top: .5rem; }
+.tv__panel-btn { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .65rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
+.tv__panel-btn--primary { background: #1b5e20; color: #fff; }
+.tv__panel-btn--primary:hover { background: #144a18; }
+.tv__panel-btn--ghost { background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; }
+.tv__panel-btn--ghost:hover { background: #e2e8f0; }
+
+/* Buttons */
+.tv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 10px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.tv__btn-primary:hover { background: #144a18; }
+
+/* Toast */
+.tv__toast { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; display: flex; align-items: center; gap: .6rem; padding: .875rem 1.25rem; border-radius: 12px; font-size: .875rem; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.tv__toast--success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+.tv__toast--error   { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+.tv__toast--warning { background: #fffbeb; border: 1px solid #fde68a; color: #b45309; }
+.tv-toast-enter-active, .tv-toast-leave-active { transition: all .25s ease; }
+.tv-toast-enter-from, .tv-toast-leave-to { opacity: 0; transform: translateY(10px); }
 </style>
