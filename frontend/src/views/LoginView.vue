@@ -1,23 +1,31 @@
 <template>
   <div class="lv">
 
-    <!-- Fondo -->
+    <!-- Fondo cosmos -->
     <div class="lv__bg">
-      <div class="lv__orb lv__orb--1"></div>
-      <div class="lv__orb lv__orb--2"></div>
-      <div class="lv__orb lv__orb--3"></div>
-      <!-- Chalas decorativas — solo zona derecha -->
+      <!-- Estrellas pequeñas -->
+      <div class="lv__star lv__star--1"></div>
+      <div class="lv__star lv__star--2"></div>
+      <div class="lv__star lv__star--3"></div>
+      <div class="lv__star lv__star--4"></div>
+      <div class="lv__star lv__star--5"></div>
+      <div class="lv__star lv__star--6"></div>
+      <div class="lv__star lv__star--7"></div>
+      <div class="lv__star lv__star--8"></div>
+      <!-- Nebulosa de fondo -->
+      <div class="lv__nebula lv__nebula--1"></div>
+      <div class="lv__nebula lv__nebula--2"></div>
+      <div class="lv__nebula lv__nebula--3"></div>
+      <!-- Chalas / hojas decorativas -->
       <svg class="lv__chala lv__chala--a" viewBox="0 0 100 160" fill="none">
-        <path d="M50 8C44 22 38 42 40 65C42 80 47 88 50 92C53 88 58 80 60 65C62 42 56 22 50 8Z" fill="rgba(76,175,80,.1)"/>
-        <path d="M48 35C38 28 24 26 16 32C20 40 32 44 44 40Z" fill="rgba(76,175,80,.08)"/>
-        <path d="M52 35C62 28 76 26 84 32C80 40 68 44 56 40Z" fill="rgba(76,175,80,.08)"/>
-        <path d="M46 55C34 50 20 52 12 60C17 68 30 70 44 64Z" fill="rgba(76,175,80,.07)"/>
-        <path d="M54 55C66 50 80 52 88 60C83 68 70 70 56 64Z" fill="rgba(76,175,80,.07)"/>
-        <path d="M47 74C37 70 25 73 18 82C24 89 37 90 48 82Z" fill="rgba(76,175,80,.06)"/>
-        <path d="M53 74C63 70 75 73 82 82C76 89 63 90 52 82Z" fill="rgba(76,175,80,.06)"/>
-        <path d="M50 92L50 155" stroke="rgba(76,175,80,.09)" stroke-width="2.5" stroke-linecap="round"/>
-        <path d="M50 130C44 138 38 142 32 145" stroke="rgba(76,175,80,.06)" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M50 130C56 138 62 142 68 145" stroke="rgba(76,175,80,.06)" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M50 8C44 22 38 42 40 65C42 80 47 88 50 92C53 88 58 80 60 65C62 42 56 22 50 8Z" fill="rgba(76,175,80,.09)"/>
+        <path d="M48 35C38 28 24 26 16 32C20 40 32 44 44 40Z" fill="rgba(76,175,80,.07)"/>
+        <path d="M52 35C62 28 76 26 84 32C80 40 68 44 56 40Z" fill="rgba(76,175,80,.07)"/>
+        <path d="M46 55C34 50 20 52 12 60C17 68 30 70 44 64Z" fill="rgba(76,175,80,.06)"/>
+        <path d="M54 55C66 50 80 52 88 60C83 68 70 70 56 64Z" fill="rgba(76,175,80,.06)"/>
+        <path d="M47 74C37 70 25 73 18 82C24 89 37 90 48 82Z" fill="rgba(76,175,80,.05)"/>
+        <path d="M53 74C63 70 75 73 82 82C76 89 63 90 52 82Z" fill="rgba(76,175,80,.05)"/>
+        <path d="M50 92L50 155" stroke="rgba(76,175,80,.08)" stroke-width="2.5" stroke-linecap="round"/>
       </svg>
       <svg class="lv__chala lv__chala--b" viewBox="0 0 100 160" fill="none">
         <path d="M50 8C44 22 38 42 40 65C42 80 47 88 50 92C53 88 58 80 60 65C62 42 56 22 50 8Z" fill="rgba(56,142,60,.07)"/>
@@ -29,35 +37,114 @@
       </svg>
       <svg class="lv__chala lv__chala--c" viewBox="0 0 100 160" fill="none">
         <path d="M50 8C44 22 38 42 40 65C42 80 47 88 50 92C53 88 58 80 60 65C62 42 56 22 50 8Z" fill="rgba(129,199,132,.05)"/>
-        <path d="M50 92L50 155" stroke="rgba(129,199,132,.06)" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M48 35C38 28 24 26 16 32C20 40 32 44 44 40Z" fill="rgba(129,199,132,.04)"/>
+        <path d="M52 35C62 28 76 26 84 32C80 40 68 44 56 40Z" fill="rgba(129,199,132,.04)"/>
+        <path d="M50 92L50 155" stroke="rgba(129,199,132,.05)" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <!-- Chalas lado izquierdo -->
+      <svg class="lv__chala lv__chala--d" viewBox="0 0 100 160" fill="none">
+        <path d="M50 8C44 22 38 42 40 65C42 80 47 88 50 92C53 88 58 80 60 65C62 42 56 22 50 8Z" fill="rgba(56,142,60,.06)"/>
+        <path d="M48 35C38 28 24 26 16 32C20 40 32 44 44 40Z" fill="rgba(56,142,60,.05)"/>
+        <path d="M52 35C62 28 76 26 84 32C80 40 68 44 56 40Z" fill="rgba(56,142,60,.05)"/>
+        <path d="M46 55C34 50 20 52 12 60C17 68 30 70 44 64Z" fill="rgba(56,142,60,.04)"/>
+        <path d="M54 55C66 50 80 52 88 60C83 68 70 70 56 64Z" fill="rgba(56,142,60,.04)"/>
+        <path d="M50 92L50 155" stroke="rgba(56,142,60,.06)" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <svg class="lv__chala lv__chala--e" viewBox="0 0 100 160" fill="none">
+        <path d="M50 8C44 22 38 42 40 65C42 80 47 88 50 92C53 88 58 80 60 65C62 42 56 22 50 8Z" fill="rgba(76,175,80,.05)"/>
+        <path d="M48 35C38 28 24 26 16 32C20 40 32 44 44 40Z" fill="rgba(76,175,80,.04)"/>
+        <path d="M52 35C62 28 76 26 84 32C80 40 68 44 56 40Z" fill="rgba(76,175,80,.04)"/>
+        <path d="M50 92L50 155" stroke="rgba(76,175,80,.05)" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <!-- Chala centro -->
+      <svg class="lv__chala lv__chala--f" viewBox="0 0 100 160" fill="none">
+        <path d="M50 8C44 22 38 42 40 65C42 80 47 88 50 92C53 88 58 80 60 65C62 42 56 22 50 8Z" fill="rgba(46,125,50,.05)"/>
+        <path d="M48 35C38 28 24 26 16 32C20 40 32 44 44 40Z" fill="rgba(46,125,50,.04)"/>
+        <path d="M52 35C62 28 76 26 84 32C80 40 68 44 56 40Z" fill="rgba(46,125,50,.04)"/>
+        <path d="M50 92L50 155" stroke="rgba(46,125,50,.05)" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
     </div>
 
-    <!-- Layout: 3 columnas — vacío | login | info -->
+    <!-- Layout: 4 columnas — vacío | login | vacío | info -->
     <div class="lv__layout">
 
-      <!-- Col 1: espacio vacío (decorativa) -->
-      <div class="lv__col-empty"></div>
+      <!-- Col 1: vacía -->
+      <div></div>
 
-      <!-- Col 2: Card de login -->
+      <!-- Col 2: Card login -->
       <div class="lv__col-login">
         <div class="lv__card">
 
-          <!-- Logo -->
+          <!-- Logo Cultivo Espacial -->
           <div class="lv__logo">
-            <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-              <circle cx="22" cy="22" r="22" fill="#1b5e20"/>
-              <path d="M22 6C19.5 11 17 17 18 23C18.8 27 20.5 29.5 22 31C23.5 29.5 25.2 27 27 23C28 17 25.5 11 22 6Z" fill="#a5d6a7"/>
-              <path d="M21 16C17 13.5 12 13 9 16C11 19.5 16 20.5 20 18.5Z" fill="#81c784"/>
-              <path d="M23 16C27 13.5 32 13 35 16C33 19.5 28 20.5 24 18.5Z" fill="#81c784"/>
-              <path d="M20.5 22C15.5 20 10.5 21 8 25C11 28 17 28 21 25Z" fill="#66bb6a"/>
-              <path d="M23.5 22C28.5 20 33.5 21 36 25C33 28 27 28 23 25Z" fill="#66bb6a"/>
-              <path d="M22 31L22 40" stroke="#c8e6c9" stroke-width="2" stroke-linecap="round"/>
-              <path d="M22 37C19 39.5 17 40.5 15 41" stroke="#c8e6c9" stroke-width="1.2" stroke-linecap="round"/>
-              <path d="M22 37C25 39.5 27 40.5 29 41" stroke="#c8e6c9" stroke-width="1.2" stroke-linecap="round"/>
-            </svg>
+            <!-- SVG inspirado en el logo: cogollo + navecita + espacio -->
+            <div class="lv__logo-mark">
+              <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Fondo circular tipo espacio -->
+                <circle cx="26" cy="26" r="26" fill="#0a1a0c"/>
+                <circle cx="26" cy="26" r="26" fill="url(#space-grad)"/>
+                <!-- Estrellas del fondo -->
+                <circle cx="8"  cy="10" r="0.8" fill="white" opacity="0.6"/>
+                <circle cx="44" cy="8"  r="0.6" fill="white" opacity="0.5"/>
+                <circle cx="46" cy="20" r="0.7" fill="white" opacity="0.4"/>
+                <circle cx="6"  cy="32" r="0.5" fill="white" opacity="0.5"/>
+                <circle cx="42" cy="40" r="0.7" fill="white" opacity="0.4"/>
+                <circle cx="14" cy="44" r="0.5" fill="white" opacity="0.3"/>
+                <!-- Cogollo central (bud) -->
+                <!-- Forma principal del bud — esferas agrupadas -->
+                <ellipse cx="26" cy="28" rx="9" ry="10" fill="#3d8c3d"/>
+                <ellipse cx="22" cy="30" rx="6" ry="7" fill="#4caf50"/>
+                <ellipse cx="30" cy="30" rx="6" ry="7" fill="#4caf50"/>
+                <ellipse cx="26" cy="24" rx="7" ry="8" fill="#66bb6a"/>
+                <ellipse cx="21" cy="26" rx="5" ry="5.5" fill="#81c784"/>
+                <ellipse cx="31" cy="26" rx="5" ry="5.5" fill="#81c784"/>
+                <ellipse cx="26" cy="22" rx="5.5" ry="6" fill="#a5d6a7"/>
+                <!-- Pistils (pistilos naranjas) -->
+                <ellipse cx="23" cy="20" rx="0.8" ry="2" fill="#ff7043" transform="rotate(-10 23 20)"/>
+                <ellipse cx="27" cy="19" rx="0.8" ry="2" fill="#ff8a65" transform="rotate(5 27 19)"/>
+                <ellipse cx="30" cy="21" rx="0.8" ry="1.8" fill="#ff7043" transform="rotate(15 30 21)"/>
+                <!-- Tricomas (puntos blancos) -->
+                <circle cx="24" cy="21" r="0.9" fill="white" opacity="0.7"/>
+                <circle cx="28" cy="20" r="0.8" fill="white" opacity="0.6"/>
+                <circle cx="26" cy="23" r="0.7" fill="white" opacity="0.5"/>
+                <circle cx="22" cy="24" r="0.7" fill="white" opacity="0.5"/>
+                <circle cx="30" cy="23" r="0.8" fill="white" opacity="0.6"/>
+                <!-- Hojas de cannabis a los lados -->
+                <path d="M17 30 C14 26 10 25 8 28 C10 31 14 32 17 30Z" fill="#2e7d32" opacity="0.9"/>
+                <path d="M17 34 C13 31 9 32 8 36 C11 38 15 37 17 34Z" fill="#388e3c" opacity="0.8"/>
+                <path d="M35 30 C38 26 42 25 44 28 C42 31 38 32 35 30Z" fill="#2e7d32" opacity="0.9"/>
+                <path d="M35 34 C39 31 43 32 44 36 C41 38 37 37 35 34Z" fill="#388e3c" opacity="0.8"/>
+                <!-- Tallo -->
+                <path d="M26 38 L26 46" stroke="#1b5e20" stroke-width="2" stroke-linecap="round"/>
+                <path d="M26 43 C23 45 21 46 19 47" stroke="#2e7d32" stroke-width="1.2" stroke-linecap="round"/>
+                <path d="M26 43 C29 45 31 46 33 47" stroke="#2e7d32" stroke-width="1.2" stroke-linecap="round"/>
+                <!-- Navecita espacial (arriba derecha) -->
+                <g transform="translate(35, 10) rotate(45)">
+                  <!-- Cuerpo cohete -->
+                  <ellipse cx="0" cy="0" rx="3" ry="5.5" fill="#e0e0e0"/>
+                  <!-- Cabeza cohete -->
+                  <path d="M0 -5.5 C-2 -3 -3 0 -3 0 L3 0 C3 0 2 -3 0 -5.5Z" fill="#f5f5f5"/>
+                  <!-- Ventana -->
+                  <circle cx="0" cy="0.5" r="1.2" fill="#64b5f6" opacity="0.9"/>
+                  <!-- Aletas -->
+                  <path d="M-3 2 L-5 5 L-3 5 Z" fill="#bdbdbd"/>
+                  <path d="M3 2 L5 5 L3 5 Z" fill="#bdbdbd"/>
+                  <!-- Llama del cohete -->
+                  <path d="M-2 5 L0 9 L2 5Z" fill="#ff7043" opacity="0.9"/>
+                  <path d="M-1 5 L0 8 L1 5Z" fill="#ffcc02" opacity="0.8"/>
+                </g>
+                <!-- Estela del cohete -->
+                <path d="M36 16 C33 19 30 21 27 22" stroke="rgba(255,200,100,.4)" stroke-width="1" stroke-dasharray="1.5 2" stroke-linecap="round"/>
+                <defs>
+                  <radialGradient id="space-grad" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#0d2010"/>
+                    <stop offset="100%" stop-color="#060f07"/>
+                  </radialGradient>
+                </defs>
+              </svg>
+            </div>
             <div>
-              <div class="lv__logo-name">Club Cultivo</div>
+              <div class="lv__logo-name">Cultivo Espacial</div>
               <div class="lv__logo-sub">Gestión medicinal profesional</div>
             </div>
           </div>
@@ -65,7 +152,7 @@
           <div class="lv__sep"></div>
 
           <div class="lv__welcome">
-            <h2 class="lv__welcome-h">Bienvenido</h2>
+            <h2 class="lv__welcome-h">Bienvenido 🚀</h2>
             <p class="lv__welcome-p">Iniciá sesión para acceder a tu club</p>
           </div>
 
@@ -134,7 +221,10 @@
         <div class="lv__ver">v0.1.0 beta</div>
       </div>
 
-      <!-- Col 3: Info — todo visible -->
+      <!-- Col 3: vacía -->
+      <div></div>
+
+      <!-- Col 4: Info -->
       <div class="lv__col-info">
         <div class="lv__info">
 
@@ -153,7 +243,6 @@
 
           <div class="lv__ruler"></div>
 
-          <!-- Stats compactas -->
           <div class="lv__stats">
             <div class="lv__stat">
               <span class="lv__stat-n">100%</span>
@@ -171,7 +260,6 @@
             </div>
           </div>
 
-          <!-- Features -->
           <div class="lv__features">
             <div class="lv__feat">
               <div class="lv__feat-ico">
@@ -208,7 +296,6 @@
             </div>
           </div>
 
-          <!-- Novedades — compactas para que entren -->
           <div class="lv__news">
             <div class="lv__news-hd">Últimas novedades</div>
             <div class="lv__nitem"><span class="lv__ndot" style="background:#4caf50"></span>Genéticas INASE integradas al sistema</div>
@@ -231,9 +318,9 @@ import { useAuthStore } from '../stores/auth'
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
-const email     = ref('')
-const password  = ref('')
-const showPass  = ref(false)
+const email      = ref('')
+const password   = ref('')
+const showPass   = ref(false)
 const focusEmail = ref(false)
 const focusPass  = ref(false)
 const yr = new Date().getFullYear()
@@ -252,29 +339,48 @@ async function onSubmit() {
 .lv {
   position: fixed; inset: 0;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: #060f07;
+  background: #050d06;
   overflow: hidden;
 }
 
-/* Fondo */
+/* Fondo espacio */
 .lv__bg {
   position: absolute; inset: 0; pointer-events: none; overflow: hidden;
   background:
-    radial-gradient(ellipse 90% 80% at 65% 42%, rgba(27,94,32,.48) 0%, transparent 58%),
-    radial-gradient(ellipse 50% 50% at 10% 80%, rgba(46,125,50,.22) 0%, transparent 50%),
-    radial-gradient(ellipse 45% 45% at 88% 88%, rgba(21,71,23,.32) 0%, transparent 46%),
-    linear-gradient(165deg, #060f07 0%, #0b1d0d 45%, #070f08 100%);
+    radial-gradient(ellipse 70% 70% at 50% 50%, rgba(27,94,32,.28) 0%, transparent 65%),
+    radial-gradient(ellipse 90% 60% at 75% 45%, rgba(20,80,25,.35) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 50% at 20% 80%, rgba(15,60,20,.2) 0%, transparent 50%),
+    linear-gradient(170deg, #050d06 0%, #091508 45%, #050d06 100%);
 }
-.lv__orb { position: absolute; border-radius: 50%; filter: blur(100px); animation: orb linear infinite; }
-.lv__orb--1 { width: 600px; height: 600px; background: rgba(27,94,32,.16); top: -160px; right: -60px; animation-duration: 22s; }
-.lv__orb--2 { width: 450px; height: 450px; background: rgba(56,142,60,.13); bottom: -120px; right: 150px; animation-duration: 28s; animation-delay: -9s; }
-.lv__orb--3 { width: 350px; height: 350px; background: rgba(76,175,80,.10); top: 36%; right: 32%; animation-duration: 17s; animation-delay: -5s; }
-@keyframes orb { 0%,100%{transform:translateY(0) scale(1)} 40%{transform:translateY(-28px) scale(1.05)} 70%{transform:translateY(14px) scale(0.96)} }
 
+/* Nebulosas */
+.lv__nebula { position: absolute; border-radius: 50%; filter: blur(80px); animation: neb linear infinite; }
+.lv__nebula--1 { width: 500px; height: 500px; background: rgba(27,94,32,.18); top: -100px; right: 5%; animation-duration: 25s; }
+.lv__nebula--2 { width: 400px; height: 400px; background: rgba(46,125,50,.14); bottom: -80px; right: 20%; animation-duration: 30s; animation-delay: -10s; }
+.lv__nebula--3 { width: 350px; height: 350px; background: rgba(13,50,18,.25); top: 30%; left: 5%; animation-duration: 20s; animation-delay: -6s; }
+@keyframes neb { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-20px) scale(1.04)} }
+
+/* Estrellas */
+.lv__star { position: absolute; border-radius: 50%; background: white; animation: twinkle ease-in-out infinite; }
+.lv__star--1 { width:2px; height:2px; top:8%;  left:12%; opacity:.6; animation-duration:3s; }
+.lv__star--2 { width:1.5px; height:1.5px; top:15%; left:35%; opacity:.4; animation-duration:4s; animation-delay:-1s; }
+.lv__star--3 { width:2px; height:2px; top:5%;  left:55%; opacity:.7; animation-duration:2.5s; animation-delay:-0.5s; }
+.lv__star--4 { width:1px; height:1px; top:22%; left:72%; opacity:.5; animation-duration:3.5s; animation-delay:-2s; }
+.lv__star--5 { width:2px; height:2px; top:70%; left:8%;  opacity:.4; animation-duration:4.5s; animation-delay:-1.5s; }
+.lv__star--6 { width:1.5px; height:1.5px; top:80%; left:30%; opacity:.6; animation-duration:3s; animation-delay:-0.8s; }
+.lv__star--7 { width:2px; height:2px; top:60%; left:82%; opacity:.5; animation-duration:2.8s; animation-delay:-2.5s; }
+.lv__star--8 { width:1px; height:1px; top:40%; left:90%; opacity:.7; animation-duration:3.8s; animation-delay:-1.2s; }
+@keyframes twinkle { 0%,100%{opacity:.7;transform:scale(1)} 50%{opacity:.1;transform:scale(0.6)} }
+
+/* Chalas */
 .lv__chala { position: absolute; pointer-events: none; animation: sway ease-in-out infinite; transform-origin: 50% 99%; }
-.lv__chala--a { width: 200px; height: 320px; right: 0%;  top: 2%;  animation-duration: 9s; }
-.lv__chala--b { width: 240px; height: 384px; right: 4%;  top: 48%; animation-duration: 11s; animation-delay: -4s; }
-.lv__chala--c { width: 150px; height: 240px; right: 22%; top: 58%; animation-duration: 14s; animation-delay: -6s; }
+.lv__chala--a { width: 190px; height: 304px; right: 1%;  top: 3%;  animation-duration: 9s; }
+.lv__chala--b { width: 230px; height: 368px; right: 5%;  top: 50%; animation-duration: 12s; animation-delay: -4s; }
+.lv__chala--c { width: 140px; height: 224px; right: 23%; top: 60%; animation-duration: 15s; animation-delay: -7s; }
+/* Chalas lado izquierdo y centro */
+.lv__chala--d { width: 170px; height: 272px; left: 1%;  top: 10%; animation-duration: 11s; animation-delay: -3s; }
+.lv__chala--e { width: 130px; height: 208px; left: 4%;  top: 55%; animation-duration: 14s; animation-delay: -8s; }
+.lv__chala--f { width: 120px; height: 192px; left: 30%; top: 70%; animation-duration: 16s; animation-delay: -5s; }
 @keyframes sway {
   0%  { transform: rotate(-4deg); }
   25% { transform: rotate(2deg) translateY(-5px); }
@@ -283,31 +389,26 @@ async function onSubmit() {
   100%{ transform: rotate(-4deg); }
 }
 
-/* Layout — 3 columnas: 1fr | 420px | 1fr */
+/* Layout 4 columnas: 1fr | 420px | 1fr | 1fr */
 .lv__layout {
   position: relative; z-index: 10;
   display: grid;
-  grid-template-columns: 1fr 420px 1fr;
+  grid-template-columns: 0.3fr 420px 0.2fr 1fr;
   min-height: 100vh;
   align-items: center;
 }
-@media (max-width: 1024px) {
-  .lv__layout { grid-template-columns: 1fr 420px; }
-  .lv__col-empty { display: none; }
+@media (max-width: 1100px) {
+  .lv__layout { grid-template-columns: 0.3fr 420px 0.2fr 1fr; }
 }
-@media (max-width: 720px) {
+@media (max-width: 860px) {
   .lv__layout { grid-template-columns: 1fr; padding: 1.5rem; }
-  .lv__col-empty { display: none; }
-  .lv__col-info  { display: none; }
+  .lv__col-info { display: none; }
 }
 
-/* Col 1: vacía */
-.lv__col-empty { /* decorativa */ }
-
-/* Col 2: login centrado */
+/* Col login */
 .lv__col-login {
   display: flex; flex-direction: column; align-items: center;
-  padding: 2rem 1rem;
+  padding: 2rem 0;
 }
 
 /* Card */
@@ -317,21 +418,22 @@ async function onSubmit() {
   border-radius: 26px; overflow: hidden;
   box-shadow:
     0 0 0 1px rgba(255,255,255,.15),
-    0 40px 80px rgba(0,0,0,.65),
-    0 0 120px rgba(27,94,32,.22),
+    0 40px 80px rgba(0,0,0,.7),
+    0 0 140px rgba(27,94,32,.25),
     inset 0 1px 0 rgba(255,255,255,.9);
 }
 
-.lv__logo { display: flex; align-items: center; gap: 1rem; padding: 1.6rem 1.6rem 1.1rem; }
+.lv__logo { display: flex; align-items: center; gap: .9rem; padding: 1.5rem 1.5rem 1rem; }
+.lv__logo-mark { flex-shrink: 0; filter: drop-shadow(0 2px 8px rgba(27,94,32,.4)); }
 .lv__logo-name { font-size: 1.05rem; font-weight: 800; color: #0f172a; letter-spacing: -.03em; }
 .lv__logo-sub { font-size: .6rem; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; margin-top: .1rem; }
-.lv__sep { height: 1px; background: #f1f5f9; margin: 0 1.6rem; }
+.lv__sep { height: 1px; background: #f1f5f9; margin: 0 1.5rem; }
 
-.lv__welcome { padding: 1.1rem 1.6rem 0; }
+.lv__welcome { padding: 1.1rem 1.5rem 0; }
 .lv__welcome-h { font-size: 1.25rem; font-weight: 800; color: #0f172a; letter-spacing: -.04em; margin-bottom: .18rem; }
 .lv__welcome-p { font-size: .78rem; color: #64748b; }
 
-.lv__form { padding: 1rem 1.6rem 1.1rem; display: flex; flex-direction: column; gap: .8rem; }
+.lv__form { padding: 1rem 1.5rem 1.1rem; display: flex; flex-direction: column; gap: .8rem; }
 .lv__field { display: flex; flex-direction: column; gap: .28rem; }
 .lv__label { font-size: .65rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .07em; }
 
@@ -362,22 +464,19 @@ async function onSubmit() {
 .lv__spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.lv__foot { display: flex; align-items: center; justify-content: space-between; padding: .7rem 1.6rem 1.4rem; border-top: 1px solid #f1f5f9; }
+.lv__foot { display: flex; align-items: center; justify-content: space-between; padding: .7rem 1.5rem 1.4rem; border-top: 1px solid #f1f5f9; }
 .lv__secure { display: flex; align-items: center; gap: .38rem; font-size: .65rem; color: #94a3b8; }
 .lv__copy { font-size: .65rem; color: #94a3b8; }
 .lv__dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; display: inline-block; animation: pulse 2.5s ease infinite; }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
 .lv__ver { margin-top: .9rem; font-size: .63rem; color: rgba(255,255,255,.13); text-align: center; }
 
-/* Col 3: info — centrada verticalmente, todo visible */
+/* Col info */
 .lv__col-info {
-  display: flex; align-items: center; justify-content: flex-start;
-  padding: 2rem 2.5rem 2rem 2rem;
+  display: flex; align-items: center;
+  padding: 2rem 1.5rem 2rem 1rem;
 }
-.lv__info {
-  display: flex; flex-direction: column; gap: 1.1rem;
-  max-width: 440px; width: 100%;
-}
+.lv__info { display: flex; flex-direction: column; gap: 1.1rem; max-width: 420px; width: 100%; }
 
 .lv__badge {
   display: inline-flex; align-items: center; gap: .45rem;
@@ -395,37 +494,23 @@ async function onSubmit() {
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
 
-.lv__desc { font-size: .8rem; color: rgba(255,255,255,.33); line-height: 1.7; }
+.lv__desc { font-size: .8rem; color: rgba(255,255,255,.32); line-height: 1.7; }
 .lv__ruler { width: 36px; height: 2px; background: linear-gradient(90deg, #4caf50, transparent); border-radius: 2px; }
 
-/* Stats */
-.lv__stats {
-  display: flex; align-items: center; gap: 1rem;
-  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
-  border-radius: 12px; padding: .75rem 1.1rem;
-}
+.lv__stats { display: flex; align-items: center; gap: 1rem; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); border-radius: 12px; padding: .75rem 1.1rem; }
 .lv__stat { text-align: center; flex: 1; }
 .lv__stat-n { display: block; font-size: 1.05rem; font-weight: 800; color: #81c784; letter-spacing: -.03em; }
 .lv__stat-l { display: block; font-size: .56rem; color: rgba(255,255,255,.28); text-transform: uppercase; letter-spacing: .06em; margin-top: .12rem; }
 .lv__ssep { width: 1px; height: 26px; background: rgba(255,255,255,.08); flex-shrink: 0; }
 
-/* Features */
 .lv__features { display: flex; flex-direction: column; gap: .5rem; }
-.lv__feat {
-  display: flex; align-items: flex-start; gap: .75rem;
-  background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.04);
-  border-radius: 11px; padding: .7rem .9rem; transition: all .2s;
-}
+.lv__feat { display: flex; align-items: flex-start; gap: .75rem; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.04); border-radius: 11px; padding: .7rem .9rem; transition: all .2s; }
 .lv__feat:hover { background: rgba(76,175,80,.07); border-color: rgba(76,175,80,.14); transform: translateX(4px); }
 .lv__feat-ico { width: 30px; height: 30px; border-radius: 8px; background: rgba(76,175,80,.12); color: #66bb6a; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .lv__feat-t { font-size: .78rem; font-weight: 700; color: rgba(255,255,255,.8); margin-bottom: .12rem; }
 .lv__feat-d { font-size: .67rem; color: rgba(255,255,255,.28); line-height: 1.4; }
 
-/* Novedades */
-.lv__news {
-  background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.04);
-  border-radius: 11px; padding: .8rem 1rem;
-}
+.lv__news { background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.04); border-radius: 11px; padding: .8rem 1rem; }
 .lv__news-hd { font-size: .58rem; font-weight: 800; color: rgba(255,255,255,.26); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .55rem; }
 .lv__nitem { display: flex; align-items: center; gap: .48rem; font-size: .72rem; color: rgba(255,255,255,.4); padding: .22rem 0; }
 .lv__nitem + .lv__nitem { border-top: 1px solid rgba(255,255,255,.04); }
