@@ -90,4 +90,12 @@ module Permissions
   def socio?
     role == 'socio'
   end
+
+  def super_admin?
+    role == 'super_admin'
+  end
+
+  def admin_or_agricultor?
+    admin? || agricultor?
+  end
 end
