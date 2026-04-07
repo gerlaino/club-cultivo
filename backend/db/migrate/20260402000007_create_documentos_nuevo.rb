@@ -1,4 +1,4 @@
-class CreateDocumentos < ActiveRecord::Migration[7.2]
+class CreateDocumentosNuevo < ActiveRecord::Migration[7.2]
   def change
     create_table :documentos do |t|
       t.references :club,    null: false, foreign_key: true
