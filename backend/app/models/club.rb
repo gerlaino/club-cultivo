@@ -22,6 +22,7 @@ class Club < ApplicationRecord
   validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
 
   before_validation :generar_slug, on: :create
+  after_create :crear_geneticas_default!
 
   ROLES_DEFAULT    = %w[admin medico agricultor cultivador abogado].freeze
   PASSWORD_DEFAULT = '123456Aa'.freeze
