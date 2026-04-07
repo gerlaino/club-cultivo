@@ -1,3 +1,9 @@
+# ============================================================
+# SEED STAGING — Cultivo Espacial
+# Correr desde el shell de Render:
+#   bundle exec rails runner seed_staging.rb
+# ============================================================
+
 puts "🌱 Iniciando seed de staging..."
 puts "="*55
 
@@ -267,8 +273,8 @@ puts "\n💰 Creando movimientos contables..."
   { tipo: 'egreso',  categoria: 'alquiler',       descripcion: 'Alquiler sede Caballito - Feb',   monto_ars: 380000,  fecha: 60.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
   { tipo: 'egreso',  categoria: 'alquiler',       descripcion: 'Alquiler sede Palermo - Mar',     monto_ars: 520000,  fecha: 30.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
   { tipo: 'egreso',  categoria: 'alquiler',       descripcion: 'Alquiler sede Caballito - Mar',   monto_ars: 380000,  fecha: 30.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
-  { tipo: 'egreso',  categoria: 'electricidad',   descripcion: 'Factura electrica Febrero',       monto_ars: 145000,  fecha: 55.days.ago.to_date, pagado: true, medio_pago: 'debito'        },
-  { tipo: 'egreso',  categoria: 'electricidad',   descripcion: 'Factura electrica Marzo',         monto_ars: 162000,  fecha: 25.days.ago.to_date, pagado: true, medio_pago: 'debito'        },
+  { tipo: 'egreso',  categoria: 'electricidad',   descripcion: 'Factura electrica Febrero',       monto_ars: 145000,  fecha: 55.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
+  { tipo: 'egreso',  categoria: 'electricidad',   descripcion: 'Factura electrica Marzo',         monto_ars: 162000,  fecha: 25.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
   { tipo: 'egreso',  categoria: 'honorario',      descripcion: 'Honorarios Dr. Altamirano - Feb', monto_ars: 320000,  fecha: 58.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
   { tipo: 'egreso',  categoria: 'honorario',      descripcion: 'Honorarios Dr. Altamirano - Mar', monto_ars: 320000,  fecha: 28.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
   { tipo: 'egreso',  categoria: 'sueldo',         descripcion: 'Sueldo cultivador - Febrero',     monto_ars: 420000,  fecha: 58.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
@@ -279,7 +285,7 @@ puts "\n💰 Creando movimientos contables..."
   { tipo: 'egreso',  categoria: 'insumo',         descripcion: 'Lamparas LED Samsung 480W x4',    monto_ars: 380000,  fecha: 50.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
   { tipo: 'egreso',  categoria: 'mantenimiento',  descripcion: 'Servicio tecnico sistema riego',  monto_ars: 85000,   fecha: 22.days.ago.to_date, pagado: true, medio_pago: 'efectivo'      },
   { tipo: 'egreso',  categoria: 'mantenimiento',  descripcion: 'Cambio filtros HEPA aire',         monto_ars: 54000,   fecha: 15.days.ago.to_date, pagado: true, medio_pago: 'efectivo'      },
-  { tipo: 'egreso',  categoria: 'administrativo', descripcion: 'Gestoria renovacion habilitacion', monto_ars: 120000,  fecha: 12.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
+  { tipo: 'egreso',  categoria: 'admin',          descripcion: 'Gestoria renovacion habilitacion', monto_ars: 120000,  fecha: 12.days.ago.to_date, pagado: true, medio_pago: 'transferencia' },
 ].each { |m| club.movimientos_contables.create!(m.merge(created_by: admin)) }
 puts "  ✅ #{club.movimientos_contables.count} movimientos contables"
 
