@@ -1,67 +1,188 @@
 <template>
-  <footer class="bg-dark text-light py-5 mt-5">
-    <div class="container">
-      <div class="row">
-        <div class="col-md-4 mb-4">
-          <h5 class="text-success">{{ club?.name }}</h5>
-          <p class="small text-muted">{{ club?.legal_name }}</p>
-          <p class="small">
-            Cannabis medicinal de calidad para nuestros socios.
-          </p>
-        </div>
+  <footer class="wp-footer">
+    <div class="wp-footer-inner">
 
-        <div class="col-md-4 mb-4">
-          <h5 class="text-success">Contacto</h5>
-          <ul class="list-unstyled small">
-            <li v-if="club?.address" class="mb-2">
-              <i class="bi bi-geo-alt-fill text-success me-2"></i>
-              {{ club.address }}, {{ club.city }}
-            </li>
-            <li v-if="club?.phone" class="mb-2">
-              <i class="bi bi-telephone-fill text-success me-2"></i>
-              {{ club.phone }}
-            </li>
-            <li v-if="club?.email" class="mb-2">
-              <i class="bi bi-envelope-fill text-success me-2"></i>
-              {{ club.email }}
-            </li>
-          </ul>
+      <div class="wp-footer-brand-col">
+        <div class="wp-footer-name">{{ club?.name || 'Club Cannábico' }}</div>
+        <div class="wp-footer-legal">{{ club?.legal_name }}</div>
+        <div class="wp-footer-desc">
+          Asociación civil sin fines de lucro dedicada al cultivo responsable y acceso legal para pacientes REPROCANN.
         </div>
-
-        <div class="col-md-4 mb-4">
-          <h5 class="text-success">Seguinos</h5>
-          <div class="d-flex gap-3">
-            <a href="#" class="text-light fs-4"><i class="bi bi-facebook"></i></a>
-            <a href="#" class="text-light fs-4"><i class="bi bi-instagram"></i></a>
-            <a href="#" class="text-light fs-4"><i class="bi bi-twitter"></i></a>
-          </div>
+        <div v-if="club?.numero_resolucion_reprocann" class="wp-footer-reprocann">
+          {{ club.numero_resolucion_reprocann }}
         </div>
       </div>
 
-      <hr class="border-secondary">
+      <div class="wp-footer-col">
+        <div class="wp-footer-col-title">Navegación</div>
+        <RouterLink to="/geneticas" class="wp-footer-link">Variedades</RouterLink>
+        <RouterLink to="/noticias" class="wp-footer-link">Noticias</RouterLink>
+        <RouterLink to="/eventos" class="wp-footer-link">Eventos</RouterLink>
+        <RouterLink to="/galeria" class="wp-footer-link">Galería</RouterLink>
+        <RouterLink to="/contacto" class="wp-footer-link">Contacto</RouterLink>
+      </div>
 
-      <div class="row">
-        <div class="col-md-12 text-center small text-muted">
-          <p class="mb-0">
-            © {{ new Date().getFullYear() }} {{ club?.name }}. Todos los derechos reservados.
-          </p>
+      <div class="wp-footer-col">
+        <div class="wp-footer-col-title">Contacto</div>
+        <div v-if="club?.address" class="wp-footer-contact-item">
+          <span class="wp-footer-contact-icon">📍</span>
+          {{ club.address }}, {{ club.city }}
         </div>
+        <div v-if="club?.phone" class="wp-footer-contact-item">
+          <span class="wp-footer-contact-icon">📞</span>
+          {{ club.phone }}
+        </div>
+        <div v-if="club?.email" class="wp-footer-contact-item">
+          <span class="wp-footer-contact-icon">✉️</span>
+          {{ club.email }}
+        </div>
+      </div>
+
+    </div>
+
+    <div class="wp-footer-bottom">
+      <div class="wp-footer-copy">
+        © {{ new Date().getFullYear() }} {{ club?.name }}. Todos los derechos reservados.
+      </div>
+      <div class="wp-footer-powered">
+        Potenciado por <strong>Cultivo Espacial</strong>
       </div>
     </div>
   </footer>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import publicApi from '@/api/publicApi'
+import { useClubStore } from '../stores/club.js'
+import { storeToRefs } from 'pinia'
 
-const club = ref(null)
-
-onMounted(async () => {
-  try {
-    club.value = await publicApi.getClub()
-  } catch (error) {
-    console.error('Error cargando info del club:', error)
-  }
-})
+const store = useClubStore()
+store.fetchClub()
+const { club } = storeToRefs(store)
 </script>
+
+<style scoped>
+.wp-footer {
+  background: #050d06;
+  border-top: 1px solid #1b5e2022;
+  margin-top: auto;
+}
+
+.wp-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem 2rem 2rem;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 3rem;
+}
+
+.wp-footer-name {
+  color: #66bb6a;
+  font-size: 17px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.wp-footer-legal {
+  color: #81c784;
+  font-size: 12px;
+  opacity: 0.5;
+  margin-bottom: 12px;
+}
+
+.wp-footer-desc {
+  color: #81c784;
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0.6;
+  margin-bottom: 12px;
+}
+
+.wp-footer-reprocann {
+  display: inline-block;
+  background: #1b5e2022;
+  border: 1px solid #1b5e2044;
+  color: #66bb6a;
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.wp-footer-col-title {
+  color: #a5d6a7;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 16px;
+}
+
+.wp-footer-link {
+  display: block;
+  color: #81c784;
+  font-size: 13px;
+  text-decoration: none;
+  opacity: 0.6;
+  margin-bottom: 10px;
+  transition: opacity 0.2s;
+}
+
+.wp-footer-link:hover {
+  opacity: 1;
+}
+
+.wp-footer-contact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #81c784;
+  font-size: 13px;
+  opacity: 0.6;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.wp-footer-contact-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.wp-footer-bottom {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 2rem;
+  border-top: 1px solid #1b5e2022;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wp-footer-copy {
+  color: #81c784;
+  font-size: 12px;
+  opacity: 0.4;
+}
+
+.wp-footer-powered {
+  color: #66bb6a;
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+.wp-footer-powered strong {
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .wp-footer-inner {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  .wp-footer-bottom {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+}
+</style>

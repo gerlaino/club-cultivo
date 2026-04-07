@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import api from '../api/index.js'
+import api from '@/api/publicApi.js'
 
 export const useClubStore = defineStore('club', () => {
     const club = ref(null)
