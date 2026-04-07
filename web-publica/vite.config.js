@@ -10,6 +10,13 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5174  // ← Para no chocar con la app en 5173
+    port: 5174,
+    host: true,
+    proxy: {
+      '/public': {
+        target: 'http://localhost:3001',
+        changeOrigin: true
+      }
+    }
   }
 })

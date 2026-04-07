@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_04_192713) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_07_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -66,6 +66,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_04_192713) do
     t.string "numero_resolucion_reprocann"
     t.date "fecha_resolucion_reprocann"
     t.string "tipo_organizacion"
+    t.boolean "web_activa", default: false, null: false
+    t.text "descripcion_web"
+    t.string "instagram_url"
+    t.string "facebook_url"
+    t.string "whatsapp"
+    t.text "horarios_atencion"
     t.index ["plan"], name: "index_clubs_on_plan"
     t.index ["slug"], name: "index_clubs_on_slug", unique: true
   end
@@ -183,6 +189,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_04_192713) do
     t.boolean "registrada_inase"
     t.string "criador"
     t.string "terpenos"
+    t.boolean "visible_web", default: false, null: false
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
     t.index ["club_id"], name: "index_geneticas_on_club_id"

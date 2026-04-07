@@ -1,10 +1,15 @@
-class SuperAdmin::BaseController < ApplicationController
-  before_action :authenticate_user!
-  before_action :require_super_admin!
+module Public
+  class BaseController < ApplicationController
+    include Rails.application.routes.url_helpers
+    skip_before_action :authenticate_user!, raise: false
 
-  private
+    private
 
-  def require_super_admin!
-    render json: { error: 'No autorizado' }, status: :forbidden unless current_user.super_admin?
+    def current_club
+      @current_club ||= begin
+                          slug = params[:club_slug] || request.subdomain.presence
+                          slug.present? ? Club.find_by(slug: slug) : Club.first
+                        end
+    end
   end
 end
