@@ -1,48 +1,32 @@
-# ============================================================
-# RESET DB — Cultivo Espacial Staging
-# Correr desde el shell de Render:
-#   bundle exec rails runner reset_db.rb
-# ============================================================
-
-puts "⚠️  RESET COMPLETO DE LA BASE DE DATOS"
+uts "⚠️  RESET COMPLETO DE LA BASE DE DATOS"
 puts "="*55
 
-# Orden importante: respetar foreign keys
-modelos = [
-  "PlantActivity",
-  "Plant",
-  "LoteEvento",
-  "RegistroAmbiental",
-  "CostoLote",
-  "Lote",
-  "SalaCultivador",
-  "Sala",
-  "Dispensacion",
-  "SocioNota",
-  "IndicacionMedica",
-  "Socio",
-  "MovimientoContable",
-  "Tarea",
-  "Documento",
-  "UserSede",
-  "Sede",
-  "Genetica",
-  "JwtDenylist",
-  "User",
-  "Club",
+tablas = %w[
+  plant_activities
+  plants
+  lote_eventos
+  registros_ambientales
+  costo_lotes
+  dispensaciones
+  socio_notas
+  indicacion_medicas
+  socios
+  movimientos_contables
+  tareas
+  documentos
+  document_templates
+  patient_documents
+  user_sedes
+  sala_cultivadores
+  lotes
+  salas
+  sedes
+  geneticas
+  jwt_denylists
+  users
+  clubs
 ]
 
-modelos.each do |nombre|
-  begin
-    klass = nombre.constantize
-    count = klass.unscoped.count
-    klass.unscoped.delete_all
-    puts "  🗑️  #{nombre}: #{count} registros eliminados"
-  rescue => e
-    puts "  ⚠️  #{nombre}: #{e.message}"
-  end
-end
-
-puts ""
-puts "✅ Base de datos limpia."
-puts "   Ahora corré: bundle exec rails runner seed_staging.rb"
+ActiveRecord::Base.connection.execute("TRUNCATE #{tablas.join(', ')} RESTART IDENTITY CASCADE")
+puts "✅ Base de datos limpia (TRUNCATE CASCADE)."
+puts "   Ahora corré: bundle exec rails runner db/scripts/seed_staging.rb"
