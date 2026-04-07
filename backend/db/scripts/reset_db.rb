@@ -1,4 +1,4 @@
-uts "⚠️  RESET COMPLETO DE LA BASE DE DATOS"
+puts "⚠️  RESET COMPLETO DE LA BASE DE DATOS"
 puts "="*55
 
 tablas = %w[
