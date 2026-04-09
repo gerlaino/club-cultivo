@@ -240,4 +240,18 @@ export const createSuperAdminUser = (payload)     => api.post('/super_admin/user
 export const updateSuperAdminUser = (id, payload) => api.put(`/super_admin/users/${id}`, { user: payload })
 export const deleteSuperAdminUser = (id)          => api.delete(`/super_admin/users/${id}`)
 
+// -------- NOTICIAS --------
+export const listNoticias  = (params = {}) => api.get('/noticias', { params })
+export const getNoticia    = (id)          => api.get(`/noticias/${id}`)
+export const createNoticia = (payload)     => api.post('/noticias', { noticia: payload })
+export const updateNoticia = (id, payload) => api.patch(`/noticias/${id}`, { noticia: payload })
+export const deleteNoticia = (id)          => api.delete(`/noticias/${id}`)
+
+// -------- EVENTOS --------
+export const listEventos  = (params = {}) => api.get('/eventos', { params })
+export const getEvento    = (id)          => api.get(`/eventos/${id}`)
+export const createEvento = (payload)     => api.post('/eventos', { evento: payload })
+export const updateEvento = (id, payload) => api.patch(`/eventos/${id}`, { evento: payload })
+export const deleteEvento = (id)          => api.delete(`/eventos/${id}`)
+
 export default api;

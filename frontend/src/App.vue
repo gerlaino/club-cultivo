@@ -132,6 +132,11 @@ onMounted(async () => {
                 <i class="bi bi-clipboard-check me-1 d-lg-none"></i>Tareas
               </RouterLink>
             </li>
+            <li class="nav-item" v-if="isAdmin">
+              <RouterLink class="nav-link px-2" to="/web" @click="closeNav">
+                <i class="bi bi-globe me-1 d-lg-none"></i>Web
+              </RouterLink>
+            </li>
             <li class="nav-item" v-if="can('documentos', 'index')">
               <RouterLink class="nav-link px-2" to="/documentos" @click="closeNav">
                 <i class="bi bi-clipboard-check me-1 d-lg-none"></i>Documentos

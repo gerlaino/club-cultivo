@@ -215,6 +215,14 @@ const routes = [
     },
   },
 
+  // Web publica
+  {
+    path: '/web',
+    name: 'web-publica-panel',
+    component: () => import('../views/WebPublicaView.vue'),
+    meta: { requiresAuth: true },
+  },
+
   // Informe REPROCANN
   {
     path: "/informe-semestral",
