@@ -1,165 +1,161 @@
 <template>
-  <div class="eventos-view">
-    <div class="container py-5">
-      <h1 class="mb-4">Eventos del Club</h1>
-      <p class="lead text-muted mb-4">
-        Participá de nuestros talleres, charlas y actividades.
-      </p>
+  <div class="ev">
 
-      <!-- Toggle próximos/pasados -->
-      <div class="mb-4">
-        <div class="btn-group" role="group">
-          <button
-              type="button"
-              class="btn"
-              :class="!mostrarPasados ? 'btn-success' : 'btn-outline-success'"
-              @click="mostrarPasados = false; cargarEventos()"
-          >
-            Próximos eventos
-          </button>
-          <button
-              type="button"
-              class="btn"
-              :class="mostrarPasados ? 'btn-success' : 'btn-outline-success'"
-              @click="mostrarPasados = true; cargarEventos()"
-          >
-            Eventos pasados
-          </button>
+    <section class="ev__hero">
+      <div class="ev__hero-inner">
+        <h1 class="ev__hero-title">Eventos <span class="ev__hero-accent">del club</span></h1>
+        <p class="ev__hero-sub">Talleres, charlas y actividades. Participá de nuestra comunidad.</p>
+      </div>
+    </section>
+
+    <section class="ev__section">
+      <div class="ev__container">
+
+        <div v-if="loading" class="ev__loading"><div class="ev__spinner"></div></div>
+
+        <div v-else-if="eventos.length === 0" class="ev__empty">
+          <i class="bi bi-calendar-x" style="font-size:3rem;opacity:.3;display:block;margin-bottom:1rem"></i>
+          No hay eventos próximos por el momento.
         </div>
-      </div>
 
-      <div v-if="loading" class="loading">
-        <div class="spinner-border text-success" role="status">
-          <span class="visually-hidden">Cargando...</span>
-        </div>
-      </div>
+        <div v-else class="ev__lista">
+          <div v-for="e in eventos" :key="e.id" class="ev__card">
 
-      <div v-else-if="error" class="alert alert-danger">
-        {{ error }}
-      </div>
-
-      <div v-else class="row g-4">
-        <div v-for="evento in eventos" :key="evento.id" class="col-md-6 col-lg-4">
-          <div class="card h-100 shadow-sm hover-card">
-            <div v-if="evento.imagenes_urls.length > 0" class="card-img-top-wrapper">
-              <img :src="evento.imagenes_urls[0]" class="card-img-top" :alt="evento.titulo">
-            </div>
-            <div v-else class="card-img-top-wrapper bg-light d-flex align-items-center justify-content-center">
-              <i class="bi bi-calendar-event text-muted" style="font-size: 3rem;"></i>
+            <div class="ev__card-fecha">
+              <div class="ev__dia">{{ getDia(e.fecha_inicio) }}</div>
+              <div class="ev__mes">{{ getMes(e.fecha_inicio) }}</div>
+              <div class="ev__anio">{{ getAnio(e.fecha_inicio) }}</div>
             </div>
 
-            <div class="card-body">
-              <h5 class="card-title text-success">{{ evento.titulo }}</h5>
+            <div class="ev__card-img" v-if="e.imagen_url">
+              <img :src="e.imagen_url" :alt="e.titulo" />
+            </div>
+            <div class="ev__card-img ev__card-img--placeholder" v-else>
+              <i class="bi bi-calendar-event"></i>
+            </div>
 
-              <div class="evento-info mb-3">
-                <p class="mb-2">
-                  <i class="bi bi-calendar-event text-success"></i>
-                  <strong>{{ formatFecha(evento.fecha_inicio) }}</strong>
-                </p>
-                <p class="mb-2">
-                  <i class="bi bi-clock text-success"></i>
-                  {{ formatHora(evento.fecha_inicio) }}
-                  <span v-if="evento.fecha_fin">
-                    - {{ formatHora(evento.fecha_fin) }}
-                  </span>
-                </p>
-                <p class="mb-0">
-                  <i class="bi bi-geo-alt text-success"></i>
-                  {{ evento.lugar }}
-                </p>
+            <div class="ev__card-body">
+              <h2 class="ev__card-titulo">{{ e.titulo }}</h2>
+              <div class="ev__card-meta">
+                <span v-if="e.lugar"><i class="bi bi-geo-alt"></i> {{ e.lugar }}</span>
+                <span><i class="bi bi-clock"></i> {{ getHora(e.fecha_inicio) }}</span>
+                <span v-if="e.fecha_fin"><i class="bi bi-arrow-right"></i> {{ getHora(e.fecha_fin) }}</span>
               </div>
+              <p v-if="e.descripcion" class="ev__card-desc">{{ e.descripcion }}</p>
+            </div>
 
-              <RouterLink :to="`/eventos/${evento.id}`" class="btn btn-outline-success w-100">
-                Ver detalles
+            <div class="ev__card-cta">
+              <RouterLink to="/contacto" class="ev__inscribirse-btn">
+                Anotarme <i class="bi bi-arrow-right"></i>
               </RouterLink>
             </div>
+
           </div>
         </div>
-      </div>
 
-      <div v-if="!loading && eventos.length === 0" class="text-center py-5">
-        <i class="bi bi-calendar-x display-1 text-muted"></i>
-        <p class="text-muted mt-3">
-          {{ mostrarPasados ? 'No hay eventos pasados.' : 'No hay eventos próximos programados.' }}
-        </p>
       </div>
-    </div>
+    </section>
+
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import publicApi from '@/api/publicApi'
+import publicApi from '../api/publicApi.js'
 
 const eventos = ref([])
 const loading = ref(true)
-const error = ref(null)
-const mostrarPasados = ref(false)
 
-function formatFecha(dateString) {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('es-AR', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
+function getDia(f)  { return f ? new Date(f).getDate() : '' }
+function getMes(f)  { return f ? new Date(f).toLocaleDateString('es-AR', { month: 'short' }).toUpperCase() : '' }
+function getAnio(f) { return f ? new Date(f).getFullYear() : '' }
+function getHora(f) { return f ? new Date(f).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '' }
 
-function formatHora(dateString) {
-  const date = new Date(dateString)
-  return date.toLocaleTimeString('es-AR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-async function cargarEventos() {
-  loading.value = true
-  error.value = null
-
-  try {
-    eventos.value = await publicApi.getEventos(mostrarPasados.value)
-  } catch (err) {
-    console.error('Error cargando eventos:', err)
-    error.value = 'Error al cargar los eventos. Por favor, intenta de nuevo.'
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  cargarEventos()
+onMounted(async () => {
+  try { eventos.value = await publicApi.getEventos() }
+  catch (e) { console.error(e) }
+  finally { loading.value = false }
 })
 </script>
 
 <style scoped>
-.card-img-top-wrapper {
-  height: 200px;
-  overflow: hidden;
+.ev { min-height: 100vh; background: #f0fdf4; }
+
+.ev__hero { background: #060f07; padding: 5rem 2rem 4rem; position: relative; overflow: hidden; }
+.ev__hero::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, #1b5e2018 0%, transparent 65%);
+}
+.ev__hero-inner { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
+.ev__hero-title { color: #f0fdf4; font-size: 40px; font-weight: 500; margin-bottom: 1rem; }
+.ev__hero-accent { color: #66bb6a; }
+.ev__hero-sub { color: #81c784; font-size: 16px; opacity: .8; margin: 0; }
+
+.ev__section { padding: 3.5rem 0; }
+.ev__container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+
+.ev__loading { display: flex; justify-content: center; padding: 4rem; }
+.ev__spinner {
+  width: 32px; height: 32px; border: 2px solid #d4edda; border-top-color: #1b5e20;
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.ev__empty { text-align: center; color: #4a7c59; padding: 4rem; font-size: 15px; }
+
+.ev__lista { display: flex; flex-direction: column; gap: 16px; }
+.ev__card {
+  background: white; border: 1px solid #d4edda; border-radius: 18px;
+  display: flex; gap: 0; overflow: hidden;
+  transition: box-shadow .2s;
+}
+.ev__card:hover { box-shadow: 0 8px 32px #1b5e2012; }
+
+.ev__card-fecha {
+  background: linear-gradient(180deg, #1b5e20, #2e7d32);
+  padding: 1.5rem 1.25rem; text-align: center; min-width: 90px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.ev__dia { color: #e8f5e9; font-size: 36px; font-weight: 700; line-height: 1; }
+.ev__mes { color: #a5d6a7; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
+.ev__anio { color: #4a7c59; font-size: 11px; margin-top: 2px; }
+
+.ev__card-img {
+  width: 180px; flex-shrink: 0; overflow: hidden;
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+}
+.ev__card-img img { width: 100%; height: 100%; object-fit: cover; }
+.ev__card-img--placeholder {
+  display: flex; align-items: center; justify-content: center; font-size: 2.5rem; opacity: .3;
 }
 
-.card-img-top {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.ev__card-body { padding: 1.5rem 1.75rem; flex: 1; }
+.ev__card-titulo { font-size: 20px; font-weight: 600; color: #1a2e1b; margin-bottom: .75rem; line-height: 1.3; }
+.ev__card-meta {
+  display: flex; gap: 16px; font-size: 13px; color: #4a7c59;
+  margin-bottom: 1rem; flex-wrap: wrap;
 }
+.ev__card-meta span { display: flex; align-items: center; gap: 5px; }
+.ev__card-desc { font-size: 14px; color: #4a7c59; line-height: 1.65; margin: 0; }
 
-.hover-card {
-  transition: transform 0.2s, box-shadow 0.2s;
+.ev__card-cta {
+  padding: 1.5rem; display: flex; align-items: center; flex-shrink: 0;
 }
-
-.hover-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+.ev__inscribirse-btn {
+  display: flex; align-items: center; gap: 7px;
+  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  color: #e8f5e9; padding: 11px 20px; border-radius: 10px;
+  font-size: 13px; text-decoration: none; white-space: nowrap;
+  transition: opacity .2s; box-shadow: 0 2px 8px #1b5e2030;
 }
+.ev__inscribirse-btn:hover { opacity: .88; color: #e8f5e9; }
 
-.evento-info {
-  font-size: 0.95rem;
-}
-
-.evento-info i {
-  width: 20px;
-  margin-right: 8px;
+@media (max-width: 768px) {
+  .ev__card { flex-direction: column; }
+  .ev__card-fecha { flex-direction: row; gap: 10px; padding: 1rem 1.5rem; min-width: unset; }
+  .ev__dia { font-size: 26px; }
+  .ev__card-img { width: 100%; height: 180px; }
+  .ev__card-cta { padding: 0 1.5rem 1.5rem; }
+  .ev__hero-title { font-size: 28px; }
 }
 </style>

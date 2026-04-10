@@ -1,168 +1,121 @@
 <template>
-  <div class="noticia-detail">
-    <div v-if="loading" class="loading">
-      <div class="spinner-border text-success" role="status">
-        <span class="visually-hidden">Cargando...</span>
+  <div class="ndv" v-if="noticia">
+
+    <div class="ndv__breadcrumb">
+      <div class="ndv__container">
+        <RouterLink to="/noticias" class="ndv__back">
+          <i class="bi bi-arrow-left"></i> Volver a noticias
+        </RouterLink>
       </div>
     </div>
 
-    <div v-else-if="error" class="container py-5">
-      <div class="alert alert-danger">{{ error }}</div>
-      <RouterLink to="/noticias" class="btn btn-success">
-        <i class="bi bi-arrow-left"></i> Volver a Noticias
-      </RouterLink>
-    </div>
-
-    <article v-else>
-      <!-- Header con imagen -->
-      <div v-if="noticia.cover_url" class="noticia-header">
-        <img :src="noticia.cover_url" :alt="noticia.titulo" class="w-100">
-        <div class="overlay"></div>
+    <section class="ndv__hero">
+      <div class="ndv__container">
+        <div class="ndv__fecha">{{ formatFecha(noticia.publicada_at) }}</div>
+        <h1 class="ndv__titulo">{{ noticia.titulo }}</h1>
       </div>
+    </section>
 
-      <div class="container py-5">
-        <nav aria-label="breadcrumb" class="mb-4">
-          <ol class="breadcrumb">
-            <li class="breadcrumb-item"><RouterLink to="/">Inicio</RouterLink></li>
-            <li class="breadcrumb-item"><RouterLink to="/noticias">Noticias</RouterLink></li>
-            <li class="breadcrumb-item active">{{ noticia.titulo }}</li>
-          </ol>
-        </nav>
-
-        <div class="row justify-content-center">
-          <div class="col-lg-8">
-            <!-- Metadata -->
-            <div class="mb-4">
-              <small class="text-muted">
-                <i class="bi bi-calendar3"></i>
-                {{ formatDate(noticia.publicada_at) }}
-              </small>
-            </div>
-
-            <!-- Título -->
-            <h1 class="display-5 fw-bold mb-4">{{ noticia.titulo }}</h1>
-
-            <!-- Contenido -->
-            <div class="noticia-content">
-              <p v-for="(parrafo, index) in formatContenido(noticia.contenido)" :key="index" class="lead">
-                {{ parrafo }}
-              </p>
-            </div>
-
-            <!-- Compartir -->
-            <div class="mt-5 pt-4 border-top">
-              <h5 class="mb-3">Compartir</h5>
-              <div class="d-flex gap-2">
-                <button class="btn btn-outline-primary" @click="compartir('facebook')">
-                  <i class="bi bi-facebook"></i> Facebook
-                </button>
-                <button class="btn btn-outline-info" @click="compartir('twitter')">
-                  <i class="bi bi-twitter"></i> Twitter
-                </button>
-                <button class="btn btn-outline-success" @click="compartir('whatsapp')">
-                  <i class="bi bi-whatsapp"></i> WhatsApp
-                </button>
-                <button class="btn btn-outline-secondary" @click="copiarLink">
-                  <i class="bi bi-link-45deg"></i> Copiar link
-                </button>
-              </div>
-            </div>
-
-            <!-- Botón volver -->
-            <div class="mt-5">
-              <RouterLink to="/noticias" class="btn btn-outline-success">
-                <i class="bi bi-arrow-left"></i> Volver a Noticias
-              </RouterLink>
-            </div>
+    <section class="ndv__body">
+      <div class="ndv__container ndv__layout">
+        <article class="ndv__article">
+          <div v-if="noticia.cover_url" class="ndv__cover">
+            <img :src="noticia.cover_url" :alt="noticia.titulo" />
           </div>
-        </div>
+          <div class="ndv__contenido">{{ noticia.contenido }}</div>
+        </article>
+        <aside class="ndv__aside">
+          <div class="ndv__aside-card">
+            <div class="ndv__aside-title">¿Querés saber más?</div>
+            <p class="ndv__aside-text">Asociate al club y accedé a cannabis medicinal de calidad.</p>
+            <RouterLink to="/contacto" class="ndv__aside-btn">Contactanos</RouterLink>
+          </div>
+        </aside>
       </div>
-    </article>
+    </section>
+
+  </div>
+
+  <div v-else-if="loading" class="ndv__loading">
+    <div class="ndv__spinner"></div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import publicApi from '@/api/publicApi'
+import publicApi from '../api/publicApi.js'
 
-const route = useRoute()
-const noticia = ref({})
+const route   = useRoute()
+const noticia = ref(null)
 const loading = ref(true)
-const error = ref(null)
 
-function formatDate(dateString) {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('es-AR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
-
-function formatContenido(contenido) {
-  if (!contenido) return []
-  // Divide el contenido en párrafos por saltos de línea
-  return contenido.split('\n').filter(p => p.trim().length > 0)
-}
-
-function compartir(red) {
-  const url = window.location.href
-  const titulo = noticia.value.titulo
-
-  const urls = {
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-    twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(titulo)}`,
-    whatsapp: `https://wa.me/?text=${encodeURIComponent(titulo + ' ' + url)}`
-  }
-
-  if (urls[red]) {
-    window.open(urls[red], '_blank', 'width=600,height=400')
-  }
-}
-
-function copiarLink() {
-  navigator.clipboard.writeText(window.location.href).then(() => {
-    alert('Link copiado al portapapeles')
-  })
+function formatFecha(fecha) {
+  if (!fecha) return ''
+  return new Date(fecha).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 onMounted(async () => {
-  try {
-    noticia.value = await publicApi.getNoticia(route.params.id)
-  } catch (err) {
-    console.error('Error cargando noticia:', err)
-    error.value = 'No se pudo cargar la noticia. Por favor, intenta de nuevo.'
-  } finally {
-    loading.value = false
-  }
+  try { noticia.value = await publicApi.getNoticia(route.params.id) }
+  catch (e) { console.error(e) }
+  finally { loading.value = false }
 })
 </script>
 
 <style scoped>
-.noticia-header {
-  position: relative;
-  height: 400px;
-  overflow: hidden;
+.ndv { min-height: 100vh; background: #f0fdf4; }
+.ndv__container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+
+.ndv__breadcrumb { background: #060f07; padding: .75rem 0; border-bottom: 1px solid #1b5e2022; }
+.ndv__back {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: #66bb6a; font-size: 14px; text-decoration: none; transition: opacity .2s;
+}
+.ndv__back:hover { opacity: .8; color: #66bb6a; }
+
+.ndv__hero { background: #060f07; padding: 3rem 0 4rem; }
+.ndv__fecha { font-size: 13px; color: #66bb6a; margin-bottom: .75rem; }
+.ndv__titulo { color: #f0fdf4; font-size: 36px; font-weight: 600; line-height: 1.2; max-width: 800px; margin: 0; }
+
+.ndv__body { padding: 3rem 0 4rem; }
+.ndv__layout { display: grid; grid-template-columns: 1fr 280px; gap: 3rem; align-items: start; }
+
+.ndv__cover {
+  border-radius: 16px; overflow: hidden; margin-bottom: 2rem; max-height: 420px;
+}
+.ndv__cover img { width: 100%; height: 100%; object-fit: cover; }
+.ndv__contenido {
+  font-size: 16px; color: #2d4a30; line-height: 1.8;
+  white-space: pre-wrap;
 }
 
-.noticia-header img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.ndv__aside { position: sticky; top: 80px; }
+.ndv__aside-card {
+  background: #060f07; border-radius: 16px; padding: 1.75rem;
+  border: 1px solid #1b5e2033;
 }
-
-.noticia-header .overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 100%);
+.ndv__aside-title { color: #f0fdf4; font-size: 16px; font-weight: 600; margin-bottom: .75rem; }
+.ndv__aside-text { color: #81c784; font-size: 13px; line-height: 1.6; margin-bottom: 1.25rem; opacity: .8; }
+.ndv__aside-btn {
+  display: block; text-align: center;
+  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  color: #e8f5e9; padding: 11px; border-radius: 10px;
+  font-size: 14px; text-decoration: none; transition: opacity .2s;
 }
+.ndv__aside-btn:hover { opacity: .88; color: #e8f5e9; }
 
-.noticia-content p {
-  line-height: 1.8;
-  margin-bottom: 1.5rem;
+.ndv__loading {
+  min-height: 60vh; display: flex; align-items: center; justify-content: center;
+}
+.ndv__spinner {
+  width: 36px; height: 36px; border: 2px solid #d4edda; border-top-color: #1b5e20;
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 900px) {
+  .ndv__layout { grid-template-columns: 1fr; }
+  .ndv__aside { position: static; }
+  .ndv__titulo { font-size: 26px; }
 }
 </style>

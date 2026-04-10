@@ -1,248 +1,214 @@
 <template>
-  <div class="genetica-detail">
-    <div v-if="loading" class="loading">
-      <div class="spinner-border text-success" role="status">
-        <span class="visually-hidden">Cargando...</span>
-      </div>
-    </div>
+  <div class="gdv" v-if="genetica">
 
-    <div v-else-if="error" class="container py-5">
-      <div class="alert alert-danger">{{ error }}</div>
-      <RouterLink to="/geneticas" class="btn btn-success">
-        <i class="bi bi-arrow-left"></i> Volver a Genéticas
-      </RouterLink>
-    </div>
-
-    <div v-else class="container py-5">
-      <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
-          <li class="breadcrumb-item"><RouterLink to="/">Inicio</RouterLink></li>
-          <li class="breadcrumb-item"><RouterLink to="/geneticas">Genéticas</RouterLink></li>
-          <li class="breadcrumb-item active">{{ genetica.nombre }}</li>
-        </ol>
-      </nav>
-
-      <div class="row">
-        <!-- Galería de fotos -->
-        <div class="col-lg-6 mb-4">
-          <div v-if="genetica.fotos_urls.length > 0" class="foto-principal mb-3">
-            <img :src="currentPhoto" :alt="genetica.nombre" class="img-fluid rounded shadow">
-          </div>
-          <div v-else class="foto-principal bg-light d-flex align-items-center justify-content-center rounded shadow">
-            <i class="bi bi-image text-muted" style="font-size: 5rem;"></i>
-          </div>
-
-          <!-- Miniaturas -->
-          <div v-if="genetica.fotos_urls.length > 1" class="d-flex gap-2 mt-3">
-            <div
-                v-for="(foto, index) in genetica.fotos_urls"
-                :key="index"
-                class="thumbnail"
-                :class="{ active: currentPhoto === foto }"
-                @click="currentPhoto = foto"
-            >
-              <img :src="foto" :alt="`${genetica.nombre} ${index + 1}`" class="img-fluid rounded">
-            </div>
-          </div>
-        </div>
-
-        <!-- Información -->
-        <div class="col-lg-6">
-          <h1 class="mb-3">{{ genetica.nombre }}</h1>
-
-          <div class="mb-4">
-            <span class="badge bg-secondary fs-6 me-2">{{ formatTipo(genetica.tipo) }}</span>
-            <span v-if="genetica.disponible" class="badge bg-success fs-6">
-              <i class="bi bi-check-circle"></i> Disponible
-            </span>
-            <span v-else class="badge bg-warning text-dark fs-6">
-              <i class="bi bi-x-circle"></i> No disponible
-            </span>
-          </div>
-
-          <!-- Cannabinoides -->
-          <div class="cannabinoides mb-4">
-            <h5 class="text-success mb-3">Perfil de Cannabinoides</h5>
-            <div class="row g-3">
-              <div class="col-6">
-                <div class="card border-success">
-                  <div class="card-body text-center">
-                    <div class="text-muted small mb-1">THC</div>
-                    <div class="display-6 text-success fw-bold">{{ genetica.thc }}%</div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="card border-success">
-                  <div class="card-body text-center">
-                    <div class="text-muted small mb-1">CBD</div>
-                    <div class="display-6 text-success fw-bold">{{ genetica.cbd }}%</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Descripción -->
-          <div v-if="genetica.descripcion" class="mb-4">
-            <h5 class="text-success mb-3">Descripción</h5>
-            <p class="text-muted">{{ genetica.descripcion }}</p>
-          </div>
-
-          <div v-if="!genetica.disponible" class="alert alert-warning mt-3">
-            <i class="bi bi-info-circle"></i>
-            Esta genética no está disponible en este momento. Contactanos para más información.
-          </div>
-        </div>
-      </div>
-
-      <!-- Información adicional -->
-      <div class="row mt-5">
-        <div class="col-12">
-          <h3 class="mb-4">Información Adicional</h3>
-
-          <div class="accordion" id="accordionInfo">
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseUso">
-                  Uso Recomendado
-                </button>
-              </h2>
-              <div id="collapseUso" class="accordion-collapse collapse show" data-bs-parent="#accordionInfo">
-                <div class="accordion-body">
-                  <p v-if="genetica.tipo === 'indica'">
-                    Las variedades Indica son ideales para uso nocturno. Proporcionan relajación profunda, ayudan con el insomnio y alivian el dolor crónico.
-                  </p>
-                  <p v-else-if="genetica.tipo === 'sativa'">
-                    Las variedades Sativa son perfectas para uso diurno. Proporcionan energía, estimulan la creatividad y mejoran el estado de ánimo.
-                  </p>
-                  <p v-else>
-                    Las variedades Híbridas combinan lo mejor de Indica y Sativa, proporcionando un balance entre relajación y energía. Versátiles para uso diurno o nocturno.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCultivo">
-                  Información de Cultivo
-                </button>
-              </h2>
-              <div id="collapseCultivo" class="accordion-collapse collapse" data-bs-parent="#accordionInfo">
-                <div class="accordion-body">
-                  Cultivado de forma orgánica, sin pesticidas ni fertilizantes químicos.
-                  Cada lote pasa por análisis de laboratorio para garantizar su calidad y pureza.
-                </div>
-              </div>
-            </div>
-
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAviso">
-                  Aviso Legal
-                </button>
-              </h2>
-              <div id="collapseAviso" class="accordion-collapse collapse" data-bs-parent="#accordionInfo">
-                <div class="accordion-body">
-                  <strong>Solo para socios del club.</strong> El cannabis medicinal solo está disponible para personas con autorización REPROCANN vigente.
-                  Uso exclusivamente medicinal. Prohibida su venta.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Botón volver -->
-      <div class="mt-5">
-        <RouterLink to="/geneticas" class="btn btn-outline-success">
-          <i class="bi bi-arrow-left"></i> Volver a Genéticas
+    <!-- Breadcrumb -->
+    <div class="gdv__breadcrumb">
+      <div class="gdv__container">
+        <RouterLink to="/geneticas" class="gdv__back">
+          <i class="bi bi-arrow-left"></i> Volver a variedades
         </RouterLink>
       </div>
     </div>
+
+    <!-- Hero de la genética -->
+    <section class="gdv__hero">
+      <div class="gdv__container gdv__hero-layout">
+
+        <div class="gdv__hero-img">
+          <img v-if="genetica.fotos_urls?.length" :src="genetica.fotos_urls[0]" :alt="genetica.nombre" />
+          <div v-else class="gdv__hero-img-placeholder">🌿</div>
+        </div>
+
+        <div class="gdv__hero-info">
+          <div class="gdv__hero-badges">
+            <span class="gdv__tipo-badge" :class="`gdv__tipo-badge--${genetica.tipo}`">{{ formatTipo(genetica.tipo) }}</span>
+            <span v-if="genetica.registrada_inase" class="gdv__inase-badge">★ Registrada INASE</span>
+          </div>
+          <h1 class="gdv__nombre">{{ genetica.nombre }}</h1>
+          <p v-if="genetica.criador" class="gdv__criador">
+            <i class="bi bi-person"></i> {{ genetica.criador }}
+          </p>
+          <p v-if="genetica.origen" class="gdv__origen">
+            <i class="bi bi-geo-alt"></i> {{ genetica.origen }}
+          </p>
+          <p class="gdv__descripcion">{{ genetica.descripcion }}</p>
+
+          <!-- Stats principales -->
+          <div class="gdv__stats-grid">
+            <div class="gdv__stat-card">
+              <span class="gdv__stat-label">THC</span>
+              <span class="gdv__stat-val">{{ genetica.thc }}%</span>
+            </div>
+            <div class="gdv__stat-card gdv__stat-card--cbd">
+              <span class="gdv__stat-label">CBD</span>
+              <span class="gdv__stat-val gdv__stat-val--cbd">{{ genetica.cbd }}%</span>
+            </div>
+            <div v-if="genetica.tiempo_floracion" class="gdv__stat-card">
+              <span class="gdv__stat-label">Floración</span>
+              <span class="gdv__stat-val">{{ genetica.tiempo_floracion }} días</span>
+            </div>
+            <div v-if="genetica.rendimiento" class="gdv__stat-card">
+              <span class="gdv__stat-label">Rendimiento</span>
+              <span class="gdv__stat-val">{{ genetica.rendimiento }}g/m²</span>
+            </div>
+            <div v-if="genetica.altura" class="gdv__stat-card">
+              <span class="gdv__stat-label">Altura</span>
+              <span class="gdv__stat-val">{{ genetica.altura }}cm</span>
+            </div>
+            <div v-if="genetica.dificultad" class="gdv__stat-card">
+              <span class="gdv__stat-label">Dificultad</span>
+              <span class="gdv__stat-val">{{ formatDificultad(genetica.dificultad) }}</span>
+            </div>
+          </div>
+
+          <!-- Terpenos -->
+          <div v-if="genetica.terpenos" class="gdv__terpenos">
+            <div class="gdv__terpenos-label">Perfil de terpenos</div>
+            <div class="gdv__terpenos-list">
+              <span v-for="t in genetica.terpenos.split(',')" :key="t" class="gdv__terpeno-pill">
+                {{ t.trim() }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="gdv__cta">
+      <div class="gdv__container">
+        <div class="gdv__cta-inner">
+          <div>
+            <h2 class="gdv__cta-title">¿Querés acceder a esta variedad?</h2>
+            <p class="gdv__cta-sub">Asociate al club con tu autorización REPROCANN.</p>
+          </div>
+          <RouterLink to="/contacto" class="gdv__cta-btn">Contactanos</RouterLink>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <div v-else-if="loading" class="gdv__loading-page">
+    <div class="gdv__spinner"></div>
+  </div>
+
+  <div v-else class="gdv__not-found">
+    <p>Variedad no encontrada.</p>
+    <RouterLink to="/geneticas">Volver al catálogo</RouterLink>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import publicApi from '@/api/publicApi'
+import publicApi from '../api/publicApi.js'
 
-const route = useRoute()
-const genetica = ref({})
-const currentPhoto = ref(null)
-const loading = ref(true)
-const error = ref(null)
+const route    = useRoute()
+const genetica = ref(null)
+const loading  = ref(true)
 
 function formatTipo(tipo) {
-  const tipos = {
-    'indica': 'Indica',
-    'sativa': 'Sativa',
-    'hibrida': 'Híbrida'
-  }
-  return tipos[tipo] || tipo
+  return { indica: 'Índica', sativa: 'Sativa', hibrida: 'Híbrida' }[tipo] || tipo
+}
+function formatDificultad(d) {
+  return { facil: 'Fácil', intermedia: 'Intermedia', dificil: 'Difícil' }[d] || d
 }
 
 onMounted(async () => {
   try {
     genetica.value = await publicApi.getGenetica(route.params.id)
-    if (genetica.value.fotos_urls.length > 0) {
-      currentPhoto.value = genetica.value.fotos_urls[0]
-    }
-  } catch (err) {
-    console.error('Error cargando genética:', err)
-    error.value = 'No se pudo cargar la genética. Por favor, intenta de nuevo.'
-  } finally {
-    loading.value = false
-  }
+  } catch (e) { console.error(e) }
+  finally { loading.value = false }
 })
 </script>
 
 <style scoped>
-.foto-principal {
-  height: 500px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.gdv { min-height: 100vh; background: #f0fdf4; }
+
+.gdv__breadcrumb { background: #060f07; padding: .75rem 0; border-bottom: 1px solid #1b5e2022; }
+.gdv__container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+.gdv__back {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: #66bb6a; font-size: 14px; text-decoration: none; transition: opacity .2s;
+}
+.gdv__back:hover { opacity: .8; color: #66bb6a; }
+
+.gdv__hero { background: #060f07; padding: 3rem 0 4rem; }
+.gdv__hero-layout {
+  display: grid; grid-template-columns: 400px 1fr; gap: 3rem; align-items: start;
+}
+.gdv__hero-img {
+  border-radius: 20px; overflow: hidden; aspect-ratio: 1;
+  background: linear-gradient(135deg, #1b5e2030, #2e7d3220);
+  display: flex; align-items: center; justify-content: center;
+}
+.gdv__hero-img img { width: 100%; height: 100%; object-fit: cover; }
+.gdv__hero-img-placeholder { font-size: 6rem; }
+
+.gdv__hero-info { padding-top: .5rem; }
+.gdv__hero-badges { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
+.gdv__tipo-badge { display: inline-block; font-size: 12px; padding: 4px 12px; border-radius: 6px; font-weight: 500; }
+.gdv__tipo-badge--indica  { background: #e8eaf6; color: #3949ab; }
+.gdv__tipo-badge--sativa  { background: #fff8e1; color: #f57f17; }
+.gdv__tipo-badge--hibrida { background: #e8f5e9; color: #2e7d32; }
+.gdv__inase-badge { background: #fff3e0; color: #bf360c; font-size: 12px; padding: 4px 12px; border-radius: 6px; font-weight: 600; }
+
+.gdv__nombre { color: #f0fdf4; font-size: 36px; font-weight: 600; margin-bottom: .75rem; line-height: 1.1; }
+.gdv__criador, .gdv__origen {
+  color: #81c784; font-size: 14px; margin-bottom: .5rem; display: flex; align-items: center; gap: 7px; opacity: .8;
+}
+.gdv__descripcion { color: #a5d6a7; font-size: 15px; line-height: 1.7; margin: 1.25rem 0 1.75rem; opacity: .9; }
+
+.gdv__stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+.gdv__stat-card {
+  background: #0d1f0e; border: 1px solid #1b5e2033; border-radius: 12px; padding: 14px 16px;
+}
+.gdv__stat-label { display: block; font-size: 10px; color: #4a7c59; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+.gdv__stat-val { display: block; font-size: 20px; font-weight: 600; color: #66bb6a; }
+.gdv__stat-val--cbd { color: #4fc3f7; }
+
+.gdv__terpenos { margin-top: .5rem; }
+.gdv__terpenos-label { font-size: 12px; color: #4a7c59; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+.gdv__terpenos-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.gdv__terpeno-pill {
+  background: #1b5e2022; border: 1px solid #1b5e2044;
+  color: #81c784; font-size: 12px; padding: 4px 12px; border-radius: 12px;
 }
 
-.foto-principal img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.gdv__cta { background: #060f07; padding: 3rem 0; border-top: 1px solid #1b5e2022; }
+.gdv__cta-inner {
+  display: flex; justify-content: space-between; align-items: center;
+  background: #0d1f0e; border: 1px solid #1b5e2033; border-radius: 16px; padding: 2rem 2.5rem;
 }
-
-.thumbnail {
-  width: 80px;
-  height: 80px;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  border: 2px solid transparent;
+.gdv__cta-title { color: #f0fdf4; font-size: 20px; font-weight: 500; margin-bottom: 6px; }
+.gdv__cta-sub { color: #81c784; font-size: 14px; opacity: .8; margin: 0; }
+.gdv__cta-btn {
+  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  color: #e8f5e9; padding: 13px 28px; border-radius: 10px;
+  font-size: 14px; text-decoration: none; flex-shrink: 0; transition: opacity .2s;
 }
+.gdv__cta-btn:hover { opacity: .88; color: #e8f5e9; }
 
-.thumbnail:hover {
-  opacity: 1;
+.gdv__loading-page, .gdv__not-found {
+  min-height: 60vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1rem;
 }
-
-.thumbnail.active {
-  opacity: 1;
-  border-color: #198754;
+.gdv__spinner {
+  width: 36px; height: 36px; border: 2px solid #d4edda; border-top-color: #1b5e20;
+  border-radius: 50%; animation: spin .7s linear infinite;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.thumbnail img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+@media (max-width: 900px) {
+  .gdv__hero-layout { grid-template-columns: 1fr; }
+  .gdv__hero-img { max-width: 300px; margin: 0 auto; }
+  .gdv__cta-inner { flex-direction: column; gap: 1.5rem; text-align: center; }
+  .gdv__stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
-
-.cannabinoides .card {
-  transition: transform 0.2s;
-}
-
-.cannabinoides .card:hover {
-  transform: translateY(-5px);
+@media (max-width: 600px) {
+  .gdv__nombre { font-size: 26px; }
+  .gdv__stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

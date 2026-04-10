@@ -54,7 +54,9 @@ class PreferencesController < ApplicationController
       :name, :legal_name, :email, :phone, :website,
       :address, :city, :state, :timezone, :theme_primary,
       :cuit, :numero_igj, :numero_resolucion_reprocann,
-      :fecha_resolucion_reprocann, :tipo_organizacion
+      :fecha_resolucion_reprocann, :tipo_organizacion,
+      :descripcion_web, :whatsapp, :instagram_url,
+      :facebook_url, :horarios_atencion, :web_activa
     )
   end
 
@@ -76,7 +78,13 @@ class PreferencesController < ApplicationController
       numero_resolucion_reprocann:  club.numero_resolucion_reprocann,
       fecha_resolucion_reprocann:   club.fecha_resolucion_reprocann,
       tipo_organizacion:            club.tipo_organizacion,
-      logo_url:                     club.logo.attached? ? url_for(club.logo) : nil
+      logo_url:                     club.logo.attached? ? url_for(club.logo) : nil,
+      descripcion_web:              club.descripcion_web,
+      whatsapp:                     club.whatsapp,
+      instagram_url:                club.instagram_url,
+      facebook_url:                 club.facebook_url,
+      horarios_atencion:            club.horarios_atencion,
+      web_activa:                   club.web_activa,
     }
   end
 end

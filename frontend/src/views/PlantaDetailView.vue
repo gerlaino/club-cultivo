@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { getPlantActivities, createPlantActivity } from '../lib/api'
+import VozRegistro from '../components/VozRegistro.vue'
 
 const route  = useRoute()
 const plants = usePlantsStore()
@@ -183,6 +184,19 @@ function toggleFotos() {
   fotosExpanded.value = !fotosExpanded.value
 }
 
+function aplicarVoz(datos) {
+  // Pre-llenar el form con los datos de la IA
+  if (datos.altura_cm)    form.value.altura_cm    = datos.altura_cm
+  if (datos.num_colas)    form.value.num_colas    = datos.num_colas
+  if (datos.estado_salud) form.value.estado_salud = datos.estado_salud
+  if (datos.color_hojas)  form.value.color_hojas  = datos.color_hojas
+  if (datos.plagas)       form.value.plagas       = datos.plagas
+  if (datos.deficiencias) form.value.deficiencias = datos.deficiencias
+  if (datos.notas)        form.value.notas        = datos.notas
+  // Abrir el modal para que el cultivador confirme
+  showModal.value = true
+}
+
 onMounted(async () => {
   try {
     await plants.fetchOne(id)
@@ -239,9 +253,12 @@ onMounted(async () => {
             <span>Día {{ diasEnCiclo }}</span>
           </div>
         </div>
-        <button class="pd__btn-primary" @click="abrirModal">
-          <i class="bi bi-clipboard2-pulse"></i>Registrar planta
-        </button>
+        <div style="display:flex;gap:10px;align-items:center">
+          <VozRegistro :planta="planta" @aplicar="aplicarVoz" />
+          <button class="pd__btn-primary" @click="abrirModal">
+            <i class="bi bi-clipboard2-pulse"></i>Registrar planta
+          </button>
+        </div>
       </div>
 
       <!-- Timeline ciclo -->
