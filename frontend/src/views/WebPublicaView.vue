@@ -602,6 +602,10 @@ async function guardarConfig() {
   savingConfig.value = true
   try {
     await api.put('/preferences', { club: { ...configForm.value } })
+    // Actualizar el store local para que refleje los cambios
+    if (club.value) {
+      Object.assign(club.value, configForm.value)
+    }
     configSaved.value = true
     setTimeout(() => { configSaved.value = false }, 3000)
   } catch (e) { console.error(e) }
@@ -635,16 +639,18 @@ async function cargarEventos() {
 
 onMounted(async () => {
   await Promise.all([cargarGeneticas(), cargarNoticias(), cargarEventos()])
-  if (club.value) {
+  // Siempre traer la config fresca del backend
+  try {
+    const { data } = await api.get('/preferences')
     configForm.value = {
-      descripcion_web:   club.value.descripcion_web   || '',
-      whatsapp:          club.value.whatsapp           || '',
-      instagram_url:     club.value.instagram_url      || '',
-      facebook_url:      club.value.facebook_url       || '',
-      horarios_atencion: club.value.horarios_atencion  || '',
-      web_activa:        club.value.web_activa         || false,
+      descripcion_web:   data.descripcion_web   || '',
+      whatsapp:          data.whatsapp           || '',
+      instagram_url:     data.instagram_url      || '',
+      facebook_url:      data.facebook_url       || '',
+      horarios_atencion: data.horarios_atencion  || '',
+      web_activa:        data.web_activa         || false,
     }
-  }
+  } catch (e) { console.error(e) }
 })
 </script>
 

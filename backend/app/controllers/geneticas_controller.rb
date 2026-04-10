@@ -61,15 +61,6 @@ class GeneticasController < ApplicationController
     render json: { error: 'Genética no encontrada' }, status: :not_found
   end
 
-  def genetica_params
-    params.require(:genetica).permit(
-      :nombre, :tipo, :thc, :cbd, :descripcion,
-      :origen, :tiempo_floracion, :rendimiento,
-      :altura, :dificultad, :activa, :disponible,
-      :registrada_inase, :criador, :terpenos
-    )
-  end
-
   def attach_foto(genetica)
     genetica.fotos.attach(params[:foto])
   rescue => e
@@ -89,6 +80,15 @@ class GeneticasController < ApplicationController
     nil
   end
 
+  def genetica_params
+    params.require(:genetica).permit(
+      :nombre, :tipo, :thc, :cbd, :descripcion,
+      :origen, :tiempo_floracion, :rendimiento,
+      :altura, :dificultad, :activa, :disponible,
+      :registrada_inase, :criador, :terpenos, :visible_web
+    )
+  end
+
   def serialize_genetica(genetica, club)
     {
       id:               genetica.id,
@@ -102,6 +102,7 @@ class GeneticasController < ApplicationController
       registrada_inase: genetica.registrada_inase,
       criador:          genetica.criador,
       terpenos:         genetica.terpenos,
+      visible_web:      genetica.visible_web,
       foto_url:         foto_url(genetica),
       plantas_count:    plantas_count(genetica, club),
     }
