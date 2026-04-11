@@ -7,7 +7,6 @@
         <h1 class="ag__greeting">{{ saludo }}, {{ auth.user?.first_name }}</h1>
         <p class="ag__date">{{ hoy }} · Responsable de Cultivo</p>
       </div>
-
     </div>
 
     <div v-if="loading" class="ag__loading">
@@ -17,7 +16,7 @@
 
     <template v-else>
 
-      <!-- Alertas críticas — si hay, van primero -->
+      <!-- Alertas críticas -->
       <div v-if="alertas.length > 0" class="ag__alertas">
         <div v-for="a in alertas" :key="a.id" class="ag__alerta" :class="`ag__alerta--${a.tipo}`">
           <i class="bi" :class="a.icono"></i>
@@ -109,7 +108,6 @@
             </div>
           </div>
 
-
           <!-- Tareas vencidas o urgentes -->
           <div v-if="tareasUrgentes.length > 0" class="ag__section ag__section--mt">
             <div class="ag__section-header">
@@ -193,7 +191,6 @@
 
     </template>
 
-
   </div>
 </template>
 
@@ -203,7 +200,6 @@ import { useAuthStore }   from '../../stores/auth'
 import { useLotesStore }  from '../../stores/lotes'
 import { useSalasStore }  from '../../stores/salas'
 import { useTareasStore } from '../../stores/tareas'
-import { storeToRefs }    from 'pinia'
 import { getDocumentos, listTareas } from '../../lib/api.js'
 
 const auth        = useAuthStore()
@@ -216,7 +212,6 @@ const lotes       = ref([])
 const tareas      = ref([])
 const documentos  = ref([])
 
-// ── Constantes ────────────────────────────────────────────
 const CICLO = [
   { key:'semilla',    label:'Semilla',    emoji:'🌱', color:'#64748b' },
   { key:'vegetativo', label:'Vegetativo', emoji:'🍃', color:'#16a34a' },
@@ -232,14 +227,12 @@ const DOC_TIPOS = {
   otro:              { label:'Otro',               emoji:'📄' },
 }
 
-// ── Fecha / saludo ────────────────────────────────────────
 const hora   = new Date().getHours()
 const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
 const hoy    = new Date().toLocaleDateString('es-AR', {
   weekday:'long', day:'numeric', month:'long', year:'numeric'
 }).replace(/^\w/, c => c.toUpperCase())
 
-// ── Computed ──────────────────────────────────────────────
 const lotesActivos = computed(() =>
   lotes.value.filter(l => !['finalizado'].includes(l.estado))
 )
@@ -318,7 +311,6 @@ const actividadReciente = computed(() => {
   return items.sort((a,b) => new Date(b.fecha) - new Date(a.fecha))
 })
 
-// ── Helpers ───────────────────────────────────────────────
 function estaVencida(t) {
   if (!t.fecha_programada) return false
   return new Date(t.fecha_programada) < new Date() && t.estado !== 'completada'
@@ -335,36 +327,7 @@ function formatDateTime(f) {
   if (!f) return '—'
   return new Date(f).toLocaleString('es-AR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
 }
-function iniciales(u) {
-  return `${u.first_name?.[0] || ''}${u.last_name?.[0] || ''}`.toUpperCase()
-}
 
-// ── Acciones ──────────────────────────────────────────────
-function handleDocFile(e) { docFile.value = e.target.files?.[0] || null }
-
-async function subirDocumento() {
-  if (!docForm.value.titulo) return
-  guardandoDoc.value = true; docError.value = null
-  try {
-    const fd = new FormData()
-    fd.append('documento[tipo]',   docForm.value.tipo)
-    fd.append('documento[titulo]', docForm.value.titulo)
-    if (docForm.value.descripcion)      fd.append('documento[descripcion]',       docForm.value.descripcion)
-    if (docForm.value.fecha_vencimiento) fd.append('documento[fecha_vencimiento]', docForm.value.fecha_vencimiento)
-    if (docFile.value) fd.append('archivo', docFile.value)
-
-    const { data } = await createDocumento(fd)
-    documentos.value.unshift(data)
-    showDocModal.value = false
-    docForm.value = { tipo:'plan_trabajo', titulo:'', fecha_vencimiento:'', descripcion:'' }
-    docFile.value = null
-  } catch(e) {
-    docError.value = e?.response?.data?.errors?.join(', ') || 'Error al guardar'
-  }
-  finally { guardandoDoc.value = false }
-}
-
-// ── Mount ─────────────────────────────────────────────────
 onMounted(async () => {
   try {
     const [lotesRes, tareasRes, docsRes] = await Promise.all([
@@ -384,26 +347,22 @@ onMounted(async () => {
 .ag { padding: 2rem 1.5rem; max-width: 1200px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; }
 @media (max-width: 640px) { .ag { padding: 1.25rem 1rem; } }
 
-/* Header */
 .ag__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
 .ag__greeting { font-size: 1.65rem; font-weight: 800; color: #1a1a1a; margin: 0 0 .2rem; letter-spacing: -.03em; }
 .ag__date { font-size: .82rem; color: #60725d; margin: 0; }
 .ag__header-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 
-/* Loading */
 .ag__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
 .ag__spinner { width: 22px; height: 22px; border: 2.5px solid #d4e6d4; border-top-color: #1b5e20; border-radius: 50%; animation: ag-spin .6s linear infinite; }
 .ag__spinner--sm { width: 14px; height: 14px; border-width: 2px; border-top-color: #fff; border-color: rgba(255,255,255,.3); }
 @keyframes ag-spin { to { transform: rotate(360deg); } }
 
-/* Alertas */
 .ag__alertas { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1.5rem; }
 .ag__alerta { display: flex; align-items: center; gap: .6rem; padding: .65rem 1rem; border-radius: 10px; font-size: .835rem; font-weight: 500; }
 .ag__alerta--danger { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
 .ag__alerta--warn   { background: #fffbeb; border: 1px solid #fde68a; color: #b45309; }
 .ag__alerta-link { margin-left: auto; font-weight: 700; color: inherit; text-decoration: none; border-bottom: 1px solid currentColor; font-size: .78rem; }
 
-/* KPIs */
 .ag__kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 2rem; }
 @media (max-width: 640px) { .ag__kpis { grid-template-columns: repeat(2,1fr); } }
 .ag__kpi { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; padding: 1.1rem 1rem; transition: box-shadow .15s; }
@@ -418,11 +377,9 @@ onMounted(async () => {
 .ag__kpi-value--red  { color: #dc2626; }
 .ag__kpi-label { font-size: .7rem; color: #60725d; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 
-/* Layout */
 .ag__layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.25rem; align-items: start; }
 @media (max-width: 960px) { .ag__layout { grid-template-columns: 1fr; } }
 
-/* Sections */
 .ag__section { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; padding: 1.25rem; }
 .ag__section--mt { margin-top: 1.25rem; }
 .ag__section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
@@ -430,7 +387,6 @@ onMounted(async () => {
 .ag__section-link { font-size: .78rem; color: #60725d; text-decoration: none; font-weight: 500; }
 .ag__section-link:hover { color: #1b5e20; }
 
-/* Kanban */
 .ag__kanban { display: grid; grid-template-columns: repeat(5,1fr); gap: .75rem; overflow-x: auto; }
 @media (max-width: 900px) { .ag__kanban { grid-template-columns: repeat(3,1fr); } }
 .ag__kanban-col { display: flex; flex-direction: column; gap: .5rem; min-width: 140px; }
@@ -449,24 +405,6 @@ onMounted(async () => {
 .ag__kc-alerta { font-size: .62rem; color: #b45309; font-weight: 600; margin-bottom: .2rem; }
 .ag__kc-strain { font-size: .68rem; color: #60725d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Equipo */
-.ag__equipo { display: flex; flex-direction: column; gap: .5rem; }
-.ag__cultivador { display: flex; align-items: center; gap: .75rem; padding: .85rem 1rem; background: #f4f8f4; border-radius: 10px; border: 1px solid #e8f0e9; }
-.ag__cult-avatar { width: 36px; height: 36px; border-radius: 50%; background: #1b5e20; color: #fff; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 800; flex-shrink: 0; }
-.ag__cult-info { flex: 1; min-width: 0; }
-.ag__cult-nombre { font-size: .875rem; font-weight: 600; color: #1a1a1a; }
-.ag__cult-salas  { font-size: .72rem; color: #94a3b8; }
-.ag__cult-stats { display: flex; gap: .75rem; flex-shrink: 0; }
-.ag__cult-stat { display: flex; flex-direction: column; align-items: center; }
-.ag__cult-stat-val   { font-size: 1rem; font-weight: 800; color: #1a1a1a; line-height: 1; }
-.ag__cult-stat-label { font-size: .6rem; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: .03em; }
-.ag__cult-stat--warn   .ag__cult-stat-val { color: #b45309; }
-.ag__cult-stat--danger .ag__cult-stat-val { color: #dc2626; }
-.ag__cult-stat--ok     .ag__cult-stat-val { color: #16a34a; }
-.ag__cult-link { font-size: .75rem; color: #60725d; text-decoration: none; white-space: nowrap; flex-shrink: 0; }
-.ag__cult-link:hover { color: #1b5e20; }
-
-/* Tareas urgentes */
 .ag__tareas-urgentes { display: flex; flex-direction: column; gap: .4rem; }
 .ag__tarea-urgente { display: flex; align-items: center; gap: .75rem; padding: .7rem .9rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; }
 .ag__tu-prioridad { font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: .2em .55em; border-radius: 6px; flex-shrink: 0; }
@@ -478,7 +416,6 @@ onMounted(async () => {
 .ag__tu-fecha  { font-size: .72rem; color: #94a3b8; white-space: nowrap; flex-shrink: 0; }
 .ag__tu-fecha--vencida { color: #dc2626; font-weight: 700; }
 
-/* Aside */
 .ag__card { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
 .ag__card--mt { margin-top: 1rem; }
 .ag__card-header { display: flex; align-items: center; justify-content: space-between; padding: .85rem 1rem; border-bottom: 1px solid #e8f0e9; }
@@ -486,7 +423,6 @@ onMounted(async () => {
 .ag__card-empty  { padding: 1.25rem 1rem; text-align: center; color: #60725d; font-size: .82rem; }
 .ag__card-empty p { margin: 0 0 .5rem; }
 
-/* Documentos */
 .ag__docs { display: flex; flex-direction: column; }
 .ag__doc  { display: flex; align-items: flex-start; gap: .6rem; padding: .75rem 1rem; border-bottom: 1px solid #f0fdf4; }
 .ag__doc:last-child { border-bottom: none; }
@@ -500,7 +436,6 @@ onMounted(async () => {
 .ag__doc-dl { color: #60725d; font-size: .85rem; flex-shrink: 0; padding: .25rem; transition: color .15s; }
 .ag__doc-dl:hover { color: #1b5e20; }
 
-/* Actividad */
 .ag__actividad { display: flex; flex-direction: column; }
 .ag__act-item { display: flex; align-items: flex-start; gap: .6rem; padding: .65rem 1rem; border-bottom: 1px solid #f0fdf4; }
 .ag__act-item:last-child { border-bottom: none; }
@@ -509,43 +444,6 @@ onMounted(async () => {
 .ag__act-texto{ font-size: .78rem; color: #1a1a1a; line-height: 1.4; }
 .ag__act-fecha{ font-size: .68rem; color: #94a3b8; margin-top: .1rem; }
 
-/* Modal */
-.ag__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
-.ag__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(27,94,32,.15); display: flex; flex-direction: column; }
-.ag__modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid #e8f0e9; position: sticky; top: 0; background: #fff; z-index: 1; }
-.ag__modal-title { font-size: 1rem; font-weight: 700; color: #1a1a1a; margin: 0; }
-.ag__modal-sub   { font-size: .75rem; color: #60725d; margin: .2rem 0 0; }
-.ag__modal-close { background: #e8f5e9; border: none; width: 28px; height: 28px; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #60725d; transition: all .15s; }
-.ag__modal-close:hover { background: #c8e6c9; color: #1b5e20; }
-.ag__modal-body { padding: 1.25rem 1.5rem; flex: 1; display: flex; flex-direction: column; gap: 1rem; }
-.ag__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1rem 1.5rem; border-top: 1px solid #e8f0e9; position: sticky; bottom: 0; background: #fff; }
-
-/* Form */
-.ag__field { display: flex; flex-direction: column; gap: .35rem; }
-.ag__label { font-size: .78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
-.ag__optional { font-size: .65rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
-.ag__req { color: #dc2626; }
-.ag__input { background: #f4f8f4; border: 1.5px solid #d4e6d4; border-radius: 8px; padding: .6rem .85rem; font-size: .875rem; color: #1a1a1a; width: 100%; box-sizing: border-box; transition: border .15s; }
-.ag__input:focus { outline: none; border-color: #1b5e20; background: #fff; }
-.ag__textarea { resize: vertical; min-height: 60px; }
-.ag__selector { display: flex; gap: .4rem; flex-wrap: wrap; }
-.ag__sel-btn { display: flex; align-items: center; gap: .3rem; padding: .4rem .8rem; border: 1.5px solid #d4e6d4; border-radius: 8px; background: #f4f8f4; font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .15s; }
-.ag__sel-btn:hover { border-color: #1b5e20; }
-.ag__sel-btn--active { background: #e8f5e9; border-color: #1b5e20; color: #1b5e20; }
-.ag__file-upload { display: flex; align-items: center; gap: .75rem; padding: .85rem 1rem; border: 1.5px dashed #d4e6d4; border-radius: 10px; background: #f4f8f4; cursor: pointer; font-size: .85rem; color: #60725d; transition: all .15s; }
-.ag__file-upload:hover { border-color: #1b5e20; background: #f0fdf4; color: #1b5e20; }
-.ag__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .65rem .9rem; border-radius: 8px; font-size: .82rem; }
-
-/* Buttons */
-.ag__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; text-decoration: none; }
-.ag__btn-primary:hover { background: #104417; }
-.ag__btn-primary:disabled { opacity: .6; cursor: not-allowed; }
-.ag__btn-secondary { display: inline-flex; align-items: center; gap: .4rem; background: #e8f5e9; color: #1b5e20; border: 1.5px solid #d4e6d4; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
-.ag__btn-secondary:hover { background: #d4e6d4; }
-.ag__btn-ghost { background: transparent; color: #60725d; border: 1px solid #d4e6d4; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 500; cursor: pointer; transition: all .15s; }
-.ag__btn-ghost:hover { background: #f0fdf4; color: #1b5e20; }
-.ag__btn-xs { background: #e8f5e9; color: #1b5e20; border: 1px solid #d4e6d4; padding: .25rem .65rem; border-radius: 6px; font-size: .72rem; font-weight: 700; cursor: pointer; transition: all .15s; }
-.ag__btn-xs:hover { background: #1b5e20; color: #fff; }
 .ag__btn-outline-sm { display: inline-flex; align-items: center; gap: .3rem; background: transparent; color: #1b5e20; border: 1.5px solid #d4e6d4; padding: .4rem .9rem; border-radius: 8px; font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .ag__btn-outline-sm:hover { border-color: #1b5e20; background: #f0fdf4; }
 .ag__empty { text-align: center; padding: 1.5rem; color: #60725d; font-size: .875rem; }

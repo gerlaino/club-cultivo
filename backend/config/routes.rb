@@ -22,6 +22,8 @@ Rails.application.routes.draw do
   defaults format: :json do
     get "/me",    to: "me#show"
     get "/stats", to: "stats#show"
+    post '/asistente/parsear',  to: 'asistente#parsear'
+    post '/asistente/ejecutar', to: 'asistente#ejecutar'
 
     resources :salas do
       resources :lotes, only: [:index, :create]
