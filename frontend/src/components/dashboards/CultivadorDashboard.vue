@@ -7,9 +7,11 @@
         <h1 class="cvd__greeting">{{ saludo }}, {{ auth.user?.first_name }}</h1>
         <p class="cvd__date">{{ hoy }}</p>
       </div>
-      <div v-if="tareasVencidas.length > 0" class="cvd__alert">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        <span>{{ tareasVencidas.length }} tarea{{ tareasVencidas.length > 1 ? 's' : '' }} vencida{{ tareasVencidas.length > 1 ? 's' : '' }}</span>
+      <div class="cvd__header-right">
+        <div v-if="tareasVencidas.length > 0" class="cvd__alert">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span>{{ tareasVencidas.length }} tarea{{ tareasVencidas.length > 1 ? 's' : '' }} vencida{{ tareasVencidas.length > 1 ? 's' : '' }}</span>
+        </div>
       </div>
     </div>
 
@@ -19,6 +21,7 @@
     </div>
 
     <template v-else>
+
       <!-- Tareas del día -->
       <section class="cvd__section">
         <div class="cvd__section-header cvd__section-header--clickable" @click="tareasExpandidas = !tareasExpandidas">
@@ -30,7 +33,6 @@
         </div>
 
         <div v-show="tareasExpandidas">
-          <!-- Filtros en una línea -->
           <div class="cvd__filtros">
             <button
               v-for="f in FILTROS_ESTADO" :key="f.value"
@@ -193,14 +195,12 @@ import { useTareasStore } from '../../stores/tareas'
 import { useSalasStore } from '../../stores/salas'
 import { storeToRefs } from 'pinia'
 
-
 const auth        = useAuthStore()
 const tareasStore = useTareasStore()
 const salasStore  = useSalasStore()
 const { dashboard } = storeToRefs(tareasStore)
 
 const loading          = ref(true)
-const plantas          = ref([])
 const salasExpandidas  = ref(true)
 const tareasExpandidas = ref(true)
 const tareaCompletando = ref(null)
@@ -240,12 +240,6 @@ const tareasHoyFiltradas = computed(() => {
   return lista
 })
 
-const kpis = computed(() => ({
-  pendientes:     tareasHoy.value.filter(t => !['completada','cancelada'].includes(t.estado)).length,
-  completadasHoy: dashboard.value?.stats?.completadas_hoy || 0,
-  vencidas:       dashboard.value?.stats?.vencidas || 0,
-}))
-
 function ocupacionPct(sala)   { return Math.min(sala?.porcentaje_ocupacion || 0, 100) }
 function ocupacionColor(sala) {
   const p = ocupacionPct(sala)
@@ -263,6 +257,7 @@ const TIPO_LABELS = {
   limpieza:'🧹 Limpieza', cosecha:'🌿 Cosecha', transplante:'🪴 Trasplante',
   inspeccion:'🔍 Inspección', otro:'📋 Otro'
 }
+
 
 async function iniciarTarea(tarea) {
   try { await tareasStore.iniciar(tarea.id) } catch {}
@@ -293,28 +288,27 @@ onMounted(async () => {
 <style scoped>
 .cvd { padding: 2rem 1.5rem; max-width: 960px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; }
 @media (max-width: 640px) { .cvd { padding: 1.25rem 1rem; } }
+
 .cvd__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
 .cvd__greeting { font-size: 1.65rem; font-weight: 700; color: #1a1a1a; margin: 0 0 .2rem; letter-spacing: -.03em; }
 .cvd__date { font-size: .85rem; color: #60725d; margin: 0; }
+.cvd__header-right { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .cvd__alert { display: flex; align-items: center; gap: .5rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .55rem 1rem; border-radius: 10px; font-size: .825rem; font-weight: 600; }
+.cvd__voz-btn {
+  display: flex; align-items: center; gap: .5rem;
+  background: #1b5e20; color: #e8f5e9; border: none;
+  padding: .6rem 1.1rem; border-radius: 10px; font-size: .875rem;
+  font-weight: 600; cursor: pointer; transition: background .15s;
+  box-shadow: 0 2px 8px rgba(27,94,32,.25);
+}
+.cvd__voz-btn:hover { background: #104417; }
+.cvd__voz-btn i { font-size: 1rem; }
+
 .cvd__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
 .cvd__spinner { width: 22px; height: 22px; border: 2.5px solid #d4e6d4; border-top-color: #1b5e20; border-radius: 50%; animation: cvd-spin .6s linear infinite; flex-shrink: 0; }
 .cvd__spinner--sm { width: 14px; height: 14px; border-width: 2px; border-top-color: #fff; border-color: rgba(255,255,255,.3); }
 @keyframes cvd-spin { to { transform: rotate(360deg); } }
-.cvd__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2.5rem; }
-@media (max-width: 640px) { .cvd__kpis { grid-template-columns: repeat(2, 1fr); } }
-.cvd__kpi { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; padding: 1.1rem 1rem; transition: box-shadow .15s; }
-.cvd__kpi:hover { box-shadow: 0 4px 16px rgba(27,94,32,.1); }
-.cvd__kpi--active { border-color: #a7d7a9; background: #f0fdf4; }
-.cvd__kpi--danger { border-color: #fecaca; background: #fef2f2; }
-.cvd__kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: .6rem; }
-.cvd__kpi-icon { font-size: 1.25rem; }
-.cvd__kpi-badge { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #1b5e20; background: #dcfce7; padding: .15em .5em; border-radius: 999px; }
-.cvd__kpi-value { font-size: 2rem; font-weight: 800; color: #1a1a1a; line-height: 1; letter-spacing: -.04em; margin-bottom: .25rem; }
-.cvd__kpi-value--green { color: #16a34a; }
-.cvd__kpi-value--red   { color: #dc2626; }
-.cvd__kpi-value--warn  { color: #d97706; }
-.cvd__kpi-label { font-size: .72rem; color: #60725d; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+
 .cvd__section { margin-bottom: 2rem; }
 .cvd__section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; padding-bottom: .75rem; border-bottom: 1px solid #e8f0e9; }
 .cvd__section-header--clickable { cursor: pointer; user-select: none; border-radius: 8px; padding: .5rem .25rem; margin-bottom: .75rem; border-bottom: none; transition: background .15s; }
@@ -322,18 +316,19 @@ onMounted(async () => {
 .cvd__section-title { font-size: 1rem; font-weight: 700; color: #1a1a1a; margin: 0; display: flex; align-items: center; gap: .4rem; }
 .cvd__badge { display: inline-flex; align-items: center; justify-content: center; background: #e8f5e9; color: #1b5e20; font-size: .7rem; font-weight: 700; width: 20px; height: 20px; border-radius: 999px; }
 .cvd__chevron { color: #60725d; font-size: .8rem; }
-.cvd__section-link { font-size: .8rem; color: #60725d; text-decoration: none; font-weight: 500; }
-.cvd__section-link:hover { color: #1b5e20; }
+
 .cvd__filtros { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-bottom: .85rem; }
 .cvd__filtro-pill { display: inline-flex; align-items: center; gap: .3rem; padding: .35rem .8rem; border: 1.5px solid #d4e6d4; border-radius: 999px; background: #f4f8f4; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; color: #60725d; }
 .cvd__filtro-pill:hover { border-color: #1b5e20; color: #1b5e20; }
 .cvd__filtro-pill--active { background: #e8f5e9; border-color: #1b5e20; color: #1b5e20; }
 .cvd__filtro-sep { width: 1px; height: 18px; background: #d4e6d4; flex-shrink: 0; }
+
 .cvd__empty { text-align: center; padding: 3rem 1rem; background: #f4f8f4; border: 1px dashed #d4e6d4; border-radius: 14px; }
 .cvd__empty--inline { display: flex; align-items: center; gap: .75rem; justify-content: center; padding: 1.5rem; background: #f4f8f4; border: 1px solid #e8f0e9; border-radius: 12px; }
 .cvd__empty-icon { font-size: 2.5rem; margin-bottom: .75rem; }
 .cvd__empty p { color: #60725d; font-size: .9rem; margin: 0; font-weight: 500; }
 .cvd__empty-hint { font-size: .78rem; color: #94a3b8; margin-top: .3rem; display: block; }
+
 .cvd__salas { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
 .cvd__sala-card { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: box-shadow .2s, transform .15s; }
 .cvd__sala-card:hover { box-shadow: 0 8px 28px rgba(27,94,32,.12); transform: translateY(-2px); }
@@ -356,6 +351,7 @@ onMounted(async () => {
 .cvd__sala-kind { font-size: .72rem; color: #94a3b8; font-weight: 500; }
 .cvd__sala-cta { font-size: .75rem; font-weight: 700; color: #1b5e20; opacity: 0; transition: opacity .15s; }
 .cvd__sala-card:hover .cvd__sala-cta { opacity: 1; }
+
 .cvd__tareas { display: flex; flex-direction: column; gap: .5rem; }
 .cvd__tarea { display: flex; align-items: center; gap: .75rem; padding: .85rem 1rem; background: #fff; border: 1px solid #d4e6d4; border-radius: 10px; border-left: 3px solid #d4e6d4; transition: box-shadow .15s; }
 .cvd__tarea:hover { box-shadow: 0 2px 10px rgba(27,94,32,.08); }
@@ -378,11 +374,13 @@ onMounted(async () => {
 .cvd__tarea-prioridad--alta    { background: #fff7ed; color: #ea580c; }
 .cvd__tarea-prioridad--normal  { background: #eff6ff; color: #2563eb; }
 .cvd__tarea-prioridad--baja    { background: #f0fdf4; color: #16a34a; }
+
 .cvd__proximas { display: flex; flex-direction: column; gap: .4rem; }
 .cvd__proxima { display: grid; grid-template-columns: 90px 1fr auto; gap: .75rem; align-items: center; padding: .7rem 1rem; background: #f4f8f4; border-radius: 10px; border: 1px solid #e8f0e9; }
 .cvd__proxima-fecha { font-size: .72rem; color: #60725d; font-weight: 600; text-transform: capitalize; }
 .cvd__proxima-titulo { font-size: .85rem; font-weight: 500; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cvd__proxima-sala { font-size: .72rem; color: #94a3b8; text-align: right; white-space: nowrap; }
+
 .cvd__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
 .cvd__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 440px; box-shadow: 0 24px 64px rgba(27,94,32,.15); }
 .cvd__modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid #e8f0e9; }

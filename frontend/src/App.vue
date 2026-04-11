@@ -8,6 +8,7 @@ import { usePlan } from "./composables/usePlan";
 import Avatar from "./components/Avatar.vue";
 import BrandLogo from "./components/BrandLogo.vue";
 import PlanBadge from "./components/PlanBadge.vue";
+import AsistenteVoz from "./components/AsistenteVoz.vue";
 
 const auth   = useAuthStore();
 const club   = useClubStore();
@@ -23,7 +24,6 @@ async function doLogout() {
 }
 
 function closeNav() {
-  // Solo cerrar en mobile (cuando el toggler está visible)
   const toggler = document.querySelector('.navbar-toggler')
   if (toggler && getComputedStyle(toggler).display !== 'none') {
     const el = document.getElementById("mainNav")
@@ -144,8 +144,14 @@ onMounted(async () => {
             </li>
           </ul>
 
-          <!-- Menú de usuario -->
-          <div class="ms-auto d-flex align-items-center mt-2 mt-lg-0">
+          <!-- Menú de usuario + Asistente de voz -->
+          <div class="ms-auto d-flex align-items-center gap-2 mt-2 mt-lg-0">
+
+            <!-- Asistente de voz — visible para cultivador, agricultor y admin -->
+            <AsistenteVoz
+              v-if="auth.user?.role === 'cultivador' || auth.user?.role === 'agricultor' || auth.user?.role === 'admin'"
+            />
+
             <div class="dropdown">
               <button
                 class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 py-1 px-2"
@@ -158,7 +164,6 @@ onMounted(async () => {
               </button>
 
               <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="min-width:240px">
-                <!-- Info usuario -->
                 <li class="px-3 py-2 border-bottom">
                   <div class="d-flex align-items-center gap-2">
                     <Avatar :src="auth.avatarUrl" :name="auth.displayName" :size="36" />

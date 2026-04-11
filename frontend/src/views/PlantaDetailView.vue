@@ -1,11 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import QRCode from 'qrcode'
 import { useRoute } from 'vue-router'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { getPlantActivities, createPlantActivity } from '../lib/api'
-import VozRegistro from '../components/VozRegistro.vue'
 
 const route  = useRoute()
 const plants = usePlantsStore()
@@ -137,7 +136,6 @@ async function loadActivities() {
 }
 
 function abrirModal() {
-  // Pre-llenar con último registro si existe
   const last = ultimoRegistro.value?.metadata
   form.value = {
     altura_cm:    last?.altura_cm    || null,
@@ -168,7 +166,6 @@ async function guardarRegistro() {
       }
     })
     activities.value.unshift(data)
-    // Actualizar la planta local
     if (plants.current) {
       plants.current.altura_actual = form.value.altura_cm
       plants.current.estado_salud  = form.value.estado_salud
@@ -182,19 +179,6 @@ async function guardarRegistro() {
 
 function toggleFotos() {
   fotosExpanded.value = !fotosExpanded.value
-}
-
-function aplicarVoz(datos) {
-  // Pre-llenar el form con los datos de la IA
-  if (datos.altura_cm)    form.value.altura_cm    = datos.altura_cm
-  if (datos.num_colas)    form.value.num_colas    = datos.num_colas
-  if (datos.estado_salud) form.value.estado_salud = datos.estado_salud
-  if (datos.color_hojas)  form.value.color_hojas  = datos.color_hojas
-  if (datos.plagas)       form.value.plagas       = datos.plagas
-  if (datos.deficiencias) form.value.deficiencias = datos.deficiencias
-  if (datos.notas)        form.value.notas        = datos.notas
-  // Abrir el modal para que el cultivador confirme
-  showModal.value = true
 }
 
 onMounted(async () => {
@@ -253,12 +237,9 @@ onMounted(async () => {
             <span>Día {{ diasEnCiclo }}</span>
           </div>
         </div>
-        <div style="display:flex;gap:10px;align-items:center">
-          <VozRegistro :planta="planta" @aplicar="aplicarVoz" />
-          <button class="pd__btn-primary" @click="abrirModal">
-            <i class="bi bi-clipboard2-pulse"></i>Registrar planta
-          </button>
-        </div>
+        <button class="pd__btn-primary" @click="abrirModal">
+          <i class="bi bi-clipboard2-pulse"></i>Registrar planta
+        </button>
       </div>
 
       <!-- Timeline ciclo -->
@@ -335,7 +316,6 @@ onMounted(async () => {
                   </div>
                   <div class="pd__act-content">
                     <div class="pd__act-head">
-                      <!-- Registro de planta -->
                       <template v-if="a.activity_type === 'registro_planta'">
                         <div class="pd__act-titulo">
                           🌱 Registro de planta
@@ -360,7 +340,6 @@ onMounted(async () => {
                         </div>
                         <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
                       </template>
-                      <!-- Otras actividades -->
                       <template v-else>
                         <div class="pd__act-titulo">{{ a.activity_type }} <span v-if="a.description">· {{ a.description }}</span></div>
                       </template>
@@ -414,7 +393,7 @@ onMounted(async () => {
         <!-- Aside -->
         <div class="pd__aside">
 
-          <!-- Datos técnicos (heredados del lote) -->
+          <!-- Datos técnicos -->
           <div class="pd__card">
             <div class="pd__card-header"><span class="pd__card-title">⚙️ Datos técnicos</span></div>
             <dl class="pd__dl">
