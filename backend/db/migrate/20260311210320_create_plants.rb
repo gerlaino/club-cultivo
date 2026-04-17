@@ -1,5 +1,6 @@
 class CreatePlants < ActiveRecord::Migration[7.2]
   def change
+    return if table_exists?(:plants)
     create_table :plants do |t|
       t.references :lote, null: false, foreign_key: true
       t.string :codigo_qr
