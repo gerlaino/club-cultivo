@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub } from '../../lib/api.js'
 
 const route  = useRoute()
 const router = useRouter()
