@@ -23,7 +23,7 @@ const showDelete     = ref(false)
 const deleteTarget   = ref(null)
 const formError      = ref(null)
 
-const canCreate = computed(() => ['admin', 'medico', 'agricultor'].includes(auth.user?.role))
+const canCreate = computed(() => ['admin'].includes(auth.user?.role))
 const canEdit   = computed(() => ['admin', 'medico', 'agricultor'].includes(auth.user?.role))
 
 const today = new Date().toISOString().split('T')[0]
