@@ -48,19 +48,60 @@ class MovimientosContablesController < ApplicationController
     hoy   = Date.today
     scope = club.movimientos_contables
 
-    # Mes actual
-    mes_actual = scope.del_mes(hoy)
-    # Mes anterior
-    mes_ant    = scope.del_mes(hoy - 1.month)
-    # Año actual
+    # Filtro por sede si viene el parámetro
+    scope = scope.por_sede(params[:sede_id]) if params[:sede_id].present?
+
+    mes_actual  = scope.del_mes(hoy)
+    mes_ant     = scope.del_mes(hoy - 1.month)
     anio_actual = scope.del_periodo(hoy.beginning_of_year, hoy)
 
+    # Desglose por sede (siempre, para el breakdown comparativo)
+    sedes_del_club = club.sedes.activas.order(:nombre)
+    por_sede = sedes_del_club.map do |sede|
+      s = club.movimientos_contables.por_sede(sede.id)
+      mes = s.del_mes(hoy)
+      {
+        id:       sede.id,
+        nombre:   sede.nombre,
+        tipo:     sede.tipo,
+        ingresos: mes.ingresos.sum(:monto_ars).to_f,
+        egresos:  mes.egresos.sum(:monto_ars).to_f,
+        balance:  (mes.ingresos.sum(:monto_ars) - mes.egresos.sum(:monto_ars)).to_f,
+        anio: {
+          ingresos: s.del_periodo(hoy.beginning_of_year, hoy).ingresos.sum(:monto_ars).to_f,
+          egresos:  s.del_periodo(hoy.beginning_of_year, hoy).egresos.sum(:monto_ars).to_f,
+          balance:  (s.del_periodo(hoy.beginning_of_year, hoy).ingresos.sum(:monto_ars) -
+            s.del_periodo(hoy.beginning_of_year, hoy).egresos.sum(:monto_ars)).to_f,
+        }
+      }
+    end
+
+    # Sin sede asignada
+    sin_sede = club.movimientos_contables.where(sede_id: nil)
+    mes_sin_sede = sin_sede.del_mes(hoy)
+    sin_sede_data = {
+      id:       nil,
+      nombre:   'Sin sede',
+      tipo:     nil,
+      ingresos: mes_sin_sede.ingresos.sum(:monto_ars).to_f,
+      egresos:  mes_sin_sede.egresos.sum(:monto_ars).to_f,
+      balance:  (mes_sin_sede.ingresos.sum(:monto_ars) - mes_sin_sede.egresos.sum(:monto_ars)).to_f,
+      anio: {
+        ingresos: sin_sede.del_periodo(hoy.beginning_of_year, hoy).ingresos.sum(:monto_ars).to_f,
+        egresos:  sin_sede.del_periodo(hoy.beginning_of_year, hoy).egresos.sum(:monto_ars).to_f,
+        balance:  (sin_sede.del_periodo(hoy.beginning_of_year, hoy).ingresos.sum(:monto_ars) -
+          sin_sede.del_periodo(hoy.beginning_of_year, hoy).egresos.sum(:monto_ars)).to_f,
+      }
+    }
+    por_sede << sin_sede_data if sin_sede_data[:ingresos] > 0 || sin_sede_data[:egresos] > 0
+
     render json: {
+      sede_filtro:  params[:sede_id].presence,
       mes_actual: {
-        ingresos:  mes_actual.ingresos.sum(:monto_ars).to_f,
-        egresos:   mes_actual.egresos.sum(:monto_ars).to_f,
-        balance:   (mes_actual.ingresos.sum(:monto_ars) - mes_actual.egresos.sum(:monto_ars)).to_f,
-        por_categoria: resumen_por_categoria(mes_actual),
+        ingresos:       mes_actual.ingresos.sum(:monto_ars).to_f,
+        egresos:        mes_actual.egresos.sum(:monto_ars).to_f,
+        balance:        (mes_actual.ingresos.sum(:monto_ars) - mes_actual.egresos.sum(:monto_ars)).to_f,
+        por_categoria:  resumen_por_categoria(mes_actual),
       },
       mes_anterior: {
         ingresos: mes_ant.ingresos.sum(:monto_ars).to_f,
@@ -73,6 +114,7 @@ class MovimientosContablesController < ApplicationController
         balance:  (anio_actual.ingresos.sum(:monto_ars) - anio_actual.egresos.sum(:monto_ars)).to_f,
         por_mes:  resumen_por_mes(anio_actual, hoy),
       },
+      por_sede:            por_sede,
       ultimos_movimientos: scope.recientes.limit(10).map { |m| serialize(m) },
     }
   end

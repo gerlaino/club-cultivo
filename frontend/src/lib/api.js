@@ -177,7 +177,7 @@ export const agregarStock    = (id, payload) => api.post(`/sedes/${id}/agregar_s
 export const getPlan = () => api.get('/plan')
 
 // ── Contabilidad ──────────────────────────────────────────────────────────────
-export const getContableDashboard  = ()             => api.get('/movimientos_contables/dashboard')
+export const getContableDashboard  = (params = {}) => api.get('/movimientos_contables/dashboard', { params })
 export const listMovimientos        = (params = {})  => api.get('/movimientos_contables', { params })
 export const getMovimiento          = (id)           => api.get(`/movimientos_contables/${id}`)
 export const createMovimiento       = (payload)      => api.post('/movimientos_contables', { movimiento_contable: payload })
