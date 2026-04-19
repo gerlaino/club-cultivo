@@ -112,6 +112,18 @@ async function generarUsuarios() {
   }
 }
 
+async function toggleWeb() {
+  saving.value = true
+  try {
+    const { data } = await updateSuperAdminClub(id, { web_activa: !club.value.web_activa })
+    club.value = { ...club.value, ...data }
+  } catch (e) {
+    alert('Error al actualizar')
+  } finally {
+    saving.value = false
+  }
+}
+
 onMounted(cargar)
 </script>
 
@@ -189,6 +201,31 @@ onMounted(cargar)
                 <span v-else>Sin fecha de vencimiento</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Card web pública -->
+        <div class="scd__card scd__card--mt">
+          <div class="scd__card-header">
+            <span class="scd__card-title">Web pública</span>
+          </div>
+          <div class="scd__plan-body" style="justify-content:space-between">
+            <div>
+              <div style="font-size:.875rem;font-weight:600;color:#0f172a;margin-bottom:4px">
+                {{ club.web_activa ? 'Activa y visible al público' : 'Desactivada' }}
+              </div>
+              <div style="font-size:.78rem;color:#94a3b8">
+                {{ club.web_activa ? 'El sitio público del club es accesible.' : 'El sitio no es accesible públicamente.' }}
+              </div>
+            </div>
+            <button
+              class="scd__web-toggle"
+              :class="{ 'scd__web-toggle--on': club.web_activa }"
+              :disabled="saving"
+              @click="toggleWeb"
+            >
+              <span class="scd__web-toggle-thumb"></span>
+            </button>
           </div>
         </div>
 
@@ -401,5 +438,19 @@ onMounted(cargar)
 .scd__btn-ghost { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; }
 .scd__btn-ghost:hover { background: #f8fafc; }
 .scd__spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: scd-spin .6s linear infinite; }
+
+.scd__web-toggle {
+  width: 46px; height: 26px; border-radius: 13px; background: #e2e8f0;
+  border: none; cursor: pointer; position: relative; transition: background .25s;
+  padding: 0; flex-shrink: 0;
+}
+.scd__web-toggle--on { background: #1b5e20; }
+.scd__web-toggle:disabled { opacity: .5; cursor: not-allowed; }
+.scd__web-toggle-thumb {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  border-radius: 50%; background: white; transition: transform .25s; display: block;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.scd__web-toggle--on .scd__web-toggle-thumb { transform: translateX(20px); }
 </style>
 

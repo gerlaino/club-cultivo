@@ -28,7 +28,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     if @club.update(club_params)
       render json: serialize_club_detail(@club)
     else
-      render json: { errors: club.errors.full_messages }, status: :unprocessable_entity
+      render json: { errors: @club.errors.full_messages }, status: :unprocessable_entity
     end
   end
 
@@ -68,7 +68,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     params.require(:club).permit(
       :name, :legal_name, :email, :phone, :website,
       :address, :city, :state, :country, :timezone,
-      :plan, :plan_activo_hasta, :plan_trial
+      :plan, :plan_activo_hasta, :plan_trial, :web_activa
     )
   end
 
@@ -99,6 +99,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       address:   c.address,
       timezone:  c.timezone,
       usuarios:  c.users.map { |u| { id: u.id, email: u.email, role: u.role, nombre: u.nombre_completo } },
+      web_activa: c.web_activa,
       )
   end
 end
