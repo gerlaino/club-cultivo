@@ -64,7 +64,7 @@ class SedesController < ApplicationController
   def agregar_stock
     item = @sede.inventarios.find_or_initialize_by(
       producto: params[:producto],
-      lote_id:  params[:lote_id]
+      lote_id:  params[:lote_id].presence
     )
     cantidad       = params[:cantidad].to_f
     stock_anterior = item.stock_gramos.to_f
@@ -77,6 +77,7 @@ class SedesController < ApplicationController
         club:            current_user.club,
         sede_inventario: item,
         created_by:      current_user,
+        lote_id:         params[:lote_id].presence,
         tipo:            'ingreso',
         cantidad:        cantidad,
         stock_anterior:  stock_anterior,
@@ -207,6 +208,16 @@ class SedesController < ApplicationController
   end
 
   def serialize_inventario(i)
+    lote_data = if i.lote
+                  {
+                    id:       i.lote.id,
+                    codigo:   i.lote.codigo,
+                    estado:   i.lote.estado,
+                    strain:   i.lote.strain,
+                    genetica: i.lote.genetica&.nombre,
+                    sala:     i.lote.sala&.nombre,
+                  }
+                end
     {
       id:             i.id,
       producto:       i.producto,
@@ -215,6 +226,7 @@ class SedesController < ApplicationController
       stock_minimo:   i.stock_minimo,
       stock_bajo:     i.stock_bajo?,
       updated_at:     i.updated_at,
+      lote:           lote_data,
     }
   end
 end
