@@ -1,4 +1,4 @@
-module Public
+module SuperAdmin
   class BaseController < ApplicationController
     include Rails.application.routes.url_helpers
     skip_before_action :authenticate_user!, raise: false
