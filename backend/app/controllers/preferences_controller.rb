@@ -5,13 +5,10 @@ class PreferencesController < ApplicationController
   before_action :set_club
 
   def show
-    authorize @club, :show?
     render json: serialize(@club)
   end
 
   def update
-    authorize @club, :update?
-
     if ActiveModel::Type::Boolean.new.cast(params[:purge_logo])
       @club.logo.purge if @club.logo.attached?
     end
@@ -24,7 +21,6 @@ class PreferencesController < ApplicationController
   end
 
   def upload_logo
-    authorize @club, :upload_logo?
     unless params[:logo].present?
       return render json: { errors: ["Archivo no recibido"] }, status: :bad_request
     end
