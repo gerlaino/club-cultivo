@@ -11,43 +11,42 @@ import {
 
 export const useContabilidadStore = defineStore("contabilidad", {
   state: () => ({
-    // Lista
     items:       [],
     totales:     { ingresos: 0, egresos: 0, balance: 0, count: 0 },
     pagination:  { page: 1, per_page: 50, total: 0, total_pages: 1 },
     loading:     false,
     error:       null,
 
-    // Dashboard
     dashboard:        null,
     loadingDashboard: false,
+    dashboardSede:    null, // sede_id activa en dashboard
 
-    // CRUD
-    creating:     false,
-    createError:  null,
-    updating:     false,
-    updateError:  null,
-    removing:     false,
-    removeError:  null,
+    creating:    false,
+    createError: null,
+    updating:    false,
+    updateError: null,
+    removing:    false,
+    removeError: null,
 
-    // Filtros activos
     filtros: {
-      tipo:       "",
-      categoria:  "",
-      sede_id:    "",
-      lote_id:    "",
-      desde:      "",
-      hasta:      "",
-      page:       1,
-      per_page:   50,
+      tipo:      "",
+      categoria: "",
+      sede_id:   "",
+      lote_id:   "",
+      desde:     "",
+      hasta:     "",
+      page:      1,
+      per_page:  50,
     },
   }),
 
   actions: {
-    async fetchDashboard() {
+    async fetchDashboard(sede_id = null) {
       this.loadingDashboard = true;
+      this.dashboardSede    = sede_id;
       try {
-        const { data } = await getContableDashboard();
+        const params = sede_id ? { sede_id } : {};
+        const { data } = await getContableDashboard(params);
         this.dashboard = data;
       } catch (e) {
         console.error("Contabilidad.fetchDashboard", e);
@@ -60,7 +59,6 @@ export const useContabilidadStore = defineStore("contabilidad", {
       this.loading = true;
       this.error   = null;
       const params = { ...this.filtros, ...filtros };
-      // Limpiar params vacíos
       Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
       try {
         const { data } = await listMovimientos(params);
@@ -81,7 +79,6 @@ export const useContabilidadStore = defineStore("contabilidad", {
         const { data } = await createMovimiento(payload);
         this.items = [data, ...this.items];
         this.totales.count++;
-        // Actualizar totales localmente
         if (["ingreso","recupero_costo"].includes(data.tipo)) {
           this.totales.ingresos = +(this.totales.ingresos + data.monto_ars).toFixed(2);
         } else {

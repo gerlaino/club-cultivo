@@ -9,9 +9,14 @@ const auth    = useAuthStore()
 const sedes   = ref([])
 const canEdit = computed(() => ["admin","abogado"].includes(auth.role))
 
-const vistaActiva = ref("dashboard")
+const vistaActiva   = ref("dashboard")
+const dashboardSede = ref(null)
 
-// ── Formato ───────────────────────────────────────────────────────────────────
+async function cambiarSedeDashboard(sede_id) {
+  dashboardSede.value = sede_id || null
+  await store.fetchDashboard(sede_id || null)
+}
+
 const fmt = (n) => new Intl.NumberFormat("es-AR", {
   style: "currency", currency: "ARS",
   minimumFractionDigits: 0, maximumFractionDigits: 0
@@ -22,11 +27,24 @@ function balanceBg(n)    { return n >= 0 ? "rgba(21,128,61,.08)" : "rgba(220,38,
 
 function tipoMeta(tipo) {
   return {
-    egreso:         { label: "Egreso",   color: "#dc2626", bg: "rgba(220,38,38,.1)"  },
-    ingreso:        { label: "Ingreso",  color: "#15803d", bg: "rgba(21,128,61,.1)"  },
-    recupero_costo: { label: "Recupero", color: "#0369a1", bg: "rgba(3,105,161,.1)"  },
+    egreso:         { label: "Egreso",   color: "#dc2626", bg: "rgba(220,38,38,.1)"   },
+    ingreso:        { label: "Ingreso",  color: "#15803d", bg: "rgba(21,128,61,.1)"   },
+    recupero_costo: { label: "Recupero", color: "#0369a1", bg: "rgba(3,105,161,.1)"   },
     ajuste:         { label: "Ajuste",   color: "#64748b", bg: "rgba(100,116,139,.1)" },
   }[tipo] || { label: tipo, color: "#64748b", bg: "rgba(100,116,139,.1)" }
+}
+
+function sedeTipoIcon(tipo) {
+  return tipo === 'social' ? 'bi-shop' : tipo === 'mixta' ? 'bi-arrow-left-right' : 'bi-flower2'
+}
+function sedeTipoColor(tipo) {
+  return tipo === 'social' ? '#0369a1' : tipo === 'mixta' ? '#7c3aed' : '#15803d'
+}
+function sedeTipoBg(tipo) {
+  return tipo === 'social' ? 'rgba(3,105,161,.1)' : tipo === 'mixta' ? 'rgba(124,58,237,.1)' : 'rgba(21,128,61,.1)'
+}
+function sedeTipoLabel(tipo) {
+  return { produccion: 'Producción', social: 'Dispensario', mixta: 'Mixta' }[tipo] || '—'
 }
 
 const MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
@@ -58,7 +76,6 @@ const CATEGORIAS = [
 ]
 function catLabel(cat) { return CATEGORIAS.find(c => c.value === cat)?.label || cat || "—" }
 
-// ── Búsqueda dashboard (últimos movimientos) ──────────────────────────────────
 const busquedaDash = ref("")
 const ultimosFiltrados = computed(() => {
   const list = store.dashboard?.ultimos_movimientos || []
@@ -73,7 +90,6 @@ const ultimosFiltrados = computed(() => {
   return filtered.slice(0, 10)
 })
 
-// ── Filtros libro diario ──────────────────────────────────────────────────────
 const filtroQ         = ref("")
 const filtroTipo      = ref("")
 const filtroCategoria = ref("")
@@ -110,7 +126,6 @@ const hayFiltros = computed(() =>
   filtroTipo.value || filtroCategoria.value || filtroSede.value || filtroDesde.value || filtroHasta.value
 )
 
-// ── Categorías del form filtradas por tipo ────────────────────────────────────
 const categoriasForm = computed(() => {
   const t = form.value.tipo
   if (t === "egreso")  return CATEGORIAS.filter(c => c.tipo === "egreso"  || c.tipo === "ambos")
@@ -118,7 +133,6 @@ const categoriasForm = computed(() => {
   return CATEGORIAS
 })
 
-// ── Modal crear/editar ────────────────────────────────────────────────────────
 const showModal  = ref(false)
 const editingId  = ref(null)
 const formErrors = ref({})
@@ -151,11 +165,11 @@ function openEdit(m) {
 }
 function validate(f) {
   const e = {}
-  if (!f.tipo)               e.tipo        = "Requerido"
-  if (!f.categoria)          e.categoria   = "Requerido"
+  if (!f.tipo)                e.tipo        = "Requerido"
+  if (!f.categoria)           e.categoria   = "Requerido"
   if (!f.descripcion?.trim()) e.descripcion = "Requerido"
   if (!f.monto_ars || f.monto_ars <= 0) e.monto_ars = "Debe ser mayor a 0"
-  if (!f.fecha)              e.fecha       = "Requerido"
+  if (!f.fecha)               e.fecha       = "Requerido"
   return e
 }
 async function submitForm() {
@@ -165,11 +179,10 @@ async function submitForm() {
     if (editingId.value) await store.update(editingId.value, form.value)
     else await store.create(form.value)
     showModal.value = false
-    if (vistaActiva.value === "dashboard") await store.fetchDashboard()
+    if (vistaActiva.value === "dashboard") await store.fetchDashboard(dashboardSede.value)
   } catch {}
 }
 
-// ── Modal eliminar ────────────────────────────────────────────────────────────
 const showDelete = ref(false)
 const toDelete   = ref(null)
 function confirmDelete(m) { toDelete.value = m; showDelete.value = true }
@@ -179,17 +192,16 @@ async function doDelete() {
   showDelete.value = false; toDelete.value = null
 }
 
-// ── Paginación ────────────────────────────────────────────────────────────────
 async function goToPage(p) {
   store.setFiltro("page", p); await store.fetch()
   window.scrollTo({ top: 0, behavior: "smooth" })
 }
 
-// ── Export CSV ────────────────────────────────────────────────────────────────
 async function exportar() {
   const params = {}
   if (filtroDesde.value) params.desde = filtroDesde.value
   if (filtroHasta.value) params.hasta = filtroHasta.value
+  if (dashboardSede.value && vistaActiva.value === "dashboard") params.sede_id = dashboardSede.value
   await store.exportCSV(params)
 }
 
@@ -244,6 +256,37 @@ onMounted(async () => {
 
       <template v-else-if="store.dashboard">
 
+        <!-- Selector de sede -->
+        <div class="cv__sede-selector">
+          <button
+            class="cv__sede-btn"
+            :class="{ 'cv__sede-btn--active': dashboardSede === null }"
+            @click="cambiarSedeDashboard(null)"
+          >
+            <i class="bi bi-building"></i> Club completo
+          </button>
+          <button
+            v-for="s in sedes"
+            :key="s.id"
+            class="cv__sede-btn"
+            :class="{ 'cv__sede-btn--active': dashboardSede === s.id }"
+            @click="cambiarSedeDashboard(s.id)"
+          >
+            <i class="bi" :class="sedeTipoIcon(s.tipo)"></i>
+            {{ s.nombre }}
+          </button>
+        </div>
+
+        <!-- Contexto de sede activa -->
+        <div v-if="dashboardSede" class="cv__dash-context">
+          <i class="bi bi-funnel-fill" style="color:#0369a1"></i>
+          Mostrando datos de
+          <strong>{{ sedes.find(s => s.id === dashboardSede)?.nombre }}</strong>
+          <button class="cv__dash-context-clear" @click="cambiarSedeDashboard(null)">
+            Ver todo el club <i class="bi bi-x"></i>
+          </button>
+        </div>
+
         <!-- KPIs -->
         <div class="cv__kpis">
           <div class="cv__kpi">
@@ -274,8 +317,6 @@ onMounted(async () => {
 
         <!-- Evolución + Por categoría -->
         <div class="cv__row2">
-
-          <!-- Evolución mensual -->
           <div class="cv__card cv__card--main">
             <div class="cv__card-header">
               <span class="cv__card-title">Evolución mensual {{ new Date().getFullYear() }}</span>
@@ -313,7 +354,6 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Por categoría -->
           <div class="cv__card">
             <div class="cv__card-header">
               <span class="cv__card-title">Por categoría (mes actual)</span>
@@ -335,6 +375,77 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- Balance por sede (solo vista consolidada del club) -->
+        <div v-if="!dashboardSede && store.dashboard?.por_sede?.length" class="cv__card cv__card--mt">
+          <div class="cv__card-header">
+            <span class="cv__card-title">
+              <i class="bi bi-building" style="margin-right:6px;color:#0369a1;font-size:.9rem"></i>
+              Balance por sede — mes actual
+            </span>
+            <span class="cv__card-sub">
+              {{ new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }) }}
+            </span>
+          </div>
+          <div class="cv__sede-breakdown">
+            <div
+              v-for="sede in store.dashboard.por_sede"
+              :key="sede.id ?? 'sin-sede'"
+              class="cv__sede-card"
+              :class="{ 'cv__sede-card--clickable': sede.id }"
+              @click="sede.id && cambiarSedeDashboard(sede.id)"
+            >
+              <div class="cv__sede-card-header">
+                <div
+                  class="cv__sede-card-icon"
+                  :style="{
+                    background: sede.id ? sedeTipoBg(sede.tipo) : 'rgba(100,116,139,.1)',
+                    color:      sede.id ? sedeTipoColor(sede.tipo) : '#64748b',
+                  }"
+                >
+                  <i class="bi" :class="sede.id ? sedeTipoIcon(sede.tipo) : 'bi-dash-circle'"></i>
+                </div>
+                <div class="cv__sede-card-info">
+                  <div class="cv__sede-card-nombre">{{ sede.nombre }}</div>
+                  <div v-if="sede.tipo" class="cv__sede-card-tipo">{{ sedeTipoLabel(sede.tipo) }}</div>
+                </div>
+                <i v-if="sede.id" class="bi bi-arrow-right cv__sede-card-arrow"></i>
+              </div>
+
+              <div class="cv__sede-card-stats">
+                <div class="cv__sede-stat cv__sede-stat--green">
+                  <span class="cv__sede-stat-lbl">Ingresos</span>
+                  <span class="cv__sede-stat-val">{{ fmt(sede.ingresos) }}</span>
+                </div>
+                <div class="cv__sede-stat cv__sede-stat--red">
+                  <span class="cv__sede-stat-lbl">Egresos</span>
+                  <span class="cv__sede-stat-val">{{ fmt(sede.egresos) }}</span>
+                </div>
+                <div class="cv__sede-stat">
+                  <span class="cv__sede-stat-lbl">Balance</span>
+                  <span class="cv__sede-stat-val" :style="{ color: balanceColor(sede.balance) }">{{ fmt(sede.balance) }}</span>
+                </div>
+              </div>
+
+              <div v-if="sede.ingresos + sede.egresos > 0" class="cv__sede-bar-wrap">
+                <div
+                  class="cv__sede-bar-fill"
+                  :style="{ width: `${Math.min(100, (sede.ingresos / (sede.ingresos + sede.egresos)) * 100)}%` }"
+                ></div>
+              </div>
+              <div v-if="sede.ingresos + sede.egresos > 0" class="cv__sede-bar-labels">
+                <span>Ing.</span><span>Egr.</span>
+              </div>
+
+              <div class="cv__sede-anio">
+                <span class="cv__sede-anio-lbl">Año {{ new Date().getFullYear() }}</span>
+                <span class="cv__sede-anio-val" :style="{ color: balanceColor(sede.anio.balance) }">
+                  {{ fmt(sede.anio.balance) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Últimos movimientos -->
         <div class="cv__card cv__card--mt">
           <div class="cv__card-header">
@@ -348,7 +459,6 @@ onMounted(async () => {
               <button class="cv__btn-link" @click="irALibro">Ver todos →</button>
             </div>
           </div>
-
           <div v-if="!ultimosFiltrados.length" class="cv__empty-sm">
             {{ busquedaDash ? 'Sin resultados para "' + busquedaDash + '"' : 'Sin movimientos todavía' }}
           </div>
@@ -377,8 +487,6 @@ onMounted(async () => {
 
     <!-- ══════════════ LIBRO DIARIO ══════════════ -->
     <div v-else-if="vistaActiva === 'libro'">
-
-      <!-- Filtros -->
       <div class="cv__filtros">
         <div class="cv__filtro-search">
           <i class="bi bi-search cv__search-icon"></i>
@@ -401,16 +509,15 @@ onMounted(async () => {
           <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
         <div class="cv__filtro-fechas">
-          <input type="date" class="cv__filtro-input cv__filtro-input--date" v-model="filtroDesde" placeholder="Desde" @change="aplicarFiltros" />
+          <input type="date" class="cv__filtro-input cv__filtro-input--date" v-model="filtroDesde" @change="aplicarFiltros" />
           <span class="cv__filtro-sep">—</span>
-          <input type="date" class="cv__filtro-input cv__filtro-input--date" v-model="filtroHasta" placeholder="Hasta" @change="aplicarFiltros" />
+          <input type="date" class="cv__filtro-input cv__filtro-input--date" v-model="filtroHasta" @change="aplicarFiltros" />
         </div>
         <button v-if="hayFiltros" class="cv__btn-clear" @click="limpiarFiltros">
           <i class="bi bi-x-circle"></i> Limpiar
         </button>
       </div>
 
-      <!-- Totales período -->
       <div class="cv__totales">
         <div class="cv__total cv__total--green">
           <div class="cv__total-label">Ingresos del período</div>
@@ -426,7 +533,6 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Tabla -->
       <div class="cv__card">
         <div v-if="store.loading" class="cv__loading"><div class="cv__ring"></div><span>Cargando…</span></div>
         <div v-else-if="!itemsFiltrados.length" class="cv__empty">
@@ -479,8 +585,6 @@ onMounted(async () => {
             </tbody>
           </table>
         </div>
-
-        <!-- Paginación -->
         <div v-if="store.pagination.total_pages > 1" class="cv__pagination">
           <button class="cv__page-btn" :disabled="store.pagination.page <= 1" @click="goToPage(store.pagination.page - 1)">
             <i class="bi bi-chevron-left"></i>
@@ -510,12 +614,9 @@ onMounted(async () => {
             <button class="cv__modal-close" @click="showModal = false"><i class="bi bi-x-lg"></i></button>
           </div>
           <div class="cv__modal-body">
-
             <div v-if="store.createError || store.updateError" class="cv__alert">
               {{ store.createError || store.updateError }}
             </div>
-
-            <!-- Tipo selector visual -->
             <div class="cv__mfield cv__mfield--full">
               <label class="cv__mlabel">Tipo <span class="cv__req">*</span></label>
               <div class="cv__tipo-btns">
@@ -532,9 +633,7 @@ onMounted(async () => {
                 >{{ t.label }}</button>
               </div>
             </div>
-
             <div class="cv__mgrid">
-
               <div class="cv__mfield">
                 <label class="cv__mlabel">Categoría <span class="cv__req">*</span></label>
                 <select class="cv__minput" v-model="form.categoria" :class="{ 'cv__minput--err': formErrors.categoria }">
@@ -543,13 +642,11 @@ onMounted(async () => {
                 </select>
                 <span v-if="formErrors.categoria" class="cv__merr">{{ formErrors.categoria }}</span>
               </div>
-
               <div class="cv__mfield">
                 <label class="cv__mlabel">Fecha <span class="cv__req">*</span></label>
                 <input type="date" class="cv__minput" v-model="form.fecha" :class="{ 'cv__minput--err': formErrors.fecha }" />
                 <span v-if="formErrors.fecha" class="cv__merr">{{ formErrors.fecha }}</span>
               </div>
-
               <div class="cv__mfield cv__mfield--full">
                 <label class="cv__mlabel">Descripción <span class="cv__req">*</span></label>
                 <input type="text" class="cv__minput" v-model.trim="form.descripcion"
@@ -557,7 +654,6 @@ onMounted(async () => {
                        placeholder="Ej: Factura electricidad Sede Avellaneda marzo" />
                 <span v-if="formErrors.descripcion" class="cv__merr">{{ formErrors.descripcion }}</span>
               </div>
-
               <div class="cv__mfield">
                 <label class="cv__mlabel">Monto ARS <span class="cv__req">*</span></label>
                 <div class="cv__minput-prefix-wrap">
@@ -567,7 +663,6 @@ onMounted(async () => {
                 </div>
                 <span v-if="formErrors.monto_ars" class="cv__merr">{{ formErrors.monto_ars }}</span>
               </div>
-
               <div class="cv__mfield">
                 <label class="cv__mlabel">Medio de pago</label>
                 <select class="cv__minput" v-model="form.medio_pago">
@@ -578,7 +673,6 @@ onMounted(async () => {
                   <option value="cheque">Cheque</option>
                 </select>
               </div>
-
               <div class="cv__mfield">
                 <label class="cv__mlabel">Sede <span class="cv__mopt">opcional</span></label>
                 <select class="cv__minput" v-model="form.sede_id">
@@ -586,12 +680,10 @@ onMounted(async () => {
                   <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
                 </select>
               </div>
-
               <div class="cv__mfield">
                 <label class="cv__mlabel">Proveedor / Origen <span class="cv__mopt">opcional</span></label>
                 <input type="text" class="cv__minput" v-model.trim="form.proveedor" placeholder="Edenor, AYSA, Proveedor S.A.…" />
               </div>
-
               <div class="cv__mfield">
                 <label class="cv__mlabel">Tipo comprobante</label>
                 <select class="cv__minput" v-model="form.comprobante_tipo">
@@ -602,12 +694,10 @@ onMounted(async () => {
                   <option value="ticket">Ticket</option>
                 </select>
               </div>
-
               <div class="cv__mfield">
                 <label class="cv__mlabel">N° comprobante <span class="cv__mopt">opcional</span></label>
                 <input type="text" class="cv__minput" v-model.trim="form.comprobante_numero" placeholder="0001-00001234" />
               </div>
-
               <div class="cv__mfield cv__mfield--full">
                 <label class="cv__toggle-wrap">
                   <input type="checkbox" class="cv__toggle-chk" v-model="form.pagado" />
@@ -615,12 +705,10 @@ onMounted(async () => {
                   <span class="cv__toggle-label">Pagado / Cobrado</span>
                 </label>
               </div>
-
               <div class="cv__mfield cv__mfield--full">
                 <label class="cv__mlabel">Notas <span class="cv__mopt">opcional</span></label>
                 <textarea class="cv__minput cv__mtextarea" rows="2" v-model.trim="form.notas" placeholder="Observaciones…"></textarea>
               </div>
-
             </div>
           </div>
           <div class="cv__modal-footer">
@@ -664,19 +752,16 @@ onMounted(async () => {
 .cv { padding: 2rem 1.75rem 3rem; max-width: 1280px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #0f172a; }
 @media (max-width: 768px) { .cv { padding: 1.25rem 1rem 2rem; } }
 
-/* Header */
 .cv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
 .cv__title { font-size: 1.75rem; font-weight: 800; margin: 0 0 .15rem; letter-spacing: -.04em; }
 .cv__sub { font-size: .82rem; color: #64748b; margin: 0; }
 .cv__header-right { display: flex; gap: .65rem; align-items: center; flex-wrap: wrap; }
 
-/* Tabs */
 .cv__tabs { display: flex; gap: .25rem; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.75rem; }
 .cv__tab { display: flex; align-items: center; gap: .4rem; padding: .65rem 1.1rem; font-size: .875rem; font-weight: 600; color: #64748b; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; cursor: pointer; transition: all .15s; }
 .cv__tab:hover { color: #0f172a; }
 .cv__tab--active { color: #1b5e20; border-bottom-color: #1b5e20; }
 
-/* KPIs */
 .cv__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
 @media (max-width: 900px) { .cv__kpis { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 480px) { .cv__kpis { grid-template-columns: 1fr; } }
@@ -690,19 +775,17 @@ onMounted(async () => {
 .cv__kpi-bar--green { background: #15803d; }
 .cv__kpi-bar--red   { background: #dc2626; }
 
-/* Row 2 */
 .cv__row2 { display: grid; grid-template-columns: 1fr 320px; gap: 1rem; margin-bottom: 1.5rem; }
 @media (max-width: 1000px) { .cv__row2 { grid-template-columns: 1fr; } }
 
-/* Cards */
 .cv__card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
 .cv__card--main { flex: 1; }
 .cv__card--mt { margin-top: 1.25rem; }
 .cv__card-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; gap: .5rem; }
 .cv__card-title { font-size: .9rem; font-weight: 700; color: #0f172a; }
+.cv__card-sub { font-size: .78rem; color: #94a3b8; }
 .cv__card-header-right { display: flex; align-items: center; gap: .65rem; flex-wrap: wrap; }
 
-/* Search inline */
 .cv__search-inline { position: relative; display: flex; align-items: center; }
 .cv__search-icon-sm { position: absolute; left: .6rem; font-size: .75rem; color: #94a3b8; pointer-events: none; }
 .cv__search-sm { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .4rem .65rem .4rem 1.75rem; font-size: .78rem; width: 160px; outline: none; transition: border-color .15s; }
@@ -710,20 +793,17 @@ onMounted(async () => {
 .cv__search-x { position: absolute; right: .5rem; color: #94a3b8; cursor: pointer; font-size: .9rem; display: flex; align-items: center; }
 .cv__search-x:hover { color: #0f172a; }
 
-/* Últimos movimientos */
 .cv__movs { display: flex; flex-direction: column; }
 .cv__mov { display: grid; grid-template-columns: 90px 80px 1fr 140px 110px 36px; align-items: center; gap: .5rem; padding: .75rem 1.25rem; border-bottom: 1px solid #f8fafc; transition: background .1s; }
 .cv__mov:last-child { border-bottom: none; }
 .cv__mov:hover { background: #fafbfc; }
 @media (max-width: 900px) { .cv__mov { grid-template-columns: 1fr; } }
 .cv__mov-fecha { font-size: .72rem; color: #94a3b8; font-family: monospace; }
-.cv__mov-tipo { }
 .cv__mov-desc { font-size: .82rem; color: #0f172a; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cv__mov-cat { font-size: .75rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cv__mov-monto { font-size: .875rem; font-weight: 700; text-align: right; letter-spacing: -.02em; }
 .cv__mov-actions { display: flex; justify-content: flex-end; }
 
-/* Por categoría */
 .cv__cat-list { display: flex; flex-direction: column; }
 .cv__cat-item { display: flex; align-items: center; justify-content: space-between; padding: .65rem 1.25rem; border-bottom: 1px solid #f8fafc; }
 .cv__cat-item:last-child { border-bottom: none; }
@@ -731,11 +811,9 @@ onMounted(async () => {
 .cv__cat-name { font-size: .8rem; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cv__cat-monto { font-size: .82rem; font-weight: 700; flex-shrink: 0; }
 
-/* Tipo pill */
 .cv__tipo-pill { display: inline-flex; align-items: center; font-size: .68rem; font-weight: 700; padding: .2em .65em; border-radius: 6px; white-space: nowrap; }
 .cv__tipo-pill--sm { font-size: .64rem; }
 
-/* Filtros */
 .cv__filtros { display: flex; align-items: center; gap: .65rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
 .cv__filtro-search { position: relative; display: flex; align-items: center; flex: 1; min-width: 200px; }
 .cv__search-icon { position: absolute; left: .75rem; color: #94a3b8; font-size: .8rem; pointer-events: none; }
@@ -750,7 +828,6 @@ onMounted(async () => {
 .cv__btn-clear { display: inline-flex; align-items: center; gap: .3rem; background: none; border: 1.5px solid #e2e8f0; color: #64748b; padding: .55rem .875rem; border-radius: 9px; font-size: .8rem; font-weight: 500; cursor: pointer; white-space: nowrap; transition: all .15s; }
 .cv__btn-clear:hover { border-color: #dc2626; color: #dc2626; background: #fef2f2; }
 
-/* Totales */
 .cv__totales { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .875rem; margin-bottom: 1.1rem; }
 @media (max-width: 640px) { .cv__totales { grid-template-columns: 1fr; } }
 .cv__total { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.25rem; }
@@ -761,7 +838,6 @@ onMounted(async () => {
 .cv__total--green .cv__total-val { color: #15803d; }
 .cv__total--red   .cv__total-val { color: #dc2626; }
 
-/* Tabla */
 .cv__table-wrap { overflow-x: auto; }
 .cv__table { width: 100%; border-collapse: collapse; font-size: .82rem; }
 .cv__table th { padding: .75rem 1rem; font-size: .7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1.5px solid #f1f5f9; background: #fafbfc; white-space: nowrap; }
@@ -782,27 +858,22 @@ onMounted(async () => {
 .cv__desc-cell { display: flex; align-items: center; gap: .5rem; }
 .cv__desc-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
 
-/* Pagado pill */
 .cv__pagado-pill { font-size: .68rem; font-weight: 700; padding: .2em .65em; border-radius: 6px; white-space: nowrap; }
 .cv__pagado-pill--ok   { background: rgba(21,128,61,.1); color: #15803d; }
 .cv__pagado-pill--pend { background: rgba(180,83,9,.1);  color: #b45309; }
 
-/* Row actions */
 .cv__row-actions { display: flex; gap: .35rem; justify-content: flex-end; }
 
-/* Icon buttons */
 .cv__icon-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: .75rem; transition: all .15s; }
 .cv__icon-btn:hover { background: #e2e8f0; color: #0f172a; }
 .cv__icon-btn--danger:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
 
-/* Empty */
 .cv__empty { text-align: center; padding: 3.5rem 1rem; color: #94a3b8; }
 .cv__empty-sm { text-align: center; padding: 2rem 1rem; color: #94a3b8; font-size: .85rem; }
 .cv__empty-icon { font-size: 2.5rem; margin-bottom: .75rem; opacity: .4; }
 .cv__empty-title { font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: .5rem; }
 .cv__empty-desc { font-size: .875rem; margin-bottom: 1.25rem; }
 
-/* Paginación */
 .cv__pagination { display: flex; align-items: center; gap: .35rem; padding: 1rem 1.25rem; border-top: 1px solid #f1f5f9; }
 .cv__page-btn { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; font-size: .8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
 .cv__page-btn:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }
@@ -810,7 +881,6 @@ onMounted(async () => {
 .cv__page-btn:disabled { opacity: .4; cursor: not-allowed; }
 .cv__page-info { font-size: .75rem; color: #94a3b8; margin-left: .5rem; }
 
-/* Buttons */
 .cv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 10px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .cv__btn-primary:hover:not(:disabled) { background: #144a18; }
 .cv__btn-primary:disabled { opacity: .55; cursor: not-allowed; }
@@ -822,12 +892,10 @@ onMounted(async () => {
 .cv__btn-link { background: none; border: none; color: #1b5e20; font-size: .8rem; font-weight: 600; cursor: pointer; padding: 0; white-space: nowrap; }
 .cv__btn-link:hover { text-decoration: underline; }
 
-/* Loading */
 .cv__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 4rem; color: #94a3b8; }
 .cv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: cv-spin .7s linear infinite; }
 @keyframes cv-spin { to { transform: rotate(360deg); } }
 
-/* Modal */
 .cv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
 .cv__modal { background: #fff; border-radius: 18px; width: 100%; max-width: 620px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.15); display: flex; flex-direction: column; }
 .cv__modal--sm { max-width: 420px; text-align: center; padding: 2.5rem 2rem; }
@@ -839,7 +907,6 @@ onMounted(async () => {
 .cv__modal-body { padding: 1.5rem; flex: 1; }
 .cv__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1.1rem 1.5rem; border-top: 1px solid #f1f5f9; position: sticky; bottom: 0; background: #fff; }
 
-/* Form */
 .cv__mgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 500px) { .cv__mgrid { grid-template-columns: 1fr; } }
 .cv__mfield { display: flex; flex-direction: column; gap: .35rem; }
@@ -856,13 +923,11 @@ onMounted(async () => {
 .cv__mtextarea { resize: vertical; min-height: 65px; }
 .cv__merr { font-size: .73rem; color: #dc2626; }
 
-/* Tipo buttons */
 .cv__tipo-btns { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .25rem; }
 .cv__tipo-btn { padding: .45rem 1rem; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc; font-size: .82rem; font-weight: 500; cursor: pointer; color: #475569; transition: all .15s; }
 .cv__tipo-btn:hover { border-color: #cbd5e1; }
 .cv__tipo-btn--active { font-weight: 700; }
 
-/* Toggle */
 .cv__toggle-wrap { display: flex; align-items: center; gap: .65rem; cursor: pointer; }
 .cv__toggle-chk { display: none; }
 .cv__toggle-track { width: 38px; height: 21px; background: #d1d5db; border-radius: 999px; position: relative; transition: background .2s; flex-shrink: 0; }
@@ -871,16 +936,119 @@ onMounted(async () => {
 .cv__toggle-chk:checked + .cv__toggle-track .cv__toggle-thumb { left: 20px; }
 .cv__toggle-label { font-size: .875rem; font-weight: 500; color: #0f172a; }
 
-/* Alert */
 .cv__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; margin-bottom: 1rem; }
 
-/* Delete modal */
 .cv__delete-icon { width: 56px; height: 56px; border-radius: 50%; background: #fef2f2; color: #dc2626; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.1rem; }
 .cv__delete-title { font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0 0 .65rem; letter-spacing: -.03em; }
 .cv__delete-desc { font-size: .875rem; color: #64748b; line-height: 1.6; margin: 0 0 1.5rem; }
 .cv__delete-actions { display: flex; gap: .65rem; justify-content: center; }
 
-/* Spinner */
 .cv__spin { width: 14px; height: 14px; border: 2px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: cv-spin .6s linear infinite; }
 .cv__spin--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
+
+/* ══ NUEVO: Selector de sede en dashboard ══════════════════════ */
+.cv__sede-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+.cv__sede-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 13px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all .15s;
+  font-weight: 500;
+}
+.cv__sede-btn:hover { border-color: #94a3b8; color: #0f172a; }
+.cv__sede-btn--active { border-color: #1b5e20; background: rgba(27,94,32,.07); color: #1b5e20; }
+
+.cv__dash-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(3,105,161,.05);
+  border: 1px solid rgba(3,105,161,.18);
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-size: 13px;
+  color: #0f172a;
+  margin-bottom: 1.25rem;
+}
+.cv__dash-context-clear {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #0369a1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+.cv__dash-context-clear:hover { text-decoration: underline; }
+
+/* ══ NUEVO: Breakdown por sede ════════════════════════════════ */
+.cv__sede-breakdown {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.cv__sede-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  transition: box-shadow .15s, border-color .15s;
+}
+.cv__sede-card--clickable { cursor: pointer; }
+.cv__sede-card--clickable:hover { box-shadow: 0 2px 12px rgba(0,0,0,.08); border-color: #1b5e20; }
+
+.cv__sede-card-header { display: flex; align-items: center; gap: 10px; }
+.cv__sede-card-icon {
+  width: 34px; height: 34px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+.cv__sede-card-info { flex: 1; min-width: 0; }
+.cv__sede-card-nombre { font-size: 14px; font-weight: 700; color: #0f172a; }
+.cv__sede-card-tipo { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+.cv__sede-card-arrow { color: #cbd5e1; font-size: 13px; transition: transform .15s, color .15s; margin-left: auto; }
+.cv__sede-card--clickable:hover .cv__sede-card-arrow { color: #1b5e20; transform: translateX(3px); }
+
+.cv__sede-card-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.cv__sede-stat {
+  background: white; border: 1px solid #f1f5f9;
+  border-radius: 8px; padding: 7px 6px; text-align: center;
+}
+.cv__sede-stat--green { border-color: rgba(21,128,61,.15); background: rgba(21,128,61,.03); }
+.cv__sede-stat--red   { border-color: rgba(220,38,38,.15); background: rgba(220,38,38,.03); }
+.cv__sede-stat-lbl { display: block; font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+.cv__sede-stat-val { display: block; font-size: 11px; font-weight: 700; color: #0f172a; }
+.cv__sede-stat--green .cv__sede-stat-val { color: #15803d; }
+.cv__sede-stat--red   .cv__sede-stat-val { color: #dc2626; }
+
+.cv__sede-bar-wrap { height: 5px; background: rgba(220,38,38,.18); border-radius: 999px; overflow: hidden; }
+.cv__sede-bar-fill { height: 100%; background: #15803d; border-radius: 999px; transition: width .4s; }
+.cv__sede-bar-labels { display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; margin-top: 1px; }
+
+.cv__sede-anio {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 10px; border-top: 1px solid #f1f5f9;
+}
+.cv__sede-anio-lbl { font-size: 11px; color: #94a3b8; }
+.cv__sede-anio-val { font-size: 13px; font-weight: 700; }
 </style>
