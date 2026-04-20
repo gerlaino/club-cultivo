@@ -1,10 +1,11 @@
 <template>
   <div class="av">
 
-    <!-- Botón en navbar -->
-    <button class="av__trigger" :class="{ 'av__trigger--activo': abierto }" @click="abrir">
+    <!-- Botón trigger — se adapta al contexto -->
+    <button class="av__trigger" :class="{ 'av__trigger--activo': abierto, 'av__trigger--mini': mini }" @click="abrir">
       <span class="av__trigger-dot" :class="{ 'av__trigger-dot--pulse': escuchando }"></span>
-      Registrar sesión
+      <span v-if="!mini">{{ triggerLabel }}</span>
+      <i v-if="mini" class="bi bi-mic-fill"></i>
     </button>
 
     <!-- Panel modal -->
@@ -21,10 +22,26 @@
                 </div>
                 <div>
                   <div class="av__header-title">Asistente de cultivo</div>
-                  <div class="av__header-sub">Hablá libremente — la IA distribuye todo automáticamente</div>
+                  <div class="av__header-sub">{{ subtituloContexto }}</div>
                 </div>
               </div>
               <button class="av__close" @click="cerrar"><i class="bi bi-x-lg"></i></button>
+            </div>
+
+            <!-- Chip de contexto -->
+            <div v-if="contexto" class="av__contexto-bar">
+              <span v-if="contexto.lote_codigo" class="av__ctx-chip av__ctx-chip--lote">
+                🌿 {{ contexto.lote_codigo }}
+              </span>
+              <span v-if="contexto.sala_nombre" class="av__ctx-chip av__ctx-chip--sala">
+                📍 {{ contexto.sala_nombre }}
+              </span>
+              <span v-if="contexto.plantas_count" class="av__ctx-chip av__ctx-chip--plantas">
+                🪴 {{ contexto.plantas_count }} plantas
+              </span>
+              <span v-if="contexto.planta_nombre" class="av__ctx-chip av__ctx-chip--planta">
+                🌱 {{ contexto.planta_nombre }}
+              </span>
             </div>
 
             <!-- PASO 1: Escuchar -->
@@ -32,19 +49,11 @@
 
               <div v-if="!escuchando && !transcripcion" class="av__idle">
                 <div class="av__idle-icon">🎙️</div>
-                <div class="av__idle-title">¿Qué pasó hoy en el cultivo?</div>
+                <div class="av__idle-title">{{ idleTitle }}</div>
                 <div class="av__idle-ejemplos">
-                  <div class="av__ejemplo">
-                    <span class="av__ejemplo-icono">💧</span>
-                    "Regué el lote L-26-003 con EC 1.4 pH 6.2"
-                  </div>
-                  <div class="av__ejemplo">
-                    <span class="av__ejemplo-icono">🌿</span>
-                    "La planta P012 tiene déficit de nitrógeno, hojas amarillas"
-                  </div>
-                  <div class="av__ejemplo">
-                    <span class="av__ejemplo-icono">📋</span>
-                    "Hay que revisar plagas en sala de floración la semana que viene"
+                  <div v-for="ej in ejemplosContexto" :key="ej.texto" class="av__ejemplo">
+                    <span class="av__ejemplo-icono">{{ ej.icono }}</span>
+                    "{{ ej.texto }}"
                   </div>
                 </div>
               </div>
@@ -53,12 +62,18 @@
                 <div class="av__waves">
                   <div v-for="i in 9" :key="i" class="av__wave" :style="{ animationDelay: `${i * 0.09}s` }"></div>
                 </div>
-                <div class="av__rec-label">Escuchando... hablá con libertad</div>
+                <div class="av__rec-label">Escuchando… hablá con libertad</div>
+                <div v-if="transcripcionInterim" class="av__interim">{{ transcripcionInterim }}</div>
               </div>
 
               <div v-if="transcripcion && !escuchando" class="av__transcript-box">
                 <div class="av__transcript-label">Escuché esto:</div>
                 <div class="av__transcript-text">"{{ transcripcion }}"</div>
+                <button class="av__transcript-edit" @click="editandoTranscripcion = !editandoTranscripcion">
+                  <i class="bi bi-pencil"></i> Editar
+                </button>
+                <textarea v-if="editandoTranscripcion" class="av__transcript-textarea"
+                          v-model="transcripcion" rows="3"></textarea>
               </div>
 
               <div v-if="errorVoz" class="av__error">
@@ -76,9 +91,17 @@
                 </button>
                 <div v-if="procesando" class="av__procesando">
                   <div class="av__procesando-spinner"></div>
-                  <span>Analizando con IA...</span>
+                  <span>Analizando con IA…</span>
                 </div>
               </div>
+
+              <!-- Atajo: si hay transcripción, botón de procesar directo -->
+              <div v-if="transcripcion && !escuchando && !procesando" class="av__procesar-directo">
+                <button class="av__btn-procesar" @click="parsearConIA">
+                  <i class="bi bi-cpu"></i> Procesar lo que dije
+                </button>
+              </div>
+
             </div>
 
             <!-- PASO 2: Revisar acciones -->
@@ -97,7 +120,7 @@
                   v-for="(accion, i) in acciones"
                   :key="i"
                   class="av__accion"
-                  :class="`av__accion--${accion.tipo}`"
+                  :class="[`av__accion--${accion.tipo}`, accion._alerta ? 'av__accion--alerta' : '']"
                 >
                   <div class="av__accion-icono">
                     <span v-if="accion.tipo === 'registro_ambiental'">💧</span>
@@ -113,6 +136,10 @@
                       {{ descripcionAccion(accion) }}
                     </div>
                     <div class="av__accion-meta">{{ metaAccion(accion) }}</div>
+                    <!-- Alerta de ambigüedad -->
+                    <div v-if="accion._alerta" class="av__accion-alerta-msg">
+                      <i class="bi bi-exclamation-triangle-fill"></i> {{ accion._alerta }}
+                    </div>
                   </div>
                   <button class="av__accion-remove" @click="quitarAccion(i)" title="Quitar esta acción">
                     <i class="bi bi-x"></i>
@@ -135,7 +162,7 @@
                   :disabled="ejecutando"
                 >
                   <span v-if="ejecutando">
-                    <i class="bi bi-hourglass-split"></i> Guardando...
+                    <i class="bi bi-hourglass-split"></i> Guardando…
                   </span>
                   <span v-else>
                     <i class="bi bi-check-lg"></i> Guardar todo ({{ acciones.length }})
@@ -169,27 +196,93 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import api from '../lib/api'
 
-const abierto             = ref(false)
-const paso                = ref('escuchar')
-const escuchando          = ref(false)
-const procesando          = ref(false)
-const ejecutando          = ref(false)
-const transcripcion       = ref('')
-const resumen             = ref('')
-const acciones            = ref([])
-const resultados          = ref([])
-const erroresEjecucion    = ref([])
-const errorVoz            = ref(null)
+const props = defineProps({
+  // Contexto implícito de la vista donde se usa el asistente
+  contexto: {
+    type: Object,
+    default: null
+    // Estructura esperada:
+    // { tipo: 'lote', lote_id, lote_codigo, sala_nombre, plantas_count, estado }
+    // { tipo: 'planta', planta_id, planta_nombre, lote_id, lote_codigo }
+    // { tipo: 'sala', sala_id, sala_nombre }
+    // { tipo: 'general' }
+  },
+  mini: {
+    type: Boolean,
+    default: false
+  }
+})
+
+const emit = defineEmits(['registrado'])
+
+const abierto               = ref(false)
+const paso                  = ref('escuchar')
+const escuchando            = ref(false)
+const procesando            = ref(false)
+const ejecutando            = ref(false)
+const transcripcion         = ref('')
+const transcripcionInterim  = ref('')
+const editandoTranscripcion = ref(false)
+const resumen               = ref('')
+const acciones              = ref([])
+const resultados            = ref([])
+const erroresEjecucion      = ref([])
+const errorVoz              = ref(null)
 
 let recognition = null
 
+// ── Textos adaptados al contexto ──────────────────────────
+
+const triggerLabel = computed(() => {
+  if (!props.contexto) return 'Registrar sesión'
+  if (props.contexto.tipo === 'lote') return '🎙️ Registrar por voz'
+  if (props.contexto.tipo === 'planta') return '🎙️ Observación por voz'
+  return 'Registrar sesión'
+})
+
+const subtituloContexto = computed(() => {
+  if (!props.contexto) return 'Hablá libremente — la IA distribuye todo automáticamente'
+  if (props.contexto.tipo === 'lote') return `Registrando en ${props.contexto.lote_codigo} · ${props.contexto.sala_nombre || ''}`
+  if (props.contexto.tipo === 'planta') return `Observación para ${props.contexto.planta_nombre}`
+  return 'Hablá libremente — la IA distribuye todo automáticamente'
+})
+
+const idleTitle = computed(() => {
+  if (!props.contexto) return '¿Qué pasó hoy en el cultivo?'
+  if (props.contexto.tipo === 'lote') return `¿Qué pasó hoy en ${props.contexto.lote_codigo}?`
+  if (props.contexto.tipo === 'planta') return `¿Cómo está ${props.contexto.planta_nombre}?`
+  return '¿Qué pasó hoy en el cultivo?'
+})
+
+const ejemplosContexto = computed(() => {
+  if (props.contexto?.tipo === 'lote') {
+    return [
+      { icono: '💧', texto: 'Regué con dos pulsos, base bloom, EC 1.8, pH 6.2' },
+      { icono: '🌿', texto: 'Todas bien, un poco de amarillo en las hojas bajas' },
+      { icono: '📋', texto: 'La semana que viene hay que revisar plagas' },
+    ]
+  }
+  if (props.contexto?.tipo === 'planta') {
+    return [
+      { icono: '🌿', texto: 'Hojas verdes, sin plagas, crecimiento normal' },
+      { icono: '⚠️', texto: 'Amarillo en hojas bajas, posible déficit de nitrógeno' },
+      { icono: '📋', texto: 'Hay que revisarla mañana' },
+    ]
+  }
+  return [
+    { icono: '💧', texto: 'Regué el lote L-26-003 con EC 1.4 pH 6.2' },
+    { icono: '🌿', texto: 'La planta P012 tiene déficit de nitrógeno, hojas amarillas' },
+    { icono: '📋', texto: 'Hay que revisar plagas en sala de floración la semana que viene' },
+  ]
+})
+
+// ── Eventos de apertura ──────────────────────────────────
+
 function abrir() { abierto.value = true }
 
-// Permite que los dashboards abran el asistente via evento global
 onMounted(() => {
   window.addEventListener('abrir-asistente-voz', abrir)
 })
@@ -204,21 +297,27 @@ function cerrar() {
 }
 
 function resetear() {
-  paso.value          = 'escuchar'
-  escuchando.value    = false
-  procesando.value    = false
-  ejecutando.value    = false
-  transcripcion.value = ''
-  resumen.value       = ''
-  acciones.value      = []
-  resultados.value    = []
-  erroresEjecucion.value = []
-  errorVoz.value      = null
+  paso.value                  = 'escuchar'
+  escuchando.value            = false
+  procesando.value            = false
+  ejecutando.value            = false
+  transcripcion.value         = ''
+  transcripcionInterim.value  = ''
+  editandoTranscripcion.value = false
+  resumen.value               = ''
+  acciones.value              = []
+  resultados.value            = []
+  erroresEjecucion.value      = []
+  errorVoz.value              = null
 }
 
+// ── Grabación ────────────────────────────────────────────
+
 function iniciarGrabacion() {
-  errorVoz.value    = null
-  transcripcion.value = ''
+  errorVoz.value              = null
+  transcripcion.value         = ''
+  transcripcionInterim.value  = ''
+  editandoTranscripcion.value = false
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
   if (!SpeechRecognition) {
@@ -227,28 +326,44 @@ function iniciarGrabacion() {
   }
 
   recognition = new SpeechRecognition()
-  recognition.lang            = 'es-AR'
-  recognition.continuous      = true
-  recognition.interimResults  = true
+  recognition.lang           = 'es-AR'
+  recognition.continuous     = true
+  recognition.interimResults = true
 
-  recognition.onstart  = () => { escuchando.value = true }
+  recognition.onstart = () => { escuchando.value = true }
+
   recognition.onresult = (e) => {
-    let txt = ''
-    for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript
-    transcripcion.value = txt
+    let final = ''
+    let interim = ''
+    for (let i = 0; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        final += e.results[i][0].transcript
+      } else {
+        interim += e.results[i][0].transcript
+      }
+    }
+    if (final) transcripcion.value = final
+    transcripcionInterim.value = interim
   }
-  recognition.onerror  = (e) => {
+
+  recognition.onerror = (e) => {
     if (e.error === 'no-speech') return
-    errorVoz.value  = `Error de micrófono: ${e.error}`
+    errorVoz.value   = `Error de micrófono: ${e.error}`
     escuchando.value = false
   }
-  recognition.onend    = () => { escuchando.value = false }
+
+  recognition.onend = () => {
+    escuchando.value           = false
+    transcripcionInterim.value = ''
+  }
+
   recognition.start()
 }
 
 function detenerGrabacion() {
   if (recognition) recognition.stop()
-  escuchando.value = false
+  escuchando.value           = false
+  transcripcionInterim.value = ''
 
   if (!transcripcion.value.trim()) {
     errorVoz.value = 'No escuché nada. Intentá de nuevo.'
@@ -257,11 +372,19 @@ function detenerGrabacion() {
   parsearConIA()
 }
 
+// ── Parseo con IA ────────────────────────────────────────
+
 async function parsearConIA() {
-  procesando.value = true
-  errorVoz.value   = null
+  procesando.value            = true
+  errorVoz.value              = null
+  editandoTranscripcion.value = false
+
   try {
-    const { data } = await api.post('/asistente/parsear', { texto: transcripcion.value })
+    const payload = { texto: transcripcion.value }
+    // Inyectar contexto si existe
+    if (props.contexto) payload.contexto = props.contexto
+
+    const { data } = await api.post('/asistente/parsear', payload)
     resumen.value  = data.resumen || ''
     acciones.value = data.acciones || []
     paso.value     = 'revisar'
@@ -272,21 +395,23 @@ async function parsearConIA() {
   }
 }
 
-function quitarAccion(i) {
-  acciones.value.splice(i, 1)
-}
+// ── Ejecución ────────────────────────────────────────────
 
-function volverEscuchar() {
-  paso.value = 'escuchar'
-}
+function quitarAccion(i) { acciones.value.splice(i, 1) }
+
+function volverEscuchar() { paso.value = 'escuchar' }
 
 async function ejecutarAcciones() {
   ejecutando.value = true
   try {
-    const { data } = await api.post('/asistente/ejecutar', { acciones: acciones.value })
-    resultados.value       = data.resultados || []
-    erroresEjecucion.value = data.errores_detalle || []
+    const payload = { acciones: acciones.value }
+    if (props.contexto) payload.contexto = props.contexto
+
+    const { data } = await api.post('/asistente/ejecutar', payload)
+    resultados.value       = data.resultados       || []
+    erroresEjecucion.value = data.errores_detalle   || []
     paso.value             = 'resultado'
+    emit('registrado', data)
   } catch (e) {
     errorVoz.value = e?.response?.data?.error || 'Error al guardar'
   } finally {
@@ -294,9 +419,9 @@ async function ejecutarAcciones() {
   }
 }
 
-function nuevaSesion() {
-  resetear()
-}
+function nuevaSesion() { resetear() }
+
+// ── Helpers de display ───────────────────────────────────
 
 function labelTipo(tipo) {
   return {
@@ -311,16 +436,18 @@ function descripcionAccion(accion) {
   const d = accion.datos || {}
   if (accion.tipo === 'registro_ambiental') {
     const partes = []
-    if (d.fertilizacion) partes.push('Fertilización')
-    if (d.ph) partes.push(`pH ${d.ph}`)
-    if (d.ec) partes.push(`EC ${d.ec}`)
-    if (d.observaciones) partes.push(d.observaciones)
+    if (d.fertilizacion)  partes.push('Fertilización')
+    if (d.ph)             partes.push(`pH ${d.ph}`)
+    if (d.ec)             partes.push(`EC ${d.ec}`)
+    if (d.temperatura)    partes.push(`${d.temperatura}°C`)
+    if (d.observaciones)  partes.push(d.observaciones)
     return partes.join(' · ') || 'Registro ambiental'
   }
   if (accion.tipo === 'registro_planta') {
     const partes = []
-    if (d.estado_salud) partes.push(d.estado_salud)
-    if (d.deficiencias) partes.push(d.deficiencias)
+    if (d.estado_salud)  partes.push(d.estado_salud)
+    if (d.deficiencias)  partes.push(d.deficiencias)
+    if (d.plagas && d.plagas !== 'ninguna') partes.push(`plagas: ${d.plagas}`)
     return partes.join(' · ') || 'Observación de planta'
   }
   if (accion.tipo === 'tarea') return d.titulo || 'Tarea sin título'
@@ -334,7 +461,10 @@ function metaAccion(accion) {
     return `Prioridad ${d.prioridad || 'media'} · en ${dias} días`
   }
   if (accion.tipo === 'registro_planta' && d.color_hojas) {
-    return `Color hojas: ${d.color_hojas} · Plagas: ${d.plagas || 'ninguna'}`
+    return `Color: ${d.color_hojas} · Plagas: ${d.plagas || 'ninguna'}`
+  }
+  if (accion.tipo === 'registro_ambiental' && d.notas_fertilizacion) {
+    return d.notas_fertilizacion
   }
   return ''
 }
@@ -353,11 +483,17 @@ function metaAccion(accion) {
 }
 .av__trigger:hover { opacity: .88; }
 .av__trigger--activo { opacity: .88; }
+.av__trigger--mini {
+  width: 38px; height: 38px; padding: 0;
+  justify-content: center; border-radius: 50%;
+  font-size: 15px;
+}
 
 .av__trigger-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: #a5d6a7; flex-shrink: 0; transition: background .3s;
 }
+.av__trigger--mini .av__trigger-dot { display: none; }
 .av__trigger-dot--pulse {
   background: #ff5252;
   animation: av-pulse 1s infinite;
@@ -407,6 +543,21 @@ function metaAccion(accion) {
 }
 .av__close:hover { background: #e2e8f0; }
 
+/* Contexto bar */
+.av__contexto-bar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 24px; background: #f8fdf8; border-bottom: 1px solid #e8f5e9;
+}
+.av__ctx-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; padding: 3px 10px;
+  border-radius: 999px;
+}
+.av__ctx-chip--lote    { background: #dcfce7; color: #1b5e20; }
+.av__ctx-chip--sala    { background: #dbeafe; color: #1e40af; }
+.av__ctx-chip--plantas { background: #fef3c7; color: #92400e; }
+.av__ctx-chip--planta  { background: #fce7f3; color: #9d174d; }
+
 .av__body { padding: 20px 24px 24px; }
 
 .av__idle { text-align: center; padding: 1rem 0 .5rem; }
@@ -440,13 +591,30 @@ function metaAccion(accion) {
   to   { transform: scaleY(1);  opacity: 1; }
 }
 .av__rec-label { font-size: 14px; color: #dc2626; font-weight: 500; }
+.av__interim {
+  margin-top: .75rem; font-size: 13px; color: #94a3b8;
+  font-style: italic; min-height: 20px;
+}
 
 .av__transcript-box {
   background: #f8fdf8; border: 1px solid #c8e6c9; border-radius: 12px;
-  padding: 14px 16px; margin-bottom: 1rem;
+  padding: 14px 16px; margin-bottom: 1rem; position: relative;
 }
 .av__transcript-label { font-size: 11px; color: #4a7c59; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
 .av__transcript-text { font-size: 14px; color: #1a2e1b; line-height: 1.6; font-style: italic; }
+.av__transcript-edit {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 8px; background: none; border: none;
+  font-size: 12px; color: #4a7c59; cursor: pointer; padding: 0;
+}
+.av__transcript-edit:hover { color: #1b5e20; text-decoration: underline; }
+.av__transcript-textarea {
+  width: 100%; margin-top: 8px; border: 1.5px solid #c8e6c9;
+  border-radius: 8px; padding: 8px; font-size: 13px;
+  background: white; resize: vertical; box-sizing: border-box;
+  font-family: inherit;
+}
+.av__transcript-textarea:focus { outline: none; border-color: #1b5e20; }
 
 .av__error {
   background: #fef2f2; color: #dc2626; border-radius: 8px;
@@ -483,6 +651,18 @@ function metaAccion(accion) {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.av__procesar-directo {
+  display: flex; justify-content: center; margin-top: .75rem;
+}
+.av__btn-procesar {
+  display: flex; align-items: center; gap: 7px;
+  background: #f0fdf4; color: #1b5e20;
+  border: 1.5px solid #c8e6c9; padding: 10px 20px;
+  border-radius: 10px; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .15s;
+}
+.av__btn-procesar:hover { background: #dcfce7; border-color: #1b5e20; }
+
 /* Acciones */
 .av__resumen-header { margin-bottom: 1.25rem; }
 .av__resumen-badge {
@@ -501,6 +681,7 @@ function metaAccion(accion) {
 .av__accion:hover { background: #f8fdf8; }
 .av__accion--tarea { border-color: #ffe0b2; }
 .av__accion--registro_planta { border-color: #fce4ec; }
+.av__accion--alerta { border-color: #fde68a; background: #fffbeb; }
 .av__accion-icono { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
 .av__accion-body { flex: 1; min-width: 0; }
 .av__accion-tipo {
@@ -516,6 +697,11 @@ function metaAccion(accion) {
   border-radius: 4px; margin-right: 6px;
 }
 .av__accion-meta { font-size: 12px; color: #94a3b8; }
+.av__accion-alerta-msg {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: #b45309; margin-top: 5px;
+  background: #fef3c7; padding: 4px 8px; border-radius: 6px;
+}
 .av__accion-remove {
   background: none; border: none; color: #cbd5e1; cursor: pointer;
   font-size: 14px; padding: 2px 4px; transition: color .15s; flex-shrink: 0;
@@ -555,7 +741,7 @@ function metaAccion(accion) {
   display: flex; align-items: flex-start; gap: 9px;
   padding: 10px 14px; border-radius: 10px; font-size: 14px;
 }
-.av__resultado-item--ok { background: #e8f5e9; color: #1b5e20; }
+.av__resultado-item--ok  { background: #e8f5e9; color: #1b5e20; }
 .av__resultado-item--err { background: #fef2f2; color: #dc2626; }
 .av__btn-nueva-sesion {
   display: inline-flex; align-items: center; gap: 8px;
