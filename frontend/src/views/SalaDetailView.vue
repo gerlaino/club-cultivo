@@ -27,14 +27,18 @@ const DIAS_CICLO   = { semilla:7, vegetativo:45, floracion:65, cosecha:10, curad
 
 // ── Genéticas ──────────────────────────────────────────────
 const geneticas = ref([])
+
 onMounted(async () => {
   try {
     await salas.fetchSala(salaId)
     await lotes.fetchBySala(salaId)
-    const res = await listGeneticas({ activa: true })
-    geneticas.value = res.data || []
   } catch { error.value = "No se pudo cargar la sala." }
   finally  { loading.value = false }
+
+  try {
+    const res = await listGeneticas({ activa: true })
+    geneticas.value = res.data || []
+  } catch { /* genéticas no críticas */ }
 })
 
 const sala  = computed(() => salas.currentSala)
