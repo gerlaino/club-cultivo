@@ -8,7 +8,6 @@ import { usePlan } from "./composables/usePlan";
 import Avatar from "./components/Avatar.vue";
 import BrandLogo from "./components/BrandLogo.vue";
 import PlanBadge from "./components/PlanBadge.vue";
-import AsistenteVoz from "./components/AsistenteVoz.vue";
 
 const auth   = useAuthStore();
 const club   = useClubStore();
@@ -55,10 +54,6 @@ const bottomNavLinks = computed(() => {
   ]
 })
 
-const mostrarAsistenteVoz = computed(() => {
-  const role = auth.user?.role
-  return role === 'cultivador' || role === 'agricultor' || role === 'admin'
-})
 
 watch(
   () => auth.isAuthenticated,
@@ -265,11 +260,6 @@ onMounted(async () => {
         <span class="bottom-nav__label">{{ link.label }}</span>
       </RouterLink>
 
-      <!-- FAB asistente de voz (centro) -->
-      <div v-if="mostrarAsistenteVoz" class="bottom-nav__fab-wrap">
-        <AsistenteVoz :mini="true" />
-      </div>
-
       <!-- Más opciones (solo admin) -->
       <div v-if="isAdmin" class="bottom-nav__item bottom-nav__item--more dropdown">
         <button
@@ -460,7 +450,7 @@ onMounted(async () => {
 /* ── Mostrar bottom nav solo en mobile ── */
 @media (max-width: 767px) {
   .bottom-nav {
-    display: flex;
+    display: flex !important;
   }
   /* Ocultar navbar links en mobile, solo mostrar brand + avatar */
   .navbar-default .navbar-collapse {
