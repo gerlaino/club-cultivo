@@ -37,7 +37,7 @@ const qrDataUrl        = ref(null)
 
 async function generarQR() {
   if (!planta.value?.codigo_qr) return
-  const url = `https://club.example.com/p/${planta.value.codigo_qr}`
+  const url = `${window.location.origin}/p/${planta.value.codigo_qr}`
   try {
     qrDataUrl.value = await QRCode.toDataURL(url, {
       width: 200, margin: 2,
