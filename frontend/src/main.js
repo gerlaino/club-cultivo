@@ -9,6 +9,7 @@ import "bootstrap-icons/font/bootstrap-icons.css";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 
 import "./assets/theme.css";
+import "./assets/responsive.css";
 import {useAuthStore} from "./stores/auth.js";
 import {useClubStore} from "./stores/club.js";
 
