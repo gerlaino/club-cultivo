@@ -7,11 +7,12 @@ class AsistenteController < ApplicationController
     Sos un asistente inteligente para clubes de cannabis medicinal bajo el programa REPROCANN de Argentina.
     Tu función es analizar el reporte oral de un cultivador y extraer acciones estructuradas.
 
-    El cultivador puede mencionar:
-    - Riegos o fertilizaciones → acción tipo "registro_ambiental"
-    - Observaciones sobre plantas → acción tipo "registro_planta"
-    - Tareas a futuro → acción tipo "tarea"
-    - Notas generales → acción tipo "nota_lote"
+    Tipos de acciones posibles:
+    - "registro_ambiental": riego, fertilización, métricas del lote (pH, EC, temperatura, etc.)
+    - "registro_planta": observación de una planta específica o todas las plantas del lote
+    - "nota_sala": nota general sobre la sala (actividad del día, observaciones generales)
+    - "nota_lote": nota libre sobre un lote
+    - "tarea": tarea a futuro (SOLO si el contexto lo permite — no para cultivadores)
 
     Devolvé SOLO un JSON con esta estructura exacta, sin texto adicional ni backticks:
     {
@@ -39,17 +40,30 @@ class AsistenteController < ApplicationController
             "estado_salud": "regular",
             "color_hojas": "amarillo",
             "plagas": "ninguna",
-            "deficiencias": "déficit de nitrógeno en hojas bajas",
-            "notas": "observación visual"
+            "deficiencias": "deficit de nitrogeno en hojas bajas",
+            "notas": "observacion visual"
+          }
+        },
+        {
+          "tipo": "nota_sala",
+          "datos": {
+            "contenido": "texto de la nota"
+          }
+        },
+        {
+          "tipo": "nota_lote",
+          "lote_codigo": "L-26-003",
+          "datos": {
+            "contenido": "texto de la nota"
           }
         },
         {
           "tipo": "tarea",
           "datos": {
-            "titulo": "Revisión de plagas en sala de floración",
-            "descripcion": "El cultivador observó la necesidad de revisar plagas",
+            "titulo": "Revision de plagas",
+            "descripcion": "descripcion",
             "prioridad": "media",
-            "sala_nombre": "Sala Floración",
+            "sala_nombre": "Sala Floracion",
             "dias_desde_hoy": 7
           }
         }
@@ -63,10 +77,11 @@ class AsistenteController < ApplicationController
     - estado_general: excelente | bueno | regular | malo | critico
     - plagas_observadas: ninguna | leve | moderada | severa
     - prioridad: baja | normal | media | alta | urgente
-    - Si el cultivador dice "todas las plantas" o no menciona planta específica → es registro_ambiental del lote
-    - dias_desde_hoy: cuántos días desde hoy se programa la tarea
-    - Incluí solo los campos que puedas inferir del texto
-    - Nunca inventes datos que no están en el texto
+    - Si el cultivador dice "todas las plantas" o no menciona planta especifica => registro_ambiental del lote
+    - Si estas en contexto de sala => usa nota_sala para observaciones generales
+    - dias_desde_hoy: cuantos dias desde hoy se programa la tarea
+    - Incluye solo los campos que puedas inferir del texto
+    - Nunca inventes datos que no estan en el texto
   PROMPT
 
   # POST /asistente/parsear
@@ -76,12 +91,17 @@ class AsistenteController < ApplicationController
 
     return render json: { error: 'Texto vacío' }, status: :unprocessable_entity if texto.blank?
 
-    prompt_sistema = construir_prompt(contexto)
-    resultado      = llamar_claude(texto, prompt_sistema, contexto)
+    es_cultivador  = current_user.cultivador?
+    prompt_sistema = construir_prompt(contexto, es_cultivador)
+    resultado      = llamar_claude(texto, prompt_sistema)
 
     if resultado[:error]
       render json: { error: resultado[:error] }, status: :unprocessable_entity
     else
+      # Cultivador nunca crea tareas
+      if es_cultivador && resultado['acciones']
+        resultado['acciones'] = resultado['acciones'].reject { |a| (a['tipo'] || a[:tipo]) == 'tarea' }
+      end
       render json: resultado
     end
   end
@@ -99,14 +119,20 @@ class AsistenteController < ApplicationController
       tipo  = accion[:tipo]  || accion['tipo']
       datos = (accion[:datos] || accion['datos'] || {}).to_unsafe_h rescue {}
 
-      # Enriquecer con contexto implícito si el backend lo tiene
-      accion_enriquecida = enriquecer_con_contexto(accion, contexto, club)
+      if tipo == 'tarea' && current_user.cultivador?
+        errores << { tipo: tipo, error: 'Los cultivadores no pueden crear tareas' }
+        next
+      end
+
+      accion_e = enriquecer_con_contexto(accion, contexto, club)
 
       resultado = case tipo
-                  when 'registro_ambiental' then ejecutar_registro_ambiental(accion_enriquecida, datos, club)
-                  when 'registro_planta'    then ejecutar_registro_planta(accion_enriquecida, datos, club)
-                  when 'tarea'              then ejecutar_tarea(accion_enriquecida, datos, club, contexto)
-                  when 'nota_lote'          then ejecutar_nota_lote(accion_enriquecida, datos, club)
+                  when 'registro_ambiental' then ejecutar_registro_ambiental(accion_e, datos, club)
+                  when 'registro_planta'    then ejecutar_registro_planta(accion_e, datos, club)
+                  when 'tarea'              then ejecutar_tarea(accion_e, datos, club, contexto)
+                  when 'nota_sala'          then ejecutar_nota_sala(datos, club, contexto)
+                  when 'nota_lote'          then ejecutar_nota_lote(accion_e, datos, club, contexto)
+                  when 'avance_ciclo'       then ejecutar_avance_ciclo(accion_e, datos, club, contexto)
                   else { ok: false, error: "Tipo desconocido: #{tipo}" }
                   end
 
@@ -127,76 +153,85 @@ class AsistenteController < ApplicationController
 
   private
 
-  # Construye el prompt del sistema inyectando contexto real
-  def construir_prompt(contexto)
-    return PROMPT_BASE unless contexto.present?
+  def construir_prompt(contexto, es_cultivador)
+    prompt = PROMPT_BASE.dup
 
-    ctx_texto = "\n\n=== CONTEXTO ACTUAL DE LA VISTA ===\n"
-
-    if contexto[:lote_id].present? || contexto['lote_id'].present?
-      lote_id    = contexto[:lote_id] || contexto['lote_id']
-      lote       = current_user.club.lotes.find_by(id: lote_id)
-      if lote
-        ctx_texto += "El cultivador está registrando en el lote: #{lote.codigo}\n"
-        ctx_texto += "Sala: #{lote.sala&.nombre || 'no especificada'}\n"
-        ctx_texto += "Estado del lote: #{lote.estado}\n"
-        ctx_texto += "Plantas en este lote: #{lote.plants_count || 0}\n"
-        ctx_texto += "\nIMPORTANTE: Usá '#{lote.codigo}' como lote_codigo en TODAS las acciones de tipo registro_ambiental y nota_lote.\n"
-        ctx_texto += "No necesitás que el cultivador mencione el lote — ya está implícito.\n"
-      end
+    if es_cultivador
+      prompt += "\n\nIMPORTANTE: Este usuario es CULTIVADOR.\n"
+      prompt += "- NO generes acciones de tipo 'tarea' bajo ninguna circunstancia.\n"
+      prompt += "- Si el cultivador menciona 'avanzar ciclo', 'pasar a floración', 'cambiar estado' o similar, generá una nota_lote con contenido: 'Sugerencia del cultivador: [lo que dijo]'. No generes avance_ciclo.\n"
+    else
+      prompt += "\n\nEste usuario es ADMIN o AGRICULTOR y tiene permisos completos.\n"
+      prompt += "- Puede generar acciones de tipo 'avance_ciclo'.\n"
+      prompt += "- Si menciona 'avanzar ciclo', 'pasar a floración', 'cambiar a vegetativo', etc., generá:\n"
+      prompt += "  { \"tipo\": \"avance_ciclo\", \"datos\": { \"estado_nuevo\": \"floracion\", \"descripcion\": \"motivo o descripción\" } }\n"
+      prompt += "- estado_nuevo debe ser uno de: semilla | vegetativo | floracion | cosecha | curado | finalizado\n"
     end
 
-    if contexto[:planta_id].present? || contexto['planta_id'].present?
+    return prompt unless contexto.present?
+
+    ctx      = "\n=== CONTEXTO ACTUAL ===\n"
+    tipo_ctx = contexto[:tipo] || contexto['tipo']
+
+    case tipo_ctx
+    when 'lote'
+      lote_id = contexto[:lote_id] || contexto['lote_id']
+      lote    = current_user.club.lotes.find_by(id: lote_id)
+      if lote
+        ctx += "Lote: #{lote.codigo} | Sala: #{lote.sala&.nombre || 'no especificada'} | Estado: #{lote.estado} | Plantas: #{lote.plants_count || 0}\n"
+        ctx += "USAR '#{lote.codigo}' como lote_codigo en registro_ambiental y nota_lote.\n"
+        ctx += "Para observaciones generales usar registro_ambiental o nota_lote, NO nota_sala.\n"
+      end
+    when 'planta'
       planta_id = contexto[:planta_id] || contexto['planta_id']
       planta    = Plant.joins(:lote).where(lotes: { club_id: current_user.club.id }).find_by(id: planta_id)
       if planta
-        ctx_texto += "El cultivador está registrando sobre la planta: #{planta.nombre}\n"
-        ctx_texto += "\nIMPORTANTE: Usá '#{planta.nombre}' como planta_nombre en TODAS las acciones de tipo registro_planta.\n"
+        ctx += "Planta: #{planta.nombre} | Lote: #{planta.lote&.codigo}\n"
+        ctx += "USAR '#{planta.nombre}' como planta_nombre. Solo generar registro_planta.\n"
+        ctx += "No generes registro_ambiental ni nota_sala para esta planta individual.\n"
+      end
+    when 'sala'
+      sala_id = contexto[:sala_id] || contexto['sala_id']
+      sala    = current_user.club.salas.find_by(id: sala_id)
+      if sala
+        lotes_codigos = sala.lotes.pluck(:codigo)
+        ctx += "Sala: #{sala.nombre}\n"
+        ctx += "Lotes en esta sala: #{lotes_codigos.join(', ')}\n" if lotes_codigos.any?
+        ctx += "Para actividad general de la sala usar nota_sala.\n"
+        ctx += "Si menciona un lote especifico, agregar registro_ambiental con ese lote_codigo.\n"
       end
     end
 
-    if contexto[:sala_id].present? || contexto['sala_id'].present?
-      sala_id = contexto[:sala_id] || contexto['sala_id']
-      sala    = current_user.club.salas.find_by(id: sala_id)
-      ctx_texto += "Sala actual: #{sala.nombre}\n" if sala
-    end
-
-    ctx_texto += "=================================\n"
-
-    PROMPT_BASE + ctx_texto
+    ctx += "======================\n"
+    prompt + ctx
   end
 
-  # Enriquece la acción con datos del contexto cuando el campo está vacío
   def enriquecer_con_contexto(accion, contexto, club)
     return accion unless contexto.present?
 
     accion = accion.to_unsafe_h rescue accion.to_h
     accion = accion.with_indifferent_access
 
-    # Si el lote_codigo no fue resuelto por Claude, usar el del contexto
     if accion[:lote_codigo].blank? && (contexto[:lote_id] || contexto['lote_id']).present?
-      lote_id = contexto[:lote_id] || contexto['lote_id']
-      lote    = club.lotes.find_by(id: lote_id)
+      lote = club.lotes.find_by(id: contexto[:lote_id] || contexto['lote_id'])
       accion[:lote_codigo] = lote.codigo if lote
     end
 
-    # Si la planta no fue resuelta, usar la del contexto
     if accion[:planta_nombre].blank? && (contexto[:planta_id] || contexto['planta_id']).present?
-      planta_id = contexto[:planta_id] || contexto['planta_id']
-      planta    = Plant.joins(:lote).where(lotes: { club_id: club.id }).find_by(id: planta_id)
+      planta = Plant.joins(:lote).where(lotes: { club_id: club.id }).find_by(id: contexto[:planta_id] || contexto['planta_id'])
       accion[:planta_nombre] = planta.nombre if planta
     end
 
     accion
   end
 
-  def llamar_claude(texto, prompt_sistema, contexto = nil)
+  def llamar_claude(texto, prompt_sistema)
     api_key = ENV['ANTHROPIC_API_KEY']
     return { error: 'API key de IA no configurada' } if api_key.blank?
 
     uri  = URI('https://api.anthropic.com/v1/messages')
     http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl    = true
+    http.use_ssl      = true
     http.read_timeout = 30
 
     request = Net::HTTP::Post.new(uri)
@@ -234,29 +269,28 @@ class AsistenteController < ApplicationController
 
   def ejecutar_registro_ambiental(accion, datos, club)
     lote_codigo = accion['lote_codigo'] || accion[:lote_codigo]
-    lote        = club.lotes.find_by(codigo: lote_codigo) if lote_codigo.present?
-
+    lote = club.lotes.find_by(codigo: lote_codigo) if lote_codigo.present?
     return { ok: false, error: "Lote '#{lote_codigo}' no encontrado" } unless lote
 
     campos = {
-      ph:                  datos['ph'],
-      ec:                  datos['ec'],
-      temperatura:         datos['temperatura'],
-      humedad:             datos['humedad'],
-      co2:                 datos['co2'],
-      ppfd:                datos['ppfd'],
-      horas_luz:           datos['horas_luz'],
+      ph:                   datos['ph'],
+      ec:                   datos['ec'],
+      temperatura:          datos['temperatura'],
+      humedad:              datos['humedad'],
+      co2:                  datos['co2'],
+      ppfd:                 datos['ppfd'],
+      horas_luz:            datos['horas_luz'],
       temperatura_sustrato: datos['temperatura_sustrato'],
-      ph_runoff:           datos['ph_runoff'],
-      fertilizacion:       datos['fertilizacion'] || false,
-      notas_fertilizacion: datos['notas_fertilizacion'],
-      estado_general:      datos['estado_general'],
-      plagas_observadas:   datos['plagas_observadas'],
-      observaciones:       datos['observaciones'],
-      fuente:              'asistente_voz',
-      user:                current_user,
-      club:                club,
-      registrado_en:       Time.current
+      ph_runoff:            datos['ph_runoff'],
+      fertilizacion:        datos['fertilizacion'] || false,
+      notas_fertilizacion:  datos['notas_fertilizacion'],
+      estado_general:       datos['estado_general'],
+      plagas_observadas:    datos['plagas_observadas'],
+      observaciones:        datos['observaciones'],
+      fuente:               'asistente_voz',
+      user:                 current_user,
+      club:                 club,
+      registrado_en:        Time.current
     }.compact
 
     registro = lote.registros_ambientales.build(campos)
@@ -272,7 +306,6 @@ class AsistenteController < ApplicationController
     planta = Plant.joins(:lote)
                   .where(lotes: { club_id: club.id })
                   .find_by(nombre: planta_nombre) if planta_nombre.present?
-
     return { ok: false, error: "Planta '#{planta_nombre}' no encontrada" } unless planta
 
     activity = planta.activities.build(
@@ -306,16 +339,13 @@ class AsistenteController < ApplicationController
     sala_nombre = datos['sala_nombre']
     sala = club.salas.find_by('LOWER(nombre) LIKE ?', "%#{sala_nombre&.downcase}%") if sala_nombre.present?
 
-    # Si no encontró sala por nombre, usar la del contexto
     if sala.nil? && (contexto&.dig('sala_id') || contexto&.dig(:sala_id)).present?
-      sala_id = contexto['sala_id'] || contexto[:sala_id]
-      sala = club.salas.find_by(id: sala_id)
+      sala = club.salas.find_by(id: contexto['sala_id'] || contexto[:sala_id])
     end
 
-    # Lote: del contexto o del campo explícito
     lote_id = contexto&.dig('lote_id') || contexto&.dig(:lote_id)
-    lote = club.lotes.find_by(id: lote_id) if lote_id.present?
-    lote ||= club.lotes.find_by(codigo: datos['lote_codigo']) if datos['lote_codigo'].present?
+    lote    = club.lotes.find_by(id: lote_id) if lote_id.present?
+    lote  ||= club.lotes.find_by(codigo: datos['lote_codigo']) if datos['lote_codigo'].present?
 
     dias  = (datos['dias_desde_hoy'] || 7).to_i
     fecha = dias.days.from_now.to_date
@@ -338,24 +368,65 @@ class AsistenteController < ApplicationController
     end
   end
 
-  def ejecutar_nota_lote(accion, datos, club)
+  def ejecutar_nota_sala(datos, club, contexto)
+    sala_id = contexto&.dig('sala_id') || contexto&.dig(:sala_id)
+    sala    = club.salas.find_by(id: sala_id) if sala_id.present?
+    return { ok: false, error: 'Sala no encontrada en el contexto' } unless sala
+
+    contenido = datos['contenido'].to_s.strip
+    return { ok: false, error: 'Nota vacía' } if contenido.blank?
+
+    nota = sala.notas.build(contenido: contenido, fuente: 'asistente_voz', club: club, user: current_user)
+    nota.save ? { ok: true, mensaje: "Nota guardada en #{sala.nombre}" } : { ok: false, error: nota.errors.full_messages.join(', ') }
+  end
+
+  def ejecutar_nota_lote(accion, datos, club, contexto)
     lote_codigo = accion['lote_codigo'] || accion[:lote_codigo]
-    lote        = club.lotes.find_by(codigo: lote_codigo) if lote_codigo.present?
+    lote = club.lotes.find_by(codigo: lote_codigo) if lote_codigo.present?
 
-    return { ok: false, error: "Lote '#{lote_codigo}' no encontrado" } unless lote
+    unless lote
+      lote_id = contexto&.dig('lote_id') || contexto&.dig(:lote_id)
+      lote    = club.lotes.find_by(id: lote_id) if lote_id.present?
+    end
 
-    registro = lote.registros_ambientales.build(
-      observaciones: datos['observaciones'] || datos['notas'],
-      fuente:        'asistente_voz',
-      user:          current_user,
-      club:          club,
-      registrado_en: Time.current
-    )
+    return { ok: false, error: 'Lote no encontrado' } unless lote
 
-    if registro.save
-      { ok: true, mensaje: "Nota guardada en #{lote.codigo}" }
+    contenido = (datos['contenido'] || datos['observaciones'] || datos['notas']).to_s.strip
+    return { ok: false, error: 'Nota vacía' } if contenido.blank?
+
+    nota = lote.notas.build(contenido: contenido, fuente: 'asistente_voz', club: club, user: current_user)
+    nota.save ? { ok: true, mensaje: "Nota guardada en #{lote.codigo}" } : { ok: false, error: nota.errors.full_messages.join(', ') }
+  end
+
+  def ejecutar_avance_ciclo(accion, datos, club, contexto)
+    lote_codigo = accion['lote_codigo'] || accion[:lote_codigo]
+    lote = club.lotes.find_by(codigo: lote_codigo) if lote_codigo.present?
+    unless lote
+      lote_id = contexto&.dig('lote_id') || contexto&.dig(:lote_id)
+      lote = club.lotes.find_by(id: lote_id) if lote_id.present?
+    end
+    return { ok: false, error: 'Lote no encontrado' } unless lote
+
+    estado_nuevo = datos['estado_nuevo']
+    return { ok: false, error: 'Estado nuevo no especificado' } if estado_nuevo.blank?
+    return { ok: false, error: "Estado inválido: #{estado_nuevo}" } unless Lote::ESTADOS.include?(estado_nuevo)
+
+    estado_anterior = lote.estado
+    if lote.update(estado: estado_nuevo)
+      lote.lote_eventos.create!(
+        tipo:             'cambio_estado',
+        estado_anterior:  estado_anterior,
+        estado_nuevo:     estado_nuevo,
+        descripcion:      datos['descripcion'] || 'Avance de ciclo registrado por voz',
+        user:             current_user,
+        club:             club,
+        registrado_en:    Time.current
+      )
+      { ok: true, mensaje: "Ciclo avanzado: #{estado_anterior} → #{estado_nuevo} en #{lote.codigo}" }
     else
-      { ok: false, error: registro.errors.full_messages.join(', ') }
+      { ok: false, error: lote.errors.full_messages.join(', ') }
     end
   end
+
+
 end

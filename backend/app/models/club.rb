@@ -14,6 +14,7 @@ class Club < ApplicationRecord
   has_many :document_templates,   dependent: :destroy
   has_many :patient_documents,    through: :socios
   has_many :plants,               through: :lotes
+  has_many :notas, dependent: :destroy
 
   has_one_attached :logo
 

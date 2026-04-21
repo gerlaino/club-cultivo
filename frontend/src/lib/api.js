@@ -254,4 +254,12 @@ export const createEvento = (payload)     => api.post('/eventos', { evento: payl
 export const updateEvento = (id, payload) => api.patch(`/eventos/${id}`, { evento: payload })
 export const deleteEvento = (id)          => api.delete(`/eventos/${id}`)
 
+export const getSalaNotas   = (salaId)   => api.get(`/salas/${salaId}/notas`)
+export const createSalaNota = (salaId, payload) => api.post(`/salas/${salaId}/notas`, payload)
+export const getLoteNotas   = (loteId)   => api.get(`/lotes/${loteId}/notas`)
+export const createLoteNota = (loteId, payload) => api.post(`/lotes/${loteId}/notas`, payload)
+export const getPlantNotas  = (plantId)  => api.get(`/plants/${plantId}/notas`)
+export const createPlantNota = (plantId, payload) => api.post(`/plants/${plantId}/notas`, payload)
+export const deleteNota     = (id)       => api.delete(`/notas/${id}`)
+
 export default api;

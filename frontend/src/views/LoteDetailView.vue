@@ -9,6 +9,7 @@ import { listGeneticas, createPlant,
   getLoteEventos, createLoteEvento,
   getLoteFotos, uploadFotoLote } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
+import AsistenteVoz from '../components/AsistenteVoz.vue'
 
 const route    = useRoute()
 const lotes    = useLotesStore()
@@ -49,6 +50,16 @@ const STATE_MAP = {
   floracion: 'floracion', cosecha: 'cosechado',
   curado: 'cosechado', finalizado: 'cosechado',
 }
+
+const contextoAsistente = computed(() => lote.value ? {
+  tipo:          'lote',
+  lote_id:       lote.value.id,
+  lote_codigo:   lote.value.codigo,
+  sala_id:       lote.value.sala?.id,
+  sala_nombre:   lote.value.sala?.nombre,
+  plantas_count: plantList.value.length,
+  estado:        lote.value.estado,
+} : null)
 
 function openAddPlanta() {
   plantaForm.value = {
@@ -144,6 +155,8 @@ async function guardarRegistro() {
     savingRegistro.value = false
   }
 }
+
+function onRegistradoPorVoz() { loadEventos() }
 
 // ── Historial ─────────────────────────────────────────────
 const eventos        = ref([])
@@ -316,9 +329,14 @@ onMounted(async () => {
           </p>
         </div>
         <div class="ld__hero-actions">
-          <button v-if="(canEdit || isCultivador) && estadosSiguientes.length > 0" class="ld__btn-ghost-sm" @click="showCicloModal = true">
+          <button v-if="(canEdit) && estadosSiguientes.length > 0" class="ld__btn-ghost-sm" @click="showCicloModal = true">
             <i class="bi bi-arrow-right-circle"></i>Avanzar ciclo
           </button>
+          <AsistenteVoz
+            v-if="contextoAsistente && (canEdit || isCultivador)"
+            :contexto="contextoAsistente"
+            @registrado="onRegistradoPorVoz"
+          />
           <button class="ld__btn-secondary" @click="abrirRegistroModal">
             <i class="bi bi-clipboard-data"></i>Registrar lote
           </button>

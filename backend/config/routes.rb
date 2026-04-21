@@ -140,4 +140,22 @@ Rails.application.routes.draw do
     get :stats, to: 'stats#show'
   end
 
+  resources :salas do
+    resources :lotes, only: [:index, :create]
+    resources :cultivadores, controller: 'sala_cultivadores', only: [:index, :create, :destroy]
+    resources :notas, only: [:index, :create]   # <-- AGREGAR
+  end
+
+  resources :lotes, only: [:index, :show, :update, :destroy] do
+    # ... existentes ...
+    resources :notas, only: [:index, :create]   # <-- AGREGAR
+  end
+
+  resources :plants do
+    resources :plant_activities, only: [:index, :create, :destroy]
+    resources :notas, only: [:index, :create]   # <-- AGREGAR
+  end
+
+  resources :notas, only: [:destroy]   # <-- AGREGAR (para delete)
+
 end

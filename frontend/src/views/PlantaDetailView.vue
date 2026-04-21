@@ -5,6 +5,17 @@ import { useRoute } from 'vue-router'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { getPlantActivities, createPlantActivity } from '../lib/api'
+import AsistenteVoz from '../components/AsistenteVoz.vue'
+
+const contextoAsistente = computed(() => planta.value ? {
+  tipo:          'planta',
+  planta_id:     planta.value.id,
+  planta_nombre: planta.value.nombre || planta.value.codigo_qr,
+  lote_id:       planta.value.lote?.id,
+  lote_codigo:   planta.value.lote?.codigo,
+} : null)
+
+function onRegistradoPorVoz() { loadActivities() }
 
 const route  = useRoute()
 const plants = usePlantsStore()
@@ -237,9 +248,16 @@ onMounted(async () => {
             <span>Día {{ diasEnCiclo }}</span>
           </div>
         </div>
-        <button class="pd__btn-primary" @click="abrirModal">
-          <i class="bi bi-clipboard2-pulse"></i>Registrar planta
-        </button>
+        <div>
+          <AsistenteVoz
+            v-if="contextoAsistente"
+            :contexto="contextoAsistente"
+            @registrado="onRegistradoPorVoz"
+          />
+          <button class="pd__btn-primary" @click="abrirModal">
+            <i class="bi bi-clipboard2-pulse"></i>Registrar planta
+          </button>
+        </div>
       </div>
 
       <!-- Timeline ciclo -->

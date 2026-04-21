@@ -10,7 +10,7 @@ class RegistroAmbiental < ApplicationRecord
   ESTADOS   = %w[excelente bueno regular malo critico].freeze
   ESPECTROS = %w[veg bloom auto mixto].freeze
   FASES     = %w[crecimiento floracion engorde lavado].freeze
-  FUENTES   = %w[manual csv_bluelab sensor_mqtt].freeze
+  FUENTES   = %w[manual csv_bluelab sensor_mqtt asistente_voz].freeze
   PLAGAS    = %w[ninguna leve moderada severa].freeze
 
   validates :registrado_en,  presence: true

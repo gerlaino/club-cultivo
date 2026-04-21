@@ -8,6 +8,7 @@ class Lote < ApplicationRecord
   has_many :registros_ambientales, class_name: 'RegistroAmbiental', dependent: :destroy
   has_many :lote_eventos,          dependent: :destroy
   has_many_attached :fotos
+  has_many :notas, as: :noteable, dependent: :destroy
 
   ESTADOS       = %w[semilla vegetativo floracion cosecha curado finalizado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
