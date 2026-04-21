@@ -8,7 +8,6 @@ import { usePlan } from "./composables/usePlan";
 import Avatar from "./components/Avatar.vue";
 import BrandLogo from "./components/BrandLogo.vue";
 import PlanBadge from "./components/PlanBadge.vue";
-import AsistenteVoz from "./components/AsistenteVoz.vue";
 
 const auth   = useAuthStore();
 const club   = useClubStore();
@@ -144,14 +143,8 @@ onMounted(async () => {
             </li>
           </ul>
 
-          <!-- Menú de usuario + Asistente de voz -->
+          <!-- Menú de usuario -->
           <div class="ms-auto d-flex align-items-center gap-2 mt-2 mt-lg-0">
-
-            <!-- Asistente de voz — visible para cultivador, agricultor y admin -->
-            <AsistenteVoz
-              v-if="auth.user?.role === 'cultivador' || auth.user?.role === 'agricultor' || auth.user?.role === 'admin'"
-            />
-
             <div class="dropdown">
               <button
                 class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 py-1 px-2"

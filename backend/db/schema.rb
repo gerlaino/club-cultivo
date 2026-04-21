@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_07_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_20_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -315,6 +315,22 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_07_000001) do
     t.index ["lote_id"], name: "index_movimientos_contables_on_lote_id"
     t.index ["sede_id", "fecha"], name: "index_movimientos_contables_on_sede_id_and_fecha"
     t.index ["sede_id"], name: "index_movimientos_contables_on_sede_id"
+  end
+
+  create_table "notas", force: :cascade do |t|
+    t.string "noteable_type", null: false
+    t.bigint "noteable_id", null: false
+    t.bigint "club_id", null: false
+    t.bigint "user_id", null: false
+    t.text "contenido", null: false
+    t.string "fuente", default: "manual"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_notas_on_club_id"
+    t.index ["deleted_at"], name: "index_notas_on_deleted_at"
+    t.index ["noteable_type", "noteable_id"], name: "index_notas_on_noteable_type_and_noteable_id"
+    t.index ["user_id"], name: "index_notas_on_user_id"
   end
 
   create_table "noticias", force: :cascade do |t|
@@ -661,6 +677,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_07_000001) do
   add_foreign_key "movimientos_contables", "lotes"
   add_foreign_key "movimientos_contables", "sedes"
   add_foreign_key "movimientos_contables", "users", column: "created_by_id"
+  add_foreign_key "notas", "clubs"
+  add_foreign_key "notas", "users"
   add_foreign_key "noticias", "clubs"
   add_foreign_key "patient_documents", "clubs"
   add_foreign_key "patient_documents", "document_templates", column: "template_id"

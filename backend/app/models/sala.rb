@@ -7,6 +7,7 @@ class Sala < ApplicationRecord
   has_many :lotes, dependent: :destroy
   has_many :sala_cultivadores, class_name: 'SalaCultivador', foreign_key: 'sala_id', dependent: :destroy
   has_many :cultivadores, through: :sala_cultivadores, source: :user
+  has_many :notas, as: :noteable, dependent: :destroy
 
   ESTADOS = %w[activa mantenimiento cerrada].freeze
   KINDS   = %w[vegetativo floracion mixta madre clon].freeze

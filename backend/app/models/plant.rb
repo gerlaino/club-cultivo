@@ -5,6 +5,7 @@ class Plant < ApplicationRecord
 
   has_many   :esquejes, class_name: 'Plant', foreign_key: :planta_madre_id, dependent: :nullify
   has_many :activities, class_name: 'PlantActivity', dependent: :destroy
+  has_many :observaciones, as: :noteable, dependent: :destroy
 
   before_create :generate_codigo_qr
   has_one_attached :foto

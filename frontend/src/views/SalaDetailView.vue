@@ -6,6 +6,13 @@ import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
 import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
 import { listGeneticas, updateSala } from '../lib/api.js'
+import AsistenteVoz from '../components/AsistenteVoz.vue'
+
+const contextoAsistente = computed(() => sala.value ? {
+  tipo:       'sala',
+  sala_id:    sala.value.id,
+  sala_nombre: sala.value.nombre,
+} : null)
 
 const route  = useRoute()
 const router = useRouter()
@@ -232,6 +239,10 @@ const capacidadDisponible = computed(() => {
           </p>
         </div>
         <div class="sd__hero-actions">
+          <AsistenteVoz
+            v-if="contextoAsistente"
+            :contexto="contextoAsistente"
+          />
           <button v-if="canEdit" class="sd__btn-primary" @click="showCreate = true">
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
