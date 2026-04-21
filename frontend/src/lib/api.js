@@ -262,4 +262,6 @@ export const getPlantNotas  = (plantId)  => api.get(`/plants/${plantId}/notas`)
 export const createPlantNota = (plantId, payload) => api.post(`/plants/${plantId}/notas`, payload)
 export const deleteNota     = (id)       => api.delete(`/notas/${id}`)
 
+export const getPlantaByQR = (codigoQr) => api.get(`/p/${codigoQr}`)
+
 export default api;

@@ -265,7 +265,15 @@ const routes = [
     ],
   },
 
+  {
+    path: '/p/:codigo_qr',
+    name: 'planta-qr',
+    component: () => import('../views/PlantaQrView.vue'),
+    meta: { fullscreen: true },
+  },
+
   { path: "/:pathMatch(.*)*", redirect: "/" },
+
 ];
 
 const router = createRouter({
