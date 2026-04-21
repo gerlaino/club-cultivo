@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   # Salud / raíz
   root to: "health#show"
+  get "/p/:codigo_qr", to: "public/plantas#show_qr", defaults: { format: :json }
   get  "/up", to: "health#show"
 
   # Devise
@@ -16,6 +17,7 @@ Rails.application.routes.draw do
     resources :noticias, only: [:index, :show]
     resources :eventos, only: [:index, :show]
     resources :galeria, only: [:index], controller: 'galeria'
+    get '/plantas/:codigo_qr', to: 'plantas#show_qr'
   end
 
   # Rutas protegidas (requieren autenticación)
@@ -157,5 +159,7 @@ Rails.application.routes.draw do
   end
 
   resources :notas, only: [:destroy]   # <-- AGREGAR (para delete)
+
+  get '/p/:codigo_qr', to: 'public/plantas#show_qr', defaults: { format: :json }
 
 end

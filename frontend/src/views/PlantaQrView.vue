@@ -169,7 +169,7 @@ async function hacerLogin() {
   loginError.value    = null
 
   try {
-    await auth.signIn(loginForm.value.email, loginForm.value.password)
+    await auth.login(loginForm.value.email, loginForm.value.password)
     await club.fetch()
 
     // Verificar permisos post-login
