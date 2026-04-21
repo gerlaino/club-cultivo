@@ -1,0 +1,238 @@
+/* ── Safe area para dispositivos con notch ── */
+:root {
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+/* ── Touch targets mínimos 44px en mobile ── */
+@media (max-width: 767px) {
+  button, a, [role="button"] {
+    min-height: 36px;
+  }
+
+  /* Padding inferior para bottom nav */
+  body {
+    padding-bottom: calc(64px + var(--safe-bottom));
+  }
+
+  /* Modales full-width en mobile */
+  .ld__modal,
+  .sd__modal,
+  .pd__modal,
+  .av__panel {
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-height: 92vh !important;
+  }
+
+  /* Overlays en mobile — bottom sheet */
+  .ld__overlay,
+  .sd__overlay,
+  .pd__overlay,
+  .av__backdrop {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  /* Tablas scrolleables */
+  .table-responsive-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Cards de lotes/salas en columna única */
+  .cvd__salas {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* KPIs en 2 columnas en mobile */
+  .pd__kpis,
+  .sd__kpis {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Layout sin aside en mobile */
+  .ld__layout,
+  .sd__layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Aside al final en mobile */
+  .ld__aside,
+  .sd__aside {
+    order: 2;
+  }
+
+  /* Grids de formularios en columna única */
+  .ld__grid,
+  .sd__grid,
+  .pd__mgrid,
+  .av__editor-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Hero en columna */
+  .ld__hero,
+  .sd__hero,
+  .pd__hero {
+    flex-direction: column !important;
+    gap: .75rem !important;
+  }
+
+  /* Hero actions full width en mobile */
+  .ld__hero-actions,
+  .sd__hero-actions,
+  .pd__hero-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  /* Títulos más pequeños */
+  .ld__title,
+  .sd__title,
+  .pd__title {
+    font-size: 1.4rem !important;
+  }
+
+  /* Timeline ciclo scrolleable */
+  .ld__ciclo,
+  .pd__ciclo {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Selector de estado en wrap */
+  .ld__selector,
+  .pd__selector {
+    flex-wrap: wrap !important;
+  }
+
+  /* Botones de selector más grandes en mobile */
+  .ld__sel-btn,
+  .pd__sel-btn {
+    padding: .5rem .9rem !important;
+    font-size: .82rem !important;
+  }
+
+  /* Plantas en mobile */
+  .ld__planta {
+    padding: .65rem .9rem !important;
+  }
+
+  /* Breadcrumb más compacto */
+  .ld__breadcrumb,
+  .pd__breadcrumb {
+    font-size: .72rem !important;
+  }
+
+  /* Chips de contexto del asistente */
+  .av__ctx-bar {
+    padding: 6px 16px !important;
+  }
+
+  /* Asistente de voz en mobile */
+  .av__panel {
+    border-radius: 20px 20px 0 0 !important;
+  }
+
+  .av__body {
+    padding: 16px 20px 20px !important;
+  }
+
+  /* Bottom padding extra en modales para el safe area */
+  .av__revisar-footer,
+  .ld__modal-footer,
+  .sd__modal-footer,
+  .pd__modal-footer {
+    padding-bottom: calc(1rem + var(--safe-bottom)) !important;
+  }
+
+  /* Dashboard admin KPIs en 2x2 */
+  .admin-kpis-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Tabla de pacientes en mobile */
+  .socios-table {
+    font-size: .8rem !important;
+  }
+
+  /* Filtros en mobile */
+  .cvd__filtros {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    padding-bottom: .25rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cvd__filtro-sep {
+    flex-shrink: 0;
+  }
+}
+
+/* ── Tablet ── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .ld__layout,
+  .sd__layout {
+    grid-template-columns: 1fr 260px !important;
+  }
+
+  .ld__grid,
+  .sd__grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .cvd__salas {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .pd__kpis,
+  .sd__kpis {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
+/* ── Mejoras táctiles generales ── */
+@media (hover: none) and (pointer: coarse) {
+  /* Remover hover effects que no aplican en touch */
+  .cvd__sala-card:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Aumentar área de tap de botones pequeños */
+  .ld__btn-sm,
+  .sd__btn-sm,
+  .pd__btn-sm {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Quitar animaciones de hover en touch */
+  .ld__planta:hover,
+  .ld__accion:hover {
+    background: transparent !important;
+  }
+}
+
+/* ── Scrollbar delgado en tablet ── */
+@media (max-width: 1023px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,.15);
+    border-radius: 2px;
+  }
+}
