@@ -2,7 +2,8 @@
 import { ref, computed, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
-import { getSede, listSalas, getSedeInventario, agregarStock, listLotes } from "../lib/api"
+import { getSede, listSalas, getSedeInventario, agregarStock, listLotes, listGeneticas,
+         getStockPendiente, aprobarStock, rechazarStock } from "../lib/api"
 import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
 
 const route  = useRoute()
@@ -16,7 +17,10 @@ const loading       = ref(true)
 const error         = ref(null)
 const showCrearSala = ref(false)
 
-const canEdit = computed(() => ["admin", "agricultor"].includes(auth.role))
+const canEdit    = computed(() => ["admin", "agricultor"].includes(auth.role))
+const isAdmin       = computed(() => auth.user?.role === 'admin')
+const canAddStock   = computed(() => ["admin", "agricultor", "manicurador"].includes(auth.user?.role))
+const esManicurador = computed(() => auth.user?.role === 'manicurador')
 
 // ── Inventario ──────────────────────────────────────────────────
 const inventario     = ref([])
@@ -24,23 +28,36 @@ const loadingInv     = ref(false)
 const showStockModal = ref(false)
 const savingStock    = ref(false)
 const lotes          = ref([])
+const geneticas      = ref([])
 const loadingLotes   = ref(false)
 const loteSearch     = ref('')
 
+// ── Aprobaciones de stock (manicurador → admin) ──────────────────
+const stockPendiente   = ref([])
+const loadingPendiente = ref(false)
+const aprobando        = ref(null)
+const rechazando       = ref(null)
+const showRechazar     = ref(false)
+const rechazarTarget   = ref(null)
+const rechazarMotivo   = ref('')
+
 const stockForm = ref({
-  producto: 'flores',
-  cantidad: null,
-  lote_id:  null,
-  origen:   'lote',
-  motivo:   '',
+  producto:          'flores',
+  cantidad:          null,
+  lote_id:           null,
+  genetica_id:       null,
+  precio_por_unidad: null,
+  origen:            'lote',
+  motivo:            '',
 })
 
 const PRODUCTOS = [
-  { value: 'flores',   label: 'Flores',   unidad: 'g',  step: 0.1, icon: 'bi-flower2'    },
-  { value: 'aceite',   label: 'Aceite',   unidad: 'ml', step: 0.1, icon: 'bi-droplet'    },
-  { value: 'extracto', label: 'Extracto', unidad: 'ml', step: 0.1, icon: 'bi-eyedropper' },
-  { value: 'crema',    label: 'Crema',    unidad: 'g',  step: 1,   icon: 'bi-jar'        },
-  { value: 'otro',     label: 'Otro',     unidad: 'g',  step: 0.1, icon: 'bi-box-seam'   },
+  { value: 'flores',   label: 'Flores',   unidad: 'g',  step: 0.1, icon: 'bi-flower2',    tieneGenetica: true  },
+  { value: 'preroll',  label: 'Preroll',  unidad: 'u',  step: 1,   icon: 'bi-archive',    tieneGenetica: true  },
+  { value: 'aceite',   label: 'Aceite',   unidad: 'ml', step: 0.1, icon: 'bi-droplet',    tieneGenetica: false },
+  { value: 'extracto', label: 'Extracto', unidad: 'ml', step: 0.1, icon: 'bi-eyedropper', tieneGenetica: false },
+  { value: 'crema',    label: 'Crema',    unidad: 'g',  step: 1,   icon: 'bi-jar',        tieneGenetica: false },
+  { value: 'otro',     label: 'Otro',     unidad: 'u',  step: 1,   icon: 'bi-box-seam',   tieneGenetica: false },
 ]
 
 const ESTADOS_LOTE = {
@@ -52,8 +69,10 @@ const ESTADOS_LOTE = {
   finalizado: { label: 'Finalizado', color: '#475569', bg: 'rgba(71,85,105,.1)'  },
 }
 
-const productoActual  = computed(() => PRODUCTOS.find(p => p.value === stockForm.value.producto) || PRODUCTOS[0])
-const loteSeleccionado = computed(() => lotes.value.find(l => l.id === stockForm.value.lote_id) || null)
+const productoActual    = computed(() => PRODUCTOS.find(p => p.value === stockForm.value.producto) || PRODUCTOS[0])
+const loteSeleccionado  = computed(() => lotes.value.find(l => l.id === stockForm.value.lote_id) || null)
+const geneticaSeleccionada = computed(() => geneticas.value.find(g => g.id === stockForm.value.genetica_id) || null)
+const productoTieneGenetica = computed(() => productoActual.value.tieneGenetica)
 const tieneInv        = computed(() => ['social', 'mixta'].includes(sede.value?.tipo))
 const tieneSalas      = computed(() => ['produccion', 'mixta'].includes(sede.value?.tipo))
 const stockTotal      = computed(() => inventario.value.reduce((a, i) => a + Number(i.stock_gramos || 0), 0))
@@ -75,6 +94,41 @@ const lotesFiltrados = computed(() => {
 function estadoLote(estado) { return ESTADOS_LOTE[estado] || ESTADOS_LOTE.finalizado }
 function productoIcon(producto) { return PRODUCTOS.find(p => p.value === producto)?.icon || 'bi-box-seam' }
 
+async function cargarPendientes() {
+  if (!isAdmin.value) return
+  loadingPendiente.value = true
+  try {
+    const { data } = await getStockPendiente(sedeId)
+    stockPendiente.value = data || []
+  } catch { stockPendiente.value = [] }
+  finally { loadingPendiente.value = false }
+}
+
+async function handleAprobar(mov) {
+  aprobando.value = mov.id
+  try {
+    await aprobarStock(sedeId, mov.id)
+    await Promise.all([cargarInventario(), cargarPendientes()])
+  } catch (e) { console.error(e) }
+  finally { aprobando.value = null }
+}
+
+function abrirRechazar(mov) {
+  rechazarTarget.value = mov
+  rechazarMotivo.value = ''
+  showRechazar.value = true
+}
+
+async function handleRechazar() {
+  rechazando.value = rechazarTarget.value.id
+  try {
+    await rechazarStock(sedeId, rechazarTarget.value.id, rechazarMotivo.value)
+    await cargarPendientes()
+    showRechazar.value = false
+  } catch (e) { console.error(e) }
+  finally { rechazando.value = null }
+}
+
 async function cargarInventario() {
   loadingInv.value = true
   try {
@@ -85,31 +139,52 @@ async function cargarInventario() {
 }
 
 async function abrirStock() {
-  stockForm.value = { producto: 'flores', cantidad: null, lote_id: null, origen: 'lote', motivo: '' }
+  stockForm.value = { producto: 'flores', cantidad: null, lote_id: null, genetica_id: null, precio_por_unidad: null, origen: 'lote', motivo: '' }
   loteSearch.value = ''
   showStockModal.value = true
   loadingLotes.value = true
   try {
-    const { data } = await listLotes()
-    const order = { cosecha: 0, curado: 1, finalizado: 2, floracion: 3, vegetativo: 4, semilla: 5 }
-    lotes.value = data.sort((a, b) => (order[a.estado] ?? 9) - (order[b.estado] ?? 9))
+    if (esManicurador.value) {
+      // Manicurador: solo sus lotes en cosecha/curado
+      const { data } = await listLotes({ manicura: true })
+      lotes.value = data || []
+    } else {
+      const [lotesRes, geneticasRes] = await Promise.all([listLotes(), listGeneticas()])
+      const order = { cosecha: 0, curado: 1, finalizado: 2, floracion: 3, vegetativo: 4, semilla: 5 }
+      lotes.value     = (lotesRes.data || []).sort((a, b) => (order[a.estado] ?? 9) - (order[b.estado] ?? 9))
+      geneticas.value = geneticasRes.data || []
+    }
   } catch (e) { console.error(e) }
   finally { loadingLotes.value = false }
 }
 
 async function confirmarStock() {
   if (!stockForm.value.cantidad || stockForm.value.cantidad <= 0) return
+  if (esManicurador.value && !stockForm.value.lote_id) return
   savingStock.value = true
   try {
-    const payload = {
-      producto: stockForm.value.producto,
-      cantidad: stockForm.value.cantidad,
-      motivo: stockForm.value.origen === 'lote' && loteSeleccionado.value
-        ? `Cosecha lote ${loteSeleccionado.value.codigo}`
-        : (stockForm.value.motivo || 'Ingreso externo'),
-    }
-    if (stockForm.value.origen === 'lote' && stockForm.value.lote_id) {
-      payload.lote_id = stockForm.value.lote_id
+    let payload
+    if (esManicurador.value) {
+      const lote = loteSeleccionado.value
+      payload = {
+        producto:    'flores',
+        cantidad:    stockForm.value.cantidad,
+        lote_id:     lote.id,
+        genetica_id: lote.genetica?.id || undefined,
+        motivo:      `Manicura — lote ${lote.codigo}`,
+      }
+    } else {
+      payload = {
+        producto:          stockForm.value.producto,
+        cantidad:          stockForm.value.cantidad,
+        precio_por_unidad: stockForm.value.precio_por_unidad || undefined,
+        genetica_id:       stockForm.value.genetica_id       || undefined,
+        motivo: stockForm.value.origen === 'lote' && loteSeleccionado.value
+          ? `Cosecha lote ${loteSeleccionado.value.codigo}`
+          : (stockForm.value.motivo || 'Ingreso externo'),
+      }
+      if (stockForm.value.origen === 'lote' && stockForm.value.lote_id)
+        payload.lote_id = stockForm.value.lote_id
     }
     await agregarStock(sedeId, payload)
     showStockModal.value = false
@@ -159,7 +234,7 @@ onMounted(async () => {
     const [sedeRes, salasRes] = await Promise.all([getSede(sedeId), listSalas()])
     sede.value  = sedeRes.data
     salas.value = (salasRes.data || []).filter(s => s.sede?.id === sedeId)
-    if (tieneInv.value) await cargarInventario()
+    if (tieneInv.value) await Promise.all([cargarInventario(), cargarPendientes()])
   } catch (e) {
     error.value = "No se pudo cargar la sede."
   } finally {
@@ -212,8 +287,8 @@ onMounted(async () => {
           <button v-if="canEdit && tieneSalas" class="sdv__btn-primary" @click="showCrearSala = true">
             <i class="bi bi-plus-lg"></i> Nueva sala aquí
           </button>
-          <button v-if="canEdit && tieneInv" class="sdv__btn-inv" @click="abrirStock">
-            <i class="bi bi-plus-lg"></i> Agregar stock
+          <button v-if="canAddStock && tieneInv" class="sdv__btn-inv" @click="abrirStock">
+            <i class="bi bi-plus-lg"></i> {{ esManicurador ? 'Registrar cosecha' : 'Agregar stock' }}
           </button>
           <button class="sdv__btn-ghost" @click="router.back()">
             <i class="bi bi-arrow-left"></i> Volver
@@ -245,7 +320,7 @@ onMounted(async () => {
                 <span class="sdv__card-title">Inventario de stock</span>
                 <span class="sdv__pill">{{ inventario.length }}</span>
               </div>
-              <button v-if="canEdit" class="sdv__card-btn-green" @click="abrirStock">
+              <button v-if="canAddStock" class="sdv__card-btn-green" @click="abrirStock">
                 <i class="bi bi-plus-lg"></i> Agregar
               </button>
             </div>
@@ -260,6 +335,44 @@ onMounted(async () => {
               </button>
             </div>
 
+            <!-- Panel aprobaciones (solo admin) -->
+            <div v-if="isAdmin && (loadingPendiente || stockPendiente.length)" class="sdv__pending">
+              <div class="sdv__pending-header">
+                <i class="bi bi-hourglass-split"></i>
+                Pendientes de aprobación
+                <span class="sdv__pending-badge">{{ stockPendiente.length }}</span>
+              </div>
+              <div v-if="loadingPendiente" class="sdv__pending-loading">
+                <div class="sdv__ring sdv__ring--sm"></div> Cargando…
+              </div>
+              <div v-else class="sdv__pending-list">
+                <div v-for="mov in stockPendiente" :key="mov.id" class="sdv__pending-item">
+                  <div class="sdv__pending-info">
+                    <div class="sdv__pending-producto">
+                      {{ mov.sede_inventario.producto_label }}
+                      <span class="sdv__pending-qty">+{{ mov.cantidad }}{{ mov.sede_inventario.unidad_medida }}</span>
+                    </div>
+                    <div class="sdv__pending-meta">
+                      <span>{{ mov.creado_por.nombre }}</span>
+                      <span v-if="mov.lote"> · Lote {{ mov.lote.codigo }}</span>
+                      <span> · {{ new Date(mov.created_at).toLocaleDateString('es-AR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) }}</span>
+                    </div>
+                    <div v-if="mov.motivo" class="sdv__pending-motivo">{{ mov.motivo }}</div>
+                  </div>
+                  <div class="sdv__pending-actions">
+                    <button class="sdv__btn-aprobar" :disabled="aprobando === mov.id" @click="handleAprobar(mov)">
+                      <div v-if="aprobando === mov.id" class="sdv__ring sdv__ring--sm sdv__ring--white"></div>
+                      <i v-else class="bi bi-check-lg"></i>
+                      Aprobar
+                    </button>
+                    <button class="sdv__btn-rechazar" :disabled="aprobando === mov.id" @click="abrirRechazar(mov)">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div v-else class="sdv__inv-grid">
               <div v-for="item in inventario" :key="item.id" class="sdv__inv-card" :class="{ 'sdv__inv-card--low': item.stock_bajo }">
                 <div class="sdv__inv-card__top">
@@ -270,30 +383,24 @@ onMounted(async () => {
                   </span>
                 </div>
                 <div class="sdv__inv-producto">{{ item.producto_label }}</div>
+                <div v-if="item.genetica" class="sdv__inv-genetica">
+                  <span v-if="item.genetica.tipo" class="sdv__inv-gen-tipo">{{ item.genetica.tipo }}</span>
+                  <span v-if="item.genetica.thc">THC {{ item.genetica.thc }}%</span>
+                  <span v-if="item.genetica.cbd"> · CBD {{ item.genetica.cbd }}%</span>
+                </div>
                 <div class="sdv__inv-stock">
                   {{ Number(item.stock_gramos).toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}
-                  <span class="sdv__inv-unit">g</span>
+                  <span class="sdv__inv-unit">{{ item.unidad_medida || 'g' }}</span>
                 </div>
-                <!-- Trazabilidad -->
-                <div v-if="item.lote" class="sdv__inv-lote">
-                  <div class="sdv__inv-lote-header"><i class="bi bi-diagram-3"></i> Origen</div>
-                  <div class="sdv__inv-lote-codigo">{{ item.lote.codigo }}</div>
-                  <div class="sdv__inv-lote-meta">
-                    <span v-if="item.lote.genetica">{{ item.lote.genetica }}</span>
-                    <span v-if="item.lote.sala"> · {{ item.lote.sala }}</span>
-                  </div>
-                  <span class="sdv__inv-lote-estado" :style="{ background: estadoLote(item.lote.estado).bg, color: estadoLote(item.lote.estado).color }">
-                    {{ estadoLote(item.lote.estado).label }}
-                  </span>
-                </div>
-                <div v-else class="sdv__inv-lote sdv__inv-lote--ext">
-                  <i class="bi bi-box-arrow-in-down"></i> Ingreso externo
+                <div v-if="item.precio_por_unidad" class="sdv__inv-precio">
+                  ${{ item.precio_por_unidad }}/{{ item.unidad_medida || 'g' }}
                 </div>
                 <div v-if="item.stock_minimo" class="sdv__inv-bar-wrap">
-                  <div class="sdv__inv-bar" :class="item.stock_bajo ? 'sdv__inv-bar--low' : 'sdv__inv-bar--ok'" :style="{ width: `${Math.min(100, (item.stock_gramos / item.stock_minimo) * 50)}%` }"></div>
+                  <div class="sdv__inv-bar" :class="item.stock_bajo ? 'sdv__inv-bar--low' : 'sdv__inv-bar--ok'"
+                       :style="{ width: `${Math.min(100, (item.stock_gramos / item.stock_minimo) * 50)}%` }"></div>
                 </div>
                 <div class="sdv__inv-meta">
-                  <span v-if="item.stock_minimo">Mín: {{ item.stock_minimo }}g</span>
+                  <span v-if="item.stock_minimo">Mín: {{ item.stock_minimo }}</span>
                   <span>{{ new Date(item.updated_at).toLocaleDateString('es-AR', { day:'numeric', month:'short' }) }}</span>
                 </div>
               </div>
@@ -382,6 +489,38 @@ onMounted(async () => {
 
     <ModalCrearSala v-if="showCrearSala" :sede-id-fija="sedeId" @close="showCrearSala = false" @created="onSalaCreada" />
 
+    <!-- Modal rechazo -->
+    <Teleport to="body">
+      <div v-if="showRechazar" class="sdv__modal-overlay" @click.self="showRechazar = false">
+        <div class="sdv__modal sdv__modal--sm">
+          <div class="sdv__modal-header">
+            <div class="sdv__modal-header-icon" style="background:#fef2f2;color:#dc2626"><i class="bi bi-x-circle"></i></div>
+            <div>
+              <h3 class="sdv__modal-title">Rechazar ingreso</h3>
+              <p class="sdv__modal-sub" v-if="rechazarTarget">
+                {{ rechazarTarget.sede_inventario.producto_label }} · {{ rechazarTarget.cantidad }}{{ rechazarTarget.sede_inventario.unidad_medida }}
+                · {{ rechazarTarget.creado_por.nombre }}
+              </p>
+            </div>
+            <button class="sdv__modal-close" @click="showRechazar = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="sdv__modal-body">
+            <label class="sdv__label">Motivo del rechazo <span style="color:#94a3b8;font-weight:400;text-transform:none">(opcional)</span></label>
+            <textarea v-model.trim="rechazarMotivo" class="sdv__input" rows="3"
+                      placeholder="Ej: Cantidad no coincide con el pesaje real…"></textarea>
+          </div>
+          <div class="sdv__modal-footer">
+            <button class="sdv__btn-ghost" :disabled="!!rechazando" @click="showRechazar = false">Cancelar</button>
+            <button class="sdv__btn-danger" :disabled="!!rechazando" @click="handleRechazar">
+              <span v-if="rechazando" class="sdv__ring sdv__ring--sm sdv__ring--white"></span>
+              <i v-else class="bi bi-x-lg"></i>
+              Rechazar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- MODAL STOCK -->
     <Teleport to="body">
       <div v-if="showStockModal" class="sdv__modal-overlay" @click.self="showStockModal = false">
@@ -396,7 +535,68 @@ onMounted(async () => {
             <button class="sdv__modal-close" @click="showStockModal = false"><i class="bi bi-x-lg"></i></button>
           </div>
 
-          <div class="sdv__modal-body">
+          <!-- ══ MODAL MANICURADOR ══ -->
+          <div v-if="esManicurador" class="sdv__modal-body">
+
+            <div v-if="loadingLotes" class="sdv__lotes-loading">
+              <div class="sdv__ring sdv__ring--sm"></div><span>Cargando tus lotes…</span>
+            </div>
+
+            <template v-else>
+              <!-- Lote selector -->
+              <div class="sdv__field">
+                <label class="sdv__label"><span class="sdv__label-num">1</span> Lote a manicurar</label>
+                <div v-if="!lotes.length" class="sdv__manicura-empty">
+                  <i class="bi bi-box-seam"></i>
+                  No tenés lotes asignados en cosecha o curado.
+                </div>
+                <div v-else class="sdv__manicura-lotes">
+                  <button
+                    v-for="lote in lotes" :key="lote.id"
+                    class="sdv__manicura-lote"
+                    :class="{ 'sdv__manicura-lote--active': stockForm.lote_id === lote.id }"
+                    type="button"
+                    @click="stockForm.lote_id = lote.id"
+                  >
+                    <div class="sdv__manicura-lote-top">
+                      <span class="sdv__manicura-codigo">{{ lote.codigo }}</span>
+                      <span class="sdv__manicura-estado" :style="{ background: estadoLote(lote.estado).bg, color: estadoLote(lote.estado).color }">
+                        {{ estadoLote(lote.estado).label }}
+                      </span>
+                    </div>
+                    <div class="sdv__manicura-genetica">
+                      {{ lote.genetica?.nombre || 'Sin genética' }}
+                    </div>
+                    <div class="sdv__manicura-sala">
+                      <i class="bi bi-grid-3x3-gap"></i> {{ lote.sala?.nombre || '—' }}
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Cantidad -->
+              <div v-if="stockForm.lote_id" class="sdv__field">
+                <label class="sdv__label"><span class="sdv__label-num">2</span> Cantidad manicurada</label>
+                <div class="sdv__cant-wrap">
+                  <input v-model.number="stockForm.cantidad" type="number" step="0.1" min="0.1"
+                         class="sdv__input sdv__input--big" placeholder="0" />
+                  <span class="sdv__cant-suffix">g</span>
+                </div>
+                <div v-if="loteSeleccionado" class="sdv__manicura-confirm">
+                  <i class="bi bi-check-circle-fill" style="color:#15803d"></i>
+                  <span>
+                    Se registrará <strong>{{ stockForm.cantidad || 0 }}g</strong> de
+                    <strong>{{ loteSeleccionado.genetica?.nombre || loteSeleccionado.codigo }}</strong>
+                    como ingreso pendiente de aprobación.
+                  </span>
+                </div>
+              </div>
+            </template>
+
+          </div>
+
+          <!-- ══ MODAL ADMIN/AGRICULTOR ══ -->
+          <div v-else class="sdv__modal-body">
 
             <!-- 1. Producto -->
             <div class="sdv__field">
@@ -412,9 +612,37 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- 2. Origen -->
+            <!-- 2. Genética (solo para flores/preroll) -->
+            <div v-if="productoTieneGenetica" class="sdv__field">
+              <label class="sdv__label"><span class="sdv__label-num">2</span> Genética <span class="sdv__optional">(mejora trazabilidad)</span></label>
+              <select v-model="stockForm.genetica_id" class="sdv__input">
+                <option :value="null">Sin genética específica</option>
+                <option v-for="g in geneticas" :key="g.id" :value="g.id">
+                  {{ g.nombre }}{{ g.thc ? ` · THC ${g.thc}%` : '' }}{{ g.tipo ? ` (${g.tipo})` : '' }}
+                </option>
+              </select>
+            </div>
+
+            <!-- 3. Precio por unidad -->
             <div class="sdv__field">
-              <label class="sdv__label"><span class="sdv__label-num">2</span> Origen del stock</label>
+              <label class="sdv__label">
+                <span class="sdv__label-num">{{ productoTieneGenetica ? '3' : '2' }}</span>
+                Precio por {{ productoActual.unidad }}
+                <span class="sdv__optional">(opcional)</span>
+              </label>
+              <div class="sdv__cant-wrap">
+                <span class="sdv__cant-prefix">$</span>
+                <input v-model.number="stockForm.precio_por_unidad" type="number" min="0" step="0.01"
+                       class="sdv__input sdv__input--mid" placeholder="0.00" />
+                <span class="sdv__cant-suffix">/ {{ productoActual.unidad }}</span>
+              </div>
+            </div>
+
+            <!-- Origen -->
+            <div class="sdv__field">
+              <label class="sdv__label">
+                <span class="sdv__label-num">{{ productoTieneGenetica ? '4' : '3' }}</span> Origen del stock
+              </label>
               <div class="sdv__origen-tabs">
                 <button class="sdv__origen-tab" :class="{ 'sdv__origen-tab--active': stockForm.origen === 'lote' }"
                         @click="stockForm.origen = 'lote'; stockForm.lote_id = null">
@@ -427,10 +655,10 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- 3a. Selector lote -->
+            <!-- Selector lote -->
             <div v-if="stockForm.origen === 'lote'" class="sdv__field">
               <label class="sdv__label">
-                <span class="sdv__label-num">3</span> Seleccionar lote
+                <span class="sdv__label-num">{{ productoTieneGenetica ? '5' : '4' }}</span> Seleccionar lote
                 <span class="sdv__optional">(opcional — mejora trazabilidad)</span>
               </label>
               <div v-if="loadingLotes" class="sdv__lotes-loading">
@@ -481,16 +709,18 @@ onMounted(async () => {
               </template>
             </div>
 
-            <!-- 3b. Motivo externo -->
+            <!-- Motivo externo -->
             <div v-else class="sdv__field">
-              <label class="sdv__label"><span class="sdv__label-num">3</span> Descripción del origen</label>
+              <label class="sdv__label">
+                <span class="sdv__label-num">{{ productoTieneGenetica ? '5' : '4' }}</span> Descripción del origen
+              </label>
               <input v-model.trim="stockForm.motivo" class="sdv__input" placeholder="Ej: Compra a proveedor, donación, transferencia…" />
             </div>
 
-            <!-- 4. Cantidad -->
+            <!-- Cantidad -->
             <div class="sdv__field">
               <label class="sdv__label">
-                <span class="sdv__label-num">4</span> Cantidad a ingresar
+                <span class="sdv__label-num">{{ productoTieneGenetica ? '6' : '5' }}</span> Cantidad a ingresar
                 <span class="sdv__unidad-pill">{{ productoActual.unidad }}</span>
               </label>
               <div class="sdv__cant-wrap">
@@ -509,9 +739,20 @@ onMounted(async () => {
                 <span class="sdv__trace-lbl">Producto</span>
                 <span class="sdv__trace-val">{{ productoActual.label }}</span>
               </div>
+              <div v-if="geneticaSeleccionada" class="sdv__trace-row">
+                <span class="sdv__trace-lbl">Genética</span>
+                <span class="sdv__trace-val">{{ geneticaSeleccionada.nombre }}</span>
+              </div>
               <div class="sdv__trace-row">
                 <span class="sdv__trace-lbl">Cantidad</span>
                 <span class="sdv__trace-val" style="color:#0369a1;font-weight:700">{{ stockForm.cantidad }} {{ productoActual.unidad }}</span>
+              </div>
+              <div v-if="stockForm.precio_por_unidad" class="sdv__trace-row">
+                <span class="sdv__trace-lbl">Precio</span>
+                <span class="sdv__trace-val" style="color:#1b5e20;font-weight:700">
+                  ${{ stockForm.precio_por_unidad }}/{{ productoActual.unidad }}
+                  · Total: ${{ (stockForm.precio_por_unidad * stockForm.cantidad).toLocaleString('es-AR') }}
+                </span>
               </div>
               <div class="sdv__trace-row">
                 <span class="sdv__trace-lbl">Destino</span>
@@ -530,14 +771,16 @@ onMounted(async () => {
               </div>
             </div>
 
-          </div>
+          </div><!-- fin v-else admin/agricultor -->
 
           <div class="sdv__modal-footer">
             <button class="sdv__btn-ghost" :disabled="savingStock" @click="showStockModal = false">Cancelar</button>
-            <button class="sdv__btn-primary" :disabled="savingStock || !stockForm.cantidad || stockForm.cantidad <= 0" @click="confirmarStock">
+            <button class="sdv__btn-primary"
+                    :disabled="savingStock || !stockForm.cantidad || stockForm.cantidad <= 0 || (esManicurador && !stockForm.lote_id)"
+                    @click="confirmarStock">
               <span v-if="savingStock" class="sdv__ring sdv__ring--sm sdv__ring--white"></span>
               <i v-else class="bi bi-check-lg"></i>
-              Confirmar ingreso
+              {{ esManicurador ? 'Enviar para aprobación' : 'Confirmar ingreso' }}
             </button>
           </div>
 
@@ -713,6 +956,8 @@ onMounted(async () => {
 .sdv__input { width: 100%; padding: 10px 13px; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: 14px; color: #0f172a; background: #f8fafc; outline: none; transition: border-color .15s, box-shadow .15s; font-family: inherit; }
 .sdv__input:focus { border-color: #0369a1; box-shadow: 0 0 0 3px rgba(3,105,161,.1); }
 .sdv__input--big { font-size: 20px; font-weight: 700; padding-right: 52px; letter-spacing: -.02em; }
+.sdv__input--mid { padding-left: 2rem; padding-right: 3.5rem; }
+.sdv__cant-prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: #1b5e20; font-weight: 700; pointer-events: none; }
 .sdv__cant-suffix { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; color: #94a3b8; font-weight: 500; pointer-events: none; }
 
 .sdv__trace-preview { background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 12px; padding: 14px 16px; }
@@ -721,4 +966,49 @@ onMounted(async () => {
 .sdv__trace-row:last-child { border-bottom: none; }
 .sdv__trace-lbl { font-size: 12px; color: #15803d; opacity: .7; white-space: nowrap; }
 .sdv__trace-val { font-size: 12px; color: #0f172a; font-weight: 500; text-align: right; }
+
+/* Modal manicurador */
+.sdv__manicura-empty { font-size: .82rem; color: #94a3b8; background: #f8fafc; border: 1.5px dashed #e2e8f0; border-radius: 10px; padding: 1.25rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+.sdv__manicura-lotes { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; }
+.sdv__manicura-lote { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: .875rem; text-align: left; cursor: pointer; transition: all .15s; }
+.sdv__manicura-lote:hover { border-color: #86efac; background: #f0fdf4; }
+.sdv__manicura-lote--active { border-color: #1b5e20; background: #f0fdf4; box-shadow: 0 0 0 3px rgba(27,94,32,.1); }
+.sdv__manicura-lote-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .4rem; }
+.sdv__manicura-codigo { font-size: .8rem; font-weight: 800; color: #0f172a; font-family: monospace; }
+.sdv__manicura-estado { font-size: .65rem; font-weight: 700; padding: .15em .5em; border-radius: 5px; }
+.sdv__manicura-genetica { font-size: .82rem; font-weight: 600; color: #1b5e20; margin-bottom: .25rem; }
+.sdv__manicura-sala { font-size: .72rem; color: #94a3b8; display: flex; align-items: center; gap: .3rem; }
+.sdv__manicura-confirm { display: flex; align-items: flex-start; gap: .5rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 9px; padding: .75rem; font-size: .8rem; color: #374151; margin-top: .5rem; }
+
+/* Pendientes de aprobación */
+.sdv__pending { border: 2px solid #fde68a; border-radius: 14px; background: #fffbeb; margin-bottom: 1.25rem; overflow: hidden; }
+.sdv__pending-header { display: flex; align-items: center; gap: .6rem; padding: .875rem 1.1rem; font-size: .82rem; font-weight: 700; color: #92400e; background: #fef3c7; border-bottom: 1px solid #fde68a; }
+.sdv__pending-badge { background: #d97706; color: #fff; font-size: .68rem; font-weight: 800; padding: .15em .55em; border-radius: 10px; margin-left: auto; }
+.sdv__pending-loading { display: flex; align-items: center; gap: .5rem; padding: 1rem; font-size: .8rem; color: #94a3b8; }
+.sdv__pending-list { display: flex; flex-direction: column; }
+.sdv__pending-item { display: flex; align-items: center; gap: 1rem; padding: .875rem 1.1rem; border-bottom: 1px solid #fde68a; }
+.sdv__pending-item:last-child { border-bottom: none; }
+.sdv__pending-info { flex: 1; min-width: 0; }
+.sdv__pending-producto { font-size: .875rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: .5rem; }
+.sdv__pending-qty { font-size: .8rem; font-weight: 800; color: #15803d; background: rgba(21,128,61,.1); padding: .15em .5em; border-radius: 6px; }
+.sdv__pending-meta { font-size: .72rem; color: #92400e; margin-top: .2rem; }
+.sdv__pending-motivo { font-size: .72rem; color: #64748b; font-style: italic; margin-top: .15rem; }
+.sdv__pending-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+.sdv__btn-aprobar { display: inline-flex; align-items: center; gap: .35rem; background: #1b5e20; color: #fff; border: none; padding: .45rem .9rem; border-radius: 8px; font-size: .78rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.sdv__btn-aprobar:hover:not(:disabled) { background: #144a18; }
+.sdv__btn-aprobar:disabled { opacity: .5; cursor: not-allowed; }
+.sdv__btn-rechazar { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #fca5a5; background: #fef2f2; color: #dc2626; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: .8rem; transition: all .15s; }
+.sdv__btn-rechazar:hover:not(:disabled) { background: #dc2626; color: #fff; }
+.sdv__btn-rechazar:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Inventory cards — genética y precio */
+.sdv__inv-genetica { display: flex; gap: .35rem; flex-wrap: wrap; font-size: .7rem; color: #64748b; margin: .15rem 0; }
+.sdv__inv-gen-tipo { background: rgba(124,58,237,.1); color: #7c3aed; padding: .1em .4em; border-radius: 4px; text-transform: capitalize; font-size: .65rem; font-weight: 700; }
+.sdv__inv-precio { font-size: .75rem; color: #1b5e20; font-weight: 600; margin-top: .15rem; }
+
+/* Modal danger */
+.sdv__btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #dc2626; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+.sdv__btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.sdv__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
+.sdv__modal--sm { max-width: 420px; }
 </style>

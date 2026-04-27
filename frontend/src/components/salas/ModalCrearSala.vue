@@ -21,6 +21,8 @@ const KINDS = [
   { value: 'mixta',      label: 'Mixta' },
   { value: 'madre',      label: 'Madres' },
   { value: 'clon',       label: 'Clones' },
+  { value: 'manicura',   label: 'Manicura' },
+  { value: 'secado',     label: 'Secado' },
 ]
 
 const form = ref({
@@ -162,6 +164,12 @@ onMounted(async () => {
                 {{ s.nombre }} — {{ s.tipo_label }}
               </option>
             </select>
+          </div>
+
+          <!-- Nota manicura -->
+          <div v-if="form.kind === 'manicura'" class="mcr__capacity-info" style="background:#fffbeb;border-color:#fde68a;color:#92400e">
+            <i class="bi bi-info-circle"></i>
+            La sala de manicura solo puede estar en sedes de <strong>producción</strong> o <strong>mixta</strong>.
           </div>
 
           <!-- Info capacidad de la sede seleccionada -->

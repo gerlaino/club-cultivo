@@ -21,12 +21,18 @@ class PlantsController < ApplicationController
 
   # POST /plants
   def create
+    enforcer = PlanEnforcer.new(current_user.club)
+    unless enforcer.puede_crear_planta?
+      info = enforcer.info
+      return render json: PlanEnforcer.error_limite('plantas', info[:limites][:plantas]), status: :payment_required
+    end
+
     lote = current_user.club.lotes.find(params[:plant][:lote_id])
     sala = lote.sala
 
-    if sala && sala.capacidad_disponible == 0 && (sala.plants_max.to_i > 0 || sala.pots_count.to_i > 0)
+    if sala&.tiene_limite_capacidad? && sala.capacidad_disponible == 0
       return render json: {
-        errors: ["La sala '#{sala.nombre}' está al límite de su capacidad (#{sala.plants_max || sala.pots_count} plantas)"]
+        errors: ["La sala '#{sala.nombre}' está al límite de su capacidad (#{sala.capacidad_maxima} plantas)"]
       }, status: :unprocessable_entity
     end
 

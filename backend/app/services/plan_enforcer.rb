@@ -27,6 +27,12 @@ class PlanEnforcer
     Plant.joins(:lote).where(lotes: { club_id: @club.id }).count < @limite[:plantas]
   end
 
+  def puede_crear_planta_bulk?(cantidad)
+    return true if @limite[:plantas].nil?
+    actuales = Plant.joins(:lote).where(lotes: { club_id: @club.id }).count
+    actuales + cantidad <= @limite[:plantas]
+  end
+
   def puede_crear_paciente?
     return true if @limite[:pacientes].nil?
     @club.socios.count < @limite[:pacientes]
@@ -61,6 +67,8 @@ class PlanEnforcer
   end
 
   def self.error_limite(recurso, limite)
-    { error: 'limite_plan', mensaje: "Tu plan no permite mas #{recurso}. Limite: #{limite || 'ilimitado'}", upgrade: true }
+    msg = limite ? "Límite del plan alcanzado: tu plan permite #{limite} #{recurso} como máximo." \
+                 : "Tu plan no permite más #{recurso}."
+    { error: 'limite_plan', errors: [msg], mensaje: msg, upgrade: true }
   end
 end

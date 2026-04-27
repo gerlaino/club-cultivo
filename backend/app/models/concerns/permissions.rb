@@ -46,6 +46,27 @@ module Permissions
       mi_perfil: [:show, :update],
       mis_dispensaciones: [:index, :show],
       eventos: [:index, :show]
+    },
+    dispensador: {
+      socios: [:index, :show],
+      dispensaciones: [:index, :show, :create],
+      sede_inventario: [:index, :show],
+      socio_notas: [:index, :create],
+    },
+    tesorero: {
+      contabilidad: [:index, :show, :create, :update],
+      movimientos_contables: [:index, :show, :create, :update],
+      informes_financieros: [:index, :show],
+      socios: [:index, :show],
+      dispensaciones: [:index, :show],
+      sedes: [:index, :show],
+    },
+    manicurador: {
+      sede_inventario: [:index, :show],
+      inventario_movimientos: [:index, :show, :create],
+      lotes: [:index, :show],
+      geneticas: [:index, :show],
+      sedes: [:index, :show],
     }
   }.freeze
 
@@ -89,6 +110,18 @@ module Permissions
 
   def socio?
     role == 'socio'
+  end
+
+  def dispensador?
+    role == 'dispensador'
+  end
+
+  def tesorero?
+    role == 'tesorero'
+  end
+
+  def manicurador?
+    role == 'manicurador'
   end
 
   def super_admin?

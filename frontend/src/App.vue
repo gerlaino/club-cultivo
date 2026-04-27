@@ -45,6 +45,7 @@ const bottomNavLinks = computed(() => {
       { to: '/',           icon: 'bi-speedometer2',   label: 'Dashboard' },
       { to: '/sedes',      icon: 'bi-building',       label: 'Sedes',     perm: ['sedes','index'] },
       { to: '/socios',     icon: 'bi-people',         label: 'Pacientes', perm: ['socios','index'] },
+      { to: '/manicura',   icon: 'bi-scissors',       label: 'Manicura' },
       { to: '/tareas',     icon: 'bi-clipboard-check',label: 'Tareas',    perm: ['tareas','index'] },
       { to: '/contabilidad',icon: 'bi-cash-stack',    label: 'Caja',      perm: ['movimientos_contables','index'] },
     ]
@@ -137,6 +138,9 @@ onMounted(async () => {
             </li>
             <li class="nav-item" v-if="can('tareas', 'index')">
               <RouterLink class="nav-link px-2" to="/tareas" @click="closeNav">Tareas</RouterLink>
+            </li>
+            <li class="nav-item" v-if="isAdmin || auth.user?.role === 'agricultor'">
+              <RouterLink class="nav-link px-2" to="/manicura" @click="closeNav">Manicura</RouterLink>
             </li>
             <li class="nav-item" v-if="isAdmin">
               <RouterLink class="nav-link px-2" to="/web" @click="closeNav">Web</RouterLink>

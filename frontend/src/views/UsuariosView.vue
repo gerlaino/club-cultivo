@@ -21,12 +21,16 @@ const form = ref({
 })
 
 const ROLES = [
-  { value: 'admin',      label: 'Administrador', color: '#dc2626', bg: 'rgba(220,38,38,.1)',    icon: 'bi-shield-fill-check' },
-  { value: 'medico',     label: 'Médico',        color: '#15803d', bg: 'rgba(21,128,61,.1)',    icon: 'bi-heart-pulse-fill'  },
-  { value: 'agricultor', label: 'Agricultor',    color: '#0369a1', bg: 'rgba(3,105,161,.1)',    icon: 'bi-tree-fill'         },
-  { value: 'cultivador', label: 'Cultivador',    color: '#0891b2', bg: 'rgba(8,145,178,.1)',    icon: 'bi-flower1'           },
-  { value: 'abogado',    label: 'Abogado',       color: '#b45309', bg: 'rgba(180,83,9,.1)',     icon: 'bi-briefcase-fill'    },
-  { value: 'auditor',    label: 'Auditor',       color: '#475569', bg: 'rgba(71,85,105,.1)',    icon: 'bi-clipboard-data-fill'},
+  { value: 'admin',       label: 'Administrador', color: '#dc2626', bg: 'rgba(220,38,38,.1)',    icon: 'bi-shield-fill-check'   },
+  { value: 'medico',      label: 'Médico',        color: '#15803d', bg: 'rgba(21,128,61,.1)',    icon: 'bi-heart-pulse-fill'    },
+  { value: 'agricultor',  label: 'Agricultor',    color: '#0369a1', bg: 'rgba(3,105,161,.1)',    icon: 'bi-tree-fill'           },
+  { value: 'cultivador',  label: 'Cultivador',    color: '#0891b2', bg: 'rgba(8,145,178,.1)',    icon: 'bi-flower1'             },
+  { value: 'manicurador', label: 'Manicurador',   color: '#7c3aed', bg: 'rgba(124,58,237,.1)',   icon: 'bi-scissors'            },
+  { value: 'dispensador', label: 'Dispensador',   color: '#0891b2', bg: 'rgba(8,145,178,.08)',   icon: 'bi-bag-check-fill'      },
+  { value: 'tesorero',    label: 'Tesorero',      color: '#b45309', bg: 'rgba(180,83,9,.1)',     icon: 'bi-coin'                },
+  { value: 'abogado',     label: 'Abogado',       color: '#92400e', bg: 'rgba(146,64,14,.1)',    icon: 'bi-briefcase-fill'      },
+  { value: 'auditor',     label: 'Auditor',       color: '#475569', bg: 'rgba(71,85,105,.1)',    icon: 'bi-clipboard-data-fill' },
+  { value: 'socio',       label: 'Socio',         color: '#64748b', bg: 'rgba(100,116,139,.1)',  icon: 'bi-person-badge-fill'   },
 ]
 
 const AVATAR_COLORS = [
@@ -107,7 +111,11 @@ async function save() {
       showToast('success', 'Usuario creado. La contraseña inicial es 123456Aa.')
     }
   } catch (e) {
-    showToast('error', store.error || 'Error al guardar.')
+    if (e.response?.status === 402) {
+      showToast('error', e.response.data?.mensaje || 'Límite del plan alcanzado. Contactá al equipo.')
+    } else {
+      showToast('error', store.error || 'Error al guardar.')
+    }
   }
 }
 
@@ -284,8 +292,8 @@ watch(showModal, async (val) => {
                 </div>
               </div>
 
-              <!-- Sala para cultivador -->
-              <template v-if="form.role === 'cultivador'">
+              <!-- Sala para cultivador / manicurador -->
+              <template v-if="['cultivador', 'manicurador'].includes(form.role)">
                 <div class="uv__field uv__field--full">
                   <label class="uv__label">Sede</label>
                   <select class="uv__input" v-model="form.sede_id" @change="form.sala_id = ''">
@@ -303,7 +311,11 @@ watch(showModal, async (val) => {
                       {{ sala.nombre }}
                     </option>
                   </select>
-                  <span class="uv__hint">Podés asignar más salas desde el perfil del cultivador.</span>
+                  <span class="uv__hint">
+                    {{ form.role === 'manicurador'
+                      ? 'El manicurador trabaja en una única sala. Podés cambiarla desde su perfil.'
+                      : 'Podés asignar más salas desde el perfil del cultivador.' }}
+                  </span>
                 </div>
               </template>
 

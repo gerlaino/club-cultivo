@@ -22,21 +22,29 @@ const isMe    = computed(() => auth.user?.id === userId)
 const canEdit = computed(() => auth.role === "admin" && !isMe.value)
 
 const ROLES = [
-  { value: "admin",      label: "Administrador", color: "#dc2626", bg: "rgba(220,38,38,.1)",  icon: "bi-shield-fill-check",   desc: "Acceso total al sistema — puede gestionar todos los módulos, usuarios y configuración." },
-  { value: "medico",     label: "Médico",        color: "#15803d", bg: "rgba(21,128,61,.1)",  icon: "bi-heart-pulse-fill",    desc: "Gestión de pacientes e indicaciones médicas. Sin acceso a producción." },
-  { value: "agricultor", label: "Agricultor",    color: "#0369a1", bg: "rgba(3,105,161,.1)",  icon: "bi-tree-fill",           desc: "Gestión de sedes, salas, lotes y plantas. Sin acceso a pacientes." },
-  { value: "cultivador", label: "Cultivador",    color: "#0891b2", bg: "rgba(8,145,178,.1)",  icon: "bi-flower1",             desc: "Seguimiento de plantas y actividades en sus salas asignadas." },
-  { value: "abogado",    label: "Abogado",       color: "#b45309", bg: "rgba(180,83,9,.1)",   icon: "bi-briefcase-fill",      desc: "Acceso a documentos, contabilidad y trazabilidad legal. Solo lectura clínica." },
-  { value: "auditor",    label: "Auditor",       color: "#475569", bg: "rgba(71,85,105,.1)",  icon: "bi-clipboard-data-fill", desc: "Lectura de todos los módulos e informes. Sin modificar datos." },
+  { value: "admin",       label: "Administrador", color: "#dc2626", bg: "rgba(220,38,38,.1)",   icon: "bi-shield-fill-check",   desc: "Acceso total al sistema — puede gestionar todos los módulos, usuarios y configuración." },
+  { value: "medico",      label: "Médico",        color: "#15803d", bg: "rgba(21,128,61,.1)",   icon: "bi-heart-pulse-fill",    desc: "Gestión de pacientes e indicaciones médicas. Sin acceso a producción." },
+  { value: "agricultor",  label: "Agricultor",    color: "#0369a1", bg: "rgba(3,105,161,.1)",   icon: "bi-tree-fill",           desc: "Gestión de sedes, salas, lotes y plantas. Sin acceso a pacientes." },
+  { value: "cultivador",  label: "Cultivador",    color: "#0891b2", bg: "rgba(8,145,178,.1)",   icon: "bi-flower1",             desc: "Seguimiento de plantas y actividades en sus salas asignadas." },
+  { value: "manicurador", label: "Manicurador",   color: "#7c3aed", bg: "rgba(124,58,237,.1)",  icon: "bi-scissors",            desc: "Registra el peso de cosecha por lote en sus salas asignadas. Requiere aprobación del admin." },
+  { value: "dispensador", label: "Dispensador",   color: "#0891b2", bg: "rgba(8,145,178,.08)",  icon: "bi-bag-check-fill",      desc: "Opera el dispensario: registra entregas a socios y consulta stock disponible." },
+  { value: "tesorero",    label: "Tesorero",      color: "#b45309", bg: "rgba(180,83,9,.1)",    icon: "bi-coin",                desc: "Acceso completo a contabilidad, movimientos e informes financieros del club." },
+  { value: "abogado",     label: "Abogado",       color: "#92400e", bg: "rgba(146,64,14,.1)",   icon: "bi-briefcase-fill",      desc: "Acceso a documentos, contabilidad y trazabilidad legal. Solo lectura clínica." },
+  { value: "auditor",     label: "Auditor",       color: "#475569", bg: "rgba(71,85,105,.1)",   icon: "bi-clipboard-data-fill", desc: "Lectura de todos los módulos e informes. Sin modificar datos." },
+  { value: "socio",       label: "Socio",         color: "#64748b", bg: "rgba(100,116,139,.1)", icon: "bi-person-badge-fill",   desc: "Acceso al portal del socio: su perfil y su historial de dispensaciones." },
 ]
 
 const PERMISOS = {
-  admin:      [{ ok: true, label: "Gestión total del sistema" }, { ok: true, label: "Usuarios y configuración" }, { ok: true, label: "Contabilidad y documentos" }, { ok: true, label: "Todos los módulos" }],
-  medico:     [{ ok: true, label: "Gestionar pacientes" }, { ok: true, label: "Indicaciones médicas" }, { ok: true, label: "Dispensaciones" }, { ok: false, label: "Gestión de producción" }],
-  agricultor: [{ ok: true, label: "Sedes y salas" }, { ok: true, label: "Lotes y plantas" }, { ok: true, label: "Genéticas" }, { ok: false, label: "Pacientes y clínico" }],
-  cultivador: [{ ok: true, label: "Ver salas asignadas" }, { ok: true, label: "Actualizar plantas" }, { ok: true, label: "Registrar actividades" }, { ok: false, label: "Crear lotes o dispensar" }],
-  abogado:    [{ ok: true, label: "Documentos legales" }, { ok: true, label: "Contabilidad (lectura)" }, { ok: true, label: "Trazabilidad" }, { ok: false, label: "Modificar datos clínicos" }],
-  auditor:    [{ ok: true, label: "Lectura completa" }, { ok: true, label: "Contabilidad" }, { ok: false, label: "Crear o modificar datos" }, { ok: false, label: "Gestionar usuarios" }],
+  admin:       [{ ok: true, label: "Gestión total del sistema" }, { ok: true, label: "Usuarios y configuración" }, { ok: true, label: "Contabilidad y documentos" }, { ok: true, label: "Todos los módulos" }],
+  medico:      [{ ok: true, label: "Gestionar pacientes" }, { ok: true, label: "Indicaciones médicas" }, { ok: true, label: "Dispensaciones" }, { ok: false, label: "Gestión de producción" }],
+  agricultor:  [{ ok: true, label: "Sedes y salas" }, { ok: true, label: "Lotes y plantas" }, { ok: true, label: "Genéticas" }, { ok: false, label: "Pacientes y clínico" }],
+  cultivador:  [{ ok: true, label: "Ver salas asignadas" }, { ok: true, label: "Actualizar plantas" }, { ok: true, label: "Registrar actividades" }, { ok: false, label: "Crear lotes o dispensar" }],
+  manicurador: [{ ok: true, label: "Registrar cosecha (pendiente aprobación)" }, { ok: true, label: "Ver lotes en sus salas asignadas" }, { ok: false, label: "Aprobar stock" }, { ok: false, label: "Dispensar o acceder a socios" }],
+  dispensador: [{ ok: true, label: "Registrar dispensaciones" }, { ok: true, label: "Consultar socios" }, { ok: true, label: "Ver stock disponible" }, { ok: false, label: "Producción o contabilidad" }],
+  tesorero:    [{ ok: true, label: "Contabilidad completa" }, { ok: true, label: "Movimientos e informes" }, { ok: true, label: "Ver socios y dispensaciones" }, { ok: false, label: "Producción o usuarios" }],
+  abogado:     [{ ok: true, label: "Documentos legales" }, { ok: true, label: "Contabilidad (lectura)" }, { ok: true, label: "Trazabilidad" }, { ok: false, label: "Modificar datos clínicos" }],
+  auditor:     [{ ok: true, label: "Lectura completa" }, { ok: true, label: "Contabilidad" }, { ok: false, label: "Crear o modificar datos" }, { ok: false, label: "Gestionar usuarios" }],
+  socio:       [{ ok: true, label: "Ver su perfil" }, { ok: true, label: "Ver sus dispensaciones" }, { ok: false, label: "Acceso a producción" }, { ok: false, label: "Acceso a otros módulos" }],
 }
 
 const AVATAR_COLORS = ['#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc2626','#15803d']
@@ -209,16 +217,20 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Salas asignadas — solo cultivador -->
-          <div v-if="u.role === 'cultivador'" class="ud__card ud__card--mt">
+          <!-- Salas asignadas — cultivador y manicurador -->
+          <div v-if="['cultivador', 'manicurador'].includes(u.role)" class="ud__card ud__card--mt">
             <div class="ud__card-header">
-              <div class="ud__card-icon" style="background:rgba(8,145,178,.1);color:#0891b2">
-                <i class="bi bi-grid-3x3-gap"></i>
+              <div class="ud__card-icon"
+                   :style="u.role === 'manicurador' ? 'background:rgba(124,58,237,.1);color:#7c3aed' : 'background:rgba(8,145,178,.1);color:#0891b2'">
+                <i :class="u.role === 'manicurador' ? 'bi bi-scissors' : 'bi bi-grid-3x3-gap'"></i>
               </div>
-              <span class="ud__card-title">Salas asignadas</span>
+              <span class="ud__card-title">{{ u.role === 'manicurador' ? 'Sala asignada' : 'Salas asignadas' }}</span>
+              <span v-if="u.role === 'manicurador'" class="ud__card-hint">
+                Solo verá lotes en cosecha/curado de su sala
+              </span>
             </div>
             <div class="ud__card-body">
-              <UsuarioSalasManager :user-id="userId" />
+              <UsuarioSalasManager :user-id="userId" :user-role="u.role" />
             </div>
           </div>
 
@@ -373,6 +385,7 @@ onMounted(async () => {
 .ud__card-header { display: flex; align-items: center; gap: .65rem; padding: .875rem 1.25rem; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
 .ud__card-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: .8rem; flex-shrink: 0; }
 .ud__card-title { font-size: .875rem; font-weight: 700; color: #0f172a; flex: 1; }
+.ud__card-hint { font-size: .72rem; color: #7c3aed; font-weight: 500; }
 .ud__card-body { padding: 1.25rem; }
 
 /* Info grid */

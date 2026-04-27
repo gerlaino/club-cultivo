@@ -1,6 +1,6 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_admin_or_agricultor
+  before_action :require_admin_agricultor_o_manicurador
   before_action :set_lote, only: [:show, :update, :destroy]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -15,6 +15,15 @@ class LotesController < ApplicationController
       lotes = lotes.where(sala_id: salas_ids)
     end
 
+    if current_user.manicurador?
+      salas_ids = current_user.salas_ids_asignadas
+      return render json: [] if salas_ids.empty?
+      lotes = lotes.where(sala_id: salas_ids, estado: %w[cosecha curado])
+    elsif params[:manicura].present?
+      lotes = lotes.where(estado: %w[cosecha curado])
+    end
+
+    lotes = lotes.where(estado: params[:estado]) if params[:estado].present?
     lotes = lotes.order(created_at: :desc)
     render json: lotes.map { |l| serialize_lote(l) }
   end
@@ -26,16 +35,35 @@ class LotesController < ApplicationController
 
   # POST /salas/:sala_id/lotes
   def create
+    enforcer = PlanEnforcer.new(current_user.club)
+    unless enforcer.puede_crear_lote?
+      info = enforcer.info
+      return render json: PlanEnforcer.error_limite('lotes', info[:limites][:lotes]), status: :payment_required
+    end
+
     @lote = @sala.lotes.build(lote_params)
     @lote.club = current_user.club
 
     plantas_iniciales = lote_params[:plants_count].to_i
-    if plantas_iniciales > 0 && @sala.plants_max.to_i > 0
+    if plantas_iniciales > 0 && @sala.tiene_limite_capacidad?
       disponible = @sala.capacidad_disponible
       if plantas_iniciales > disponible
         return render json: {
-          errors: ["La sala '#{@sala.nombre}' solo tiene capacidad para #{disponible} plantas más (máx: #{@sala.plants_max})"]
+          errors: ["La sala '#{@sala.nombre}' solo tiene capacidad para #{disponible} plantas más (máx: #{@sala.capacidad_maxima})"]
         }, status: :unprocessable_entity
+      end
+    end
+
+    if plantas_iniciales > 0
+      enforcer2 = PlanEnforcer.new(current_user.club)
+      unless enforcer2.puede_crear_planta_bulk?(plantas_iniciales)
+        info = enforcer2.info
+        restantes = (info[:limites][:plantas] || 0) - info[:uso][:plantas]
+        return render json: {
+          error: 'limite_plan',
+          mensaje: "Tu plan solo permite #{restantes} plantas más (límite: #{info[:limites][:plantas]})",
+          upgrade: true,
+        }, status: :payment_required
       end
     end
 
@@ -61,6 +89,19 @@ class LotesController < ApplicationController
 
   # PATCH/PUT /lotes/:id
   def update
+    if lote_params[:plants_count].present?
+      nuevas   = lote_params[:plants_count].to_i
+      actuales = @lote.plants_count.to_i
+      delta    = nuevas - actuales
+      if delta > 0 && @lote.sala.tiene_limite_capacidad?
+        disponible = @lote.sala.capacidad_disponible
+        if delta > disponible
+          return render json: {
+            errors: ["La sala '#{@lote.sala.nombre}' solo tiene capacidad para #{disponible} plantas más (máx: #{@lote.sala.capacidad_maxima})"]
+          }, status: :unprocessable_entity
+        end
+      end
+    end
     if @lote.update(lote_params)
       render json: serialize_lote(@lote)
     else
@@ -106,8 +147,8 @@ class LotesController < ApplicationController
     )
   end
 
-  def require_admin_or_agricultor
-    unless current_user.admin? || current_user.agricultor? || current_user.cultivador?
+  def require_admin_agricultor_o_manicurador
+    unless current_user.admin? || current_user.agricultor? || current_user.cultivador? || current_user.manicurador?
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end

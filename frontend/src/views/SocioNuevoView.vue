@@ -50,8 +50,12 @@ async function handleSubmit() {
     Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k] })
     const socio = await store.create(payload)
     router.push({ name: 'socio-detail', params: { id: socio.id } })
-  } catch {
-    formError.value = store.error || 'Error al crear el paciente'
+  } catch (e) {
+    if (e.response?.status === 402) {
+      formError.value = e.response.data?.mensaje || 'Límite del plan alcanzado. Contactá al equipo para actualizar.'
+    } else {
+      formError.value = store.error || 'Error al crear el paciente'
+    }
   }
 }
 

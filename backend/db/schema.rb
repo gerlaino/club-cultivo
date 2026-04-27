@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_20_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -110,10 +110,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_20_000001) do
     t.decimal "aporte_socio_ars", precision: 10, scale: 2
     t.decimal "costo_por_gramo", precision: 10, scale: 2
     t.decimal "costo_total_calculado", precision: 10, scale: 2
+    t.bigint "sede_inventario_id"
+    t.decimal "porcentaje_descuento", precision: 5, scale: 2
     t.index ["fecha_dispensacion"], name: "index_dispensaciones_on_fecha_dispensacion"
     t.index ["indicacion_medica_id"], name: "index_dispensaciones_on_indicacion_medica_id"
     t.index ["lote_id"], name: "index_dispensaciones_on_lote_id"
     t.index ["sede_id"], name: "index_dispensaciones_on_sede_id"
+    t.index ["sede_inventario_id"], name: "index_dispensaciones_on_sede_inventario_id"
     t.index ["socio_id", "fecha_dispensacion"], name: "index_dispensaciones_on_socio_id_and_fecha_dispensacion"
     t.index ["socio_id"], name: "index_dispensaciones_on_socio_id"
     t.index ["user_id"], name: "index_dispensaciones_on_user_id"
@@ -228,9 +231,15 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_20_000001) do
     t.text "motivo"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "estado", default: "aprobado", null: false
+    t.bigint "aprobado_por_id"
+    t.datetime "aprobado_at"
+    t.string "nota_rechazo"
+    t.index ["aprobado_por_id"], name: "index_inventario_movimientos_on_aprobado_por_id"
     t.index ["club_id"], name: "index_inventario_movimientos_on_club_id"
     t.index ["created_by_id"], name: "index_inventario_movimientos_on_created_by_id"
     t.index ["dispensacion_id"], name: "index_inventario_movimientos_on_dispensacion_id"
+    t.index ["estado"], name: "index_inventario_movimientos_on_estado"
     t.index ["lote_id"], name: "index_inventario_movimientos_on_lote_id"
     t.index ["sede_id", "created_at"], name: "index_inventario_movimientos_on_sede_id_and_created_at"
     t.index ["sede_id"], name: "index_inventario_movimientos_on_sede_id"
@@ -490,17 +499,20 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_20_000001) do
     t.bigint "sede_id", null: false
     t.bigint "club_id", null: false
     t.bigint "created_by_id", null: false
-    t.string "producto", null: false
+    t.string "producto"
     t.string "descripcion"
     t.decimal "stock_gramos", precision: 10, scale: 2, default: "0.0", null: false
     t.decimal "stock_minimo", precision: 10, scale: 2, default: "0.0"
     t.bigint "lote_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "genetica_id"
+    t.decimal "precio_por_unidad", precision: 10, scale: 2
     t.index ["club_id"], name: "index_sede_inventarios_on_club_id"
     t.index ["created_by_id"], name: "index_sede_inventarios_on_created_by_id"
+    t.index ["genetica_id"], name: "index_sede_inventarios_on_genetica_id"
     t.index ["lote_id"], name: "index_sede_inventarios_on_lote_id"
-    t.index ["sede_id", "producto"], name: "index_sede_inventarios_on_sede_id_and_producto"
+    t.index ["sede_id", "genetica_id"], name: "index_sede_inv_sede_genetica_unique", unique: true, where: "(genetica_id IS NOT NULL)"
     t.index ["sede_id"], name: "index_sede_inventarios_on_sede_id"
   end
 
@@ -650,6 +662,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_20_000001) do
   add_foreign_key "costo_lotes", "users", column: "calculado_por_id"
   add_foreign_key "dispensaciones", "indicacion_medicas"
   add_foreign_key "dispensaciones", "lotes"
+  add_foreign_key "dispensaciones", "sede_inventarios"
   add_foreign_key "dispensaciones", "sedes"
   add_foreign_key "dispensaciones", "socios"
   add_foreign_key "dispensaciones", "users"
@@ -666,6 +679,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_20_000001) do
   add_foreign_key "inventario_movimientos", "lotes"
   add_foreign_key "inventario_movimientos", "sede_inventarios"
   add_foreign_key "inventario_movimientos", "sedes"
+  add_foreign_key "inventario_movimientos", "users", column: "aprobado_por_id"
   add_foreign_key "inventario_movimientos", "users", column: "created_by_id"
   add_foreign_key "lote_eventos", "clubs"
   add_foreign_key "lote_eventos", "lotes"
@@ -697,6 +711,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_20_000001) do
   add_foreign_key "salas", "sedes"
   add_foreign_key "salas", "users", column: "created_by_id"
   add_foreign_key "sede_inventarios", "clubs"
+  add_foreign_key "sede_inventarios", "geneticas"
   add_foreign_key "sede_inventarios", "lotes"
   add_foreign_key "sede_inventarios", "sedes"
   add_foreign_key "sede_inventarios", "users", column: "created_by_id"

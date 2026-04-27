@@ -41,6 +41,12 @@ class SociosController < ApplicationController
   end
 
   def create
+    enforcer = PlanEnforcer.new(current_user.club)
+    unless enforcer.puede_crear_paciente?
+      info = enforcer.info
+      return render json: PlanEnforcer.error_limite('pacientes', info[:limites][:pacientes]), status: :payment_required
+    end
+
     socio = Socio.new(socio_params)
     socio.club_id    = current_user.club_id
     socio.created_by = current_user

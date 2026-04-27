@@ -22,14 +22,25 @@ Rails.application.routes.draw do
 
   # Rutas protegidas (requieren autenticación)
   defaults format: :json do
-    get "/me",    to: "me#show"
-    get "/stats", to: "stats#show"
+    get "/me",             to: "me#show"
+    get "/me/movimientos", to: "me#movimientos"
+    get "/stats",          to: "stats#show"
+
+    scope '/inventario' do
+      get  'pendiente',      to: 'inventario#pendiente'
+      get  'disponible',     to: 'inventario#disponible'
+      post 'aprobar/:id',    to: 'inventario#aprobar',  as: 'inventario_aprobar'
+      post 'rechazar/:id',   to: 'inventario#rechazar', as: 'inventario_rechazar'
+    end
     post '/asistente/parsear',  to: 'asistente#parsear'
     post '/asistente/ejecutar', to: 'asistente#ejecutar'
 
     resources :salas do
       resources :lotes, only: [:index, :create]
       resources :cultivadores, controller: 'sala_cultivadores', only: [:index, :create, :destroy]
+      member do
+        post :cargar_lote
+      end
     end
 
     resources :lotes, only: [:index, :show, :update, :destroy] do
@@ -104,6 +115,9 @@ Rails.application.routes.draw do
       member do
         get  :inventario
         post :agregar_stock
+        get  :stock_pendiente
+        post 'aprobar_stock/:movimiento_id',  action: :aprobar_stock
+        post 'rechazar_stock/:movimiento_id', action: :rechazar_stock
       end
     end
 
@@ -145,7 +159,10 @@ Rails.application.routes.draw do
   resources :salas do
     resources :lotes, only: [:index, :create]
     resources :cultivadores, controller: 'sala_cultivadores', only: [:index, :create, :destroy]
-    resources :notas, only: [:index, :create]   # <-- AGREGAR
+    resources :notas, only: [:index, :create]
+    member do
+      post :cargar_lote
+    end
   end
 
   resources :lotes, only: [:index, :show, :update, :destroy] do

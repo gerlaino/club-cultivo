@@ -10,6 +10,7 @@ import { listGeneticas, createPlant,
   getLoteFotos, uploadFotoLote } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
+import GraficosLote from '../components/GraficosLote.vue'
 
 const route    = useRoute()
 const lotes    = useLotesStore()
@@ -26,6 +27,7 @@ const isCultivador  = computed(() => auth.role === "cultivador")
 const tareasExpanded    = ref(true)
 const plantasExpanded   = ref(true)
 const historialExpanded = ref(true)
+const graficosExpanded  = ref(true)
 const fotosExpanded     = ref(false)
 const fotos             = ref([])
 const uploadingFoto     = ref(false)
@@ -427,6 +429,20 @@ onMounted(async () => {
                   <span class="ld__ver-mas-hint">{{ plantasMostradas.length }} de {{ plantList.length }}</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Gráficos ambientales -->
+          <div class="ld__section ld__section--mt">
+            <button class="ld__section-toggle" @click="graficosExpanded = !graficosExpanded">
+              <div class="ld__section-toggle-left">
+                <span class="ld__section-emoji">📊</span>
+                <span class="ld__section-title">Registros ambientales</span>
+              </div>
+              <i class="bi ld__chevron" :class="graficosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </button>
+            <div v-show="graficosExpanded" class="ld__section-body">
+              <GraficosLote :lote-id="id" />
             </div>
           </div>
 

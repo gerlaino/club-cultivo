@@ -8,7 +8,7 @@ class DispensacionesController < ApplicationController
   # GET /socios/:socio_id/dispensaciones
   def index
     @dispensaciones = @socio.dispensaciones
-                            .includes(:user, :lote, :indicacion_medica, :sede)
+                            .includes(:user, :lote, :indicacion_medica, :sede, sede_inventario: :genetica)
                             .recientes
 
     cupo_disponible = Dispensacion.cupo_disponible(@socio.id)
@@ -29,22 +29,16 @@ class DispensacionesController < ApplicationController
 
   # POST /socios/:socio_id/dispensaciones
   def create
-    @dispensacion = @socio.dispensaciones.build(dispensacion_params)
+    @dispensacion      = @socio.dispensaciones.build(dispensacion_params)
     @dispensacion.user = current_user
-
-    # Calcular costo si hay lote con CostoLote registrado
-    if @dispensacion.lote_id.present?
-      costo_lote = CostoLote.find_by(lote_id: @dispensacion.lote_id)
-      if costo_lote&.costo_por_gramo.to_d > 0
-        @dispensacion.costo_por_gramo      = costo_lote.costo_por_gramo
-        @dispensacion.costo_total_calculado = (costo_lote.costo_por_gramo * @dispensacion.cantidad_gramos).round(2)
-      end
+    # Sede se deriva del stock seleccionado, no la elige el operador
+    if @dispensacion.sede_inventario && @dispensacion.sede_id.nil?
+      @dispensacion.sede_id = @dispensacion.sede_inventario.sede_id
     end
 
     ActiveRecord::Base.transaction do
+      calcular_costo_y_bajar_stock!
       @dispensacion.save!
-
-      # Generar MovimientoContable automáticamente
       crear_movimiento_contable(@dispensacion)
     end
 
@@ -89,25 +83,60 @@ class DispensacionesController < ApplicationController
 
   def dispensacion_params
     params.require(:dispensacion).permit(
-      :indicacion_medica_id, :lote_id, :sede_id,
-      :cantidad_gramos, :tipo_producto,
+      :indicacion_medica_id, :lote_id, :sede_id, :sede_inventario_id,
+      :cantidad_gramos, :tipo_producto, :porcentaje_descuento,
       :aporte_socio_ars, :observaciones, :fecha_dispensacion
     )
   end
 
-  # Al editar no permitimos cambiar campos financieros calculados
   def dispensacion_params_update
     params.require(:dispensacion).permit(
-      :indicacion_medica_id, :lote_id, :sede_id,
-      :tipo_producto, :aporte_socio_ars,
+      :indicacion_medica_id, :lote_id, :sede_id, :sede_inventario_id,
+      :tipo_producto, :aporte_socio_ars, :porcentaje_descuento,
       :observaciones, :fecha_dispensacion
     )
   end
 
   def require_medico_agricultor_or_admin
-    unless current_user.admin? || current_user.medico? || current_user.agricultor?
+    unless current_user.admin? || current_user.medico? || current_user.agricultor? || current_user.dispensador?
       render json: { error: 'No autorizado' }, status: :forbidden
     end
+  end
+
+  def calcular_costo_y_bajar_stock!
+    inv = @dispensacion.sede_inventario
+    return unless inv
+
+    cantidad = @dispensacion.cantidad_gramos.to_d
+
+    raise "Stock insuficiente (disponible: #{inv.stock_gramos}#{inv.unidad_medida})" if inv.stock_gramos < cantidad
+
+    if inv.precio_por_unidad.to_d > 0
+      costo_base = (inv.precio_por_unidad * cantidad).round(2)
+      descuento  = @dispensacion.porcentaje_descuento.to_d
+      costo_final = descuento > 0 ? (costo_base * (1 - descuento / 100)).round(2) : costo_base
+
+      @dispensacion.costo_por_gramo      = inv.precio_por_unidad
+      @dispensacion.costo_total_calculado = costo_final
+      @dispensacion.aporte_socio_ars    ||= costo_final
+    end
+
+    stock_anterior      = inv.stock_gramos.to_f
+    inv.stock_gramos   -= cantidad
+    inv.save!
+
+    InventarioMovimiento.create!(
+      sede:            inv.sede,
+      club:            current_user.club,
+      sede_inventario: inv,
+      dispensacion:    @dispensacion,
+      created_by:      current_user,
+      tipo:            'egreso_dispensacion',
+      cantidad:        -cantidad,
+      stock_anterior:  stock_anterior,
+      stock_nuevo:     inv.stock_gramos.to_f,
+      motivo:          "Dispensación #{@socio.nombre} #{@socio.apellido}"
+    )
   end
 
   def crear_movimiento_contable(dispensacion)
@@ -142,28 +171,35 @@ class DispensacionesController < ApplicationController
   end
 
   def serialize_dispensacion(dispensacion)
+    inv = dispensacion.sede_inventario
     {
-      id:                     dispensacion.id,
-      socio_id:               dispensacion.socio_id,
-      socio_nombre:           "#{dispensacion.socio.nombre} #{dispensacion.socio.apellido}",
+      id:           dispensacion.id,
+      socio_id:     dispensacion.socio_id,
+      socio_nombre: "#{dispensacion.socio.nombre} #{dispensacion.socio.apellido}",
       usuario: {
         id:     dispensacion.user.id,
         nombre: dispensacion.user.first_name || dispensacion.user.email,
       },
-      indicacion_medica: dispensacion.indicacion_medica ? {
-        id:        dispensacion.indicacion_medica.id,
-        patologia: dispensacion.indicacion_medica.patologia,
-      } : nil,
-      lote: dispensacion.lote ? {
-        id:     dispensacion.lote.id,
-        codigo: dispensacion.lote.codigo,
-      } : nil,
       sede: dispensacion.sede ? {
         id:     dispensacion.sede.id,
         nombre: dispensacion.sede.nombre,
       } : nil,
+      stock: inv ? {
+        id:                inv.id,
+        producto_label:    inv.producto_label,
+        unidad_medida:     inv.unidad_medida,
+        precio_por_unidad: inv.precio_por_unidad&.to_f,
+        genetica: inv.genetica ? {
+          id:     inv.genetica.id,
+          nombre: inv.genetica.nombre,
+          tipo:   inv.genetica.tipo,
+          thc:    inv.genetica.thc,
+          cbd:    inv.genetica.cbd,
+        } : nil,
+      } : nil,
       cantidad_gramos:         dispensacion.cantidad_gramos.to_f.round(2),
       tipo_producto:           dispensacion.tipo_producto,
+      porcentaje_descuento:    dispensacion.porcentaje_descuento&.to_f,
       aporte_socio_ars:        dispensacion.aporte_socio_ars&.to_f,
       costo_por_gramo:         dispensacion.costo_por_gramo&.to_f,
       costo_total_calculado:   dispensacion.costo_total_calculado&.to_f,

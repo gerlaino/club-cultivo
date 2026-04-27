@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import api, { listSedes, getContableDashboard, getTareasDashboard } from '../../lib/api.js'
+import api, { listSedes, getContableDashboard, getTareasDashboard, getInventarioPendiente } from '../../lib/api.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import PlantDistributionChart from '../charts/PlantDistributionChart.vue'
@@ -16,6 +16,7 @@ const sedes    = ref([])
 const contable = ref(null)
 const tareas   = ref(null)
 const loading  = ref(true)
+const stockPendiente = ref(0)
 
 const mostrarOnboarding = computed(() => !loading.value && sedes.value.length === 0)
 
@@ -41,6 +42,8 @@ function formatDate(d) {
 
 const alertas = computed(() => {
   const list = []
+  const sp = stockPendiente.value || 0
+  if (sp > 0) list.push({ level: 'info', icon: 'bi-scissors', msg: `${sp} movimiento${sp !== 1 ? 's' : ''} de manicura pendiente${sp !== 1 ? 's' : ''} de aprobación`, action: { label: 'Revisar stock', to: '/manicura' } })
   const v = stats.value.vencimientos || 0
   if (v > 0) list.push({ level: 'danger', icon: 'bi-patch-exclamation-fill', msg: `${v} paciente${v !== 1 ? 's' : ''} con REPROCANN vencido`, action: { label: 'Ver pacientes', to: '/socios' } })
   const tv = tareas.value?.stats?.vencidas || 0
@@ -69,16 +72,18 @@ function prioMeta(p) { return PRIORIDAD_META[p] || PRIORIDAD_META.normal }
 
 onMounted(async () => {
   try {
-    const [statsRes, sedesRes, contableRes, tareasRes] = await Promise.allSettled([
+    const [statsRes, sedesRes, contableRes, tareasRes, stockRes] = await Promise.allSettled([
       api.get('/stats'),
       listSedes(),
       getContableDashboard(),
       getTareasDashboard(),
+      getInventarioPendiente(),
     ])
     if (statsRes.status    === 'fulfilled') stats.value    = statsRes.value.data
     if (sedesRes.status    === 'fulfilled') sedes.value    = sedesRes.value.data || []
     if (contableRes.status === 'fulfilled') contable.value = contableRes.value.data
     if (tareasRes.status   === 'fulfilled') tareas.value   = tareasRes.value.data
+    if (stockRes.status    === 'fulfilled') stockPendiente.value = (stockRes.value.data || []).length
   } finally {
     loading.value = false
   }
@@ -364,6 +369,7 @@ async function onOnboardingCompletado() {
 
 .ad__alertas { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1.5rem; }
 .ad__alerta { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; border-radius: 10px; font-size: .875rem; font-weight: 500; }
+.ad__alerta--info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #0369a1; }
 .ad__alerta--danger  { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
 .ad__alerta--warning { background: #fffbeb; border: 1px solid #fde68a; color: #b45309; }
 .ad__alerta-icon { font-size: 1rem; flex-shrink: 0; }

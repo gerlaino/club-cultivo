@@ -10,10 +10,23 @@ class Sala < ApplicationRecord
   has_many :notas, as: :noteable, dependent: :destroy
 
   ESTADOS = %w[activa mantenimiento cerrada].freeze
-  KINDS   = %w[vegetativo floracion mixta madre clon].freeze
+  KINDS   = %w[vegetativo floracion mixta madre clon manicura secado].freeze
 
-  validates :nombre,  presence: true, uniqueness: { scope: :club_id }
-  validates :state,   inclusion: { in: ESTADOS }, allow_blank: false
+  validates :nombre, presence: true, uniqueness: { scope: :club_id }
+  validates :state,  inclusion: { in: ESTADOS }, allow_blank: false
+  validate  :manicura_requiere_sede_produccion
+
+  private
+
+  def manicura_requiere_sede_produccion
+    return unless kind == 'manicura'
+    return if sede.nil?
+    unless %w[produccion mixta].include?(sede.tipo)
+      errors.add(:sede, 'La sala de manicura solo puede estar en sedes de producción o mixtas')
+    end
+  end
+
+  public
   validates :pots_count,  numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :plants_max,  numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
 
@@ -27,14 +40,21 @@ class Sala < ApplicationRecord
   end
 
   def porcentaje_ocupacion
-    max = plants_max.to_i > 0 ? plants_max : pots_count.to_i
-    return 0 if max.zero?
-    ((plantas_totales.to_f / max) * 100).round(1)
+    return 0 unless tiene_limite_capacidad?
+    [(plantas_totales.to_f / capacidad_maxima * 100).round(1), 100].min
+  end
+
+  def tiene_limite_capacidad?
+    plants_max.to_i > 0 || pots_count.to_i > 0
+  end
+
+  def capacidad_maxima
+    plants_max.to_i > 0 ? plants_max.to_i : pots_count.to_i
   end
 
   def capacidad_disponible
-    max = plants_max.to_i > 0 ? plants_max : pots_count.to_i
-    [max - plantas_totales, 0].max
+    return Float::INFINITY unless tiene_limite_capacidad?
+    [capacidad_maxima - plantas_totales, 0].max
   end
 
   def created_by_name

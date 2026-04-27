@@ -4,16 +4,18 @@ class Dispensacion < ApplicationRecord
   belongs_to :socio
   belongs_to :user
   belongs_to :indicacion_medica, optional: true
-  belongs_to :lote, optional: true
+  belongs_to :lote,              optional: true
+  belongs_to :sede_inventario,   optional: true
 
   has_one :movimiento_contable, dependent: :nullify
   belongs_to :sede, optional: true
 
-  TIPOS_PRODUCTO = %w[flores aceite extracto crema].freeze
+  TIPOS_PRODUCTO = %w[flores preroll aceite extracto crema otro].freeze
 
-  validates :cantidad_gramos, presence: true, numericality: { greater_than: 0 }
-  validates :tipo_producto, presence: true, inclusion: { in: TIPOS_PRODUCTO }
+  validates :cantidad_gramos,    presence: true, numericality: { greater_than: 0 }
+  validates :tipo_producto,      presence: true, inclusion: { in: TIPOS_PRODUCTO }
   validates :fecha_dispensacion, presence: true
+  validates :porcentaje_descuento, numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 100, allow_nil: true }
   validate :fecha_no_futura
   validate :cupo_mensual_no_excedido, on: :create
 

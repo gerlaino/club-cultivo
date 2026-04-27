@@ -249,6 +249,18 @@ const routes = [
   },
 
   {
+    path: '/manicura',
+    name: 'manicura',
+    component: () => import('../views/ManicuraView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (['admin', 'agricultor'].includes(auth.user?.role)) next()
+      else next('/')
+    },
+  },
+
+  {
     path: '/super-admin',
     component: () => import('../views/superadmin/SuperAdminLayout.vue'),
     meta: { requiresAuth: true },

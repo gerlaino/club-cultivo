@@ -4,7 +4,7 @@
       <div class="spinner-border spinner-border-sm text-primary"></div>
     </div>
     <div v-else-if="salasAsignadas.length === 0" class="text-muted small py-1">
-      <i class="bi bi-house-dash me-1"></i>Sin salas asignadas
+      <i class="bi bi-house-dash me-1"></i>Sin sala asignada
     </div>
     <div v-else class="mb-3">
       <div v-for="sala in salasAsignadas" :key="sala.id"
@@ -15,7 +15,7 @@
             <i class="bi bi-building me-1"></i>{{ sala.sede?.nombre || 'Sin sede' }}
           </div>
         </div>
-        <button v-if="puedeEditar" class="btn btn-sm btn-outline-danger" @click="desasignar(sala)">
+        <button v-if="puedeEditar && !esManicurador" class="btn btn-sm btn-outline-danger" @click="desasignar(sala)">
           <i class="bi bi-x-lg"></i>
         </button>
       </div>
@@ -24,7 +24,7 @@
     <div v-if="puedeEditar">
       <div v-if="!mostrarForm" class="d-grid">
         <button class="btn btn-sm btn-outline-success" @click="abrirForm">
-          <i class="bi bi-plus-lg me-1"></i>Asignar sala
+          <i class="bi bi-plus-lg me-1"></i>{{ esManicurador && salasAsignadas.length > 0 ? 'Cambiar sala' : 'Asignar sala' }}
         </button>
       </div>
 
@@ -46,6 +46,11 @@
           <div v-if="salasDeLaSede.length === 0" class="text-muted small mt-1">No hay salas disponibles en esta sede</div>
         </div>
 
+        <div v-if="esManicurador && salasAsignadas.length > 0" class="alert alert-warning py-2 px-3 small mb-3">
+          <i class="bi bi-info-circle me-1"></i>
+          Esto reemplazará la sala actual ({{ salasAsignadas[0]?.nombre }}).
+        </div>
+
         <div v-if="error" class="text-danger small mb-2">{{ error }}</div>
 
         <div class="d-flex gap-2">
@@ -65,7 +70,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { getUserSalasAsignadas, asignarSalaAUsuario, desasignarSalaAUsuario, listSalas } from '../lib/api.js'
 
-const props = defineProps({ userId: { type: Number, required: true } })
+const props = defineProps({
+  userId:   { type: Number, required: true },
+  userRole: { type: String, default: '' },
+})
 
 const auth             = useAuthStore()
 const salasAsignadas   = ref([])
@@ -78,6 +86,7 @@ const asignando        = ref(false)
 const error            = ref('')
 
 const puedeEditar = computed(() => ['admin', 'agricultor'].includes(auth.user?.role))
+const esManicurador = computed(() => props.userRole === 'manicurador')
 
 const salasNoAsignadas = computed(() => {
   const asignadasIds = new Set(salasAsignadas.value.map(s => s.id))
@@ -85,8 +94,9 @@ const salasNoAsignadas = computed(() => {
 })
 
 const sedesDisponibles = computed(() => {
+  const fuente = esManicurador.value ? todasLasSalas.value : salasNoAsignadas.value
   const map = new Map()
-  salasNoAsignadas.value.forEach(sala => {
+  fuente.forEach(sala => {
     if (sala.sede?.id && !map.has(sala.sede.id)) {
       map.set(sala.sede.id, { id: sala.sede.id, nombre: sala.sede.nombre })
     }
@@ -94,10 +104,11 @@ const sedesDisponibles = computed(() => {
   return Array.from(map.values())
 })
 
-const salasDeLaSede = computed(() =>
-  !sedeSeleccionada.value ? [] :
-    salasNoAsignadas.value.filter(s => s.sede?.id === sedeSeleccionada.value)
-)
+const salasDeLaSede = computed(() => {
+  if (!sedeSeleccionada.value) return []
+  const fuente = esManicurador.value ? todasLasSalas.value : salasNoAsignadas.value
+  return fuente.filter(s => s.sede?.id === sedeSeleccionada.value)
+})
 
 onMounted(async () => {
   loading.value = true
@@ -133,7 +144,11 @@ async function asignar() {
   try {
     await asignarSalaAUsuario(props.userId, salaSeleccionada.value)
     const sala = todasLasSalas.value.find(s => s.id === salaSeleccionada.value)
-    if (sala) salasAsignadas.value.push(sala)
+    if (esManicurador.value) {
+      salasAsignadas.value = sala ? [sala] : []
+    } else {
+      if (sala) salasAsignadas.value.push(sala)
+    }
     cerrarForm()
   } catch (e) {
     error.value = e.response?.data?.error || 'Error al asignar'

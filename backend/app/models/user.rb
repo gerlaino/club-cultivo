@@ -12,14 +12,17 @@ class User < ApplicationRecord
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
   enum role: {
-    super_admin: 'super_admin',
-    admin:       'admin',
-    medico:      'medico',
-    agricultor:  'agricultor',
-    cultivador:  'cultivador',
-    abogado:     'abogado',
-    auditor:     'auditor',
-    socio:       'socio'
+    super_admin:  'super_admin',
+    admin:        'admin',
+    medico:       'medico',
+    agricultor:   'agricultor',
+    cultivador:   'cultivador',
+    abogado:      'abogado',
+    auditor:      'auditor',
+    socio:        'socio',
+    dispensador:  'dispensador',
+    tesorero:     'tesorero',
+    manicurador:  'manicurador',
   }
 
   validates :role,  presence: true

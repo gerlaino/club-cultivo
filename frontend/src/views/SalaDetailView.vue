@@ -5,6 +5,7 @@ import { useSalasStore } from "../stores/salas"
 import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
 import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
+import ModalCargarLote from '../components/salas/ModalCargarLote.vue'
 import { listGeneticas, updateSala } from '../lib/api.js'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 
@@ -24,8 +25,10 @@ const salaId  = Number(route.params.id) || 0
 const loading = ref(true)
 const error   = ref(null)
 
-const canEdit      = computed(() => auth.role === "admin")
-const isCultivador = computed(() => auth.role === "cultivador")
+const canEdit        = computed(() => auth.role === "admin")
+const isCultivador   = computed(() => auth.role === "cultivador")
+const isManicurador  = computed(() => auth.role === "manicurador")
+const isAgricultor   = computed(() => auth.role === "agricultor")
 
 const lotesExpanded = ref(true)
 
@@ -92,7 +95,7 @@ const ESTADO_META = {
 }
 function estadoMeta(e) { return ESTADO_META[e] || { label:e, color:"#64748b", emoji:"📦" } }
 function growLabel(g)  { return { sustrato:"Sustrato", hidroponia:"Hidroponia", aeroponia:"Aeroponia" }[g] || g || "—" }
-function kindLabel(k)  { return { vegetativo:"Vegetativo", floracion:"Floración", mixta:"Mixta", madre:"Madres", clon:"Clones" }[k] || k || "—" }
+function kindLabel(k)  { return { vegetativo:"Vegetativo", floracion:"Floración", mixta:"Mixta", madre:"Madres", clon:"Clones", secado:"Secado", manicura:"Manicura" }[k] || k || "—" }
 
 function salaEstadoStyle(state) {
   return { activa:{bg:"#dcfce7",color:"#15803d"}, mantenimiento:{bg:"#fef3c7",color:"#b45309"}, cerrada:{bg:"#f1f5f9",color:"#64748b"} }[state] || {bg:"#f1f5f9",color:"#64748b"}
@@ -128,10 +131,27 @@ const breadcrumbs = computed(() => {
   return crumbs
 })
 
+// ── Cargar lote (secado / manicura) ────────────────────────
+const showCargarLote = ref(false)
+
+const esSalaSecado   = computed(() => sala.value?.kind === 'secado')
+const esSalaManicura = computed(() => sala.value?.kind === 'manicura')
+const puedeCargarLote = computed(() =>
+  (esSalaSecado.value   && (canEdit.value || isAgricultor.value)) ||
+  (esSalaManicura.value && (canEdit.value || isAgricultor.value || isManicurador.value))
+)
+
+async function onLoteCargado() {
+  await lotes.fetchBySala(salaId)
+  await salas.fetchSala(salaId)
+}
+
 // ── Crear lote ─────────────────────────────────────────────
-const showCreate = ref(false)
-const loteForm   = ref(emptyLoteForm())
-const loteErrors = ref({})
+const showCreate   = ref(false)
+const loteForm     = ref(emptyLoteForm())
+const loteErrors   = ref({})
+const loteApiError = ref(null)
+const showUpgrade  = ref(false)
 
 function emptyLoteForm() {
   return { estado:"vegetativo", plants_count:0, start_date:new Date().toISOString().slice(0,10), genetica_id:"", grow_type:"sustrato", light_type:"", tamanio_maceta:"", notes:"" }
@@ -145,11 +165,11 @@ function validateLote(form) {
   if (!Number.isInteger(n) || n < 0 || n > 5000) {
     e.plants_count = "Debe ser 0–5000"
   } else if (sala.value && n > 0) {
-    const cap = sala.value.plants_max || sala.value.pots_count || 0
-    const actual = sala.value.plantas_totales ?? kpis.value.totalPlantas
-    const disponible = cap - actual
-    if (cap > 0 && n > disponible) {
-      e.plants_count = `La sala solo tiene capacidad para ${disponible} plantas más (cap: ${cap}, actual: ${actual})`
+    // capacidad_disponible es null cuando no hay límite configurado
+    const disp = sala.value.capacidad_disponible
+    if (disp !== null && disp !== undefined && n > disp) {
+      const max = sala.value.plants_max || sala.value.pots_count || 0
+      e.plants_count = `La sala solo tiene capacidad para ${disp} plantas más (máx: ${max})`
     }
   }
   return e
@@ -158,6 +178,7 @@ function validateLote(form) {
 async function createLote() {
   const e = validateLote(loteForm.value)
   loteErrors.value = e
+  loteApiError.value = null
   if (Object.keys(e).length) return
   try {
     const payload = { ...loteForm.value }
@@ -166,21 +187,27 @@ async function createLote() {
     await lotes.createInSala(salaId, payload)
     closeCreate()
     lotesExpanded.value = true
-  } catch {}
+  } catch (err) {
+    if (err.response?.status === 402) {
+      showCreate.value  = false
+      showUpgrade.value = true
+    } else {
+      loteApiError.value = err.response?.data?.errors?.[0] || err.response?.data?.error || 'Error al crear el lote'
+    }
+  }
 }
 function closeCreate() {
-  showCreate.value = false
-  loteForm.value   = emptyLoteForm()
-  loteErrors.value = {}
+  showCreate.value   = false
+  loteForm.value     = emptyLoteForm()
+  loteErrors.value   = {}
+  loteApiError.value = null
 }
 
-// Capacidad disponible para el formulario
+// Usa el valor del API (null = sin límite, número = disponible)
 const capacidadDisponible = computed(() => {
   if (!sala.value) return null
-  const cap = sala.value.plants_max || sala.value.pots_count || 0
-  if (!cap) return null
-  const usadas = sala.value.plantas_totales ?? kpis.value.totalPlantas
-  return cap - usadas
+  // capacidad_disponible viene null del API cuando no hay límite configurado
+  return sala.value.capacidad_disponible ?? null
 })
 </script>
 
@@ -243,7 +270,15 @@ const capacidadDisponible = computed(() => {
             v-if="contextoAsistente"
             :contexto="contextoAsistente"
           />
-          <button v-if="canEdit" class="sd__btn-primary" @click="showCreate = true">
+          <button
+            v-if="puedeCargarLote"
+            class="sd__btn-secondary"
+            @click="showCargarLote = true"
+          >
+            <i class="bi bi-box-arrow-in-down"></i>
+            {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
+          </button>
+          <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="showCreate = true">
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
         </div>
@@ -305,7 +340,11 @@ const capacidadDisponible = computed(() => {
               <div v-else-if="!items.length" class="sd__empty">
                 <div class="sd__empty-icon">📦</div>
                 <p>Esta sala no tiene lotes todavía</p>
-                <button v-if="canEdit" class="sd__btn-outline" @click="showCreate=true">Crear primer lote</button>
+                <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="showCreate=true">Crear primer lote</button>
+                <button v-else-if="puedeCargarLote" class="sd__btn-outline" style="color:#b45309;border-color:#fde68a" @click="showCargarLote=true">
+                  <i class="bi bi-box-arrow-in-down"></i>
+                  {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
+                </button>
               </div>
               <div v-else class="sd__lotes">
                 <RouterLink v-for="l in itemsSorted" :key="l.id" :to="{ name:'lote-detail', params:{ id:l.id } }" class="sd__lote">
@@ -393,7 +432,8 @@ const capacidadDisponible = computed(() => {
             <button class="sd__modal-close" @click="closeCreate"><i class="bi bi-x-lg"></i></button>
           </div>
           <div class="sd__modal-body">
-            <div v-if="lotes.createError" class="sd__alert">{{ lotes.createError }}</div>
+            <div v-if="loteApiError" class="sd__alert">{{ loteApiError }}</div>
+            <div v-else-if="lotes.createError" class="sd__alert">{{ lotes.createError }}</div>
 
             <!-- Alerta de capacidad -->
             <div v-if="capacidadDisponible !== null" class="sd__capacity-bar">
@@ -482,7 +522,7 @@ const capacidadDisponible = computed(() => {
           </div>
           <div class="sd__modal-footer">
             <button class="sd__btn-ghost" :disabled="lotes.creating" @click="closeCreate">Cancelar</button>
-            <button class="sd__btn-primary" :disabled="lotes.creating || capacidadDisponible === 0" @click="createLote">
+            <button class="sd__btn-primary" :disabled="lotes.creating || capacidadDisponible === 0" @click="createLote" :title="capacidadDisponible === 0 ? 'Sala al límite de capacidad' : ''">
               <div v-if="lotes.creating" class="sd__spinner sd__spinner--sm"></div>
               <i v-else class="bi bi-plus-lg"></i>Crear lote
             </button>
@@ -492,6 +532,27 @@ const capacidadDisponible = computed(() => {
     </Teleport>
 
   </div>
+
+  <!-- Modal cargar lote (secado / manicura) -->
+  <ModalCargarLote
+    v-if="showCargarLote && sala"
+    :sala="sala"
+    @loaded="onLoteCargado"
+    @close="showCargarLote = false"
+  />
+
+  <!-- Modal upgrade plan -->
+  <Teleport to="body">
+    <div v-if="showUpgrade" class="sd__overlay" @click.self="showUpgrade=false">
+      <div class="sd__modal" style="max-width:380px;text-align:center;padding:2rem">
+        <div style="font-size:3rem;margin-bottom:.75rem">🚀</div>
+        <h3 class="sd__modal-title" style="margin-bottom:.5rem">Límite del plan alcanzado</h3>
+        <p style="color:#64748b;font-size:.875rem;margin-bottom:1.5rem">Alcanzaste el máximo de lotes o plantas de tu plan. Contactá al equipo para actualizar.</p>
+        <button class="sd__btn-primary" @click="showUpgrade=false">Entendido</button>
+      </div>
+    </div>
+  </Teleport>
+
 </template>
 
 <style scoped>
@@ -607,6 +668,8 @@ const capacidadDisponible = computed(() => {
 .sd__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .sd__btn-primary:hover:not(:disabled) { background: #104417; }
 .sd__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.sd__btn-secondary { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #b45309; border: 1.5px solid #fde68a; padding: .6rem 1.1rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.sd__btn-secondary:hover { background: #fffbeb; border-color: #f59e0b; }
 .sd__btn-ghost { background: transparent; color: #60725d; border: 1px solid #d4e6d4; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 500; cursor: pointer; transition: all .15s; }
 .sd__btn-ghost:hover { background: #f0fdf4; color: #1b5e20; }
 .sd__btn-outline { background: transparent; color: #1b5e20; border: 1.5px solid #d4e6d4; padding: .5rem 1.1rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; }

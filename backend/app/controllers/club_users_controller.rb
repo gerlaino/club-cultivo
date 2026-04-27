@@ -26,6 +26,12 @@ class ClubUsersController < ApplicationController
 
   # POST /usuarios
   def create
+    enforcer = PlanEnforcer.new(current_user.club)
+    unless enforcer.puede_crear_usuario?
+      info = enforcer.info
+      return render json: PlanEnforcer.error_limite('usuarios', info[:limites][:usuarios]), status: :payment_required
+    end
+
     user = User.new(user_params)
     user.club_id = current_user.club_id
     # password temporal para crear el usuario
@@ -75,11 +81,14 @@ class ClubUsersController < ApplicationController
 
   def salas_asignadas
     salas = @user.salas_asignadas.includes(:sede)
-    render json: salas.map { |s| { id: s.id, nombre: s.nombre, sede: s.sede&.nombre } }
+    render json: salas.map { |s| { id: s.id, nombre: s.nombre, sede: s.sede ? { id: s.sede.id, nombre: s.sede.nombre } : nil } }
   end
 
   def asignar_sala
     sala = current_user.club.salas.find(params[:sala_id])
+    if @user.manicurador?
+      @user.sala_cultivadores.destroy_all
+    end
     SalaCultivador.find_or_create_by!(sala: sala, user: @user)
     render json: { message: "Sala asignada correctamente" }
   rescue ActiveRecord::RecordNotFound
