@@ -1,10 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSociosStore } from '../stores/socios'
+import { usePacientesStore } from '../stores/pacientes'
 
 const router = useRouter()
-const store  = useSociosStore()
+const store  = usePacientesStore()
 
 const formError  = ref(null)
 const formErrors = ref({})
@@ -49,7 +49,7 @@ async function handleSubmit() {
     const payload = { ...form.value }
     Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k] })
     const socio = await store.create(payload)
-    router.push({ name: 'socio-detail', params: { id: socio.id } })
+    router.push({ name: 'paciente-detail', params: { id: socio.id } })
   } catch (e) {
     if (e.response?.status === 402) {
       formError.value = e.response.data?.mensaje || 'Límite del plan alcanzado. Contactá al equipo para actualizar.'
@@ -72,7 +72,7 @@ function sugerirVencimiento() {
     <!-- Header -->
     <div class="snv__header">
       <div class="snv__header-left">
-        <RouterLink to="/socios" class="snv__back">
+        <RouterLink to="/pacientes" class="snv__back">
           <i class="bi bi-arrow-left"></i>
           Pacientes
         </RouterLink>
@@ -291,7 +291,7 @@ function sugerirVencimiento() {
             <i v-else class="bi bi-person-plus-fill"></i>
             {{ store.saving ? 'Creando paciente…' : 'Crear paciente' }}
           </button>
-          <RouterLink to="/socios" class="snv__btn-ghost">
+          <RouterLink to="/pacientes" class="snv__btn-ghost">
             Cancelar
           </RouterLink>
         </div>

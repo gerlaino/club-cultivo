@@ -2,6 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { getDocumentos, createDocumento, deleteDocumento } from '../lib/api.js'
+import { useConfirm } from '../composables/useConfirm.js'
+import EmptyState from '../components/ui/EmptyState.vue'
+const { confirm } = useConfirm()
 
 const auth    = useAuthStore()
 const loading = ref(true)
@@ -18,11 +21,10 @@ const docForm = ref({ tipo: '', titulo: '', fecha_vencimiento: '', descripcion: 
 // ── Mapeo rol → tipos permitidos ─────────────────────────
 const TIPOS_POR_ROL = {
   admin:      ['plan_trabajo','reprocann','informe_semestral','contrato','habilitacion','otro'],
-  agricultor: ['plan_trabajo','reprocann','informe_semestral','otro'],
+  cultivador: ['plan_trabajo','reprocann','informe_semestral','otro'],
   medico:     ['indicacion','historia_clinica','consentimiento','certificado','otro'],
   abogado:    ['contrato','habilitacion','poder','acta','otro'],
-  auditor:    [], // solo lectura
-  cultivador: [],
+  auditor:    [],
 }
 
 const DOC_META = {
@@ -124,7 +126,8 @@ async function subirDocumento() {
 }
 
 async function eliminar(doc) {
-  if (!confirm(`¿Eliminás "${doc.titulo}"?`)) return
+  const ok = await confirm({ title: `¿Eliminar "${doc.titulo}"?`, confirmText: 'Eliminar' })
+  if (!ok) return
   try {
     await deleteDocumento(doc.id)
     docs.value = docs.value.filter(d => d.id !== doc.id)
@@ -194,13 +197,17 @@ onMounted(async () => {
     </div>
 
     <!-- Sin resultados -->
-    <div v-else-if="docsFiltrados.length === 0" class="dv__empty">
-      <div class="dv__empty-icon">📭</div>
-      <p>{{ busqueda || filtroTipo ? 'Sin documentos con ese criterio' : 'Sin documentos todavía' }}</p>
-      <button v-if="puedeSubir && !busqueda && !filtroTipo" class="dv__btn-outline" @click="abrirModal">
-        <i class="bi bi-file-earmark-arrow-up"></i> Subir primer documento
-      </button>
-    </div>
+    <EmptyState
+      v-else-if="docsFiltrados.length === 0"
+      icon="📭"
+      :title="busqueda || filtroTipo ? 'Sin documentos con ese criterio' : 'Sin documentos todavía'"
+    >
+      <template #actions>
+        <button v-if="puedeSubir && !busqueda && !filtroTipo" class="dv__btn-outline" @click="abrirModal">
+          <i class="bi bi-file-earmark-arrow-up"></i> Subir primer documento
+        </button>
+      </template>
+    </EmptyState>
 
     <!-- Grid de documentos -->
     <div v-else class="dv__grid">
@@ -356,9 +363,6 @@ onMounted(async () => {
 .dv__spinner { width: 20px; height: 20px; border: 2.5px solid #d4e6d4; border-top-color: #1b5e20; border-radius: 50%; animation: dv-spin .6s linear infinite; }
 .dv__spinner--sm { width: 14px; height: 14px; border-width: 2px; border-color: rgba(255,255,255,.3); border-top-color: #fff; }
 @keyframes dv-spin { to { transform: rotate(360deg); } }
-.dv__empty { text-align: center; padding: 4rem 1rem; color: #60725d; }
-.dv__empty-icon { font-size: 3rem; margin-bottom: .75rem; }
-.dv__empty p { font-size: .95rem; margin: 0 0 1rem; }
 
 /* Grid documentos */
 .dv__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }

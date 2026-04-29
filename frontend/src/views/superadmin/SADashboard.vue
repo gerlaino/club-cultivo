@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logger } from '../../utils/logger.js'
 import { useRouter } from 'vue-router'
 import { getSuperAdminStats } from '../../lib/api.js'
 
@@ -43,7 +44,7 @@ onMounted(async () => {
     const { data } = await getSuperAdminStats()
     stats.value = data
   } catch (e) {
-    console.error(e)
+    logger.error(e)
   } finally {
     loading.value = false
   }

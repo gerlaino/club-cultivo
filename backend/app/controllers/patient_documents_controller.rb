@@ -1,22 +1,22 @@
 class PatientDocumentsController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_socio
+  before_action :set_paciente
   before_action :set_document, only: [:show, :update, :destroy, :firmar, :archivar]
 
-  # GET /socios/:socio_id/documents
+  # GET /pacientes/:paciente_id/documents
   def index
-    docs = @socio.patient_documents
+    docs = @paciente.patient_documents
                  .includes(:created_by, :template)
                  .order(created_at: :desc)
     render json: docs.map { |d| serialize_doc(d) }
   end
 
-  # GET /socios/:socio_id/documents/:id
+  # GET /pacientes/:paciente_id/documents/:id
   def show
     render json: serialize_doc_detail(@doc)
   end
 
-  # POST /socios/:socio_id/documents
+  # POST /pacientes/:paciente_id/documents
   def create
     # Obtener template si se pasa
     template = nil
@@ -29,13 +29,13 @@ class PatientDocumentsController < ApplicationController
     if contenido.present?
       contenido = PatientDocument.interpolar(
         contenido,
-        socio:  @socio,
+        paciente:  @paciente,
         club:   current_user.club,
         medico: current_user
       )
     end
 
-    doc = @socio.patient_documents.build(doc_params)
+    doc = @paciente.patient_documents.build(doc_params)
     doc.club        = current_user.club
     doc.created_by  = current_user
     doc.template    = template
@@ -51,7 +51,7 @@ class PatientDocumentsController < ApplicationController
     end
   end
 
-  # PATCH /socios/:socio_id/documents/:id
+  # PATCH /pacientes/:paciente_id/documents/:id
   def update
     if @doc.update(doc_params)
       render json: serialize_doc_detail(@doc)
@@ -60,13 +60,13 @@ class PatientDocumentsController < ApplicationController
     end
   end
 
-  # DELETE /socios/:socio_id/documents/:id
+  # DELETE /pacientes/:paciente_id/documents/:id
   def destroy
     @doc.destroy
     head :no_content
   end
 
-  # POST /socios/:socio_id/documents/:id/firmar
+  # POST /pacientes/:paciente_id/documents/:id/firmar
   def firmar
     firmante = params[:firmante] # 'paciente' | 'medico'
     firma_data = params[:firma_data]
@@ -76,8 +76,8 @@ class PatientDocumentsController < ApplicationController
     end
 
     if firmante == 'paciente'
-      @doc.firma_paciente_nombre = "#{@socio.nombre} #{@socio.apellido}"
-      @doc.firma_paciente_dni    = @socio.dni
+      @doc.firma_paciente_nombre = "#{@paciente.nombre} #{@paciente.apellido}"
+      @doc.firma_paciente_dni    = @paciente.dni
       @doc.firma_paciente_data   = firma_data
       @doc.firmado_paciente_at   = Time.current
     else
@@ -101,7 +101,7 @@ class PatientDocumentsController < ApplicationController
     end
   end
 
-  # PATCH /socios/:socio_id/documents/:id/archivar
+  # PATCH /pacientes/:paciente_id/documents/:id/archivar
   def archivar
     @doc.update(estado: 'archivado', archivado_at: Time.current)
     render json: serialize_doc(@doc)
@@ -109,14 +109,14 @@ class PatientDocumentsController < ApplicationController
 
   private
 
-  def set_socio
-    @socio = Socio.for_club(current_user.club_id).find(params[:socio_id])
+  def set_paciente
+    @paciente = Paciente.for_club(current_user.club_id).find(params[:paciente_id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Paciente no encontrado' }, status: :not_found
   end
 
   def set_document
-    @doc = @socio.patient_documents.find(params[:id])
+    @doc = @paciente.patient_documents.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Documento no encontrado' }, status: :not_found
   end

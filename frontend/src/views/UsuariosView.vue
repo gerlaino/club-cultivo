@@ -3,6 +3,8 @@ import { ref, computed, onMounted, watch } from "vue"
 import { useRouter } from "vue-router"
 import { useUsuariosStore } from "../stores/usuarios"
 import { listSalas, listSedes } from '../lib/api.js'
+import { useToast } from '../composables/useToast.js'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const router = useRouter()
 const store  = useUsuariosStore()
@@ -10,8 +12,8 @@ const store  = useUsuariosStore()
 const q             = ref("")
 const showModal     = ref(false)
 const editing       = ref(false)
-const toast         = ref(null)
-const toastTimer    = ref(null)
+const toast   = useToast()
+const { confirm } = useConfirm()
 const todasLasSalas = ref([])
 const todasLasSedes = ref([])
 
@@ -23,11 +25,10 @@ const form = ref({
 const ROLES = [
   { value: 'admin',       label: 'Administrador', color: '#dc2626', bg: 'rgba(220,38,38,.1)',    icon: 'bi-shield-fill-check'   },
   { value: 'medico',      label: 'Médico',        color: '#15803d', bg: 'rgba(21,128,61,.1)',    icon: 'bi-heart-pulse-fill'    },
-  { value: 'agricultor',  label: 'Agricultor',    color: '#0369a1', bg: 'rgba(3,105,161,.1)',    icon: 'bi-tree-fill'           },
   { value: 'cultivador',  label: 'Cultivador',    color: '#0891b2', bg: 'rgba(8,145,178,.1)',    icon: 'bi-flower1'             },
-  { value: 'manicurador', label: 'Manicurador',   color: '#7c3aed', bg: 'rgba(124,58,237,.1)',   icon: 'bi-scissors'            },
+  { value: 'manicura',    label: 'Manicura',      color: '#7c3aed', bg: 'rgba(124,58,237,.1)',   icon: 'bi-scissors'            },
   { value: 'dispensador', label: 'Dispensador',   color: '#0891b2', bg: 'rgba(8,145,178,.08)',   icon: 'bi-bag-check-fill'      },
-  { value: 'tesorero',    label: 'Tesorero',      color: '#b45309', bg: 'rgba(180,83,9,.1)',     icon: 'bi-coin'                },
+  { value: 'delivery',    label: 'Delivery',      color: '#f59e0b', bg: 'rgba(245,158,11,.1)',   icon: 'bi-bicycle'             },
   { value: 'abogado',     label: 'Abogado',       color: '#92400e', bg: 'rgba(146,64,14,.1)',    icon: 'bi-briefcase-fill'      },
   { value: 'auditor',     label: 'Auditor',       color: '#475569', bg: 'rgba(71,85,105,.1)',    icon: 'bi-clipboard-data-fill' },
   { value: 'socio',       label: 'Socio',         color: '#64748b', bg: 'rgba(100,116,139,.1)',  icon: 'bi-person-badge-fill'   },
@@ -68,11 +69,6 @@ const salasDeLaSede = computed(() =>
   )
 )
 
-function showToast(type, msg) {
-  clearTimeout(toastTimer.value)
-  toast.value = { type, msg }
-  toastTimer.value = setTimeout(() => toast.value = null, 3500)
-}
 
 onMounted(() => store.fetch())
 
@@ -104,28 +100,29 @@ async function save() {
     if (editing.value && form.value.id) {
       await store.update(form.value.id, payload)
       showModal.value = false
-      showToast('success', 'Usuario actualizado correctamente.')
+      toast.success('Usuario actualizado correctamente.')
     } else {
       const nuevo = await store.create(payload)
       showModal.value = false
-      showToast('success', 'Usuario creado. La contraseña inicial es 123456Aa.')
+      toast.success('Usuario creado. La contraseña inicial es 123456Aa.')
     }
   } catch (e) {
     if (e.response?.status === 402) {
-      showToast('error', e.response.data?.mensaje || 'Límite del plan alcanzado. Contactá al equipo.')
+      toast.error(e.response.data?.mensaje || 'Límite del plan alcanzado. Contactá al equipo.')
     } else {
-      showToast('error', store.error || 'Error al guardar.')
+      toast.error(store.error || 'Error al guardar.')
     }
   }
 }
 
 async function removeOne(u) {
-  if (!confirm(`¿Eliminar a ${u.first_name || ''} ${u.last_name || ''}?\nEsta acción no se puede deshacer.`)) return
+  const ok = await confirm({ title: `¿Eliminar a ${u.first_name || ''} ${u.last_name || ''}?`, message: 'Esta acción no se puede deshacer.', confirmText: 'Eliminar' })
+  if (!ok) return
   try {
     await store.remove(u.id)
-    showToast('success', 'Usuario eliminado.')
+    toast.success('Usuario eliminado.')
   } catch {
-    showToast('error', store.error || 'No se pudo eliminar.')
+    toast.error(store.error || 'No se pudo eliminar.')
   }
 }
 
@@ -142,14 +139,6 @@ watch(showModal, async (val) => {
 
 <template>
   <div class="uv">
-
-    <!-- Toast -->
-    <Transition name="uv-toast">
-      <div v-if="toast" class="uv__toast" :class="`uv__toast--${toast.type}`">
-        <i :class="toast.type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-triangle-fill'"></i>
-        {{ toast.msg }}
-      </div>
-    </Transition>
 
     <!-- Header -->
     <div class="uv__header">
@@ -292,8 +281,8 @@ watch(showModal, async (val) => {
                 </div>
               </div>
 
-              <!-- Sala para cultivador / manicurador -->
-              <template v-if="['cultivador', 'manicurador'].includes(form.role)">
+              <!-- Sala para cultivador / manicura -->
+              <template v-if="['cultivador', 'manicura'].includes(form.role)">
                 <div class="uv__field uv__field--full">
                   <label class="uv__label">Sede</label>
                   <select class="uv__input" v-model="form.sede_id" @change="form.sala_id = ''">
@@ -312,8 +301,8 @@ watch(showModal, async (val) => {
                     </option>
                   </select>
                   <span class="uv__hint">
-                    {{ form.role === 'manicurador'
-                      ? 'El manicurador trabaja en una única sala. Podés cambiarla desde su perfil.'
+                    {{ form.role === 'manicura'
+                      ? 'La manicura trabaja en una única sala. Podés cambiarla desde su perfil.'
                       : 'Podés asignar más salas desde el perfil del cultivador.' }}
                   </span>
                 </div>
@@ -342,19 +331,6 @@ watch(showModal, async (val) => {
 .uv { padding: 2rem 1.75rem 3rem; max-width: 1280px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #0f172a; }
 @media (max-width: 768px) { .uv { padding: 1.25rem 1rem 2rem; } }
 
-/* Toast */
-.uv__toast {
-  position: fixed; top: 1.25rem; right: 1.25rem; z-index: 9999;
-  display: flex; align-items: center; gap: .6rem;
-  padding: .875rem 1.25rem; border-radius: 12px;
-  font-size: .875rem; font-weight: 500;
-  box-shadow: 0 8px 24px rgba(0,0,0,.15);
-  max-width: 380px;
-}
-.uv__toast--success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
-.uv__toast--error   { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
-.uv-toast-enter-active, .uv-toast-leave-active { transition: all .25s ease; }
-.uv-toast-enter-from, .uv-toast-leave-to { opacity: 0; transform: translateY(-10px); }
 
 /* Header */
 .uv__header { display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; margin-bottom: 2rem; flex-wrap: wrap; }

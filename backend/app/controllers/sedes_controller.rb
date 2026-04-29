@@ -5,14 +5,13 @@ class SedesController < ApplicationController
 
   def index
     sedes = case current_user.role
-            when 'cultivador', 'manicurador'
+            when 'cultivador', 'manicura'
               salas_ids = current_user.salas_ids_asignadas
               sede_ids  = Sala.where(id: salas_ids).pluck(:sede_id).compact.uniq
               current_user.club.sedes.activas.where(id: sede_ids)
-            when 'agricultor'
+            when 'dispensador'
               asignadas = current_user.sedes_asignadas.activas
-              asignadas = current_user.club.sedes.activas.produccion if asignadas.empty?
-              asignadas
+              asignadas.any? ? asignadas : current_user.club.sedes.activas.where(tipo: %w[social mixta])
             else
               current_user.club.sedes.activas
             end
@@ -78,7 +77,7 @@ class SedesController < ApplicationController
     item.precio_por_unidad = params[:precio_por_unidad].presence&.to_d || item.precio_por_unidad
     item.stock_gramos      = stock_anterior + cantidad
 
-    es_manicurador = current_user.manicurador?
+    es_manicurador = current_user.manicura?
 
     ActiveRecord::Base.transaction do
       item.save!
@@ -186,6 +185,7 @@ class SedesController < ApplicationController
   def serialize_sede(s)
     base = {
       id:                  s.id,
+      club_id:             s.club_id,
       nombre:              s.nombre,
       tipo:                s.tipo,
       tipo_label:          s.tipo_label,
@@ -200,7 +200,7 @@ class SedesController < ApplicationController
       created_at:          s.created_at,
     }
 
-    if current_user.agricultor?
+    if current_user.cultivador?
       base.merge!(serialize_ops(s))
     end
 

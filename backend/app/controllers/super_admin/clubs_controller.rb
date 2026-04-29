@@ -2,7 +2,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan]
 
   def index
-    clubs = Club.all.includes(:users, :socios).order(:created_at)
+    clubs = Club.all.includes(:users, :pacientes).order(:created_at)
     render json: clubs.map { |c| serialize_club(c) }
   end
 
@@ -87,7 +87,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       plan_trial:       c.plan_trial,
       plan_activo_hasta: c.plan_activo_hasta,
       usuarios_count:   c.users.count,
-      pacientes_count:  c.socios.count,
+      pacientes_count:  c.pacientes.count,
       lotes_count:      c.lotes.count,
       created_at:       c.created_at,
     }

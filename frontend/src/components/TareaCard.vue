@@ -106,8 +106,7 @@ const TIPO_LABELS = {
 const puedeEditar = computed(() => {
   const user = authStore.user
   if (!user) return false
-  return user.role === 'admin' || user.role === 'agricultor' ||
-    (user.role === 'cultivador' && props.tarea.asignada_a?.id === user.id)
+  return user.role === 'admin' || user.role === 'cultivador'
 })
 
 function formatFecha(fecha) {

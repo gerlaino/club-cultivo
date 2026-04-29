@@ -90,8 +90,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { getSalaCultivadores, asignarCultivador, desasignarCultivador, listUsers } from '../lib/api.js'
+import { useConfirm } from '../composables/useConfirm.js'
+const { confirm } = useConfirm()
 
 const props = defineProps({
   salaId:     { type: Number, required: true },
@@ -135,7 +138,7 @@ async function cargar() {
     const res = await getSalaCultivadores(props.salaId)
     cultivadores.value = res.data || []
   } catch (e) {
-    console.error(e)
+    logger.error(e)
   } finally {
     loading.value = false
   }
@@ -159,13 +162,14 @@ async function asignar() {
 }
 
 async function desasignar(cultivador) {
-  if (!confirm(`¿Desasignar a ${cultivador.nombre_completo} de esta sala?`)) return
+  const ok = await confirm({ title: `¿Desasignar a ${cultivador.nombre_completo}?`, message: 'Se removerá al cultivador de esta sala.', confirmText: 'Desasignar' })
+  if (!ok) return
   try {
     await desasignarCultivador(props.salaId, cultivador.id)
     await cargar()
     emit('actualizado')
   } catch (e) {
-    console.error(e)
+    logger.error(e)
   }
 }
 

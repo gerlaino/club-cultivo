@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logger } from '../../utils/logger.js'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
-import { getContableDashboard, listSocios, getInformeSemestral } from '../../lib/api.js'
+import { getContableDashboard, listPacientes, getInformeSemestral } from '../../lib/api.js'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -80,14 +81,15 @@ onMounted(async () => {
   try {
     const [contRes, sociosRes, informeRes] = await Promise.all([
       getContableDashboard(),
-      listSocios(),
+      listPacientes({ limite: 200 }),
       getInformeSemestral({ anio: anioActual, semestre: semActual }).catch(() => ({ data: null })),
     ])
     contable.value = contRes.data
-    socios.value   = Array.isArray(sociosRes.data) ? sociosRes.data : []
+    const d = sociosRes.data
+    socios.value = Array.isArray(d) ? d : (d?.data ?? [])
     informe.value  = informeRes.data
   } catch (e) {
-    console.error('LegalDashboard:', e)
+    logger.error('LegalDashboard:', e)
   } finally {
     loading.value = false
   }
@@ -300,7 +302,7 @@ onMounted(async () => {
                 <span class="ld__card-title">REPROCANN por atender</span>
                 <span v-if="sociosAlerta.length" class="ld__badge ld__badge--warn">{{ sociosAlerta.length }}</span>
               </div>
-              <RouterLink to="/socios" class="ld__card-link">Ver todos →</RouterLink>
+              <RouterLink to="/pacientes" class="ld__card-link">Ver todos →</RouterLink>
             </div>
 
             <div v-if="!sociosAlerta.length" class="ld__empty">
@@ -312,7 +314,7 @@ onMounted(async () => {
               <RouterLink
                 v-for="s in sociosAlerta"
                 :key="s.id"
-                :to="`/socios/${s.id}`"
+                :to="`/pacientes/${s.id}`"
                 class="ld__alert-row"
                 :class="s.dias < 0 ? 'ld__alert-row--danger' : s.dias <= 30 ? 'ld__alert-row--warn' : 'ld__alert-row--info'"
               >
@@ -360,7 +362,7 @@ onMounted(async () => {
                 </div>
                 <i class="bi bi-arrow-right ld__action-arrow"></i>
               </RouterLink>
-              <RouterLink to="/socios" class="ld__action">
+              <RouterLink to="/pacientes" class="ld__action">
                 <div class="ld__action-icon" style="background:rgba(124,58,237,.08);color:#7c3aed">
                   <i class="bi bi-people"></i>
                 </div>

@@ -11,9 +11,11 @@ class Sala < ApplicationRecord
 
   ESTADOS = %w[activa mantenimiento cerrada].freeze
   KINDS   = %w[vegetativo floracion mixta madre clon manicura secado].freeze
+  TIPOS   = %w[cultivo vegetativo floracion secado curado madre clones].freeze
 
   validates :nombre, presence: true, uniqueness: { scope: :club_id }
   validates :state,  inclusion: { in: ESTADOS }, allow_blank: false
+  validates :tipo,   inclusion: { in: TIPOS }, allow_blank: true
   validate  :manicura_requiere_sede_produccion
 
   private
@@ -30,10 +32,38 @@ class Sala < ApplicationRecord
   validates :pots_count,  numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :plants_max,  numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
 
-  enum state: { activa: "activa", mantenimiento: "mantenimiento", cerrada: "cerrada" }, _prefix: true
+  enum :state, { activa: "activa", mantenimiento: "mantenimiento", cerrada: "cerrada" }, prefix: true
 
-  scope :activas,        -> { where(state: 'activa') }
-  scope :en_mantenimiento, -> { where(state: 'mantenimiento') }
+  scope :activas,           -> { where(state: 'activa') }
+  scope :en_mantenimiento,  -> { where(state: 'mantenimiento') }
+  scope :de_tipo,           ->(t) { where(tipo: t) }
+
+  def self.find_or_create_proceso!(sede:, tipo:, created_by: nil)
+    sala = joins(:sede).where(sede: sede, tipo: tipo).where.not(state: 'cerrada').first
+    return sala if sala
+
+    created_by ||= sede.club.users.find_by(role: 'admin') || sede.club.users.first
+
+    nombre_base = "#{tipo.to_s.titleize} · #{sede.nombre}"
+    nombre = nombre_base
+    n = 2
+    while sede.club.salas.exists?(nombre: nombre)
+      nombre = "#{nombre_base} (#{n})"
+      n += 1
+    end
+
+    create!(
+      nombre:     nombre,
+      tipo:       tipo,
+      kind:       tipo,
+      state:      'activa',
+      club:       sede.club,
+      sede:       sede,
+      created_by: created_by,
+      plants_max: 50,
+      pots_count: 50,
+    )
+  end
 
   def plantas_totales
     lotes.sum(:plants_count)

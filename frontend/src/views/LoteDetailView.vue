@@ -1,21 +1,32 @@
 <script setup>
 import { onMounted, ref, computed } from "vue"
+import { logger } from '../utils/logger.js'
 import { useRoute } from "vue-router"
 import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
-import { listGeneticas, createPlant,
+import { createPlant, updatePlant,
   getRegistrosAmbientales, createRegistroAmbiental,
   getLoteEventos, createLoteEvento,
-  getLoteFotos, uploadFotoLote } from "../lib/api"
+  getLoteFotos, uploadFotoLote,
+  transicionarLote, cerrarCurado, getLoteTimeline,
+  listSedes, getSedeStocks } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 import GraficosLote from '../components/GraficosLote.vue'
+import Breadcrumb from '../components/ui/Breadcrumb.vue'
+import EmptyState from '../components/ui/EmptyState.vue'
+import Lightbox from '../components/ui/Lightbox.vue'
+import Paginator from '../components/ui/Paginator.vue'
+import { useToast } from '../composables/useToast.js'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const route    = useRoute()
 const lotes    = useLotesStore()
 const plants   = usePlantsStore()
 const auth     = useAuthStore()
+const toast    = useToast()
+const { confirm } = useConfirm()
 
 const id            = Number(route.params.id)
 const error         = ref(null)
@@ -32,14 +43,19 @@ const fotosExpanded     = ref(false)
 const fotos             = ref([])
 const uploadingFoto     = ref(false)
 const fotoInput         = ref(null)
+const lightboxOpen      = ref(false)
+const lightboxIndex     = ref(0)
+const lightboxImages    = computed(() => fotos.value.map(f => ({ src: f.url, alt: f.filename })))
+function openLightbox(i) { lightboxIndex.value = i; lightboxOpen.value = true }
 
 // ── Plantas ────────────────────────────────────────────────
-const PLANTAS_POR_PAGINA = 5
 const plantasPage        = ref(1)
+const plantasPerPage     = ref(10)
 const plantList          = computed(() => plants.byLote(id))
-const plantasMostradas   = computed(() => plantList.value.slice(0, plantasPage.value * PLANTAS_POR_PAGINA))
-const hayMasplantas      = computed(() => plantList.value.length > plantasMostradas.value.length)
-function cargarMasplantas() { plantasPage.value++ }
+const plantasMostradas   = computed(() => {
+  const start = (plantasPage.value - 1) * plantasPerPage.value
+  return plantList.value.slice(start, start + plantasPerPage.value)
+})
 
 // ── Agregar planta al lote ─────────────────────────────────
 const showAddPlanta    = ref(false)
@@ -163,10 +179,26 @@ function onRegistradoPorVoz() { loadEventos() }
 // ── Historial ─────────────────────────────────────────────
 const eventos        = ref([])
 const loadingEventos = ref(false)
-const showCicloModal = ref(false)
-const savingEvento   = ref(false)
-const eventoError    = ref(null)
-const cicloForm      = ref({ estado_nuevo: '', descripcion: '' })
+
+// ── Transición de fase ────────────────────────────────────
+const showTransicionModal = ref(false)
+const savingTransicion    = ref(false)
+const transicionError     = ref(null)
+const transicionForm      = ref({ peso_humedo_g: null, peso_seco_g: null, manicurado: false, notas: '' })
+
+// ── Cerrar curado ─────────────────────────────────────────
+const showCerrarCuradoModal = ref(false)
+const savingCurado          = ref(false)
+const curadoError           = ref(null)
+const curadoForm            = ref({ peso_curado_g: null, flor_seca: null, descarte: null, sede_destino_id: null, costo_unitario_ars: null, precio_sugerido_ars: null })
+
+// ── Timeline ──────────────────────────────────────────────
+const timelineExpanded = ref(false)
+const timeline         = ref(null)
+const loadingTimeline  = ref(false)
+
+// ── Sedes ─────────────────────────────────────────────────
+const sedes = ref([])
 
 async function loadEventos() {
   loadingEventos.value = true
@@ -191,7 +223,7 @@ async function handleFotoUpload(e) {
     const fd = new FormData(); fd.append('foto', file)
     const { data } = await uploadFotoLote(id, fd)
     fotos.value.unshift(data)
-  } catch (err) { console.error(err) }
+  } catch (err) { logger.error(err); toast.error('Error al subir la foto') }
   finally { uploadingFoto.value = false; if (fotoInput.value) fotoInput.value.value = '' }
 }
 function toggleFotos() {
@@ -199,27 +231,96 @@ function toggleFotos() {
   if (fotosExpanded.value && fotos.value.length === 0) loadFotos()
 }
 
-async function cambiarCiclo() {
-  if (!cicloForm.value.estado_nuevo) return
-  savingEvento.value = true; eventoError.value = null
+function openTransicionModal() {
+  transicionForm.value = { peso_humedo_g: null, peso_seco_g: null, manicurado: false, notas: '' }
+  transicionError.value = null
+  showTransicionModal.value = true
+}
+
+async function ejecutarTransicion() {
+  const faseSig = lote.value?.proxima_fase_posible
+  if (!faseSig) return
+  savingTransicion.value = true; transicionError.value = null
   try {
-    const { data } = await createLoteEvento(id, {
-      tipo: 'cambio_estado', estado_nuevo: cicloForm.value.estado_nuevo, descripcion: cicloForm.value.descripcion
+    const pesada = {}
+    if (faseSig === 'secado') {
+      pesada.peso_humedo_g = transicionForm.value.peso_humedo_g
+      pesada.manicurado    = transicionForm.value.manicurado
+    }
+    if (faseSig === 'curado') pesada.peso_seco_g = transicionForm.value.peso_seco_g
+    if (transicionForm.value.notas) pesada.notas = transicionForm.value.notas
+    const { data } = await transicionarLote(id, { nueva_fase: faseSig, pesada })
+    lotes.current = data
+    showTransicionModal.value = false
+    toast.success(`Lote avanzado a ${em(faseSig).label}`)
+    await loadEventos()
+  } catch (e) {
+    transicionError.value = e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'Error al transicionar'
+  } finally { savingTransicion.value = false }
+}
+
+async function openCerrarCuradoModal() {
+  const sedeId = sedes.value[0]?.id || null
+  curadoForm.value = { peso_curado_g: pesadaUltimaCurado.value?.peso_curado_g || null, flor_seca: null, descarte: null, sede_destino_id: sedeId, costo_unitario_ars: null, precio_sugerido_ars: null }
+  curadoError.value = null
+  showCerrarCuradoModal.value = true
+  if (sedeId) {
+    try {
+      const { data } = await getSedeStocks(sedeId, { canal: 'regulatorio' })
+      const stocks = (data || []).filter(s => s.forma_producto === 'flor_seca' && s.precio_sugerido_ars != null)
+      if (stocks.length) {
+        const ultimo = stocks.reduce((a, b) => (b.id > a.id ? b : a))
+        curadoForm.value.precio_sugerido_ars = parseFloat(ultimo.precio_sugerido_ars)
+      }
+    } catch { /* silencioso — no romper el modal */ }
+  }
+}
+
+async function ejecutarCerrarCurado() {
+  savingCurado.value = true; curadoError.value = null
+  try {
+    const { data } = await cerrarCurado(id, {
+      peso_curado_g: curadoForm.value.peso_curado_g,
+      splitter: { flor_seca: curadoForm.value.flor_seca, descarte: curadoForm.value.descarte },
+      sede_destino_id: curadoForm.value.sede_destino_id,
+      costo_unitario_ars: curadoForm.value.costo_unitario_ars,
+      precio_sugerido_ars: curadoForm.value.precio_sugerido_ars,
     })
-    eventos.value.unshift({ ...data, _tipo: 'evento' })
-    if (lotes.current) lotes.current.estado = cicloForm.value.estado_nuevo
-    showCicloModal.value = false; cicloForm.value = { estado_nuevo: '', descripcion: '' }
-  } catch (e) { eventoError.value = e?.response?.data?.errors?.join(', ') || 'Error' }
-  finally { savingEvento.value = false }
+    lotes.current = data.lote
+    showCerrarCuradoModal.value = false
+    toast.success('Curado cerrado. Stock generado exitosamente.')
+    await loadEventos()
+  } catch (e) {
+    curadoError.value = e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'Error al cerrar curado'
+  } finally { savingCurado.value = false }
+}
+
+function toggleTimeline() {
+  timelineExpanded.value = !timelineExpanded.value
+  if (timelineExpanded.value && !timeline.value) loadTimeline()
+}
+
+async function loadTimeline() {
+  loadingTimeline.value = true
+  try { const { data } = await getLoteTimeline(id); timeline.value = data }
+  catch { timeline.value = null }
+  finally { loadingTimeline.value = false }
+}
+
+async function toggleEsSeleccion(plant) {
+  const original = plant.es_seleccion
+  plant.es_seleccion = !original
+  try { await updatePlant(plant.id, { es_seleccion: !original }) }
+  catch { plant.es_seleccion = original; toast.error('Error al actualizar selección') }
 }
 
 // ── Helpers ────────────────────────────────────────────────
-const CICLO = ["semilla", "vegetativo", "floracion", "cosecha", "curado", "finalizado"]
+const CICLO = ["vegetativo", "floracion", "secado", "curado"]
 const ESTADO_META = {
   semilla:    { label: "Semilla/Esqueje", color: "#64748b", bg: "#f1f5f9", emoji: "🌱" },
   vegetativo: { label: "Vegetativo",      color: "#16a34a", bg: "#dcfce7", emoji: "🍃" },
   floracion:  { label: "Floración",       color: "#d97706", bg: "#fef3c7", emoji: "🌸" },
-  cosecha:    { label: "Cosecha",         color: "#92400e", bg: "#fff7ed", emoji: "✂️"  },
+  secado:     { label: "Secado",          color: "#78350f", bg: "#fef3c7", emoji: "💨" },
   curado:     { label: "Curado",          color: "#2563eb", bg: "#dbeafe", emoji: "🫙" },
   finalizado: { label: "Finalizado",      color: "#1b5e20", bg: "#dcfce7", emoji: "✅" },
 }
@@ -275,10 +376,18 @@ function formatDateTime(d) {
   return isNaN(date.getTime()) ? "—" : date.toLocaleString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
 }
 
-const cicloIndex        = computed(() => lote.value ? CICLO.indexOf(lote.value.estado) : -1)
-const estadosSiguientes = computed(() => {
-  const idx = CICLO.indexOf(lote.value?.estado)
-  return CICLO.filter((_, i) => i > idx)
+const cicloIndex = computed(() => lote.value ? CICLO.indexOf(lote.value.estado) : -1)
+
+const pesadaUltimaCurado = computed(() => {
+  if (!lote.value?.pesadas) return null
+  return [...lote.value.pesadas].reverse().find(p => p.fase_destino === 'curado') || null
+})
+
+const splitOk = computed(() => {
+  const f = curadoForm.value
+  if (!f.peso_curado_g) return false
+  const sum = (parseFloat(f.flor_seca) || 0) + (parseFloat(f.descarte) || 0)
+  return Math.abs(sum - parseFloat(f.peso_curado_g)) < 0.01
 })
 
 onMounted(async () => {
@@ -287,22 +396,19 @@ onMounted(async () => {
   try   { await plants.fetchByLote(id) }
   catch {}
   await loadEventos()
+  try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
 })
 </script>
 
 <template>
   <div class="ld">
 
-    <!-- Breadcrumb -->
-    <nav class="ld__breadcrumb">
-      <RouterLink :to="{ name: 'sedes' }" class="ld__breadcrumb-link">Sedes</RouterLink>
-      <span class="ld__breadcrumb-sep">›</span>
-      <template v-if="lote?.sala">
-        <RouterLink :to="{ name: 'sala-detail', params: { id: lote.sala.id } }" class="ld__breadcrumb-link">{{ lote.sala.nombre }}</RouterLink>
-        <span class="ld__breadcrumb-sep">›</span>
-      </template>
-      <span class="ld__breadcrumb-current">{{ lote?.codigo || `Lote #${id}` }}</span>
-    </nav>
+    <Breadcrumb :items="[
+      { label: 'Sedes', to: { name: 'sedes' } },
+      ...(lote?.sala?.sede ? [{ label: lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: lote.sala.sede.id } } }] : []),
+      ...(lote?.sala ? [{ label: lote.sala.nombre, to: { name: 'sala-detail', params: { id: lote.sala.id } } }] : []),
+      { label: lote?.codigo || `Lote #${id}` },
+    ]" />
 
     <div v-if="loading" class="ld__loading"><div class="ld__spinner"></div><span>Cargando lote…</span></div>
     <div v-else-if="error" class="ld__error">{{ error }}</div>
@@ -331,8 +437,11 @@ onMounted(async () => {
           </p>
         </div>
         <div class="ld__hero-actions">
-          <button v-if="(canEdit) && estadosSiguientes.length > 0" class="ld__btn-ghost-sm" @click="showCicloModal = true">
-            <i class="bi bi-arrow-right-circle"></i>Avanzar ciclo
+          <button v-if="canEdit && lote.puede_cerrar_curado" class="ld__btn-curado" @click="openCerrarCuradoModal">
+            <i class="bi bi-box-seam"></i>Cerrar curado
+          </button>
+          <button v-if="canEdit && lote.puede_transicionar" class="ld__btn-ghost-sm" @click="openTransicionModal">
+            <i class="bi bi-arrow-right-circle"></i>Avanzar fase
           </button>
           <AsistenteVoz
             v-if="contextoAsistente && (canEdit || isCultivador)"
@@ -395,13 +504,11 @@ onMounted(async () => {
             </button>
             <div v-show="plantasExpanded" class="ld__section-body ld__section-body--flush">
               <div v-if="plants.loading" class="ld__placeholder">Cargando plantas…</div>
-              <div v-else-if="!plantList.length" class="ld__empty">
-                <div class="ld__empty-icon">🪴</div>
-                <p>Sin plantas registradas en este lote</p>
-                <button v-if="canEdit || isCultivador" class="ld__btn-outline" @click="openAddPlanta">
-                  <i class="bi bi-plus-lg"></i> Agregar primera planta
-                </button>
-              </div>
+              <EmptyState v-else-if="!plantList.length" icon="🪴" title="Sin plantas" message="Sin plantas registradas en este lote." compact>
+                <template #actions>
+                  <button v-if="canEdit || isCultivador" class="ld__btn-outline" @click="openAddPlanta"><i class="bi bi-plus-lg"></i> Agregar primera planta</button>
+                </template>
+              </EmptyState>
               <div v-else class="ld__plantas">
                 <RouterLink
                   v-for="(p, i) in plantasMostradas" :key="p.id"
@@ -417,18 +524,22 @@ onMounted(async () => {
                   <span class="ld__planta-estado" :style="{ background: pm(p.state).color + '18', color: pm(p.state).color }">
                     {{ pm(p.state).emoji }} {{ pm(p.state).label }}
                   </span>
+                  <button v-if="canEdit || isCultivador" class="ld__planta-sel" :class="{ 'ld__planta-sel--on': p.es_seleccion }"
+                          :title="p.es_seleccion ? 'Quitar de selección' : 'Marcar como selección'"
+                          @click.prevent.stop="toggleEsSeleccion(p)">
+                    <i class="bi" :class="p.es_seleccion ? 'bi-star-fill' : 'bi-star'"></i>
+                  </button>
                   <i class="bi bi-chevron-right ld__planta-arrow"></i>
                 </RouterLink>
 
-                <!-- Ver más -->
-                <div v-if="hayMasplantas" class="ld__ver-mas">
-                  <button class="ld__btn-ver-mas" @click="cargarMasplantas">
-                    Ver {{ Math.min(PLANTAS_POR_PAGINA, plantList.length - plantasMostradas.length) }} más
-                    <i class="bi bi-chevron-down"></i>
-                  </button>
-                  <span class="ld__ver-mas-hint">{{ plantasMostradas.length }} de {{ plantList.length }}</span>
-                </div>
               </div>
+              <Paginator
+                v-if="plantList.length > plantasPerPage"
+                v-model:page="plantasPage"
+                v-model:perPage="plantasPerPage"
+                :total="plantList.length"
+                :pageSizes="[10, 25, 50]"
+              />
             </div>
           </div>
 
@@ -457,10 +568,7 @@ onMounted(async () => {
             </button>
             <div v-show="historialExpanded" class="ld__section-body ld__section-body--flush">
               <div v-if="loadingEventos" class="ld__placeholder">Cargando historial…</div>
-              <div v-else-if="eventos.length === 0" class="ld__empty ld__empty--sm">
-                <div class="ld__empty-icon" style="font-size:1.8rem">📜</div>
-                <p>Sin eventos registrados todavía</p>
-              </div>
+              <EmptyState v-else-if="eventos.length === 0" icon="📜" title="Sin eventos" message="Sin eventos registrados todavía." compact />
               <div v-else class="ld__eventos">
                 <div v-for="e in eventos" :key="e._tipo + e.id" class="ld__evento">
                   <template v-if="e._tipo === 'evento'">
@@ -508,7 +616,78 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- 4. Fotos -->
+          <!-- 4. Timeline del ciclo -->
+          <div class="ld__section ld__section--mt">
+            <button class="ld__section-toggle" @click="toggleTimeline">
+              <div class="ld__section-toggle-left">
+                <span class="ld__section-emoji">📦</span>
+                <span class="ld__section-title">Timeline del ciclo</span>
+                <span v-if="timeline?.pesadas?.length" class="ld__pill">{{ timeline.pesadas.length }} pesadas</span>
+              </div>
+              <i class="bi ld__chevron" :class="timelineExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </button>
+            <div v-show="timelineExpanded" class="ld__section-body">
+              <div v-if="loadingTimeline" class="ld__placeholder">Cargando timeline…</div>
+              <EmptyState v-else-if="!timeline" icon="📦" title="Sin datos de ciclo" compact />
+              <div v-else class="ld__timeline">
+
+                <!-- Pesadas -->
+                <div v-if="timeline.pesadas?.length" class="ld__tl-group">
+                  <div class="ld__tl-group-title">🏋️ Pesadas</div>
+                  <div v-for="p in timeline.pesadas" :key="p.id" class="ld__tl-row">
+                    <div class="ld__tl-fase">
+                      <span class="ld__tl-pill" :style="{ background: em(p.fase_origen).bg, color: em(p.fase_origen).color }">{{ em(p.fase_origen).emoji }} {{ em(p.fase_origen).label }}</span>
+                      <i class="bi bi-arrow-right" style="color:#94a3b8;font-size:.7rem"></i>
+                      <span class="ld__tl-pill" :style="{ background: em(p.fase_destino).bg, color: em(p.fase_destino).color }">{{ em(p.fase_destino).emoji }} {{ em(p.fase_destino).label }}</span>
+                    </div>
+                    <div class="ld__tl-pesos">
+                      <span v-if="p.peso_humedo_g">🌿 húmedo: <strong>{{ p.peso_humedo_g }}g</strong></span>
+                      <span v-if="p.peso_seco_g">
+                        💨 seco: <strong>{{ p.peso_seco_g }}g</strong>
+                        <span v-if="p.peso_humedo_g" class="ld__tl-merma">
+                          ({{ (100 - p.peso_seco_g / p.peso_humedo_g * 100).toFixed(1) }}% merma)
+                        </span>
+                      </span>
+                      <span v-if="p.peso_curado_g">
+                        🫙 curado: <strong>{{ p.peso_curado_g }}g</strong>
+                        <span v-if="p.peso_seco_g" class="ld__tl-merma">
+                          ({{ (100 - p.peso_curado_g / p.peso_seco_g * 100).toFixed(1) }}% merma)
+                        </span>
+                      </span>
+                    </div>
+                    <div class="ld__tl-meta">{{ p.registrado_por }} · {{ formatDate(p.registrado_at) }}</div>
+                  </div>
+                </div>
+
+                <!-- Stocks generados -->
+                <div v-if="timeline.stocks?.length" class="ld__tl-group">
+                  <div class="ld__tl-group-title">🛒 Stocks generados</div>
+                  <div v-for="s in timeline.stocks" :key="s.id" class="ld__tl-row">
+                    <div class="ld__tl-stock-info">
+                      <span class="ld__tl-pill" style="background:#f0fdf4;color:#1b5e20">{{ s.forma_producto || 'flor_seca' }}</span>
+                      <span><strong>{{ s.cantidad }}{{ s.unidad }}</strong></span>
+                      <span v-if="s.precio_sugerido_ars" class="ld__tl-precio">$ {{ s.precio_sugerido_ars }}/{{ s.unidad }}</span>
+                      <span v-if="s.sede_nombre" class="ld__tl-sede">📍 {{ s.sede_nombre }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Dispensaciones -->
+                <div v-if="timeline.dispensaciones?.length" class="ld__tl-group">
+                  <div class="ld__tl-group-title">🧑‍⚕️ Dispensaciones</div>
+                  <div v-for="d in timeline.dispensaciones" :key="d.id" class="ld__tl-row">
+                    <span>{{ d.socio }}</span>
+                    <span><strong>{{ d.cantidad }}{{ d.unidad }}</strong></span>
+                    <span class="ld__tl-meta">{{ formatDate(d.fecha) }}</span>
+                  </div>
+                </div>
+
+                <EmptyState v-if="!timeline.pesadas?.length && !timeline.stocks?.length" icon="📦" title="Sin actividad de ciclo" compact />
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Fotos -->
           <div class="ld__section ld__section--mt">
             <button class="ld__section-toggle" @click="toggleFotos">
               <div class="ld__section-toggle-left">
@@ -526,15 +705,13 @@ onMounted(async () => {
             </button>
             <input ref="fotoInput" type="file" accept="image/*" style="display:none" @change="handleFotoUpload" />
             <div v-show="fotosExpanded" class="ld__section-body">
-              <div v-if="fotos.length === 0" class="ld__empty ld__empty--sm">
-                <div class="ld__empty-icon" style="font-size:2rem">📷</div>
-                <p>Sin fotos todavía</p>
-                <button class="ld__btn-outline" @click="fotoInput?.click()">
-                  <i class="bi bi-camera-fill"></i> Subir primera foto
-                </button>
-              </div>
+              <EmptyState v-if="fotos.length === 0" icon="📷" title="Sin fotos todavía" compact>
+                <template #actions>
+                  <button class="ld__btn-outline" @click="fotoInput?.click()"><i class="bi bi-camera-fill"></i> Subir primera foto</button>
+                </template>
+              </EmptyState>
               <div v-else class="ld__fotos-grid">
-                <div v-for="f in fotos" :key="f.id" class="ld__foto">
+                <div v-for="(f, i) in fotos" :key="f.id" class="ld__foto" @click="openLightbox(i)" style="cursor:pointer">
                   <img :src="f.url" :alt="f.filename" class="ld__foto-img" />
                   <div class="ld__foto-meta">{{ f.created_at_label }}</div>
                 </div>
@@ -743,46 +920,144 @@ onMounted(async () => {
       </div>
     </Teleport>
 
-    <!-- ══ Modal Avanzar Ciclo ══ -->
+    <!-- ══ Modal Avanzar Fase ══ -->
     <Teleport to="body">
-      <div v-if="showCicloModal" class="ld__overlay" @click.self="showCicloModal = false">
+      <div v-if="showTransicionModal" class="ld__overlay" @click.self="showTransicionModal = false">
         <div class="ld__modal" style="max-width:440px">
           <div class="ld__modal-header">
             <div>
-              <h3 class="ld__modal-title">🔄 Avanzar ciclo</h3>
-              <p class="ld__modal-sub">{{ lote?.codigo }} · ahora en {{ em(lote?.estado).label }}</p>
+              <h3 class="ld__modal-title">🔄 Avanzar fase</h3>
+              <p class="ld__modal-sub">
+                {{ lote?.codigo }} · {{ em(lote?.estado).emoji }} {{ em(lote?.estado).label }}
+                <span style="color:#94a3b8"> → </span>
+                {{ em(lote?.proxima_fase_posible).emoji }} {{ em(lote?.proxima_fase_posible).label }}
+              </p>
             </div>
-            <button class="ld__modal-close" @click="showCicloModal = false"><i class="bi bi-x-lg"></i></button>
+            <button class="ld__modal-close" @click="showTransicionModal = false"><i class="bi bi-x-lg"></i></button>
           </div>
           <div class="ld__modal-body">
-            <div v-if="eventoError" class="ld__alert">{{ eventoError }}</div>
-            <div class="ld__field" style="margin-bottom:1rem">
-              <label class="ld__label">Nueva etapa</label>
-              <div class="ld__etapas-selector">
-                <button v-for="etapa in estadosSiguientes" :key="etapa" type="button"
-                        class="ld__etapa-btn"
-                        :class="{ 'ld__etapa-btn--active': cicloForm.estado_nuevo === etapa }"
-                        :style="cicloForm.estado_nuevo === etapa ? { borderColor: em(etapa).color, background: em(etapa).bg, color: em(etapa).color } : {}"
-                        @click="cicloForm.estado_nuevo = etapa">
-                  {{ em(etapa).emoji }} {{ em(etapa).label }}
-                </button>
+            <div v-if="transicionError" class="ld__alert">{{ transicionError }}</div>
+
+            <!-- Peso húmedo + manicurado (floracion → secado) -->
+            <template v-if="lote?.proxima_fase_posible === 'secado'">
+              <div class="ld__field" style="margin-bottom:1rem">
+                <label class="ld__label">Peso húmedo total (g) <span style="color:#dc2626">*</span></label>
+                <input type="number" step="0.1" min="0" class="ld__input" v-model.number="transicionForm.peso_humedo_g" placeholder="ej: 1200.5" />
+                <span class="ld__optional">Peso cosechado fresco antes del secado</span>
               </div>
+              <div class="ld__field" style="margin-bottom:1rem">
+                <label class="ld__toggle">
+                  <input type="checkbox" v-model="transicionForm.manicurado" class="ld__toggle-input" />
+                  <div class="ld__toggle-track"><div class="ld__toggle-thumb"></div></div>
+                  <span class="ld__toggle-label">Manicurado antes del secado</span>
+                </label>
+              </div>
+            </template>
+
+            <!-- Peso seco (secado → curado) -->
+            <div v-if="lote?.proxima_fase_posible === 'curado'" class="ld__field" style="margin-bottom:1rem">
+              <label class="ld__label">Peso seco (g) <span style="color:#dc2626">*</span></label>
+              <input type="number" step="0.1" min="0" class="ld__input" v-model.number="transicionForm.peso_seco_g" placeholder="ej: 350.0" />
+              <span class="ld__optional">Al ingreso del curado</span>
             </div>
+
             <div class="ld__field">
               <label class="ld__label">Notas <span class="ld__optional">opcional</span></label>
-              <textarea class="ld__input ld__textarea" rows="2" v-model="cicloForm.descripcion" placeholder="Motivo del cambio, observaciones..."></textarea>
+              <textarea class="ld__input ld__textarea" rows="2" v-model="transicionForm.notas" placeholder="Observaciones del cambio de fase…"></textarea>
             </div>
           </div>
           <div class="ld__modal-footer">
-            <button class="ld__btn-ghost" @click="showCicloModal = false">Cancelar</button>
-            <button class="ld__btn-primary" :disabled="!cicloForm.estado_nuevo || savingEvento" @click="cambiarCiclo">
-              <div v-if="savingEvento" class="ld__spinner ld__spinner--sm"></div>
-              <i v-else class="bi bi-check-lg"></i>Confirmar
+            <button class="ld__btn-ghost" :disabled="savingTransicion" @click="showTransicionModal = false">Cancelar</button>
+            <button class="ld__btn-primary" :disabled="savingTransicion" @click="ejecutarTransicion">
+              <div v-if="savingTransicion" class="ld__spinner ld__spinner--sm"></div>
+              <i v-else class="bi bi-arrow-right-circle"></i>Avanzar fase
             </button>
           </div>
         </div>
       </div>
     </Teleport>
+
+    <!-- ══ Modal Cerrar Curado ══ -->
+    <Teleport to="body">
+      <div v-if="showCerrarCuradoModal" class="ld__overlay" @click.self="showCerrarCuradoModal = false">
+        <div class="ld__modal" style="max-width:500px">
+          <div class="ld__modal-header">
+            <div>
+              <h3 class="ld__modal-title">🫙 Cerrar curado y generar stock</h3>
+              <p class="ld__modal-sub">{{ lote?.codigo }}</p>
+            </div>
+            <button class="ld__modal-close" @click="showCerrarCuradoModal = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="ld__modal-body">
+            <div v-if="curadoError" class="ld__alert">{{ curadoError }}</div>
+
+            <!-- Peso curado -->
+            <div class="ld__field" style="margin-bottom:1rem">
+              <label class="ld__label">Peso curado (g) <span style="color:#dc2626">*</span></label>
+              <input type="number" step="0.1" min="0" class="ld__input" v-model.number="curadoForm.peso_curado_g" placeholder="ej: 320.0" />
+              <span class="ld__optional">Peso final del producto curado</span>
+            </div>
+
+            <!-- Splitter -->
+            <div class="ld__modal-section-title">Distribución del lote</div>
+            <div class="ld__grid" style="margin-bottom:.5rem">
+              <div class="ld__field">
+                <label class="ld__label">Flor seca (g) <span style="color:#dc2626">*</span></label>
+                <input type="number" step="0.1" min="0" class="ld__input" v-model.number="curadoForm.flor_seca" placeholder="ej: 280.0" />
+              </div>
+              <div class="ld__field">
+                <label class="ld__label">Descarte (g) <span style="color:#dc2626">*</span></label>
+                <input type="number" step="0.1" min="0" class="ld__input" v-model.number="curadoForm.descarte" placeholder="ej: 40.0" />
+              </div>
+            </div>
+            <div class="ld__split-check" :class="splitOk ? 'ld__split-check--ok' : 'ld__split-check--err'">
+              <span v-if="curadoForm.peso_curado_g">
+                Total: {{ ((parseFloat(curadoForm.flor_seca) || 0) + (parseFloat(curadoForm.descarte) || 0)).toFixed(1) }}g
+                / {{ parseFloat(curadoForm.peso_curado_g).toFixed(1) }}g
+                <strong v-if="splitOk"> ✓</strong>
+                <span v-else style="color:#dc2626"> ✗ debe coincidir exactamente</span>
+              </span>
+              <span v-else style="color:#94a3b8">Ingresá el peso curado para validar el splitter</span>
+            </div>
+
+            <!-- Stock -->
+            <div class="ld__modal-section-title">Stock generado (flor seca)</div>
+            <div class="ld__field" style="margin-bottom:1rem">
+              <label class="ld__label">Sede destino <span style="color:#dc2626">*</span></label>
+              <select class="ld__input" v-model="curadoForm.sede_destino_id">
+                <option :value="null" disabled>Seleccioná una sede…</option>
+                <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              </select>
+            </div>
+            <div class="ld__grid">
+              <div class="ld__field">
+                <label class="ld__label">Costo unitario (ARS/g) <span class="ld__optional">opcional</span></label>
+                <input type="number" step="0.01" min="0" class="ld__input" v-model.number="curadoForm.costo_unitario_ars" placeholder="ej: 1200.00" />
+              </div>
+              <div class="ld__field">
+                <label class="ld__label">Precio sugerido (ARS/g) <span class="ld__optional">opcional</span></label>
+                <input type="number" step="0.01" min="0" class="ld__input" v-model.number="curadoForm.precio_sugerido_ars" placeholder="ej: 2500.00" />
+              </div>
+            </div>
+          </div>
+          <div class="ld__modal-footer">
+            <button class="ld__btn-ghost" :disabled="savingCurado" @click="showCerrarCuradoModal = false">Cancelar</button>
+            <button class="ld__btn-primary" :disabled="savingCurado || !splitOk || !curadoForm.sede_destino_id" @click="ejecutarCerrarCurado">
+              <div v-if="savingCurado" class="ld__spinner ld__spinner--sm"></div>
+              <i v-else class="bi bi-box-seam"></i>Cerrar curado
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Lightbox
+      :images="lightboxImages"
+      :index="lightboxIndex"
+      :open="lightboxOpen"
+      @close="lightboxOpen = false"
+      @update:index="lightboxIndex = $event"
+    />
 
   </div>
 </template>
@@ -790,11 +1065,6 @@ onMounted(async () => {
 <style scoped>
 .ld { padding: 1.75rem 1.5rem; max-width: 1200px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; }
 @media (max-width: 640px) { .ld { padding: 1rem; } }
-.ld__breadcrumb { display: flex; align-items: center; gap: .4rem; font-size: .78rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
-.ld__breadcrumb-link { color: #94a3b8; text-decoration: none; }
-.ld__breadcrumb-link:hover { color: #1b5e20; }
-.ld__breadcrumb-sep { color: #cbd5e1; }
-.ld__breadcrumb-current { color: #1a1a1a; font-weight: 600; }
 .ld__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
 .ld__error { padding: 1rem 1.25rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 10px; }
 .ld__spinner { width: 20px; height: 20px; border: 2.5px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: ld-spin .6s linear infinite; flex-shrink: 0; }
@@ -897,10 +1167,6 @@ onMounted(async () => {
 .ld__dl { display: grid; grid-template-columns: auto 1fr; gap: .4rem .75rem; padding: .9rem 1rem; margin: 0; }
 .ld__dl dt { font-size: .75rem; color: #60725d; font-weight: 500; white-space: nowrap; }
 .ld__dl dd { font-size: .8rem; color: #1a1a1a; font-weight: 500; margin: 0; }
-.ld__empty { text-align: center; padding: 2.5rem 1rem; color: #60725d; }
-.ld__empty--sm { padding: 1.5rem 1rem; }
-.ld__empty-icon { font-size: 2.5rem; margin-bottom: .75rem; }
-.ld__empty p { font-size: .875rem; margin: 0 0 .75rem; }
 .ld__placeholder { padding: 1rem 1.1rem; color: #94a3b8; font-size: .875rem; }
 .ld__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .ld__btn-primary:hover { background: #104417; }
@@ -936,4 +1202,29 @@ onMounted(async () => {
 .ld__textarea { resize: vertical; min-height: 60px; }
 .ld__err-msg { font-size: .75rem; color: #dc2626; }
 .ld__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; margin-bottom: 1rem; }
+/* es_seleccion star */
+.ld__planta-sel { background: none; border: none; cursor: pointer; padding: .25rem; border-radius: 5px; color: #d4e6d4; font-size: .85rem; flex-shrink: 0; transition: color .15s; }
+.ld__planta-sel:hover { color: #d97706; }
+.ld__planta-sel--on { color: #d97706; }
+/* Cerrar curado button */
+.ld__btn-curado { display: inline-flex; align-items: center; gap: .35rem; background: #1d4ed8; color: #fff; border: none; padding: .5rem .9rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.ld__btn-curado:hover { background: #1e40af; }
+/* Split validator */
+.ld__split-check { font-size: .8rem; padding: .5rem .75rem; border-radius: 8px; margin-top: .25rem; }
+.ld__split-check--ok { background: #f0fdf4; color: #16a34a; }
+.ld__split-check--err { background: #fef2f2; color: #dc2626; }
+/* Timeline */
+.ld__timeline { display: flex; flex-direction: column; gap: .5rem; padding: .75rem 1.1rem; }
+.ld__tl-group { border: 1px solid #e8f0e9; border-radius: 10px; overflow: hidden; }
+.ld__tl-group-title { font-size: .72rem; font-weight: 800; color: #60725d; text-transform: uppercase; letter-spacing: .05em; padding: .5rem .85rem; background: #f4f8f4; border-bottom: 1px solid #e8f0e9; }
+.ld__tl-row { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .6rem .85rem; border-bottom: 1px solid #f0fdf4; font-size: .8rem; }
+.ld__tl-row:last-child { border-bottom: none; }
+.ld__tl-fase { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.ld__tl-pill { font-size: .68rem; font-weight: 700; padding: .2em .6em; border-radius: 6px; white-space: nowrap; }
+.ld__tl-pesos { display: flex; flex-wrap: wrap; gap: .75rem; color: #374151; font-size: .78rem; }
+.ld__tl-merma { color: #d97706; font-size: .7rem; margin-left: .2rem; }
+.ld__tl-meta { font-size: .7rem; color: #94a3b8; margin-left: auto; white-space: nowrap; }
+.ld__tl-stock-info { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.ld__tl-precio { color: #1b5e20; font-weight: 600; }
+.ld__tl-sede { font-size: .72rem; color: #64748b; }
 </style>

@@ -12,20 +12,20 @@ module Permissions
       dispensaciones: [:index, :show],
       reportes_medicos: [:index, :show]
     },
-    agricultor: {
+    cultivador: {
       plantas: [:index, :show, :create, :update, :destroy],
+      plant_activities: [:index, :create, :destroy],
       lotes: [:index, :show, :create, :update, :destroy],
       salas: [:index, :show, :create, :update, :destroy],
       geneticas: [:index, :show],
       plan_trabajo: [:index, :show, :create, :update],
-      reportes_cultivo: [:index, :show]
-    },
-    cultivador: {
-      plantas: [:index, :show, :update],
-      plant_activities: [:index, :create, :destroy],
-      lotes: [:index, :show],
-      salas: [:index, :show],
-      mediciones: [:index, :create]
+      reportes_cultivo: [:index, :show],
+      mediciones: [:index, :create],
+      dispositivos: [:index, :show, :create, :update, :destroy],
+      lecturas_ambientales: [:index, :show, :create, :destroy],
+      setpoints_fase: [:index, :show, :create, :update, :destroy],
+      reglas_ambientales: [:index, :show, :create, :update, :destroy],
+      alertas: [:index, :show, :update],
     },
     abogado: {
       socios: [:index, :show],
@@ -40,9 +40,11 @@ module Permissions
       trazabilidad: [:index, :show],
       plantas: [:index, :show],
       lotes: [:index, :show],
-      socios: [:index, :show]
+      socios: [:index, :show],
+      lecturas_ambientales: [:index, :show],
+      alertas: [:index, :show],
     },
-    socio: {
+    paciente: {
       mi_perfil: [:show, :update],
       mis_dispensaciones: [:index, :show],
       eventos: [:index, :show]
@@ -52,20 +54,25 @@ module Permissions
       dispensaciones: [:index, :show, :create],
       sede_inventario: [:index, :show],
       socio_notas: [:index, :create],
-    },
-    tesorero: {
-      contabilidad: [:index, :show, :create, :update],
-      movimientos_contables: [:index, :show, :create, :update],
-      informes_financieros: [:index, :show],
-      socios: [:index, :show],
-      dispensaciones: [:index, :show],
       sedes: [:index, :show],
+      tareas: [:index, :show],
     },
-    manicurador: {
+    manicura: {
       sede_inventario: [:index, :show],
       inventario_movimientos: [:index, :show, :create],
       lotes: [:index, :show],
       geneticas: [:index, :show],
+      sedes: [:index, :show],
+      manicura: [:access],
+    },
+    paciente: {
+      mi_perfil: [:show, :update],
+      mis_dispensaciones: [:index, :show],
+      eventos: [:index, :show]
+    },
+    delivery: {
+      dispensaciones: [:index, :show, :create],
+      socios: [:index, :show],
       sedes: [:index, :show],
     }
   }.freeze
@@ -92,10 +99,6 @@ module Permissions
     role == 'medico'
   end
 
-  def agricultor?
-    role == 'agricultor'
-  end
-
   def cultivador?
     role == 'cultivador'
   end
@@ -109,26 +112,30 @@ module Permissions
   end
 
   def socio?
-    role == 'socio'
+    role == 'paciente'
   end
 
   def dispensador?
     role == 'dispensador'
   end
 
-  def tesorero?
-    role == 'tesorero'
+  def manicura?
+    role == 'manicura'
   end
 
-  def manicurador?
-    role == 'manicurador'
+  def paciente?
+    role == 'paciente'
+  end
+
+  def delivery?
+    role == 'delivery'
   end
 
   def super_admin?
     role == 'super_admin'
   end
 
-  def admin_or_agricultor?
-    admin? || agricultor?
+  def admin_or_cultivador?
+    admin? || cultivador?
   end
 end

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { defineStore } from "pinia";
 import {
   listSalas, getSala, createSala, updateSala, deleteSala
@@ -32,7 +33,7 @@ export const useSalasStore = defineStore("salas", {
         const { data } = await listSalas();
         this.items = data || [];
       } catch (e) {
-        console.error("Salas.fetch", e);
+        logger.error("Salas.fetch", e);
         this.error = e?.response?.data?.error || e.message;
       } finally {
         this.loading = false;
@@ -46,7 +47,7 @@ export const useSalasStore = defineStore("salas", {
         this.currentSala = data;
         return data;
       } catch (e) {
-        console.error("Salas.fetchSala", e);
+        logger.error("Salas.fetchSala", e);
         this.error = e?.response?.data?.error || e.message;
         throw e;
       } finally {
@@ -61,7 +62,7 @@ export const useSalasStore = defineStore("salas", {
         this.items = [data, ...this.items];
         return data;
       } catch (e) {
-        console.error("Salas.create", e);
+        logger.error("Salas.create", e);
         this.createError = e?.response?.data?.errors?.join(", ") || "No se pudo crear la sala";
         throw e;
       } finally {
@@ -77,7 +78,7 @@ export const useSalasStore = defineStore("salas", {
         if (this.currentSala?.id === id) this.currentSala = data;
         return data;
       } catch (e) {
-        console.error("Salas.update", e);
+        logger.error("Salas.update", e);
         this.updateError = e?.response?.data?.errors?.join(", ") || "No se pudo actualizar la sala";
         throw e;
       } finally {
@@ -92,7 +93,7 @@ export const useSalasStore = defineStore("salas", {
         this.items = this.items.filter(s => s.id !== id);
         if (this.currentSala?.id === id) this.currentSala = null;
       } catch (e) {
-        console.error("Salas.remove", e);
+        logger.error("Salas.remove", e);
         this.removeError = e?.response?.data?.errors?.join(", ") || "No se pudo eliminar la sala";
         throw e;
       } finally {

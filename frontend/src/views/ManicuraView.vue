@@ -1,6 +1,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { getInventarioPendiente, aprobarMovimiento, rechazarMovimiento } from '../lib/api.js'
+import EmptyState from '../components/ui/EmptyState.vue'
+import { useToast } from '../composables/useToast.js'
+
+const toast = useToast()
 
 const movimientos    = ref([])
 const loading        = ref(true)
@@ -37,7 +41,7 @@ async function aprobar(m) {
     await aprobarMovimiento(m.id)
     await cargar()
   } catch (e) {
-    alert(e.response?.data?.errors?.[0] || 'Error al aprobar')
+    toast.error(e.response?.data?.errors?.[0] || 'Error al aprobar')
   } finally { procesando.value = null }
 }
 
@@ -54,7 +58,7 @@ async function confirmarRechazo() {
     showRechazo.value = false
     await cargar()
   } catch (e) {
-    alert(e.response?.data?.errors?.[0] || 'Error al rechazar')
+    toast.error(e.response?.data?.errors?.[0] || 'Error al rechazar')
   } finally { rechazando.value = false }
 }
 
@@ -89,10 +93,7 @@ onMounted(cargar)
           </div>
         </div>
 
-        <div v-if="!pendientes.length" class="mv__empty">
-          <i class="bi bi-check-circle mv__empty-icon"></i>
-          <p>No hay movimientos pendientes. Todo al día.</p>
-        </div>
+        <EmptyState v-if="!pendientes.length" icon="bi-check-circle" title="Todo al día" message="No hay movimientos pendientes." compact />
 
         <div v-else class="mv__cards">
           <div v-for="m in pendientes" :key="m.id" class="mv__card mv__card--pending">
@@ -136,9 +137,7 @@ onMounted(cargar)
           </div>
         </div>
 
-        <div v-if="!historial.length" class="mv__empty mv__empty--sm">
-          <p>Sin movimientos procesados aún.</p>
-        </div>
+        <EmptyState v-if="!historial.length" icon="bi-clock-history" title="Sin historial" message="Sin movimientos procesados aún." compact />
 
         <div v-else class="mv__table-wrap">
           <table class="mv__table">
@@ -236,10 +235,6 @@ onMounted(cargar)
 .mv__badge--ok     { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
 .mv__badge--danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 
-.mv__empty { text-align: center; padding: 3rem 1rem; color: #94a3b8; }
-.mv__empty--sm { padding: 1.5rem 1rem; }
-.mv__empty-icon { font-size: 2.5rem; display: block; margin-bottom: .75rem; color: #bbf7d0; }
-.mv__empty p { font-size: .875rem; margin: 0; }
 
 .mv__cards { display: flex; flex-direction: column; gap: .75rem; }
 .mv__card { display: flex; align-items: stretch; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; transition: box-shadow .15s; }

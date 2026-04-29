@@ -1,16 +1,13 @@
 Rails.application.routes.draw do
-  # Salud / raíz
   root to: "health#show"
   get "/p/:codigo_qr", to: "public/plantas#show_qr", defaults: { format: :json }
   get  "/up", to: "health#show"
 
-  # Devise
   devise_for :users,
              path: '',
              path_names: { sign_in: 'users/sign_in', sign_out: 'users/sign_out' },
              controllers: { sessions: 'users/sessions' }
 
-  # Rutas públicas (sin autenticación) - ANTES del defaults
   namespace :public, defaults: { format: :json } do
     resource :club, only: [:show], controller: 'club'
     resources :geneticas, only: [:index, :show]
@@ -20,24 +17,21 @@ Rails.application.routes.draw do
     get '/plantas/:codigo_qr', to: 'plantas#show_qr'
   end
 
-  # Rutas protegidas (requieren autenticación)
   defaults format: :json do
     get "/me",             to: "me#show"
     get "/me/movimientos", to: "me#movimientos"
     get "/stats",          to: "stats#show"
 
-    scope '/inventario' do
-      get  'pendiente',      to: 'inventario#pendiente'
-      get  'disponible',     to: 'inventario#disponible'
-      post 'aprobar/:id',    to: 'inventario#aprobar',  as: 'inventario_aprobar'
-      post 'rechazar/:id',   to: 'inventario#rechazar', as: 'inventario_rechazar'
-    end
     post '/asistente/parsear',  to: 'asistente#parsear'
     post '/asistente/ejecutar', to: 'asistente#ejecutar'
 
     resources :salas do
       resources :lotes, only: [:index, :create]
       resources :cultivadores, controller: 'sala_cultivadores', only: [:index, :create, :destroy]
+      resources :notas, only: [:index, :create]
+      resources :lecturas_ambientales, only: [:index, :create, :destroy]
+      get :ambiente, to: 'lecturas_ambientales#ambiente'
+      resources :alertas, only: [:index]
       member do
         post :cargar_lote
       end
@@ -48,23 +42,59 @@ Rails.application.routes.draw do
       resources :registros_ambientales, only: [:index, :create, :destroy]
       resources :lote_eventos,          only: [:index, :create]
       resources :fotos, only: [:index, :create], controller: 'fotos_lote'
+      resources :notas, only: [:index, :create]
+      member do
+        post :transiciones
+        post :cerrar_curado
+        get  :timeline
+      end
     end
+
+    resources :stocks, only: [:index, :create]
 
     resources :plants do
       resources :plant_activities, only: [:index, :create, :destroy]
+      resources :notas, only: [:index, :create]
     end
 
-    resources :socios do
-      resources :notas, controller: "socio_notas", only: [:index, :create]
+    resources :notas, only: [:destroy]
+
+    # Canonical pacientes routes
+    resources :pacientes do
+      resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
       resources :dispensaciones, only: [:index, :create]
+      resources :documents, controller: 'patient_documents' do
+        member do
+          post  :firmar
+          patch :archivar
+        end
+      end
     end
+    resources :paciente_notas, only: [:destroy]
+
+    # Deprecated alias — kept for 1 release, logs warning on every hit
+    resources :socios, controller: 'pacientes', as: :socios_legacy do
+      resources :notas,        controller: "paciente_notas",    only: [:index, :create]
+      resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
+      resources :dispensaciones, only: [:index, :create]
+      resources :documents, controller: 'patient_documents' do
+        member do
+          post  :firmar
+          patch :archivar
+        end
+      end
+    end
+    resources :socio_notas, controller: 'paciente_notas', only: [:destroy], as: :socio_notas_legacy
+
     resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy]
-    resources :socio_notas, only: [:destroy]
     resources :dispensaciones, only: [:show, :update, :destroy]
 
-    # Recursos protegidos para admin
-    resources :geneticas
+    resources :geneticas do
+      member do
+        delete 'fotos/:foto_id', to: 'geneticas#destroy_foto', as: :foto
+      end
+    end
     resources :noticias
     resources :eventos
 
@@ -89,36 +119,13 @@ Rails.application.routes.draw do
       end
     end
 
-    # Templates de documentos (admin)
     resources :document_templates
 
-    # Documentos por paciente
-    resources :socios do
-      resources :documents, controller: 'patient_documents' do
-        member do
-          post  :firmar
-          patch :archivar
-        end
-      end
-      resources :notas, controller: "socio_notas", only: [:index, :create]
-      resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
-      resources :dispensaciones, only: [:index, :create]
-    end
-
-    # Plan info
     resource :plan, only: [:show], controller: 'plan'
-
     resources :documentos, only: [:index, :create, :destroy]
 
-    # Sedes
     resources :sedes do
-      member do
-        get  :inventario
-        post :agregar_stock
-        get  :stock_pendiente
-        post 'aprobar_stock/:movimiento_id',  action: :aprobar_stock
-        post 'rechazar_stock/:movimiento_id', action: :rechazar_stock
-      end
+      resources :stocks, only: [:index]
     end
 
     resources :movimientos_contables, only: [:index, :show, :create, :update, :destroy] do
@@ -132,19 +139,50 @@ Rails.application.routes.draw do
 
     resources :tareas do
       collection do
-        get :dashboard   # GET /api/v1/tareas/dashboard
-        get :kanban      # GET /api/v1/tareas/kanban
+        get :dashboard
+        get :kanban
       end
       member do
-        post :iniciar    # POST /api/v1/tareas/:id/iniciar
-        post :completar  # POST /api/v1/tareas/:id/completar
-        post :cancelar   # POST /api/v1/tareas/:id/cancelar
+        post :iniciar
+        post :completar
+        post :cancelar
       end
     end
 
+    resources :dispositivos do
+      resources :imports, only: [:create], module: :lecturas_ambientales
+      member do
+        post :regenerar_token
+      end
+    end
+
+    resources :setpoints_fase,    only: [:index, :show, :create, :update, :destroy]
+    resources :reglas_ambientales, only: [:index, :show, :create, :update, :destroy]
+    resources :alertas, only: [:index, :show] do
+      member do
+        post :reconocer
+        post :resolver
+      end
+    end
   end
 
-  # Super Admin — gestión global
+  namespace :webhooks do
+    post 'lecturas', to: 'lecturas#create'
+  end
+
+  begin
+    require 'sidekiq/web'
+    Sidekiq::Web.use(Rack::Auth::Basic) do |user, pass|
+      ActiveSupport::SecurityUtils.secure_compare(
+        ::Digest::SHA256.hexdigest(pass),
+        ::Digest::SHA256.hexdigest(ENV.fetch('SIDEKIQ_PASSWORD', 'changeme'))
+      ) && user == 'admin'
+    end if Rails.env.production?
+    mount Sidekiq::Web, at: '/sidekiq'
+  rescue LoadError
+    Rails.logger.warn 'sidekiq/web not available — /sidekiq not mounted'
+  end
+
   namespace :super_admin do
     resources :clubs, only: [:index, :show, :create, :update] do
       member do
@@ -156,27 +194,5 @@ Rails.application.routes.draw do
     get :stats, to: 'stats#show'
   end
 
-  resources :salas do
-    resources :lotes, only: [:index, :create]
-    resources :cultivadores, controller: 'sala_cultivadores', only: [:index, :create, :destroy]
-    resources :notas, only: [:index, :create]
-    member do
-      post :cargar_lote
-    end
-  end
-
-  resources :lotes, only: [:index, :show, :update, :destroy] do
-    # ... existentes ...
-    resources :notas, only: [:index, :create]   # <-- AGREGAR
-  end
-
-  resources :plants do
-    resources :plant_activities, only: [:index, :create, :destroy]
-    resources :notas, only: [:index, :create]   # <-- AGREGAR
-  end
-
-  resources :notas, only: [:destroy]   # <-- AGREGAR (para delete)
-
   get '/p/:codigo_qr', to: 'public/plantas#show_qr', defaults: { format: :json }
-
 end

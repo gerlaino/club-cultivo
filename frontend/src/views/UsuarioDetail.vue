@@ -4,6 +4,9 @@ import { useRoute, useRouter } from "vue-router"
 import { useUsuariosStore } from "../stores/usuarios"
 import { useAuthStore } from "../stores/auth"
 import UsuarioSalasManager from '../components/UsuarioSalasManager.vue'
+import Breadcrumb from '../components/ui/Breadcrumb.vue'
+import { useToast } from '../composables/useToast.js'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -13,8 +16,8 @@ const auth   = useAuthStore()
 const userId  = Number(route.params.id)
 const loading = ref(true)
 const error   = ref(null)
-const toast   = ref(null)
-const toastTimer = ref(null)
+const toast   = useToast()
+const { confirm } = useConfirm()
 
 const u = computed(() => store.current)
 
@@ -24,11 +27,10 @@ const canEdit = computed(() => auth.role === "admin" && !isMe.value)
 const ROLES = [
   { value: "admin",       label: "Administrador", color: "#dc2626", bg: "rgba(220,38,38,.1)",   icon: "bi-shield-fill-check",   desc: "Acceso total al sistema — puede gestionar todos los módulos, usuarios y configuración." },
   { value: "medico",      label: "Médico",        color: "#15803d", bg: "rgba(21,128,61,.1)",   icon: "bi-heart-pulse-fill",    desc: "Gestión de pacientes e indicaciones médicas. Sin acceso a producción." },
-  { value: "agricultor",  label: "Agricultor",    color: "#0369a1", bg: "rgba(3,105,161,.1)",   icon: "bi-tree-fill",           desc: "Gestión de sedes, salas, lotes y plantas. Sin acceso a pacientes." },
-  { value: "cultivador",  label: "Cultivador",    color: "#0891b2", bg: "rgba(8,145,178,.1)",   icon: "bi-flower1",             desc: "Seguimiento de plantas y actividades en sus salas asignadas." },
-  { value: "manicurador", label: "Manicurador",   color: "#7c3aed", bg: "rgba(124,58,237,.1)",  icon: "bi-scissors",            desc: "Registra el peso de cosecha por lote en sus salas asignadas. Requiere aprobación del admin." },
+  { value: "cultivador",  label: "Cultivador",    color: "#0891b2", bg: "rgba(8,145,178,.1)",   icon: "bi-flower1",             desc: "Gestión completa de sedes, salas, lotes y plantas. Sin acceso a pacientes." },
+  { value: "manicura",    label: "Manicura",      color: "#7c3aed", bg: "rgba(124,58,237,.1)",  icon: "bi-scissors",            desc: "Registra el peso de cosecha por lote en sus salas asignadas. Requiere aprobación del admin." },
   { value: "dispensador", label: "Dispensador",   color: "#0891b2", bg: "rgba(8,145,178,.08)",  icon: "bi-bag-check-fill",      desc: "Opera el dispensario: registra entregas a socios y consulta stock disponible." },
-  { value: "tesorero",    label: "Tesorero",      color: "#b45309", bg: "rgba(180,83,9,.1)",    icon: "bi-coin",                desc: "Acceso completo a contabilidad, movimientos e informes financieros del club." },
+  { value: "delivery",    label: "Delivery",      color: "#f59e0b", bg: "rgba(245,158,11,.1)",  icon: "bi-bicycle",             desc: "Gestiona las entregas a domicilio de dispensaciones." },
   { value: "abogado",     label: "Abogado",       color: "#92400e", bg: "rgba(146,64,14,.1)",   icon: "bi-briefcase-fill",      desc: "Acceso a documentos, contabilidad y trazabilidad legal. Solo lectura clínica." },
   { value: "auditor",     label: "Auditor",       color: "#475569", bg: "rgba(71,85,105,.1)",   icon: "bi-clipboard-data-fill", desc: "Lectura de todos los módulos e informes. Sin modificar datos." },
   { value: "socio",       label: "Socio",         color: "#64748b", bg: "rgba(100,116,139,.1)", icon: "bi-person-badge-fill",   desc: "Acceso al portal del socio: su perfil y su historial de dispensaciones." },
@@ -37,11 +39,10 @@ const ROLES = [
 const PERMISOS = {
   admin:       [{ ok: true, label: "Gestión total del sistema" }, { ok: true, label: "Usuarios y configuración" }, { ok: true, label: "Contabilidad y documentos" }, { ok: true, label: "Todos los módulos" }],
   medico:      [{ ok: true, label: "Gestionar pacientes" }, { ok: true, label: "Indicaciones médicas" }, { ok: true, label: "Dispensaciones" }, { ok: false, label: "Gestión de producción" }],
-  agricultor:  [{ ok: true, label: "Sedes y salas" }, { ok: true, label: "Lotes y plantas" }, { ok: true, label: "Genéticas" }, { ok: false, label: "Pacientes y clínico" }],
-  cultivador:  [{ ok: true, label: "Ver salas asignadas" }, { ok: true, label: "Actualizar plantas" }, { ok: true, label: "Registrar actividades" }, { ok: false, label: "Crear lotes o dispensar" }],
-  manicurador: [{ ok: true, label: "Registrar cosecha (pendiente aprobación)" }, { ok: true, label: "Ver lotes en sus salas asignadas" }, { ok: false, label: "Aprobar stock" }, { ok: false, label: "Dispensar o acceder a socios" }],
+  cultivador:  [{ ok: true, label: "Sedes y salas" }, { ok: true, label: "Lotes y plantas" }, { ok: true, label: "Genéticas" }, { ok: false, label: "Pacientes y clínico" }],
+  manicura:    [{ ok: true, label: "Registrar cosecha (pendiente aprobación)" }, { ok: true, label: "Ver lotes en sus salas asignadas" }, { ok: false, label: "Aprobar stock" }, { ok: false, label: "Dispensar o acceder a socios" }],
   dispensador: [{ ok: true, label: "Registrar dispensaciones" }, { ok: true, label: "Consultar socios" }, { ok: true, label: "Ver stock disponible" }, { ok: false, label: "Producción o contabilidad" }],
-  tesorero:    [{ ok: true, label: "Contabilidad completa" }, { ok: true, label: "Movimientos e informes" }, { ok: true, label: "Ver socios y dispensaciones" }, { ok: false, label: "Producción o usuarios" }],
+  delivery:    [{ ok: true, label: "Entregar dispensaciones a domicilio" }, { ok: true, label: "Consultar socios" }, { ok: false, label: "Crear dispensaciones" }, { ok: false, label: "Producción o contabilidad" }],
   abogado:     [{ ok: true, label: "Documentos legales" }, { ok: true, label: "Contabilidad (lectura)" }, { ok: true, label: "Trazabilidad" }, { ok: false, label: "Modificar datos clínicos" }],
   auditor:     [{ ok: true, label: "Lectura completa" }, { ok: true, label: "Contabilidad" }, { ok: false, label: "Crear o modificar datos" }, { ok: false, label: "Gestionar usuarios" }],
   socio:       [{ ok: true, label: "Ver su perfil" }, { ok: true, label: "Ver sus dispensaciones" }, { ok: false, label: "Acceso a producción" }, { ok: false, label: "Acceso a otros módulos" }],
@@ -60,12 +61,6 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-function showToast(type, msg) {
-  clearTimeout(toastTimer.value)
-  toast.value = { type, msg }
-  toastTimer.value = setTimeout(() => toast.value = null, 3500)
-}
-
 // ── Editar rol ────────────────────────────────────────────
 const editingRole = ref(false)
 const newRole     = ref('')
@@ -74,19 +69,22 @@ async function saveRole() {
   try {
     await store.update(userId, { role: newRole.value })
     editingRole.value = false
-    showToast('success', 'Rol actualizado correctamente.')
-  } catch { showToast('error', store.error || 'No se pudo actualizar el rol.') }
+    toast.success('Rol actualizado correctamente.')
+  } catch { toast.error(store.error || 'No se pudo actualizar el rol.') }
 }
 
-// ── Eliminar ──────────────────────────────────────────────
-const showDelete = ref(false)
 async function doDelete() {
+  const ok = await confirm({
+    title: `¿Eliminar a ${u.value?.first_name || ''} ${u.value?.last_name || ''}?`,
+    message: 'Esta acción no se puede deshacer.',
+    confirmText: 'Eliminar',
+  })
+  if (!ok) return
   try {
     await store.remove(userId)
     router.push({ name: 'usuarios' })
   } catch {
-    showToast('error', store.error || 'No se pudo eliminar el usuario.')
-    showDelete.value = false
+    toast.error(store.error || 'No se pudo eliminar el usuario.')
   }
 }
 
@@ -100,20 +98,8 @@ onMounted(async () => {
 <template>
   <div class="ud">
 
-    <!-- Toast -->
-    <Transition name="ud-toast">
-      <div v-if="toast" class="ud__toast" :class="`ud__toast--${toast.type}`">
-        <i :class="toast.type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-triangle-fill'"></i>
-        {{ toast.msg }}
-      </div>
-    </Transition>
-
     <!-- Breadcrumb -->
-    <nav class="ud__breadcrumb">
-      <RouterLink :to="{ name: 'usuarios' }" class="ud__breadcrumb-link">Equipo</RouterLink>
-      <span class="ud__breadcrumb-sep">›</span>
-      <span class="ud__breadcrumb-current">{{ u ? `${u.first_name} ${u.last_name}` : `Usuario #${userId}` }}</span>
-    </nav>
+    <Breadcrumb :items="[{ label: 'Equipo', to: { name: 'usuarios' } }, { label: u ? `${u.first_name} ${u.last_name}` : `Usuario #${userId}` }]" />
 
     <div v-if="loading" class="ud__loading">
       <div class="ud__ring"></div><span>Cargando…</span>
@@ -149,7 +135,7 @@ onMounted(async () => {
           </div>
 
           <div v-if="canEdit" class="ud__hero-actions">
-            <button class="ud__btn-danger-outline" @click="showDelete = true">
+            <button class="ud__btn-danger-outline" @click="doDelete">
               <i class="bi bi-trash"></i> Eliminar
             </button>
           </div>
@@ -217,15 +203,15 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Salas asignadas — cultivador y manicurador -->
-          <div v-if="['cultivador', 'manicurador'].includes(u.role)" class="ud__card ud__card--mt">
+          <!-- Salas asignadas — cultivador y manicura -->
+          <div v-if="['cultivador', 'manicura'].includes(u.role)" class="ud__card ud__card--mt">
             <div class="ud__card-header">
               <div class="ud__card-icon"
-                   :style="u.role === 'manicurador' ? 'background:rgba(124,58,237,.1);color:#7c3aed' : 'background:rgba(8,145,178,.1);color:#0891b2'">
-                <i :class="u.role === 'manicurador' ? 'bi bi-scissors' : 'bi bi-grid-3x3-gap'"></i>
+                   :style="u.role === 'manicura' ? 'background:rgba(124,58,237,.1);color:#7c3aed' : 'background:rgba(8,145,178,.1);color:#0891b2'">
+                <i :class="u.role === 'manicura' ? 'bi bi-scissors' : 'bi bi-grid-3x3-gap'"></i>
               </div>
-              <span class="ud__card-title">{{ u.role === 'manicurador' ? 'Sala asignada' : 'Salas asignadas' }}</span>
-              <span v-if="u.role === 'manicurador'" class="ud__card-hint">
+              <span class="ud__card-title">{{ u.role === 'manicura' ? 'Sala asignada' : 'Salas asignadas' }}</span>
+              <span v-if="u.role === 'manicura'" class="ud__card-hint">
                 Solo verá lotes en cosecha/curado de su sala
               </span>
             </div>
@@ -308,29 +294,6 @@ onMounted(async () => {
 
     </template>
 
-    <!-- Modal eliminar -->
-    <Teleport to="body">
-      <div v-if="showDelete" class="ud__overlay" @click.self="showDelete = false">
-        <div class="ud__modal-delete">
-          <div class="ud__delete-icon">
-            <i class="bi bi-exclamation-triangle-fill"></i>
-          </div>
-          <h3 class="ud__delete-title">¿Eliminar usuario?</h3>
-          <p class="ud__delete-desc">
-            Vas a eliminar a <strong>{{ u?.first_name }} {{ u?.last_name }}</strong>.
-            Esta acción no se puede deshacer — el usuario perderá acceso inmediatamente.
-          </p>
-          <div class="ud__delete-actions">
-            <button class="ud__btn-ghost" @click="showDelete = false">Cancelar</button>
-            <button class="ud__btn-danger" :disabled="store.removing" @click="doDelete">
-              <div v-if="store.removing" class="ud__spinner ud__spinner--white"></div>
-              <i v-else class="bi bi-trash"></i>
-              Eliminar definitivamente
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
   </div>
 </template>
@@ -339,19 +302,8 @@ onMounted(async () => {
 .ud { padding: 2rem 1.75rem 3rem; max-width: 1200px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #0f172a; }
 @media (max-width: 768px) { .ud { padding: 1.25rem 1rem 2rem; } }
 
-/* Toast */
-.ud__toast { position: fixed; top: 1.25rem; right: 1.25rem; z-index: 9999; display: flex; align-items: center; gap: .6rem; padding: .875rem 1.25rem; border-radius: 12px; font-size: .875rem; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.15); max-width: 380px; }
-.ud__toast--success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
-.ud__toast--error   { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
-.ud-toast-enter-active, .ud-toast-leave-active { transition: all .25s ease; }
-.ud-toast-enter-from, .ud-toast-leave-to { opacity: 0; transform: translateY(-10px); }
 
 /* Breadcrumb */
-.ud__breadcrumb { display: flex; align-items: center; gap: .4rem; font-size: .78rem; margin-bottom: 1.5rem; }
-.ud__breadcrumb-link { color: #94a3b8; text-decoration: none; font-weight: 600; }
-.ud__breadcrumb-link:hover { color: #1b5e20; }
-.ud__breadcrumb-sep { color: #cbd5e1; }
-.ud__breadcrumb-current { color: #0f172a; font-weight: 600; }
 
 /* Loading / Error */
 .ud__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
@@ -447,10 +399,4 @@ onMounted(async () => {
 .ud__spinner--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
 
 /* Modal delete */
-.ud__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(4px); }
-.ud__modal-delete { background: #fff; border-radius: 18px; padding: 2.5rem 2rem; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,.18); }
-.ud__delete-icon { width: 60px; height: 60px; border-radius: 50%; background: #fef2f2; color: #dc2626; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
-.ud__delete-title { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0 0 .75rem; letter-spacing: -.03em; }
-.ud__delete-desc { font-size: .875rem; color: #64748b; line-height: 1.6; margin: 0 0 1.75rem; }
-.ud__delete-actions { display: flex; gap: .75rem; justify-content: center; }
 </style>

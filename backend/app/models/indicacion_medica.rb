@@ -1,5 +1,5 @@
 class IndicacionMedica < ApplicationRecord
-  belongs_to :socio
+  belongs_to :paciente
   belongs_to :user # médico que emite
 
   VIAS_ADMINISTRACION = %w[

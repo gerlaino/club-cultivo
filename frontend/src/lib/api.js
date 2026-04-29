@@ -112,27 +112,36 @@ export const uploadClubLogo    = (file) => {
   return api.post("/preferences/logo", form, { headers: { "Content-Type": "multipart/form-data" } });
 };
 
-// -------- SOCIOS --------
-export const listSocios      = (params = {}) => api.get("/socios", { params });
-export const getSocio        = (id) => api.get(`/socios/${id}`);
-export const createSocio     = (payload) => api.post("/socios", { socio: payload });
-export const updateSocio     = (id, payload) => api.put(`/socios/${id}`, { socio: payload });
-export const deleteSocio     = (id) => api.delete(`/socios/${id}`);
-export const listSocioNotas  = (socioId) => api.get(`/socios/${socioId}/notas`);
-export const createSocioNota = (socioId, c) => api.post(`/socios/${socioId}/notas`, { nota: { contenido: c } });
-export const deleteSocioNota = (notaId) => api.delete(`/socio_notas/${notaId}`);
+// -------- PACIENTES --------
+export const listPacientes      = (params = {}) => api.get("/pacientes", { params });
+export const getPaciente        = (id) => api.get(`/pacientes/${id}`);
+export const createPaciente     = (payload) => api.post("/pacientes", { paciente: payload });
+export const updatePaciente     = (id, payload) => api.put(`/pacientes/${id}`, { paciente: payload });
+export const deletePaciente     = (id) => api.delete(`/pacientes/${id}`);
+export const listPacienteNotas  = (pacienteId) => api.get(`/pacientes/${pacienteId}/notas`);
+export const createPacienteNota = (pacienteId, c) => api.post(`/pacientes/${pacienteId}/notas`, { nota: { contenido: c } });
+export const deletePacienteNota = (notaId) => api.delete(`/paciente_notas/${notaId}`);
+// deprecated aliases
+export const listSocios      = listPacientes;
+export const getSocio        = getPaciente;
+export const createSocio     = createPaciente;
+export const updateSocio     = updatePaciente;
+export const deleteSocio     = deletePaciente;
+export const listSocioNotas  = listPacienteNotas;
+export const createSocioNota = createPacienteNota;
+export const deleteSocioNota = deletePacienteNota;
 
 // -------- INDICACIONES MÉDICAS --------
-export const listIndicaciones = (socioId) => api.get(`/socios/${socioId}/indicaciones`);
+export const listIndicaciones = (pacienteId) => api.get(`/pacientes/${pacienteId}/indicaciones`);
 export const getIndicacion = (id) => api.get(`/indicaciones/${id}`);
-export const createIndicacion = (socioId, payload) => api.post(`/socios/${socioId}/indicaciones`, { indicacion_medica: payload });
+export const createIndicacion = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/indicaciones`, { indicacion_medica: payload });
 export const updateIndicacion = (id, payload) => api.put(`/indicaciones/${id}`, { indicacion_medica: payload });
 export const deleteIndicacion = (id) => api.delete(`/indicaciones/${id}`);
 
 // -------- DISPENSACIONES --------
-export const listDispensaciones = (socioId) => api.get(`/socios/${socioId}/dispensaciones`);
+export const listDispensaciones = (pacienteId) => api.get(`/pacientes/${pacienteId}/dispensaciones`);
 export const getDispensacion = (id) => api.get(`/dispensaciones/${id}`);
-export const createDispensacion = (socioId, payload) => api.post(`/socios/${socioId}/dispensaciones`, { dispensacion: payload });
+export const createDispensacion = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/dispensaciones`, { dispensacion: payload });
 export const updateDispensacion = (id, payload) => api.put(`/dispensaciones/${id}`, { dispensacion: payload });
 export const deleteDispensacion = (id) => api.delete(`/dispensaciones/${id}`);
 
@@ -155,14 +164,14 @@ export const updateDocumentTemplate = (id, payload) => api.put(`/document_templa
 export const deleteDocumentTemplate = (id)       => api.delete(`/document_templates/${id}`)
 
 // -------- PATIENT DOCUMENTS --------
-export const listPatientDocuments   = (socioId)  => api.get(`/socios/${socioId}/documents`)
-export const getPatientDocument     = (socioId, id) => api.get(`/socios/${socioId}/documents/${id}`)
-export const uploadPatientDocument  = (socioId, formData) => api.post(`/socios/${socioId}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-export const createPatientDocument  = (socioId, payload) => api.post(`/socios/${socioId}/documents`, { document: payload })
-export const updatePatientDocument  = (socioId, id, payload) => api.put(`/socios/${socioId}/documents/${id}`, { document: payload })
-export const deletePatientDocument  = (socioId, id) => api.delete(`/socios/${socioId}/documents/${id}`)
-export const firmarDocumento        = (socioId, id, payload) => api.post(`/socios/${socioId}/documents/${id}/firmar`, payload)
-export const archivarDocumento      = (socioId, id) => api.patch(`/socios/${socioId}/documents/${id}/archivar`)
+export const listPatientDocuments   = (pacienteId)  => api.get(`/pacientes/${pacienteId}/documents`)
+export const getPatientDocument     = (pacienteId, id) => api.get(`/pacientes/${pacienteId}/documents/${id}`)
+export const uploadPatientDocument  = (pacienteId, formData) => api.post(`/pacientes/${pacienteId}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const createPatientDocument  = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/documents`, { document: payload })
+export const updatePatientDocument  = (pacienteId, id, payload) => api.put(`/pacientes/${pacienteId}/documents/${id}`, { document: payload })
+export const deletePatientDocument  = (pacienteId, id) => api.delete(`/pacientes/${pacienteId}/documents/${id}`)
+export const firmarDocumento        = (pacienteId, id, payload) => api.post(`/pacientes/${pacienteId}/documents/${id}/firmar`, payload)
+export const archivarDocumento      = (pacienteId, id) => api.patch(`/pacientes/${pacienteId}/documents/${id}/archivar`)
 
 // DOCUMENTOS
 export const getDocumentos    = ()         => api.get('/documentos')
@@ -236,6 +245,31 @@ export const getRegistrosAmbientales  = (loteId)          => api.get(`/lotes/${l
 export const createRegistroAmbiental  = (loteId, payload)  => api.post(`/lotes/${loteId}/registros_ambientales`, { registro_ambiental: payload })
 export const deleteRegistroAmbiental  = (loteId, id)       => api.delete(`/lotes/${loteId}/registros_ambientales/${id}`)
 
+// ── Módulo Ambiente ──────────────────────────────────────────────────────────
+export const getSalaAmbiente     = (salaId, params = {}) => api.get(`/salas/${salaId}/ambiente`, { params })
+export const getSalaAlertas      = (salaId)              => api.get(`/salas/${salaId}/alertas`)
+export const listAlertas         = (params = {})         => api.get('/alertas', { params })
+export const getAlerta           = (id)                  => api.get(`/alertas/${id}`)
+export const reconocerAlerta     = (id)                  => api.post(`/alertas/${id}/reconocer`)
+export const resolverAlerta      = (id)                  => api.post(`/alertas/${id}/resolver`)
+
+export const listDispositivos    = ()            => api.get('/dispositivos')
+export const createDispositivo   = (payload)     => api.post('/dispositivos', { dispositivo: payload })
+export const updateDispositivo   = (id, payload) => api.put(`/dispositivos/${id}`, { dispositivo: payload })
+export const deleteDispositivo   = (id)          => api.delete(`/dispositivos/${id}`)
+export const regenerarToken      = (id)          => api.post(`/dispositivos/${id}/regenerar_token`)
+
+export const listReglasAmbientales  = (params = {}) => api.get('/reglas_ambientales', { params })
+export const getReglaAmbiental      = (id)           => api.get(`/reglas_ambientales/${id}`)
+export const createReglaAmbiental   = (payload)      => api.post('/reglas_ambientales', { regla_ambiental: payload })
+export const updateReglaAmbiental   = (id, payload)  => api.put(`/reglas_ambientales/${id}`, { regla_ambiental: payload })
+export const deleteReglaAmbiental   = (id)           => api.delete(`/reglas_ambientales/${id}`)
+
+export const listSetpointsFase   = (params = {}) => api.get('/setpoints_fase', { params })
+export const createSetpointFase  = (payload)     => api.post('/setpoints_fase', { setpoint_fase: payload })
+export const updateSetpointFase  = (id, payload) => api.put(`/setpoints_fase/${id}`, { setpoint_fase: payload })
+export const deleteSetpointFase  = (id)          => api.delete(`/setpoints_fase/${id}`)
+
 export const getLoteEventos    = (loteId)          => api.get(`/lotes/${loteId}/lote_eventos`)
 export const createLoteEvento  = (loteId, payload)  => api.post(`/lotes/${loteId}/lote_eventos`, { lote_evento: payload })
 
@@ -278,5 +312,15 @@ export const createPlantNota = (plantId, payload) => api.post(`/plants/${plantId
 export const deleteNota     = (id)       => api.delete(`/notas/${id}`)
 
 export const getPlantaByQR = (codigoQr) => api.get(`/p/${codigoQr}`)
+
+// ── Lote ciclo productivo ─────────────────────────────────────────────────────
+export const transicionarLote = (loteId, payload) => api.post(`/lotes/${loteId}/transiciones`, payload)
+export const cerrarCurado     = (loteId, payload) => api.post(`/lotes/${loteId}/cerrar_curado`, payload)
+export const getLoteTimeline  = (loteId)          => api.get(`/lotes/${loteId}/timeline`)
+
+// ── Stocks (nuevo modelo) ─────────────────────────────────────────────────────
+export const listStocks      = (params = {})      => api.get('/stocks', { params })
+export const createStock     = (payload)          => api.post('/stocks', { stock: payload })
+export const getSedeStocks   = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/stocks`, { params })
 
 export default api;

@@ -3,7 +3,7 @@ class MovimientoContable < ApplicationRecord
   self.table_name = "movimientos_contables"
 
   belongs_to :club
-  belongs_to :sede,         optional: true
+  belongs_to :sede
   belongs_to :lote,         optional: true
   belongs_to :dispensacion, optional: true
   belongs_to :created_by,   class_name: "User"

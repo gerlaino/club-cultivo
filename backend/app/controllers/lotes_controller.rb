@@ -1,12 +1,12 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_admin_agricultor_o_manicurador
-  before_action :set_lote, only: [:show, :update, :destroy]
+  before_action :require_admin_cultivador_o_manicura
+  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :timeline]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
   # GET /lotes o GET /salas/:sala_id/lotes
   def index
-    lotes = current_user.club.lotes.includes(:sala, :genetica)
+    lotes = current_user.club.lotes.includes(:genetica, sala: :sede)
     lotes = lotes.where(sala_id: @sala.id) if @sala.present?
 
     if current_user.cultivador?
@@ -15,7 +15,7 @@ class LotesController < ApplicationController
       lotes = lotes.where(sala_id: salas_ids)
     end
 
-    if current_user.manicurador?
+    if current_user.manicura?
       salas_ids = current_user.salas_ids_asignadas
       return render json: [] if salas_ids.empty?
       lotes = lotes.where(sala_id: salas_ids, estado: %w[cosecha curado])
@@ -30,7 +30,7 @@ class LotesController < ApplicationController
 
   # GET /lotes/:id
   def show
-    render json: serialize_lote(@lote, include_plants: true)
+    render json: serialize_lote(@lote, include_plants: true, include_cycle_data: true)
   end
 
   # POST /salas/:sala_id/lotes
@@ -115,6 +115,63 @@ class LotesController < ApplicationController
     head :no_content
   end
 
+  # POST /lotes/:id/transiciones
+  def transiciones
+    pesada_attrs   = (params[:pesada] || {}).to_unsafe_h.symbolize_keys
+    pesadas_plantas = (params[:pesadas_plantas] || []).map { |p| p.to_unsafe_h.symbolize_keys }
+    pesada_attrs[:registrado_por] = current_user
+
+    @lote.transicionar!(
+      params[:nueva_fase],
+      pesada_attrs:          pesada_attrs,
+      manicurado:            pesada_attrs.delete(:manicurado).in?([true, 'true', '1']),
+      pesadas_plantas_attrs: pesadas_plantas
+    )
+
+    render json: serialize_lote(@lote.reload)
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /lotes/:id/cerrar_curado
+  def cerrar_curado
+    splitter = params[:splitter]&.to_unsafe_h&.symbolize_keys || {}
+
+    stock = @lote.cerrar_curado!(
+      splitter:            splitter,
+      sede_destino_id:     params[:sede_destino_id],
+      costo_unitario_ars:  params[:costo_unitario_ars],
+      precio_sugerido_ars: params[:precio_sugerido_ars],
+      registrado_por:      current_user,
+      peso_curado_g:       params[:peso_curado_g],
+    )
+
+    render json: { lote: serialize_lote(@lote.reload), stock: serialize_stock_inline(stock) }, status: :created
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # GET /lotes/:id/timeline
+  def timeline
+    pesadas = @lote.pesadas.includes(:registrado_por, pesadas_plantas: :plant).order(registrado_at: :asc)
+    stocks  = @lote.stocks.includes(:sede).order(created_at: :asc)
+    dispensaciones = Dispensacion.joins(:stock).where(stocks: { lote_id: @lote.id }).includes(:paciente, :stock).recientes
+
+    render json: {
+      lote:          serialize_lote(@lote, include_cycle_data: true),
+      pesadas:       pesadas.map { |p| serialize_pesada(p) },
+      stocks:        stocks.map  { |s| serialize_stock_inline(s) },
+      dispensaciones: dispensaciones.map { |d|
+        { id: d.id, socio: "#{d.socio.nombre} #{d.socio.apellido}", fecha: d.fecha_dispensacion,
+          cantidad: d.cantidad.to_f, unidad: d.stock&.unidad, forma_producto: d.stock&.forma_producto }
+      },
+    }
+  end
+
   private
 
   def estado_a_state(estado)
@@ -147,20 +204,56 @@ class LotesController < ApplicationController
     )
   end
 
-  def require_admin_agricultor_o_manicurador
-    unless current_user.admin? || current_user.agricultor? || current_user.cultivador? || current_user.manicurador?
+  def serialize_pesada(p)
+    {
+      id:           p.id,
+      fase_origen:  p.fase_origen,
+      fase_destino: p.fase_destino,
+      peso_humedo_g: p.peso_humedo_g&.to_f,
+      peso_seco_g:   p.peso_seco_g&.to_f,
+      peso_curado_g: p.peso_curado_g&.to_f,
+      manicurado:    p.manicurado,
+      notas:         p.notas,
+      registrado_por: p.registrado_por&.first_name,
+      registrado_at:  p.registrado_at,
+      merma_porcentual: p.merma_porcentual,
+      pesadas_plantas: p.pesadas_plantas.map { |pp|
+        { plant_id: pp.plant_id, nombre: pp.plant.nombre,
+          peso_humedo_g: pp.peso_humedo_g&.to_f, peso_seco_g: pp.peso_seco_g&.to_f }
+      },
+    }
+  end
+
+  def serialize_stock_inline(s)
+    { id: s.id, origen: s.origen, forma_producto: s.forma_producto,
+      unidad: s.unidad, cantidad: s.cantidad.to_f,
+      precio_sugerido_ars: s.precio_sugerido_ars&.to_f, sede_id: s.sede_id }
+  end
+
+  def require_admin_cultivador_o_manicura
+    unless current_user.admin? || current_user.cultivador? || current_user.manicura? || current_user.auditor?
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end
 
-  def serialize_lote(lote, include_plants: false)
+  def serialize_lote(lote, include_plants: false, include_cycle_data: false)
+    idx_ciclo        = Lote::CICLO_FASES.index(lote.estado)
+    proxima_fase     = idx_ciclo ? Lote::CICLO_FASES[idx_ciclo + 1] : nil
+    puede_transicion = idx_ciclo.present? && idx_ciclo < Lote::CICLO_FASES.length - 1
+
     result = {
-      id:                lote.id,
-      sala_id:           lote.sala_id,
-      codigo:            lote.codigo,
-      estado:            lote.estado,
-      start_date:        lote.start_date,
-      plants_count:      lote.plants_count,
+      id:                   lote.id,
+      club_id:              lote.club_id,
+      sala_id:              lote.sala_id,
+      codigo:               lote.codigo,
+      estado:               lote.estado,
+      fase:                 lote.estado,
+      proxima_fase_posible: proxima_fase,
+      puede_transicionar:   puede_transicion,
+      puede_cerrar_curado:  lote.estado == 'curado',
+      start_date:           lote.start_date,
+      plants_count:         lote.plants_count,
+      plantas_seleccion_count: lote.plants.where(es_seleccion: true).count,
       strain:            lote.strain,
       notes:             lote.notes,
       grow_type:         lote.grow_type,
@@ -174,14 +267,21 @@ class LotesController < ApplicationController
       sala: {
         id:     lote.sala.id,
         nombre: lote.sala.nombre,
+        tipo:   lote.sala.tipo,
+        sede:   { id: lote.sala.sede_id, nombre: lote.sala.sede.nombre },
       },
       created_at: lote.created_at,
       updated_at: lote.updated_at,
     }
 
+    if include_cycle_data
+      result[:pesadas] = lote.pesadas.includes(:registrado_por, pesadas_plantas: :plant).map { |p| serialize_pesada(p) }
+      result[:stocks]  = lote.stocks.includes(:sede).map { |s| serialize_stock_inline(s) }
+    end
+
     if include_plants
       result[:plants] = lote.plants.order(:nombre).map { |p|
-        { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, state: p.state }
+        { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, state: p.state, es_seleccion: p.es_seleccion }
       }
     end
 

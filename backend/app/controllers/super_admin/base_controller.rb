@@ -1,9 +1,15 @@
 module SuperAdmin
   class BaseController < ApplicationController
-    include Rails.application.routes.url_helpers
-    skip_before_action :authenticate_user!, raise: false
+    before_action :authenticate_user!
+    before_action :require_super_admin!
 
     private
+
+    def require_super_admin!
+      unless current_user&.super_admin?
+        render json: { error: 'Forbidden — super_admin only' }, status: :forbidden
+      end
+    end
 
     def current_club
       @current_club ||= begin

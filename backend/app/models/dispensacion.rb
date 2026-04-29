@@ -1,63 +1,54 @@
 class Dispensacion < ApplicationRecord
   self.table_name = 'dispensaciones'
 
-  belongs_to :socio
+  belongs_to :paciente
   belongs_to :user
   belongs_to :indicacion_medica, optional: true
-  belongs_to :lote,              optional: true
-  belongs_to :sede_inventario,   optional: true
-
-  has_one :movimiento_contable, dependent: :nullify
+  belongs_to :stock
   belongs_to :sede, optional: true
 
-  TIPOS_PRODUCTO = %w[flores preroll aceite extracto crema otro].freeze
+  has_one :movimiento_contable, dependent: :nullify
 
-  validates :cantidad_gramos,    presence: true, numericality: { greater_than: 0 }
-  validates :tipo_producto,      presence: true, inclusion: { in: TIPOS_PRODUCTO }
+  before_validation { self.fecha_dispensacion ||= Date.current }
+
+  validates :cantidad,           presence: true, numericality: { greater_than: 0 }
   validates :fecha_dispensacion, presence: true
-  validates :porcentaje_descuento, numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 100, allow_nil: true }
-  validate :fecha_no_futura
-  validate :cupo_mensual_no_excedido, on: :create
+  validate  :fecha_no_futura
+  validate  :stock_regulatorio
+  validate  :credito_suficiente, on: :create
 
-  scope :del_mes, ->(fecha = Date.today) {
-    where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month)
-  }
-  scope :del_socio, ->(socio_id) { where(socio_id: socio_id) }
+  scope :del_mes,   ->(fecha = Date.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
+  scope :del_paciente, ->(paciente_id) { where(paciente_id: paciente_id) }
   scope :recientes, -> { order(fecha_dispensacion: :desc, created_at: :desc) }
 
-  # Cupo mensual por socio (en gramos) - puede ser configurable por club
-  CUPO_MENSUAL_GRAMOS = 40.0
-
-  def self.total_dispensado_mes(socio_id, mes = Date.today)
-    del_mes(mes).del_socio(socio_id).sum(:cantidad_gramos)
-  end
-
-  def self.cupo_disponible(socio_id, mes = Date.today)
-    total = total_dispensado_mes(socio_id, mes)
-    CUPO_MENSUAL_GRAMOS - total
-  end
-
-  def cupo_disponible_tras_dispensacion
-    mes = fecha_dispensacion || Date.today
-    total_mes = self.class.total_dispensado_mes(socio_id, mes)
-    self.class::CUPO_MENSUAL_GRAMOS - total_mes - cantidad_gramos.to_f
-  end
+  after_create  :decrementar_stock
+  after_destroy :incrementar_stock
 
   private
 
   def fecha_no_futura
-    if fecha_dispensacion.present? && fecha_dispensacion > Date.today
-      errors.add(:fecha_dispensacion, "no puede ser futura")
+    errors.add(:fecha_dispensacion, 'no puede ser futura') if fecha_dispensacion.present? && fecha_dispensacion > Date.today
+  end
+
+  def stock_regulatorio
+    errors.add(:stock, 'solo se pueden dispensar stocks regulatorios (de lote propio o derivado)') unless stock&.regulatorio?
+  end
+
+  def credito_suficiente
+    return unless paciente_id && aporte_socio_ars.to_d > 0
+    cc = paciente.cuenta_corriente
+    return unless cc
+    if cc.saldo_disponible < aporte_socio_ars.to_d
+      errors.add(:aporte_socio_ars,
+        "supera el crédito disponible del paciente (#{cc.saldo_disponible.to_f.round(2)} ARS disponibles)")
     end
   end
 
-  def cupo_mensual_no_excedido
-    return unless socio_id && cantidad_gramos && fecha_dispensacion
+  def decrementar_stock
+    stock&.decrement!(:cantidad, cantidad)
+  end
 
-    disponible = cupo_disponible_tras_dispensacion
-
-    if disponible < 0
-      errors.add(:cantidad_gramos, "excede el cupo mensual disponible (#{self.class.cupo_disponible(socio_id, fecha_dispensacion).round(2)}g restantes)")
-    end
+  def incrementar_stock
+    stock&.increment!(:cantidad, cantidad)
   end
 end

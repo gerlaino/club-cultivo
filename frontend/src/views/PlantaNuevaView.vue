@@ -1,14 +1,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { createPlant, listLotes, listGeneticas } from '../lib/api.js'
+import { listLotes } from '../lib/api.js'
 import api from '../lib/api.js'
 
 const router = useRouter()
 const route  = useRoute()
 
 const lotes     = ref([])
-const geneticas = ref([])
 const saving    = ref(false)
 const errors    = ref({})
 
@@ -37,7 +36,6 @@ const ORIGEN_META = {
 
 const form = ref({
   lote_id:           route.query.lote_id ? Number(route.query.lote_id) : '',
-  genetica_id:       '',
   state:             'vegetativo',
   origen:            'semilla',
   fecha_germinacion: today,
@@ -116,12 +114,8 @@ async function handleSubmit() {
 }
 
 onMounted(async () => {
-  const [lotesRes, genRes] = await Promise.allSettled([
-    listLotes(),
-    listGeneticas({ activa: true, disponible: true }),
-  ])
-  if (lotesRes.status === 'fulfilled') lotes.value    = lotesRes.value.data
-  if (genRes.status   === 'fulfilled') geneticas.value = genRes.value.data
+  const res = await listLotes().catch(() => null)
+  if (res) lotes.value = res.data
 })
 </script>
 
@@ -172,16 +166,11 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div class="pnv__field pnv__field--full">
-              <label class="pnv__label">Genética <span class="pnv__opt">(opcional)</span></label>
-              <select v-model="form.genetica_id" class="pnv__select">
-                <option value="">Sin genética asignada</option>
-                <option v-for="g in geneticas" :key="g.id" :value="g.id">
-                  {{ g.nombre }}{{ g.registrada_inase ? ' 🏛️' : '' }} — {{ g.tipo }}
-                </option>
-              </select>
-              <div class="pnv__hint" v-if="!geneticas.length">
-                No hay genéticas disponibles para cultivo. Activá alguna en la sección Genéticas.
+            <div class="pnv__field pnv__field--full" v-if="loteSeleccionado?.genetica">
+              <label class="pnv__label">Genética</label>
+              <div class="pnv__hint pnv__hint--ok">
+                <i class="bi bi-diagram-3 me-1"></i>
+                La planta hereda la genética del lote: <strong>{{ loteSeleccionado.genetica?.nombre }}</strong>
               </div>
             </div>
 
@@ -327,9 +316,9 @@ onMounted(async () => {
               <span class="pnv__meta-label">Lote</span>
               <span>{{ loteSeleccionado.codigo }}</span>
             </div>
-            <div v-if="form.genetica_id">
+            <div v-if="loteSeleccionado?.genetica">
               <span class="pnv__meta-label">Genética</span>
-              <span>{{ geneticas.find(g => g.id === Number(form.genetica_id))?.nombre }}</span>
+              <span>{{ loteSeleccionado.genetica?.nombre }}</span>
             </div>
             <div>
               <span class="pnv__meta-label">Origen</span>

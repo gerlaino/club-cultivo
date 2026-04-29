@@ -3,11 +3,13 @@ import { ref, computed, onMounted, watch } from "vue"
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
 import { listSedes }            from "../lib/api"
+import { useConfirm }           from "../composables/useConfirm.js"
 
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
 const sedes   = ref([])
 const canEdit = computed(() => ["admin","abogado"].includes(auth.role))
+const { confirm } = useConfirm()
 
 const vistaActiva   = ref("dashboard")
 const dashboardSede = ref(null)
@@ -183,13 +185,15 @@ async function submitForm() {
   } catch {}
 }
 
-const showDelete = ref(false)
-const toDelete   = ref(null)
-function confirmDelete(m) { toDelete.value = m; showDelete.value = true }
-async function doDelete() {
-  if (!toDelete.value) return
-  await store.remove(toDelete.value.id)
-  showDelete.value = false; toDelete.value = null
+async function confirmDelete(m) {
+  const ok = await confirm({
+    title: '¿Eliminar movimiento?',
+    message: `${m.descripcion} · ${fmt(m.monto_ars)} · ${m.fecha}`,
+    confirmText: 'Eliminar',
+    variant: 'danger',
+  })
+  if (!ok) return
+  await store.remove(m.id)
 }
 
 async function goToPage(p) {
@@ -723,27 +727,6 @@ onMounted(async () => {
       </div>
     </Teleport>
 
-    <!-- ══════════════ MODAL ELIMINAR ══════════════ -->
-    <Teleport to="body">
-      <div v-if="showDelete" class="cv__overlay" @click.self="showDelete = false">
-        <div class="cv__modal cv__modal--sm">
-          <div class="cv__delete-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
-          <h3 class="cv__delete-title">¿Eliminar movimiento?</h3>
-          <p class="cv__delete-desc">
-            <strong>{{ toDelete?.descripcion }}</strong><br>
-            {{ fmt(toDelete?.monto_ars) }} · {{ toDelete?.fecha }}
-          </p>
-          <div v-if="store.removeError" class="cv__alert">{{ store.removeError }}</div>
-          <div class="cv__delete-actions">
-            <button class="cv__btn-ghost" @click="showDelete = false">Cancelar</button>
-            <button class="cv__btn-danger" :disabled="store.removing" @click="doDelete">
-              <div v-if="store.removing" class="cv__spin cv__spin--white"></div>
-              <i v-else class="bi bi-trash"></i> Eliminar
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
   </div>
 </template>
@@ -898,7 +881,6 @@ onMounted(async () => {
 
 .cv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
 .cv__modal { background: #fff; border-radius: 18px; width: 100%; max-width: 620px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.15); display: flex; flex-direction: column; }
-.cv__modal--sm { max-width: 420px; text-align: center; padding: 2.5rem 2rem; }
 .cv__modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.5rem 1.5rem 1.25rem; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: #fff; z-index: 1; }
 .cv__modal-title { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0; }
 .cv__modal-sub { font-size: .78rem; color: #64748b; margin: .2rem 0 0; }
@@ -938,10 +920,6 @@ onMounted(async () => {
 
 .cv__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; margin-bottom: 1rem; }
 
-.cv__delete-icon { width: 56px; height: 56px; border-radius: 50%; background: #fef2f2; color: #dc2626; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.1rem; }
-.cv__delete-title { font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0 0 .65rem; letter-spacing: -.03em; }
-.cv__delete-desc { font-size: .875rem; color: #64748b; line-height: 1.6; margin: 0 0 1.5rem; }
-.cv__delete-actions { display: flex; gap: .65rem; justify-content: center; }
 
 .cv__spin { width: 14px; height: 14px; border: 2px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: cv-spin .6s linear infinite; }
 .cv__spin--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }

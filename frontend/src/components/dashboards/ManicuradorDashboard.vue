@@ -10,7 +10,7 @@
       <div v-if="sala" class="mnd__sala-badge">
         <i class="bi bi-grid-3x3-gap"></i>
         {{ sala.nombre }}
-        <span class="mnd__sala-sede">· {{ sala.sede?.nombre || '' }}</span>
+        <span v-if="sala.sede?.nombre && !sala.nombre.includes(sala.sede.nombre)" class="mnd__sala-sede">· {{ sala.sede.nombre }}</span>
       </div>
     </div>
 

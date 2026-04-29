@@ -1,12 +1,12 @@
 class SuperAdmin::StatsController < SuperAdmin::BaseController
   def show
-    clubs = Club.all.includes(:users, :socios, :lotes)
+    clubs = Club.all.includes(:users, :pacientes, :lotes)
 
     render json: {
       resumen: {
         total_clubs:    clubs.count,
         total_usuarios: User.where.not(role: 'super_admin').count,
-        total_pacientes: Socio.count,
+        total_pacientes: Paciente.count,
         total_plantas:  Plant.count,
         total_lotes:    Lote.count,
       },
@@ -28,7 +28,7 @@ class SuperAdmin::StatsController < SuperAdmin::BaseController
       plan_trial:   c.plan_trial,
       plan_activo_hasta: c.plan_activo_hasta,
       usuarios:     c.users.count,
-      pacientes:    c.socios.count,
+      pacientes:    c.pacientes.count,
       lotes:        c.lotes.count,
       created_at:   c.created_at,
     }

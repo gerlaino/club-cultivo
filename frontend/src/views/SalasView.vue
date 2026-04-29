@@ -4,10 +4,12 @@ import { useSalasStore } from "../stores/salas";
 import { useAuthStore } from "../stores/auth";
 import { listSedes } from "../lib/api";
 import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const salas = useSalasStore();
 const auth  = useAuthStore();
 const sedes = ref([]);
+const { confirm } = useConfirm();
 
 onMounted(async () => {
   if (!salas.items.length) salas.fetch();
@@ -16,7 +18,7 @@ onMounted(async () => {
 });
 
 // ---------- permisos ----------
-const canEdit = computed(() => ["admin","agricultor"].includes(auth.role));
+const canEdit = computed(() => ["admin","cultivador"].includes(auth.role));
 
 // ---------- helpers ----------
 function stateBadgeColor(state) {
@@ -92,6 +94,25 @@ const paginated  = computed(() => sorted.value.slice((page.value-1)*perPage.valu
 
 watch([sorted, perPage], () => { if (page.value > totalPages.value) page.value = 1; });
 
+// ---------- Tabs por tipo ----------
+const KIND_TABS = [
+  { value: '',          emoji: '🏠', label: 'Todas'     },
+  { value: 'vegetativo',emoji: '🍃', label: 'Vegetativo'},
+  { value: 'floracion', emoji: '🌸', label: 'Floración' },
+  { value: 'secado',    emoji: '💨', label: 'Secado'    },
+  { value: 'curado',    emoji: '🫙', label: 'Curado'    },
+  { value: 'mixta',     emoji: '🔀', label: 'Mixta'     },
+  { value: 'madre',     emoji: '🌱', label: 'Madres'    },
+  { value: 'clon',      emoji: '✂️', label: 'Clones'    },
+  { value: 'manicura',  emoji: '✂️', label: 'Manicura'  },
+]
+const kindTabs = computed(() =>
+  KIND_TABS.map(t => ({
+    ...t,
+    count: t.value === '' ? salas.items.length : salas.items.filter(s => s.kind === t.value || s.tipo === t.value).length,
+  })).filter(t => t.value === '' || t.count > 0)
+)
+
 // ---------- stats globales ----------
 const statsGlobal = computed(() => {
   const all = salas.items;
@@ -153,12 +174,15 @@ async function submitEdit() {
 }
 
 // ---------- Eliminar ----------
-const showDelete = ref(false);
-const toDelete   = ref(null);
-function confirmDelete(s) { toDelete.value = s; showDelete.value = true; }
-async function doDelete() {
-  if (!toDelete.value) return;
-  try { await salas.remove(toDelete.value.id); showDelete.value = false; toDelete.value = null; } catch {}
+async function confirmDelete(s) {
+  const ok = await confirm({
+    title: `¿Eliminar "${s.nombre}"?`,
+    message: 'Esta acción eliminará la sala y todos sus datos. No se puede deshacer.',
+    confirmText: 'Eliminar',
+    variant: 'danger',
+  });
+  if (!ok) return;
+  try { await salas.remove(s.id); } catch {}
 }
 </script>
 
@@ -210,6 +234,17 @@ async function doDelete() {
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- ── Tabs por tipo ── -->
+    <div class="salas-tabs mb-3">
+      <button v-for="tab in kindTabs" :key="tab.value" class="salas-tab"
+              :class="{ 'salas-tab--active': filterKind === tab.value }"
+              @click="filterKind = tab.value; page = 1">
+        <span>{{ tab.emoji }}</span>
+        <span>{{ tab.label }}</span>
+        <span class="salas-tab-count">{{ tab.count }}</span>
+      </button>
     </div>
 
     <!-- ── Toolbar ── -->
@@ -338,7 +373,7 @@ async function doDelete() {
                 <button class="btn btn-sm btn-outline-secondary" @click="startEdit(s)" :disabled="salas.updating && editForm.id === s.id">
                   ✏️
                 </button>
-                <button class="btn btn-sm btn-outline-danger" @click="confirmDelete(s)" :disabled="salas.removing && toDelete?.id === s.id">
+                <button class="btn btn-sm btn-outline-danger" @click="confirmDelete(s)" :disabled="salas.removing">
                   🗑️
                 </button>
               </template>
@@ -490,29 +525,6 @@ async function doDelete() {
     </div>
     <div class="modal-backdrop fade" :class="{ show: showEdit }" v-if="showEdit" @click="showEdit=false"></div>
 
-    <!-- ===== MODAL Eliminar ===== -->
-    <div class="modal fade" :class="{ show: showDelete }" :style="{ display: showDelete ? 'block':'none' }" tabindex="-1" aria-modal="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header border-0 pb-0">
-            <button class="btn-close ms-auto" @click="showDelete=false"></button>
-          </div>
-          <div class="modal-body text-center py-2">
-            <div class="display-4 mb-3">⚠️</div>
-            <h5>¿Eliminar "{{ toDelete?.nombre }}"?</h5>
-            <p class="text-muted small">Esta acción eliminará la sala y todos sus datos. No se puede deshacer.</p>
-            <div v-if="salas.removeError" class="alert alert-danger">{{ salas.removeError }}</div>
-          </div>
-          <div class="modal-footer justify-content-center border-0">
-            <button class="btn btn-outline-secondary px-4" @click="showDelete=false">Cancelar</button>
-            <button class="btn btn-danger px-4" :disabled="salas.removing" @click="doDelete">
-              <span v-if="salas.removing" class="spinner-border spinner-border-sm me-2"></span>Eliminar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-backdrop fade" :class="{ show: showDelete }" v-if="showDelete" @click="showDelete=false"></div>
 
   </div>
 </template>
@@ -530,6 +542,12 @@ async function doDelete() {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.salas-tabs { display: flex; flex-wrap: wrap; gap: .4rem; }
+.salas-tab { display: inline-flex; align-items: center; gap: .4rem; padding: .4rem .85rem; border: 1.5px solid #e2e8f0; border-radius: 999px; background: #f8fafc; font-size: .8rem; font-weight: 600; color: #64748b; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.salas-tab:hover { border-color: #94a3b8; color: #0f172a; }
+.salas-tab--active { border-color: #1b5e20; background: #f0fdf4; color: #1b5e20; }
+.salas-tab-count { background: #e2e8f0; color: #64748b; font-size: .68rem; padding: .1em .45em; border-radius: 999px; }
+.salas-tab--active .salas-tab-count { background: #dcfce7; color: #15803d; }
 </style>
 
 

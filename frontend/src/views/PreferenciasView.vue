@@ -2,12 +2,14 @@
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useClubStore } from '../stores/club'
 import Avatar from '../components/Avatar.vue'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const club  = useClubStore()
 const toast = ref(null)
 const pristine = ref(true)
 const logoPreview = ref(null)
 let toastTimer = null
+const { confirm } = useConfirm()
 
 const TIPOS_ORGANIZACION = [
   { value: 'asociacion_civil',  label: 'Asociación Civil' },
@@ -129,7 +131,8 @@ function onLogoFile(e) {
 }
 
 async function removeLogo() {
-  if (!confirm('¿Seguro que querés quitar el logo del club?')) return
+  const ok = await confirm({ title: '¿Quitar el logo del club?', message: 'El logo será eliminado permanentemente.', confirmText: 'Quitar logo' })
+  if (!ok) return
   try { await club.removeLogo(); logoPreview.value = null; showToast('success', 'Logo eliminado') }
   catch (_) { showToast('danger', club.error || 'Error al eliminar el logo') }
 }

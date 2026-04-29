@@ -67,8 +67,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { getUserSalasAsignadas, asignarSalaAUsuario, desasignarSalaAUsuario, listSalas } from '../lib/api.js'
+import { useConfirm } from '../composables/useConfirm.js'
+const { confirm } = useConfirm()
 
 const props = defineProps({
   userId:   { type: Number, required: true },
@@ -85,8 +88,8 @@ const salaSeleccionada = ref('')
 const asignando        = ref(false)
 const error            = ref('')
 
-const puedeEditar = computed(() => ['admin', 'agricultor'].includes(auth.user?.role))
-const esManicurador = computed(() => props.userRole === 'manicurador')
+const puedeEditar = computed(() => ['admin', 'cultivador'].includes(auth.user?.role))
+const esManicurador = computed(() => props.userRole === 'manicura')
 
 const salasNoAsignadas = computed(() => {
   const asignadasIds = new Set(salasAsignadas.value.map(s => s.id))
@@ -119,7 +122,7 @@ onMounted(async () => {
     ])
     salasAsignadas.value = resSalas.data || []
     todasLasSalas.value  = resTodas.data || []
-  } catch (e) { console.error(e) }
+  } catch (e) { logger.error(e) }
   finally { loading.value = false }
 })
 
@@ -156,7 +159,8 @@ async function asignar() {
 }
 
 async function desasignar(sala) {
-  if (!confirm(`¿Quitar "${sala.nombre}" de este cultivador?`)) return
+  const ok = await confirm({ title: `¿Quitar "${sala.nombre}"?`, message: 'Se desasignará al cultivador de esta sala.', confirmText: 'Quitar' })
+  if (!ok) return
   try {
     await desasignarSalaAUsuario(props.userId, sala.id)
     salasAsignadas.value = salasAsignadas.value.filter(s => s.id !== sala.id)

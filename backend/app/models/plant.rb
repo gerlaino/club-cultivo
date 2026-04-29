@@ -1,6 +1,5 @@
 class Plant < ApplicationRecord
   belongs_to :lote
-  belongs_to :genetica, optional: true
   belongs_to :planta_madre, class_name: 'Plant', optional: true
 
   has_many   :esquejes, class_name: 'Plant', foreign_key: :planta_madre_id, dependent: :nullify
@@ -20,6 +19,7 @@ class Plant < ApplicationRecord
   validates :origen, inclusion: { in: ORIGENES }, allow_nil: true
 
   scope :por_estado, ->(estado) { where(state: estado) }
+  scope :seleccion,  -> { where(es_seleccion: true) }
   scope :en_germinacion, -> { where(state: 'germinacion') }
   scope :en_vegetativo, -> { where(state: 'vegetativo') }
   scope :en_floracion, -> { where(state: 'floracion') }

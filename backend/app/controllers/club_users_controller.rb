@@ -86,7 +86,7 @@ class ClubUsersController < ApplicationController
 
   def asignar_sala
     sala = current_user.club.salas.find(params[:sala_id])
-    if @user.manicurador?
+    if @user.manicura?
       @user.sala_cultivadores.destroy_all
     end
     SalaCultivador.find_or_create_by!(sala: sala, user: @user)

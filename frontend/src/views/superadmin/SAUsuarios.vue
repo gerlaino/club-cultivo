@@ -1,6 +1,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { listSuperAdminUsers, listSuperAdminClubs, createSuperAdminUser, deleteSuperAdminUser } from '../../lib/api.js'
+import { useConfirm } from '../../composables/useConfirm.js'
+import { ROLES as ALL_ROLES, roleMeta } from '../../constants/roles.js'
+
+const { confirm } = useConfirm()
+
+const ROLES = ALL_ROLES.map(r => r.value)
 
 const users   = ref([])
 const clubs   = ref([])
@@ -13,17 +19,6 @@ const filterRole = ref('todos')
 const showCreate = ref(false)
 const createError = ref(null)
 const form = ref({ email: '', first_name: '', last_name: '', role: 'admin', club_id: '', password: '123456Aa' })
-
-const ROLES = ['admin','medico','agricultor','cultivador','abogado','auditor']
-const ROLE_META = {
-  admin:      { label: 'Admin',      color: '#0f172a', bg: '#f1f5f9' },
-  medico:     { label: 'Médico',     color: '#0369a1', bg: '#dbeafe' },
-  agricultor: { label: 'Agricultor', color: '#15803d', bg: '#dcfce7' },
-  cultivador: { label: 'Cultivador', color: '#16a34a', bg: '#f0fdf4' },
-  abogado:    { label: 'Abogado',    color: '#7c3aed', bg: '#ede9fe' },
-  auditor:    { label: 'Auditor',    color: '#b45309', bg: '#fffbeb' },
-}
-function roleMeta(r) { return ROLE_META[r] || { label: r, color: '#64748b', bg: '#f1f5f9' } }
 
 function formatDate(d) {
   if (!d) return '—'
@@ -78,7 +73,8 @@ async function handleCreate() {
 }
 
 async function handleDelete(u) {
-  if (!confirm(`¿Eliminar a ${u.email}? Esta acción no se puede deshacer.`)) return
+  const ok = await confirm({ title: `¿Eliminar a ${u.email}?`, message: 'Esta acción no se puede deshacer.', confirmText: 'Eliminar' })
+  if (!ok) return
   try {
     await deleteSuperAdminUser(u.id)
     users.value = users.value.filter(x => x.id !== u.id)

@@ -14,7 +14,7 @@ class InformeSemestralController < ApplicationController
     render json: {
       periodo:           { anio: anio, semestre: semestre, desde: desde, hasta: hasta },
       club:              datos_club(club),
-      socios:            datos_socios(club, hasta),
+      pacientes:            datos_pacientes(club, hasta),
       produccion:        datos_produccion(club, desde, hasta),
       dispensaciones:    datos_dispensaciones(club, desde, hasta),
       resumen_geneticas: resumen_geneticas(club, desde, hasta),
@@ -45,9 +45,9 @@ class InformeSemestralController < ApplicationController
     }
   end
 
-  def datos_socios(club, hasta)
-    socios     = club.socios.with_deleted.where("created_at <= ?", hasta.end_of_day)
-    activos    = socios.where(deleted_at: nil)
+  def datos_pacientes(club, hasta)
+    pacientes     = club.pacientes.with_deleted.where("created_at <= ?", hasta.end_of_day)
+    activos    = pacientes.where(deleted_at: nil)
     con_repro  = activos.where.not(reprocann_numero: [nil, ""])
     vencidos   = activos.where("reprocann_vencimiento < ?", Date.today)
                         .where.not(reprocann_vencimiento: nil)
@@ -59,11 +59,11 @@ class InformeSemestralController < ApplicationController
       sin_reprocann: activos.where(reprocann_numero: [nil, ""]).count,
       vencidos:      vencidos.count,
       por_vencer:    por_vencer.count,
-      nomina:        activos.order(:apellido, :nombre).map { |s| nomina_socio(s) },
+      nomina:        activos.order(:apellido, :nombre).map { |s| nomina_paciente(s) },
     }
   end
 
-  def nomina_socio(s)
+  def nomina_paciente(s)
     {
       nombre_completo:       s.nombre_completo,
       dni:                   s.dni,
@@ -115,8 +115,8 @@ class InformeSemestralController < ApplicationController
   end
 
   def datos_dispensaciones(club, desde, hasta)
-    disps = Dispensacion.joins(:socio)
-                        .where(socios: { club_id: club.id })
+    disps = Dispensacion.joins(:paciente)
+                        .where(pacientes: { club_id: club.id })
                         .where(fecha_dispensacion: desde..hasta)
     {
       total:              disps.count,
@@ -124,49 +124,46 @@ class InformeSemestralController < ApplicationController
       por_tipo_producto:  disps.group(:tipo_producto).sum(:cantidad_gramos)
                                .map { |tipo, g| { tipo: tipo, gramos: g.to_f.round(2) } },
       aporte_total_ars:   disps.sum(:aporte_socio_ars).to_f.round(2),
-      socios_dispensados: disps.distinct.count(:socio_id),
+      pacientes_dispensados: disps.distinct.count(:paciente_id),
     }
   end
 
   # Solo genéticas que tienen plantas activas O tuvieron lotes en el período
   # Las genéticas INASE sin uso real no aparecen
   def resumen_geneticas(club, desde, hasta)
-    lotes_ids = club.lotes.pluck(:id)
-
-    # Genéticas con plantas vivas actualmente
-    geneticas_con_plantas = Plant.where(lote_id: lotes_ids)
-                                 .where.not(state: %w[cosechado descartada])
-                                 .where.not(genetica_id: nil)
-                                 .group(:genetica_id)
+    # Genéticas con plantas vivas actualmente (via lote.genetica_id)
+    geneticas_con_plantas = Plant.joins(:lote)
+                                 .where(lotes: { club_id: club.id })
+                                 .where.not(plants: { state: %w[cosechado descartada] })
+                                 .where.not(lotes: { genetica_id: nil })
+                                 .group('lotes.genetica_id')
                                  .count
 
-    # Genéticas usadas en lotes del período (aunque las plantas ya no estén)
+    # Genéticas usadas en lotes del período
     geneticas_en_periodo = club.lotes
                                .where("start_date <= ?", hasta)
                                .where.not(genetica_id: nil)
                                .pluck(:genetica_id)
                                .uniq
 
-    # Unión de ambos sets
     genetica_ids = (geneticas_con_plantas.keys + geneticas_en_periodo).uniq
-
     return [] if genetica_ids.empty?
 
     club.geneticas.where(id: genetica_ids, activa: true).map do |g|
       plantas_activas = geneticas_con_plantas[g.id] || 0
       {
-        nombre:          g.nombre,
-        tipo:            g.tipo,
-        thc:             g.thc&.to_f,
-        cbd:             g.cbd&.to_f,
+        nombre:           g.nombre,
+        tipo:             g.tipo,
+        thc:              g.thc&.to_f,
+        cbd:              g.cbd&.to_f,
         registrada_inase: g.registrada_inase,
-        plantas_activas: plantas_activas,
+        plantas_activas:  plantas_activas,
       }
     end.sort_by { |g| -g[:plantas_activas] }
   end
 
   def require_admin_or_autorizado!
-    unless current_user.admin? || current_user.role.in?(%w[abogado auditor])
+    unless current_user.admin? || current_user.role.in?(%w[auditor])
       render json: { error: "No autorizado" }, status: :forbidden
     end
   end

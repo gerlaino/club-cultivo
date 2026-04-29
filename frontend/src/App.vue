@@ -1,5 +1,6 @@
 <script setup>
 import { watch, onMounted, computed } from "vue";
+import { logger } from './utils/logger.js'
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 import { useClubStore } from "./stores/club";
@@ -8,6 +9,10 @@ import { usePlan } from "./composables/usePlan";
 import Avatar from "./components/Avatar.vue";
 import BrandLogo from "./components/BrandLogo.vue";
 import PlanBadge from "./components/PlanBadge.vue";
+import ToastProvider from "./components/ui/ToastProvider.vue";
+import ConfirmDialog from "./components/ui/ConfirmDialog.vue";
+import NotificationBell from "./components/ui/NotificationBell.vue";
+import AuditorBanner from "./components/AuditorBanner.vue";
 
 const auth   = useAuthStore();
 const club   = useClubStore();
@@ -30,29 +35,63 @@ function closeNav() {
   }
 }
 
-// Links del bottom nav según rol
-const bottomNavLinks = computed(() => {
-  const role = auth.user?.role
-  if (role === 'cultivador' || role === 'agricultor') {
-    return [
-      { to: '/',      icon: 'bi-house',           label: 'Inicio' },
-      { to: '/sedes', icon: 'bi-building',         label: 'Salas', perm: ['sedes','index'] },
-      { to: '/tareas',icon: 'bi-clipboard-check',  label: 'Tareas', perm: ['tareas','index'] },
-    ]
+// Master list for bottom nav + "Más" drawer
+const ALL_NAV_LINKS = [
+  { to: '/',                  icon: 'bi-house',             label: 'Inicio' },
+  { to: '/pacientes',         icon: 'bi-people',             label: 'Pacientes',  perm: ['socios','index'] },
+  { to: '/sedes',             icon: 'bi-building',           label: 'Sedes',      perm: ['sedes','index'] },
+  { to: '/contabilidad',      icon: 'bi-cash-stack',         label: 'Caja',       perm: ['movimientos_contables','index'] },
+  { to: '/tareas',            icon: 'bi-clipboard-check',    label: 'Tareas',     perm: ['tareas','index'] },
+  { to: '/geneticas',         icon: 'bi-diagram-3',          label: 'Genéticas',  perm: ['geneticas','index'] },
+  { to: '/manicura',          icon: 'bi-scissors',           label: 'Manicura',   perm: ['manicura','access'] },
+  { to: '/informe-semestral', icon: 'bi-file-earmark-text',  label: 'REPROCANN',  perm: ['informe_semestral','show'] },
+  { to: '/documentos',        icon: 'bi-file-earmark',       label: 'Docs',       perm: ['documentos','index'] },
+  { to: '/usuarios',          icon: 'bi-person-badge',       label: 'Usuarios',   adminOnly: true },
+  { to: '/web',               icon: 'bi-globe',              label: 'Web',        adminOnly: true },
+]
+
+// 4 priority paths per role
+const ROLE_PRIORITY = {
+  admin:       ['/', '/pacientes', '/contabilidad', '/tareas'],
+  medico:      ['/', '/pacientes', '/tareas', '/documentos'],
+  dispensador: ['/', '/pacientes', '/__dispensario__', '/tareas'],
+  cultivador:  ['/', '/sedes', '/tareas', '/geneticas'],
+  manicura:    ['/', '/sedes', '/manicura', '/geneticas'],
+  abogado:     ['/documentos'],
+  auditor:     ['/', '/pacientes', '/informe-semestral'],
+  socio:       ['/'],
+}
+
+// Sede asignada al dispensador (fallback a primera sede social/mixta via me_controller)
+const dispensarioSedeId = computed(() => auth.user?.dispensario_sede_id || null)
+const dispensarioLink   = computed(() =>
+  dispensarioSedeId.value ? `/sedes/${dispensarioSedeId.value}` : '/sedes'
+)
+
+function isAccessible(link) {
+  if (link.adminOnly) return isAdmin.value
+  if (!link.perm) return true
+  return can(link.perm[0], link.perm[1])
+}
+
+function resolveLink(path) {
+  if (path === '/__dispensario__') {
+    return { to: dispensarioLink.value, icon: 'bi-bag-check-fill', label: 'Dispensario' }
   }
-  if (role === 'admin') {
-    return [
-      { to: '/',           icon: 'bi-speedometer2',   label: 'Dashboard' },
-      { to: '/sedes',      icon: 'bi-building',       label: 'Sedes',     perm: ['sedes','index'] },
-      { to: '/socios',     icon: 'bi-people',         label: 'Pacientes', perm: ['socios','index'] },
-      { to: '/manicura',   icon: 'bi-scissors',       label: 'Manicura' },
-      { to: '/tareas',     icon: 'bi-clipboard-check',label: 'Tareas',    perm: ['tareas','index'] },
-      { to: '/contabilidad',icon: 'bi-cash-stack',    label: 'Caja',      perm: ['movimientos_contables','index'] },
-    ]
-  }
-  return [
-    { to: '/', icon: 'bi-house', label: 'Inicio' },
-  ]
+  return ALL_NAV_LINKS.find(l => l.to === path) || null
+}
+
+const priorityPaths = computed(() => ROLE_PRIORITY[auth.user?.role] || ['/'])
+
+const bottomNavLinks = computed(() =>
+  priorityPaths.value
+    .map(resolveLink)
+    .filter(l => l && isAccessible(l))
+)
+
+const moreNavLinks = computed(() => {
+  const prioritySet = new Set(priorityPaths.value)
+  return ALL_NAV_LINKS.filter(l => !prioritySet.has(l.to) && isAccessible(l))
 })
 
 
@@ -65,7 +104,7 @@ watch(
           await club.fetch();
           await fetchPlan();
         }
-      } catch (e) { console.error("Error club:", e); }
+      } catch (e) { logger.error("Error club:", e); }
     } else {
       club.$reset();
       planData.value = null
@@ -84,6 +123,8 @@ onMounted(async () => {
 </script>
 
 <template>
+  <ToastProvider />
+  <ConfirmDialog />
   <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' }">
 
     <!-- ── NAVBAR DESKTOP (oculto en mobile) ── -->
@@ -122,7 +163,7 @@ onMounted(async () => {
               <RouterLink class="nav-link px-2" to="/sedes" @click="closeNav">Sedes</RouterLink>
             </li>
             <li class="nav-item" v-if="can('socios', 'index')">
-              <RouterLink class="nav-link px-2" to="/socios" @click="closeNav">Pacientes</RouterLink>
+              <RouterLink class="nav-link px-2" to="/pacientes" @click="closeNav">Pacientes</RouterLink>
             </li>
             <li class="nav-item" v-if="can('geneticas', 'index')">
               <RouterLink class="nav-link px-2" to="/geneticas" @click="closeNav">Genéticas</RouterLink>
@@ -139,7 +180,7 @@ onMounted(async () => {
             <li class="nav-item" v-if="can('tareas', 'index')">
               <RouterLink class="nav-link px-2" to="/tareas" @click="closeNav">Tareas</RouterLink>
             </li>
-            <li class="nav-item" v-if="isAdmin || auth.user?.role === 'agricultor'">
+            <li class="nav-item" v-if="can('manicura', 'access')">
               <RouterLink class="nav-link px-2" to="/manicura" @click="closeNav">Manicura</RouterLink>
             </li>
             <li class="nav-item" v-if="isAdmin">
@@ -151,6 +192,7 @@ onMounted(async () => {
           </ul>
 
           <div class="ms-auto d-flex align-items-center gap-2 mt-2 mt-lg-0">
+            <NotificationBell v-if="auth.isAuthenticated && (auth.user?.role === 'admin' || auth.user?.role === 'cultivador')" />
             <div class="dropdown">
               <button
                 class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 py-1 px-2"
@@ -244,13 +286,14 @@ onMounted(async () => {
       <router-view />
     </main>
     <main v-else class="app-main">
+      <AuditorBanner v-if="auth.user?.role === 'auditor'" />
       <router-view />
     </main>
 
     <!-- ── BOTTOM NAV MOBILE ── -->
     <nav
       v-if="auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin'"
-      class="bottom-nav"
+      class="bottom-nav d-md-none"
     >
       <RouterLink
         v-for="link in bottomNavLinks"
@@ -264,40 +307,20 @@ onMounted(async () => {
         <span class="bottom-nav__label">{{ link.label }}</span>
       </RouterLink>
 
-      <!-- Más opciones (solo admin) -->
-      <div v-if="isAdmin" class="bottom-nav__item bottom-nav__item--more dropdown">
+      <!-- Más opciones (cuando hay overflow) -->
+      <div v-if="moreNavLinks.length > 0" class="bottom-nav__item bottom-nav__item--more dropdown">
         <button
           class="bottom-nav__item-btn"
           data-bs-toggle="dropdown"
           data-bs-auto-close="true"
         >
-          <i class="bi bi-grid bottom-nav__icon"></i>
+          <i class="bi bi-three-dots bottom-nav__icon"></i>
           <span class="bottom-nav__label">Más</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end bottom-nav__more-menu shadow border-0">
-          <li v-if="can('geneticas', 'index')">
-            <RouterLink class="dropdown-item py-2 d-flex align-items-center gap-2" to="/geneticas">
-              <i class="bi bi-diagram-3 text-muted"></i> Genéticas
-            </RouterLink>
-          </li>
-          <li v-if="can('usuarios', 'index')">
-            <RouterLink class="dropdown-item py-2 d-flex align-items-center gap-2" to="/usuarios">
-              <i class="bi bi-person-badge text-muted"></i> Usuarios
-            </RouterLink>
-          </li>
-          <li v-if="can('informe_semestral', 'show')">
-            <RouterLink class="dropdown-item py-2 d-flex align-items-center gap-2" to="/informe-semestral">
-              <i class="bi bi-file-earmark-text text-muted"></i> Informe REPROCANN
-            </RouterLink>
-          </li>
-          <li v-if="isAdmin">
-            <RouterLink class="dropdown-item py-2 d-flex align-items-center gap-2" to="/web">
-              <i class="bi bi-globe text-muted"></i> Web pública
-            </RouterLink>
-          </li>
-          <li v-if="can('documentos', 'index')">
-            <RouterLink class="dropdown-item py-2 d-flex align-items-center gap-2" to="/documentos">
-              <i class="bi bi-file-earmark text-muted"></i> Documentos
+          <li v-for="link in moreNavLinks" :key="link.to">
+            <RouterLink class="dropdown-item py-2 d-flex align-items-center gap-2" :to="link.to">
+              <i :class="`bi ${link.icon} text-muted`"></i> {{ link.label }}
             </RouterLink>
           </li>
           <li><hr class="dropdown-divider my-1"></li>

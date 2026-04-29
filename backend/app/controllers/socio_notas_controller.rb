@@ -3,15 +3,15 @@ class SocioNotasController < ApplicationController
   before_action :authenticate_user!
   before_action :set_socio, only: [:index, :create]
 
-  # GET /socios/:socio_id/notas
+  # GET /pacientes/:paciente_id/notas
   def index
-    notas = @socio.notas.order(created_at: :desc)
+    notas = @paciente.notas.order(created_at: :desc)
     render json: { data: notas }
   end
 
-  # POST /socios/:socio_id/notas
+  # POST /pacientes/:paciente_id/notas
   def create
-    nota = @socio.notas.build(nota_params)
+    nota = @paciente.notas.build(nota_params)
     nota.user_id = current_user.id
 
     if nota.save
@@ -31,8 +31,8 @@ class SocioNotasController < ApplicationController
   private
 
   def set_socio
-    # Aseguramos que el socio pertenezca al mismo club que el usuario
-    @socio = Socio.for_club(current_user.club_id).find(params[:socio_id])
+    # Aseguramos que el paciente pertenezca al mismo club que el usuario
+    @paciente = Paciente.for_club(current_user.club_id).find(params[:paciente_id])
   end
 
   def nota_params

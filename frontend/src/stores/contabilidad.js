@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 // frontend/src/stores/contabilidad.js
 import { defineStore } from "pinia";
 import {
@@ -49,7 +50,7 @@ export const useContabilidadStore = defineStore("contabilidad", {
         const { data } = await getContableDashboard(params);
         this.dashboard = data;
       } catch (e) {
-        console.error("Contabilidad.fetchDashboard", e);
+        logger.error("Contabilidad.fetchDashboard", e);
       } finally {
         this.loadingDashboard = false;
       }
@@ -136,7 +137,7 @@ export const useContabilidadStore = defineStore("contabilidad", {
         link.remove();
         window.URL.revokeObjectURL(url);
       } catch (e) {
-        console.error("Export CSV error", e);
+        logger.error("Export CSV error", e);
       }
     },
 

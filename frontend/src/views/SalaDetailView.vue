@@ -1,13 +1,18 @@
 <script setup>
 import { onMounted, ref, computed } from "vue"
+import { logger } from '../utils/logger.js'
 import { useRoute, useRouter } from "vue-router"
 import { useSalasStore } from "../stores/salas"
 import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
 import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
 import ModalCargarLote from '../components/salas/ModalCargarLote.vue'
-import { listGeneticas, updateSala } from '../lib/api.js'
+import { listGeneticas, updateSala, getSalaAmbiente } from '../lib/api.js'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
+import Breadcrumb from '../components/ui/Breadcrumb.vue'
+import EmptyState from '../components/ui/EmptyState.vue'
+import { useToast } from '../composables/useToast.js'
+import SemaforoAmbiente from '../components/ambiente/SemaforoAmbiente.vue'
 
 const contextoAsistente = computed(() => sala.value ? {
   tipo:       'sala',
@@ -20,6 +25,7 @@ const router = useRouter()
 const salas  = useSalasStore()
 const lotes  = useLotesStore()
 const auth   = useAuthStore()
+const toast  = useToast()
 
 const salaId  = Number(route.params.id) || 0
 const loading = ref(true)
@@ -27,8 +33,8 @@ const error   = ref(null)
 
 const canEdit        = computed(() => auth.role === "admin")
 const isCultivador   = computed(() => auth.role === "cultivador")
-const isManicurador  = computed(() => auth.role === "manicurador")
-const isAgricultor   = computed(() => auth.role === "agricultor")
+const isManicurador  = computed(() => auth.role === "manicura")
+const isAgricultor   = computed(() => auth.role === "cultivador")
 
 const lotesExpanded = ref(true)
 
@@ -49,6 +55,8 @@ onMounted(async () => {
     const res = await listGeneticas({ activa: true })
     geneticas.value = res.data || []
   } catch { /* genéticas no críticas */ }
+
+  if (canSeeAmbiente.value) cargarAmbienteMini()
 })
 
 const sala  = computed(() => salas.currentSala)
@@ -67,8 +75,10 @@ async function cambiarEstado(nuevoEstado) {
   try {
     await updateSala(salaId, { state: nuevoEstado })
     await salas.fetchSala(salaId)
+    toast.success('Estado de la sala actualizado')
   } catch (e) {
-    console.error('Error cambiando estado:', e)
+    logger.error('Error cambiando estado:', e)
+    toast.error('Error al cambiar el estado')
   } finally {
     cambiandoEstado.value = false
   }
@@ -209,19 +219,37 @@ const capacidadDisponible = computed(() => {
   // capacidad_disponible viene null del API cuando no hay límite configurado
   return sala.value.capacidad_disponible ?? null
 })
+
+// ── Mini widget ambiente ───────────────────────────────────────
+const ambienteMini = ref([])
+
+async function cargarAmbienteMini() {
+  try {
+    const desde = new Date(Date.now() - 2 * 3600_000).toISOString().slice(0, 19).replace('T', ' ')
+    const res   = await getSalaAmbiente(salaId, { desde, bucket: 'raw' })
+    const lecturas = res.data || []
+    const tiposTarget = ['temperatura', 'humedad', 'vpd', 'co2']
+    ambienteMini.value = tiposTarget.map(tipo => {
+      const last = lecturas
+        .filter(l => l.tipo === tipo)
+        .sort((a, b) => new Date(b.medido_at) - new Date(a.medido_at))[0]
+      return { tipo, valor: last?.valor ?? null, unidad: last?.unidad || '' }
+    }).filter(i => i.valor !== null)
+  } catch { /* ambiente no crítico */ }
+}
+
+const canSeeAmbiente = computed(() =>
+  auth.role === 'admin' || auth.role === 'cultivador'
+)
 </script>
 
 <template>
   <div class="sd">
 
-    <!-- Breadcrumb -->
-    <nav v-if="breadcrumbs.length > 0" class="sd__breadcrumb">
-      <template v-for="(crumb, i) in breadcrumbs" :key="i">
-        <RouterLink :to="crumb.to" class="sd__breadcrumb-link">{{ crumb.label }}</RouterLink>
-        <span class="sd__breadcrumb-sep">›</span>
-      </template>
-      <span class="sd__breadcrumb-current">{{ sala?.nombre || "…" }}</span>
-    </nav>
+    <Breadcrumb
+      v-if="breadcrumbs.length > 0"
+      :items="[...breadcrumbs, { label: sala?.nombre || '…' }]"
+    />
 
     <div v-if="loading" class="sd__loading"><div class="sd__spinner"></div><span>Cargando sala…</span></div>
     <div v-else-if="error" class="sd__error">{{ error }}</div>
@@ -337,15 +365,15 @@ const capacidadDisponible = computed(() => {
             </button>
             <div v-show="lotesExpanded" class="sd__section-body sd__section-body--flush">
               <div v-if="lotes.loading" class="sd__placeholder">Cargando lotes…</div>
-              <div v-else-if="!items.length" class="sd__empty">
-                <div class="sd__empty-icon">📦</div>
-                <p>Esta sala no tiene lotes todavía</p>
-                <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="showCreate=true">Crear primer lote</button>
-                <button v-else-if="puedeCargarLote" class="sd__btn-outline" style="color:#b45309;border-color:#fde68a" @click="showCargarLote=true">
-                  <i class="bi bi-box-arrow-in-down"></i>
-                  {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
-                </button>
-              </div>
+              <EmptyState v-else-if="!items.length" icon="📦" title="Sin lotes todavía" message="Esta sala no tiene lotes asignados." compact>
+                <template #actions>
+                  <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="showCreate=true">Crear primer lote</button>
+                  <button v-else-if="puedeCargarLote" class="sd__btn-outline" style="color:#b45309;border-color:#fde68a" @click="showCargarLote=true">
+                    <i class="bi bi-box-arrow-in-down"></i>
+                    {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
+                  </button>
+                </template>
+              </EmptyState>
               <div v-else class="sd__lotes">
                 <RouterLink v-for="l in itemsSorted" :key="l.id" :to="{ name:'lote-detail', params:{ id:l.id } }" class="sd__lote">
                   <div class="sd__lote-stripe" :style="{ background: estadoMeta(l.estado).color }"></div>
@@ -382,8 +410,30 @@ const capacidadDisponible = computed(() => {
         <!-- Aside -->
         <div class="sd__aside">
 
+          <!-- Widget Ambiente -->
+          <div v-if="canSeeAmbiente && (ambienteMini.length > 0)" class="sd__card sd__card--ambiente">
+            <div class="sd__card-header" style="display:flex;align-items:center;justify-content:space-between">
+              <span class="sd__card-title">🌿 Ambiente</span>
+              <RouterLink :to="{ name: 'sala-ambiente', params: { id: salaId } }" class="sd__link-small">
+                Ver detalle <i class="bi bi-arrow-right"></i>
+              </RouterLink>
+            </div>
+            <div class="sd__card-body sd__card-body--p0">
+              <SemaforoAmbiente :items="ambienteMini" />
+            </div>
+          </div>
+          <div v-else-if="canSeeAmbiente" class="sd__card sd__card--ambiente">
+            <div class="sd__card-header" style="display:flex;align-items:center;justify-content:space-between">
+              <span class="sd__card-title">🌿 Ambiente</span>
+              <RouterLink :to="{ name: 'sala-ambiente', params: { id: salaId } }" class="sd__link-small">
+                Ver detalle <i class="bi bi-arrow-right"></i>
+              </RouterLink>
+            </div>
+            <div class="sd__card-body" style="color:#94a3b8;font-size:.78rem">Sin lecturas recientes.</div>
+          </div>
+
           <!-- Información -->
-          <div class="sd__card">
+          <div class="sd__card sd__card--mt">
             <div class="sd__card-header"><span class="sd__card-title">ℹ️ Información</span></div>
             <dl class="sd__dl">
               <dt>Estado</dt>
@@ -531,27 +581,27 @@ const capacidadDisponible = computed(() => {
       </div>
     </Teleport>
 
-  </div>
+    <!-- Modal cargar lote (usa Teleport internamente) -->
+    <ModalCargarLote
+      v-if="showCargarLote && sala"
+      :sala="sala"
+      @loaded="onLoteCargado"
+      @close="showCargarLote = false"
+    />
 
-  <!-- Modal cargar lote (secado / manicura) -->
-  <ModalCargarLote
-    v-if="showCargarLote && sala"
-    :sala="sala"
-    @loaded="onLoteCargado"
-    @close="showCargarLote = false"
-  />
-
-  <!-- Modal upgrade plan -->
-  <Teleport to="body">
-    <div v-if="showUpgrade" class="sd__overlay" @click.self="showUpgrade=false">
-      <div class="sd__modal" style="max-width:380px;text-align:center;padding:2rem">
-        <div style="font-size:3rem;margin-bottom:.75rem">🚀</div>
-        <h3 class="sd__modal-title" style="margin-bottom:.5rem">Límite del plan alcanzado</h3>
-        <p style="color:#64748b;font-size:.875rem;margin-bottom:1.5rem">Alcanzaste el máximo de lotes o plantas de tu plan. Contactá al equipo para actualizar.</p>
-        <button class="sd__btn-primary" @click="showUpgrade=false">Entendido</button>
+    <!-- Modal upgrade plan -->
+    <Teleport to="body">
+      <div v-if="showUpgrade" class="sd__overlay" @click.self="showUpgrade=false">
+        <div class="sd__modal" style="max-width:380px;text-align:center;padding:2rem">
+          <div style="font-size:3rem;margin-bottom:.75rem">🚀</div>
+          <h3 class="sd__modal-title" style="margin-bottom:.5rem">Límite del plan alcanzado</h3>
+          <p style="color:#64748b;font-size:.875rem;margin-bottom:1.5rem">Alcanzaste el máximo de lotes o plantas de tu plan. Contactá al equipo para actualizar.</p>
+          <button class="sd__btn-primary" @click="showUpgrade=false">Entendido</button>
+        </div>
       </div>
-    </div>
-  </Teleport>
+    </Teleport>
+
+  </div>
 
 </template>
 
@@ -559,11 +609,6 @@ const capacidadDisponible = computed(() => {
 .sd { padding: 1.75rem 1.5rem; max-width: 1200px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; }
 @media (max-width: 640px) { .sd { padding: 1rem; } }
 
-.sd__breadcrumb { display: flex; align-items: center; gap: .4rem; font-size: .78rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
-.sd__breadcrumb-link { color: #94a3b8; text-decoration: none; transition: color .15s; }
-.sd__breadcrumb-link:hover { color: #1b5e20; }
-.sd__breadcrumb-sep { color: #cbd5e1; }
-.sd__breadcrumb-current { color: #1a1a1a; font-weight: 600; }
 
 .sd__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
 .sd__error { padding: 1rem 1.25rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 10px; font-size: .875rem; }
@@ -651,6 +696,10 @@ const capacidadDisponible = computed(() => {
 
 .sd__card { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
 .sd__card--mt { margin-top: 1rem; }
+.sd__card--ambiente { margin-bottom: 1rem; }
+.sd__card-body--p0 { padding: .75rem; }
+.sd__link-small { font-size: .72rem; font-weight: 600; color: #1b5e20; text-decoration: none; display: flex; align-items: center; gap: .25rem; }
+.sd__link-small:hover { text-decoration: underline; }
 .sd__card-header { padding: .8rem 1rem; border-bottom: 1px solid #e8f0e9; }
 .sd__card-title { font-size: .85rem; font-weight: 700; color: #1a1a1a; }
 .sd__card-body { padding: 1rem; }
@@ -660,9 +709,6 @@ const capacidadDisponible = computed(() => {
 .sd__dl dt { font-size: .75rem; color: #60725d; font-weight: 500; white-space: nowrap; }
 .sd__dl dd { font-size: .8rem; color: #1a1a1a; font-weight: 500; margin: 0; }
 
-.sd__empty { text-align: center; padding: 2.5rem 1rem; color: #60725d; }
-.sd__empty-icon { font-size: 2.5rem; margin-bottom: .75rem; }
-.sd__empty p { font-size: .875rem; margin: 0 0 .75rem; }
 .sd__placeholder { padding: 1rem 1.1rem; color: #94a3b8; font-size: .875rem; }
 
 .sd__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }

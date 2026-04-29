@@ -187,7 +187,7 @@ class MovimientosContablesController < ApplicationController
   end
 
   def require_admin_or_tesorero
-    unless current_user.admin? || current_user.role.in?(%w[admin abogado auditor])
+    unless current_user.admin? || current_user.role.in?(%w[auditor])
       render json: { error: "No autorizado" }, status: :forbidden
     end
   end

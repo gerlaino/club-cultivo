@@ -50,3 +50,19 @@ gem "devise", "~> 4.9"
 gem 'devise-jwt'
 gem "pundit", "~> 2.5"
 gem "rack-cors", "~> 3.0", require: 'rack/cors'
+
+# Background jobs
+gem "sidekiq", "~> 7.0"
+gem "sidekiq-cron", "~> 1.9"
+gem "redis", ">= 4.0.1"
+
+# Rate limiting
+gem "rack-attack", "~> 6.7"
+
+group :test do
+  gem "rspec-rails", "~> 7.0"
+  gem "factory_bot_rails", "~> 6.4"
+  gem "faker", "~> 3.0"
+  gem "shoulda-matchers", "~> 6.0"
+  gem "database_cleaner-active_record", "~> 2.1"
+end

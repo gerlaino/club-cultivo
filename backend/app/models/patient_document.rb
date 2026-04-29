@@ -1,6 +1,6 @@
 class PatientDocument < ApplicationRecord
   belongs_to :club
-  belongs_to :socio
+  belongs_to :paciente
   belongs_to :template, class_name: 'DocumentTemplate', optional: true
   belongs_to :created_by, class_name: 'User'
 
@@ -21,7 +21,7 @@ class PatientDocument < ApplicationRecord
   validates :contenido_html, presence: true, unless: -> { archivo_pdf.attached? || archivo_pdf.attachment.present? }
 
   scope :for_club,  ->(club_id) { where(club_id: club_id) }
-  scope :for_socio, ->(socio_id) { where(socio_id: socio_id) }
+  scope :for_paciente, ->(paciente_id) { where(paciente_id: paciente_id) }
   scope :firmados,  -> { where(estado: 'firmado') }
 
   before_create :calcular_hash
@@ -35,13 +35,13 @@ class PatientDocument < ApplicationRecord
   end
 
   # Interpola variables en el contenido HTML con datos reales
-  def self.interpolar(html, socio:, club:, medico: nil)
+  def self.interpolar(html, paciente:, club:, medico: nil)
     vars = {
-      '{{paciente_nombre}}'          => socio.nombre,
-      '{{paciente_apellido}}'        => socio.apellido,
-      '{{paciente_dni}}'             => socio.dni,
-      '{{paciente_fecha_nacimiento}}' => socio.fecha_nacimiento&.strftime('%d/%m/%Y'),
-      '{{paciente_reprocann}}'       => socio.reprocann_numero || '—',
+      '{{paciente_nombre}}'          => paciente.nombre,
+      '{{paciente_apellido}}'        => paciente.apellido,
+      '{{paciente_dni}}'             => paciente.dni,
+      '{{paciente_fecha_nacimiento}}' => paciente.fecha_nacimiento&.strftime('%d/%m/%Y'),
+      '{{paciente_reprocann}}'       => paciente.reprocann_numero || '—',
       '{{club_nombre}}'              => club.name,
       '{{club_legal_name}}'          => club.legal_name || club.name,
       '{{club_direccion}}'           => [club.address, club.city, club.state].compact.join(', '),

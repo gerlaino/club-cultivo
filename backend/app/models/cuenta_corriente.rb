@@ -1,5 +1,5 @@
 class CuentaCorriente < ApplicationRecord
-  belongs_to :socio
+  belongs_to :paciente
   belongs_to :club
 
   has_many :movimientos, class_name: 'CuentaCorrienteMovimiento', dependent: :destroy

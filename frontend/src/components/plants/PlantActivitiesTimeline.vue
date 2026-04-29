@@ -107,7 +107,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { logger } from '../../utils/logger.js'
 import { listPlantActivities, createPlantActivity, deletePlantActivity } from '../../lib/api.js'
+import { useConfirm } from '../../composables/useConfirm.js'
+import { useToast } from '../../composables/useToast.js'
+const { confirm } = useConfirm()
+const toast = useToast()
 
 const props = defineProps({
   plantId: {
@@ -217,7 +222,7 @@ const loadActivities = async () => {
     const { data } = await listPlantActivities(props.plantId)
     activities.value = data
   } catch (error) {
-    console.error('Error cargando actividades:', error)
+    logger.error('Error cargando actividades:', error)
   } finally {
     loading.value = false
   }
@@ -230,23 +235,24 @@ const handleSubmit = async () => {
     form.value = { activity_type: '', description: '' }
     await loadActivities()
   } catch (error) {
-    console.error('Error creando actividad:', error)
-    alert('Error al crear la actividad')
+    logger.error('Error creando actividad:', error)
+    toast.error('Error al crear la actividad')
   } finally {
     saving.value = false
   }
 }
 
 const handleDelete = async (id) => {
-  if (!confirm('¿Eliminar esta actividad?')) return
+  const ok = await confirm({ title: '¿Eliminar esta actividad?', message: 'Esta acción no se puede deshacer.', confirmText: 'Eliminar' })
+  if (!ok) return
 
   try {
     deleting.value = id
     await deletePlantActivity(props.plantId, id)
     await loadActivities()
   } catch (error) {
-    console.error('Error eliminando actividad:', error)
-    alert('Error al eliminar la actividad')
+    logger.error('Error eliminando actividad:', error)
+    toast.error('Error al eliminar la actividad')
   } finally {
     deleting.value = null
   }

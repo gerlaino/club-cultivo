@@ -10,6 +10,6 @@ class SalaCultivador < ApplicationRecord
   private
 
   def user_must_be_cultivador
-    errors.add(:user, 'debe ser cultivador o manicurador') unless user&.cultivador? || user&.manicurador?
+    errors.add(:user, 'debe ser cultivador o manicura') unless user&.cultivador? || user&.manicura?
   end
 end

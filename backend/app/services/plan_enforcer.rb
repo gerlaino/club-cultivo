@@ -35,7 +35,7 @@ class PlanEnforcer
 
   def puede_crear_paciente?
     return true if @limite[:pacientes].nil?
-    @club.socios.count < @limite[:pacientes]
+    @club.pacientes.count < @limite[:pacientes]
   end
 
   def puede_crear_usuario?
@@ -60,7 +60,7 @@ class PlanEnforcer
         sedes:     @club.sedes.activas.count,
         lotes:     @club.lotes.count,
         plantas:   Plant.joins(:lote).where(lotes: { club_id: @club.id }).count,
-        pacientes: @club.socios.count,
+        pacientes: @club.pacientes.count,
         usuarios:  @club.users.count,
       },
     }

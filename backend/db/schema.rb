@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_29_210005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -40,6 +40,28 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "alertas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "regla_id", null: false
+    t.bigint "sala_id", null: false
+    t.bigint "lectura_id"
+    t.string "estado", default: "activa", null: false
+    t.text "mensaje", null: false
+    t.datetime "reconocida_at"
+    t.bigint "reconocida_por_id"
+    t.datetime "resuelta_at"
+    t.bigint "resuelta_por_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "estado"], name: "idx_alertas_club_estado"
+    t.index ["lectura_id"], name: "index_alertas_on_lectura_id"
+    t.index ["reconocida_por_id"], name: "index_alertas_on_reconocida_por_id"
+    t.index ["regla_id"], name: "index_alertas_on_regla_id"
+    t.index ["resuelta_por_id"], name: "index_alertas_on_resuelta_por_id"
+    t.index ["sala_id", "estado"], name: "idx_alertas_sala_estado"
+    t.index ["sala_id"], name: "index_alertas_on_sala_id"
   end
 
   create_table "clubs", force: :cascade do |t|
@@ -72,6 +94,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.string "facebook_url"
     t.string "whatsapp"
     t.text "horarios_atencion"
+    t.boolean "activo", default: true, null: false
     t.index ["plan"], name: "index_clubs_on_plan"
     t.index ["slug"], name: "index_clubs_on_slug", unique: true
   end
@@ -95,31 +118,76 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.index ["lote_id"], name: "index_costo_lotes_on_lote_id", unique: true
   end
 
+  create_table "cuenta_corriente_movimientos", force: :cascade do |t|
+    t.bigint "cuenta_corriente_id", null: false
+    t.bigint "dispensacion_id"
+    t.bigint "created_by_id", null: false
+    t.string "tipo", null: false
+    t.decimal "monto", precision: 12, scale: 2, null: false
+    t.decimal "saldo_anterior", precision: 12, scale: 2, null: false
+    t.decimal "saldo_nuevo", precision: 12, scale: 2, null: false
+    t.string "descripcion"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_by_id"], name: "index_cuenta_corriente_movimientos_on_created_by_id"
+    t.index ["cuenta_corriente_id"], name: "index_cuenta_corriente_movimientos_on_cuenta_corriente_id"
+    t.index ["dispensacion_id"], name: "index_cuenta_corriente_movimientos_on_dispensacion_id"
+  end
+
+  create_table "cuenta_corrientes", force: :cascade do |t|
+    t.bigint "paciente_id", null: false
+    t.bigint "club_id", null: false
+    t.decimal "limite_credito", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "saldo_disponible", precision: 12, scale: 2, default: "0.0", null: false
+    t.text "notas"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_cuenta_corrientes_on_club_id"
+    t.index ["paciente_id"], name: "index_cuenta_corrientes_on_paciente_id"
+  end
+
   create_table "dispensaciones", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.bigint "socio_id", null: false
+    t.bigint "paciente_id", null: false
     t.bigint "user_id", null: false
     t.bigint "indicacion_medica_id"
-    t.bigint "lote_id"
-    t.decimal "cantidad_gramos", precision: 8, scale: 2, null: false
-    t.string "tipo_producto", default: "flores", null: false
     t.text "observaciones"
     t.date "fecha_dispensacion", null: false
     t.bigint "sede_id"
     t.decimal "aporte_socio_ars", precision: 10, scale: 2
-    t.decimal "costo_por_gramo", precision: 10, scale: 2
-    t.decimal "costo_total_calculado", precision: 10, scale: 2
-    t.bigint "sede_inventario_id"
-    t.decimal "porcentaje_descuento", precision: 5, scale: 2
+    t.string "medio_pago", default: "efectivo", null: false
+    t.bigint "stock_id"
+    t.decimal "cantidad", precision: 10, scale: 3, default: "0.0", null: false
+    t.decimal "precio_unitario_ars", precision: 10, scale: 2
     t.index ["fecha_dispensacion"], name: "index_dispensaciones_on_fecha_dispensacion"
     t.index ["indicacion_medica_id"], name: "index_dispensaciones_on_indicacion_medica_id"
-    t.index ["lote_id"], name: "index_dispensaciones_on_lote_id"
+    t.index ["medio_pago"], name: "index_dispensaciones_on_medio_pago"
+    t.index ["paciente_id", "fecha_dispensacion"], name: "index_dispensaciones_on_paciente_id_and_fecha_dispensacion"
+    t.index ["paciente_id"], name: "index_dispensaciones_on_paciente_id"
     t.index ["sede_id"], name: "index_dispensaciones_on_sede_id"
-    t.index ["sede_inventario_id"], name: "index_dispensaciones_on_sede_inventario_id"
-    t.index ["socio_id", "fecha_dispensacion"], name: "index_dispensaciones_on_socio_id_and_fecha_dispensacion"
-    t.index ["socio_id"], name: "index_dispensaciones_on_socio_id"
+    t.index ["stock_id"], name: "index_dispensaciones_on_stock_id"
     t.index ["user_id"], name: "index_dispensaciones_on_user_id"
+  end
+
+  create_table "dispositivos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "sala_id", null: false
+    t.string "tipo", null: false
+    t.string "marca"
+    t.string "modelo"
+    t.string "serial"
+    t.string "nombre_amigable", null: false
+    t.string "estado", default: "activo", null: false
+    t.datetime "ultima_lectura_at"
+    t.string "webhook_token_digest"
+    t.datetime "last_token_rotated_at"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "serial"], name: "idx_dispositivos_serial", unique: true, where: "(serial IS NOT NULL)"
+    t.index ["club_id"], name: "index_dispositivos_on_club_id"
+    t.index ["sala_id"], name: "index_dispositivos_on_sala_id"
   end
 
   create_table "document_templates", force: :cascade do |t|
@@ -174,7 +242,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
   end
 
   create_table "geneticas", force: :cascade do |t|
-    t.bigint "club_id", null: false
+    t.bigint "club_id"
     t.string "nombre", null: false
     t.text "descripcion"
     t.decimal "thc", precision: 5, scale: 2
@@ -193,13 +261,16 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.string "criador"
     t.string "terpenos"
     t.boolean "visible_web", default: false, null: false
+    t.string "slug", null: false
+    t.boolean "global", default: false, null: false
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
     t.index ["club_id"], name: "index_geneticas_on_club_id"
+    t.index ["slug"], name: "index_geneticas_on_slug", unique: true
   end
 
   create_table "indicacion_medicas", force: :cascade do |t|
-    t.bigint "socio_id", null: false
+    t.bigint "paciente_id", null: false
     t.bigint "user_id", null: false, comment: "Médico que emite"
     t.string "patologia", null: false
     t.text "dosificacion", null: false
@@ -213,38 +284,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.datetime "updated_at", null: false
     t.index ["activa"], name: "index_indicacion_medicas_on_activa"
     t.index ["fecha_vencimiento"], name: "index_indicacion_medicas_on_fecha_vencimiento"
-    t.index ["socio_id"], name: "index_indicacion_medicas_on_socio_id"
+    t.index ["paciente_id"], name: "index_indicacion_medicas_on_paciente_id"
     t.index ["user_id"], name: "index_indicacion_medicas_on_user_id"
-  end
-
-  create_table "inventario_movimientos", force: :cascade do |t|
-    t.bigint "sede_id", null: false
-    t.bigint "club_id", null: false
-    t.bigint "sede_inventario_id", null: false
-    t.bigint "created_by_id", null: false
-    t.bigint "dispensacion_id"
-    t.bigint "lote_id"
-    t.string "tipo", null: false
-    t.decimal "cantidad", precision: 10, scale: 2, null: false
-    t.decimal "stock_anterior", precision: 10, scale: 2, null: false
-    t.decimal "stock_nuevo", precision: 10, scale: 2, null: false
-    t.text "motivo"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.string "estado", default: "aprobado", null: false
-    t.bigint "aprobado_por_id"
-    t.datetime "aprobado_at"
-    t.string "nota_rechazo"
-    t.index ["aprobado_por_id"], name: "index_inventario_movimientos_on_aprobado_por_id"
-    t.index ["club_id"], name: "index_inventario_movimientos_on_club_id"
-    t.index ["created_by_id"], name: "index_inventario_movimientos_on_created_by_id"
-    t.index ["dispensacion_id"], name: "index_inventario_movimientos_on_dispensacion_id"
-    t.index ["estado"], name: "index_inventario_movimientos_on_estado"
-    t.index ["lote_id"], name: "index_inventario_movimientos_on_lote_id"
-    t.index ["sede_id", "created_at"], name: "index_inventario_movimientos_on_sede_id_and_created_at"
-    t.index ["sede_id"], name: "index_inventario_movimientos_on_sede_id"
-    t.index ["sede_inventario_id", "created_at"], name: "idx_on_sede_inventario_id_created_at_5eb09e8add"
-    t.index ["sede_inventario_id"], name: "index_inventario_movimientos_on_sede_inventario_id"
   end
 
   create_table "jwt_denylists", force: :cascade do |t|
@@ -253,6 +294,47 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["jti"], name: "index_jwt_denylists_on_jti"
+  end
+
+  create_table "lecturas_ambientales", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "sala_id", null: false
+    t.bigint "dispositivo_id"
+    t.bigint "lote_id"
+    t.string "tipo", null: false
+    t.decimal "valor", precision: 10, scale: 4, null: false
+    t.string "unidad", limit: 20, null: false
+    t.datetime "medido_at", null: false
+    t.string "fuente", default: "manual", null: false
+    t.string "origen_record_type"
+    t.bigint "origen_record_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "medido_at"], name: "idx_la_club_medido"
+    t.index ["dispositivo_id", "tipo", "medido_at"], name: "idx_la_idempotencia", unique: true, where: "(dispositivo_id IS NOT NULL)"
+    t.index ["dispositivo_id"], name: "index_lecturas_ambientales_on_dispositivo_id"
+    t.index ["lote_id"], name: "index_lecturas_ambientales_on_lote_id"
+    t.index ["origen_record_type", "origen_record_id"], name: "idx_la_origen", where: "(origen_record_id IS NOT NULL)"
+    t.index ["sala_id", "tipo", "medido_at"], name: "idx_la_sala_tipo_medido"
+    t.index ["sala_id"], name: "index_lecturas_ambientales_on_sala_id"
+  end
+
+  create_table "lecturas_ambientales_diarias", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "sala_id", null: false
+    t.string "tipo", null: false
+    t.date "fecha", null: false
+    t.decimal "valor_min", precision: 10, scale: 4, null: false
+    t.decimal "valor_max", precision: 10, scale: 4, null: false
+    t.decimal "valor_avg", precision: 10, scale: 4, null: false
+    t.decimal "valor_p5", precision: 10, scale: 4
+    t.decimal "valor_p95", precision: 10, scale: 4
+    t.integer "n_lecturas", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "fecha"], name: "idx_lad_club_fecha"
+    t.index ["sala_id", "tipo", "fecha"], name: "idx_lad_unique", unique: true
+    t.index ["sala_id"], name: "index_lecturas_ambientales_diarias_on_sala_id"
   end
 
   create_table "lote_eventos", force: :cascade do |t|
@@ -299,7 +381,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
 
   create_table "movimientos_contables", force: :cascade do |t|
     t.bigint "club_id", null: false
-    t.bigint "sede_id"
+    t.bigint "sede_id", null: false
     t.bigint "lote_id"
     t.bigint "dispensacion_id"
     t.bigint "created_by_id", null: false
@@ -356,9 +438,50 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.index ["publicada"], name: "index_noticias_on_publicada"
   end
 
+  create_table "paciente_notas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "paciente_id", null: false
+    t.text "contenido", null: false
+    t.datetime "deleted_at"
+    t.bigint "created_by_id", null: false
+    t.bigint "deleted_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_paciente_notas_on_club_id"
+    t.index ["deleted_at"], name: "index_paciente_notas_on_deleted_at"
+    t.index ["paciente_id", "created_at"], name: "idx_socio_notas_socio_created_desc", order: { created_at: :desc }
+  end
+
+  create_table "pacientes", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "nombre", null: false
+    t.string "apellido", null: false
+    t.string "dni", null: false
+    t.string "dni_normalizado", null: false
+    t.date "fecha_nacimiento", null: false
+    t.boolean "es_paciente", default: true, null: false
+    t.datetime "deleted_at"
+    t.bigint "created_by_id", null: false
+    t.bigint "updated_by_id"
+    t.bigint "deleted_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "email"
+    t.string "telefono"
+    t.string "reprocann_numero"
+    t.date "reprocann_vencimiento"
+    t.string "reprocann_adjunto"
+    t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
+    t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
+    t.index ["club_id"], name: "index_pacientes_on_club_id"
+    t.index ["created_at"], name: "index_pacientes_on_created_at"
+    t.index ["deleted_at"], name: "index_pacientes_on_deleted_at"
+    t.index ["dni_normalizado"], name: "index_pacientes_on_dni_normalizado", unique: true
+  end
+
   create_table "patient_documents", force: :cascade do |t|
     t.bigint "club_id", null: false
-    t.bigint "socio_id", null: false
+    t.bigint "paciente_id", null: false
     t.bigint "template_id"
     t.bigint "created_by_id", null: false
     t.string "nombre", null: false
@@ -379,13 +502,42 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["club_id", "estado"], name: "index_patient_documents_on_club_id_and_estado"
-    t.index ["club_id", "socio_id"], name: "index_patient_documents_on_club_id_and_socio_id"
+    t.index ["club_id", "paciente_id"], name: "index_patient_documents_on_club_id_and_paciente_id"
     t.index ["club_id", "tipo"], name: "index_patient_documents_on_club_id_and_tipo"
     t.index ["club_id"], name: "index_patient_documents_on_club_id"
     t.index ["created_by_id"], name: "index_patient_documents_on_created_by_id"
     t.index ["hash_documento"], name: "index_patient_documents_on_hash_documento", unique: true, where: "(hash_documento IS NOT NULL)"
-    t.index ["socio_id"], name: "index_patient_documents_on_socio_id"
+    t.index ["paciente_id"], name: "index_patient_documents_on_paciente_id"
     t.index ["template_id"], name: "index_patient_documents_on_template_id"
+  end
+
+  create_table "pesadas", force: :cascade do |t|
+    t.bigint "lote_id", null: false
+    t.bigint "registrado_por_id", null: false
+    t.string "fase_origen", null: false
+    t.string "fase_destino", null: false
+    t.decimal "peso_humedo_g", precision: 10, scale: 2
+    t.decimal "peso_seco_g", precision: 10, scale: 2
+    t.decimal "peso_curado_g", precision: 10, scale: 2
+    t.boolean "manicurado", default: false, null: false
+    t.text "notas"
+    t.datetime "registrado_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["lote_id", "registrado_at"], name: "index_pesadas_on_lote_id_and_registrado_at"
+    t.index ["lote_id"], name: "index_pesadas_on_lote_id"
+    t.index ["registrado_por_id"], name: "index_pesadas_on_registrado_por_id"
+  end
+
+  create_table "pesadas_plantas", force: :cascade do |t|
+    t.bigint "pesada_id", null: false
+    t.bigint "plant_id", null: false
+    t.decimal "peso_humedo_g", precision: 8, scale: 2
+    t.decimal "peso_seco_g", precision: 8, scale: 2
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["pesada_id"], name: "index_pesadas_plantas_on_pesada_id"
+    t.index ["plant_id"], name: "index_pesadas_plantas_on_plant_id"
   end
 
   create_table "plant_activities", force: :cascade do |t|
@@ -407,7 +559,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.bigint "lote_id", null: false
     t.string "codigo_qr"
     t.string "nombre"
-    t.bigint "genetica_id"
     t.string "state"
     t.date "fecha_germinacion"
     t.date "fecha_vegetativo"
@@ -423,8 +574,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.integer "num_colas"
     t.string "estado_salud"
     t.string "color_hojas"
+    t.boolean "es_seleccion", default: false, null: false
     t.index ["codigo_qr"], name: "index_plants_on_codigo_qr", unique: true
-    t.index ["genetica_id"], name: "index_plants_on_genetica_id"
+    t.index ["lote_id", "es_seleccion"], name: "index_plants_on_lote_id_and_es_seleccion"
     t.index ["lote_id"], name: "index_plants_on_lote_id"
     t.index ["origen"], name: "index_plants_on_origen"
     t.index ["planta_madre_id"], name: "index_plants_on_planta_madre_id"
@@ -465,6 +617,27 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.index ["user_id"], name: "index_registros_ambientales_on_user_id"
   end
 
+  create_table "reglas_ambientales", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "sala_id"
+    t.string "nombre", null: false
+    t.text "descripcion"
+    t.string "tipo_lectura", null: false
+    t.string "condicion", null: false
+    t.decimal "umbral_a", precision: 10, scale: 4, null: false
+    t.decimal "umbral_b", precision: 10, scale: 4
+    t.integer "duracion_minutos", default: 5, null: false
+    t.string "accion", default: "notificar", null: false
+    t.string "prioridad", default: "media", null: false
+    t.boolean "activa", default: true, null: false
+    t.text "webhook_url"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "activa"], name: "idx_reglas_club_activa"
+    t.index ["sala_id"], name: "idx_reglas_sala", where: "(sala_id IS NOT NULL)"
+    t.index ["sala_id"], name: "index_reglas_ambientales_on_sala_id"
+  end
+
   create_table "sala_cultivadores", force: :cascade do |t|
     t.bigint "sala_id", null: false
     t.bigint "user_id", null: false
@@ -489,31 +662,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.string "camera_snapshot_url"
     t.bigint "sede_id"
     t.integer "plants_max", default: 0
+    t.string "tipo", default: "cultivo", null: false
     t.index ["club_id"], name: "index_salas_on_club_id"
     t.index ["created_by_id"], name: "index_salas_on_created_by_id"
     t.index ["nombre"], name: "index_salas_on_nombre"
+    t.index ["sede_id", "tipo"], name: "index_salas_on_sede_id_and_tipo"
     t.index ["sede_id"], name: "index_salas_on_sede_id"
-  end
-
-  create_table "sede_inventarios", force: :cascade do |t|
-    t.bigint "sede_id", null: false
-    t.bigint "club_id", null: false
-    t.bigint "created_by_id", null: false
-    t.string "producto"
-    t.string "descripcion"
-    t.decimal "stock_gramos", precision: 10, scale: 2, default: "0.0", null: false
-    t.decimal "stock_minimo", precision: 10, scale: 2, default: "0.0"
-    t.bigint "lote_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.bigint "genetica_id"
-    t.decimal "precio_por_unidad", precision: 10, scale: 2
-    t.index ["club_id"], name: "index_sede_inventarios_on_club_id"
-    t.index ["created_by_id"], name: "index_sede_inventarios_on_created_by_id"
-    t.index ["genetica_id"], name: "index_sede_inventarios_on_genetica_id"
-    t.index ["lote_id"], name: "index_sede_inventarios_on_lote_id"
-    t.index ["sede_id", "genetica_id"], name: "index_sede_inv_sede_genetica_unique", unique: true, where: "(genetica_id IS NOT NULL)"
-    t.index ["sede_id"], name: "index_sede_inventarios_on_sede_id"
   end
 
   create_table "sedes", force: :cascade do |t|
@@ -537,57 +691,55 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
     t.index ["created_by_id"], name: "index_sedes_on_created_by_id"
   end
 
+  create_table "setpoints_fase", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "genetica_id"
+    t.string "fase", null: false
+    t.string "tipo_lectura", null: false
+    t.decimal "valor_min", precision: 10, scale: 4
+    t.decimal "valor_max", precision: 10, scale: 4
+    t.decimal "valor_ideal", precision: 10, scale: 4
+    t.string "unidad", limit: 20, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "fase", "tipo_lectura"], name: "idx_setpoints_default", unique: true, where: "(genetica_id IS NULL)"
+    t.index ["club_id", "fase"], name: "idx_setpoints_club_fase"
+    t.index ["club_id", "genetica_id", "fase", "tipo_lectura"], name: "idx_setpoints_genetica", unique: true, where: "(genetica_id IS NOT NULL)"
+    t.index ["genetica_id"], name: "index_setpoints_fase_on_genetica_id"
+  end
+
   create_table "socio_nota", force: :cascade do |t|
-    t.bigint "socio_id", null: false
+    t.bigint "paciente_id", null: false
     t.bigint "user_id", null: false
     t.text "contenido"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
     t.index ["deleted_at"], name: "index_socio_nota_on_deleted_at"
-    t.index ["socio_id"], name: "index_socio_nota_on_socio_id"
+    t.index ["paciente_id"], name: "index_socio_nota_on_paciente_id"
     t.index ["user_id"], name: "index_socio_nota_on_user_id"
   end
 
-  create_table "socio_notas", force: :cascade do |t|
-    t.bigint "club_id", null: false
-    t.bigint "socio_id", null: false
-    t.text "contenido", null: false
-    t.datetime "deleted_at"
-    t.bigint "created_by_id", null: false
-    t.bigint "deleted_by_id"
+  create_table "stocks", force: :cascade do |t|
+    t.bigint "sede_id", null: false
+    t.string "origen", null: false
+    t.bigint "lote_id"
+    t.decimal "lote_origen_consumido_g", precision: 10, scale: 2
+    t.string "forma_producto", null: false
+    t.string "unidad", default: "g", null: false
+    t.decimal "cantidad", precision: 10, scale: 2, null: false
+    t.decimal "costo_unitario_ars", precision: 10, scale: 2
+    t.decimal "precio_sugerido_ars", precision: 10, scale: 2
+    t.string "proveedor"
+    t.string "descripcion"
+    t.string "categoria"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["club_id"], name: "index_socio_notas_on_club_id"
-    t.index ["deleted_at"], name: "index_socio_notas_on_deleted_at"
-    t.index ["socio_id", "created_at"], name: "idx_socio_notas_socio_created_desc", order: { created_at: :desc }
-  end
-
-  create_table "socios", force: :cascade do |t|
-    t.bigint "club_id", null: false
-    t.string "nombre", null: false
-    t.string "apellido", null: false
-    t.string "dni", null: false
-    t.string "dni_normalizado", null: false
-    t.date "fecha_nacimiento", null: false
-    t.boolean "es_paciente", default: true, null: false
-    t.datetime "deleted_at"
-    t.bigint "created_by_id", null: false
-    t.bigint "updated_by_id"
-    t.bigint "deleted_by_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.string "email"
-    t.string "telefono"
-    t.string "reprocann_numero"
-    t.date "reprocann_vencimiento"
-    t.string "reprocann_adjunto"
-    t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
-    t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
-    t.index ["club_id"], name: "index_socios_on_club_id"
-    t.index ["created_at"], name: "index_socios_on_created_at"
-    t.index ["deleted_at"], name: "index_socios_on_deleted_at"
-    t.index ["dni_normalizado"], name: "index_socios_on_dni_normalizado", unique: true
+    t.index ["lote_id", "forma_producto"], name: "index_stocks_on_lote_id_and_forma_producto"
+    t.index ["lote_id"], name: "index_stocks_on_lote_id"
+    t.index ["origen"], name: "index_stocks_on_origen"
+    t.index ["sede_id", "origen"], name: "index_stocks_on_sede_id_and_origen"
+    t.index ["sede_id"], name: "index_stocks_on_sede_id"
   end
 
   create_table "tareas", force: :cascade do |t|
@@ -657,30 +809,38 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "alertas", "lecturas_ambientales", column: "lectura_id"
+  add_foreign_key "alertas", "reglas_ambientales", column: "regla_id"
+  add_foreign_key "alertas", "salas"
+  add_foreign_key "alertas", "users", column: "reconocida_por_id"
+  add_foreign_key "alertas", "users", column: "resuelta_por_id"
   add_foreign_key "costo_lotes", "clubs"
   add_foreign_key "costo_lotes", "lotes"
   add_foreign_key "costo_lotes", "users", column: "calculado_por_id"
+  add_foreign_key "cuenta_corriente_movimientos", "cuenta_corrientes"
+  add_foreign_key "cuenta_corriente_movimientos", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "cuenta_corriente_movimientos", "users", column: "created_by_id"
+  add_foreign_key "cuenta_corrientes", "clubs"
+  add_foreign_key "cuenta_corrientes", "pacientes"
   add_foreign_key "dispensaciones", "indicacion_medicas"
-  add_foreign_key "dispensaciones", "lotes"
-  add_foreign_key "dispensaciones", "sede_inventarios"
+  add_foreign_key "dispensaciones", "pacientes"
   add_foreign_key "dispensaciones", "sedes"
-  add_foreign_key "dispensaciones", "socios"
+  add_foreign_key "dispensaciones", "stocks", on_delete: :nullify
   add_foreign_key "dispensaciones", "users"
+  add_foreign_key "dispositivos", "clubs"
+  add_foreign_key "dispositivos", "salas"
   add_foreign_key "document_templates", "clubs"
   add_foreign_key "document_templates", "users", column: "created_by_id"
   add_foreign_key "documentos", "clubs"
   add_foreign_key "documentos", "users"
   add_foreign_key "eventos", "clubs"
   add_foreign_key "geneticas", "clubs"
-  add_foreign_key "indicacion_medicas", "socios"
+  add_foreign_key "indicacion_medicas", "pacientes"
   add_foreign_key "indicacion_medicas", "users"
-  add_foreign_key "inventario_movimientos", "clubs"
-  add_foreign_key "inventario_movimientos", "dispensaciones", column: "dispensacion_id"
-  add_foreign_key "inventario_movimientos", "lotes"
-  add_foreign_key "inventario_movimientos", "sede_inventarios"
-  add_foreign_key "inventario_movimientos", "sedes"
-  add_foreign_key "inventario_movimientos", "users", column: "aprobado_por_id"
-  add_foreign_key "inventario_movimientos", "users", column: "created_by_id"
+  add_foreign_key "lecturas_ambientales", "dispositivos"
+  add_foreign_key "lecturas_ambientales", "lotes"
+  add_foreign_key "lecturas_ambientales", "salas"
+  add_foreign_key "lecturas_ambientales_diarias", "salas"
   add_foreign_key "lote_eventos", "clubs"
   add_foreign_key "lote_eventos", "lotes"
   add_foreign_key "lote_eventos", "users"
@@ -694,39 +854,41 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_24_163000) do
   add_foreign_key "notas", "clubs"
   add_foreign_key "notas", "users"
   add_foreign_key "noticias", "clubs"
+  add_foreign_key "paciente_notas", "clubs"
+  add_foreign_key "paciente_notas", "pacientes"
+  add_foreign_key "paciente_notas", "users", column: "created_by_id"
+  add_foreign_key "paciente_notas", "users", column: "deleted_by_id"
+  add_foreign_key "pacientes", "clubs"
+  add_foreign_key "pacientes", "users", column: "created_by_id"
+  add_foreign_key "pacientes", "users", column: "deleted_by_id"
+  add_foreign_key "pacientes", "users", column: "updated_by_id"
   add_foreign_key "patient_documents", "clubs"
   add_foreign_key "patient_documents", "document_templates", column: "template_id"
-  add_foreign_key "patient_documents", "socios"
+  add_foreign_key "patient_documents", "pacientes"
   add_foreign_key "patient_documents", "users", column: "created_by_id"
+  add_foreign_key "pesadas", "lotes"
+  add_foreign_key "pesadas", "users", column: "registrado_por_id"
+  add_foreign_key "pesadas_plantas", "pesadas"
+  add_foreign_key "pesadas_plantas", "plants"
   add_foreign_key "plant_activities", "plants"
   add_foreign_key "plant_activities", "users"
-  add_foreign_key "plants", "geneticas"
   add_foreign_key "plants", "lotes"
   add_foreign_key "registros_ambientales", "clubs"
   add_foreign_key "registros_ambientales", "lotes"
   add_foreign_key "registros_ambientales", "users"
+  add_foreign_key "reglas_ambientales", "salas"
   add_foreign_key "sala_cultivadores", "salas"
   add_foreign_key "sala_cultivadores", "users"
   add_foreign_key "salas", "clubs"
   add_foreign_key "salas", "sedes"
   add_foreign_key "salas", "users", column: "created_by_id"
-  add_foreign_key "sede_inventarios", "clubs"
-  add_foreign_key "sede_inventarios", "geneticas"
-  add_foreign_key "sede_inventarios", "lotes"
-  add_foreign_key "sede_inventarios", "sedes"
-  add_foreign_key "sede_inventarios", "users", column: "created_by_id"
   add_foreign_key "sedes", "clubs"
   add_foreign_key "sedes", "users", column: "created_by_id"
-  add_foreign_key "socio_nota", "socios"
+  add_foreign_key "setpoints_fase", "geneticas"
+  add_foreign_key "socio_nota", "pacientes"
   add_foreign_key "socio_nota", "users"
-  add_foreign_key "socio_notas", "clubs"
-  add_foreign_key "socio_notas", "socios"
-  add_foreign_key "socio_notas", "users", column: "created_by_id"
-  add_foreign_key "socio_notas", "users", column: "deleted_by_id"
-  add_foreign_key "socios", "clubs"
-  add_foreign_key "socios", "users", column: "created_by_id"
-  add_foreign_key "socios", "users", column: "deleted_by_id"
-  add_foreign_key "socios", "users", column: "updated_by_id"
+  add_foreign_key "stocks", "lotes"
+  add_foreign_key "stocks", "sedes"
   add_foreign_key "tareas", "clubs"
   add_foreign_key "tareas", "lotes"
   add_foreign_key "tareas", "plants"

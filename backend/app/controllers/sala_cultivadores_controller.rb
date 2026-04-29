@@ -13,8 +13,8 @@ class SalaCultivadoresController < ApplicationController
   def create
     user = current_user.club.users.find(params[:user_id])
 
-    unless user.cultivador? || user.manicurador?
-      return render json: { error: 'El usuario debe ser cultivador o manicurador' }, status: :unprocessable_entity
+    unless user.cultivador? || user.manicura?
+      return render json: { error: 'El usuario debe ser cultivador o manicura' }, status: :unprocessable_entity
     end
 
     asignacion = @sala.sala_cultivadores.find_or_initialize_by(user: user)
@@ -48,7 +48,7 @@ class SalaCultivadoresController < ApplicationController
   end
 
   def require_admin!
-    unless current_user.admin? || current_user.agricultor?
+    unless current_user.admin? || current_user.cultivador?
       render json: { error: 'Sin permiso' }, status: :forbidden
     end
   end

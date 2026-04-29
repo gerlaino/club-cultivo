@@ -2,7 +2,7 @@ class Club < ApplicationRecord
   has_many :users,                dependent: :restrict_with_error
   has_many :salas,                dependent: :destroy
   has_many :lotes,                dependent: :destroy
-  has_many :socios,               dependent: :destroy
+  has_many :pacientes,            class_name: 'Paciente', dependent: :destroy
   has_many :geneticas,            dependent: :destroy
   has_many :noticias,             dependent: :destroy
   has_many :eventos,              dependent: :destroy
@@ -12,9 +12,13 @@ class Club < ApplicationRecord
   has_many :tareas,               dependent: :destroy
   has_many :documentos,           dependent: :destroy
   has_many :document_templates,   dependent: :destroy
-  has_many :patient_documents,    through: :socios
+  has_many :patient_documents,    through: :pacientes
   has_many :plants,               through: :lotes
-  has_many :notas, dependent: :destroy
+  has_many :notas,           dependent: :destroy
+  has_many :inventario_movimientos, class_name: 'InventarioMovimiento', dependent: :destroy
+  has_many :dispositivos,    dependent: :destroy
+  has_many :reglas_ambientales, class_name: 'ReglaAmbiental', dependent: :destroy
+  has_many :alertas,         dependent: :destroy
 
   has_one_attached :logo
 
@@ -25,7 +29,7 @@ class Club < ApplicationRecord
   before_validation :generar_slug, on: :create
   after_create :crear_geneticas_default!
 
-  ROLES_DEFAULT    = %w[admin medico agricultor cultivador abogado].freeze
+  ROLES_DEFAULT    = %w[admin medico cultivador abogado].freeze
   PASSWORD_DEFAULT = '123456Aa'.freeze
 
   GENETICAS_INASE = [
@@ -112,8 +116,8 @@ class Club < ApplicationRecord
 
   def crear_geneticas_default!
     GENETICAS_INASE.map do |data|
-      next if geneticas.exists?(nombre: data[:nombre])
-      geneticas.create!(data)
+      next if Genetica.where(global: true, nombre: data[:nombre]).exists?
+      Genetica.create!(data.merge(global: true, club_id: nil))
     end.compact
   end
 

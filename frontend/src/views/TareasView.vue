@@ -73,14 +73,11 @@
             <span class="tv__section-count">{{ dashboard.hoy?.length || 0 }}</span>
           </div>
 
-          <div v-if="!dashboard.hoy?.length" class="tv__empty">
-            <div class="tv__empty-emoji">🎉</div>
-            <div class="tv__empty-title">Sin tareas para hoy</div>
-            <p class="tv__empty-desc">¡Todo al día! O creá una nueva tarea para organizar el trabajo.</p>
-            <button v-if="puedeCrear" class="tv__btn-primary" @click="abrirModalNueva">
-              <i class="bi bi-plus-lg"></i> Nueva tarea
-            </button>
-          </div>
+          <EmptyState v-if="!dashboard.hoy?.length" icon="🎉" title="Sin tareas para hoy" message="¡Todo al día! O creá una nueva tarea para organizar el trabajo.">
+            <template #actions>
+              <button v-if="puedeCrear" class="tv__btn-primary" @click="abrirModalNueva"><i class="bi bi-plus-lg"></i> Nueva tarea</button>
+            </template>
+          </EmptyState>
 
           <div v-else class="tv__kanban-cols">
             <!-- Pendiente -->
@@ -94,7 +91,7 @@
                            @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
                            @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
                            @cancelar="confirmarCancelar(t)" />
-                <div v-if="!hoyPendientes.length" class="tv__col-empty">Sin pendientes 👍</div>
+                <EmptyState v-if="!hoyPendientes.length" icon="bi-check2-all" title="Sin pendientes" compact />
               </div>
             </div>
             <!-- En progreso -->
@@ -107,7 +104,7 @@
                 <TareaCard v-for="t in hoyEnProgreso" :key="t.id" :tarea="t"
                            @click="abrirDetalle(t)" @completar="abrirModalCompletar(t)"
                            @editar="abrirModalEditar(t)" @cancelar="confirmarCancelar(t)" />
-                <div v-if="!hoyEnProgreso.length" class="tv__col-empty">Sin tareas activas</div>
+                <EmptyState v-if="!hoyEnProgreso.length" icon="bi-activity" title="Sin tareas activas" compact />
               </div>
             </div>
             <!-- Completadas -->
@@ -119,7 +116,7 @@
               <div class="tv__col-body">
                 <TareaCard v-for="t in hoyCompletadas" :key="t.id" :tarea="t"
                            @click="abrirDetalle(t)" @editar="abrirModalEditar(t)" />
-                <div v-if="!hoyCompletadas.length" class="tv__col-empty">Aún no hay completadas</div>
+                <EmptyState v-if="!hoyCompletadas.length" icon="bi-check2-circle" title="Sin completadas" compact />
               </div>
             </div>
           </div>
@@ -174,7 +171,7 @@
                          @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
                          @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
                          @cancelar="confirmarCancelar(t)" />
-              <div v-if="!kanban[col.key]?.length" class="tv__col-empty">Sin tareas</div>
+              <EmptyState v-if="!kanban[col.key]?.length" icon="bi-inbox" title="Sin tareas" compact />
             </div>
           </div>
         </div>
@@ -276,18 +273,13 @@
       @cerrar="showModalCompletar = false"
     />
 
-    <!-- Toast -->
-    <Transition name="tv-toast">
-      <div v-if="toast.visible" class="tv__toast" :class="`tv__toast--${toast.tipo}`">
-        <i :class="toast.icono"></i> {{ toast.mensaje }}
-      </div>
-    </Transition>
 
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { useTareasStore } from '../stores/tareas'
 import TareaCard from '../components/TareaCard.vue'
@@ -295,6 +287,9 @@ import ModalTarea from '../components/ModalTarea.vue'
 import ModalCompletarTarea from '../components/ModalCompletarTarea.vue'
 import { listSalas, listLotes, listUsers, listSedes } from '../lib/api'
 import { storeToRefs } from 'pinia'
+import { useToast } from '../composables/useToast.js'
+import { useConfirm } from '../composables/useConfirm.js'
+import EmptyState from '../components/ui/EmptyState.vue'
 
 const authStore   = useAuthStore()
 const tareasStore = useTareasStore()
@@ -310,7 +305,8 @@ const sedes             = ref([])
 const lotes             = ref([])
 const usuarios          = ref([])
 const filtros           = ref({ asignada_a_id: '', sala_id: '', lote_id: '' })
-const toast             = ref({ visible: false, mensaje: '', tipo: 'success', icono: 'bi bi-check-circle-fill' })
+const toast             = useToast()
+const { confirm }       = useConfirm()
 
 const { loading, dashboard, kanban, stats, hayVencidas, hoyPendientes, hoyEnProgreso, hoyCompletadas } = storeToRefs(tareasStore)
 
@@ -376,7 +372,7 @@ async function cargarContexto() {
         ...u, nombre_completo: `${u.first_name} ${u.last_name}`.trim()
       }))
     }
-  } catch (e) { console.error('Error cargando contexto:', e) }
+  } catch (e) { logger.error('Error cargando contexto:', e) }
 }
 
 async function cambiarAKanban() { vistaActiva.value = 'kanban'; await cargarKanban() }
@@ -400,22 +396,23 @@ async function iniciarTarea(t) {
   catch (e) { mostrarToast(e.response?.data?.error || 'Error al iniciar', 'error') }
 }
 async function confirmarCancelar(t) {
-  if (!confirm(`¿Cancelar la tarea "${t.titulo}"?`)) return
-  try { await tareasStore.cancelar(t.id); tareaDetalle.value = null; mostrarToast('Tarea cancelada', 'warning') }
-  catch (e) { mostrarToast(e.response?.data?.error || 'Error', 'error') }
+  const ok = await confirm({ title: `¿Cancelar la tarea "${t.titulo}"?`, variant: 'warning', confirmText: 'Cancelar tarea', cancelText: 'Volver' })
+  if (!ok) return
+  try { await tareasStore.cancelar(t.id); tareaDetalle.value = null; toast.warning('Tarea cancelada') }
+  catch (e) { toast.error(e.response?.data?.error || 'Error') }
 }
-function onTareaGuardada() { showModalTarea.value = false; tareaEditando.value = null; mostrarToast(tareaEditando.value ? 'Tarea actualizada' : 'Tarea creada ✓') }
-function onTareaCompletada() { showModalCompletar.value = false; tareaCompletando.value = null; mostrarToast('Tarea completada ✓') }
+function onTareaGuardada() { showModalTarea.value = false; tareaEditando.value = null; toast.success('Tarea guardada ✓') }
+function onTareaCompletada() { showModalCompletar.value = false; tareaCompletando.value = null; toast.success('Tarea completada ✓') }
 
 function puedeEditarTarea(t) {
   const u = authStore.user
-  return u?.role === 'admin' || u?.role === 'agricultor' || (u?.role === 'cultivador' && t.asignada_a?.id === u.id)
+  return u?.role === 'admin' || u?.role === 'cultivador'
 }
 
 function mostrarToast(mensaje, tipo = 'success') {
-  const iconos = { success: 'bi bi-check-circle-fill', error: 'bi bi-x-circle-fill', warning: 'bi bi-exclamation-triangle-fill' }
-  toast.value = { visible: true, mensaje, tipo, icono: iconos[tipo] }
-  setTimeout(() => { toast.value.visible = false }, 3000)
+  if (tipo === 'error') toast.error(mensaje)
+  else if (tipo === 'warning') toast.warning(mensaje)
+  else toast.success(mensaje)
 }
 </script>
 
@@ -472,16 +469,11 @@ function mostrarToast(mensaje, tipo = 'success') {
 .tv__col-header--done     { background: rgba(21,128,61,.1);   color: #15803d; }
 .tv__col-count { font-size: .7rem; font-weight: 700; background: rgba(0,0,0,.06); padding: .15em .5em; border-radius: 5px; }
 .tv__col-body { padding: .75rem; min-height: 100px; max-height: 65vh; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; }
-.tv__col-empty { text-align: center; color: #94a3b8; font-size: .8rem; padding: 1.5rem 0; }
 
 /* Próximas */
 .tv__proximas { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .75rem; padding: 1rem; }
 
 /* Empty */
-.tv__empty { text-align: center; padding: 3.5rem 1rem; color: #94a3b8; }
-.tv__empty-emoji { font-size: 3rem; margin-bottom: .75rem; }
-.tv__empty-title { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin-bottom: .4rem; }
-.tv__empty-desc { font-size: .875rem; margin-bottom: 1.25rem; }
 
 /* Filtros kanban */
 .tv__filtros { display: flex; align-items: center; gap: .65rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
@@ -522,10 +514,4 @@ function mostrarToast(mensaje, tipo = 'success') {
 .tv__btn-primary:hover { background: #144a18; }
 
 /* Toast */
-.tv__toast { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; display: flex; align-items: center; gap: .6rem; padding: .875rem 1.25rem; border-radius: 12px; font-size: .875rem; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
-.tv__toast--success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
-.tv__toast--error   { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
-.tv__toast--warning { background: #fffbeb; border: 1px solid #fde68a; color: #b45309; }
-.tv-toast-enter-active, .tv-toast-leave-active { transition: all .25s ease; }
-.tv-toast-enter-from, .tv-toast-leave-to { opacity: 0; transform: translateY(10px); }
 </style>

@@ -1,7 +1,8 @@
 class SocioNota < ApplicationRecord
+  self.table_name = 'paciente_notas'
   acts_as_paranoid
 
-  belongs_to :socio
+  belongs_to :paciente, foreign_key: :paciente_id
 
   validates :contenido, presence: true
 

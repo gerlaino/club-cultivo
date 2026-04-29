@@ -1,19 +1,18 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from "vue"
-import html2pdf from 'html2pdf.js'
 import { useAuthStore } from "../stores/auth"
 import { getInformeSemestral } from "../lib/api"
+import { semestreActual as getSemestreActual, formatFechaLarga, formatFechaCorta, formatFechaSemestre } from '../utils/dates.js'
 
 const auth    = useAuthStore()
 const informe = ref(null)
 const loading = ref(false)
 const error   = ref(null)
 
-const anioActual     = new Date().getFullYear()
-const semestreActual = new Date().getMonth() < 6 ? 1 : 2
+const { year: anioActual, semestre: semActual } = getSemestreActual()
 
 const anio     = ref(anioActual)
-const semestre = ref(semestreActual)
+const semestre = ref(semActual)
 
 const anios = computed(() => {
   const arr = []
@@ -23,9 +22,8 @@ const anios = computed(() => {
 
 const periodoLabel = computed(() => {
   if (!informe.value) return ''
-  const s = informe.value.periodo.semestre
-  const a = informe.value.periodo.anio
-  return `${s}° Semestre ${a} — ${s === 1 ? 'Enero a Junio' : 'Julio a Diciembre'}`
+  const { semestre: s, anio: a } = informe.value.periodo
+  return `${s}° Semestre ${a} — ${formatFechaSemestre(a, s)}`
 })
 
 async function cargar() {
@@ -41,14 +39,8 @@ async function cargar() {
   }
 }
 
-function formatDate(d) {
-  if (!d) return "—"
-  return new Date(d).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" })
-}
-function formatDateShort(d) {
-  if (!d) return "—"
-  return new Date(d).toLocaleDateString("es-AR")
-}
+function formatDate(d)      { return formatFechaLarga(d) }
+function formatDateShort(d) { return formatFechaCorta(d) }
 
 function estadoMeta(estado) {
   return {
@@ -88,6 +80,7 @@ async function descargarPDF() {
     pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] },
   }
   try {
+    const { default: html2pdf } = await import('html2pdf.js')
     await html2pdf().set(opt).from(el).save()
   } finally {
     generandoPDF.value = false
@@ -167,25 +160,25 @@ onMounted(() => cargar())
             <div class="ir__portada-periodo">
               <div class="ir__portada-periodo-label">Período declarado</div>
               <div class="ir__portada-periodo-val">{{ periodoLabel }}</div>
-              <div class="ir__portada-periodo-fechas">{{ formatDateShort(informe.periodo.desde) }} al {{ formatDateShort(informe.periodo.hasta) }}</div>
+              <div class="ir__portada-periodo-fechas">{{ formatDate(informe.periodo.desde) }} al {{ formatDate(informe.periodo.hasta) }}</div>
               <div class="ir__portada-generado">Generado el {{ formatDate(informe.generado_en) }} por {{ informe.generado_por }}</div>
             </div>
           </div>
         </div>
 
         <!-- ── Alertas ── -->
-        <div v-if="informe.socios.vencidos > 0 || informe.socios.por_vencer > 0" class="ir__alertas d-print-none">
-          <div v-if="informe.socios.vencidos > 0" class="ir__alerta ir__alerta--danger">
+        <div v-if="informe.pacientes.vencidos > 0 || informe.pacientes.por_vencer > 0" class="ir__alertas d-print-none">
+          <div v-if="informe.pacientes.vencidos > 0" class="ir__alerta ir__alerta--danger">
             <i class="bi bi-x-circle-fill"></i>
             <div>
-              <strong>{{ informe.socios.vencidos }} paciente{{ informe.socios.vencidos > 1 ? 's' : '' }} con autorización REPROCANN vencida</strong>
+              <strong>{{ informe.pacientes.vencidos }} paciente{{ informe.pacientes.vencidos > 1 ? 's' : '' }} con autorización REPROCANN vencida</strong>
               <span>— Requieren renovación urgente ante ANMAT.</span>
             </div>
           </div>
-          <div v-if="informe.socios.por_vencer > 0" class="ir__alerta ir__alerta--warn">
+          <div v-if="informe.pacientes.por_vencer > 0" class="ir__alerta ir__alerta--warn">
             <i class="bi bi-exclamation-triangle-fill"></i>
             <div>
-              <strong>{{ informe.socios.por_vencer }} paciente{{ informe.socios.por_vencer > 1 ? 's' : '' }} con autorización próxima a vencer</strong>
+              <strong>{{ informe.pacientes.por_vencer }} paciente{{ informe.pacientes.por_vencer > 1 ? 's' : '' }} con autorización próxima a vencer</strong>
               <span>— Vencen en los próximos 30 días.</span>
             </div>
           </div>
@@ -195,9 +188,9 @@ onMounted(() => cargar())
         <div class="ir__kpis">
           <div class="ir__kpi">
             <div class="ir__kpi-icon ir__kpi-icon--blue"><i class="bi bi-people-fill"></i></div>
-            <div class="ir__kpi-val">{{ informe.socios.con_reprocann }}</div>
+            <div class="ir__kpi-val">{{ informe.pacientes.con_reprocann }}</div>
             <div class="ir__kpi-label">Pacientes REPROCANN</div>
-            <div class="ir__kpi-sub">{{ informe.socios.total }} socios en total</div>
+            <div class="ir__kpi-sub">{{ informe.pacientes.total }} socios en total</div>
           </div>
           <div class="ir__kpi">
             <div class="ir__kpi-icon ir__kpi-icon--green"><i class="bi bi-flower1"></i></div>
@@ -231,7 +224,7 @@ onMounted(() => cargar())
                   <div class="ir__section-title">Nómina de pacientes vinculados</div>
                   <div class="ir__section-desc">Pacientes con autorización REPROCANN registrada en el club</div>
                 </div>
-                <span class="ir__badge">{{ informe.socios.total }}</span>
+                <span class="ir__badge">{{ informe.pacientes.total }}</span>
               </div>
               <div class="ir__table-wrap">
                 <table class="ir__table">
@@ -246,7 +239,7 @@ onMounted(() => cargar())
                   </tr>
                   </thead>
                   <tbody>
-                  <tr v-for="(s, i) in informe.socios.nomina" :key="s.dni">
+                  <tr v-for="(s, i) in informe.pacientes.nomina" :key="s.dni">
                     <td class="ir__td-num">{{ i + 1 }}</td>
                     <td class="ir__td-nombre">{{ s.nombre_completo }}</td>
                     <td class="ir__td-mono">{{ s.dni }}</td>
@@ -264,10 +257,10 @@ onMounted(() => cargar())
               </div>
               <!-- Resumen REPROCANN -->
               <div class="ir__section-footer">
-                <div class="ir__stat"><span class="ir__stat-val ir__stat-val--green">{{ informe.socios.con_reprocann }}</span><span class="ir__stat-label">Con autorización</span></div>
-                <div class="ir__stat"><span class="ir__stat-val ir__stat-val--amber">{{ informe.socios.sin_reprocann }}</span><span class="ir__stat-label">Sin registro</span></div>
-                <div class="ir__stat"><span class="ir__stat-val" :style="{ color: informe.socios.vencidos > 0 ? '#dc2626' : '#94a3b8' }">{{ informe.socios.vencidos }}</span><span class="ir__stat-label">Vencidos</span></div>
-                <div class="ir__stat"><span class="ir__stat-val" :style="{ color: informe.socios.por_vencer > 0 ? '#d97706' : '#94a3b8' }">{{ informe.socios.por_vencer }}</span><span class="ir__stat-label">Por vencer (30d)</span></div>
+                <div class="ir__stat"><span class="ir__stat-val ir__stat-val--green">{{ informe.pacientes.con_reprocann }}</span><span class="ir__stat-label">Con autorización</span></div>
+                <div class="ir__stat"><span class="ir__stat-val ir__stat-val--amber">{{ informe.pacientes.sin_reprocann }}</span><span class="ir__stat-label">Sin registro</span></div>
+                <div class="ir__stat"><span class="ir__stat-val" :style="{ color: informe.pacientes.vencidos > 0 ? '#dc2626' : '#94a3b8' }">{{ informe.pacientes.vencidos }}</span><span class="ir__stat-label">Vencidos</span></div>
+                <div class="ir__stat"><span class="ir__stat-val" :style="{ color: informe.pacientes.por_vencer > 0 ? '#d97706' : '#94a3b8' }">{{ informe.pacientes.por_vencer }}</span><span class="ir__stat-label">Por vencer (30d)</span></div>
               </div>
             </div>
 
@@ -343,7 +336,7 @@ onMounted(() => cargar())
                   <div class="ir__disp-kpi-label">Gramos entregados</div>
                 </div>
                 <div class="ir__disp-kpi">
-                  <div class="ir__disp-kpi-val">{{ informe.dispensaciones.socios_dispensados }}</div>
+                  <div class="ir__disp-kpi-val">{{ informe.dispensaciones.pacientes_dispensados }}</div>
                   <div class="ir__disp-kpi-label">Pacientes atendidos</div>
                 </div>
                 <div class="ir__disp-kpi">
@@ -452,23 +445,23 @@ onMounted(() => cargar())
               <div class="ir__repro-list">
                 <div class="ir__repro-row">
                   <span>Total socios</span>
-                  <strong>{{ informe.socios.total }}</strong>
+                  <strong>{{ informe.pacientes.total }}</strong>
                 </div>
                 <div class="ir__repro-row">
                   <span>Con autorización</span>
-                  <strong style="color:#15803d">{{ informe.socios.con_reprocann }}</strong>
+                  <strong style="color:#15803d">{{ informe.pacientes.con_reprocann }}</strong>
                 </div>
                 <div class="ir__repro-row">
                   <span>Sin registro</span>
-                  <strong style="color:#64748b">{{ informe.socios.sin_reprocann }}</strong>
+                  <strong style="color:#64748b">{{ informe.pacientes.sin_reprocann }}</strong>
                 </div>
                 <div class="ir__repro-row">
                   <span>Autorizaciones vencidas</span>
-                  <strong :style="{ color: informe.socios.vencidos > 0 ? '#dc2626' : '#94a3b8' }">{{ informe.socios.vencidos }}</strong>
+                  <strong :style="{ color: informe.pacientes.vencidos > 0 ? '#dc2626' : '#94a3b8' }">{{ informe.pacientes.vencidos }}</strong>
                 </div>
                 <div class="ir__repro-row">
                   <span>Por vencer (30 días)</span>
-                  <strong :style="{ color: informe.socios.por_vencer > 0 ? '#d97706' : '#94a3b8' }">{{ informe.socios.por_vencer }}</strong>
+                  <strong :style="{ color: informe.pacientes.por_vencer > 0 ? '#d97706' : '#94a3b8' }">{{ informe.pacientes.por_vencer }}</strong>
                 </div>
               </div>
             </div>

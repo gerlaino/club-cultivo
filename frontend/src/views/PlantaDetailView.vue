@@ -1,11 +1,15 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import QRCode from 'qrcode'
 import { useRoute } from 'vue-router'
+import { useQRCode } from '../composables/useQRCode'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { getPlantActivities, createPlantActivity } from '../lib/api'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
+import Breadcrumb from '../components/ui/Breadcrumb.vue'
+import EmptyState from '../components/ui/EmptyState.vue'
+import Lightbox from '../components/ui/Lightbox.vue'
+import { useToast } from '../composables/useToast.js'
 
 const contextoAsistente = computed(() => planta.value ? {
   tipo:          'planta',
@@ -20,6 +24,7 @@ function onRegistradoPorVoz() { loadActivities() }
 const route  = useRoute()
 const plants = usePlantsStore()
 const auth   = useAuthStore()
+const toast  = useToast()
 
 const id           = Number(route.params.id)
 const error        = ref(null)
@@ -33,25 +38,30 @@ const historialExpanded= ref(true)
 const fotos            = ref([])
 const fotoInput        = ref(null)
 const uploadingFoto    = ref(false)
+const lightboxOpen     = ref(false)
+const lightboxIndex    = ref(0)
+const lightboxImages   = computed(() => fotos.value.map(f => ({ src: f.url, alt: f.filename })))
+function openLightbox(i) { lightboxIndex.value = i; lightboxOpen.value = true }
 const qrDataUrl        = ref(null)
+const { generatePNG, downloadPNG, downloadSVG } = useQRCode()
+
+function qrPlantaUrl() {
+  return `${window.location.origin}/p/${planta.value.codigo_qr}`
+}
+function qrFilename(ext) {
+  return `qr-planta-${planta.value.codigo_qr}.${ext}`
+}
 
 async function generarQR() {
   if (!planta.value?.codigo_qr) return
-  const url = `${window.location.origin}/p/${planta.value.codigo_qr}`
   try {
-    qrDataUrl.value = await QRCode.toDataURL(url, {
-      width: 200, margin: 2,
-      color: { dark: '#1b5e20', light: '#ffffff' }
+    qrDataUrl.value = await generatePNG(qrPlantaUrl(), {
+      width: 256, color: { dark: '#1b5e20', light: '#ffffff' }
     })
   } catch {}
 }
-function descargarQR() {
-  if (!qrDataUrl.value) return
-  const a = document.createElement('a')
-  a.href = qrDataUrl.value
-  a.download = `planta-${planta.value.codigo_qr}.png`
-  a.click()
-}
+async function descargarQRpng() { await downloadPNG(qrPlantaUrl(), qrFilename('png')) }
+async function descargarQRsvg() { await downloadSVG(qrPlantaUrl(), qrFilename('svg')) }
 
 // Modal registro
 const showModal   = ref(false)
@@ -191,6 +201,9 @@ async function guardarRegistro() {
 function toggleFotos() {
   fotosExpanded.value = !fotosExpanded.value
 }
+async function handleFotoUpload() {
+  toast.error('Subida de fotos de planta no implementada aún')
+}
 
 onMounted(async () => {
   try {
@@ -214,18 +227,13 @@ onMounted(async () => {
 
     <template v-else>
 
-      <!-- Breadcrumb -->
-      <nav class="pd__breadcrumb">
-        <RouterLink v-if="planta.lote?.sala" :to="{ name:'sala-detail', params:{ id: planta.lote.sala.id } }" class="pd__bc-link">
-          {{ planta.lote.sala.nombre }}
-        </RouterLink>
-        <span class="pd__bc-sep">›</span>
-        <RouterLink v-if="planta.lote" :to="{ name:'lote-detail', params:{ id: planta.lote.id } }" class="pd__bc-link">
-          {{ planta.lote.codigo }}
-        </RouterLink>
-        <span class="pd__bc-sep">›</span>
-        <span class="pd__bc-current">{{ planta.nombre || planta.codigo_qr }}</span>
-      </nav>
+      <Breadcrumb :items="[
+        { label: 'Sedes', to: { name: 'sedes' } },
+        ...(planta.lote?.sala?.sede ? [{ label: planta.lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: planta.lote.sala.sede.id } } }] : []),
+        ...(planta.lote?.sala ? [{ label: planta.lote.sala.nombre, to: { name: 'sala-detail', params: { id: planta.lote.sala.id } } }] : []),
+        ...(planta.lote ? [{ label: planta.lote.codigo, to: { name: 'lote-detail', params: { id: planta.lote.id } } }] : []),
+        { label: planta.nombre || planta.codigo_qr },
+      ]" />
 
       <!-- Hero -->
       <div class="pd__hero">
@@ -243,7 +251,7 @@ onMounted(async () => {
           <div class="pd__hero-meta">
             <span class="pd__qr-code">{{ planta.codigo_qr }}</span>
             <span class="pd__bc-sep">·</span>
-            <span>{{ planta.lote?.strain || planta.genetica?.nombre || '—' }}</span>
+            <span>{{ planta.genetica?.nombre || '—' }}</span>
             <span class="pd__bc-sep">·</span>
             <span>Día {{ diasEnCiclo }}</span>
           </div>
@@ -322,11 +330,11 @@ onMounted(async () => {
             </button>
             <div v-show="historialExpanded" class="pd__section-body pd__section-body--flush">
               <div v-if="loadingActs" class="pd__placeholder">Cargando historial…</div>
-              <div v-else-if="activities.length === 0" class="pd__empty">
-                <div class="pd__empty-icon">📋</div>
-                <p>Sin registros todavía</p>
-                <button class="pd__btn-outline" @click="abrirModal">Hacer primer registro</button>
-              </div>
+              <EmptyState v-else-if="activities.length === 0" icon="📋" title="Sin registros todavía" compact>
+                <template #actions>
+                  <button class="pd__btn-outline" @click="abrirModal">Hacer primer registro</button>
+                </template>
+              </EmptyState>
               <div v-else class="pd__actividades">
                 <div v-for="a in activities" :key="a.id" class="pd__actividad">
                   <div class="pd__act-dot"
@@ -390,15 +398,13 @@ onMounted(async () => {
             </button>
             <input ref="fotoInput" type="file" accept="image/*" style="display:none" @change="handleFotoUpload" />
             <div v-show="fotosExpanded" class="pd__section-body">
-              <div v-if="fotos.length === 0" class="pd__empty pd__empty--sm">
-                <div class="pd__empty-icon" style="font-size:2rem">📷</div>
-                <p>Sin fotos todavía</p>
-                <button class="pd__btn-outline" @click="fotoInput?.click()">
-                  <i class="bi bi-camera-fill"></i> Subir primera foto
-                </button>
-              </div>
+              <EmptyState v-if="fotos.length === 0" icon="📷" title="Sin fotos todavía" compact>
+                <template #actions>
+                  <button class="pd__btn-outline" @click="fotoInput?.click()"><i class="bi bi-camera-fill"></i> Subir primera foto</button>
+                </template>
+              </EmptyState>
               <div v-else class="pd__fotos-grid">
-                <div v-for="f in fotos" :key="f.id" class="pd__foto">
+                <div v-for="(f, i) in fotos" :key="f.id" class="pd__foto" @click="openLightbox(i)" style="cursor:pointer">
                   <img :src="f.url" :alt="f.filename" class="pd__foto-img" />
                   <div class="pd__foto-meta">{{ f.created_at_label }}</div>
                 </div>
@@ -417,7 +423,7 @@ onMounted(async () => {
             <dl class="pd__dl">
               <dt>Código</dt><dd class="pd__mono">{{ planta.codigo_qr || '—' }}</dd>
               <dt>Origen</dt><dd>{{ origenLabel(planta.origen) }}</dd>
-              <dt>Genética</dt><dd>{{ planta.lote?.strain || planta.genetica?.nombre || '—' }}</dd>
+              <dt>Genética</dt><dd>{{ planta.genetica?.nombre || '—' }}</dd>
               <dt>Tipo cultivo</dt><dd>{{ growLabel(planta.lote?.grow_type) }}</dd>
               <dt>Maceta</dt><dd>{{ planta.lote?.tamanio_maceta ? planta.lote.tamanio_maceta + 'L' : '—' }}</dd>
               <dt>Sustrato</dt><dd>{{ planta.lote?.sustrato_especifico || '—' }}</dd>
@@ -469,10 +475,24 @@ onMounted(async () => {
             <div class="pd__qr-body">
               <img v-if="qrDataUrl" :src="qrDataUrl" alt="QR" class="pd__qr-img" />
               <div v-else class="pd__qr-placeholder">Generando…</div>
-              <div class="pd__qr-hint">Escaneá para ver info pública de la planta</div>
-              <button v-if="qrDataUrl" class="pd__btn-outline pd__btn-qr-dl" @click="descargarQR">
-                <i class="bi bi-download"></i> Descargar QR
-              </button>
+              <div class="pd__qr-hint">Escaneá para acceder a esta planta</div>
+              <div v-if="qrDataUrl" class="dropdown">
+                <button class="pd__btn-outline pd__btn-qr-dl dropdown-toggle" data-bs-toggle="dropdown">
+                  <i class="bi bi-download"></i> Descargar QR
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                  <li>
+                    <button class="dropdown-item small py-2 d-flex align-items-center gap-2" @click="descargarQRsvg">
+                      <i class="bi bi-file-earmark-code text-muted"></i> SVG (impresión)
+                    </button>
+                  </li>
+                  <li>
+                    <button class="dropdown-item small py-2 d-flex align-items-center gap-2" @click="descargarQRpng">
+                      <i class="bi bi-file-earmark-image text-muted"></i> PNG (digital)
+                    </button>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
 
@@ -580,6 +600,14 @@ onMounted(async () => {
       </div>
     </Teleport>
 
+    <Lightbox
+      :images="lightboxImages"
+      :index="lightboxIndex"
+      :open="lightboxOpen"
+      @close="lightboxOpen = false"
+      @update:index="lightboxIndex = $event"
+    />
+
   </div>
 </template>
 
@@ -595,11 +623,6 @@ onMounted(async () => {
 @keyframes pd-spin { to { transform: rotate(360deg); } }
 
 /* Breadcrumb */
-.pd__breadcrumb { display: flex; align-items: center; gap: .4rem; font-size: .78rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
-.pd__bc-link    { color: #94a3b8; text-decoration: none; transition: color .15s; }
-.pd__bc-link:hover { color: #1b5e20; }
-.pd__bc-sep     { color: #cbd5e1; }
-.pd__bc-current { color: #1a1a1a; font-weight: 600; }
 
 /* Hero */
 .pd__hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
@@ -654,10 +677,6 @@ onMounted(async () => {
 .pd__section-body { border-top: 1px solid #e8f0e9; padding: 1rem 1.1rem; }
 .pd__section-body--flush { border-top: 1px solid #e8f0e9; padding: 0; }
 .pd__placeholder { padding: 1rem 1.1rem; color: #94a3b8; font-size: .875rem; }
-.pd__empty { text-align: center; padding: 2rem 1rem; color: #60725d; }
-.pd__empty--sm { padding: 1.25rem 1rem; }
-.pd__empty-icon { font-size: 2.5rem; margin-bottom: .5rem; }
-.pd__empty p { font-size: .875rem; margin: 0 0 .75rem; }
 
 /* Actividades / historial */
 .pd__actividades { display: flex; flex-direction: column; }

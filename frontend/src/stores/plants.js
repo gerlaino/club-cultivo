@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { defineStore } from "pinia";
 import { listPlants, getPlant } from "../lib/api";
 
@@ -19,7 +20,7 @@ export const usePlantsStore = defineStore("plants", {
         const { data } = await listPlants({ lote_id: loteId });
         this.itemsByLote.set(String(loteId), data || []);
       } catch (e) {
-        console.error("Plants.fetchByLote", e);
+        logger.error("Plants.fetchByLote", e);
         this.error = e?.response?.data?.error || e.message;
       } finally {
         this.loading = false;
@@ -32,7 +33,7 @@ export const usePlantsStore = defineStore("plants", {
         this.current = data;
         return data;
       } catch (e) {
-        console.error("Plants.fetchOne", e);
+        logger.error("Plants.fetchOne", e);
         this.error = e?.response?.data?.error || e.message;
         throw e;
       } finally {

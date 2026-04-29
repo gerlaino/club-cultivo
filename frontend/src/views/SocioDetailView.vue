@@ -1,27 +1,30 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useSociosStore } from '../stores/socios'
+import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
-import IndicacionesMedicas from '../components/socios/IndicacionesMedicas.vue'
-import Dispensaciones from '../components/socios/Dispensaciones.vue'
-import PatientDocuments from '../components/socios/PacienteDocumentos.vue'
+import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
+import Breadcrumb from '../components/ui/Breadcrumb.vue'
+import { useConfirm } from '../composables/useConfirm.js'
+import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
+import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
 
 const route   = useRoute()
 const router  = useRouter()
-const store   = useSociosStore()
+const store   = usePacientesStore()
 const auth    = useAuthStore()
 
+const { confirm } = useConfirm()
 const socioId   = Number(route.params.id)
 const loading   = ref(true)
 const error     = ref(null)
 const activeTab = ref('info')
 
-const canEdit = computed(() => ['admin', 'medico'].includes(auth.role))
+const canEdit = computed(() => ['admin', 'medico'].includes(auth.user?.role))
 const s       = computed(() => store.current)
 
 function openEdit() {
-  router.push({ name: 'socios', query: { editar: socioId } })
+  router.push({ name: 'pacientes', query: { editar: socioId } })
 }
 
 // ── Notas ─────────────────────────────────────────────────────────────
@@ -32,7 +35,8 @@ async function agregarNota() {
   try { await store.addNota(socioId, txt); notaTexto.value = '' } catch {}
 }
 async function borrarNota(n) {
-  if (!confirm('¿Eliminar esta nota?')) return
+  const ok = await confirm({ title: '¿Eliminar esta nota?', confirmText: 'Eliminar' })
+  if (!ok) return
   try { await store.removeNota(n.id) } catch {}
 }
 
@@ -57,13 +61,19 @@ const reprocannStatus = computed(() => {
 const AVATAR_COLORS = ['#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc2626','#15803d']
 function avatarColor(id) { return AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length] }
 
-const TABS = [
+const ALL_TABS = [
   { key: 'info',          label: 'Información',   icon: 'bi-person' },
-  { key: 'indicaciones',  label: 'Indicaciones',  icon: 'bi-file-medical' },
+  { key: 'indicaciones',  label: 'Indicaciones',  icon: 'bi-file-medical',     roles: ['admin', 'medico', 'auditor', 'abogado'] },
   { key: 'dispensaciones',label: 'Dispensaciones',icon: 'bi-capsule' },
-  { key: 'notas',         label: 'Notas',         icon: 'bi-journal-text' },
-  { key: 'documentos',    label: 'Documentos',    icon: 'bi-file-earmark-text' },
+  { key: 'notas',         label: 'Notas',         icon: 'bi-journal-text',     roles: ['admin', 'medico'] },
+  { key: 'documentos',    label: 'Documentos',    icon: 'bi-file-earmark-text',roles: ['admin', 'medico', 'auditor', 'abogado'] },
 ]
+
+const TABS = computed(() => {
+  const role = auth.user?.role
+  if (!role) return ALL_TABS
+  return ALL_TABS.filter(t => !t.roles || t.roles.includes(role))
+})
 
 onMounted(async () => {
   try {
@@ -90,11 +100,7 @@ onMounted(async () => {
     <template v-else>
 
       <!-- Breadcrumb -->
-      <nav class="sd__breadcrumb">
-        <RouterLink to="/socios" class="sd__breadcrumb-link">Pacientes</RouterLink>
-        <span class="sd__breadcrumb-sep">›</span>
-        <span class="sd__breadcrumb-current">{{ s.nombre }} {{ s.apellido }}</span>
-      </nav>
+      <Breadcrumb :items="[{ label: 'Pacientes', to: '/pacientes' }, { label: `${s.nombre} ${s.apellido}` }]" />
 
       <!-- Hero -->
       <div class="sd__hero">
@@ -345,11 +351,6 @@ onMounted(async () => {
 .sd__error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 10px; }
 
 /* Breadcrumb */
-.sd__breadcrumb { display: flex; align-items: center; gap: .4rem; font-size: .78rem; margin-bottom: 1.5rem; }
-.sd__breadcrumb-link { color: #94a3b8; text-decoration: none; font-weight: 600; }
-.sd__breadcrumb-link:hover { color: #1b5e20; }
-.sd__breadcrumb-sep { color: #cbd5e1; }
-.sd__breadcrumb-current { color: #0f172a; font-weight: 600; }
 
 /* Hero */
 .sd__hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.25rem; margin-bottom: 1.25rem; flex-wrap: wrap; }

@@ -2,7 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub } from '../../lib/api.js'
+import { useConfirm } from '../../composables/useConfirm.js'
+import { useToast } from '../../composables/useToast.js'
 
+const { confirm } = useConfirm()
+const toast = useToast()
 const route  = useRoute()
 const router = useRouter()
 const id     = Number(route.params.id)
@@ -27,11 +31,10 @@ const PLAN_META = {
 const PLANES = Object.entries(PLAN_META).map(([v, m]) => ({ value: v, ...m }))
 function planMeta(p) { return PLAN_META[p] || PLAN_META.semilla }
 
-const ROLES = ['admin', 'medico', 'agricultor', 'cultivador', 'abogado', 'auditor']
+const ROLES = ['admin', 'medico', 'cultivador', 'abogado', 'auditor']
 const ROLE_META = {
   admin:      { label: 'Admin',      color: '#0f172a', bg: '#f1f5f9' },
   medico:     { label: 'Médico',     color: '#0369a1', bg: '#dbeafe' },
-  agricultor: { label: 'Agricultor', color: '#15803d', bg: '#dcfce7' },
   cultivador: { label: 'Cultivador', color: '#16a34a', bg: '#f0fdf4' },
   abogado:    { label: 'Abogado',    color: '#7c3aed', bg: '#ede9fe' },
   auditor:    { label: 'Auditor',    color: '#b45309', bg: '#fffbeb' },
@@ -101,12 +104,13 @@ async function crearUsuario() {
 }
 
 async function generarUsuarios() {
-  if (!confirm('¿Generar los 5 usuarios por defecto? Solo se crean los que no existen todavía.')) return
+  const ok = await confirm({ title: '¿Generar usuarios por defecto?', message: 'Solo se crean los que no existen todavía.', variant: 'default', confirmText: 'Generar' })
+  if (!ok) return
   saving.value = true
   try {
     const { data } = await crearUsuariosDefault(id)
     await cargar()
-    alert(`Se crearon ${data.usuarios.length} usuarios nuevos.`)
+    toast.success(`Se crearon ${data.usuarios.length} usuarios nuevos.`)
   } finally {
     saving.value = false
   }
@@ -118,7 +122,7 @@ async function toggleWeb() {
     const { data } = await updateSuperAdminClub(id, { web_activa: !club.value.web_activa })
     club.value = { ...club.value, ...data }
   } catch (e) {
-    alert('Error al actualizar')
+    toast.error('Error al actualizar')
   } finally {
     saving.value = false
   }

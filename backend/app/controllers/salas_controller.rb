@@ -55,7 +55,7 @@ class SalasController < ApplicationController
 
   # POST /salas/:id/cargar_lote
   def cargar_lote
-    unless current_user.admin? || current_user.agricultor? || current_user.manicurador?
+    unless current_user.admin? || current_user.cultivador? || current_user.manicura?
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 
@@ -64,8 +64,8 @@ class SalasController < ApplicationController
       return render json: { error: "Esta sala (#{@sala.kind}) no acepta carga de lotes" }, status: :unprocessable_entity
     end
 
-    if @sala.kind == 'secado' && current_user.manicurador?
-      return render json: { error: 'Solo el agricultor puede mover lotes a secado' }, status: :forbidden
+    if @sala.kind == 'secado' && current_user.manicura?
+      return render json: { error: 'Solo el cultivador puede mover lotes a secado' }, status: :forbidden
     end
 
     lote = current_user.club.lotes.find(params.require(:lote_id))
@@ -111,7 +111,9 @@ class SalasController < ApplicationController
   def serialize_sala(s)
     {
       id:                   s.id,
+      club_id:              s.club_id,
       nombre:               s.nombre,
+      tipo:                 s.tipo,
       state:                s.state,
       kind:                 s.kind,
       notes:                s.notes,

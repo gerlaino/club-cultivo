@@ -123,9 +123,8 @@ onMounted(async () => {
 
         <div>
           <span class="sac__plan-pill" :style="{ background: planMeta(c.plan).bg, color: planMeta(c.plan).color }">
-            {{ planMeta(c.plan).label }}
+            {{ planMeta(c.plan).label }}{{ c.plan_trial ? ' · Trial' : '' }}
           </span>
-          <div v-if="c.plan_trial" class="sac__trial">trial</div>
           <div v-if="c.plan_activo_hasta" class="sac__hasta">hasta {{ formatDate(c.plan_activo_hasta) }}</div>
         </div>
 

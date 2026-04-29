@@ -10,7 +10,8 @@ class PlantsController < ApplicationController
       return render json: [] if salas_ids.empty?
       plants = plants.where(lotes: { sala_id: salas_ids })
     end
-    plants = plants.includes(:lote, :genetica).order(created_at: :desc)
+    plants = plants.where(lote_id: params[:lote_id]) if params[:lote_id].present?
+    plants = plants.includes(lote: [:genetica, { sala: :sede }]).order(created_at: :desc)
     render json: plants.map { |p| serialize_plant(p) }
   end
 
@@ -40,7 +41,7 @@ class PlantsController < ApplicationController
     count  = lote.plants.count + 1
     nombre = "#{lote.codigo}-P#{count.to_s.rjust(3, '0')}"
 
-    plant = lote.plants.build(plant_params.except(:nombre))
+    plant = lote.plants.build(plant_params.except(:nombre, :genetica_id))
     plant.nombre = nombre
 
     if plant.save
@@ -56,7 +57,7 @@ class PlantsController < ApplicationController
   def update
     old_state = @plant.state
 
-    permitted = plant_params.except(:nombre) # nombre nunca se edita
+    permitted = plant_params.except(:nombre, :genetica_id) # nombre y genetica_id nunca se editan en la planta
     if @plant.update(permitted)
       attach_foto(@plant) if params[:foto].present?
       if plant_params[:state].present? && @plant.state != old_state
@@ -97,7 +98,7 @@ class PlantsController < ApplicationController
       :nombre, :lote_id, :genetica_id, :state, :origen,
       :fecha_germinacion, :fecha_vegetativo,
       :fecha_floracion, :fecha_cosecha,
-      :peso_seco, :notas
+      :peso_seco, :notas, :es_seleccion
     )
   end
 
@@ -115,22 +116,21 @@ class PlantsController < ApplicationController
   end
 
   def serialize_plant(plant)
+    g = plant.lote.genetica
     {
-      id:         plant.id,
-      nombre:     plant.nombre,
-      codigo_qr:  plant.codigo_qr,
-      state:      plant.state,
-      origen:     plant.origen,
-      foto_url:   foto_url(plant),
+      id:           plant.id,
+      club_id:      plant.lote.club_id,
+      nombre:       plant.nombre,
+      codigo_qr:    plant.codigo_qr,
+      state:        plant.state,
+      origen:       plant.origen,
+      es_seleccion: plant.es_seleccion,
+      foto_url:     foto_url(plant),
       lote: {
         id:     plant.lote.id,
         codigo: plant.lote.codigo,
       },
-      genetica: plant.genetica ? {
-        id:     plant.genetica.id,
-        nombre: plant.genetica.nombre,
-        tipo:   plant.genetica.tipo,
-      } : nil,
+      genetica: g ? { id: g.id, nombre: g.nombre, tipo: g.tipo } : nil,
       fecha_germinacion:      plant.fecha_germinacion,
       dias_desde_germinacion: plant.fecha_germinacion ? (Date.today - plant.fecha_germinacion).to_i : nil,
       created_at: plant.created_at,
@@ -138,6 +138,7 @@ class PlantsController < ApplicationController
   end
 
   def serialize_plant_detail(plant)
+    g = plant.lote.genetica
     {
       id:        plant.id,
       nombre:    plant.nombre,
@@ -146,20 +147,16 @@ class PlantsController < ApplicationController
       origen:    plant.origen,
       foto_url:  foto_url(plant),
       lote: {
-        id:     plant.lote.id,
-        codigo: plant.lote.codigo,
+        id:         plant.lote.id,
+        codigo:     plant.lote.codigo,
+        genetica_id: plant.lote.genetica_id,
         sala: {
           id:     plant.lote.sala.id,
           nombre: plant.lote.sala.nombre,
+          sede:   { id: plant.lote.sala.sede_id, nombre: plant.lote.sala.sede.nombre },
         },
       },
-      genetica: plant.genetica ? {
-        id:     plant.genetica.id,
-        nombre: plant.genetica.nombre,
-        tipo:   plant.genetica.tipo,
-        thc:    plant.genetica.thc,
-        cbd:    plant.genetica.cbd,
-      } : nil,
+      genetica: g ? { id: g.id, nombre: g.nombre, tipo: g.tipo, thc: g.thc, cbd: g.cbd } : nil,
       fecha_germinacion:      plant.fecha_germinacion,
       fecha_vegetativo:       plant.fecha_vegetativo,
       fecha_floracion:        plant.fecha_floracion,

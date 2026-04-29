@@ -66,7 +66,6 @@
           <div class="qr__plant-nombre">{{ plantaInfo.nombre }}</div>
           <div class="qr__plant-meta">
             <span v-if="plantaInfo.lote?.codigo">{{ plantaInfo.lote.codigo }}</span>
-            <span v-if="plantaInfo.estado" class="qr__plant-estado">· {{ plantaInfo.estado }}</span>
           </div>
         </div>
       </div>

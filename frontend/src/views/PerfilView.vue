@@ -180,7 +180,6 @@ function roleLabel(role) {
   return {
     admin:       'Administrador',
     medico:      'Médico',
-    agricultor:  'Agricultor',
     cultivador:  'Cultivador',
     abogado:     'Abogado',
     auditor:     'Auditor',

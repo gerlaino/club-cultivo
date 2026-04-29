@@ -71,10 +71,7 @@
         </button>
       </div>
       <div v-if="loadingNoticias" class="wpv__loading"><div class="wpv__spinner"></div></div>
-      <div v-else-if="noticias.length === 0" class="wpv__empty">
-        <i class="bi bi-newspaper" style="font-size:2rem;opacity:.3;display:block;margin-bottom:.75rem"></i>
-        No hay noticias todavía. Creá la primera.
-      </div>
+      <EmptyState v-else-if="noticias.length === 0" icon="bi-newspaper" title="Sin noticias todavía" message="Creá la primera noticia para tu club." />
       <div v-else class="wpv__cards-grid">
         <div v-for="n in noticias" :key="n.id" class="wpv__news-card">
           <div class="wpv__news-card-img" :style="n.cover_url ? `background-image:url(${n.cover_url})` : ''">
@@ -113,10 +110,7 @@
       <div v-if="loadingEventos" class="wpv__loading"><div class="wpv__spinner"></div></div>
       <div v-else class="wpv__eventos-layout">
         <div class="wpv__eventos-list">
-          <div v-if="eventos.length === 0" class="wpv__empty">
-            <i class="bi bi-calendar-event" style="font-size:2rem;opacity:.3;display:block;margin-bottom:.75rem"></i>
-            No hay eventos cargados todavía.
-          </div>
+          <EmptyState v-if="eventos.length === 0" icon="bi-calendar-event" title="Sin eventos" message="No hay eventos cargados todavía." compact />
           <div v-for="e in eventos" :key="e.id" class="wpv__evento-card"
                :class="{ 'wpv__evento-card--inactivo': !e.activo }">
             <div class="wpv__evento-card-fecha">
@@ -412,10 +406,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logger } from '../utils/logger.js'
 import { useClubStore } from '../stores/club'
 import { storeToRefs } from 'pinia'
 import api from '../lib/api'
+import { useConfirm } from '../composables/useConfirm.js'
+import EmptyState from '../components/ui/EmptyState.vue'
 
+const { confirm } = useConfirm()
 const clubStore = useClubStore()
 const { data: club } = storeToRefs(clubStore)
 const webUrl = import.meta.env.VITE_PUBLIC_WEB_URL || 'http://localhost:5174'
@@ -525,7 +523,7 @@ async function toggleVisibleWeb(g) {
   try {
     const { data } = await api.patch(`/geneticas/${g.id}`, { genetica: { visible_web: !g.visible_web } })
     g.visible_web = data.visible_web
-  } catch (e) { console.error(e) }
+  } catch (e) { logger.error(e) }
   finally { savingId.value = null }
 }
 
@@ -553,11 +551,12 @@ async function guardarNoticia() {
     }
     await cargarNoticias()
     modalNoticia.value = false
-  } catch (e) { console.error(e) }
+  } catch (e) { logger.error(e) }
   finally { savingNoticia.value = false }
 }
 async function eliminarNoticia(n) {
-  if (!confirm(`¿Eliminar "${n.titulo}"?`)) return
+  const ok = await confirm({ title: `¿Eliminar "${n.titulo}"?`, confirmText: 'Eliminar' })
+  if (!ok) return
   await api.delete(`/noticias/${n.id}`)
   await cargarNoticias()
 }
@@ -589,11 +588,12 @@ async function guardarEvento() {
     }
     await cargarEventos()
     modalEvento.value = false
-  } catch (e) { console.error(e) }
+  } catch (e) { logger.error(e) }
   finally { savingEvento.value = false }
 }
 async function eliminarEvento(e) {
-  if (!confirm(`¿Eliminar "${e.titulo}"?`)) return
+  const ok = await confirm({ title: `¿Eliminar "${e.titulo}"?`, confirmText: 'Eliminar' })
+  if (!ok) return
   await api.delete(`/eventos/${e.id}`)
   await cargarEventos()
 }
@@ -608,7 +608,7 @@ async function guardarConfig() {
     }
     configSaved.value = true
     setTimeout(() => { configSaved.value = false }, 3000)
-  } catch (e) { console.error(e) }
+  } catch (e) { logger.error(e) }
   finally { savingConfig.value = false }
 }
 
@@ -617,7 +617,7 @@ async function cargarGeneticas() {
   try {
     const { data } = await api.get('/geneticas')
     geneticas.value = data.data || data
-  } catch (e) { console.error(e) }
+  } catch (e) { logger.error(e) }
   finally { loadingGeneticas.value = false }
 }
 async function cargarNoticias() {
@@ -625,7 +625,7 @@ async function cargarNoticias() {
   try {
     const { data } = await api.get('/noticias')
     noticias.value = data.data || data
-  } catch (e) { console.error(e) }
+  } catch (e) { logger.error(e) }
   finally { loadingNoticias.value = false }
 }
 async function cargarEventos() {
@@ -633,7 +633,7 @@ async function cargarEventos() {
   try {
     const { data } = await api.get('/eventos')
     eventos.value = data.data || data
-  } catch (e) { console.error(e) }
+  } catch (e) { logger.error(e) }
   finally { loadingEventos.value = false }
 }
 
@@ -650,7 +650,7 @@ onMounted(async () => {
       horarios_atencion: data.horarios_atencion  || '',
       web_activa:        data.web_activa         || false,
     }
-  } catch (e) { console.error(e) }
+  } catch (e) { logger.error(e) }
 })
 </script>
 
@@ -689,10 +689,6 @@ onMounted(async () => {
   border-radius: 50%; animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.wpv__empty {
-  text-align: center; color: #6b8f71; padding: 3rem; font-size: 14px;
-  background: #f8fdf8; border-radius: 14px; border: 1px dashed #c8e6c9;
-}
 
 .wpv__geneticas-table { border: 1px solid #e8f5e9; border-radius: 14px; overflow: hidden; }
 .wpv__table-header {

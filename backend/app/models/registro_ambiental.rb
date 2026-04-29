@@ -25,12 +25,56 @@ class RegistroAmbiental < ApplicationRecord
   validates :horas_luz,      numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 24 }, allow_nil: true
   validates :ppfd,           numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
 
-  before_save :calcular_vpd
+  before_save  :calcular_vpd
+  after_save   :propagar_a_lecturas_ambientales
 
   scope :recientes, -> { order(registrado_en: :desc) }
   scope :del_lote,  ->(lote_id) { where(lote_id: lote_id) }
 
+  COLUMNAS_AMBIENTALES = {
+    temperatura:          'temperatura',
+    humedad:              'humedad',
+    vpd:                  'vpd',
+    co2:                  'co2',
+    ppfd:                 'ppfd',
+    ph:                   'ph',
+    ec:                   'ec',
+    ph_runoff:            'ph_runoff',
+    ec_runoff:            'ec_runoff',
+    temperatura_sustrato: 'temperatura_sustrato',
+  }.freeze
+
   private
+
+  def propagar_a_lecturas_ambientales
+    sala_id = lote.sala_id
+    return unless sala_id.present?
+
+    propagadas = 0
+    COLUMNAS_AMBIENTALES.each do |col, tipo|
+      valor = public_send(col)
+      next if valor.nil?
+
+      lectura = LecturaAmbiental.find_or_initialize_by(
+        origen_record_type: 'RegistroAmbiental',
+        origen_record_id:   id,
+        tipo:               tipo
+      )
+      lectura.assign_attributes(
+        club_id:   club_id,
+        sala_id:   sala_id,
+        lote_id:   lote_id,
+        valor:     valor,
+        unidad:    AmbienteTipos::TIPOS_CANONICOS[tipo],
+        fuente:    'manual',
+        medido_at: registrado_en
+      )
+      lectura.save!
+      propagadas += 1
+    end
+
+    EvaluarReglasJob.perform_later(sala_id) if propagadas > 0
+  end
 
   def calcular_vpd
     return unless temperatura.present? && humedad.present?

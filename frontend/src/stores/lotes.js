@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { defineStore } from "pinia";
 import {
   listLotes,
@@ -37,7 +38,7 @@ export const useLotesStore = defineStore("lotes", {
         const { data } = await listLotes();
         this.items = data || [];
       } catch (e) {
-        console.error("Lotes.fetch", e);
+        logger.error("Lotes.fetch", e);
         this.error = e?.response?.data?.error || e.message;
       } finally {
         this.loading = false;
@@ -50,7 +51,7 @@ export const useLotesStore = defineStore("lotes", {
         const { data } = await listLotes(salaId);
         this.itemsBySala.set(String(salaId), data || []);
       } catch (e) {
-        console.error("Lotes.fetchBySala", e);
+        logger.error("Lotes.fetchBySala", e);
         this.error = e?.response?.data?.error || e.message;
       } finally {
         this.loading = false;
@@ -65,7 +66,7 @@ export const useLotesStore = defineStore("lotes", {
         this.itemsBySala.set(String(salaId), [data, ...arr]);
         return data;
       } catch (e) {
-        console.error("Lotes.createInSala", e);
+        logger.error("Lotes.createInSala", e);
         this.createError = e?.response?.data?.errors?.join(", ") || "No se pudo crear el lote";
         throw e;
       } finally {
@@ -80,7 +81,7 @@ export const useLotesStore = defineStore("lotes", {
         this.current = data;
         return data;
       } catch (e) {
-        console.error("Lotes.fetchOne", e);
+        logger.error("Lotes.fetchOne", e);
         this.error = e?.response?.data?.error || e.message;
         throw e;
       } finally {
@@ -101,7 +102,7 @@ export const useLotesStore = defineStore("lotes", {
         if (this.current?.id === id) this.current = data;
         return data;
       } catch (e) {
-        console.error("Lotes.update", e);
+        logger.error("Lotes.update", e);
         this.updateError = e?.response?.data?.errors?.join(", ") || "No se pudo actualizar el lote";
         throw e;
       } finally {
@@ -121,7 +122,7 @@ export const useLotesStore = defineStore("lotes", {
         }
         if (this.current?.id === id) this.current = null;
       } catch (e) {
-        console.error("Lotes.remove", e);
+        logger.error("Lotes.remove", e);
         this.removeError = e?.response?.data?.errors?.join(", ") || "No se pudo eliminar el lote";
         throw e;
       } finally {

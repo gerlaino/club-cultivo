@@ -3,8 +3,7 @@ class Sede < ApplicationRecord
   belongs_to :created_by, class_name: 'User'
 
   has_many :salas,               dependent: :nullify
-  has_many :inventarios, class_name: "SedeInventario",    dependent: :destroy
-  has_many :inventario_movimientos, dependent: :destroy
+  has_many :stocks,              dependent: :restrict_with_error
   has_many :user_sedes, class_name: 'UserSede', foreign_key: 'sede_id', dependent: :destroy
   has_many :usuarios_asignados, through: :user_sedes, source: :user
 

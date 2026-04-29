@@ -258,7 +258,7 @@ const AVATAR_COLORS = ['#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc262
 function avatarColor(id) { return AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length] }
 
 const editando     = computed(() => !!props.tareaInicial?.id)
-const puedeAsignar = computed(() => ['admin', 'agricultor'].includes(authStore.user?.role))
+const puedeAsignar = computed(() => ['admin', 'cultivador'].includes(authStore.user?.role))
 const tipoActual   = computed(() => TIPOS.find(t => t.value === form.value.tipo) || TIPOS[0])
 
 const sedeSeleccionada = computed(() =>

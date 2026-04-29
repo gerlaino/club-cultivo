@@ -3,7 +3,7 @@ class LoteEventosController < ApplicationController
   before_action :set_lote
 
   # Cultivador puede ver el historial de sus lotes
-  skip_before_action :require_admin_o_agricultor, raise: false
+  skip_before_action :require_admin_o_cultivador, raise: false
 
   def index
     eventos = @lote.lote_eventos.recientes.limit(50)
@@ -11,8 +11,8 @@ class LoteEventosController < ApplicationController
   end
 
   def create
-    # Solo admin/agricultor puede crear eventos de cambio de ciclo
-    if params.dig(:lote_evento, :tipo) == 'cambio_estado' && !current_user.admin_or_agricultor?
+    # Solo admin/cultivador puede crear eventos de cambio de ciclo
+    if params.dig(:lote_evento, :tipo) == 'cambio_estado' && !current_user.admin_or_cultivador?
       render json: { error: 'No autorizado' }, status: :forbidden and return
     end
 

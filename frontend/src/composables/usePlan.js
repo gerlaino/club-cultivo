@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 // frontend/src/composables/usePlan.js
 import { ref, computed } from 'vue'
 import { getPlan } from '../lib/api'
@@ -14,7 +15,7 @@ export function usePlan() {
       const { data } = await getPlan()
       planData.value = data
     } catch (e) {
-      console.error('Error cargando plan:', e)
+      logger.error('Error cargando plan:', e)
     } finally {
       loading.value = false
     }

@@ -9,8 +9,8 @@ import PlantasView from "../views/PlantasView.vue";
 import PlantaDetailView from "../views/PlantaDetailView.vue";
 import PerfilView from "../views/PerfilView.vue";
 import PreferenciasView from "../views/PreferenciasView.vue";
-import SociosView from "../views/SociosView.vue";
-import SocioDetailView from "../views/SocioDetailView.vue";
+import PacientesView from "../views/SociosView.vue";
+import PacienteDetailView from "../views/SocioDetailView.vue";
 import UsuariosView from "../views/UsuariosView.vue";
 import UsuarioDetail from "../views/UsuarioDetail.vue";
 import SedesView from "../views/SedesView.vue";
@@ -18,6 +18,7 @@ import SedeDetailView from "../views/SedeDetailView.vue";
 import DocumentTemplatesView from "../views/DocumentTemplatesView.vue";
 import { useAuthStore } from "../stores/auth";
 import { usePermissions } from "../composables/usePermissions";
+import { useToast } from "../composables/useToast";
 import ContabilidadView from "../views/ContabilidadView.vue";
 import InformeSemestralView from "../views/InformeSemestralView.vue";
 import DocumentosView from "../views/DocumentosView.vue";
@@ -53,6 +54,7 @@ const routes = [
     beforeEnter: () => {
       const auth = useAuthStore()
       if (auth.user?.role === 'super_admin') return '/super-admin'
+      if (auth.user?.role === 'abogado')     return '/documentos'
     },
   },
 
@@ -96,6 +98,37 @@ const routes = [
     component: SalaDetailView,
     props: (r) => ({ id: Number(r.params.id) }),
     beforeEnter: requiresPermission("salas", "show"),
+  },
+  {
+    path: "/salas/:id/ambiente",
+    name: "sala-ambiente",
+    component: () => import("../views/SalaAmbienteView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("ambiente", "index"),
+  },
+
+  // Módulo Ambiente — admin only
+  {
+    path: "/dispositivos",
+    name: "dispositivos",
+    component: () => import("../views/DispositivosView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role === "admin") next()
+      else next("/")
+    },
+  },
+  {
+    path: "/reglas-ambientales",
+    name: "reglas-ambientales",
+    component: () => import("../views/ReglasAmbientalesView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role === "admin") next()
+      else next("/")
+    },
   },
 
   // Lotes
@@ -145,25 +178,36 @@ const routes = [
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("geneticas", "index"),
   },
+  {
+    path: "/geneticas/:id",
+    name: "genetica-detalle",
+    component: () => import("../views/GeneticaDetalleView.vue"),
+    props: (r) => ({ id: Number(r.params.id) }),
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("geneticas", "show"),
+  },
 
   // Pacientes
   {
-    path: "/socios",
-    name: "socios",
-    component: SociosView,
+    path: "/pacientes",
+    alias: ["/socios"],
+    name: "pacientes",
+    component: PacientesView,
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("socios", "index"),
   },
   {
-    path: "/socios/nuevo",
-    name: "socio-nuevo",
+    path: "/pacientes/nuevo",
+    alias: ["/socios/nuevo"],
+    name: "paciente-nuevo",
     component: () => import("../views/SocioNuevoView.vue"),
     beforeEnter: requiresPermission("socios", "create"),
   },
   {
-    path: "/socios/:id",
-    name: "socio-detail",
-    component: SocioDetailView,
+    path: "/pacientes/:id",
+    alias: ["/socios/:id"],
+    name: "paciente-detail",
+    component: PacienteDetailView,
     props: true,
     beforeEnter: requiresPermission("socios", "show"),
   },
@@ -253,11 +297,7 @@ const routes = [
     name: 'manicura',
     component: () => import('../views/ManicuraView.vue'),
     meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore()
-      if (['admin', 'agricultor'].includes(auth.user?.role)) next()
-      else next('/')
-    },
+    beforeEnter: requiresPermission('manicura', 'access'),
   },
 
   {
@@ -275,6 +315,13 @@ const routes = [
       { path: 'clubs/:id', name: 'sa-club-detail', component: () => import('../views/superadmin/SAClubDetail.vue') },
       { path: 'usuarios', name: 'sa-usuarios', component: () => import('../views/superadmin/SAUsuarios.vue') },
     ],
+  },
+
+  {
+    path: '/g/:slug',
+    name: 'genetica-publica',
+    component: () => import('../views/GeneticaPublicaView.vue'),
+    meta: { public: true, fullscreen: true },
   },
 
   {
@@ -297,6 +344,9 @@ router.afterEach((to) => {
   document.documentElement.classList.toggle("route-login", !!to.meta.fullscreen);
 });
 
+const ABOGADO_ALLOWED = ['/documentos', '/perfil', '/login']
+const DELIVERY_BLOCKED = ['/pacientes']
+
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
   await auth.ensureBootstrapped();
@@ -308,6 +358,22 @@ router.beforeEach(async (to) => {
     const redirect = to.query.redirect || "/";
     return typeof redirect === "string" ? redirect : "/";
   }
+
+  // Abogado: solo puede acceder a /documentos y /perfil
+  if (auth.isAuthenticated && auth.user?.role === 'abogado') {
+    const allowed = ABOGADO_ALLOWED.some(p => to.path === p || to.path.startsWith(p + '/'))
+    if (!allowed) {
+      useToast().warning('Sin permisos para acceder a esa sección')
+      return '/documentos'
+    }
+  }
+
+  // Delivery: bloqueado de /pacientes
+  if (auth.isAuthenticated && auth.user?.role === 'delivery') {
+    const blocked = DELIVERY_BLOCKED.some(p => to.path === p || to.path.startsWith(p + '/'))
+    if (blocked) return '/'
+  }
+
   return true;
 });
 

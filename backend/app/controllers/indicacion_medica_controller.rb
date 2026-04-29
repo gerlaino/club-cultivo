@@ -1,12 +1,12 @@
 class IndicacionMedicaController < ApplicationController
   before_action :authenticate_user!
   before_action :require_medico_or_admin, except: [:index, :show]
-  before_action :set_socio, only: [:index, :create]
+  before_action :set_paciente, only: [:index, :create]
   before_action :set_indicacion, only: [:show, :update, :destroy]
 
-  # GET /socios/:socio_id/indicaciones
+  # GET /pacientes/:paciente_id/indicaciones
   def index
-    indicaciones = @socio.indicacion_medicas.order(fecha_emision: :desc)
+    indicaciones = @paciente.indicacion_medicas.order(fecha_emision: :desc)
     render json: indicaciones.map { |i| serialize_indicacion(i) }
   end
 
@@ -15,9 +15,9 @@ class IndicacionMedicaController < ApplicationController
     render json: serialize_indicacion_detail(@indicacion)
   end
 
-  # POST /socios/:socio_id/indicaciones
+  # POST /pacientes/:paciente_id/indicaciones
   def create
-    indicacion = @socio.indicacion_medicas.build(indicacion_params)
+    indicacion = @paciente.indicacion_medicas.build(indicacion_params)
     indicacion.user = current_user
 
     if indicacion.save
@@ -50,15 +50,15 @@ class IndicacionMedicaController < ApplicationController
     end
   end
 
-  def set_socio
-    @socio = current_user.club.socios.find(params[:socio_id])
+  def set_paciente
+    @paciente = current_user.club.pacientes.find(params[:paciente_id])
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Socio no encontrado' }, status: :not_found
+    render json: { error: 'Paciente no encontrado' }, status: :not_found
   end
 
   def set_indicacion
-    @indicacion = IndicacionMedica.joins(:socio)
-                                  .where(socios: { club_id: current_user.club_id })
+    @indicacion = IndicacionMedica.joins(:paciente)
+                                  .where(pacientes: { club_id: current_user.club_id })
                                   .find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Indicación no encontrada' }, status: :not_found
@@ -101,9 +101,9 @@ class IndicacionMedicaController < ApplicationController
   def serialize_indicacion_detail(indicacion)
     serialize_indicacion(indicacion).merge(
       observaciones: indicacion.observaciones,
-      socio: {
-        id: indicacion.socio.id,
-        nombre_completo: indicacion.socio.nombre_completo
+      paciente: {
+        id: indicacion.paciente.id,
+        nombre_completo: indicacion.paciente.nombre_completo
       }
     )
   end

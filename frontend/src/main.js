@@ -3,6 +3,11 @@ import { createPinia } from "pinia";
 import router from "./router";
 import App from "./App.vue";
 
+// Design System — must be first to provide tokens to all styles
+// fonts loaded via index.html <link> tags (avoids Vite @import url() issues)
+import "./design-system/tokens.css";
+import "./design-system/reset.css";
+
 // Bootstrap CSS & Icons
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";

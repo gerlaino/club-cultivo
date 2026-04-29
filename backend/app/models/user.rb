@@ -11,18 +11,17 @@ class User < ApplicationRecord
   devise :database_authenticatable, :recoverable, :rememberable, :validatable,
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
-  enum role: {
+  enum :role, {
     super_admin:  'super_admin',
     admin:        'admin',
     medico:       'medico',
-    agricultor:   'agricultor',
     cultivador:   'cultivador',
     abogado:      'abogado',
     auditor:      'auditor',
-    socio:        'socio',
     dispensador:  'dispensador',
-    tesorero:     'tesorero',
-    manicurador:  'manicurador',
+    manicura:     'manicura',
+    paciente:     'paciente',
+    delivery:     'delivery',
   }
 
   validates :role,  presence: true

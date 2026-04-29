@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logger } from '../utils/logger.js'
 import { useRouter } from 'vue-router'
 import { listPlants, listLotes } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
+import EmptyState from '../components/ui/EmptyState.vue'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -80,7 +82,7 @@ async function loadPlants() {
     plants.value = data
   } catch (e) {
     error.value = 'No se pudieron cargar las plantas'
-    console.error(e)
+    logger.error(e)
   } finally {
     loading.value = false
   }
@@ -91,7 +93,7 @@ async function loadLotes() {
     const { data } = await listLotes()
     lotes.value = data
   } catch (e) {
-    console.error('Error cargando lotes:', e)
+    logger.error('Error cargando lotes:', e)
   }
 }
 
@@ -208,19 +210,17 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
     <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
 
     <!-- Empty -->
-    <div v-else-if="!filtered.length" class="text-center py-5 text-muted">
-      <div class="fs-1 mb-3">🌿</div>
-      <h5>{{ hasFilters ? 'Sin resultados' : 'No hay plantas todavía' }}</h5>
-      <p class="small mb-3">
-        {{ hasFilters ? 'Probá ajustando los filtros' : 'Registrá tu primera planta para comenzar la trazabilidad' }}
-      </p>
-      <button v-if="hasFilters" class="btn btn-sm btn-outline-secondary me-2" @click="clearFilters">
-        Limpiar filtros
-      </button>
-      <RouterLink v-else to="/plantas/nueva" class="btn btn-success btn-sm">
-        Nueva planta
-      </RouterLink>
-    </div>
+    <EmptyState
+      v-else-if="!filtered.length"
+      icon="🌿"
+      :title="hasFilters ? 'Sin resultados' : 'No hay plantas todavía'"
+      :message="hasFilters ? 'Probá ajustando los filtros' : 'Registrá tu primera planta para comenzar la trazabilidad'"
+    >
+      <template #actions>
+        <button v-if="hasFilters" class="btn btn-sm btn-outline-secondary me-2" @click="clearFilters">Limpiar filtros</button>
+        <RouterLink v-else to="/plantas/nueva" class="btn btn-success btn-sm">Nueva planta</RouterLink>
+      </template>
+    </EmptyState>
 
     <!-- Grid -->
     <div v-else class="row g-3">

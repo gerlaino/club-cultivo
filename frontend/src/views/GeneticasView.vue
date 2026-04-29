@@ -1,11 +1,30 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { listGeneticas, createGenetica, updateGenetica, deleteGenetica } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
+import { useQRCode } from '../composables/useQRCode.js'
+import { useConfirm } from '../composables/useConfirm.js'
+import { useToast } from '../composables/useToast.js'
+import EmptyState from '../components/ui/EmptyState.vue'
 import api from '../lib/api.js'
+
+const router = useRouter()
 
 const auth    = useAuthStore()
 const canEdit = computed(() => auth.role === 'admin')
+const { downloadPNG, downloadSVG } = useQRCode()
+const { confirm } = useConfirm()
+const toast = useToast()
+
+function qrUrl(gen) {
+  return `${window.location.origin}/g/${gen.slug}`
+}
+function qrFilename(gen, ext) {
+  return `qr-genetica-${gen.slug}.${ext}`
+}
+async function descargarQRpng(gen) { await downloadPNG(qrUrl(gen), qrFilename(gen, 'png')) }
+async function descargarQRsvg(gen) { await downloadSVG(qrUrl(gen), qrFilename(gen, 'svg')) }
 
 const geneticas    = ref([])
 const loading      = ref(true)
@@ -13,10 +32,8 @@ const saving       = ref(false)
 const deleting     = ref(false)
 const error        = ref(null)
 const showModal    = ref(false)
-const showDelete   = ref(false)
 const editingId    = ref(null)
 const editingInase = ref(false)
-const deleteTarget = ref(null)
 const formError    = ref(null)
 
 const search     = ref('')
@@ -152,11 +169,6 @@ function openEdit(gen) {
   showModal.value   = true
 }
 
-function openDelete(gen) {
-  deleteTarget.value = gen
-  showDelete.value   = true
-}
-
 async function loadGeneticas() {
   loading.value = true
   error.value   = null
@@ -222,14 +234,21 @@ async function handleSubmit() {
   }
 }
 
-async function handleDelete() {
+async function openDelete(gen) {
+  const ok = await confirm({
+    title: 'Eliminar genética',
+    message: `¿Seguro que querés eliminar ${gen.nombre}? Se marcará como inactiva.`,
+    confirmText: 'Eliminar',
+    variant: 'danger',
+  })
+  if (!ok) return
   deleting.value = true
   try {
-    await deleteGenetica(deleteTarget.value.id)
-    geneticas.value = geneticas.value.filter(g => g.id !== deleteTarget.value.id)
-    showDelete.value = false
+    await deleteGenetica(gen.id)
+    geneticas.value = geneticas.value.filter(g => g.id !== gen.id)
+    toast.success('Genética eliminada')
   } catch (e) {
-    console.error('Error eliminando:', e)
+    toast.error('Error al eliminar')
   } finally {
     deleting.value = false
   }
@@ -354,18 +373,29 @@ onMounted(loadGeneticas)
     <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
 
     <!-- Empty -->
-    <div v-else-if="!filtered.length" class="text-center py-5 text-muted">
-      <div class="fs-1 mb-3">🌿</div>
-      <h5>{{ hasFilters ? 'Sin resultados' : 'No hay genéticas todavía' }}</h5>
-      <p class="small mb-3">{{ hasFilters ? 'Probá ajustando los filtros' : 'Agregá la primera cepa al catálogo' }}</p>
-      <button v-if="hasFilters" class="btn btn-sm btn-outline-secondary me-2" @click="clearFilters">Limpiar filtros</button>
-      <button v-else-if="canEdit" class="btn btn-success btn-sm" @click="openCreate">Nueva genética</button>
-    </div>
+    <EmptyState
+      v-else-if="!filtered.length"
+      icon="🌿"
+      :title="hasFilters ? 'Sin resultados' : 'No hay genéticas todavía'"
+      :message="hasFilters ? 'Probá ajustando los filtros' : 'Agregá la primera cepa al catálogo'"
+    >
+      <template #actions>
+        <button v-if="hasFilters" class="btn btn-sm btn-outline-secondary me-2" @click="clearFilters">Limpiar filtros</button>
+        <button v-else-if="canEdit" class="btn btn-success btn-sm" @click="openCreate">Nueva genética</button>
+      </template>
+    </EmptyState>
 
     <!-- Grid -->
     <div v-else class="row g-3">
       <div v-for="gen in filtered" :key="gen.id" class="col-12 col-sm-6 col-lg-4 col-xl-3">
-        <div class="gen-card" :style="{ '--tipo-color': tipoMeta(gen.tipo).color, '--tipo-bg': tipoMeta(gen.tipo).bg }">
+        <div
+          class="gen-card gen-card--clickable"
+          :style="{ '--tipo-color': tipoMeta(gen.tipo).color, '--tipo-bg': tipoMeta(gen.tipo).bg }"
+          role="link"
+          tabindex="0"
+          @click="router.push({ name: 'genetica-detalle', params: { id: gen.id } })"
+          @keydown.enter="router.push({ name: 'genetica-detalle', params: { id: gen.id } })"
+        >
           <div class="gen-card__bar"></div>
 
           <!-- Foto si existe -->
@@ -418,6 +448,34 @@ onMounted(loadGeneticas)
               <button class="btn btn-sm btn-outline-secondary flex-fill" @click.stop="openEdit(gen)">
                 <i class="bi bi-pencil me-1"></i>{{ gen.registrada_inase ? 'Ver / Editar' : 'Editar' }}
               </button>
+              <!-- QR público dropdown -->
+              <div v-if="gen.slug" class="dropdown" @click.stop>
+                <button
+                  class="btn btn-sm btn-outline-success dropdown-toggle px-2"
+                  data-bs-toggle="dropdown"
+                  title="Descargar QR público"
+                >
+                  <i class="bi bi-qr-code"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                  <li>
+                    <button class="dropdown-item small py-2 d-flex align-items-center gap-2" @click="descargarQRsvg(gen)">
+                      <i class="bi bi-file-earmark-code text-muted"></i> Descargar SVG
+                    </button>
+                  </li>
+                  <li>
+                    <button class="dropdown-item small py-2 d-flex align-items-center gap-2" @click="descargarQRpng(gen)">
+                      <i class="bi bi-file-earmark-image text-muted"></i> Descargar PNG
+                    </button>
+                  </li>
+                  <li><hr class="dropdown-divider my-1"></li>
+                  <li>
+                    <a :href="`/g/${gen.slug}`" target="_blank" class="dropdown-item small py-2 d-flex align-items-center gap-2">
+                      <i class="bi bi-box-arrow-up-right text-muted"></i> Ver página pública
+                    </a>
+                  </li>
+                </ul>
+              </div>
               <button
                 class="btn btn-sm btn-outline-danger"
                 @click.stop="openDelete(gen)"
@@ -641,29 +699,6 @@ onMounted(loadGeneticas)
     </div>
     <div v-if="showModal" class="modal-backdrop fade show" @click="showModal=false"></div>
 
-    <!-- ===== MODAL ELIMINAR ===== -->
-    <div v-if="showDelete" class="modal fade show d-block" tabindex="-1" aria-modal="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header border-0">
-            <h5 class="modal-title text-danger">⚠️ Eliminar genética</h5>
-            <button class="btn-close" @click="showDelete=false"></button>
-          </div>
-          <div class="modal-body">
-            <p>¿Seguro que querés eliminar <strong>{{ deleteTarget?.nombre }}</strong>?</p>
-            <p class="text-muted small mb-0">Se marcará como inactiva. Las plantas que ya la tenían asignada no se verán afectadas.</p>
-          </div>
-          <div class="modal-footer border-0">
-            <button class="btn btn-outline-secondary" :disabled="deleting" @click="showDelete=false">Cancelar</button>
-            <button class="btn btn-danger" :disabled="deleting" @click="handleDelete">
-              <span v-if="deleting" class="spinner-border spinner-border-sm me-2"></span>
-              Eliminar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div v-if="showDelete" class="modal-backdrop fade show" @click="showDelete=false"></div>
 
   </div>
 </template>
@@ -676,6 +711,9 @@ onMounted(loadGeneticas)
 .kpi--inase { border-left: 3px solid #1b5e20 !important; }
 
 .gen-card { background: white; border-radius: 14px; border: 1.5px solid rgba(0,0,0,.06); overflow: hidden; height: 100%; display: flex; flex-direction: column; transition: all .15s; }
+.gen-card--clickable { cursor: pointer; }
+.gen-card--clickable:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.09); border-color: var(--tipo-color); }
+.gen-card--clickable:focus-visible { outline: 2px solid var(--tipo-color); outline-offset: 2px; }
 .gen-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.09); border-color: var(--tipo-color); }
 .gen-card__bar { height: 4px; background: var(--tipo-color); }
 .gen-card__foto { width: 100%; height: 140px; overflow: hidden; }

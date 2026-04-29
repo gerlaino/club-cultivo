@@ -1,5 +1,6 @@
 class TareasController < ApplicationController
   before_action :authenticate_user!
+  before_action :check_tareas_role!
   before_action :set_club
   before_action :set_tarea, only: [:show, :update, :destroy, :completar, :iniciar, :cancelar]
   before_action :authorize_create!, only: [:create]
@@ -190,15 +191,21 @@ class TareasController < ApplicationController
     )
   end
 
+  def check_tareas_role!
+    blocked = %w[abogado paciente delivery]
+    if blocked.include?(current_user&.role)
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
+  end
+
   def authorize_create!
-    unless current_user.admin? || current_user.agricultor? || current_user.cultivador?
+    unless current_user.admin? || current_user.cultivador?
       render json: { error: 'Sin permiso para crear tareas' }, status: :forbidden
     end
   end
 
   def authorize_manage!
-    unless current_user.admin? || current_user.agricultor? ||
-           (current_user.cultivador? && @tarea.asignada_a_id == current_user.id)
+    unless current_user.admin? || current_user.cultivador?
       render json: { error: 'Sin permiso para modificar esta tarea' }, status: :forbidden
     end
   end

@@ -53,6 +53,7 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
+import { logger } from '../utils/logger.js'
 
 const props = defineProps({
   // Contexto que se le pasa a Claude para entender qué campos llenar
@@ -195,7 +196,7 @@ Responde SOLO con el JSON, sin texto adicional, sin backticks.`
     estado.value = 'idle'
 
   } catch (e) {
-    console.error('Error procesando voz con IA:', e)
+    logger.error('Error procesando voz con IA:', e)
     // Aunque falle la IA, emitir la transcripción cruda
     emit('campos-detectados', { _transcripcion: texto })
     estado.value = 'idle'

@@ -1,22 +1,23 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logger } from '../utils/logger.js'
 import {
   listDocumentTemplates, getDocumentTemplate,
   createDocumentTemplate, updateDocumentTemplate, deleteDocumentTemplate
 } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const auth = useAuthStore()
+const { confirm } = useConfirm()
 
 const templates = ref([])
 const loading   = ref(true)
 const saving    = ref(false)
 const formError = ref(null)
 
-const showModal  = ref(false)
-const showDelete = ref(false)
-const editingId  = ref(null)
-const deleteTarget = ref(null)
+const showModal = ref(false)
+const editingId = ref(null)
 
 const TIPO_LABELS = {
   consentimiento_informado: 'Consentimiento Informado Bilateral',
@@ -73,7 +74,7 @@ async function load() {
     const { data } = await listDocumentTemplates()
     templates.value = data
   } catch (e) {
-    console.error('Error:', e)
+    logger.error('Error:', e)
   } finally {
     loading.value = false
   }
@@ -102,7 +103,7 @@ async function openEdit(t) {
     }
     showModal.value = true
   } catch (e) {
-    console.error('Error cargando template:', e)
+    logger.error('Error cargando template:', e)
   }
 }
 
@@ -144,14 +145,18 @@ async function handleSubmit() {
   }
 }
 
-async function handleDelete() {
+async function handleDelete(t) {
+  const ok = await confirm({
+    title: 'Eliminar template',
+    message: `¿Seguro que querés eliminar ${t.nombre}? Los documentos ya generados no se verán afectados.`,
+    confirmText: 'Eliminar',
+    variant: 'danger',
+  })
+  if (!ok) return
   try {
-    await deleteDocumentTemplate(deleteTarget.value.id)
-    templates.value = templates.value.filter(t => t.id !== deleteTarget.value.id)
-    showDelete.value = false
-  } catch (e) {
-    console.error('Error:', e)
-  }
+    await deleteDocumentTemplate(t.id)
+    templates.value = templates.value.filter(x => x.id !== t.id)
+  } catch {}
 }
 
 function formatDate(d) {
@@ -255,7 +260,7 @@ onMounted(load)
               <button class="btn btn-sm btn-outline-primary flex-fill" @click="openEdit(t)">
                 <i class="bi bi-pencil me-1"></i>Editar
               </button>
-              <button class="btn btn-sm btn-outline-danger" @click="deleteTarget=t; showDelete=true">
+              <button class="btn btn-sm btn-outline-danger" @click="handleDelete(t)">
                 <i class="bi bi-trash"></i>
               </button>
             </div>
@@ -356,26 +361,6 @@ onMounted(load)
     </div>
     <div v-if="showModal" class="modal-backdrop fade show" @click="showModal=false"></div>
 
-    <!-- ===== MODAL ELIMINAR ===== -->
-    <div v-if="showDelete" class="modal fade show d-block" tabindex="-1" aria-modal="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header border-0">
-            <h5 class="modal-title text-danger">⚠️ Eliminar template</h5>
-            <button class="btn-close" @click="showDelete=false"></button>
-          </div>
-          <div class="modal-body">
-            <p>¿Seguro que querés eliminar <strong>{{ deleteTarget?.nombre }}</strong>?</p>
-            <p class="text-muted small mb-0">Se marcará como inactivo. Los documentos ya generados no se verán afectados.</p>
-          </div>
-          <div class="modal-footer border-0">
-            <button class="btn btn-outline-secondary" @click="showDelete=false">Cancelar</button>
-            <button class="btn btn-danger" @click="handleDelete">Eliminar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div v-if="showDelete" class="modal-backdrop fade show" @click="showDelete=false"></div>
 
   </div>
 </template>

@@ -3,6 +3,9 @@ import { ref, computed, watch, onMounted } from "vue";
 import { useLotesStore } from "../stores/lotes";
 import { useSalasStore } from "../stores/salas";
 import { useAuthStore }  from "../stores/auth";
+import Paginator from '../components/ui/Paginator.vue';
+import EmptyState from '../components/ui/EmptyState.vue';
+import { useConfirm } from '../composables/useConfirm.js';
 
 // Valores reales del modelo:
 // estado:     planificacion | vegetativo | floracion | secado | cosechado | finalizado
@@ -12,13 +15,14 @@ import { useAuthStore }  from "../stores/auth";
 const store = useLotesStore();
 const salas = useSalasStore();
 const auth  = useAuthStore();
+const { confirm } = useConfirm();
 
 onMounted(() => {
   store.fetch();
   if (!salas.items.length) salas.fetch();
 });
 
-const canEdit = computed(() => ["admin","agricultor"].includes(auth.role));
+const canEdit = computed(() => ["admin","cultivador"].includes(auth.role));
 
 // ---------- helpers ----------
 const ESTADOS = ["planificacion","vegetativo","floracion","secado","cosechado","finalizado"];
@@ -115,8 +119,6 @@ const showEdit   = ref(false);
 const editForm   = ref({ id: null, ...emptyForm() });
 const editErrors = ref({});
 
-const showDelete = ref(false);
-const toDelete   = ref(null);
 
 function validateForm(form) {
   const e = {};
@@ -163,10 +165,15 @@ async function submitEdit() {
   } catch {}
 }
 
-function confirmDelete(l) { toDelete.value = l; showDelete.value = true; }
-async function doDelete() {
-  if (!toDelete.value) return;
-  try { await store.remove(toDelete.value.id, toDelete.value.sala_id); showDelete.value = false; toDelete.value = null; } catch {}
+async function confirmDelete(l) {
+  const ok = await confirm({
+    title: `¿Eliminar "${l.codigo}"?`,
+    message: 'Esta acción no se puede deshacer.',
+    confirmText: 'Eliminar',
+    variant: 'danger',
+  });
+  if (!ok) return;
+  try { await store.remove(l.id, l.sala_id); } catch {}
 }
 </script>
 
@@ -256,15 +263,7 @@ async function doDelete() {
               <option value="plantas_desc">Más plantas</option>
             </select>
           </div>
-          <div class="col-6 col-md-1">
-            <select class="form-select" v-model.number="perPage">
-              <option :value="6">6</option>
-              <option :value="9">9</option>
-              <option :value="12">12</option>
-            </select>
-          </div>
         </div>
-        <div class="small text-muted mt-2">{{ paginated.length }} de {{ totalItems }} lote(s)</div>
       </div>
     </div>
 
@@ -274,14 +273,8 @@ async function doDelete() {
       <div class="mt-2 text-muted">Cargando lotes…</div>
     </div>
     <div v-else-if="store.error" class="alert alert-danger">{{ store.error }}</div>
-    <div v-else-if="!store.items.length" class="text-center py-5 text-muted">
-      <div class="display-4 mb-3">🌱</div>
-      <h5>No hay lotes todavía</h5>
-    </div>
-    <div v-else-if="!paginated.length" class="text-center py-5 text-muted">
-      <div class="display-4 mb-3">🔍</div>
-      <h5>Sin resultados</h5>
-    </div>
+    <EmptyState v-else-if="!store.items.length" icon="🌱" title="No hay lotes todavía" message="Creá el primer lote para comenzar la trazabilidad" />
+    <EmptyState v-else-if="!paginated.length" icon="🔍" title="Sin resultados" message="Probá ajustando los filtros" />
 
     <!-- Grid -->
     <div v-else class="row g-3">
@@ -348,7 +341,7 @@ async function doDelete() {
               </RouterLink>
               <template v-if="canEdit">
                 <button class="btn btn-sm btn-outline-secondary" @click="startEdit(l)" :disabled="store.updating && editForm.id===l.id">✏️</button>
-                <button class="btn btn-sm btn-outline-danger" @click="confirmDelete(l)" :disabled="store.removing && toDelete?.id===l.id">🗑️</button>
+                <button class="btn btn-sm btn-outline-danger" @click="confirmDelete(l)" :disabled="store.removing">🗑️</button>
               </template>
             </div>
           </div>
@@ -356,16 +349,12 @@ async function doDelete() {
       </div>
     </div>
 
-    <!-- Paginación -->
-    <nav v-if="totalPages > 1" class="mt-3">
-      <ul class="pagination mb-0">
-        <li class="page-item" :class="{ disabled: page<=1 }"><button class="page-link" @click="page--">‹</button></li>
-        <li v-for="p in totalPages" :key="p" class="page-item" :class="{ active: p===page }">
-          <button class="page-link" @click="page=p">{{ p }}</button>
-        </li>
-        <li class="page-item" :class="{ disabled: page>=totalPages }"><button class="page-link" @click="page++">›</button></li>
-      </ul>
-    </nav>
+    <Paginator
+      v-model:page="page"
+      v-model:perPage="perPage"
+      :total="totalItems"
+      :pageSizes="[6, 12, 24]"
+    />
 
     <!-- MODAL Crear -->
     <div class="modal fade" :class="{ show: showCreate }" :style="{ display: showCreate?'block':'none' }" tabindex="-1" aria-modal="true">
@@ -526,29 +515,6 @@ async function doDelete() {
     </div>
     <div class="modal-backdrop fade" :class="{ show: showEdit }" v-if="showEdit" @click="showEdit=false"></div>
 
-    <!-- MODAL Eliminar -->
-    <div class="modal fade" :class="{ show: showDelete }" :style="{ display: showDelete?'block':'none' }" tabindex="-1" aria-modal="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header border-0 pb-0">
-            <button class="btn-close ms-auto" @click="showDelete=false"></button>
-          </div>
-          <div class="modal-body text-center py-2">
-            <div class="display-4 mb-3">⚠️</div>
-            <h5>¿Eliminar "{{ toDelete?.codigo }}"?</h5>
-            <p class="text-muted small">Esta acción no se puede deshacer.</p>
-            <div v-if="store.removeError" class="alert alert-danger">{{ store.removeError }}</div>
-          </div>
-          <div class="modal-footer justify-content-center border-0">
-            <button class="btn btn-outline-secondary px-4" @click="showDelete=false">Cancelar</button>
-            <button class="btn btn-danger px-4" :disabled="store.removing" @click="doDelete">
-              <span v-if="store.removing" class="spinner-border spinner-border-sm me-2"></span>Eliminar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-backdrop fade" :class="{ show: showDelete }" v-if="showDelete" @click="showDelete=false"></div>
 
   </div>
 </template>

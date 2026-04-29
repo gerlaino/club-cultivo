@@ -7,10 +7,16 @@ class Lote < ApplicationRecord
   has_many :movimientos_contables, dependent: :nullify
   has_many :registros_ambientales, class_name: 'RegistroAmbiental', dependent: :destroy
   has_many :lote_eventos,          dependent: :destroy
+  has_many :pesadas,               -> { order(registrado_at: :asc) }, dependent: :destroy
+  has_many :stocks,                dependent: :nullify
   has_many_attached :fotos
   has_many :notas, as: :noteable, dependent: :destroy
 
-  ESTADOS       = %w[semilla vegetativo floracion cosecha curado finalizado].freeze
+  # TODO(Ola 4): migrar usos del frontend de lote.estado → lote.fase y
+  # deprecar la columna `estado` cuando se introduzca la fase 'manicura'
+  # entre secado y curado. Por ahora `fase` es alias en serializer.
+  ESTADOS       = %w[semilla vegetativo floracion secado cosecha curado finalizado].freeze
+  CICLO_FASES   = %w[vegetativo floracion secado curado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
   TIPOS_LUZ     = %w[led hps cmh natural mixta].freeze
   SUSTRATOS     = %w[tierra coco perlita mezcla rockwool fibra_coco].freeze
@@ -27,7 +33,8 @@ class Lote < ApplicationRecord
 
   before_create :generar_codigo
 
-  scope :activos,     -> { where(estado: %w[vegetativo floracion]) }
+  scope :activos,     -> { where.not(estado: 'finalizado') }
+  scope :en_ciclo,    -> { where(estado: CICLO_FASES + ['finalizado']) }
   scope :finalizados, -> { where(estado: 'finalizado') }
   scope :por_sala,    ->(sala_id) { where(sala_id: sala_id) }
   scope :recientes,   -> { order(created_at: :desc) }
@@ -41,11 +48,123 @@ class Lote < ApplicationRecord
     case estado
     when 'semilla'    then 0
     when 'vegetativo' then 20
-    when 'floracion'  then 55
-    when 'cosecha'    then 80
-    when 'curado'     then 95
+    when 'floracion'  then 45
+    when 'secado'     then 65
+    when 'cosecha'    then 70
+    when 'curado'     then 85
     when 'finalizado' then 100
     else 0
+    end
+  end
+
+  # Avanza el lote al siguiente paso del ciclo (vegetativo→floracion→secado→curado).
+  # Crea la pesada y mueve el lote a la sala destino (creándola si hace falta).
+  # pesada_attrs debe incluir: registrado_por (User), y el peso según fase_destino.
+  def transicionar!(nueva_fase, pesada_attrs:, manicurado: false, pesadas_plantas_attrs: [])
+    raise ArgumentError, "Fase inválida: #{nueva_fase}" unless CICLO_FASES.include?(nueva_fase)
+    raise "El lote ya está finalizado" if estado == 'finalizado'
+
+    idx_actual = CICLO_FASES.index(estado)
+    idx_nueva  = CICLO_FASES.index(nueva_fase)
+
+    raise "El lote (estado '#{estado}') no está en el ciclo de transición" if idx_actual.nil?
+    raise "Solo se puede avanzar al paso siguiente (esperado: #{CICLO_FASES[idx_actual + 1]})" \
+      unless idx_nueva == idx_actual + 1
+
+    registrado_por = pesada_attrs[:registrado_por] || pesada_attrs['registrado_por']
+    raise ArgumentError, "registrado_por es obligatorio" unless registrado_por
+
+    ActiveRecord::Base.transaction do
+      sala_destino = Sala.find_or_create_proceso!(
+        sede:        sala.sede,
+        tipo:        nueva_fase,
+        created_by:  registrado_por
+      )
+
+      pesada = pesadas.create!(
+        fase_origen:    estado,
+        fase_destino:   nueva_fase,
+        manicurado:     manicurado,
+        registrado_por: registrado_por,
+        registrado_at:  Time.current,
+        notas:          pesada_attrs[:notas],
+        peso_humedo_g:  pesada_attrs[:peso_humedo_g],
+        peso_seco_g:    pesada_attrs[:peso_seco_g],
+        peso_curado_g:  pesada_attrs[:peso_curado_g],
+      )
+
+      pesadas_plantas_attrs.each do |pp|
+        pesada.pesadas_plantas.create!(
+          plant_id:    pp[:plant_id] || pp['plant_id'],
+          peso_humedo_g: pp[:peso_humedo_g] || pp['peso_humedo_g'],
+          peso_seco_g:   pp[:peso_seco_g]   || pp['peso_seco_g'],
+        )
+      end
+
+      update!(estado: nueva_fase, sala: sala_destino)
+    end
+  end
+
+  # Cierra el curado, genera Stock de flor_seca, marca el lote como finalizado.
+  # splitter: { flor_seca: Decimal, descarte: Decimal } — debe sumar == peso_curado_g última pesada
+  def cerrar_curado!(splitter:, sede_destino_id:, costo_unitario_ars:, precio_sugerido_ars:, registrado_por:, peso_curado_g: nil)
+    raise "El lote no está en curado" unless estado == 'curado'
+
+    ultima = pesadas.where(fase_destino: 'curado').reorder(id: :desc).first
+
+    if peso_curado_g.present?
+      if ultima
+        ultima.update!(peso_curado_g: peso_curado_g) if ultima.peso_curado_g.blank?
+      else
+        ultima = pesadas.create!(
+          fase_origen:    'secado',
+          fase_destino:   'curado',
+          peso_curado_g:  peso_curado_g,
+          registrado_por: registrado_por,
+          registrado_at:  Time.current,
+          manicurado:     false,
+        )
+      end
+    end
+
+    raise "No hay pesada de curado registrada" unless ultima
+    raise "La pesada de curado no tiene peso_curado_g" unless ultima.peso_curado_g.present?
+
+    flor_seca = splitter[:flor_seca].to_d
+    descarte  = splitter[:descarte].to_d
+    total     = flor_seca + descarte
+
+    unless total.round(2) == ultima.peso_curado_g.to_d.round(2)
+      raise "El splitter (#{total}g) no coincide con el peso curado (#{ultima.peso_curado_g}g)"
+    end
+
+    sede = Sede.find(sede_destino_id)
+
+    ActiveRecord::Base.transaction do
+      # Pesada de cierre
+      pesadas.create!(
+        fase_origen:    'curado',
+        fase_destino:   'finalizado',
+        peso_curado_g:  ultima.peso_curado_g,
+        manicurado:     false,
+        registrado_por: registrado_por,
+        registrado_at:  Time.current,
+        notas:          "Splitter: #{flor_seca}g flor + #{descarte}g descarte",
+      )
+
+      stock = Stock.create!(
+        sede:               sede,
+        lote:               self,
+        origen:             'lote',
+        forma_producto:     'flor_seca',
+        unidad:             'g',
+        cantidad:           flor_seca,
+        costo_unitario_ars:  costo_unitario_ars,
+        precio_sugerido_ars: precio_sugerido_ars,
+      )
+
+      update!(estado: 'finalizado')
+      stock
     end
   end
 

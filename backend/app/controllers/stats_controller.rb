@@ -2,37 +2,85 @@ class StatsController < ApplicationController
   before_action :authenticate_user!
 
   def show
-    club = current_user.club
+    club     = current_user.club
+    lote_ids = club.lotes.pluck(:id)
+
+    plantas_scope     = Plant.where(lote_id: lote_ids)
+    plantas_activas   = plantas_scope.where.not(state: %w[cosechado descartada])
+
+    vencidos_count    = club.pacientes.where.not(reprocann_vencimiento: nil)
+                            .where('reprocann_vencimiento < ?', Date.today).count
+    por_vencer_count  = club.pacientes.reprocann_por_vencer.count
 
     render json: {
-      socios: club.socios.count,
-      plantas: Plant.where(lote_id: club.lotes.pluck(:id)).count,
-      plantas_por_genetica: plantas_por_genetica(club),
-      salas: club.salas.count,
-      lotes: club.lotes.count,
-
-      vegetativo: Plant.where(lote_id: club.lotes.pluck(:id), state: 'vegetativo').count,
-      floracion: Plant.where(lote_id: club.lotes.pluck(:id), state: 'floracion').count,
-      secado: Plant.where(lote_id: club.lotes.pluck(:id), state: 'secado').count,
-
-      pacientes: club.socios.count,
-      vencimientos: club.socios.reprocann_por_vencer.count,
-      indicaciones: 0,
-
-      actividad: []
+      pacientes:         club.pacientes.count,
+      plantas:           plantas_activas.count,
+      salas:             club.salas.count,
+      lotes:             club.lotes.count,
+      vencimientos:      vencidos_count,
+      reprocann_vencidos:   vencidos_count,
+      reprocann_por_vencer: por_vencer_count,
+      # Por fase
+      germinacion:       plantas_activas.where(state: 'germinacion').count,
+      vegetativo:        plantas_activas.where(state: 'vegetativo').count,
+      floracion:         plantas_activas.where(state: 'floracion').count,
+      secado:            plantas_activas.where(state: 'secado').count,
+      # Por genética (basado en lote)
+      plantas_por_genetica: plantas_por_genetica(club, lote_ids),
+      # Ocupación de salas
+      salas_ocupacion:   salas_ocupacion(club),
+      # Plantas activas por sede (via sala → sede)
+      plantas_por_sede:  plantas_por_sede(club, lote_ids),
+      # Plantas activas por lote
+      plantas_por_lote:  plantas_activas.group(:lote_id).count,
     }
   end
 
   private
 
-  def plantas_por_genetica(club)
-    Genetica.where(club_id: club.id, activa: true).map do |genetica|
+  def plantas_por_genetica(club, lote_ids)
+    scope = Genetica.where(global: true).or(Genetica.where(club_id: club.id))
+    scope.where(activa: true).map do |g|
+      plantas_activas = Plant.joins(:lote)
+                             .where(lotes: { club_id: club.id, genetica_id: g.id })
+                             .where.not(plants: { state: %w[cosechado descartada] })
+                             .count
       {
-        id: genetica.id,
-        nombre: genetica.nombre,
-        tipo: genetica.tipo,
-        plantas_count: Plant.joins(:lote).where(lotes: { club_id: club.id }, genetica_id: genetica.id).count
+        id:            g.id,
+        nombre:        g.nombre,
+        tipo:          g.tipo,
+        plantas_count: plantas_activas,
       }
     end
+  end
+
+  def salas_ocupacion(club)
+    club.salas.includes(:lotes).map do |sala|
+      plantas_count = Plant.joins(:lote)
+                           .where(lotes: { sala_id: sala.id })
+                           .where.not(plants: { state: %w[cosechado descartada] })
+                           .count
+      capacidad = sala.plants_max.to_i
+      porcentaje = capacidad > 0 ? [(plantas_count.to_f / capacidad * 100).round, 100].min : 0
+      inconsistente = capacidad == 0 && plantas_count > 0
+      {
+        sala_id:      sala.id,
+        nombre:       sala.nombre,
+        sede_id:      sala.sede_id,
+        plants_count: plantas_count,
+        capacidad:    capacidad,
+        porcentaje:   porcentaje,
+        inconsistente: inconsistente,
+      }
+    end
+  end
+
+  def plantas_por_sede(club, lote_ids)
+    result = Plant.joins(lote: { sala: :sede })
+                  .where(lotes: { club_id: club.id })
+                  .where.not(plants: { state: %w[cosechado descartada] })
+                  .group('sedes.id')
+                  .count
+    result.map { |sede_id, count| { sede_id: sede_id, plantas_count: count } }
   end
 end

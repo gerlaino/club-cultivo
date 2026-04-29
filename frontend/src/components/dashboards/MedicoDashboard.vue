@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logger } from '../../utils/logger.js'
 import { useRouter } from 'vue-router'
-import { listSocios, listIndicaciones } from '../../lib/api.js'
+import { listPacientes, listIndicaciones } from '../../lib/api.js'
 import { useAuthStore } from '../../stores/auth.js'
 
 const router = useRouter()
@@ -70,8 +71,8 @@ const ultimasIndicaciones = computed(() =>
 // ── Carga ─────────────────────────────────────────────────────
 onMounted(async () => {
   try {
-    const { data } = await listSocios()
-    socios.value = Array.isArray(data) ? data : []
+    const { data } = await listPacientes({ limite: 200 })
+    socios.value = Array.isArray(data) ? data : (data?.data ?? [])
 
     if (socios.value.length > 0) {
       const results = await Promise.all(
@@ -89,7 +90,7 @@ onMounted(async () => {
       indicaciones.value = results.flat()
     }
   } catch (e) {
-    console.error('MedicoDashboard:', e)
+    logger.error('MedicoDashboard:', e)
   } finally {
     loading.value = false
   }
@@ -125,7 +126,7 @@ onMounted(async () => {
       <!-- ── KPIs ──────────────────────────────────────────── -->
       <div class="md__kpis">
 
-        <div class="md__kpi md__kpi--main" @click="router.push('/socios')">
+        <div class="md__kpi md__kpi--main" @click="router.push('/pacientes')">
           <div class="md__kpi-icon" style="background:rgba(27,94,32,.1);color:#1b5e20">
             <i class="bi bi-people"></i>
           </div>
@@ -201,7 +202,7 @@ onMounted(async () => {
                 <span class="md__card-title">REPROCANN por vencer</span>
                 <span v-if="alertasReprocann.length" class="md__badge md__badge--warn">{{ alertasReprocann.length }}</span>
               </div>
-              <RouterLink to="/socios" class="md__card-link">Ver todos →</RouterLink>
+              <RouterLink to="/pacientes" class="md__card-link">Ver todos →</RouterLink>
             </div>
 
             <div v-if="!alertasReprocann.length" class="md__empty">
@@ -213,7 +214,7 @@ onMounted(async () => {
               <RouterLink
                 v-for="s in alertasReprocann"
                 :key="s.id"
-                :to="`/socios/${s.id}`"
+                :to="`/pacientes/${s.id}`"
                 class="md__alert-row"
                 :class="s.dias < 0 ? 'md__alert-row--danger' : s.dias <= 30 ? 'md__alert-row--warn' : 'md__alert-row--info'"
               >
@@ -254,7 +255,7 @@ onMounted(async () => {
               <RouterLink
                 v-for="ind in alertasIndicaciones"
                 :key="ind.id"
-                :to="`/socios/${ind.socio_id}`"
+                :to="`/pacientes/${ind.socio_id}`"
                 class="md__alert-row"
                 :class="ind.dias < 0 ? 'md__alert-row--danger' : ind.dias <= 30 ? 'md__alert-row--warn' : 'md__alert-row--info'"
               >
@@ -301,7 +302,7 @@ onMounted(async () => {
               <RouterLink
                 v-for="ind in ultimasIndicaciones"
                 :key="ind.id"
-                :to="`/socios/${ind.socio_id}`"
+                :to="`/pacientes/${ind.socio_id}`"
                 class="md__ind-row"
               >
                 <div class="md__ind-left">

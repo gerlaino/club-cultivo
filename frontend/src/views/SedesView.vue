@@ -2,15 +2,18 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listSedes, createSede, updateSede, deleteSede,
-  getSedeInventario, agregarStock } from '../lib/api.js'
+  getSedeStocks } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import { usePermissions } from '../composables/usePermissions.js'
 import { usePlan } from '../composables/usePlan.js'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const router   = useRouter()
 const auth     = useAuthStore()
-const { isAgricultor, isAdmin } = usePermissions()
+const { isCultivador, isAdmin } = usePermissions()
+const isAgricultor = isCultivador
 const { fetchPlan, planLabel, planColor, limites, uso } = usePlan()
+const { confirm } = useConfirm()
 
 const canEdit = computed(() => ['admin'].includes(auth.role))
 const sedes      = ref([])
@@ -19,26 +22,12 @@ const saving     = ref(false)
 const formError  = ref(null)
 
 const showModal      = ref(false)
-const showDelete     = ref(false)
 const showInventario = ref(false)
-const showStock      = ref(false)
 const showUpgrade    = ref(false)
 const editingId      = ref(null)
-const deleteTarget   = ref(null)
 const sedeActiva     = ref(null)
 const inventarioData = ref([])
 const loadingInv     = ref(false)
-const stockForm = ref({ producto: 'flores', cantidad: null, motivo: '' })
-const PRODUCTOS = [
-  { value: "flores",  label: "Flores",   unidad: "g",  step: 0.1,  placeholder: "100" },
-  { value: "preroll", label: "Pre-roll", unidad: "u",  step: 1,    placeholder: "10" },
-  { value: "aceite",  label: "Aceite",   unidad: "ml", step: 0.1,  placeholder: "50" },
-  { value: "extracto",label: "Extracto", unidad: "ml", step: 0.1,  placeholder: "30" },
-  { value: "capsula", label: "Cápsula",  unidad: "u",  step: 1,    placeholder: "30" },
-  { value: "crema",   label: "Crema",    unidad: "g",  step: 1,    placeholder: "100" },
-  { value: "otro",    label: "Otro",     unidad: "g",  step: 0.1,  placeholder: "100" },
-]
-const productoActual = computed(() => PRODUCTOS.find(p => p.value === stockForm.value.producto) || PRODUCTOS[0])
 
 const CICLO_META = {
   semilla:    { label: 'Semilla',    color: '#a16207', bg: 'rgba(161,98,7,.12)',    dot: '#ca8a04' },
@@ -126,40 +115,28 @@ async function handleSubmit() {
     }
   } finally { saving.value = false }
 }
-async function handleDelete() {
+async function handleDelete(sede) {
+  const ok = await confirm({
+    title: 'Eliminar sede',
+    message: `¿Eliminar ${sede.nombre}? Las salas e inventario se mantendrán en el sistema.`,
+    confirmText: 'Eliminar',
+    variant: 'danger',
+  })
+  if (!ok) return
   try {
-    await deleteSede(deleteTarget.value.id)
-    sedes.value      = sedes.value.filter(s => s.id !== deleteTarget.value.id)
-    showDelete.value = false
+    await deleteSede(sede.id)
+    sedes.value = sedes.value.filter(s => s.id !== sede.id)
     await fetchPlan()
-  } catch { showDelete.value = false }
+  } catch {}
 }
 async function verInventario(sede) {
   sedeActiva.value     = sede
   loadingInv.value     = true
   showInventario.value = true
   try {
-    const { data } = await getSedeInventario(sede.id)
-    inventarioData.value = data
+    const { data } = await getSedeStocks(sede.id, { canal: 'regulatorio' })
+    inventarioData.value = data || []
   } finally { loadingInv.value = false }
-}
-function abrirAgregarStock(sede) {
-  sedeActiva.value = sede
-  stockForm.value  = { producto: 'flores', cantidad: null, motivo: '' }
-  showStock.value  = true
-}
-async function confirmarStock() {
-  if (!stockForm.value.cantidad || stockForm.value.cantidad <= 0) return
-  saving.value = true
-  try {
-    await agregarStock(sedeActiva.value.id, {
-      producto: stockForm.value.producto,
-      cantidad: stockForm.value.cantidad,
-      motivo:   stockForm.value.motivo || 'Ingreso manual',
-    })
-    showStock.value = false
-    if (showInventario.value) await verInventario(sedeActiva.value)
-  } finally { saving.value = false }
 }
 
 function tieneActividad(sede) {
@@ -462,13 +439,10 @@ function tieneActividad(sede) {
               >
                 <i class="bi bi-box-seam"></i> Inventario
               </button>
-              <button v-if="canEdit && ['social','mixta'].includes(sede.tipo)" class="sede-card__btn sede-card__btn--ghost" @click="abrirAgregarStock(sede)">
-                <i class="bi bi-plus-circle"></i>
-              </button>
               <button v-if="canEdit" class="sede-card__btn sede-card__btn--ghost" @click="openEdit(sede)">
                 <i class="bi bi-pencil"></i>
               </button>
-              <button v-if="canEdit" class="sede-card__btn sede-card__btn--danger" @click="deleteTarget = sede; showDelete = true">
+              <button v-if="canEdit" class="sede-card__btn sede-card__btn--danger" @click="handleDelete(sede)">
                 <i class="bi bi-trash"></i>
               </button>
               <RouterLink :to="{ name: 'sede-detail', params: { id: sede.id } }" class="sede-card__btn sede-card__btn--primary">
@@ -549,25 +523,6 @@ function tieneActividad(sede) {
     </Teleport>
 
     <Teleport to="body">
-      <div v-if="showDelete" class="modal-overlay" @click.self="showDelete=false">
-        <div class="modal-panel modal-panel--sm">
-          <div class="modal-panel__header">
-            <h2 class="modal-panel__title modal-panel__title--danger">Eliminar sede</h2>
-            <button class="modal-panel__close" @click="showDelete=false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="modal-panel__body">
-            <p>¿Eliminar <strong>{{ deleteTarget?.nombre }}</strong>?</p>
-            <p class="text-muted-sm">Las salas e inventario se mantendrán en el sistema.</p>
-          </div>
-          <div class="modal-panel__footer">
-            <button class="btn-ghost" @click="showDelete=false">Cancelar</button>
-            <button class="btn-danger" @click="handleDelete">Eliminar</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <Teleport to="body">
       <div v-if="showInventario && sedeActiva" class="modal-overlay" @click.self="showInventario=false">
         <div class="modal-panel modal-panel--lg">
           <div class="modal-panel__header">
@@ -576,9 +531,9 @@ function tieneActividad(sede) {
               <p class="modal-panel__subtitle">Stock disponible para dispensar</p>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn-primary-action btn-primary-action--sm" @click="abrirAgregarStock(sedeActiva)">
-                <i class="bi bi-plus-lg"></i> Agregar stock
-              </button>
+              <RouterLink :to="{ name: 'sede-detail', params: { id: sedeActiva.id } }" class="btn-primary-action btn-primary-action--sm" @click="showInventario=false">
+                <i class="bi bi-box-arrow-up-right"></i> Ver sede
+              </RouterLink>
               <button class="modal-panel__close" @click="showInventario=false"><i class="bi bi-x-lg"></i></button>
             </div>
           </div>
@@ -589,96 +544,29 @@ function tieneActividad(sede) {
               <p class="empty-state__desc">Sin stock en esta sede</p>
             </div>
             <div v-else class="inv-grid">
-              <div v-for="item in inventarioData" :key="item.id" class="inv-card" :class="{ 'inv-card--low': item.stock_bajo, 'inv-card--ok': !item.stock_bajo }">
+              <div v-for="item in inventarioData" :key="item.id" class="inv-card" :class="parseFloat(item.cantidad) > 0 ? 'inv-card--ok' : 'inv-card--low'">
                 <div class="inv-card__header">
                   <div class="inv-card__producto-icon">
-                    <i class="bi" :class="item.producto === 'flores' ? 'bi-flower2' : item.producto === 'aceite' ? 'bi-droplet' : item.producto === 'extracto' ? 'bi-eyedropper' : 'bi-box-seam'"></i>
+                    <i class="bi" :class="item.forma_producto === 'flor_seca' ? 'bi-flower2' : item.forma_producto === 'aceite' ? 'bi-droplet' : item.forma_producto === 'extracto' ? 'bi-eyedropper' : 'bi-box-seam'"></i>
                   </div>
-                  <span v-if="item.stock_bajo" class="inv-card__badge inv-card__badge--warn">
-        <i class="bi bi-exclamation-triangle-fill"></i> Stock bajo
-      </span>
-                  <span v-else class="inv-card__badge inv-card__badge--ok">
-        <i class="bi bi-check-circle-fill"></i> OK
-      </span>
+                  <span class="inv-card__badge" :class="parseFloat(item.cantidad) > 0 ? 'inv-card__badge--ok' : 'inv-card__badge--warn'">
+                    <i class="bi" :class="parseFloat(item.cantidad) > 0 ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
+                    {{ parseFloat(item.cantidad) > 0 ? 'OK' : 'Agotado' }}
+                  </span>
                 </div>
-                <div class="inv-card__producto">{{ item.producto_label }}</div>
+                <div class="inv-card__producto">{{ item.forma_producto?.replace('_', ' ') }}</div>
                 <div class="inv-card__stock">
-                  {{ Number(item.stock_gramos).toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}
-                  <span class="inv-card__unit">g</span>
+                  {{ parseFloat(item.cantidad).toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}
+                  <span class="inv-card__unit">{{ item.unidad || 'g' }}</span>
                 </div>
-                <div v-if="item.stock_minimo" class="inv-card__bar-wrap">
-                  <div class="inv-card__bar"
-                       :style="{ width: `${Math.min(100, (item.stock_gramos / item.stock_minimo) * 50)}%` }"
-                       :class="item.stock_bajo ? 'inv-card__bar--low' : 'inv-card__bar--ok'">
-                  </div>
-                </div>
-                <div class="inv-card__meta">
-                  <span v-if="item.stock_minimo">Mínimo: {{ item.stock_minimo }}g</span>
-                  <span>{{ new Date(item.updated_at).toLocaleDateString('es-AR', { day:'numeric', month:'short' }) }}</span>
+                <div v-if="item.precio_sugerido_ars" class="inv-card__meta">
+                  <span>$ {{ parseFloat(item.precio_sugerido_ars).toLocaleString('es-AR', { maximumFractionDigits: 2 }) }}/{{ item.unidad || 'g' }}</span>
                 </div>
               </div>
             </div>
           </div>
           <div class="modal-panel__footer">
             <button class="btn-ghost" @click="showInventario=false">Cerrar</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <Teleport to="body">
-      <div v-if="showStock" class="modal-overlay modal-overlay--top" @click.self="showStock=false">
-        <div class="modal-panel modal-panel--sm">
-          <div class="modal-panel__header">
-            <h2 class="modal-panel__title">Agregar stock — {{ sedeActiva?.nombre }}</h2>
-            <button class="modal-panel__close" @click="showStock=false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="modal-panel__body">
-            <div class="form-grid">
-              <div class="form-group form-group--full">
-                <label class="form-label">Producto</label>
-                <div class="stock-productos">
-                  <button
-                    v-for="p in PRODUCTOS" :key="p.value" type="button"
-                    class="stock-producto-btn"
-                    :class="{ 'stock-producto-btn--active': stockForm.producto === p.value }"
-                    @click="stockForm.producto = p.value; stockForm.cantidad = null"
-                  >
-                    <i class="bi" :class="p.value === 'flores' ? 'bi-flower2' : p.value === 'preroll' ? 'bi-cannabis' : p.value === 'aceite' || p.value === 'extracto' ? 'bi-droplet' : p.value === 'capsula' ? 'bi-capsule' : p.value === 'crema' ? 'bi-jar' : 'bi-box-seam'"></i>
-                    {{ p.label }}
-                  </button>
-                </div>
-              </div>
-              <div class="form-group form-group--full">
-                <label class="form-label">
-                  Cantidad
-                  <span class="stock-unidad-badge">{{ productoActual.unidad }}</span>
-                </label>
-                <div class="stock-cantidad-wrap">
-                  <input
-                    v-model.number="stockForm.cantidad"
-                    type="number"
-                    :step="productoActual.step"
-                    min="0.1"
-                    class="form-input stock-cantidad-input"
-                    :placeholder="productoActual.placeholder"
-                  />
-                  <span class="stock-cantidad-suffix">{{ productoActual.unidad }}</span>
-                </div>
-                <span class="form-hint">{{ productoActual.label }} se mide en {{ productoActual.unidad === 'g' ? 'gramos' : productoActual.unidad === 'ml' ? 'mililitros' : 'unidades' }}</span>
-              </div>
-              <div class="form-group form-group--full">
-                <label class="form-label">Motivo</label>
-                <input v-model.trim="stockForm.motivo" class="form-input" placeholder="Ej: Cosecha lote L-001…" />
-              </div>
-            </div>
-          </div>
-          <div class="modal-panel__footer">
-            <button class="btn-ghost" :disabled="saving" @click="showStock=false">Cancelar</button>
-            <button class="btn-primary-action" :disabled="saving" @click="confirmarStock">
-              <span v-if="saving" class="spinner spinner--sm"></span>
-              Confirmar ingreso
-            </button>
           </div>
         </div>
       </div>

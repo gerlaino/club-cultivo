@@ -2,13 +2,17 @@
 import { ref, computed, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
-import { getSede, listSalas, getSedeInventario, agregarStock, listLotes, listGeneticas,
-         getStockPendiente, aprobarStock, rechazarStock } from "../lib/api"
+import { getSede, listSalas, listLotes,
+         getSedeStocks, createStock } from "../lib/api"
 import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
+import Breadcrumb from '../components/ui/Breadcrumb.vue'
+import EmptyState from '../components/ui/EmptyState.vue'
+import { useToast } from '../composables/useToast.js'
 
 const route  = useRoute()
 const router = useRouter()
 const auth   = useAuthStore()
+const toast  = useToast()
 
 const sedeId        = Number(route.params.id)
 const sede          = ref(null)
@@ -17,181 +21,64 @@ const loading       = ref(true)
 const error         = ref(null)
 const showCrearSala = ref(false)
 
-const canEdit    = computed(() => ["admin", "agricultor"].includes(auth.role))
+const canEdit    = computed(() => ["admin", "cultivador"].includes(auth.role))
 const isAdmin       = computed(() => auth.user?.role === 'admin')
-const canAddStock   = computed(() => ["admin", "agricultor", "manicurador"].includes(auth.user?.role))
-const esManicurador = computed(() => auth.user?.role === 'manicurador')
+const canAddStock   = computed(() => ["admin", "cultivador", "manicura"].includes(auth.user?.role))
+const esManicurador = computed(() => auth.user?.role === 'manicura')
 
-// ── Inventario ──────────────────────────────────────────────────
-const inventario     = ref([])
-const loadingInv     = ref(false)
-const showStockModal = ref(false)
-const savingStock    = ref(false)
-const lotes          = ref([])
-const geneticas      = ref([])
-const loadingLotes   = ref(false)
-const loteSearch     = ref('')
+const tieneInv   = computed(() => ['social', 'mixta'].includes(sede.value?.tipo))
+const tieneSalas = computed(() => ['produccion', 'mixta'].includes(sede.value?.tipo))
+const stockTotal = computed(() => tiendaStocks.value.reduce((a, s) => a + Number(s.cantidad || 0), 0))
+const itemsBajos = computed(() => tiendaStocks.value.filter(s => Number(s.cantidad) < 5).length)
 
-// ── Aprobaciones de stock (manicurador → admin) ──────────────────
-const stockPendiente   = ref([])
-const loadingPendiente = ref(false)
-const aprobando        = ref(null)
-const rechazando       = ref(null)
-const showRechazar     = ref(false)
-const rechazarTarget   = ref(null)
-const rechazarMotivo   = ref('')
 
-const stockForm = ref({
-  producto:          'flores',
-  cantidad:          null,
-  lote_id:           null,
-  genetica_id:       null,
-  precio_por_unidad: null,
-  origen:            'lote',
-  motivo:            '',
-})
+// ── Tienda social (nuevo modelo stocks) ─────────────────────────
+const tiendaStocks       = ref([])
+const loadingTienda      = ref(false)
+const showNuevoStockModal = ref(false)
+const savingNuevoStock   = ref(false)
+const nuevoStockError    = ref(null)
+const nuevoStockForm     = ref({ origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, precio_sugerido_ars: null, proveedor: '', descripcion: '' })
 
-const PRODUCTOS = [
-  { value: 'flores',   label: 'Flores',   unidad: 'g',  step: 0.1, icon: 'bi-flower2',    tieneGenetica: true  },
-  { value: 'preroll',  label: 'Preroll',  unidad: 'u',  step: 1,   icon: 'bi-archive',    tieneGenetica: true  },
-  { value: 'aceite',   label: 'Aceite',   unidad: 'ml', step: 0.1, icon: 'bi-droplet',    tieneGenetica: false },
-  { value: 'extracto', label: 'Extracto', unidad: 'ml', step: 0.1, icon: 'bi-eyedropper', tieneGenetica: false },
-  { value: 'crema',    label: 'Crema',    unidad: 'g',  step: 1,   icon: 'bi-jar',        tieneGenetica: false },
-  { value: 'otro',     label: 'Otro',     unidad: 'u',  step: 1,   icon: 'bi-box-seam',   tieneGenetica: false },
-]
+const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '🫙 Aceite', tintura: '💧 Tintura', topico: '🧴 Tópico', otro: '📦 Otro' }
+const lotesParaStock = ref([])
+const loadingLotesStock = ref(false)
 
-const ESTADOS_LOTE = {
-  semilla:    { label: 'Semilla',    color: '#92400e', bg: 'rgba(146,64,14,.1)'  },
-  vegetativo: { label: 'Vegetativo', color: '#15803d', bg: 'rgba(21,128,61,.1)'  },
-  floracion:  { label: 'Floración',  color: '#7c3aed', bg: 'rgba(124,58,237,.1)' },
-  cosecha:    { label: 'Cosecha',    color: '#b45309', bg: 'rgba(180,83,9,.1)'   },
-  curado:     { label: 'Curado',     color: '#0369a1', bg: 'rgba(3,105,161,.1)'  },
-  finalizado: { label: 'Finalizado', color: '#475569', bg: 'rgba(71,85,105,.1)'  },
+async function loadTiendaStocks() {
+  loadingTienda.value = true
+  try { const { data } = await getSedeStocks(sedeId, { canal: 'regulatorio' }); tiendaStocks.value = data || [] }
+  catch { tiendaStocks.value = [] }
+  finally { loadingTienda.value = false }
 }
 
-const productoActual    = computed(() => PRODUCTOS.find(p => p.value === stockForm.value.producto) || PRODUCTOS[0])
-const loteSeleccionado  = computed(() => lotes.value.find(l => l.id === stockForm.value.lote_id) || null)
-const geneticaSeleccionada = computed(() => geneticas.value.find(g => g.id === stockForm.value.genetica_id) || null)
-const productoTieneGenetica = computed(() => productoActual.value.tieneGenetica)
-const tieneInv        = computed(() => ['social', 'mixta'].includes(sede.value?.tipo))
-const tieneSalas      = computed(() => ['produccion', 'mixta'].includes(sede.value?.tipo))
-const stockTotal      = computed(() => inventario.value.reduce((a, i) => a + Number(i.stock_gramos || 0), 0))
-const itemsBajos      = computed(() => inventario.value.filter(i => i.stock_bajo).length)
+async function abrirNuevoStockModal() {
+  nuevoStockForm.value = { origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, precio_sugerido_ars: null, proveedor: '', descripcion: '' }
+  nuevoStockError.value = null
+  showNuevoStockModal.value = true
+  if (!lotesParaStock.value.length) {
+    loadingLotesStock.value = true
+    try { const { data } = await listLotes({ estado: 'finalizado' }); lotesParaStock.value = data || [] }
+    catch { lotesParaStock.value = [] }
+    finally { loadingLotesStock.value = false }
+  }
+}
 
-const lotesFiltrados = computed(() => {
-  const q = loteSearch.value.toLowerCase().trim()
-  const lista = q
-    ? lotes.value.filter(l =>
-      l.codigo?.toLowerCase().includes(q) ||
-      l.strain?.toLowerCase().includes(q) ||
-      l.genetica?.nombre?.toLowerCase().includes(q) ||
-      l.sala?.nombre?.toLowerCase().includes(q)
-    )
-    : lotes.value
-  return lista.slice(0, 8)
-})
-
-function estadoLote(estado) { return ESTADOS_LOTE[estado] || ESTADOS_LOTE.finalizado }
-function productoIcon(producto) { return PRODUCTOS.find(p => p.value === producto)?.icon || 'bi-box-seam' }
-
-async function cargarPendientes() {
-  if (!isAdmin.value) return
-  loadingPendiente.value = true
+async function confirmarNuevoStock() {
+  savingNuevoStock.value = true; nuevoStockError.value = null
   try {
-    const { data } = await getStockPendiente(sedeId)
-    stockPendiente.value = data || []
-  } catch { stockPendiente.value = [] }
-  finally { loadingPendiente.value = false }
+    const f = nuevoStockForm.value
+    const payload = { origen: f.origen, sede_id: sedeId, forma_producto: f.forma_producto, unidad: f.unidad, cantidad: f.cantidad, costo_unitario_ars: f.costo_unitario_ars || undefined, precio_sugerido_ars: f.precio_sugerido_ars || undefined }
+    if (f.origen === 'derivado_lote') { payload.lote_id = f.lote_id; payload.lote_origen_consumido_g = f.lote_origen_consumido_g }
+    else { payload.proveedor = f.proveedor; payload.descripcion = f.descripcion }
+    await createStock(payload)
+    showNuevoStockModal.value = false
+    await loadTiendaStocks()
+    toast.success('Stock agregado correctamente')
+  } catch (e) {
+    nuevoStockError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'Error al agregar stock'
+  } finally { savingNuevoStock.value = false }
 }
 
-async function handleAprobar(mov) {
-  aprobando.value = mov.id
-  try {
-    await aprobarStock(sedeId, mov.id)
-    await Promise.all([cargarInventario(), cargarPendientes()])
-  } catch (e) { console.error(e) }
-  finally { aprobando.value = null }
-}
-
-function abrirRechazar(mov) {
-  rechazarTarget.value = mov
-  rechazarMotivo.value = ''
-  showRechazar.value = true
-}
-
-async function handleRechazar() {
-  rechazando.value = rechazarTarget.value.id
-  try {
-    await rechazarStock(sedeId, rechazarTarget.value.id, rechazarMotivo.value)
-    await cargarPendientes()
-    showRechazar.value = false
-  } catch (e) { console.error(e) }
-  finally { rechazando.value = null }
-}
-
-async function cargarInventario() {
-  loadingInv.value = true
-  try {
-    const { data } = await getSedeInventario(sedeId)
-    inventario.value = data
-  } catch (e) { console.error(e) }
-  finally { loadingInv.value = false }
-}
-
-async function abrirStock() {
-  stockForm.value = { producto: 'flores', cantidad: null, lote_id: null, genetica_id: null, precio_por_unidad: null, origen: 'lote', motivo: '' }
-  loteSearch.value = ''
-  showStockModal.value = true
-  loadingLotes.value = true
-  try {
-    if (esManicurador.value) {
-      // Manicurador: solo sus lotes en cosecha/curado
-      const { data } = await listLotes({ manicura: true })
-      lotes.value = data || []
-    } else {
-      const [lotesRes, geneticasRes] = await Promise.all([listLotes(), listGeneticas()])
-      const order = { cosecha: 0, curado: 1, finalizado: 2, floracion: 3, vegetativo: 4, semilla: 5 }
-      lotes.value     = (lotesRes.data || []).sort((a, b) => (order[a.estado] ?? 9) - (order[b.estado] ?? 9))
-      geneticas.value = geneticasRes.data || []
-    }
-  } catch (e) { console.error(e) }
-  finally { loadingLotes.value = false }
-}
-
-async function confirmarStock() {
-  if (!stockForm.value.cantidad || stockForm.value.cantidad <= 0) return
-  if (esManicurador.value && !stockForm.value.lote_id) return
-  savingStock.value = true
-  try {
-    let payload
-    if (esManicurador.value) {
-      const lote = loteSeleccionado.value
-      payload = {
-        producto:    'flores',
-        cantidad:    stockForm.value.cantidad,
-        lote_id:     lote.id,
-        genetica_id: lote.genetica?.id || undefined,
-        motivo:      `Manicura — lote ${lote.codigo}`,
-      }
-    } else {
-      payload = {
-        producto:          stockForm.value.producto,
-        cantidad:          stockForm.value.cantidad,
-        precio_por_unidad: stockForm.value.precio_por_unidad || undefined,
-        genetica_id:       stockForm.value.genetica_id       || undefined,
-        motivo: stockForm.value.origen === 'lote' && loteSeleccionado.value
-          ? `Cosecha lote ${loteSeleccionado.value.codigo}`
-          : (stockForm.value.motivo || 'Ingreso externo'),
-      }
-      if (stockForm.value.origen === 'lote' && stockForm.value.lote_id)
-        payload.lote_id = stockForm.value.lote_id
-    }
-    await agregarStock(sedeId, payload)
-    showStockModal.value = false
-    await cargarInventario()
-  } catch (e) { console.error(e) }
-  finally { savingStock.value = false }
-}
 
 // ── Original ────────────────────────────────────────────────────
 const TIPO_META = {
@@ -234,7 +121,7 @@ onMounted(async () => {
     const [sedeRes, salasRes] = await Promise.all([getSede(sedeId), listSalas()])
     sede.value  = sedeRes.data
     salas.value = (salasRes.data || []).filter(s => s.sede?.id === sedeId)
-    if (tieneInv.value) await Promise.all([cargarInventario(), cargarPendientes()])
+    if (tieneInv.value) await loadTiendaStocks()
   } catch (e) {
     error.value = "No se pudo cargar la sede."
   } finally {
@@ -257,11 +144,7 @@ onMounted(async () => {
 
     <template v-else-if="sede">
 
-      <div class="sdv__breadcrumb">
-        <RouterLink :to="{ name: 'sedes' }" class="sdv__breadcrumb-link">Sedes</RouterLink>
-        <i class="bi bi-chevron-right sdv__breadcrumb-sep"></i>
-        <span>{{ sede.nombre }}</span>
-      </div>
+      <Breadcrumb :items="[{ label: 'Sedes', to: { name: 'sedes' } }, { label: sede.nombre }]" />
 
       <div class="sdv__header">
         <div class="sdv__header-left">
@@ -287,8 +170,8 @@ onMounted(async () => {
           <button v-if="canEdit && tieneSalas" class="sdv__btn-primary" @click="showCrearSala = true">
             <i class="bi bi-plus-lg"></i> Nueva sala aquí
           </button>
-          <button v-if="canAddStock && tieneInv" class="sdv__btn-inv" @click="abrirStock">
-            <i class="bi bi-plus-lg"></i> {{ esManicurador ? 'Registrar cosecha' : 'Agregar stock' }}
+          <button v-if="canAddStock && tieneInv" class="sdv__btn-inv" @click="abrirNuevoStockModal">
+            <i class="bi bi-plus-lg"></i> Agregar stock
           </button>
           <button class="sdv__btn-ghost" @click="router.back()">
             <i class="bi bi-arrow-left"></i> Volver
@@ -304,104 +187,44 @@ onMounted(async () => {
       </div>
 
       <div v-if="tieneInv" class="sdv__kpis">
-        <div class="sdv__kpi"><div class="sdv__kpi-val">{{ inventario.length }}</div><div class="sdv__kpi-lbl">Productos en stock</div></div>
+        <div class="sdv__kpi"><div class="sdv__kpi-val">{{ tiendaStocks.length }}</div><div class="sdv__kpi-lbl">Productos en stock</div></div>
         <div class="sdv__kpi"><div class="sdv__kpi-val" style="color:#0369a1">{{ stockTotal.toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}g</div><div class="sdv__kpi-lbl">Gramos totales</div></div>
-        <div class="sdv__kpi"><div class="sdv__kpi-val" :style="{ color: itemsBajos > 0 ? '#dc2626' : '#15803d' }">{{ itemsBajos }}</div><div class="sdv__kpi-lbl">Stock bajo</div></div>
+        <div class="sdv__kpi"><div class="sdv__kpi-val" :style="{ color: itemsBajos > 0 ? '#dc2626' : '#15803d' }">{{ itemsBajos }}</div><div class="sdv__kpi-lbl">Stock bajo (&lt;5g)</div></div>
       </div>
 
       <div class="sdv__layout">
         <div class="sdv__col-main">
 
-          <!-- INVENTARIO -->
+          <!-- STOCK / TIENDA SOCIAL -->
           <div v-if="tieneInv" class="sdv__card" :class="{ 'sdv__card--mb': tieneSalas }">
             <div class="sdv__card-header">
               <div class="sdv__card-title-wrap">
-                <span class="sdv__card-icon" style="background:rgba(3,105,161,.1);color:#0369a1"><i class="bi bi-box-seam"></i></span>
-                <span class="sdv__card-title">Inventario de stock</span>
-                <span class="sdv__pill">{{ inventario.length }}</span>
+                <span class="sdv__card-icon" style="background:rgba(27,94,32,.1);color:#1b5e20"><i class="bi bi-shop"></i></span>
+                <span class="sdv__card-title">Stock disponible</span>
+                <span class="sdv__pill">{{ tiendaStocks.length }}</span>
               </div>
-              <button v-if="canAddStock" class="sdv__card-btn-green" @click="abrirStock">
-                <i class="bi bi-plus-lg"></i> Agregar
+              <button v-if="canEdit" class="sdv__card-btn-green" @click="abrirNuevoStockModal">
+                <i class="bi bi-plus-lg"></i> Agregar stock
               </button>
             </div>
-
-            <div v-if="loadingInv" class="sdv__empty"><div class="sdv__ring"></div></div>
-
-            <div v-else-if="!inventario.length" class="sdv__empty">
-              <i class="bi bi-box-seam sdv__empty-icon"></i>
-              <p>Sin stock registrado en esta sede.</p>
-              <button v-if="canEdit" class="sdv__btn-sm-green" @click="abrirStock">
-                <i class="bi bi-plus-lg"></i> Registrar primer ingreso
-              </button>
-            </div>
-
-            <!-- Panel aprobaciones (solo admin) -->
-            <div v-if="isAdmin && (loadingPendiente || stockPendiente.length)" class="sdv__pending">
-              <div class="sdv__pending-header">
-                <i class="bi bi-hourglass-split"></i>
-                Pendientes de aprobación
-                <span class="sdv__pending-badge">{{ stockPendiente.length }}</span>
-              </div>
-              <div v-if="loadingPendiente" class="sdv__pending-loading">
-                <div class="sdv__ring sdv__ring--sm"></div> Cargando…
-              </div>
-              <div v-else class="sdv__pending-list">
-                <div v-for="mov in stockPendiente" :key="mov.id" class="sdv__pending-item">
-                  <div class="sdv__pending-info">
-                    <div class="sdv__pending-producto">
-                      {{ mov.sede_inventario.producto_label }}
-                      <span class="sdv__pending-qty">+{{ mov.cantidad }}{{ mov.sede_inventario.unidad_medida }}</span>
-                    </div>
-                    <div class="sdv__pending-meta">
-                      <span>{{ mov.creado_por.nombre }}</span>
-                      <span v-if="mov.lote"> · Lote {{ mov.lote.codigo }}</span>
-                      <span> · {{ new Date(mov.created_at).toLocaleDateString('es-AR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) }}</span>
-                    </div>
-                    <div v-if="mov.motivo" class="sdv__pending-motivo">{{ mov.motivo }}</div>
-                  </div>
-                  <div class="sdv__pending-actions">
-                    <button class="sdv__btn-aprobar" :disabled="aprobando === mov.id" @click="handleAprobar(mov)">
-                      <div v-if="aprobando === mov.id" class="sdv__ring sdv__ring--sm sdv__ring--white"></div>
-                      <i v-else class="bi bi-check-lg"></i>
-                      Aprobar
-                    </button>
-                    <button class="sdv__btn-rechazar" :disabled="aprobando === mov.id" @click="abrirRechazar(mov)">
-                      <i class="bi bi-x-lg"></i>
-                    </button>
-                  </div>
+            <div v-if="loadingTienda" class="sdv__tienda-loading"><div class="sdv__ring sdv__ring--sm"></div> Cargando…</div>
+            <EmptyState v-else-if="!tiendaStocks.length" icon="bi-shop" title="Sin stocks" message="No hay stocks disponibles para dispensación." compact>
+              <template #actions>
+                <button v-if="canEdit" class="sdv__btn-sm-green" @click="abrirNuevoStockModal"><i class="bi bi-plus-lg"></i> Agregar primer stock</button>
+              </template>
+            </EmptyState>
+            <div v-else class="sdv__tienda-grid">
+              <div v-for="s in tiendaStocks" :key="s.id" class="sdv__tienda-card">
+                <div class="sdv__tienda-forma">{{ FORMA_LABELS[s.forma_producto] || s.forma_producto }}</div>
+                <div v-if="s.genetica" class="sdv__tienda-gen">🧬 {{ s.genetica.nombre }}</div>
+                <div v-if="s.lote_codigo" class="sdv__tienda-lote">📋 {{ s.lote_codigo }}</div>
+                <div class="sdv__tienda-qty">
+                  <strong>{{ parseFloat(s.cantidad).toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}</strong>
+                  <span class="sdv__tienda-unit">{{ s.unidad || 'g' }}</span>
                 </div>
-              </div>
-            </div>
-
-            <div v-else class="sdv__inv-grid">
-              <div v-for="item in inventario" :key="item.id" class="sdv__inv-card" :class="{ 'sdv__inv-card--low': item.stock_bajo }">
-                <div class="sdv__inv-card__top">
-                  <div class="sdv__inv-icon"><i :class="['bi', productoIcon(item.producto)]"></i></div>
-                  <span class="sdv__inv-badge" :class="item.stock_bajo ? 'sdv__inv-badge--warn' : 'sdv__inv-badge--ok'">
-                    <i :class="item.stock_bajo ? 'bi bi-exclamation-triangle-fill' : 'bi bi-check-circle-fill'"></i>
-                    {{ item.stock_bajo ? 'Stock bajo' : 'OK' }}
-                  </span>
-                </div>
-                <div class="sdv__inv-producto">{{ item.producto_label }}</div>
-                <div v-if="item.genetica" class="sdv__inv-genetica">
-                  <span v-if="item.genetica.tipo" class="sdv__inv-gen-tipo">{{ item.genetica.tipo }}</span>
-                  <span v-if="item.genetica.thc">THC {{ item.genetica.thc }}%</span>
-                  <span v-if="item.genetica.cbd"> · CBD {{ item.genetica.cbd }}%</span>
-                </div>
-                <div class="sdv__inv-stock">
-                  {{ Number(item.stock_gramos).toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}
-                  <span class="sdv__inv-unit">{{ item.unidad_medida || 'g' }}</span>
-                </div>
-                <div v-if="item.precio_por_unidad" class="sdv__inv-precio">
-                  ${{ item.precio_por_unidad }}/{{ item.unidad_medida || 'g' }}
-                </div>
-                <div v-if="item.stock_minimo" class="sdv__inv-bar-wrap">
-                  <div class="sdv__inv-bar" :class="item.stock_bajo ? 'sdv__inv-bar--low' : 'sdv__inv-bar--ok'"
-                       :style="{ width: `${Math.min(100, (item.stock_gramos / item.stock_minimo) * 50)}%` }"></div>
-                </div>
-                <div class="sdv__inv-meta">
-                  <span v-if="item.stock_minimo">Mín: {{ item.stock_minimo }}</span>
-                  <span>{{ new Date(item.updated_at).toLocaleDateString('es-AR', { day:'numeric', month:'short' }) }}</span>
+                <div v-if="s.precio_sugerido_ars" class="sdv__tienda-precio">$ {{ parseFloat(s.precio_sugerido_ars).toLocaleString('es-AR', { maximumFractionDigits: 2 }) }}/{{ s.unidad || 'g' }}</div>
+                <div class="sdv__tienda-status" :class="parseFloat(s.cantidad) > 0 ? 'sdv__tienda-status--ok' : 'sdv__tienda-status--empty'">
+                  {{ parseFloat(s.cantidad) > 0 ? '✓ Disponible' : '✗ Agotado' }}
                 </div>
               </div>
             </div>
@@ -417,11 +240,11 @@ onMounted(async () => {
               </div>
               <RouterLink :to="{ name: 'salas' }" class="sdv__card-btn">Ver todas →</RouterLink>
             </div>
-            <div v-if="!salas.length" class="sdv__empty">
-              <i class="bi bi-building-slash sdv__empty-icon"></i>
-              <p>Esta sede no tiene salas asignadas todavía.</p>
-              <button v-if="canEdit" class="sdv__btn-sm-green" @click="showCrearSala = true">Crear primera sala</button>
-            </div>
+            <EmptyState v-if="!salas.length" icon="bi-building-slash" title="Sin salas" message="Esta sede no tiene salas asignadas todavía." compact>
+              <template #actions>
+                <button v-if="canEdit" class="sdv__btn-sm-green" @click="showCrearSala = true">Crear primera sala</button>
+              </template>
+            </EmptyState>
             <div v-else class="sdv__salas">
               <RouterLink v-for="s in salas" :key="s.id" :to="{ name: 'sala-detail', params: { id: s.id } }" class="sdv__sala">
                 <div class="sdv__sala-state" :style="{ background: s.state === 'activa' ? '#15803d' : s.state === 'mantenimiento' ? '#f59e0b' : '#94a3b8' }"></div>
@@ -489,301 +312,109 @@ onMounted(async () => {
 
     <ModalCrearSala v-if="showCrearSala" :sede-id-fija="sedeId" @close="showCrearSala = false" @created="onSalaCreada" />
 
-    <!-- Modal rechazo -->
+    <!-- MODAL NUEVO STOCK (nuevo modelo) -->
     <Teleport to="body">
-      <div v-if="showRechazar" class="sdv__modal-overlay" @click.self="showRechazar = false">
-        <div class="sdv__modal sdv__modal--sm">
-          <div class="sdv__modal-header">
-            <div class="sdv__modal-header-icon" style="background:#fef2f2;color:#dc2626"><i class="bi bi-x-circle"></i></div>
-            <div>
-              <h3 class="sdv__modal-title">Rechazar ingreso</h3>
-              <p class="sdv__modal-sub" v-if="rechazarTarget">
-                {{ rechazarTarget.sede_inventario.producto_label }} · {{ rechazarTarget.cantidad }}{{ rechazarTarget.sede_inventario.unidad_medida }}
-                · {{ rechazarTarget.creado_por.nombre }}
-              </p>
-            </div>
-            <button class="sdv__modal-close" @click="showRechazar = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="sdv__modal-body">
-            <label class="sdv__label">Motivo del rechazo <span style="color:#94a3b8;font-weight:400;text-transform:none">(opcional)</span></label>
-            <textarea v-model.trim="rechazarMotivo" class="sdv__input" rows="3"
-                      placeholder="Ej: Cantidad no coincide con el pesaje real…"></textarea>
-          </div>
-          <div class="sdv__modal-footer">
-            <button class="sdv__btn-ghost" :disabled="!!rechazando" @click="showRechazar = false">Cancelar</button>
-            <button class="sdv__btn-danger" :disabled="!!rechazando" @click="handleRechazar">
-              <span v-if="rechazando" class="sdv__ring sdv__ring--sm sdv__ring--white"></span>
-              <i v-else class="bi bi-x-lg"></i>
-              Rechazar
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- MODAL STOCK -->
-    <Teleport to="body">
-      <div v-if="showStockModal" class="sdv__modal-overlay" @click.self="showStockModal = false">
+      <div v-if="showNuevoStockModal" class="sdv__modal-overlay" @click.self="showNuevoStockModal = false">
         <div class="sdv__modal">
-
           <div class="sdv__modal-header">
-            <div class="sdv__modal-header-icon"><i class="bi bi-box-seam"></i></div>
+            <div class="sdv__modal-header-icon" style="background:rgba(27,94,32,.1);color:#1b5e20"><i class="bi bi-shop"></i></div>
             <div>
               <h3 class="sdv__modal-title">Agregar stock</h3>
               <p class="sdv__modal-sub">{{ sede?.nombre }}</p>
             </div>
-            <button class="sdv__modal-close" @click="showStockModal = false"><i class="bi bi-x-lg"></i></button>
+            <button class="sdv__modal-close" @click="showNuevoStockModal = false"><i class="bi bi-x-lg"></i></button>
           </div>
+          <div class="sdv__modal-body">
+            <div v-if="nuevoStockError" class="sdv__alert-err">{{ nuevoStockError }}</div>
 
-          <!-- ══ MODAL MANICURADOR ══ -->
-          <div v-if="esManicurador" class="sdv__modal-body">
-
-            <div v-if="loadingLotes" class="sdv__lotes-loading">
-              <div class="sdv__ring sdv__ring--sm"></div><span>Cargando tus lotes…</span>
+            <!-- Modo origen -->
+            <div class="sdv__field" style="margin-bottom:1.25rem">
+              <label class="sdv__label">Origen del stock</label>
+              <div class="sdv__origen-selector">
+                <button type="button" class="sdv__origen-btn" :class="{ 'sdv__origen-btn--active': nuevoStockForm.origen === 'derivado_lote' }" @click="nuevoStockForm.origen = 'derivado_lote'">
+                  <i class="bi bi-flower1"></i>
+                  <div><strong>Derivado de lote</strong><span>Stock generado desde un lote propio</span></div>
+                </button>
+                <button type="button" class="sdv__origen-btn" :class="{ 'sdv__origen-btn--active': nuevoStockForm.origen === 'compra_externa' }" @click="nuevoStockForm.origen = 'compra_externa'">
+                  <i class="bi bi-bag"></i>
+                  <div><strong>Compra externa</strong><span>Stock adquirido de proveedor externo</span></div>
+                </button>
+              </div>
             </div>
 
-            <template v-else>
-              <!-- Lote selector -->
-              <div class="sdv__field">
-                <label class="sdv__label"><span class="sdv__label-num">1</span> Lote a manicurar</label>
-                <div v-if="!lotes.length" class="sdv__manicura-empty">
-                  <i class="bi bi-box-seam"></i>
-                  No tenés lotes asignados en cosecha o curado.
-                </div>
-                <div v-else class="sdv__manicura-lotes">
-                  <button
-                    v-for="lote in lotes" :key="lote.id"
-                    class="sdv__manicura-lote"
-                    :class="{ 'sdv__manicura-lote--active': stockForm.lote_id === lote.id }"
-                    type="button"
-                    @click="stockForm.lote_id = lote.id"
-                  >
-                    <div class="sdv__manicura-lote-top">
-                      <span class="sdv__manicura-codigo">{{ lote.codigo }}</span>
-                      <span class="sdv__manicura-estado" :style="{ background: estadoLote(lote.estado).bg, color: estadoLote(lote.estado).color }">
-                        {{ estadoLote(lote.estado).label }}
-                      </span>
-                    </div>
-                    <div class="sdv__manicura-genetica">
-                      {{ lote.genetica?.nombre || 'Sin genética' }}
-                    </div>
-                    <div class="sdv__manicura-sala">
-                      <i class="bi bi-grid-3x3-gap"></i> {{ lote.sala?.nombre || '—' }}
-                    </div>
-                  </button>
-                </div>
+            <!-- Lote selector (derivado_lote) -->
+            <div v-if="nuevoStockForm.origen === 'derivado_lote'" class="sdv__field" style="margin-bottom:1rem">
+              <label class="sdv__label">Lote origen</label>
+              <div v-if="loadingLotesStock" class="sdv__tienda-loading"><div class="sdv__ring sdv__ring--sm"></div> Cargando lotes…</div>
+              <select v-else class="sdv__input" v-model="nuevoStockForm.lote_id">
+                <option :value="null" disabled>Seleccioná un lote…</option>
+                <option v-for="l in lotesParaStock" :key="l.id" :value="l.id">{{ l.codigo }} — {{ l.genetica?.nombre || 'Sin genética' }}</option>
+              </select>
+              <div class="sdv__field" style="margin-top:.75rem">
+                <label class="sdv__label">Gramos consumidos del lote <span class="sdv__optional">opcional</span></label>
+                <input type="number" step="0.1" min="0" class="sdv__input" v-model.number="nuevoStockForm.lote_origen_consumido_g" placeholder="ej: 320.0" />
               </div>
+            </div>
 
-              <!-- Cantidad -->
-              <div v-if="stockForm.lote_id" class="sdv__field">
-                <label class="sdv__label"><span class="sdv__label-num">2</span> Cantidad manicurada</label>
-                <div class="sdv__cant-wrap">
-                  <input v-model.number="stockForm.cantidad" type="number" step="0.1" min="0.1"
-                         class="sdv__input sdv__input--big" placeholder="0" />
-                  <span class="sdv__cant-suffix">g</span>
-                </div>
-                <div v-if="loteSeleccionado" class="sdv__manicura-confirm">
-                  <i class="bi bi-check-circle-fill" style="color:#15803d"></i>
-                  <span>
-                    Se registrará <strong>{{ stockForm.cantidad || 0 }}g</strong> de
-                    <strong>{{ loteSeleccionado.genetica?.nombre || loteSeleccionado.codigo }}</strong>
-                    como ingreso pendiente de aprobación.
-                  </span>
-                </div>
+            <!-- Proveedor/desc (compra_externa) -->
+            <template v-if="nuevoStockForm.origen === 'compra_externa'">
+              <div class="sdv__field" style="margin-bottom:.75rem">
+                <label class="sdv__label">Proveedor <span style="color:#dc2626">*</span></label>
+                <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.proveedor" placeholder="Nombre del proveedor" />
+              </div>
+              <div class="sdv__field" style="margin-bottom:1rem">
+                <label class="sdv__label">Descripción <span style="color:#dc2626">*</span></label>
+                <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.descripcion" placeholder="Ej: Aceite CBD 10mg/ml" />
               </div>
             </template>
 
+            <!-- Forma producto -->
+            <div class="sdv__field" style="margin-bottom:1rem">
+              <label class="sdv__label">Forma de producto</label>
+              <div class="sdv__forma-grid">
+                <button v-for="(label, key) in FORMA_LABELS" :key="key" type="button" class="sdv__forma-btn"
+                        :class="{ 'sdv__forma-btn--active': nuevoStockForm.forma_producto === key }"
+                        @click="nuevoStockForm.forma_producto = key">{{ label }}</button>
+              </div>
+            </div>
+
+            <!-- Cantidad + precios -->
+            <div class="sdv__grid-2" style="margin-bottom:.75rem">
+              <div class="sdv__field">
+                <label class="sdv__label">Cantidad <span style="color:#dc2626">*</span></label>
+                <div class="sdv__cant-wrap">
+                  <input type="number" step="0.1" min="0" class="sdv__input sdv__input--big" v-model.number="nuevoStockForm.cantidad" placeholder="0" />
+                  <span class="sdv__cant-suffix">{{ nuevoStockForm.unidad }}</span>
+                </div>
+              </div>
+              <div class="sdv__field">
+                <label class="sdv__label">Unidad</label>
+                <select class="sdv__input" v-model="nuevoStockForm.unidad">
+                  <option value="g">g (gramos)</option>
+                  <option value="ml">ml (mililitros)</option>
+                  <option value="u">u (unidades)</option>
+                </select>
+              </div>
+            </div>
+            <div class="sdv__grid-2">
+              <div class="sdv__field">
+                <label class="sdv__label">Costo unitario (ARS) <span class="sdv__optional">opcional</span></label>
+                <input type="number" step="0.01" min="0" class="sdv__input" v-model.number="nuevoStockForm.costo_unitario_ars" placeholder="ej: 1200" />
+              </div>
+              <div class="sdv__field">
+                <label class="sdv__label">Precio sugerido (ARS) <span class="sdv__optional">opcional</span></label>
+                <input type="number" step="0.01" min="0" class="sdv__input" v-model.number="nuevoStockForm.precio_sugerido_ars" placeholder="ej: 2500" />
+              </div>
+            </div>
           </div>
-
-          <!-- ══ MODAL ADMIN/AGRICULTOR ══ -->
-          <div v-else class="sdv__modal-body">
-
-            <!-- 1. Producto -->
-            <div class="sdv__field">
-              <label class="sdv__label"><span class="sdv__label-num">1</span> Tipo de producto</label>
-              <div class="sdv__producto-grid">
-                <button v-for="p in PRODUCTOS" :key="p.value" type="button" class="sdv__producto-btn"
-                        :class="{ 'sdv__producto-btn--active': stockForm.producto === p.value }"
-                        @click="stockForm.producto = p.value; stockForm.cantidad = null">
-                  <i :class="['bi', p.icon]"></i>
-                  <span>{{ p.label }}</span>
-                  <span class="sdv__prod-unidad">{{ p.unidad }}</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- 2. Genética (solo para flores/preroll) -->
-            <div v-if="productoTieneGenetica" class="sdv__field">
-              <label class="sdv__label"><span class="sdv__label-num">2</span> Genética <span class="sdv__optional">(mejora trazabilidad)</span></label>
-              <select v-model="stockForm.genetica_id" class="sdv__input">
-                <option :value="null">Sin genética específica</option>
-                <option v-for="g in geneticas" :key="g.id" :value="g.id">
-                  {{ g.nombre }}{{ g.thc ? ` · THC ${g.thc}%` : '' }}{{ g.tipo ? ` (${g.tipo})` : '' }}
-                </option>
-              </select>
-            </div>
-
-            <!-- 3. Precio por unidad -->
-            <div class="sdv__field">
-              <label class="sdv__label">
-                <span class="sdv__label-num">{{ productoTieneGenetica ? '3' : '2' }}</span>
-                Precio por {{ productoActual.unidad }}
-                <span class="sdv__optional">(opcional)</span>
-              </label>
-              <div class="sdv__cant-wrap">
-                <span class="sdv__cant-prefix">$</span>
-                <input v-model.number="stockForm.precio_por_unidad" type="number" min="0" step="0.01"
-                       class="sdv__input sdv__input--mid" placeholder="0.00" />
-                <span class="sdv__cant-suffix">/ {{ productoActual.unidad }}</span>
-              </div>
-            </div>
-
-            <!-- Origen -->
-            <div class="sdv__field">
-              <label class="sdv__label">
-                <span class="sdv__label-num">{{ productoTieneGenetica ? '4' : '3' }}</span> Origen del stock
-              </label>
-              <div class="sdv__origen-tabs">
-                <button class="sdv__origen-tab" :class="{ 'sdv__origen-tab--active': stockForm.origen === 'lote' }"
-                        @click="stockForm.origen = 'lote'; stockForm.lote_id = null">
-                  <i class="bi bi-diagram-3"></i> Desde lote propio
-                </button>
-                <button class="sdv__origen-tab" :class="{ 'sdv__origen-tab--active': stockForm.origen === 'externo' }"
-                        @click="stockForm.origen = 'externo'; stockForm.lote_id = null">
-                  <i class="bi bi-box-arrow-in-down"></i> Ingreso externo
-                </button>
-              </div>
-            </div>
-
-            <!-- Selector lote -->
-            <div v-if="stockForm.origen === 'lote'" class="sdv__field">
-              <label class="sdv__label">
-                <span class="sdv__label-num">{{ productoTieneGenetica ? '5' : '4' }}</span> Seleccionar lote
-                <span class="sdv__optional">(opcional — mejora trazabilidad)</span>
-              </label>
-              <div v-if="loadingLotes" class="sdv__lotes-loading">
-                <div class="sdv__ring sdv__ring--sm"></div><span>Cargando lotes…</span>
-              </div>
-              <template v-else>
-                <div class="sdv__lote-search-wrap">
-                  <i class="bi bi-search sdv__lote-search-icon"></i>
-                  <input v-model="loteSearch" class="sdv__input sdv__input--search" placeholder="Buscar por código, genética, sala…" />
-                  <button v-if="stockForm.lote_id" class="sdv__lote-clear" @click="stockForm.lote_id = null; loteSearch = ''">
-                    <i class="bi bi-x"></i>
-                  </button>
-                </div>
-                <div class="sdv__lotes-list">
-                  <div v-if="!lotesFiltrados.length" class="sdv__lotes-empty">Sin resultados</div>
-                  <button v-for="lote in lotesFiltrados" :key="lote.id" type="button"
-                          class="sdv__lote-item" :class="{ 'sdv__lote-item--active': stockForm.lote_id === lote.id }"
-                          @click="stockForm.lote_id = lote.id; loteSearch = ''">
-                    <div class="sdv__lote-item-left">
-                      <div class="sdv__lote-codigo">{{ lote.codigo }}</div>
-                      <div class="sdv__lote-info">
-                        <span v-if="lote.genetica">{{ lote.genetica.nombre }}</span>
-                        <span v-if="lote.sala"> · {{ lote.sala.nombre }}</span>
-                        <span v-if="lote.plants_count"> · {{ lote.plants_count }} plantas</span>
-                      </div>
-                    </div>
-                    <div class="sdv__lote-item-right">
-                      <span class="sdv__lote-estado" :style="{ background: estadoLote(lote.estado).bg, color: estadoLote(lote.estado).color }">
-                        {{ estadoLote(lote.estado).label }}
-                      </span>
-                      <i v-if="stockForm.lote_id === lote.id" class="bi bi-check-circle-fill" style="color:#15803d;font-size:14px"></i>
-                    </div>
-                  </button>
-                </div>
-                <div v-if="loteSeleccionado" class="sdv__lote-selected">
-                  <div class="sdv__lote-selected-header">
-                    <i class="bi bi-link-45deg"></i> Lote vinculado
-                    <button class="sdv__lote-selected-remove" @click="stockForm.lote_id = null">
-                      <i class="bi bi-x"></i> Quitar
-                    </button>
-                  </div>
-                  <div class="sdv__lote-selected-body">
-                    <strong>{{ loteSeleccionado.codigo }}</strong>
-                    <span v-if="loteSeleccionado.genetica"> · {{ loteSeleccionado.genetica.nombre }}</span>
-                    <span v-if="loteSeleccionado.sala"> · {{ loteSeleccionado.sala.nombre }}</span>
-                  </div>
-                </div>
-              </template>
-            </div>
-
-            <!-- Motivo externo -->
-            <div v-else class="sdv__field">
-              <label class="sdv__label">
-                <span class="sdv__label-num">{{ productoTieneGenetica ? '5' : '4' }}</span> Descripción del origen
-              </label>
-              <input v-model.trim="stockForm.motivo" class="sdv__input" placeholder="Ej: Compra a proveedor, donación, transferencia…" />
-            </div>
-
-            <!-- Cantidad -->
-            <div class="sdv__field">
-              <label class="sdv__label">
-                <span class="sdv__label-num">{{ productoTieneGenetica ? '6' : '5' }}</span> Cantidad a ingresar
-                <span class="sdv__unidad-pill">{{ productoActual.unidad }}</span>
-              </label>
-              <div class="sdv__cant-wrap">
-                <input v-model.number="stockForm.cantidad" type="number" :step="productoActual.step" min="0.1"
-                       class="sdv__input sdv__input--big" placeholder="0" />
-                <span class="sdv__cant-suffix">{{ productoActual.unidad }}</span>
-              </div>
-            </div>
-
-            <!-- Preview trazabilidad -->
-            <div v-if="stockForm.cantidad > 0" class="sdv__trace-preview">
-              <div class="sdv__trace-preview-header">
-                <i class="bi bi-check-circle-fill"></i> Resumen del ingreso
-              </div>
-              <div class="sdv__trace-row">
-                <span class="sdv__trace-lbl">Producto</span>
-                <span class="sdv__trace-val">{{ productoActual.label }}</span>
-              </div>
-              <div v-if="geneticaSeleccionada" class="sdv__trace-row">
-                <span class="sdv__trace-lbl">Genética</span>
-                <span class="sdv__trace-val">{{ geneticaSeleccionada.nombre }}</span>
-              </div>
-              <div class="sdv__trace-row">
-                <span class="sdv__trace-lbl">Cantidad</span>
-                <span class="sdv__trace-val" style="color:#0369a1;font-weight:700">{{ stockForm.cantidad }} {{ productoActual.unidad }}</span>
-              </div>
-              <div v-if="stockForm.precio_por_unidad" class="sdv__trace-row">
-                <span class="sdv__trace-lbl">Precio</span>
-                <span class="sdv__trace-val" style="color:#1b5e20;font-weight:700">
-                  ${{ stockForm.precio_por_unidad }}/{{ productoActual.unidad }}
-                  · Total: ${{ (stockForm.precio_por_unidad * stockForm.cantidad).toLocaleString('es-AR') }}
-                </span>
-              </div>
-              <div class="sdv__trace-row">
-                <span class="sdv__trace-lbl">Destino</span>
-                <span class="sdv__trace-val">{{ sede?.nombre }}</span>
-              </div>
-              <div class="sdv__trace-row">
-                <span class="sdv__trace-lbl">Origen</span>
-                <span class="sdv__trace-val">
-                  <template v-if="stockForm.origen === 'lote' && loteSeleccionado">
-                    Lote <strong>{{ loteSeleccionado.codigo }}</strong>
-                    <span v-if="loteSeleccionado.genetica"> · {{ loteSeleccionado.genetica.nombre }}</span>
-                  </template>
-                  <template v-else-if="stockForm.origen === 'lote'">Lote propio (sin vincular)</template>
-                  <template v-else>{{ stockForm.motivo || 'Ingreso externo' }}</template>
-                </span>
-              </div>
-            </div>
-
-          </div><!-- fin v-else admin/agricultor -->
-
           <div class="sdv__modal-footer">
-            <button class="sdv__btn-ghost" :disabled="savingStock" @click="showStockModal = false">Cancelar</button>
-            <button class="sdv__btn-primary"
-                    :disabled="savingStock || !stockForm.cantidad || stockForm.cantidad <= 0 || (esManicurador && !stockForm.lote_id)"
-                    @click="confirmarStock">
-              <span v-if="savingStock" class="sdv__ring sdv__ring--sm sdv__ring--white"></span>
+            <button class="sdv__btn-ghost" :disabled="savingNuevoStock" @click="showNuevoStockModal = false">Cancelar</button>
+            <button class="sdv__btn-primary" :disabled="savingNuevoStock || !nuevoStockForm.cantidad" @click="confirmarNuevoStock">
+              <span v-if="savingNuevoStock" class="sdv__ring sdv__ring--sm sdv__ring--white"></span>
               <i v-else class="bi bi-check-lg"></i>
-              {{ esManicurador ? 'Enviar para aprobación' : 'Confirmar ingreso' }}
+              Guardar stock
             </button>
           </div>
-
         </div>
       </div>
     </Teleport>
@@ -801,10 +432,6 @@ onMounted(async () => {
 .sdv__ring--white { border-color: rgba(255,255,255,.3); border-top-color: white; }
 @keyframes sdv-spin { to { transform: rotate(360deg); } }
 .sdv__error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 10px; display: flex; gap: .5rem; align-items: center; }
-.sdv__breadcrumb { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: #94a3b8; margin-bottom: 1.25rem; }
-.sdv__breadcrumb-link { color: #0369a1; text-decoration: none; font-weight: 600; }
-.sdv__breadcrumb-link:hover { text-decoration: underline; }
-.sdv__breadcrumb-sep { font-size: .65rem; }
 .sdv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
 .sdv__header-left { display: flex; align-items: flex-start; gap: 1rem; }
 .sdv__tipo-icon { width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
@@ -835,9 +462,6 @@ onMounted(async () => {
 .sdv__card-btn-green { display: inline-flex; align-items: center; gap: 5px; font-size: .78rem; font-weight: 600; color: #15803d; background: rgba(21,128,61,.08); border: 1px solid rgba(21,128,61,.2); padding: .25rem .7rem; border-radius: 6px; cursor: pointer; transition: background .15s; }
 .sdv__card-btn-green:hover { background: rgba(21,128,61,.14); }
 .sdv__pill { font-size: .65rem; font-weight: 800; background: #f1f5f9; color: #475569; padding: .15em .5em; border-radius: 999px; }
-.sdv__empty { text-align: center; padding: 3rem 1rem; color: #94a3b8; }
-.sdv__empty-icon { font-size: 2.5rem; display: block; margin-bottom: .75rem; opacity: .4; }
-.sdv__empty p { font-size: .875rem; margin: 0 0 .75rem; }
 .sdv__salas { display: flex; flex-direction: column; }
 .sdv__sala { display: flex; align-items: center; gap: .875rem; padding: .875rem 1.1rem; border-bottom: 1px solid #f8fafc; text-decoration: none; color: inherit; transition: background .12s; }
 .sdv__sala:last-child { border-bottom: none; }
@@ -967,7 +591,7 @@ onMounted(async () => {
 .sdv__trace-lbl { font-size: 12px; color: #15803d; opacity: .7; white-space: nowrap; }
 .sdv__trace-val { font-size: 12px; color: #0f172a; font-weight: 500; text-align: right; }
 
-/* Modal manicurador */
+/* Modal manicura */
 .sdv__manicura-empty { font-size: .82rem; color: #94a3b8; background: #f8fafc; border: 1.5px dashed #e2e8f0; border-radius: 10px; padding: 1.25rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: .5rem; }
 .sdv__manicura-lotes { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; }
 .sdv__manicura-lote { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: .875rem; text-align: left; cursor: pointer; transition: all .15s; }
@@ -1011,4 +635,40 @@ onMounted(async () => {
 .sdv__btn-danger:hover:not(:disabled) { background: #b91c1c; }
 .sdv__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
 .sdv__modal--sm { max-width: 420px; }
+
+/* ── Tienda social ───────────────────────────────────────────── */
+.sdv__card-title-wrap--btn { background: none; border: none; cursor: pointer; padding: 0; transition: opacity .15s; }
+.sdv__card-title-wrap--btn:hover { opacity: .8; }
+.sdv__tienda-loading { display: flex; align-items: center; gap: .5rem; padding: 1rem 1.1rem; font-size: .82rem; color: #94a3b8; }
+.sdv__tienda-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .75rem; padding: .875rem 1.1rem; }
+.sdv__tienda-card { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: .875rem; display: flex; flex-direction: column; gap: .3rem; }
+.sdv__tienda-forma { font-size: .82rem; font-weight: 700; color: #0f172a; }
+.sdv__tienda-gen { font-size: .72rem; color: #64748b; }
+.sdv__tienda-lote { font-size: .68rem; color: #94a3b8; font-family: monospace; }
+.sdv__tienda-qty { font-size: 1.5rem; font-weight: 800; color: #0f172a; letter-spacing: -.04em; line-height: 1; margin-top: .25rem; }
+.sdv__tienda-unit { font-size: .75rem; font-weight: 500; color: #94a3b8; margin-left: .15rem; }
+.sdv__tienda-precio { font-size: .75rem; color: #1b5e20; font-weight: 600; }
+.sdv__tienda-status { font-size: .68rem; font-weight: 700; padding: .2em .55em; border-radius: 6px; width: fit-content; margin-top: .2rem; }
+.sdv__tienda-status--ok { background: #dcfce7; color: #15803d; }
+.sdv__tienda-status--empty { background: #fef2f2; color: #dc2626; }
+
+/* ── Nuevo Stock Modal ────────────────────────────────────────── */
+.sdv__alert-err { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; }
+.sdv__origen-selector { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+@media (max-width: 480px) { .sdv__origen-selector { grid-template-columns: 1fr; } }
+.sdv__origen-btn { display: flex; align-items: center; gap: .75rem; padding: .875rem 1rem; border: 2px solid #e2e8f0; border-radius: 12px; background: #f8fafc; cursor: pointer; text-align: left; transition: all .15s; }
+.sdv__origen-btn i { font-size: 1.3rem; color: #94a3b8; flex-shrink: 0; }
+.sdv__origen-btn div { display: flex; flex-direction: column; gap: .15rem; }
+.sdv__origen-btn strong { font-size: .82rem; font-weight: 700; color: #0f172a; }
+.sdv__origen-btn span { font-size: .72rem; color: #94a3b8; }
+.sdv__origen-btn:hover { border-color: #1b5e20; }
+.sdv__origen-btn--active { border-color: #1b5e20; background: #f0fdf4; }
+.sdv__origen-btn--active i { color: #1b5e20; }
+.sdv__origen-btn--active strong { color: #1b5e20; }
+.sdv__forma-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; }
+.sdv__forma-btn { padding: .45rem .5rem; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: .72rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.sdv__forma-btn:hover { border-color: #1b5e20; }
+.sdv__forma-btn--active { border-color: #1b5e20; background: #f0fdf4; color: #1b5e20; }
+.sdv__grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+@media (max-width: 480px) { .sdv__grid-2 { grid-template-columns: 1fr; } }
 </style>

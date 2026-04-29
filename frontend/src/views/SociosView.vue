@@ -1,22 +1,23 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useSociosStore } from '../stores/socios'
+import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
+import { useConfirm } from '../composables/useConfirm.js'
+import EmptyState from '../components/ui/EmptyState.vue'
 
-const store  = useSociosStore()
+const store  = usePacientesStore()
 const auth   = useAuthStore()
 const route  = useRoute()
 const router = useRouter()
 
 const canEdit = computed(() => ['admin', 'medico'].includes(auth.role))
+const { confirm } = useConfirm()
 
 const search       = ref('')
 const searchTimer  = ref(null)
 const showModal    = ref(false)
-const showDelete   = ref(false)
 const editing      = ref(false)
-const deleteTarget = ref(null)
 const formError    = ref(null)
 const filterEstado = ref('todos')
 
@@ -62,9 +63,17 @@ function openEdit(s) {
   showModal.value  = true
 }
 
-function openDelete(s) {
-  deleteTarget.value = s
-  showDelete.value   = true
+async function openDelete(s) {
+  const ok = await confirm({
+    title: 'Eliminar paciente',
+    message: `¿Eliminar a ${s.nombre} ${s.apellido}? Se eliminará su historial. Esta acción no se puede deshacer.`,
+    confirmText: 'Eliminar',
+    variant: 'danger',
+  })
+  if (!ok) return
+  try {
+    await store.remove(s.id)
+  } catch {}
 }
 
 async function doSearch() {
@@ -90,14 +99,6 @@ async function save() {
   }
 }
 
-async function doDelete() {
-  try {
-    await store.remove(deleteTarget.value.id)
-    showDelete.value = false
-  } catch {
-    showDelete.value = false
-  }
-}
 
 function reprocannDias(s) {
   if (!s.reprocann_vencimiento) return null
@@ -170,7 +171,7 @@ onMounted(async () => {
         <h1 class="sv__title">Pacientes</h1>
         <p class="sv__sub">Trazabilidad clínica y gestión REPROCANN</p>
       </div>
-      <button v-if="canEdit" class="sv__btn-primary" @click="router.push({ name: 'socio-nuevo' })">
+      <button v-if="canEdit" class="sv__btn-primary" @click="router.push({ name: 'paciente-nuevo' })">
         <i class="bi bi-person-plus"></i>
         Nuevo paciente
       </button>
@@ -217,21 +218,25 @@ onMounted(async () => {
     </div>
 
     <!-- Empty -->
-    <div v-else-if="!filtrados.length" class="sv__empty">
-      <i class="bi bi-people sv__empty-icon"></i>
-      <p class="sv__empty-title">{{ search || filterEstado !== 'todos' ? 'Sin resultados' : 'Sin pacientes registrados' }}</p>
-      <p class="sv__empty-sub">{{ search ? 'Probá con otro término' : filterEstado !== 'todos' ? 'No hay pacientes en este filtro' : 'Registrá el primer paciente del club' }}</p>
-      <button v-if="!search && canEdit && filterEstado === 'todos'" class="sv__btn-primary" @click="router.push({ name: 'socio-nuevo' })">
-        <i class="bi bi-person-plus"></i> Nuevo paciente
-      </button>
-    </div>
+    <EmptyState
+      v-else-if="!filtrados.length"
+      icon="bi-people"
+      :title="search || filterEstado !== 'todos' ? 'Sin resultados' : 'Sin pacientes registrados'"
+      :message="search ? 'Probá con otro término' : filterEstado !== 'todos' ? 'No hay pacientes en este filtro' : 'Registrá el primer paciente del club'"
+    >
+      <template #actions>
+        <button v-if="!search && canEdit && filterEstado === 'todos'" class="sv__btn-primary" @click="router.push({ name: 'paciente-nuevo' })">
+          <i class="bi bi-person-plus"></i> Nuevo paciente
+        </button>
+      </template>
+    </EmptyState>
 
     <!-- Lista -->
     <div v-else class="sv__list">
       <RouterLink
         v-for="s in filtrados"
         :key="s.id"
-        :to="`/socios/${s.id}`"
+        :to="`/pacientes/${s.id}`"
         class="sv__row"
         :class="{
           'sv__row--danger':  reprocannStatus(s)?.level === 'danger',
@@ -377,28 +382,6 @@ onMounted(async () => {
       </div>
     </Teleport>
 
-    <!-- Modal Eliminar -->
-    <Teleport to="body">
-      <div v-if="showDelete" class="sp-overlay" @click.self="showDelete=false">
-        <div class="sp-modal sp-modal--sm">
-          <div class="sp-modal__header">
-            <h2 class="sp-modal__title sp-modal__title--danger">Eliminar paciente</h2>
-            <button class="sp-modal__close" @click="showDelete=false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="sp-modal__body">
-            <p style="margin:0 0 .5rem">¿Eliminar a <strong>{{ deleteTarget?.nombre }} {{ deleteTarget?.apellido }}</strong>?</p>
-            <p style="font-size:.85rem;color:#64748b;margin:0">Se eliminará su historial de notas, indicaciones y dispensaciones. Esta acción no se puede deshacer.</p>
-          </div>
-          <div class="sp-modal__footer">
-            <button class="sp-btn-ghost" :disabled="store.removing" @click="showDelete=false">Cancelar</button>
-            <button class="sp-btn-danger" :disabled="store.removing" @click="doDelete">
-              <span v-if="store.removing" class="sp-spinner"></span>
-              <i v-else class="bi bi-trash"></i> Eliminar
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
   </div>
 </template>
@@ -436,10 +419,6 @@ onMounted(async () => {
 .sv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: sv-spin .7s linear infinite; }
 @keyframes sv-spin { to { transform: rotate(360deg); } }
 
-.sv__empty { text-align: center; padding: 4rem 1rem; background: #fafbfc; border: 1.5px dashed #e2e8f0; border-radius: 14px; }
-.sv__empty-icon { font-size: 2.5rem; color: #cbd5e1; display: block; margin-bottom: .875rem; }
-.sv__empty-title { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0 0 .35rem; }
-.sv__empty-sub { font-size: .82rem; color: #94a3b8; margin: 0 0 1.25rem; }
 
 .sv__list { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
 
@@ -492,7 +471,6 @@ onMounted(async () => {
 
 .sp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1055; padding: 1rem; backdrop-filter: blur(3px); }
 .sp-modal { background: #fff; border-radius: 18px; width: 100%; max-width: 620px; max-height: 92vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,.15); }
-.sp-modal--sm { max-width: 440px; }
 .sp-modal__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.5rem 1.5rem 1.1rem; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: #fff; z-index: 1; }
 .sp-modal__title { font-size: 1.2rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; letter-spacing: -.02em; }
 .sp-modal__title--danger { color: #dc2626; }
@@ -531,5 +509,4 @@ onMounted(async () => {
 .sp-btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #dc2626; color: #fff; border: none; padding: .65rem 1.4rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s; }
 .sp-btn-danger:hover:not(:disabled) { background: #b91c1c; }
 .sp-btn-danger:disabled { opacity: .6; cursor: not-allowed; }
-.sp-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: sv-spin .6s linear infinite; flex-shrink: 0; }
 </style>

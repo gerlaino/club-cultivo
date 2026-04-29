@@ -1,7 +1,7 @@
 # backend/app/controllers/costo_lotes_controller.rb
 class CostoLotesController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_admin_or_agricultor
+  before_action :require_admin_or_cultivador
   before_action :set_lote
 
   # GET /lotes/:lote_id/costo
@@ -57,8 +57,8 @@ class CostoLotesController < ApplicationController
     )
   end
 
-  def require_admin_or_agricultor
-    unless current_user.admin? || current_user.agricultor?
+  def require_admin_or_cultivador
+    unless current_user.admin? || current_user.cultivador?
       render json: { error: "No autorizado" }, status: :forbidden
     end
   end
