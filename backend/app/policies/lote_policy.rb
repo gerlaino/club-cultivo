@@ -9,12 +9,25 @@ class LotePolicy < ApplicationPolicy
   end
 
   def cerrar_curado?
-    mismo_club? && (admin? || manicura?)
+    mismo_club? && admin?
+  end
+
+  def aprobar_manicura?
+    mismo_club? && admin?
+  end
+
+  def rechazar_manicura?
+    mismo_club? && admin?
   end
 
   class Scope < Scope
     def resolve
-      scope.where(club_id: user.club_id)
+      base = scope.where(club_id: user.club_id)
+      if user.manicura?
+        base.where(estado: %w[secado manicura_pendiente])
+      else
+        base
+      end
     end
   end
 
@@ -29,7 +42,7 @@ class LotePolicy < ApplicationPolicy
     when 'vegetativo', 'floracion'
       admin? || cultivador?
     when 'cosecha', 'secado'
-      admin? || cultivador? || manicura?
+      admin? || cultivador?
     else
       admin?
     end

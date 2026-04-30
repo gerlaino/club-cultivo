@@ -41,6 +41,15 @@ class User < ApplicationRecord
     sedes_asignadas.pluck(:id)
   end
 
+  def observando_club
+    return nil unless observer_club_id.present? && observer_expires_at&.future?
+    Club.find_by(id: observer_club_id)
+  end
+
+  def modo_observador?
+    observer_club_id.present? && observer_expires_at&.future?
+  end
+
   private
 
   def club_requerido_para_no_super_admin

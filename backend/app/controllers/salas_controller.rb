@@ -1,6 +1,7 @@
 # backend/app/controllers/salas_controller.rb
 class SalasController < ApplicationController
   before_action :authenticate_user!
+  before_action :require_salas_role!
   before_action :set_sala, only: [:show, :update, :destroy, :cargar_lote]
 
   TRANSICIONES_KIND = {
@@ -100,6 +101,13 @@ class SalasController < ApplicationController
     @sala = current_user.club.salas.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Sala no encontrada' }, status: :not_found
+  end
+
+  def require_salas_role!
+    blocked = %w[auditor abogado paciente]
+    if blocked.include?(current_user&.role)
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
   end
 
   def sala_params

@@ -1,10 +1,15 @@
 class Documento < ApplicationRecord
   belongs_to :club
   belongs_to :user
+  belongs_to :subido_por, class_name: 'User', foreign_key: :subido_por_id, optional: true
+  belongs_to :paciente, optional: true
+
   has_one_attached :archivo
 
-  TIPOS = %w[plan_trabajo reprocann informe_semestral otro].freeze
-  ESTADOS = %w[vigente vencido pendiente].freeze
+  TIPOS_CLINICOS = %w[reprocann receta certificado_medico estudio_clinico dni identificacion].freeze
+  TIPOS_LEGALES  = %w[contrato_socio estatuto acta_asamblea reglamento_interno plan_trabajo informe_semestral otro].freeze
+  TIPOS          = (TIPOS_CLINICOS + TIPOS_LEGALES).freeze
+  ESTADOS        = %w[vigente vencido pendiente].freeze
 
   validates :tipo,   inclusion: { in: TIPOS }
   validates :titulo, presence: true
@@ -16,6 +21,12 @@ class Documento < ApplicationRecord
   scope :por_tipo,   ->(tipo) { where(tipo: tipo) }
   scope :vencidos,   -> { where(estado: 'vencido') }
   scope :por_vencer, -> { where(estado: 'vigente').where('fecha_vencimiento <= ?', 30.days.from_now) }
+  scope :clinicos,   -> { where(tipo: TIPOS_CLINICOS) }
+  scope :legales,    -> { where(tipo: TIPOS_LEGALES) }
+
+  def categoria
+    TIPOS_CLINICOS.include?(tipo) ? 'clinico' : 'legal'
+  end
 
   private
 

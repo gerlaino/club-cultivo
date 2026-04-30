@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue"
+import { ref, computed, onMounted, watch, nextTick } from "vue"
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import { listSedes }            from "../lib/api"
+import { listSedes, listLotes } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 
 const store   = useContabilidadStore()
@@ -11,8 +11,77 @@ const sedes   = ref([])
 const canEdit = computed(() => ["admin","abogado"].includes(auth.role))
 const { confirm } = useConfirm()
 
-const vistaActiva   = ref("dashboard")
-const dashboardSede = ref(null)
+const vistaActiva    = ref("dashboard")
+const dashboardSede  = ref(null)
+const todosLotes     = ref([])
+const loadingLotes   = ref(false)
+const generandoPDF   = ref(false)
+const plContainerRef = ref(null)
+
+const plSubTab = ref('lotes') // 'lotes' | 'cepas'
+
+const lotesConCosto = computed(() =>
+  todosLotes.value
+    .filter(l => l.tiene_costo)
+    .sort((a, b) => (a.costo_por_gramo || Infinity) - (b.costo_por_gramo || Infinity))
+)
+
+const plPorCepa = computed(() => {
+  const map = {}
+  for (const l of todosLotes.value) {
+    if (!l.tiene_costo || !l.costo_por_gramo) continue
+    const key   = l.genetica_id || 'sin_cepa'
+    const label = l.genetica?.nombre || l.strain || 'Sin cepa'
+    if (!map[key]) map[key] = { genetica_id: key, nombre: label, lotes: [] }
+    map[key].lotes.push(l)
+  }
+  return Object.values(map).map(g => {
+    const cpgs = g.lotes.map(l => l.costo_por_gramo).filter(Boolean)
+    const totalGramos = g.lotes.reduce((s, l) => s + (l.gramos_producidos || 0), 0)
+    const totalCosto  = g.lotes.reduce((s, l) => s + (l.costo_total || 0), 0)
+    return {
+      ...g,
+      n_lotes:      g.lotes.length,
+      cpg_promedio: cpgs.length ? cpgs.reduce((a, b) => a + b, 0) / cpgs.length : null,
+      cpg_min:      cpgs.length ? Math.min(...cpgs) : null,
+      cpg_max:      cpgs.length ? Math.max(...cpgs) : null,
+      total_gramos: totalGramos,
+      total_costo:  totalCosto,
+    }
+  }).sort((a, b) => (a.cpg_promedio || Infinity) - (b.cpg_promedio || Infinity))
+})
+
+async function irAPL() {
+  vistaActiva.value = 'pl'
+  if (!todosLotes.value.length) {
+    loadingLotes.value = true
+    try { const { data } = await listLotes(); todosLotes.value = data || [] }
+    finally { loadingLotes.value = false }
+  }
+}
+
+async function exportarPDF() {
+  generandoPDF.value = true
+  await nextTick()
+  const el = plContainerRef.value
+  if (!el) { generandoPDF.value = false; return }
+  const subTab = plSubTab.value === 'lotes' ? 'por-lote' : 'por-cepa'
+  const fecha  = new Date().toISOString().slice(0, 10)
+  const opt = {
+    margin:      [12, 10, 12, 10],
+    filename:    `PL_produccion_${subTab}_${fecha}.pdf`,
+    image:       { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    pagebreak:   { mode: ['avoid-all', 'css', 'legacy'] },
+  }
+  try {
+    const { default: html2pdf } = await import('html2pdf.js')
+    await html2pdf().set(opt).from(el).save()
+  } finally {
+    generandoPDF.value = false
+  }
+}
 
 async function cambiarSedeDashboard(sede_id) {
   dashboardSede.value = sede_id || null
@@ -77,6 +146,21 @@ const CATEGORIAS = [
   { value: "otro",          label: "Otro",                     tipo: "ambos"   },
 ]
 function catLabel(cat) { return CATEGORIAS.find(c => c.value === cat)?.label || cat || "—" }
+
+const ESTADO_COLORS = {
+  germinacion:       { color: '#7c3aed', bg: 'rgba(124,58,237,.1)'  },
+  vegetativo:        { color: '#15803d', bg: 'rgba(21,128,61,.1)'   },
+  floracion:         { color: '#d97706', bg: 'rgba(217,119,6,.1)'   },
+  cosecha:           { color: '#0369a1', bg: 'rgba(3,105,161,.1)'   },
+  secado:            { color: '#64748b', bg: 'rgba(100,116,139,.1)' },
+  manicura_pendiente:{ color: '#b45309', bg: 'rgba(180,83,9,.1)'    },
+  curado:            { color: '#065f46', bg: 'rgba(6,95,70,.1)'     },
+  finalizado:        { color: '#1e293b', bg: 'rgba(30,41,59,.1)'    },
+}
+function estadoStyle(estado) {
+  const m = ESTADO_COLORS[estado] || { color: '#64748b', bg: 'rgba(100,116,139,.1)' }
+  return { color: m.color, background: m.bg }
+}
 
 const busquedaDash = ref("")
 const ultimosFiltrados = computed(() => {
@@ -248,6 +332,9 @@ onMounted(async () => {
       </button>
       <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'libro' }" @click="irALibro">
         <i class="bi bi-journal-text"></i> Libro diario
+      </button>
+      <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'pl' }" @click="irAPL">
+        <i class="bi bi-bar-chart-line"></i> P&amp;L por lote
       </button>
     </div>
 
@@ -727,6 +814,122 @@ onMounted(async () => {
       </div>
     </Teleport>
 
+    <!-- ══════════════ P&L POR LOTE ══════════════ -->
+    <div v-if="vistaActiva === 'pl'" ref="plContainerRef">
+      <div v-if="loadingLotes" class="cv__loading"><div class="cv__ring"></div><span>Cargando lotes…</span></div>
+      <template v-else>
+
+        <!-- Sub-tabs + PDF export -->
+        <div class="cv__pl-subtabs">
+          <button class="cv__pl-subtab" :class="{ 'cv__pl-subtab--active': plSubTab === 'lotes' }" @click="plSubTab = 'lotes'">
+            Por lote
+          </button>
+          <button class="cv__pl-subtab" :class="{ 'cv__pl-subtab--active': plSubTab === 'cepas' }" @click="plSubTab = 'cepas'">
+            Por cepa
+          </button>
+          <button class="cv__btn-ghost cv__pl-pdf" :disabled="generandoPDF" @click="exportarPDF">
+            <div v-if="generandoPDF" class="cv__spin cv__spin--sm"></div>
+            <i v-else class="bi bi-file-earmark-pdf"></i>
+            {{ generandoPDF ? 'Generando…' : 'Exportar PDF' }}
+          </button>
+        </div>
+
+        <!-- ── Sub-tab Lotes ── -->
+        <div v-if="plSubTab === 'lotes'">
+        <div class="cv__pl-header">
+          <div>
+            <h2 class="cv__pl-title">P&amp;L por lote de producción</h2>
+            <p class="cv__pl-sub">Lotes con costos cargados · ordenados por eficiencia (costo/g)</p>
+          </div>
+          <span class="cv__pl-count">{{ lotesConCosto.length }} lote{{ lotesConCosto.length !== 1 ? 's' : '' }}</span>
+        </div>
+
+        <div v-if="!lotesConCosto.length" class="cv__pl-empty">
+          <i class="bi bi-calculator" style="font-size:2rem;color:#cbd5e1"></i>
+          <p>Ningún lote tiene costos cargados aún.</p>
+          <p style="font-size:.8rem;color:#94a3b8">Abrí un lote y cargá sus costos de producción.</p>
+        </div>
+
+        <div v-else class="cv__pl-table">
+          <div class="cv__pl-thead">
+            <span>Lote</span>
+            <span>Cepa</span>
+            <span>Estado</span>
+            <span class="cv__pl-num">Costo total</span>
+            <span class="cv__pl-num">Gramos</span>
+            <span class="cv__pl-num">$/g</span>
+            <span></span>
+          </div>
+          <RouterLink
+            v-for="l in lotesConCosto"
+            :key="l.id"
+            :to="`/salas/${l.sala_id}/lotes/${l.id}`"
+            class="cv__pl-row"
+          >
+            <span class="cv__pl-codigo">{{ l.codigo }}</span>
+            <span class="cv__pl-cepa">{{ l.genetica?.nombre || l.strain || '—' }}</span>
+            <span>
+              <span class="cv__pl-estado" :style="estadoStyle(l.estado)">{{ l.estado }}</span>
+            </span>
+            <span class="cv__pl-num cv__pl-monto">{{ l.costo_total ? fmt(l.costo_total) : '—' }}</span>
+            <span class="cv__pl-num">{{ l.gramos_producidos ? l.gramos_producidos + 'g' : '—' }}</span>
+            <span class="cv__pl-num cv__pl-cpg" :class="{ 'cv__pl-cpg--ok': l.costo_por_gramo && l.costo_por_gramo < 2000 }">
+              {{ l.costo_por_gramo ? fmt(l.costo_por_gramo) : '—' }}
+            </span>
+            <span class="cv__pl-arrow"><i class="bi bi-chevron-right"></i></span>
+          </RouterLink>
+        </div>
+
+        <div v-if="todosLotes.length > 0 && !lotesConCosto.length" class="cv__pl-hint">
+          <i class="bi bi-info-circle"></i>
+          Hay {{ todosLotes.length }} lotes en el sistema. Cargá costos desde el detalle de cada lote.
+        </div>
+        </div><!-- /sub-tab lotes -->
+
+        <!-- ── Sub-tab Cepas ── -->
+        <div v-if="plSubTab === 'cepas'">
+          <div class="cv__pl-header">
+            <div>
+              <h2 class="cv__pl-title">Eficiencia por cepa</h2>
+              <p class="cv__pl-sub">Promedio de costo/g agrupado por genética · menor es mejor</p>
+            </div>
+            <span class="cv__pl-count">{{ plPorCepa.length }} cepa{{ plPorCepa.length !== 1 ? 's' : '' }}</span>
+          </div>
+
+          <div v-if="!plPorCepa.length" class="cv__pl-empty">
+            <i class="bi bi-bar-chart" style="font-size:2rem;color:#cbd5e1"></i>
+            <p>No hay datos de costo por cepa aún.</p>
+          </div>
+
+          <div v-else class="cv__pl-table">
+            <div class="cv__pl-thead" style="grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr">
+              <span>Cepa</span>
+              <span class="cv__pl-num">Lotes</span>
+              <span class="cv__pl-num">$/g promedio</span>
+              <span class="cv__pl-num">$/g mínimo</span>
+              <span class="cv__pl-num">$/g máximo</span>
+              <span class="cv__pl-num">Gramos total</span>
+            </div>
+            <div
+              v-for="g in plPorCepa"
+              :key="g.genetica_id"
+              class="cv__pl-row"
+              style="grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr"
+            >
+              <span class="cv__pl-cepa" style="font-weight:700;color:#1e293b">{{ g.nombre }}</span>
+              <span class="cv__pl-num">{{ g.n_lotes }}</span>
+              <span class="cv__pl-num cv__pl-cpg" :class="{ 'cv__pl-cpg--ok': g.cpg_promedio && g.cpg_promedio < 2000 }">
+                {{ g.cpg_promedio ? fmt(g.cpg_promedio) : '—' }}
+              </span>
+              <span class="cv__pl-num" style="color:#15803d;font-family:monospace">{{ g.cpg_min ? fmt(g.cpg_min) : '—' }}</span>
+              <span class="cv__pl-num" style="color:#dc2626;font-family:monospace">{{ g.cpg_max ? fmt(g.cpg_max) : '—' }}</span>
+              <span class="cv__pl-num" style="font-family:monospace">{{ g.total_gramos ? g.total_gramos.toFixed(0) + 'g' : '—' }}</span>
+            </div>
+          </div>
+        </div><!-- /sub-tab cepas -->
+
+      </template>
+    </div>
 
   </div>
 </template>
@@ -1029,4 +1232,65 @@ onMounted(async () => {
 }
 .cv__sede-anio-lbl { font-size: 11px; color: #94a3b8; }
 .cv__sede-anio-val { font-size: 13px; font-weight: 700; }
+
+/* ── P&L sub-tabs ── */
+.cv__pl-subtabs { display: flex; align-items: center; gap: .25rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; }
+.cv__pl-subtab { background: none; border: none; padding: .6rem 1rem; font-size: .875rem; font-weight: 600; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color .15s, border-color .15s; }
+.cv__pl-subtab:hover { color: #0f172a; }
+.cv__pl-subtab--active { color: #15803d; border-bottom-color: #15803d; }
+.cv__pl-pdf { margin-left: auto; margin-bottom: 2px; display: flex; align-items: center; gap: .4rem; font-size: .8rem; padding: .4rem .85rem; }
+.cv__spin--sm { width: 11px; height: 11px; }
+
+/* ── P&L por lote ── */
+.cv__pl-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.cv__pl-title  { font-size: 1.2rem; font-weight: 700; margin: 0 0 .2rem; color: #0f172a; }
+.cv__pl-sub    { font-size: .8rem; color: #64748b; margin: 0; }
+.cv__pl-count  { font-family: monospace; font-size: .85rem; font-weight: 700; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: .25rem .75rem; border-radius: 999px; white-space: nowrap; }
+
+.cv__pl-empty { text-align: center; padding: 4rem 1rem; color: #64748b; display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+.cv__pl-hint  { text-align: center; padding: 1.5rem; font-size: .82rem; color: #94a3b8; display: flex; align-items: center; justify-content: center; gap: .5rem; }
+
+.cv__pl-table { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+.cv__pl-thead {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr 1fr 1fr 1fr 28px;
+  gap: .5rem;
+  padding: .65rem 1.1rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: .72rem;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.cv__pl-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr 1fr 1fr 1fr 28px;
+  gap: .5rem;
+  padding: .8rem 1.1rem;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  text-decoration: none;
+  color: inherit;
+  transition: background .12s;
+  font-size: .85rem;
+}
+.cv__pl-row:last-child { border-bottom: none; }
+.cv__pl-row:hover { background: #f8fafc; }
+.cv__pl-codigo { font-family: monospace; font-size: .8rem; font-weight: 700; color: #1e293b; }
+.cv__pl-cepa   { font-size: .82rem; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cv__pl-estado { font-size: .72rem; font-weight: 600; padding: .2rem .55rem; border-radius: 999px; white-space: nowrap; }
+.cv__pl-num    { text-align: right; font-family: monospace; }
+.cv__pl-monto  { color: #475569; font-size: .8rem; }
+.cv__pl-cpg    { font-weight: 700; font-size: .85rem; color: #1e293b; }
+.cv__pl-cpg--ok { color: #15803d; }
+.cv__pl-arrow  { color: #cbd5e1; font-size: .8rem; text-align: right; }
+.cv__pl-row:hover .cv__pl-arrow { color: #64748b; }
+
+@media (max-width: 768px) {
+  .cv__pl-thead { display: none; }
+  .cv__pl-row   { grid-template-columns: 1fr 1fr 28px; }
+  .cv__pl-cepa, .cv__pl-monto, .cv__pl-num:nth-child(5) { display: none; }
+}
 </style>

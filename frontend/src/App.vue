@@ -23,15 +23,27 @@ import DispensadorSidebar     from "./components/layout/DispensadorSidebar.vue";
 import DispensadorTopBar      from "./components/layout/DispensadorTopBar.vue";
 import ManicuraSidebar        from "./components/layout/ManicuraSidebar.vue";
 import ManicuraTopBar         from "./components/layout/ManicuraTopBar.vue";
+import MedicoSidebar          from "./components/layout/MedicoSidebar.vue";
+import MedicoTopBar           from "./components/layout/MedicoTopBar.vue";
+import AbogadoSidebar         from "./components/layout/AbogadoSidebar.vue";
+import AbogadoTopBar          from "./components/layout/AbogadoTopBar.vue";
+import AuditorSidebar         from "./components/layout/AuditorSidebar.vue";
+import AuditorTopBar          from "./components/layout/AuditorTopBar.vue";
 
 const auth   = useAuthStore();
 const club   = useClubStore();
 const router = useRouter();
 const route  = useRoute();
-const { can, isAdmin, isCultivador, isDispensador, isManicura } = usePermissions();
+const { can, isAdmin, isCultivador, isDispensador, isManicura, isMedico, isAbogado, isAuditor } = usePermissions();
 
+const adminDrawerOpen = ref(false);
 const dpvDrawerOpen = ref(false);
 const mncDrawerOpen = ref(false);
+const audDrawerOpen = ref(false);
+const medDrawerOpen = ref(false);
+const abgDrawerOpen = ref(false);
+
+watch(() => route.path, () => { adminDrawerOpen.value = false });
 const { fetchPlan, planData } = usePlan();
 
 async function doLogout() {
@@ -138,20 +150,30 @@ onMounted(async () => {
 <template>
   <ToastProvider />
   <ConfirmDialog />
-  <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isDispensador && !isManicura }">
+  <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor }">
 
     <!-- ── ADMIN LAYOUT (sidebar + topbar, desktop ≥1024px) ── -->
     <template v-if="isAdmin && auth.isAuthenticated && !$route.meta.fullscreen">
       <div class="admin-shell">
         <AdminSidebar />
         <div class="admin-body">
-          <AdminTopBar />
+          <AdminTopBar @toggle-drawer="adminDrawerOpen = !adminDrawerOpen" />
           <div class="admin-accent-bar"></div>
           <main class="admin-main">
             <router-view />
           </main>
         </div>
       </div>
+      <!-- Mobile drawer overlay -->
+      <Teleport to="body">
+        <Transition name="admin-drawer">
+          <div v-if="adminDrawerOpen" class="admin-drawer-overlay" @click.self="adminDrawerOpen = false">
+            <div class="admin-drawer">
+              <AdminSidebar />
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
     </template>
 
     <!-- ── CULTIVADOR LAYOUT (sidebar + topbar desktop, mobile header + bottom-nav) ── -->
@@ -212,6 +234,75 @@ onMounted(async () => {
           <div v-if="mncDrawerOpen" class="mnc-drawer-overlay" @click.self="mncDrawerOpen = false">
             <div class="mnc-drawer">
               <ManicuraSidebar />
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+    </template>
+
+    <!-- ── MEDICO LAYOUT ── -->
+    <template v-else-if="isMedico && auth.isAuthenticated && !$route.meta.fullscreen">
+      <div class="med-shell">
+        <MedicoSidebar @logout="doLogout" />
+        <div class="med-body">
+          <MedicoTopBar @open-drawer="medDrawerOpen = true" />
+          <div class="med-accent-bar"></div>
+          <main class="med-main">
+            <router-view />
+          </main>
+        </div>
+      </div>
+      <Teleport to="body">
+        <Transition name="med-drawer">
+          <div v-if="medDrawerOpen" class="med-drawer-overlay" @click.self="medDrawerOpen = false">
+            <div class="med-drawer">
+              <MedicoSidebar @logout="doLogout" />
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+    </template>
+
+    <!-- ── ABOGADO LAYOUT ── -->
+    <template v-else-if="isAbogado && auth.isAuthenticated && !$route.meta.fullscreen">
+      <div class="abg-shell">
+        <AbogadoSidebar @logout="doLogout" />
+        <div class="abg-body">
+          <AbogadoTopBar @open-drawer="abgDrawerOpen = true" />
+          <div class="abg-accent-bar"></div>
+          <main class="abg-main">
+            <router-view />
+          </main>
+        </div>
+      </div>
+      <Teleport to="body">
+        <Transition name="abg-drawer">
+          <div v-if="abgDrawerOpen" class="abg-drawer-overlay" @click.self="abgDrawerOpen = false">
+            <div class="abg-drawer">
+              <AbogadoSidebar @logout="doLogout" />
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+    </template>
+
+    <!-- ── AUDITOR LAYOUT ── -->
+    <template v-else-if="isAuditor && auth.isAuthenticated && !$route.meta.fullscreen">
+      <div class="aud-shell">
+        <AuditorSidebar @logout="doLogout" />
+        <div class="aud-body">
+          <AuditorTopBar @open-drawer="audDrawerOpen = true" />
+          <div class="aud-accent-bar"></div>
+          <main class="aud-main">
+            <router-view />
+          </main>
+        </div>
+      </div>
+      <Teleport to="body">
+        <Transition name="aud-drawer">
+          <div v-if="audDrawerOpen" class="aud-drawer-overlay" @click.self="audDrawerOpen = false">
+            <div class="aud-drawer">
+              <AuditorSidebar @logout="doLogout" />
             </div>
           </div>
         </Transition>
@@ -388,7 +479,7 @@ onMounted(async () => {
 
     <!-- ── BOTTOM NAV MOBILE (todos los roles autenticados, incl. admin en mobile) ── -->
     <nav
-      v-if="auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isCultivador && !isDispensador"
+      v-if="auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor"
       class="bottom-nav d-md-none"
     >
       <RouterLink
@@ -449,6 +540,33 @@ onMounted(async () => {
   display: flex;
   min-height: 100vh;
 }
+
+/* Drawer overlay (mobile <1024px) */
+.admin-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 500;
+  display: flex;
+}
+.admin-drawer {
+  width: 240px;
+  height: 100%;
+  overflow: hidden;
+}
+.admin-drawer :deep(.asb) {
+  display: flex !important;
+  height: 100%;
+  position: static;
+}
+
+/* Drawer transition */
+.admin-drawer-enter-active,
+.admin-drawer-leave-active { transition: opacity .2s, transform .2s; }
+.admin-drawer-enter-from,
+.admin-drawer-leave-to { opacity: 0; }
+.admin-drawer-enter-from .admin-drawer,
+.admin-drawer-leave-to  .admin-drawer { transform: translateX(-100%); }
 
 /* ── Cultivador layout ── */
 .cvd-shell {
@@ -713,6 +831,39 @@ onMounted(async () => {
   border-radius: 12px !important;
   min-width: 200px;
 }
+
+/* ── Médico layout ── */
+.med-shell { display: flex; min-height: 100vh; }
+.med-body { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--c-paper); }
+.med-accent-bar { height: 4px; background: #2D8A6B; flex-shrink: 0; }
+.med-main { flex: 1; }
+.med-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
+.med-drawer { width: 240px; height: 100%; overflow: hidden; }
+.med-drawer-enter-active, .med-drawer-leave-active { transition: opacity .2s, transform .2s; }
+.med-drawer-enter-from, .med-drawer-leave-to { opacity: 0; }
+.med-drawer-enter-from .med-drawer, .med-drawer-leave-to .med-drawer { transform: translateX(-100%); }
+
+/* ── Abogado layout ── */
+.abg-shell { display: flex; min-height: 100vh; }
+.abg-body { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--c-paper); }
+.abg-accent-bar { height: 4px; background: #5B6473; flex-shrink: 0; }
+.abg-main { flex: 1; }
+.abg-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
+.abg-drawer { width: 240px; height: 100%; overflow: hidden; }
+.abg-drawer-enter-active, .abg-drawer-leave-active { transition: opacity .2s, transform .2s; }
+.abg-drawer-enter-from, .abg-drawer-leave-to { opacity: 0; }
+.abg-drawer-enter-from .abg-drawer, .abg-drawer-leave-to .abg-drawer { transform: translateX(-100%); }
+
+/* ── Auditor layout ── */
+.aud-shell { display: flex; min-height: 100vh; }
+.aud-body { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--c-paper); }
+.aud-accent-bar { height: 4px; background: #8B5A2B; flex-shrink: 0; }
+.aud-main { flex: 1; }
+.aud-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
+.aud-drawer { width: 240px; height: 100%; overflow: hidden; }
+.aud-drawer-enter-active, .aud-drawer-leave-active { transition: opacity .2s, transform .2s; }
+.aud-drawer-enter-from, .aud-drawer-leave-to { opacity: 0; }
+.aud-drawer-enter-from .aud-drawer, .aud-drawer-leave-to .aud-drawer { transform: translateX(-100%); }
 
 /* ── Mostrar bottom nav solo en mobile ── */
 @media (max-width: 767px) {

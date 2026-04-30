@@ -17,6 +17,21 @@ class SuperAdmin::StatsController < SuperAdmin::BaseController
     }
   end
 
+  def metricas
+    inicio_mes = Date.today.beginning_of_month
+
+    render json: {
+      total_clubes:          Club.count,
+      total_clubes_activos:  Club.where(activo: true).count,
+      total_pacientes:       Paciente.count,
+      total_dispensaciones_mes: Dispensacion.where('fecha_dispensacion >= ?', inicio_mes).count,
+      total_gramos_dispensados_mes: Dispensacion.where('fecha_dispensacion >= ?', inicio_mes).sum(:cantidad).to_f,
+      total_lotes_activos:   Lote.where.not(estado: 'finalizado').count,
+      churn_30d:             0,
+      mrr:                   0,
+    }
+  end
+
   private
 
   def serialize_club(c)

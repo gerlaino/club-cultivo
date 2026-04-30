@@ -9,10 +9,10 @@ import { useToast } from '../composables/useToast.js'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, updatePaciente } from '../lib/api.js'
+import { getPacienteTimeline, updatePaciente, getCuentaCorriente, cargarCreditoCC, ajustarCC } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
-  Pencil, Plus, Trash2, AlertTriangle, CheckCircle, Info, X, Save
+  Pencil, Plus, Trash2, AlertTriangle, CheckCircle, Info, X, Save, Wallet
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -124,7 +124,10 @@ async function loadTimeline() {
   }
 }
 
-watch(activeTab, (tab) => { if (tab === 'timeline') loadTimeline() })
+watch(activeTab, (tab) => {
+  if (tab === 'timeline') loadTimeline()
+  if (tab === 'cuenta_corriente') loadCC()
+})
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDate(d) {
@@ -164,14 +167,61 @@ function timelineLabel(tipo) {
 }
 
 const ALL_TABS = [
-  { key: 'info',           label: 'Datos',           icon: User },
-  { key: 'reprocann',      label: 'REPROCANN',        icon: ShieldCheck },
-  { key: 'dispensaciones', label: 'Dispensaciones',   icon: Pill },
-  { key: 'historia',       label: 'Historia clínica', icon: ClipboardList, roles: ['admin', 'medico'] },
-  { key: 'notas',          label: 'Notas',            icon: BookOpen,      roles: ['admin', 'medico'] },
-  { key: 'documentos',     label: 'Documentos',       icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
-  { key: 'timeline',       label: 'Timeline',         icon: Clock,         roles: ['admin', 'medico', 'cultivador'] },
+  { key: 'info',             label: 'Datos',            icon: User },
+  { key: 'reprocann',        label: 'REPROCANN',         icon: ShieldCheck },
+  { key: 'dispensaciones',   label: 'Dispensaciones',    icon: Pill },
+  { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin'] },
+  { key: 'historia',         label: 'Historia clínica',  icon: ClipboardList, roles: ['admin', 'medico'] },
+  { key: 'notas',            label: 'Notas',             icon: BookOpen,      roles: ['admin', 'medico'] },
+  { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
+  { key: 'timeline',         label: 'Timeline',          icon: Clock,         roles: ['admin', 'medico', 'cultivador'] },
 ]
+
+// ── Cuenta corriente ──
+const cc            = ref(null)
+const loadingCC     = ref(false)
+const ccCargaForm   = ref({ monto: null, descripcion: '' })
+const ccAjusteForm  = ref({ monto: null, descripcion: '' })
+const savingCC      = ref(false)
+const ccModo        = ref(null) // 'carga' | 'ajuste' | null
+
+const fmtARS = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n || 0)
+
+const ccPorcentaje = computed(() => {
+  if (!cc.value || !cc.value.limite_credito) return 0
+  const consumido = cc.value.limite_credito - cc.value.saldo_disponible
+  return Math.min(Math.round(consumido / cc.value.limite_credito * 100), 100)
+})
+
+async function loadCC() {
+  if (cc.value) return
+  loadingCC.value = true
+  try { const { data } = await getCuentaCorriente(socioId); cc.value = data }
+  catch { toastErr('No se pudo cargar la cuenta corriente') }
+  finally { loadingCC.value = false }
+}
+
+async function submitCarga() {
+  if (!ccCargaForm.value.monto || ccCargaForm.value.monto <= 0) return
+  savingCC.value = true
+  try {
+    const { data } = await cargarCreditoCC(socioId, { monto: ccCargaForm.value.monto, descripcion: ccCargaForm.value.descripcion })
+    cc.value = data; ccModo.value = null; ccCargaForm.value = { monto: null, descripcion: '' }
+    toastOk('Crédito cargado')
+  } catch { toastErr('Error al cargar crédito') }
+  finally { savingCC.value = false }
+}
+
+async function submitAjuste() {
+  if (!ccAjusteForm.value.monto || ccAjusteForm.value.monto === 0) return
+  savingCC.value = true
+  try {
+    const { data } = await ajustarCC(socioId, { monto: ccAjusteForm.value.monto, descripcion: ccAjusteForm.value.descripcion })
+    cc.value = data; ccModo.value = null; ccAjusteForm.value = { monto: null, descripcion: '' }
+    toastOk('Ajuste registrado')
+  } catch { toastErr('Error al registrar ajuste') }
+  finally { savingCC.value = false }
+}
 
 const TABS = computed(() => {
   const role = auth.user?.role
@@ -356,6 +406,103 @@ onMounted(async () => {
         <div class="sd__card">
           <Dispensaciones :socio-id="socioId" />
         </div>
+      </div>
+
+      <!-- ── Tab: Cuenta corriente ── -->
+      <div v-show="activeTab === 'cuenta_corriente'" class="sd__tab-content">
+        <div v-if="loadingCC" class="sd__cc-loading"><div class="sd__cc-spinner"></div> Cargando…</div>
+        <template v-else-if="cc">
+
+          <!-- Saldo y límite -->
+          <div class="sd__cc-header">
+            <div class="sd__cc-saldo-block">
+              <span class="sd__cc-saldo-label">Saldo disponible</span>
+              <span class="sd__cc-saldo-valor" :class="cc.saldo_disponible > 0 ? 'sd__cc-saldo--ok' : 'sd__cc-saldo--zero'">
+                {{ fmtARS(cc.saldo_disponible) }}
+              </span>
+            </div>
+            <div class="sd__cc-limite-block">
+              <span class="sd__cc-limite-label">Límite de crédito</span>
+              <span class="sd__cc-limite-valor">{{ fmtARS(cc.limite_credito) }}</span>
+            </div>
+          </div>
+
+          <!-- Barra de consumo -->
+          <div v-if="cc.limite_credito > 0" class="sd__cc-bar-wrap">
+            <div class="sd__cc-bar">
+              <div class="sd__cc-bar-fill" :style="{ width: ccPorcentaje + '%' }" :class="ccPorcentaje >= 90 ? 'sd__cc-bar-fill--danger' : ccPorcentaje >= 70 ? 'sd__cc-bar-fill--warn' : ''"></div>
+            </div>
+            <span class="sd__cc-bar-pct">{{ ccPorcentaje }}% consumido</span>
+          </div>
+
+          <!-- Acciones -->
+          <div class="sd__cc-actions">
+            <button class="sd__cc-btn sd__cc-btn--primary" @click="ccModo = ccModo === 'carga' ? null : 'carga'">
+              <Plus :size="14" /> Cargar crédito
+            </button>
+            <button class="sd__cc-btn sd__cc-btn--ghost" @click="ccModo = ccModo === 'ajuste' ? null : 'ajuste'">
+              <Pencil :size="14" /> Ajuste manual
+            </button>
+          </div>
+
+          <!-- Form carga -->
+          <div v-if="ccModo === 'carga'" class="sd__cc-form">
+            <h4 class="sd__cc-form-title">Cargar crédito</h4>
+            <div class="sd__cc-form-row">
+              <label>Monto (ARS)</label>
+              <input type="number" min="1" step="1" v-model.number="ccCargaForm.monto" class="sd__cc-input" placeholder="ej: 5000" />
+            </div>
+            <div class="sd__cc-form-row">
+              <label>Descripción</label>
+              <input type="text" v-model="ccCargaForm.descripcion" class="sd__cc-input" placeholder="Pago cuota mensual…" />
+            </div>
+            <div class="sd__cc-form-footer">
+              <button class="sd__cc-btn sd__cc-btn--ghost" @click="ccModo = null">Cancelar</button>
+              <button class="sd__cc-btn sd__cc-btn--primary" :disabled="savingCC || !ccCargaForm.monto" @click="submitCarga">
+                {{ savingCC ? 'Cargando…' : 'Confirmar carga' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Form ajuste -->
+          <div v-if="ccModo === 'ajuste'" class="sd__cc-form">
+            <h4 class="sd__cc-form-title">Ajuste manual</h4>
+            <p class="sd__cc-form-sub">Usá valores negativos para debitar, positivos para acreditar.</p>
+            <div class="sd__cc-form-row">
+              <label>Monto (ARS)</label>
+              <input type="number" step="1" v-model.number="ccAjusteForm.monto" class="sd__cc-input" placeholder="ej: -500 o 1000" />
+            </div>
+            <div class="sd__cc-form-row">
+              <label>Motivo</label>
+              <input type="text" v-model="ccAjusteForm.descripcion" class="sd__cc-input" placeholder="Motivo del ajuste…" />
+            </div>
+            <div class="sd__cc-form-footer">
+              <button class="sd__cc-btn sd__cc-btn--ghost" @click="ccModo = null">Cancelar</button>
+              <button class="sd__cc-btn sd__cc-btn--primary" :disabled="savingCC || !ccAjusteForm.monto" @click="submitAjuste">
+                {{ savingCC ? 'Guardando…' : 'Confirmar ajuste' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Historial de movimientos -->
+          <div class="sd__cc-historial">
+            <div class="sd__cc-historial-title">Historial</div>
+            <div v-if="!cc.movimientos?.length" class="sd__cc-empty">Sin movimientos registrados</div>
+            <div v-else class="sd__cc-movs">
+              <div v-for="m in cc.movimientos" :key="m.id" class="sd__cc-mov">
+                <div class="sd__cc-mov-tipo" :class="`sd__cc-mov-tipo--${m.tipo}`">{{ m.tipo_label }}</div>
+                <div class="sd__cc-mov-desc">{{ m.descripcion || '—' }}</div>
+                <div class="sd__cc-mov-monto" :class="m.monto >= 0 ? 'sd__cc-mov--pos' : 'sd__cc-mov--neg'">
+                  {{ m.monto >= 0 ? '+' : '' }}{{ fmtARS(m.monto) }}
+                </div>
+                <div class="sd__cc-mov-saldo">Saldo: {{ fmtARS(m.saldo_nuevo) }}</div>
+                <div class="sd__cc-mov-meta">{{ m.created_by }} · {{ new Date(m.created_at).toLocaleDateString('es-AR', { day:'numeric', month:'short', year:'numeric' }) }}</div>
+              </div>
+            </div>
+          </div>
+
+        </template>
+        <div v-else class="sd__cc-empty">No se pudo cargar la cuenta corriente.</div>
       </div>
 
       <!-- ── Tab: Historia clínica ── -->
@@ -669,4 +816,60 @@ onMounted(async () => {
 .sd-modal-enter-from, .sd-modal-leave-to { opacity: 0; }
 .sd-modal-enter-active .sd-modal, .sd-modal-leave-active .sd-modal { transition: transform .2s; }
 .sd-modal-enter-from .sd-modal, .sd-modal-leave-to .sd-modal { transform: translateY(-12px); }
+
+/* ── Cuenta Corriente ── */
+.sd__cc-loading { display: flex; align-items: center; gap: .6rem; padding: 2rem; color: #64748b; font-size: .875rem; }
+.sd__cc-spinner { width: 18px; height: 18px; border: 2px solid #e2e8f0; border-top-color: #15803d; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.sd__cc-header { display: flex; align-items: stretch; gap: 1rem; margin-bottom: 1rem; }
+.sd__cc-saldo-block, .sd__cc-limite-block { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: .25rem; }
+.sd__cc-saldo-block { background: #f0fdf4; border-color: #bbf7d0; }
+.sd__cc-saldo-label, .sd__cc-limite-label { font-size: .72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+.sd__cc-saldo-valor { font-family: monospace; font-size: 1.6rem; font-weight: 800; color: #0f172a; }
+.sd__cc-saldo--ok { color: #15803d; }
+.sd__cc-saldo--zero { color: #94a3b8; }
+.sd__cc-limite-valor { font-family: monospace; font-size: 1.3rem; font-weight: 700; color: #475569; }
+
+.sd__cc-bar-wrap { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.sd__cc-bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+.sd__cc-bar-fill { height: 100%; background: #15803d; border-radius: 999px; transition: width .4s; }
+.sd__cc-bar-fill--warn { background: #d97706; }
+.sd__cc-bar-fill--danger { background: #dc2626; }
+.sd__cc-bar-pct { font-size: .72rem; color: #94a3b8; white-space: nowrap; font-family: monospace; }
+
+.sd__cc-actions { display: flex; gap: .5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.sd__cc-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem 1rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
+.sd__cc-btn--primary { background: #15803d; color: #fff; }
+.sd__cc-btn--primary:hover { background: #166534; }
+.sd__cc-btn--primary:disabled { opacity: .5; cursor: not-allowed; }
+.sd__cc-btn--ghost { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.sd__cc-btn--ghost:hover { background: #e2e8f0; }
+
+.sd__cc-form { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .75rem; }
+.sd__cc-form-title { font-size: .9rem; font-weight: 700; color: #0f172a; margin: 0 0 .25rem; }
+.sd__cc-form-sub { font-size: .78rem; color: #64748b; margin: -.25rem 0 .25rem; }
+.sd__cc-form-row { display: flex; flex-direction: column; gap: .3rem; }
+.sd__cc-form-row label { font-size: .75rem; font-weight: 600; color: #64748b; }
+.sd__cc-input { padding: .5rem .75rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; outline: none; transition: border-color .15s; }
+.sd__cc-input:focus { border-color: #15803d; }
+.sd__cc-form-footer { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .25rem; }
+
+.sd__cc-historial { margin-top: 1.25rem; }
+.sd__cc-historial-title { font-size: .75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .75rem; }
+.sd__cc-empty { text-align: center; color: #94a3b8; font-size: .875rem; padding: 1.5rem; }
+.sd__cc-movs { display: flex; flex-direction: column; gap: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+.sd__cc-mov { display: grid; grid-template-columns: auto 1fr auto; grid-template-rows: auto auto; gap: .1rem .75rem; padding: .8rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: .82rem; }
+.sd__cc-mov:last-child { border-bottom: none; }
+.sd__cc-mov-tipo { grid-column: 1; grid-row: 1; font-size: .7rem; font-weight: 700; padding: .15rem .5rem; border-radius: 999px; white-space: nowrap; align-self: center; }
+.sd__cc-mov-tipo--carga  { background: #f0fdf4; color: #15803d; }
+.sd__cc-mov-tipo--debito { background: #fef2f2; color: #dc2626; }
+.sd__cc-mov-tipo--ajuste { background: #fffbeb; color: #b45309; }
+.sd__cc-mov-tipo--pago   { background: #eff6ff; color: #2563eb; }
+.sd__cc-mov-desc { grid-column: 2; grid-row: 1; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd__cc-mov-monto { grid-column: 3; grid-row: 1; font-family: monospace; font-weight: 700; text-align: right; white-space: nowrap; }
+.sd__cc-mov--pos { color: #15803d; }
+.sd__cc-mov--neg { color: #dc2626; }
+.sd__cc-mov-saldo { grid-column: 2; grid-row: 2; font-family: monospace; font-size: .72rem; color: #94a3b8; }
+.sd__cc-mov-meta  { grid-column: 3; grid-row: 2; font-size: .7rem; color: #94a3b8; text-align: right; }
 </style>

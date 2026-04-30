@@ -1,5 +1,6 @@
 class DispensacionesController < ApplicationController
   before_action :authenticate_user!
+  before_action :require_dispensaciones_role!
   before_action :require_dispensador_o_admin, except: [:index, :show]
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
@@ -108,6 +109,13 @@ class DispensacionesController < ApplicationController
       :indicacion_medica_id, :stock_id, :sede_id,
       :aporte_socio_ars, :observaciones, :fecha_dispensacion, :medio_pago
     )
+  end
+
+  def require_dispensaciones_role!
+    blocked = %w[auditor abogado cultivador manicura paciente delivery]
+    if blocked.include?(current_user&.role)
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
   end
 
   def require_dispensador_o_admin

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { listSedes, getContableDashboard, getTareasDashboard, getInventarioPendiente } from '../../lib/api.js'
+import { listSedes, getContableDashboard, getTareasDashboard, listLotes, listStocks } from '../../lib/api.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import { useStatsStore } from '../../stores/stats.js'
@@ -21,11 +21,13 @@ const club       = useClubStore()
 const statsStore = useStatsStore()
 const router     = useRouter()
 
-const sedes          = ref([])
-const contable       = ref(null)
-const tareas         = ref(null)
-const loading        = ref(true)
-const stockPendiente = ref(0)
+const sedes                  = ref([])
+const contable               = ref(null)
+const tareas                 = ref(null)
+const loading                = ref(true)
+const lotesManicuraPendiente = ref([])
+const lotesCurado            = ref([])
+const stocks                 = ref([])
 
 const stats = computed(() => statsStore.data ?? {})
 
@@ -54,13 +56,22 @@ function formatDate(d) {
 
 const alertas = computed(() => {
   const list = []
-  const sp = stockPendiente.value || 0
-  if (sp > 0) list.push({ variant: 'sky',   icon: 'bi-scissors',             msg: `${sp} movimiento${sp !== 1 ? 's' : ''} de manicura pendiente${sp !== 1 ? 's' : ''} de aprobación`, to: '/manicura', cta: 'Revisar stock' })
+  const sp = lotesManicuraPendiente.value.length
+  if (sp > 0) list.push({ variant: 'sky',   icon: 'bi-clipboard-check',       msg: `${sp} lote${sp !== 1 ? 's' : ''} pendiente${sp !== 1 ? 's' : ''} de aprobación de manicura`, to: '/aprobaciones', cta: 'Revisar' })
   const v = stats.value.vencimientos || 0
   if (v > 0) list.push({ variant: 'rust',   icon: 'bi-patch-exclamation-fill', msg: `${v} paciente${v !== 1 ? 's' : ''} con REPROCANN vencido`, to: '/pacientes', cta: 'Ver pacientes' })
   const tv = tareas.value?.stats?.vencidas || 0
   if (tv > 0) list.push({ variant: 'amber', icon: 'bi-clock-history',         msg: `${tv} tarea${tv !== 1 ? 's' : ''} vencida${tv !== 1 ? 's' : ''} sin completar`, to: '/tareas', cta: 'Ver tareas' })
   return list
+})
+
+const stockDisponible = computed(() => {
+  const map = {}
+  for (const s of stocks.value) {
+    const key = s.forma_producto || 'otros'
+    map[key] = (map[key] || 0) + (Number(s.cantidad) || 0)
+  }
+  return Object.entries(map).sort((a, b) => b[1] - a[1])
 })
 
 const TIPO_META = {
@@ -86,17 +97,21 @@ const balancePositivo = computed(() => (contable.value?.mes_actual?.balance || 0
 
 onMounted(async () => {
   try {
-    const [sedesRes, contableRes, tareasRes, stockRes] = await Promise.allSettled([
+    const [sedesRes, contableRes, tareasRes, manicuraRes, curadoRes, stocksRes] = await Promise.allSettled([
       listSedes(),
       getContableDashboard(),
       getTareasDashboard(),
-      getInventarioPendiente(),
+      listLotes({ estado: 'manicura_pendiente' }),
+      listLotes({ estado: 'curado' }),
+      listStocks(),
     ])
     await statsStore.fetchAll()
-    if (sedesRes.status    === 'fulfilled') sedes.value    = sedesRes.value.data || []
-    if (contableRes.status === 'fulfilled') contable.value = contableRes.value.data
-    if (tareasRes.status   === 'fulfilled') tareas.value   = tareasRes.value.data
-    if (stockRes.status    === 'fulfilled') stockPendiente.value = (stockRes.value.data || []).length
+    if (sedesRes.status    === 'fulfilled') sedes.value                  = sedesRes.value.data    || []
+    if (contableRes.status === 'fulfilled') contable.value               = contableRes.value.data
+    if (tareasRes.status   === 'fulfilled') tareas.value                 = tareasRes.value.data
+    if (manicuraRes.status === 'fulfilled') lotesManicuraPendiente.value = manicuraRes.value.data || []
+    if (curadoRes.status   === 'fulfilled') lotesCurado.value            = curadoRes.value.data   || []
+    if (stocksRes.status   === 'fulfilled') stocks.value                 = stocksRes.value.data   || []
   } finally {
     loading.value = false
   }
@@ -255,6 +270,33 @@ async function onOnboardingCompletado() {
             </div>
           </DsCard>
 
+          <!-- Pipeline post-cosecha -->
+          <DsCard v-if="lotesManicuraPendiente.length || lotesCurado.length" variant="outlined" padding="none" class="ad__card--mt">
+            <div class="ad__ch">
+              <span class="ad__ch-title">Pipeline post-cosecha</span>
+            </div>
+            <div class="ad__pipeline">
+              <RouterLink v-if="lotesManicuraPendiente.length" to="/aprobaciones" class="ad__pipe-item">
+                <div class="ad__pipe-ico ad__pipe-ico--amber"><i class="bi bi-clipboard-check"></i></div>
+                <div class="ad__pipe-body">
+                  <div class="ad__pipe-label">Pendientes de aprobación</div>
+                  <div class="ad__pipe-sub">Manicura finalizada, esperando admin</div>
+                </div>
+                <span class="ad__pipe-count">{{ lotesManicuraPendiente.length }}</span>
+                <i class="bi bi-chevron-right ad__pipe-arrow"></i>
+              </RouterLink>
+              <RouterLink v-if="lotesCurado.length" to="/admin/curado" class="ad__pipe-item">
+                <div class="ad__pipe-ico ad__pipe-ico--green"><i class="bi bi-box-seam"></i></div>
+                <div class="ad__pipe-body">
+                  <div class="ad__pipe-label">En curado — listos para cerrar</div>
+                  <div class="ad__pipe-sub">Pesada final + ingreso a stock</div>
+                </div>
+                <span class="ad__pipe-count">{{ lotesCurado.length }}</span>
+                <i class="bi bi-chevron-right ad__pipe-arrow"></i>
+              </RouterLink>
+            </div>
+          </DsCard>
+
           <!-- Últimos movimientos -->
           <DsCard variant="outlined" padding="none" class="ad__card--mt">
             <div class="ad__ch">
@@ -310,6 +352,24 @@ async function onOnboardingCompletado() {
               <span class="ad__ch-title">Acciones rápidas</span>
             </div>
             <div class="ad__actions">
+              <RouterLink v-if="lotesManicuraPendiente.length" to="/aprobaciones" class="ad__action ad__action--alert">
+                <div class="ad__action-ico ad__action-ico--amber"><i class="bi bi-clipboard-check"></i></div>
+                <div class="ad__action-body">
+                  <div class="ad__action-label">Aprobaciones</div>
+                  <div class="ad__action-hint">{{ lotesManicuraPendiente.length }} lote{{ lotesManicuraPendiente.length !== 1 ? 's' : '' }} esperando</div>
+                </div>
+                <span class="ad__action-badge">{{ lotesManicuraPendiente.length }}</span>
+                <i class="bi bi-chevron-right ad__action-arrow"></i>
+              </RouterLink>
+              <RouterLink v-if="lotesCurado.length" to="/admin/curado" class="ad__action ad__action--alert">
+                <div class="ad__action-ico ad__action-ico--green"><i class="bi bi-box-seam"></i></div>
+                <div class="ad__action-body">
+                  <div class="ad__action-label">Cerrar curado</div>
+                  <div class="ad__action-hint">{{ lotesCurado.length }} lote{{ lotesCurado.length !== 1 ? 's' : '' }} listos</div>
+                </div>
+                <span class="ad__action-badge ad__action-badge--green">{{ lotesCurado.length }}</span>
+                <i class="bi bi-chevron-right ad__action-arrow"></i>
+              </RouterLink>
               <RouterLink to="/pacientes/nuevo" class="ad__action">
                 <div class="ad__action-ico ad__action-ico--blue"><i class="bi bi-person-plus"></i></div>
                 <div class="ad__action-body">
@@ -342,6 +402,21 @@ async function onOnboardingCompletado() {
                 </div>
                 <i class="bi bi-chevron-right ad__action-arrow"></i>
               </RouterLink>
+            </div>
+          </DsCard>
+
+          <!-- Stock disponible -->
+          <DsCard v-if="stockDisponible.length" variant="outlined" padding="none" class="ad__card--mt">
+            <div class="ad__ch">
+              <span class="ad__ch-title">Stock disponible</span>
+              <RouterLink to="/sedes" class="ad__ch-link">Ver sedes →</RouterLink>
+            </div>
+            <div class="ad__stock">
+              <div v-for="[forma, total] in stockDisponible" :key="forma" class="ad__stock-item">
+                <i class="bi bi-bag ad__stock-ico"></i>
+                <span class="ad__stock-forma">{{ forma }}</span>
+                <span class="ad__stock-total">{{ total % 1 === 0 ? total : total.toFixed(1) }}</span>
+              </div>
             </div>
           </DsCard>
 
@@ -643,6 +718,89 @@ async function onOnboardingCompletado() {
 .ad__tarea-body { flex: 1; min-width: 0; }
 .ad__tarea-titulo { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ad__tarea-meta { font-size: var(--fs-12); color: var(--c-ink-500); margin-top: 1px; }
+
+/* ── Pipeline post-cosecha ── */
+.ad__pipeline { display: flex; flex-direction: column; }
+.ad__pipe-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--c-ink-100);
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--t-fast);
+}
+.ad__pipe-item:last-child { border-bottom: none; }
+.ad__pipe-item:hover { background: var(--c-leaf-50); }
+.ad__pipe-ico {
+  width: 36px; height: 36px;
+  border-radius: var(--r-lg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-16);
+  flex-shrink: 0;
+}
+.ad__pipe-ico--amber { background: rgba(180,83,9,.1);  color: var(--c-gold-500); }
+.ad__pipe-ico--green { background: rgba(21,128,61,.1); color: #15803d; }
+.ad__pipe-body { flex: 1; min-width: 0; }
+.ad__pipe-label { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
+.ad__pipe-sub   { font-size: var(--fs-12); color: var(--c-ink-500); margin-top: 1px; }
+.ad__pipe-count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-20);
+  font-weight: 700;
+  color: var(--c-ink-700);
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
+}
+.ad__pipe-arrow { color: var(--c-ink-300); font-size: var(--fs-13); transition: color var(--t-fast), transform var(--t-fast); margin-left: var(--sp-1); }
+.ad__pipe-item:hover .ad__pipe-arrow { color: var(--c-leaf-700); transform: translateX(2px); }
+
+/* ── Stock disponible ── */
+.ad__stock { display: flex; flex-direction: column; padding: var(--sp-2) 0; }
+.ad__stock-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-5);
+}
+.ad__stock-ico { color: var(--c-ink-400); font-size: var(--fs-14); flex-shrink: 0; }
+.ad__stock-forma {
+  flex: 1;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  color: var(--c-ink-700);
+  text-transform: capitalize;
+}
+.ad__stock-total {
+  font-family: var(--font-mono);
+  font-size: var(--fs-14);
+  font-weight: 700;
+  color: var(--c-leaf-700);
+}
+
+/* ── Acción con badge ── */
+.ad__action--alert { background: var(--c-leaf-50); }
+.ad__action-badge {
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  font-weight: 800;
+  min-width: 22px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  background: rgba(180,83,9,.15);
+  color: var(--c-gold-600, #b45309);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--sp-1);
+  flex-shrink: 0;
+}
+.ad__action-badge--green {
+  background: rgba(21,128,61,.12);
+  color: #15803d;
+}
 
 /* ── Footer ── */
 .ad__footer {

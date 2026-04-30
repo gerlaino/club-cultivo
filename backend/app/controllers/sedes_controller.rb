@@ -1,6 +1,7 @@
 # backend/app/controllers/sedes_controller.rb
 class SedesController < ApplicationController
   before_action :authenticate_user!
+  before_action :require_sedes_role!
   before_action :set_sede, only: [:show, :update, :destroy, :inventario, :agregar_stock, :stock_pendiente, :aprobar_stock, :rechazar_stock]
 
   def index
@@ -173,6 +174,13 @@ class SedesController < ApplicationController
     @sede = current_user.club.sedes.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Sede no encontrada' }, status: :not_found
+  end
+
+  def require_sedes_role!
+    blocked = %w[auditor abogado paciente]
+    if blocked.include?(current_user&.role)
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
   end
 
   def sede_params

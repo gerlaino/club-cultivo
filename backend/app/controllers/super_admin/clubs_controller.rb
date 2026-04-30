@@ -1,5 +1,5 @@
 class SuperAdmin::ClubsController < SuperAdmin::BaseController
-  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan]
+  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion]
 
   def index
     clubs = Club.all.includes(:users, :pacientes).order(:created_at)
@@ -36,6 +36,31 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     @club.crear_geneticas_default!
     usuarios = @club.crear_usuarios_default!
     render json: { usuarios: usuarios.map { |u| { id: u.id, email: u.email, role: u.role } } }
+  end
+
+  def observar
+    token = SecureRandom.hex(24)
+    current_user.update!(
+      observer_club_id:   @club.id,
+      observer_token:     token,
+      observer_expires_at: 15.minutes.from_now
+    )
+    render json: {
+      token:            token,
+      club_id:          @club.id,
+      club_nombre:      @club.name,
+      expires_at:       current_user.observer_expires_at,
+      instrucciones:    'Incluir header X-Observer-Token en requests. Modo solo lectura activo.',
+    }, status: :created
+  end
+
+  def detener_observacion
+    current_user.update!(
+      observer_club_id:    nil,
+      observer_token:      nil,
+      observer_expires_at: nil
+    )
+    head :no_content
   end
 
   def cambiar_plan

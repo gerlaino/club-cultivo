@@ -10,7 +10,8 @@ import { createPlant, updatePlant,
   getLoteEventos, createLoteEvento,
   getLoteFotos, uploadFotoLote,
   transicionarLote, avanzarFaseLote, cerrarCurado, getLoteTimeline,
-  listSedes, getSedeStocks } from "../lib/api"
+  listSedes, getSedeStocks,
+  getCostoLote, createCostoLote, updateCostoLote } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 import GraficosLote from '../components/GraficosLote.vue'
@@ -36,6 +37,59 @@ const loading       = computed(() => lotes.loading)
 const lote          = computed(() => lotes.current)
 const canEdit       = computed(() => auth.role === "admin")
 const isCultivador  = computed(() => auth.role === "cultivador")
+
+const costoLote     = ref(null)
+const showCostoForm = ref(false)
+const savingCosto   = ref(false)
+const costoForm     = ref({ costo_insumos: 0, costo_energia: 0, costo_mano_obra: 0, costo_prorrateado: 0, gramos_producidos: null, notas: '' })
+
+const costoTotal = computed(() => {
+  const f = costoForm.value
+  return (Number(f.costo_insumos) || 0) + (Number(f.costo_energia) || 0) + (Number(f.costo_mano_obra) || 0) + (Number(f.costo_prorrateado) || 0)
+})
+const costoPorGramo = computed(() => {
+  const g = Number(costoForm.value.gramos_producidos)
+  return g > 0 ? costoTotal.value / g : null
+})
+
+function openCostoForm() {
+  if (costoLote.value) {
+    costoForm.value = {
+      costo_insumos:    costoLote.value.costo_insumos    || 0,
+      costo_energia:    costoLote.value.costo_energia     || 0,
+      costo_mano_obra:  costoLote.value.costo_mano_obra   || 0,
+      costo_prorrateado: costoLote.value.costo_prorrateado || 0,
+      gramos_producidos: costoLote.value.gramos_producidos || null,
+      notas: costoLote.value.notas || '',
+    }
+  } else {
+    costoForm.value = { costo_insumos: 0, costo_energia: 0, costo_mano_obra: 0, costo_prorrateado: 0, gramos_producidos: null, notas: '' }
+  }
+  showCostoForm.value = true
+}
+
+async function saveCosto() {
+  savingCosto.value = true
+  try {
+    const payload = {
+      costo_insumos:    Number(costoForm.value.costo_insumos)    || 0,
+      costo_energia:    Number(costoForm.value.costo_energia)     || 0,
+      costo_mano_obra:  Number(costoForm.value.costo_mano_obra)   || 0,
+      costo_prorrateado: Number(costoForm.value.costo_prorrateado) || 0,
+      gramos_producidos: costoForm.value.gramos_producidos ? Number(costoForm.value.gramos_producidos) : null,
+      notas: costoForm.value.notas,
+    }
+    const fn = costoLote.value ? updateCostoLote : createCostoLote
+    const { data } = await fn(id, payload)
+    costoLote.value = data
+    showCostoForm.value = false
+    toast.success('Costos guardados')
+  } catch (e) {
+    toast.error('Error al guardar costos')
+  } finally {
+    savingCosto.value = false
+  }
+}
 
 const tareasExpanded    = ref(true)
 const plantasExpanded   = ref(true)
@@ -434,6 +488,7 @@ onMounted(async () => {
   catch {}
   await loadEventos()
   try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
+  try { const { data } = await getCostoLote(id); costoLote.value = data?.costo || data || null } catch {}
 })
 </script>
 
@@ -796,6 +851,79 @@ onMounted(async () => {
           <div v-if="lote.notes" class="ld__card ld__card--mt">
             <div class="ld__card-header"><span class="ld__card-title">📋 Notas</span></div>
             <div class="ld__card-notes">{{ lote.notes }}</div>
+          </div>
+
+          <!-- Costos de producción -->
+          <div class="ld__card ld__card--mt">
+            <div class="ld__card-header">
+              <span class="ld__card-title">💰 Costos de producción</span>
+              <button v-if="canEdit" class="ld__card-action" @click="openCostoForm">
+                <i :class="costoLote ? 'bi bi-pencil' : 'bi bi-plus-lg'"></i>
+                {{ costoLote ? 'Editar' : 'Cargar' }}
+              </button>
+            </div>
+
+            <!-- Formulario inline -->
+            <div v-if="showCostoForm" class="ld__costo-form">
+              <div class="ld__costo-row">
+                <label class="ld__costo-label">Insumos (ARS)</label>
+                <input type="number" min="0" step="0.01" class="ld__costo-input" v-model.number="costoForm.costo_insumos" placeholder="0" />
+              </div>
+              <div class="ld__costo-row">
+                <label class="ld__costo-label">Energía (ARS)</label>
+                <input type="number" min="0" step="0.01" class="ld__costo-input" v-model.number="costoForm.costo_energia" placeholder="0" />
+              </div>
+              <div class="ld__costo-row">
+                <label class="ld__costo-label">Mano de obra (ARS)</label>
+                <input type="number" min="0" step="0.01" class="ld__costo-input" v-model.number="costoForm.costo_mano_obra" placeholder="0" />
+              </div>
+              <div class="ld__costo-row">
+                <label class="ld__costo-label">Prorrateado (ARS)</label>
+                <input type="number" min="0" step="0.01" class="ld__costo-input" v-model.number="costoForm.costo_prorrateado" placeholder="0" />
+              </div>
+              <div class="ld__costo-total">
+                Total: <strong>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoTotal) }}</strong>
+              </div>
+              <div class="ld__costo-row ld__costo-row--sep">
+                <label class="ld__costo-label">Gramos producidos</label>
+                <input type="number" min="0" step="0.1" class="ld__costo-input" v-model.number="costoForm.gramos_producidos" placeholder="g" />
+              </div>
+              <div v-if="costoPorGramo" class="ld__costo-cpg">
+                <span>Costo/g: </span>
+                <strong>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 }).format(costoPorGramo) }}</strong>
+              </div>
+              <div class="ld__costo-row">
+                <label class="ld__costo-label">Notas</label>
+                <input type="text" class="ld__costo-input" v-model="costoForm.notas" placeholder="Opcional" />
+              </div>
+              <div class="ld__costo-actions">
+                <button class="ld__btn-ghost" @click="showCostoForm = false">Cancelar</button>
+                <button class="ld__btn-primary" :disabled="savingCosto" @click="saveCosto">
+                  {{ savingCosto ? 'Guardando…' : 'Guardar costos' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Vista datos guardados -->
+            <template v-else-if="costoLote">
+              <dl class="ld__dl">
+                <dt>Insumos</dt><dd>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_insumos) }}</dd>
+                <dt>Energía</dt><dd>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_energia) }}</dd>
+                <dt>Mano de obra</dt><dd>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_mano_obra) }}</dd>
+                <dt v-if="costoLote.costo_prorrateado">Prorrateado</dt><dd v-if="costoLote.costo_prorrateado">{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_prorrateado) }}</dd>
+                <dt class="ld__dl-total">Total</dt><dd class="ld__dl-total">{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_total) }}</dd>
+                <dt v-if="costoLote.gramos_producidos">Rendimiento</dt><dd v-if="costoLote.gramos_producidos">{{ costoLote.gramos_producidos }}g</dd>
+              </dl>
+              <div v-if="costoLote.costo_por_gramo" class="ld__cpg-badge">
+                <span class="ld__cpg-label">Costo/gramo</span>
+                <span class="ld__cpg-value">{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 }).format(costoLote.costo_por_gramo) }}</span>
+              </div>
+            </template>
+
+            <div v-else class="ld__costo-empty">
+              <i class="bi bi-calculator"></i>
+              <span>Sin costos cargados</span>
+            </div>
           </div>
 
         </div>
@@ -1217,9 +1345,28 @@ onMounted(async () => {
 .ld__card-header { display: flex; align-items: center; justify-content: space-between; padding: .8rem 1rem; border-bottom: 1px solid #e8f0e9; }
 .ld__card-title { font-size: .85rem; font-weight: 700; color: #1a1a1a; }
 .ld__card-notes { padding: .9rem 1rem; font-size: .82rem; color: #475569; line-height: 1.6; }
+.ld__card-action { background: none; border: 1px solid #d4e6d4; color: #15803d; font-size: .75rem; font-weight: 600; padding: .25rem .65rem; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: .3rem; transition: background .15s; }
+.ld__card-action:hover { background: #f0fdf4; }
 .ld__dl { display: grid; grid-template-columns: auto 1fr; gap: .4rem .75rem; padding: .9rem 1rem; margin: 0; }
 .ld__dl dt { font-size: .75rem; color: #60725d; font-weight: 500; white-space: nowrap; }
 .ld__dl dd { font-size: .8rem; color: #1a1a1a; font-weight: 500; margin: 0; }
+.ld__dl-total { font-weight: 700 !important; color: #1a3d2e !important; border-top: 1px solid #e8f0e9; padding-top: .3rem; }
+
+/* ── Costos ── */
+.ld__costo-form { padding: .9rem 1rem; display: flex; flex-direction: column; gap: .6rem; }
+.ld__costo-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.ld__costo-row--sep { border-top: 1px solid #e8f0e9; padding-top: .6rem; margin-top: .2rem; }
+.ld__costo-label { font-size: .75rem; color: #60725d; font-weight: 500; flex-shrink: 0; }
+.ld__costo-input { width: 120px; padding: .3rem .5rem; border: 1px solid #d4e6d4; border-radius: 6px; font-size: .8rem; text-align: right; background: #f9fdfb; }
+.ld__costo-input:focus { outline: none; border-color: #15803d; }
+.ld__costo-total { font-size: .8rem; font-weight: 700; color: #1a3d2e; text-align: right; padding: .4rem .5rem; background: #f0fdf4; border-radius: 6px; }
+.ld__costo-cpg { font-size: .8rem; color: #0369a1; text-align: right; font-weight: 600; }
+.ld__costo-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .4rem; }
+.ld__costo-empty { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 1.2rem 1rem; color: #94a3b8; font-size: .8rem; }
+.ld__costo-empty i { font-size: 1.4rem; }
+.ld__cpg-badge { display: flex; justify-content: space-between; align-items: center; margin: 0 1rem .9rem; padding: .5rem .75rem; background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-radius: 8px; border: 1px solid #bbf7d0; }
+.ld__cpg-label { font-size: .75rem; font-weight: 600; color: #15803d; }
+.ld__cpg-value { font-family: var(--font-mono, monospace); font-size: .95rem; font-weight: 800; color: #15803d; }
 .ld__placeholder { padding: 1rem 1.1rem; color: #94a3b8; font-size: .875rem; }
 .ld__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .ld__btn-primary:hover { background: #104417; }

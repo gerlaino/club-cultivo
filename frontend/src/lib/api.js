@@ -140,6 +140,10 @@ export const updateIndicacion = (id, payload) => api.put(`/indicaciones/${id}`, 
 export const deleteIndicacion = (id) => api.delete(`/indicaciones/${id}`);
 
 // -------- DISPENSACIONES --------
+export const getCuentaCorriente  = (pacienteId)         => api.get(`/pacientes/${pacienteId}/cuenta_corriente`)
+export const cargarCreditoCC     = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/cargar`, payload)
+export const ajustarCC           = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/ajuste`, payload)
+
 export const listDispensaciones = (pacienteId) => api.get(`/pacientes/${pacienteId}/dispensaciones`);
 export const listDispensacionesFecha = (params = {}) => api.get('/dispensaciones', { params });
 export const getDispensacion = (id) => api.get(`/dispensaciones/${id}`);
@@ -198,6 +202,10 @@ export const getInventarioPendiente = ()              => api.get('/inventario/pe
 export const getStockDisponible     = ()              => api.get('/inventario/disponible')
 export const aprobarMovimiento      = (id)            => api.post(`/inventario/aprobar/${id}`)
 export const rechazarMovimiento     = (id, motivo)    => api.post(`/inventario/rechazar/${id}`, { motivo })
+
+// ── Aprobación manicura ───────────────────────────────────────────────────────
+export const aprobarManicura  = (loteId, observaciones) => api.post(`/lotes/${loteId}/aprobar_manicura`, { observaciones })
+export const rechazarManicura = (loteId, motivo)        => api.post(`/lotes/${loteId}/rechazar_manicura`, { motivo })
 
 // -------- PLAN --------
 export const getPlan = () => api.get('/plan')

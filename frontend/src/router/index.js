@@ -54,7 +54,10 @@ const routes = [
     beforeEnter: () => {
       const auth = useAuthStore()
       if (auth.user?.role === 'super_admin') return '/super-admin'
-      if (auth.user?.role === 'abogado')     return '/documentos'
+      if (auth.user?.role === 'auditor')     return '/auditor'
+      if (auth.user?.role === 'medico')      return '/medico'
+      if (auth.user?.role === 'abogado')     return '/abogado'
+      if (auth.user?.role === 'manicura')    return '/mnc/pendientes'
     },
   },
 
@@ -302,34 +305,43 @@ const routes = [
 
   {
     path: '/manicura',
-    name: 'manicura',
-    component: () => import('../views/ManicuraView.vue'),
+    redirect: '/aprobaciones',
+  },
+
+  {
+    path: '/aprobaciones',
+    name: 'aprobaciones',
+    component: () => import('../views/admin/AdminAprobacionesView.vue'),
     meta: { requiresAuth: true },
-    beforeEnter: requiresPermission('manicura', 'access'),
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role !== 'admin') return next('/')
+      next()
+    },
+  },
+
+  {
+    path: '/admin/curado',
+    name: 'admin-curado',
+    component: () => import('../views/admin/AdminCuradoView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role !== 'admin') return next('/')
+      next()
+    },
   },
 
   // Manicura role routes
   {
     path: '/mnc',
-    redirect: '/',
+    redirect: '/mnc/pendientes',
     meta: { requiresAuth: true },
   },
   {
-    path: '/mnc/cosecha',
-    name: 'mnc-cosecha',
-    component: () => import('../views/manicura/LotesEnCosechaView.vue'),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore()
-      const role = auth.user?.role
-      if (!['admin', 'manicura'].includes(role)) return next('/')
-      next()
-    },
-  },
-  {
-    path: '/mnc/secado',
-    name: 'mnc-secado',
-    component: () => import('../views/manicura/LotesEnSecadoView.vue'),
+    path: '/mnc/pendientes',
+    name: 'mnc-pendientes',
+    component: () => import('../views/manicura/MncPendientesView.vue'),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
@@ -339,21 +351,9 @@ const routes = [
     },
   },
   {
-    path: '/mnc/curado',
-    name: 'mnc-curado',
-    component: () => import('../views/manicura/LotesEnCuradoView.vue'),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore()
-      const role = auth.user?.role
-      if (!['admin', 'manicura'].includes(role)) return next('/')
-      next()
-    },
-  },
-  {
-    path: '/mnc/stocks',
-    name: 'mnc-stocks',
-    component: () => import('../views/manicura/StocksManicuraView.vue'),
+    path: '/mnc/espera',
+    name: 'mnc-espera',
+    component: () => import('../views/manicura/MncEsperaView.vue'),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
@@ -429,6 +429,57 @@ const routes = [
     },
   },
 
+  // ── Médico routes ──
+  {
+    path: '/medico',
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'medico'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+    children: [
+      { path: '', name: 'medico-dashboard', component: () => import('../views/medico/MedicoDashboard.vue') },
+      { path: 'pacientes', name: 'medico-pacientes', component: () => import('../views/medico/MedicoPacientesView.vue') },
+      { path: 'indicaciones', name: 'medico-indicaciones', component: () => import('../views/medico/MedicoIndicacionesView.vue') },
+      { path: 'documentos', name: 'medico-documentos', component: () => import('../views/medico/MedicoDocumentosView.vue') },
+    ],
+  },
+
+  // ── Abogado routes ──
+  {
+    path: '/abogado',
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'abogado'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+    children: [
+      { path: '', name: 'abogado-dashboard', component: () => import('../views/abogado/AbogadoDashboard.vue') },
+      { path: 'documentos', name: 'abogado-documentos', component: () => import('../views/abogado/AbogadoMisDocumentosView.vue') },
+    ],
+  },
+
+  // ── Auditor routes ──
+  {
+    path: '/auditor',
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'auditor'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+    children: [
+      { path: '', name: 'auditor-dashboard', component: () => import('../views/auditor/AuditorDashboard.vue') },
+      { path: 'reprocann', name: 'auditor-reprocann', component: () => import('../views/auditor/InformeReprocannView.vue') },
+      { path: 'produccion', name: 'auditor-produccion', component: () => import('../views/auditor/InformeProduccionView.vue') },
+      { path: 'dispensaciones', name: 'auditor-dispensaciones', component: () => import('../views/auditor/InformeDispensacionesView.vue') },
+      { path: 'sedes', name: 'auditor-sedes', component: () => import('../views/auditor/InformeSedesView.vue') },
+      { path: 'cumplimiento', name: 'auditor-cumplimiento', component: () => import('../views/auditor/InformeCumplimientoView.vue') },
+    ],
+  },
+
   { path: "/:pathMatch(.*)*", redirect: "/" },
 
 ];
@@ -442,8 +493,20 @@ router.afterEach((to) => {
   document.documentElement.classList.toggle("route-login", !!to.meta.fullscreen);
 });
 
-const ABOGADO_ALLOWED = ['/documentos', '/perfil', '/login']
 const DELIVERY_BLOCKED = ['/pacientes']
+
+const ROLE_HOME = {
+  super_admin: '/super-admin',
+  auditor:     '/auditor',
+  medico:      '/medico',
+  abogado:     '/abogado',
+}
+
+const ROLE_ALLOWED_PREFIX = {
+  auditor: ['/auditor', '/perfil', '/login'],
+  medico:  ['/medico',  '/perfil', '/login'],
+  abogado: ['/abogado', '/perfil', '/login'],
+}
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
@@ -457,17 +520,17 @@ router.beforeEach(async (to) => {
     return typeof redirect === "string" ? redirect : "/";
   }
 
-  // Abogado: solo puede acceder a /documentos y /perfil
-  if (auth.isAuthenticated && auth.user?.role === 'abogado') {
-    const allowed = ABOGADO_ALLOWED.some(p => to.path === p || to.path.startsWith(p + '/'))
+  const role = auth.user?.role
+  if (auth.isAuthenticated && ROLE_ALLOWED_PREFIX[role]) {
+    const allowed = ROLE_ALLOWED_PREFIX[role].some(p => to.path === p || to.path.startsWith(p + '/'))
     if (!allowed) {
       useToast().warning('Sin permisos para acceder a esa sección')
-      return '/documentos'
+      return ROLE_HOME[role]
     }
   }
 
   // Delivery: bloqueado de /pacientes
-  if (auth.isAuthenticated && auth.user?.role === 'delivery') {
+  if (auth.isAuthenticated && role === 'delivery') {
     const blocked = DELIVERY_BLOCKED.some(p => to.path === p || to.path.startsWith(p + '/'))
     if (blocked) return '/'
   }

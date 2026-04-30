@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -62,6 +62,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
     t.index ["resuelta_por_id"], name: "index_alertas_on_resuelta_por_id"
     t.index ["sala_id", "estado"], name: "idx_alertas_sala_estado"
     t.index ["sala_id"], name: "index_alertas_on_sala_id"
+  end
+
+  create_table "alertas_internas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "tipo", null: false
+    t.text "mensaje", null: false
+    t.string "severidad", default: "info", null: false
+    t.datetime "leida_at"
+    t.bigint "creada_por_id"
+    t.string "destinada_a_role"
+    t.jsonb "contexto", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "leida_at"], name: "index_alertas_internas_on_club_id_and_leida_at"
+    t.index ["club_id"], name: "index_alertas_internas_on_club_id"
   end
 
   create_table "clubs", force: :cascade do |t|
@@ -219,9 +234,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
     t.string "estado", default: "vigente"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "subido_por_id"
+    t.bigint "paciente_id"
     t.index ["club_id"], name: "index_documentos_on_club_id"
     t.index ["estado"], name: "index_documentos_on_estado"
     t.index ["fecha_vencimiento"], name: "index_documentos_on_fecha_vencimiento"
+    t.index ["paciente_id"], name: "index_documentos_on_paciente_id"
+    t.index ["subido_por_id"], name: "index_documentos_on_subido_por_id"
     t.index ["tipo"], name: "index_documentos_on_tipo"
     t.index ["user_id"], name: "index_documentos_on_user_id"
   end
@@ -472,6 +491,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
     t.date "reprocann_vencimiento"
     t.string "reprocann_adjunto"
     t.text "notas_clinicas"
+    t.boolean "con_seguimiento_medico", default: true, null: false
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["club_id"], name: "index_pacientes_on_club_id"
@@ -525,6 +545,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
     t.datetime "registrado_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.datetime "aprobada_at"
+    t.bigint "aprobada_por_id"
+    t.datetime "rechazada_at"
+    t.bigint "rechazada_por_id"
+    t.string "motivo_rechazo"
+    t.index ["aprobada_por_id"], name: "index_pesadas_on_aprobada_por_id"
     t.index ["lote_id", "registrado_at"], name: "index_pesadas_on_lote_id_and_registrado_at"
     t.index ["lote_id"], name: "index_pesadas_on_lote_id"
     t.index ["registrado_por_id"], name: "index_pesadas_on_registrado_por_id"
@@ -709,18 +735,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
     t.index ["genetica_id"], name: "index_setpoints_fase_on_genetica_id"
   end
 
-  create_table "socio_nota", force: :cascade do |t|
-    t.bigint "paciente_id", null: false
-    t.bigint "user_id", null: false
-    t.text "contenido"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.datetime "deleted_at"
-    t.index ["deleted_at"], name: "index_socio_nota_on_deleted_at"
-    t.index ["paciente_id"], name: "index_socio_nota_on_paciente_id"
-    t.index ["user_id"], name: "index_socio_nota_on_user_id"
-  end
-
   create_table "stocks", force: :cascade do |t|
     t.bigint "sede_id", null: false
     t.string "origen", null: false
@@ -800,6 +814,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
     t.string "dni"
     t.date "birth_date"
     t.string "phone"
+    t.bigint "observer_club_id"
+    t.string "observer_token"
+    t.datetime "observer_expires_at"
     t.index ["club_id"], name: "index_users_on_club_id"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["first_name"], name: "index_users_on_first_name"
@@ -815,6 +832,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
   add_foreign_key "alertas", "salas"
   add_foreign_key "alertas", "users", column: "reconocida_por_id"
   add_foreign_key "alertas", "users", column: "resuelta_por_id"
+  add_foreign_key "alertas_internas", "clubs"
+  add_foreign_key "alertas_internas", "users", column: "creada_por_id"
   add_foreign_key "costo_lotes", "clubs"
   add_foreign_key "costo_lotes", "lotes"
   add_foreign_key "costo_lotes", "users", column: "calculado_por_id"
@@ -833,7 +852,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
   add_foreign_key "document_templates", "clubs"
   add_foreign_key "document_templates", "users", column: "created_by_id"
   add_foreign_key "documentos", "clubs"
+  add_foreign_key "documentos", "pacientes"
   add_foreign_key "documentos", "users"
+  add_foreign_key "documentos", "users", column: "subido_por_id"
   add_foreign_key "eventos", "clubs"
   add_foreign_key "geneticas", "clubs"
   add_foreign_key "indicacion_medicas", "pacientes"
@@ -868,6 +889,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
   add_foreign_key "patient_documents", "pacientes"
   add_foreign_key "patient_documents", "users", column: "created_by_id"
   add_foreign_key "pesadas", "lotes"
+  add_foreign_key "pesadas", "users", column: "aprobada_por_id"
+  add_foreign_key "pesadas", "users", column: "rechazada_por_id"
   add_foreign_key "pesadas", "users", column: "registrado_por_id"
   add_foreign_key "pesadas_plantas", "pesadas"
   add_foreign_key "pesadas_plantas", "plants"
@@ -886,8 +909,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
   add_foreign_key "sedes", "clubs"
   add_foreign_key "sedes", "users", column: "created_by_id"
   add_foreign_key "setpoints_fase", "geneticas"
-  add_foreign_key "socio_nota", "pacientes"
-  add_foreign_key "socio_nota", "users"
   add_foreign_key "stocks", "lotes"
   add_foreign_key "stocks", "sedes"
   add_foreign_key "tareas", "clubs"

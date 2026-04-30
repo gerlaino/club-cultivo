@@ -12,10 +12,9 @@ class Lote < ApplicationRecord
   has_many_attached :fotos
   has_many :notas, as: :noteable, dependent: :destroy
 
-  # TODO(Ola 4): migrar usos del frontend de lote.estado → lote.fase y
-  # deprecar la columna `estado` cuando se introduzca la fase 'manicura'
-  # entre secado y curado. Por ahora `fase` es alias en serializer.
-  ESTADOS       = %w[semilla vegetativo floracion cosecha secado curado finalizado].freeze
+  # manicura_pendiente se inserta entre secado y curado.
+  # No forma parte de CICLO_FASES (transición controlada por pesada de manicura).
+  ESTADOS       = %w[semilla vegetativo floracion cosecha secado manicura_pendiente curado finalizado].freeze
   CICLO_FASES   = %w[vegetativo floracion cosecha secado curado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
   TIPOS_LUZ     = %w[led hps cmh natural mixta].freeze
@@ -46,13 +45,14 @@ class Lote < ApplicationRecord
 
   def progreso_ciclo
     case estado
-    when 'semilla'    then 0
-    when 'vegetativo' then 20
-    when 'floracion'  then 40
-    when 'cosecha'    then 60
-    when 'secado'     then 75
-    when 'curado'     then 90
-    when 'finalizado' then 100
+    when 'semilla'             then 0
+    when 'vegetativo'          then 20
+    when 'floracion'           then 40
+    when 'cosecha'             then 60
+    when 'secado'              then 72
+    when 'manicura_pendiente'  then 82
+    when 'curado'              then 90
+    when 'finalizado'          then 100
     else 0
     end
   end
@@ -110,6 +110,58 @@ class Lote < ApplicationRecord
       end
 
       update!(estado: nueva_fase, sala: sala_destino)
+    end
+  end
+
+  # Aprueba la pesada de manicura, transiciona de manicura_pendiente a curado.
+  def aprobar_manicura!(aprobado_por:, observaciones: nil)
+    raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
+
+    ultima_pesada = pesadas.where(fase_origen: 'secado', manicurado: true).reorder(id: :desc).first
+    raise "No hay pesada de manicura para aprobar" unless ultima_pesada
+
+    ActiveRecord::Base.transaction do
+      ultima_pesada.update!(aprobada_at: Time.current, aprobada_por_id: aprobado_por.id,
+                            rechazada_at: nil, rechazada_por_id: nil, motivo_rechazo: nil)
+
+      sala_curado = Sala.find_or_create_proceso!(sede: sala.sede, tipo: 'curado', created_by: aprobado_por)
+      update!(estado: 'curado', sala: sala_curado)
+
+      AlertaInterna.create!(
+        club:             club,
+        tipo:             'manicura_aprobada',
+        mensaje:          "Manicura aprobada para lote #{codigo}",
+        severidad:        'info',
+        creada_por:       aprobado_por,
+        destinada_a_role: 'manicura',
+        contexto:         { lote_id: id, lote_codigo: codigo, aprobado_por_id: aprobado_por.id }
+      )
+    end
+  end
+
+  # Rechaza la pesada de manicura, devuelve el lote a secado.
+  def rechazar_manicura!(rechazado_por:, motivo:)
+    raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
+    raise ArgumentError, "El motivo es obligatorio" if motivo.blank?
+
+    ultima_pesada = pesadas.where(fase_origen: 'secado', manicurado: true).reorder(id: :desc).first
+
+    ActiveRecord::Base.transaction do
+      ultima_pesada&.update!(rechazada_at: Time.current, rechazada_por_id: rechazado_por.id,
+                             motivo_rechazo: motivo, aprobada_at: nil, aprobada_por_id: nil)
+
+      sala_secado = Sala.find_or_create_proceso!(sede: sala.sede, tipo: 'secado', created_by: rechazado_por)
+      update!(estado: 'secado', sala: sala_secado)
+
+      AlertaInterna.create!(
+        club:             club,
+        tipo:             'manicura_rechazada',
+        mensaje:          "Manicura rechazada para lote #{codigo}: #{motivo}",
+        severidad:        'warning',
+        creada_por:       rechazado_por,
+        destinada_a_role: 'manicura',
+        contexto:         { lote_id: id, lote_codigo: codigo, motivo: motivo }
+      )
     end
   end
 

@@ -23,23 +23,31 @@ const form = ref({
 })
 
 const ROLES = [
-  { value: 'admin',       label: 'Administrador', color: '#dc2626', bg: 'rgba(220,38,38,.1)',    icon: 'bi-shield-fill-check'   },
-  { value: 'medico',      label: 'Médico',        color: '#15803d', bg: 'rgba(21,128,61,.1)',    icon: 'bi-heart-pulse-fill'    },
-  { value: 'cultivador',  label: 'Cultivador',    color: '#0891b2', bg: 'rgba(8,145,178,.1)',    icon: 'bi-flower1'             },
-  { value: 'manicura',    label: 'Manicura',      color: '#7c3aed', bg: 'rgba(124,58,237,.1)',   icon: 'bi-scissors'            },
-  { value: 'dispensador', label: 'Dispensador',   color: '#0891b2', bg: 'rgba(8,145,178,.08)',   icon: 'bi-bag-check-fill'      },
-  { value: 'delivery',    label: 'Delivery',      color: '#f59e0b', bg: 'rgba(245,158,11,.1)',   icon: 'bi-bicycle'             },
-  { value: 'abogado',     label: 'Abogado',       color: '#92400e', bg: 'rgba(146,64,14,.1)',    icon: 'bi-briefcase-fill'      },
-  { value: 'auditor',     label: 'Auditor',       color: '#475569', bg: 'rgba(71,85,105,.1)',    icon: 'bi-clipboard-data-fill' },
-  { value: 'socio',       label: 'Socio',         color: '#64748b', bg: 'rgba(100,116,139,.1)',  icon: 'bi-person-badge-fill'   },
+  { value: 'admin',       label: 'Administrador', icon: 'bi-shield-fill-check'   },
+  { value: 'medico',      label: 'Médico',        icon: 'bi-heart-pulse-fill'    },
+  { value: 'cultivador',  label: 'Cultivador',    icon: 'bi-flower1'             },
+  { value: 'manicura',    label: 'Manicura',      icon: 'bi-scissors'            },
+  { value: 'dispensador', label: 'Dispensador',   icon: 'bi-bag-check-fill'      },
+  { value: 'delivery',    label: 'Delivery',      icon: 'bi-bicycle'             },
+  { value: 'abogado',     label: 'Abogado',       icon: 'bi-briefcase-fill'      },
+  { value: 'auditor',     label: 'Auditor',       icon: 'bi-clipboard-data-fill' },
+  { value: 'paciente',    label: 'Paciente',      icon: 'bi-person-badge-fill'   },
 ]
 
 const AVATAR_COLORS = [
-  '#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc2626','#15803d',
+  '#1A3D2E','#1A1F36','#172B1F','#C2410C','#1A2F1E','#2A2F38','#1F1810',
 ]
 
 function getRoleInfo(role) {
-  return ROLES.find(r => r.value === role) || { label: role, color: '#475569', bg: 'rgba(71,85,105,.1)', icon: 'bi-person' }
+  return ROLES.find(r => r.value === role) || { label: role, icon: 'bi-person' }
+}
+
+function roleVar(role) { return `--c-role-${role}` }
+function roleColor(role) { return `var(${roleVar(role)}, #475569)` }
+function roleBg(role) { return `color-mix(in srgb, var(${roleVar(role)}, #475569) 12%, white)` }
+function roleBorder(role) { return `color-mix(in srgb, var(${roleVar(role)}, #475569) 30%, white)` }
+function roleStyle(role) {
+  return { color: roleColor(role), background: roleBg(role), borderColor: roleBorder(role) }
 }
 function getInitials(user) {
   const f = user.first_name?.[0] || ''
@@ -188,7 +196,7 @@ watch(showModal, async (val) => {
       <div v-for="u in filteredUsers" :key="u.id" class="uv__card">
 
         <!-- Franja de color del rol -->
-        <div class="uv__card-bar" :style="{ background: getRoleInfo(u.role).color }"></div>
+        <div class="uv__card-bar" :style="{ background: roleColor(u.role) }"></div>
 
         <div class="uv__card-body">
           <!-- Avatar + info -->
@@ -203,7 +211,7 @@ watch(showModal, async (val) => {
           </div>
 
           <!-- Badge rol -->
-          <div class="uv__role-badge" :style="{ background: getRoleInfo(u.role).bg, color: getRoleInfo(u.role).color }">
+          <div class="uv__role-badge" :style="roleStyle(u.role)">
             <i :class="['bi', getRoleInfo(u.role).icon]"></i>
             {{ getRoleInfo(u.role).label }}
           </div>
@@ -272,7 +280,7 @@ watch(showModal, async (val) => {
                     type="button"
                     class="uv__role-btn"
                     :class="{ 'uv__role-btn--active': form.role === r.value }"
-                    :style="form.role === r.value ? { background: r.bg, borderColor: r.color, color: r.color } : {}"
+                    :style="form.role === r.value ? roleStyle(r.value) : {}"
                     @click="form.role = r.value"
                   >
                     <i :class="['bi', r.icon]"></i>
@@ -348,7 +356,7 @@ watch(showModal, async (val) => {
   width: 280px; outline: none;
   transition: border-color .15s;
 }
-.uv__search-input:focus { border-color: #1b5e20; }
+.uv__search-input:focus { border-color: var(--c-role-admin); }
 .uv__search-input::placeholder { color: #94a3b8; }
 .uv__search-clear {
   position: absolute; right: .75rem; color: #94a3b8; cursor: pointer;
@@ -359,7 +367,7 @@ watch(showModal, async (val) => {
 /* Buttons */
 .uv__btn-primary {
   display: inline-flex; align-items: center; gap: .4rem;
-  background: #1b5e20; color: #fff; border: none;
+  background: var(--c-role-admin); color: #fff; border: none;
   padding: .65rem 1.25rem; border-radius: 10px;
   font-size: .875rem; font-weight: 600; cursor: pointer;
   transition: background .15s; white-space: nowrap; text-decoration: none;
@@ -375,7 +383,7 @@ watch(showModal, async (val) => {
 
 /* Loading */
 .uv__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
-.uv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: uv-spin .7s linear infinite; }
+.uv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: var(--c-role-admin); border-radius: 50%; animation: uv-spin .7s linear infinite; }
 @keyframes uv-spin { to { transform: rotate(360deg); } }
 
 /* Empty */
@@ -424,11 +432,11 @@ watch(showModal, async (val) => {
   font-size: .8rem; font-weight: 600; cursor: pointer;
   transition: all .15s; border: none; text-decoration: none;
 }
-.uv__action--primary { background: #1b5e20; color: #fff; flex: 1; justify-content: center; }
+.uv__action--primary { background: var(--c-role-admin); color: #fff; flex: 1; justify-content: center; }
 .uv__action--primary:hover { background: #144a18; }
 .uv__action--ghost { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
 .uv__action--ghost:hover { background: #e2e8f0; color: #0f172a; }
-.uv__action--danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.uv__action--danger { background: var(--c-rust-100); color: var(--c-rust-600); border: 1px solid #fecaca; }
 .uv__action--danger:hover { background: #fee2e2; }
 
 /* Modal */
@@ -481,7 +489,7 @@ watch(showModal, async (val) => {
   width: 100%; box-sizing: border-box; outline: none;
   transition: border-color .15s;
 }
-.uv__input:focus { border-color: #1b5e20; background: #fff; }
+.uv__input:focus { border-color: var(--c-role-admin); background: #fff; }
 
 /* Roles selector */
 .uv__roles { display: flex; flex-wrap: wrap; gap: .5rem; }

@@ -229,7 +229,7 @@ onMounted(async () => {
 .sad__sub { font-size: .83rem; color: #94a3b8; margin: 0; }
 
 .sad__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
-.sad__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: sad-spin .7s linear infinite; }
+.sad__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: var(--c-role-superadmin); border-radius: 50%; animation: sad-spin .7s linear infinite; }
 @keyframes sad-spin { to { transform: rotate(360deg); } }
 
 .sad__section-label { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin-bottom: .75rem; }
@@ -259,7 +259,7 @@ onMounted(async () => {
 .sad__search-wrap { position: relative; flex: 1; min-width: 220px; }
 .sad__search-icon { position: absolute; left: .875rem; top: 50%; transform: translateY(-50%); color: #94a3b8; pointer-events: none; font-size: .85rem; }
 .sad__search { width: 100%; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: .6rem .875rem .6rem 2.4rem; font-size: .875rem; color: #0f172a; box-sizing: border-box; transition: border .15s; }
-.sad__search:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); }
+.sad__search:focus { outline: none; border-color: var(--c-role-superadmin); box-shadow: 0 0 0 3px rgba(27,94,32,.1); }
 .sad__search-count { position: absolute; right: .875rem; top: 50%; transform: translateY(-50%); font-size: .72rem; font-weight: 600; color: #94a3b8; }
 .sad__plan-filters { display: flex; gap: .4rem; flex-wrap: wrap; }
 .sad__plan-filter { padding: .4rem .875rem; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #fff; font-size: .78rem; font-weight: 600; cursor: pointer; color: #64748b; transition: all .15s; }
@@ -273,7 +273,7 @@ onMounted(async () => {
 .sad__club-row:last-child { border-bottom: none; }
 .sad__club-row:hover { background: #fafbfc; }
 .sad__club-name-cell { display: flex; align-items: center; gap: .75rem; }
-.sad__club-avatar { width: 36px; height: 36px; border-radius: 9px; background: linear-gradient(135deg, rgba(27,94,32,.15), rgba(3,105,161,.15)); color: #1b5e20; font-size: .85rem; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sad__club-avatar { width: 36px; height: 36px; border-radius: 9px; background: linear-gradient(135deg, rgba(27,94,32,.15), rgba(3,105,161,.15)); color: var(--c-role-superadmin); font-size: .85rem; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .sad__club-name { font-size: .875rem; font-weight: 700; color: #0f172a; }
 .sad__club-slug { font-size: .7rem; color: #94a3b8; font-family: monospace; }
 .sad__plan-pill { display: inline-flex; align-items: center; gap: .35rem; font-size: .72rem; font-weight: 700; padding: .2em .6em; border-radius: 6px; }
@@ -286,7 +286,7 @@ onMounted(async () => {
 .sad__empty { padding: 2.5rem; text-align: center; color: #94a3b8; font-size: .875rem; }
 .sad__footer { text-align: right; font-size: .75rem; color: #94a3b8; margin-top: .75rem; }
 
-.sad__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: var(--brand-primary, #1b5e20); color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s, transform .1s; white-space: nowrap; }
+.sad__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: var(--brand-primary, var(--c-role-superadmin)); color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s, transform .1s; white-space: nowrap; }
 .sad__btn-primary:hover { background: #144a18; transform: translateY(-1px); }
 </style>
 

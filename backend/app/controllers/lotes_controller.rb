@@ -1,12 +1,12 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :timeline]
+  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :timeline, :aprobar_manicura, :rechazar_manicura]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
   # GET /lotes o GET /salas/:sala_id/lotes
   def index
-    lotes = current_user.club.lotes.includes(:genetica, sala: :sede)
+    lotes = current_user.club.lotes.includes(:genetica, :costo_lote, sala: :sede)
     lotes = lotes.where(sala_id: @sala.id) if @sala.present?
 
     if current_user.cultivador?
@@ -16,7 +16,7 @@ class LotesController < ApplicationController
     end
 
     if current_user.manicura?
-      manicura_estados = %w[cosecha secado curado]
+      manicura_estados = %w[secado manicura_pendiente]
       if params[:estado].present?
         lotes = manicura_estados.include?(params[:estado]) ? lotes.where(estado: params[:estado]) : lotes.none
       else
@@ -120,17 +120,69 @@ class LotesController < ApplicationController
 
   # POST /lotes/:id/transiciones
   def transiciones
-    pesada_attrs   = (params[:pesada] || {}).to_unsafe_h.symbolize_keys
+    pesada_attrs    = (params[:pesada] || {}).to_unsafe_h.symbolize_keys
     pesadas_plantas = (params[:pesadas_plantas] || []).map { |p| p.to_unsafe_h.symbolize_keys }
     pesada_attrs[:registrado_por] = current_user
+    manicurado = pesada_attrs.delete(:manicurado).in?([true, 'true', '1'])
+    nueva_fase = params[:nueva_fase]
+
+    # Manicura pesa un lote en secado → va a manicura_pendiente, no a curado
+    if manicurado && @lote.estado == 'secado' && current_user.manicura?
+      ActiveRecord::Base.transaction do
+        pesada = @lote.pesadas.create!(
+          fase_origen:    'secado',
+          fase_destino:   'manicura_pendiente',
+          manicurado:     true,
+          registrado_por: current_user,
+          registrado_at:  Time.current,
+          notas:          pesada_attrs[:notas],
+          peso_seco_g:    pesada_attrs[:peso_seco_g],
+          peso_humedo_g:  pesada_attrs[:peso_humedo_g],
+        )
+        @lote.update!(estado: 'manicura_pendiente')
+        AlertaInterna.create!(
+          club:             current_user.club,
+          tipo:             'manicura_aprobacion_pendiente',
+          mensaje:          "Manicura #{current_user.first_name} completó lote #{@lote.codigo} — pendiente aprobación admin (#{pesada_attrs[:peso_seco_g]}g)",
+          severidad:        'info',
+          creada_por:       current_user,
+          destinada_a_role: 'admin',
+          contexto:         { lote_id: @lote.id, lote_codigo: @lote.codigo,
+                              peso_seco_g: pesada_attrs[:peso_seco_g], manicura_id: current_user.id }
+        )
+      end
+      return render json: serialize_lote(@lote.reload), status: :created
+    end
 
     @lote.transicionar!(
-      params[:nueva_fase],
+      nueva_fase,
       pesada_attrs:          pesada_attrs,
-      manicurado:            pesada_attrs.delete(:manicurado).in?([true, 'true', '1']),
+      manicurado:            manicurado,
       pesadas_plantas_attrs: pesadas_plantas
     )
 
+    render json: serialize_lote(@lote.reload)
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /lotes/:id/aprobar_manicura
+  def aprobar_manicura
+    authorize @lote, :aprobar_manicura?
+    @lote.aprobar_manicura!(aprobado_por: current_user, observaciones: params[:observaciones])
+    render json: serialize_lote(@lote.reload)
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /lotes/:id/rechazar_manicura
+  def rechazar_manicura
+    authorize @lote, :rechazar_manicura?
+    @lote.rechazar_manicura!(rechazado_por: current_user, motivo: params.require(:motivo))
     render json: serialize_lote(@lote.reload)
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
@@ -199,7 +251,7 @@ class LotesController < ApplicationController
 
   def set_lote
     scope = current_user.club.lotes
-    scope = scope.where(estado: %w[cosecha secado curado]) if current_user.manicura?
+    scope = scope.where(estado: %w[secado manicura_pendiente]) if current_user.manicura?
     @lote = scope.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Lote no encontrado' }, status: :not_found
@@ -214,18 +266,22 @@ class LotesController < ApplicationController
 
   def serialize_pesada(p)
     {
-      id:              p.id,
-      fase_origen:     p.fase_origen,
-      fase_destino:    p.fase_destino,
-      peso_humedo_g:   p.peso_humedo_g&.to_f,
-      peso_seco_g:     p.peso_seco_g&.to_f,
-      peso_curado_g:   p.peso_curado_g&.to_f,
-      manicurado:      p.manicurado,
-      notas:           p.notas,
-      registrado_por:  p.registrado_por&.first_name,
-      registrado_at:   p.registrado_at,
+      id:               p.id,
+      fase_origen:      p.fase_origen,
+      fase_destino:     p.fase_destino,
+      peso_humedo_g:    p.peso_humedo_g&.to_f,
+      peso_seco_g:      p.peso_seco_g&.to_f,
+      peso_curado_g:    p.peso_curado_g&.to_f,
+      manicurado:       p.manicurado,
+      notas:            p.notas,
+      registrado_por:   p.registrado_por&.first_name,
+      registrado_at:    p.registrado_at,
       merma_porcentual: p.merma_porcentual,
-      pesadas_plantas: p.pesadas_plantas.map { |pp|
+      aprobada_at:      p.aprobada_at,
+      aprobada_por:     p.aprobada_por&.first_name,
+      rechazada_at:     p.rechazada_at,
+      motivo_rechazo:   p.motivo_rechazo,
+      pesadas_plantas:  p.pesadas_plantas.map { |pp|
         { plant_id: pp.plant_id, nombre: pp.plant.nombre,
           peso_humedo_g: pp.peso_humedo_g&.to_f, peso_seco_g: pp.peso_seco_g&.to_f }
       },
@@ -307,7 +363,7 @@ class LotesController < ApplicationController
   end
 
   def require_admin_cultivador_o_manicura
-    unless current_user.admin? || current_user.cultivador? || current_user.manicura? || current_user.auditor?
+    unless current_user.admin? || current_user.cultivador? || current_user.manicura?
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end
@@ -326,7 +382,8 @@ class LotesController < ApplicationController
       fase:                 lote.estado,
       proxima_fase_posible: proxima_fase,
       puede_transicionar:   puede_transicion,
-      puede_cerrar_curado:  lote.estado == 'curado',
+      puede_cerrar_curado:       lote.estado == 'curado',
+      puede_aprobar_manicura:    lote.estado == 'manicura_pendiente',
       start_date:           lote.start_date,
       plants_count:         lote.plants_count,
       plantas_seleccion_count: lote.plants.where(es_seleccion: true).count,
@@ -339,6 +396,8 @@ class LotesController < ApplicationController
       dias_desde_inicio: lote.dias_desde_inicio,
       progreso_ciclo:    lote.progreso_ciclo,
       costo_por_gramo:   lote.costo_lote&.costo_por_gramo&.to_f,
+      costo_total:       lote.costo_lote&.costo_total&.to_f,
+      gramos_producidos: lote.costo_lote&.gramos_producidos&.to_f,
       tiene_costo:       lote.costo_lote.present?,
       sala: {
         id:     lote.sala.id,

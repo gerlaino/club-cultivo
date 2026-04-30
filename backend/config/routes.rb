@@ -48,6 +48,8 @@ Rails.application.routes.draw do
         post :transiciones
         post :cerrar_curado
         post :avanzar_fase
+        post :aprobar_manicura
+        post :rechazar_manicura
         get  :timeline
       end
     end
@@ -70,6 +72,12 @@ Rails.application.routes.draw do
         member do
           post  :firmar
           patch :archivar
+        end
+      end
+      resource :cuenta_corriente, controller: 'cuenta_corrientes', only: [:show] do
+        collection do
+          post :cargar
+          post :ajuste
         end
       end
       member do
@@ -127,7 +135,26 @@ Rails.application.routes.draw do
     resources :document_templates
 
     resource :plan, only: [:show], controller: 'plan'
-    resources :documentos, only: [:index, :create, :destroy]
+    resources :documentos, only: [:index, :show, :create, :update, :destroy] do
+      member do
+        post  :subir_archivo
+        get   :descargar
+      end
+    end
+
+    resources :alertas_internas, only: [:index] do
+      member do
+        patch :marcar_leida
+      end
+    end
+
+    scope '/informes', controller: :informes do
+      get :reprocann
+      get :produccion
+      get :dispensaciones,  action: :dispensaciones
+      get :sedes,           action: :sedes
+      get :cumplimiento
+    end
 
     resources :sedes do
       resources :stocks, only: [:index]
@@ -191,12 +218,15 @@ Rails.application.routes.draw do
   namespace :super_admin do
     resources :clubs, only: [:index, :show, :create, :update] do
       member do
-        post :crear_usuarios_default
+        post  :crear_usuarios_default
         patch :cambiar_plan
+        post  :observar
+        delete :detener_observacion
       end
     end
     resources :users, only: [:index, :create, :update, :destroy]
-    get :stats, to: 'stats#show'
+    get :stats,    to: 'stats#show'
+    get :metricas, to: 'stats#metricas'
   end
 
   get '/p/:codigo_qr', to: 'public/plantas#show_qr', defaults: { format: :json }

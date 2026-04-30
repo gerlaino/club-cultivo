@@ -77,7 +77,7 @@ const navItems = [
 .sa-sidebar {
   width: 240px;
   flex-shrink: 0;
-  background: #1b5e20;
+  background: var(--c-role-superadmin);
   display: flex;
   flex-direction: column;
   position: fixed;

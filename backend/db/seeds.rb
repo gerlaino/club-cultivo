@@ -11,6 +11,12 @@ sa.club_id = nil
 sa.save!(validate: false)
 puts "  ✅ #{sa.email}"
 
+sa2 = User.find_or_initialize_by(email: 'super@cultivoespacial.com')
+sa2.assign_attributes(password: '123456Aa', role: 'super_admin', first_name: 'Cultivo', last_name: 'Espacial')
+sa2.club_id = nil
+sa2.save!(validate: false)
+puts "  ✅ #{sa2.email}"
+
 # ── Club ─────────────────────────────────────────────────────
 puts "\n🏢 Club..."
 club = Club.find_or_create_by!(name: 'Mitocondria Club') do |c|
@@ -53,11 +59,17 @@ auditor    = crear_user(club, email: 'auditor@mitocondriaclub.org',    role: 'au
 paciente_user = crear_user(club, email: 'paciente@mitocondriaclub.org', role: 'paciente',  first_name: 'Marcos',   last_name: 'Villalba')
 delivery_user = crear_user(club, email: 'delivery@mitocondriaclub.org', role: 'delivery',  first_name: 'Tomás',    last_name: 'Pereyra')
 
-# Super admin global (sin club)
-sa = User.find_or_initialize_by(email: 'superadmin@cultivoespacial.app')
-sa.assign_attributes(password: '123456Aa', role: 'super_admin', first_name: 'Super', last_name: 'Admin')
-sa.club_id = nil
-sa.save!(validate: false)
+# Super admins adicionales (sin club)
+[
+  { email: 'superadmin@cultivoespacial.app', first_name: 'Super',    last_name: 'Admin' },
+  { email: 'super@cultivoespacial.com',      first_name: 'Platform', last_name: 'Admin' },
+].each do |attrs|
+  sa2 = User.find_or_initialize_by(email: attrs[:email])
+  sa2.assign_attributes(attrs.merge(password: '123456Aa', role: 'super_admin'))
+  sa2.club_id = nil
+  sa2.save!(validate: false)
+  puts "  ✅ #{sa2.email}"
+end
 
 # Migrar agricultor existente a cultivador si aún existe
 User.where(email: 'agricultor@mitocondriaclub.org').update_all(role: 'cultivador') rescue nil
