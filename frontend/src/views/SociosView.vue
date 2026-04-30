@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
@@ -19,7 +19,20 @@ const searchTimer  = ref(null)
 const showModal    = ref(false)
 const editing      = ref(false)
 const formError    = ref(null)
-const filterEstado = ref('todos')
+
+const REPRO_URL = {
+  vencen_pronto: 'proximos',
+  vencidos: 'vencidos',
+  sin_reprocann: 'sin_rep',
+  todos: 'todos',
+}
+const REPRO_URL_REVERSE = Object.fromEntries(Object.entries(REPRO_URL).map(([k,v]) => [v,k]))
+
+const filterEstado = ref(REPRO_URL[route.query.reprocann] || 'todos')
+
+watch(filterEstado, (val) => {
+  router.replace({ query: { ...route.query, reprocann: REPRO_URL_REVERSE[val] || 'todos' } })
+})
 
 function emptyForm() {
   return {
@@ -141,6 +154,7 @@ const kpis = computed(() => {
       const v = new Date(s.reprocann_vencimiento)
       return v >= hoy && v <= en30
     }).length,
+    sin_rep: items.filter(s => !s.reprocann_vencimiento).length,
   }
 })
 
@@ -194,6 +208,10 @@ onMounted(async () => {
       <button class="sv__kpi sv__kpi--danger" :class="{ 'sv__kpi--active': filterEstado === 'vencidos' }" @click="filterEstado = 'vencidos'">
         <div class="sv__kpi-val">{{ kpis.vencidos }}</div>
         <div class="sv__kpi-lbl">REPROCANN vencido</div>
+      </button>
+      <button class="sv__kpi sv__kpi--gray" :class="{ 'sv__kpi--active': filterEstado === 'sin_rep' }" @click="filterEstado = 'sin_rep'">
+        <div class="sv__kpi-val">{{ kpis.sin_rep }}</div>
+        <div class="sv__kpi-lbl">Sin REPROCANN</div>
       </button>
     </div>
 
@@ -394,7 +412,8 @@ onMounted(async () => {
 .sv__title { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; letter-spacing: -.04em; line-height: 1; }
 .sv__sub { font-size: .83rem; color: #94a3b8; margin: 0; }
 
-.sv__kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: .75rem; margin-bottom: 1.5rem; }
+.sv__kpis { display: grid; grid-template-columns: repeat(5,1fr); gap: .75rem; margin-bottom: 1.5rem; }
+@media (max-width: 900px) { .sv__kpis { grid-template-columns: repeat(3,1fr); } }
 @media (max-width: 640px) { .sv__kpis { grid-template-columns: repeat(2,1fr); } }
 .sv__kpi { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 1rem; text-align: left; cursor: pointer; transition: all .15s; }
 .sv__kpi:hover { border-color: #94a3b8; }
@@ -406,6 +425,8 @@ onMounted(async () => {
 .sv__kpi--ok     .sv__kpi-val { color: #15803d; }
 .sv__kpi--warn   .sv__kpi-val { color: #b45309; }
 .sv__kpi--danger .sv__kpi-val { color: #dc2626; }
+.sv__kpi--gray   .sv__kpi-val { color: #64748b; }
+.sv__kpi--gray.sv__kpi--active { border-color: #64748b !important; box-shadow: 0 0 0 1px #64748b; }
 .sv__kpi-lbl { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #94a3b8; }
 
 .sv__toolbar { margin-bottom: 1.25rem; }

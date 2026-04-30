@@ -1,5 +1,5 @@
 <script setup>
-import { watch, onMounted, computed } from "vue";
+import { watch, onMounted, computed, ref } from "vue";
 import { logger } from './utils/logger.js'
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "./stores/auth";
@@ -13,12 +13,25 @@ import ToastProvider from "./components/ui/ToastProvider.vue";
 import ConfirmDialog from "./components/ui/ConfirmDialog.vue";
 import NotificationBell from "./components/ui/NotificationBell.vue";
 import AuditorBanner from "./components/AuditorBanner.vue";
+import AdminSidebar          from "./components/layout/AdminSidebar.vue";
+import AdminTopBar            from "./components/layout/AdminTopBar.vue";
+import CultivadorSidebar      from "./components/layout/CultivadorSidebar.vue";
+import CultivadorTopBar       from "./components/layout/CultivadorTopBar.vue";
+import CultivadorMobileHeader from "./components/layout/CultivadorMobileHeader.vue";
+import BottomNavCultivador    from "./components/cultivador/BottomNavCultivador.vue";
+import DispensadorSidebar     from "./components/layout/DispensadorSidebar.vue";
+import DispensadorTopBar      from "./components/layout/DispensadorTopBar.vue";
+import ManicuraSidebar        from "./components/layout/ManicuraSidebar.vue";
+import ManicuraTopBar         from "./components/layout/ManicuraTopBar.vue";
 
 const auth   = useAuthStore();
 const club   = useClubStore();
 const router = useRouter();
 const route  = useRoute();
-const { can, isAdmin } = usePermissions();
+const { can, isAdmin, isCultivador, isDispensador, isManicura } = usePermissions();
+
+const dpvDrawerOpen = ref(false);
+const mncDrawerOpen = ref(false);
 const { fetchPlan, planData } = usePlan();
 
 async function doLogout() {
@@ -125,7 +138,88 @@ onMounted(async () => {
 <template>
   <ToastProvider />
   <ConfirmDialog />
-  <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' }">
+  <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isDispensador && !isManicura }">
+
+    <!-- ── ADMIN LAYOUT (sidebar + topbar, desktop ≥1024px) ── -->
+    <template v-if="isAdmin && auth.isAuthenticated && !$route.meta.fullscreen">
+      <div class="admin-shell">
+        <AdminSidebar />
+        <div class="admin-body">
+          <AdminTopBar />
+          <div class="admin-accent-bar"></div>
+          <main class="admin-main">
+            <router-view />
+          </main>
+        </div>
+      </div>
+    </template>
+
+    <!-- ── CULTIVADOR LAYOUT (sidebar + topbar desktop, mobile header + bottom-nav) ── -->
+    <template v-else-if="isCultivador && auth.isAuthenticated && !$route.meta.fullscreen">
+      <div class="cvd-shell">
+        <CultivadorSidebar />
+        <div class="cvd-body">
+          <CultivadorTopBar />
+          <CultivadorMobileHeader />
+          <div class="cvd-accent-bar"></div>
+          <main class="cvd-main">
+            <router-view />
+          </main>
+        </div>
+      </div>
+      <BottomNavCultivador />
+    </template>
+
+    <!-- ── DISPENSADOR LAYOUT (sidebar desktop + topbar con hamburger en mobile) ── -->
+    <template v-else-if="isDispensador && auth.isAuthenticated && !$route.meta.fullscreen">
+      <div class="dpv-shell">
+        <DispensadorSidebar />
+        <div class="dpv-body">
+          <DispensadorTopBar @open-drawer="dpvDrawerOpen = true" />
+          <div class="dpv-accent-bar"></div>
+          <main class="dpv-main">
+            <router-view />
+          </main>
+        </div>
+      </div>
+      <!-- Mobile drawer overlay -->
+      <Teleport to="body">
+        <Transition name="dpv-drawer">
+          <div v-if="dpvDrawerOpen" class="dpv-drawer-overlay" @click.self="dpvDrawerOpen = false">
+            <div class="dpv-drawer">
+              <DispensadorSidebar />
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+    </template>
+
+    <!-- ── MANICURA LAYOUT (sidebar + topbar, mismo patrón que dispensador) ── -->
+    <template v-else-if="isManicura && auth.isAuthenticated && !$route.meta.fullscreen">
+      <div class="mnc-shell">
+        <ManicuraSidebar />
+        <div class="mnc-body">
+          <ManicuraTopBar @open-drawer="mncDrawerOpen = true" />
+          <div class="mnc-accent-bar"></div>
+          <main class="mnc-main">
+            <router-view />
+          </main>
+        </div>
+      </div>
+      <!-- Mobile drawer overlay -->
+      <Teleport to="body">
+        <Transition name="mnc-drawer">
+          <div v-if="mncDrawerOpen" class="mnc-drawer-overlay" @click.self="mncDrawerOpen = false">
+            <div class="mnc-drawer">
+              <ManicuraSidebar />
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+    </template>
+
+    <!-- ── LAYOUT ESTÁNDAR (todos los demás roles) ── -->
+    <template v-else>
 
     <!-- ── NAVBAR DESKTOP (oculto en mobile) ── -->
     <nav
@@ -290,9 +384,11 @@ onMounted(async () => {
       <router-view />
     </main>
 
-    <!-- ── BOTTOM NAV MOBILE ── -->
+    </template><!-- /layout estándar -->
+
+    <!-- ── BOTTOM NAV MOBILE (todos los roles autenticados, incl. admin en mobile) ── -->
     <nav
-      v-if="auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin'"
+      v-if="auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isCultivador && !isDispensador"
       class="bottom-nav d-md-none"
     >
       <RouterLink
@@ -347,6 +443,150 @@ onMounted(async () => {
 .app-shell--mobile-nav .app-main {
   padding-bottom: 72px; /* espacio para bottom nav */
 }
+
+/* ── Admin layout ── */
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Cultivador layout ── */
+.cvd-shell {
+  display: flex;
+  min-height: 100vh;
+}
+.cvd-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-paper);
+}
+.cvd-accent-bar {
+  height: 4px;
+  background: var(--c-role-cultivador);
+  flex-shrink: 0;
+}
+.cvd-main {
+  flex: 1;
+}
+@media (max-width: 767px) {
+  .cvd-main { padding-bottom: 80px; }
+}
+.admin-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-paper);
+}
+.admin-accent-bar {
+  height: 4px;
+  background: var(--c-role-admin);
+  flex-shrink: 0;
+}
+.admin-main {
+  flex: 1;
+}
+@media (max-width: 767px) {
+  .admin-main { padding-bottom: 72px; }
+}
+
+/* ── Dispensador layout ── */
+.dpv-shell {
+  display: flex;
+  min-height: 100vh;
+}
+.dpv-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-paper);
+}
+.dpv-accent-bar {
+  height: 4px;
+  background: var(--c-role-dispensador);
+  flex-shrink: 0;
+}
+.dpv-main {
+  flex: 1;
+}
+
+/* Drawer overlay (mobile <1024px) */
+.dpv-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 500;
+  display: flex;
+}
+.dpv-drawer {
+  width: 240px;
+  height: 100%;
+  overflow: hidden;
+}
+.dpv-drawer :deep(.dsb) {
+  display: flex !important;
+  height: 100%;
+  position: static;
+}
+
+/* Drawer transition */
+.dpv-drawer-enter-active,
+.dpv-drawer-leave-active { transition: opacity .2s, transform .2s; }
+.dpv-drawer-enter-from,
+.dpv-drawer-leave-to { opacity: 0; }
+.dpv-drawer-enter-from .dpv-drawer,
+.dpv-drawer-leave-to  .dpv-drawer { transform: translateX(-100%); }
+
+/* ── Manicura layout ── */
+.mnc-shell {
+  display: flex;
+  min-height: 100vh;
+}
+.mnc-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-paper);
+}
+.mnc-accent-bar {
+  height: 4px;
+  background: var(--c-role-manicura);
+  flex-shrink: 0;
+}
+.mnc-main {
+  flex: 1;
+}
+
+/* Drawer overlay (mobile <1024px) */
+.mnc-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 500;
+  display: flex;
+}
+.mnc-drawer {
+  width: 240px;
+  height: 100%;
+  overflow: hidden;
+}
+.mnc-drawer :deep(.msb) {
+  display: flex !important;
+  height: 100%;
+  position: static;
+}
+
+/* Drawer transition */
+.mnc-drawer-enter-active,
+.mnc-drawer-leave-active { transition: opacity .2s, transform .2s; }
+.mnc-drawer-enter-from,
+.mnc-drawer-leave-to { opacity: 0; }
+.mnc-drawer-enter-from .mnc-drawer,
+.mnc-drawer-leave-to  .mnc-drawer { transform: translateX(-100%); }
 
 /* ── Navbar desktop ── */
 .navbar-default {

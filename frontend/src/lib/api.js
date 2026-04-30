@@ -118,6 +118,7 @@ export const getPaciente        = (id) => api.get(`/pacientes/${id}`);
 export const createPaciente     = (payload) => api.post("/pacientes", { paciente: payload });
 export const updatePaciente     = (id, payload) => api.put(`/pacientes/${id}`, { paciente: payload });
 export const deletePaciente     = (id) => api.delete(`/pacientes/${id}`);
+export const getPacienteTimeline = (id) => api.get(`/pacientes/${id}/timeline`)
 export const listPacienteNotas  = (pacienteId) => api.get(`/pacientes/${pacienteId}/notas`);
 export const createPacienteNota = (pacienteId, c) => api.post(`/pacientes/${pacienteId}/notas`, { nota: { contenido: c } });
 export const deletePacienteNota = (notaId) => api.delete(`/paciente_notas/${notaId}`);
@@ -140,6 +141,7 @@ export const deleteIndicacion = (id) => api.delete(`/indicaciones/${id}`);
 
 // -------- DISPENSACIONES --------
 export const listDispensaciones = (pacienteId) => api.get(`/pacientes/${pacienteId}/dispensaciones`);
+export const listDispensacionesFecha = (params = {}) => api.get('/dispensaciones', { params });
 export const getDispensacion = (id) => api.get(`/dispensaciones/${id}`);
 export const createDispensacion = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/dispensaciones`, { dispensacion: payload });
 export const updateDispensacion = (id, payload) => api.put(`/dispensaciones/${id}`, { dispensacion: payload });
@@ -314,9 +316,18 @@ export const deleteNota     = (id)       => api.delete(`/notas/${id}`)
 export const getPlantaByQR = (codigoQr) => api.get(`/p/${codigoQr}`)
 
 // ── Lote ciclo productivo ─────────────────────────────────────────────────────
-export const transicionarLote = (loteId, payload) => api.post(`/lotes/${loteId}/transiciones`, payload)
-export const cerrarCurado     = (loteId, payload) => api.post(`/lotes/${loteId}/cerrar_curado`, payload)
+export const transicionarLote  = (loteId, payload) => api.post(`/lotes/${loteId}/transiciones`, payload)
+export const avanzarFaseLote   = (loteId)          => api.post(`/lotes/${loteId}/avanzar_fase`)
+export const cerrarCurado      = (loteId, payload) => api.post(`/lotes/${loteId}/cerrar_curado`, payload)
 export const getLoteTimeline  = (loteId)          => api.get(`/lotes/${loteId}/timeline`)
+
+// ── Pesadas ───────────────────────────────────────────────────────────────────
+export const getPesadas     = (loteId)          => api.get(`/lotes/${loteId}/pesadas`)
+export const createPesada   = (loteId, payload) => api.post(`/lotes/${loteId}/pesadas`, { pesada: payload })
+export const deletePesada   = (loteId, id)      => api.delete(`/lotes/${loteId}/pesadas/${id}`)
+
+// ── Lecturas ambientales ──────────────────────────────────────────────────────
+export const createLecturaAmbiental = (salaId, payload) => api.post(`/salas/${salaId}/lecturas_ambientales`, { lectura_ambiental: payload })
 
 // ── Stocks (nuevo modelo) ─────────────────────────────────────────────────────
 export const listStocks      = (params = {})      => api.get('/stocks', { params })

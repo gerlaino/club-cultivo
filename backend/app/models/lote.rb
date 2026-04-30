@@ -15,8 +15,8 @@ class Lote < ApplicationRecord
   # TODO(Ola 4): migrar usos del frontend de lote.estado → lote.fase y
   # deprecar la columna `estado` cuando se introduzca la fase 'manicura'
   # entre secado y curado. Por ahora `fase` es alias en serializer.
-  ESTADOS       = %w[semilla vegetativo floracion secado cosecha curado finalizado].freeze
-  CICLO_FASES   = %w[vegetativo floracion secado curado].freeze
+  ESTADOS       = %w[semilla vegetativo floracion cosecha secado curado finalizado].freeze
+  CICLO_FASES   = %w[vegetativo floracion cosecha secado curado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
   TIPOS_LUZ     = %w[led hps cmh natural mixta].freeze
   SUSTRATOS     = %w[tierra coco perlita mezcla rockwool fibra_coco].freeze
@@ -48,13 +48,21 @@ class Lote < ApplicationRecord
     case estado
     when 'semilla'    then 0
     when 'vegetativo' then 20
-    when 'floracion'  then 45
-    when 'secado'     then 65
-    when 'cosecha'    then 70
-    when 'curado'     then 85
+    when 'floracion'  then 40
+    when 'cosecha'    then 60
+    when 'secado'     then 75
+    when 'curado'     then 90
     when 'finalizado' then 100
     else 0
     end
+  end
+
+  # Avance rápido sin pesada — usado por el cultivador desde el botón "Avanzar fase".
+  # No crea pesada ni mueve sala; el admin registra pesos y movimiento físico vía transicionar!
+  def avanzar_fase!
+    idx = CICLO_FASES.index(estado)
+    raise ArgumentError, 'Lote no puede transicionar en este estado' unless idx.present? && idx < CICLO_FASES.length - 1
+    update!(estado: CICLO_FASES[idx + 1])
   end
 
   # Avanza el lote al siguiente paso del ciclo (vegetativo→floracion→secado→curado).

@@ -1,16 +1,31 @@
 class DispensacionesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_dispensador_o_admin, except: [:index, :show]
-  before_action :set_paciente,        only: [:index, :create]
+  before_action :set_paciente,     only: [:create]
+  before_action :set_paciente_opt, only: [:index]
   before_action :set_dispensacion, only: [:show, :update, :destroy]
 
-  # GET /pacientes/:paciente_id/dispensaciones
+  # GET /pacientes/:paciente_id/dispensaciones  OR  GET /dispensaciones?fecha=YYYY-MM-DD
   def index
-    @dispensaciones = @paciente.dispensaciones
-                            .includes(:user, :indicacion_medica, :sede, stock: :lote)
-                            .recientes
+    if @paciente
+      @dispensaciones = @paciente.dispensaciones
+                                 .includes(:user, :indicacion_medica, :sede, stock: :lote)
+                                 .recientes
+    else
+      require_dispensador_o_admin
+      return if performed?
+      fecha = params[:fecha].present? ? Date.parse(params[:fecha]) : Date.today
+      @dispensaciones = Dispensacion
+        .joins(stock: :sede)
+        .where(sedes: { club_id: current_user.club_id })
+        .where(fecha_dispensacion: fecha)
+        .includes(:user, :paciente, :sede, stock: :lote)
+        .order(created_at: :desc)
+    end
 
     render json: { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion(d) } }
+  rescue ArgumentError
+    render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
   end
 
   # GET /dispensaciones/:id
@@ -61,6 +76,13 @@ class DispensacionesController < ApplicationController
   private
 
   def set_paciente
+    @paciente = current_user.club.pacientes.find(params[:paciente_id])
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Paciente no encontrado' }, status: :not_found
+  end
+
+  def set_paciente_opt
+    return unless params[:paciente_id].present?
     @paciente = current_user.club.pacientes.find(params[:paciente_id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Paciente no encontrado' }, status: :not_found

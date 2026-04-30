@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_29_210005) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_29_210006) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -471,6 +471,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_29_210005) do
     t.string "reprocann_numero"
     t.date "reprocann_vencimiento"
     t.string "reprocann_adjunto"
+    t.text "notas_clinicas"
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["club_id"], name: "index_pacientes_on_club_id"

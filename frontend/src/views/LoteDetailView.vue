@@ -9,7 +9,7 @@ import { createPlant, updatePlant,
   getRegistrosAmbientales, createRegistroAmbiental,
   getLoteEventos, createLoteEvento,
   getLoteFotos, uploadFotoLote,
-  transicionarLote, cerrarCurado, getLoteTimeline,
+  transicionarLote, avanzarFaseLote, cerrarCurado, getLoteTimeline,
   listSedes, getSedeStocks } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
@@ -20,6 +20,8 @@ import Lightbox from '../components/ui/Lightbox.vue'
 import Paginator from '../components/ui/Paginator.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import { ArrowRight } from 'lucide-vue-next'
+import DsBanner from '../design-system/components/Banner.vue'
 
 const route    = useRoute()
 const lotes    = useLotesStore()
@@ -237,6 +239,32 @@ function openTransicionModal() {
   showTransicionModal.value = true
 }
 
+const transicionandoRapido = ref(false)
+
+function handleAvanzarFase() {
+  if (isCultivador.value) {
+    avanzarFaseRapido()
+  } else {
+    openTransicionModal()
+  }
+}
+
+async function avanzarFaseRapido() {
+  transicionandoRapido.value = true
+  try {
+    const { data } = await avanzarFaseLote(lote.value.id)
+    lotes.current = data
+    toast.success(`Lote avanzado a ${capitalizarFase(data.estado)}`)
+    await loadEventos()
+  } catch (e) {
+    const msg = e?.response?.data?.error || 'Error al avanzar el lote'
+    if (e?.response?.status === 422) toast.warning(msg)
+    else toast.error(msg)
+  } finally {
+    transicionandoRapido.value = false
+  }
+}
+
 async function ejecutarTransicion() {
   const faseSig = lote.value?.proxima_fase_posible
   if (!faseSig) return
@@ -378,6 +406,15 @@ function formatDateTime(d) {
 
 const cicloIndex = computed(() => lote.value ? CICLO.indexOf(lote.value.estado) : -1)
 
+const FASE_LABELS = { vegetativo:'Vegetativo', floracion:'Floración', secado:'Secado', curado:'Curado', cosecha:'Cosecha', semilla:'Germinación', manicura:'Manicura', cerrado:'Cerrado' }
+function capitalizarFase(f) { return FASE_LABELS[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : '') }
+function phaseBannerMsg(estado) {
+  if (estado === 'cosecha') return 'Lote cosechado. Manicura toma desde acá.'
+  if (estado === 'semilla') return 'Plantas en germinación. El sistema avanzará automáticamente cuando estén listas.'
+  if (['secado','manicura','curado','cerrado'].includes(estado)) return 'Este lote pasó tu turno. Otro rol toma desde acá.'
+  return null
+}
+
 const pesadaUltimaCurado = computed(() => {
   if (!lote.value?.pesadas) return null
   return [...lote.value.pesadas].reverse().find(p => p.fase_destino === 'curado') || null
@@ -440,8 +477,15 @@ onMounted(async () => {
           <button v-if="canEdit && lote.puede_cerrar_curado" class="ld__btn-curado" @click="openCerrarCuradoModal">
             <i class="bi bi-box-seam"></i>Cerrar curado
           </button>
-          <button v-if="canEdit && lote.puede_transicionar" class="ld__btn-ghost-sm" @click="openTransicionModal">
-            <i class="bi bi-arrow-right-circle"></i>Avanzar fase
+          <button
+            v-if="(canEdit || isCultivador) && lote.puede_transicionar && lote.proxima_fase_posible"
+            class="ld__btn-transicion"
+            :disabled="transicionandoRapido"
+            @click="handleAvanzarFase"
+          >
+            <div v-if="transicionandoRapido" class="ld__spinner ld__spinner--sm" />
+            <ArrowRight v-else :size="15" :stroke-width="1.75" />
+            Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
           </button>
           <AsistenteVoz
             v-if="contextoAsistente && (canEdit || isCultivador)"
@@ -453,6 +497,15 @@ onMounted(async () => {
           </button>
         </div>
       </div>
+
+      <!-- Banner fase terminal (cultivador) -->
+      <DsBanner
+        v-if="isCultivador && !lote.puede_transicionar && phaseBannerMsg(lote.estado)"
+        variant="sky"
+        class="ld__fase-banner"
+      >
+        {{ phaseBannerMsg(lote.estado) }}
+      </DsBanner>
 
       <!-- Timeline ciclo -->
       <div class="ld__ciclo">
@@ -1177,6 +1230,9 @@ onMounted(async () => {
 .ld__btn-ghost:hover { background: #f0fdf4; }
 .ld__btn-ghost-sm { display: inline-flex; align-items: center; gap: .35rem; background: transparent; color: #60725d; border: 1px solid #d4e6d4; padding: .5rem .9rem; border-radius: 8px; font-size: .8rem; font-weight: 500; cursor: pointer; transition: all .15s; white-space: nowrap; }
 .ld__btn-ghost-sm:hover { background: #f0fdf4; color: #1b5e20; }
+.ld__btn-transicion { display: inline-flex; align-items: center; gap: .4rem; background: var(--c-role-cultivador, #5C7A4A); color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: opacity .15s; white-space: nowrap; }
+.ld__btn-transicion:hover { opacity: .88; }
+.ld__fase-banner { margin-bottom: 1.25rem; }
 .ld__btn-outline { display: inline-flex; align-items: center; gap: .3rem; background: transparent; color: #1b5e20; border: 1.5px solid #d4e6d4; padding: .5rem 1.1rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; text-decoration: none; }
 .ld__btn-outline:hover { border-color: #1b5e20; background: #f0fdf4; }
 .ld__btn-sm { display: inline-flex; align-items: center; gap: .3rem; background: #e8f5e9; color: #1b5e20; border: 1px solid #d4e6d4; padding: .35rem .65rem; border-radius: 7px; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; }

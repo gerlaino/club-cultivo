@@ -7,8 +7,10 @@ import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
 import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
 import ModalCargarLote from '../components/salas/ModalCargarLote.vue'
+import RegistrarLecturaModal from '../components/salas/RegistrarLecturaModal.vue'
 import { listGeneticas, updateSala, getSalaAmbiente } from '../lib/api.js'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
+import { Gauge } from 'lucide-vue-next'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
@@ -36,6 +38,7 @@ const isCultivador   = computed(() => auth.role === "cultivador")
 const isManicurador  = computed(() => auth.role === "manicura")
 const isAgricultor   = computed(() => auth.role === "cultivador")
 
+const lecturaOpen   = ref(false)
 const lotesExpanded = ref(true)
 
 const ESTADOS_LOTE = ["semilla","vegetativo","floracion","cosecha","curado","finalizado"]
@@ -294,6 +297,14 @@ const canSeeAmbiente = computed(() =>
           </p>
         </div>
         <div class="sd__hero-actions">
+          <button
+            v-if="canEdit || isCultivador"
+            class="sd__btn-lectura"
+            @click="lecturaOpen = true"
+          >
+            <Gauge :size="16" :stroke-width="1.75" />
+            Registrar lectura
+          </button>
           <AsistenteVoz
             v-if="contextoAsistente"
             :contexto="contextoAsistente"
@@ -589,6 +600,11 @@ const canSeeAmbiente = computed(() =>
       @close="showCargarLote = false"
     />
 
+    <RegistrarLecturaModal
+      v-model="lecturaOpen"
+      :sala-id="salaId"
+    />
+
     <!-- Modal upgrade plan -->
     <Teleport to="body">
       <div v-if="showUpgrade" class="sd__overlay" @click.self="showUpgrade=false">
@@ -711,6 +727,8 @@ const canSeeAmbiente = computed(() =>
 
 .sd__placeholder { padding: 1rem 1.1rem; color: #94a3b8; font-size: .875rem; }
 
+.sd__btn-lectura { display: inline-flex; align-items: center; gap: .35rem; background: transparent; color: var(--c-role-cultivador, #5C7A4A); border: 1.5px solid var(--c-role-cultivador, #5C7A4A); padding: .5rem 1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.sd__btn-lectura:hover { background: rgba(92,122,74,.08); }
 .sd__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .sd__btn-primary:hover:not(:disabled) { background: #104417; }
 .sd__btn-primary:disabled { opacity: .5; cursor: not-allowed; }

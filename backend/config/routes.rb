@@ -43,9 +43,11 @@ Rails.application.routes.draw do
       resources :lote_eventos,          only: [:index, :create]
       resources :fotos, only: [:index, :create], controller: 'fotos_lote'
       resources :notas, only: [:index, :create]
+      resources :pesadas, only: [:index, :create, :destroy]
       member do
         post :transiciones
         post :cerrar_curado
+        post :avanzar_fase
         get  :timeline
       end
     end
@@ -70,6 +72,9 @@ Rails.application.routes.draw do
           patch :archivar
         end
       end
+      member do
+        get :timeline
+      end
     end
     resources :paciente_notas, only: [:destroy]
 
@@ -88,7 +93,7 @@ Rails.application.routes.draw do
     resources :socio_notas, controller: 'paciente_notas', only: [:destroy], as: :socio_notas_legacy
 
     resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy]
-    resources :dispensaciones, only: [:show, :update, :destroy]
+    resources :dispensaciones, only: [:index, :show, :update, :destroy]
 
     resources :geneticas do
       member do

@@ -9,7 +9,7 @@ import PlantasView from "../views/PlantasView.vue";
 import PlantaDetailView from "../views/PlantaDetailView.vue";
 import PerfilView from "../views/PerfilView.vue";
 import PreferenciasView from "../views/PreferenciasView.vue";
-import PacientesView from "../views/SociosView.vue";
+import PacientesDispatch from "../views/PacientesDispatch.vue";
 import PacienteDetailView from "../views/SocioDetailView.vue";
 import UsuariosView from "../views/UsuariosView.vue";
 import UsuarioDetail from "../views/UsuarioDetail.vue";
@@ -192,7 +192,7 @@ const routes = [
     path: "/pacientes",
     alias: ["/socios"],
     name: "pacientes",
-    component: PacientesView,
+    component: PacientesDispatch,
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("socios", "index"),
   },
@@ -209,7 +209,15 @@ const routes = [
     name: "paciente-detail",
     component: PacienteDetailView,
     props: true,
-    beforeEnter: requiresPermission("socios", "show"),
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      const role = auth.user?.role
+      if (role === 'dispensador') return next('/pacientes')
+      if (['delivery', 'abogado', 'cultivador', 'manicura'].includes(role)) return next('/')
+      const { can } = usePermissions()
+      if (!can('socios', 'show')) return next('/')
+      next()
+    },
   },
 
   // Usuarios
@@ -300,6 +308,61 @@ const routes = [
     beforeEnter: requiresPermission('manicura', 'access'),
   },
 
+  // Manicura role routes
+  {
+    path: '/mnc',
+    redirect: '/',
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/mnc/cosecha',
+    name: 'mnc-cosecha',
+    component: () => import('../views/manicura/LotesEnCosechaView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      const role = auth.user?.role
+      if (!['admin', 'manicura'].includes(role)) return next('/')
+      next()
+    },
+  },
+  {
+    path: '/mnc/secado',
+    name: 'mnc-secado',
+    component: () => import('../views/manicura/LotesEnSecadoView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      const role = auth.user?.role
+      if (!['admin', 'manicura'].includes(role)) return next('/')
+      next()
+    },
+  },
+  {
+    path: '/mnc/curado',
+    name: 'mnc-curado',
+    component: () => import('../views/manicura/LotesEnCuradoView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      const role = auth.user?.role
+      if (!['admin', 'manicura'].includes(role)) return next('/')
+      next()
+    },
+  },
+  {
+    path: '/mnc/stocks',
+    name: 'mnc-stocks',
+    component: () => import('../views/manicura/StocksManicuraView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      const role = auth.user?.role
+      if (!['admin', 'manicura'].includes(role)) return next('/')
+      next()
+    },
+  },
+
   {
     path: '/super-admin',
     component: () => import('../views/superadmin/SuperAdminLayout.vue'),
@@ -329,6 +392,41 @@ const routes = [
     name: 'planta-qr',
     component: () => import('../views/PlantaQrView.vue'),
     meta: { fullscreen: true },
+  },
+
+  // ── Dispensador routes ──
+  {
+    path: '/dispensar',
+    name: 'dispensar',
+    component: () => import('../views/DispensarView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role === 'dispensador' || auth.user?.role === 'admin') next()
+      else next('/')
+    },
+  },
+  {
+    path: '/historial',
+    name: 'historial-dispensaciones',
+    component: () => import('../views/HistorialDispensacionesView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role === 'dispensador' || auth.user?.role === 'admin') next()
+      else next('/')
+    },
+  },
+  {
+    path: '/stock',
+    name: 'stock-dispensador',
+    component: () => import('../views/StockDispensadorView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role === 'dispensador' || auth.user?.role === 'admin') next()
+      else next('/')
+    },
   },
 
   { path: "/:pathMatch(.*)*", redirect: "/" },
