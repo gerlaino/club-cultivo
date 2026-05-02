@@ -54,7 +54,7 @@ class MovimientoContable < ApplicationRecord
   scope :egresos,          -> { where(tipo: %w[egreso]) }
   scope :ingresos,         -> { where(tipo: %w[ingreso recupero_costo]) }
   scope :del_periodo,      ->(desde, hasta) { where(fecha: desde..hasta) }
-  scope :del_mes,          ->(fecha = Date.today) {
+  scope :del_mes,          ->(fecha = Time.zone.today) {
     where(fecha: fecha.beginning_of_month..fecha.end_of_month)
   }
   scope :por_sede,         ->(sede_id) { where(sede_id: sede_id) }

@@ -4,6 +4,9 @@ import { logger } from './utils/logger.js'
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 import { useClubStore } from "./stores/club";
+import { useSalasStore } from "./stores/salas";
+import { useLotesStore } from "./stores/lotes";
+import { usePlantsStore } from "./stores/plants";
 import { usePermissions } from "./composables/usePermissions";
 import { usePlan } from "./composables/usePlan";
 import Avatar from "./components/Avatar.vue";
@@ -19,6 +22,8 @@ import CultivadorSidebar      from "./components/layout/CultivadorSidebar.vue";
 import CultivadorTopBar       from "./components/layout/CultivadorTopBar.vue";
 import CultivadorMobileHeader from "./components/layout/CultivadorMobileHeader.vue";
 import BottomNavCultivador    from "./components/cultivador/BottomNavCultivador.vue";
+import SupervisorSidebar      from "./components/layout/SupervisorSidebar.vue";
+import SupervisorTopBar       from "./components/layout/SupervisorTopBar.vue";
 import DispensadorSidebar     from "./components/layout/DispensadorSidebar.vue";
 import DispensadorTopBar      from "./components/layout/DispensadorTopBar.vue";
 import ManicuraSidebar        from "./components/layout/ManicuraSidebar.vue";
@@ -29,12 +34,17 @@ import AbogadoSidebar         from "./components/layout/AbogadoSidebar.vue";
 import AbogadoTopBar          from "./components/layout/AbogadoTopBar.vue";
 import AuditorSidebar         from "./components/layout/AuditorSidebar.vue";
 import AuditorTopBar          from "./components/layout/AuditorTopBar.vue";
+import DeliverySidebar        from "./components/layout/DeliverySidebar.vue";
+import DeliveryTopBar         from "./components/layout/DeliveryTopBar.vue";
 
 const auth   = useAuthStore();
 const club   = useClubStore();
+const salas  = useSalasStore();
+const lotes  = useLotesStore();
+const plants = usePlantsStore();
 const router = useRouter();
 const route  = useRoute();
-const { can, isAdmin, isCultivador, isDispensador, isManicura, isMedico, isAbogado, isAuditor } = usePermissions();
+const { can, isAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
 
 const adminDrawerOpen = ref(false);
 const dpvDrawerOpen = ref(false);
@@ -42,6 +52,7 @@ const mncDrawerOpen = ref(false);
 const audDrawerOpen = ref(false);
 const medDrawerOpen = ref(false);
 const abgDrawerOpen = ref(false);
+const dlvDrawerOpen = ref(false);
 
 watch(() => route.path, () => { adminDrawerOpen.value = false });
 const { fetchPlan, planData } = usePlan();
@@ -49,6 +60,9 @@ const { fetchPlan, planData } = usePlan();
 async function doLogout() {
   await auth.logOut();
   club.$reset();
+  salas.$reset();
+  lotes.$reset();
+  plants.$reset();
   router.replace("/login");
 }
 
@@ -81,6 +95,7 @@ const ROLE_PRIORITY = {
   medico:      ['/', '/pacientes', '/tareas', '/documentos'],
   dispensador: ['/', '/pacientes', '/__dispensario__', '/tareas'],
   cultivador:  ['/', '/sedes', '/tareas', '/geneticas'],
+  supervisor:  ['/', '/sedes', '/salas', '/tareas'],
   manicura:    ['/', '/sedes', '/manicura', '/geneticas'],
   abogado:     ['/documentos'],
   auditor:     ['/', '/pacientes', '/informe-semestral'],
@@ -150,7 +165,7 @@ onMounted(async () => {
 <template>
   <ToastProvider />
   <ConfirmDialog />
-  <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor }">
+  <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isSupervisor && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor && !isDelivery }">
 
     <!-- ── ADMIN LAYOUT (sidebar + topbar, desktop ≥1024px) ── -->
     <template v-if="isAdmin && auth.isAuthenticated && !$route.meta.fullscreen">
@@ -190,6 +205,20 @@ onMounted(async () => {
         </div>
       </div>
       <BottomNavCultivador />
+    </template>
+
+    <!-- ── SUPERVISOR LAYOUT (sidebar + topbar desktop, sin mobile bottom-nav) ── -->
+    <template v-else-if="isSupervisor && auth.isAuthenticated && !$route.meta.fullscreen">
+      <div class="svr-shell">
+        <SupervisorSidebar />
+        <div class="svr-body">
+          <SupervisorTopBar />
+          <div class="svr-accent-bar"></div>
+          <main class="svr-main">
+            <router-view />
+          </main>
+        </div>
+      </div>
     </template>
 
     <!-- ── DISPENSADOR LAYOUT (sidebar desktop + topbar con hamburger en mobile) ── -->
@@ -303,6 +332,29 @@ onMounted(async () => {
           <div v-if="audDrawerOpen" class="aud-drawer-overlay" @click.self="audDrawerOpen = false">
             <div class="aud-drawer">
               <AuditorSidebar @logout="doLogout" />
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+    </template>
+
+    <!-- ── DELIVERY LAYOUT ── -->
+    <template v-else-if="isDelivery && auth.isAuthenticated && !$route.meta.fullscreen">
+      <div class="dlv-shell">
+        <DeliverySidebar @logout="doLogout" />
+        <div class="dlv-body">
+          <DeliveryTopBar @open-drawer="dlvDrawerOpen = true" />
+          <div class="dlv-accent-bar"></div>
+          <main class="dlv-main">
+            <router-view />
+          </main>
+        </div>
+      </div>
+      <Teleport to="body">
+        <Transition name="dlv-drawer">
+          <div v-if="dlvDrawerOpen" class="dlv-drawer-overlay" @click.self="dlvDrawerOpen = false">
+            <div class="dlv-drawer">
+              <DeliverySidebar @logout="doLogout" />
             </div>
           </div>
         </Transition>
@@ -479,7 +531,7 @@ onMounted(async () => {
 
     <!-- ── BOTTOM NAV MOBILE (todos los roles autenticados, incl. admin en mobile) ── -->
     <nav
-      v-if="auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor"
+      v-if="auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isSupervisor && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor && !isDelivery"
       class="bottom-nav d-md-none"
     >
       <RouterLink
@@ -864,6 +916,23 @@ onMounted(async () => {
 .aud-drawer-enter-active, .aud-drawer-leave-active { transition: opacity .2s, transform .2s; }
 .aud-drawer-enter-from, .aud-drawer-leave-to { opacity: 0; }
 .aud-drawer-enter-from .aud-drawer, .aud-drawer-leave-to .aud-drawer { transform: translateX(-100%); }
+
+/* ── Delivery layout ── */
+.dlv-shell { display: flex; min-height: 100vh; }
+.dlv-body { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--c-paper); }
+.dlv-accent-bar { height: 4px; background: var(--c-role-delivery, #1A3A4A); flex-shrink: 0; }
+.dlv-main { flex: 1; }
+.dlv-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
+.dlv-drawer { width: 200px; height: 100%; overflow: hidden; }
+.dlv-drawer-enter-active, .dlv-drawer-leave-active { transition: opacity .2s, transform .2s; }
+.dlv-drawer-enter-from, .dlv-drawer-leave-to { opacity: 0; }
+.dlv-drawer-enter-from .dlv-drawer, .dlv-drawer-leave-to .dlv-drawer { transform: translateX(-100%); }
+
+/* ── Supervisor layout ── */
+.svr-shell { display: flex; min-height: 100vh; }
+.svr-body { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--c-paper); }
+.svr-accent-bar { height: 4px; background: #0f766e; flex-shrink: 0; }
+.svr-main { flex: 1; }
 
 /* ── Mostrar bottom nav solo en mobile ── */
 @media (max-width: 767px) {

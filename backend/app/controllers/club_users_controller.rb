@@ -15,8 +15,11 @@ class ClubUsersController < ApplicationController
       )
     end
 
-    users = rel.order("created_at DESC")
-    render json: { data: users.as_json(only: [:id, :email, :first_name, :last_name, :role, :created_at, :updated_at]) }
+    users = rel.includes(:sala_cultivadores).order("created_at DESC")
+    render json: { data: users.map { |u|
+      u.as_json(only: [:id, :email, :first_name, :last_name, :role, :created_at, :updated_at])
+       .merge(sala_ids: u.sala_cultivadores.map(&:sala_id))
+    } }
   end
 
   # GET /usuarios/:id
@@ -34,14 +37,17 @@ class ClubUsersController < ApplicationController
 
     user = User.new(user_params)
     user.club_id = current_user.club_id
-    # password temporal para crear el usuario
-    tmp_password = SecureRandom.base64(12)
-    user.password = tmp_password
-    user.password_confirmation = tmp_password
+
+    # Si no se provee password, generar uno temporal y mandar reset
+    send_reset = params.dig(:user, :password).blank?
+    if send_reset
+      tmp_password = SecureRandom.base64(12)
+      user.password = tmp_password
+      user.password_confirmation = tmp_password
+    end
 
     if user.save
-      # dispara mail de reset para que el usuario defina su password
-      user.send_reset_password_instructions
+      user.send_reset_password_instructions if send_reset
       render json: { data: user.as_json(only: [:id, :email, :first_name, :last_name, :role]) }, status: :created
     else
       render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
@@ -135,7 +141,7 @@ class ClubUsersController < ApplicationController
 
   # Solo campos que EXISTEN en tu schema
   def user_params
-    params.require(:user).permit(:email, :first_name, :last_name, :role)
+    params.require(:user).permit(:email, :first_name, :last_name, :role, :password, :password_confirmation)
   end
 end
 

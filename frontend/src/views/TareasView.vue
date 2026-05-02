@@ -15,6 +15,9 @@
           <button class="tv__tab" :class="{ 'tv__tab--active': vistaActiva === 'kanban' }" @click="cambiarAKanban">
             <i class="bi bi-kanban"></i> Kanban
           </button>
+          <button class="tv__tab" :class="{ 'tv__tab--active': vistaActiva === 'semana' }" @click="vistaActiva = 'semana'">
+            <i class="bi bi-calendar-week"></i> Semana
+          </button>
         </div>
         <button v-if="puedeCrear" class="tv__btn-primary" @click="abrirModalNueva">
           <i class="bi bi-plus-lg"></i> Nueva tarea
@@ -90,7 +93,7 @@
                 <TareaCard v-for="t in hoyPendientes" :key="t.id" :tarea="t"
                            @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
                            @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
-                           @cancelar="confirmarCancelar(t)" />
+                           @cancelar="confirmarCancelar(t)" @cancelar-serie="confirmarCancelarSerie(t)" />
                 <EmptyState v-if="!hoyPendientes.length" icon="bi-check2-all" title="Sin pendientes" compact />
               </div>
             </div>
@@ -103,7 +106,8 @@
               <div class="tv__col-body">
                 <TareaCard v-for="t in hoyEnProgreso" :key="t.id" :tarea="t"
                            @click="abrirDetalle(t)" @completar="abrirModalCompletar(t)"
-                           @editar="abrirModalEditar(t)" @cancelar="confirmarCancelar(t)" />
+                           @editar="abrirModalEditar(t)" @cancelar="confirmarCancelar(t)"
+                           @cancelar-serie="confirmarCancelarSerie(t)" />
                 <EmptyState v-if="!hoyEnProgreso.length" icon="bi-activity" title="Sin tareas activas" compact />
               </div>
             </div>
@@ -132,7 +136,7 @@
             <TareaCard v-for="t in dashboard.proximas" :key="t.id" :tarea="t"
                        @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
                        @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
-                       @cancelar="confirmarCancelar(t)" />
+                       @cancelar="confirmarCancelar(t)" @cancelar-serie="confirmarCancelarSerie(t)" />
           </div>
         </div>
 
@@ -170,12 +174,66 @@
               <TareaCard v-for="t in kanban[col.key]" :key="t.id" :tarea="t"
                          @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
                          @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
-                         @cancelar="confirmarCancelar(t)" />
+                         @cancelar="confirmarCancelar(t)" @cancelar-serie="confirmarCancelarSerie(t)" />
               <EmptyState v-if="!kanban[col.key]?.length" icon="bi-inbox" title="Sin tareas" compact />
             </div>
           </div>
         </div>
 
+      </div>
+
+      <!-- Vista Semana -->
+      <div v-if="vistaActiva === 'semana'" class="tv__semana">
+        <div class="sem__nav">
+          <button class="sem__nav-btn" @click="semAnterior">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          <span class="sem__nav-label">{{ labelSemana }}</span>
+          <button class="sem__nav-btn" @click="semSiguiente">
+            <i class="bi bi-chevron-right"></i>
+          </button>
+          <button class="sem__hoy-btn" @click="irHoy">Hoy</button>
+        </div>
+
+        <div v-if="loadingSem" class="sem__loading">
+          <div class="sem__ring"></div>
+        </div>
+
+        <div v-else class="sem__grid">
+          <div
+            v-for="dia in semana.dias"
+            :key="dia.fecha"
+            class="sem__col"
+            :class="{ 'sem__col--hoy': esDiaHoy(dia.fecha), 'sem__col--pasado': esPasado(dia.fecha) }"
+          >
+            <div class="sem__col-header">
+              <div class="sem__dia-nombre">{{ dia.dia_semana?.slice(0, 3) }}</div>
+              <div class="sem__dia-num" :class="{ 'sem__dia-num--hoy': esDiaHoy(dia.fecha) }">
+                {{ new Date(dia.fecha + 'T00:00:00').getDate() }}
+              </div>
+              <div class="sem__col-count" v-if="dia.tareas.length">{{ dia.tareas.length }}</div>
+            </div>
+            <div class="sem__tareas">
+              <div
+                v-for="t in dia.tareas"
+                :key="t.id"
+                class="sem__tarea"
+                :class="['sem__tarea--' + t.prioridad, t.estado === 'completada' && 'sem__tarea--done']"
+                @click="abrirTarea(t)"
+              >
+                <span class="sem__tarea-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
+                <span class="sem__tarea-titulo">{{ t.titulo }}</span>
+                <span v-if="t.parent_tarea_id || t.recurrente" class="sem__recurrente" title="Tarea recurrente">🔁</span>
+                <span v-if="t.asignada_a" class="sem__asig" :title="t.asignada_a.nombre">
+                  {{ t.asignada_a.nombre.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() }}
+                </span>
+              </div>
+              <button class="sem__add" @click="nuevaTareaEnDia(dia.fecha)" title="Nueva tarea">
+                <i class="bi bi-plus"></i>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
     </template>
@@ -260,7 +318,6 @@
       :show="showModalTarea"
       :tarea-inicial="tareaEditando"
       :salas="salas"
-      :sedes="sedes"
       :lotes="lotes"
       :usuarios="usuarios"
       @guardada="onTareaGuardada"
@@ -278,14 +335,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { useTareasStore } from '../stores/tareas'
 import TareaCard from '../components/TareaCard.vue'
 import ModalTarea from '../components/ModalTarea.vue'
 import ModalCompletarTarea from '../components/ModalCompletarTarea.vue'
-import { listSalas, listLotes, listUsers, listSedes } from '../lib/api'
+import { listSalas, listLotes, listUsers, listSedes, getTareasSemana } from '../lib/api'
 import { storeToRefs } from 'pinia'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
@@ -355,6 +412,80 @@ function estadoMeta(estado) {
   }[estado] || { background: '#f1f5f9', color: '#64748b' }
 }
 
+const semana       = ref({ desde: null, hasta: null, dias: [] })
+const loadingSem   = ref(false)
+
+function lunasActual() {
+  const hoy = new Date()
+  const dow  = hoy.getDay()
+  const diff = dow === 0 ? -6 : 1 - dow
+  const d = new Date(hoy)
+  d.setDate(hoy.getDate() + diff)
+  return d.toISOString().slice(0, 10)
+}
+const desdeRef = ref(lunasActual())
+
+async function cargarSemana() {
+  loadingSem.value = true
+  try {
+    const { data } = await getTareasSemana(desdeRef.value)
+    semana.value = data
+  } finally {
+    loadingSem.value = false
+  }
+}
+
+function semAnterior() {
+  const d = new Date(desdeRef.value + 'T00:00:00')
+  d.setDate(d.getDate() - 7)
+  desdeRef.value = d.toISOString().slice(0, 10)
+  cargarSemana()
+}
+
+function semSiguiente() {
+  const d = new Date(desdeRef.value + 'T00:00:00')
+  d.setDate(d.getDate() + 7)
+  desdeRef.value = d.toISOString().slice(0, 10)
+  cargarSemana()
+}
+
+function irHoy() {
+  desdeRef.value = lunasActual()
+  cargarSemana()
+}
+
+const labelSemana = computed(() => {
+  if (!semana.value.desde) return ''
+  const d = new Date(semana.value.desde + 'T00:00:00')
+  const h = new Date(semana.value.hasta  + 'T00:00:00')
+  return `${d.getDate()} — ${h.getDate()} ${h.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}`
+})
+
+function esDiaHoy(fechaStr) {
+  return fechaStr === new Date().toISOString().slice(0, 10)
+}
+function esPasado(fechaStr) {
+  return fechaStr < new Date().toISOString().slice(0, 10)
+}
+
+const TIPO_EMOJI = {
+  riego: '💧', poda: '✂️', medicion: '📏', limpieza: '🧹',
+  cosecha: '🌿', transplante: '🪴', inspeccion: '🔍', otro: '📋',
+}
+
+function nuevaTareaEnDia(fecha) {
+  tareaEditando.value = null
+  showModalTarea.value = true
+}
+
+function abrirTarea(tarea) {
+  abrirDetalle(tarea)
+}
+
+watch(vistaActiva, (v) => {
+  if (v === 'semana' && !semana.value.dias.length) cargarSemana()
+})
+
 onMounted(async () => {
   await cargarContexto()
   await tareasStore.fetchDashboard()
@@ -401,12 +532,36 @@ async function confirmarCancelar(t) {
   try { await tareasStore.cancelar(t.id); tareaDetalle.value = null; toast.warning('Tarea cancelada') }
   catch (e) { toast.error(e.response?.data?.error || 'Error') }
 }
-function onTareaGuardada() { showModalTarea.value = false; tareaEditando.value = null; toast.success('Tarea guardada ✓') }
+
+async function confirmarCancelarSerie(t) {
+  const ok = await confirm({
+    title: '¿Cancelar toda la serie?',
+    message: `Se cancelarán todas las tareas pendientes de la serie "${t.titulo}".`,
+    variant: 'warning',
+    confirmText: 'Cancelar serie',
+    cancelText: 'Volver',
+  })
+  if (!ok) return
+  try {
+    const res = await tareasStore.cancelarSerie(t.id)
+    tareaDetalle.value = null
+    toast.warning(`${res?.canceladas ?? 'N'} tareas canceladas`)
+    tareasStore.fetchDashboard()
+    if (vistaActiva.value === 'kanban') cargarKanban()
+    if (vistaActiva.value === 'semana') cargarSemana()
+  } catch (e) { toast.error(e.response?.data?.error || 'Error al cancelar serie') }
+}
+function onTareaGuardada() {
+  showModalTarea.value = false
+  tareaEditando.value = null
+  toast.success('Tarea guardada ✓')
+  tareasStore.fetchDashboard()
+}
 function onTareaCompletada() { showModalCompletar.value = false; tareaCompletando.value = null; toast.success('Tarea completada ✓') }
 
 function puedeEditarTarea(t) {
   const u = authStore.user
-  return u?.role === 'admin' || u?.role === 'cultivador'
+  return ['admin', 'cultivador', 'supervisor'].includes(u?.role)
 }
 
 function mostrarToast(mensaje, tipo = 'success') {
@@ -514,4 +669,40 @@ function mostrarToast(mensaje, tipo = 'success') {
 .tv__btn-primary:hover { background: #144a18; }
 
 /* Toast */
+
+/* Vista Semana */
+.tv__semana { padding: .5rem 0; }
+.sem__nav { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+.sem__nav-btn { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; transition: all .15s; }
+.sem__nav-btn:hover { border-color: #94a3b8; color: #0f172a; }
+.sem__nav-label { flex: 1; text-align: center; font-size: .9rem; font-weight: 700; color: #0f172a; }
+.sem__hoy-btn { background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .3rem .75rem; font-size: .78rem; font-weight: 600; color: #475569; cursor: pointer; }
+.sem__hoy-btn:hover { background: #e2e8f0; }
+.sem__loading { display: flex; justify-content: center; padding: 3rem; }
+.sem__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: spin .7s linear infinite; }
+.sem__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .5rem; }
+@media (max-width: 900px) { .sem__grid { grid-template-columns: repeat(7, minmax(110px, 1fr)); overflow-x: auto; } }
+.sem__col { border: 1.5px solid #e2e8f0; border-radius: 10px; background: #fff; display: flex; flex-direction: column; min-height: 280px; overflow: hidden; }
+.sem__col--hoy { border-color: #3b82f6; }
+.sem__col--pasado { opacity: .65; }
+.sem__col-header { padding: .5rem .6rem; text-align: center; border-bottom: 1px solid #f1f5f9; background: #fafbfc; display: flex; flex-direction: column; align-items: center; gap: .1rem; }
+.sem__col--hoy .sem__col-header { background: #eff6ff; }
+.sem__dia-nombre { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; }
+.sem__dia-num { font-size: 1.2rem; font-weight: 800; color: #0f172a; line-height: 1; }
+.sem__dia-num--hoy { color: #2563eb; }
+.sem__col-count { font-size: .6rem; font-weight: 700; background: #e0e7ff; color: #4338ca; padding: .1em .35em; border-radius: 3px; }
+.sem__tareas { flex: 1; padding: .4rem; display: flex; flex-direction: column; gap: .3rem; }
+.sem__tarea { display: flex; align-items: center; gap: .3rem; padding: .35rem .45rem; border-radius: 6px; border-left: 3px solid #e2e8f0; background: #f8fafc; cursor: pointer; font-size: .72rem; transition: opacity .12s; }
+.sem__tarea:hover { opacity: .8; }
+.sem__tarea--urgente { border-left-color: #dc2626; }
+.sem__tarea--alta    { border-left-color: #f97316; }
+.sem__tarea--normal  { border-left-color: #3b82f6; }
+.sem__tarea--baja    { border-left-color: #9ca3af; }
+.sem__tarea--done    { opacity: .35; text-decoration: line-through; }
+.sem__tarea-emoji { flex-shrink: 0; font-size: .8rem; }
+.sem__tarea-titulo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; font-weight: 500; }
+.sem__recurrente { font-size: .65rem; flex-shrink: 0; }
+.sem__asig { width: 18px; height: 18px; border-radius: 50%; background: #e0e7ff; color: #4338ca; font-size: .6rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sem__add { align-self: flex-start; border: 1.5px dashed #d1d5db; background: none; border-radius: 6px; width: 22px; height: 22px; cursor: pointer; color: #9ca3af; font-size: 1rem; display: flex; align-items: center; justify-content: center; transition: all .15s; margin-top: auto; }
+.sem__add:hover { border-color: #6b7280; color: #374151; }
 </style>

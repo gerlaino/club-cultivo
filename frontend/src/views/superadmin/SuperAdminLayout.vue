@@ -70,7 +70,7 @@ const navItems = [
 .sa-app {
   display: flex;
   min-height: 100vh;
-  background: #f8fafc;
+  background: var(--c-paper);
 }
 
 /* Sidebar */

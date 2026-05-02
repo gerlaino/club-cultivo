@@ -10,8 +10,8 @@ class Sala < ApplicationRecord
   has_many :notas, as: :noteable, dependent: :destroy
 
   ESTADOS = %w[activa mantenimiento cerrada].freeze
-  KINDS   = %w[vegetativo floracion mixta madre clon manicura secado].freeze
-  TIPOS   = %w[cultivo vegetativo floracion secado curado madre clones].freeze
+  KINDS   = %w[vegetativo floracion cosecha mixta madre clon manicura secado].freeze
+  TIPOS   = %w[cultivo vegetativo floracion cosecha secado curado madre clones].freeze
 
   validates :nombre, presence: true, uniqueness: { scope: :club_id }
   validates :state,  inclusion: { in: ESTADOS }, allow_blank: false
@@ -34,17 +34,30 @@ class Sala < ApplicationRecord
 
   enum :state, { activa: "activa", mantenimiento: "mantenimiento", cerrada: "cerrada" }, prefix: true
 
+  default_scope { where(deleted_at: nil) }
+
   scope :activas,           -> { where(state: 'activa') }
   scope :en_mantenimiento,  -> { where(state: 'mantenimiento') }
   scope :de_tipo,           ->(t) { where(tipo: t) }
 
+  def soft_delete!
+    update_column(:deleted_at, Time.current)
+  end
+
+  NOMBRES_TIPO = {
+    'germinacion' => 'Germinación', 'vegetativo' => 'Vegetativo',
+    'floracion'   => 'Floración',   'cosecha'    => 'Cosecha',
+    'secado'      => 'Secado',      'curado'     => 'Curado',
+    'manicura'    => 'Manicura',
+  }.freeze
+
   def self.find_or_create_proceso!(sede:, tipo:, created_by: nil)
-    sala = joins(:sede).where(sede: sede, tipo: tipo).where.not(state: 'cerrada').first
+    sala = where(sede: sede).where('tipo = ? OR kind = ?', tipo, tipo).where.not(state: 'cerrada').first
     return sala if sala
 
     created_by ||= sede.club.users.find_by(role: 'admin') || sede.club.users.first
 
-    nombre_base = "#{tipo.to_s.titleize} · #{sede.nombre}"
+    nombre_base = "#{NOMBRES_TIPO[tipo.to_s] || tipo.to_s.titleize} · #{sede.nombre}"
     nombre = nombre_base
     n = 2
     while sede.club.salas.exists?(nombre: nombre)
@@ -71,7 +84,7 @@ class Sala < ApplicationRecord
 
   def porcentaje_ocupacion
     return 0 unless tiene_limite_capacidad?
-    [(plantas_totales.to_f / capacidad_maxima * 100).round(1), 100].min
+    (plantas_totales.to_f / capacidad_maxima * 100).round(1)
   end
 
   def tiene_limite_capacidad?
@@ -84,7 +97,7 @@ class Sala < ApplicationRecord
 
   def capacidad_disponible
     return Float::INFINITY unless tiene_limite_capacidad?
-    [capacidad_maxima - plantas_totales, 0].max
+    capacidad_maxima - plantas_totales
   end
 
   def created_by_name

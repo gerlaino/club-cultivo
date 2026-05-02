@@ -1,6 +1,6 @@
 class SuperAdmin::StatsController < SuperAdmin::BaseController
   def show
-    clubs = Club.all.includes(:users, :pacientes, :lotes)
+    clubs = Club.unscoped.includes(:users, :pacientes, :lotes)
 
     render json: {
       resumen: {
@@ -36,16 +36,19 @@ class SuperAdmin::StatsController < SuperAdmin::BaseController
 
   def serialize_club(c)
     {
-      id:           c.id,
-      name:         c.name,
-      slug:         c.slug,
-      plan:         c.plan,
-      plan_trial:   c.plan_trial,
+      id:               c.id,
+      name:             c.name,
+      slug:             c.slug,
+      email:            c.email,
+      city:             c.city,
+      plan:             c.plan,
+      plan_trial:       c.plan_trial,
       plan_activo_hasta: c.plan_activo_hasta,
-      usuarios:     c.users.count,
-      pacientes:    c.pacientes.count,
-      lotes:        c.lotes.count,
-      created_at:   c.created_at,
+      usuarios_count:   c.users.count,
+      pacientes_count:  c.pacientes.count,
+      lotes_count:      c.lotes.count,
+      created_at:       c.created_at,
+      deleted_at:       c.deleted_at,
     }
   end
 end

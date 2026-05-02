@@ -2,12 +2,6 @@ import { defineConfig } from "vite"
 import vue from "@vitejs/plugin-vue"
 import { VitePWA } from "vite-plugin-pwa"
 
-// Browser page navigations (Accept: text/html) must be served by Vite, not proxied.
-// XHR/fetch API calls don't include text/html in Accept, so they still get proxied.
-function htmlBypass(req) {
-  if (req.headers.accept?.includes('text/html')) return '/index.html'
-}
-
 export default defineConfig({
   plugins: [
     vue(),
@@ -69,12 +63,5 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: {
-      "/users":  { target: "http://localhost:3001", changeOrigin: true, bypass: htmlBypass },
-      "/me":     { target: "http://localhost:3001", changeOrigin: true, bypass: htmlBypass },
-      "/salas":  { target: "http://localhost:3001", changeOrigin: true, bypass: htmlBypass },
-      "/lotes":  { target: "http://localhost:3001", changeOrigin: true, bypass: htmlBypass },
-      "/health": { target: "http://localhost:3001", changeOrigin: true },
-    }
   }
 })

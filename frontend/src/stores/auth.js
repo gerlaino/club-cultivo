@@ -50,12 +50,7 @@ export const useAuthStore = defineStore("auth", {
 
     async ensureBootstrapped() {
       if (!this.bootstrapped) {
-        const token = localStorage.getItem('jwt_token');
-        if (token) {
-          await this.fetchMe();
-        } else {
-          this.bootstrapped = true;
-        }
+        await this.fetchMe();
       }
     },
 

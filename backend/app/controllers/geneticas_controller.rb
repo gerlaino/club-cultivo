@@ -85,6 +85,7 @@ class GeneticasController < ApplicationController
   end
 
   def plantas_count(genetica, club)
+    return 0 unless club
     Plant.joins(:lote)
          .where(lotes: { club_id: club.id, genetica_id: genetica.id })
          .where.not(plants: { state: %w[cosechado descartada] })

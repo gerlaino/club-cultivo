@@ -17,6 +17,16 @@ export function usePermissions() {
       documentos: ['index', 'show', 'create', 'update', 'delete'],
     },
 
+    supervisor: {
+      salas: ['index', 'show'],
+      lotes: ['index', 'show'],
+      plantas: ['index', 'show'],
+      plant_activities: ['index', 'show'],
+      sedes: ['index', 'show'],
+      geneticas: ['index', 'show'],
+      tareas: ['index', 'show', 'create', 'update', 'destroy'],
+    },
+
     cultivador: {
       plantas: ['index', 'show', 'create', 'update', 'destroy'],
       plant_activities: ['index', 'create', 'destroy'],
@@ -113,6 +123,7 @@ export function usePermissions() {
   const isAdmin       = computed(() => userRole.value === 'admin' || userRole.value === 'super_admin')
   const isMedico      = computed(() => userRole.value === 'medico')
   const isCultivador  = computed(() => userRole.value === 'cultivador')
+  const isSupervisor  = computed(() => userRole.value === 'supervisor')
   const isAbogado     = computed(() => userRole.value === 'abogado')
   const isAuditor     = computed(() => userRole.value === 'auditor')
   const isDispensador = computed(() => userRole.value === 'dispensador')
@@ -126,6 +137,7 @@ export function usePermissions() {
     isAdmin,
     isMedico,
     isCultivador,
+    isSupervisor,
     isAbogado,
     isAuditor,
     isDispensador,

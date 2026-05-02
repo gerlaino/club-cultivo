@@ -1,13 +1,11 @@
 Rails.application.routes.draw do
   root to: "health#show"
-  get "/p/:codigo_qr", to: "public/plantas#show_qr", defaults: { format: :json }
   get  "/up", to: "health#show"
 
-  devise_for :users,
-             path: '',
-             path_names: { sign_in: 'users/sign_in', sign_out: 'users/sign_out' },
-             controllers: { sessions: 'users/sessions' }
+  # QR público — sin prefijo /api para que los links de QR funcionen siempre
+  get "/p/:codigo_qr", to: "public/plantas#show_qr", defaults: { format: :json }
 
+  # Web pública del club (accedida desde el sitio web externo del club)
   namespace :public, defaults: { format: :json } do
     resource :club, only: [:show], controller: 'club'
     resources :geneticas, only: [:index, :show]
@@ -17,7 +15,20 @@ Rails.application.routes.draw do
     get '/plantas/:codigo_qr', to: 'plantas#show_qr'
   end
 
-  defaults format: :json do
+  # Webhooks externos — sin prefijo /api para URLs fijas de hardware
+  namespace :webhooks do
+    post 'lecturas', to: 'lecturas#create'
+  end
+
+  # ══════════════════════════════════════════════════════════════
+  # API — todo bajo /api para evitar colisión con Vue Router
+  # ══════════════════════════════════════════════════════════════
+  scope '/api', defaults: { format: :json } do
+    devise_for :users,
+               path: '',
+               path_names: { sign_in: 'users/sign_in', sign_out: 'users/sign_out' },
+               controllers: { sessions: 'users/sessions' }
+
     get "/me",             to: "me#show"
     get "/me/movimientos", to: "me#movimientos"
     get "/stats",          to: "stats#show"
@@ -54,7 +65,11 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :stocks, only: [:index, :create]
+    resources :stocks, only: [:index, :create] do
+      member do
+        post :asignar
+      end
+    end
 
     resources :plants do
       resources :plant_activities, only: [:index, :create, :destroy]
@@ -63,7 +78,6 @@ Rails.application.routes.draw do
 
     resources :notas, only: [:destroy]
 
-    # Canonical pacientes routes
     resources :pacientes do
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
@@ -86,7 +100,7 @@ Rails.application.routes.draw do
     end
     resources :paciente_notas, only: [:destroy]
 
-    # Deprecated alias — kept for 1 release, logs warning on every hit
+    # Alias deprecado — mantenido por compatibilidad
     resources :socios, controller: 'pacientes', as: :socios_legacy do
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
@@ -100,6 +114,7 @@ Rails.application.routes.draw do
     end
     resources :socio_notas, controller: 'paciente_notas', only: [:destroy], as: :socio_notas_legacy
 
+    get '/indicaciones_medicas', to: 'indicacion_medica#index_medico'
     resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy]
     resources :dispensaciones, only: [:index, :show, :update, :destroy]
 
@@ -173,11 +188,13 @@ Rails.application.routes.draw do
       collection do
         get :dashboard
         get :kanban
+        get :semana
       end
       member do
-        post :iniciar
-        post :completar
-        post :cancelar
+        post   :iniciar
+        post   :completar
+        post   :cancelar
+        delete :cancelar_serie
       end
     end
 
@@ -196,10 +213,21 @@ Rails.application.routes.draw do
         post :resolver
       end
     end
-  end
 
-  namespace :webhooks do
-    post 'lecturas', to: 'lecturas#create'
+    namespace :super_admin do
+      resources :clubs, only: [:index, :show, :create, :update, :destroy] do
+        member do
+          post   :crear_usuarios_default
+          patch  :cambiar_plan
+          post   :observar
+          delete :detener_observacion
+          patch  :restaurar
+        end
+      end
+      resources :users, only: [:index, :create, :update, :destroy]
+      get :stats,    to: 'stats#show'
+      get :metricas, to: 'stats#metricas'
+    end
   end
 
   begin
@@ -215,19 +243,7 @@ Rails.application.routes.draw do
     Rails.logger.warn 'sidekiq/web not available — /sidekiq not mounted'
   end
 
-  namespace :super_admin do
-    resources :clubs, only: [:index, :show, :create, :update] do
-      member do
-        post  :crear_usuarios_default
-        patch :cambiar_plan
-        post  :observar
-        delete :detener_observacion
-      end
-    end
-    resources :users, only: [:index, :create, :update, :destroy]
-    get :stats,    to: 'stats#show'
-    get :metricas, to: 'stats#metricas'
-  end
-
-  get '/p/:codigo_qr', to: 'public/plantas#show_qr', defaults: { format: :json }
+  # SPA fallback — sirve index.html para cualquier ruta desconocida con Accept: text/html
+  # Esto permite navegación directa a rutas del frontend en producción
+  get '*path', to: 'application#spa_fallback', constraints: ->(req) { !req.xhr? && req.format.html? }
 end

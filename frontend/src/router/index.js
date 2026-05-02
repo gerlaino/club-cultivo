@@ -58,6 +58,7 @@ const routes = [
       if (auth.user?.role === 'medico')      return '/medico'
       if (auth.user?.role === 'abogado')     return '/abogado'
       if (auth.user?.role === 'manicura')    return '/mnc/pendientes'
+      if (auth.user?.role === 'delivery')    return '/delivery'
     },
   },
 
@@ -332,6 +333,18 @@ const routes = [
     },
   },
 
+  {
+    path: '/admin/stocks/pendientes',
+    name: 'admin-stocks-pendientes',
+    component: () => import('../views/admin/AdminStocksPendientesView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role !== 'admin') return next('/')
+      next()
+    },
+  },
+
   // Manicura role routes
   {
     path: '/mnc',
@@ -480,6 +493,20 @@ const routes = [
     ],
   },
 
+  {
+    path: '/delivery',
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'delivery'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+    children: [
+      { path: '', name: 'delivery-dashboard', component: () => import('../views/delivery/DeliveryDashboard.vue') },
+      { path: 'despachos', name: 'delivery-despachos', component: () => import('../views/delivery/DespachoListView.vue') },
+    ],
+  },
+
   { path: "/:pathMatch(.*)*", redirect: "/" },
 
 ];
@@ -493,19 +520,19 @@ router.afterEach((to) => {
   document.documentElement.classList.toggle("route-login", !!to.meta.fullscreen);
 });
 
-const DELIVERY_BLOCKED = ['/pacientes']
-
 const ROLE_HOME = {
   super_admin: '/super-admin',
   auditor:     '/auditor',
   medico:      '/medico',
   abogado:     '/abogado',
+  delivery:    '/delivery',
 }
 
 const ROLE_ALLOWED_PREFIX = {
-  auditor: ['/auditor', '/perfil', '/login'],
-  medico:  ['/medico',  '/perfil', '/login'],
-  abogado: ['/abogado', '/perfil', '/login'],
+  auditor:  ['/auditor',  '/perfil', '/login'],
+  medico:   ['/medico',   '/perfil', '/login'],
+  abogado:  ['/abogado',  '/perfil', '/login'],
+  delivery: ['/delivery', '/perfil', '/login'],
 }
 
 router.beforeEach(async (to) => {
@@ -527,12 +554,6 @@ router.beforeEach(async (to) => {
       useToast().warning('Sin permisos para acceder a esa sección')
       return ROLE_HOME[role]
     }
-  }
-
-  // Delivery: bloqueado de /pacientes
-  if (auth.isAuthenticated && role === 'delivery') {
-    const blocked = DELIVERY_BLOCKED.some(p => to.path === p || to.path.startsWith(p + '/'))
-    if (blocked) return '/'
   }
 
   return true;

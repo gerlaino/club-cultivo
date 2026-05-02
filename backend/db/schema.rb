@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_02_000004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -110,6 +110,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
     t.string "whatsapp"
     t.text "horarios_atencion"
     t.boolean "activo", default: true, null: false
+    t.datetime "deleted_at"
+    t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["plan"], name: "index_clubs_on_plan"
     t.index ["slug"], name: "index_clubs_on_slug", unique: true
   end
@@ -392,8 +394,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
     t.string "fotoperiodo"
     t.integer "semanas_floracion"
     t.integer "genetica_id"
+    t.datetime "deleted_at"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
+    t.index ["deleted_at"], name: "index_lotes_on_deleted_at"
     t.index ["estado"], name: "index_lotes_on_estado"
     t.index ["sala_id"], name: "index_lotes_on_sala_id"
   end
@@ -690,8 +694,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
     t.bigint "sede_id"
     t.integer "plants_max", default: 0
     t.string "tipo", default: "cultivo", null: false
+    t.datetime "deleted_at"
     t.index ["club_id"], name: "index_salas_on_club_id"
     t.index ["created_by_id"], name: "index_salas_on_created_by_id"
+    t.index ["deleted_at"], name: "index_salas_on_deleted_at"
     t.index ["nombre"], name: "index_salas_on_nombre"
     t.index ["sede_id", "tipo"], name: "index_salas_on_sede_id_and_tipo"
     t.index ["sede_id"], name: "index_salas_on_sede_id"
@@ -712,10 +718,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
     t.text "notas"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.datetime "deleted_at"
     t.index ["club_id", "activa"], name: "index_sedes_on_club_id_and_activa"
     t.index ["club_id", "tipo"], name: "index_sedes_on_club_id_and_tipo"
     t.index ["club_id"], name: "index_sedes_on_club_id"
     t.index ["created_by_id"], name: "index_sedes_on_created_by_id"
+    t.index ["deleted_at"], name: "index_sedes_on_deleted_at"
   end
 
   create_table "setpoints_fase", force: :cascade do |t|
@@ -735,8 +743,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
     t.index ["genetica_id"], name: "index_setpoints_fase_on_genetica_id"
   end
 
+  create_table "stock_movimientos", force: :cascade do |t|
+    t.bigint "stock_id", null: false
+    t.string "tipo", null: false
+    t.decimal "gramos", precision: 10, scale: 2, null: false
+    t.bigint "sede_origen_id"
+    t.bigint "sede_destino_id"
+    t.bigint "usuario_id", null: false
+    t.text "notas"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["sede_destino_id"], name: "index_stock_movimientos_on_sede_destino_id"
+    t.index ["sede_origen_id"], name: "index_stock_movimientos_on_sede_origen_id"
+    t.index ["stock_id"], name: "index_stock_movimientos_on_stock_id"
+    t.index ["tipo"], name: "index_stock_movimientos_on_tipo"
+    t.index ["usuario_id"], name: "index_stock_movimientos_on_usuario_id"
+  end
+
   create_table "stocks", force: :cascade do |t|
-    t.bigint "sede_id", null: false
+    t.bigint "sede_id"
     t.string "origen", null: false
     t.bigint "lote_id"
     t.decimal "lote_origen_consumido_g", precision: 10, scale: 2
@@ -750,6 +775,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
     t.string "categoria"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "estado", default: "asignado", null: false
+    t.index ["estado"], name: "index_stocks_on_estado"
     t.index ["lote_id", "forma_producto"], name: "index_stocks_on_lote_id_and_forma_producto"
     t.index ["lote_id"], name: "index_stocks_on_lote_id"
     t.index ["origen"], name: "index_stocks_on_origen"
@@ -777,6 +804,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
     t.boolean "horas_aplicadas_al_lote", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "recurrente", default: false, null: false
+    t.string "frecuencia"
+    t.integer "intervalo", default: 1
+    t.date "recurrencia_hasta"
+    t.integer "recurrencia_veces"
+    t.integer "parent_tarea_id"
     t.index ["asignada_a_id", "estado"], name: "index_tareas_on_asignada_a_id_and_estado"
     t.index ["asignada_a_id"], name: "index_tareas_on_asignada_a_id"
     t.index ["club_id", "estado"], name: "index_tareas_on_club_id_and_estado"
@@ -785,6 +818,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
     t.index ["creada_por_id"], name: "index_tareas_on_creada_por_id"
     t.index ["lote_id", "horas_aplicadas_al_lote"], name: "index_tareas_on_lote_id_and_horas_aplicadas_al_lote"
     t.index ["lote_id"], name: "index_tareas_on_lote_id"
+    t.index ["parent_tarea_id"], name: "index_tareas_on_parent_tarea_id"
     t.index ["plant_id"], name: "index_tareas_on_plant_id"
     t.index ["sala_id"], name: "index_tareas_on_sala_id"
   end
@@ -909,6 +943,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_30_200002) do
   add_foreign_key "sedes", "clubs"
   add_foreign_key "sedes", "users", column: "created_by_id"
   add_foreign_key "setpoints_fase", "geneticas"
+  add_foreign_key "stock_movimientos", "sedes", column: "sede_destino_id"
+  add_foreign_key "stock_movimientos", "sedes", column: "sede_origen_id"
+  add_foreign_key "stock_movimientos", "stocks"
+  add_foreign_key "stock_movimientos", "users", column: "usuario_id"
   add_foreign_key "stocks", "lotes"
   add_foreign_key "stocks", "sedes"
   add_foreign_key "tareas", "clubs"

@@ -27,6 +27,15 @@ module Permissions
       reglas_ambientales: [:index, :show, :create, :update, :destroy],
       alertas: [:index, :show, :update],
     },
+    supervisor: {
+      salas: [:index, :show],
+      lotes: [:index, :show],
+      plantas: [:index, :show],
+      plant_activities: [:index, :show],
+      sedes: [:index, :show],
+      geneticas: [:index, :show],
+      tareas: [:index, :show, :create, :update, :destroy],
+    },
     abogado: {
       socios: [:index, :show],
       reportes_legales: [:index, :show],
@@ -101,6 +110,10 @@ module Permissions
 
   def cultivador?
     role == 'cultivador'
+  end
+
+  def supervisor?
+    role == 'supervisor'
   end
 
   def abogado?

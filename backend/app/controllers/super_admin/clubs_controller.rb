@@ -1,8 +1,8 @@
 class SuperAdmin::ClubsController < SuperAdmin::BaseController
-  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion]
+  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar]
 
   def index
-    clubs = Club.all.includes(:users, :pacientes).order(:created_at)
+    clubs = Club.unscoped.includes(:users, :pacientes).order(:created_at)
     render json: clubs.map { |c| serialize_club(c) }
   end
 
@@ -63,6 +63,20 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     head :no_content
   end
 
+  def destroy
+    @club.soft_delete!
+    head :no_content
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  def restaurar
+    @club.restaurar!
+    render json: serialize_club_detail(@club)
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   def cambiar_plan
     plan      = params[:plan]
     hasta     = params[:hasta]
@@ -84,7 +98,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   private
 
   def set_club
-    @club = Club.find(params[:id])
+    @club = Club.unscoped.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Club no encontrado' }, status: :not_found
   end
@@ -115,6 +129,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       pacientes_count:  c.pacientes.count,
       lotes_count:      c.lotes.count,
       created_at:       c.created_at,
+      deleted_at:       c.deleted_at,
     }
   end
 

@@ -1,8 +1,20 @@
 class IndicacionMedicaController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_medico_or_admin, except: [:index, :show]
+  before_action :require_medico_or_admin, except: [:index, :show, :index_medico]
   before_action :set_paciente, only: [:index, :create]
   before_action :set_indicacion, only: [:show, :update, :destroy]
+
+  # GET /indicaciones_medicas — standalone, scoped to medico's club patients
+  def index_medico
+    unless current_user.medico? || current_user.admin?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    scope = IndicacionMedica.joins(:paciente)
+                            .where(pacientes: { club_id: current_user.club_id })
+    scope = scope.where(pacientes: { con_seguimiento_medico: true }) if current_user.medico?
+    indicaciones = scope.order(created_at: :desc)
+    render json: indicaciones.map { |i| serialize_indicacion_detail(i) }
+  end
 
   # GET /pacientes/:paciente_id/indicaciones
   def index

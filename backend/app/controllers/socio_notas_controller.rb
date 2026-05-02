@@ -23,7 +23,9 @@ class SocioNotasController < ApplicationController
 
   # DELETE /socio_notas/:id
   def destroy
-    nota = SocioNota.find(params[:id])
+    nota = SocioNota.joins(:paciente)
+                    .where(pacientes: { club_id: current_user.club_id })
+                    .find(params[:id])
     nota.destroy
     head :no_content
   end

@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref, computed } from "vue"
 import { logger } from '../utils/logger.js'
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
@@ -10,7 +10,7 @@ import { createPlant, updatePlant,
   getLoteEventos, createLoteEvento,
   getLoteFotos, uploadFotoLote,
   transicionarLote, avanzarFaseLote, cerrarCurado, getLoteTimeline,
-  listSedes, getSedeStocks,
+  listSedes, getSedeStocks, deleteLote,
   getCostoLote, createCostoLote, updateCostoLote } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
@@ -25,11 +25,35 @@ import { ArrowRight } from 'lucide-vue-next'
 import DsBanner from '../design-system/components/Banner.vue'
 
 const route    = useRoute()
+const router   = useRouter()
 const lotes    = useLotesStore()
 const plants   = usePlantsStore()
 const auth     = useAuthStore()
 const toast    = useToast()
 const { confirm } = useConfirm()
+
+const deletingLote = ref(false)
+async function eliminarLote() {
+  const ok = await confirm({
+    title: 'Eliminar lote',
+    message: `¿Seguro que querés eliminar el lote "${lote.value?.codigo}"? Quedará archivado (soft delete) junto a sus plantas y registros. Podrá recuperarse si es necesario.`,
+    confirmText: 'Eliminar',
+    variant: 'danger',
+  })
+  if (!ok) return
+  deletingLote.value = true
+  try {
+    const salaId = lote.value?.sala?.id
+    await deleteLote(id)
+    toast.success('Lote eliminado')
+    if (salaId) router.push({ name: 'sala-detail', params: { id: salaId } })
+    else router.push({ name: 'salas' })
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al eliminar el lote')
+  } finally {
+    deletingLote.value = false
+  }
+}
 
 const id            = Number(route.params.id)
 const error         = ref(null)
@@ -95,6 +119,7 @@ const tareasExpanded    = ref(true)
 const plantasExpanded   = ref(true)
 const historialExpanded = ref(true)
 const graficosExpanded  = ref(true)
+const graficosKey       = ref(0)
 const fotosExpanded     = ref(false)
 const fotos             = ref([])
 const uploadingFoto     = ref(false)
@@ -220,6 +245,7 @@ async function guardarRegistro() {
       result = data
     }
     eventos.value.unshift({ ...result, _tipo: 'registro' })
+    graficosKey.value++
     showRegistroModal.value = false
     registroForm.value = emptyRegistroForm()
     csvFile.value = null
@@ -230,7 +256,7 @@ async function guardarRegistro() {
   }
 }
 
-function onRegistradoPorVoz() { loadEventos() }
+function onRegistradoPorVoz() { loadEventos(); graficosKey.value++ }
 
 // ── Historial ─────────────────────────────────────────────
 const eventos        = ref([])
@@ -309,7 +335,7 @@ async function avanzarFaseRapido() {
     const { data } = await avanzarFaseLote(lote.value.id)
     lotes.current = data
     toast.success(`Lote avanzado a ${capitalizarFase(data.estado)}`)
-    await loadEventos()
+    await Promise.all([loadEventos(), plants.fetchByLote(id)])
   } catch (e) {
     const msg = e?.response?.data?.error || 'Error al avanzar el lote'
     if (e?.response?.status === 422) toast.warning(msg)
@@ -335,7 +361,7 @@ async function ejecutarTransicion() {
     lotes.current = data
     showTransicionModal.value = false
     toast.success(`Lote avanzado a ${em(faseSig).label}`)
-    await loadEventos()
+    await Promise.all([loadEventos(), plants.fetchByLote(id)])
   } catch (e) {
     transicionError.value = e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'Error al transicionar'
   } finally { savingTransicion.value = false }
@@ -399,12 +425,14 @@ async function toggleEsSeleccion(plant) {
 // ── Helpers ────────────────────────────────────────────────
 const CICLO = ["vegetativo", "floracion", "secado", "curado"]
 const ESTADO_META = {
-  semilla:    { label: "Semilla/Esqueje", color: "#64748b", bg: "#f1f5f9", emoji: "🌱" },
-  vegetativo: { label: "Vegetativo",      color: "#16a34a", bg: "#dcfce7", emoji: "🍃" },
-  floracion:  { label: "Floración",       color: "#d97706", bg: "#fef3c7", emoji: "🌸" },
-  secado:     { label: "Secado",          color: "#78350f", bg: "#fef3c7", emoji: "💨" },
-  curado:     { label: "Curado",          color: "#2563eb", bg: "#dbeafe", emoji: "🫙" },
-  finalizado: { label: "Finalizado",      color: "#1b5e20", bg: "#dcfce7", emoji: "✅" },
+  semilla:           { label: "Semilla/Esqueje",   color: "#64748b", bg: "#f1f5f9", emoji: "🌱" },
+  vegetativo:        { label: "Vegetativo",         color: "#16a34a", bg: "#dcfce7", emoji: "🍃" },
+  floracion:         { label: "Floración",          color: "#d97706", bg: "#fef3c7", emoji: "🌸" },
+  cosecha:           { label: "Cosecha",            color: "#059669", bg: "#d1fae5", emoji: "🌿" },
+  secado:            { label: "Secado",             color: "#78350f", bg: "#fef3c7", emoji: "💨" },
+  manicura_pendiente:{ label: "Manicura pendiente", color: "#7c3aed", bg: "#ede9fe", emoji: "✂️" },
+  curado:            { label: "Curado",             color: "#2563eb", bg: "#dbeafe", emoji: "🫙" },
+  finalizado:        { label: "Finalizado",         color: "#1b5e20", bg: "#dcfce7", emoji: "✅" },
 }
 const PLANT_STATE_META = {
   semilla:    { label: "Semilla",    color: "#64748b", emoji: "🌰" },
@@ -447,15 +475,21 @@ function pgm(p) { return PLAGAS_META[p]       || { color: "#94a3b8", emoji: "—
 function growLabel(g)  { return { sustrato: "Sustrato", hidroponia: "Hidroponia", aeroponia: "Aeroponia" }[g] || g || "—" }
 function lightLabel(l) { return { led: "LED", hps: "HPS", cmh: "CMH", natural: "Natural", mixta: "Mixta" }[l] || l || "—" }
 function macetaLabel(m) { return MACETA_LABELS[String(m)] || (m ? m + 'L' : '—') }
+function parseDate(d) {
+  if (!d) return null
+  // Date-only strings (YYYY-MM-DD) must be parsed as local time, not UTC
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return new Date(d + 'T00:00:00')
+  return new Date(d)
+}
 function formatDate(d) {
   if (!d) return "—"
-  const date = new Date(d)
-  return isNaN(date.getTime()) ? "—" : date.toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" })
+  const date = parseDate(d)
+  return !date || isNaN(date.getTime()) ? "—" : date.toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" })
 }
 function formatDateTime(d) {
   if (!d) return "—"
-  const date = new Date(d)
-  return isNaN(date.getTime()) ? "—" : date.toLocaleString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+  const date = parseDate(d)
+  return !date || isNaN(date.getTime()) ? "—" : date.toLocaleString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
 }
 
 const cicloIndex = computed(() => lote.value ? CICLO.indexOf(lote.value.estado) : -1)
@@ -549,6 +583,9 @@ onMounted(async () => {
           />
           <button class="ld__btn-secondary" @click="abrirRegistroModal">
             <i class="bi bi-clipboard-data"></i>Registrar lote
+          </button>
+          <button v-if="canEdit" class="ld__btn-danger" :disabled="deletingLote" @click="eliminarLote">
+            <i class="bi bi-trash3"></i>
           </button>
         </div>
       </div>
@@ -661,7 +698,7 @@ onMounted(async () => {
               <i class="bi ld__chevron" :class="graficosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </button>
             <div v-show="graficosExpanded" class="ld__section-body">
-              <GraficosLote :lote-id="id" />
+              <GraficosLote :lote-id="id" :key="graficosKey" />
             </div>
           </div>
 
@@ -907,11 +944,11 @@ onMounted(async () => {
             <!-- Vista datos guardados -->
             <template v-else-if="costoLote">
               <dl class="ld__dl">
-                <dt>Insumos</dt><dd>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_insumos) }}</dd>
-                <dt>Energía</dt><dd>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_energia) }}</dd>
-                <dt>Mano de obra</dt><dd>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_mano_obra) }}</dd>
-                <dt v-if="costoLote.costo_prorrateado">Prorrateado</dt><dd v-if="costoLote.costo_prorrateado">{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_prorrateado) }}</dd>
-                <dt class="ld__dl-total">Total</dt><dd class="ld__dl-total">{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_total) }}</dd>
+                <dt>Insumos</dt><dd>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_insumos || 0) }}</dd>
+                <dt>Energía</dt><dd>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_energia || 0) }}</dd>
+                <dt>Mano de obra</dt><dd>{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_mano_obra || 0) }}</dd>
+                <dt v-if="costoLote.costo_prorrateado">Prorrateado</dt><dd v-if="costoLote.costo_prorrateado">{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_prorrateado || 0) }}</dd>
+                <dt class="ld__dl-total">Total</dt><dd class="ld__dl-total">{{ new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(costoLote.costo_total || 0) }}</dd>
                 <dt v-if="costoLote.gramos_producidos">Rendimiento</dt><dd v-if="costoLote.gramos_producidos">{{ costoLote.gramos_producidos }}g</dd>
               </dl>
               <div v-if="costoLote.costo_por_gramo" class="ld__cpg-badge">
@@ -1375,6 +1412,9 @@ onMounted(async () => {
 .ld__btn-secondary:hover { background: #d4e6d4; }
 .ld__btn-ghost { background: transparent; color: #60725d; border: 1px solid #d4e6d4; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 500; cursor: pointer; transition: all .15s; }
 .ld__btn-ghost:hover { background: #f0fdf4; }
+.ld__btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #dc2626; color: #fff; border: none; padding: .6rem .9rem; border-radius: 8px; font-size: .875rem; cursor: pointer; transition: background .15s; }
+.ld__btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.ld__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
 .ld__btn-ghost-sm { display: inline-flex; align-items: center; gap: .35rem; background: transparent; color: #60725d; border: 1px solid #d4e6d4; padding: .5rem .9rem; border-radius: 8px; font-size: .8rem; font-weight: 500; cursor: pointer; transition: all .15s; white-space: nowrap; }
 .ld__btn-ghost-sm:hover { background: #f0fdf4; color: #1b5e20; }
 .ld__btn-transicion { display: inline-flex; align-items: center; gap: .4rem; background: var(--c-role-cultivador, #5C7A4A); color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: opacity .15s; white-space: nowrap; }

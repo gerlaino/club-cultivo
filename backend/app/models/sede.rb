@@ -17,9 +17,15 @@ class Sede < ApplicationRecord
   validates :nombre, presence: true
   validates :tipo,   inclusion: { in: TIPOS }
 
+  default_scope { where(deleted_at: nil) }
+
   scope :activas,     -> { where(activa: true) }
   scope :produccion,  -> { where(tipo: ['produccion', 'mixta']) }
   scope :social,      -> { where(tipo: ['social', 'mixta']) }
+
+  def soft_delete!
+    update_column(:deleted_at, Time.current)
+  end
 
   def tipo_label
     TIPO_LABELS[tipo] || tipo

@@ -9,6 +9,7 @@
       <div class="d-flex align-items-center gap-2">
         <span class="badge tipo-badge">{{ TIPO_LABELS[tarea.tipo] || tarea.tipo }}</span>
         <span v-if="tarea.vencida" class="badge bg-danger">Vencida</span>
+        <span v-if="tarea.parent_tarea_id || tarea.recurrente" class="badge bg-light text-muted" title="Tarea recurrente" style="font-size:.65rem">🔁</span>
       </div>
       <div class="tarea-card__acciones" @click.stop>
         <div class="dropdown">
@@ -35,6 +36,12 @@
               <hr class="dropdown-divider">
               <button class="dropdown-item text-danger" @click="$emit('cancelar', tarea)">
                 <i class="bi bi-x-circle me-2"></i>Cancelar
+              </button>
+            </li>
+            <li v-if="(tarea.parent_tarea_id || tarea.recurrente) && tarea.estado !== 'completada' && puedeEditar">
+              <hr class="dropdown-divider">
+              <button class="dropdown-item text-danger" @click.stop="$emit('cancelar-serie', tarea)">
+                <i class="bi bi-x-circle-fill me-2"></i>Cancelar serie completa
               </button>
             </li>
           </ul>
@@ -88,7 +95,7 @@ const props = defineProps({
   tarea: { type: Object, required: true }
 })
 
-defineEmits(['click', 'iniciar', 'completar', 'editar', 'cancelar'])
+defineEmits(['click', 'iniciar', 'completar', 'editar', 'cancelar', 'cancelar-serie'])
 
 const authStore = useAuthStore()
 
@@ -106,7 +113,7 @@ const TIPO_LABELS = {
 const puedeEditar = computed(() => {
   const user = authStore.user
   if (!user) return false
-  return user.role === 'admin' || user.role === 'cultivador'
+  return ['admin', 'cultivador', 'supervisor'].includes(user.role)
 })
 
 function formatFecha(fecha) {

@@ -11,7 +11,9 @@ import {
   deleteTarea,
   iniciarTarea,
   completarTarea,
-  cancelarTarea
+  cancelarTarea,
+  getTareasSemana,
+  cancelarSerieTarea
 } from '../lib/api'
 
 export const useTareasStore = defineStore('tareas', () => {
@@ -19,6 +21,7 @@ export const useTareasStore = defineStore('tareas', () => {
   const tareas      = ref([])
   const dashboard   = ref({ hoy: [], vencidas: [], proximas: [], stats: {} })
   const kanban      = ref({ pendiente: [], en_progreso: [], completada: [] })
+  const semana      = ref({ desde: null, hasta: null, dias: [] })
   const loading     = ref(false)
   const error       = ref(null)
 
@@ -126,6 +129,24 @@ export const useTareasStore = defineStore('tareas', () => {
     return actualizada
   }
 
+  async function fetchSemana(desde) {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await getTareasSemana(desde)
+      semana.value = res.data
+    } catch (e) {
+      error.value = 'Error al cargar la semana'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function cancelarSerie(id) {
+    const res = await cancelarSerieTarea(id)
+    return res.data
+  }
+
   // ── Helpers internos ───────────────────────────────────────────
 
   function _reemplazarEnKanban(id, tarea) {
@@ -171,10 +192,11 @@ export const useTareasStore = defineStore('tareas', () => {
   }
 
   return {
-    tareas, dashboard, kanban, loading, error,
+    tareas, dashboard, kanban, semana, loading, error,
     tareasDeHoy, stats, hayVencidas,
     hoyPendientes, hoyEnProgreso, hoyCompletadas,
     fetchDashboard, fetchKanban, fetchTareas,
-    create, update, remove, iniciar, completar, cancelar
+    create, update, remove, iniciar, completar, cancelar,
+    fetchSemana, cancelarSerie
   }
 })

@@ -4,6 +4,7 @@ class ApplicationController < ActionController::API
 
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
 
+  before_action :inject_jwt_from_cookie
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
 
@@ -25,13 +26,28 @@ class ApplicationController < ActionController::API
     return unless current_user&.super_admin?
     return unless current_user.modo_observador?
     return if request.get? || request.head? || request.options?
-    return if request.path.start_with?('/super_admin/')
+    return if request.path.start_with?('/api/super_admin/', '/super_admin/')
     render json: { error: "Modo solo observación — escritura no permitida" }, status: :forbidden
   end
 
   def require_admin_for_write!
     unless current_user&.admin? || current_user&.super_admin?
       render json: { error: "No autorizado" }, status: :forbidden
+    end
+  end
+
+  def inject_jwt_from_cookie
+    return if request.headers['Authorization'].present?
+    token = request.cookies['jwt_token']
+    request.headers['Authorization'] = "Bearer #{token}" if token.present?
+  end
+
+  def spa_fallback
+    index_html = Rails.root.join('public', 'index.html')
+    if index_html.exist?
+      render file: index_html, layout: false
+    else
+      render json: { error: 'Not found' }, status: :not_found
     end
   end
 end

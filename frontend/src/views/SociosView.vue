@@ -113,9 +113,14 @@ async function save() {
 }
 
 
+function safeDate(d) {
+  if (!d) return null
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : new Date(d)
+}
+
 function reprocannDias(s) {
   if (!s.reprocann_vencimiento) return null
-  return Math.floor((new Date(s.reprocann_vencimiento) - new Date()) / 86400000)
+  return Math.floor((safeDate(s.reprocann_vencimiento) - new Date()) / 86400000)
 }
 
 function reprocannStatus(s) {
@@ -129,12 +134,12 @@ function reprocannStatus(s) {
 
 function formatDate(d) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+  return safeDate(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function edad(fn) {
   if (!fn) return null
-  return Math.floor((Date.now() - new Date(fn).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
+  return Math.floor((Date.now() - safeDate(fn).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
 }
 
 function iniciales(s) {
@@ -148,10 +153,10 @@ const kpis = computed(() => {
   return {
     total:    items.length,
     activos:  items.filter(s => s.es_paciente).length,
-    vencidos: items.filter(s => s.reprocann_vencimiento && new Date(s.reprocann_vencimiento) < hoy).length,
+    vencidos: items.filter(s => s.reprocann_vencimiento && safeDate(s.reprocann_vencimiento) < hoy).length,
     proximos: items.filter(s => {
       if (!s.reprocann_vencimiento) return false
-      const v = new Date(s.reprocann_vencimiento)
+      const v = safeDate(s.reprocann_vencimiento)
       return v >= hoy && v <= en30
     }).length,
     sin_rep: items.filter(s => !s.reprocann_vencimiento).length,
@@ -527,7 +532,7 @@ onMounted(async () => {
 .sp-btn-ghost { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; padding: .65rem 1.2rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .sp-btn-ghost:hover:not(:disabled) { background: #f8fafc; color: #0f172a; }
 .sp-btn-ghost:disabled { opacity: .6; cursor: not-allowed; }
-.sp-btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #dc2626; color: #fff; border: none; padding: .65rem 1.4rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s; }
-.sp-btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.sp-btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #b91c1c; color: #fff; border: none; padding: .65rem 1.4rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s; }
+.sp-btn-danger:hover:not(:disabled) { background: #991b1b; }
 .sp-btn-danger:disabled { opacity: .6; cursor: not-allowed; }
 </style>

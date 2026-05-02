@@ -3,7 +3,8 @@ import { ref, computed, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useUsuariosStore } from "../stores/usuarios"
 import { useAuthStore } from "../stores/auth"
-import UsuarioSalasManager from '../components/UsuarioSalasManager.vue'
+import UsuarioSalasManager  from '../components/UsuarioSalasManager.vue'
+import UsuarioSedesManager  from '../components/UsuarioSedesManager.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
@@ -28,6 +29,7 @@ const ROLES = [
   { value: "admin",       label: "Administrador", color: "#dc2626", bg: "rgba(220,38,38,.1)",   icon: "bi-shield-fill-check",   desc: "Acceso total al sistema — puede gestionar todos los módulos, usuarios y configuración." },
   { value: "medico",      label: "Médico",        color: "#15803d", bg: "rgba(21,128,61,.1)",   icon: "bi-heart-pulse-fill",    desc: "Gestión de pacientes e indicaciones médicas. Sin acceso a producción." },
   { value: "cultivador",  label: "Cultivador",    color: "#0891b2", bg: "rgba(8,145,178,.1)",   icon: "bi-flower1",             desc: "Gestión completa de sedes, salas, lotes y plantas. Sin acceso a pacientes." },
+  { value: "supervisor",  label: "Supervisor",    color: "#0f766e", bg: "rgba(15,118,110,.1)",  icon: "bi-binoculars-fill",     desc: "Supervisa las sedes que le asigne el admin. Puede crear y gestionar tareas en esas sedes." },
   { value: "manicura",    label: "Manicura",      color: "#7c3aed", bg: "rgba(124,58,237,.1)",  icon: "bi-scissors",            desc: "Registra el peso de cosecha por lote en sus salas asignadas. Requiere aprobación del admin." },
   { value: "dispensador", label: "Dispensador",   color: "#0891b2", bg: "rgba(8,145,178,.08)",  icon: "bi-bag-check-fill",      desc: "Opera el dispensario: registra entregas a socios y consulta stock disponible." },
   { value: "delivery",    label: "Delivery",      color: "#f59e0b", bg: "rgba(245,158,11,.1)",  icon: "bi-bicycle",             desc: "Gestiona las entregas a domicilio de dispensaciones." },
@@ -40,6 +42,7 @@ const PERMISOS = {
   admin:       [{ ok: true, label: "Gestión total del sistema" }, { ok: true, label: "Usuarios y configuración" }, { ok: true, label: "Contabilidad y documentos" }, { ok: true, label: "Todos los módulos" }],
   medico:      [{ ok: true, label: "Gestionar pacientes" }, { ok: true, label: "Indicaciones médicas" }, { ok: true, label: "Dispensaciones" }, { ok: false, label: "Gestión de producción" }],
   cultivador:  [{ ok: true, label: "Sedes y salas" }, { ok: true, label: "Lotes y plantas" }, { ok: true, label: "Genéticas" }, { ok: false, label: "Pacientes y clínico" }],
+  supervisor:  [{ ok: true, label: "Sedes asignadas" }, { ok: true, label: "Crear y gestionar tareas" }, { ok: true, label: "Ver salas, lotes y plantas" }, { ok: false, label: "Usuarios y pacientes" }],
   manicura:    [{ ok: true, label: "Registrar cosecha (pendiente aprobación)" }, { ok: true, label: "Ver lotes en sus salas asignadas" }, { ok: false, label: "Aprobar stock" }, { ok: false, label: "Dispensar o acceder a socios" }],
   dispensador: [{ ok: true, label: "Registrar dispensaciones" }, { ok: true, label: "Consultar socios" }, { ok: true, label: "Ver stock disponible" }, { ok: false, label: "Producción o contabilidad" }],
   delivery:    [{ ok: true, label: "Entregar dispensaciones a domicilio" }, { ok: true, label: "Consultar socios" }, { ok: false, label: "Crear dispensaciones" }, { ok: false, label: "Producción o contabilidad" }],
@@ -200,6 +203,20 @@ onMounted(async () => {
                   {{ p.label }}
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Sedes asignadas — supervisor -->
+          <div v-if="u.role === 'supervisor'" class="ud__card ud__card--mt">
+            <div class="ud__card-header">
+              <div class="ud__card-icon" style="background:rgba(15,118,110,.1);color:#0f766e">
+                <i class="bi bi-building"></i>
+              </div>
+              <span class="ud__card-title">Sedes asignadas</span>
+              <span class="ud__card-hint" style="color:#0f766e">Solo puede crear tareas en estas sedes</span>
+            </div>
+            <div class="ud__card-body">
+              <UsuarioSedesManager :user-id="userId" />
             </div>
           </div>
 
@@ -388,8 +405,8 @@ onMounted(async () => {
 .ud__btn-primary:disabled { opacity: .55; cursor: not-allowed; }
 .ud__btn-ghost { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .55rem 1rem; border-radius: 8px; font-size: .82rem; font-weight: 500; cursor: pointer; }
 .ud__btn-ghost:hover { background: #f8fafc; }
-.ud__btn-danger { display: inline-flex; align-items: center; gap: .35rem; background: #dc2626; color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; }
-.ud__btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.ud__btn-danger { display: inline-flex; align-items: center; gap: .35rem; background: #b91c1c; color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; }
+.ud__btn-danger:hover:not(:disabled) { background: #991b1b; }
 .ud__btn-danger:disabled { opacity: .55; cursor: not-allowed; }
 .ud__btn-danger-outline { display: inline-flex; align-items: center; gap: .35rem; background: rgba(255,255,255,.8); color: #dc2626; border: 1.5px solid rgba(220,38,38,.3); padding: .55rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; backdrop-filter: blur(4px); }
 .ud__btn-danger-outline:hover { background: #fef2f2; border-color: #dc2626; }

@@ -43,7 +43,7 @@ class DocumentosController < ApplicationController
   end
 
   def subir_archivo
-    authorize @documento, :update?
+    authorize @documento, :subir_archivo?
     @documento.archivo.attach(params[:archivo])
     if @documento.archivo.attached?
       render json: serialize(@documento)

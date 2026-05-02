@@ -1,43 +1,22 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   }
 });
 
-// REQUEST INTERCEPTOR: Agregar token JWT a cada request
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('jwt_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// RESPONSE INTERCEPTOR: Guardar token y manejar errores
+// RESPONSE INTERCEPTOR: Manejar errores de autenticación
 api.interceptors.response.use(
-  (response) => {
-    // Si viene token en el header, guardarlo
-    const token = response.headers['authorization'];
-    if (token) {
-      const cleanToken = token.replace('Bearer ', '');
-      localStorage.setItem('jwt_token', cleanToken);
-    }
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const status = error?.response?.status;
     const url = error?.config?.url || "";
 
-    // Si es 401 (no autorizado)
     if (status === 401 && !url.includes('/users/sign_in')) {
-      // Limpiar token inválido
-      localStorage.removeItem('jwt_token');
-
-      // Limpiar auth store
       try {
         const { useAuthStore } = await import("../stores/auth");
         const auth = useAuthStore();
@@ -239,6 +218,8 @@ export const deleteTarea       = (id)           => api.delete(`/tareas/${id}`)
 export const iniciarTarea      = (id)           => api.post(`/tareas/${id}/iniciar`)
 export const completarTarea    = (id, data)     => api.post(`/tareas/${id}/completar`, data)
 export const cancelarTarea     = (id)           => api.post(`/tareas/${id}/cancelar`)
+export const getTareasSemana   = (desde)        => api.get('/tareas/semana', { params: { desde } })
+export const cancelarSerieTarea = (id)          => api.delete(`/tareas/${id}/cancelar_serie`)
 
 // Gestión de cultivadores asignados a salas
 
@@ -294,6 +275,8 @@ export const createSuperAdminClub = (payload)     => api.post('/super_admin/club
 export const updateSuperAdminClub = (id, payload) => api.put(`/super_admin/clubs/${id}`, { club: payload })
 export const cambiarPlanClub     = (id, payload)  => api.patch(`/super_admin/clubs/${id}/cambiar_plan`, payload)
 export const crearUsuariosDefault = (id)          => api.post(`/super_admin/clubs/${id}/crear_usuarios_default`)
+export const eliminarClub        = (id)           => api.delete(`/super_admin/clubs/${id}`)
+export const restaurarClub       = (id)           => api.patch(`/super_admin/clubs/${id}/restaurar`)
 export const listSuperAdminUsers = ()             => api.get('/super_admin/users')
 export const createSuperAdminUser = (payload)     => api.post('/super_admin/users', { user: payload })
 export const updateSuperAdminUser = (id, payload) => api.put(`/super_admin/users/${id}`, { user: payload })
@@ -338,8 +321,10 @@ export const deletePesada   = (loteId, id)      => api.delete(`/lotes/${loteId}/
 export const createLecturaAmbiental = (salaId, payload) => api.post(`/salas/${salaId}/lecturas_ambientales`, { lectura_ambiental: payload })
 
 // ── Stocks (nuevo modelo) ─────────────────────────────────────────────────────
-export const listStocks      = (params = {})      => api.get('/stocks', { params })
-export const createStock     = (payload)          => api.post('/stocks', { stock: payload })
-export const getSedeStocks   = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/stocks`, { params })
+export const listStocks           = (params = {})         => api.get('/stocks', { params })
+export const listStocksPendientes = ()                    => api.get('/stocks', { params: { pendientes: true } })
+export const createStock          = (payload)             => api.post('/stocks', { stock: payload })
+export const asignarStock         = (id, payload)         => api.post(`/stocks/${id}/asignar`, payload)
+export const getSedeStocks        = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/stocks`, { params })
 
 export default api;

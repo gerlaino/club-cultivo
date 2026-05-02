@@ -32,11 +32,17 @@ class Lote < ApplicationRecord
 
   before_create :generar_codigo
 
+  default_scope { where(deleted_at: nil) }
+
   scope :activos,     -> { where.not(estado: 'finalizado') }
   scope :en_ciclo,    -> { where(estado: CICLO_FASES + ['finalizado']) }
   scope :finalizados, -> { where(estado: 'finalizado') }
   scope :por_sala,    ->(sala_id) { where(sala_id: sala_id) }
   scope :recientes,   -> { order(created_at: :desc) }
+
+  def soft_delete!
+    update_column(:deleted_at, Time.current)
+  end
 
   def dias_desde_inicio
     return 0 unless start_date
@@ -57,12 +63,24 @@ class Lote < ApplicationRecord
     end
   end
 
+  FASE_A_PLANT_STATE = {
+    'vegetativo' => 'vegetativo',
+    'floracion'  => 'floracion',
+    'cosecha'    => 'cosechado',
+    'secado'     => 'secado',
+  }.freeze
+
   # Avance rápido sin pesada — usado por el cultivador desde el botón "Avanzar fase".
   # No crea pesada ni mueve sala; el admin registra pesos y movimiento físico vía transicionar!
   def avanzar_fase!
     idx = CICLO_FASES.index(estado)
     raise ArgumentError, 'Lote no puede transicionar en este estado' unless idx.present? && idx < CICLO_FASES.length - 1
-    update!(estado: CICLO_FASES[idx + 1])
+    nueva_fase = CICLO_FASES[idx + 1]
+    ActiveRecord::Base.transaction do
+      update!(estado: nueva_fase)
+      plant_state = FASE_A_PLANT_STATE[nueva_fase]
+      plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state) if plant_state
+    end
   end
 
   # Avanza el lote al siguiente paso del ciclo (vegetativo→floracion→secado→curado).
@@ -110,6 +128,8 @@ class Lote < ApplicationRecord
       end
 
       update!(estado: nueva_fase, sala: sala_destino)
+      plant_state = FASE_A_PLANT_STATE[nueva_fase]
+      plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state) if plant_state
     end
   end
 

@@ -3,16 +3,39 @@ import { ref, computed, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
 import { getSede, listSalas, listLotes,
-         getSedeStocks, createStock } from "../lib/api"
+         getSedeStocks, createStock, deleteSede } from "../lib/api"
 import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const route  = useRoute()
 const router = useRouter()
 const auth   = useAuthStore()
 const toast  = useToast()
+const { confirm } = useConfirm()
+
+const deleting = ref(false)
+async function eliminarSede() {
+  const ok = await confirm({
+    title: 'Eliminar sede',
+    message: `¿Seguro que querés eliminar "${sede.value?.nombre}"? Esta acción no se puede deshacer.`,
+    confirmText: 'Eliminar',
+    variant: 'danger',
+  })
+  if (!ok) return
+  deleting.value = true
+  try {
+    await deleteSede(sedeId)
+    toast.success('Sede eliminada')
+    router.push({ name: 'sedes' })
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al eliminar la sede')
+  } finally {
+    deleting.value = false
+  }
+}
 
 const sedeId        = Number(route.params.id)
 const sede          = ref(null)
@@ -41,6 +64,8 @@ const nuevoStockError    = ref(null)
 const nuevoStockForm     = ref({ origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, precio_sugerido_ars: null, proveedor: '', descripcion: '' })
 
 const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '🫙 Aceite', tintura: '💧 Tintura', topico: '🧴 Tópico', otro: '📦 Otro' }
+const KIND_LABELS = { germinacion: 'Germinación', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', secado: 'Secado', curado: 'Curado', manicura: 'Manicura', mixta: 'Mixta', madre: 'Madre', madres: 'Madres' }
+function kindLabel(k) { return KIND_LABELS[k] || k || '' }
 const lotesParaStock = ref([])
 const loadingLotesStock = ref(false)
 
@@ -96,6 +121,7 @@ const kpis = computed(() => ({
 }))
 
 function ocupacionColor(pct) {
+  if (pct >= 100) return "#b91c1c"
   if (pct >= 90) return "#dc2626"
   if (pct >= 70) return "#f59e0b"
   return "#15803d"
@@ -172,6 +198,9 @@ onMounted(async () => {
           </button>
           <button v-if="canAddStock && tieneInv" class="sdv__btn-inv" @click="abrirNuevoStockModal">
             <i class="bi bi-plus-lg"></i> Agregar stock
+          </button>
+          <button v-if="isAdmin" class="sdv__btn-danger" :disabled="deleting" @click="eliminarSede">
+            <i class="bi bi-trash3"></i> Eliminar sede
           </button>
           <button class="sdv__btn-ghost" @click="router.back()">
             <i class="bi bi-arrow-left"></i> Volver
@@ -253,7 +282,7 @@ onMounted(async () => {
                     <span class="sdv__sala-nombre">{{ s.nombre }}</span>
                     <div class="sdv__sala-badges">
                       <span class="sdv__state-badge" :style="s.state === 'activa' ? 'background:#dcfce7;color:#15803d' : s.state === 'mantenimiento' ? 'background:#fffbeb;color:#b45309' : 'background:#f1f5f9;color:#64748b'">{{ s.state }}</span>
-                      <span v-if="s.kind" class="sdv__kind-badge">{{ s.kind }}</span>
+                      <span v-if="s.kind" class="sdv__kind-badge">{{ kindLabel(s.kind) }}</span>
                     </div>
                   </div>
                   <div class="sdv__sala-meta">
@@ -631,8 +660,8 @@ onMounted(async () => {
 .sdv__inv-precio { font-size: .75rem; color: #1b5e20; font-weight: 600; margin-top: .15rem; }
 
 /* Modal danger */
-.sdv__btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #dc2626; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; }
-.sdv__btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.sdv__btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #b91c1c; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+.sdv__btn-danger:hover:not(:disabled) { background: #991b1b; }
 .sdv__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
 .sdv__modal--sm { max-width: 420px; }
 

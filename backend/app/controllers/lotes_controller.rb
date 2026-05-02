@@ -13,6 +13,10 @@ class LotesController < ApplicationController
       salas_ids = current_user.salas_ids_asignadas
       return render json: [] if salas_ids.empty?
       lotes = lotes.where(sala_id: salas_ids)
+    elsif current_user.supervisor?
+      salas_ids = current_user.salas_ids_en_sedes_asignadas
+      return render json: [] if salas_ids.empty?
+      lotes = lotes.where(sala_id: salas_ids)
     end
 
     if current_user.manicura?
@@ -70,24 +74,23 @@ class LotesController < ApplicationController
       end
     end
 
-    if @lote.save
-      # Crear registros de plantas automáticamente
+    ActiveRecord::Base.transaction do
+      @lote.save!
       if plantas_iniciales > 0
         state_inicial = estado_a_state(@lote.estado)
         plantas_iniciales.times do |i|
           numero = (i + 1).to_s.rjust(3, '0')
           @lote.plants.create!(
-            nombre:    "#{@lote.codigo}-P#{numero}",
-            state:     state_inicial,
-            genetica:  @lote.genetica,
-            )
+            nombre: "#{@lote.codigo}-P#{numero}",
+            state:  state_inicial,
+          )
         end
       end
-
-      render json: serialize_lote(@lote, include_plants: true), status: :created
-    else
-      render json: { errors: @lote.errors.full_messages }, status: :unprocessable_entity
     end
+
+    render json: serialize_lote(@lote, include_plants: true), status: :created
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
   # PATCH/PUT /lotes/:id
@@ -114,7 +117,7 @@ class LotesController < ApplicationController
 
   # DELETE /lotes/:id
   def destroy
-    @lote.destroy
+    @lote.soft_delete!
     head :no_content
   end
 
@@ -291,14 +294,16 @@ class LotesController < ApplicationController
   def serialize_stock_inline(s)
     { id: s.id, origen: s.origen, forma_producto: s.forma_producto,
       unidad: s.unidad, cantidad: s.cantidad.to_f,
-      precio_sugerido_ars: s.precio_sugerido_ars&.to_f, sede_id: s.sede_id }
+      estado: s.estado, sede_id: s.sede_id,
+      precio_sugerido_ars: s.precio_sugerido_ars&.to_f,
+      lote_codigo: s.lote&.codigo }
   end
 
   def cerrar_curado_con_stocks
     raise RuntimeError, 'El lote no está en curado' unless @lote.estado == 'curado'
 
     pesada_data   = params.require(:pesada).permit(:fase_origen, :fase_destino, :peso_curado_g, :notas)
-    stocks_params = params[:stocks].map { |s| s.permit(:sede_id, :forma_producto, :cantidad, :unidad, :precio_sugerido_ars) }
+    stocks_params = params[:stocks].map { |s| s.permit(:forma_producto, :cantidad, :unidad, :precio_sugerido_ars) }
 
     peso_curado_g = pesada_data[:peso_curado_g].to_d
     total_stock   = stocks_params.sum { |s| s[:cantidad].to_d }
@@ -310,25 +315,32 @@ class LotesController < ApplicationController
 
     ActiveRecord::Base.transaction do
       pesada = @lote.pesadas.create!(
-        fase_origen:   pesada_data[:fase_origen]  || 'curado',
-        fase_destino:  pesada_data[:fase_destino] || 'finalizado',
-        peso_curado_g: peso_curado_g,
-        notas:         pesada_data[:notas],
+        fase_origen:    pesada_data[:fase_origen]  || 'curado',
+        fase_destino:   pesada_data[:fase_destino] || 'finalizado',
+        peso_curado_g:  peso_curado_g,
+        notas:          pesada_data[:notas],
         registrado_por: current_user,
         registrado_at:  Time.current,
       )
 
+      # Stocks nacen sin sede asignada — el admin decide destino en el siguiente paso
       stocks_creados = stocks_params.map do |sp|
-        sede = current_user.club.sedes.find(sp[:sede_id])
-        Stock.create!(
-          sede:               sede,
+        stock = Stock.create!(
+          sede:               nil,
           lote:               @lote,
           origen:             'lote',
+          estado:             'pendiente_asignacion',
           forma_producto:     sp[:forma_producto],
           cantidad:           sp[:cantidad].to_d,
           unidad:             sp[:unidad] || 'g',
           precio_sugerido_ars: sp[:precio_sugerido_ars],
         )
+        stock.stock_movimientos.create!(
+          tipo:    'produccion',
+          gramos:  stock.cantidad,
+          usuario: current_user,
+        )
+        stock
       end
 
       @lote.update!(estado: 'finalizado')
@@ -363,7 +375,7 @@ class LotesController < ApplicationController
   end
 
   def require_admin_cultivador_o_manicura
-    unless current_user.admin? || current_user.cultivador? || current_user.manicura?
+    unless current_user.admin? || current_user.cultivador? || current_user.manicura? || current_user.supervisor?
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end

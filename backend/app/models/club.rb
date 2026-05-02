@@ -1,5 +1,5 @@
 class Club < ApplicationRecord
-  has_many :users,                dependent: :restrict_with_error
+  has_many :users
   has_many :salas,                dependent: :destroy
   has_many :lotes,                dependent: :destroy
   has_many :pacientes,            class_name: 'Paciente', dependent: :destroy
@@ -26,6 +26,9 @@ class Club < ApplicationRecord
   validates :name,  presence: true
   validates :slug,  presence: true, uniqueness: true, format: { with: /\A[a-z0-9_]+\z/ }
   validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
+
+  scope :activos,    -> { where(deleted_at: nil) }
+  scope :eliminados, -> { where.not(deleted_at: nil) }
 
   before_validation :generar_slug, on: :create
   after_create :crear_geneticas_default!
@@ -120,6 +123,16 @@ class Club < ApplicationRecord
       next if Genetica.where(global: true, nombre: data[:nombre]).exists?
       Genetica.create!(data.merge(global: true, club_id: nil))
     end.compact
+  end
+
+  def eliminado? = deleted_at.present?
+
+  def soft_delete!
+    update!(deleted_at: Time.current)
+  end
+
+  def restaurar!
+    update!(deleted_at: nil)
   end
 
   private

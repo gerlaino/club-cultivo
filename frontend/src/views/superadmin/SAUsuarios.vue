@@ -210,7 +210,7 @@ onMounted(cargar)
 </template>
 
 <style scoped>
-.sau { padding: 2rem 2rem 3rem; max-width: 1200px; }
+.sau { padding: 2rem 2.5rem 3rem; max-width: 1100px; margin: 0 auto; }
 .sau__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
 .sau__eyebrow { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #94a3b8; margin-bottom: .35rem; }
 .sau__title { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -.04em; }

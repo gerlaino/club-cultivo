@@ -45,6 +45,12 @@ const TIPO_META = {
 }
 function tipoMeta(tipo) { return TIPO_META[tipo] || TIPO_META.produccion }
 function cicloMeta(ciclo) { return CICLO_META[ciclo] || CICLO_META.vegetativo }
+const KIND_LABEL = {
+  vegetativo: 'Vegetativo', floracion: 'Floración', mixta: 'Mixta',
+  madre: 'Madres', clon: 'Clones', secado: 'Secado', curado: 'Curado',
+  manicura: 'Manicura', cosecha: 'Cosecha',
+}
+function kindLabel(k) { return KIND_LABEL[k] || k || '' }
 
 function emptyForm() {
   return { nombre: '', tipo: 'produccion', direccion: '', ciudad: '',
@@ -264,7 +270,7 @@ function tieneActividad(sede) {
                   <div class="agri-sala__name-wrap">
                     <span class="agri-sala__indicator" :class="sala.state === 'activa' ? 'agri-sala__indicator--on' : 'agri-sala__indicator--off'"></span>
                     <span class="agri-sala__nombre">{{ sala.nombre }}</span>
-                    <span v-if="sala.kind" class="agri-sala__kind">{{ sala.kind }}</span>
+                    <span v-if="sala.kind" class="agri-sala__kind">{{ kindLabel(sala.kind) }}</span>
                   </div>
                   <div class="agri-sala__stats">
                     <span class="agri-sala__stat">
@@ -433,7 +439,7 @@ function tieneActividad(sede) {
             </div>
             <div class="sede-card__actions" @click.stop>
               <button
-                v-if="['social','mixta'].includes(sede.tipo)"
+                v-if="['social','mixta','produccion'].includes(sede.tipo)"
                 class="sede-card__btn sede-card__btn--secondary"
                 @click="verInventario(sede)"
               >

@@ -12,6 +12,8 @@ const store  = useUsuariosStore()
 const q             = ref("")
 const showModal     = ref(false)
 const editing       = ref(false)
+const currentPage   = ref(1)
+const PER_PAGE      = 20
 const toast   = useToast()
 const { confirm } = useConfirm()
 const todasLasSalas = ref([])
@@ -26,6 +28,7 @@ const ROLES = [
   { value: 'admin',       label: 'Administrador', icon: 'bi-shield-fill-check'   },
   { value: 'medico',      label: 'Médico',        icon: 'bi-heart-pulse-fill'    },
   { value: 'cultivador',  label: 'Cultivador',    icon: 'bi-flower1'             },
+  { value: 'supervisor',  label: 'Supervisor',    icon: 'bi-binoculars-fill'     },
   { value: 'manicura',    label: 'Manicura',      icon: 'bi-scissors'            },
   { value: 'dispensador', label: 'Dispensador',   icon: 'bi-bag-check-fill'      },
   { value: 'delivery',    label: 'Delivery',      icon: 'bi-bicycle'             },
@@ -69,6 +72,14 @@ const filteredUsers = computed(() => {
   )
 })
 
+const totalPages  = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / PER_PAGE)))
+const pagedUsers  = computed(() => {
+  const start = (currentPage.value - 1) * PER_PAGE
+  return filteredUsers.value.slice(start, start + PER_PAGE)
+})
+
+watch(q, () => { currentPage.value = 1 })
+
 const sedesDisponibles = computed(() => todasLasSedes.value)
 const salasDeLaSede = computed(() =>
   todasLasSalas.value.filter(s =>
@@ -110,7 +121,7 @@ async function save() {
       showModal.value = false
       toast.success('Usuario actualizado correctamente.')
     } else {
-      const nuevo = await store.create(payload)
+      const nuevo = await store.create({ ...payload, password: '123456Aa', password_confirmation: '123456Aa' })
       showModal.value = false
       toast.success('Usuario creado. La contraseña inicial es 123456Aa.')
     }
@@ -191,50 +202,77 @@ watch(showModal, async (val) => {
       </button>
     </div>
 
-    <!-- Grid -->
-    <div v-else class="uv__grid">
-      <div v-for="u in filteredUsers" :key="u.id" class="uv__card">
+    <!-- Tabla -->
+    <div v-else class="uv__table-wrap">
+      <table class="uv__table">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Rol</th>
+            <th class="uv__col-fecha">Miembro desde</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="u in pagedUsers" :key="u.id" class="uv__table-row">
+            <td>
+              <div class="uv__user-cell">
+                <div class="uv__avatar" :style="{ background: getAvatarColor(u) }">{{ getInitials(u) }}</div>
+                <div>
+                  <div class="uv__cell-name">{{ u.first_name }} {{ u.last_name }}</div>
+                  <div class="uv__cell-email">{{ u.email }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="uv__role-badge" :style="roleStyle(u.role)">
+                <i :class="['bi', getRoleInfo(u.role).icon]"></i>
+                {{ getRoleInfo(u.role).label }}
+              </span>
+            </td>
+            <td class="uv__col-fecha">
+              <span class="uv__fecha">{{ u.created_at ? new Date(u.created_at).toLocaleDateString('es-AR', { day:'numeric', month:'short', year:'numeric' }) : '—' }}</span>
+            </td>
+            <td>
+              <div class="uv__row-actions">
+                <RouterLink :to="{ name: 'usuario-detail', params: { id: u.id } }" class="uv__row-btn" title="Ver perfil">
+                  <i class="bi bi-person-lines-fill"></i>
+                </RouterLink>
+                <button class="uv__row-btn" @click="startEdit(u)" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="uv__row-btn uv__row-btn--danger" @click="removeOne(u)" title="Eliminar">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
-        <!-- Franja de color del rol -->
-        <div class="uv__card-bar" :style="{ background: roleColor(u.role) }"></div>
-
-        <div class="uv__card-body">
-          <!-- Avatar + info -->
-          <div class="uv__card-top">
-            <div class="uv__avatar" :style="{ background: getAvatarColor(u) }">
-              {{ getInitials(u) }}
-            </div>
-            <div class="uv__card-info">
-              <div class="uv__card-name">{{ u.first_name }} {{ u.last_name }}</div>
-              <div class="uv__card-email">{{ u.email }}</div>
-            </div>
-          </div>
-
-          <!-- Badge rol -->
-          <div class="uv__role-badge" :style="roleStyle(u.role)">
-            <i :class="['bi', getRoleInfo(u.role).icon]"></i>
-            {{ getRoleInfo(u.role).label }}
-          </div>
-
-          <!-- Acciones -->
-          <div class="uv__card-actions">
-            <RouterLink
-              :to="{ name: 'usuario-detail', params: { id: u.id } }"
-              class="uv__action uv__action--primary"
-              title="Ver perfil"
-            >
-              <i class="bi bi-person-lines-fill"></i>
-              Ver perfil
-            </RouterLink>
-            <button class="uv__action uv__action--ghost" @click="startEdit(u)" title="Editar">
-              <i class="bi bi-pencil"></i>
-            </button>
-            <button class="uv__action uv__action--danger" @click="removeOne(u)" title="Eliminar">
-              <i class="bi bi-trash"></i>
-            </button>
-          </div>
+      <!-- Paginación -->
+      <div v-if="totalPages > 1" class="uv__pagination">
+        <span class="uv__page-info">
+          {{ filteredUsers.length }} usuario{{ filteredUsers.length !== 1 ? 's' : '' }} ·
+          página {{ currentPage }} de {{ totalPages }}
+        </span>
+        <div class="uv__page-nav">
+          <button class="uv__page-btn" :disabled="currentPage === 1" @click="currentPage--">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          <button
+            v-for="p in totalPages" :key="p"
+            class="uv__page-btn"
+            :class="{ 'uv__page-btn--active': p === currentPage }"
+            @click="currentPage = p"
+          >{{ p }}</button>
+          <button class="uv__page-btn" :disabled="currentPage === totalPages" @click="currentPage++">
+            <i class="bi bi-chevron-right"></i>
+          </button>
         </div>
-
+      </div>
+      <div v-else class="uv__page-footer">
+        {{ filteredUsers.length }} usuario{{ filteredUsers.length !== 1 ? 's' : '' }}
       </div>
     </div>
 
@@ -392,52 +430,48 @@ watch(showModal, async (val) => {
 .uv__empty-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin: 0 0 .5rem; }
 .uv__empty-desc { font-size: .875rem; margin: 0 0 1.25rem; }
 
-/* Grid */
-.uv__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.1rem;
-}
+/* Table */
+.uv__table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
+.uv__table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.uv__table thead th { padding: 10px 14px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb; background: #fafafa; white-space: nowrap; }
+.uv__table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; }
+.uv__table tbody tr:last-child { border-bottom: none; }
+.uv__table tbody tr:hover { background: #f8fafc; }
+.uv__table td { padding: 10px 14px; vertical-align: middle; }
 
-/* Card */
-.uv__card {
-  background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
-  overflow: hidden; transition: box-shadow .15s, transform .12s;
-}
-.uv__card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.08); transform: translateY(-2px); }
-.uv__card-bar { height: 4px; }
-.uv__card-body { padding: 1.25rem; }
-
-.uv__card-top { display: flex; align-items: center; gap: .875rem; margin-bottom: .875rem; }
+.uv__user-cell { display: flex; align-items: center; gap: .75rem; }
 .uv__avatar {
-  width: 48px; height: 48px; border-radius: 13px;
+  width: 32px; height: 32px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: .95rem; font-weight: 800; flex-shrink: 0;
-  letter-spacing: -.02em;
+  color: #fff; font-size: .72rem; font-weight: 700; flex-shrink: 0;
 }
-.uv__card-info { flex: 1; min-width: 0; }
-.uv__card-name { font-size: .95rem; font-weight: 700; color: #0f172a; margin-bottom: .15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.uv__card-email { font-size: .75rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uv__cell-name { font-weight: 600; font-size: .875rem; color: #0f172a; }
+.uv__cell-email { font-size: .75rem; color: #9ca3af; }
 
 .uv__role-badge {
   display: inline-flex; align-items: center; gap: .35rem;
-  font-size: .72rem; font-weight: 700; padding: .25em .7em;
-  border-radius: 6px; margin-bottom: 1rem;
+  font-size: .72rem; font-weight: 700; padding: .2em .6em;
+  border-radius: 5px;
 }
 
-.uv__card-actions { display: flex; gap: .5rem; }
-.uv__action {
-  display: inline-flex; align-items: center; gap: .35rem;
-  padding: .5rem .875rem; border-radius: 8px;
-  font-size: .8rem; font-weight: 600; cursor: pointer;
-  transition: all .15s; border: none; text-decoration: none;
+.uv__col-fecha { width: 140px; }
+.uv__fecha { font-size: .78rem; color: #94a3b8; }
+
+.uv__row-actions { display: flex; align-items: center; gap: .2rem; justify-content: flex-end; opacity: 0; transition: opacity .15s; }
+.uv__table-row:hover .uv__row-actions { opacity: 1; }
+.uv__row-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 7px;
+  background: none; border: none; color: #64748b; cursor: pointer;
+  font-size: .875rem; transition: all .15s; text-decoration: none;
 }
-.uv__action--primary { background: var(--c-role-admin); color: #fff; flex: 1; justify-content: center; }
-.uv__action--primary:hover { background: #144a18; }
-.uv__action--ghost { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
-.uv__action--ghost:hover { background: #e2e8f0; color: #0f172a; }
-.uv__action--danger { background: var(--c-rust-100); color: var(--c-rust-600); border: 1px solid #fecaca; }
-.uv__action--danger:hover { background: #fee2e2; }
+.uv__row-btn:hover { background: #f1f5f9; color: #1e293b; }
+.uv__row-btn--danger:hover { background: #fef2f2; color: #b91c1c; }
+
+@media (max-width: 640px) {
+  .uv__col-fecha, .uv__table thead th:nth-child(3), .uv__table td:nth-child(3) { display: none; }
+  .uv__row-actions { opacity: 1; }
+}
 
 /* Modal */
 .uv__overlay {
@@ -510,4 +544,30 @@ watch(showModal, async (val) => {
   border-top-color: #fff; border-radius: 50%;
   animation: uv-spin .6s linear infinite;
 }
+
+/* Pagination */
+.uv__pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem 1rem; border-top: 1px solid #f1f5f9; gap: 1rem; flex-wrap: wrap;
+}
+.uv__page-footer {
+  padding: .65rem 1rem; border-top: 1px solid #f1f5f9;
+  font-size: .75rem; color: #94a3b8; text-align: right;
+}
+.uv__page-info { font-size: .75rem; color: #94a3b8; }
+.uv__page-nav { display: flex; gap: .25rem; align-items: center; }
+.uv__page-btn {
+  min-width: 32px; height: 32px; padding: 0 .5rem;
+  border: 1.5px solid #e2e8f0; border-radius: 7px;
+  background: #fff; font-size: .8rem; font-weight: 500;
+  color: #475569; cursor: pointer; transition: all .15s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.uv__page-btn:hover:not(:disabled) { border-color: #94a3b8; color: #0f172a; }
+.uv__page-btn:disabled { opacity: .4; cursor: not-allowed; }
+.uv__page-btn--active {
+  background: var(--c-role-admin); border-color: var(--c-role-admin);
+  color: #fff; font-weight: 700;
+}
+.uv__page-btn--active:hover { background: var(--c-role-admin); color: #fff; }
 </style>

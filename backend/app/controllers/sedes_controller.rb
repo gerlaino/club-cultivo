@@ -10,6 +10,8 @@ class SedesController < ApplicationController
               salas_ids = current_user.salas_ids_asignadas
               sede_ids  = Sala.where(id: salas_ids).pluck(:sede_id).compact.uniq
               current_user.club.sedes.activas.where(id: sede_ids)
+            when 'supervisor'
+              current_user.sedes_asignadas.activas
             when 'dispensador'
               asignadas = current_user.sedes_asignadas.activas
               asignadas.any? ? asignadas : current_user.club.sedes.activas.where(tipo: %w[social mixta])
@@ -48,11 +50,10 @@ class SedesController < ApplicationController
   end
 
   def destroy
-    if @sede.salas.where(state: 'activa').any?
-      return render json: { error: 'No se puede eliminar una sede con salas activas' },
-                    status: :unprocessable_entity
+    if current_user.club.sedes.count <= 1
+      return render json: { error: 'No se puede eliminar la única sede del club' }, status: :unprocessable_entity
     end
-    @sede.destroy
+    @sede.soft_delete!
     head :no_content
   end
 

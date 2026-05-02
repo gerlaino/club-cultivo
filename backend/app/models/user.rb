@@ -16,6 +16,7 @@ class User < ApplicationRecord
     admin:        'admin',
     medico:       'medico',
     cultivador:   'cultivador',
+    supervisor:   'supervisor',
     abogado:      'abogado',
     auditor:      'auditor',
     dispensador:  'dispensador',
@@ -39,6 +40,10 @@ class User < ApplicationRecord
 
   def sedes_ids_asignadas
     sedes_asignadas.pluck(:id)
+  end
+
+  def salas_ids_en_sedes_asignadas
+    Sala.where(sede_id: sedes_ids_asignadas, club_id: club_id).pluck(:id)
   end
 
   def observando_club

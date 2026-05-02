@@ -15,8 +15,9 @@ class SalasController < ApplicationController
                         .order(:nombre)
 
     if current_user.cultivador?
-      salas_ids = current_user.salas_ids_asignadas
-      salas = salas.where(id: salas_ids)
+      salas = salas.where(id: current_user.salas_ids_asignadas)
+    elsif current_user.supervisor?
+      salas = salas.where(sede_id: current_user.sedes_ids_asignadas)
     end
 
     render json: salas.map { |s| serialize_sala(s) }
@@ -46,11 +47,7 @@ class SalasController < ApplicationController
   end
 
   def destroy
-    if @sala.lotes.any?
-      return render json: { error: 'No se puede eliminar una sala con lotes activos' },
-                    status: :unprocessable_entity
-    end
-    @sala.destroy
+    @sala.soft_delete!
     head :no_content
   end
 

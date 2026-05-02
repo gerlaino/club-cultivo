@@ -8,7 +8,8 @@ import { useAuthStore } from "../stores/auth"
 import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
 import ModalCargarLote from '../components/salas/ModalCargarLote.vue'
 import RegistrarLecturaModal from '../components/salas/RegistrarLecturaModal.vue'
-import { listGeneticas, updateSala, getSalaAmbiente } from '../lib/api.js'
+import { listGeneticas, updateSala, getSalaAmbiente, deleteSala } from '../lib/api.js'
+import { useConfirm } from '../composables/useConfirm.js'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 import { Gauge } from 'lucide-vue-next'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
@@ -28,6 +29,28 @@ const salas  = useSalasStore()
 const lotes  = useLotesStore()
 const auth   = useAuthStore()
 const toast  = useToast()
+const { confirm } = useConfirm()
+
+const deleting = ref(false)
+async function eliminarSala() {
+  const ok = await confirm({
+    title: 'Eliminar sala',
+    message: `¿Seguro que querés eliminar "${sala.value?.nombre}"? Los lotes y plantas quedarán archivados (soft delete) y podrán recuperarse si es necesario.`,
+    confirmText: 'Eliminar',
+    variant: 'danger',
+  })
+  if (!ok) return
+  deleting.value = true
+  try {
+    await deleteSala(salaId)
+    toast.success('Sala eliminada')
+    router.push({ name: 'salas' })
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al eliminar la sala')
+  } finally {
+    deleting.value = false
+  }
+}
 
 const salaId  = Number(route.params.id) || 0
 const loading = ref(true)
@@ -113,8 +136,8 @@ function kindLabel(k)  { return { vegetativo:"Vegetativo", floracion:"Floración
 function salaEstadoStyle(state) {
   return { activa:{bg:"#dcfce7",color:"#15803d"}, mantenimiento:{bg:"#fef3c7",color:"#b45309"}, cerrada:{bg:"#f1f5f9",color:"#64748b"} }[state] || {bg:"#f1f5f9",color:"#64748b"}
 }
-function ocupacionColor(pct) { return pct >= 90 ? "#dc2626" : pct >= 70 ? "#d97706" : "#16a34a" }
-function ocupacionPct(s)     { return Math.min(s?.porcentaje_ocupacion || 0, 100) }
+function ocupacionColor(pct) { return pct >= 100 ? "#b91c1c" : pct >= 90 ? "#dc2626" : pct >= 70 ? "#d97706" : "#16a34a" }
+function ocupacionPct(s)     { return s?.porcentaje_ocupacion || 0 }
 function formatDate(d) {
   if (!d) return "—"
   const date = new Date(d)
@@ -200,6 +223,7 @@ async function createLote() {
     await lotes.createInSala(salaId, payload)
     closeCreate()
     lotesExpanded.value = true
+    salas.fetchSala(salaId)
   } catch (err) {
     if (err.response?.status === 402) {
       showCreate.value  = false
@@ -320,6 +344,9 @@ const canSeeAmbiente = computed(() =>
           <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="showCreate = true">
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
+          <button v-if="canEdit" class="sd__btn-danger" :disabled="deleting" @click="eliminarSala">
+            <i class="bi bi-trash3"></i>
+          </button>
         </div>
       </div>
 
@@ -329,9 +356,12 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__kpi-icon">📊</div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value" :style="{ color: ocupacionColor(ocupacionPct(sala)) }">{{ ocupacionPct(sala).toFixed(0) }}%</div>
-            <div class="sd__kpi-label">Ocupación</div>
+            <div class="sd__kpi-label">
+              Ocupación
+              <span v-if="ocupacionPct(sala) > 100" style="font-size:.65rem;color:#b91c1c;font-weight:700;margin-left:.3rem">⚠ excede capacidad</span>
+            </div>
             <div class="sd__kpi-progress">
-              <div class="sd__kpi-progress-fill" :style="{ width: ocupacionPct(sala) + '%', background: ocupacionColor(ocupacionPct(sala)) }"></div>
+              <div class="sd__kpi-progress-fill" :style="{ width: Math.min(ocupacionPct(sala), 100) + '%', background: ocupacionColor(ocupacionPct(sala)) }"></div>
             </div>
           </div>
         </div>
@@ -732,6 +762,9 @@ const canSeeAmbiente = computed(() =>
 .sd__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .sd__btn-primary:hover:not(:disabled) { background: #104417; }
 .sd__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.sd__btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #b91c1c; color: #fff; border: none; padding: .6rem .9rem; border-radius: 8px; font-size: .875rem; cursor: pointer; transition: background .15s; }
+.sd__btn-danger:hover:not(:disabled) { background: #991b1b; }
+.sd__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
 .sd__btn-secondary { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #b45309; border: 1.5px solid #fde68a; padding: .6rem 1.1rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
 .sd__btn-secondary:hover { background: #fffbeb; border-color: #f59e0b; }
 .sd__btn-ghost { background: transparent; color: #60725d; border: 1px solid #d4e6d4; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 500; cursor: pointer; transition: all .15s; }

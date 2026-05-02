@@ -45,7 +45,7 @@ class MovimientosContablesController < ApplicationController
   # GET /movimientos_contables/dashboard
   def dashboard
     club  = current_user.club
-    hoy   = Date.today
+    hoy   = Time.zone.today
     scope = club.movimientos_contables
 
     # Filtro por sede si viene el parámetro

@@ -5,8 +5,9 @@ class InformeSemestralController < ApplicationController
   # GET /informe_semestral
   def show
     club     = current_user.club
-    anio     = (params[:anio]     || Date.today.year).to_i
-    semestre = (params[:semestre] || (Date.today.month <= 6 ? 1 : 2)).to_i
+    hoy      = Time.zone.today
+    anio     = (params[:anio]     || hoy.year).to_i
+    semestre = (params[:semestre] || (hoy.month <= 6 ? 1 : 2)).to_i
 
     desde = semestre == 1 ? Date.new(anio, 1, 1)  : Date.new(anio, 7, 1)
     hasta = semestre == 1 ? Date.new(anio, 6, 30) : Date.new(anio, 12, 31)
@@ -118,48 +119,57 @@ class InformeSemestralController < ApplicationController
     disps = Dispensacion.joins(:paciente)
                         .where(pacientes: { club_id: club.id })
                         .where(fecha_dispensacion: desde..hasta)
+    por_forma = disps.joins(:stock)
+                     .group('stocks.forma_producto')
+                     .sum('dispensaciones.cantidad')
+                     .map { |forma, g| { tipo: forma, gramos: g.to_f.round(2) } }
     {
       total:              disps.count,
-      total_gramos:       disps.sum(:cantidad_gramos).to_f.round(2),
-      por_tipo_producto:  disps.group(:tipo_producto).sum(:cantidad_gramos)
-                               .map { |tipo, g| { tipo: tipo, gramos: g.to_f.round(2) } },
+      total_gramos:       disps.sum(:cantidad).to_f.round(2),
+      por_tipo_producto:  por_forma,
       aporte_total_ars:   disps.sum(:aporte_socio_ars).to_f.round(2),
       pacientes_dispensados: disps.distinct.count(:paciente_id),
     }
   end
 
-  # Solo genéticas que tienen plantas activas O tuvieron lotes en el período
-  # Las genéticas INASE sin uso real no aparecen
-  def resumen_geneticas(club, desde, hasta)
-    # Genéticas con plantas vivas actualmente (via lote.genetica_id)
-    geneticas_con_plantas = Plant.joins(:lote)
-                                 .where(lotes: { club_id: club.id })
-                                 .where.not(plants: { state: %w[cosechado descartada] })
-                                 .where.not(lotes: { genetica_id: nil })
-                                 .group('lotes.genetica_id')
-                                 .count
+  def resumen_geneticas(club, _desde, _hasta)
+    lotes = club.lotes.includes(:genetica, :costo_lote)
+    return [] if lotes.empty?
 
-    # Genéticas usadas en lotes del período
-    geneticas_en_periodo = club.lotes
-                               .where("start_date <= ?", hasta)
-                               .where.not(genetica_id: nil)
-                               .pluck(:genetica_id)
-                               .uniq
+    # Agrupar lotes por nombre de genética (case-insensitive), usando FK o strain
+    groups = {}
+    lotes.each do |lote|
+      nombre = lote.genetica&.nombre.presence || lote.strain.presence
+      next if nombre.blank?
+      key = nombre.downcase
+      groups[key] ||= { nombre: nombre, lote_ids: [], gramos_producidos: 0.0, lotes_count: 0 }
+      groups[key][:lote_ids] << lote.id
+      groups[key][:lotes_count] += 1
+      groups[key][:gramos_producidos] += (lote.costo_lote&.gramos_producidos&.to_f || 0.0)
+    end
 
-    genetica_ids = (geneticas_con_plantas.keys + geneticas_en_periodo).uniq
-    return [] if genetica_ids.empty?
+    return [] if groups.empty?
 
-    club.geneticas.where(id: genetica_ids, activa: true).map do |g|
-      plantas_activas = geneticas_con_plantas[g.id] || 0
+    all_lote_ids = groups.values.flat_map { |g| g[:lote_ids] }
+
+    activas_por_lote = Plant.where(lote_id: all_lote_ids)
+                            .where.not(state: %w[cosechado descartada])
+                            .group(:lote_id).count
+
+    cosechadas_por_lote = Plant.where(lote_id: all_lote_ids, state: 'cosechado')
+                               .group(:lote_id).count
+
+    groups.map do |_, g|
+      activas    = g[:lote_ids].sum { |id| activas_por_lote[id] || 0 }
+      cosechadas = g[:lote_ids].sum { |id| cosechadas_por_lote[id] || 0 }
       {
-        nombre:           g.nombre,
-        tipo:             g.tipo,
-        thc:              g.thc&.to_f,
-        cbd:              g.cbd&.to_f,
-        registrada_inase: g.registrada_inase,
-        plantas_activas:  plantas_activas,
+        nombre:             g[:nombre],
+        plantas_activas:    activas,
+        plantas_cosechadas: cosechadas,
+        gramos_producidos:  g[:gramos_producidos].round(2),
+        lotes_count:        g[:lotes_count],
       }
-    end.sort_by { |g| -g[:plantas_activas] }
+    end.sort_by { |g| -(g[:plantas_activas] + g[:plantas_cosechadas]) }
   end
 
   def require_admin_or_autorizado!

@@ -6,6 +6,7 @@
     <ManicuradorDashboard v-else-if="auth.user?.role === 'manicura'"                               :key="auth.user?.id" />
     <DispensadorDashboard v-else-if="auth.user?.role === 'dispensador'"                             :key="auth.user?.id" />
     <LegalDashboard       v-else-if="auth.user?.role === 'abogado' || auth.user?.role === 'auditor'" :key="auth.user?.id" />
+    <SupervisorDashboard  v-else-if="auth.user?.role === 'supervisor'"                               :key="auth.user?.id" />
     <DefaultDashboard     v-else                                                                     :key="auth.user?.id" />
   </div>
 </template>
@@ -18,6 +19,7 @@ import CultivadorDashboard  from '../components/dashboards/CultivadorDashboard.v
 import ManicuradorDashboard from '../components/dashboards/ManicuradorDashboard.vue'
 import DispensadorDashboard from '../components/dashboards/DispensadorDashboard.vue'
 import LegalDashboard       from '../components/dashboards/LegalDashboard.vue'
+import SupervisorDashboard  from './supervisor/SupervisorDashboard.vue'
 import DefaultDashboard     from '../components/dashboards/DefaultDashboard.vue'
 
 const auth = useAuthStore()

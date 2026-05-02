@@ -372,10 +372,18 @@ function iniciarGrabacion() {
 }
 
 function detenerGrabacion() {
-  if (recognition) recognition.stop()
+  if (!recognition) return
   escuchando.value = false; transcripcionInterim.value = ''
-  if (!transcripcion.value.trim()) { errorVoz.value = 'No escuché nada. Intentá de nuevo.'; return }
-  parsearConIA()
+  // Override onend to check transcript AFTER final results are delivered (stop() is async)
+  recognition.onend = () => {
+    transcripcionInterim.value = ''
+    if (!transcripcion.value.trim()) {
+      errorVoz.value = 'No escuché nada. Intentá de nuevo.'
+    } else {
+      parsearConIA()
+    }
+  }
+  recognition.stop()
 }
 
 async function parsearConIA() {

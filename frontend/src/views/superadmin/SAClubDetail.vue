@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 
@@ -16,8 +16,8 @@ const loading = ref(true)
 const saving  = ref(false)
 const error   = ref(null)
 
-const showPlanModal   = ref(false)
-const showUserModal   = ref(false)
+const showPlanModal = ref(false)
+const showUserModal = ref(false)
 const planForm = ref({ plan: '', plan_activo_hasta: '', trial: false })
 const userForm = ref({ first_name: '', last_name: '', email: '', password: '123456Aa', role: 'cultivador' })
 const userError = ref(null)
@@ -43,7 +43,8 @@ function roleMeta(r) { return ROLE_META[r] || { label: r, color: '#64748b', bg: 
 
 function formatDate(d) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+  const safe = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d + 'T00:00:00' : d
+  return new Date(safe).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 async function cargar() {
@@ -81,6 +82,7 @@ async function guardarPlan() {
     })
     club.value = { ...club.value, ...data }
     showPlanModal.value = false
+    toast.success('Plan actualizado')
   } catch (e) {
     error.value = e?.response?.data?.error || 'Error al actualizar el plan'
   } finally {
@@ -96,6 +98,7 @@ async function crearUsuario() {
     await createSuperAdminUser({ ...userForm.value, club_id: id })
     await cargar()
     showUserModal.value = false
+    toast.success('Usuario creado')
   } catch (e) {
     userError.value = e?.response?.data?.errors?.join(', ') || 'Error al crear el usuario'
   } finally {
@@ -121,8 +124,48 @@ async function toggleWeb() {
   try {
     const { data } = await updateSuperAdminClub(id, { web_activa: !club.value.web_activa })
     club.value = { ...club.value, ...data }
-  } catch (e) {
+  } catch {
     toast.error('Error al actualizar')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function eliminar() {
+  const ok = await confirm({
+    title: `Eliminar ${club.value.name}`,
+    message: 'El club y toda su data quedarán inaccesibles para sus usuarios. Los datos NO se borran de la base de datos.',
+    confirmText: 'Eliminar club',
+    variant: 'danger',
+  })
+  if (!ok) return
+  saving.value = true
+  try {
+    await eliminarClub(id)
+    toast.success('Club eliminado')
+    router.push({ name: 'sa-dashboard' })
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al eliminar')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function restaurar() {
+  const ok = await confirm({
+    title: `Restaurar ${club.value.name}`,
+    message: 'El club y sus usuarios recuperarán acceso al sistema.',
+    confirmText: 'Restaurar',
+    variant: 'default',
+  })
+  if (!ok) return
+  saving.value = true
+  try {
+    const { data } = await restaurarClub(id)
+    club.value = data
+    toast.success('Club restaurado')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al restaurar')
   } finally {
     saving.value = false
   }
@@ -140,14 +183,27 @@ onMounted(cargar)
 
     <template v-else-if="club">
 
+      <!-- Banner eliminado -->
+      <div v-if="club.deleted_at" class="scd__deleted-banner">
+        <i class="bi bi-trash3"></i>
+        <div>
+          <strong>Club eliminado</strong> — eliminado el {{ formatDate(club.deleted_at) }}. Los usuarios no pueden acceder.
+        </div>
+        <button class="scd__btn-restore" :disabled="saving" @click="restaurar">
+          <i class="bi bi-arrow-counterclockwise"></i> Restaurar
+        </button>
+      </div>
+
       <!-- Header -->
       <div class="scd__header">
         <div>
-          <RouterLink :to="{ name: 'sa-clubs' }" class="scd__back">
-            <i class="bi bi-arrow-left"></i> Clubs
+          <RouterLink :to="{ name: 'sa-dashboard' }" class="scd__back">
+            <i class="bi bi-arrow-left"></i> Dashboard
           </RouterLink>
           <div class="scd__title-row">
-            <div class="scd__avatar">{{ club.name?.[0]?.toUpperCase() }}</div>
+            <div class="scd__avatar" :class="{ 'scd__avatar--deleted': club.deleted_at }">
+              {{ club.name?.[0]?.toUpperCase() }}
+            </div>
             <div>
               <h1 class="scd__title">{{ club.name }}</h1>
               <div class="scd__slug">{{ club.slug }}</div>
@@ -156,42 +212,60 @@ onMounted(cargar)
         </div>
         <div class="scd__header-actions">
           <button class="scd__btn-secondary" @click="generarUsuarios" :disabled="saving">
-            <i class="bi bi-magic"></i> Generar usuarios default
+            <i class="bi bi-magic"></i> Generar usuarios
           </button>
-          <button class="scd__btn-primary" @click="abrirPlanModal">
-            <i class="bi bi-stars"></i> Cambiar plan
+          <button v-if="!club.deleted_at" class="scd__btn-danger" @click="eliminar" :disabled="saving">
+            <i class="bi bi-trash3"></i> Eliminar club
           </button>
         </div>
       </div>
 
+      <!-- Layout 3 columnas -->
       <div class="scd__layout">
 
-        <!-- Info del club -->
+        <!-- Col 1: Info del club -->
+        <div class="scd__card">
+          <div class="scd__card-header">
+            <span class="scd__card-title">Información</span>
+          </div>
+          <dl class="scd__dl">
+            <dt>Nombre legal</dt><dd>{{ club.legal_name || '—' }}</dd>
+            <dt>Email</dt><dd>{{ club.email || '—' }}</dd>
+            <dt>Teléfono</dt><dd>{{ club.phone || '—' }}</dd>
+            <dt>Sitio web</dt><dd>{{ club.website || '—' }}</dd>
+            <dt>Dirección</dt><dd>{{ club.address || '—' }}</dd>
+            <dt>Ciudad</dt><dd>{{ club.city || '—' }}</dd>
+            <dt>Provincia</dt><dd>{{ club.state || '—' }}</dd>
+            <dt>País</dt><dd>{{ club.country || '—' }}</dd>
+            <dt>Timezone</dt><dd>{{ club.timezone || '—' }}</dd>
+            <dt>Registrado</dt><dd>{{ formatDate(club.created_at) }}</dd>
+          </dl>
+
+          <!-- Estadísticas rápidas -->
+          <div class="scd__stats">
+            <div class="scd__stat">
+              <div class="scd__stat-val">{{ club.usuarios_count }}</div>
+              <div class="scd__stat-lbl">Usuarios</div>
+            </div>
+            <div class="scd__stat">
+              <div class="scd__stat-val">{{ club.pacientes_count }}</div>
+              <div class="scd__stat-lbl">Pacientes</div>
+            </div>
+            <div class="scd__stat">
+              <div class="scd__stat-val">{{ club.lotes_count }}</div>
+              <div class="scd__stat-lbl">Lotes</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Col 2: Plan + Web -->
         <div class="scd__col">
+
           <div class="scd__card">
             <div class="scd__card-header">
-              <span class="scd__card-title">Información del club</span>
-            </div>
-            <dl class="scd__dl">
-              <dt>Nombre legal</dt><dd>{{ club.legal_name || '—' }}</dd>
-              <dt>Email</dt><dd>{{ club.email || '—' }}</dd>
-              <dt>Teléfono</dt><dd>{{ club.phone || '—' }}</dd>
-              <dt>Sitio web</dt><dd>{{ club.website || '—' }}</dd>
-              <dt>Dirección</dt><dd>{{ club.address || '—' }}</dd>
-              <dt>Ciudad</dt><dd>{{ club.city || '—' }}</dd>
-              <dt>Provincia</dt><dd>{{ club.state || '—' }}</dd>
-              <dt>País</dt><dd>{{ club.country || '—' }}</dd>
-              <dt>Timezone</dt><dd>{{ club.timezone || '—' }}</dd>
-              <dt>Registrado</dt><dd>{{ formatDate(club.created_at) }}</dd>
-            </dl>
-          </div>
-
-          <!-- Plan -->
-          <div class="scd__card scd__card--mt">
-            <div class="scd__card-header">
-              <span class="scd__card-title">Plan actual</span>
+              <span class="scd__card-title">Plan</span>
               <button class="scd__edit-btn" @click="abrirPlanModal">
-                <i class="bi bi-pencil"></i> Editar
+                <i class="bi bi-pencil"></i> Cambiar
               </button>
             </div>
             <div class="scd__plan-body">
@@ -206,59 +280,51 @@ onMounted(cargar)
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Card web pública -->
-        <div class="scd__card scd__card--mt">
-          <div class="scd__card-header">
-            <span class="scd__card-title">Web pública</span>
-          </div>
-          <div class="scd__plan-body" style="justify-content:space-between">
-            <div>
-              <div style="font-size:.875rem;font-weight:600;color:#0f172a;margin-bottom:4px">
-                {{ club.web_activa ? 'Activa y visible al público' : 'Desactivada' }}
-              </div>
-              <div style="font-size:.78rem;color:#94a3b8">
-                {{ club.web_activa ? 'El sitio público del club es accesible.' : 'El sitio no es accesible públicamente.' }}
-              </div>
-            </div>
-            <button
-              class="scd__web-toggle"
-              :class="{ 'scd__web-toggle--on': club.web_activa }"
-              :disabled="saving"
-              @click="toggleWeb"
-            >
-              <span class="scd__web-toggle-thumb"></span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Usuarios -->
-        <div class="scd__col">
-          <div class="scd__card">
+          <div class="scd__card scd__card--mt">
             <div class="scd__card-header">
-              <span class="scd__card-title">Usuarios ({{ club.usuarios?.length || 0 }})</span>
-              <button class="scd__btn-primary scd__btn-sm" @click="abrirUserModal">
-                <i class="bi bi-person-plus"></i> Crear usuario
+              <span class="scd__card-title">Web pública</span>
+            </div>
+            <div class="scd__plan-body" style="justify-content:space-between">
+              <div>
+                <div class="scd__web-status">{{ club.web_activa ? 'Activa y visible al público' : 'Desactivada' }}</div>
+                <div class="scd__web-hint">{{ club.web_activa ? 'El sitio público es accesible.' : 'El sitio no es accesible públicamente.' }}</div>
+              </div>
+              <button
+                class="scd__web-toggle"
+                :class="{ 'scd__web-toggle--on': club.web_activa }"
+                :disabled="saving"
+                @click="toggleWeb"
+              >
+                <span class="scd__web-toggle-thumb"></span>
               </button>
             </div>
-            <div v-if="!club.usuarios?.length" class="scd__empty">
-              Sin usuarios registrados
-            </div>
-            <div v-else class="scd__users">
-              <div v-for="u in club.usuarios" :key="u.id" class="scd__user-row">
-                <div class="scd__user-avatar">
-                  {{ (u.nombre?.[0] || u.email?.[0] || '?').toUpperCase() }}
-                </div>
-                <div class="scd__user-info">
-                  <div class="scd__user-nombre">{{ u.nombre || '—' }}</div>
-                  <div class="scd__user-email">{{ u.email }}</div>
-                </div>
-                <span class="scd__role-badge"
-                      :style="{ background: roleMeta(u.role).bg, color: roleMeta(u.role).color }">
-                  {{ roleMeta(u.role).label }}
-                </span>
+          </div>
+
+        </div>
+
+        <!-- Col 3: Usuarios -->
+        <div class="scd__card">
+          <div class="scd__card-header">
+            <span class="scd__card-title">Usuarios ({{ club.usuarios?.length || 0 }})</span>
+            <button class="scd__btn-primary scd__btn-sm" @click="abrirUserModal">
+              <i class="bi bi-person-plus"></i> Crear
+            </button>
+          </div>
+          <div v-if="!club.usuarios?.length" class="scd__empty">Sin usuarios</div>
+          <div v-else class="scd__users">
+            <div v-for="u in club.usuarios" :key="u.id" class="scd__user-row">
+              <div class="scd__user-avatar">
+                {{ (u.nombre?.[0] || u.email?.[0] || '?').toUpperCase() }}
               </div>
+              <div class="scd__user-info">
+                <div class="scd__user-nombre">{{ u.nombre || '—' }}</div>
+                <div class="scd__user-email">{{ u.email }}</div>
+              </div>
+              <span class="scd__role-badge"
+                    :style="{ background: roleMeta(u.role).bg, color: roleMeta(u.role).color }">
+                {{ roleMeta(u.role).label }}
+              </span>
             </div>
           </div>
         </div>
@@ -361,23 +427,47 @@ onMounted(cargar)
 </template>
 
 <style scoped>
-.scd { padding: 2rem 2rem 3rem; max-width: 1100px; }
+.scd { padding: 2rem 2rem 3rem; max-width: 1200px; }
 .scd__loading { display: flex; justify-content: center; padding: 5rem; }
 .scd__ring { width: 24px; height: 24px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: scd-spin .7s linear infinite; }
 @keyframes scd-spin { to { transform: rotate(360deg); } }
 
+/* Banner eliminado */
+.scd__deleted-banner {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px;
+  padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+  font-size: .875rem; color: #991b1b;
+}
+.scd__deleted-banner strong { color: #7f1d1d; }
+.scd__deleted-banner > div { flex: 1; }
+.scd__btn-restore {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: #fff; color: #991b1b; border: 1.5px solid #fca5a5;
+  padding: .45rem .9rem; border-radius: 8px; font-size: .82rem; font-weight: 600;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.scd__btn-restore:hover:not(:disabled) { background: #fef2f2; }
+.scd__btn-restore:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Header */
 .scd__back { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; font-weight: 600; color: #64748b; text-decoration: none; margin-bottom: .75rem; }
 .scd__back:hover { color: #0f172a; }
 .scd__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
 .scd__title-row { display: flex; align-items: center; gap: .875rem; }
 .scd__avatar { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, rgba(27,94,32,.15), rgba(3,105,161,.15)); color: #1b5e20; font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.scd__avatar--deleted { background: #f1f5f9; color: #94a3b8; }
 .scd__title { font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0 0 .15rem; letter-spacing: -.03em; }
 .scd__slug  { font-size: .78rem; color: #94a3b8; font-family: monospace; }
 .scd__header-actions { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
 
-.scd__layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
-@media (max-width: 900px) { .scd__layout { grid-template-columns: 1fr; } }
-.scd__col { display: flex; flex-direction: column; }
+/* Layout 3 columnas */
+.scd__layout { display: grid; grid-template-columns: 1.2fr 1fr 1.2fr; gap: 1.25rem; align-items: start; }
+@media (max-width: 1100px) { .scd__layout { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px)  { .scd__layout { grid-template-columns: 1fr; } }
+.scd__col { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* Cards */
 .scd__card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
 .scd__card--mt { margin-top: 1.25rem; }
 .scd__card-header { display: flex; align-items: center; justify-content: space-between; padding: .875rem 1.1rem; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
@@ -385,24 +475,49 @@ onMounted(cargar)
 .scd__edit-btn { font-size: .75rem; font-weight: 600; color: #0369a1; background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: .3rem; }
 .scd__edit-btn:hover { text-decoration: underline; }
 
-.scd__dl { display: grid; grid-template-columns: 130px 1fr; gap: .4rem .75rem; padding: 1rem 1.1rem; margin: 0; }
+.scd__dl { display: grid; grid-template-columns: 110px 1fr; gap: .4rem .75rem; padding: 1rem 1.1rem; margin: 0; }
 .scd__dl dt { font-size: .75rem; color: #94a3b8; font-weight: 500; }
 .scd__dl dd { font-size: .82rem; color: #0f172a; font-weight: 500; margin: 0; }
 
+/* Stats rápidas */
+.scd__stats { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #f1f5f9; }
+.scd__stat { padding: .875rem; text-align: center; border-right: 1px solid #f1f5f9; }
+.scd__stat:last-child { border-right: none; }
+.scd__stat-val { font-size: 1.4rem; font-weight: 800; color: #0f172a; letter-spacing: -.03em; }
+.scd__stat-lbl { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #94a3b8; margin-top: .1rem; }
+
+/* Plan */
 .scd__plan-body { padding: 1rem 1.1rem; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .scd__plan-badge { font-size: .82rem; font-weight: 800; padding: .3em .85em; border-radius: 8px; }
 .scd__trial-badge { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; background: #fffbeb; color: #b45309; padding: .2em .6em; border-radius: 6px; }
 .scd__plan-meta { font-size: .78rem; color: #94a3b8; width: 100%; }
+.scd__web-status { font-size: .875rem; font-weight: 600; color: #0f172a; margin-bottom: .2rem; }
+.scd__web-hint   { font-size: .78rem; color: #94a3b8; }
 
+/* Usuarios */
 .scd__empty { padding: 2rem; text-align: center; color: #94a3b8; font-size: .875rem; }
-.scd__users { display: flex; flex-direction: column; }
-.scd__user-row { display: flex; align-items: center; gap: .75rem; padding: .75rem 1.1rem; border-bottom: 1px solid #f8fafc; }
+.scd__users { display: flex; flex-direction: column; max-height: 420px; overflow-y: auto; }
+.scd__user-row { display: flex; align-items: center; gap: .75rem; padding: .7rem 1.1rem; border-bottom: 1px solid #f8fafc; }
 .scd__user-row:last-child { border-bottom: none; }
 .scd__user-avatar { width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; color: #475569; font-size: .75rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .scd__user-info { flex: 1; min-width: 0; }
 .scd__user-nombre { font-size: .82rem; font-weight: 600; color: #0f172a; }
 .scd__user-email  { font-size: .72rem; color: #94a3b8; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .scd__role-badge { font-size: .68rem; font-weight: 700; padding: .2em .55em; border-radius: 5px; white-space: nowrap; flex-shrink: 0; }
+
+/* Botones */
+.scd__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: var(--brand-primary, #1b5e20); color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.scd__btn-primary:hover:not(:disabled) { background: #144a18; }
+.scd__btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+.scd__btn-sm { padding: .45rem .875rem; font-size: .8rem; }
+.scd__btn-secondary { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #475569; border: 1.5px solid #e2e8f0; padding: .6rem 1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.scd__btn-secondary:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; }
+.scd__btn-secondary:disabled { opacity: .6; cursor: not-allowed; }
+.scd__btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #b91c1c; border: 1.5px solid #fca5a5; padding: .6rem 1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.scd__btn-danger:hover:not(:disabled) { background: #fef2f2; border-color: #f87171; }
+.scd__btn-danger:disabled { opacity: .6; cursor: not-allowed; }
+.scd__btn-ghost { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; }
+.scd__btn-ghost:hover { background: #f8fafc; }
 
 /* Modal */
 .scd__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(3px); }
@@ -431,30 +546,12 @@ onMounted(cargar)
 .scd__toggle__thumb { position: absolute; width: 16px; height: 16px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .2s; }
 .scd__toggle__input:checked + .scd__toggle__track .scd__toggle__thumb { left: 19px; }
 .scd__toggle__label { font-size: .875rem; font-weight: 600; color: #0f172a; }
-
-.scd__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: var(--brand-primary, #1b5e20); color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; }
-.scd__btn-primary:hover:not(:disabled) { background: #144a18; }
-.scd__btn-primary:disabled { opacity: .6; cursor: not-allowed; }
-.scd__btn-sm { padding: .45rem .875rem; font-size: .8rem; }
-.scd__btn-secondary { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #475569; border: 1.5px solid #e2e8f0; padding: .6rem 1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
-.scd__btn-secondary:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; }
-.scd__btn-secondary:disabled { opacity: .6; cursor: not-allowed; }
-.scd__btn-ghost { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; }
-.scd__btn-ghost:hover { background: #f8fafc; }
 .scd__spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: scd-spin .6s linear infinite; }
 
-.scd__web-toggle {
-  width: 46px; height: 26px; border-radius: 13px; background: #e2e8f0;
-  border: none; cursor: pointer; position: relative; transition: background .25s;
-  padding: 0; flex-shrink: 0;
-}
+/* Web toggle */
+.scd__web-toggle { width: 46px; height: 26px; border-radius: 13px; background: #e2e8f0; border: none; cursor: pointer; position: relative; transition: background .25s; padding: 0; flex-shrink: 0; }
 .scd__web-toggle--on { background: #1b5e20; }
 .scd__web-toggle:disabled { opacity: .5; cursor: not-allowed; }
-.scd__web-toggle-thumb {
-  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
-  border-radius: 50%; background: white; transition: transform .25s; display: block;
-  box-shadow: 0 1px 3px rgba(0,0,0,.2);
-}
+.scd__web-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: white; transition: transform .25s; display: block; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 .scd__web-toggle--on .scd__web-toggle-thumb { transform: translateX(20px); }
 </style>
-

@@ -130,9 +130,13 @@ watch(activeTab, (tab) => {
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function safeDate(d) {
+  if (!d) return null
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : new Date(d)
+}
 function formatDate(d) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+  return safeDate(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 function formatDateTime(d) {
   if (!d) return '—'
@@ -140,12 +144,12 @@ function formatDateTime(d) {
 }
 function edad(fn) {
   if (!fn) return null
-  return Math.floor((Date.now() - new Date(fn).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
+  return Math.floor((Date.now() - safeDate(fn).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
 }
 
 const reprocannStatus = computed(() => {
   if (!s.value?.reprocann_vencimiento) return null
-  const days = Math.floor((new Date(s.value.reprocann_vencimiento) - new Date()) / 86400000)
+  const days = Math.floor((safeDate(s.value.reprocann_vencimiento) - new Date()) / 86400000)
   if (days < 0)   return { label: 'Vencido',                        color: '#dc2626', bg: 'rgba(220,38,38,.1)',   key: 'danger'  }
   if (days <= 30) return { label: `Vence en ${days} días`,           color: '#d97706', bg: 'rgba(217,119,6,.1)',  key: 'warning' }
   return               { label: `Vigente — ${days} días restantes`, color: '#15803d', bg: 'rgba(21,128,61,.1)',  key: 'success' }

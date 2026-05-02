@@ -9,6 +9,10 @@ class PlantsController < ApplicationController
       salas_ids = current_user.salas_ids_asignadas
       return render json: [] if salas_ids.empty?
       plants = plants.where(lotes: { sala_id: salas_ids })
+    elsif current_user.supervisor?
+      salas_ids = current_user.salas_ids_en_sedes_asignadas
+      return render json: [] if salas_ids.empty?
+      plants = plants.where(lotes: { sala_id: salas_ids })
     end
     plants = plants.where(lote_id: params[:lote_id]) if params[:lote_id].present?
     plants = plants.includes(lote: [:genetica, { sala: :sede }]).order(created_at: :desc)

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { listSedes, getContableDashboard, getTareasDashboard, listLotes, listStocks } from '../../lib/api.js'
+import { listSedes, getContableDashboard, getTareasDashboard, listLotes, listStocks, listStocksPendientes } from '../../lib/api.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import { useStatsStore } from '../../stores/stats.js'
@@ -28,6 +28,7 @@ const loading                = ref(true)
 const lotesManicuraPendiente = ref([])
 const lotesCurado            = ref([])
 const stocks                 = ref([])
+const stocksPendientes       = ref([])
 
 const stats = computed(() => statsStore.data ?? {})
 
@@ -51,13 +52,16 @@ function fmtCompacto(n) {
 
 function formatDate(d) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+  const parsed = typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : new Date(d)
+  return parsed.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
 }
 
 const alertas = computed(() => {
   const list = []
   const sp = lotesManicuraPendiente.value.length
   if (sp > 0) list.push({ variant: 'sky',   icon: 'bi-clipboard-check',       msg: `${sp} lote${sp !== 1 ? 's' : ''} pendiente${sp !== 1 ? 's' : ''} de aprobación de manicura`, to: '/aprobaciones', cta: 'Revisar' })
+  const stk = stocksPendientes.value.length
+  if (stk > 0) list.push({ variant: 'amber', icon: 'bi-box-seam',             msg: `${stk} lote${stk !== 1 ? 's' : ''} de stock sin asignar a sede`, to: '/admin/stocks/pendientes', cta: 'Asignar' })
   const v = stats.value.vencimientos || 0
   if (v > 0) list.push({ variant: 'rust',   icon: 'bi-patch-exclamation-fill', msg: `${v} paciente${v !== 1 ? 's' : ''} con REPROCANN vencido`, to: '/pacientes', cta: 'Ver pacientes' })
   const tv = tareas.value?.stats?.vencidas || 0
@@ -97,21 +101,23 @@ const balancePositivo = computed(() => (contable.value?.mes_actual?.balance || 0
 
 onMounted(async () => {
   try {
-    const [sedesRes, contableRes, tareasRes, manicuraRes, curadoRes, stocksRes] = await Promise.allSettled([
+    const [sedesRes, contableRes, tareasRes, manicuraRes, curadoRes, stocksRes, stocksPendRes] = await Promise.allSettled([
       listSedes(),
       getContableDashboard(),
       getTareasDashboard(),
       listLotes({ estado: 'manicura_pendiente' }),
       listLotes({ estado: 'curado' }),
       listStocks(),
+      listStocksPendientes(),
     ])
     await statsStore.fetchAll()
-    if (sedesRes.status    === 'fulfilled') sedes.value                  = sedesRes.value.data    || []
-    if (contableRes.status === 'fulfilled') contable.value               = contableRes.value.data
-    if (tareasRes.status   === 'fulfilled') tareas.value                 = tareasRes.value.data
-    if (manicuraRes.status === 'fulfilled') lotesManicuraPendiente.value = manicuraRes.value.data || []
-    if (curadoRes.status   === 'fulfilled') lotesCurado.value            = curadoRes.value.data   || []
-    if (stocksRes.status   === 'fulfilled') stocks.value                 = stocksRes.value.data   || []
+    if (sedesRes.status      === 'fulfilled') sedes.value                  = sedesRes.value.data      || []
+    if (contableRes.status   === 'fulfilled') contable.value               = contableRes.value.data
+    if (tareasRes.status     === 'fulfilled') tareas.value                 = tareasRes.value.data
+    if (manicuraRes.status   === 'fulfilled') lotesManicuraPendiente.value = manicuraRes.value.data   || []
+    if (curadoRes.status     === 'fulfilled') lotesCurado.value            = curadoRes.value.data     || []
+    if (stocksRes.status     === 'fulfilled') stocks.value                 = stocksRes.value.data     || []
+    if (stocksPendRes.status === 'fulfilled') stocksPendientes.value       = stocksPendRes.value.data || []
   } finally {
     loading.value = false
   }
@@ -220,9 +226,9 @@ async function onOnboardingCompletado() {
               :tone="balancePositivo ? 'leaf-600' : 'rust-600'"
             />
             <p class="ad__kpi-sub c-muted" style="font-family:var(--font-mono);font-size:var(--fs-12)">
-              <span class="c-leaf">↓ {{ fmtCompacto(contable?.mes_actual?.ingresos || 0) }}</span>
+              <span class="c-leaf">↑ {{ fmtCompacto(contable?.mes_actual?.ingresos || 0) }}</span>
               <span>  ·  </span>
-              <span class="c-red">↑ {{ fmtCompacto(contable?.mes_actual?.egresos || 0) }}</span>
+              <span class="c-red">↓ {{ fmtCompacto(contable?.mes_actual?.egresos || 0) }}</span>
             </p>
           </DsCard>
         </RouterLink>

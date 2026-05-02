@@ -6,16 +6,20 @@ class Tarea < ApplicationRecord
   belongs_to :sala,  optional: true
   belongs_to :lote,  optional: true
   belongs_to :plant, optional: true
+  belongs_to :parent_tarea, class_name: 'Tarea', optional: true
+  has_many   :tareas_hijas, class_name: 'Tarea', foreign_key: :parent_tarea_id, dependent: :nullify
 
   # ── Enums ──────────────────────────────────────────────────────
-  TIPOS = %w[riego poda medicion limpieza cosecha transplante inspeccion otro].freeze
-  ESTADOS = %w[pendiente en_progreso completada cancelada].freeze
+  TIPOS       = %w[riego poda medicion limpieza cosecha transplante inspeccion otro].freeze
+  ESTADOS     = %w[pendiente en_progreso completada cancelada].freeze
   PRIORIDADES = %w[baja normal alta urgente].freeze
+  FRECUENCIAS = %w[diaria semanal quincenal mensual].freeze
 
   validates :titulo,    presence: true, length: { maximum: 200 }
   validates :tipo,      inclusion: { in: TIPOS }
   validates :estado,    inclusion: { in: ESTADOS }
   validates :prioridad, inclusion: { in: PRIORIDADES }
+  validates :frecuencia, inclusion: { in: FRECUENCIAS }, allow_nil: true
   validates :horas_estimadas, numericality: { greater_than: 0, allow_nil: true }
   validates :horas_reales,    numericality: { greater_than: 0, allow_nil: true }
 
@@ -29,9 +33,9 @@ class Tarea < ApplicationRecord
   scope :en_progreso,      -> { where(estado: 'en_progreso') }
   scope :completadas,      -> { where(estado: 'completada') }
   scope :activas,          -> { where(estado: %w[pendiente en_progreso]) }
-  scope :de_hoy,           -> { where(fecha_programada: Date.today) }
-  scope :vencidas,         -> { where('fecha_programada < ? AND estado NOT IN (?)', Date.today, %w[completada cancelada]) }
-  scope :proximas,         -> { where(fecha_programada: Date.today..7.days.from_now) }
+  scope :de_hoy,           -> { where(fecha_programada: Time.zone.today) }
+  scope :vencidas,         -> { where('fecha_programada < ? AND estado NOT IN (?)', Time.zone.today, %w[completada cancelada]) }
+  scope :proximas,         -> { where(fecha_programada: Time.zone.today..7.days.from_now) }
   scope :con_lote,         -> { where.not(lote_id: nil) }
   scope :horas_pendientes, -> { con_lote.completadas.where(horas_aplicadas_al_lote: false).where.not(horas_reales: nil) }
   scope :por_prioridad,    -> { order(Arel.sql("CASE prioridad WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END")) }
@@ -79,6 +83,40 @@ class Tarea < ApplicationRecord
   # Marcar que las horas ya fueron aplicadas al lote
   def marcar_horas_aplicadas!
     update!(horas_aplicadas_al_lote: true)
+  end
+
+  def en_serie? = parent_tarea_id.present? || tareas_hijas.exists?
+
+  def generar_serie!
+    return [] unless recurrente? && frecuencia.present? && fecha_programada.present?
+
+    paso = { 'diaria' => 1, 'semanal' => 7, 'quincenal' => 14, 'mensual' => 30 }[frecuencia] * (intervalo || 1)
+    max  = recurrencia_veces.present? ? recurrencia_veces.to_i - 1 : 51
+    max  = [max, 51].min
+
+    hijas = []
+    1.upto(max) do |i|
+      siguiente = fecha_programada + (i * paso).days
+      break if recurrencia_hasta.present? && siguiente > recurrencia_hasta
+
+      hijas << Tarea.create!(
+        club_id:          club_id,
+        titulo:           titulo,
+        tipo:             tipo,
+        descripcion:      descripcion,
+        prioridad:        prioridad,
+        asignada_a_id:    asignada_a_id,
+        creada_por_id:    creada_por_id,
+        sala_id:          sala_id,
+        lote_id:          lote_id,
+        horas_estimadas:  horas_estimadas,
+        fecha_programada: siguiente,
+        estado:           'pendiente',
+        recurrente:       false,
+        parent_tarea_id:  id,
+      )
+    end
+    hijas
   end
 
   private

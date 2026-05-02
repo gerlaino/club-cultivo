@@ -2,7 +2,7 @@ class TareasController < ApplicationController
   before_action :authenticate_user!
   before_action :check_tareas_role!
   before_action :set_club
-  before_action :set_tarea, only: [:show, :update, :destroy, :completar, :iniciar, :cancelar]
+  before_action :set_tarea, only: [:show, :update, :destroy, :completar, :iniciar, :cancelar, :cancelar_serie]
   before_action :authorize_create!, only: [:create]
   before_action :authorize_manage!, only: [:update, :destroy]
 
@@ -11,7 +11,13 @@ class TareasController < ApplicationController
   def index
     tareas = @club.tareas.includes(:asignada_a, :creada_por, :sala, :lote, :plant)
 
-    # scope especial para dashboard del cultivador
+    # Supervisor solo ve tareas de sus sedes
+    if current_user.supervisor?
+      salas_ids = current_user.salas_ids_en_sedes_asignadas
+      tareas = tareas.where(sala_id: salas_ids)
+    end
+
+    # scope especial para dashboard del cultivador / supervisor
     if params[:scope] == 'mias'
       tareas = tareas.asignadas_a(current_user.id)
     elsif params[:scope] == 'hoy'
@@ -42,17 +48,21 @@ class TareasController < ApplicationController
   # GET /api/v1/tareas/dashboard
   # Resumen para el dashboard del cultivador
   def dashboard
-    base = @club.tareas.asignadas_a(current_user.id)
+    base = if current_user.admin? || current_user.super_admin?
+      @club.tareas
+    else
+      @club.tareas.asignadas_a(current_user.id)
+    end
 
     render json: {
       hoy: base.de_hoy.order(created_at: :desc).map { |t| serialize_tarea(t) },
       vencidas: base.vencidas.por_prioridad.limit(5).map { |t| serialize_tarea(t) },
-      proximas: base.proximas.where.not(fecha_programada: Date.today)
+      proximas: base.proximas.where.not(fecha_programada: Time.zone.today)
                     .por_prioridad.limit(10).map { |t| serialize_tarea(t) },
       stats: {
         pendientes: base.pendientes.count,
         en_progreso: base.en_progreso.count,
-        completadas_hoy: base.completadas.where(fecha_completada: Date.today.all_day).count,
+        completadas_hoy: base.completadas.where(fecha_completada: Time.zone.today.all_day).count,
         vencidas: base.vencidas.count
       }
     }
@@ -98,8 +108,16 @@ class TareasController < ApplicationController
       tarea.asignada_a_id = current_user.id
     end
 
+    # Supervisor solo puede crear tareas en salas de sus sedes asignadas
+    if current_user.supervisor? && tarea.sala_id.present?
+      unless current_user.salas_ids_en_sedes_asignadas.include?(tarea.sala_id.to_i)
+        return render json: { error: 'Solo podés crear tareas en salas de tus sedes asignadas' }, status: :forbidden
+      end
+    end
+
     if tarea.save
-      render json: serialize_tarea(tarea), status: :created
+      serie_count = tarea.recurrente? ? tarea.generar_serie!.length : 0
+      render json: serialize_tarea(tarea).merge(serie_creada: serie_count), status: :created
     else
       render json: { errors: tarea.errors.full_messages }, status: :unprocessable_entity
     end
@@ -170,6 +188,44 @@ class TareasController < ApplicationController
     head :no_content
   end
 
+  # GET /api/v1/tareas/semana?desde=YYYY-MM-DD
+  def semana
+    desde = params[:desde].present? ? Date.parse(params[:desde]) : Date.current.beginning_of_week(:monday)
+    hasta = desde + 6.days
+
+    base = if current_user.admin? || current_user.super_admin?
+      @club.tareas
+    else
+      @club.tareas.asignadas_a(current_user.id)
+    end
+
+    tareas = base.where(fecha_programada: desde..hasta)
+                 .where.not(estado: %w[cancelada])
+                 .includes(:asignada_a, :sala, :lote)
+                 .order(:fecha_programada, :prioridad)
+
+    dias = (0..6).map do |offset|
+      dia = desde + offset
+      {
+        fecha:      dia,
+        dia_semana: I18n.l(dia, format: '%A').capitalize,
+        tareas:     tareas.select { |t| t.fecha_programada == dia }.map { |t| serialize_tarea(t) }
+      }
+    end
+
+    render json: { desde: desde, hasta: hasta, dias: dias }
+  end
+
+  # DELETE /api/v1/tareas/:id/cancelar_serie
+  def cancelar_serie
+    root = @tarea.parent_tarea_id ? @tarea.parent_tarea : @tarea
+    canceladas = Tarea.where(parent_tarea_id: root.id, estado: %w[pendiente en_progreso]).count
+    Tarea.where(parent_tarea_id: root.id, estado: %w[pendiente en_progreso]).update_all(estado: 'cancelada')
+    canceladas += 1 if root.pendiente? || root.en_progreso?
+    root.update(estado: 'cancelada') if root.pendiente? || root.en_progreso?
+    render json: { canceladas: canceladas }
+  end
+
   private
 
   def set_club
@@ -187,7 +243,8 @@ class TareasController < ApplicationController
       :titulo, :descripcion, :tipo, :estado, :prioridad,
       :asignada_a_id, :sala_id, :lote_id, :plant_id,
       :fecha_programada, :horas_estimadas, :horas_reales,
-      :notas_completado, :horas_aplicadas_al_lote
+      :notas_completado, :horas_aplicadas_al_lote,
+      :recurrente, :frecuencia, :intervalo, :recurrencia_hasta, :recurrencia_veces
     )
   end
 
@@ -199,13 +256,13 @@ class TareasController < ApplicationController
   end
 
   def authorize_create!
-    unless current_user.admin? || current_user.cultivador?
+    unless current_user.admin? || current_user.cultivador? || current_user.supervisor?
       render json: { error: 'Sin permiso para crear tareas' }, status: :forbidden
     end
   end
 
   def authorize_manage!
-    unless current_user.admin? || current_user.cultivador?
+    unless current_user.admin? || current_user.cultivador? || current_user.supervisor?
       render json: { error: 'Sin permiso para modificar esta tarea' }, status: :forbidden
     end
   end
@@ -228,11 +285,14 @@ class TareasController < ApplicationController
       vencida: t.vencida?,
       creada_por: t.creada_por ? { id: t.creada_por.id, nombre: t.creada_por.nombre_completo } : nil,
       asignada_a: t.asignada_a ? { id: t.asignada_a.id, nombre: t.asignada_a.nombre_completo } : nil,
-      sala: t.sala ? { id: t.sala.id, nombre: t.sala.nombre } : nil,
+      sala: t.sala ? { id: t.sala.id, nombre: t.sala.nombre, sede_id: t.sala.sede_id } : nil,
       lote: t.lote ? { id: t.lote.id, codigo: t.lote.codigo } : nil,
       plant: t.plant ? { id: t.plant.id, codigo_qr: t.plant.codigo_qr, nombre: t.plant.nombre } : nil,
-      created_at: t.created_at,
-      updated_at: t.updated_at
+      recurrente:        t.recurrente,
+      frecuencia:        t.frecuencia,
+      parent_tarea_id:   t.parent_tarea_id,
+      created_at:        t.created_at,
+      updated_at:        t.updated_at
     }
   end
 end

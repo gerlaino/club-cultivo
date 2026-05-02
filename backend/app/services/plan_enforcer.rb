@@ -3,7 +3,7 @@ class PlanEnforcer
     'semilla'    => { label: 'Semilla',    sedes: 1,   lotes: 2,   plantas: 50,  pacientes: 30,  usuarios: 3  },
     'brote'      => { label: 'Brote',      sedes: 2,   lotes: 6,   plantas: 150, pacientes: 100, usuarios: 8  },
     'cosecha'    => { label: 'Cosecha',    sedes: 3,   lotes: nil, plantas: nil, pacientes: 250, usuarios: 20 },
-    'federacion' => { label: 'Federacion', sedes: nil, lotes: nil, plantas: nil, pacientes: nil, usuarios: nil },
+    'federacion' => { label: 'Federación', sedes: nil, lotes: nil, plantas: nil, pacientes: nil, usuarios: nil },
   }.freeze
 
   def initialize(club)
