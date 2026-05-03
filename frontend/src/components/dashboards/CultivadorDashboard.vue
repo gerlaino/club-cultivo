@@ -284,6 +284,7 @@ import { useSalasStore }   from '../../stores/salas'
 import { useLotesStore }   from '../../stores/lotes'
 import { useAmbienteStore } from '../../stores/ambiente'
 import { useAlertasBell }  from '../../composables/useAlertasBell.js'
+import { useToast }        from '../../composables/useToast.js'
 import { storeToRefs }     from 'pinia'
 import { getTareasSemana } from '../../lib/api.js'
 import { formatFechaLarga } from '../../utils/fecha.js'
@@ -307,6 +308,7 @@ const lotesStore  = useLotesStore()
 const ambienteStore = useAmbienteStore()
 
 const { dashboard, kanban } = storeToRefs(tareasStore)
+const toast = useToast()
 useAlertasBell()
 
 const loading      = ref(true)
@@ -426,12 +428,14 @@ async function finalizarTarea() {
   if (!tareaDetalle.value) return
   guardandoAccion.value = true
   try {
-    await tareasStore.completar(tareaDetalle.value.id, 0, '')
+    await tareasStore.completar(tareaDetalle.value.id, null, '')
     await tareasStore.fetchKanban({})
     await cargarSemana()
     tareaDetalle.value = null
-  } catch { /* silencioso */ }
-  finally { guardandoAccion.value = false }
+    toast.success('Tarea finalizada')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'No se pudo finalizar la tarea')
+  } finally { guardandoAccion.value = false }
 }
 
 async function revertirTarea() {
@@ -442,8 +446,10 @@ async function revertirTarea() {
     await tareasStore.fetchKanban({})
     await cargarSemana()
     tareaDetalle.value = null
-  } catch { /* silencioso */ }
-  finally { guardandoAccion.value = false }
+    toast.success('Tarea marcada como pendiente')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo actualizar la tarea')
+  } finally { guardandoAccion.value = false }
 }
 
 function onRegistrarDesdeSala() { lecturaOpen.value = true }
