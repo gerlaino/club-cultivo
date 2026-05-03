@@ -56,18 +56,15 @@ function formatDate(d) {
   return parsed.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
 }
 
+// Solo alertas operativas — REPROCANN va al bell (AlertaInterna), no al dashboard
 const alertas = computed(() => {
   const list = []
   const sp = lotesManicuraPendiente.value.length
-  if (sp > 0) list.push({ variant: 'sky',   icon: 'bi-clipboard-check',       msg: `${sp} lote${sp !== 1 ? 's' : ''} pendiente${sp !== 1 ? 's' : ''} de aprobación de manicura`, to: '/aprobaciones', cta: 'Revisar' })
+  if (sp > 0) list.push({ variant: 'sky',   icon: 'bi-clipboard-check', msg: `${sp} lote${sp !== 1 ? 's' : ''} pendiente${sp !== 1 ? 's' : ''} de aprobación de manicura`, to: '/aprobaciones', cta: 'Revisar' })
   const stk = stocksPendientes.value.length
-  if (stk > 0) list.push({ variant: 'amber', icon: 'bi-box-seam',             msg: `${stk} lote${stk !== 1 ? 's' : ''} de stock sin asignar a sede`, to: '/admin/stocks/pendientes', cta: 'Asignar' })
-  const vencidos   = stats.value.reprocann_vencidos   || 0
-  const porVencer  = stats.value.reprocann_por_vencer || 0
-  if (vencidos > 0)  list.push({ variant: 'rust',  icon: 'bi-patch-exclamation-fill', msg: `${vencidos} paciente${vencidos !== 1 ? 's' : ''} con REPROCANN vencido`,              to: '/pacientes?reprocann=vencido',    cta: 'Renovar' })
-  if (porVencer > 0) list.push({ variant: 'amber', icon: 'bi-clock-history',          msg: `${porVencer} paciente${porVencer !== 1 ? 's' : ''} con REPROCANN vencen en 30 días`,  to: '/pacientes?reprocann=por_vencer', cta: 'Ver' })
+  if (stk > 0) list.push({ variant: 'amber', icon: 'bi-box-seam',       msg: `${stk} lote${stk !== 1 ? 's' : ''} de stock sin asignar a sede`, to: '/admin/stocks/pendientes', cta: 'Asignar' })
   const tv = tareas.value?.stats?.vencidas || 0
-  if (tv > 0) list.push({ variant: 'amber', icon: 'bi-clock-history',         msg: `${tv} tarea${tv !== 1 ? 's' : ''} vencida${tv !== 1 ? 's' : ''} sin completar`, to: '/tareas', cta: 'Ver tareas' })
+  if (tv > 0) list.push({ variant: 'amber', icon: 'bi-clock-history',   msg: `${tv} tarea${tv !== 1 ? 's' : ''} vencida${tv !== 1 ? 's' : ''} sin completar`, to: '/tareas', cta: 'Ver tareas' })
   return list
 })
 

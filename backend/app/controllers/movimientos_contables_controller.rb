@@ -1,8 +1,9 @@
 # backend/app/controllers/movimientos_contables_controller.rb
 class MovimientosContablesController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_admin_or_tesorero
-  before_action :set_movimiento, only: [:show, :update, :destroy]
+  before_action :require_lectura,   only: [:index, :show, :dashboard, :export_csv]
+  before_action :require_escritura, only: [:create, :update, :destroy]
+  before_action :set_movimiento,    only: [:show, :update, :destroy]
 
   # GET /movimientos_contables
   # Params opcionales: desde, hasta, tipo, categoria, sede_id, lote_id, page, per_page
@@ -180,15 +181,21 @@ class MovimientosContablesController < ApplicationController
   def movimiento_params
     params.require(:movimiento_contable).permit(
       :tipo, :categoria, :descripcion, :monto_ars, :fecha,
-      :sede_id, :lote_id, :dispensacion_id,
+      :sede_id, :lote_id, :dispensacion_id, :paciente_id,
       :comprobante_numero, :comprobante_tipo, :proveedor,
       :pagado, :medio_pago, :notas
     )
   end
 
-  def require_admin_or_tesorero
+  def require_lectura
     unless current_user.admin? || current_user.role.in?(%w[auditor])
       render json: { error: "No autorizado" }, status: :forbidden
+    end
+  end
+
+  def require_escritura
+    unless current_user.admin?
+      render json: { error: "Solo administradores pueden crear o modificar movimientos contables" }, status: :forbidden
     end
   end
 
@@ -211,6 +218,8 @@ class MovimientosContablesController < ApplicationController
       sede:                 m.sede ? { id: m.sede.id, nombre: m.sede.nombre } : nil,
       lote:                 m.lote ? { id: m.lote.id, codigo: m.lote.codigo } : nil,
       dispensacion_id:      m.dispensacion_id,
+      paciente_id:          m.paciente_id,
+      paciente:             m.paciente ? { id: m.paciente.id, nombre: m.paciente.nombre_completo } : nil,
       created_by:           m.created_by&.first_name || m.created_by&.email,
       created_at:           m.created_at,
       updated_at:           m.updated_at,

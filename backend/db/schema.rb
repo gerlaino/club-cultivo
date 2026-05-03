@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_02_130000) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_03_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -421,12 +421,14 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_02_130000) do
     t.text "notas"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "paciente_id"
     t.index ["club_id", "fecha"], name: "index_movimientos_contables_on_club_id_and_fecha"
     t.index ["club_id", "tipo"], name: "index_movimientos_contables_on_club_id_and_tipo"
     t.index ["club_id"], name: "index_movimientos_contables_on_club_id"
     t.index ["dispensacion_id"], name: "index_movimientos_contables_on_dispensacion_id"
     t.index ["fecha"], name: "index_movimientos_contables_on_fecha"
     t.index ["lote_id"], name: "index_movimientos_contables_on_lote_id"
+    t.index ["paciente_id"], name: "index_movimientos_contables_on_paciente_id"
     t.index ["sede_id", "fecha"], name: "index_movimientos_contables_on_sede_id_and_fecha"
     t.index ["sede_id"], name: "index_movimientos_contables_on_sede_id"
   end
@@ -909,6 +911,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_02_130000) do
   add_foreign_key "movimientos_contables", "clubs"
   add_foreign_key "movimientos_contables", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "movimientos_contables", "lotes"
+  add_foreign_key "movimientos_contables", "pacientes"
   add_foreign_key "movimientos_contables", "sedes"
   add_foreign_key "movimientos_contables", "users", column: "created_by_id"
   add_foreign_key "notas", "clubs"

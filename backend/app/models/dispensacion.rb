@@ -16,7 +16,7 @@ class Dispensacion < ApplicationRecord
   validate  :fecha_no_futura
   validate  :stock_regulatorio
   validate  :stock_disponible,   on: :create
-  validate  :credito_suficiente, on: :create
+  validate  :credito_suficiente, on: :create, if: -> { medio_pago == 'cuenta_corriente' }
 
   scope :del_mes,   ->(fecha = Date.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
   scope :del_paciente, ->(paciente_id) { where(paciente_id: paciente_id) }
@@ -64,6 +64,7 @@ class Dispensacion < ApplicationRecord
   end
 
   def debitar_cuenta_corriente
+    return unless medio_pago == 'cuenta_corriente'
     return unless aporte_socio_ars.to_d > 0
     cc = paciente.cuenta_corriente
     return unless cc

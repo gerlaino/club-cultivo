@@ -6,7 +6,10 @@ class MovimientoContable < ApplicationRecord
   belongs_to :sede
   belongs_to :lote,         optional: true
   belongs_to :dispensacion, optional: true
+  belongs_to :paciente,     optional: true
   belongs_to :created_by,   class_name: "User"
+
+  after_create :acreditar_cuenta_corriente
 
   TIPOS = %w[egreso ingreso recupero_costo ajuste].freeze
 
@@ -82,5 +85,32 @@ class MovimientoContable < ApplicationRecord
 
   def fecha_no_futura
     errors.add(:fecha, "no puede ser futura") if fecha.present? && fecha > Date.today
+  end
+
+  # Cuando se registra un pago de socio (aporte_socio) vinculado a un paciente,
+  # se acredita automáticamente su cuenta corriente.
+  def acreditar_cuenta_corriente
+    return unless categoria == 'aporte_socio' && paciente_id.present? && monto_ars.to_d > 0
+
+    cc = paciente.cuenta_corriente
+    return unless cc
+
+    anterior = cc.saldo_disponible
+    nuevo    = anterior + monto_ars.to_d
+
+    ActiveRecord::Base.transaction do
+      cc.update!(saldo_disponible: nuevo)
+      cc.movimientos.create!(
+        tipo:           'pago',
+        monto:          monto_ars.to_d,
+        saldo_anterior: anterior,
+        saldo_nuevo:    nuevo,
+        descripcion:    "Pago registrado — Mov. contable ##{id}",
+        created_by:     created_by
+      )
+    end
+  rescue => e
+    Rails.logger.error "[MovimientoContable] Error al acreditar CC paciente #{paciente_id}: #{e.message}"
+    raise
   end
 end

@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from "vue"
+import { ref, computed, onMounted, nextTick } from "vue"
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import { listSedes, listLotes } from "../lib/api"
+import { listSedes, listLotes, listPacientes } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
+import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
 
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
@@ -15,6 +16,7 @@ const vistaActiva    = ref("dashboard")
 const dashboardSede  = ref(null)
 const todosLotes     = ref([])
 const loadingLotes   = ref(false)
+const pacientes      = ref([])
 const generandoPDF   = ref(false)
 const plContainerRef = ref(null)
 
@@ -212,58 +214,40 @@ const hayFiltros = computed(() =>
   filtroTipo.value || filtroCategoria.value || filtroSede.value || filtroDesde.value || filtroHasta.value
 )
 
-const categoriasForm = computed(() => {
-  const t = form.value.tipo
-  if (t === "egreso")  return CATEGORIAS.filter(c => c.tipo === "egreso"  || c.tipo === "ambos")
-  if (t === "ingreso" || t === "recupero_costo") return CATEGORIAS.filter(c => c.tipo === "ingreso" || c.tipo === "ambos")
-  return CATEGORIAS
-})
+const showModal        = ref(false)
+const editingMovimiento = ref(null)
 
-const showModal  = ref(false)
-const editingId  = ref(null)
-const formErrors = ref({})
-
-function emptyForm() {
-  return {
-    tipo: "egreso", categoria: "", descripcion: "",
-    monto_ars: null, fecha: new Date().toISOString().slice(0, 10),
-    sede_id: null, lote_id: null,
-    comprobante_numero: "", comprobante_tipo: "sin_comprobante",
-    proveedor: "", pagado: false, medio_pago: "efectivo", notas: "",
+async function openCreate() {
+  editingMovimiento.value = null
+  showModal.value = true
+  if (!pacientes.value.length) {
+    const { data } = await listPacientes({ per_page: 500 })
+    pacientes.value = (data.pacientes || data || []).map(p => ({
+      id: p.id,
+      label: `${p.apellido}, ${p.nombre} — DNI ${p.dni || '—'}`,
+    }))
   }
 }
-const form = ref(emptyForm())
-watch(() => form.value.tipo, () => { form.value.categoria = "" })
 
-function openCreate() {
-  editingId.value = null; form.value = emptyForm(); formErrors.value = {}; showModal.value = true
-}
-function openEdit(m) {
-  editingId.value = m.id
-  form.value = {
-    tipo: m.tipo, categoria: m.categoria, descripcion: m.descripcion,
-    monto_ars: m.monto_ars, fecha: m.fecha,
-    sede_id: m.sede?.id || null, lote_id: m.lote?.id || null,
-    comprobante_numero: m.comprobante_numero || "", comprobante_tipo: m.comprobante_tipo || "sin_comprobante",
-    proveedor: m.proveedor || "", pagado: m.pagado || false, medio_pago: m.medio_pago || "efectivo", notas: m.notas || "",
+async function openEdit(m) {
+  editingMovimiento.value = m
+  showModal.value = true
+  if (!pacientes.value.length) {
+    const { data } = await listPacientes({ per_page: 500 })
+    pacientes.value = (data.pacientes || data || []).map(p => ({
+      id: p.id,
+      label: `${p.apellido}, ${p.nombre} — DNI ${p.dni || '—'}`,
+    }))
   }
-  formErrors.value = {}; showModal.value = true
 }
-function validate(f) {
-  const e = {}
-  if (!f.tipo)                e.tipo        = "Requerido"
-  if (!f.categoria)           e.categoria   = "Requerido"
-  if (!f.descripcion?.trim()) e.descripcion = "Requerido"
-  if (!f.monto_ars || f.monto_ars <= 0) e.monto_ars = "Debe ser mayor a 0"
-  if (!f.fecha)               e.fecha       = "Requerido"
-  return e
-}
-async function submitForm() {
-  const e = validate(form.value); formErrors.value = e
-  if (Object.keys(e).length) return
+
+async function onMovimientoGuardado(payload) {
   try {
-    if (editingId.value) await store.update(editingId.value, form.value)
-    else await store.create(form.value)
+    if (editingMovimiento.value) {
+      await store.update(editingMovimiento.value.id, payload)
+    } else {
+      await store.create(payload)
+    }
     showModal.value = false
     if (vistaActiva.value === "dashboard") await store.fetchDashboard(dashboardSede.value)
   } catch {}
@@ -694,125 +678,14 @@ onMounted(async () => {
     </div>
 
     <!-- ══════════════ MODAL CREAR/EDITAR ══════════════ -->
-    <Teleport to="body">
-      <div v-if="showModal" class="cv__overlay" @click.self="showModal = false">
-        <div class="cv__modal">
-          <div class="cv__modal-header">
-            <div>
-              <h3 class="cv__modal-title">{{ editingId ? 'Editar movimiento' : 'Nuevo movimiento' }}</h3>
-              <p class="cv__modal-sub">{{ editingId ? 'Modificá los datos del movimiento' : 'Registrá un ingreso o egreso en el libro diario' }}</p>
-            </div>
-            <button class="cv__modal-close" @click="showModal = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="cv__modal-body">
-            <div v-if="store.createError || store.updateError" class="cv__alert">
-              {{ store.createError || store.updateError }}
-            </div>
-            <div class="cv__mfield cv__mfield--full">
-              <label class="cv__mlabel">Tipo <span class="cv__req">*</span></label>
-              <div class="cv__tipo-btns">
-                <button v-for="t in [
-                  { value:'ingreso',        label:'Ingreso',   color:'#15803d' },
-                  { value:'egreso',         label:'Egreso',    color:'#dc2626' },
-                  { value:'recupero_costo', label:'Recupero',  color:'#0369a1' },
-                  { value:'ajuste',         label:'Ajuste',    color:'#64748b' },
-                ]" :key="t.value"
-                        type="button" class="cv__tipo-btn"
-                        :class="{ 'cv__tipo-btn--active': form.tipo === t.value }"
-                        :style="form.tipo === t.value ? { background: t.color + '15', borderColor: t.color, color: t.color } : {}"
-                        @click="form.tipo = t.value"
-                >{{ t.label }}</button>
-              </div>
-            </div>
-            <div class="cv__mgrid">
-              <div class="cv__mfield">
-                <label class="cv__mlabel">Categoría <span class="cv__req">*</span></label>
-                <select class="cv__minput" v-model="form.categoria" :class="{ 'cv__minput--err': formErrors.categoria }">
-                  <option value="">Seleccioná…</option>
-                  <option v-for="c in categoriasForm" :key="c.value" :value="c.value">{{ c.label }}</option>
-                </select>
-                <span v-if="formErrors.categoria" class="cv__merr">{{ formErrors.categoria }}</span>
-              </div>
-              <div class="cv__mfield">
-                <label class="cv__mlabel">Fecha <span class="cv__req">*</span></label>
-                <input type="date" class="cv__minput" v-model="form.fecha" :class="{ 'cv__minput--err': formErrors.fecha }" />
-                <span v-if="formErrors.fecha" class="cv__merr">{{ formErrors.fecha }}</span>
-              </div>
-              <div class="cv__mfield cv__mfield--full">
-                <label class="cv__mlabel">Descripción <span class="cv__req">*</span></label>
-                <input type="text" class="cv__minput" v-model.trim="form.descripcion"
-                       :class="{ 'cv__minput--err': formErrors.descripcion }"
-                       placeholder="Ej: Factura electricidad Sede Avellaneda marzo" />
-                <span v-if="formErrors.descripcion" class="cv__merr">{{ formErrors.descripcion }}</span>
-              </div>
-              <div class="cv__mfield">
-                <label class="cv__mlabel">Monto ARS <span class="cv__req">*</span></label>
-                <div class="cv__minput-prefix-wrap">
-                  <span class="cv__minput-prefix">$</span>
-                  <input type="number" min="0.01" step="0.01" class="cv__minput cv__minput--prefixed"
-                         v-model.number="form.monto_ars" :class="{ 'cv__minput--err': formErrors.monto_ars }" />
-                </div>
-                <span v-if="formErrors.monto_ars" class="cv__merr">{{ formErrors.monto_ars }}</span>
-              </div>
-              <div class="cv__mfield">
-                <label class="cv__mlabel">Medio de pago</label>
-                <select class="cv__minput" v-model="form.medio_pago">
-                  <option value="efectivo">Efectivo</option>
-                  <option value="transferencia">Transferencia</option>
-                  <option value="mercado_pago">Mercado Pago</option>
-                  <option value="debito">Débito</option>
-                  <option value="cheque">Cheque</option>
-                </select>
-              </div>
-              <div class="cv__mfield">
-                <label class="cv__mlabel">Sede <span class="cv__mopt">opcional</span></label>
-                <select class="cv__minput" v-model="form.sede_id">
-                  <option :value="null">Sin sede específica</option>
-                  <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-                </select>
-              </div>
-              <div class="cv__mfield">
-                <label class="cv__mlabel">Proveedor / Origen <span class="cv__mopt">opcional</span></label>
-                <input type="text" class="cv__minput" v-model.trim="form.proveedor" placeholder="Edenor, AYSA, Proveedor S.A.…" />
-              </div>
-              <div class="cv__mfield">
-                <label class="cv__mlabel">Tipo comprobante</label>
-                <select class="cv__minput" v-model="form.comprobante_tipo">
-                  <option value="sin_comprobante">Sin comprobante</option>
-                  <option value="factura_a">Factura A</option>
-                  <option value="factura_b">Factura B</option>
-                  <option value="recibo">Recibo</option>
-                  <option value="ticket">Ticket</option>
-                </select>
-              </div>
-              <div class="cv__mfield">
-                <label class="cv__mlabel">N° comprobante <span class="cv__mopt">opcional</span></label>
-                <input type="text" class="cv__minput" v-model.trim="form.comprobante_numero" placeholder="0001-00001234" />
-              </div>
-              <div class="cv__mfield cv__mfield--full">
-                <label class="cv__toggle-wrap">
-                  <input type="checkbox" class="cv__toggle-chk" v-model="form.pagado" />
-                  <div class="cv__toggle-track"><div class="cv__toggle-thumb"></div></div>
-                  <span class="cv__toggle-label">Pagado / Cobrado</span>
-                </label>
-              </div>
-              <div class="cv__mfield cv__mfield--full">
-                <label class="cv__mlabel">Notas <span class="cv__mopt">opcional</span></label>
-                <textarea class="cv__minput cv__mtextarea" rows="2" v-model.trim="form.notas" placeholder="Observaciones…"></textarea>
-              </div>
-            </div>
-          </div>
-          <div class="cv__modal-footer">
-            <button class="cv__btn-ghost" :disabled="store.creating || store.updating" @click="showModal = false">Cancelar</button>
-            <button class="cv__btn-primary" :disabled="store.creating || store.updating" @click="submitForm">
-              <div v-if="store.creating || store.updating" class="cv__spin"></div>
-              <i v-else class="bi bi-check-lg"></i>
-              {{ editingId ? 'Guardar cambios' : 'Crear movimiento' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <ModalNuevoMovimiento
+      v-model="showModal"
+      :balance-actual="store.dashboard?.mes_actual?.balance || 0"
+      :pacientes="pacientes"
+      :sedes="sedes"
+      :movimiento-editar="editingMovimiento"
+      @guardado="onMovimientoGuardado"
+    />
 
     <!-- ══════════════ P&L POR LOTE ══════════════ -->
     <div v-if="vistaActiva === 'pl'" ref="plContainerRef">
@@ -1082,52 +955,10 @@ onMounted(async () => {
 .cv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: cv-spin .7s linear infinite; }
 @keyframes cv-spin { to { transform: rotate(360deg); } }
 
-.cv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
-.cv__modal { background: #fff; border-radius: 18px; width: 100%; max-width: 620px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.15); display: flex; flex-direction: column; }
-.cv__modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.5rem 1.5rem 1.25rem; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: #fff; z-index: 1; }
-.cv__modal-title { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0; }
-.cv__modal-sub { font-size: .78rem; color: #64748b; margin: .2rem 0 0; }
-.cv__modal-close { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b; flex-shrink: 0; }
-.cv__modal-close:hover { background: #e2e8f0; }
-.cv__modal-body { padding: 1.5rem; flex: 1; }
-.cv__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1.1rem 1.5rem; border-top: 1px solid #f1f5f9; position: sticky; bottom: 0; background: #fff; }
-
-.cv__mgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-@media (max-width: 500px) { .cv__mgrid { grid-template-columns: 1fr; } }
-.cv__mfield { display: flex; flex-direction: column; gap: .35rem; }
-.cv__mfield--full { grid-column: 1 / -1; }
-.cv__mlabel { font-size: .78rem; font-weight: 600; color: #374151; }
-.cv__req { color: #ef4444; }
-.cv__mopt { font-size: .7rem; font-weight: 400; color: #94a3b8; }
-.cv__minput { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .65rem .875rem; font-size: .875rem; color: #0f172a; width: 100%; box-sizing: border-box; outline: none; transition: border-color .15s; }
-.cv__minput:focus { border-color: #1b5e20; background: #fff; }
-.cv__minput--err { border-color: #ef4444; }
-.cv__minput--prefixed { border-radius: 0 9px 9px 0; border-left: none; }
-.cv__minput-prefix-wrap { display: flex; }
-.cv__minput-prefix { background: #f1f5f9; border: 1.5px solid #e2e8f0; border-right: none; border-radius: 9px 0 0 9px; padding: .65rem .75rem; font-size: .85rem; font-weight: 700; color: #1b5e20; }
-.cv__mtextarea { resize: vertical; min-height: 65px; }
-.cv__merr { font-size: .73rem; color: #dc2626; }
-
-.cv__tipo-btns { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .25rem; }
-.cv__tipo-btn { padding: .45rem 1rem; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc; font-size: .82rem; font-weight: 500; cursor: pointer; color: #475569; transition: all .15s; }
-.cv__tipo-btn:hover { border-color: #cbd5e1; }
-.cv__tipo-btn--active { font-weight: 700; }
-
-.cv__toggle-wrap { display: flex; align-items: center; gap: .65rem; cursor: pointer; }
-.cv__toggle-chk { display: none; }
-.cv__toggle-track { width: 38px; height: 21px; background: #d1d5db; border-radius: 999px; position: relative; transition: background .2s; flex-shrink: 0; }
-.cv__toggle-chk:checked + .cv__toggle-track { background: #1b5e20; }
-.cv__toggle-thumb { position: absolute; width: 15px; height: 15px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
-.cv__toggle-chk:checked + .cv__toggle-track .cv__toggle-thumb { left: 20px; }
-.cv__toggle-label { font-size: .875rem; font-weight: 500; color: #0f172a; }
-
-.cv__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; margin-bottom: 1rem; }
-
-
 .cv__spin { width: 14px; height: 14px; border: 2px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: cv-spin .6s linear infinite; }
-.cv__spin--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
+.cv__spin--sm { width: 11px; height: 11px; }
 
-/* ══ NUEVO: Selector de sede en dashboard ══════════════════════ */
+/* ══ Selector de sede en dashboard ══════════════════════ */
 .cv__sede-selector {
   display: flex;
   gap: 8px;
@@ -1239,7 +1070,6 @@ onMounted(async () => {
 .cv__pl-subtab:hover { color: #0f172a; }
 .cv__pl-subtab--active { color: #15803d; border-bottom-color: #15803d; }
 .cv__pl-pdf { margin-left: auto; margin-bottom: 2px; display: flex; align-items: center; gap: .4rem; font-size: .8rem; padding: .4rem .85rem; }
-.cv__spin--sm { width: 11px; height: 11px; }
 
 /* ── P&L por lote ── */
 .cv__pl-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
