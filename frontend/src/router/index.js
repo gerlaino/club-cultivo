@@ -1,27 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
-import LoginView from "../views/LoginView.vue";
-import DashboardView from "../views/DashboardView.vue";
-import SalasView from "../views/SalasView.vue";
-import SalaDetailView from "../views/SalaDetailView.vue";
-import LotesView from "../views/LotesView.vue";
-import LoteDetailView from "../views/LoteDetailView.vue";
-import PlantasView from "../views/PlantasView.vue";
-import PlantaDetailView from "../views/PlantaDetailView.vue";
-import PerfilView from "../views/PerfilView.vue";
-import PreferenciasView from "../views/PreferenciasView.vue";
-import PacientesDispatch from "../views/PacientesDispatch.vue";
-import PacienteDetailView from "../views/SocioDetailView.vue";
-import UsuariosView from "../views/UsuariosView.vue";
-import UsuarioDetail from "../views/UsuarioDetail.vue";
-import SedesView from "../views/SedesView.vue";
-import SedeDetailView from "../views/SedeDetailView.vue";
-import DocumentTemplatesView from "../views/DocumentTemplatesView.vue";
 import { useAuthStore } from "../stores/auth";
 import { usePermissions } from "../composables/usePermissions";
 import { useToast } from "../composables/useToast";
-import ContabilidadView from "../views/ContabilidadView.vue";
-import InformeSemestralView from "../views/InformeSemestralView.vue";
-import DocumentosView from "../views/DocumentosView.vue";
 
 const requiresPermission = (resource, action) => {
   return (to, from, next) => {
@@ -41,7 +21,7 @@ const routes = [
   {
     path: "/login",
     name: "login",
-    component: LoginView,
+    component: () => import("../views/LoginView.vue"),
     meta: { guestOnly: true, fullscreen: true },
   },
 
@@ -49,7 +29,7 @@ const routes = [
   {
     path: "/",
     name: "dashboard",
-    component: DashboardView,
+    component: () => import("../views/DashboardView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: () => {
       const auth = useAuthStore()
@@ -66,14 +46,14 @@ const routes = [
   {
     path: "/sedes",
     name: "sedes",
-    component: SedesView,
+    component: () => import("../views/SedesView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("sedes", "index"),
   },
   {
     path: "/sedes/:id",
     name: "sede-detail",
-    component: SedeDetailView,
+    component: () => import("../views/SedeDetailView.vue"),
     props: (r) => ({ id: Number(r.params.id) }),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("sedes", "show"),
@@ -83,7 +63,7 @@ const routes = [
   {
     path: "/contabilidad",
     name: "contabilidad",
-    component: ContabilidadView,
+    component: () => import("../views/ContabilidadView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("movimientos_contables", "index"),
   },
@@ -92,14 +72,14 @@ const routes = [
   {
     path: "/salas",
     name: "salas",
-    component: SalasView,
+    component: () => import("../views/SalasView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("salas", "index"),
   },
   {
     path: "/salas/:id",
     name: "sala-detail",
-    component: SalaDetailView,
+    component: () => import("../views/SalaDetailView.vue"),
     props: (r) => ({ id: Number(r.params.id) }),
     beforeEnter: requiresPermission("salas", "show"),
   },
@@ -139,14 +119,14 @@ const routes = [
   {
     path: "/lotes",
     name: "lotes",
-    component: LotesView,
+    component: () => import("../views/LotesView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("lotes", "index"),
   },
   {
     path: "/lotes/:id",
     name: "lote-detail",
-    component: LoteDetailView,
+    component: () => import("../views/LoteDetailView.vue"),
     props: true,
     beforeEnter: requiresPermission("lotes", "show"),
   },
@@ -155,7 +135,7 @@ const routes = [
   {
     path: "/plantas",
     name: "plantas",
-    component: PlantasView,
+    component: () => import("../views/PlantasView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("plantas", "index"),
   },
@@ -169,7 +149,7 @@ const routes = [
   {
     path: "/plantas/:id",
     name: "planta-detalle",
-    component: PlantaDetailView,
+    component: () => import("../views/PlantaDetailView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("plantas", "show"),
   },
@@ -196,7 +176,7 @@ const routes = [
     path: "/pacientes",
     alias: ["/socios"],
     name: "pacientes",
-    component: PacientesDispatch,
+    component: () => import("../views/PacientesDispatch.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("socios", "index"),
   },
@@ -211,7 +191,7 @@ const routes = [
     path: "/pacientes/:id",
     alias: ["/socios/:id"],
     name: "paciente-detail",
-    component: PacienteDetailView,
+    component: () => import("../views/SocioDetailView.vue"),
     props: true,
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
@@ -228,14 +208,14 @@ const routes = [
   {
     path: "/usuarios",
     name: "usuarios",
-    component: UsuariosView,
+    component: () => import("../views/UsuariosView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("usuarios", "index"),
   },
   {
     path: "/usuarios/:id",
     name: "usuario-detail",
-    component: UsuarioDetail,
+    component: () => import("../views/UsuarioDetail.vue"),
     beforeEnter: requiresPermission("usuarios", "show"),
   },
 
@@ -243,13 +223,13 @@ const routes = [
   {
     path: "/perfil",
     name: "perfil",
-    component: PerfilView,
+    component: () => import("../views/PerfilView.vue"),
     meta: { requiresAuth: true },
   },
   {
     path: "/preferencias",
     name: "preferencias",
-    component: PreferenciasView,
+    component: () => import("../views/PreferenciasView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore();
@@ -262,7 +242,7 @@ const routes = [
   {
     path: "/documentos/templates",
     name: "document-templates",
-    component: DocumentTemplatesView,
+    component: () => import("../views/DocumentTemplatesView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore();
@@ -283,7 +263,7 @@ const routes = [
   {
     path: "/informe-semestral",
     name: "informe-semestral",
-    component: InformeSemestralView,
+    component: () => import("../views/InformeSemestralView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("informe_semestral", "show"),
   },
@@ -300,7 +280,7 @@ const routes = [
   {
     path: '/documentos',
     name: 'documentos',
-    component: DocumentosView,
+    component: () => import("../views/DocumentosView.vue"),
     meta: { requiresAuth: true }
   },
 
