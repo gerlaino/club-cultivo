@@ -451,6 +451,12 @@ class LotesController < ApplicationController
       aprobada_at:         pm.aprobada_at,
     } : nil
 
+    # Mejor peso disponible de cualquier pesada (para lotes finalizados vía cerrar_curado)
+    ultima_p = lote.pesadas.loaded? \
+      ? lote.pesadas.max_by { |p| p.registrado_at } \
+      : lote.pesadas.order(registrado_at: :desc).first
+    result[:peso_final_g] = ultima_p&.peso_curado_g&.to_f || ultima_p&.peso_seco_g&.to_f
+
     if include_cycle_data
       result[:pesadas] = lote.pesadas.includes(:registrado_por, pesadas_plantas: :plant).map { |p| serialize_pesada(p) }
       result[:stocks]  = lote.stocks.includes(:sede).map { |s| serialize_stock_inline(s) }

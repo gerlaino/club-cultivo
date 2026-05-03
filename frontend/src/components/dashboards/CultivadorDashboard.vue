@@ -276,7 +276,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore }    from '../../stores/auth'
 import { useClubStore }    from '../../stores/club'
 import { useTareasStore }  from '../../stores/tareas'
@@ -453,6 +453,13 @@ async function revertirTarea() {
 }
 
 function onRegistrarDesdeSala() { lecturaOpen.value = true }
+
+// ── Escape panel ──────────────────────────────────────────────
+function panelEscapeHandler(e) {
+  if (e.key === 'Escape' && tareaDetalle.value) tareaDetalle.value = null
+}
+onMounted(() => document.addEventListener('keydown', panelEscapeHandler, true))
+onUnmounted(() => document.removeEventListener('keydown', panelEscapeHandler, true))
 
 // ── Load ───────────────────────────────────────────────────────
 onMounted(async () => {

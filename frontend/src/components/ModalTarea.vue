@@ -465,13 +465,17 @@ async function guardar() {
       const res = await tareasStore.update(props.tareaInicial.id, payload)
       emit('guardada', res)
     } else if (conRepeticion.value) {
-      const res = await tareasStore.create({
-        ...payload,
-        recurrente:        true,
-        dias_semana:       repeticion.value.dias,
-        recurrencia_hasta: repeticion.value.hasta || null,
-      })
-      emit('guardada', res)
+      if (!fechasGeneradas.value.length) {
+        errorGlobal.value = 'Seleccioná al menos un día y una fecha de fin'
+        guardando.value = false
+        return
+      }
+      const tareas = await Promise.all(
+        fechasGeneradas.value.map(fecha =>
+          tareasStore.create({ ...payload, fecha_programada: fecha })
+        )
+      )
+      emit('guardada', tareas[0])
     } else {
       const res = await tareasStore.create(payload)
       emit('guardada', res)

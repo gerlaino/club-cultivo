@@ -47,7 +47,7 @@
       <DsEmpty
         v-else-if="!lotesCosechados.length"
         title="Sin cosechas registradas"
-        description="Cuando un lote avance a cosecha, secado o finalizado, aparecerá acá."
+        description="Los lotes aparecen acá cuando avanzan a cosecha o finalización. Si no ves nada, pedile al admin que te asigne a una sala."
       />
 
       <div v-else class="cosh__list">
@@ -119,6 +119,7 @@ const lotesCosechados = computed(() =>
 
 function pesoLote(lote) {
   return lote.gramos_producidos ||
+         lote.peso_final_g ||
          lote.ultima_pesada_manicura?.peso_seco_g ||
          null
 }
