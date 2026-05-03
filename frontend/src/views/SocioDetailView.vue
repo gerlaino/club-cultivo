@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
@@ -247,7 +247,12 @@ const TABS = computed(() => {
   return ALL_TABS.filter(t => !t.roles || t.roles.includes(role))
 })
 
+function escapeHandler(e) {
+  if (e.key !== 'Escape') return
+  if (editOpen.value) { editOpen.value = false }
+}
 onMounted(async () => {
+  document.addEventListener('keydown', escapeHandler, true)
   try {
     await store.fetchOne(socioId)
     await store.fetchNotas(socioId)
@@ -257,6 +262,7 @@ onMounted(async () => {
     loading.value = false
   }
 })
+onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true) })
 </script>
 
 <template>

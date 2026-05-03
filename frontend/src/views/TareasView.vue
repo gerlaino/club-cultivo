@@ -246,7 +246,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { useTareasStore } from '../stores/tareas'
@@ -399,11 +399,17 @@ watch(vistaActiva, (v) => {
   if (v === 'semana' && !semana.value.dias.length) cargarSemana()
 })
 
+function escapeHandler(e) {
+  if (e.key !== 'Escape') return
+  if (tareaDetalle.value) { tareaDetalle.value = null }
+}
 onMounted(async () => {
+  document.addEventListener('keydown', escapeHandler, true)
   await cargarContexto()
   await tareasStore.fetchDashboard()
   await cargarSemana()
 })
+onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true) })
 
 async function cargarContexto() {
   try {

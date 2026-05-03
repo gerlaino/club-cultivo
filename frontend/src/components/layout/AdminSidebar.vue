@@ -64,7 +64,7 @@ const NAV_LINKS = [
   { to: '/admin/curado',      icon: Container,       label: 'Curado' },
   { to: '/informe-semestral', icon: FileCheck,       label: 'REPROCANN' },
   { to: '/documentos',        icon: FileText,        label: 'Documentos' },
-  { to: '/usuarios',          icon: UserCog,         label: 'Usuarios' },
+  { to: '/usuarios',          icon: UserCog,         label: 'Equipo' },
   { to: '/web',               icon: Globe,           label: 'Web' },
 ]
 

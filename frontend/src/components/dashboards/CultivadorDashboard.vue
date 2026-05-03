@@ -67,11 +67,11 @@
     </div>
 
     <!-- ── SEMANA DE TAREAS ──────────────────────────────────────── -->
-    <section class="cvd__section">
+    <section class="cvd__section cvd__section--semana">
       <div class="cvd__section-head">
-        <h2 class="cvd__section-title">Semana</h2>
+        <span class="cvd__section-dot cvd__section-dot--semana"></span>
+        <h2 class="cvd__section-title">Esta semana</h2>
         <DsBadge variant="leaf">{{ totalTareasSemana }}</DsBadge>
-        <RouterLink to="/tareas" class="cvd__ver-todos">Ver en calendario →</RouterLink>
       </div>
       <div v-if="loadingSem" class="cvd__semana">
         <DsCard v-for="i in 7" :key="i" variant="elevated" class="cvd__dia">
@@ -79,10 +79,9 @@
         </DsCard>
       </div>
       <div v-else class="cvd__semana">
-        <RouterLink
+        <div
           v-for="dia in semana.dias"
           :key="dia.fecha"
-          to="/tareas"
           class="cvd__dia"
           :class="{ 'cvd__dia--hoy': esDiaHoy(dia.fecha), 'cvd__dia--pasado': esPasado(dia.fecha) }"
         >
@@ -95,71 +94,60 @@
             <span v-if="dia.tareas.length > 2" class="cvd__dia-mas">+{{ dia.tareas.length - 2 }} más</span>
             <span v-if="!dia.tareas.length" class="cvd__dia-libre">libre</span>
           </div>
-        </RouterLink>
+        </div>
       </div>
     </section>
 
-    <!-- ── KANBAN ─────────────────────────────────────────────────── -->
-    <section class="cvd__section">
+    <!-- ── TABLERO ────────────────────────────────────────────────── -->
+    <section class="cvd__section cvd__section--tablero">
       <div class="cvd__section-head">
-        <h2 class="cvd__section-title">Tablero</h2>
-        <RouterLink to="/tareas" class="cvd__ver-todos">Kanban completo →</RouterLink>
+        <span class="cvd__section-dot cvd__section-dot--tablero"></span>
+        <h2 class="cvd__section-title">Mis tareas</h2>
       </div>
       <div class="cvd__kanban">
-        <!-- Pendiente -->
+        <!-- Pendientes (pendiente + en_progreso) -->
         <div class="cvd__kanban-col">
           <div class="cvd__kanban-colhead cvd__kanban-colhead--pending">
-            Pendiente <span class="cvd__kanban-badge">{{ kanban.pendiente?.length || 0 }}</span>
+            Pendientes
+            <span class="cvd__kanban-badge">{{ tareasPendientesTotal }}</span>
           </div>
-          <RouterLink
-            v-for="t in (kanban.pendiente || []).slice(0, 5)"
+          <div
+            v-for="t in tareasPendientes.slice(0, 8)"
             :key="t.id"
-            to="/tareas"
             class="cvd__kanban-card"
+            :class="{ 'cvd__kanban-card--selected': tareaSeleccionada?.id === t.id }"
+            @click="seleccionarTarea(t, 'finalizar')"
           >
             <span class="cvd__kanban-titulo">{{ t.titulo }}</span>
             <span v-if="t.sala" class="cvd__kanban-meta">{{ t.sala.nombre }}</span>
-          </RouterLink>
-          <div v-if="!kanban.pendiente?.length" class="cvd__kanban-empty">Sin pendientes ✓</div>
-        </div>
-        <!-- En progreso -->
-        <div class="cvd__kanban-col">
-          <div class="cvd__kanban-colhead cvd__kanban-colhead--progress">
-            En progreso <span class="cvd__kanban-badge">{{ kanban.en_progreso?.length || 0 }}</span>
           </div>
-          <RouterLink
-            v-for="t in (kanban.en_progreso || []).slice(0, 5)"
-            :key="t.id"
-            to="/tareas"
-            class="cvd__kanban-card cvd__kanban-card--progress"
-          >
-            <span class="cvd__kanban-titulo">{{ t.titulo }}</span>
-            <span v-if="t.sala" class="cvd__kanban-meta">{{ t.sala.nombre }}</span>
-          </RouterLink>
-          <div v-if="!kanban.en_progreso?.length" class="cvd__kanban-empty">Nada en curso</div>
+          <div v-if="!tareasPendientes.length" class="cvd__kanban-empty">Sin pendientes ✓</div>
         </div>
-        <!-- Completadas hoy -->
+        <!-- Completadas -->
         <div class="cvd__kanban-col">
           <div class="cvd__kanban-colhead cvd__kanban-colhead--done">
-            Completadas hoy <span class="cvd__kanban-badge">{{ tareasHoy.filter(t => t.estado === 'completada').length }}</span>
+            Completadas
+            <span class="cvd__kanban-badge">{{ (kanban.completada || []).length }}</span>
           </div>
-          <RouterLink
-            v-for="t in tareasHoy.filter(t => t.estado === 'completada').slice(0, 5)"
+          <div
+            v-for="t in (kanban.completada || []).slice(0, 8)"
             :key="t.id"
-            to="/tareas"
             class="cvd__kanban-card cvd__kanban-card--done"
+            :class="{ 'cvd__kanban-card--selected': tareaSeleccionada?.id === t.id }"
+            @click="seleccionarTarea(t, 'revertir')"
           >
             <span class="cvd__kanban-titulo">{{ t.titulo }}</span>
             <span v-if="t.sala" class="cvd__kanban-meta">{{ t.sala.nombre }}</span>
-          </RouterLink>
-          <div v-if="!tareasHoy.filter(t => t.estado === 'completada').length" class="cvd__kanban-empty">Sin completadas aún</div>
+          </div>
+          <div v-if="!(kanban.completada || []).length" class="cvd__kanban-empty">Sin completadas aún</div>
         </div>
       </div>
     </section>
 
     <!-- ── MIS SALAS ──────────────────────────────────────────────── -->
-    <section class="cvd__section">
+    <section class="cvd__section cvd__section--salas">
       <div class="cvd__section-head">
+        <span class="cvd__section-dot cvd__section-dot--salas"></span>
         <h2 class="cvd__section-title">Mis salas</h2>
         <DsBadge variant="leaf">{{ salas.length }}</DsBadge>
       </div>
@@ -184,6 +172,43 @@
         />
       </div>
     </section>
+
+    <!-- ── PANEL ACCIÓN TAREA ────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="cvd-accion">
+        <div v-if="tareaSeleccionada" class="cvd__accion-overlay" @click.self="tareaSeleccionada = null">
+          <div class="cvd__accion-bar">
+            <div class="cvd__accion-info">
+              <span class="cvd__accion-titulo">{{ tareaSeleccionada.titulo }}</span>
+              <span v-if="tareaSeleccionada.sala" class="cvd__accion-meta">{{ tareaSeleccionada.sala.nombre }}</span>
+            </div>
+            <div class="cvd__accion-btns">
+              <button
+                v-if="accionTipo === 'finalizar'"
+                class="cvd__accion-btn cvd__accion-btn--ok"
+                :disabled="guardandoAccion"
+                @click="ejecutarFinalizar"
+              >
+                <i class="bi bi-check-circle-fill"></i>
+                {{ guardandoAccion ? 'Guardando…' : 'Finalizada' }}
+              </button>
+              <button
+                v-if="accionTipo === 'revertir'"
+                class="cvd__accion-btn cvd__accion-btn--revert"
+                :disabled="guardandoAccion"
+                @click="ejecutarRevertir"
+              >
+                <i class="bi bi-arrow-counterclockwise"></i>
+                {{ guardandoAccion ? 'Guardando…' : 'Sin finalizar' }}
+              </button>
+              <button class="cvd__accion-btn cvd__accion-btn--cancel" @click="tareaSeleccionada = null">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- Footer -->
     <footer class="cvd__footer">
@@ -233,10 +258,13 @@ const ambienteStore = useAmbienteStore()
 const { dashboard, kanban } = storeToRefs(tareasStore)
 useAlertasBell()
 
-const loading     = ref(true)
-const lecturaOpen = ref(false)
-const semana      = ref({ dias: [] })
-const loadingSem  = ref(false)
+const loading          = ref(true)
+const lecturaOpen      = ref(false)
+const semana           = ref({ dias: [] })
+const loadingSem       = ref(false)
+const tareaSeleccionada = ref(null)
+const accionTipo        = ref(null)  // 'finalizar' | 'revertir'
+const guardandoAccion   = ref(false)
 
 // ── Saludo / fecha ─────────────────────────────────────────────
 const hora   = new Date().getHours()
@@ -280,7 +308,11 @@ const alertasCriticas = computed(() =>
 )
 
 // ── Tareas ─────────────────────────────────────────────────────
-const tareasHoy = computed(() => dashboard.value?.hoy || [])
+const tareasPendientes     = computed(() => [
+  ...(kanban.value.pendiente  || []),
+  ...(kanban.value.en_progreso || []),
+])
+const tareasPendientesTotal = computed(() => tareasPendientes.value.length)
 
 // ── Semana ─────────────────────────────────────────────────────
 const totalTareasSemana = computed(() => semana.value.dias?.reduce((s, d) => s + d.tareas.length, 0) || 0)
@@ -309,6 +341,34 @@ async function cargarSemana() {
     semana.value = data
   } catch { /* no crítico */ }
   finally { loadingSem.value = false }
+}
+
+// ── Acciones de tarea ──────────────────────────────────────────
+function seleccionarTarea(t, tipo) {
+  tareaSeleccionada.value = t
+  accionTipo.value        = tipo
+}
+
+async function ejecutarFinalizar() {
+  if (!tareaSeleccionada.value) return
+  guardandoAccion.value = true
+  try {
+    await tareasStore.completar(tareaSeleccionada.value.id, 0, '')
+    await tareasStore.fetchKanban({})
+    tareaSeleccionada.value = null
+  } catch { /* silencioso */ }
+  finally { guardandoAccion.value = false }
+}
+
+async function ejecutarRevertir() {
+  if (!tareaSeleccionada.value) return
+  guardandoAccion.value = true
+  try {
+    await tareasStore.update(tareaSeleccionada.value.id, { estado: 'pendiente' })
+    await tareasStore.fetchKanban({})
+    tareaSeleccionada.value = null
+  } catch { /* silencioso */ }
+  finally { guardandoAccion.value = false }
 }
 
 // ── Registrar lectura desde SalaCard ──────────────────────────
@@ -408,14 +468,36 @@ onMounted(async () => {
   margin-top: -var(--sp-1);
 }
 
-/* Salas */
-.cvd__section { margin-bottom: var(--sp-8); }
+/* Sections */
+.cvd__section {
+  margin-bottom: var(--sp-6);
+  background: var(--c-paper);
+  border: 1px solid var(--c-ink-100);
+  border-radius: var(--r-2xl);
+  padding: var(--sp-5) var(--sp-6);
+  border-top-width: 3px;
+}
+@media (max-width: 767px) { .cvd__section { padding: var(--sp-4); border-radius: var(--r-xl); } }
+.cvd__section--semana  { border-top-color: var(--c-role-cultivador); }
+.cvd__section--tablero { border-top-color: #6366f1; }
+.cvd__section--salas   { border-top-color: #f59e0b; }
+
 .cvd__section-head {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   margin-bottom: var(--sp-4);
 }
+.cvd__section-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cvd__section-dot--semana  { background: var(--c-role-cultivador); }
+.cvd__section-dot--tablero { background: #6366f1; }
+.cvd__section-dot--salas   { background: #f59e0b; }
+
 .cvd__section-title {
   font-family: var(--font-display);
   font-size: var(--fs-18);
@@ -431,16 +513,6 @@ onMounted(async () => {
 @media (max-width: 767px) {
   .cvd__salas-grid { grid-template-columns: 1fr; gap: var(--sp-4); }
 }
-
-/* Semana de tareas */
-.cvd__ver-todos {
-  font-size: var(--fs-13);
-  color: var(--c-role-cultivador);
-  text-decoration: none;
-  font-weight: 600;
-  margin-left: auto;
-}
-.cvd__ver-todos:hover { text-decoration: underline; }
 
 .cvd__semana {
   display: grid;
@@ -459,12 +531,7 @@ onMounted(async () => {
   flex-direction: column;
   gap: var(--sp-1);
   min-height: 100px;
-  cursor: pointer;
-  text-decoration: none;
-  color: inherit;
-  transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
-.cvd__dia:hover { border-color: var(--c-role-cultivador); box-shadow: var(--sh-1); }
 .cvd__dia--hoy {
   border-color: var(--c-role-cultivador);
   background: color-mix(in srgb, var(--c-role-cultivador) 6%, transparent);
@@ -507,10 +574,10 @@ onMounted(async () => {
 /* Kanban */
 .cvd__kanban {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr 1fr;
   gap: var(--sp-4);
 }
-@media (max-width: 767px) { .cvd__kanban { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .cvd__kanban { grid-template-columns: 1fr; } }
 
 .cvd__kanban-col {
   background: var(--c-ink-50);
@@ -531,9 +598,8 @@ onMounted(async () => {
   margin-bottom: var(--sp-1);
   color: var(--c-ink-600);
 }
-.cvd__kanban-colhead--pending  { color: #64748b; }
-.cvd__kanban-colhead--progress { color: #d97706; }
-.cvd__kanban-colhead--done     { color: #15803d; }
+.cvd__kanban-colhead--pending { color: #64748b; }
+.cvd__kanban-colhead--done    { color: #15803d; }
 
 .cvd__kanban-badge {
   background: var(--c-paper);
@@ -551,18 +617,70 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  text-decoration: none;
   color: inherit;
   border: 1px solid var(--c-ink-100);
-  transition: box-shadow var(--t-fast);
+  cursor: pointer;
+  transition: box-shadow var(--t-fast), border-color var(--t-fast);
 }
-.cvd__kanban-card:hover { box-shadow: var(--sh-1); }
-.cvd__kanban-card--progress { border-left: 3px solid #d97706; }
-.cvd__kanban-card--done     { border-left: 3px solid #15803d; opacity: .7; }
+.cvd__kanban-card:hover         { box-shadow: var(--sh-1); border-color: var(--c-ink-300); }
+.cvd__kanban-card--done         { border-left: 3px solid #15803d; opacity: .75; }
+.cvd__kanban-card--selected     { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,.2); opacity: 1 !important; }
 
 .cvd__kanban-titulo { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-900); }
 .cvd__kanban-meta   { font-size: var(--fs-11); color: var(--c-ink-400); }
 .cvd__kanban-empty  { font-size: var(--fs-12); color: var(--c-ink-400); text-align: center; padding: var(--sp-4) 0; }
+
+/* Floating action panel */
+.cvd__accion-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, .35);
+  padding: var(--sp-4);
+}
+.cvd__accion-bar {
+  width: 100%;
+  max-width: 540px;
+  background: var(--c-paper);
+  border-radius: var(--r-2xl);
+  padding: var(--sp-5) var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  box-shadow: var(--sh-4);
+}
+.cvd__accion-info { display: flex; flex-direction: column; gap: 2px; }
+.cvd__accion-titulo { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); }
+.cvd__accion-meta   { font-size: var(--fs-13); color: var(--c-ink-500); }
+.cvd__accion-btns   { display: flex; gap: var(--sp-3); }
+.cvd__accion-btn {
+  flex: 1;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  transition: opacity var(--t-fast);
+}
+.cvd__accion-btn:disabled { opacity: .6; cursor: not-allowed; }
+.cvd__accion-btn--ok     { background: #15803d; color: #fff; }
+.cvd__accion-btn--revert { background: var(--c-ink-100); color: var(--c-ink-700); }
+.cvd__accion-btn--cancel { background: transparent; color: var(--c-ink-500); border: 1px solid var(--c-ink-200); flex: 0 0 auto; }
+.cvd__accion-btn--ok:not(:disabled):hover     { opacity: .88; }
+.cvd__accion-btn--revert:not(:disabled):hover { opacity: .8; }
+
+/* Action transition */
+.cvd-accion-enter-active, .cvd-accion-leave-active { transition: opacity .2s, transform .2s; }
+.cvd-accion-enter-from, .cvd-accion-leave-to { opacity: 0; }
+.cvd-accion-enter-from .cvd__accion-bar, .cvd-accion-leave-to .cvd__accion-bar { transform: translateY(20px); }
 
 /* Footer */
 .cvd__footer {

@@ -222,7 +222,8 @@ async function openCreate() {
   showModal.value = true
   if (!pacientes.value.length) {
     const { data } = await listPacientes({ per_page: 500 })
-    pacientes.value = (data.pacientes || data || []).map(p => ({
+    const arr = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : [])
+    pacientes.value = arr.map(p => ({
       id: p.id,
       label: `${p.apellido}, ${p.nombre} — DNI ${p.dni || '—'}`,
     }))
@@ -234,7 +235,8 @@ async function openEdit(m) {
   showModal.value = true
   if (!pacientes.value.length) {
     const { data } = await listPacientes({ per_page: 500 })
-    pacientes.value = (data.pacientes || data || []).map(p => ({
+    const arr = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : [])
+    pacientes.value = arr.map(p => ({
       id: p.id,
       label: `${p.apellido}, ${p.nombre} — DNI ${p.dni || '—'}`,
     }))
@@ -413,7 +415,7 @@ onMounted(async () => {
                 <tr v-for="m in store.dashboard.anio_actual.por_mes" :key="m.mes">
                   <td class="cv__td-mes">{{ mesLabel(m.mes_label || m.mes) }}</td>
                   <td class="cv__td-right cv__td-green">{{ fmt(m.ingresos) }}</td>
-                  <td class="cv__td-right cv__td-red">{{ fmt(m.egresos) }}</td>
+                  <td class="cv__td-right" :class="m.egresos > 0 ? 'cv__td-red' : ''">{{ fmt(m.egresos) }}</td>
                   <td class="cv__td-right cv__td-bold" :style="{ color: balanceColor(m.balance) }">{{ fmt(m.balance) }}</td>
                 </tr>
                 </tbody>
@@ -421,7 +423,7 @@ onMounted(async () => {
                 <tr>
                   <td class="cv__td-bold">Total año</td>
                   <td class="cv__td-right cv__td-green cv__td-bold">{{ fmt(store.dashboard.anio_actual.ingresos) }}</td>
-                  <td class="cv__td-right cv__td-red cv__td-bold">{{ fmt(store.dashboard.anio_actual.egresos) }}</td>
+                  <td class="cv__td-right cv__td-bold" :class="store.dashboard.anio_actual.egresos > 0 ? 'cv__td-red' : ''">{{ fmt(store.dashboard.anio_actual.egresos) }}</td>
                   <td class="cv__td-right cv__td-bold" :style="{ color: balanceColor(store.dashboard.anio_actual.balance) }">{{ fmt(store.dashboard.anio_actual.balance) }}</td>
                 </tr>
                 </tfoot>
