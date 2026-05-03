@@ -36,8 +36,8 @@ const loading   = ref(true)
 const error     = ref(null)
 const activeTab = ref('info')
 
-const canEdit      = computed(() => ['admin', 'medico'].includes(auth.user?.role))
-const canClinica   = computed(() => ['admin', 'medico'].includes(auth.user?.role))
+const canEdit      = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
+const canClinica   = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
 const s            = computed(() => store.current)
 
 // ── Inline edit modal ────────────────────────────────────────────────────────
@@ -469,7 +469,7 @@ onMounted(async () => {
                 {{ fmtARS(Math.max(0, ccMargen)) }}
               </span>
               <span class="sd__cc-saldo-hint">
-                {{ ccMargen <= 0 ? 'Límite agotado — bloqueado' : 'Antes de ser bloqueado' }}
+                {{ ccMargen <= 0 ? (cc.limite_credito === 0 ? 'Sin límite configurado' : 'Límite agotado — bloqueado') : 'Antes de ser bloqueado' }}
               </span>
             </div>
 

@@ -44,6 +44,10 @@ const lotes  = useLotesStore();
 const plants = usePlantsStore();
 const router = useRouter();
 const route  = useRoute();
+
+const routeLoading = ref(false)
+router.beforeEach(() => { routeLoading.value = true })
+router.afterEach(() => { routeLoading.value = false })
 const { can, isAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
 
 const adminDrawerOpen = ref(false);
@@ -169,6 +173,7 @@ onMounted(async () => {
 <template>
   <ToastProvider />
   <ConfirmDialog />
+  <div v-if="routeLoading" class="route-loading-bar"></div>
   <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isSupervisor && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor && !isDelivery }">
 
     <!-- ── ADMIN LAYOUT (sidebar + topbar, desktop ≥1024px) ── -->
@@ -591,6 +596,21 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* ── Route loading bar ── */
+.route-loading-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #1b5e20, #4ade80, #1b5e20);
+  background-size: 200% 100%;
+  animation: route-loading-slide 1s linear infinite;
+  z-index: 99999;
+}
+@keyframes route-loading-slide {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* ── Shell ── */
 .app-shell {
   min-height: 100vh;

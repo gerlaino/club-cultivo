@@ -29,8 +29,8 @@ const showModal      = ref(false)
 const saving         = ref(false)
 const formError      = ref(null)
 
-const canCreate = computed(() => ['admin', 'cultivador', 'dispensador', 'medico'].includes(auth.user?.role))
-const canDelete = computed(() => ['admin', 'dispensador'].includes(auth.user?.role))
+const canCreate = computed(() => ['admin', 'cultivador', 'dispensador', 'medico', 'super_admin'].includes(auth.user?.role))
+const canDelete = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
 
 const today = new Date().toISOString().split('T')[0]
 

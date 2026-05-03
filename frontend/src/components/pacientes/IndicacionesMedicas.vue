@@ -281,8 +281,8 @@ const saving = ref(false)
 const deleting = ref(false)
 const deleteConfirm = ref(null)
 
-const canCreate = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'medico')
-const canEdit = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'medico')
+const canCreate = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
+const canEdit = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
 
 const form = ref({
   patologia: '',

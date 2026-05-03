@@ -15,7 +15,7 @@ const isAgricultor = isCultivador
 const { fetchPlan, planLabel, planColor, limites, uso } = usePlan()
 const { confirm } = useConfirm()
 
-const canEdit = computed(() => ['admin'].includes(auth.role))
+const canEdit = computed(() => ['admin', 'super_admin'].includes(auth.role))
 const sedes      = ref([])
 const loading    = ref(true)
 const saving     = ref(false)
@@ -357,6 +357,7 @@ function tieneActividad(sede) {
       </div>
 
       <!-- KPIs -->
+      <template v-if="!loading">
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-card__icon" style="background:rgba(15,23,42,.06)">🏢</div>
@@ -387,6 +388,7 @@ function tieneActividad(sede) {
           </div>
         </div>
       </div>
+      </template>
 
       <!-- Loading -->
       <div v-if="loading" class="loading-state">
@@ -439,7 +441,6 @@ function tieneActividad(sede) {
             </div>
             <div class="sede-card__actions" @click.stop>
               <button
-                v-if="['social','mixta'].includes(sede.tipo)"
                 class="sede-card__btn sede-card__btn--secondary"
                 @click="verInventario(sede)"
               >

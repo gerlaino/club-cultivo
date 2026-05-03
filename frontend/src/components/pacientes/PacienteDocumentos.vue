@@ -18,7 +18,7 @@ const props = defineProps({
 })
 
 const auth     = useAuthStore()
-const canEdit  = computed(() => ['admin', 'medico'].includes(auth.user?.role))
+const canEdit  = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
 
 // ── Estado ────────────────────────────────────────────────────────────
 const docs      = ref([])
