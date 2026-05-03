@@ -587,7 +587,7 @@ function mostrarToast(mensaje, tipo = 'success') {
 /* Header */
 .tv__header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
 .tv__title { font-size: 1.75rem; font-weight: 800; margin: 0 0 .15rem; letter-spacing: -.04em; }
-.tv__sub { font-size: .82rem; color: #64748b; margin: 0; text-transform: capitalize; }
+.tv__sub { font-size: .82rem; color: #64748b; margin: 0; }
 .tv__header-right { display: flex; align-items: center; gap: .75rem; }
 
 /* Tabs */

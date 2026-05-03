@@ -650,7 +650,7 @@ onMounted(async () => {
 .admin-drawer-enter-active,
 .admin-drawer-leave-active { transition: opacity .2s, transform .2s; }
 .admin-drawer-enter-from,
-.admin-drawer-leave-to { opacity: 0; }
+.admin-drawer-leave-to { opacity: 0; pointer-events: none; }
 .admin-drawer-enter-from .admin-drawer,
 .admin-drawer-leave-to  .admin-drawer { transform: translateX(-100%); }
 
@@ -739,7 +739,7 @@ onMounted(async () => {
 .svr-drawer-enter-active,
 .svr-drawer-leave-active { transition: opacity .2s, transform .2s; }
 .svr-drawer-enter-from,
-.svr-drawer-leave-to { opacity: 0; }
+.svr-drawer-leave-to { opacity: 0; pointer-events: none; }
 .svr-drawer-enter-from .svr-drawer,
 .svr-drawer-leave-to  .svr-drawer { transform: translateX(-100%); }
 
@@ -765,7 +765,7 @@ onMounted(async () => {
 .dpv-drawer-enter-active,
 .dpv-drawer-leave-active { transition: opacity .2s, transform .2s; }
 .dpv-drawer-enter-from,
-.dpv-drawer-leave-to { opacity: 0; }
+.dpv-drawer-leave-to { opacity: 0; pointer-events: none; }
 .dpv-drawer-enter-from .dpv-drawer,
 .dpv-drawer-leave-to  .dpv-drawer { transform: translateX(-100%); }
 
@@ -813,7 +813,7 @@ onMounted(async () => {
 .mnc-drawer-enter-active,
 .mnc-drawer-leave-active { transition: opacity .2s, transform .2s; }
 .mnc-drawer-enter-from,
-.mnc-drawer-leave-to { opacity: 0; }
+.mnc-drawer-leave-to { opacity: 0; pointer-events: none; }
 .mnc-drawer-enter-from .mnc-drawer,
 .mnc-drawer-leave-to  .mnc-drawer { transform: translateX(-100%); }
 
@@ -951,7 +951,7 @@ onMounted(async () => {
 .med-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
 .med-drawer { width: 240px; height: 100%; overflow: hidden; }
 .med-drawer-enter-active, .med-drawer-leave-active { transition: opacity .2s, transform .2s; }
-.med-drawer-enter-from, .med-drawer-leave-to { opacity: 0; }
+.med-drawer-enter-from, .med-drawer-leave-to { opacity: 0; pointer-events: none; }
 .med-drawer-enter-from .med-drawer, .med-drawer-leave-to .med-drawer { transform: translateX(-100%); }
 
 /* ── Abogado layout ── */
@@ -962,7 +962,7 @@ onMounted(async () => {
 .abg-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
 .abg-drawer { width: 240px; height: 100%; overflow: hidden; }
 .abg-drawer-enter-active, .abg-drawer-leave-active { transition: opacity .2s, transform .2s; }
-.abg-drawer-enter-from, .abg-drawer-leave-to { opacity: 0; }
+.abg-drawer-enter-from, .abg-drawer-leave-to { opacity: 0; pointer-events: none; }
 .abg-drawer-enter-from .abg-drawer, .abg-drawer-leave-to .abg-drawer { transform: translateX(-100%); }
 
 /* ── Auditor layout ── */
@@ -973,7 +973,7 @@ onMounted(async () => {
 .aud-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
 .aud-drawer { width: 240px; height: 100%; overflow: hidden; }
 .aud-drawer-enter-active, .aud-drawer-leave-active { transition: opacity .2s, transform .2s; }
-.aud-drawer-enter-from, .aud-drawer-leave-to { opacity: 0; }
+.aud-drawer-enter-from, .aud-drawer-leave-to { opacity: 0; pointer-events: none; }
 .aud-drawer-enter-from .aud-drawer, .aud-drawer-leave-to .aud-drawer { transform: translateX(-100%); }
 
 /* ── Delivery layout ── */
@@ -984,7 +984,7 @@ onMounted(async () => {
 .dlv-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
 .dlv-drawer { width: 200px; height: 100%; overflow: hidden; }
 .dlv-drawer-enter-active, .dlv-drawer-leave-active { transition: opacity .2s, transform .2s; }
-.dlv-drawer-enter-from, .dlv-drawer-leave-to { opacity: 0; }
+.dlv-drawer-enter-from, .dlv-drawer-leave-to { opacity: 0; pointer-events: none; }
 .dlv-drawer-enter-from .dlv-drawer, .dlv-drawer-leave-to .dlv-drawer { transform: translateX(-100%); }
 
 /* ── Supervisor layout ── */

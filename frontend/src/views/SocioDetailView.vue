@@ -882,7 +882,7 @@ onMounted(async () => {
 
 /* Transitions */
 .sd-modal-enter-active, .sd-modal-leave-active { transition: opacity .2s; }
-.sd-modal-enter-from, .sd-modal-leave-to { opacity: 0; }
+.sd-modal-enter-from, .sd-modal-leave-to { opacity: 0; pointer-events: none; }
 .sd-modal-enter-active .sd-modal, .sd-modal-leave-active .sd-modal { transition: transform .2s; }
 .sd-modal-enter-from .sd-modal, .sd-modal-leave-to .sd-modal { transform: translateY(-12px); }
 

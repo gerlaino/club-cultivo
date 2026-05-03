@@ -10,7 +10,7 @@ class Sala < ApplicationRecord
   has_many :notas, as: :noteable, dependent: :destroy
 
   ESTADOS = %w[activa mantenimiento cerrada].freeze
-  KINDS   = %w[vegetativo floracion cosecha mixta madre clon manicura secado].freeze
+  KINDS   = %w[vegetativo floracion manicura cosechado cosecha mixta madre clon secado].freeze
   TIPOS   = %w[cultivo vegetativo floracion cosecha secado curado madre clones].freeze
 
   validates :nombre, presence: true, uniqueness: { scope: :club_id }
@@ -47,8 +47,8 @@ class Sala < ApplicationRecord
   NOMBRES_TIPO = {
     'germinacion' => 'Germinación', 'vegetativo' => 'Vegetativo',
     'floracion'   => 'Floración',   'cosecha'    => 'Cosecha',
-    'secado'      => 'Secado',      'curado'     => 'Curado',
-    'manicura'    => 'Manicura',
+    'cosechado'   => 'Cosechado',   'secado'     => 'Secado',
+    'curado'      => 'Curado',      'manicura'   => 'Manicura',
   }.freeze
 
   def self.find_or_create_proceso!(sede:, tipo:, created_by: nil)

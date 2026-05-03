@@ -72,7 +72,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   justify-content: flex-end;
   gap: .5rem;
 }
-.cd-enter-active, .cd-leave-active { transition: all .15s ease; }
-.cd-enter-from, .cd-leave-to { opacity: 0; }
+.cd-enter-active, .cd-leave-active { transition: opacity .15s ease, transform .15s ease; }
+.cd-enter-from, .cd-leave-to { opacity: 0; pointer-events: none; }
 .cd-enter-from .cd-box { transform: scale(.96); }
 </style>

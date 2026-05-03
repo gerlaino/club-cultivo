@@ -15,20 +15,16 @@ const saving = ref(false)
 const error  = ref(null)
 
 const KINDS = [
-  { value: '',           label: 'Sin especificar' },
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración' },
-  { value: 'mixta',      label: 'Mixta' },
-  { value: 'madre',      label: 'Madres' },
-  { value: 'clon',       label: 'Clones' },
   { value: 'manicura',   label: 'Manicura' },
-  { value: 'secado',     label: 'Secado' },
+  { value: 'cosechado',  label: 'Cosechado' },
 ]
 
 const form = ref({
   nombre:    '',
   state:     'activa',
-  kind:      '',
+  kind:      'vegetativo',
   pots_count: null,
   sede_id:   props.sedeIdFija || null,
   notes:     '',
@@ -57,7 +53,6 @@ async function handleSubmit() {
   try {
     const payload = { ...form.value }
     if (!payload.pots_count) payload.pots_count = 0
-    if (!payload.kind) delete payload.kind
     await salas.create(payload)
     emit('created')
     emit('close')

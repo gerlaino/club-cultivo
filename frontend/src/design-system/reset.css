@@ -14,6 +14,11 @@ input, button, textarea, select {
   font: inherit;
 }
 
+/* Respuesta táctil inmediata en mobile — previene el delay de 300ms en iOS */
+button, a, [role="button"], [tabindex] {
+  touch-action: manipulation;
+}
+
 /* Imágenes y media responsivos */
 img, svg, video {
   display: block;
