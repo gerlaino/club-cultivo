@@ -91,13 +91,21 @@ const error            = ref('')
 const puedeEditar = computed(() => ['admin', 'cultivador'].includes(auth.user?.role))
 const esManicurador = computed(() => props.userRole === 'manicura')
 
+const salasParaRol = computed(() => {
+  return todasLasSalas.value.filter(sala => {
+    if (!['produccion', 'mixta'].includes(sala.sede?.tipo)) return false
+    if (esManicurador.value) return sala.kind === 'manicura'
+    return sala.kind !== 'manicura'
+  })
+})
+
 const salasNoAsignadas = computed(() => {
   const asignadasIds = new Set(salasAsignadas.value.map(s => s.id))
-  return todasLasSalas.value.filter(s => !asignadasIds.has(s.id))
+  return salasParaRol.value.filter(s => !asignadasIds.has(s.id))
 })
 
 const sedesDisponibles = computed(() => {
-  const fuente = esManicurador.value ? todasLasSalas.value : salasNoAsignadas.value
+  const fuente = esManicurador.value ? salasParaRol.value : salasNoAsignadas.value
   const map = new Map()
   fuente.forEach(sala => {
     if (sala.sede?.id && !map.has(sala.sede.id)) {
@@ -109,7 +117,7 @@ const sedesDisponibles = computed(() => {
 
 const salasDeLaSede = computed(() => {
   if (!sedeSeleccionada.value) return []
-  const fuente = esManicurador.value ? todasLasSalas.value : salasNoAsignadas.value
+  const fuente = esManicurador.value ? salasParaRol.value : salasNoAsignadas.value
   return fuente.filter(s => s.sede?.id === sedeSeleccionada.value)
 })
 

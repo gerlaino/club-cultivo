@@ -51,6 +51,13 @@ const PERMISOS = {
   socio:       [{ ok: true, label: "Ver su perfil" }, { ok: true, label: "Ver sus dispensaciones" }, { ok: false, label: "Acceso a producción" }, { ok: false, label: "Acceso a otros módulos" }],
 }
 
+const SEDE_HINTS = {
+  supervisor:  'Solo puede crear tareas en estas sedes',
+  medico:      'Solo ve pacientes de estas sedes — sin asignar: todo el club',
+  dispensador: 'Solo puede dispensar en estas sedes — sin asignar: todas',
+  delivery:    'Solo gestiona entregas de estas sedes — sin asignar: todas',
+}
+
 const AVATAR_COLORS = ['#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc2626','#15803d']
 
 function roleInfo(role) { return ROLES.find(r => r.value === role) || { label: role, color: '#475569', bg: 'rgba(71,85,105,.1)', icon: 'bi-person', desc: '' } }
@@ -206,17 +213,53 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Sedes asignadas — supervisor -->
-          <div v-if="u.role === 'supervisor'" class="ud__card ud__card--mt">
+          <!-- Sedes asignadas — roles sede-nivel -->
+          <div v-if="['supervisor', 'medico', 'dispensador', 'delivery'].includes(u.role)" class="ud__card ud__card--mt">
             <div class="ud__card-header">
-              <div class="ud__card-icon" style="background:rgba(15,118,110,.1);color:#0f766e">
+              <div class="ud__card-icon" :style="{ background: roleInfo(u.role).bg, color: roleInfo(u.role).color }">
                 <i class="bi bi-building"></i>
               </div>
               <span class="ud__card-title">Sedes asignadas</span>
-              <span class="ud__card-hint" style="color:#0f766e">Solo puede crear tareas en estas sedes</span>
+              <span class="ud__card-hint">{{ SEDE_HINTS[u.role] }}</span>
             </div>
             <div class="ud__card-body">
               <UsuarioSedesManager :user-id="userId" />
+              <p class="ud__sede-total-note">
+                <i class="bi bi-info-circle me-1"></i>
+                Sin sedes asignadas = acceso a todo el club
+              </p>
+            </div>
+          </div>
+
+          <!-- Acceso total — admin -->
+          <div v-if="u.role === 'admin'" class="ud__card ud__card--mt">
+            <div class="ud__card-header">
+              <div class="ud__card-icon" style="background:rgba(220,38,38,.1);color:#dc2626">
+                <i class="bi bi-shield-fill-check"></i>
+              </div>
+              <span class="ud__card-title">Acceso</span>
+            </div>
+            <div class="ud__card-body">
+              <p class="ud__acceso-note ud__acceso-note--full">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                Acceso total al club — no requiere asignación de sede ni sala.
+              </p>
+            </div>
+          </div>
+
+          <!-- Acceso club — abogado / auditor -->
+          <div v-if="['abogado', 'auditor'].includes(u.role)" class="ud__card ud__card--mt">
+            <div class="ud__card-header">
+              <div class="ud__card-icon" :style="{ background: roleInfo(u.role).bg, color: roleInfo(u.role).color }">
+                <i :class="['bi', roleInfo(u.role).icon]"></i>
+              </div>
+              <span class="ud__card-title">Acceso</span>
+            </div>
+            <div class="ud__card-body">
+              <p class="ud__acceso-note">
+                <i class="bi bi-info-circle me-2"></i>
+                {{ u.role === 'auditor' ? 'Externo — acceso de solo lectura a nivel club, sin restricción por sede.' : 'Acceso a nivel club completo — no se diferencia por sede.' }}
+              </p>
             </div>
           </div>
 
@@ -228,8 +271,8 @@ onMounted(async () => {
                 <i :class="u.role === 'manicura' ? 'bi bi-scissors' : 'bi bi-grid-3x3-gap'"></i>
               </div>
               <span class="ud__card-title">{{ u.role === 'manicura' ? 'Sala asignada' : 'Salas asignadas' }}</span>
-              <span v-if="u.role === 'manicura'" class="ud__card-hint">
-                Solo verá lotes en cosecha/curado de su sala
+              <span class="ud__card-hint">
+                {{ u.role === 'manicura' ? 'Solo salas de manicura (sedes producción/mixta)' : 'Solo salas de cultivo (sedes producción/mixta)' }}
               </span>
             </div>
             <div class="ud__card-body">
@@ -364,6 +407,24 @@ onMounted(async () => {
 .ud__info-item--full { grid-column: 1 / -1; border-right: none; }
 .ud__info-label { font-size: .72rem; color: #94a3b8; font-weight: 500; margin-bottom: .25rem; text-transform: uppercase; letter-spacing: .04em; }
 .ud__info-val { font-size: .875rem; font-weight: 600; color: #0f172a; }
+
+/* Acceso notas */
+.ud__sede-total-note {
+  font-size: .75rem;
+  color: #64748b;
+  margin: .75rem 0 0;
+  padding: .5rem .75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 3px solid #cbd5e1;
+}
+.ud__acceso-note {
+  font-size: .82rem;
+  color: #475569;
+  margin: 0;
+  line-height: 1.6;
+}
+.ud__acceso-note--full { color: #15803d; }
 
 /* Permisos */
 .ud__role-desc { font-size: .83rem; color: #64748b; margin-bottom: 1rem; line-height: 1.6; }
