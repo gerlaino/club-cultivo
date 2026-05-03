@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, computed } from "vue"
+import { onMounted, onUnmounted, ref, computed } from "vue"
 import { logger } from '../utils/logger.js'
 import { useRoute, useRouter } from "vue-router"
 import { useLotesStore }  from "../stores/lotes"
@@ -549,7 +549,18 @@ const splitOk = computed(() => {
   return Math.abs(sum - parseFloat(f.peso_curado_g)) < 0.01
 })
 
+function loteEscapeHandler(e) {
+  if (e.key !== 'Escape') return
+  if (showCerrarCuradoModal.value) { showCerrarCuradoModal.value = false; return }
+  if (showCosechaModal.value)      { showCosechaModal.value = false; return }
+  if (showTransicionModal.value)   { showTransicionModal.value = false; return }
+  if (showRegistroModal.value)     { showRegistroModal.value = false; return }
+  if (showCostoForm.value)         { showCostoForm.value = false; return }
+  if (showAddPlanta.value)         { showAddPlanta.value = false; return }
+}
+
 onMounted(async () => {
+  document.addEventListener('keydown', loteEscapeHandler, true)
   try   { await lotes.fetchOne(id) }
   catch { error.value = "No se pudo cargar el lote." }
   try   { await plants.fetchByLote(id) }
@@ -557,6 +568,10 @@ onMounted(async () => {
   await loadEventos()
   try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
   try { const { data } = await getCostoLote(id); costoLote.value = data?.costo || data || null } catch {}
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', loteEscapeHandler, true)
 })
 </script>
 

@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, computed } from "vue"
+import { onMounted, onUnmounted, ref, computed } from "vue"
 import { logger } from '../utils/logger.js'
 import { useRoute, useRouter } from "vue-router"
 import { useSalasStore } from "../stores/salas"
@@ -64,7 +64,16 @@ const DIAS_CICLO   = { semilla:7, vegetativo:45, floracion:65, cosecha:10, curad
 // ── Genéticas ──────────────────────────────────────────────
 const geneticas = ref([])
 
+function salaEscapeHandler(e) {
+  if (e.key !== 'Escape') return
+  if (showCreate.value)      { closeCreate(); return }
+  if (showCargarLote.value)  { showCargarLote.value = false; return }
+  if (showUpgrade.value)     { showUpgrade.value = false; return }
+  if (lecturaOpen.value)     { lecturaOpen.value = false; return }
+}
+
 onMounted(async () => {
+  document.addEventListener('keydown', salaEscapeHandler, true)
   try {
     await salas.fetchSala(salaId)
     await lotes.fetchBySala(salaId)
@@ -77,6 +86,10 @@ onMounted(async () => {
   } catch { /* genéticas no críticas */ }
 
   if (canSeeAmbiente.value) cargarAmbienteMini()
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', salaEscapeHandler, true)
 })
 
 const sala  = computed(() => salas.currentSala)
