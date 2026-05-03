@@ -180,9 +180,7 @@ const form = ref({ lote_id: null, cantidad: null })
 
 const hora   = new Date().getHours()
 const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
-const hoy    = new Date().toLocaleDateString('es-AR', {
-  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-}).replace(/^\w/, c => c.toUpperCase())
+const hoy    = (() => { const s = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() })()
 
 const ESTADOS = {
   semilla:    { label: 'Semilla',    color: '#92400e', bg: 'rgba(146,64,14,.12)'  },

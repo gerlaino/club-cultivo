@@ -108,7 +108,7 @@ onMounted(async () => {
         </div>
         <h1 class="ld__title">Buenas {{ new Date().getHours() < 13 ? 'mañanas' : new Date().getHours() < 20 ? 'tardes' : 'noches' }}, {{ auth.user?.first_name }}</h1>
         <p class="ld__subtitle">
-          {{ new Date().toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long', year:'numeric' }) }}
+          {{ (s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())(new Date().toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })) }}
           · {{ isAbogado ? 'Oficial de cumplimiento' : 'Auditor' }}
         </p>
       </div>

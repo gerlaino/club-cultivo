@@ -7,10 +7,14 @@
         <h1 class="wpv__title">Web pública</h1>
         <p class="wpv__subtitle">Gestioná el contenido de la web de tu club</p>
       </div>
-      <a :href="webUrl" target="_blank" class="wpv__preview-btn">
+      <a v-if="webUrl" :href="webUrl" target="_blank" class="wpv__preview-btn">
         <i class="bi bi-box-arrow-up-right"></i>
         Ver web
       </a>
+      <span v-else class="wpv__preview-btn wpv__preview-btn--disabled" title="Configurá VITE_PUBLIC_WEB_URL en el deploy">
+        <i class="bi bi-box-arrow-up-right"></i>
+        Ver web
+      </span>
     </div>
 
     <!-- Tabs -->
@@ -416,7 +420,12 @@ import EmptyState from '../components/ui/EmptyState.vue'
 const { confirm } = useConfirm()
 const clubStore = useClubStore()
 const { data: club } = storeToRefs(clubStore)
-const webUrl = import.meta.env.VITE_PUBLIC_WEB_URL || 'http://localhost:5174'
+const webUrl = computed(() => {
+  if (import.meta.env.VITE_PUBLIC_WEB_URL) return import.meta.env.VITE_PUBLIC_WEB_URL
+  const slug = club.value?.slug
+  if (slug) return `https://${slug}.clubcultivo.app`
+  return null
+})
 
 const activeTab = ref('geneticas')
 const tabs = [
@@ -668,6 +677,7 @@ onMounted(async () => {
   box-shadow: 0 2px 8px #1b5e2030;
 }
 .wpv__preview-btn:hover { opacity: .88; color: #e8f5e9; }
+.wpv__preview-btn--disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
 
 .wpv__tabs { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; margin-bottom: 2rem; }
 .wpv__tab {

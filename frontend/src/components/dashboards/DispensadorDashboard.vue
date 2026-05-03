@@ -85,7 +85,7 @@ const totalPacientes = ref(0)
 const totalStocks    = ref(0)
 
 const hoy = new Date()
-const fechaHoy = hoy.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+const fechaHoy = (() => { const s = hoy.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() })()
 const fechaParam = hoy.toISOString().slice(0, 10)
 
 const kpis = computed(() => {

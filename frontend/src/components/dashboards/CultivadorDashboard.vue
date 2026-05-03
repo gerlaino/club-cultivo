@@ -220,7 +220,7 @@ const hora   = new Date().getHours()
 const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
 const hoy    = (() => {
   const d = new Date().toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
-  return d.charAt(0).toUpperCase() + d.slice(1)
+  return d.charAt(0).toUpperCase() + d.slice(1).toLowerCase()
 })()
 
 // ── Salas ──────────────────────────────────────────────────────

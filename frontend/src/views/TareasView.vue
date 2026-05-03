@@ -370,9 +370,10 @@ const { loading, dashboard, kanban, stats, hayVencidas, hoyPendientes, hoyEnProg
 const esAdmin    = computed(() => authStore.user?.role === 'admin')
 const puedeCrear = computed(() => authStore.user?.role === 'admin')
 
-const fechaHoy = computed(() =>
-  new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
-)
+const fechaHoy = computed(() => {
+  const s = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+})
 const saludo = computed(() => {
   const h = new Date().getHours()
   const n = authStore.user?.first_name || ''

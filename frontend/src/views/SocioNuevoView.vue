@@ -6,6 +6,12 @@ import { usePacientesStore } from '../stores/pacientes'
 const router = useRouter()
 const store  = usePacientesStore()
 
+function fmtFecha(iso) {
+  if (!iso) return '—'
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
 const formError  = ref(null)
 const formErrors = ref({})
 
@@ -317,7 +323,7 @@ function sugerirVencimiento() {
           <div class="snv__summary-items">
             <div class="snv__summary-item">
               <span class="snv__summary-key">Nacimiento</span>
-              <span class="snv__summary-val">{{ form.fecha_nacimiento || '—' }}</span>
+              <span class="snv__summary-val">{{ fmtFecha(form.fecha_nacimiento) }}</span>
             </div>
             <div class="snv__summary-item">
               <span class="snv__summary-key">REPROCANN</span>

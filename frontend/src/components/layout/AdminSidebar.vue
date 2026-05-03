@@ -44,7 +44,7 @@ import LeafSeal from '../../design-system/icons/LeafSeal.vue'
 import DsAvatar from '../../design-system/components/Avatar.vue'
 import {
   LayoutDashboard, Users, Building2, Wallet, CheckSquare,
-  Sprout, FileCheck, FileText, UserCog, Globe, ClipboardCheck, Container,
+  Sprout, FileCheck, FileText, UserCog, Globe, ClipboardCheck, Container, Layers,
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -56,6 +56,7 @@ const NAV_LINKS = [
   { to: '/',                  icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/pacientes',         icon: Users,           label: 'Pacientes' },
   { to: '/sedes',             icon: Building2,       label: 'Sedes' },
+  { to: '/salas',             icon: Layers,          label: 'Salas' },
   { to: '/contabilidad',      icon: Wallet,          label: 'Contabilidad' },
   { to: '/tareas',            icon: CheckSquare,     label: 'Tareas' },
   { to: '/geneticas',         icon: Sprout,          label: 'Genéticas' },
