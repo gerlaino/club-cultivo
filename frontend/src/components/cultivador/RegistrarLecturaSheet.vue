@@ -1,62 +1,78 @@
 <template>
-  <SheetBottom v-model="open" title="Registrar lectura ambiental">
+  <Teleport to="body">
+    <Transition name="rls-modal">
+      <div v-if="open" class="rls__overlay" @click.self="open = false">
+        <div class="rls__modal">
 
-    <!-- Sala selector -->
-    <div class="rls__field">
-      <label class="rls__label">Sala</label>
-      <select class="rls__select" v-model="salaId" @change="onSalaChange">
-        <option value="" disabled>Seleccioná una sala</option>
-        <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-      </select>
-    </div>
+          <!-- Header -->
+          <div class="rls__header">
+            <h2 class="rls__title">Registrar lectura ambiental</h2>
+            <button class="rls__close" @click="open = false"><i class="bi bi-x-lg"></i></button>
+          </div>
 
-    <!-- Lote selector (solo si hay más de uno) -->
-    <div v-if="lotesEnSala.length > 1" class="rls__field">
-      <label class="rls__label">Lote</label>
-      <select class="rls__select" v-model="loteId">
-        <option value="" disabled>Seleccioná un lote</option>
-        <option v-for="l in lotesEnSala" :key="l.id" :value="l.id">{{ l.codigo }}</option>
-      </select>
-    </div>
-    <div v-else-if="salaId && lotesEnSala.length === 0" class="rls__empty">
-      Esta sala no tiene lotes activos.
-    </div>
+          <!-- Body -->
+          <div class="rls__body">
 
-    <!-- Inputs de lectura -->
-    <div v-if="loteId" class="rls__grid">
-      <div class="rls__field">
-        <label class="rls__label">Temperatura (°C)</label>
-        <input class="rls__input" type="number" step="0.1" v-model="form.temperatura" placeholder="23.5" inputmode="decimal" />
+            <!-- Sala selector -->
+            <div class="rls__field">
+              <label class="rls__label">Sala</label>
+              <select class="rls__select" v-model="salaId" @change="onSalaChange">
+                <option value="" disabled>Seleccioná una sala</option>
+                <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              </select>
+            </div>
+
+            <!-- Lote selector (solo si hay más de uno) -->
+            <div v-if="lotesEnSala.length > 1" class="rls__field">
+              <label class="rls__label">Lote</label>
+              <select class="rls__select" v-model="loteId">
+                <option value="" disabled>Seleccioná un lote</option>
+                <option v-for="l in lotesEnSala" :key="l.id" :value="l.id">{{ l.codigo }}</option>
+              </select>
+            </div>
+            <div v-else-if="salaId && lotesEnSala.length === 0" class="rls__empty">
+              Esta sala no tiene lotes activos.
+            </div>
+
+            <!-- Inputs de lectura -->
+            <div v-if="loteId" class="rls__grid">
+              <div class="rls__field">
+                <label class="rls__label">Temperatura (°C)</label>
+                <input class="rls__input" type="number" step="0.1" v-model="form.temperatura" placeholder="23.5" inputmode="decimal" />
+              </div>
+              <div class="rls__field">
+                <label class="rls__label">Humedad (%)</label>
+                <input class="rls__input" type="number" step="0.1" v-model="form.humedad" placeholder="60" inputmode="decimal" />
+              </div>
+              <div class="rls__field">
+                <label class="rls__label">CO₂ (ppm)</label>
+                <input class="rls__input" type="number" step="1" v-model="form.co2" placeholder="1100" inputmode="numeric" />
+              </div>
+              <div class="rls__field">
+                <label class="rls__label">Luz / PPFD (μmol)</label>
+                <input class="rls__input" type="number" step="1" v-model="form.ppfd" placeholder="600" inputmode="numeric" />
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Footer -->
+          <div class="rls__footer">
+            <button class="rls__cancel" @click="open = false">Cancelar</button>
+            <button class="rls__submit" :disabled="!canSubmit || guardando" @click="guardar">
+              <DsSpinner v-if="guardando" style="width:16px;height:16px" />
+              <span>{{ guardando ? 'Guardando…' : 'Guardar lectura' }}</span>
+            </button>
+          </div>
+
+        </div>
       </div>
-      <div class="rls__field">
-        <label class="rls__label">Humedad (%)</label>
-        <input class="rls__input" type="number" step="0.1" v-model="form.humedad" placeholder="60" inputmode="decimal" />
-      </div>
-      <div class="rls__field">
-        <label class="rls__label">CO₂ (ppm)</label>
-        <input class="rls__input" type="number" step="1" v-model="form.co2" placeholder="1100" inputmode="numeric" />
-      </div>
-      <div class="rls__field">
-        <label class="rls__label">Luz / PPFD (μmol)</label>
-        <input class="rls__input" type="number" step="1" v-model="form.ppfd" placeholder="600" inputmode="numeric" />
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div class="rls__footer">
-      <button class="rls__cancel" @click="open = false">Cancelar</button>
-      <button class="rls__submit" :disabled="!canSubmit || guardando" @click="guardar">
-        <DsSpinner v-if="guardando" style="width:16px;height:16px" />
-        <span>{{ guardando ? 'Guardando…' : 'Guardar lectura' }}</span>
-      </button>
-    </div>
-
-  </SheetBottom>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import SheetBottom from './SheetBottom.vue'
 import DsSpinner   from '../../design-system/components/Spinner.vue'
 import { useSalasStore } from '../../stores/salas.js'
 import { useLotesStore } from '../../stores/lotes.js'
@@ -91,9 +107,7 @@ const lotesEnSala = computed(() =>
 
 function onSalaChange() {
   loteId.value = ''
-  // Cargar lotes si no están
   if (!lotesStore.items.length) lotesStore.fetch()
-  // Auto-seleccionar el único lote si hay solo uno
   if (lotesEnSala.value.length === 1) loteId.value = lotesEnSala.value[0].id
 }
 
@@ -133,13 +147,89 @@ function resetForm() {
   loteId.value = ''
 }
 
-// Cargar salas cuando el sheet se abre
-watch(() => props.modelValue, (open) => {
-  if (open && !salasStore.items.length) salasStore.fetch()
+watch(() => props.modelValue, (isOpen) => {
+  if (isOpen && !salasStore.items.length) salasStore.fetch()
 })
 </script>
 
 <style scoped>
+/* Overlay */
+.rls__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .45);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+}
+
+/* Modal */
+.rls__modal {
+  background: var(--c-paper);
+  border-radius: var(--r-2xl);
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .2);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+/* Header */
+.rls__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-5) var(--sp-6);
+  border-bottom: 1px solid var(--c-ink-100);
+  flex-shrink: 0;
+}
+.rls__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-18);
+  font-weight: 600;
+  color: var(--c-ink-900);
+  margin: 0;
+}
+.rls__close {
+  background: var(--c-ink-100);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--c-ink-600);
+  transition: background var(--t-fast);
+}
+.rls__close:hover { background: var(--c-ink-200); }
+
+/* Body */
+.rls__body {
+  padding: var(--sp-5) var(--sp-6);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Footer */
+.rls__footer {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-6);
+  border-top: 1px solid var(--c-ink-100);
+  flex-shrink: 0;
+}
+
+/* Transition */
+.rls-modal-enter-active, .rls-modal-leave-active { transition: opacity .2s, transform .2s; }
+.rls-modal-enter-from, .rls-modal-leave-to { opacity: 0; }
+.rls-modal-enter-from .rls__modal, .rls-modal-leave-to .rls__modal { transform: scale(.95); }
+
+/* Fields */
 .rls__field { margin-bottom: var(--sp-4); }
 .rls__label {
   display: block;
@@ -153,13 +243,13 @@ watch(() => props.modelValue, (open) => {
 .rls__select,
 .rls__input {
   width: 100%;
-  height: 56px;
+  height: 48px;
   padding: 0 var(--sp-4);
   background: var(--c-leaf-50);
   border: 1.5px solid var(--c-ink-300);
   border-radius: var(--r-lg);
   font-family: var(--font-mono);
-  font-size: var(--fs-16);
+  font-size: var(--fs-15);
   color: var(--c-ink-900);
   box-sizing: border-box;
   transition: border-color var(--t-fast);
@@ -184,15 +274,9 @@ watch(() => props.modelValue, (open) => {
   margin-bottom: var(--sp-4);
 }
 
-.rls__footer {
-  display: flex;
-  gap: var(--sp-3);
-  margin-top: var(--sp-2);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
 .rls__cancel {
   flex: 1;
-  height: 52px;
+  height: 48px;
   border: 1.5px solid var(--c-ink-300);
   border-radius: var(--r-lg);
   background: transparent;
@@ -205,7 +289,7 @@ watch(() => props.modelValue, (open) => {
 .rls__cancel:hover { background: var(--c-ink-100); }
 .rls__submit {
   flex: 2;
-  height: 52px;
+  height: 48px;
   border: none;
   border-radius: var(--r-lg);
   background: var(--c-role-cultivador);

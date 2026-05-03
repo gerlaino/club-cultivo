@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
 import { getSede, listSalas, listLotes,
@@ -143,7 +143,13 @@ function onSalaCreada() {
   recargarSalas()
 }
 
+function escapeHandler(e) {
+  if (e.key !== 'Escape') return
+  if (showNuevoStockModal.value) showNuevoStockModal.value = false
+}
+onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 onMounted(async () => {
+  document.addEventListener('keydown', escapeHandler, true)
   try {
     const [sedeRes, salasRes] = await Promise.all([getSede(sedeId), listSalas()])
     sede.value  = sedeRes.data

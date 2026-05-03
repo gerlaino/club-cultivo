@@ -600,7 +600,7 @@ onMounted(async () => {
           <div class="cv__total-label">Ingresos del período</div>
           <div class="cv__total-val">{{ fmt(store.totales.ingresos) }}</div>
         </div>
-        <div class="cv__total cv__total--red">
+        <div class="cv__total" :class="store.totales.egresos > 0 ? 'cv__total--red' : ''">
           <div class="cv__total-label">Egresos del período</div>
           <div class="cv__total-val">{{ fmt(store.totales.egresos) }}</div>
         </div>
