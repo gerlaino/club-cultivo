@@ -9,14 +9,11 @@
       </div>
       <div class="tv__header-right">
         <div class="tv__tabs">
-          <button class="tv__tab" :class="{ 'tv__tab--active': vistaActiva === 'dashboard' }" @click="vistaActiva = 'dashboard'">
-            <i class="bi bi-grid-1x2"></i> Mi día
+          <button class="tv__tab" :class="{ 'tv__tab--active': vistaActiva === 'semana' }" @click="vistaActiva = 'semana'">
+            <i class="bi bi-calendar-week"></i> Semana
           </button>
           <button class="tv__tab" :class="{ 'tv__tab--active': vistaActiva === 'kanban' }" @click="cambiarAKanban">
             <i class="bi bi-kanban"></i> Kanban
-          </button>
-          <button class="tv__tab" :class="{ 'tv__tab--active': vistaActiva === 'semana' }" @click="vistaActiva = 'semana'">
-            <i class="bi bi-calendar-week"></i> Semana
           </button>
         </div>
         <button v-if="puedeCrear" class="tv__btn-primary" @click="abrirModalNueva">
@@ -55,92 +52,6 @@
     </div>
 
     <template v-else>
-
-      <!-- ══ DASHBOARD ══ -->
-      <div v-if="vistaActiva === 'dashboard'">
-
-        <!-- Alerta vencidas -->
-        <div v-if="hayVencidas" class="tv__alerta">
-          <i class="bi bi-exclamation-triangle-fill"></i>
-          <div>
-            <strong>{{ dashboard.vencidas.length }} tarea{{ dashboard.vencidas.length > 1 ? 's' : '' }} vencida{{ dashboard.vencidas.length > 1 ? 's' : '' }}</strong>
-            <span class="tv__alerta-sub">— {{ dashboard.vencidas.slice(0,2).map(t => t.titulo).join(', ') }}<span v-if="dashboard.vencidas.length > 2"> y {{ dashboard.vencidas.length - 2 }} más</span></span>
-          </div>
-          <button class="tv__alerta-btn" @click="cambiarAKanban">Ver todas</button>
-        </div>
-
-        <!-- Tareas de hoy -->
-        <div class="tv__section">
-          <div class="tv__section-header">
-            <span class="tv__section-title">Tareas de hoy</span>
-            <span class="tv__section-count">{{ dashboard.hoy?.length || 0 }}</span>
-          </div>
-
-          <EmptyState v-if="!dashboard.hoy?.length" icon="🎉" title="Sin tareas para hoy" message="¡Todo al día! O creá una nueva tarea para organizar el trabajo.">
-            <template #actions>
-              <button v-if="puedeCrear" class="tv__btn-primary" @click="abrirModalNueva"><i class="bi bi-plus-lg"></i> Nueva tarea</button>
-            </template>
-          </EmptyState>
-
-          <div v-else class="tv__kanban-cols">
-            <!-- Pendiente -->
-            <div class="tv__col">
-              <div class="tv__col-header tv__col-header--pending">
-                <span>Pendiente</span>
-                <span class="tv__col-count">{{ hoyPendientes.length }}</span>
-              </div>
-              <div class="tv__col-body">
-                <TareaCard v-for="t in hoyPendientes" :key="t.id" :tarea="t"
-                           @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
-                           @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
-                           @cancelar="confirmarCancelar(t)" @cancelar-serie="confirmarCancelarSerie(t)" />
-                <EmptyState v-if="!hoyPendientes.length" icon="bi-check2-all" title="Sin pendientes" compact />
-              </div>
-            </div>
-            <!-- En progreso -->
-            <div class="tv__col">
-              <div class="tv__col-header tv__col-header--progress">
-                <span>En progreso</span>
-                <span class="tv__col-count">{{ hoyEnProgreso.length }}</span>
-              </div>
-              <div class="tv__col-body">
-                <TareaCard v-for="t in hoyEnProgreso" :key="t.id" :tarea="t"
-                           @click="abrirDetalle(t)" @completar="abrirModalCompletar(t)"
-                           @editar="abrirModalEditar(t)" @cancelar="confirmarCancelar(t)"
-                           @cancelar-serie="confirmarCancelarSerie(t)" />
-                <EmptyState v-if="!hoyEnProgreso.length" icon="bi-activity" title="Sin tareas activas" compact />
-              </div>
-            </div>
-            <!-- Completadas -->
-            <div class="tv__col">
-              <div class="tv__col-header tv__col-header--done">
-                <span>Completadas</span>
-                <span class="tv__col-count">{{ hoyCompletadas.length }}</span>
-              </div>
-              <div class="tv__col-body">
-                <TareaCard v-for="t in hoyCompletadas" :key="t.id" :tarea="t"
-                           @click="abrirDetalle(t)" @editar="abrirModalEditar(t)" />
-                <EmptyState v-if="!hoyCompletadas.length" icon="bi-check2-circle" title="Sin completadas" compact />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Próximas -->
-        <div v-if="dashboard.proximas?.length" class="tv__section tv__section--mt">
-          <div class="tv__section-header">
-            <span class="tv__section-title">Próximos 7 días</span>
-            <span class="tv__section-count">{{ dashboard.proximas.length }}</span>
-          </div>
-          <div class="tv__proximas">
-            <TareaCard v-for="t in dashboard.proximas" :key="t.id" :tarea="t"
-                       @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
-                       @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
-                       @cancelar="confirmarCancelar(t)" @cancelar-serie="confirmarCancelarSerie(t)" />
-          </div>
-        </div>
-
-      </div>
 
       <!-- ══ KANBAN COMPLETO ══ -->
       <div v-if="vistaActiva === 'kanban'">
@@ -351,7 +262,7 @@ import EmptyState from '../components/ui/EmptyState.vue'
 const authStore   = useAuthStore()
 const tareasStore = useTareasStore()
 
-const vistaActiva       = ref('dashboard')
+const vistaActiva       = ref('semana')
 const showModalTarea    = ref(false)
 const showModalCompletar = ref(false)
 const tareaEditando     = ref(null)
@@ -490,6 +401,7 @@ watch(vistaActiva, (v) => {
 onMounted(async () => {
   await cargarContexto()
   await tareasStore.fetchDashboard()
+  await cargarSemana()
 })
 
 async function cargarContexto() {

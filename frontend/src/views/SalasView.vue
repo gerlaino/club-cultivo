@@ -17,13 +17,14 @@ onMounted(async () => {
   sedes.value = data || [];
 });
 
-const canEdit = computed(() => ["admin","cultivador"].includes(auth.role));
+const canEdit   = computed(() => ["admin","cultivador","supervisor"].includes(auth.role));
+const canCreate = computed(() => ["admin","supervisor"].includes(auth.role));
 
 function kindLabel(k) {
   const map = {
-    vegetativo: "Vegetativo", floracion: "Floración", mixta: "Mixta",
-    madre: "Madres", clon: "Clones", secado: "Secado", curado: "Curado",
-    manicura: "Manicura", cosecha: "Cosecha",
+    vegetativo: "Vegetativo", floracion: "Floración", cosechado: "Cosechado",
+    mixta: "Mixta", madre: "Madres", clon: "Clones", secado: "Secado",
+    curado: "Curado", manicura: "Manicura", cosecha: "Cosecha",
   };
   return map[k] || k || "—";
 }
@@ -187,7 +188,7 @@ async function confirmDelete(s) {
         <h1 class="slv__title">Salas de cultivo</h1>
         <p class="slv__sub">Gestioná los espacios físicos del club</p>
       </div>
-      <button v-if="canEdit" class="slv__btn-primary" @click="showCreate = true">
+      <button v-if="canCreate" class="slv__btn-primary" @click="showCreate = true">
         <i class="bi bi-plus-lg"></i> Nueva sala
       </button>
     </div>
@@ -272,8 +273,8 @@ async function confirmDelete(s) {
     <div v-else-if="!salas.items.length" class="slv__empty">
       <div class="slv__empty-icon">🏗️</div>
       <p class="slv__empty-title">No hay salas todavía</p>
-      <p v-if="canEdit" class="slv__empty-sub">Creá la primera sala para organizar el cultivo.</p>
-      <button v-if="canEdit" class="slv__btn-primary" @click="showCreate = true">
+      <p v-if="canCreate" class="slv__empty-sub">Creá la primera sala para organizar el cultivo.</p>
+      <button v-if="canCreate" class="slv__btn-primary" @click="showCreate = true">
         <i class="bi bi-plus-lg"></i> Nueva sala
       </button>
     </div>
