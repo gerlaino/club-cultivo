@@ -90,7 +90,7 @@ const ALL_NAV_LINKS = [
   { to: '/manicura',          icon: 'bi-scissors',           label: 'Manicura',   perm: ['manicura','access'] },
   { to: '/informe-semestral', icon: 'bi-file-earmark-text',  label: 'REPROCANN',  perm: ['informe_semestral','show'] },
   { to: '/documentos',        icon: 'bi-file-earmark',       label: 'Docs',       perm: ['documentos','index'] },
-  { to: '/usuarios',          icon: 'bi-person-badge',       label: 'Usuarios',   adminOnly: true },
+  { to: '/usuarios',          icon: 'bi-person-badge',       label: 'Equipo',     adminOnly: true },
   { to: '/web',               icon: 'bi-globe',              label: 'Web',        adminOnly: true },
 ]
 
@@ -425,7 +425,7 @@ onMounted(async () => {
               <RouterLink class="nav-link px-2" to="/geneticas" @click="closeNav">Genéticas</RouterLink>
             </li>
             <li class="nav-item" v-if="can('usuarios', 'index')">
-              <RouterLink class="nav-link px-2" to="/usuarios" @click="closeNav">Usuarios</RouterLink>
+              <RouterLink class="nav-link px-2" to="/usuarios" @click="closeNav">Equipo</RouterLink>
             </li>
             <li class="nav-item" v-if="can('movimientos_contables', 'index')">
               <RouterLink class="nav-link px-2" to="/contabilidad" @click="closeNav">Contabilidad</RouterLink>

@@ -4,6 +4,6 @@ export function useModalEscape(onEscape) {
   function handler(e) {
     if (e.key === 'Escape') onEscape()
   }
-  onMounted(()  => document.addEventListener('keydown', handler))
-  onUnmounted(() => document.removeEventListener('keydown', handler))
+  onMounted(()  => document.addEventListener('keydown', handler, true))
+  onUnmounted(() => document.removeEventListener('keydown', handler, true))
 }

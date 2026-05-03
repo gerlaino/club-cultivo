@@ -370,6 +370,7 @@ async function onOnboardingCompletado() {
   font-size: .875rem;
   color: #64748b;
   margin: .25rem 0 0;
+  text-transform: none;
 }
 
 /* KPIs */

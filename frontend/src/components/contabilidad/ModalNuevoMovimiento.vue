@@ -70,7 +70,7 @@ const PLACEHOLDERS = {
 // ─── FORM ─────────────────────────────────────────────────
 function emptyForm() {
   return {
-    tipo: 'egreso',
+    tipo: 'ingreso',
     categoria: '',
     descripcion: '',
     monto_ars: null,

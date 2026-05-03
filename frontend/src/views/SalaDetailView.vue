@@ -17,12 +17,6 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import SemaforoAmbiente from '../components/ambiente/SemaforoAmbiente.vue'
 
-const contextoAsistente = computed(() => sala.value ? {
-  tipo:       'sala',
-  sala_id:    sala.value.id,
-  sala_nombre: sala.value.nombre,
-} : null)
-
 const route  = useRoute()
 const router = useRouter()
 const salas  = useSalasStore()
@@ -87,6 +81,12 @@ onMounted(async () => {
 
 const sala  = computed(() => salas.currentSala)
 const items = computed(() => lotes.bySala(salaId))
+
+const contextoAsistente = computed(() => sala.value ? {
+  tipo:        'sala',
+  sala_id:     sala.value.id,
+  sala_nombre: sala.value.nombre,
+} : null)
 
 // ── Cambiar estado de sala ──────────────────────────────────
 const cambiandoEstado = ref(false)
@@ -183,13 +183,13 @@ async function onLoteCargado() {
 }
 
 // ── Crear lote ─────────────────────────────────────────────
+const KIND_TO_ESTADO = { vegetativo:"vegetativo", floracion:"floracion", secado:"secado", manicura:"curado", madre:"vegetativo", clon:"vegetativo" }
+
 const showCreate   = ref(false)
 const loteForm     = ref(emptyLoteForm())
 const loteErrors   = ref({})
 const loteApiError = ref(null)
 const showUpgrade  = ref(false)
-
-const KIND_TO_ESTADO = { vegetativo:"vegetativo", floracion:"floracion", secado:"secado", manicura:"curado", madre:"vegetativo", clon:"vegetativo" }
 
 function emptyLoteForm() {
   const estadoInicial = KIND_TO_ESTADO[sala.value?.kind] || "vegetativo"

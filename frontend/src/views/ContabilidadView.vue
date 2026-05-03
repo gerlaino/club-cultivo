@@ -371,8 +371,8 @@ onMounted(async () => {
           </div>
           <div class="cv__kpi">
             <div class="cv__kpi-label">Egresos este mes</div>
-            <div class="cv__kpi-val cv__kpi-val--red">{{ fmt(store.dashboard.mes_actual.egresos) }}</div>
-            <div class="cv__kpi-bar cv__kpi-bar--red"></div>
+            <div class="cv__kpi-val" :class="store.dashboard.mes_actual.egresos > 0 ? 'cv__kpi-val--red' : ''">{{ fmt(store.dashboard.mes_actual.egresos) }}</div>
+            <div class="cv__kpi-bar" :class="store.dashboard.mes_actual.egresos > 0 ? 'cv__kpi-bar--red' : 'cv__kpi-bar--neutral'"></div>
           </div>
           <div class="cv__kpi">
             <div class="cv__kpi-label">Balance del mes</div>
@@ -831,8 +831,9 @@ onMounted(async () => {
 .cv__kpi-val--green { color: #15803d; }
 .cv__kpi-val--red   { color: #dc2626; }
 .cv__kpi-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; }
-.cv__kpi-bar--green { background: #15803d; }
-.cv__kpi-bar--red   { background: #dc2626; }
+.cv__kpi-bar--green   { background: #15803d; }
+.cv__kpi-bar--red     { background: #dc2626; }
+.cv__kpi-bar--neutral { background: #e2e8f0; }
 
 .cv__row2 { display: grid; grid-template-columns: 1fr 320px; gap: 1rem; margin-bottom: 1.5rem; }
 @media (max-width: 1000px) { .cv__row2 { grid-template-columns: 1fr; } }

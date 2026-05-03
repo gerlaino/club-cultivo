@@ -7,10 +7,6 @@
         <h1 class="cvd__saludo">{{ saludo }}, {{ auth.user?.first_name }}</h1>
         <span class="cvd__fecha">{{ hoy }}</span>
       </div>
-      <button class="cvd__cta" @click="lecturaOpen = true">
-        <Gauge :size="18" :stroke-width="1.75" />
-        Registrar lectura
-      </button>
     </div>
 
     <!-- Banner alertas críticas -->
@@ -70,13 +66,103 @@
       </DsCard>
     </div>
 
-    <!-- ── MIS SALAS (Trello-like) ─────────────────────────────── -->
+    <!-- ── SEMANA DE TAREAS ──────────────────────────────────────── -->
+    <section class="cvd__section">
+      <div class="cvd__section-head">
+        <h2 class="cvd__section-title">Semana</h2>
+        <DsBadge variant="leaf">{{ totalTareasSemana }}</DsBadge>
+        <RouterLink to="/tareas" class="cvd__ver-todos">Ver en calendario →</RouterLink>
+      </div>
+      <div v-if="loadingSem" class="cvd__semana">
+        <DsCard v-for="i in 7" :key="i" variant="elevated" class="cvd__dia">
+          <DsSkeleton variant="line" :rows="2" />
+        </DsCard>
+      </div>
+      <div v-else class="cvd__semana">
+        <RouterLink
+          v-for="dia in semana.dias"
+          :key="dia.fecha"
+          to="/tareas"
+          class="cvd__dia"
+          :class="{ 'cvd__dia--hoy': esDiaHoy(dia.fecha), 'cvd__dia--pasado': esPasado(dia.fecha) }"
+        >
+          <span class="cvd__dia-nombre">{{ diaNombre(dia.fecha) }}</span>
+          <span class="cvd__dia-num">{{ diaNum(dia.fecha) }}</span>
+          <div class="cvd__dia-chips">
+            <span v-for="t in dia.tareas.slice(0, 2)" :key="t.id" class="cvd__tarea-chip" :title="t.titulo">
+              {{ t.titulo.length > 18 ? t.titulo.slice(0, 18) + '…' : t.titulo }}
+            </span>
+            <span v-if="dia.tareas.length > 2" class="cvd__dia-mas">+{{ dia.tareas.length - 2 }} más</span>
+            <span v-if="!dia.tareas.length" class="cvd__dia-libre">libre</span>
+          </div>
+        </RouterLink>
+      </div>
+    </section>
+
+    <!-- ── KANBAN ─────────────────────────────────────────────────── -->
+    <section class="cvd__section">
+      <div class="cvd__section-head">
+        <h2 class="cvd__section-title">Tablero</h2>
+        <RouterLink to="/tareas" class="cvd__ver-todos">Kanban completo →</RouterLink>
+      </div>
+      <div class="cvd__kanban">
+        <!-- Pendiente -->
+        <div class="cvd__kanban-col">
+          <div class="cvd__kanban-colhead cvd__kanban-colhead--pending">
+            Pendiente <span class="cvd__kanban-badge">{{ kanban.pendiente?.length || 0 }}</span>
+          </div>
+          <RouterLink
+            v-for="t in (kanban.pendiente || []).slice(0, 5)"
+            :key="t.id"
+            to="/tareas"
+            class="cvd__kanban-card"
+          >
+            <span class="cvd__kanban-titulo">{{ t.titulo }}</span>
+            <span v-if="t.sala" class="cvd__kanban-meta">{{ t.sala.nombre }}</span>
+          </RouterLink>
+          <div v-if="!kanban.pendiente?.length" class="cvd__kanban-empty">Sin pendientes ✓</div>
+        </div>
+        <!-- En progreso -->
+        <div class="cvd__kanban-col">
+          <div class="cvd__kanban-colhead cvd__kanban-colhead--progress">
+            En progreso <span class="cvd__kanban-badge">{{ kanban.en_progreso?.length || 0 }}</span>
+          </div>
+          <RouterLink
+            v-for="t in (kanban.en_progreso || []).slice(0, 5)"
+            :key="t.id"
+            to="/tareas"
+            class="cvd__kanban-card cvd__kanban-card--progress"
+          >
+            <span class="cvd__kanban-titulo">{{ t.titulo }}</span>
+            <span v-if="t.sala" class="cvd__kanban-meta">{{ t.sala.nombre }}</span>
+          </RouterLink>
+          <div v-if="!kanban.en_progreso?.length" class="cvd__kanban-empty">Nada en curso</div>
+        </div>
+        <!-- Completadas hoy -->
+        <div class="cvd__kanban-col">
+          <div class="cvd__kanban-colhead cvd__kanban-colhead--done">
+            Completadas hoy <span class="cvd__kanban-badge">{{ tareasHoy.filter(t => t.estado === 'completada').length }}</span>
+          </div>
+          <RouterLink
+            v-for="t in tareasHoy.filter(t => t.estado === 'completada').slice(0, 5)"
+            :key="t.id"
+            to="/tareas"
+            class="cvd__kanban-card cvd__kanban-card--done"
+          >
+            <span class="cvd__kanban-titulo">{{ t.titulo }}</span>
+            <span v-if="t.sala" class="cvd__kanban-meta">{{ t.sala.nombre }}</span>
+          </RouterLink>
+          <div v-if="!tareasHoy.filter(t => t.estado === 'completada').length" class="cvd__kanban-empty">Sin completadas aún</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── MIS SALAS ──────────────────────────────────────────────── -->
     <section class="cvd__section">
       <div class="cvd__section-head">
         <h2 class="cvd__section-title">Mis salas</h2>
         <DsBadge variant="leaf">{{ salas.length }}</DsBadge>
       </div>
-
       <div v-if="loading" class="cvd__salas-grid">
         <DsCard v-for="i in 3" :key="i" variant="elevated">
           <DsSkeleton variant="card" />
@@ -98,72 +184,6 @@
         />
       </div>
     </section>
-
-    <!-- ── GRID 2 COLUMNAS ─────────────────────────────────────── -->
-    <div class="cvd__grid2">
-
-      <!-- Mis lotes -->
-      <DsCard variant="outlined" class="cvd__lotes-card">
-        <div class="cvd__lotes-head">
-          <span class="cvd__lotes-title">Mis lotes</span>
-          <div class="cvd__lotes-head-right">
-            <DsBadge variant="leaf">{{ lotesStore.items.length }}</DsBadge>
-            <RouterLink to="/lotes" class="cvd__ver-todos">Ver todos →</RouterLink>
-          </div>
-        </div>
-        <DsEmpty
-          v-if="!loading && lotesStore.items.length === 0"
-          title="Sin lotes activos en tus salas"
-          class="cvd__lotes-empty"
-        />
-        <div v-else class="cvd__lotes-list">
-          <RouterLink
-            v-for="l in lotesOrdenados.slice(0, 8)"
-            :key="l.id"
-            :to="{ name: 'lote-detail', params: { id: l.id } }"
-            class="cvd__lote-row"
-          >
-            <div class="cvd__lote-left">
-              <span class="cvd__lote-codigo">{{ l.codigo }}</span>
-              <span class="cvd__lote-sala">{{ salaNombre(l.sala_id) }}</span>
-            </div>
-            <div class="cvd__lote-right">
-              <DsBadge :variant="estadoBadgeVariant(l.estado)" size="sm">{{ estadoLabel(l.estado) }}</DsBadge>
-              <span class="cvd__lote-dias">{{ l.dias_desde_inicio != null ? `${l.dias_desde_inicio}d` : '—' }}</span>
-            </div>
-          </RouterLink>
-          <DsSkeleton v-if="loading" variant="line" :rows="4" />
-        </div>
-      </DsCard>
-
-      <!-- Tareas de hoy -->
-      <DsCard variant="outlined" class="cvd__tareas-card">
-        <div class="cvd__tareas-head">
-          <span class="cvd__tareas-title">Tareas de hoy</span>
-          <DsBadge v-if="tareasHoy.length > 0" variant="amber">{{ tareasHoy.length }}</DsBadge>
-        </div>
-        <DsEmpty
-          v-if="!loading && tareasHoy.length === 0"
-          title="Todo al día — sin tareas para hoy"
-          class="cvd__tareas-empty"
-        />
-        <div v-else class="cvd__tareas-list">
-          <div
-            v-for="t in tareasHoy.slice(0, 5)"
-            :key="t.id"
-            class="cvd__tarea-row"
-          >
-            <DsBadge :variant="prioridadVariant(t.prioridad)" size="sm">{{ t.prioridad }}</DsBadge>
-            <div class="cvd__tarea-info">
-              <span class="cvd__tarea-titulo">{{ t.titulo }}</span>
-              <span v-if="t.sala" class="cvd__tarea-sala">{{ t.sala.nombre }}</span>
-            </div>
-          </div>
-          <DsSkeleton v-if="loading" variant="line" :rows="3" />
-        </div>
-      </DsCard>
-
-    </div>
 
     <!-- Footer -->
     <footer class="cvd__footer">
@@ -187,6 +207,7 @@ import { useLotesStore }   from '../../stores/lotes'
 import { useAmbienteStore } from '../../stores/ambiente'
 import { useAlertasBell }  from '../../composables/useAlertasBell.js'
 import { storeToRefs }     from 'pinia'
+import { getTareasSemana } from '../../lib/api.js'
 
 import DsCard     from '../../design-system/components/Card.vue'
 import DsStat     from '../../design-system/components/Stat.vue'
@@ -199,7 +220,7 @@ import SalaCard   from '../cultivador/SalaCard.vue'
 import RegistrarLecturaSheet from '../cultivador/RegistrarLecturaSheet.vue'
 
 import {
-  Gauge, LayoutGrid, Sprout, GitBranch, AlertTriangle,
+  LayoutGrid, Sprout, GitBranch, AlertTriangle,
 } from 'lucide-vue-next'
 
 const auth        = useAuthStore()
@@ -209,11 +230,13 @@ const salasStore  = useSalasStore()
 const lotesStore  = useLotesStore()
 const ambienteStore = useAmbienteStore()
 
-const { dashboard } = storeToRefs(tareasStore)
+const { dashboard, kanban } = storeToRefs(tareasStore)
 useAlertasBell()
 
 const loading     = ref(true)
 const lecturaOpen = ref(false)
+const semana      = ref({ dias: [] })
+const loadingSem  = ref(false)
 
 // ── Saludo / fecha ─────────────────────────────────────────────
 const hora   = new Date().getHours()
@@ -256,26 +279,37 @@ const alertasCriticas = computed(() =>
   ambienteStore.alertasActivas.filter(a => ['temperatura', 'co2'].includes(a.tipo))
 )
 
-// ── Lotes ──────────────────────────────────────────────────────
-const ESTADO_LABEL   = { planificacion:'Planific.', vegetativo:'Vegetativo', floracion:'Floración', secado:'Secado', cosechado:'Cosechado', finalizado:'Finalizado' }
-const ESTADO_VARIANT = { vegetativo:'leaf', floracion:'gold', secado:'sky', cosechado:'ink', planificacion:'ink', finalizado:'ink' }
-function estadoLabel(e)        { return ESTADO_LABEL[e]   || e || '—' }
-function estadoBadgeVariant(e) { return ESTADO_VARIANT[e] || 'ink' }
-
-const lotesOrdenados = computed(() =>
-  [...lotesStore.items]
-    .filter(l => ['vegetativo','floracion','secado'].includes(l.estado))
-    .sort((a, b) => {
-      const dA = a.fecha_inicio ? new Date(a.fecha_inicio).getTime() : 0
-      const dB = b.fecha_inicio ? new Date(b.fecha_inicio).getTime() : 0
-      return dA - dB  // más viejos primero
-    })
-)
-
 // ── Tareas ─────────────────────────────────────────────────────
 const tareasHoy = computed(() => dashboard.value?.hoy || [])
-const PRIORIDAD_VARIANT = { urgente:'rust', alta:'amber', normal:'sky', baja:'leaf' }
-function prioridadVariant(p) { return PRIORIDAD_VARIANT[p] || 'ink' }
+
+// ── Semana ─────────────────────────────────────────────────────
+const totalTareasSemana = computed(() => semana.value.dias?.reduce((s, d) => s + d.tareas.length, 0) || 0)
+
+function lunasActual() {
+  const d = new Date()
+  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay()
+  d.setDate(d.getDate() + diff)
+  return d.toISOString().slice(0, 10)
+}
+
+function esDiaHoy(fecha) { return fecha === new Date().toISOString().slice(0, 10) }
+function esPasado(fecha)  { return fecha < new Date().toISOString().slice(0, 10) }
+
+function diaNombre(fecha) {
+  return new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '')
+}
+function diaNum(fecha) {
+  return new Date(fecha + 'T00:00:00').getDate()
+}
+
+async function cargarSemana() {
+  loadingSem.value = true
+  try {
+    const { data } = await getTareasSemana(lunasActual())
+    semana.value = data
+  } catch { /* no crítico */ }
+  finally { loadingSem.value = false }
+}
 
 // ── Registrar lectura desde SalaCard ──────────────────────────
 function onRegistrarDesdeSala(_sala) {
@@ -289,8 +323,10 @@ onMounted(async () => {
       salasStore.fetch(),
       lotesStore.fetch(),
       tareasStore.fetchDashboard(),
+      tareasStore.fetchKanban({}),
     ])
   } catch {} finally { loading.value = false }
+  cargarSemana()
 })
 </script>
 
@@ -329,24 +365,6 @@ onMounted(async () => {
   font-size: var(--fs-13);
   color: var(--c-ink-500);
 }
-.cvd__cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  height: 44px;
-  padding: 0 var(--sp-5);
-  background: var(--c-role-cultivador);
-  color: #fff;
-  border: none;
-  border-radius: var(--r-lg);
-  font-size: var(--fs-14);
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity var(--t-fast);
-  white-space: nowrap;
-}
-.cvd__cta:hover { opacity: 0.9; }
-@media (max-width: 767px) { .cvd__cta { display: none; } }
 
 .cvd__banner { margin-bottom: var(--sp-4); }
 .cvd__banner-link { font-size: var(--fs-13); font-weight: 600; text-decoration: underline; color: inherit; }
@@ -414,89 +432,137 @@ onMounted(async () => {
   .cvd__salas-grid { grid-template-columns: 1fr; gap: var(--sp-4); }
 }
 
-/* Grid 2 columnas */
-.cvd__grid2 {
-  display: grid;
-  grid-template-columns: 7fr 5fr;
-  gap: var(--sp-6);
-  margin-bottom: var(--sp-8);
-}
-@media (max-width: 1023px) { .cvd__grid2 { grid-template-columns: 1fr; } }
-
-/* Lotes card */
-.cvd__lotes-card { padding: var(--sp-4) !important; }
-.cvd__lotes-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--sp-4);
-  gap: var(--sp-3);
-}
-.cvd__lotes-head-right { display: flex; align-items: center; gap: var(--sp-3); }
-.cvd__lotes-title {
-  font-family: var(--font-display);
-  font-size: var(--fs-18);
-  font-weight: 500;
-  color: var(--c-ink-900);
-}
+/* Semana de tareas */
 .cvd__ver-todos {
   font-size: var(--fs-13);
   color: var(--c-role-cultivador);
   text-decoration: none;
   font-weight: 600;
+  margin-left: auto;
 }
 .cvd__ver-todos:hover { text-decoration: underline; }
-.cvd__lotes-empty { padding: var(--sp-4) 0; }
-.cvd__lotes-list { display: flex; flex-direction: column; }
 
-.cvd__lote-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.cvd__semana {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
   gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-md);
+}
+@media (max-width: 1023px) { .cvd__semana { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 640px)  { .cvd__semana { grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); } }
+
+.cvd__dia {
+  background: var(--c-paper);
+  border: 1.5px solid var(--c-ink-100);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-height: 100px;
+  cursor: pointer;
   text-decoration: none;
   color: inherit;
-  transition: background var(--t-fast);
-  min-height: 40px;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
-.cvd__lote-row:hover { background: var(--c-leaf-50); }
-.cvd__lote-left { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.cvd__lote-codigo { font-family: var(--font-mono); font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-900); }
-.cvd__lote-sala   { font-size: var(--fs-12); color: var(--c-ink-500); }
-.cvd__lote-right  { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; }
-.cvd__lote-dias   { font-family: var(--font-mono); font-size: var(--fs-12); color: var(--c-ink-500); }
+.cvd__dia:hover { border-color: var(--c-role-cultivador); box-shadow: var(--sh-1); }
+.cvd__dia--hoy {
+  border-color: var(--c-role-cultivador);
+  background: color-mix(in srgb, var(--c-role-cultivador) 6%, transparent);
+}
+.cvd__dia--pasado { opacity: .6; }
 
-/* Tareas card */
-.cvd__tareas-card { padding: var(--sp-4) !important; }
-.cvd__tareas-head {
+.cvd__dia-nombre {
+  font-size: var(--fs-11);
+  font-weight: 700;
+  color: var(--c-ink-500);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.cvd__dia--hoy .cvd__dia-nombre { color: var(--c-role-cultivador); }
+
+.cvd__dia-num {
+  font-family: var(--font-display);
+  font-size: var(--fs-22);
+  font-weight: 700;
+  color: var(--c-ink-900);
+  line-height: 1;
+  margin-bottom: var(--sp-1);
+}
+.cvd__dia--hoy .cvd__dia-num { color: var(--c-role-cultivador); }
+
+.cvd__dia-chips { display: flex; flex-direction: column; gap: 3px; }
+.cvd__tarea-chip {
+  font-size: var(--fs-11);
+  background: var(--c-leaf-50);
+  color: var(--c-role-cultivador);
+  border-radius: 4px;
+  padding: 2px 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cvd__dia-mas  { font-size: var(--fs-11); color: var(--c-ink-400); font-weight: 600; }
+.cvd__dia-libre { font-size: var(--fs-11); color: var(--c-ink-300); font-style: italic; }
+
+/* Kanban */
+.cvd__kanban {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+}
+@media (max-width: 767px) { .cvd__kanban { grid-template-columns: 1fr; } }
+
+.cvd__kanban-col {
+  background: var(--c-ink-50);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 160px;
+}
+.cvd__kanban-colhead {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  letter-spacing: .03em;
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-4);
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+  color: var(--c-ink-600);
 }
-.cvd__tareas-title {
-  font-family: var(--font-display);
-  font-size: var(--fs-16);
-  font-weight: 500;
-  color: var(--c-ink-900);
-}
-.cvd__tareas-empty { padding: var(--sp-3) 0; }
-.cvd__tareas-list  { display: flex; flex-direction: column; gap: var(--sp-2); }
+.cvd__kanban-colhead--pending  { color: #64748b; }
+.cvd__kanban-colhead--progress { color: #d97706; }
+.cvd__kanban-colhead--done     { color: #15803d; }
 
-.cvd__tarea-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-md);
-  transition: background var(--t-fast);
+.cvd__kanban-badge {
+  background: var(--c-paper);
+  border-radius: 9px;
+  padding: 1px 7px;
+  font-size: var(--fs-11);
+  color: var(--c-ink-600);
+  border: 1px solid var(--c-ink-200);
 }
-.cvd__tarea-row:hover { background: var(--c-leaf-50); }
-.cvd__tarea-info { flex: 1; min-width: 0; }
-.cvd__tarea-titulo { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); display: block; }
-.cvd__tarea-sala   { font-size: var(--fs-12); color: var(--c-ink-500); }
+
+.cvd__kanban-card {
+  background: var(--c-paper);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid var(--c-ink-100);
+  transition: box-shadow var(--t-fast);
+}
+.cvd__kanban-card:hover { box-shadow: var(--sh-1); }
+.cvd__kanban-card--progress { border-left: 3px solid #d97706; }
+.cvd__kanban-card--done     { border-left: 3px solid #15803d; opacity: .7; }
+
+.cvd__kanban-titulo { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-900); }
+.cvd__kanban-meta   { font-size: var(--fs-11); color: var(--c-ink-400); }
+.cvd__kanban-empty  { font-size: var(--fs-12); color: var(--c-ink-400); text-align: center; padding: var(--sp-4) 0; }
 
 /* Footer */
 .cvd__footer {

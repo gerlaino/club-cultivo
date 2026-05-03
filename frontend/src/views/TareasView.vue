@@ -190,7 +190,7 @@
               </div>
               <div v-if="tareaDetalle.fecha_programada" class="tv__panel-row">
                 <span class="tv__panel-key">Fecha</span>
-                <span>{{ tareaDetalle.fecha_programada }}</span>
+                <span>{{ formatFechaLarga(tareaDetalle.fecha_programada) }}</span>
               </div>
               <div v-if="tareaDetalle.horas_estimadas" class="tv__panel-row">
                 <span class="tv__panel-key">Hs. estimadas</span>
@@ -258,6 +258,7 @@ import { storeToRefs } from 'pinia'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import EmptyState from '../components/ui/EmptyState.vue'
+import { formatFechaLarga } from '../utils/fecha.js'
 
 const authStore   = useAuthStore()
 const tareasStore = useTareasStore()

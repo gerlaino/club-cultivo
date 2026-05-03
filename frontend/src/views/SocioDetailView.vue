@@ -463,9 +463,9 @@ onMounted(async () => {
             </div>
 
             <!-- Margen disponible (el número que importa para dispensar) -->
-            <div class="sd__cc-margen-block" :class="ccMargen <= 0 ? 'sd__cc-margen-block--agotado' : ''">
+            <div class="sd__cc-margen-block" :class="cc.limite_credito > 0 && ccMargen <= 0 ? 'sd__cc-margen-block--agotado' : ''">
               <span class="sd__cc-saldo-label">Puede retirar aún</span>
-              <span class="sd__cc-margen-valor" :class="ccMargen <= 0 ? 'sd__cc-margen--agotado' : ccMargen < cc.limite_credito * 0.2 ? 'sd__cc-margen--bajo' : 'sd__cc-margen--ok'">
+              <span class="sd__cc-margen-valor" :class="!cc.limite_credito ? 'sd__cc-margen--zero' : ccMargen <= 0 ? 'sd__cc-margen--agotado' : ccMargen < cc.limite_credito * 0.2 ? 'sd__cc-margen--bajo' : 'sd__cc-margen--ok'">
                 {{ fmtARS(Math.max(0, ccMargen)) }}
               </span>
               <span class="sd__cc-saldo-hint">
@@ -907,6 +907,7 @@ onMounted(async () => {
 .sd__cc-margen--ok      { color: #2563eb; }
 .sd__cc-margen--bajo    { color: #d97706; }
 .sd__cc-margen--agotado { color: #dc2626; }
+.sd__cc-margen--zero    { color: #94a3b8; }
 .sd__cc-limite-valor { font-family: monospace; font-size: 1.3rem; font-weight: 700; color: #475569; }
 .sd__cc-limite-valor-row { display: flex; align-items: center; gap: .35rem; }
 .sd__cc-limite-edit-btn { background: none; border: none; cursor: pointer; color: #94a3b8; padding: .1rem .2rem; border-radius: 4px; display: inline-flex; align-items: center; transition: color .15s; flex-shrink: 0; }
