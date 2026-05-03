@@ -14,3 +14,7 @@ development:
 test:
   <<: *default
   database: club_test
+
+production:
+  url: <%= ENV['DATABASE_URL'] %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 10 } %>
