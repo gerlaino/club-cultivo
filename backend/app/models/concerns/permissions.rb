@@ -53,11 +53,6 @@ module Permissions
       lecturas_ambientales: [:index, :show],
       alertas: [:index, :show],
     },
-    paciente: {
-      mi_perfil: [:show, :update],
-      mis_dispensaciones: [:index, :show],
-      eventos: [:index, :show]
-    },
     dispensador: {
       socios: [:index, :show],
       dispensaciones: [:index, :show, :create],
