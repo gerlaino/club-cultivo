@@ -15,9 +15,8 @@ class AddTipoToSalas < ActiveRecord::Migration[7.2]
     add_column :salas, :tipo, :string, null: false, default: 'cultivo'
     add_index  :salas, [:sede_id, :tipo]
 
-    Sala.reset_column_information
     KIND_TO_TIPO.each do |kind, tipo|
-      Sala.where(kind: kind).update_all(tipo: tipo)
+      execute "UPDATE salas SET tipo = '#{tipo}' WHERE kind = '#{kind}'"
     end
   end
 
