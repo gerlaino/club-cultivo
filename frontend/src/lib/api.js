@@ -9,14 +9,38 @@ const api = axios.create({
   }
 });
 
-// RESPONSE INTERCEPTOR: Manejar errores de autenticación
+// Restore JWT from previous session
+const storedToken = localStorage.getItem('jwt_token');
+if (storedToken) {
+  api.defaults.headers.common['Authorization'] = storedToken;
+}
+
+// REQUEST INTERCEPTOR: Attach JWT token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('jwt_token');
+  if (token) {
+    config.headers['Authorization'] = token;
+  }
+  return config;
+});
+
+// RESPONSE INTERCEPTOR: Capture JWT + manejar errores de autenticación
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const token = response.headers['authorization'];
+    if (token) {
+      localStorage.setItem('jwt_token', token);
+      api.defaults.headers.common['Authorization'] = token;
+    }
+    return response;
+  },
   async (error) => {
     const status = error?.response?.status;
     const url = error?.config?.url || "";
 
     if (status === 401 && !url.includes('/users/sign_in')) {
+      localStorage.removeItem('jwt_token');
+      delete api.defaults.headers.common['Authorization'];
       try {
         const { useAuthStore } = await import("../stores/auth");
         const auth = useAuthStore();
