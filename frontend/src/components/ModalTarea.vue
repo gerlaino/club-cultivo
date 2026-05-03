@@ -271,6 +271,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useModalEscape } from '../composables/useModalEscape.js'
 import { useAuthStore } from '../stores/auth'
 import { useTareasStore } from '../stores/tareas'
 import { formatFechaCorta, formatFechaLarga } from '../utils/fecha.js'
@@ -285,6 +286,7 @@ const props = defineProps({
   usuarios:     { type: Array,   default: () => [] },
 })
 const emit = defineEmits(['guardada', 'cerrar'])
+useModalEscape(() => emit('cerrar'))
 
 const authStore   = useAuthStore()
 const tareasStore = useTareasStore()

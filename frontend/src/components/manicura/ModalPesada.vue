@@ -88,12 +88,14 @@
 import { ref, computed, watch } from 'vue'
 import { Scale, X, AlertCircle } from 'lucide-vue-next'
 import { createPesada } from '../../lib/api.js'
+import { useModalEscape } from '../../composables/useModalEscape.js'
 
 const props = defineProps({
   modelValue: Boolean,
   lote: Object,
 })
 const emit = defineEmits(['update:modelValue', 'saved'])
+useModalEscape(() => emit('update:modelValue', false))
 
 // Derivar fase_origen / fase_destino / label y campo de peso según estado del lote
 const FASE_CONFIG = {

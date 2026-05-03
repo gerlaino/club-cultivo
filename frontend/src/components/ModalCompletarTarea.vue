@@ -77,6 +77,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useTareasStore } from '../stores/tareas.js'
+import { useModalEscape } from '../composables/useModalEscape.js'
 
 const props = defineProps({
   show:  { type: Boolean, default: false },
@@ -98,6 +99,8 @@ watch(() => props.tarea, (val) => {
     error.value  = ''
   }
 })
+
+useModalEscape(() => cerrar())
 
 function cerrar() {
   if (!guardando.value) emit('cerrar')

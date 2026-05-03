@@ -2,12 +2,14 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useSalasStore } from '../../stores/salas'
 import { listSedes } from '../../lib/api'
+import { useModalEscape } from '../../composables/useModalEscape.js'
 
 const props = defineProps({
   sedeIdFija: { type: Number, default: null }, // Si viene de SedeDetailView, la sede está fija
 })
 
 const emit = defineEmits(['created', 'close'])
+useModalEscape(() => emit('close'))
 
 const salas = useSalasStore()
 const sedes = ref([])

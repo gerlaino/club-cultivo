@@ -1,11 +1,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { listLotes, cargarLoteEnSala } from '../../lib/api.js'
+import { useModalEscape } from '../../composables/useModalEscape.js'
 
 const props = defineProps({
   sala: { type: Object, required: true },
 })
 const emit = defineEmits(['loaded', 'close'])
+useModalEscape(() => emit('close'))
 
 // Qué estado de lote acepta cada tipo de sala
 const CONFIG = {

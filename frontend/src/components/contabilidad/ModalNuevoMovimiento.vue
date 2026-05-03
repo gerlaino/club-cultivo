@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { useModalEscape } from '../../composables/useModalEscape.js'
 
 const props = defineProps({
   modelValue:       { type: Boolean, default: false },
@@ -281,6 +282,8 @@ watch(() => props.modelValue, (val) => {
 })
 
 onUnmounted(() => document.removeEventListener('click', onDocClick, true))
+
+useModalEscape(() => close())
 
 function close() { emit('update:modelValue', false) }
 

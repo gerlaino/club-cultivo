@@ -1,11 +1,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { listSedes, asignarStock } from '../../lib/api.js'
+import { useModalEscape } from '../../composables/useModalEscape.js'
 
 const props = defineProps({
   stocks: { type: Array, required: true },  // array de stocks pendientes
 })
 const emit = defineEmits(['close', 'asignado'])
+useModalEscape(() => emit('close'))
 
 const sedes      = ref([])
 const seleccion  = ref({})   // { stockId: sedeId | 'club' | null }
