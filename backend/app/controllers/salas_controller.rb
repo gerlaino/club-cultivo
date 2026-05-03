@@ -28,6 +28,10 @@ class SalasController < ApplicationController
   end
 
   def create
+    unless current_user.admin? || current_user.supervisor?
+      return render json: { error: 'Solo admins y supervisores pueden crear salas' }, status: :forbidden
+    end
+
     sala = current_user.club.salas.build(sala_params)
     sala.created_by = current_user
 

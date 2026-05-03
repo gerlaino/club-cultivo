@@ -268,6 +268,12 @@ const savingTransicion    = ref(false)
 const transicionError     = ref(null)
 const transicionForm      = ref({ peso_humedo_g: null, peso_seco_g: null, manicurado: false, notas: '' })
 
+// ── Cosecha modal (cultivador floración → cosecha) ────────
+const showCosechaModal  = ref(false)
+const savingCosecha     = ref(false)
+const cosechaError      = ref(null)
+const cosechaForm       = ref({ plantas_cosechadas: null, notas: '' })
+
 // ── Cerrar curado ─────────────────────────────────────────
 const showCerrarCuradoModal = ref(false)
 const savingCurado          = ref(false)
@@ -323,9 +329,37 @@ const transicionandoRapido = ref(false)
 
 function handleAvanzarFase() {
   if (isCultivador.value) {
-    avanzarFaseRapido()
+    if (lote.value?.proxima_fase_posible === 'cosecha') {
+      cosechaForm.value = { plantas_cosechadas: lote.value.plants_count || null, notas: '' }
+      cosechaError.value = null
+      showCosechaModal.value = true
+    } else {
+      avanzarFaseRapido()
+    }
   } else {
     openTransicionModal()
+  }
+}
+
+async function ejecutarCosecha() {
+  if (!cosechaForm.value.plantas_cosechadas) return
+  savingCosecha.value = true; cosechaError.value = null
+  try {
+    const { data } = await transicionarLote(lote.value.id, {
+      nueva_fase: 'cosecha',
+      pesada: {
+        plantas_cosechadas: cosechaForm.value.plantas_cosechadas,
+        notas: cosechaForm.value.notas || undefined,
+      }
+    })
+    lotes.current = data
+    showCosechaModal.value = false
+    toast.success('Cosecha registrada')
+    await Promise.all([loadEventos(), plants.fetchByLote(id)])
+  } catch (e) {
+    cosechaError.value = e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'Error al registrar cosecha'
+  } finally {
+    savingCosecha.value = false
   }
 }
 
@@ -423,7 +457,7 @@ async function toggleEsSeleccion(plant) {
 }
 
 // ── Helpers ────────────────────────────────────────────────
-const CICLO = ["vegetativo", "floracion", "secado", "curado"]
+const CICLO = ["vegetativo", "floracion", "cosecha", "secado", "curado"]
 const ESTADO_META = {
   semilla:           { label: "Semilla/Esqueje",   color: "#64748b", bg: "#f1f5f9", emoji: "🌱" },
   vegetativo:        { label: "Vegetativo",         color: "#16a34a", bg: "#dcfce7", emoji: "🍃" },
@@ -669,7 +703,7 @@ onMounted(async () => {
                   <span class="ld__planta-estado" :style="{ background: pm(p.state).color + '18', color: pm(p.state).color }">
                     {{ pm(p.state).emoji }} {{ pm(p.state).label }}
                   </span>
-                  <button v-if="canEdit || isCultivador" class="ld__planta-sel" :class="{ 'ld__planta-sel--on': p.es_seleccion }"
+                  <button v-if="canEdit" class="ld__planta-sel" :class="{ 'ld__planta-sel--on': p.es_seleccion }"
                           :title="p.es_seleccion ? 'Quitar de selección' : 'Marcar como selección'"
                           @click.prevent.stop="toggleEsSeleccion(p)">
                     <i class="bi" :class="p.es_seleccion ? 'bi-star-fill' : 'bi-star'"></i>
@@ -890,8 +924,8 @@ onMounted(async () => {
             <div class="ld__card-notes">{{ lote.notes }}</div>
           </div>
 
-          <!-- Costos de producción -->
-          <div class="ld__card ld__card--mt">
+          <!-- Costos de producción: solo admin -->
+          <div v-if="canEdit" class="ld__card ld__card--mt">
             <div class="ld__card-header">
               <span class="ld__card-title">💰 Costos de producción</span>
               <button v-if="canEdit" class="ld__card-action" @click="openCostoForm">
@@ -1189,6 +1223,45 @@ onMounted(async () => {
             <button class="ld__btn-primary" :disabled="savingTransicion" @click="ejecutarTransicion">
               <div v-if="savingTransicion" class="ld__spinner ld__spinner--sm"></div>
               <i v-else class="bi bi-arrow-right-circle"></i>Avanzar fase
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ══ Modal Cosecha (cultivador) ══ -->
+    <Teleport to="body">
+      <div v-if="showCosechaModal" class="ld__overlay" @click.self="showCosechaModal = false">
+        <div class="ld__modal" style="max-width:420px">
+          <div class="ld__modal-header">
+            <div>
+              <h3 class="ld__modal-title">🌿 Registrar cosecha</h3>
+              <p class="ld__modal-sub">{{ lote?.codigo }} · floración → cosecha</p>
+            </div>
+            <button class="ld__modal-close" @click="showCosechaModal = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="ld__modal-body">
+            <div class="ld__field">
+              <label class="ld__label">Plantas cosechadas <span style="color:var(--c-rust-600)">*</span></label>
+              <input
+                type="number" min="1" :max="lote?.plants_count"
+                class="ld__input" v-model.number="cosechaForm.plantas_cosechadas"
+                placeholder="ej: 12"
+                autofocus
+              />
+              <span class="ld__hint">Plantas que pasaron a cosecha (máx {{ lote?.plants_count }})</span>
+            </div>
+            <div class="ld__field">
+              <label class="ld__label">Notas (opcional)</label>
+              <textarea class="ld__input ld__textarea" rows="2" v-model="cosechaForm.notas" placeholder="Observaciones de la cosecha…"></textarea>
+            </div>
+            <div v-if="cosechaError" class="ld__alert">{{ cosechaError }}</div>
+          </div>
+          <div class="ld__modal-footer">
+            <button class="ld__btn-ghost" :disabled="savingCosecha" @click="showCosechaModal = false">Cancelar</button>
+            <button class="ld__btn-primary" :disabled="savingCosecha || !cosechaForm.plantas_cosechadas" @click="ejecutarCosecha">
+              <div v-if="savingCosecha" class="ld__spinner ld__spinner--sm"></div>
+              <i v-else class="bi bi-scissors"></i>Confirmar cosecha
             </button>
           </div>
         </div>

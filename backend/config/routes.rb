@@ -90,8 +90,9 @@ Rails.application.routes.draw do
       end
       resource :cuenta_corriente, controller: 'cuenta_corrientes', only: [:show] do
         collection do
-          post :cargar
-          post :ajuste
+          post  :cargar
+          post  :ajuste
+          patch :set_limite
         end
       end
       member do

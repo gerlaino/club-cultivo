@@ -364,6 +364,10 @@ const routes = [
     },
   },
   {
+    path: '/mnc/en-espera',
+    redirect: '/mnc/espera',
+  },
+  {
     path: '/mnc/espera',
     name: 'mnc-espera',
     component: () => import('../views/manicura/MncEsperaView.vue'),
@@ -529,10 +533,11 @@ const ROLE_HOME = {
 }
 
 const ROLE_ALLOWED_PREFIX = {
-  auditor:  ['/auditor',  '/perfil', '/login'],
-  medico:   ['/medico',   '/perfil', '/login'],
-  abogado:  ['/abogado',  '/perfil', '/login'],
-  delivery: ['/delivery', '/perfil', '/login'],
+  super_admin: ['/super-admin', '/login'],
+  auditor:     ['/auditor',  '/perfil', '/login'],
+  medico:      ['/medico',   '/perfil', '/login'],
+  abogado:     ['/abogado',  '/perfil', '/login'],
+  delivery:    ['/delivery', '/perfil', '/login'],
 }
 
 router.beforeEach(async (to) => {

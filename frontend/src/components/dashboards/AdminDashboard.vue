@@ -62,8 +62,10 @@ const alertas = computed(() => {
   if (sp > 0) list.push({ variant: 'sky',   icon: 'bi-clipboard-check',       msg: `${sp} lote${sp !== 1 ? 's' : ''} pendiente${sp !== 1 ? 's' : ''} de aprobación de manicura`, to: '/aprobaciones', cta: 'Revisar' })
   const stk = stocksPendientes.value.length
   if (stk > 0) list.push({ variant: 'amber', icon: 'bi-box-seam',             msg: `${stk} lote${stk !== 1 ? 's' : ''} de stock sin asignar a sede`, to: '/admin/stocks/pendientes', cta: 'Asignar' })
-  const v = stats.value.vencimientos || 0
-  if (v > 0) list.push({ variant: 'rust',   icon: 'bi-patch-exclamation-fill', msg: `${v} paciente${v !== 1 ? 's' : ''} con REPROCANN vencido`, to: '/pacientes', cta: 'Ver pacientes' })
+  const vencidos   = stats.value.reprocann_vencidos   || 0
+  const porVencer  = stats.value.reprocann_por_vencer || 0
+  if (vencidos > 0)  list.push({ variant: 'rust',  icon: 'bi-patch-exclamation-fill', msg: `${vencidos} paciente${vencidos !== 1 ? 's' : ''} con REPROCANN vencido`,              to: '/pacientes?reprocann=vencido',    cta: 'Renovar' })
+  if (porVencer > 0) list.push({ variant: 'amber', icon: 'bi-clock-history',          msg: `${porVencer} paciente${porVencer !== 1 ? 's' : ''} con REPROCANN vencen en 30 días`,  to: '/pacientes?reprocann=por_vencer', cta: 'Ver' })
   const tv = tareas.value?.stats?.vencidas || 0
   if (tv > 0) list.push({ variant: 'amber', icon: 'bi-clock-history',         msg: `${tv} tarea${tv !== 1 ? 's' : ''} vencida${tv !== 1 ? 's' : ''} sin completar`, to: '/tareas', cta: 'Ver tareas' })
   return list
@@ -197,8 +199,11 @@ async function onOnboardingCompletado() {
               label="Pacientes activos"
               :value="stats.pacientes ?? stats.socios ?? 0"
             />
-            <p v-if="stats.vencimientos" class="ad__kpi-sub c-amber">
-              {{ stats.vencimientos }} REPROCANN por vencer
+            <p v-if="stats.reprocann_vencidos" class="ad__kpi-sub" style="color:var(--c-rust-600)">
+              {{ stats.reprocann_vencidos }} REPROCANN vencido{{ stats.reprocann_vencidos !== 1 ? 's' : '' }}
+            </p>
+            <p v-else-if="stats.reprocann_por_vencer" class="ad__kpi-sub c-amber">
+              {{ stats.reprocann_por_vencer }} vencen en 30 días
             </p>
             <p v-else class="ad__kpi-sub c-muted">Socios habilitados</p>
           </DsCard>

@@ -6,7 +6,7 @@ class LotesController < ApplicationController
 
   # GET /lotes o GET /salas/:sala_id/lotes
   def index
-    lotes = current_user.club.lotes.includes(:genetica, :costo_lote, sala: :sede)
+    lotes = current_user.club.lotes.includes(:genetica, :costo_lote, :pesadas, sala: :sede)
     lotes = lotes.where(sala_id: @sala.id) if @sala.present?
 
     if current_user.cultivador?
@@ -129,24 +129,41 @@ class LotesController < ApplicationController
     manicurado = pesada_attrs.delete(:manicurado).in?([true, 'true', '1'])
     nueva_fase = params[:nueva_fase]
 
+    # Cultivador avanza floración → cosecha registrando plantas cosechadas
+    if current_user.cultivador? && @lote.estado == 'floracion' && nueva_fase == 'cosecha'
+      ActiveRecord::Base.transaction do
+        @lote.pesadas.create!(
+          fase_origen:        'floracion',
+          fase_destino:       'cosecha',
+          plantas_cosechadas: pesada_attrs[:plantas_cosechadas]&.to_i,
+          registrado_por:     current_user,
+          registrado_at:      Time.current,
+          notas:              pesada_attrs[:notas],
+        )
+        @lote.avanzar_fase!
+      end
+      return render json: serialize_lote(@lote.reload), status: :created
+    end
+
     # Manicura pesa un lote en secado → va a manicura_pendiente, no a curado
     if manicurado && @lote.estado == 'secado' && current_user.manicura?
       ActiveRecord::Base.transaction do
         pesada = @lote.pesadas.create!(
-          fase_origen:    'secado',
-          fase_destino:   'manicura_pendiente',
-          manicurado:     true,
-          registrado_por: current_user,
-          registrado_at:  Time.current,
-          notas:          pesada_attrs[:notas],
-          peso_seco_g:    pesada_attrs[:peso_seco_g],
-          peso_humedo_g:  pesada_attrs[:peso_humedo_g],
+          fase_origen:          'secado',
+          fase_destino:         'manicura_pendiente',
+          manicurado:           true,
+          registrado_por:       current_user,
+          registrado_at:        Time.current,
+          notas:                pesada_attrs[:notas],
+          peso_seco_g:          pesada_attrs[:peso_seco_g],
+          peso_humedo_g:        pesada_attrs[:peso_humedo_g],
+          plantas_manicuradas:  pesada_attrs[:plantas_manicuradas],
         )
         @lote.update!(estado: 'manicura_pendiente')
         AlertaInterna.create!(
           club:             current_user.club,
           tipo:             'manicura_aprobacion_pendiente',
-          mensaje:          "Manicura #{current_user.first_name} completó lote #{@lote.codigo} — pendiente aprobación admin (#{pesada_attrs[:peso_seco_g]}g)",
+          mensaje:          "Manicura #{current_user.first_name} completó cosecha #{@lote.codigo} — #{pesada_attrs[:plantas_manicuradas]} plantas · #{pesada_attrs[:peso_seco_g]}g — pendiente aprobación",
           severidad:        'info',
           creada_por:       current_user,
           destinada_a_role: 'admin',
@@ -275,9 +292,10 @@ class LotesController < ApplicationController
       peso_humedo_g:    p.peso_humedo_g&.to_f,
       peso_seco_g:      p.peso_seco_g&.to_f,
       peso_curado_g:    p.peso_curado_g&.to_f,
-      manicurado:       p.manicurado,
-      notas:            p.notas,
-      registrado_por:   p.registrado_por&.first_name,
+      manicurado:           p.manicurado,
+      plantas_manicuradas:  p.plantas_manicuradas,
+      notas:                p.notas,
+      registrado_por:       p.registrado_por&.first_name,
       registrado_at:    p.registrado_at,
       merma_porcentual: p.merma_porcentual,
       aprobada_at:      p.aprobada_at,
@@ -420,6 +438,18 @@ class LotesController < ApplicationController
       created_at: lote.created_at,
       updated_at: lote.updated_at,
     }
+
+    pm = lote.pesadas.loaded? \
+      ? lote.pesadas.select(&:manicurado).max_by { |p| p.registrado_at } \
+      : lote.pesadas.where(manicurado: true).order(registrado_at: :desc).first
+    result[:ultima_pesada_manicura] = pm ? {
+      peso_seco_g:         pm.peso_seco_g&.to_f,
+      plantas_manicuradas: pm.plantas_manicuradas,
+      notas:               pm.notas,
+      registrado_at:       pm.registrado_at,
+      registrado_por:      pm.registrado_por&.first_name,
+      aprobada_at:         pm.aprobada_at,
+    } : nil
 
     if include_cycle_data
       result[:pesadas] = lote.pesadas.includes(:registrado_por, pesadas_plantas: :plant).map { |p| serialize_pesada(p) }

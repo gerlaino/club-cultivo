@@ -97,7 +97,7 @@ const nombreUsuario = auth.user?.first_name || ''
           <path d="M11 22v-8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
       </div>
-      <span class="ob__logo-text">Club Cultivo</span>
+      <span class="ob__logo-text">Cultivo Espacial</span>
     </div>
 
     <!-- Contenido central -->

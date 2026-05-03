@@ -44,7 +44,8 @@ const loading       = ref(true)
 const error         = ref(null)
 const showCrearSala = ref(false)
 
-const canEdit    = computed(() => ["admin", "cultivador"].includes(auth.role))
+const canEdit        = computed(() => ["admin", "cultivador"].includes(auth.role))
+const puedeCrearSala = computed(() => ["admin", "supervisor"].includes(auth.role))
 const isAdmin       = computed(() => auth.user?.role === 'admin')
 const canAddStock   = computed(() => ["admin", "cultivador", "manicura"].includes(auth.user?.role))
 const esManicurador = computed(() => auth.user?.role === 'manicura')
@@ -61,7 +62,7 @@ const loadingTienda      = ref(false)
 const showNuevoStockModal = ref(false)
 const savingNuevoStock   = ref(false)
 const nuevoStockError    = ref(null)
-const nuevoStockForm     = ref({ origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, precio_sugerido_ars: null, proveedor: '', descripcion: '' })
+const nuevoStockForm     = ref({ origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', descripcion: '' })
 
 const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '🫙 Aceite', tintura: '💧 Tintura', topico: '🧴 Tópico', otro: '📦 Otro' }
 const KIND_LABELS = { germinacion: 'Germinación', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', secado: 'Secado', curado: 'Curado', manicura: 'Manicura', mixta: 'Mixta', madre: 'Madre', madres: 'Madres' }
@@ -77,7 +78,7 @@ async function loadTiendaStocks() {
 }
 
 async function abrirNuevoStockModal() {
-  nuevoStockForm.value = { origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, precio_sugerido_ars: null, proveedor: '', descripcion: '' }
+  nuevoStockForm.value = { origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', descripcion: '' }
   nuevoStockError.value = null
   showNuevoStockModal.value = true
   if (!lotesParaStock.value.length) {
@@ -92,9 +93,9 @@ async function confirmarNuevoStock() {
   savingNuevoStock.value = true; nuevoStockError.value = null
   try {
     const f = nuevoStockForm.value
-    const payload = { origen: f.origen, sede_id: sedeId, forma_producto: f.forma_producto, unidad: f.unidad, cantidad: f.cantidad, costo_unitario_ars: f.costo_unitario_ars || undefined, precio_sugerido_ars: f.precio_sugerido_ars || undefined }
+    const payload = { origen: f.origen, sede_id: sedeId, forma_producto: f.forma_producto, unidad: f.unidad, cantidad: f.cantidad, costo_unitario_ars: f.costo_unitario_ars || undefined }
     if (f.origen === 'derivado_lote') { payload.lote_id = f.lote_id; payload.lote_origen_consumido_g = f.lote_origen_consumido_g }
-    else { payload.proveedor = f.proveedor; payload.descripcion = f.descripcion }
+    else { payload.proveedor = f.proveedor; if (f.descripcion) payload.descripcion = f.descripcion }
     await createStock(payload)
     showNuevoStockModal.value = false
     await loadTiendaStocks()
@@ -193,7 +194,7 @@ onMounted(async () => {
           </div>
         </div>
         <div class="sdv__header-actions">
-          <button v-if="canEdit && tieneSalas" class="sdv__btn-primary" @click="showCrearSala = true">
+          <button v-if="puedeCrearSala && tieneSalas" class="sdv__btn-primary" @click="showCrearSala = true">
             <i class="bi bi-plus-lg"></i> Nueva sala aquí
           </button>
           <button v-if="canAddStock && tieneInv" class="sdv__btn-inv" @click="abrirNuevoStockModal">
@@ -271,7 +272,7 @@ onMounted(async () => {
             </div>
             <EmptyState v-if="!salas.length" icon="bi-building-slash" title="Sin salas" message="Esta sede no tiene salas asignadas todavía." compact>
               <template #actions>
-                <button v-if="canEdit" class="sdv__btn-sm-green" @click="showCrearSala = true">Crear primera sala</button>
+                <button v-if="puedeCrearSala" class="sdv__btn-sm-green" @click="showCrearSala = true">Crear primera sala</button>
               </template>
             </EmptyState>
             <div v-else class="sdv__salas">
@@ -287,11 +288,11 @@ onMounted(async () => {
                   </div>
                   <div class="sdv__sala-meta">
                     <span><i class="bi bi-flower1"></i> {{ s.plantas_totales ?? 0 }} plantas</span>
-                    <span><i class="bi bi-box-seam"></i> cap. {{ s.pots_count ?? s.plants_max ?? 0 }}</span>
+                    <span v-if="s.pots_count || s.plants_max"><i class="bi bi-box-seam"></i> cap. {{ s.pots_count ?? s.plants_max }}</span>
                     <span v-if="s.lotes_count !== undefined"><i class="bi bi-collection"></i> {{ s.lotes_count }} lotes</span>
                   </div>
                 </div>
-                <div class="sdv__sala-ocupacion">
+                <div v-if="s.pots_count || s.plants_max" class="sdv__sala-ocupacion">
                   <div class="sdv__ocu-pct" :style="{ color: ocupacionColor(s.porcentaje_ocupacion || 0) }">{{ (s.porcentaje_ocupacion || 0).toFixed(0) }}%</div>
                   <div class="sdv__ocu-bar"><div class="sdv__ocu-fill" :style="{ width: Math.min(s.porcentaje_ocupacion || 0, 100) + '%', background: ocupacionColor(s.porcentaje_ocupacion || 0) }"></div></div>
                   <div class="sdv__ocu-label">ocupación</div>
@@ -392,7 +393,7 @@ onMounted(async () => {
                 <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.proveedor" placeholder="Nombre del proveedor" />
               </div>
               <div class="sdv__field" style="margin-bottom:1rem">
-                <label class="sdv__label">Descripción <span style="color:#dc2626">*</span></label>
+                <label class="sdv__label">Descripción <span class="sdv__optional">opcional</span></label>
                 <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.descripcion" placeholder="Ej: Aceite CBD 10mg/ml" />
               </div>
             </template>
@@ -429,10 +430,6 @@ onMounted(async () => {
               <div class="sdv__field">
                 <label class="sdv__label">Costo unitario (ARS) <span class="sdv__optional">opcional</span></label>
                 <input type="number" step="0.01" min="0" class="sdv__input" v-model.number="nuevoStockForm.costo_unitario_ars" placeholder="ej: 1200" />
-              </div>
-              <div class="sdv__field">
-                <label class="sdv__label">Precio sugerido (ARS) <span class="sdv__optional">opcional</span></label>
-                <input type="number" step="0.01" min="0" class="sdv__input" v-model.number="nuevoStockForm.precio_sugerido_ars" placeholder="ej: 2500" />
               </div>
             </div>
           </div>

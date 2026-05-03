@@ -11,7 +11,8 @@ class RegistrosAmbientalesController < ApplicationController
     registro = @lote.registros_ambientales.build(registro_params)
     registro.user          = current_user
     registro.club          = current_user.club
-    registro.registrado_en = Time.current  # siempre automático
+    registro.registrado_en = params.dig(:registro_ambiental, :registrado_en).present? ?
+      Time.zone.parse(params.dig(:registro_ambiental, :registrado_en)) : Time.current
 
     if params[:archivo_csv].present?
       registro.archivo_csv.attach(params[:archivo_csv])
@@ -47,7 +48,7 @@ class RegistrosAmbientalesController < ApplicationController
       :ml_nutrientes_litro, :notas_nutricion,
       :fertilizacion, :notas_fertilizacion,
       :estado_general, :plagas_observadas,
-      :observaciones, :fuente
+      :observaciones, :fuente, :registrado_en
     )
   end
 

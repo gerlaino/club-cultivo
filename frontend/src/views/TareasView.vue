@@ -557,7 +557,15 @@ function onTareaGuardada() {
   toast.success('Tarea guardada ✓')
   tareasStore.fetchDashboard()
 }
-function onTareaCompletada() { showModalCompletar.value = false; tareaCompletando.value = null; toast.success('Tarea completada ✓') }
+function onTareaCompletada() {
+  showModalCompletar.value = false
+  tareaCompletando.value = null
+  tareaDetalle.value = null
+  toast.success('Tarea completada ✓')
+  tareasStore.fetchDashboard()
+  if (vistaActiva.value === 'kanban') cargarKanban()
+  if (vistaActiva.value === 'semana') cargarSemana()
+}
 
 function puedeEditarTarea(t) {
   const u = authStore.user

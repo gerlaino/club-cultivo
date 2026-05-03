@@ -16,10 +16,19 @@ const form = ref({
   fecha_nacimiento:      '',
   telefono:              '',
   email:                 '',
-  reprocann_numero:      '',
-  reprocann_vencimiento: '',
-  es_paciente:           true,
+  reprocann_numero:             '',
+  reprocann_vencimiento:        '',
+  reprocann_estado:             'sin_registro',
+  limite_dispensacion_mensual_g: '',
+  es_paciente:                  true,
 })
+
+const REPROCANN_ESTADOS = [
+  { value: 'sin_registro', label: 'Sin registro',         color: '#94a3b8', bg: '#f8fafc' },
+  { value: 'pendiente',    label: 'Pendiente aprobación', color: '#b45309', bg: '#fffbeb' },
+  { value: 'activo',       label: 'Activo',               color: '#15803d', bg: '#f0fdf4' },
+  { value: 'inactivo',     label: 'Inactivo',             color: '#dc2626', bg: '#fef2f2' },
+]
 
 // Auto-calcular vencimiento REPROCANN: 3 años desde hoy si no se carga
 const reprocannVencimientoSugerido = computed(() => {
@@ -181,6 +190,23 @@ function sugerirVencimiento() {
             </div>
           </div>
           <div class="snv__card-body">
+            <!-- Estado REPROCANN -->
+            <div class="snv__field snv__field--3" style="margin-bottom:1rem">
+              <label class="snv__label">Estado del certificado</label>
+              <div class="snv__repro-estados">
+                <button
+                  v-for="opt in REPROCANN_ESTADOS" :key="opt.value"
+                  type="button"
+                  class="snv__repro-btn"
+                  :class="{ 'snv__repro-btn--active': form.reprocann_estado === opt.value }"
+                  :style="form.reprocann_estado === opt.value ? { background: opt.bg, borderColor: opt.color, color: opt.color } : {}"
+                  @click="form.reprocann_estado = opt.value"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+
             <div class="snv__grid snv__grid--2">
               <div class="snv__field">
                 <label class="snv__label">Número de certificado</label>
@@ -210,6 +236,34 @@ function sugerirVencimiento() {
                 El REPROCANN es requisito para dispensar cannabis medicinal. Sin número cargado,
                 el paciente aparecerá como "Sin REPROCANN" en el sistema y no podrá recibir dispensaciones.
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Límite de dispensación -->
+        <div class="snv__card snv__card--mt">
+          <div class="snv__card-header">
+            <div class="snv__card-icon" style="background:rgba(3,105,161,.08);color:#0369a1">
+              <i class="bi bi-speedometer2"></i>
+            </div>
+            <div>
+              <div class="snv__card-title">Límite de dispensación</div>
+              <div class="snv__card-sub">Opcional — límite mensual en gramos para este paciente</div>
+            </div>
+          </div>
+          <div class="snv__card-body">
+            <div class="snv__field" style="max-width:260px">
+              <label class="snv__label">Límite mensual <span class="snv__opt">opcional</span></label>
+              <div class="snv__limit-wrap">
+                <input
+                  v-model.number="form.limite_dispensacion_mensual_g"
+                  type="number" step="0.5" min="0" max="9999"
+                  class="snv__input snv__input--limit"
+                  placeholder="Sin límite"
+                />
+                <span class="snv__limit-unit">g / mes</span>
+              </div>
+              <span class="snv__hint">Dejá vacío para no restringir este paciente. Podés cambiarlo después.</span>
             </div>
           </div>
         </div>
@@ -269,6 +323,12 @@ function sugerirVencimiento() {
               <span class="snv__summary-key">REPROCANN</span>
               <span class="snv__summary-val" :style="form.reprocann_numero ? 'color:#15803d;font-weight:600' : ''">
                 {{ form.reprocann_numero || 'Sin número' }}
+              </span>
+            </div>
+            <div class="snv__summary-item">
+              <span class="snv__summary-key">Estado cert.</span>
+              <span class="snv__summary-val" :style="{ color: REPROCANN_ESTADOS.find(e=>e.value===form.reprocann_estado)?.color }">
+                {{ REPROCANN_ESTADOS.find(e=>e.value===form.reprocann_estado)?.label }}
               </span>
             </div>
             <div class="snv__summary-item">
@@ -445,6 +505,22 @@ function sugerirVencimiento() {
 .snv__err  { font-size: .72rem; color: #dc2626; font-weight: 600; }
 .snv__hint { font-size: .72rem; color: #94a3b8; }
 
+/* REPROCANN estado buttons */
+.snv__repro-estados { display: flex; gap: .5rem; flex-wrap: wrap; }
+.snv__repro-btn {
+  padding: .45rem .9rem;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+}
+.snv__repro-btn:hover { border-color: #94a3b8; color: #374151; }
+.snv__repro-btn--active { font-weight: 700; }
+
 /* Infobox */
 .snv__infobox {
   display: flex;
@@ -618,4 +694,8 @@ function sugerirVencimiento() {
 }
 .snv__legal-icon { color: #94a3b8; font-size: .9rem; flex-shrink: 0; margin-top: .1rem; }
 .snv__legal-text { font-size: .72rem; color: #94a3b8; margin: 0; line-height: 1.5; }
+.snv__opt { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; margin-left: .3rem; }
+.snv__limit-wrap { display: flex; align-items: center; gap: .5rem; }
+.snv__input--limit { max-width: 120px; }
+.snv__limit-unit { font-size: .82rem; font-weight: 600; color: #64748b; white-space: nowrap; }
 </style>

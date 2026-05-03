@@ -15,6 +15,7 @@ class Dispensacion < ApplicationRecord
   validates :fecha_dispensacion, presence: true
   validate  :fecha_no_futura
   validate  :stock_regulatorio
+  validate  :stock_disponible,   on: :create
   validate  :credito_suficiente, on: :create
 
   scope :del_mes,   ->(fecha = Date.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
@@ -35,13 +36,22 @@ class Dispensacion < ApplicationRecord
     errors.add(:stock, 'solo se pueden dispensar stocks regulatorios (de lote propio o derivado)') unless stock&.regulatorio?
   end
 
+  def stock_disponible
+    return unless stock && cantidad.to_d > 0
+    if cantidad.to_d > stock.cantidad.to_d
+      errors.add(:cantidad,
+        "supera el stock disponible (#{stock.cantidad.to_f} #{stock.unidad || 'g'} disponibles)")
+    end
+  end
+
   def credito_suficiente
     return unless paciente_id && aporte_socio_ars.to_d > 0
     cc = paciente.cuenta_corriente
     return unless cc
-    if cc.saldo_disponible < aporte_socio_ars.to_d
+    margen = cc.saldo_disponible + cc.limite_credito
+    if margen < aporte_socio_ars.to_d
       errors.add(:aporte_socio_ars,
-        "supera el crédito disponible del paciente (#{cc.saldo_disponible.to_f.round(2)} ARS disponibles)")
+        "supera el crédito disponible del paciente (#{margen.to_f.round(2)} ARS disponibles)")
     end
   end
 

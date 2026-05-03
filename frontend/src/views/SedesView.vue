@@ -439,7 +439,7 @@ function tieneActividad(sede) {
             </div>
             <div class="sede-card__actions" @click.stop>
               <button
-                v-if="['social','mixta','produccion'].includes(sede.tipo)"
+                v-if="['social','mixta'].includes(sede.tipo)"
                 class="sede-card__btn sede-card__btn--secondary"
                 @click="verInventario(sede)"
               >

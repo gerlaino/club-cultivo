@@ -47,6 +47,7 @@ const route  = useRoute();
 const { can, isAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
 
 const adminDrawerOpen = ref(false);
+const svrDrawerOpen = ref(false);
 const dpvDrawerOpen = ref(false);
 const mncDrawerOpen = ref(false);
 const audDrawerOpen = ref(false);
@@ -54,7 +55,7 @@ const medDrawerOpen = ref(false);
 const abgDrawerOpen = ref(false);
 const dlvDrawerOpen = ref(false);
 
-watch(() => route.path, () => { adminDrawerOpen.value = false });
+watch(() => route.path, () => { adminDrawerOpen.value = false; svrDrawerOpen.value = false });
 const { fetchPlan, planData } = usePlan();
 
 async function doLogout() {
@@ -147,6 +148,9 @@ watch(
       } catch (e) { logger.error("Error club:", e); }
     } else {
       club.$reset();
+      salas.$reset();
+      lotes.$reset();
+      plants.$reset();
       planData.value = null
     }
   },
@@ -212,13 +216,23 @@ onMounted(async () => {
       <div class="svr-shell">
         <SupervisorSidebar />
         <div class="svr-body">
-          <SupervisorTopBar />
+          <SupervisorTopBar @toggle-drawer="svrDrawerOpen = !svrDrawerOpen" />
           <div class="svr-accent-bar"></div>
           <main class="svr-main">
             <router-view />
           </main>
         </div>
       </div>
+      <!-- Mobile drawer overlay -->
+      <Teleport to="body">
+        <Transition name="svr-drawer">
+          <div v-if="svrDrawerOpen" class="svr-drawer-overlay" @click.self="svrDrawerOpen = false">
+            <div class="svr-drawer">
+              <SupervisorSidebar />
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
     </template>
 
     <!-- ── DISPENSADOR LAYOUT (sidebar desktop + topbar con hamburger en mobile) ── -->
@@ -684,6 +698,31 @@ onMounted(async () => {
 }
 
 /* Drawer overlay (mobile <1024px) */
+/* ── Supervisor drawer (mobile) ── */
+.svr-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 500;
+  display: flex;
+}
+.svr-drawer {
+  width: 240px;
+  height: 100%;
+  overflow: hidden;
+}
+.svr-drawer :deep(.csb) {
+  display: flex !important;
+  height: 100%;
+  position: static;
+}
+.svr-drawer-enter-active,
+.svr-drawer-leave-active { transition: opacity .2s, transform .2s; }
+.svr-drawer-enter-from,
+.svr-drawer-leave-to { opacity: 0; }
+.svr-drawer-enter-from .svr-drawer,
+.svr-drawer-leave-to  .svr-drawer { transform: translateX(-100%); }
+
 .dpv-drawer-overlay {
   position: fixed;
   inset: 0;

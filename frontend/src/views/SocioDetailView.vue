@@ -9,7 +9,7 @@ import { useToast } from '../composables/useToast.js'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, updatePaciente, getCuentaCorriente, cargarCreditoCC, ajustarCC } from '../lib/api.js'
+import { getPacienteTimeline, updatePaciente, getCuentaCorriente, setLimiteCC } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, Plus, Trash2, AlertTriangle, CheckCircle, Info, X, Save, Wallet
@@ -20,6 +20,16 @@ const store  = usePacientesStore()
 const auth   = useAuthStore()
 const { confirm } = useConfirm()
 const { success: toastOk, error: toastErr } = useToast()
+
+const REPROCANN_ESTADOS = [
+  { value: 'sin_registro', label: 'Sin registro',         color: '#94a3b8', bg: '#f8fafc' },
+  { value: 'pendiente',    label: 'Pendiente aprobación', color: '#b45309', bg: '#fffbeb' },
+  { value: 'activo',       label: 'Activo',               color: '#15803d', bg: '#f0fdf4' },
+  { value: 'inactivo',     label: 'Inactivo',             color: '#dc2626', bg: '#fef2f2' },
+]
+const reprocannEstadoMeta = computed(() =>
+  REPROCANN_ESTADOS.find(e => e.value === (s.value?.reprocann_estado || 'sin_registro'))
+)
 
 const socioId   = Number(route.params.id)
 const loading   = ref(true)
@@ -46,7 +56,9 @@ function openEdit() {
     telefono:             s.value?.telefono || '',
     reprocann_numero:     s.value?.reprocann_numero || '',
     reprocann_vencimiento: s.value?.reprocann_vencimiento || '',
-    es_paciente:          s.value?.es_paciente ?? true,
+    reprocann_estado:              s.value?.reprocann_estado || 'sin_registro',
+    es_paciente:                   s.value?.es_paciente ?? true,
+    limite_dispensacion_mensual_g: s.value?.limite_dispensacion_mensual_g ?? '',
   }
   editError.value = null
   editOpen.value  = true
@@ -182,19 +194,43 @@ const ALL_TABS = [
 ]
 
 // ── Cuenta corriente ──
-const cc            = ref(null)
-const loadingCC     = ref(false)
-const ccCargaForm   = ref({ monto: null, descripcion: '' })
-const ccAjusteForm  = ref({ monto: null, descripcion: '' })
-const savingCC      = ref(false)
-const ccModo        = ref(null) // 'carga' | 'ajuste' | null
+const cc              = ref(null)
+const loadingCC       = ref(false)
+const limiteEditOpen  = ref(false)
+const limiteEditVal   = ref(null)
+const savingLimite    = ref(false)
+
+function openLimiteEdit() {
+  limiteEditVal.value  = cc.value?.limite_credito ?? 0
+  limiteEditOpen.value = true
+}
+
+async function saveLimite() {
+  const nuevo = Number(limiteEditVal.value)
+  if (nuevo < 0) return
+  savingLimite.value = true
+  try {
+    const { data } = await setLimiteCC(socioId, nuevo)
+    cc.value = data
+    limiteEditOpen.value = false
+    store.fetchOne(socioId)
+    toastOk('Límite actualizado')
+  } catch (e) {
+    toastErr(e?.response?.data?.error || 'Error al guardar límite')
+  } finally {
+    savingLimite.value = false
+  }
+}
 
 const fmtARS = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n || 0)
 
-const ccPorcentaje = computed(() => {
-  if (!cc.value || !cc.value.limite_credito) return 0
-  const consumido = cc.value.limite_credito - cc.value.saldo_disponible
-  return Math.min(Math.round(consumido / cc.value.limite_credito * 100), 100)
+// saldo positivo → pagó de más / a favor; saldo negativo → deuda
+// margen = cuánto puede seguir retirando antes de ser bloqueado
+const ccDeudaActual = computed(() => Math.max(0, -(cc.value?.saldo_disponible ?? 0)))
+const ccMargen      = computed(() => (cc.value?.saldo_disponible ?? 0) + (cc.value?.limite_credito ?? 0))
+const ccPorcentaje  = computed(() => {
+  if (!cc.value?.limite_credito) return 0
+  return Math.min(Math.round(ccDeudaActual.value / cc.value.limite_credito * 100), 100)
 })
 
 async function loadCC() {
@@ -205,27 +241,6 @@ async function loadCC() {
   finally { loadingCC.value = false }
 }
 
-async function submitCarga() {
-  if (!ccCargaForm.value.monto || ccCargaForm.value.monto <= 0) return
-  savingCC.value = true
-  try {
-    const { data } = await cargarCreditoCC(socioId, { monto: ccCargaForm.value.monto, descripcion: ccCargaForm.value.descripcion })
-    cc.value = data; ccModo.value = null; ccCargaForm.value = { monto: null, descripcion: '' }
-    toastOk('Crédito cargado')
-  } catch { toastErr('Error al cargar crédito') }
-  finally { savingCC.value = false }
-}
-
-async function submitAjuste() {
-  if (!ccAjusteForm.value.monto || ccAjusteForm.value.monto === 0) return
-  savingCC.value = true
-  try {
-    const { data } = await ajustarCC(socioId, { monto: ccAjusteForm.value.monto, descripcion: ccAjusteForm.value.descripcion })
-    cc.value = data; ccModo.value = null; ccAjusteForm.value = { monto: null, descripcion: '' }
-    toastOk('Ajuste registrado')
-  } catch { toastErr('Error al registrar ajuste') }
-  finally { savingCC.value = false }
-}
 
 const TABS = computed(() => {
   const role = auth.user?.role
@@ -367,6 +382,15 @@ onMounted(async () => {
           </div>
           <div class="sd__info-grid">
             <div class="sd__info-item">
+              <div class="sd__info-label">Estado REPROCANN</div>
+              <div class="sd__info-val">
+                <span class="sd__inline-badge"
+                      :style="{ background: reprocannEstadoMeta?.bg, color: reprocannEstadoMeta?.color, borderColor: reprocannEstadoMeta?.color }">
+                  {{ reprocannEstadoMeta?.label || '—' }}
+                </span>
+              </div>
+            </div>
+            <div class="sd__info-item">
               <div class="sd__info-label">N° autorización</div>
               <div class="sd__info-val sd__info-val--mono">{{ s.reprocann_numero || '—' }}</div>
             </div>
@@ -383,7 +407,7 @@ onMounted(async () => {
                 <span v-else class="sd__val-empty">Sin datos</span>
               </div>
             </div>
-            <div class="sd__info-item sd__info-item--full">
+            <div class="sd__info-item">
               <div class="sd__info-label">Estado del tratamiento</div>
               <div class="sd__info-val">
                 <span v-if="s.es_paciente" style="color:#15803d;font-weight:600">✓ En tratamiento activo</span>
@@ -408,7 +432,13 @@ onMounted(async () => {
       <!-- ── Tab: Dispensaciones ── -->
       <div v-show="activeTab === 'dispensaciones'" class="sd__tab-content">
         <div class="sd__card">
-          <Dispensaciones :socio-id="socioId" />
+          <Dispensaciones
+            :socio-id="socioId"
+            :limite-mensual-g="s?.limite_dispensacion_mensual_g ? Number(s.limite_dispensacion_mensual_g) : null"
+            :dispensado-mes-g="s?.dispensado_mes_actual_g ?? null"
+            :saldo-cc="s?.saldo_cc ?? null"
+            :limite-cc="s?.limite_cc ?? null"
+          />
         </div>
       </div>
 
@@ -417,75 +447,75 @@ onMounted(async () => {
         <div v-if="loadingCC" class="sd__cc-loading"><div class="sd__cc-spinner"></div> Cargando…</div>
         <template v-else-if="cc">
 
-          <!-- Saldo y límite -->
+          <!-- Saldo, margen y límite -->
           <div class="sd__cc-header">
-            <div class="sd__cc-saldo-block">
-              <span class="sd__cc-saldo-label">Saldo disponible</span>
-              <span class="sd__cc-saldo-valor" :class="cc.saldo_disponible > 0 ? 'sd__cc-saldo--ok' : 'sd__cc-saldo--zero'">
-                {{ fmtARS(cc.saldo_disponible) }}
+
+            <!-- Saldo actual -->
+            <div class="sd__cc-saldo-block" :class="cc.saldo_disponible < 0 ? 'sd__cc-saldo-block--deuda' : ''">
+              <span class="sd__cc-saldo-label">{{ cc.saldo_disponible < 0 ? 'Deuda actual' : 'Saldo a favor' }}</span>
+              <span class="sd__cc-saldo-valor"
+                    :class="cc.saldo_disponible < 0 ? 'sd__cc-saldo--deuda' : cc.saldo_disponible > 0 ? 'sd__cc-saldo--ok' : 'sd__cc-saldo--zero'">
+                {{ cc.saldo_disponible < 0 ? '−' : '' }}{{ fmtARS(Math.abs(cc.saldo_disponible)) }}
+              </span>
+              <span class="sd__cc-saldo-hint">
+                {{ cc.saldo_disponible < 0 ? 'El socio nos debe este monto' : cc.saldo_disponible > 0 ? 'Pagó por adelantado' : 'Sin saldo ni deuda' }}
               </span>
             </div>
+
+            <!-- Margen disponible (el número que importa para dispensar) -->
+            <div class="sd__cc-margen-block" :class="ccMargen <= 0 ? 'sd__cc-margen-block--agotado' : ''">
+              <span class="sd__cc-saldo-label">Puede retirar aún</span>
+              <span class="sd__cc-margen-valor" :class="ccMargen <= 0 ? 'sd__cc-margen--agotado' : ccMargen < cc.limite_credito * 0.2 ? 'sd__cc-margen--bajo' : 'sd__cc-margen--ok'">
+                {{ fmtARS(Math.max(0, ccMargen)) }}
+              </span>
+              <span class="sd__cc-saldo-hint">
+                {{ ccMargen <= 0 ? 'Límite agotado — bloqueado' : 'Antes de ser bloqueado' }}
+              </span>
+            </div>
+
+            <!-- Límite (editable) -->
             <div class="sd__cc-limite-block">
               <span class="sd__cc-limite-label">Límite de crédito</span>
-              <span class="sd__cc-limite-valor">{{ fmtARS(cc.limite_credito) }}</span>
+              <template v-if="!limiteEditOpen">
+                <div class="sd__cc-limite-valor-row">
+                  <span class="sd__cc-limite-valor">{{ fmtARS(cc.limite_credito) }}</span>
+                  <button class="sd__cc-limite-edit-btn" @click="openLimiteEdit" title="Editar límite">
+                    <Pencil :size="12" :stroke-width="1.75" />
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <div class="sd__cc-limite-form">
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    v-model.number="limiteEditVal"
+                    class="sd__cc-limite-input"
+                    placeholder="0"
+                    @keydown.enter="saveLimite"
+                    @keydown.esc="limiteEditOpen = false"
+                  />
+                  <button class="sd__cc-btn sd__cc-btn--primary sd__cc-btn--sm" :disabled="savingLimite" @click="saveLimite">
+                    {{ savingLimite ? '…' : 'Guardar' }}
+                  </button>
+                  <button class="sd__cc-btn sd__cc-btn--ghost sd__cc-btn--sm" @click="limiteEditOpen = false">
+                    Cancelar
+                  </button>
+                </div>
+              </template>
             </div>
           </div>
 
-          <!-- Barra de consumo -->
-          <div v-if="cc.limite_credito > 0" class="sd__cc-bar-wrap">
+          <!-- Barra de deuda utilizada (solo muestra si hay límite Y deuda) -->
+          <div v-if="cc.limite_credito > 0 && ccDeudaActual > 0" class="sd__cc-bar-wrap">
             <div class="sd__cc-bar">
-              <div class="sd__cc-bar-fill" :style="{ width: ccPorcentaje + '%' }" :class="ccPorcentaje >= 90 ? 'sd__cc-bar-fill--danger' : ccPorcentaje >= 70 ? 'sd__cc-bar-fill--warn' : ''"></div>
+              <div class="sd__cc-bar-fill"
+                   :style="{ width: ccPorcentaje + '%' }"
+                   :class="ccPorcentaje >= 90 ? 'sd__cc-bar-fill--danger' : ccPorcentaje >= 70 ? 'sd__cc-bar-fill--warn' : ''">
+              </div>
             </div>
-            <span class="sd__cc-bar-pct">{{ ccPorcentaje }}% consumido</span>
-          </div>
-
-          <!-- Acciones -->
-          <div class="sd__cc-actions">
-            <button class="sd__cc-btn sd__cc-btn--primary" @click="ccModo = ccModo === 'carga' ? null : 'carga'">
-              <Plus :size="14" /> Cargar crédito
-            </button>
-            <button class="sd__cc-btn sd__cc-btn--ghost" @click="ccModo = ccModo === 'ajuste' ? null : 'ajuste'">
-              <Pencil :size="14" /> Ajuste manual
-            </button>
-          </div>
-
-          <!-- Form carga -->
-          <div v-if="ccModo === 'carga'" class="sd__cc-form">
-            <h4 class="sd__cc-form-title">Cargar crédito</h4>
-            <div class="sd__cc-form-row">
-              <label>Monto (ARS)</label>
-              <input type="number" min="1" step="1" v-model.number="ccCargaForm.monto" class="sd__cc-input" placeholder="ej: 5000" />
-            </div>
-            <div class="sd__cc-form-row">
-              <label>Descripción</label>
-              <input type="text" v-model="ccCargaForm.descripcion" class="sd__cc-input" placeholder="Pago cuota mensual…" />
-            </div>
-            <div class="sd__cc-form-footer">
-              <button class="sd__cc-btn sd__cc-btn--ghost" @click="ccModo = null">Cancelar</button>
-              <button class="sd__cc-btn sd__cc-btn--primary" :disabled="savingCC || !ccCargaForm.monto" @click="submitCarga">
-                {{ savingCC ? 'Cargando…' : 'Confirmar carga' }}
-              </button>
-            </div>
-          </div>
-
-          <!-- Form ajuste -->
-          <div v-if="ccModo === 'ajuste'" class="sd__cc-form">
-            <h4 class="sd__cc-form-title">Ajuste manual</h4>
-            <p class="sd__cc-form-sub">Usá valores negativos para debitar, positivos para acreditar.</p>
-            <div class="sd__cc-form-row">
-              <label>Monto (ARS)</label>
-              <input type="number" step="1" v-model.number="ccAjusteForm.monto" class="sd__cc-input" placeholder="ej: -500 o 1000" />
-            </div>
-            <div class="sd__cc-form-row">
-              <label>Motivo</label>
-              <input type="text" v-model="ccAjusteForm.descripcion" class="sd__cc-input" placeholder="Motivo del ajuste…" />
-            </div>
-            <div class="sd__cc-form-footer">
-              <button class="sd__cc-btn sd__cc-btn--ghost" @click="ccModo = null">Cancelar</button>
-              <button class="sd__cc-btn sd__cc-btn--primary" :disabled="savingCC || !ccAjusteForm.monto" @click="submitAjuste">
-                {{ savingCC ? 'Guardando…' : 'Confirmar ajuste' }}
-              </button>
-            </div>
+            <span class="sd__cc-bar-pct">{{ ccPorcentaje }}% del crédito utilizado</span>
           </div>
 
           <!-- Historial de movimientos -->
@@ -667,6 +697,41 @@ onMounted(async () => {
                 <input v-model="editForm.reprocann_vencimiento" class="sd-modal__input" type="date" />
               </div>
               <div class="sd-modal__field sd-modal__field--full">
+                <label class="sd-modal__label" style="margin-bottom:.4rem">Estado REPROCANN</label>
+                <div class="sd-modal__repro-estados">
+                  <button
+                    v-for="opt in REPROCANN_ESTADOS" :key="opt.value"
+                    type="button"
+                    class="sd-modal__repro-btn"
+                    :style="editForm.reprocann_estado === opt.value ? { background: opt.bg, borderColor: opt.color, color: opt.color } : {}"
+                    @click="editForm.reprocann_estado = opt.value"
+                  >{{ opt.label }}</button>
+                </div>
+              </div>
+              <div class="sd-modal__field sd-modal__field--full">
+                <label class="sd-modal__label" style="margin-bottom:.4rem">
+                  Límite de dispensación mensual
+                  <span class="sd-modal__opt">opcional — en gramos</span>
+                </label>
+                <div class="sd-modal__limit-wrap">
+                  <input
+                    v-model.number="editForm.limite_dispensacion_mensual_g"
+                    class="sd-modal__input sd-modal__input--limit"
+                    type="number" step="0.5" min="0" max="9999"
+                    placeholder="Sin límite"
+                  />
+                  <span class="sd-modal__limit-unit">g / mes</span>
+                  <button
+                    v-if="editForm.limite_dispensacion_mensual_g"
+                    type="button"
+                    class="sd-modal__limit-clear"
+                    @click="editForm.limite_dispensacion_mensual_g = ''"
+                    title="Quitar límite"
+                  ><X :size="13" /></button>
+                </div>
+                <span class="sd-modal__hint">Dejá vacío para no aplicar ningún límite a este paciente.</span>
+              </div>
+              <div class="sd-modal__field sd-modal__field--full">
                 <label class="sd-modal__label">
                   <input v-model="editForm.es_paciente" type="checkbox" class="sd-modal__check" />
                   En tratamiento activo
@@ -827,13 +892,29 @@ onMounted(async () => {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .sd__cc-header { display: flex; align-items: stretch; gap: 1rem; margin-bottom: 1rem; }
-.sd__cc-saldo-block, .sd__cc-limite-block { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: .25rem; }
+.sd__cc-saldo-block, .sd__cc-margen-block, .sd__cc-limite-block { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: .2rem; }
 .sd__cc-saldo-block { background: #f0fdf4; border-color: #bbf7d0; }
+.sd__cc-saldo-block--deuda { background: #fef2f2; border-color: #fecaca; }
+.sd__cc-margen-block { background: #eff6ff; border-color: #bfdbfe; }
+.sd__cc-margen-block--agotado { background: #fef2f2; border-color: #fecaca; }
 .sd__cc-saldo-label, .sd__cc-limite-label { font-size: .72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+.sd__cc-saldo-hint { font-size: .7rem; color: #94a3b8; margin-top: .1rem; }
 .sd__cc-saldo-valor { font-family: monospace; font-size: 1.6rem; font-weight: 800; color: #0f172a; }
-.sd__cc-saldo--ok { color: #15803d; }
+.sd__cc-saldo--ok   { color: #15803d; }
 .sd__cc-saldo--zero { color: #94a3b8; }
+.sd__cc-saldo--deuda { color: #dc2626; }
+.sd__cc-margen-valor { font-family: monospace; font-size: 1.6rem; font-weight: 800; }
+.sd__cc-margen--ok      { color: #2563eb; }
+.sd__cc-margen--bajo    { color: #d97706; }
+.sd__cc-margen--agotado { color: #dc2626; }
 .sd__cc-limite-valor { font-family: monospace; font-size: 1.3rem; font-weight: 700; color: #475569; }
+.sd__cc-limite-valor-row { display: flex; align-items: center; gap: .35rem; }
+.sd__cc-limite-edit-btn { background: none; border: none; cursor: pointer; color: #94a3b8; padding: .1rem .2rem; border-radius: 4px; display: inline-flex; align-items: center; transition: color .15s; flex-shrink: 0; }
+.sd__cc-limite-edit-btn:hover { color: #475569; }
+.sd__cc-limite-form { display: flex; align-items: center; gap: .4rem; margin-top: .25rem; flex-wrap: wrap; }
+.sd__cc-limite-input { font-family: monospace; font-size: 1rem; font-weight: 600; border: 1.5px solid #6366f1; border-radius: 8px; padding: .35rem .6rem; width: 8rem; color: #1e293b; background: #fff; outline: none; }
+.sd__cc-limite-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+.sd__cc-btn--sm { padding: .3rem .7rem; font-size: .78rem; }
 
 .sd__cc-bar-wrap { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
 .sd__cc-bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
@@ -849,10 +930,31 @@ onMounted(async () => {
 .sd__cc-btn--primary:disabled { opacity: .5; cursor: not-allowed; }
 .sd__cc-btn--ghost { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
 .sd__cc-btn--ghost:hover { background: #e2e8f0; }
+.sd__cc-btn--danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.sd__cc-btn--danger:hover:not(:disabled) { background: #fee2e2; }
+.sd__cc-btn--danger:disabled { opacity: .5; cursor: not-allowed; }
+
+.sd__cc-signo-wrap { display: flex; gap: .4rem; }
+.sd__cc-signo-btn { flex: 1; padding: .55rem; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; color: #64748b; }
+.sd__cc-signo-btn--active-pos { background: #f0fdf4; border-color: #15803d; color: #15803d; }
+.sd__cc-signo-btn--active-neg { background: #fef2f2; border-color: #dc2626; color: #dc2626; }
 
 .sd__cc-form { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .75rem; }
-.sd__cc-form-title { font-size: .9rem; font-weight: 700; color: #0f172a; margin: 0 0 .25rem; }
+.sd__cc-form--ajuste { border-color: #fcd34d; background: #fffbeb; }
+.sd__cc-form-title { font-size: .9rem; font-weight: 700; color: #0f172a; margin: 0; }
+.sd__cc-form-hint { font-size: .75rem; color: #64748b; margin: -.25rem 0 .1rem; line-height: 1.5; }
 .sd__cc-form-sub { font-size: .78rem; color: #64748b; margin: -.25rem 0 .25rem; }
+
+.sd-modal__repro-estados { display: flex; gap: .4rem; flex-wrap: wrap; }
+.sd-modal__repro-btn { padding: .4rem .8rem; border-radius: 7px; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.sd-modal__repro-btn:hover { border-color: #94a3b8; }
+.sd-modal__opt  { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; margin-left: .35rem; }
+.sd-modal__hint { font-size: .72rem; color: #94a3b8; margin-top: .2rem; display: block; }
+.sd-modal__limit-wrap { display: flex; align-items: center; gap: .4rem; }
+.sd-modal__input--limit { max-width: 140px; }
+.sd-modal__limit-unit { font-size: .8rem; font-weight: 600; color: #64748b; white-space: nowrap; }
+.sd-modal__limit-clear { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 2px; display: flex; align-items: center; border-radius: 4px; transition: color .15s; }
+.sd-modal__limit-clear:hover { color: #dc2626; }
 .sd__cc-form-row { display: flex; flex-direction: column; gap: .3rem; }
 .sd__cc-form-row label { font-size: .75rem; font-weight: 600; color: #64748b; }
 .sd__cc-input { padding: .5rem .75rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; outline: none; transition: border-color .15s; }

@@ -26,7 +26,7 @@ const navItems = [
       <div class="sa-sidebar__brand">
         <div class="sa-brand-icon">CC</div>
         <div>
-          <div class="sa-brand-name">Club Cultivo</div>
+          <div class="sa-brand-name">Cultivo Espacial</div>
           <div class="sa-brand-role">Super Admin</div>
         </div>
       </div>

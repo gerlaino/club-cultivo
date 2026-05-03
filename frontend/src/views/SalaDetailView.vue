@@ -189,8 +189,11 @@ const loteErrors   = ref({})
 const loteApiError = ref(null)
 const showUpgrade  = ref(false)
 
+const KIND_TO_ESTADO = { vegetativo:"vegetativo", floracion:"floracion", secado:"secado", manicura:"curado", madre:"vegetativo", clon:"vegetativo" }
+
 function emptyLoteForm() {
-  return { estado:"vegetativo", plants_count:0, start_date:new Date().toISOString().slice(0,10), genetica_id:"", grow_type:"sustrato", light_type:"", tamanio_maceta:"", notes:"" }
+  const estadoInicial = KIND_TO_ESTADO[sala.value?.kind] || "vegetativo"
+  return { estado: estadoInicial, plants_count:0, start_date:new Date().toISOString().slice(0,10), genetica_id:"", grow_type:"sustrato", light_type:"", tamanio_maceta:"", notes:"" }
 }
 
 // Validación con capacidad de sala
@@ -233,6 +236,12 @@ async function createLote() {
     }
   }
 }
+function openCreate() {
+  loteForm.value     = emptyLoteForm()
+  loteErrors.value   = {}
+  loteApiError.value = null
+  showCreate.value   = true
+}
 function closeCreate() {
   showCreate.value   = false
   loteForm.value     = emptyLoteForm()
@@ -252,8 +261,8 @@ const ambienteMini = ref([])
 
 async function cargarAmbienteMini() {
   try {
-    const desde = new Date(Date.now() - 2 * 3600_000).toISOString().slice(0, 19).replace('T', ' ')
-    const res   = await getSalaAmbiente(salaId, { desde, bucket: 'raw' })
+    // No enviamos `desde` — el backend defaultea a 24h, evitando problemas de timezone
+    const res = await getSalaAmbiente(salaId, { bucket: 'raw' })
     const lecturas = res.data || []
     const tiposTarget = ['temperatura', 'humedad', 'vpd', 'co2']
     ambienteMini.value = tiposTarget.map(tipo => {
@@ -341,7 +350,7 @@ const canSeeAmbiente = computed(() =>
             <i class="bi bi-box-arrow-in-down"></i>
             {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
           </button>
-          <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="showCreate = true">
+          <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
           <button v-if="canEdit" class="sd__btn-danger" :disabled="deleting" @click="eliminarSala">
@@ -352,7 +361,7 @@ const canSeeAmbiente = computed(() =>
 
       <!-- KPIs -->
       <div class="sd__kpis">
-        <div class="sd__kpi sd__kpi--accent">
+        <div v-if="sala?.pots_count" class="sd__kpi sd__kpi--accent">
           <div class="sd__kpi-icon">📊</div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value" :style="{ color: ocupacionColor(ocupacionPct(sala)) }">{{ ocupacionPct(sala).toFixed(0) }}%</div>
@@ -378,7 +387,7 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value">{{ kpis.totalPlantas }}</div>
             <div class="sd__kpi-label">Plantas activas</div>
-            <div class="sd__kpi-sub">cap. {{ sala.pots_count ?? 0 }}</div>
+            <div v-if="sala?.pots_count" class="sd__kpi-sub">cap. {{ sala.pots_count }}</div>
           </div>
         </div>
         <div class="sd__kpi">
@@ -408,7 +417,7 @@ const canSeeAmbiente = computed(() =>
               <div v-if="lotes.loading" class="sd__placeholder">Cargando lotes…</div>
               <EmptyState v-else-if="!items.length" icon="📦" title="Sin lotes todavía" message="Esta sala no tiene lotes asignados." compact>
                 <template #actions>
-                  <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="showCreate=true">Crear primer lote</button>
+                  <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="openCreate">Crear primer lote</button>
                   <button v-else-if="puedeCargarLote" class="sd__btn-outline" style="color:#b45309;border-color:#fde68a" @click="showCargarLote=true">
                     <i class="bi bi-box-arrow-in-down"></i>
                     {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
@@ -484,7 +493,7 @@ const canSeeAmbiente = computed(() =>
                 </span>
               </dd>
               <dt>Tipo</dt><dd>{{ kindLabel(sala.kind) }}</dd>
-              <dt>Capacidad</dt><dd>{{ sala.pots_count ?? 0 }} plantas</dd>
+              <dt v-if="sala.pots_count">Capacidad</dt><dd v-if="sala.pots_count">{{ sala.pots_count }} plantas</dd>
               <dt>Sede</dt><dd>{{ sala.sede?.nombre || "—" }}</dd>
               <dt>A cargo</dt><dd>{{ sala.cultivadores?.map(c => c.nombre).join(', ') || "—" }}</dd>
               <dt>Creado por</dt><dd>{{ sala.created_by_name || "—" }}</dd>
@@ -545,7 +554,7 @@ const canSeeAmbiente = computed(() =>
             </div>
 
             <div class="sd__grid">
-              <div class="sd__field">
+              <div v-if="!sala?.kind" class="sd__field">
                 <label class="sd__label">Estado inicial</label>
                 <select class="sd__input" v-model="loteForm.estado">
                   <option v-for="e in ESTADOS_LOTE" :key="e" :value="e">{{ estadoMeta(e).label }}</option>
@@ -633,6 +642,8 @@ const canSeeAmbiente = computed(() =>
     <RegistrarLecturaModal
       v-model="lecturaOpen"
       :sala-id="salaId"
+      :lotes="items"
+      @registrada="cargarAmbienteMini"
     />
 
     <!-- Modal upgrade plan -->

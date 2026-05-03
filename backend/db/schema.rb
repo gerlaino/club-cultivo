@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_02_000004) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_02_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -496,6 +496,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_02_000004) do
     t.string "reprocann_adjunto"
     t.text "notas_clinicas"
     t.boolean "con_seguimiento_medico", default: true, null: false
+    t.string "reprocann_estado", default: "sin_registro", null: false
+    t.decimal "limite_dispensacion_mensual_g", precision: 8, scale: 2
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["club_id"], name: "index_pacientes_on_club_id"
@@ -554,6 +556,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_02_000004) do
     t.datetime "rechazada_at"
     t.bigint "rechazada_por_id"
     t.string "motivo_rechazo"
+    t.integer "plantas_manicuradas"
+    t.integer "plantas_cosechadas"
     t.index ["aprobada_por_id"], name: "index_pesadas_on_aprobada_por_id"
     t.index ["lote_id", "registrado_at"], name: "index_pesadas_on_lote_id_and_registrado_at"
     t.index ["lote_id"], name: "index_pesadas_on_lote_id"
