@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import { signIn, signOut, me } from "../lib/api";
 import api from "../lib/api";
-import router from "../router";
 import { useClubStore } from "../stores/club.js";
 import { usePlan } from '../composables/usePlan.js'
 
@@ -62,6 +61,7 @@ export const useAuthStore = defineStore("auth", {
         await signIn(email, password);
         await this.fetchMe();
 
+        const { default: router } = await import("../router");
         if (this.user?.role === 'super_admin') {
           router.push({ path: '/super-admin' });
         } else {
@@ -94,6 +94,7 @@ export const useAuthStore = defineStore("auth", {
         delete api.defaults.headers.common['Authorization'];
         const { planData } = usePlan();
         planData.value = null;
+        const { default: router } = await import("../router");
         router.push({ name: "login" });
         this.loading = false;
       }
