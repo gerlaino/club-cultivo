@@ -20,10 +20,10 @@
       </button>
     </div>
 
-    <!-- Tareas -->
-    <RouterLink to="/tareas" class="bnc__item" :class="{ 'bnc__item--active': isActive('/tareas') }">
-      <CheckSquare :size="22" :stroke-width="1.75" class="bnc__ico" />
-      <span class="bnc__lbl">Tareas</span>
+    <!-- Lotes -->
+    <RouterLink to="/lotes" class="bnc__item" :class="{ 'bnc__item--active': isActive('/lotes') }">
+      <Sprout :size="22" :stroke-width="1.75" class="bnc__ico" />
+      <span class="bnc__lbl">Lotes</span>
     </RouterLink>
 
     <!-- Más -->
@@ -67,7 +67,7 @@ import { useClubStore } from '../../stores/club.js'
 import SheetBottom          from './SheetBottom.vue'
 import RegistrarLecturaSheet from './RegistrarLecturaSheet.vue'
 import {
-  Home, LayoutGrid, Plus, CheckSquare, MoreHorizontal,
+  Home, LayoutGrid, Plus, MoreHorizontal,
   Sprout, User, LogOut, ChevronRight,
 } from 'lucide-vue-next'
 
