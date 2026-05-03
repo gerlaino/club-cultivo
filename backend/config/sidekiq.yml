@@ -1,0 +1,6 @@
+:concurrency: 5
+:queues:
+  - [ambiente, 3]
+  - [notifications, 2]
+  - [mailers, 2]
+  - [default, 1]

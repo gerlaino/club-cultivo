@@ -1,0 +1,13 @@
+/* ─────────────────────────────────────────────────────────────
+   Club Cultivo — Fuentes del DS
+   Inter (UI), General Sans (Display), Geist Mono (Mono)
+───────────────────────────────────────────────────────────── */
+
+/* Inter — Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* General Sans — Fontshare */
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap');
+
+/* Geist Mono — Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap');

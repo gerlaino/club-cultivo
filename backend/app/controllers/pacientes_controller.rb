@@ -1,0 +1,214 @@
+class PacientesController < ApplicationController
+  before_action :authenticate_user!
+  before_action :check_pacientes_role!
+  before_action :set_paciente, only: [:show, :update, :destroy, :timeline]
+  before_action :normalize_paciente_params, only: [:create, :update]
+  before_action :warn_deprecated_route
+
+  def index
+    page   = (params[:pagina] || 1).to_i
+    limit  = (params[:limite] || 20).to_i
+    query  = params[:query].to_s.strip
+    dni    = params[:dni].to_s.gsub(/\D/, "")
+    orden  = params[:orden].presence_in(%w[created_at nombre apellido]) || "created_at"
+    dir    = params[:dir].to_s.downcase == "asc" ? "asc" : "desc"
+
+    scope = policy_scope(Paciente)
+
+    if params[:sin_seguimiento].present?
+      scope = scope.where(con_seguimiento_medico: false)
+    end
+
+    if query.present?
+      q = query.downcase
+      scope = scope.where(
+        "lower(nombre) LIKE :q OR lower(apellido) LIKE :q OR dni_normalizado LIKE :dni",
+        q: "%#{q}%", dni: "%#{dni}%"
+      )
+    elsif dni.present?
+      scope = scope.where("dni_normalizado LIKE ?", "%#{dni}%")
+    end
+
+    total    = scope.count
+    pacientes = scope.order("#{orden} #{dir}")
+                     .offset((page - 1) * limit)
+                     .limit(limit)
+
+    render json: {
+      data: pacientes.as_json(methods: :nombre_completo),
+      meta: { pagina: page, limite: limit, total: total }
+    }
+  end
+
+  def show
+    json = @paciente.as_json(
+      methods: [:nombre_completo, :dispensado_mes_actual_g, :porcentaje_limite_mensual, :saldo_cc, :limite_cc],
+      except:  :notas_clinicas
+    )
+    json['notas_clinicas'] = @paciente.notas_clinicas if policy(@paciente).ver_notas_clinicas?
+    render json: { data: json }
+  end
+
+  def timeline
+    authorize @paciente, :timeline?
+    eventos = []
+
+    @paciente.dispensaciones.order(created_at: :desc).limit(50).each do |d|
+      eventos << {
+        tipo: 'dispensacion',
+        fecha: d.created_at,
+        descripcion: "Dispensación: #{d.cantidad}#{d.unidad_display rescue ''} — $#{d.aporte_socio_ars}",
+        id: d.id
+      }
+    end
+
+    @paciente.notas.order(created_at: :desc).each do |n|
+      eventos << {
+        tipo: 'nota',
+        fecha: n.created_at,
+        descripcion: n.contenido.to_s.truncate(120),
+        id: n.id
+      }
+    end
+
+    @paciente.indicacion_medicas.order(created_at: :desc).each do |i|
+      eventos << {
+        tipo: 'indicacion',
+        fecha: i.created_at,
+        descripcion: "Indicación médica registrada",
+        id: i.id
+      }
+    end
+
+    eventos << {
+      tipo: 'alta',
+      fecha: @paciente.created_at,
+      descripcion: "Alta como paciente del club",
+      id: nil
+    }
+
+    render json: { timeline: eventos.sort_by { |e| e[:fecha] }.reverse }
+  end
+
+  def create
+    unless current_user.admin? || current_user.medico? || current_user.dispensador?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    enforcer = PlanEnforcer.new(current_user.club)
+    unless enforcer.puede_crear_paciente?
+      info = enforcer.info
+      return render json: PlanEnforcer.error_limite('pacientes', info[:limites][:pacientes]), status: :payment_required
+    end
+
+    paciente = Paciente.new(paciente_params)
+    paciente.club_id    = current_user.club_id
+    paciente.created_by = current_user
+    paciente.updated_by = current_user
+
+    if current_user.dispensador?
+      paciente.con_seguimiento_medico = false
+    elsif current_user.medico?
+      paciente.con_seguimiento_medico = true
+    end
+
+    if paciente.save
+      crear_alerta_dispensador(paciente) if current_user.dispensador?
+      render json: { data: paciente }, status: :created
+    else
+      render json: { errors: paciente.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  def update
+    if params_include_notas_clinicas? && !can_edit_notas_clinicas?
+      return render json: { error: 'No autorizado para modificar notas clínicas' }, status: :forbidden
+    end
+
+    raw = params[:paciente] || params[:socio]
+    if raw&.key?(:con_seguimiento_medico) && current_user.dispensador?
+      return render json: { error: 'No autorizado para modificar seguimiento médico' }, status: :forbidden
+    end
+
+    attrs = paciente_params
+
+    @paciente.assign_attributes(attrs)
+    @paciente.updated_by = current_user
+
+    if @paciente.save
+      render json: { data: @paciente }
+    else
+      render json: { errors: @paciente.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @paciente.update!(deleted_by_id: current_user.id)
+    @paciente.destroy
+    head :no_content
+  end
+
+  private
+
+  def set_paciente
+    @paciente = policy_scope(Paciente).find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Paciente no encontrado' }, status: :not_found
+  end
+
+  def normalize_paciente_params
+    p = params[:paciente] || params[:socio]
+    return unless p.is_a?(ActionController::Parameters)
+    params[:paciente] = p
+    p[:nombre]           ||= p.delete(:first_name)  if p[:first_name]
+    p[:apellido]         ||= p.delete(:last_name)   if p[:last_name]
+    p[:fecha_nacimiento] ||= p.delete(:birthday)    if p[:birthday]
+    p[:telefono]         ||= p.delete(:phone)       if p[:phone]
+
+    if p[:fecha_nacimiento].present? && p[:fecha_nacimiento] =~ %r{\A\d{2}/\d{2}/\d{4}\z}
+      d, m, y = p[:fecha_nacimiento].split("/")
+      p[:fecha_nacimiento] = "#{y}-#{m}-#{d}"
+    end
+  end
+
+  def paciente_params
+    allowed = %i[nombre apellido dni fecha_nacimiento es_paciente email telefono reprocann_numero reprocann_vencimiento reprocann_estado limite_dispensacion_mensual_g]
+    allowed << :notas_clinicas          if can_edit_notas_clinicas?
+    allowed << :con_seguimiento_medico  if current_user&.admin? || current_user&.medico?
+    (params[:paciente] || params[:socio]).permit(*allowed)
+  end
+
+  def params_include_notas_clinicas?
+    p = params[:paciente] || params[:socio]
+    p.present? && p.key?(:notas_clinicas)
+  end
+
+  def can_edit_notas_clinicas?
+    %w[admin medico].include?(current_user&.role)
+  end
+
+  def check_pacientes_role!
+    blocked = %w[delivery abogado cultivador manicura auditor]
+    if blocked.include?(current_user&.role)
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
+  end
+
+  def warn_deprecated_route
+    if request.path.start_with?('/socios')
+      Rails.logger.warn "[DEPRECATED] /socios hit by #{current_user&.email} — migrate to /pacientes"
+    end
+  end
+
+  def crear_alerta_dispensador(paciente)
+    AlertaInterna.create!(
+      club_id:          current_user.club_id,
+      tipo:             'paciente_creado_por_dispensador',
+      mensaje:          "Dispensador #{current_user.nombre_completo} creó al paciente #{paciente.nombre_completo} sin seguimiento médico",
+      severidad:        'info',
+      creada_por:       current_user,
+      destinada_a_role: 'admin',
+      contexto:         { paciente_id: paciente.id, dispensador_id: current_user.id }
+    )
+  end
+end

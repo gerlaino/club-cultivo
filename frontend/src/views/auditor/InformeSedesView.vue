@@ -1,0 +1,92 @@
+<template>
+  <div class="inf">
+    <div class="inf__header">
+      <h1 class="inf__title"><Building2 :size="20" :stroke-width="1.75" /> Informe Sedes</h1>
+      <select v-model="periodo" class="inf__periodo" @change="cargar">
+        <option value="mes_actual">Mes actual</option>
+        <option value="mes_anterior">Mes anterior</option>
+        <option value="trimestre">Trimestre</option>
+        <option value="anio">Año</option>
+      </select>
+    </div>
+
+    <div v-if="loading" class="inf__loading">Cargando…</div>
+
+    <template v-else-if="data">
+      <div class="inf__kpis">
+        <div class="inf__kpi">
+          <span class="inf__kpi-valor">{{ data.total_sedes }}</span>
+          <span class="inf__kpi-label">Total sedes</span>
+        </div>
+        <div class="inf__kpi inf__kpi--ok">
+          <span class="inf__kpi-valor">{{ data.sedes_activas }}</span>
+          <span class="inf__kpi-label">Activas</span>
+        </div>
+        <div class="inf__kpi">
+          <span class="inf__kpi-valor">{{ data.salas_totales }}</span>
+          <span class="inf__kpi-label">Salas totales</span>
+        </div>
+        <div class="inf__kpi">
+          <span class="inf__kpi-valor">{{ data.plantas_totales }}</span>
+          <span class="inf__kpi-label">Plantas totales</span>
+        </div>
+      </div>
+
+      <div class="inf__section">
+        <h2 class="inf__section-title">Detalle por sede</h2>
+        <table class="inf__table">
+          <thead><tr><th>Sede</th><th>Salas</th><th>Plantas</th><th>Stock disponible (g)</th></tr></thead>
+          <tbody>
+            <tr v-for="(s, i) in data.por_sede" :key="i">
+              <td>{{ s.nombre }}</td>
+              <td>{{ s.salas }}</td>
+              <td>{{ s.plantas }}</td>
+              <td>{{ formatGramos(s.stock_disponible) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { Building2 } from 'lucide-vue-next'
+import api from '../../lib/api.js'
+
+const periodo = ref('mes_actual')
+const loading = ref(false)
+const data    = ref(null)
+
+async function cargar() {
+  loading.value = true
+  try {
+    const res = await api.get('/informes/sedes', { params: { periodo: periodo.value } })
+    data.value = res.data
+  } finally {
+    loading.value = false
+  }
+}
+
+const formatGramos = (g) => g != null ? `${Number(g).toLocaleString('es-AR')} g` : '—'
+
+onMounted(cargar)
+</script>
+
+<style scoped>
+.inf { padding: var(--sp-6); max-width: 900px; }
+.inf__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-6); gap: var(--sp-4); flex-wrap: wrap; }
+.inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
+.inf__periodo { background: var(--c-ink-50); border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: 6px 12px; font-size: var(--fs-14); color: var(--c-ink-900); }
+.inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }
+.inf__kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-6); }
+.inf__kpi { background: var(--c-paper); border: 1px solid var(--c-ink-100); border-radius: var(--r-lg); padding: var(--sp-4); text-align: center; }
+.inf__kpi-valor { display: block; font-size: var(--fs-28); font-weight: 800; color: var(--c-ink-900); line-height: 1; }
+.inf__kpi-label { display: block; font-size: var(--fs-12); color: var(--c-ink-500); margin-top: var(--sp-1); }
+.inf__kpi--ok .inf__kpi-valor { color: #2D8A6B; }
+.inf__section-title { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); margin-bottom: var(--sp-3); }
+.inf__table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
+.inf__table th { text-align: left; padding: var(--sp-2) var(--sp-3); background: var(--c-ink-50); font-weight: 600; color: var(--c-ink-600); border-bottom: 1px solid var(--c-ink-100); }
+.inf__table td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--c-ink-50); color: var(--c-ink-800); }
+</style>

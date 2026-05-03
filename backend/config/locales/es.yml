@@ -1,0 +1,81 @@
+es:
+  date:
+    month_names:
+      - ~
+      - enero
+      - febrero
+      - marzo
+      - abril
+      - mayo
+      - junio
+      - julio
+      - agosto
+      - septiembre
+      - octubre
+      - noviembre
+      - diciembre
+    abbr_month_names:
+      - ~
+      - ene
+      - feb
+      - mar
+      - abr
+      - may
+      - jun
+      - jul
+      - ago
+      - sep
+      - oct
+      - nov
+      - dic
+    day_names:
+      - domingo
+      - lunes
+      - martes
+      - miércoles
+      - jueves
+      - viernes
+      - sábado
+    abbr_day_names:
+      - dom
+      - lun
+      - mar
+      - mié
+      - jue
+      - vie
+      - sáb
+    formats:
+      default: "%d/%m/%Y"
+      short: "%d %b"
+      long: "%d de %B de %Y"
+  time:
+    formats:
+      default: "%d/%m/%Y %H:%M"
+      short: "%d %b %H:%M"
+      long: "%d de %B de %Y a las %H:%M"
+  activerecord:
+    errors:
+      messages:
+        required: "es obligatorio"
+        blank: "no puede estar vacío"
+        taken: "ya está en uso"
+        invalid: "no es válido"
+        too_short:
+          one: "es demasiado corto (mínimo 1 caracter)"
+          other: "es demasiado corto (mínimo %{count} caracteres)"
+        too_long:
+          one: "es demasiado largo (máximo 1 caracter)"
+          other: "es demasiado largo (máximo %{count} caracteres)"
+      models:
+        dispensacion:
+          attributes:
+            sede:
+              required: "debe existir"
+        stock:
+          attributes:
+            sede:
+              required: "debe existir"
+        movimiento_contable:
+          attributes:
+            sede:
+              required: "debe existir"

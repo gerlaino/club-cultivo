@@ -1,0 +1,29 @@
+/* ─────────────────────────────────────────────────────────────
+   Club Cultivo — Reset mínimo moderno
+   Complementa (no reemplaza) el reset de Bootstrap.
+───────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Herencia de fuente en formularios */
+input, button, textarea, select {
+  font: inherit;
+}
+
+/* Imágenes y media responsivos */
+img, svg, video {
+  display: block;
+  max-width: 100%;
+}
+
+/* Tipografía base del DS sobre los componentes que lo usan */
+.ds-root {
+  font-family: var(--font-ui);
+  color: var(--c-ink-900);
+  background: var(--c-paper);
+  line-height: var(--lh-base);
+}
