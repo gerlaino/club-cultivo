@@ -57,7 +57,7 @@ import LeafSeal from '../../design-system/icons/LeafSeal.vue'
 import DsAvatar from '../../design-system/components/Avatar.vue'
 import RegistrarLecturaSheet from '../cultivador/RegistrarLecturaSheet.vue'
 import {
-  Home, LayoutGrid, Sprout, Gauge, LogOut,
+  Home, LayoutGrid, PackageCheck, Gauge, LogOut,
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -68,10 +68,10 @@ const club   = useClubStore()
 const lecturaOpen = ref(false)
 
 const NAV_LINKS = [
-  { to: '/',      icon: Home,       label: 'Inicio' },
-  { to: '/salas', icon: LayoutGrid, label: 'Mis salas' },
-  { to: '/lotes', icon: Sprout,     label: 'Mis lotes' },
-  {               icon: Gauge,      label: 'Registrar lectura' },
+  { to: '/',          icon: Home,         label: 'Inicio' },
+  { to: '/salas',     icon: LayoutGrid,   label: 'Mis salas' },
+  { to: '/cosechado', icon: PackageCheck, label: 'Cosechado' },
+  {                   icon: Gauge,        label: 'Registrar lectura' },
 ]
 
 function isActive(to) {

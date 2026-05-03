@@ -72,7 +72,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import DsSpinner   from '../../design-system/components/Spinner.vue'
 import { useSalasStore } from '../../stores/salas.js'
 import { useLotesStore } from '../../stores/lotes.js'
@@ -150,6 +150,12 @@ function resetForm() {
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen && !salasStore.items.length) salasStore.fetch()
 })
+
+function escapeHandler(e) {
+  if (e.key === 'Escape' && open.value) open.value = false
+}
+onMounted(() => document.addEventListener('keydown', escapeHandler, true))
+onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 </script>
 
 <style scoped>
