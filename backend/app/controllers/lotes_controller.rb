@@ -269,6 +269,7 @@ class LotesController < ApplicationController
   def cosechar_plantas
     authorize @lote, :avanzar_fase?
     raise ArgumentError, 'El lote no está en floración' unless @lote.estado == 'floracion'
+    raise ArgumentError, 'Función no disponible — ejecutá las migraciones pendientes' unless Plant.column_names.include?('pasada_cosecha')
 
     plantas_ids  = Array(params[:plantas_ids]).map(&:to_i)
     peso_total_g = params[:peso_total_g].presence&.to_f
@@ -563,14 +564,21 @@ class LotesController < ApplicationController
     end
 
     if include_plants
+      has_pasada_col = Plant.column_names.include?('pasada_cosecha')
       result[:plants] = lote.plants.order(:nombre).map { |p|
         { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, state: p.state,
-          es_seleccion: p.es_seleccion, pasada_cosecha: p.pasada_cosecha, fecha_cosecha: p.fecha_cosecha }
+          es_seleccion: p.es_seleccion,
+          fecha_cosecha:  p.fecha_cosecha,
+          pasada_cosecha: has_pasada_col ? p.pasada_cosecha : nil }
       }
       result[:plantas_en_floracion] = lote.plants.where(state: 'floracion').count
-      result[:pasadas_cosecha]      = lote.plants.where.not(pasada_cosecha: nil)
-                                          .group(:pasada_cosecha).count
-                                          .sort.map { |pasada, cnt| { pasada: pasada, plantas: cnt } }
+      result[:pasadas_cosecha] = if has_pasada_col
+        lote.plants.where.not(pasada_cosecha: nil)
+            .group(:pasada_cosecha).count
+            .sort.map { |pasada, cnt| { pasada: pasada, plantas: cnt } }
+      else
+        []
+      end
     end
 
     result

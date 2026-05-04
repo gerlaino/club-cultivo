@@ -391,10 +391,16 @@ function estadoMeta(estado) {
 }
 
 // ── Kanban ─────────────────────────────────────────────────────
-const tareasPendientes  = computed(() => [
-  ...(kanban.value.pendiente   || []),
-  ...(kanban.value.en_progreso || []),
-])
+const hoyISO = new Date().toISOString().split('T')[0]  // YYYY-MM-DD
+
+const tareasPendientes = computed(() => {
+  const todas = [
+    ...(kanban.value.pendiente   || []),
+    ...(kanban.value.en_progreso || []),
+  ]
+  // Solo mostrar tareas sin fecha futura (sin fecha, vencidas, o de hoy)
+  return todas.filter(t => !t.fecha_programada || t.fecha_programada <= hoyISO)
+})
 const tareasFinalizadas = computed(() => kanban.value.completada || [])
 
 // ── Saludo / fecha ─────────────────────────────────────────────
