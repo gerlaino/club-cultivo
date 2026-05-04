@@ -391,7 +391,11 @@ function estadoMeta(estado) {
 }
 
 // ── Kanban ─────────────────────────────────────────────────────
-const hoyISO = new Date().toISOString().split('T')[0]  // YYYY-MM-DD
+function localDateISO() {
+  const n = new Date()
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
+}
+const hoyISO = localDateISO()  // YYYY-MM-DD en hora local (evita off-by-one UTC−3)
 
 const tareasPendientes = computed(() => {
   const todas = [
