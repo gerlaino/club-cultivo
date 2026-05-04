@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :timeline, :aprobar_manicura, :rechazar_manicura]
+  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :aprobar_manicura, :rechazar_manicura]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
   # GET /lotes o GET /salas/:sala_id/lotes
@@ -131,6 +131,7 @@ class LotesController < ApplicationController
 
     # Cultivador avanza floración → cosecha registrando plantas cosechadas
     if current_user.cultivador? && @lote.estado == 'floracion' && nueva_fase == 'cosecha'
+      estado_anterior = @lote.estado
       ActiveRecord::Base.transaction do
         @lote.pesadas.create!(
           fase_origen:        'floracion',
@@ -141,6 +142,15 @@ class LotesController < ApplicationController
           notas:              pesada_attrs[:notas],
         )
         @lote.avanzar_fase!
+        @lote.lote_eventos.create!(
+          tipo:            'cambio_estado',
+          estado_anterior: estado_anterior,
+          estado_nuevo:    @lote.estado,
+          descripcion:     "Cosecha registrada: #{pesada_attrs[:plantas_cosechadas]} plantas",
+          user:            current_user,
+          club:            current_user.club,
+          registrado_en:   Time.current,
+        )
       end
       return render json: serialize_lote(@lote.reload), status: :created
     end
@@ -174,11 +184,21 @@ class LotesController < ApplicationController
       return render json: serialize_lote(@lote.reload), status: :created
     end
 
+    estado_anterior = @lote.estado
     @lote.transicionar!(
       nueva_fase,
       pesada_attrs:          pesada_attrs,
       manicurado:            manicurado,
       pesadas_plantas_attrs: pesadas_plantas
+    )
+    @lote.lote_eventos.create!(
+      tipo:            'cambio_estado',
+      estado_anterior: estado_anterior,
+      estado_nuevo:    @lote.estado,
+      descripcion:     "Transición: #{estado_anterior} → #{@lote.estado}",
+      user:            current_user,
+      club:            current_user.club,
+      registrado_en:   Time.current,
     )
 
     render json: serialize_lote(@lote.reload)
@@ -225,8 +245,82 @@ class LotesController < ApplicationController
   # POST /lotes/:id/avanzar_fase
   def avanzar_fase
     authorize @lote, :avanzar_fase?
+    estado_anterior = @lote.estado
     @lote.avanzar_fase!
+    @lote.lote_eventos.create!(
+      tipo:            'cambio_estado',
+      estado_anterior: estado_anterior,
+      estado_nuevo:    @lote.estado,
+      descripcion:     "Avance de fase: #{estado_anterior} → #{@lote.estado}",
+      user:            current_user,
+      club:            current_user.club,
+      registrado_en:   Time.current,
+    )
     render json: serialize_lote(@lote.reload)
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /lotes/:id/cosechar_plantas
+  # Marca plantas individuales como cosechadas sin avanzar la fase del lote.
+  # Body: { plantas_ids: [1,2,3], peso_total_g: 150.0, pasada: "A" }
+  def cosechar_plantas
+    authorize @lote, :avanzar_fase?
+    raise ArgumentError, 'El lote no está en floración' unless @lote.estado == 'floracion'
+
+    plantas_ids  = Array(params[:plantas_ids]).map(&:to_i)
+    peso_total_g = params[:peso_total_g].presence&.to_f
+    pasada       = params[:pasada].presence || siguiente_pasada(@lote)
+
+    raise ArgumentError, 'Seleccioná al menos una planta' if plantas_ids.empty?
+
+    plantas = @lote.plants.where(id: plantas_ids, state: 'floracion')
+    raise ArgumentError, "No se encontraron plantas en floración con esos IDs" if plantas.empty?
+
+    ActiveRecord::Base.transaction do
+      plantas.update_all(
+        state:          'cosechado',
+        pasada_cosecha: pasada,
+        fecha_cosecha:  Date.today,
+      )
+
+      @lote.pesadas.create!(
+        fase_origen:        'floracion',
+        fase_destino:       'cosecha',
+        plantas_cosechadas: plantas.count,
+        peso_humedo_g:      peso_total_g,
+        registrado_por:     current_user,
+        registrado_at:      Time.current,
+        notas:              "Cosecha #{pasada} — #{plantas.count} plantas",
+      )
+
+      @lote.lote_eventos.create!(
+        tipo:          'nota',
+        descripcion:   "Cosecha #{pasada}: #{plantas.count} plantas cosechadas#{peso_total_g ? " · #{peso_total_g}g húmedo" : ''}",
+        user:          current_user,
+        club:          current_user.club,
+        registrado_en: Time.current,
+      )
+
+      # Si todas las plantas del lote están cosechadas, avanzar la fase automáticamente
+      if @lote.plants.where.not(state: %w[cosechado descartada]).none?
+        estado_anterior = @lote.estado
+        @lote.avanzar_fase!
+        @lote.lote_eventos.create!(
+          tipo:            'cambio_estado',
+          estado_anterior: estado_anterior,
+          estado_nuevo:    @lote.estado,
+          descripcion:     "Todas las plantas cosechadas — lote avanza a #{@lote.estado}",
+          user:            current_user,
+          club:            current_user.club,
+          registrado_en:   Time.current,
+        )
+      end
+    end
+
+    render json: serialize_lote(@lote.reload, include_plants: true), status: :created
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
@@ -392,6 +486,12 @@ class LotesController < ApplicationController
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
+  def siguiente_pasada(lote)
+    usadas = lote.plants.where.not(pasada_cosecha: nil).distinct.pluck(:pasada_cosecha)
+    letra  = ('A'..'Z').find { |l| usadas.exclude?(l) }
+    letra || "#{usadas.length + 1}"
+  end
+
   def require_admin_cultivador_o_manicura
     unless current_user.admin? || current_user.cultivador? || current_user.manicura? || current_user.supervisor?
       render json: { error: 'No autorizado' }, status: :forbidden
@@ -464,8 +564,13 @@ class LotesController < ApplicationController
 
     if include_plants
       result[:plants] = lote.plants.order(:nombre).map { |p|
-        { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, state: p.state, es_seleccion: p.es_seleccion }
+        { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, state: p.state,
+          es_seleccion: p.es_seleccion, pasada_cosecha: p.pasada_cosecha, fecha_cosecha: p.fecha_cosecha }
       }
+      result[:plantas_en_floracion] = lote.plants.where(state: 'floracion').count
+      result[:pasadas_cosecha]      = lote.plants.where.not(pasada_cosecha: nil)
+                                          .group(:pasada_cosecha).count
+                                          .sort.map { |pasada, cnt| { pasada: pasada, plantas: cnt } }
     end
 
     result

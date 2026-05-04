@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref, computed } from "vue"
+import { onMounted, onUnmounted, ref, computed, watch } from "vue"
 import { logger } from '../utils/logger.js'
 import { useRoute, useRouter } from "vue-router"
 import { useLotesStore }  from "../stores/lotes"
@@ -13,6 +13,7 @@ import { createPlant, updatePlant,
   listSedes, getSedeStocks, deleteLote,
   getCostoLote, createCostoLote, updateCostoLote } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
+import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 import GraficosLote from '../components/GraficosLote.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
@@ -274,6 +275,28 @@ const savingCosecha     = ref(false)
 const cosechaError      = ref(null)
 const cosechaForm       = ref({ plantas_cosechadas: null, notas: '' })
 
+// ── Cosecha parcial (multi-select plants) ─────────────────
+const showCosechaPartialModal = ref(false)
+
+const plantasEnFloracion = computed(() => plantList.value.filter(p => p.state === 'floracion'))
+const todasCosechadas    = computed(() => plantList.value.length > 0 && plantasEnFloracion.value.length === 0)
+const pasadasUsadas      = computed(() => {
+  const pasadas = plantList.value.map(p => p.pasada_cosecha).filter(Boolean)
+  return [...new Set(pasadas)]
+})
+const siguientePasada    = computed(() => {
+  const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+  return letras.find(l => !pasadasUsadas.value.includes(l)) || 'Z'
+})
+
+function onCosechadoParcial(loteActualizado) {
+  lotes.current = loteActualizado
+  showCosechaPartialModal.value = false
+  toast.success('Cosecha registrada')
+  plants.fetchByLote(id)
+  loadEventos()
+}
+
 // ── Cerrar curado ─────────────────────────────────────────
 const showCerrarCuradoModal = ref(false)
 const savingCurado          = ref(false)
@@ -328,14 +351,18 @@ function openTransicionModal() {
 const transicionandoRapido = ref(false)
 
 function handleAvanzarFase() {
-  if (isCultivador.value) {
-    if (lote.value?.proxima_fase_posible === 'cosecha') {
+  if (lote.value?.proxima_fase_posible === 'cosecha') {
+    // Si hay plantas registradas individualmente, usar cosecha parcial
+    if (plantList.value.length > 0) {
+      showCosechaPartialModal.value = true
+    } else {
+      // Sin plantas registradas: modal simple para admin/cultivador
       cosechaForm.value = { plantas_cosechadas: lote.value.plants_count || null, notas: '' }
       cosechaError.value = null
       showCosechaModal.value = true
-    } else {
-      avanzarFaseRapido()
     }
+  } else if (isCultivador.value) {
+    avanzarFaseRapido()
   } else {
     openTransicionModal()
   }
@@ -551,12 +578,13 @@ const splitOk = computed(() => {
 
 function loteEscapeHandler(e) {
   if (e.key !== 'Escape') return
-  if (showCerrarCuradoModal.value) { showCerrarCuradoModal.value = false; return }
-  if (showCosechaModal.value)      { showCosechaModal.value = false; return }
-  if (showTransicionModal.value)   { showTransicionModal.value = false; return }
-  if (showRegistroModal.value)     { showRegistroModal.value = false; return }
-  if (showCostoForm.value)         { showCostoForm.value = false; return }
-  if (showAddPlanta.value)         { showAddPlanta.value = false; return }
+  if (showCerrarCuradoModal.value)    { showCerrarCuradoModal.value = false; return }
+  if (showCosechaPartialModal.value)  { showCosechaPartialModal.value = false; return }
+  if (showCosechaModal.value)         { showCosechaModal.value = false; return }
+  if (showTransicionModal.value)      { showTransicionModal.value = false; return }
+  if (showRegistroModal.value)        { showRegistroModal.value = false; return }
+  if (showCostoForm.value)            { showCostoForm.value = false; return }
+  if (showAddPlanta.value)            { showAddPlanta.value = false; return }
 }
 
 onMounted(async () => {
@@ -690,6 +718,14 @@ onUnmounted(() => {
                 <span class="ld__pill">{{ plantList.length }}</span>
               </div>
               <div class="ld__section-toggle-right">
+                <button
+                  v-if="(canEdit || isCultivador) && lote.estado === 'floracion' && plantList.length > 0"
+                  class="ld__btn-sm ld__btn-sm--cosecha"
+                  title="Registrar cosecha parcial"
+                  @click.stop="showCosechaPartialModal = true"
+                >
+                  🌿 Cosechar
+                </button>
                 <button v-if="canEdit || isCultivador" class="ld__btn-sm" @click.stop="openAddPlanta">
                   <i class="bi bi-plus-lg"></i>
                 </button>
@@ -1365,6 +1401,17 @@ onUnmounted(() => {
       @update:index="lightboxIndex = $event"
     />
 
+    <!-- ══ Modal Cosecha Parcial ══ -->
+    <ModalCosechaPartial
+      v-if="showCosechaPartialModal && lote"
+      :lote="lote"
+      :plantas="plantList"
+      :pasadas-usadas="pasadasUsadas"
+      :pasada-inicial="siguientePasada"
+      @cosechado="onCosechadoParcial"
+      @cerrar="showCosechaPartialModal = false"
+    />
+
   </div>
 </template>
 
@@ -1512,6 +1559,8 @@ onUnmounted(() => {
 .ld__btn-outline:hover { border-color: #1b5e20; background: #f0fdf4; }
 .ld__btn-sm { display: inline-flex; align-items: center; gap: .3rem; background: #e8f5e9; color: #1b5e20; border: 1px solid #d4e6d4; padding: .35rem .65rem; border-radius: 7px; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .ld__btn-sm:hover { background: #1b5e20; color: #fff; }
+.ld__btn-sm--cosecha { background: #dcfce7; border-color: #86efac; color: #15803d; }
+.ld__btn-sm--cosecha:hover { background: #15803d; color: #fff; }
 .ld__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
 .ld__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(27,94,32,.15); display: flex; flex-direction: column; }
 .ld__modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid #e8f0e9; position: sticky; top: 0; background: #fff; z-index: 1; }

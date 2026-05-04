@@ -341,9 +341,12 @@ const cargandoSalas    = ref(false)
 const salasDisponibles = computed(() => {
   if (!form.value.asignada_a_id) return props.salas
   if (cargandoSalas.value) return []
-  if (!salasDelUsuario.value.length) return []
+  // Si el usuario no tiene salas asignadas, mostrar todas las salas del club
+  if (!salasDelUsuario.value.length) return props.salas
   const ids = salasDelUsuario.value.map(s => String(s.id))
-  return props.salas.filter(s => ids.includes(String(s.id)))
+  const filtradas = props.salas.filter(s => ids.includes(String(s.id)))
+  // Fallback: si ninguna de las salas asignadas aparece en props.salas, mostrar todas
+  return filtradas.length ? filtradas : props.salas
 })
 const lotesDeLaSala    = computed(() => props.lotes.filter(l => String(l.sala_id) === String(form.value.sala_id)))
 const salaSeleccionada = computed(() => props.salas.find(s => String(s.id) === String(form.value.sala_id)) || null)

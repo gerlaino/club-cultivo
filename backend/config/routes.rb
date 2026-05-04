@@ -59,6 +59,7 @@ Rails.application.routes.draw do
         post :transiciones
         post :cerrar_curado
         post :avanzar_fase
+        post :cosechar_plantas
         post :aprobar_manicura
         post :rechazar_manicura
         get  :timeline

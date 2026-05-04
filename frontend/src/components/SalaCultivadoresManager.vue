@@ -19,8 +19,12 @@
     </div>
 
     <!-- Sin cultivadores -->
-    <div v-else-if="cultivadores.length === 0" class="text-muted small py-2">
-      <i class="bi bi-person-dash me-1"></i>Sin cultivadores asignados
+    <div v-else-if="cultivadores.length === 0" class="scm__empty">
+      <div class="scm__empty-ico">👤</div>
+      <div class="scm__empty-text">Esta sala no tiene cultivadores asignados.</div>
+      <RouterLink to="/usuarios" class="scm__empty-link">
+        <i class="bi bi-arrow-right-circle me-1"></i>Ir a Equipo para asignar uno
+      </RouterLink>
     </div>
 
     <!-- Lista de cultivadores -->
@@ -215,4 +219,25 @@ function iniciales(nombre) {
   border: none;
   padding: 4px 6px;
 }
+
+.scm__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  background: #fff8ec;
+  border: 1.5px dashed #fbbf24;
+  border-radius: 10px;
+  text-align: center;
+}
+.scm__empty-ico { font-size: 22px; }
+.scm__empty-text { font-size: 0.82rem; color: #92400e; }
+.scm__empty-link {
+  font-size: 0.8rem;
+  color: #1b5e20;
+  text-decoration: none;
+  font-weight: 600;
+}
+.scm__empty-link:hover { text-decoration: underline; }
 </style>

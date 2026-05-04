@@ -331,8 +331,19 @@ const ejemplosContexto = computed(() => {
 })
 
 function abrir() { abierto.value = true }
-onMounted(() => window.addEventListener('abrir-asistente-voz', abrir))
-onUnmounted(() => window.removeEventListener('abrir-asistente-voz', abrir))
+
+function avEscapeHandler(e) {
+  if (e.key === 'Escape' && abierto.value) cerrar()
+}
+
+onMounted(() => {
+  window.addEventListener('abrir-asistente-voz', abrir)
+  document.addEventListener('keydown', avEscapeHandler, true)
+})
+onUnmounted(() => {
+  window.removeEventListener('abrir-asistente-voz', abrir)
+  document.removeEventListener('keydown', avEscapeHandler, true)
+})
 
 function cerrar() {
   if (recognition) recognition.stop()

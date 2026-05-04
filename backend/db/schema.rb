@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_03_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_04_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -612,8 +612,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_03_000001) do
     t.string "estado_salud"
     t.string "color_hojas"
     t.boolean "es_seleccion", default: false, null: false
+    t.string "pasada_cosecha"
     t.index ["codigo_qr"], name: "index_plants_on_codigo_qr", unique: true
     t.index ["lote_id", "es_seleccion"], name: "index_plants_on_lote_id_and_es_seleccion"
+    t.index ["lote_id", "pasada_cosecha"], name: "idx_plants_lote_pasada"
     t.index ["lote_id"], name: "index_plants_on_lote_id"
     t.index ["origen"], name: "index_plants_on_origen"
     t.index ["planta_madre_id"], name: "index_plants_on_planta_madre_id"

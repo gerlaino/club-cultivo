@@ -1,19 +1,20 @@
 <script setup>
-import { ref, computed, reactive, onMounted } from 'vue'
-import { listSedes, getContableDashboard, getTareasDashboard, listLotes } from '../../lib/api.js'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
+import { listSedes, getContableDashboard, listLotes } from '../../lib/api.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import { useStatsStore } from '../../stores/stats.js'
+import { useTareasStore } from '../../stores/tareas.js'
 import OnboardingWizard from '../OnboardingWizard.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 
-const auth = useAuthStore()
-const club = useClubStore()
+const auth       = useAuthStore()
+const club       = useClubStore()
 const statsStore = useStatsStore()
+const tareasStore = useTareasStore()
 
 const sedes = ref([])
 const contable = ref(null)
-const tareas = ref(null)
 const lotesManicuraPendiente = ref([])
 const loading = ref(true)
 
@@ -80,8 +81,12 @@ function sparklinePath(values) {
   }).join(' ')
 }
 
-// Zone 3
-const tareasHoy = computed(() => [...(tareas.value?.vencidas || []), ...(tareas.value?.hoy || [])])
+// Zone 3 — usa tareasStore para reactividad en tiempo real cuando se completan tareas
+const tareasHoy = computed(() => {
+  const vencidas = tareasStore.dashboard?.vencidas || []
+  const hoy      = tareasStore.dashboard?.hoy      || []
+  return [...vencidas, ...hoy].filter(t => t.estado !== 'completada')
+})
 
 function sedeDot(sede) {
   return (sede.salas_count || 0) > 0 ? '#16a34a' : '#f59e0b'
@@ -100,16 +105,14 @@ const pacientesNecesitanAtencion = computed(() =>
 
 onMounted(async () => {
   try {
-    const [sedesRes, contableRes, tareasRes, manicuraRes] = await Promise.allSettled([
+    const [sedesRes, contableRes, manicuraRes] = await Promise.allSettled([
       listSedes(),
       getContableDashboard(),
-      getTareasDashboard(),
       listLotes({ estado: 'manicura_pendiente' }),
     ])
-    await statsStore.fetchAll()
+    await Promise.allSettled([statsStore.fetchAll(), tareasStore.fetchDashboard()])
     if (sedesRes.status    === 'fulfilled') sedes.value                  = sedesRes.value.data   || []
     if (contableRes.status === 'fulfilled') contable.value               = contableRes.value.data
-    if (tareasRes.status   === 'fulfilled') tareas.value                 = tareasRes.value.data
     if (manicuraRes.status === 'fulfilled') lotesManicuraPendiente.value = manicuraRes.value.data || []
   } finally {
     loading.value = false
