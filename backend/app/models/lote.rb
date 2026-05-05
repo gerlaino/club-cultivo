@@ -71,13 +71,24 @@ class Lote < ApplicationRecord
   }.freeze
 
   # Avance rápido sin pesada — usado por el cultivador desde el botón "Avanzar fase".
-  # No crea pesada ni mueve sala; el admin registra pesos y movimiento físico vía transicionar!
-  def avanzar_fase!
+  # Si sala_id se provee, mueve el lote a esa sala. Si no, intenta auto-detectar:
+  # si existe exactamente una sala activa del tipo destino en el club, la elige.
+  def avanzar_fase!(sala_id: nil)
     idx = CICLO_FASES.index(estado)
     raise ArgumentError, 'Lote no puede transicionar en este estado' unless idx.present? && idx < CICLO_FASES.length - 1
     nueva_fase = CICLO_FASES[idx + 1]
     ActiveRecord::Base.transaction do
-      update!(estado: nueva_fase)
+      sala_nueva = if sala_id.present?
+        club.salas.activas.find_by(id: sala_id)
+      else
+        candidatas = club.salas.activas.de_tipo(nueva_fase).to_a
+        candidatas.length == 1 ? candidatas.first : nil
+      end
+
+      attrs = { estado: nueva_fase }
+      attrs[:sala] = sala_nueva if sala_nueva
+      update!(attrs)
+
       plant_state = FASE_A_PLANT_STATE[nueva_fase]
       plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state) if plant_state
     end

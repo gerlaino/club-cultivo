@@ -141,7 +141,7 @@ class LotesController < ApplicationController
           registrado_at:      Time.current,
           notas:              pesada_attrs[:notas],
         )
-        @lote.avanzar_fase!
+        @lote.avanzar_fase!(sala_id: params[:sala_id])
         @lote.lote_eventos.create!(
           tipo:            'cambio_estado',
           estado_anterior: estado_anterior,
@@ -246,7 +246,7 @@ class LotesController < ApplicationController
   def avanzar_fase
     authorize @lote, :avanzar_fase?
     estado_anterior = @lote.estado
-    @lote.avanzar_fase!
+    @lote.avanzar_fase!(sala_id: params[:sala_id])
     @lote.lote_eventos.create!(
       tipo:            'cambio_estado',
       estado_anterior: estado_anterior,
@@ -308,7 +308,7 @@ class LotesController < ApplicationController
       # Si todas las plantas del lote están cosechadas, avanzar la fase automáticamente
       if @lote.plants.where.not(state: %w[cosechado descartada]).none?
         estado_anterior = @lote.estado
-        @lote.avanzar_fase!
+        @lote.avanzar_fase!(sala_id: params[:sala_id])
         @lote.lote_eventos.create!(
           tipo:            'cambio_estado',
           estado_anterior: estado_anterior,
@@ -578,6 +578,16 @@ class LotesController < ApplicationController
             .sort.map { |pasada, cnt| { pasada: pasada, plantas: cnt } }
       else
         []
+      end
+
+      # Salas disponibles para la próxima fase — usadas en el frontend para el selector
+      if puede_transicion && proxima_fase
+        result[:salas_destino] = lote.club.salas.activas
+                                      .where(tipo: proxima_fase)
+                                      .order(:nombre)
+                                      .map { |s| { id: s.id, nombre: s.nombre } }
+      else
+        result[:salas_destino] = []
       end
     end
 

@@ -372,8 +372,11 @@ async function ejecutarCosecha() {
   if (!cosechaForm.value.plantas_cosechadas) return
   savingCosecha.value = true; cosechaError.value = null
   try {
+    const salas = lote.value?.salas_destino || []
+    const sala_id = salas.length === 1 ? salas[0].id : undefined
     const { data } = await transicionarLote(lote.value.id, {
       nueva_fase: 'cosecha',
+      sala_id,
       pesada: {
         plantas_cosechadas: cosechaForm.value.plantas_cosechadas,
         notas: cosechaForm.value.notas || undefined,
@@ -393,7 +396,9 @@ async function ejecutarCosecha() {
 async function avanzarFaseRapido() {
   transicionandoRapido.value = true
   try {
-    const { data } = await avanzarFaseLote(lote.value.id)
+    const salas = lote.value?.salas_destino || []
+    const payload = salas.length === 1 ? { sala_id: salas[0].id } : {}
+    const { data } = await avanzarFaseLote(lote.value.id, payload)
     lotes.current = data
     toast.success(`Lote avanzado a ${capitalizarFase(data.estado)}`)
     await Promise.all([loadEventos(), plants.fetchByLote(id)])
@@ -1408,6 +1413,7 @@ onUnmounted(() => {
       :plantas="plantList"
       :pasadas-usadas="pasadasUsadas"
       :pasada-inicial="siguientePasada"
+      :salas-destino="lote.salas_destino || []"
       @cosechado="onCosechadoParcial"
       @cerrar="showCosechaPartialModal = false"
     />

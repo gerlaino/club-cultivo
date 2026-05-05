@@ -334,7 +334,7 @@ export const getPlantaByQR = (codigoQr) => api.get(`/p/${codigoQr}`)
 
 // ── Lote ciclo productivo ─────────────────────────────────────────────────────
 export const transicionarLote  = (loteId, payload) => api.post(`/lotes/${loteId}/transiciones`, payload)
-export const avanzarFaseLote   = (loteId)          => api.post(`/lotes/${loteId}/avanzar_fase`)
+export const avanzarFaseLote   = (loteId, payload = {}) => api.post(`/lotes/${loteId}/avanzar_fase`, payload)
 export const cerrarCurado      = (loteId, payload) => api.post(`/lotes/${loteId}/cerrar_curado`, payload)
 export const getLoteTimeline  = (loteId)          => api.get(`/lotes/${loteId}/timeline`)
 

@@ -229,7 +229,22 @@ sala_curado = club.salas.find_or_create_by!(nombre: 'Sala Curado') do |s|
   s.notes = 'Curado en oscuridad, HR 58-62%, temp 18°C.'
 end
 sala_curado.update_columns(tipo: 'curado', kind: 'curado') if sala_curado.tipo != 'curado'
-puts "  ✅ #{[sala_veg, sala_flor, sala_mad, sala_curado].map(&:nombre).join(', ')}"
+
+sala_cosecha = club.salas.find_or_create_by!(nombre: 'Sala Cosecha') do |s|
+  s.state = 'activa'; s.kind = 'cosechado'; s.tipo = 'cosecha'; s.pots_count = 50; s.plants_max = 50
+  s.sede = sede_prod; s.created_by = admin
+  s.notes = 'Colgado y cosecha fresca. Oscuridad total primeras 48h.'
+end
+sala_cosecha.update_columns(tipo: 'cosecha', kind: 'cosechado') if sala_cosecha.tipo != 'cosecha'
+
+sala_secado = club.salas.find_or_create_by!(nombre: 'Sala Secado') do |s|
+  s.state = 'activa'; s.kind = 'secado'; s.tipo = 'secado'; s.pots_count = 0; s.plants_max = 0
+  s.sede = sede_prod; s.created_by = admin
+  s.notes = 'Oscuridad total. HR 55-60%, temp 18-20°C. Secado 10-14 días.'
+end
+sala_secado.update_columns(tipo: 'secado', kind: 'secado') if sala_secado.tipo != 'secado'
+
+puts "  ✅ #{[sala_veg, sala_flor, sala_mad, sala_cosecha, sala_secado, sala_curado].map(&:nombre).join(', ')}"
 
 # ── Asignar cultivador y manicurador ─────────────────────────
 SalaCultivador.find_or_create_by!(sala: sala_veg,  user: cultivador)

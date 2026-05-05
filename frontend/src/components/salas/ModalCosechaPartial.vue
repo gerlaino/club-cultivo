@@ -86,6 +86,21 @@
             </div>
           </div>
 
+          <!-- Sala destino -->
+          <div class="mcp-field" v-if="salasDestino.length > 0">
+            <label class="mcp-label">
+              Sala destino
+              <span v-if="salasDestino.length === 1" class="mcp-hint">auto-seleccionada</span>
+            </label>
+            <div v-if="salasDestino.length === 1" class="mcp-sala-unica">
+              <i class="bi bi-house-door"></i> {{ salasDestino[0].nombre }}
+            </div>
+            <select v-else v-model="salaDestinoId" class="mcp-input">
+              <option :value="null">— Sin mover (quedar en sala actual) —</option>
+              <option v-for="s in salasDestino" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+            </select>
+          </div>
+
           <!-- Resumen -->
           <div v-if="seleccionadas.size > 0" class="mcp-resumen">
             <span class="mcp-resumen-ico">📋</span>
@@ -126,14 +141,16 @@ const props = defineProps({
   plantas:       { type: Array,  default: () => [] },
   pasadasUsadas: { type: Array,  default: () => [] },
   pasadaInicial: { type: String, default: 'A' },
+  salasDestino:  { type: Array,  default: () => [] },
 })
 const emit = defineEmits(['cosechado', 'cerrar'])
 
-const seleccionadas = ref(new Set())
-const pesoHumedo    = ref(null)
-const pasada        = ref(props.pasadaInicial)
-const guardando     = ref(false)
-const error         = ref('')
+const seleccionadas  = ref(new Set())
+const pesoHumedo     = ref(null)
+const pasada         = ref(props.pasadaInicial)
+const guardando      = ref(false)
+const error          = ref('')
+const salaDestinoId  = ref(props.salasDestino.length === 1 ? props.salasDestino[0].id : null)
 
 const plantasEnFloracion = computed(() => props.plantas.filter(p => p.state === 'floracion'))
 const pasadaLabel = computed(() => pasada.value)
@@ -161,6 +178,7 @@ async function guardar() {
       plantas_ids:  Array.from(seleccionadas.value),
       peso_total_g: pesoHumedo.value || null,
       pasada:       pasada.value,
+      sala_id:      salaDestinoId.value || undefined,
     })
     emit('cosechado', data)
   } catch (e) {
@@ -243,6 +261,12 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 .mcp-planta-ico { font-size: 16px; }
 .mcp-planta-nombre { font-family: monospace; font-size: .7rem; word-break: break-all; text-align: center; }
 
+.mcp-sala-unica {
+  display: flex; align-items: center; gap: 8px;
+  padding: .55rem .9rem;
+  background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 10px;
+  font-size: .82rem; color: #15803d; font-weight: 600;
+}
 .mcp-input-wrap { display: flex; align-items: center; gap: 8px; }
 .mcp-input {
   flex: 1; padding: .6rem .9rem;
