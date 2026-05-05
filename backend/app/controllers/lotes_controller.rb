@@ -131,7 +131,8 @@ class LotesController < ApplicationController
 
     # Cultivador avanza floración → cosecha registrando plantas cosechadas
     if current_user.cultivador? && @lote.estado == 'floracion' && nueva_fase == 'cosecha'
-      estado_anterior = @lote.estado
+      estado_anterior  = @lote.estado
+      sala_anterior_id = @lote.sala_id
       ActiveRecord::Base.transaction do
         @lote.pesadas.create!(
           fase_origen:        'floracion',
@@ -150,9 +151,11 @@ class LotesController < ApplicationController
           user:            current_user,
           club:            current_user.club,
           registrado_en:   Time.current,
+          sala_origen_id:  sala_anterior_id != @lote.sala_id ? sala_anterior_id : nil,
+          sala_destino_id: sala_anterior_id != @lote.sala_id ? @lote.sala_id   : nil,
         )
       end
-      return render json: serialize_lote(@lote.reload), status: :created
+      return render json: serialize_lote(@lote.reload, include_plants: true), status: :created
     end
 
     # Manicura pesa un lote en secado → va a manicura_pendiente, no a curado
@@ -184,7 +187,8 @@ class LotesController < ApplicationController
       return render json: serialize_lote(@lote.reload), status: :created
     end
 
-    estado_anterior = @lote.estado
+    estado_anterior  = @lote.estado
+    sala_anterior_id = @lote.sala_id
     @lote.transicionar!(
       nueva_fase,
       pesada_attrs:          pesada_attrs,
@@ -199,9 +203,11 @@ class LotesController < ApplicationController
       user:            current_user,
       club:            current_user.club,
       registrado_en:   Time.current,
+      sala_origen_id:  sala_anterior_id != @lote.sala_id ? sala_anterior_id : nil,
+      sala_destino_id: sala_anterior_id != @lote.sala_id ? @lote.sala_id   : nil,
     )
 
-    render json: serialize_lote(@lote.reload)
+    render json: serialize_lote(@lote.reload, include_plants: true)
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
@@ -245,7 +251,8 @@ class LotesController < ApplicationController
   # POST /lotes/:id/avanzar_fase
   def avanzar_fase
     authorize @lote, :avanzar_fase?
-    estado_anterior = @lote.estado
+    estado_anterior  = @lote.estado
+    sala_anterior_id = @lote.sala_id
     @lote.avanzar_fase!(sala_id: params[:sala_id])
     @lote.lote_eventos.create!(
       tipo:            'cambio_estado',
@@ -255,8 +262,10 @@ class LotesController < ApplicationController
       user:            current_user,
       club:            current_user.club,
       registrado_en:   Time.current,
+      sala_origen_id:  sala_anterior_id != @lote.sala_id ? sala_anterior_id : nil,
+      sala_destino_id: sala_anterior_id != @lote.sala_id ? @lote.sala_id   : nil,
     )
-    render json: serialize_lote(@lote.reload)
+    render json: serialize_lote(@lote.reload, include_plants: true)
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
@@ -307,7 +316,8 @@ class LotesController < ApplicationController
 
       # Si todas las plantas del lote están cosechadas, avanzar la fase automáticamente
       if @lote.plants.where.not(state: %w[cosechado descartada]).none?
-        estado_anterior = @lote.estado
+        estado_anterior  = @lote.estado
+        sala_anterior_id = @lote.sala_id
         @lote.avanzar_fase!(sala_id: params[:sala_id])
         @lote.lote_eventos.create!(
           tipo:            'cambio_estado',
@@ -317,6 +327,8 @@ class LotesController < ApplicationController
           user:            current_user,
           club:            current_user.club,
           registrado_en:   Time.current,
+          sala_origen_id:  sala_anterior_id != @lote.sala_id ? sala_anterior_id : nil,
+          sala_destino_id: sala_anterior_id != @lote.sala_id ? @lote.sala_id   : nil,
         )
       end
     end

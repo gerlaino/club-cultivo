@@ -828,6 +828,12 @@ onUnmounted(() => {
                         <span class="ld__evento-fecha">{{ formatDateTime(e.registrado_en) }}</span>
                       </div>
                       <div class="ld__evento-meta">{{ e.usuario }}</div>
+                      <div v-if="e.sala_origen && e.sala_destino" class="ld__evento-sala-move">
+                        <i class="bi bi-house-door"></i>
+                        <span>{{ e.sala_origen.nombre }}</span>
+                        <i class="bi bi-arrow-right"></i>
+                        <span>{{ e.sala_destino.nombre }}</span>
+                      </div>
                       <div v-if="e.tipo === 'cambio_estado' && e.descripcion" class="ld__evento-desc">{{ e.descripcion }}</div>
                     </div>
                   </template>
@@ -1547,6 +1553,13 @@ onUnmounted(() => {
 .ld__evento-fecha { font-size: .7rem; color: #94a3b8; white-space: nowrap; flex-shrink: 0; }
 .ld__evento-meta { font-size: .72rem; color: #94a3b8; }
 .ld__evento-desc { font-size: .75rem; color: #60725d; margin-top: .25rem; font-style: italic; }
+.ld__evento-sala-move {
+  display: flex; align-items: center; gap: 5px;
+  margin-top: .3rem;
+  font-size: .73rem; color: #0369a1; font-weight: 600;
+  background: #f0f9ff; border: 1px solid #bae6fd;
+  border-radius: 8px; padding: 3px 8px; width: fit-content;
+}
 .ld__registro-metricas { display: flex; flex-wrap: wrap; gap: .5rem; margin: .35rem 0; }
 .ld__metrica { display: flex; align-items: center; gap: .25rem; background: #f4f8f4; border: 1px solid #d4e6d4; border-radius: 6px; padding: .2em .55em; font-size: .72rem; font-weight: 600; }
 .ld__fotos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; padding: 1rem 1.1rem; }

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useLotesStore } from "../stores/lotes";
 import { useSalasStore } from "../stores/salas";
 import { useAuthStore }  from "../stores/auth";
@@ -17,10 +17,15 @@ const salas = useSalasStore();
 const auth  = useAuthStore();
 const { confirm } = useConfirm();
 
+function lotesEscapeHandler(e) {
+  if (e.key === 'Escape' && showCreate.value) { showCreate.value = false; resetCreate() }
+}
 onMounted(() => {
   store.fetch();
   if (!salas.items.length) salas.fetch();
+  document.addEventListener('keydown', lotesEscapeHandler, true)
 });
+onUnmounted(() => document.removeEventListener('keydown', lotesEscapeHandler, true));
 
 const canEdit = computed(() => ["admin","cultivador"].includes(auth.role));
 

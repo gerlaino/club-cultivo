@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_04_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_05_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -369,9 +369,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_04_000001) do
     t.datetime "registrado_en", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "sala_origen_id"
+    t.bigint "sala_destino_id"
     t.index ["club_id"], name: "index_lote_eventos_on_club_id"
     t.index ["lote_id"], name: "index_lote_eventos_on_lote_id"
     t.index ["registrado_en"], name: "index_lote_eventos_on_registrado_en"
+    t.index ["sala_destino_id"], name: "index_lote_eventos_on_sala_destino_id"
+    t.index ["sala_origen_id"], name: "index_lote_eventos_on_sala_origen_id"
     t.index ["tipo"], name: "index_lote_eventos_on_tipo"
     t.index ["user_id"], name: "index_lote_eventos_on_user_id"
   end
@@ -907,6 +911,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_04_000001) do
   add_foreign_key "lecturas_ambientales_diarias", "salas"
   add_foreign_key "lote_eventos", "clubs"
   add_foreign_key "lote_eventos", "lotes"
+  add_foreign_key "lote_eventos", "salas", column: "sala_destino_id"
+  add_foreign_key "lote_eventos", "salas", column: "sala_origen_id"
   add_foreign_key "lote_eventos", "users"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "salas"

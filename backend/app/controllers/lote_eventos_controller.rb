@@ -6,7 +6,7 @@ class LoteEventosController < ApplicationController
   skip_before_action :require_admin_o_cultivador, raise: false
 
   def index
-    eventos = @lote.lote_eventos.recientes.limit(50)
+    eventos = @lote.lote_eventos.includes(:sala_origen, :sala_destino).recientes.limit(50)
     render json: eventos.map { |e| serialize(e) }
   end
 
@@ -59,7 +59,9 @@ class LoteEventosController < ApplicationController
       descripcion:     e.descripcion,
       registrado_en:   e.registrado_en,
       usuario:         e.user.nombre_completo,
-      created_at:      e.created_at
+      created_at:      e.created_at,
+      sala_origen:     e.sala_origen  ? { id: e.sala_origen.id,  nombre: e.sala_origen.nombre  } : nil,
+      sala_destino:    e.sala_destino ? { id: e.sala_destino.id, nombre: e.sala_destino.nombre } : nil,
     }
   end
 end
