@@ -268,7 +268,7 @@ def crear_lote(sala, attrs, genetica, n_plantas)
   codigo = attrs[:codigo] || "#{sala.nombre[0..2].upcase.gsub(' ', '')}-#{SecureRandom.hex(2).upcase}"
   lote = Lote.find_or_initialize_by(codigo: codigo, club_id: sala.club_id)
   return lote unless lote.new_record?
-  lote.assign_attributes(attrs.merge(club: sala.club, genetica: genetica, plants_count: n_plantas))
+  lote.assign_attributes(attrs.merge(club: sala.club, sala: sala, genetica: genetica, plants_count: n_plantas))
   lote.save!
   state = STATE_MAP[attrs[:estado]] || 'vegetativo'
   n_plantas.times do |i|
