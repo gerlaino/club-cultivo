@@ -46,9 +46,21 @@ class DispensacionesController < ApplicationController
       @dispensacion.precio_unitario_ars ||= precio
     end
 
+    if dispensacion_params[:medio_pago] == 'cuenta_corriente'
+      cc = @paciente.cuenta_corriente
+      monto = @dispensacion.aporte_socio_ars.to_d
+      unless cc&.limite_credito.to_f > 0
+        return render json: { error: 'El socio no tiene cuenta corriente configurada' }, status: :unprocessable_entity
+      end
+      unless cc.puede_dispensar?(monto)
+        return render json: { error: "Saldo insuficiente en cuenta corriente (margen disponible: #{(cc.saldo_disponible + cc.limite_credito).round(2)} ARS)" }, status: :unprocessable_entity
+      end
+    end
+
     ActiveRecord::Base.transaction do
       @dispensacion.save!
       crear_movimiento_contable(@dispensacion)
+      debitar_cuenta_corriente(@dispensacion) if @dispensacion.medio_pago == 'cuenta_corriente'
     end
 
     render json: serialize_dispensacion(@dispensacion), status: :created
@@ -70,7 +82,10 @@ class DispensacionesController < ApplicationController
 
   # DELETE /dispensaciones/:id
   def destroy
-    @dispensacion.destroy
+    ActiveRecord::Base.transaction do
+      revertir_cuenta_corriente(@dispensacion) if @dispensacion.medio_pago == 'cuenta_corriente'
+      @dispensacion.destroy
+    end
     head :no_content
   end
 
@@ -122,6 +137,48 @@ class DispensacionesController < ApplicationController
     unless current_user.admin? || current_user.medico? || current_user.dispensador?
       render json: { error: 'No autorizado' }, status: :forbidden
     end
+  end
+
+  def debitar_cuenta_corriente(dispensacion)
+    monto = dispensacion.aporte_socio_ars.to_d
+    return if monto <= 0
+
+    cc       = dispensacion.paciente.cuenta_corriente
+    anterior = cc.saldo_disponible
+    nuevo    = anterior - monto
+
+    cc.update!(saldo_disponible: nuevo)
+    cc.movimientos.create!(
+      tipo:           'debito',
+      monto:          -monto,
+      saldo_anterior: anterior,
+      saldo_nuevo:    nuevo,
+      descripcion:    "Dispensación: #{dispensacion.cantidad}#{dispensacion.stock&.unidad} #{dispensacion.stock&.forma_producto}",
+      dispensacion:   dispensacion,
+      created_by:     current_user,
+    )
+  end
+
+  def revertir_cuenta_corriente(dispensacion)
+    monto = dispensacion.aporte_socio_ars.to_d
+    return if monto <= 0
+
+    cc = dispensacion.paciente.cuenta_corriente
+    return unless cc
+
+    anterior = cc.saldo_disponible
+    nuevo    = anterior + monto
+
+    cc.update!(saldo_disponible: nuevo)
+    cc.movimientos.create!(
+      tipo:           'ajuste',
+      monto:          monto,
+      saldo_anterior: anterior,
+      saldo_nuevo:    nuevo,
+      descripcion:    "Reversa dispensación ##{dispensacion.id}",
+      dispensacion:   dispensacion,
+      created_by:     current_user,
+    )
   end
 
   def crear_movimiento_contable(dispensacion)

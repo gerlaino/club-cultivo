@@ -12,7 +12,7 @@ class CuentaCorriente < ApplicationRecord
   end
 
   def puede_dispensar?(monto)
-    saldo_disponible.to_d >= monto.to_d
+    (saldo_disponible.to_d + limite_credito.to_d) >= monto.to_d
   end
 
   def porcentaje_consumido
