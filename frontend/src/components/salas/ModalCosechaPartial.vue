@@ -87,17 +87,17 @@
           </div>
 
           <!-- Sala destino -->
-          <div class="mcp-field" v-if="salasDestino.length > 0">
+          <div class="mcp-field" v-if="salas.length > 0">
             <label class="mcp-label">
               Sala destino
-              <span v-if="salasDestino.length === 1" class="mcp-hint">auto-seleccionada</span>
+              <span v-if="salas.length === 1" class="mcp-hint">auto-seleccionada</span>
             </label>
-            <div v-if="salasDestino.length === 1" class="mcp-sala-unica">
-              <i class="bi bi-house-door"></i> {{ salasDestino[0].nombre }}
+            <div v-if="salas.length === 1" class="mcp-sala-unica">
+              <i class="bi bi-house-door"></i> {{ salas[0].nombre }}
             </div>
             <select v-else v-model="salaDestinoId" class="mcp-input">
               <option :value="null">— Sin mover (quedar en sala actual) —</option>
-              <option v-for="s in salasDestino" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
             </select>
           </div>
 
@@ -133,7 +133,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { cosecharPlantas } from '../../lib/api.js'
 
 const props = defineProps({
@@ -145,12 +145,25 @@ const props = defineProps({
 })
 const emit = defineEmits(['cosechado', 'cerrar'])
 
-const seleccionadas  = ref(new Set())
-const pesoHumedo     = ref(null)
-const pasada         = ref(props.pasadaInicial)
-const guardando      = ref(false)
-const error          = ref('')
-const salaDestinoId  = ref(props.salasDestino.length === 1 ? props.salasDestino[0].id : null)
+const seleccionadas = ref(new Set())
+const pesoHumedo    = ref(null)
+const pasada        = ref(props.pasadaInicial)
+const guardando     = ref(false)
+const error         = ref('')
+const salaDestinoId = ref(null)
+
+// Toma las salas de la prop explícita o del objeto lote como fallback
+const salas = computed(() => {
+  const fromProp = props.salasDestino || []
+  const fromLote = props.lote?.salas_destino || []
+  return fromProp.length > 0 ? fromProp : fromLote
+})
+
+watch(salas, (arr) => {
+  if (arr.length === 1 && salaDestinoId.value === null) {
+    salaDestinoId.value = arr[0].id
+  }
+}, { immediate: true })
 
 const plantasEnFloracion = computed(() => props.plantas.filter(p => p.state === 'floracion'))
 const pasadaLabel = computed(() => pasada.value)
