@@ -269,8 +269,13 @@ const savingTransicion    = ref(false)
 const transicionError     = ref(null)
 const transicionForm      = ref({ peso_humedo_g: null, peso_seco_g: null, manicurado: false, notas: '' })
 
+// ── Avanzar fase: elegir sala destino ─────────────────────
+const showAvanzarSalaModal = ref(false)
+const avanzarSalaId        = ref(null)
+
 // ── Cosecha modal (cultivador floración → cosecha) ────────
 const showCosechaModal  = ref(false)
+const cosechaSalaId     = ref(null)
 const savingCosecha     = ref(false)
 const cosechaError      = ref(null)
 const cosechaForm       = ref({ plantas_cosechadas: null, notas: '' })
@@ -352,17 +357,22 @@ const transicionandoRapido = ref(false)
 
 function handleAvanzarFase() {
   if (lote.value?.proxima_fase_posible === 'cosecha') {
-    // Si hay plantas registradas individualmente, usar cosecha parcial
     if (plantList.value.length > 0) {
       showCosechaPartialModal.value = true
     } else {
-      // Sin plantas registradas: modal simple para admin/cultivador
       cosechaForm.value = { plantas_cosechadas: lote.value.plants_count || null, notas: '' }
       cosechaError.value = null
+      cosechaSalaId.value = null
       showCosechaModal.value = true
     }
   } else if (isCultivador.value) {
-    avanzarFaseRapido()
+    const salas = lote.value?.salas_destino || []
+    if (salas.length > 1) {
+      avanzarSalaId.value = null
+      showAvanzarSalaModal.value = true
+    } else {
+      avanzarFaseRapido(salas.length === 1 ? salas[0].id : null)
+    }
   } else {
     openTransicionModal()
   }
@@ -372,11 +382,9 @@ async function ejecutarCosecha() {
   if (!cosechaForm.value.plantas_cosechadas) return
   savingCosecha.value = true; cosechaError.value = null
   try {
-    const salas = lote.value?.salas_destino || []
-    const sala_id = salas.length === 1 ? salas[0].id : undefined
     const { data } = await transicionarLote(lote.value.id, {
       nueva_fase: 'cosecha',
-      sala_id,
+      sala_id: cosechaSalaId.value || undefined,
       pesada: {
         plantas_cosechadas: cosechaForm.value.plantas_cosechadas,
         notas: cosechaForm.value.notas || undefined,
@@ -393,11 +401,11 @@ async function ejecutarCosecha() {
   }
 }
 
-async function avanzarFaseRapido() {
+async function avanzarFaseRapido(salaId = null) {
   transicionandoRapido.value = true
+  showAvanzarSalaModal.value = false
   try {
-    const salas = lote.value?.salas_destino || []
-    const payload = salas.length === 1 ? { sala_id: salas[0].id } : {}
+    const payload = salaId ? { sala_id: salaId } : {}
     const { data } = await avanzarFaseLote(lote.value.id, payload)
     lotes.current = data
     toast.success(`Lote avanzado a ${capitalizarFase(data.estado)}`)
@@ -586,6 +594,7 @@ function loteEscapeHandler(e) {
   if (showCerrarCuradoModal.value)    { showCerrarCuradoModal.value = false; return }
   if (showCosechaPartialModal.value)  { showCosechaPartialModal.value = false; return }
   if (showCosechaModal.value)         { showCosechaModal.value = false; return }
+  if (showAvanzarSalaModal.value)     { showAvanzarSalaModal.value = false; return }
   if (showTransicionModal.value)      { showTransicionModal.value = false; return }
   if (showRegistroModal.value)        { showRegistroModal.value = false; return }
   if (showCostoForm.value)            { showCostoForm.value = false; return }
@@ -1307,6 +1316,18 @@ onUnmounted(() => {
               />
               <span class="ld__hint">Plantas que pasaron a cosecha (máx {{ lote?.plants_count }})</span>
             </div>
+            <div class="ld__field" v-if="(lote?.salas_destino || []).length > 0">
+              <label class="ld__label">Sala destino
+                <span class="ld__hint" v-if="(lote?.salas_destino || []).length === 1">auto-seleccionada</span>
+              </label>
+              <div v-if="(lote?.salas_destino || []).length === 1" class="ld__sala-chip">
+                <i class="bi bi-house-door"></i> {{ lote.salas_destino[0].nombre }}
+              </div>
+              <select v-else v-model="cosechaSalaId" class="ld__input">
+                <option :value="null">— Sin cambiar sala —</option>
+                <option v-for="s in lote.salas_destino" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              </select>
+            </div>
             <div class="ld__field">
               <label class="ld__label">Notas (opcional)</label>
               <textarea class="ld__input ld__textarea" rows="2" v-model="cosechaForm.notas" placeholder="Observaciones de la cosecha…"></textarea>
@@ -1318,6 +1339,40 @@ onUnmounted(() => {
             <button class="ld__btn-primary" :disabled="savingCosecha || !cosechaForm.plantas_cosechadas" @click="ejecutarCosecha">
               <div v-if="savingCosecha" class="ld__spinner ld__spinner--sm"></div>
               <i v-else class="bi bi-scissors"></i>Confirmar cosecha
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ══ Modal Avanzar Fase — elegir sala destino ══ -->
+    <Teleport to="body">
+      <div v-if="showAvanzarSalaModal" class="ld__overlay" @click.self="showAvanzarSalaModal = false">
+        <div class="ld__modal" style="max-width:380px">
+          <div class="ld__modal-header">
+            <div>
+              <h3 class="ld__modal-title">⬆️ Avanzar fase</h3>
+              <p class="ld__modal-sub">
+                {{ lote?.codigo }} ·
+                {{ FASE_LABELS[lote?.estado] }} → {{ FASE_LABELS[lote?.proxima_fase_posible] }}
+              </p>
+            </div>
+            <button class="ld__modal-close" @click="showAvanzarSalaModal = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="ld__modal-body">
+            <div class="ld__field">
+              <label class="ld__label">Sala destino</label>
+              <select v-model="avanzarSalaId" class="ld__input">
+                <option :value="null">— Sin cambiar sala —</option>
+                <option v-for="s in lote?.salas_destino || []" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="ld__modal-footer">
+            <button class="ld__btn-ghost" @click="showAvanzarSalaModal = false">Cancelar</button>
+            <button class="ld__btn-primary" :disabled="transicionandoRapido" @click="avanzarFaseRapido(avanzarSalaId)">
+              <div v-if="transicionandoRapido" class="ld__spinner ld__spinner--sm"></div>
+              <i v-else class="bi bi-arrow-right-circle"></i>Avanzar
             </button>
           </div>
         </div>
@@ -1580,8 +1635,15 @@ onUnmounted(() => {
 @media (max-width: 480px) { .ld__grid { grid-template-columns: 1fr; } }
 .ld__field { display: flex; flex-direction: column; gap: .35rem; }
 .ld__field--full { grid-column: 1 / -1; }
-.ld__label { font-size: .78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
+.ld__label { font-size: .78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: baseline; gap: 6px; }
 .ld__optional { font-size: .68rem; font-weight: 500; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+.ld__hint { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+.ld__sala-chip {
+  display: flex; align-items: center; gap: 7px;
+  padding: .55rem .85rem;
+  background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 8px;
+  font-size: .82rem; color: #15803d; font-weight: 600;
+}
 .ld__input { background: #f4f8f4; border: 1.5px solid #d4e6d4; border-radius: 8px; padding: .6rem .85rem; font-size: .875rem; color: #1a1a1a; width: 100%; box-sizing: border-box; transition: border .15s; }
 .ld__input:focus { outline: none; border-color: #1b5e20; background: #fff; }
 .ld__input--err { border-color: #dc2626; }
