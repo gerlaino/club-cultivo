@@ -94,6 +94,9 @@ Rails.application.routes.draw do
           post  :cargar
           post  :ajuste
           patch :set_limite
+          patch :toggle_gramos
+          patch :set_limite_g
+          post  :cargar_g
         end
       end
       member do

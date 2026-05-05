@@ -15,6 +15,10 @@ class CuentaCorriente < ApplicationRecord
     (saldo_disponible.to_d + limite_credito.to_d) >= monto.to_d
   end
 
+  def puede_dispensar_g?(gramos)
+    credito_gramos_activo? && saldo_disponible_g.to_d >= gramos.to_d
+  end
+
   def porcentaje_consumido
     return 0 if limite_credito.to_f.zero?
     consumido = limite_credito.to_f - saldo_disponible.to_f

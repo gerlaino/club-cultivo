@@ -9,7 +9,7 @@ import { useToast } from '../composables/useToast.js'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, updatePaciente, getCuentaCorriente, setLimiteCC } from '../lib/api.js'
+import { getPacienteTimeline, updatePaciente, getCuentaCorriente, setLimiteCC, toggleGramosCC, setLimiteGCC, cargarGCC } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, Plus, Trash2, AlertTriangle, CheckCircle, Info, X, Save, Wallet
@@ -199,6 +199,13 @@ const loadingCC       = ref(false)
 const limiteEditOpen  = ref(false)
 const limiteEditVal   = ref(null)
 const savingLimite    = ref(false)
+const togglingGramos  = ref(false)
+const limiteGOpen     = ref(false)
+const limiteGVal      = ref(null)
+const savingLimiteG   = ref(false)
+const cargarGOpen     = ref(false)
+const cargarGVal      = ref(null)
+const savingCargarG   = ref(false)
 
 function openLimiteEdit() {
   limiteEditVal.value  = cc.value?.limite_credito ?? 0
@@ -239,6 +246,44 @@ async function loadCC() {
   try { const { data } = await getCuentaCorriente(socioId); cc.value = data }
   catch { toastErr('No se pudo cargar la cuenta corriente') }
   finally { loadingCC.value = false }
+}
+
+async function onDispensacionCreada() {
+  store.fetchOne(socioId)
+  cc.value = null
+  if (activeTab.value === 'cuenta_corriente') await loadCC()
+}
+
+async function toggleGramos() {
+  togglingGramos.value = true
+  try { const { data } = await toggleGramosCC(socioId); cc.value = data; store.fetchOne(socioId) }
+  catch (e) { toastErr(e?.response?.data?.error || 'Error al cambiar estado') }
+  finally { togglingGramos.value = false }
+}
+
+async function saveLimiteG() {
+  const nuevo = Number(limiteGVal.value)
+  if (nuevo <= 0) return
+  savingLimiteG.value = true
+  try {
+    const { data } = await setLimiteGCC(socioId, nuevo)
+    cc.value = data; limiteGOpen.value = false
+    toastOk('Límite en gramos actualizado')
+  } catch (e) { toastErr(e?.response?.data?.error || 'Error al guardar') }
+  finally { savingLimiteG.value = false }
+}
+
+async function doCargarG() {
+  const gramos = Number(cargarGVal.value)
+  if (gramos <= 0) return
+  savingCargarG.value = true
+  try {
+    const { data } = await cargarGCC(socioId, { gramos })
+    cc.value = data; cargarGOpen.value = false; cargarGVal.value = null
+    store.fetchOne(socioId)
+    toastOk(`${gramos}g cargados`)
+  } catch (e) { toastErr(e?.response?.data?.error || 'Error al cargar') }
+  finally { savingCargarG.value = false }
 }
 
 
@@ -444,6 +489,10 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             :dispensado-mes-g="s?.dispensado_mes_actual_g ?? null"
             :saldo-cc="s?.saldo_cc ?? null"
             :limite-cc="s?.limite_cc ?? null"
+            :saldo-cc-g="cc?.saldo_disponible_g ?? s?.saldo_cc_g ?? null"
+            :limite-cc-g="cc?.limite_credito_g ?? s?.limite_cc_g ?? null"
+            :cc-gramos-activo="cc?.credito_gramos_activo ?? s?.cc_gramos_activo ?? false"
+            @dispensacion-creada="onDispensacionCreada"
           />
         </div>
       </div>
@@ -511,6 +560,80 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
                 </div>
               </template>
             </div>
+          </div>
+
+          <!-- ── Crédito en gramos ── -->
+          <div class="sd__cc-gramos-section">
+            <div class="sd__cc-gramos-header">
+              <div class="sd__cc-gramos-title">
+                <i class="bi bi-flower1"></i> Crédito en gramos
+              </div>
+              <button
+                class="sd__cc-toggle"
+                :class="cc.credito_gramos_activo ? 'sd__cc-toggle--on' : 'sd__cc-toggle--off'"
+                :disabled="togglingGramos"
+                @click="toggleGramos"
+                :title="cc.credito_gramos_activo ? 'Desactivar crédito en gramos' : 'Activar crédito en gramos'"
+              >
+                <span class="sd__cc-toggle-knob"></span>
+              </button>
+            </div>
+
+            <template v-if="cc.credito_gramos_activo">
+              <div class="sd__cc-gramos-stats">
+                <div class="sd__cc-gramos-stat">
+                  <span class="sd__cc-gramos-stat-label">Disponible</span>
+                  <span class="sd__cc-gramos-stat-val" :class="cc.saldo_disponible_g <= 0 ? 'sd__cc-gramos--agotado' : 'sd__cc-gramos--ok'">
+                    {{ (cc.saldo_disponible_g ?? 0).toFixed(1) }}g
+                  </span>
+                </div>
+                <div class="sd__cc-gramos-stat">
+                  <span class="sd__cc-gramos-stat-label">Límite</span>
+                  <span class="sd__cc-gramos-stat-val">{{ cc.limite_credito_g ? cc.limite_credito_g.toFixed(1) + 'g' : '—' }}</span>
+                </div>
+              </div>
+
+              <div class="sd__cc-gramos-actions">
+                <!-- Editar límite -->
+                <template v-if="!limiteGOpen">
+                  <button class="sd__cc-btn sd__cc-btn--ghost sd__cc-btn--sm" @click="limiteGOpen = true; limiteGVal = cc.limite_credito_g ?? null">
+                    <Pencil :size="11" :stroke-width="2" /> Límite
+                  </button>
+                </template>
+                <template v-else>
+                  <div class="sd__cc-gramos-form">
+                    <input type="number" min="0.1" step="0.5" v-model.number="limiteGVal"
+                           class="sd__cc-limite-input" placeholder="ej: 50"
+                           @keydown.enter="saveLimiteG" @keydown.esc="limiteGOpen = false" />
+                    <span class="sd__cc-gramos-unit">g</span>
+                    <button class="sd__cc-btn sd__cc-btn--primary sd__cc-btn--sm" :disabled="savingLimiteG" @click="saveLimiteG">
+                      {{ savingLimiteG ? '…' : 'OK' }}
+                    </button>
+                    <button class="sd__cc-btn sd__cc-btn--ghost sd__cc-btn--sm" @click="limiteGOpen = false">✕</button>
+                  </div>
+                </template>
+
+                <!-- Cargar gramos -->
+                <template v-if="!cargarGOpen">
+                  <button class="sd__cc-btn sd__cc-btn--primary sd__cc-btn--sm" @click="cargarGOpen = true; cargarGVal = null">
+                    + Cargar gramos
+                  </button>
+                </template>
+                <template v-else>
+                  <div class="sd__cc-gramos-form">
+                    <input type="number" min="0.1" step="0.5" v-model.number="cargarGVal"
+                           class="sd__cc-limite-input" placeholder="ej: 20"
+                           @keydown.enter="doCargarG" @keydown.esc="cargarGOpen = false" />
+                    <span class="sd__cc-gramos-unit">g</span>
+                    <button class="sd__cc-btn sd__cc-btn--primary sd__cc-btn--sm" :disabled="savingCargarG" @click="doCargarG">
+                      {{ savingCargarG ? '…' : 'Cargar' }}
+                    </button>
+                    <button class="sd__cc-btn sd__cc-btn--ghost sd__cc-btn--sm" @click="cargarGOpen = false">✕</button>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <p v-else class="sd__cc-gramos-hint">Activá para permitir que el socio dispense sin pagar en el momento, descontando de un cupo en gramos.</p>
           </div>
 
           <!-- Barra de deuda utilizada (solo muestra si hay límite Y deuda) -->
@@ -922,6 +1045,29 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__cc-limite-input { font-family: monospace; font-size: 1rem; font-weight: 600; border: 1.5px solid #6366f1; border-radius: 8px; padding: .35rem .6rem; width: 8rem; color: #1e293b; background: #fff; outline: none; }
 .sd__cc-limite-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
 .sd__cc-btn--sm { padding: .3rem .7rem; font-size: .78rem; }
+
+/* Crédito en gramos */
+.sd__cc-gramos-section { border: 1.5px solid #e2e8f0; border-radius: 12px; padding: .9rem 1rem; margin-bottom: 1rem; }
+.sd__cc-gramos-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
+.sd__cc-gramos-title { font-size: .78rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: .4rem; }
+.sd__cc-gramos-hint { font-size: .75rem; color: #94a3b8; margin: .25rem 0 0; }
+.sd__cc-gramos-stats { display: flex; gap: 1.5rem; margin-bottom: .75rem; }
+.sd__cc-gramos-stat { display: flex; flex-direction: column; gap: .15rem; }
+.sd__cc-gramos-stat-label { font-size: .68rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
+.sd__cc-gramos-stat-val { font-size: 1.1rem; font-weight: 800; font-family: monospace; color: #0f172a; }
+.sd__cc-gramos--ok { color: #15803d; }
+.sd__cc-gramos--agotado { color: #dc2626; }
+.sd__cc-gramos-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.sd__cc-gramos-form { display: flex; align-items: center; gap: .4rem; }
+.sd__cc-gramos-unit { font-size: .8rem; font-weight: 700; color: #64748b; }
+/* Toggle switch */
+.sd__cc-toggle { position: relative; width: 36px; height: 20px; border-radius: 999px; border: none; cursor: pointer; transition: background .2s; padding: 0; flex-shrink: 0; }
+.sd__cc-toggle--off { background: #cbd5e1; }
+.sd__cc-toggle--on  { background: #15803d; }
+.sd__cc-toggle:disabled { opacity: .6; cursor: not-allowed; }
+.sd__cc-toggle-knob { position: absolute; top: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.sd__cc-toggle--off .sd__cc-toggle-knob { left: 2px; }
+.sd__cc-toggle--on  .sd__cc-toggle-knob { left: 18px; }
 
 .sd__cc-bar-wrap { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
 .sd__cc-bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }

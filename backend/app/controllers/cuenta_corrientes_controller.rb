@@ -81,6 +81,42 @@ class CuentaCorrientesController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  # PATCH /pacientes/:paciente_id/cuenta_corriente/toggle_gramos
+  def toggle_gramos
+    cc = find_or_create_cc
+    cc.update!(credito_gramos_activo: !cc.credito_gramos_activo)
+    render json: serialize(cc.reload)
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  # PATCH /pacientes/:paciente_id/cuenta_corriente/set_limite_g
+  def set_limite_g
+    cc    = find_or_create_cc
+    nuevo = params[:limite_credito_g].to_d
+    return render json: { error: "El límite debe ser mayor a 0" }, status: :unprocessable_entity if nuevo <= 0
+    cc.update!(limite_credito_g: nuevo)
+    render json: serialize(cc.reload)
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  # POST /pacientes/:paciente_id/cuenta_corriente/cargar_g
+  def cargar_g
+    cc     = find_or_create_cc
+    gramos = params[:gramos].to_d
+    descripcion = params[:descripcion].presence || "Carga de crédito en gramos"
+
+    return render json: { error: "Los gramos deben ser mayor a 0" }, status: :unprocessable_entity unless gramos > 0
+    return render json: { error: "Activá el crédito en gramos primero" }, status: :unprocessable_entity unless cc.credito_gramos_activo?
+
+    nuevo = cc.saldo_disponible_g.to_d + gramos
+    cc.update!(saldo_disponible_g: nuevo)
+    render json: serialize(cc.reload), status: :created
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   private
 
   def set_paciente
@@ -90,7 +126,7 @@ class CuentaCorrientesController < ApplicationController
   end
 
   def require_admin!
-    render json: { error: "No autorizado" }, status: :forbidden unless current_user.admin?
+    render json: { error: "No autorizado" }, status: :forbidden unless current_user.admin? || current_user.supervisor?
   end
 
   def find_or_create_cc
@@ -108,12 +144,15 @@ class CuentaCorrientesController < ApplicationController
   def serialize(cc)
     movimientos = cc.persisted? ? cc.movimientos.includes(:created_by, :dispensacion).recientes.limit(50) : []
     {
-      id:               cc.id,
-      paciente_id:      cc.paciente_id,
-      limite_credito:   cc.limite_credito.to_f,
-      saldo_disponible: cc.saldo_disponible.to_f,
-      notas:            cc.notas,
-      movimientos:      movimientos.map { |m| serialize_mov(m) },
+      id:                    cc.id,
+      paciente_id:           cc.paciente_id,
+      limite_credito:        cc.limite_credito.to_f,
+      saldo_disponible:      cc.saldo_disponible.to_f,
+      credito_gramos_activo: cc.credito_gramos_activo,
+      limite_credito_g:      cc.limite_credito_g&.to_f,
+      saldo_disponible_g:    cc.saldo_disponible_g&.to_f || 0.0,
+      notas:                 cc.notas,
+      movimientos:           movimientos.map { |m| serialize_mov(m) },
     }
   end
 

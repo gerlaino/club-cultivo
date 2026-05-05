@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { logger } from '../../utils/logger.js'
 import { useAuthStore } from '../../stores/auth'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -10,12 +10,17 @@ import {
 } from '../../lib/api.js'
 
 const props = defineProps({
-  socioId:        { type: Number,  required: true },
-  limiteMensualG: { type: Number,  default: null },
-  dispensadoMesG: { type: Number,  default: null },
-  saldoCc:        { type: Number,  default: null },
-  limiteCc:       { type: Number,  default: null },
+  socioId:          { type: Number,  required: true },
+  limiteMensualG:   { type: Number,  default: null },
+  dispensadoMesG:   { type: Number,  default: null },
+  saldoCc:          { type: Number,  default: null },
+  limiteCc:         { type: Number,  default: null },
+  saldoCcG:         { type: Number,  default: null },
+  limiteCcG:        { type: Number,  default: null },
+  ccGramosActivo:   { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['dispensacion-creada'])
 
 const auth         = useAuthStore()
 const { confirm }  = useConfirm()
@@ -92,11 +97,9 @@ const estadoLimite = computed(() => {
   return 'ok'
 })
 
-// ── Cuenta corriente ──────────────────────────────────────────────────────────
-// margen = cuánto puede gastar aún antes de ser bloqueado (saldo + limite)
+// ── Cuenta corriente ARS ──────────────────────────────────────────────────────
 const tieneCc   = computed(() => props.limiteCc !== null && props.limiteCc > 0)
 const ccMargen  = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
-const ccDeuda   = computed(() => Math.max(0, -(props.saldoCc ?? 0)))
 
 const ccInsuficiente = computed(() => {
   if (!tieneCc.value || form.value.aporte_socio_ars == null) return false
@@ -109,6 +112,13 @@ const estadoCc = computed(() => {
   if (ccInsuficiente.value)    return 'insuficiente'
   if (ccMargen.value < (props.limiteCc ?? 0) * 0.2) return 'critico'
   return 'ok'
+})
+
+// ── Crédito en gramos ─────────────────────────────────────────────────────────
+const tieneCcG       = computed(() => props.ccGramosActivo && props.limiteCcG > 0)
+const ccGInsuficiente = computed(() => {
+  if (!tieneCcG.value || !form.value.cantidad) return false
+  return Number(form.value.cantidad) > (props.saldoCcG ?? 0)
 })
 
 async function cargarStocks() {
@@ -162,16 +172,34 @@ function openCreate() {
 }
 
 async function handleSubmit() {
-  if (!form.value.stock_id)               { formError.value = 'Seleccioná un stock'; return }
-  if (!form.value.cantidad || form.value.cantidad <= 0) { formError.value = 'La cantidad debe ser > 0'; return }
+  if (saving.value) return  // guard doble-click
+  saving.value = true
+  formError.value = null
+
+  // validaciones síncronas — resetean saving si fallan
+  if (!form.value.stock_id) {
+    formError.value = 'Seleccioná un stock'; saving.value = false; return
+  }
+  if (!form.value.cantidad || form.value.cantidad <= 0) {
+    formError.value = 'La cantidad debe ser > 0'; saving.value = false; return
+  }
   if (excederiaStock.value) {
     const disp = stockSeleccionado.value.cantidad
     const uni  = stockSeleccionado.value.unidad || 'g'
     formError.value = `Stock insuficiente: solo hay ${disp}${uni} disponibles`
-    return
+    saving.value = false; return
+  }
+  if (ccInsuficiente.value && form.value.medio_pago === 'cuenta_corriente') {
+    formError.value = `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
+    saving.value = false; return
+  }
+  if (ccGInsuficiente.value && form.value.medio_pago === 'credito_gramos') {
+    formError.value = `Gramos insuficientes. Disponible: ${(props.saldoCcG ?? 0).toFixed(1)}g — requerido: ${Number(form.value.cantidad).toFixed(1)}g`
+    saving.value = false; return
   }
 
   if (excederiaLimite.value) {
+    saving.value = false  // libera el botón mientras el usuario decide en el diálogo
     const ya   = consumidoEsteMes.value.toFixed(1)
     const esta = parseFloat(form.value.cantidad).toFixed(1)
     const lim  = props.limiteMensualG.toFixed(1)
@@ -182,14 +210,8 @@ async function handleSubmit() {
       variant:     'danger',
     })
     if (!ok) return
+    saving.value = true  // confirma → volvemos a bloquear antes del POST
   }
-
-  if (ccInsuficiente.value && form.value.medio_pago === 'cuenta_corriente') {
-    formError.value = `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
-    return
-  }
-
-  saving.value = true; formError.value = null
   try {
     const payload = {
       stock_id:           form.value.stock_id,
@@ -205,6 +227,7 @@ async function handleSubmit() {
     await loadDispensaciones()
     showModal.value = false
     toast.success('Dispensación registrada')
+    emit('dispensacion-creada')
   } catch (e) {
     formError.value = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al guardar'
   } finally { saving.value = false }
@@ -233,7 +256,14 @@ async function loadDispensaciones() {
 
 const totalCantidad = computed(() => dispensaciones.value.reduce((s, d) => s + (parseFloat(d.cantidad) || 0), 0))
 
-onMounted(loadDispensaciones)
+function dvEscapeHandler(e) {
+  if (e.key === 'Escape' && showModal.value) { showModal.value = false }
+}
+onMounted(() => {
+  loadDispensaciones()
+  document.addEventListener('keydown', dvEscapeHandler, true)
+})
+onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true))
 </script>
 
 <template>
@@ -433,7 +463,24 @@ onMounted(loadDispensaciones)
               </div>
             </div>
 
-            <!-- ── Estado cuenta corriente ── -->
+            <!-- ── Estado crédito en gramos ── -->
+            <div v-if="tieneCcG && form.medio_pago === 'credito_gramos'" class="dv__cc-panel" :class="ccGInsuficiente ? 'dv__cc-panel--insuficiente' : 'dv__cc-panel--ok'">
+              <div class="dv__cc-row">
+                <span class="dv__cc-label"><i class="bi bi-flower1"></i> Gramos disponibles</span>
+                <span class="dv__cc-saldo" :class="{ 'dv__cc-saldo--bajo': (props.saldoCcG ?? 0) <= 0 }">
+                  {{ (props.saldoCcG ?? 0).toFixed(1) }}g
+                </span>
+              </div>
+              <div v-if="form.cantidad > 0 && !ccGInsuficiente" class="dv__cc-tras">
+                Luego de esta dispensación: <strong>{{ ((props.saldoCcG ?? 0) - Number(form.cantidad)).toFixed(1) }}g</strong>
+              </div>
+              <div v-if="ccGInsuficiente" class="dv__cc-warn">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                Gramos insuficientes (disponible: {{ (props.saldoCcG ?? 0).toFixed(1) }}g)
+              </div>
+            </div>
+
+            <!-- ── Estado cuenta corriente ARS ── -->
             <div v-if="tieneCc" class="dv__cc-panel" :class="`dv__cc-panel--${estadoCc || 'ok'}`">
               <div class="dv__cc-row">
                 <span class="dv__cc-label"><i class="bi bi-wallet2"></i> Crédito disponible</span>
@@ -463,7 +510,8 @@ onMounted(loadDispensaciones)
                   <option value="transferencia">Transferencia</option>
                   <option value="debito">Débito</option>
                   <option value="credito">Crédito</option>
-                  <option value="cuenta_corriente">Cuenta corriente</option>
+                  <option value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite configurado)' : '' }}</option>
+                  <option value="credito_gramos" :disabled="!tieneCcG">Crédito en gramos{{ !tieneCcG ? ' (no activado)' : ` — ${(props.saldoCcG ?? 0).toFixed(1)}g disponibles` }}</option>
                   <option value="otro">Otro</option>
                 </select>
               </div>

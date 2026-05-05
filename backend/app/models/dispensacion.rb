@@ -23,7 +23,6 @@ class Dispensacion < ApplicationRecord
   scope :recientes, -> { order(fecha_dispensacion: :desc, created_at: :desc) }
 
   after_create  :decrementar_stock
-  after_create  :debitar_cuenta_corriente
   after_destroy :incrementar_stock
 
   private
@@ -63,24 +62,4 @@ class Dispensacion < ApplicationRecord
     stock&.increment!(:cantidad, cantidad)
   end
 
-  def debitar_cuenta_corriente
-    return unless medio_pago == 'cuenta_corriente'
-    return unless aporte_socio_ars.to_d > 0
-    cc = paciente.cuenta_corriente
-    return unless cc
-
-    anterior = cc.saldo_disponible
-    nuevo    = anterior - aporte_socio_ars.to_d
-
-    cc.update!(saldo_disponible: nuevo)
-    cc.movimientos.create!(
-      tipo:           'debito',
-      monto:          -aporte_socio_ars.to_d,
-      saldo_anterior: anterior,
-      saldo_nuevo:    nuevo,
-      descripcion:    "Dispensación ##{id}",
-      dispensacion:   self,
-      created_by:     user
-    )
-  end
 end
