@@ -38,7 +38,7 @@ class Sala < ApplicationRecord
 
   scope :activas,           -> { where(state: 'activa') }
   scope :en_mantenimiento,  -> { where(state: 'mantenimiento') }
-  scope :de_tipo,           ->(t) { where(tipo: t) }
+  scope :de_tipo,           ->(t) { where('tipo = ? OR kind = ?', t, t) }
 
   def soft_delete!
     update_column(:deleted_at, Time.current)

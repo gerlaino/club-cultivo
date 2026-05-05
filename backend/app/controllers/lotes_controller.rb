@@ -289,6 +289,8 @@ class LotesController < ApplicationController
     plantas = @lote.plants.where(id: plantas_ids, state: 'floracion')
     raise ArgumentError, "No se encontraron plantas en floración con esos IDs" if plantas.empty?
 
+    plantas_count = plantas.count
+
     ActiveRecord::Base.transaction do
       plantas.update_all(
         state:          'cosechado',
@@ -299,16 +301,16 @@ class LotesController < ApplicationController
       @lote.pesadas.create!(
         fase_origen:        'floracion',
         fase_destino:       'cosecha',
-        plantas_cosechadas: plantas.count,
+        plantas_cosechadas: plantas_count,
         peso_humedo_g:      peso_total_g,
         registrado_por:     current_user,
         registrado_at:      Time.current,
-        notas:              "Cosecha #{pasada} — #{plantas.count} plantas",
+        notas:              "Cosecha #{pasada} — #{plantas_count} plantas",
       )
 
       @lote.lote_eventos.create!(
         tipo:          'nota',
-        descripcion:   "Cosecha #{pasada}: #{plantas.count} plantas cosechadas#{peso_total_g ? " · #{peso_total_g}g húmedo" : ''}",
+        descripcion:   "Cosecha #{pasada}: #{plantas_count} plantas cosechadas#{peso_total_g ? " · #{peso_total_g}g húmedo" : ''}",
         user:          current_user,
         club:          current_user.club,
         registrado_en: Time.current,
@@ -595,7 +597,7 @@ class LotesController < ApplicationController
       # Salas disponibles para la próxima fase — usadas en el frontend para el selector
       if puede_transicion && proxima_fase
         result[:salas_destino] = lote.club.salas.activas
-                                      .where(tipo: proxima_fase)
+                                      .de_tipo(proxima_fase)
                                       .order(:nombre)
                                       .map { |s| { id: s.id, nombre: s.nombre } }
       else
