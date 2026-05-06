@@ -111,6 +111,10 @@ class CuentaCorrientesController < ApplicationController
     return render json: { error: "Activá el crédito en gramos primero" }, status: :unprocessable_entity unless cc.credito_gramos_activo?
 
     nuevo = cc.saldo_disponible_g.to_d + gramos
+    if cc.limite_credito_g.present? && nuevo > cc.limite_credito_g.to_d
+      return render json: { error: "La carga excede el límite de crédito en gramos (#{cc.limite_credito_g.to_f}g)" }, status: :unprocessable_entity
+    end
+
     cc.update!(saldo_disponible_g: nuevo)
     render json: serialize(cc.reload), status: :created
   rescue => e

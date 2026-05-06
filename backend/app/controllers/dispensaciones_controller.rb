@@ -207,6 +207,7 @@ class DispensacionesController < ApplicationController
 
     cc = dispensacion.paciente.cuenta_corriente
     return unless cc&.credito_gramos_activo?
+    return if cc.movimientos.exists?(dispensacion: dispensacion, tipo: 'debito')
 
     anterior = cc.saldo_disponible_g.to_d
     nuevo    = anterior - gramos
