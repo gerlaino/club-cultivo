@@ -16,10 +16,10 @@ RSpec.describe 'POST /lotes/:id/avanzar_fase', type: :request do
   context 'cultivador del mismo club — lote en floracion (→ cosecha)' do
     before { sign_in_as(cultivador) }
 
-    it 'devuelve 200 y el lote pasa a cosecha' do
+    it 'devuelve 422 — floracion→cosecha debe ir por el endpoint de transiciones con datos de pesada' do
       post "/lotes/#{lote_floracion.id}/avanzar_fase", headers: auth_headers
-      expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)['estado']).to eq('cosecha')
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['error']).to include('cosecha')
     end
   end
 

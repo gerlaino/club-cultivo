@@ -355,8 +355,14 @@ function openTransicionModal() {
 
 const transicionandoRapido = ref(false)
 
-function handleAvanzarFase() {
+async function handleAvanzarFase() {
   if (lote.value?.proxima_fase_posible === 'cosecha') {
+    // Ensure plants are loaded before deciding which modal to use.
+    // Race condition: lotes.fetchOne completes before plants.fetchByLote,
+    // so plantList can be empty even when the lote has registered plants.
+    if (!plants.itemsByLote.has(String(id))) {
+      try { await plants.fetchByLote(id) } catch {}
+    }
     if (plantList.value.length > 0) {
       showCosechaPartialModal.value = true
     } else {

@@ -251,6 +251,9 @@ class LotesController < ApplicationController
   # POST /lotes/:id/avanzar_fase
   def avanzar_fase
     authorize @lote, :avanzar_fase?
+    if @lote.estado == 'floracion'
+      return render json: { error: 'La cosecha debe registrarse con datos de pesada. Usá el formulario de cosecha.' }, status: :unprocessable_entity
+    end
     estado_anterior  = @lote.estado
     sala_anterior_id = @lote.sala_id
     @lote.avanzar_fase!(sala_id: params[:sala_id])
