@@ -14,11 +14,11 @@ class SalaPolicy < ApplicationPolicy
   end
 
   def create?
-    super_admin? || admin? || cultivador?
+    super_admin? || admin? || supervisor?
   end
 
   def update?
-    super_admin? || admin? || cultivador?
+    super_admin? || admin? || supervisor?
   end
 
   def destroy?

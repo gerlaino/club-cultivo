@@ -33,6 +33,10 @@ class ApplicationPolicy
     user&.role == "medico"
   end
 
+  def supervisor?
+    user&.role == "supervisor"
+  end
+
   def cultivador?
     user&.role == "cultivador"
   end

@@ -451,6 +451,10 @@ const canSeeAmbiente = computed(() =>
                     </div>
                     <div class="sd__lote-meta">
                       <span v-if="l.plants_count">🪴 {{ l.plants_count }} plantas</span>
+                      <span v-if="l.estado === 'floracion' && l.plantas_cosechadas_count > 0"
+                            class="sd__cosecha-parcial">
+                        ✅ {{ l.plantas_cosechadas_count }}/{{ l.plants_count || '?' }} cosechadas
+                      </span>
                       <span v-if="l.strain">🌿 {{ l.strain }}</span>
                       <span v-if="l.grow_type">⚗️ {{ growLabel(l.grow_type) }}</span>
                       <span v-if="l.start_date">📅 {{ l.start_date }}</span>
@@ -758,6 +762,7 @@ const canSeeAmbiente = computed(() =>
 .sd__lote-badge { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .2em .6em; border-radius: 6px; }
 .sd__lote-dias { font-size: .72rem; font-weight: 700; color: #60725d; background: #e8f5e9; padding: .2em .6em; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
 .sd__lote-meta { display: flex; gap: .6rem; flex-wrap: wrap; font-size: .73rem; color: #94a3b8; margin-bottom: .5rem; }
+.sd__cosecha-parcial { color: #15803d; font-weight: 600; }
 .sd__lote-progress-wrap { display: flex; align-items: center; gap: .6rem; }
 .sd__lote-progress-track { flex: 1; height: 3px; background: #e8f5e9; border-radius: 999px; overflow: hidden; }
 .sd__lote-progress-fill { height: 100%; border-radius: 999px; transition: width .5s ease; }

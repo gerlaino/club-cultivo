@@ -296,6 +296,14 @@ const siguientePasada    = computed(() => {
 
 function onCosechadoParcial(loteActualizado) {
   lotes.current = loteActualizado
+  // Patch inmediato: sincroniza estados desde la respuesta para evitar flash de estado viejo
+  if (loteActualizado.plants?.length) {
+    const stateById = Object.fromEntries(loteActualizado.plants.map(p => [p.id, p.state]))
+    const current = plants.itemsByLote.get(String(id)) || []
+    plants.itemsByLote.set(String(id), current.map(p =>
+      p.id in stateById ? { ...p, state: stateById[p.id] } : p
+    ))
+  }
   showCosechaPartialModal.value = false
   toast.success('Cosecha registrada')
   plants.fetchByLote(id)

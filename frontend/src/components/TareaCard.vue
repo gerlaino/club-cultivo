@@ -17,15 +17,15 @@
             <i class="bi bi-three-dots-vertical"></i>
           </button>
           <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-            <li v-if="tarea.estado === 'pendiente'">
-              <button class="dropdown-item" @click="$emit('iniciar', tarea)">
-                <i class="bi bi-play-fill text-primary me-2"></i>Iniciar
-              </button>
-            </li>
-            <li v-if="tarea.estado === 'pendiente' || tarea.estado === 'en_progreso'">
+            <li v-if="(tarea.estado === 'pendiente' || tarea.estado === 'en_progreso') && !esFutura">
               <button class="dropdown-item" @click="$emit('completar', tarea)">
                 <i class="bi bi-check-circle-fill text-success me-2"></i>Completar
               </button>
+            </li>
+            <li v-if="esFutura && (tarea.estado === 'pendiente' || tarea.estado === 'en_progreso')" class="disabled">
+              <span class="dropdown-item text-muted" style="font-size:.8rem; cursor:default">
+                <i class="bi bi-clock me-2"></i>Disponible el {{ formatFecha(tarea.fecha_programada) }}
+              </span>
             </li>
             <li v-if="puedeEditar">
               <button class="dropdown-item" @click="$emit('editar', tarea)">
@@ -95,7 +95,7 @@ const props = defineProps({
   tarea: { type: Object, required: true }
 })
 
-defineEmits(['click', 'iniciar', 'completar', 'editar', 'cancelar', 'cancelar-serie'])
+defineEmits(['click', 'completar', 'editar', 'cancelar', 'cancelar-serie'])
 
 const authStore = useAuthStore()
 
@@ -114,6 +114,13 @@ const puedeEditar = computed(() => {
   const user = authStore.user
   if (!user) return false
   return ['admin', 'cultivador', 'supervisor'].includes(user.role)
+})
+
+const esFutura = computed(() => {
+  if (!props.tarea.fecha_programada) return false
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+  const fecha = new Date(props.tarea.fecha_programada + 'T00:00:00')
+  return fecha > hoy
 })
 
 function formatFecha(fecha) {

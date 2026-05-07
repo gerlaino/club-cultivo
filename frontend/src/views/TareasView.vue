@@ -83,7 +83,7 @@
             </div>
             <div class="tv__col-body">
               <TareaCard v-for="t in kanban[col.key]" :key="t.id" :tarea="t"
-                         @click="abrirDetalle(t)" @iniciar="iniciarTarea(t)"
+                         @click="abrirDetalle(t)"
                          @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
                          @cancelar="confirmarCancelar(t)" @cancelar-serie="confirmarCancelarSerie(t)" />
               <EmptyState v-if="!kanban[col.key]?.length" icon="bi-inbox" title="Sin tareas" compact />
@@ -209,12 +209,12 @@
             </div>
 
             <div class="tv__panel-actions">
-              <button v-if="tareaDetalle.estado === 'pendiente'" class="tv__panel-btn tv__panel-btn--ghost" @click="iniciarTarea(tareaDetalle)">
-                <i class="bi bi-play-fill"></i> Iniciar
-              </button>
-              <button v-if="['pendiente','en_progreso'].includes(tareaDetalle.estado)" class="tv__panel-btn tv__panel-btn--primary" @click="abrirModalCompletar(tareaDetalle)">
+              <button v-if="['pendiente','en_progreso'].includes(tareaDetalle.estado) && !esTareaFutura(tareaDetalle)" class="tv__panel-btn tv__panel-btn--primary" @click="abrirModalCompletar(tareaDetalle)">
                 <i class="bi bi-check-circle"></i> Completar
               </button>
+              <p v-if="esTareaFutura(tareaDetalle) && ['pendiente','en_progreso'].includes(tareaDetalle.estado)" class="tv__futura-hint">
+                <i class="bi bi-calendar-event me-1"></i>Disponible el {{ tareaDetalle.fecha_programada }}
+              </p>
               <button v-if="puedeEditarTarea(tareaDetalle)" class="tv__panel-btn tv__panel-btn--ghost" @click="abrirModalEditar(tareaDetalle)">
                 <i class="bi bi-pencil"></i> Editar
               </button>
@@ -442,10 +442,6 @@ function abrirModalEditar(t) { tareaEditando.value = t; tareaDetalle.value = nul
 function abrirModalCompletar(t) { tareaCompletando.value = t; tareaDetalle.value = null; showModalCompletar.value = true }
 function abrirDetalle(t) { tareaDetalle.value = t }
 
-async function iniciarTarea(t) {
-  try { await tareasStore.iniciar(t.id); if (tareaDetalle.value?.id === t.id) tareaDetalle.value = null; mostrarToast('Tarea iniciada') }
-  catch (e) { mostrarToast(e.response?.data?.error || 'Error al iniciar', 'error') }
-}
 async function confirmarCancelar(t) {
   const ok = await confirm({ title: `¿Cancelar la tarea "${t.titulo}"?`, variant: 'warning', confirmText: 'Cancelar tarea', cancelText: 'Volver' })
   if (!ok) return
@@ -490,6 +486,12 @@ function onTareaCompletada() {
 function puedeEditarTarea(t) {
   const u = authStore.user
   return ['admin', 'cultivador', 'supervisor'].includes(u?.role)
+}
+
+function esTareaFutura(t) {
+  if (!t?.fecha_programada) return false
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+  return new Date(t.fecha_programada + 'T00:00:00') > hoy
 }
 
 function mostrarToast(mensaje, tipo = 'success') {
@@ -586,6 +588,7 @@ function mostrarToast(mensaje, tipo = 'success') {
 .tv__panel-hint { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; padding: .75rem 1rem; border-radius: 9px; font-size: .82rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .tv__estado-pill { font-size: .7rem; font-weight: 700; padding: .2em .65em; border-radius: 6px; text-transform: capitalize; }
 .tv__panel-actions { display: flex; flex-direction: column; gap: .5rem; padding-top: .5rem; }
+.tv__futura-hint { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .55rem .875rem; margin: 0; }
 .tv__panel-btn { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .65rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
 .tv__panel-btn--primary { background: #1b5e20; color: #fff; }
 .tv__panel-btn--primary:hover { background: #144a18; }
