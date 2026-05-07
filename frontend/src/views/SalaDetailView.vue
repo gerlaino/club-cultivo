@@ -560,7 +560,7 @@ const canSeeAmbiente = computed(() =>
                 </span>
               </dd>
               <dt>Tipo</dt><dd>{{ kindLabel(sala.kind) }}</dd>
-              <dt v-if="sala.pots_count">Capacidad</dt><dd v-if="sala.pots_count">{{ sala.pots_count }} plantas</dd>
+              <dt v-if="sala.plants_max || sala.pots_count">Capacidad</dt><dd v-if="sala.plants_max || sala.pots_count">{{ sala.plants_max || sala.pots_count }} plantas</dd>
               <dt>Sede</dt><dd>{{ sala.sede?.nombre || "—" }}</dd>
               <dt>A cargo</dt><dd>{{ sala.cultivadores?.map(c => c.nombre).join(', ') || "—" }}</dd>
               <dt>Creado por</dt><dd>{{ sala.created_by_name || "—" }}</dd>

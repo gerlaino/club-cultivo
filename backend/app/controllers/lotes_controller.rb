@@ -552,7 +552,7 @@ class LotesController < ApplicationController
         id:     lote.sala.id,
         nombre: lote.sala.nombre,
         tipo:   lote.sala.tipo,
-        sede:   { id: lote.sala.sede_id, nombre: lote.sala.sede.nombre },
+        sede:   lote.sala.sede ? { id: lote.sala.sede_id, nombre: lote.sala.sede.nombre } : nil,
       },
       created_at: lote.created_at,
       updated_at: lote.updated_at,

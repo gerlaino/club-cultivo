@@ -245,9 +245,13 @@
           </div>
 
           <div class="tv__panel-actions">
-            <!-- Finalizar: visible si no está completada -->
+            <!-- Tarea futura: no se puede completar todavía -->
+            <p v-if="esTareaFutura(tareaDetalle) && tareaDetalle.estado !== 'completada'" class="cvd__futura-hint">
+              <i class="bi bi-calendar-event me-1"></i>Disponible el {{ formatFechaLarga(tareaDetalle.fecha_programada) }}
+            </p>
+            <!-- Finalizar: solo si no es futura y no está completada -->
             <button
-              v-if="tareaDetalle.estado !== 'completada'"
+              v-if="tareaDetalle.estado !== 'completada' && !esTareaFutura(tareaDetalle)"
               class="tv__panel-btn tv__panel-btn--primary"
               :disabled="guardandoAccion"
               @click="finalizarTarea"
@@ -432,6 +436,12 @@ const notifCount      = computed(() => ambienteStore.alertasCount)
 const alertasCriticas = computed(() => ambienteStore.alertasActivas.filter(a => ['temperatura', 'co2'].includes(a.tipo)))
 
 // ── Acciones de tarea ──────────────────────────────────────────
+function esTareaFutura(t) {
+  if (!t?.fecha_programada) return false
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+  return new Date(t.fecha_programada + 'T00:00:00') > hoy
+}
+
 function abrirTarea(t) { tareaDetalle.value = t }
 
 async function finalizarTarea() {
@@ -699,4 +709,5 @@ onMounted(async () => {
 .tv__panel-btn--primary:not(:disabled):hover { background: #144a18; }
 .tv__panel-btn--ghost { background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; }
 .tv__panel-btn--ghost:not(:disabled):hover { background: #e2e8f0; }
+.cvd__futura-hint { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .55rem .875rem; margin: 0; }
 </style>

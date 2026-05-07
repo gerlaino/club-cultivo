@@ -21,7 +21,7 @@ class Lote < ApplicationRecord
   SUSTRATOS     = %w[tierra coco perlita mezcla rockwool fibra_coco].freeze
   FOTOPERIODOS  = %w[20/4 18/6 16/8 12/12 auto].freeze
 
-  validates :codigo,            uniqueness: { scope: :club_id }
+  validates :codigo,            uniqueness: { scope: :club_id, conditions: -> { where(deleted_at: nil) } }, allow_blank: true
   validates :estado,            inclusion: { in: ESTADOS }, allow_blank: false
   validates :plants_count,      numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :grow_type,         inclusion: { in: TIPOS_CULTIVO }, allow_blank: true
