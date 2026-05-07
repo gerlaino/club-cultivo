@@ -50,7 +50,7 @@ const salaId  = Number(route.params.id) || 0
 const loading = ref(true)
 const error   = ref(null)
 
-const canEdit        = computed(() => auth.role === "admin")
+const canEdit        = computed(() => ['admin', 'supervisor'].includes(auth.role))
 const isCultivador   = computed(() => auth.role === "cultivador")
 const isManicurador  = computed(() => auth.role === "manicura")
 const isAgricultor   = computed(() => auth.role === "cultivador")
@@ -64,8 +64,53 @@ const DIAS_CICLO   = { semilla:7, vegetativo:45, floracion:65, cosecha:10, curad
 // ── Genéticas ──────────────────────────────────────────────
 const geneticas = ref([])
 
+// ── Editar sala ────────────────────────────────────────────
+const showEditSala   = ref(false)
+const editSalaForm   = ref({})
+const editSalaError  = ref(null)
+const savingEditSala = ref(false)
+
+const SALA_KINDS = [
+  { value: 'vegetativo', label: 'Vegetativo' },
+  { value: 'floracion',  label: 'Floración'  },
+  { value: 'mixta',      label: 'Mixta'      },
+  { value: 'madre',      label: 'Madres'     },
+  { value: 'clon',       label: 'Clones'     },
+  { value: 'secado',     label: 'Secado'     },
+]
+
+function openEditSala() {
+  editSalaForm.value = {
+    nombre:     sala.value.nombre || '',
+    kind:       sala.value.kind   || '',
+    plants_max: sala.value.plants_max || sala.value.pots_count || '',
+    notes:      sala.value.notes  || '',
+  }
+  editSalaError.value = null
+  showEditSala.value  = true
+}
+
+async function saveEditSala() {
+  if (!editSalaForm.value.nombre?.trim()) { editSalaError.value = 'El nombre es obligatorio'; return }
+  savingEditSala.value = true
+  editSalaError.value  = null
+  try {
+    const payload = { ...editSalaForm.value }
+    if (!payload.plants_max) delete payload.plants_max
+    await updateSala(salaId, payload)
+    await salas.fetchSala(salaId)
+    showEditSala.value = false
+    toast.success('Sala actualizada')
+  } catch (e) {
+    editSalaError.value = e?.response?.data?.error || 'Error al guardar'
+  } finally {
+    savingEditSala.value = false
+  }
+}
+
 function salaEscapeHandler(e) {
   if (e.key !== 'Escape') return
+  if (showEditSala.value)    { showEditSala.value = false; return }
   if (showCreate.value)      { closeCreate(); return }
   if (showCargarLote.value)  { showCargarLote.value = false; return }
   if (showUpgrade.value)     { showUpgrade.value = false; return }
@@ -366,6 +411,9 @@ const canSeeAmbiente = computed(() =>
           <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
+          <button v-if="canEdit" class="sd__btn-edit" @click="openEditSala" title="Editar sala">
+            <i class="bi bi-pencil"></i>
+          </button>
           <button v-if="canEdit" class="sd__btn-danger" :disabled="deleting" @click="eliminarSala">
             <i class="bi bi-trash3"></i>
           </button>
@@ -663,6 +711,52 @@ const canSeeAmbiente = computed(() =>
       @registrada="cargarAmbienteMini"
     />
 
+    <!-- Modal Editar Sala -->
+    <Teleport to="body">
+      <div v-if="showEditSala" class="sd__overlay" @click.self="showEditSala = false">
+        <div class="sd__modal">
+          <div class="sd__modal-header">
+            <div>
+              <h3 class="sd__modal-title">Editar sala</h3>
+              <p class="sd__modal-sub">{{ sala?.nombre }}</p>
+            </div>
+            <button class="sd__modal-close" @click="showEditSala = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="sd__modal-body">
+            <div v-if="editSalaError" class="sd__alert">{{ editSalaError }}</div>
+            <div class="sd__grid">
+              <div class="sd__field sd__field--full">
+                <label class="sd__label">Nombre</label>
+                <input type="text" class="sd__input" v-model.trim="editSalaForm.nombre" placeholder="Nombre de la sala" />
+              </div>
+              <div class="sd__field">
+                <label class="sd__label">Tipo de sala</label>
+                <select class="sd__input" v-model="editSalaForm.kind">
+                  <option value="">Sin especificar</option>
+                  <option v-for="k in SALA_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
+                </select>
+              </div>
+              <div class="sd__field">
+                <label class="sd__label">Capacidad máxima (plantas)</label>
+                <input type="number" min="0" max="9999" step="1" class="sd__input" v-model.number="editSalaForm.plants_max" placeholder="Sin límite" />
+              </div>
+              <div class="sd__field sd__field--full">
+                <label class="sd__label">Notas</label>
+                <textarea class="sd__input sd__textarea" rows="3" v-model.trim="editSalaForm.notes" placeholder="Observaciones internas…"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="sd__modal-footer">
+            <button class="sd__btn-ghost" :disabled="savingEditSala" @click="showEditSala = false">Cancelar</button>
+            <button class="sd__btn-primary" :disabled="savingEditSala" @click="saveEditSala">
+              <div v-if="savingEditSala" class="sd__spinner sd__spinner--sm"></div>
+              <i v-else class="bi bi-check-lg"></i>Guardar cambios
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Modal upgrade plan -->
     <Teleport to="body">
       <div v-if="showUpgrade" class="sd__overlay" @click.self="showUpgrade=false">
@@ -791,6 +885,8 @@ const canSeeAmbiente = computed(() =>
 .sd__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .sd__btn-primary:hover:not(:disabled) { background: #104417; }
 .sd__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.sd__btn-edit { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #475569; border: 1.5px solid #e2e8f0; padding: .6rem .9rem; border-radius: 8px; font-size: .875rem; cursor: pointer; transition: all .15s; }
+.sd__btn-edit:hover { background: #f8fafc; border-color: #94a3b8; }
 .sd__btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #b91c1c; color: #fff; border: none; padding: .6rem .9rem; border-radius: 8px; font-size: .875rem; cursor: pointer; transition: background .15s; }
 .sd__btn-danger:hover:not(:disabled) { background: #991b1b; }
 .sd__btn-danger:disabled { opacity: .5; cursor: not-allowed; }

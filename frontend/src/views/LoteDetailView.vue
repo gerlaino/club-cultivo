@@ -11,7 +11,8 @@ import { createPlant, updatePlant,
   getLoteFotos, uploadFotoLote,
   transicionarLote, avanzarFaseLote, cerrarCurado, getLoteTimeline,
   listSedes, getSedeStocks, deleteLote,
-  getCostoLote, createCostoLote, updateCostoLote } from "../lib/api"
+  getCostoLote, createCostoLote, updateCostoLote,
+  updateLote, listGeneticas } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
@@ -60,7 +61,7 @@ const id            = Number(route.params.id)
 const error         = ref(null)
 const loading       = computed(() => lotes.loading)
 const lote          = computed(() => lotes.current)
-const canEdit       = computed(() => auth.role === "admin")
+const canEdit       = computed(() => ['admin', 'supervisor'].includes(auth.role))
 const isCultivador  = computed(() => auth.role === "cultivador")
 
 const costoLote     = ref(null)
@@ -603,8 +604,53 @@ const splitOk = computed(() => {
   return Math.abs(sum - parseFloat(f.peso_curado_g)) < 0.01
 })
 
+// ── Editar lote ────────────────────────────────────────────
+const geneticas      = ref([])
+const showEditLote   = ref(false)
+const editLoteForm   = ref({})
+const editLoteError  = ref(null)
+const savingEditLote = ref(false)
+
+function openEditLote() {
+  const l = lote.value
+  editLoteForm.value = {
+    codigo:            l.codigo             || '',
+    start_date:        l.start_date         || '',
+    genetica_id:       l.genetica?.id       || '',
+    grow_type:         l.grow_type          || '',
+    light_type:        l.light_type         || '',
+    semanas_floracion: l.semanas_floracion  ?? '',
+    tamanio_maceta:    l.tamanio_maceta     ?? '',
+    notes:             l.notes              || '',
+  }
+  editLoteError.value = null
+  showEditLote.value  = true
+}
+
+async function saveEditLote() {
+  if (!editLoteForm.value.codigo?.trim()) { editLoteError.value = 'El código es obligatorio'; return }
+  savingEditLote.value = true
+  editLoteError.value  = null
+  try {
+    const payload = { ...editLoteForm.value }
+    if (!payload.genetica_id)       delete payload.genetica_id
+    if (!payload.light_type)        delete payload.light_type
+    if (payload.semanas_floracion === '') delete payload.semanas_floracion
+    if (payload.tamanio_maceta    === '') delete payload.tamanio_maceta
+    await updateLote(id, payload)
+    await lotes.fetchOne(id)
+    showEditLote.value = false
+    toast.success('Lote actualizado')
+  } catch (e) {
+    editLoteError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al guardar'
+  } finally {
+    savingEditLote.value = false
+  }
+}
+
 function loteEscapeHandler(e) {
   if (e.key !== 'Escape') return
+  if (showEditLote.value)             { showEditLote.value = false; return }
   if (showCerrarCuradoModal.value)    { showCerrarCuradoModal.value = false; return }
   if (showCosechaPartialModal.value)  { showCosechaPartialModal.value = false; return }
   if (showCosechaModal.value)         { showCosechaModal.value = false; return }
@@ -624,6 +670,7 @@ onMounted(async () => {
   await loadEventos()
   try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
   try { const { data } = await getCostoLote(id); costoLote.value = data?.costo || data || null } catch {}
+  try { const { data } = await listGeneticas({ activa: true }); geneticas.value = data || [] } catch {}
 })
 
 onUnmounted(() => {
@@ -688,6 +735,9 @@ onUnmounted(() => {
           />
           <button class="ld__btn-secondary" @click="abrirRegistroModal">
             <i class="bi bi-clipboard-data"></i>Registrar lote
+          </button>
+          <button v-if="canEdit" class="ld__btn-edit" @click="openEditLote" title="Editar lote">
+            <i class="bi bi-pencil"></i>
           </button>
           <button v-if="canEdit" class="ld__btn-danger" :disabled="deletingLote" @click="eliminarLote">
             <i class="bi bi-trash3"></i>
@@ -1128,6 +1178,91 @@ onUnmounted(() => {
             <button class="ld__btn-primary" :disabled="savingPlanta" @click="guardarPlanta">
               <div v-if="savingPlanta" class="ld__spinner ld__spinner--sm"></div>
               <i v-else class="bi bi-plus-lg"></i>Agregar planta
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ══ Modal Editar Lote ══ -->
+    <Teleport to="body">
+      <div v-if="showEditLote" class="ld__overlay" @click.self="showEditLote = false">
+        <div class="ld__modal">
+          <div class="ld__modal-header">
+            <div>
+              <h3 class="ld__modal-title">✏️ Editar lote</h3>
+              <p class="ld__modal-sub">{{ lote?.codigo }}</p>
+            </div>
+            <button class="ld__modal-close" @click="showEditLote = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="ld__modal-body">
+            <div v-if="editLoteError" class="ld__alert">{{ editLoteError }}</div>
+            <div class="ld__grid">
+              <div class="ld__field">
+                <label class="ld__label">Código</label>
+                <input type="text" class="ld__input" v-model.trim="editLoteForm.codigo" placeholder="Ej: LOT-2026-001" />
+              </div>
+              <div class="ld__field">
+                <label class="ld__label">Fecha de inicio</label>
+                <input type="date" class="ld__input" v-model="editLoteForm.start_date" />
+              </div>
+              <div class="ld__field">
+                <label class="ld__label">Genética / Variedad</label>
+                <select class="ld__input" v-model="editLoteForm.genetica_id">
+                  <option value="">Sin especificar</option>
+                  <option v-for="g in geneticas" :key="g.id" :value="g.id">
+                    {{ g.nombre }}{{ g.registrada_inase ? ' 🏛️' : '' }} — {{ g.tipo }}
+                  </option>
+                </select>
+              </div>
+              <div class="ld__field">
+                <label class="ld__label">Tipo de cultivo</label>
+                <select class="ld__input" v-model="editLoteForm.grow_type">
+                  <option value="">Sin especificar</option>
+                  <option value="sustrato">Sustrato</option>
+                  <option value="hidroponia">Hidroponia</option>
+                  <option value="aeroponia">Aeroponia</option>
+                </select>
+              </div>
+              <div class="ld__field">
+                <label class="ld__label">Tipo de luz</label>
+                <select class="ld__input" v-model="editLoteForm.light_type">
+                  <option value="">Sin especificar</option>
+                  <option value="led">LED</option>
+                  <option value="hps">HPS</option>
+                  <option value="cmh">CMH</option>
+                  <option value="natural">Natural</option>
+                  <option value="mixta">Mixta</option>
+                </select>
+              </div>
+              <div class="ld__field">
+                <label class="ld__label">Semanas de floración</label>
+                <input type="number" min="1" max="24" step="1" class="ld__input" v-model.number="editLoteForm.semanas_floracion" placeholder="Ej: 9" />
+              </div>
+              <div class="ld__field">
+                <label class="ld__label">Tamaño de maceta (L)</label>
+                <select class="ld__input" v-model="editLoteForm.tamanio_maceta">
+                  <option value="">Sin especificar</option>
+                  <option value="1">1 litro</option>
+                  <option value="3">3 litros</option>
+                  <option value="5">5 litros</option>
+                  <option value="7">7 litros</option>
+                  <option value="10">10 litros</option>
+                  <option value="12">12 litros</option>
+                  <option value="15">15 litros</option>
+                </select>
+              </div>
+              <div class="ld__field ld__field--full">
+                <label class="ld__label">Notas</label>
+                <textarea class="ld__input ld__textarea" rows="3" v-model.trim="editLoteForm.notes" placeholder="Observaciones internas…"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="ld__modal-footer">
+            <button class="ld__btn-ghost" :disabled="savingEditLote" @click="showEditLote = false">Cancelar</button>
+            <button class="ld__btn-primary" :disabled="savingEditLote" @click="saveEditLote">
+              <div v-if="savingEditLote" class="ld__spinner ld__spinner--sm"></div>
+              <i v-else class="bi bi-check-lg"></i>Guardar cambios
             </button>
           </div>
         </div>
@@ -1635,6 +1770,8 @@ onUnmounted(() => {
 .ld__btn-secondary:hover { background: #d4e6d4; }
 .ld__btn-ghost { background: transparent; color: #60725d; border: 1px solid #d4e6d4; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 500; cursor: pointer; transition: all .15s; }
 .ld__btn-ghost:hover { background: #f0fdf4; }
+.ld__btn-edit { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #475569; border: 1.5px solid #e2e8f0; padding: .6rem .9rem; border-radius: 8px; font-size: .875rem; cursor: pointer; transition: all .15s; }
+.ld__btn-edit:hover { background: #f8fafc; border-color: #94a3b8; }
 .ld__btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #dc2626; color: #fff; border: none; padding: .6rem .9rem; border-radius: 8px; font-size: .875rem; cursor: pointer; transition: background .15s; }
 .ld__btn-danger:hover:not(:disabled) { background: #b91c1c; }
 .ld__btn-danger:disabled { opacity: .5; cursor: not-allowed; }

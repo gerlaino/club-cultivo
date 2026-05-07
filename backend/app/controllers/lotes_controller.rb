@@ -392,7 +392,7 @@ class LotesController < ApplicationController
   def lote_params
     params.require(:lote).permit(
       :codigo, :start_date, :estado, :plants_count, :strain, :notes,
-      :grow_type, :light_type, :genetica_id
+      :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta
     )
   end
 
