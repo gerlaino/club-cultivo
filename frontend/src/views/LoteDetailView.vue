@@ -614,14 +614,15 @@ const savingEditLote = ref(false)
 function openEditLote() {
   const l = lote.value
   editLoteForm.value = {
-    codigo:            l.codigo             || '',
-    start_date:        l.start_date         || '',
-    genetica_id:       l.genetica?.id       || '',
-    grow_type:         l.grow_type          || '',
-    light_type:        l.light_type         || '',
-    semanas_floracion: l.semanas_floracion  ?? '',
-    tamanio_maceta:    l.tamanio_maceta     ?? '',
-    notes:             l.notes              || '',
+    codigo:            l.codigo            || '',
+    start_date:        l.start_date        || '',
+    genetica_id:       l.genetica?.id      || '',
+    grow_type:         l.grow_type         || '',
+    light_type:        l.light_type        || '',
+    tiene_semanas:     !!l.semanas_floracion,
+    semanas_floracion: l.semanas_floracion ?? '',
+    tamanio_maceta:    l.tamanio_maceta    ?? '',
+    notes:             l.notes             || '',
   }
   editLoteError.value = null
   showEditLote.value  = true
@@ -632,11 +633,14 @@ async function saveEditLote() {
   savingEditLote.value = true
   editLoteError.value  = null
   try {
-    const payload = { ...editLoteForm.value }
-    if (!payload.genetica_id)       delete payload.genetica_id
-    if (!payload.light_type)        delete payload.light_type
-    if (payload.semanas_floracion === '') delete payload.semanas_floracion
-    if (payload.tamanio_maceta    === '') delete payload.tamanio_maceta
+    const { tiene_semanas, ...rest } = editLoteForm.value
+    const payload = {
+      ...rest,
+      semanas_floracion: tiene_semanas ? (Number(rest.semanas_floracion) || null) : null,
+      tamanio_maceta:    rest.tamanio_maceta || null,
+    }
+    if (!payload.genetica_id) delete payload.genetica_id
+    if (!payload.light_type)  delete payload.light_type
     await updateLote(id, payload)
     await lotes.fetchOne(id)
     showEditLote.value = false
@@ -1237,7 +1241,13 @@ onUnmounted(() => {
               </div>
               <div class="ld__field">
                 <label class="ld__label">Semanas de floración</label>
-                <input type="number" min="1" max="24" step="1" class="ld__input" v-model.number="editLoteForm.semanas_floracion" placeholder="Ej: 9" />
+                <label class="ld__checkbox-row">
+                  <input type="checkbox" v-model="editLoteForm.tiene_semanas" />
+                  <span>Definir semanas</span>
+                </label>
+                <input v-if="editLoteForm.tiene_semanas" type="number" min="1" max="24" step="1"
+                       class="ld__input" v-model.number="editLoteForm.semanas_floracion"
+                       placeholder="Ej: 9" style="margin-top:.35rem" />
               </div>
               <div class="ld__field">
                 <label class="ld__label">Tamaño de maceta (L)</label>
@@ -1813,6 +1823,8 @@ onUnmounted(() => {
 .ld__input--err { border-color: #dc2626; }
 .ld__textarea { resize: vertical; min-height: 60px; }
 .ld__err-msg { font-size: .75rem; color: #dc2626; }
+.ld__checkbox-row { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: #374151; cursor: pointer; user-select: none; }
+.ld__checkbox-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; flex-shrink: 0; }
 .ld__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; margin-bottom: 1rem; }
 /* es_seleccion star */
 .ld__planta-sel { background: none; border: none; cursor: pointer; padding: .25rem; border-radius: 5px; color: #d4e6d4; font-size: .85rem; flex-shrink: 0; transition: color .15s; }

@@ -80,11 +80,13 @@ const SALA_KINDS = [
 ]
 
 function openEditSala() {
+  const limite = sala.value.plants_max || sala.value.pots_count || null
   editSalaForm.value = {
-    nombre:     sala.value.nombre || '',
-    kind:       sala.value.kind   || '',
-    plants_max: sala.value.plants_max || sala.value.pots_count || '',
-    notes:      sala.value.notes  || '',
+    nombre:      sala.value.nombre || '',
+    kind:        sala.value.kind   || '',
+    tiene_limite: !!limite,
+    plants_max:  limite || '',
+    notes:       sala.value.notes  || '',
   }
   editSalaError.value = null
   showEditSala.value  = true
@@ -95,8 +97,8 @@ async function saveEditSala() {
   savingEditSala.value = true
   editSalaError.value  = null
   try {
-    const payload = { ...editSalaForm.value }
-    if (!payload.plants_max) delete payload.plants_max
+    const { tiene_limite, ...rest } = editSalaForm.value
+    const payload = { ...rest, plants_max: tiene_limite ? (Number(rest.plants_max) || null) : null }
     await updateSala(salaId, payload)
     await salas.fetchSala(salaId)
     showEditSala.value = false
@@ -737,8 +739,14 @@ const canSeeAmbiente = computed(() =>
                 </select>
               </div>
               <div class="sd__field">
-                <label class="sd__label">Capacidad máxima (plantas)</label>
-                <input type="number" min="0" max="9999" step="1" class="sd__input" v-model.number="editSalaForm.plants_max" placeholder="Sin límite" />
+                <label class="sd__label">Capacidad máxima</label>
+                <label class="sd__checkbox-row">
+                  <input type="checkbox" v-model="editSalaForm.tiene_limite" />
+                  <span>Definir límite de plantas</span>
+                </label>
+                <input v-if="editSalaForm.tiene_limite" type="number" min="1" max="9999" step="1"
+                       class="sd__input" v-model.number="editSalaForm.plants_max"
+                       placeholder="Ej: 50" style="margin-top:.35rem" />
               </div>
               <div class="sd__field sd__field--full">
                 <label class="sd__label">Notas</label>
@@ -923,5 +931,7 @@ const canSeeAmbiente = computed(() =>
 .sd__input--err { border-color: #dc2626; }
 .sd__textarea { resize: vertical; min-height: 70px; }
 .sd__err-msg { font-size: .75rem; color: #dc2626; }
+.sd__checkbox-row { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: #374151; cursor: pointer; user-select: none; }
+.sd__checkbox-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; flex-shrink: 0; }
 .sd__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; }
 </style>
