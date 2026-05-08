@@ -2,6 +2,7 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
   # App de gestión interna (con autenticación)
   allow do
     origins "http://localhost:5173",           # Dev local
+            "http://localhost:5174",           # Dev local (puerto alternativo)
             "https://club-cultivo-1.onrender.com"  # Producción
 
     resource "*",
