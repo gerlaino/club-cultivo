@@ -1,6 +1,8 @@
 class Stock < ApplicationRecord
-  belongs_to :sede, optional: true
-  belongs_to :lote, optional: true
+  belongs_to :sede,   optional: true
+  belongs_to :lote,   optional: true
+  belongs_to :pesada, optional: true
+  belongs_to :club,   optional: true
 
   has_many :dispensaciones,    dependent: :nullify
   has_many :stock_movimientos, dependent: :destroy
@@ -21,6 +23,9 @@ class Stock < ApplicationRecord
 
   validate :validar_segun_origen
 
+  before_create :set_club_id
+  before_create :generar_numero_lote_producto
+  before_create :generar_codigo_qr
   before_create :descontar_lote_origen_si_corresponde
 
   scope :regulatorios,             -> { where(origen: %w[lote derivado_lote]) }
@@ -57,6 +62,30 @@ class Stock < ApplicationRecord
   end
 
   private
+
+  def set_club_id
+    self.club_id ||= sede&.club_id || lote&.club_id
+  end
+
+  def generar_numero_lote_producto
+    return if numero_lote_producto.present?
+    return unless club_id
+    year = Date.today.strftime("%y")
+    n    = Stock.where(club_id: club_id).count + 1
+    candidate = "ST-#{year}-#{n.to_s.rjust(4, '0')}"
+    while Stock.exists?(numero_lote_producto: candidate)
+      n += 1
+      candidate = "ST-#{year}-#{n.to_s.rjust(4, '0')}"
+    end
+    self.numero_lote_producto = candidate
+  end
+
+  def generar_codigo_qr
+    return if codigo_qr.present?
+    cid = club_id || sede&.club_id || lote&.club_id
+    return unless cid
+    self.codigo_qr = "S-#{cid}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"
+  end
 
   def validar_segun_origen
     case origen

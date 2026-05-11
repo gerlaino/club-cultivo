@@ -5,6 +5,7 @@ class Pesada < ApplicationRecord
   belongs_to :rechazada_por,   class_name: 'User', optional: true, foreign_key: :rechazada_por_id
 
   has_many :pesadas_plantas, class_name: 'PesadaPlanta', dependent: :destroy
+  has_many :stocks,          dependent: :nullify
 
   FASES_VALIDAS = %w[vegetativo floracion cosecha secado manicura_pendiente curado finalizado].freeze
 

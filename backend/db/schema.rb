@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_05_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -180,6 +180,20 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_05_000002) do
     t.bigint "stock_id"
     t.decimal "cantidad", precision: 10, scale: 3, default: "0.0", null: false
     t.decimal "precio_unitario_ars", precision: 10, scale: 2
+    t.boolean "con_envio", default: false, null: false
+    t.string "estado_envio"
+    t.bigint "delivery_id"
+    t.string "direccion_envio"
+    t.string "contacto_nombre"
+    t.string "contacto_telefono"
+    t.text "notas_envio"
+    t.string "codigo_paquete"
+    t.text "notas_entrega"
+    t.text "motivo_fallo"
+    t.datetime "entregado_at"
+    t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
+    t.index ["delivery_id"], name: "index_dispensaciones_on_delivery_id"
+    t.index ["estado_envio"], name: "index_dispensaciones_on_estado_envio"
     t.index ["fecha_dispensacion"], name: "index_dispensaciones_on_fecha_dispensacion"
     t.index ["indicacion_medica_id"], name: "index_dispensaciones_on_indicacion_medica_id"
     t.index ["medio_pago"], name: "index_dispensaciones_on_medio_pago"
@@ -896,6 +910,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_05_000002) do
   add_foreign_key "dispensaciones", "sedes"
   add_foreign_key "dispensaciones", "stocks", on_delete: :nullify
   add_foreign_key "dispensaciones", "users"
+  add_foreign_key "dispensaciones", "users", column: "delivery_id"
   add_foreign_key "dispositivos", "clubs"
   add_foreign_key "dispositivos", "salas"
   add_foreign_key "document_templates", "clubs"

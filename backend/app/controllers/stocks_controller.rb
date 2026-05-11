@@ -81,7 +81,7 @@ class StocksController < ApplicationController
   end
 
   def set_stock
-    @stock = Stock.joins(:lote).where(lotes: { club_id: current_user.club_id }).find(params[:id])
+    @stock = Stock.where(club_id: current_user.club_id).find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Stock no encontrado' }, status: :not_found
   end
@@ -96,27 +96,32 @@ class StocksController < ApplicationController
 
   def serialize_stock(s)
     {
-      id:                    s.id,
-      club_id:               s.sede&.club_id,
-      sede_id:               s.sede_id,
-      estado:                s.estado,
-      origen:                s.origen,
-      lote_id:               s.lote_id,
-      lote_codigo:           s.lote_codigo,
+      id:                      s.id,
+      club_id:                 s.club_id,
+      sede_id:                 s.sede_id,
+      estado:                  s.estado,
+      origen:                  s.origen,
+      lote_id:                 s.lote_id,
+      lote_codigo:             s.lote_codigo,
       lote_origen_consumido_g: s.lote_origen_consumido_g&.to_f,
-      forma_producto:        s.forma_producto,
-      unidad:                s.unidad,
-      cantidad:              s.cantidad.to_f,
-      costo_unitario_ars:    s.costo_unitario_ars&.to_f,
-      precio_sugerido_ars:   s.precio_sugerido_ars&.to_f,
-      proveedor:             s.proveedor,
-      descripcion:           s.descripcion,
-      categoria:             s.categoria,
-      regulatorio:           s.regulatorio?,
-      del_club:              s.del_club?,
-      lote:                  s.lote ? { id: s.lote.id, codigo: s.lote.codigo, estado: s.lote.estado,
-                                        genetica: s.lote.genetica ? { nombre: s.lote.genetica.nombre } : nil } : nil,
-      created_at:            s.created_at,
+      pesada_id:               s.pesada_id,
+      numero_lote_producto:    s.numero_lote_producto,
+      codigo_qr:               s.codigo_qr,
+      fecha_elaboracion:       s.fecha_elaboracion,
+      fecha_vencimiento_est:   s.fecha_vencimiento_est,
+      forma_producto:          s.forma_producto,
+      unidad:                  s.unidad,
+      cantidad:                s.cantidad.to_f,
+      costo_unitario_ars:      s.costo_unitario_ars&.to_f,
+      precio_sugerido_ars:     s.precio_sugerido_ars&.to_f,
+      proveedor:               s.proveedor,
+      descripcion:             s.descripcion,
+      categoria:               s.categoria,
+      regulatorio:             s.regulatorio?,
+      del_club:                s.del_club?,
+      lote: s.lote ? { id: s.lote.id, codigo: s.lote.codigo, estado: s.lote.estado,
+                       genetica: s.lote.genetica ? { nombre: s.lote.genetica.nombre } : nil } : nil,
+      created_at:              s.created_at,
     }
   end
 

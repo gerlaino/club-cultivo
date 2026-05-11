@@ -30,7 +30,7 @@ defineEmits(['logout'])
 <style scoped>
 .dlv-sidebar {
   width: 200px; min-width: 200px;
-  background: var(--c-role-delivery, #1A3A4A);
+  background: var(--c-role-delivery);
   display: flex; flex-direction: column;
   padding: var(--sp-4) 0; flex-shrink: 0;
 }

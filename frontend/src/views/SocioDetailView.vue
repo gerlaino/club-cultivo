@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+
+const props = defineProps({ backPath: { type: String, default: '/pacientes' } })
 import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
@@ -323,7 +325,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
     <template v-else>
 
       <!-- Breadcrumb -->
-      <Breadcrumb :items="[{ label: 'Pacientes', to: '/pacientes' }, { label: `${s.nombre} ${s.apellido}` }]" />
+      <Breadcrumb :items="[{ label: 'Pacientes', to: props.backPath }, { label: `${s.nombre} ${s.apellido}` }]" />
 
       <!-- Hero -->
       <div class="sd__hero">

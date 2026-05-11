@@ -21,6 +21,9 @@
     </nav>
 
     <div class="mdc-footer">
+      <RouterLink to="/perfil" class="mdc-link mdc-link--perfil" active-class="mdc-link--active">
+        <UserCircle :size="16" :stroke-width="1.75" /><span>Mi perfil</span>
+      </RouterLink>
       <button class="mdc-logout" @click="$emit('logout')">
         <LogOut :size="16" :stroke-width="1.75" /> Salir
       </button>
@@ -29,7 +32,7 @@
 </template>
 
 <script setup>
-import { Stethoscope, Home, Users, FileHeart, FolderOpen, LogOut } from 'lucide-vue-next'
+import { Stethoscope, Home, Users, FileHeart, FolderOpen, LogOut, UserCircle } from 'lucide-vue-next'
 defineEmits(['logout'])
 </script>
 
@@ -59,7 +62,8 @@ defineEmits(['logout'])
 }
 .mdc-link:hover { color: #fff; background: rgba(90,179,110,.12); }
 .mdc-link--active { color: #fff; background: rgba(90,179,110,.2); }
-.mdc-footer { padding: var(--sp-4) var(--sp-5); }
+.mdc-footer { padding: var(--sp-3) var(--sp-3) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); }
+.mdc-link--perfil { font-size: var(--fs-13); }
 .mdc-logout {
   display: flex; align-items: center; gap: var(--sp-2);
   background: none; border: none;

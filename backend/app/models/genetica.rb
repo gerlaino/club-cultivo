@@ -3,11 +3,14 @@ class Genetica < ApplicationRecord
   has_many :lotes, dependent: :nullify
   has_many_attached :fotos
 
+  CATEGORIAS_INASE = %w[semilla_feminizada semilla_regular material_vegetativo hibrido].freeze
+
   validates :nombre, presence: true
   validates :slug,   presence: true, uniqueness: { scope: :club_id }
   validates :thc, numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 100, allow_nil: true }
   validates :cbd, numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 100, allow_nil: true }
   validates :tipo, inclusion: { in: %w[indica sativa hibrida], allow_nil: true }
+  validates :categoria_inase, inclusion: { in: CATEGORIAS_INASE }, allow_nil: true
 
   scope :activas,      -> { where(activa: true) }
   scope :disponibles,  -> { where(disponible: true) }

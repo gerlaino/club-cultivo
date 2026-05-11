@@ -6,7 +6,7 @@ import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import {
   listDispensaciones, createDispensacion, deleteDispensacion,
-  listStocks,
+  listStocks, listDeliveryUsers,
 } from '../../lib/api.js'
 
 const props = defineProps({
@@ -28,13 +28,15 @@ const toast        = useToast()
 
 const dispensaciones = ref([])
 const stocks         = ref([])
-const loading        = ref(true)
-const loadingStocks  = ref(false)
-const showModal      = ref(false)
-const saving         = ref(false)
-const formError      = ref(null)
+const loading          = ref(true)
+const loadingStocks    = ref(false)
+const showModal        = ref(false)
+const saving           = ref(false)
+const formError        = ref(null)
+const deliveryUsers    = ref([])
+const loadingDelivery  = ref(false)
 
-const canCreate = computed(() => ['admin', 'cultivador', 'dispensador', 'medico', 'super_admin'].includes(auth.user?.role))
+const canCreate = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
 const canDelete = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
 
 const today = new Date().toISOString().split('T')[0]
@@ -130,6 +132,20 @@ async function cargarStocks() {
   finally { loadingStocks.value = false }
 }
 
+async function cargarDeliveryUsers() {
+  if (deliveryUsers.value.length) return
+  loadingDelivery.value = true
+  try {
+    const { data } = await listDeliveryUsers()
+    deliveryUsers.value = data.data || data.usuarios || data || []
+  } catch { deliveryUsers.value = [] }
+  finally { loadingDelivery.value = false }
+}
+
+watch(() => form.value.con_envio, (val) => {
+  if (val) cargarDeliveryUsers()
+})
+
 // ── Formulario ────────────────────────────────────────────────────────────────
 function emptyForm() {
   return {
@@ -140,6 +156,12 @@ function emptyForm() {
     fecha_dispensacion: today,
     observaciones:      '',
     medio_pago:         'efectivo',
+    con_envio:          false,
+    delivery_id:        null,
+    direccion_envio:    '',
+    contacto_nombre:    '',
+    contacto_telefono:  '',
+    notas_envio:        '',
   }
 }
 const form = ref(emptyForm())
@@ -212,6 +234,22 @@ async function handleSubmit() {
     if (!ok) return
     saving.value = true  // confirma → volvemos a bloquear antes del POST
   }
+  // delivery validation
+  if (form.value.con_envio) {
+    if (!form.value.delivery_id) {
+      formError.value = 'Seleccioná un delivery para asignar el envío'
+      saving.value = false; return
+    }
+    if (!form.value.direccion_envio?.trim()) {
+      formError.value = 'La dirección de envío es requerida'
+      saving.value = false; return
+    }
+    if (!form.value.contacto_nombre?.trim()) {
+      formError.value = 'El nombre de contacto es requerido'
+      saving.value = false; return
+    }
+  }
+
   try {
     const payload = {
       stock_id:           form.value.stock_id,
@@ -219,9 +257,17 @@ async function handleSubmit() {
       fecha_dispensacion: form.value.fecha_dispensacion,
       observaciones:      form.value.observaciones || undefined,
       medio_pago:         form.value.medio_pago,
+      con_envio:          form.value.con_envio,
     }
     if (form.value.aporte_socio_ars != null && form.value.aporte_socio_ars !== '') {
       payload.aporte_socio_ars = Number(form.value.aporte_socio_ars).toFixed(2)
+    }
+    if (form.value.con_envio) {
+      payload.delivery_id       = form.value.delivery_id
+      payload.direccion_envio   = form.value.direccion_envio
+      payload.contacto_nombre   = form.value.contacto_nombre
+      payload.contacto_telefono = form.value.contacto_telefono || undefined
+      payload.notas_envio       = form.value.notas_envio || undefined
     }
     await createDispensacion(props.socioId, payload)
     await loadDispensaciones()
@@ -309,6 +355,11 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
             </span>
           </div>
           <div v-if="d.observaciones" class="dv__item-obs">{{ d.observaciones }}</div>
+          <div v-if="d.con_envio" class="dv__item-envio-badge"
+               :class="`dv__item-envio-badge--${d.estado_envio || 'pendiente'}`">
+            <i class="bi bi-bicycle"></i>
+            {{ { pendiente: 'Pendiente envío', en_viaje: 'En camino', entregado: 'Entregado', fallido: 'Fallo de entrega' }[d.estado_envio] || 'Con envío' }}
+          </div>
         </div>
         <div class="dv__item-right">
           <div class="dv__item-cantidad">{{ d.cantidad }}{{ d.stock?.unidad || 'g' }}</div>
@@ -524,6 +575,65 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
                         placeholder="Notas adicionales…"></textarea>
             </div>
 
+            <div class="dv__divider"></div>
+
+            <!-- ── Envío / Delivery ── -->
+            <div class="dv__delivery-toggle" @click="form.con_envio = !form.con_envio">
+              <div class="dv__delivery-toggle-left">
+                <i class="bi bi-bicycle" style="font-size:1rem;color:#1b5e20"></i>
+                <div>
+                  <div class="dv__delivery-toggle-title">Con envío a domicilio</div>
+                  <div class="dv__delivery-toggle-sub">Asignar un delivery y datos de entrega</div>
+                </div>
+              </div>
+              <div class="dv__toggle-switch" :class="{ 'dv__toggle-switch--on': form.con_envio }">
+                <div class="dv__toggle-knob"></div>
+              </div>
+            </div>
+
+            <div v-if="form.con_envio" class="dv__delivery-section">
+              <!-- Delivery user -->
+              <div class="dv__field">
+                <label class="dv__label">Delivery asignado <span class="dv__req">*</span></label>
+                <div v-if="loadingDelivery" class="dv__loading-inline"><div class="dv__ring dv__ring--sm"></div> Cargando…</div>
+                <div v-else-if="!deliveryUsers.length" class="dv__warn-box">
+                  <i class="bi bi-exclamation-triangle"></i> No hay usuarios delivery disponibles
+                </div>
+                <select v-else v-model.number="form.delivery_id" class="dv__input">
+                  <option :value="null" disabled>Seleccioná un delivery…</option>
+                  <option v-for="u in deliveryUsers" :key="u.id" :value="u.id">
+                    {{ u.first_name || u.nombre || u.email }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Dirección y contacto -->
+              <div class="dv__field">
+                <label class="dv__label">Dirección de entrega <span class="dv__req">*</span></label>
+                <input v-model.trim="form.direccion_envio" type="text" class="dv__input"
+                       placeholder="Calle, número, piso, depto…" />
+              </div>
+
+              <div class="dv__form-row">
+                <div class="dv__field">
+                  <label class="dv__label">Contacto <span class="dv__req">*</span></label>
+                  <input v-model.trim="form.contacto_nombre" type="text" class="dv__input"
+                         placeholder="Nombre de quien recibe" />
+                </div>
+                <div class="dv__field">
+                  <label class="dv__label">Teléfono <span class="dv__opt">opcional</span></label>
+                  <input v-model.trim="form.contacto_telefono" type="tel" class="dv__input"
+                         placeholder="+54 11 …" />
+                </div>
+              </div>
+
+              <div class="dv__field">
+                <label class="dv__label">Notas de envío <span class="dv__opt">opcional</span></label>
+                <textarea v-model.trim="form.notas_envio" class="dv__input dv__textarea" rows="2"
+                          placeholder="Instrucciones para el delivery, referencias del lugar…"></textarea>
+              </div>
+            </div>
+
           </div>
 
           <div class="dv__modal-footer">
@@ -565,6 +675,11 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__stock-pill { font-size: .7rem; font-weight: 700; background: rgba(21,128,61,.1); color: #15803d; padding: .2em .65em; border-radius: 6px; }
 .dv__lote-ref { font-size: .7rem; color: #64748b; display: flex; align-items: center; gap: .25rem; }
 .dv__item-obs { font-size: .73rem; color: #94a3b8; font-style: italic; }
+.dv__item-envio-badge { display: inline-flex; align-items: center; gap: .25rem; margin-top: .2rem; font-size: 12px; font-weight: 600; padding: .15em .55em; border-radius: 5px; }
+.dv__item-envio-badge--pendiente { background: var(--c-sky-100);   color: var(--c-sky-600); }
+.dv__item-envio-badge--en_viaje  { background: var(--c-amber-100); color: var(--c-amber-500); }
+.dv__item-envio-badge--entregado { background: var(--c-leaf-100);  color: var(--c-leaf-700); }
+.dv__item-envio-badge--fallido   { background: var(--c-rust-100);  color: var(--c-rust-600); }
 .dv__item-right { text-align: right; flex-shrink: 0; min-width: 80px; }
 .dv__item-cantidad { font-size: 1.05rem; font-weight: 800; color: #1b5e20; letter-spacing: -.03em; }
 .dv__item-aporte { font-size: .72rem; color: #64748b; margin-top: .1rem; }
@@ -686,6 +801,22 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__limite-msg--warning { color: #b45309; }
 .dv__limite-msg--danger  { color: #dc2626; }
 .dv__limite-excede { font-size: .72rem; font-weight: 700; color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: .15rem .5rem; }
+
+/* Delivery toggle */
+.dv__delivery-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  padding: .7rem .875rem; background: #f8fafc; border: 1.5px solid #e2e8f0;
+  border-radius: 10px; cursor: pointer; user-select: none; transition: border-color .15s;
+}
+.dv__delivery-toggle:hover { border-color: #86efac; background: #f0fdf4; }
+.dv__delivery-toggle-left { display: flex; align-items: center; gap: .6rem; }
+.dv__delivery-toggle-title { font-size: .82rem; font-weight: 700; color: #0f172a; }
+.dv__delivery-toggle-sub { font-size: .72rem; color: #64748b; margin-top: .05rem; }
+.dv__toggle-switch { width: 36px; height: 20px; background: var(--c-ink-300); border-radius: 999px; position: relative; transition: background .2s; flex-shrink: 0; }
+.dv__toggle-switch--on { background: var(--c-leaf-600); }
+.dv__toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.dv__toggle-switch--on .dv__toggle-knob { transform: translateX(16px); }
+.dv__delivery-section { display: flex; flex-direction: column; gap: .75rem; background: var(--c-leaf-50); border: 1.5px solid var(--c-leaf-100); border-radius: 12px; padding: .9rem; margin-top: -.4rem; }
 
 /* Cuenta corriente */
 .dv__cc-panel { border-radius: 10px; padding: .6rem .875rem; border: 1.5px solid; display: flex; flex-direction: column; gap: .3rem; }

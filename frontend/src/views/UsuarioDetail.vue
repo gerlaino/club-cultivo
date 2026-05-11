@@ -32,7 +32,7 @@ const ROLES = [
   { value: "supervisor",  label: "Supervisor",    color: "#0f766e", bg: "rgba(15,118,110,.1)",  icon: "bi-binoculars-fill",     desc: "Supervisa las sedes que le asigne el admin. Puede crear y gestionar tareas en esas sedes." },
   { value: "manicura",    label: "Manicura",      color: "#7c3aed", bg: "rgba(124,58,237,.1)",  icon: "bi-scissors",            desc: "Registra el peso de cosecha por lote en sus salas asignadas. Requiere aprobación del admin." },
   { value: "dispensador", label: "Dispensador",   color: "#0891b2", bg: "rgba(8,145,178,.08)",  icon: "bi-bag-check-fill",      desc: "Opera el dispensario: registra entregas a socios y consulta stock disponible." },
-  { value: "delivery",    label: "Delivery",      color: "#f59e0b", bg: "rgba(245,158,11,.1)",  icon: "bi-bicycle",             desc: "Gestiona las entregas a domicilio de dispensaciones." },
+  { value: "delivery",    label: "Delivery",      color: "#1A3D2E", bg: "rgba(26,61,46,.1)",    icon: "bi-bicycle",             desc: "Gestiona las entregas a domicilio de dispensaciones." },
   { value: "abogado",     label: "Abogado",       color: "#92400e", bg: "rgba(146,64,14,.1)",   icon: "bi-briefcase-fill",      desc: "Acceso a documentos, contabilidad y trazabilidad legal. Solo lectura clínica." },
   { value: "auditor",     label: "Auditor",       color: "#475569", bg: "rgba(71,85,105,.1)",   icon: "bi-clipboard-data-fill", desc: "Lectura de todos los módulos e informes. Sin modificar datos." },
   { value: "socio",       label: "Socio",         color: "#64748b", bg: "rgba(100,116,139,.1)", icon: "bi-person-badge-fill",   desc: "Acceso al portal del socio: su perfil y su historial de dispensaciones." },

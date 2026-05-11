@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
-import { getPlantActivities, createPlantActivity } from '../lib/api'
+import { getPlantActivities, createPlantActivity, updatePlant } from '../lib/api'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
@@ -205,10 +205,36 @@ async function handleFotoUpload() {
   toast.error('Subida de fotos de planta no implementada aún')
 }
 
+// ── Manicura weight ───────────────────────────────────
+const pesoManicura    = ref(null)
+const savingManicura  = ref(false)
+const manicuraSaved   = ref(false)
+
+async function saveManicura() {
+  if (savingManicura.value || !pesoManicura.value) return
+  savingManicura.value = true
+  try {
+    await updatePlant(id, { peso_seco: pesoManicura.value })
+    if (plants.current) plants.current.peso_seco = pesoManicura.value
+    manicuraSaved.value = true
+    toast.success('Peso de manicura guardado')
+  } catch {
+    toast.error('Error al guardar el peso')
+  } finally {
+    savingManicura.value = false
+  }
+}
+
+const canManicura = computed(() =>
+  ['manicura', 'admin'].includes(auth.user?.role) &&
+  ['secado', 'manicura_pendiente'].includes(planta.value?.lote?.estado)
+)
+
 onMounted(async () => {
   try {
     await plants.fetchOne(id)
     await generarQR()
+    if (plants.current?.peso_seco) pesoManicura.value = parseFloat(plants.current.peso_seco)
   } catch { error.value = 'No se pudo cargar la planta.' }
   await loadActivities()
   loading.value = false
@@ -256,7 +282,7 @@ onMounted(async () => {
             <span>Día {{ diasEnCiclo }}</span>
           </div>
         </div>
-        <div>
+        <div v-if="auth.user?.role !== 'manicura'">
           <AsistenteVoz
             v-if="contextoAsistente"
             :contexto="contextoAsistente"
@@ -315,6 +341,34 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- Manicura weight (solo rol manicura/admin en lotes elegibles) -->
+      <div v-if="canManicura" class="pd__mnc">
+        <div class="pd__mnc-label">
+          <i class="bi bi-scissors"></i>
+          Peso de manicura
+        </div>
+        <div class="pd__mnc-row">
+          <input
+            v-model.number="pesoManicura"
+            type="number"
+            step="0.1"
+            min="0"
+            class="pd__mnc-input"
+            placeholder="0.0"
+            @keydown.enter.prevent="saveManicura"
+          />
+          <span class="pd__mnc-unit">g</span>
+          <button class="pd__mnc-btn" :disabled="savingManicura || !pesoManicura" @click="saveManicura">
+            <div v-if="savingManicura" class="pd__mnc-spinner"></div>
+            <i v-else class="bi bi-check-lg"></i>
+            Guardar
+          </button>
+        </div>
+        <div v-if="planta.peso_seco" class="pd__mnc-saved">
+          <i class="bi bi-check-circle-fill"></i> Guardado: {{ planta.peso_seco }}g
+        </div>
+      </div>
+
       <!-- Layout -->
       <div class="pd__layout">
         <div class="pd__main">
@@ -331,7 +385,7 @@ onMounted(async () => {
             <div v-show="historialExpanded" class="pd__section-body pd__section-body--flush">
               <div v-if="loadingActs" class="pd__placeholder">Cargando historial…</div>
               <EmptyState v-else-if="activities.length === 0" icon="📋" title="Sin registros todavía" compact>
-                <template #actions>
+                <template v-if="auth.user?.role !== 'manicura'" #actions>
                   <button class="pd__btn-outline" @click="abrirModal">Hacer primer registro</button>
                 </template>
               </EmptyState>
@@ -389,7 +443,7 @@ onMounted(async () => {
                 <span v-if="fotos.length > 0" class="pd__pill">{{ fotos.length }}</span>
               </div>
               <div class="pd__str">
-                <button class="pd__btn-sm" @click.stop="fotoInput?.click()" :disabled="uploadingFoto">
+                <button v-if="auth.user?.role !== 'manicura'" class="pd__btn-sm" @click.stop="fotoInput?.click()" :disabled="uploadingFoto">
                   <span v-if="uploadingFoto" class="pd__spinner" style="width:12px;height:12px;border-width:1.5px"></span>
                   <i v-else class="bi bi-camera-fill"></i>
                 </button>
@@ -399,7 +453,7 @@ onMounted(async () => {
             <input ref="fotoInput" type="file" accept="image/*" style="display:none" @change="handleFotoUpload" />
             <div v-show="fotosExpanded" class="pd__section-body">
               <EmptyState v-if="fotos.length === 0" icon="📷" title="Sin fotos todavía" compact>
-                <template #actions>
+                <template v-if="auth.user?.role !== 'manicura'" #actions>
                   <button class="pd__btn-outline" @click="fotoInput?.click()"><i class="bi bi-camera-fill"></i> Subir primera foto</button>
                 </template>
               </EmptyState>
@@ -470,7 +524,7 @@ onMounted(async () => {
           </div>
 
           <!-- QR -->
-          <div class="pd__card pd__card--mt">
+          <div v-if="auth.user?.role !== 'manicura'" class="pd__card pd__card--mt">
             <div class="pd__card-header"><span class="pd__card-title">📱 Código QR</span></div>
             <div class="pd__qr-body">
               <img v-if="qrDataUrl" :src="qrDataUrl" alt="QR" class="pd__qr-img" />
@@ -660,6 +714,49 @@ onMounted(async () => {
 .pd__kpi-label { font-size: .68rem; color: #60725d; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: .2rem; }
 
 /* Layout */
+/* Manicura weight section */
+.pd__mnc {
+  display: flex; flex-direction: column; gap: .4rem;
+  background: #f0fdf4; border: 1px solid #86efac;
+  border-radius: 12px; padding: .875rem 1.1rem;
+  margin-bottom: 1.25rem;
+}
+.pd__mnc-label {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: #15803d; display: flex; align-items: center; gap: .35rem;
+}
+.pd__mnc-row {
+  display: flex; align-items: center; gap: .5rem;
+}
+.pd__mnc-input {
+  width: 90px;
+  background: #fff; border: 1.5px solid #86efac;
+  border-radius: 8px; padding: .45rem .65rem;
+  font-size: .9rem; color: #1a1a1a; text-align: right;
+  outline: none; transition: border-color .15s;
+}
+.pd__mnc-input:focus { border-color: #16a34a; }
+.pd__mnc-unit { font-size: .82rem; color: #15803d; font-weight: 600; }
+.pd__mnc-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: #16a34a; color: #fff; border: none;
+  padding: .45rem .9rem; border-radius: 8px;
+  font-size: .8rem; font-weight: 600; cursor: pointer;
+  transition: background .15s;
+}
+.pd__mnc-btn:hover:not(:disabled) { background: #15803d; }
+.pd__mnc-btn:disabled { opacity: .45; cursor: not-allowed; }
+.pd__mnc-spinner {
+  width: 12px; height: 12px;
+  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+  border-radius: 50%; animation: pd-mnc-spin .6s linear infinite;
+}
+@keyframes pd-mnc-spin { to { transform: rotate(360deg); } }
+.pd__mnc-saved {
+  font-size: .75rem; color: #15803d; font-weight: 600;
+  display: flex; align-items: center; gap: .3rem;
+}
+
 .pd__layout { display: grid; grid-template-columns: 1fr 280px; gap: 1.25rem; align-items: start; }
 @media (max-width: 900px) { .pd__layout { grid-template-columns: 1fr; } }
 

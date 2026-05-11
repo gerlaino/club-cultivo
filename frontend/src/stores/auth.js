@@ -54,7 +54,7 @@ export const useAuthStore = defineStore("auth", {
       }
     },
 
-    async login(email, password) {
+    async login(email, password, redirect = null) {
       this.loading = true;
       this.error = null;
       try {
@@ -62,12 +62,20 @@ export const useAuthStore = defineStore("auth", {
         await this.fetchMe();
 
         const { default: router } = await import("../router");
-        if (this.user?.role === 'super_admin') {
-          router.push({ path: '/super-admin' });
+        const ROLE_HOME = {
+          super_admin: '/super-admin',
+          auditor:     '/auditor',
+          medico:      '/medico',
+          abogado:     '/abogado',
+          delivery:    '/delivery',
+        }
+        const roleHome = ROLE_HOME[this.user?.role]
+        if (roleHome) {
+          router.push({ path: roleHome });
         } else {
           const club = useClubStore();
           await club.fetch();
-          router.push({ name: "dashboard" });
+          router.push(redirect ? String(redirect) : { name: "dashboard" });
         }
       } catch (e) {
         if (e?.response?.status === 401) {

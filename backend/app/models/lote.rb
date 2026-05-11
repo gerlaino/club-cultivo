@@ -244,12 +244,14 @@ class Lote < ApplicationRecord
       )
 
       stock = Stock.create!(
-        sede:               sede,
-        lote:               self,
-        origen:             'lote',
-        forma_producto:     'flor_seca',
-        unidad:             'g',
-        cantidad:           flor_seca,
+        sede:                sede,
+        lote:                self,
+        pesada:              ultima,
+        origen:              'lote',
+        forma_producto:      'flor_seca',
+        unidad:              'g',
+        cantidad:            flor_seca,
+        fecha_elaboracion:   Date.today,
         costo_unitario_ars:  costo_unitario_ars,
         precio_sugerido_ars: precio_sugerido_ars,
       )

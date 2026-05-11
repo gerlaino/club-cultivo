@@ -81,7 +81,7 @@ class PlantsController < ApplicationController
   # DELETE /plants/:id
   def destroy
     lote = @plant.lote
-    @plant.destroy
+    @plant.soft_delete!
     lote.decrement!(:plants_count) if lote.plants_count.to_i > 0
     head :no_content
   end
@@ -129,10 +129,12 @@ class PlantsController < ApplicationController
       state:        plant.state,
       origen:       plant.origen,
       es_seleccion: plant.es_seleccion,
+      peso_seco:    plant.peso_seco,
       foto_url:     foto_url(plant),
       lote: {
         id:     plant.lote.id,
         codigo: plant.lote.codigo,
+        estado: plant.lote.estado,
       },
       genetica: g ? { id: g.id, nombre: g.nombre, tipo: g.tipo } : nil,
       fecha_germinacion:      plant.fecha_germinacion,
@@ -153,6 +155,7 @@ class PlantsController < ApplicationController
       lote: {
         id:         plant.lote.id,
         codigo:     plant.lote.codigo,
+        estado:     plant.lote.estado,
         genetica_id: plant.lote.genetica_id,
         sala: {
           id:     plant.lote.sala.id,

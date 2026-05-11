@@ -22,6 +22,6 @@ const pageTitle = computed(() => LABELS[route.path] || 'Delivery')
 .dlv-topbar { height: 54px; display: flex; align-items: center; gap: var(--sp-3); padding: 0 var(--sp-5); background: var(--c-paper); border-bottom: 1px solid var(--c-ink-100); flex-shrink: 0; }
 .dlv-hamburger { display: none; background: none; border: none; cursor: pointer; color: var(--c-ink-600); padding: var(--sp-1); border-radius: var(--r-sm); }
 .dlv-breadcrumb { font-size: var(--fs-15); font-weight: 600; color: var(--c-ink-900); flex: 1; }
-.dlv-role-badge { background: rgba(26,58,74,.12); color: var(--c-role-delivery, #1A3A4A); font-size: var(--fs-12); font-weight: 600; padding: 2px 10px; border-radius: 999px; }
+.dlv-role-badge { background: rgba(26,61,46,.1); color: var(--c-role-delivery); font-size: var(--fs-12); font-weight: 600; padding: 2px 10px; border-radius: 999px; }
 @media (max-width: 1023px) { .dlv-hamburger { display: flex; } }
 </style>

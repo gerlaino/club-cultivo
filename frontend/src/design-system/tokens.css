@@ -43,7 +43,7 @@
   --c-role-supervisor:  #0f766e;  /* teal-700 */
   --c-role-manicura:    #172B1F;  /* msb dark forest */
   --c-role-dispensador: #1A3D2E;  /* misma base leaf */
-  --c-role-delivery:    #C2410C;  /* rust (sin sidebar propia) */
+  --c-role-delivery:    #1A3D2E;  /* leaf-800 — mismo verde base que admin/dispensador */
   --c-role-medico:      #1A2F1E;  /* med-shell dark sage */
   --c-role-abogado:     #2A2F38;  /* abg-shell dark slate */
   --c-role-auditor:     #1F1810;  /* aud-sidebar dark brown */

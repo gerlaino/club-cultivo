@@ -121,7 +121,16 @@ Rails.application.routes.draw do
 
     get '/indicaciones_medicas', to: 'indicacion_medica#index_medico'
     resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy]
-    resources :dispensaciones, only: [:index, :show, :update, :destroy]
+    resources :dispensaciones, only: [:index, :show, :update, :destroy] do
+      collection do
+        get  :mis_paquetes
+        patch :iniciar_viaje
+      end
+      member do
+        patch :entregar
+        patch :reportar_fallo
+      end
+    end
 
     resources :geneticas do
       member do

@@ -366,6 +366,17 @@ const routes = [
       next()
     },
   },
+  {
+    path: '/mnc/lotes/:id',
+    name: 'mnc-lote-detail',
+    component: () => import('../views/manicura/MncLoteDetailView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'manicura'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+  },
 
   {
     path: '/super-admin',
@@ -445,6 +456,7 @@ const routes = [
     children: [
       { path: '', name: 'medico-dashboard', component: () => import('../views/medico/MedicoDashboard.vue') },
       { path: 'pacientes', name: 'medico-pacientes', component: () => import('../views/medico/MedicoPacientesView.vue') },
+      { path: 'pacientes/:id', name: 'medico-paciente-detail', component: () => import('../views/SocioDetailView.vue'), props: () => ({ backPath: '/medico/pacientes' }) },
       { path: 'indicaciones', name: 'medico-indicaciones', component: () => import('../views/medico/MedicoIndicacionesView.vue') },
       { path: 'documentos', name: 'medico-documentos', component: () => import('../views/medico/MedicoDocumentosView.vue') },
     ],

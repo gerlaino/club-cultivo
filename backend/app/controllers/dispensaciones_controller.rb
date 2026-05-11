@@ -1,10 +1,10 @@
 class DispensacionesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_dispensaciones_role!
-  before_action :require_dispensador_o_admin, except: [:index, :show]
+  before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :mis_paquetes]
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
-  before_action :set_dispensacion, only: [:show, :update, :destroy]
+  before_action :set_dispensacion, only: [:show, :update, :destroy, :entregar, :reportar_fallo]
 
   # GET /pacientes/:paciente_id/dispensaciones  OR  GET /dispensaciones?fecha=YYYY-MM-DD
   def index
@@ -94,6 +94,58 @@ class DispensacionesController < ApplicationController
     end
   end
 
+  # GET /delivery/mis_paquetes
+  def mis_paquetes
+    @dispensaciones = Dispensacion
+      .del_delivery(current_user.id)
+      .includes(:paciente, :sede, stock: :lote)
+      .order(created_at: :asc)
+    render json: { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion_delivery(d) } }
+  end
+
+  # PATCH /dispensaciones/iniciar_viaje  { ids: [1,2,3] }
+  def iniciar_viaje
+    ids = params[:ids].to_a.map(&:to_i)
+    dispensaciones = Dispensacion.del_delivery(current_user.id)
+                                 .where(id: ids, estado_envio: 'pendiente')
+    dispensaciones.update_all(estado_envio: 'en_viaje')
+    render json: { updated: dispensaciones.count }
+  end
+
+  # PATCH /dispensaciones/:id/entregar
+  def entregar
+    unless @dispensacion.delivery_id == current_user.id || current_user.admin?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    unless %w[pendiente en_viaje].include?(@dispensacion.estado_envio)
+      return render json: { error: 'La dispensación no está en un estado válido para entregar' }, status: :unprocessable_entity
+    end
+    @dispensacion.update!(
+      estado_envio:  'entregado',
+      notas_entrega: params[:notas_entrega],
+      entregado_at:  Time.current
+    )
+    render json: serialize_dispensacion_delivery(@dispensacion)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # PATCH /dispensaciones/:id/reportar_fallo
+  def reportar_fallo
+    unless @dispensacion.delivery_id == current_user.id || current_user.admin?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    unless %w[pendiente en_viaje].include?(@dispensacion.estado_envio)
+      return render json: { error: 'Estado inválido' }, status: :unprocessable_entity
+    end
+    motivo = params[:motivo_fallo].presence
+    return render json: { error: 'El motivo es requerido' }, status: :unprocessable_entity unless motivo
+    @dispensacion.update!(estado_envio: 'fallido', motivo_fallo: motivo)
+    render json: serialize_dispensacion_delivery(@dispensacion)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
   # DELETE /dispensaciones/:id
   def destroy
     ActiveRecord::Base.transaction do
@@ -134,7 +186,9 @@ class DispensacionesController < ApplicationController
     params.require(:dispensacion).permit(
       :indicacion_medica_id, :stock_id, :sede_id,
       :cantidad, :precio_unitario_ars, :aporte_socio_ars,
-      :observaciones, :fecha_dispensacion, :medio_pago
+      :observaciones, :fecha_dispensacion, :medio_pago,
+      :con_envio, :delivery_id, :direccion_envio,
+      :contacto_nombre, :contacto_telefono, :notas_envio
     )
   end
 
@@ -146,7 +200,15 @@ class DispensacionesController < ApplicationController
   end
 
   def require_dispensaciones_role!
-    blocked = %w[auditor abogado cultivador manicura paciente delivery]
+    # delivery solo puede acceder a sus propias acciones
+    if current_user&.role == 'delivery'
+      delivery_actions = %w[mis_paquetes iniciar_viaje entregar reportar_fallo]
+      unless delivery_actions.include?(action_name)
+        render json: { error: 'No autorizado' }, status: :forbidden
+      end
+      return
+    end
+    blocked = %w[auditor abogado cultivador manicura paciente]
     if blocked.include?(current_user&.role)
       render json: { error: 'No autorizado' }, status: :forbidden
     end
@@ -267,6 +329,34 @@ class DispensacionesController < ApplicationController
     )
   end
 
+  def serialize_dispensacion_delivery(d)
+    {
+      id:                  d.id,
+      codigo_paquete:      d.codigo_paquete,
+      estado_envio:        d.estado_envio,
+      entregado_at:        d.entregado_at,
+      notas_entrega:       d.notas_entrega,
+      motivo_fallo:        d.motivo_fallo,
+      fecha_dispensacion:  d.fecha_dispensacion,
+      cantidad:            d.cantidad.to_f,
+      observaciones:       d.observaciones,
+      direccion_envio:     d.direccion_envio,
+      contacto_nombre:     d.contacto_nombre,
+      contacto_telefono:   d.contacto_telefono,
+      notas_envio:         d.notas_envio,
+      paciente: {
+        id:      d.paciente.id,
+        nombre:  "#{d.paciente.nombre} #{d.paciente.apellido}",
+        telefono: d.paciente.telefono,
+      },
+      sede: d.sede ? { id: d.sede.id, nombre: d.sede.nombre } : nil,
+      stock: d.stock ? {
+        forma_producto: d.stock.forma_producto,
+        unidad:         d.stock.unidad,
+      } : nil,
+    }
+  end
+
   def serialize_dispensacion(d)
     stk = d.stock
     {
@@ -291,6 +381,14 @@ class DispensacionesController < ApplicationController
       fecha_dispensacion:  d.fecha_dispensacion,
       medio_pago:          d.medio_pago,
       tiene_movimiento_contable: d.movimiento_contable.present?,
+      con_envio:           d.con_envio,
+      estado_envio:        d.estado_envio,
+      codigo_paquete:      d.codigo_paquete,
+      delivery_id:         d.delivery_id,
+      direccion_envio:     d.direccion_envio,
+      contacto_nombre:     d.contacto_nombre,
+      contacto_telefono:   d.contacto_telefono,
+      notas_envio:         d.notas_envio,
       created_at:          d.created_at,
     }
   end

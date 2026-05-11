@@ -158,6 +158,13 @@ export const createDispensacion = (pacienteId, payload) => api.post(`/pacientes/
 export const updateDispensacion = (id, payload) => api.put(`/dispensaciones/${id}`, { dispensacion: payload });
 export const deleteDispensacion = (id) => api.delete(`/dispensaciones/${id}`);
 
+// ── Delivery ──────────────────────────────────────────────────────────────────
+export const getMisPaquetes   = ()                  => api.get('/dispensaciones/mis_paquetes')
+export const iniciarViaje     = (ids)               => api.patch('/dispensaciones/iniciar_viaje', { ids })
+export const entregarPaquete  = (id, notasEntrega)  => api.patch(`/dispensaciones/${id}/entregar`, { notas_entrega: notasEntrega })
+export const reportarFallo    = (id, motivoFallo)   => api.patch(`/dispensaciones/${id}/reportar_fallo`, { motivo_fallo: motivoFallo })
+export const listDeliveryUsers = ()                 => api.get('/usuarios', { params: { role: 'delivery' } })
+
 // -------- USUARIOS (equipo del club) --------
 export const listUsers         = (params = {}) => api.get('/usuarios', { params });
 export const getUser           = (id) => api.get(`/usuarios/${id}`);

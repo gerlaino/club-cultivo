@@ -77,6 +77,7 @@ export function usePermissions() {
       sede_inventario: ['index', 'show'],
       inventario_movimientos: ['index', 'show', 'create'],
       lotes: ['index', 'show'],
+      plantas: ['index', 'show', 'update'],
       geneticas: ['index', 'show'],
       sedes: ['index', 'show'],
       manicura: ['access'],

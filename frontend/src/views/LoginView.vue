@@ -312,12 +312,11 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const route = useRoute()
-const router = useRouter()
 const email      = ref('')
 const password   = ref('')
 const showPass   = ref(false)
@@ -327,8 +326,7 @@ const yr = new Date().getFullYear()
 
 async function onSubmit() {
   try {
-    await auth.login(email.value, password.value)
-    router.replace(String(route.query.redirect || '/'))
+    await auth.login(email.value, password.value, route.query.redirect || null)
   } catch (_) {}
 }
 </script>
