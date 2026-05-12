@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
 import { useConfirm } from '../composables/useConfirm.js'
+import { exportPacientesCSV } from '../lib/api.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 
 const store  = usePacientesStore()
@@ -179,6 +180,29 @@ onMounted(async () => {
     if (s) openEdit(s)
   }
 })
+
+const exporting = ref(false)
+async function exportarCSV() {
+  exporting.value = true
+  try {
+    const params = {}
+    if (filterEstado.value === 'proximos') params.reprocann = 'proximos'
+    if (filterEstado.value === 'vencidos') params.reprocann = 'vencidos'
+    if (filterEstado.value === 'sin_rep')  params.reprocann = 'sin_rep'
+    if (search.value.trim())               params.query     = search.value.trim()
+    const { data } = await exportPacientesCSV(params)
+    const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `pacientes_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    // silencio
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <template>
@@ -232,6 +256,10 @@ onMounted(async () => {
         />
         <span v-if="search" class="sv__search-count">{{ filtrados.length }}</span>
       </div>
+      <button v-if="canEdit" class="sv__btn-export" :disabled="exporting || !filtrados.length" @click="exportarCSV">
+        <i class="bi bi-download"></i>
+        {{ exporting ? 'Exportando…' : 'CSV' }}
+      </button>
     </div>
 
     <!-- Loading -->
@@ -434,7 +462,16 @@ onMounted(async () => {
 .sv__kpi--gray.sv__kpi--active { border-color: #64748b !important; box-shadow: 0 0 0 1px #64748b; }
 .sv__kpi-lbl { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #94a3b8; }
 
-.sv__toolbar { margin-bottom: 1.25rem; }
+.sv__toolbar { margin-bottom: 1.25rem; display: flex; align-items: center; gap: .75rem; }
+.sv__search-wrap { flex: 1; }
+.sv__btn-export {
+  display: flex; align-items: center; gap: .35rem;
+  padding: .55rem .9rem; background: #1b5e20; color: #fff;
+  border: none; border-radius: 10px; font-size: .84rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; transition: background .15s;
+}
+.sv__btn-export:hover:not(:disabled) { background: #145218; }
+.sv__btn-export:disabled { opacity: .55; cursor: default; }
 .sv__search-wrap { position: relative; display: flex; align-items: center; }
 .sv__search-icon { position: absolute; left: .875rem; color: #94a3b8; font-size: .9rem; pointer-events: none; }
 .sv__search { width: 100%; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: .65rem .875rem .65rem 2.5rem; font-size: .9rem; color: #0f172a; transition: border .15s, box-shadow .15s; box-sizing: border-box; }

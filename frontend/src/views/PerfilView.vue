@@ -40,51 +40,36 @@ const passErrors = reactive({
   password_confirmation: '',
 })
 
-// ── Fortaleza de contraseña ──────────────────────────────────────────
 const passwordStrength = computed(() => {
   const p = pass.password
   if (!p) return { score: 0, label: '', color: '' }
   let score = 0
-  if (p.length >= 8)                    score++
-  if (p.length >= 12)                   score++
-  if (/[A-Z]/.test(p))                  score++
-  if (/[0-9]/.test(p))                  score++
-  if (/[^A-Za-z0-9]/.test(p))          score++
-  if      (score <= 1) return { score, label: 'Muy débil',  color: 'danger'  }
-  else if (score === 2) return { score, label: 'Débil',      color: 'warning' }
-  else if (score === 3) return { score, label: 'Regular',    color: 'info'    }
-  else if (score === 4) return { score, label: 'Fuerte',     color: 'primary' }
-  else                  return { score, label: 'Muy fuerte', color: 'success' }
+  if (p.length >= 8)           score++
+  if (p.length >= 12)          score++
+  if (/[A-Z]/.test(p))         score++
+  if (/[0-9]/.test(p))         score++
+  if (/[^A-Za-z0-9]/.test(p)) score++
+  if      (score <= 1) return { score, label: 'Muy débil',  color: '#ef4444' }
+  else if (score === 2) return { score, label: 'Débil',      color: '#f59e0b' }
+  else if (score === 3) return { score, label: 'Regular',    color: '#3b82f6' }
+  else if (score === 4) return { score, label: 'Fuerte',     color: '#1b5e20' }
+  else                  return { score, label: 'Muy fuerte', color: '#15803d' }
 })
 
 const strengthWidth = computed(() => `${(passwordStrength.value.score / 5) * 100}%`)
 
-// ── Validaciones ─────────────────────────────────────────────────────
 function validatePassword() {
   let ok = true
   passErrors.current_password      = ''
   passErrors.password              = ''
   passErrors.password_confirmation = ''
-
-  if (!pass.current_password.trim()) {
-    passErrors.current_password = 'Ingresá tu contraseña actual'
-    ok = false
-  }
-  if (pass.password.length < 8) {
-    passErrors.password = 'Mínimo 8 caracteres'
-    ok = false
-  } else if (passwordStrength.value.score < 2) {
-    passErrors.password = 'La contraseña es muy débil'
-    ok = false
-  }
-  if (pass.password !== pass.password_confirmation) {
-    passErrors.password_confirmation = 'Las contraseñas no coinciden'
-    ok = false
-  }
+  if (!pass.current_password.trim()) { passErrors.current_password = 'Ingresá tu contraseña actual'; ok = false }
+  if (pass.password.length < 8)      { passErrors.password = 'Mínimo 8 caracteres'; ok = false }
+  else if (passwordStrength.value.score < 2) { passErrors.password = 'La contraseña es muy débil'; ok = false }
+  if (pass.password !== pass.password_confirmation) { passErrors.password_confirmation = 'Las contraseñas no coinciden'; ok = false }
   return ok
 }
 
-// ── Fetch perfil ──────────────────────────────────────────────────────
 async function fetchProfile() {
   loading.value = true
   error.value   = null
@@ -107,11 +92,10 @@ async function fetchProfile() {
   }
 }
 
-// ── Guardar datos personales ──────────────────────────────────────────
 async function onSave() {
-  saving.value  = true
-  okMsg.value   = null
-  error.value   = null
+  saving.value = true
+  okMsg.value  = null
+  error.value  = null
   try {
     const { data } = await updateProfile({ ...form })
     me.value = data.data
@@ -125,10 +109,7 @@ async function onSave() {
   }
 }
 
-// ── Avatar ────────────────────────────────────────────────────────────
-function onPickAvatar() {
-  document.getElementById('avatarInput').click()
-}
+function onPickAvatar() { document.getElementById('avatarInput').click() }
 
 function onFileChange(e) {
   const file = e.target.files?.[0]
@@ -157,7 +138,6 @@ async function uploadAvatarNow(file) {
   }
 }
 
-// ── Cambiar contraseña ────────────────────────────────────────────────
 async function onChangePassword() {
   if (!validatePassword()) return
   pOkMsg.value    = null
@@ -175,16 +155,8 @@ async function onChangePassword() {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────
 function roleLabel(role) {
-  return {
-    admin:       'Administrador',
-    medico:      'Médico',
-    cultivador:  'Cultivador',
-    abogado:     'Abogado',
-    auditor:     'Auditor',
-    socio:       'Socio',
-  }[role] || role
+  return { admin: 'Administrador', medico: 'Médico', cultivador: 'Cultivador', abogado: 'Abogado', auditor: 'Auditor', socio: 'Socio' }[role] || role
 }
 
 function initials(first, last) {
@@ -195,262 +167,226 @@ onMounted(fetchProfile)
 </script>
 
 <template>
-  <div class="container-fluid py-4 px-3 px-md-4" style="max-width:960px">
+  <div class="pfl">
 
     <!-- Header -->
-    <div class="mb-4">
-      <h1 class="h3 fw-bold mb-0">Mi perfil</h1>
-      <p class="text-muted small mb-0">Gestioná tu información personal y seguridad de acceso</p>
+    <div class="pfl__header">
+      <h1 class="pfl__title">Mi perfil</h1>
+      <p class="pfl__sub">Gestioná tu información personal y seguridad de acceso</p>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border text-success"></div>
+    <div v-if="loading" class="pfl__loading">
+      <div class="pfl__spinner"></div>
     </div>
 
     <template v-else>
 
       <!-- Alertas globales -->
-      <div v-if="error" class="alert alert-danger alert-dismissible d-flex align-items-center gap-2 mb-4" role="alert">
+      <div v-if="error" class="pfl__alert pfl__alert--danger">
         <i class="bi bi-exclamation-triangle-fill"></i>
         <span>{{ error }}</span>
-        <button class="btn-close" @click="error=null"></button>
+        <button class="pfl__alert-close" @click="error=null"><i class="bi bi-x-lg"></i></button>
       </div>
-      <div v-if="okMsg" class="alert alert-success alert-dismissible d-flex align-items-center gap-2 mb-4" role="alert">
+      <div v-if="okMsg" class="pfl__alert pfl__alert--success">
         <i class="bi bi-check-circle-fill"></i>
         <span>{{ okMsg }}</span>
-        <button class="btn-close" @click="okMsg=null"></button>
+        <button class="pfl__alert-close" @click="okMsg=null"><i class="bi bi-x-lg"></i></button>
       </div>
 
-      <div class="row g-4">
+      <div class="pfl__body">
 
-        <!-- ── Columna izquierda: avatar + info básica ── -->
-        <div class="col-12 col-lg-4">
+        <!-- ── Columna izquierda ── -->
+        <div class="pfl__aside">
 
-          <!-- Card avatar -->
-          <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body text-center py-4">
-              <div class="avatar-wrap mx-auto mb-3" @click="onPickAvatar">
-                <img
-                  v-if="avatarPreview"
-                  :src="avatarPreview"
-                  class="avatar-img"
-                  alt="Avatar"
-                />
-                <div v-else class="avatar-placeholder">
-                  {{ initials(form.first_name, form.last_name) }}
-                </div>
-                <div class="avatar-overlay">
-                  <i class="bi bi-camera-fill"></i>
-                </div>
-                <div v-if="avatarSaving" class="avatar-loading">
-                  <div class="spinner-border spinner-border-sm text-white"></div>
-                </div>
-              </div>
-
-              <h5 class="fw-bold mb-0">{{ form.first_name }} {{ form.last_name }}</h5>
-              <p class="text-muted small mb-2">{{ form.email }}</p>
-              <span class="badge rounded-pill px-3" style="background:var(--brand-primary);font-size:.75rem">
-                {{ roleLabel(me?.role) }}
-              </span>
-
-              <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/webp" class="d-none" @change="onFileChange" />
-
-              <div class="mt-3">
-                <button class="btn btn-sm btn-outline-secondary w-100" @click="onPickAvatar" :disabled="avatarSaving">
-                  <i class="bi bi-image me-1"></i>
-                  {{ avatarSaving ? 'Subiendo...' : 'Cambiar foto' }}
-                </button>
-                <div class="text-muted" style="font-size:.72rem;margin-top:.4rem">JPG, PNG o WebP · máx 5 MB</div>
+          <!-- Avatar card -->
+          <div class="pfl__card pfl__avatar-card">
+            <div class="pfl__avatar-wrap" @click="onPickAvatar">
+              <img v-if="avatarPreview" :src="avatarPreview" class="pfl__avatar-img" alt="Avatar" />
+              <div v-else class="pfl__avatar-placeholder">{{ initials(form.first_name, form.last_name) }}</div>
+              <div class="pfl__avatar-overlay"><i class="bi bi-camera-fill"></i></div>
+              <div v-if="avatarSaving" class="pfl__avatar-loading">
+                <div class="pfl__spinner pfl__spinner--sm pfl__spinner--white"></div>
               </div>
             </div>
+
+            <h5 class="pfl__avatar-name">{{ form.first_name }} {{ form.last_name }}</h5>
+            <p class="pfl__avatar-email">{{ form.email }}</p>
+            <span class="pfl__role-badge">{{ roleLabel(me?.role) }}</span>
+
+            <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" @change="onFileChange" />
+
+            <button class="pfl__btn-secondary pfl__avatar-btn" @click="onPickAvatar" :disabled="avatarSaving">
+              <i class="bi bi-image"></i>
+              {{ avatarSaving ? 'Subiendo...' : 'Cambiar foto' }}
+            </button>
+            <div class="pfl__avatar-hint">JPG, PNG o WebP · máx 5 MB</div>
           </div>
 
-          <!-- Info de cuenta (solo lectura) -->
-          <div class="card border-0 shadow-sm">
-            <div class="card-header bg-transparent border-0 pt-3 pb-0">
-              <strong class="small text-uppercase text-muted" style="letter-spacing:.05em">Cuenta</strong>
-            </div>
-            <div class="card-body small pt-2">
-              <dl class="row mb-0 g-1">
-                <dt class="col-5 fw-normal text-muted">ID usuario</dt>
-                <dd class="col-7 font-monospace">#{{ me?.id }}</dd>
-                <dt class="col-5 fw-normal text-muted">Rol</dt>
-                <dd class="col-7">{{ roleLabel(me?.role) }}</dd>
-                <dt class="col-5 fw-normal text-muted">Club ID</dt>
-                <dd class="col-7 font-monospace">#{{ me?.club_id }}</dd>
-              </dl>
-            </div>
+          <!-- Info de cuenta -->
+          <div class="pfl__card">
+            <div class="pfl__card-section-title">Cuenta</div>
+            <dl class="pfl__dl">
+              <div class="pfl__dl-row"><dt>ID usuario</dt><dd class="pfl__mono">#{{ me?.id }}</dd></div>
+              <div class="pfl__dl-row"><dt>Rol</dt><dd>{{ roleLabel(me?.role) }}</dd></div>
+              <div class="pfl__dl-row"><dt>Club ID</dt><dd class="pfl__mono">#{{ me?.club_id }}</dd></div>
+            </dl>
           </div>
 
         </div>
 
-        <!-- ── Columna derecha: formularios ── -->
-        <div class="col-12 col-lg-8">
+        <!-- ── Columna derecha ── -->
+        <div class="pfl__main">
 
           <!-- Datos personales -->
-          <div class="card border-0 shadow-sm mb-4">
-            <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0 d-flex align-items-center justify-content-between">
+          <div class="pfl__card pfl__card--form">
+            <div class="pfl__card-header">
               <div>
-                <strong>Datos personales</strong>
-                <p class="text-muted small mb-0">Tu nombre, DNI y datos de contacto</p>
+                <div class="pfl__card-title">Datos personales</div>
+                <div class="pfl__card-desc">Tu nombre, DNI y datos de contacto</div>
               </div>
-              <button class="btn btn-success btn-sm px-3" :disabled="saving" @click="onSave">
-                <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
-                <i v-else class="bi bi-check2 me-1"></i>
+              <button class="pfl__btn-primary" :disabled="saving" @click="onSave">
+                <div v-if="saving" class="pfl__spinner pfl__spinner--sm pfl__spinner--white"></div>
+                <i v-else class="bi bi-check2"></i>
                 {{ saving ? 'Guardando...' : 'Guardar' }}
               </button>
             </div>
-            <div class="card-body">
-              <div class="row g-3">
-
-                <div class="col-md-6">
-                  <label class="form-label small fw-semibold">Nombre <span class="text-danger">*</span></label>
-                  <input v-model.trim="form.first_name" class="form-control" placeholder="Tu nombre" />
-                </div>
-
-                <div class="col-md-6">
-                  <label class="form-label small fw-semibold">Apellido <span class="text-danger">*</span></label>
-                  <input v-model.trim="form.last_name" class="form-control" placeholder="Tu apellido" />
-                </div>
-
-                <div class="col-md-5">
-                  <label class="form-label small fw-semibold">DNI</label>
-                  <input v-model.trim="form.dni" class="form-control" placeholder="12.345.678" />
-                </div>
-
-                <div class="col-md-4">
-                  <label class="form-label small fw-semibold">Fecha de nacimiento</label>
-                  <input v-model="form.birth_date" type="date" class="form-control" />
-                </div>
-
-                <div class="col-md-3">
-                  <label class="form-label small fw-semibold">Teléfono</label>
-                  <input v-model.trim="form.phone" class="form-control" placeholder="+54 9 11..." />
-                </div>
-
-                <div class="col-12">
-                  <label class="form-label small fw-semibold">Email <span class="text-danger">*</span></label>
-                  <input v-model.trim="form.email" type="email" class="form-control" placeholder="tu@email.com" />
-                  <div class="form-text">Cambiar el email afecta tu acceso al sistema.</div>
-                </div>
-
+            <div class="pfl__form-grid">
+              <div class="pfl__field">
+                <label class="pfl__label">Nombre <span class="pfl__required">*</span></label>
+                <input v-model.trim="form.first_name" class="pfl__input" placeholder="Tu nombre" />
+              </div>
+              <div class="pfl__field">
+                <label class="pfl__label">Apellido <span class="pfl__required">*</span></label>
+                <input v-model.trim="form.last_name" class="pfl__input" placeholder="Tu apellido" />
+              </div>
+              <div class="pfl__field">
+                <label class="pfl__label">DNI</label>
+                <input v-model.trim="form.dni" class="pfl__input" placeholder="12.345.678" />
+              </div>
+              <div class="pfl__field">
+                <label class="pfl__label">Fecha de nacimiento</label>
+                <input v-model="form.birth_date" type="date" class="pfl__input" />
+              </div>
+              <div class="pfl__field">
+                <label class="pfl__label">Teléfono</label>
+                <input v-model.trim="form.phone" class="pfl__input" placeholder="+54 9 11..." />
+              </div>
+              <div class="pfl__field pfl__field--full">
+                <label class="pfl__label">Email <span class="pfl__required">*</span></label>
+                <input v-model.trim="form.email" type="email" class="pfl__input" placeholder="tu@email.com" />
+                <div class="pfl__hint">Cambiar el email afecta tu acceso al sistema.</div>
               </div>
             </div>
           </div>
 
-          <!-- Seguridad / contraseña -->
-          <div class="card border-0 shadow-sm">
-            <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0">
-              <strong>Seguridad</strong>
-              <p class="text-muted small mb-0">Actualizá tu contraseña de acceso</p>
+          <!-- Seguridad -->
+          <div class="pfl__card pfl__card--form">
+            <div class="pfl__card-header">
+              <div>
+                <div class="pfl__card-title">Seguridad</div>
+                <div class="pfl__card-desc">Actualizá tu contraseña de acceso</div>
+              </div>
             </div>
-            <div class="card-body">
 
-              <div v-if="pError" class="alert alert-danger alert-dismissible d-flex align-items-center gap-2 mb-3" role="alert">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-                <span>{{ pError }}</span>
-                <button class="btn-close" @click="pError=null"></button>
-              </div>
-              <div v-if="pOkMsg" class="alert alert-success alert-dismissible d-flex align-items-center gap-2 mb-3" role="alert">
-                <i class="bi bi-check-circle-fill"></i>
-                <span>{{ pOkMsg }}</span>
-                <button class="btn-close" @click="pOkMsg=null"></button>
-              </div>
+            <div v-if="pError" class="pfl__alert pfl__alert--danger pfl__alert--inline">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              <span>{{ pError }}</span>
+              <button class="pfl__alert-close" @click="pError=null"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div v-if="pOkMsg" class="pfl__alert pfl__alert--success pfl__alert--inline">
+              <i class="bi bi-check-circle-fill"></i>
+              <span>{{ pOkMsg }}</span>
+              <button class="pfl__alert-close" @click="pOkMsg=null"><i class="bi bi-x-lg"></i></button>
+            </div>
 
-              <div class="row g-3">
+            <div class="pfl__form-grid">
 
-                <!-- Contraseña actual -->
-                <div class="col-12">
-                  <label class="form-label small fw-semibold">Contraseña actual <span class="text-danger">*</span></label>
-                  <div class="input-group">
-                    <input
-                      v-model="pass.current_password"
-                      :type="showCurrent ? 'text' : 'password'"
-                      class="form-control"
-                      :class="{ 'is-invalid': passErrors.current_password }"
-                      placeholder="Tu contraseña actual"
-                      autocomplete="current-password"
-                    />
-                    <button class="btn btn-outline-secondary" type="button" @click="showCurrent=!showCurrent">
-                      <i :class="showCurrent ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
-                    </button>
-                    <div class="invalid-feedback">{{ passErrors.current_password }}</div>
-                  </div>
+              <!-- Contraseña actual -->
+              <div class="pfl__field pfl__field--full">
+                <label class="pfl__label">Contraseña actual <span class="pfl__required">*</span></label>
+                <div class="pfl__input-row">
+                  <input
+                    v-model="pass.current_password"
+                    :type="showCurrent ? 'text' : 'password'"
+                    class="pfl__input"
+                    :class="{ 'pfl__input--error': passErrors.current_password }"
+                    placeholder="Tu contraseña actual"
+                    autocomplete="current-password"
+                  />
+                  <button class="pfl__eye-btn" type="button" @click="showCurrent=!showCurrent">
+                    <i :class="showCurrent ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                  </button>
                 </div>
-
-                <!-- Nueva contraseña -->
-                <div class="col-md-6">
-                  <label class="form-label small fw-semibold">Nueva contraseña <span class="text-danger">*</span></label>
-                  <div class="input-group">
-                    <input
-                      v-model="pass.password"
-                      :type="showNew ? 'text' : 'password'"
-                      class="form-control"
-                      :class="{ 'is-invalid': passErrors.password }"
-                      placeholder="Mínimo 8 caracteres"
-                      autocomplete="new-password"
-                    />
-                    <button class="btn btn-outline-secondary" type="button" @click="showNew=!showNew">
-                      <i :class="showNew ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
-                    </button>
-                    <div class="invalid-feedback">{{ passErrors.password }}</div>
-                  </div>
-                  <!-- Barra de fortaleza -->
-                  <div v-if="pass.password" class="mt-2">
-                    <div class="progress" style="height:4px;border-radius:2px">
-                      <div
-                        class="progress-bar"
-                        :class="`bg-${passwordStrength.color}`"
-                        :style="{ width: strengthWidth, transition: 'width .3s' }"
-                      ></div>
-                    </div>
-                    <div class="d-flex justify-content-between mt-1">
-                      <span class="small" :class="`text-${passwordStrength.color}`">{{ passwordStrength.label }}</span>
-                      <span class="small text-muted">{{ pass.password.length }} caracteres</span>
-                    </div>
-                    <ul class="pass-hints small text-muted mt-1 mb-0 ps-3">
-                      <li :class="pass.password.length >= 8 ? 'text-success' : ''">Mínimo 8 caracteres</li>
-                      <li :class="/[A-Z]/.test(pass.password) ? 'text-success' : ''">Al menos una mayúscula</li>
-                      <li :class="/[0-9]/.test(pass.password) ? 'text-success' : ''">Al menos un número</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <!-- Confirmar contraseña -->
-                <div class="col-md-6">
-                  <label class="form-label small fw-semibold">Confirmar contraseña <span class="text-danger">*</span></label>
-                  <div class="input-group">
-                    <input
-                      v-model="pass.password_confirmation"
-                      :type="showConfirm ? 'text' : 'password'"
-                      class="form-control"
-                      :class="{
-                        'is-invalid': passErrors.password_confirmation,
-                        'is-valid': pass.password && pass.password === pass.password_confirmation
-                      }"
-                      placeholder="Repetí la nueva contraseña"
-                      autocomplete="new-password"
-                    />
-                    <button class="btn btn-outline-secondary" type="button" @click="showConfirm=!showConfirm">
-                      <i :class="showConfirm ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
-                    </button>
-                    <div class="invalid-feedback">{{ passErrors.password_confirmation }}</div>
-                    <div class="valid-feedback">Las contraseñas coinciden ✓</div>
-                  </div>
-                </div>
-
+                <div v-if="passErrors.current_password" class="pfl__field-error">{{ passErrors.current_password }}</div>
               </div>
 
-              <div class="mt-3 d-flex justify-content-end">
-                <button class="btn btn-success px-4" :disabled="passSaving" @click="onChangePassword">
-                  <span v-if="passSaving" class="spinner-border spinner-border-sm me-2"></span>
-                  <i v-else class="bi bi-shield-lock me-1"></i>
-                  {{ passSaving ? 'Actualizando...' : 'Actualizar contraseña' }}
-                </button>
+              <!-- Nueva contraseña -->
+              <div class="pfl__field">
+                <label class="pfl__label">Nueva contraseña <span class="pfl__required">*</span></label>
+                <div class="pfl__input-row">
+                  <input
+                    v-model="pass.password"
+                    :type="showNew ? 'text' : 'password'"
+                    class="pfl__input"
+                    :class="{ 'pfl__input--error': passErrors.password }"
+                    placeholder="Mínimo 8 caracteres"
+                    autocomplete="new-password"
+                  />
+                  <button class="pfl__eye-btn" type="button" @click="showNew=!showNew">
+                    <i :class="showNew ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                  </button>
+                </div>
+                <div v-if="passErrors.password" class="pfl__field-error">{{ passErrors.password }}</div>
+                <div v-if="pass.password" class="pfl__strength">
+                  <div class="pfl__strength-bar-wrap">
+                    <div class="pfl__strength-bar" :style="{ width: strengthWidth, background: passwordStrength.color, transition: 'width .3s' }"></div>
+                  </div>
+                  <div class="pfl__strength-row">
+                    <span :style="{ color: passwordStrength.color, fontSize: '.8rem', fontWeight: 600 }">{{ passwordStrength.label }}</span>
+                    <span class="pfl__strength-chars">{{ pass.password.length }} caracteres</span>
+                  </div>
+                  <ul class="pfl__hints">
+                    <li :class="pass.password.length >= 8 ? 'pfl__hint--ok' : ''">Mínimo 8 caracteres</li>
+                    <li :class="/[A-Z]/.test(pass.password) ? 'pfl__hint--ok' : ''">Al menos una mayúscula</li>
+                    <li :class="/[0-9]/.test(pass.password) ? 'pfl__hint--ok' : ''">Al menos un número</li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Confirmar contraseña -->
+              <div class="pfl__field">
+                <label class="pfl__label">Confirmar contraseña <span class="pfl__required">*</span></label>
+                <div class="pfl__input-row">
+                  <input
+                    v-model="pass.password_confirmation"
+                    :type="showConfirm ? 'text' : 'password'"
+                    class="pfl__input"
+                    :class="{
+                      'pfl__input--error': passErrors.password_confirmation,
+                      'pfl__input--ok': pass.password && pass.password === pass.password_confirmation
+                    }"
+                    placeholder="Repetí la nueva contraseña"
+                    autocomplete="new-password"
+                  />
+                  <button class="pfl__eye-btn" type="button" @click="showConfirm=!showConfirm">
+                    <i :class="showConfirm ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                  </button>
+                </div>
+                <div v-if="passErrors.password_confirmation" class="pfl__field-error">{{ passErrors.password_confirmation }}</div>
+                <div v-else-if="pass.password && pass.password === pass.password_confirmation" class="pfl__field-ok">Las contraseñas coinciden ✓</div>
               </div>
 
             </div>
+
+            <div class="pfl__form-actions">
+              <button class="pfl__btn-primary" :disabled="passSaving" @click="onChangePassword">
+                <div v-if="passSaving" class="pfl__spinner pfl__spinner--sm pfl__spinner--white"></div>
+                <i v-else class="bi bi-shield-lock"></i>
+                {{ passSaving ? 'Actualizando...' : 'Actualizar contraseña' }}
+              </button>
+            </div>
+
           </div>
 
         </div>
@@ -460,57 +396,109 @@ onMounted(fetchProfile)
 </template>
 
 <style scoped>
-/* Avatar interactivo */
-.avatar-wrap {
-  position: relative;
-  width: 110px;
-  height: 110px;
-  border-radius: 50%;
-  cursor: pointer;
-  overflow: hidden;
-}
-.avatar-img,
-.avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-}
-.avatar-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--brand-primary, #1b5e20) 15%, white);
-  color: var(--brand-primary, #1b5e20);
-  font-size: 2rem;
-  font-weight: 700;
-}
-.avatar-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 1.4rem;
-  opacity: 0;
-  transition: opacity .2s;
-  border-radius: 50%;
-}
-.avatar-wrap:hover .avatar-overlay { opacity: 1; }
-.avatar-loading {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
+/* Layout */
+.pfl { padding: 2rem 1.75rem 3rem; max-width: 960px; margin: 0 auto; }
+@media (max-width: 768px) { .pfl { padding: 1.25rem 1rem 2rem; } }
 
-/* Hints de contraseña */
-.pass-hints { list-style: none; padding-left: 0; }
-.pass-hints li::before { content: '○ '; }
-.pass-hints li.text-success::before { content: '✓ '; }
+/* Header */
+.pfl__header { margin-bottom: 1.5rem; }
+.pfl__title  { font-size: 1.5rem; font-weight: 700; color: #0f172a; margin: 0 0 .15rem; }
+.pfl__sub    { font-size: .82rem; color: #64748b; margin: 0; }
+
+/* Loading */
+.pfl__loading { display: flex; justify-content: center; padding: 3rem; }
+
+/* Spinner */
+.pfl__spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #1a3d2e; border-radius: 50%; animation: pfl-spin .8s linear infinite; display: inline-block; }
+.pfl__spinner--sm { width: 16px; height: 16px; border-width: 2px; }
+.pfl__spinner--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
+@keyframes pfl-spin { to { transform: rotate(360deg); } }
+
+/* Alerts */
+.pfl__alert { display: flex; align-items: center; gap: .65rem; padding: .75rem 1rem; border-radius: 10px; margin-bottom: 1rem; font-size: .875rem; }
+.pfl__alert--danger  { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+.pfl__alert--success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+.pfl__alert--inline  { margin-bottom: 1rem; }
+.pfl__alert-close    { margin-left: auto; background: none; border: none; cursor: pointer; color: inherit; opacity: .6; padding: .1rem; }
+.pfl__alert-close:hover { opacity: 1; }
+
+/* 2-col body */
+.pfl__body  { display: grid; grid-template-columns: 280px 1fr; gap: 1.5rem; align-items: start; }
+@media (max-width: 768px) { .pfl__body { grid-template-columns: 1fr; } }
+
+/* Cards */
+.pfl__card { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 1.25rem; margin-bottom: 1rem; }
+.pfl__card--form { padding: 1.25rem; }
+
+/* Avatar card */
+.pfl__avatar-card { text-align: center; }
+.pfl__avatar-wrap { position: relative; width: 110px; height: 110px; border-radius: 50%; cursor: pointer; overflow: hidden; margin: 0 auto 1rem; }
+.pfl__avatar-img  { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.pfl__avatar-placeholder { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, #1b5e20 15%, white); color: #1b5e20; font-size: 2rem; font-weight: 700; }
+.pfl__avatar-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.4rem; opacity: 0; transition: opacity .2s; border-radius: 50%; }
+.pfl__avatar-wrap:hover .pfl__avatar-overlay { opacity: 1; }
+.pfl__avatar-loading { position: absolute; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.pfl__avatar-name  { font-weight: 700; font-size: 1rem; color: #0f172a; margin: 0 0 .2rem; }
+.pfl__avatar-email { font-size: .82rem; color: #64748b; margin: 0 0 .5rem; }
+.pfl__role-badge   { display: inline-block; background: #1a3d2e; color: #fff; border-radius: 99px; padding: .25rem .8rem; font-size: .75rem; font-weight: 600; margin-bottom: .75rem; }
+.pfl__avatar-btn   { width: 100%; margin-bottom: .25rem; }
+.pfl__avatar-hint  { font-size: .7rem; color: #94a3b8; }
+
+/* Account info */
+.pfl__card-section-title { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .75rem; }
+.pfl__dl     { display: flex; flex-direction: column; gap: .5rem; }
+.pfl__dl-row { display: flex; justify-content: space-between; align-items: center; font-size: .82rem; }
+.pfl__dl-row dt { color: #64748b; font-weight: 400; }
+.pfl__dl-row dd { margin: 0; color: #0f172a; font-weight: 500; }
+.pfl__mono { font-family: monospace; }
+
+/* Card headers */
+.pfl__card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem; }
+.pfl__card-title  { font-size: .95rem; font-weight: 700; color: #0f172a; }
+.pfl__card-desc   { font-size: .78rem; color: #64748b; margin-top: .1rem; }
+
+/* Form grid */
+.pfl__form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .875rem; }
+@media (max-width: 560px) { .pfl__form-grid { grid-template-columns: 1fr; } }
+.pfl__field      { display: flex; flex-direction: column; gap: .3rem; }
+.pfl__field--full { grid-column: 1 / -1; }
+
+/* Inputs */
+.pfl__label       { font-size: .8rem; font-weight: 600; color: #374151; }
+.pfl__required    { color: #dc2626; }
+.pfl__input       { padding: .55rem .75rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; color: #1e293b; background: #fff; outline: none; transition: border-color .15s; width: 100%; box-sizing: border-box; }
+.pfl__input:focus { border-color: #1a3d2e; }
+.pfl__input--error { border-color: #ef4444; }
+.pfl__input--ok   { border-color: #22c55e; }
+.pfl__hint        { font-size: .75rem; color: #64748b; }
+.pfl__field-error { font-size: .78rem; color: #ef4444; }
+.pfl__field-ok    { font-size: .78rem; color: #15803d; }
+
+/* Password reveal */
+.pfl__input-row { display: flex; gap: 0; }
+.pfl__input-row .pfl__input { border-radius: 8px 0 0 8px; flex: 1; }
+.pfl__eye-btn { padding: 0 .75rem; border: 1.5px solid #e2e8f0; border-left: none; border-radius: 0 8px 8px 0; background: #fff; color: #64748b; cursor: pointer; transition: background .15s; }
+.pfl__eye-btn:hover { background: #f8fafc; }
+
+/* Strength bar */
+.pfl__strength { margin-top: .5rem; }
+.pfl__strength-bar-wrap { height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; margin-bottom: .35rem; }
+.pfl__strength-bar { height: 100%; border-radius: 2px; }
+.pfl__strength-row { display: flex; justify-content: space-between; margin-bottom: .25rem; }
+.pfl__strength-chars { font-size: .78rem; color: #94a3b8; }
+.pfl__hints { list-style: none; padding: 0; margin: .25rem 0 0; display: flex; flex-direction: column; gap: .15rem; }
+.pfl__hints li { font-size: .78rem; color: #94a3b8; }
+.pfl__hints li::before { content: '○ '; }
+.pfl__hints li.pfl__hint--ok { color: #15803d; }
+.pfl__hints li.pfl__hint--ok::before { content: '✓ '; }
+
+/* Buttons */
+.pfl__btn-primary   { display: inline-flex; align-items: center; gap: .4rem; background: #1a3d2e; color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+.pfl__btn-primary:hover:not(:disabled) { background: #0f2a1e; }
+.pfl__btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+.pfl__btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; background: #fff; border: 1.5px solid #e2e8f0; color: #374151; padding: .5rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 500; cursor: pointer; transition: background .15s; }
+.pfl__btn-secondary:hover:not(:disabled) { background: #f8fafc; }
+.pfl__btn-secondary:disabled { opacity: .6; cursor: not-allowed; }
+
+.pfl__form-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
 </style>

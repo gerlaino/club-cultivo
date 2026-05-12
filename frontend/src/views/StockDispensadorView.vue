@@ -26,18 +26,22 @@
             <th class="sdv__th-num">Disponible</th>
             <th class="sdv__th-num">P. sugerido</th>
             <th>Origen</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="s in stocksFiltrados" :key="s.id">
             <td class="sdv__td-forma">{{ formaLabel(s.forma_producto) }}</td>
             <td class="sdv__td-mono">{{ s.lote_codigo ?? s.lote?.codigo ?? '—' }}</td>
-            <td>{{ s.sede_id ?? '—' }}</td>
+            <td>{{ s.sede?.nombre ?? '—' }}</td>
             <td class="sdv__td-num" :class="{ 'sdv__td-bajo': s.cantidad < 5 }">
               {{ s.cantidad }}{{ s.unidad }}
             </td>
             <td class="sdv__td-num">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad }}</td>
             <td>{{ s.origen ?? '—' }}</td>
+            <td class="sdv__td-etiqueta">
+              <RouterLink :to="{ name: 'stock-etiqueta', params: { id: s.id } }" class="sdv__etiqueta-link" title="Ver etiqueta">🏷️</RouterLink>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -47,6 +51,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { listStocks } from '../lib/api.js'
 
 const FORMAS = [
@@ -150,4 +155,6 @@ function formatARS(n) {
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 
 @media (max-width: 767px) { .sdv { padding: var(--sp-4); } }
+.sdv__td-etiqueta { width: 36px; text-align: center; }
+.sdv__etiqueta-link { font-size: 1rem; text-decoration: none; cursor: pointer; }
 </style>

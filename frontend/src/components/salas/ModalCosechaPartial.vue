@@ -87,17 +87,13 @@
           </div>
 
           <!-- Sala destino -->
-          <div class="mcp-field" v-if="salas.length > 0">
-            <label class="mcp-label">
-              Sala destino
-              <span v-if="salas.length === 1" class="mcp-hint">auto-seleccionada</span>
-            </label>
-            <div v-if="salas.length === 1" class="mcp-sala-unica">
-              <i class="bi bi-house-door"></i> {{ salas[0].nombre }}
-            </div>
-            <select v-else v-model="salaDestinoId" class="mcp-input">
-              <option :value="null">— Sin mover (quedar en sala actual) —</option>
-              <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+          <div class="mcp-field">
+            <label class="mcp-label">Sala destino</label>
+            <select v-model="salaDestinoId" class="mcp-input">
+              <option :value="null">— Misma sala —</option>
+              <option v-for="s in salas" :key="s.id" :value="s.id">
+                {{ s.nombre }}{{ s.actual ? ' (actual)' : '' }}
+              </option>
             </select>
           </div>
 
@@ -160,8 +156,9 @@ const salas = computed(() => {
 })
 
 watch(salas, (arr) => {
-  if (arr.length === 1 && salaDestinoId.value === null) {
-    salaDestinoId.value = arr[0].id
+  if (salaDestinoId.value === null) {
+    const actual = arr.find(s => s.actual)
+    if (actual) salaDestinoId.value = actual.id
   }
 }, { immediate: true })
 

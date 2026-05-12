@@ -104,6 +104,7 @@
                     <span v-if="accion.tipo === 'registro_ambiental'">💧</span>
                     <span v-else-if="accion.tipo === 'registro_planta'">🌿</span>
                     <span v-else-if="accion.tipo === 'tarea'">📋</span>
+                    <span v-else-if="accion.tipo === 'avance_ciclo'">🔄</span>
                     <span v-else>📝</span>
                   </div>
                   <div class="av__accion-body">
@@ -332,16 +333,20 @@ const ejemplosContexto = computed(() => {
 
 function abrir() { abierto.value = true }
 
+// Instancias contextuales (sala, lote) ignoran el evento global — solo abren via su propio trigger.
+// El check es runtime (no en onMounted) para evitar edge-cases de timing con computed props.
+function abrirDesdeEvento() { if (!props.contexto) abrir() }
+
 function avEscapeHandler(e) {
   if (e.key === 'Escape' && abierto.value) cerrar()
 }
 
 onMounted(() => {
-  window.addEventListener('abrir-asistente-voz', abrir)
+  window.addEventListener('abrir-asistente-voz', abrirDesdeEvento)
   document.addEventListener('keydown', avEscapeHandler, true)
 })
 onUnmounted(() => {
-  window.removeEventListener('abrir-asistente-voz', abrir)
+  window.removeEventListener('abrir-asistente-voz', abrirDesdeEvento)
   document.removeEventListener('keydown', avEscapeHandler, true)
 })
 
@@ -443,7 +448,8 @@ function nuevaSesion() { resetear() }
 
 function labelTipo(tipo) {
   return { registro_ambiental:'Registro ambiental', registro_planta:'Registro de planta',
-    tarea:'Nueva tarea', nota_sala:'Nota de sala', nota_lote:'Nota de lote' }[tipo] || tipo
+    tarea:'Nueva tarea', nota_sala:'Nota de sala', nota_lote:'Nota de lote',
+    avance_ciclo:'Avance de ciclo' }[tipo] || tipo
 }
 
 function descripcionAccion(accion) {
@@ -466,6 +472,7 @@ function descripcionAccion(accion) {
   }
   if (accion.tipo === 'tarea') return d.titulo || 'Tarea sin título'
   if (accion.tipo === 'nota_sala' || accion.tipo === 'nota_lote') return d.contenido || 'Nota'
+  if (accion.tipo === 'avance_ciclo') return d.estado_nuevo ? `→ ${d.estado_nuevo}` : 'Avance de estado'
   return d.observaciones || ''
 }
 
@@ -556,6 +563,7 @@ function metaAccion(accion) {
 .av__accion--tarea { border-color:#ffe0b2; }
 .av__accion--registro_planta { border-color:#fce4ec; }
 .av__accion--nota_sala,.av__accion--nota_lote { border-color:#e0e7ff; }
+.av__accion--avance_ciclo { border-color:#d1fae5; background:#f0fdf4; }
 .av__accion-icono { font-size:20px; flex-shrink:0; margin-top:1px; }
 .av__accion-body  { flex:1; min-width:0; }
 .av__accion-tipo  { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:#6b8f71; margin-bottom:4px; }

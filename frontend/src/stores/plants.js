@@ -4,21 +4,21 @@ import { listPlants, getPlant } from "../lib/api";
 
 export const usePlantsStore = defineStore("plants", {
   state: () => ({
-    itemsByLote: new Map(),
+    itemsByLote: {},
     current: null,
     loading: false,
     error: null,
   }),
   getters: {
     byLote: (state) => (loteId) =>
-      state.itemsByLote.get(String(loteId)) || [],
+      state.itemsByLote[String(loteId)] || [],
   },
   actions: {
     async fetchByLote(loteId) {
       this.loading = true; this.error = null;
       try {
         const { data } = await listPlants({ lote_id: loteId });
-        this.itemsByLote.set(String(loteId), data || []);
+        this.itemsByLote[String(loteId)] = data || [];
       } catch (e) {
         logger.error("Plants.fetchByLote", e);
         this.error = e?.response?.data?.error || e.message;
@@ -41,8 +41,8 @@ export const usePlantsStore = defineStore("plants", {
       }
     },
     addToLote(loteId, planta) {
-      const arr = this.itemsByLote.get(String(loteId)) || [];
-      this.itemsByLote.set(String(loteId), [...arr, planta]);
+      const arr = this.itemsByLote[String(loteId)] || [];
+      this.itemsByLote[String(loteId)] = [...arr, planta];
     },
   },
 });

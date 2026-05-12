@@ -51,6 +51,9 @@
         Ver detalle
         <ChevronRight :size="14" :stroke-width="1.75" />
       </RouterLink>
+      <div class="sc__av-wrap" title="Registrar por voz (IA)">
+        <AsistenteVoz :mini="true" :contexto="contextoSala" />
+      </div>
       <button class="sc__btn sc__btn--secondary" @click.prevent="$emit('registrar-lectura', sala)">
         <Gauge :size="14" :stroke-width="1.75" />
         Registrar
@@ -63,13 +66,21 @@
 import { computed } from 'vue'
 import { AlertTriangle, ChevronRight, Gauge, Thermometer } from 'lucide-vue-next'
 import DsBadge from '../../design-system/components/Badge.vue'
+import AsistenteVoz from '../AsistenteVoz.vue'
 
 const props = defineProps({
   sala:    { type: Object, required: true },
-  alertas: { type: Array,  default: () => [] }, // alertas activas de esta sala
-  lotes:   { type: Array,  default: () => [] }, // lotes de esta sala
+  alertas: { type: Array,  default: () => [] },
+  lotes:   { type: Array,  default: () => [] },
 })
 defineEmits(['registrar-lectura'])
+
+const contextoSala = computed(() => ({
+  tipo:       'sala',
+  sala_id:    props.sala.id,
+  sala_nombre: props.sala.nombre,
+  plantas_count: props.sala.plantas_totales || 0,
+}))
 
 // Mayor severidad de alerta activa de esta sala
 const alertaMax = computed(() => {
@@ -239,4 +250,12 @@ const ultimaLectura      = computed(() => null)
   font-weight: 600;
 }
 .sc__btn--secondary:hover { background: var(--c-role-cultivador); color: #fff; }
+
+/* AsistenteVoz wrapper en footer */
+.sc__av-wrap { display: flex; align-items: center; }
+.sc__av-wrap :deep(.av__trigger--mini) {
+  width: 40px;
+  height: 40px;
+  box-shadow: 0 2px 6px rgba(27, 94, 32, 0.3);
+}
 </style>

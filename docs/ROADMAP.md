@@ -32,12 +32,12 @@ Objetivo: datos ambientales en tiempo real por sala.
 
 Objetivo: dashboards completos con datos históricos.
 
-- [ ] Rendimiento por cepa a lo largo del tiempo (gramos/m², THC% estimado)
-- [ ] Comparativa de lotes: mismo genotipo en distintas condiciones
-- [ ] Tasa de pérdida (plantas descartadas, causas)
-- [ ] Tiempo promedio por estadío por cepa
-- [ ] Exportación de reportes completos (PDF, Excel)
-- [ ] Vista legal / auditor: trazabilidad planta → dispensación para compliance REPROCANN
+- [x] Rendimiento por cepa — tabla con promedio, desvío, merma% (`AnaliticaView` tab Genéticas)
+- [x] Comparativa de lotes: mismo genotipo en distintas condiciones (`AnaliticaView` tab Comparativa)
+- [x] Tasa de pérdida (plantas descartadas, merma%) por cepa y lote (`AnaliticaView` tab Pérdidas)
+- [x] Tiempo promedio por estadío por cepa — de lote_eventos (`AnaliticaView` tab Ciclos)
+- [x] Exportación CSV por tab + PDF del tab activo en AnaliticaView
+- [x] Vista legal / auditor: trazabilidad planta → dispensación para compliance REPROCANN (`/auditor/trazabilidad` + link en admin sidebar)
 
 ---
 

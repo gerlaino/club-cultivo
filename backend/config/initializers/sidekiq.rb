@@ -13,6 +13,16 @@ Sidekiq.configure_server do |config|
         'cron'  => '0 8 * * *',
         'class' => 'ReprocannVencimientoJob',
         'description' => 'Genera alertas de vencimiento REPROCANN para todos los clubes'
+      },
+      'indicacion_vencimiento' => {
+        'cron'  => '0 8 * * *',
+        'class' => 'IndicacionVencimientoJob',
+        'description' => 'Genera alertas de vencimiento de indicaciones médicas para todos los clubes'
+      },
+      'stock_bajo' => {
+        'cron'  => '0 9 * * *',
+        'class' => 'StockBajoJob',
+        'description' => 'Genera alertas de stock bajo (< 50g) para todos los clubes'
       }
     )
   end

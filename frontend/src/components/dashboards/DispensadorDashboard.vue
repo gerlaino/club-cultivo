@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="dd__header">
       <div class="dd__greeting">
-        <h1 class="dd__title">Bienvenido, {{ auth.user?.first_name || auth.displayName }}</h1>
+        <h1 class="dd__title">{{ saludo }}, {{ auth.user?.first_name || auth.displayName }}</h1>
         <p class="dd__subtitle">{{ fechaHoy }}</p>
       </div>
       <RouterLink to="/dispensar" class="dd__cta">
@@ -12,38 +12,96 @@
       </RouterLink>
     </div>
 
-    <!-- KPIs -->
+    <!-- KPIs periodo -->
     <div class="dd__kpis">
       <div class="dd__kpi-card">
-        <DsStat label="Dispensaciones hoy" :value="loading ? '…' : kpis.dispensacionesHoy" />
+        <div class="dd__kpi-label">Dispensaciones hoy</div>
+        <div class="dd__kpi-val">{{ loading ? '…' : (analytics?.resumen?.dispensaciones_hoy ?? '—') }}</div>
+        <div class="dd__kpi-sub">{{ loading ? '' : `${formatG(analytics?.resumen?.gramos_hoy)} dispensados` }}</div>
       </div>
       <div class="dd__kpi-card">
-        <DsStat
-          label="Aporte socios hoy"
-          :value="loading ? '…' : formatARS(kpis.aporteHoy)"
-          tone="role-dispensador"
-        />
+        <div class="dd__kpi-label">Esta semana</div>
+        <div class="dd__kpi-val">{{ loading ? '…' : (analytics?.resumen?.dispensaciones_semana ?? '—') }}</div>
+        <div class="dd__kpi-sub">{{ loading ? '' : `${formatG(analytics?.resumen?.gramos_semana)}` }}</div>
       </div>
       <div class="dd__kpi-card">
-        <DsStat label="Productos disponibles" :value="loading ? '…' : kpis.productosDisponibles" />
+        <div class="dd__kpi-label">Este mes</div>
+        <div class="dd__kpi-val">{{ loading ? '…' : (analytics?.resumen?.dispensaciones_mes ?? '—') }}</div>
+        <div class="dd__kpi-sub">{{ loading ? '' : `${formatG(analytics?.resumen?.gramos_mes)}` }}</div>
       </div>
-      <div class="dd__kpi-card">
-        <DsStat label="Pacientes activos" :value="loading ? '…' : kpis.pacientesActivos" />
+      <div class="dd__kpi-card" :class="{ 'dd__kpi-card--warn': reprocannAlerta }">
+        <div class="dd__kpi-label">REPROCANN</div>
+        <div class="dd__kpi-val">{{ loading ? '…' : ((analytics?.reprocann?.vencidos ?? 0) + (analytics?.reprocann?.por_vencer ?? 0)) }}</div>
+        <div class="dd__kpi-sub dd__kpi-sub--warn" v-if="!loading && reprocannAlerta">
+          {{ analytics.reprocann.vencidos }} vencidos · {{ analytics.reprocann.por_vencer }} por vencer
+        </div>
+        <div class="dd__kpi-sub" v-else-if="!loading">pacientes con atención requerida</div>
+      </div>
+    </div>
+
+    <!-- Stock por producto -->
+    <div class="dd__section">
+      <div class="dd__section-head">
+        <h2 class="dd__section-title">Stock disponible</h2>
+        <RouterLink to="/stock" class="dd__section-link">Ver detalle →</RouterLink>
+      </div>
+      <div v-if="loading" class="dd__stock-grid">
+        <div class="dd__stock-card dd__skeleton" v-for="n in 4" :key="n" />
+      </div>
+      <div v-else-if="!analytics?.stocks?.length" class="dd__empty">Sin stock disponible en sedes.</div>
+      <div v-else class="dd__stock-grid">
+        <div
+          v-for="s in analytics.stocks"
+          :key="s.forma"
+          class="dd__stock-card"
+          :class="{ 'dd__stock-card--warn': s.alerta }"
+        >
+          <div class="dd__stock-forma">{{ s.forma }}</div>
+          <div class="dd__stock-cantidad">{{ formatG(s.cantidad_g) }}</div>
+          <div v-if="s.alerta" class="dd__stock-alerta">⚠ Stock bajo</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top pacientes del mes -->
+    <div class="dd__section">
+      <h2 class="dd__section-title">Top pacientes — mes actual</h2>
+      <div v-if="loading" class="dd__table-wrap">
+        <div class="dd__skeleton" v-for="n in 5" :key="n" style="height:36px;margin-bottom:4px;" />
+      </div>
+      <div v-else-if="!analytics?.top_pacientes?.length" class="dd__empty">Sin dispensaciones este mes.</div>
+      <div v-else class="dd__table-wrap">
+        <table class="dd__table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Paciente</th>
+              <th>DNI</th>
+              <th class="dd__th-r">Dispensaciones</th>
+              <th class="dd__th-r">Total gramos</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(p, i) in analytics.top_pacientes" :key="i">
+              <td class="dd__td-rank">{{ i + 1 }}</td>
+              <td class="dd__td-name">{{ p.iniciales }}</td>
+              <td class="dd__td-mono">…{{ p.dni_last4 }}</td>
+              <td class="dd__td-r">{{ p.dispens_count }}</td>
+              <td class="dd__td-r dd__td-bold">{{ formatG(p.total_g) }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
     <!-- Última actividad -->
     <div class="dd__section">
-      <h2 class="dd__section-title">Última actividad</h2>
-
-      <div v-if="loading" class="dd__table-wrap">
-        <div class="dd__skeleton" v-for="n in 5" :key="n" />
+      <div class="dd__section-head">
+        <h2 class="dd__section-title">Última actividad (hoy)</h2>
+        <RouterLink to="/historial" class="dd__section-link">Ver historial →</RouterLink>
       </div>
-
-      <div v-else-if="!dispensaciones.length" class="dd__empty">
-        Sin dispensaciones hoy.
-      </div>
-
+      <div v-if="loadingDisps" class="dd__empty">Cargando…</div>
+      <div v-else-if="!dispensaciones.length" class="dd__empty">Sin dispensaciones hoy.</div>
       <div v-else class="dd__table-wrap">
         <table class="dd__table">
           <thead>
@@ -51,17 +109,15 @@
               <th>Hora</th>
               <th>Paciente</th>
               <th>Producto</th>
-              <th class="dd__th-num">Cantidad</th>
-              <th class="dd__th-num">Total</th>
+              <th class="dd__th-r">Cantidad</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="d in dispensaciones.slice(0, 10)" :key="d.id">
+            <tr v-for="d in dispensaciones.slice(0, 8)" :key="d.id">
               <td class="dd__td-mono">{{ formatHora(d.created_at) }}</td>
               <td>{{ d.paciente_nombre }}</td>
               <td>{{ d.stock?.forma_producto ?? '—' }}</td>
-              <td class="dd__td-num">{{ d.cantidad }}{{ d.stock?.unidad ?? '' }}</td>
-              <td class="dd__td-num dd__td-monto">{{ formatARS(d.aporte_socio_ars) }}</td>
+              <td class="dd__td-r">{{ d.cantidad }}{{ d.stock?.unidad ?? '' }}</td>
             </tr>
           </tbody>
         </table>
@@ -73,35 +129,29 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
-import { listDispensacionesFecha, listPacientes, listStocks } from '../../lib/api.js'
+import { listDispensacionesFecha, getAnalyticsDispensador } from '../../lib/api.js'
 import DsStat from '../../design-system/components/Stat.vue'
 import { PackagePlus } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 
-const loading        = ref(true)
+const loading      = ref(true)
+const loadingDisps = ref(true)
+const analytics    = ref(null)
 const dispensaciones = ref([])
-const totalPacientes = ref(0)
-const totalStocks    = ref(0)
 
-const hoy = new Date()
+const hora    = new Date().getHours()
+const saludo  = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
+const hoy     = new Date()
 const fechaHoy = (() => { const s = hoy.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() })()
 const fechaParam = hoy.toISOString().slice(0, 10)
 
-const kpis = computed(() => {
-  const d = dispensaciones.value
-  return {
-    dispensacionesHoy:   d.length,
-    aporteHoy:           d.reduce((s, x) => s + (x.aporte_socio_ars ?? 0), 0),
-    productosDisponibles: totalStocks.value,
-    pacientesActivos:    totalPacientes.value,
-  }
+const reprocannAlerta = computed(() => {
+  const r = analytics.value?.reprocann
+  return r && (r.vencidos > 0 || r.por_vencer > 0)
 })
 
-function formatARS(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
-}
+function formatG(g) { return g != null ? `${Number(g).toLocaleString('es-AR')} g` : '—' }
 
 function formatHora(ts) {
   if (!ts) return '—'
@@ -110,18 +160,17 @@ function formatHora(ts) {
 
 onMounted(async () => {
   try {
-    const [dRes, pRes, sRes] = await Promise.all([
+    const [aRes, dRes] = await Promise.all([
+      getAnalyticsDispensador(),
       listDispensacionesFecha({ fecha: fechaParam }),
-      listPacientes({ limite: 1 }),
-      listStocks(),
     ])
+    analytics.value      = aRes.data
     dispensaciones.value = dRes.data.dispensaciones ?? []
-    totalPacientes.value = pRes.data?.meta?.total ?? pRes.data?.data?.length ?? 0
-    totalStocks.value    = (Array.isArray(sRes.data) ? sRes.data : []).filter(s => s.cantidad > 0).length
   } catch {
-    // silenciar — los KPIs mostrarán 0
+    // silenciar
   } finally {
-    loading.value = false
+    loading.value      = false
+    loadingDisps.value = false
   }
 })
 </script>
@@ -131,113 +180,53 @@ onMounted(async () => {
   padding: var(--sp-6) var(--sp-8);
   max-width: 960px;
 }
+@media (max-width: 767px) { .dd { padding: var(--sp-4); } }
 
 /* Header */
-.dd__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-6);
-}
-.dd__title {
-  font-family: var(--font-display);
-  font-size: var(--fs-24);
-  font-weight: 600;
-  color: var(--c-ink-900);
-  margin: 0;
-}
-.dd__subtitle {
-  font-size: var(--fs-13);
-  color: var(--c-ink-500);
-  margin: var(--sp-1) 0 0;
-  text-transform: capitalize;
-}
-.dd__cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  background: var(--c-role-dispensador);
-  color: #fff;
-  border: none;
-  padding: .55rem 1.1rem;
-  border-radius: 8px;
-  font-size: var(--fs-14);
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: opacity .15s;
-}
+.dd__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); margin-bottom: var(--sp-6); flex-wrap: wrap; }
+.dd__title { font-family: var(--font-display); font-size: var(--fs-24); font-weight: 600; color: var(--c-ink-900); margin: 0; }
+.dd__subtitle { font-size: var(--fs-13); color: var(--c-ink-500); margin: var(--sp-1) 0 0; text-transform: capitalize; }
+.dd__cta { display: inline-flex; align-items: center; gap: var(--sp-2); background: var(--c-role-dispensador); color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 8px; font-size: var(--fs-14); font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; transition: opacity .15s; }
 .dd__cta:hover { opacity: .88; }
 
 /* KPIs */
-.dd__kpis {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-6);
-}
-.dd__kpi-card {
-  background: #fff;
-  border: 1px solid var(--c-ink-300);
-  border-radius: var(--r-lg);
-  padding: var(--sp-5);
-}
+.dd__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-4); margin-bottom: var(--sp-6); }
+@media (max-width: 900px) { .dd__kpis { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .dd__kpis { grid-template-columns: 1fr 1fr; gap: var(--sp-3); } }
+.dd__kpi-card { background: #fff; border: 1px solid var(--c-ink-100); border-radius: var(--r-lg); padding: var(--sp-4); }
+.dd__kpi-card--warn { border-color: #fca5a5; background: #fff5f5; }
+.dd__kpi-label { font-size: var(--fs-11); font-weight: 600; color: var(--c-ink-400); text-transform: uppercase; letter-spacing: .05em; margin-bottom: var(--sp-1); }
+.dd__kpi-val { font-size: var(--fs-28); font-weight: 800; color: var(--c-ink-900); line-height: 1; }
+.dd__kpi-sub { font-size: var(--fs-12); color: var(--c-ink-500); margin-top: var(--sp-1); }
+.dd__kpi-sub--warn { color: #dc2626; font-weight: 600; }
 
-/* Section */
-.dd__section-title {
-  font-size: var(--fs-15);
-  font-weight: 700;
-  color: var(--c-ink-900);
-  margin: 0 0 var(--sp-4);
-}
+/* Sections */
+.dd__section { margin-bottom: var(--sp-6); }
+.dd__section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-3); }
+.dd__section-title { font-size: var(--fs-15); font-weight: 700; color: var(--c-ink-900); margin: 0; }
+.dd__section-link { font-size: var(--fs-13); color: var(--c-ink-500); text-decoration: none; }
+.dd__section-link:hover { color: var(--c-ink-900); }
+
+/* Stock grid */
+.dd__stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); }
+.dd__stock-card { background: #fff; border: 1px solid var(--c-ink-100); border-radius: var(--r-lg); padding: var(--sp-4); }
+.dd__stock-card--warn { border-color: #fca5a5; background: #fff5f5; }
+.dd__stock-forma { font-size: var(--fs-12); font-weight: 600; color: var(--c-ink-500); text-transform: uppercase; letter-spacing: .04em; margin-bottom: var(--sp-1); }
+.dd__stock-cantidad { font-size: var(--fs-22); font-weight: 800; color: var(--c-ink-900); }
+.dd__stock-alerta { font-size: var(--fs-11); font-weight: 700; color: #dc2626; margin-top: var(--sp-1); }
 
 /* Table */
+.dd__empty { color: var(--c-ink-400); font-size: var(--fs-14); padding: var(--sp-4); background: var(--c-ink-50); border-radius: var(--r-md); }
 .dd__table-wrap { overflow-x: auto; }
-.dd__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-14);
-}
-.dd__table th {
-  text-align: left;
-  font-size: var(--fs-12);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  color: var(--c-ink-500);
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 2px solid var(--c-ink-300);
-}
-.dd__table td {
-  padding: var(--sp-3);
-  border-bottom: 1px solid var(--c-ink-100);
-  color: var(--c-ink-900);
-}
-.dd__table tr:last-child td { border-bottom: none; }
-.dd__table tr:hover td { background: var(--c-leaf-50); }
-.dd__td-mono { font-family: var(--font-mono); font-size: var(--fs-13); }
-.dd__th-num, .dd__td-num { text-align: right; }
-.dd__td-monto { font-weight: 600; color: var(--c-role-dispensador); }
-
-/* Empty */
-.dd__empty { font-size: var(--fs-14); color: var(--c-ink-500); padding: var(--sp-4) 0; }
-
-/* Skeleton */
-.dd__skeleton {
-  height: 44px;
-  background: var(--c-ink-100);
-  border-radius: var(--r-md);
-  margin-bottom: var(--sp-2);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-
-/* Responsive */
-@media (max-width: 767px) {
-  .dd { padding: var(--sp-4); }
-  .dd__kpis { grid-template-columns: repeat(2, 1fr); }
-  .dd__header { flex-direction: column; }
-}
+.dd__table { width: 100%; border-collapse: collapse; font-size: var(--fs-13); }
+.dd__table th { text-align: left; font-size: var(--fs-11); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--c-ink-400); padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--c-ink-100); }
+.dd__th-r { text-align: right; }
+.dd__table td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--c-ink-50); color: var(--c-ink-800); }
+.dd__td-r { text-align: right; }
+.dd__td-bold { font-weight: 700; }
+.dd__td-mono { font-family: monospace; font-size: var(--fs-12); }
+.dd__td-rank { font-weight: 800; color: var(--c-ink-400); font-size: var(--fs-12); }
+.dd__td-name { font-weight: 600; }
+.dd__skeleton { background: var(--c-ink-100); border-radius: var(--r-md); animation: dd-pulse 1.2s ease infinite; }
+@keyframes dd-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 </style>

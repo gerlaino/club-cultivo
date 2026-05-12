@@ -3,7 +3,14 @@ Rails.application.routes.draw do
   get  "/up", to: "health#show"
 
   # QR público — sin prefijo /api para que los links de QR funcionen siempre
-  get "/p/:codigo_qr", to: "public/plantas#show_qr", defaults: { format: :json }
+  get "/p/:codigo_qr", to: "public/plantas#show_qr",   defaults: { format: :json }
+  get "/s/:codigo_qr", to: "public/stocks#show_qr",    defaults: { format: :json }
+  get "/c/:token",     to: "public/carnets#show",      defaults: { format: :json }
+
+  # API pública para investigación — sin auth, datos anonimizados agregados
+  scope '/api/public', defaults: { format: :json } do
+    get 'benchmark', to: 'public/benchmark#show'
+  end
 
   # Web pública del club (accedida desde el sitio web externo del club)
   namespace :public, defaults: { format: :json } do
@@ -33,6 +40,14 @@ Rails.application.routes.draw do
     get "/me/movimientos", to: "me#movimientos"
     get "/stats",          to: "stats#show"
 
+    scope '/analytics', controller: :analytics do
+      get :rendimiento_genetica
+      get :dispensador
+      get :produccion
+    end
+
+    resource :benchmark, only: [:show], controller: :benchmark
+
     post '/asistente/parsear',  to: 'asistente#parsear'
     post '/asistente/ejecutar', to: 'asistente#ejecutar'
 
@@ -49,6 +64,9 @@ Rails.application.routes.draw do
     end
 
     resources :lotes, only: [:index, :show, :update, :destroy] do
+      collection do
+        get :export_csv
+      end
       resource :costo, controller: :costo_lotes, only: [:show, :create, :update]
       resources :registros_ambientales, only: [:index, :create, :destroy]
       resources :lote_eventos,          only: [:index, :create]
@@ -62,13 +80,15 @@ Rails.application.routes.draw do
         post :cosechar_plantas
         post :aprobar_manicura
         post :rechazar_manicura
+        post :asignar_manicurador
         get  :timeline
       end
     end
 
-    resources :stocks, only: [:index, :create] do
+    resources :stocks, only: [:index, :show, :create, :update] do
       member do
         post :asignar
+        get  :trazabilidad
       end
     end
 
@@ -80,9 +100,13 @@ Rails.application.routes.draw do
     resources :notas, only: [:destroy]
 
     resources :pacientes do
+      collection do
+        get :export_csv
+      end
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
       resources :dispensaciones, only: [:index, :create]
+      resources :reprocann_renovaciones, only: [:index, :create, :update, :destroy]
       resources :documents, controller: 'patient_documents' do
         member do
           post  :firmar
@@ -100,7 +124,9 @@ Rails.application.routes.draw do
         end
       end
       member do
-        get :timeline
+        get    :timeline
+        post   :subir_reprocann
+        delete :eliminar_reprocann
       end
     end
     resources :paciente_notas, only: [:destroy]
@@ -124,11 +150,13 @@ Rails.application.routes.draw do
     resources :dispensaciones, only: [:index, :show, :update, :destroy] do
       collection do
         get  :mis_paquetes
+        get  :export_csv
         patch :iniciar_viaje
       end
       member do
         patch :entregar
         patch :reportar_fallo
+        patch :reprogramar
       end
     end
 
@@ -163,6 +191,8 @@ Rails.application.routes.draw do
 
     resources :document_templates
 
+    resources :ariccame_registros, only: [:index, :show]
+
     resource :plan, only: [:show], controller: 'plan'
     resources :documentos, only: [:index, :show, :create, :update, :destroy] do
       member do
@@ -175,6 +205,9 @@ Rails.application.routes.draw do
       member do
         patch :marcar_leida
       end
+      collection do
+        patch :marcar_todas_leidas
+      end
     end
 
     scope '/informes', controller: :informes do
@@ -183,6 +216,7 @@ Rails.application.routes.draw do
       get :dispensaciones,  action: :dispensaciones
       get :sedes,           action: :sedes
       get :cumplimiento
+      get :plan_vs_real
     end
 
     resources :sedes do

@@ -191,6 +191,52 @@ class InformesController < ApplicationController
     }
   end
 
+  def plan_vs_real
+    club = current_user.club
+    lotes = club.lotes.where.not(rendimiento_objetivo_g: nil)
+                      .or(club.lotes.where.not(plants_count_objetivo: nil))
+                      .order(created_at: :desc)
+                      .limit(50)
+
+    detalle = lotes.map do |l|
+      desv_rendimiento = if l.rendimiento_objetivo_g.present? && l.rendimiento_real_g.present?
+        ((l.rendimiento_real_g.to_f - l.rendimiento_objetivo_g.to_f) / l.rendimiento_objetivo_g.to_f * 100).round(1)
+      end
+      desv_plantas = if l.plants_count_objetivo.present? && l.plants_count_cosechadas.present?
+        ((l.plants_count_cosechadas.to_f - l.plants_count_objetivo.to_f) / l.plants_count_objetivo.to_f * 100).round(1)
+      end
+      {
+        id:                       l.id,
+        codigo:                   l.codigo,
+        estado:                   l.estado,
+        plants_count_objetivo:    l.plants_count_objetivo,
+        plants_count_cosechadas:  l.plants_count_cosechadas,
+        rendimiento_objetivo_g:   l.rendimiento_objetivo_g,
+        rendimiento_real_g:       l.rendimiento_real_g,
+        fecha_cosecha_estimada:   l.fecha_cosecha_estimada,
+        desv_rendimiento_pct:     desv_rendimiento,
+        desv_plantas_pct:         desv_plantas,
+      }
+    end
+
+    lotes_con_obj = lotes.where.not(rendimiento_objetivo_g: nil)
+    lotes_cerrados = lotes_con_obj.where.not(rendimiento_real_g: nil)
+
+    promedio_desv = if lotes_cerrados.any?
+      devs = lotes_cerrados.map do |l|
+        (l.rendimiento_real_g.to_f - l.rendimiento_objetivo_g.to_f) / l.rendimiento_objetivo_g.to_f * 100
+      end
+      (devs.sum / devs.size).round(1)
+    end
+
+    render json: {
+      total_lotes_con_objetivo: lotes_con_obj.count,
+      total_lotes_cerrados:     lotes_cerrados.count,
+      promedio_desviacion_pct:  promedio_desv,
+      detalle:                  detalle,
+    }
+  end
+
   private
 
   def periodo_rango

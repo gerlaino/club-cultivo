@@ -36,28 +36,52 @@
             <div class="atb__notif-panel">
               <div class="atb__notif-header">
                 <span class="atb__notif-title">Notificaciones</span>
-                <span v-if="notifCount > 0" class="atb__notif-count">{{ notifCount }} activa{{ notifCount !== 1 ? 's' : '' }}</span>
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                  <span v-if="notifCount > 0" class="atb__notif-count">{{ notifCount }} activa{{ notifCount !== 1 ? 's' : '' }}</span>
+                  <button v-if="internasNoLeidas.length" class="atb__notif-clear" @click="marcarTodasInternas">Leer todas</button>
+                </div>
               </div>
               <DsEmpty
                 v-if="!notifCount"
                 title="Estás al día. Nada pendiente."
                 class="atb__notif-empty"
               />
-              <div v-else class="atb__notif-list">
-                <RouterLink
-                  v-for="a in alertasSlice"
-                  :key="a.id"
-                  :to="a.sala_id ? { name: 'sala-ambiente', params: { id: a.sala_id } } : '/'"
-                  class="atb__notif-item"
-                  @click="bellOpen = false"
-                >
-                  <span class="atb__notif-ico atb__notif-ico--amber">{{ TIPO_ICON[a.tipo] || '⚠️' }}</span>
-                  <div class="atb__notif-body">
-                    <div class="atb__notif-msg">{{ a.regla_nombre || a.tipo }}</div>
-                    <div class="atb__notif-time">{{ formatTime(a.generada_at) }}</div>
+              <template v-else>
+                <!-- Alertas ambientales -->
+                <div v-if="alertasSlice.length" class="atb__notif-section">Ambiente</div>
+                <div v-if="alertasSlice.length" class="atb__notif-list">
+                  <RouterLink
+                    v-for="a in alertasSlice"
+                    :key="a.id"
+                    :to="a.sala_id ? { name: 'sala-ambiente', params: { id: a.sala_id } } : '/'"
+                    class="atb__notif-item"
+                    @click="bellOpen = false"
+                  >
+                    <span class="atb__notif-ico">{{ TIPO_ICON[a.tipo] || '⚠️' }}</span>
+                    <div class="atb__notif-body">
+                      <div class="atb__notif-msg">{{ a.regla_nombre || a.tipo }}</div>
+                      <div class="atb__notif-time">{{ formatTime(a.generada_at) }}</div>
+                    </div>
+                  </RouterLink>
+                </div>
+                <!-- Alertas internas -->
+                <div v-if="internasSlice.length" class="atb__notif-section">Sistema</div>
+                <div v-if="internasSlice.length" class="atb__notif-list">
+                  <div
+                    v-for="a in internasSlice"
+                    :key="a.id"
+                    class="atb__notif-item"
+                    :class="`atb__notif-item--${a.severidad}`"
+                    @click="marcarInternaLeida(a.id); bellOpen = false"
+                  >
+                    <span class="atb__notif-ico">{{ SEV_ICON[a.severidad] || 'ℹ️' }}</span>
+                    <div class="atb__notif-body">
+                      <div class="atb__notif-msg">{{ a.mensaje }}</div>
+                      <div class="atb__notif-time">{{ formatTime(a.created_at) }}</div>
+                    </div>
                   </div>
-                </RouterLink>
-              </div>
+                </div>
+              </template>
             </div>
           </template>
         </DsDropdown>
@@ -106,6 +130,7 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
+import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
 import DsDropdown from '../../design-system/components/Dropdown.vue'
 import DsAvatar   from '../../design-system/components/Avatar.vue'
 import DsEmpty    from '../../design-system/components/EmptyState.vue'
@@ -120,14 +145,17 @@ const club   = useClubStore()
 const ambStore = useAmbienteStore()
 
 useAlertasBell()
+const { noLeidas: internasNoLeidas, marcarLeida: marcarInternaLeida, marcarTodas: marcarTodasInternas } = useAlertasInternas()
 
 const bellOpen   = ref(false)
 const avatarOpen = ref(false)
 
-const notifCount  = computed(() => ambStore.alertasCount)
-const alertasSlice = computed(() => ambStore.alertasActivas.slice(0, 5))
+const notifCount   = computed(() => ambStore.alertasCount + internasNoLeidas.value.length)
+const alertasSlice = computed(() => ambStore.alertasActivas.slice(0, 3))
+const internasSlice = computed(() => internasNoLeidas.value.slice(0, 5))
 
 const TIPO_ICON = { temperatura: '🌡️', humedad: '💧', vpd: '🌫️', co2: '🌬️', ec: '⚡', ph: '🧪' }
+const SEV_ICON  = { info: 'ℹ️', warning: '⚠️', error: '🚨' }
 
 function formatTime(ts) {
   if (!ts) return ''
@@ -307,7 +335,12 @@ async function handleLogout() {
   transition: background var(--t-fast);
 }
 .atb__notif-item:last-child { border-bottom: none; }
-.atb__notif-item:hover { background: var(--c-leaf-50); }
+.atb__notif-item:hover { background: var(--c-leaf-50); cursor: pointer; }
+.atb__notif-item--error { background: #fff5f5; }
+.atb__notif-item--warning { background: #fffbeb; }
+.atb__notif-section { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--c-ink-400); padding: var(--sp-2) var(--sp-4) var(--sp-1); background: var(--c-ink-50); }
+.atb__notif-clear { font-size: var(--fs-11); color: var(--c-ink-500); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
+.atb__notif-clear:hover { color: var(--c-ink-900); }
 .atb__notif-ico { font-size: 20px; flex-shrink: 0; }
 .atb__notif-body { flex: 1; min-width: 0; }
 .atb__notif-msg  { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }

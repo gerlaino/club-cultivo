@@ -77,6 +77,10 @@ const routes = [
     beforeEnter: requiresPermission("salas", "index"),
   },
   {
+    path: "/salas/nueva",
+    redirect: "/salas",
+  },
+  {
     path: "/salas/:id",
     name: "sala-detail",
     component: () => import("../views/SalaDetailView.vue"),
@@ -129,6 +133,18 @@ const routes = [
     component: () => import("../views/CosechadoView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("lotes", "index"),
+  },
+  {
+    path: "/rendimiento",
+    name: "rendimiento",
+    component: () => import("../views/RendimientoView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/analitica",
+    name: "analitica",
+    component: () => import("../views/AnaliticaView.vue"),
+    meta: { requiresAuth: true },
   },
   {
     path: "/lotes/:id",
@@ -245,6 +261,32 @@ const routes = [
     },
   },
 
+  // ARICCAME
+  {
+    path: "/ariccame",
+    name: "ariccame",
+    component: () => import("../views/AriccameView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (["admin", "super_admin"].includes(auth.user?.role)) next();
+      else next("/");
+    },
+  },
+
+  // Benchmark
+  {
+    path: "/benchmark",
+    name: "benchmark",
+    component: () => import("../views/BenchmarkView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (["admin", "super_admin"].includes(auth.user?.role)) next();
+      else next("/");
+    },
+  },
+
   // Templates de documentos (solo admin)
   {
     path: "/documentos/templates",
@@ -312,6 +354,17 @@ const routes = [
     path: '/admin/curado',
     name: 'admin-curado',
     component: () => import('../views/admin/AdminCuradoView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role !== 'admin') return next('/')
+      next()
+    },
+  },
+  {
+    path: '/admin/cosechado',
+    name: 'admin-cosechado',
+    component: () => import('../views/admin/AdminCosechadoView.vue'),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
@@ -408,6 +461,24 @@ const routes = [
     component: () => import('../views/PlantaQrView.vue'),
     meta: { fullscreen: true },
   },
+  {
+    path: '/s/:codigo_qr',
+    name: 'stock-qr',
+    component: () => import('../views/StockQrView.vue'),
+    meta: { fullscreen: true },
+  },
+  {
+    path: '/c/:token',
+    name: 'carnet-publico',
+    component: () => import('../views/CarnetPublicoView.vue'),
+    meta: { fullscreen: true },
+  },
+  {
+    path: '/stocks/:id/etiqueta',
+    name: 'stock-etiqueta',
+    component: () => import('../views/EtiquetaStockView.vue'),
+    meta: { requiresAuth: true },
+  },
 
   // ── Dispensador routes ──
   {
@@ -493,6 +564,8 @@ const routes = [
       { path: 'dispensaciones', name: 'auditor-dispensaciones', component: () => import('../views/auditor/InformeDispensacionesView.vue') },
       { path: 'sedes', name: 'auditor-sedes', component: () => import('../views/auditor/InformeSedesView.vue') },
       { path: 'cumplimiento', name: 'auditor-cumplimiento', component: () => import('../views/auditor/InformeCumplimientoView.vue') },
+      { path: 'plan-vs-real', name: 'auditor-plan-vs-real', component: () => import('../views/auditor/InformePlanVsRealView.vue') },
+      { path: 'trazabilidad', name: 'auditor-trazabilidad', component: () => import('../views/auditor/TrazabilidadView.vue') },
     ],
   },
 

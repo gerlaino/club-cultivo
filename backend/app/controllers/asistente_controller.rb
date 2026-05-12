@@ -84,12 +84,15 @@ class AsistenteController < ApplicationController
     - Nunca inventes datos que no estan en el texto
   PROMPT
 
+  LIMITE_LLAMADAS_POR_HORA = 20
+
   # POST /asistente/parsear
   def parsear
     texto    = params[:texto].to_s.strip
     contexto = params[:contexto]
 
     return render json: { error: 'Texto vacío' }, status: :unprocessable_entity if texto.blank?
+    return render json: { error: 'Límite de uso alcanzado. Volvé en unos minutos.' }, status: :too_many_requests if rate_limited?
 
     es_cultivador  = current_user.cultivador?
     prompt_sistema = construir_prompt(contexto, es_cultivador)
@@ -149,9 +152,22 @@ class AsistenteController < ApplicationController
       resultados:      resultados,
       errores_detalle: errores
     }
+  rescue StandardError => e
+    Rails.logger.error "AsistenteController#ejecutar error: #{e.class}: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+    render json: { error: "Error interno al ejecutar acciones: #{e.message}" }, status: :internal_server_error
   end
 
   private
+
+  def rate_limited?
+    key   = "asistente:club:#{current_user.club_id}:#{Time.current.strftime('%Y%m%d%H')}"
+    redis = Redis.new(url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'))
+    count = redis.incr(key)
+    redis.expire(key, 3600) if count == 1
+    count > LIMITE_LLAMADAS_POR_HORA
+  rescue
+    false
+  end
 
   def construir_prompt(contexto, es_cultivador)
     prompt = PROMPT_BASE.dup
@@ -197,8 +213,10 @@ class AsistenteController < ApplicationController
         lotes_codigos = sala.lotes.pluck(:codigo)
         ctx += "Sala: #{sala.nombre}\n"
         ctx += "Lotes en esta sala: #{lotes_codigos.join(', ')}\n" if lotes_codigos.any?
-        ctx += "Para actividad general de la sala usar nota_sala.\n"
-        ctx += "Si menciona un lote especifico, agregar registro_ambiental con ese lote_codigo.\n"
+        ctx += "REGLAS ESTRICTAS para contexto de sala:\n"
+        ctx += "- Si el cultivador menciona condiciones generales (temperatura, humedad, estado de plantas, actividad del día) SIN nombrar un lote concreto => generar UNA SOLA accion: nota_sala. Incluir todos los datos en el contenido de texto. NO generar registro_ambiental.\n"
+        ctx += "- Si el cultivador nombra EXPLICITAMENTE un lote (ej: 'en el lote #{lotes_codigos.first}') => generar registro_ambiental para ESE lote unicamente. NO generar nota_sala adicionalmente.\n"
+        ctx += "- Nunca generar registro_ambiental para todos los lotes a la vez por inferencia.\n"
       end
     end
 

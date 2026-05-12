@@ -40,6 +40,11 @@
   <!-- Sheet: Más opciones -->
   <SheetBottom v-model="masOpen" title="Más opciones">
     <div class="bnc__mas">
+      <button class="bnc__mas-item" @click="abrirAsistente">
+        <span class="bnc__mas-ico"><Mic :size="20" :stroke-width="1.75" /></span>
+        <span class="bnc__mas-lbl">Asistente de voz</span>
+        <ChevronRight :size="16" :stroke-width="1.75" class="bnc__mas-arr" />
+      </button>
       <RouterLink to="/lotes" class="bnc__mas-item" @click="masOpen = false">
         <span class="bnc__mas-ico"><Sprout :size="20" :stroke-width="1.75" /></span>
         <span class="bnc__mas-lbl">Mis lotes</span>
@@ -68,7 +73,7 @@ import SheetBottom          from './SheetBottom.vue'
 import RegistrarLecturaSheet from './RegistrarLecturaSheet.vue'
 import {
   Home, LayoutGrid, Plus, MoreHorizontal, PackageCheck,
-  Sprout, User, LogOut, ChevronRight,
+  Sprout, User, LogOut, ChevronRight, Mic,
 } from 'lucide-vue-next'
 
 const route   = useRoute()
@@ -78,6 +83,11 @@ const club    = useClubStore()
 
 const lecturaOpen = ref(false)
 const masOpen     = ref(false)
+
+function abrirAsistente() {
+  masOpen.value = false
+  window.dispatchEvent(new CustomEvent('abrir-asistente-voz'))
+}
 
 function isActive(to) {
   if (to === '/') return route.path === '/'

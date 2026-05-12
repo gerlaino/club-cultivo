@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 0; color: #0f172a; }
+    .wrapper { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    .header { background: #dc2626; padding: 28px 32px; }
+    .header-title { color: #fff; font-size: 20px; font-weight: 700; margin: 0; }
+    .header-sub { color: #fca5a5; font-size: 13px; margin: 4px 0 0; }
+    .body { padding: 28px 32px; }
+    .intro { font-size: 15px; color: #334155; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; font-size: 12px; font-weight: 700; color: #64748b; border-bottom: 2px solid #e2e8f0; padding: 6px 8px; }
+    td { padding: 8px; border-bottom: 1px solid #f1f5f9; }
+    .alerta { color: #dc2626; font-weight: 700; }
+    .cta { text-align: center; margin: 28px 0 0; }
+    .btn { display: inline-block; background: #dc2626; color: #fff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; }
+    .footer { background: #f8fafc; padding: 16px 32px; text-align: center; font-size: 12px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <p class="header-title">⚠️ Club Cultivo — Stock Bajo</p>
+      <p class="header-sub"><%= @club.name %> · <%= Date.today.strftime('%d/%m/%Y') %></p>
+    </div>
+    <div class="body">
+      <p class="intro">Los siguientes productos tienen stock por debajo del umbral mínimo (50g):</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Stock disponible</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @stocks_data.each do |s| %>
+            <% next unless s[:alerta] %>
+            <tr>
+              <td><%= s[:forma] %></td>
+              <td class="alerta"><%= s[:cantidad_g] %> g</td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      <div class="cta">
+        <a class="btn" href="<%= ENV.fetch('APP_HOST', 'https://app.clubcultivo.app') %>/stock">
+          Ver stock en el sistema
+        </a>
+      </div>
+    </div>
+    <div class="footer">Club Cultivo · Aviso automático del sistema.</div>
+  </div>
+</body>
+</html>

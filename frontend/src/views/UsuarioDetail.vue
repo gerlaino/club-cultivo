@@ -22,8 +22,9 @@ const { confirm } = useConfirm()
 
 const u = computed(() => store.current)
 
-const isMe    = computed(() => auth.user?.id === userId)
-const canEdit = computed(() => auth.role === "admin" && !isMe.value)
+const isMe       = computed(() => auth.user?.id === userId)
+const canEdit    = computed(() => ['admin', 'supervisor'].includes(auth.role) && !isMe.value)
+const canEditRole = computed(() => auth.role === 'admin' && !isMe.value)
 
 const ROLES = [
   { value: "admin",       label: "Administrador", color: "#dc2626", bg: "rgba(220,38,38,.1)",   icon: "bi-shield-fill-check",   desc: "Acceso total al sistema — puede gestionar todos los módulos, usuarios y configuración." },
@@ -69,6 +70,30 @@ function getAvatarColor(user) { return AVATAR_COLORS[(user?.id || 0) % AVATAR_CO
 function formatDate(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+// ── Editar info personal ──────────────────────────────────
+const editingInfo = ref(false)
+const savingInfo  = ref(false)
+const infoForm    = ref({ first_name: '', last_name: '', email: '' })
+
+function startEditInfo() {
+  infoForm.value = {
+    first_name: u.value?.first_name || '',
+    last_name:  u.value?.last_name  || '',
+    email:      u.value?.email      || '',
+  }
+  editingInfo.value = true
+}
+
+async function saveInfo() {
+  savingInfo.value = true
+  try {
+    await store.update(userId, infoForm.value)
+    editingInfo.value = false
+    toast.success('Información actualizada correctamente.')
+  } catch { toast.error(store.error || 'No se pudo actualizar la información.') }
+  finally { savingInfo.value = false }
 }
 
 // ── Editar rol ────────────────────────────────────────────
@@ -165,8 +190,13 @@ onMounted(async () => {
                 <i class="bi bi-person"></i>
               </div>
               <span class="ud__card-title">Información personal</span>
+              <button v-if="canEdit && !editingInfo" class="ud__edit-btn" @click="startEditInfo">
+                <i class="bi bi-pencil"></i> Editar
+              </button>
             </div>
-            <div class="ud__info-grid">
+
+            <!-- Modo visualización -->
+            <div v-if="!editingInfo" class="ud__info-grid">
               <div class="ud__info-item">
                 <div class="ud__info-label">Nombre</div>
                 <div class="ud__info-val">{{ u.first_name || '—' }}</div>
@@ -186,6 +216,32 @@ onMounted(async () => {
               <div class="ud__info-item">
                 <div class="ud__info-label">Última actualización</div>
                 <div class="ud__info-val">{{ formatDate(u.updated_at) }}</div>
+              </div>
+            </div>
+
+            <!-- Modo edición -->
+            <div v-else class="ud__edit-form">
+              <div class="ud__edit-row">
+                <div class="ud__field">
+                  <label class="ud__field-label">Nombre</label>
+                  <input v-model="infoForm.first_name" class="ud__input" placeholder="Nombre" />
+                </div>
+                <div class="ud__field">
+                  <label class="ud__field-label">Apellido</label>
+                  <input v-model="infoForm.last_name" class="ud__input" placeholder="Apellido" />
+                </div>
+              </div>
+              <div class="ud__field">
+                <label class="ud__field-label">Email</label>
+                <input v-model="infoForm.email" class="ud__input" type="email" placeholder="correo@ejemplo.com" />
+              </div>
+              <div class="ud__edit-actions">
+                <button class="ud__btn-ghost" @click="editingInfo = false">Cancelar</button>
+                <button class="ud__btn-primary" :disabled="savingInfo" @click="saveInfo">
+                  <div v-if="savingInfo" class="ud__spinner ud__spinner--white"></div>
+                  <i v-else class="bi bi-check-lg"></i>
+                  Guardar cambios
+                </button>
               </div>
             </div>
           </div>
@@ -292,7 +348,7 @@ onMounted(async () => {
                 <i class="bi bi-shield-check"></i>
               </div>
               <span class="ud__card-title">Rol</span>
-              <button v-if="canEdit && !editingRole" class="ud__edit-btn" @click="startEditRole">
+              <button v-if="canEditRole && !editingRole" class="ud__edit-btn" @click="startEditRole">
                 <i class="bi bi-pencil"></i> Cambiar
               </button>
             </div>
@@ -455,6 +511,16 @@ onMounted(async () => {
 /* Edit btn */
 .ud__edit-btn { display: inline-flex; align-items: center; gap: .3rem; background: none; border: 1px solid #e2e8f0; color: #64748b; padding: .25rem .7rem; border-radius: 7px; font-size: .72rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .ud__edit-btn:hover { background: #f1f5f9; color: #0f172a; }
+
+/* Edit form */
+.ud__edit-form { padding: 1.25rem; display: flex; flex-direction: column; gap: .875rem; }
+.ud__edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+@media (max-width: 600px) { .ud__edit-row { grid-template-columns: 1fr; } }
+.ud__field { display: flex; flex-direction: column; gap: .35rem; }
+.ud__field-label { font-size: .7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+.ud__input { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .6rem .875rem; font-size: .875rem; color: #0f172a; outline: none; transition: border .15s, background .15s; width: 100%; box-sizing: border-box; }
+.ud__input:focus { border-color: #1b5e20; background: #fff; }
+.ud__edit-actions { display: flex; justify-content: flex-end; gap: .5rem; padding-top: .25rem; border-top: 1px solid #f1f5f9; margin-top: .25rem; }
 
 /* Back link */
 .ud__back-link { display: flex; align-items: center; gap: .5rem; color: #64748b; font-size: .82rem; font-weight: 500; text-decoration: none; padding: .75rem .25rem; transition: color .15s; }

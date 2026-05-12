@@ -895,28 +895,6 @@ onMounted(async () => {
   max-width: 100%;
 }
 
-/* FAB asistente de voz centrado */
-.bottom-nav__fab-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  flex-shrink: 0;
-  margin-bottom: 12px;
-}
-/* Override del trigger para que sea un círculo grande en el centro */
-.bottom-nav__fab-wrap :deep(.av__trigger) {
-  width: 52px !important;
-  height: 52px !important;
-  border-radius: 50% !important;
-  padding: 0 !important;
-  font-size: 18px !important;
-  justify-content: center;
-  box-shadow: 0 4px 16px rgba(27, 94, 32, 0.4) !important;
-}
-.bottom-nav__fab-wrap :deep(.av__trigger-dot) {
-  display: none;
-}
 
 /* More button */
 .bottom-nav__item--more {

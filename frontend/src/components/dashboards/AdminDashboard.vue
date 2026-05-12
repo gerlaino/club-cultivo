@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, reactive, onMounted, watch } from 'vue'
-import { listSedes, getContableDashboard, listLotes } from '../../lib/api.js'
+import { listSedes, getContableDashboard, listLotes, getAnalyticsDispensador, listStocksPendientes } from '../../lib/api.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import { useStatsStore } from '../../stores/stats.js'
@@ -16,9 +16,11 @@ const tareasStore = useTareasStore()
 const sedes = ref([])
 const contable = ref(null)
 const lotesManicuraPendiente = ref([])
+const stocksPendientes       = ref([])
+const analyticsDisp = ref(null)
 const loading = ref(true)
 
-const sections = reactive({ tareas: true, aprobaciones: true, pacientes: true })
+const sections = reactive({ tareas: true, aprobaciones: true, stocks: true, pacientes: true })
 
 const stats = computed(() => statsStore.data ?? {})
 const mostrarOnboarding = computed(() => !loading.value && sedes.value.length === 0)
@@ -105,15 +107,19 @@ const pacientesNecesitanAtencion = computed(() =>
 
 onMounted(async () => {
   try {
-    const [sedesRes, contableRes, manicuraRes] = await Promise.allSettled([
+    const [sedesRes, contableRes, manicuraRes, dispRes, stocksRes] = await Promise.allSettled([
       listSedes(),
       getContableDashboard(),
       listLotes({ estado: 'manicura_pendiente' }),
+      getAnalyticsDispensador(),
+      listStocksPendientes(),
     ])
     await Promise.allSettled([statsStore.fetchAll(), tareasStore.fetchDashboard()])
     if (sedesRes.status    === 'fulfilled') sedes.value                  = sedesRes.value.data   || []
     if (contableRes.status === 'fulfilled') contable.value               = contableRes.value.data
     if (manicuraRes.status === 'fulfilled') lotesManicuraPendiente.value = manicuraRes.value.data || []
+    if (dispRes.status     === 'fulfilled') analyticsDisp.value          = dispRes.value.data
+    if (stocksRes.status   === 'fulfilled') stocksPendientes.value       = stocksRes.value.data  || []
   } finally {
     loading.value = false
   }
@@ -175,11 +181,10 @@ async function onOnboardingCompletado() {
         </div>
 
         <!-- 4. Dispensaciones hoy -->
-        <!-- TODO: conectar endpoint /dispensaciones?fecha=hoy -->
         <div class="ad__kpi-card">
           <span class="ad__kpi-label">Dispensaciones hoy</span>
-          <div class="ad__kpi-num">0</div>
-          <div class="ad__kpi-sub">—</div>
+          <div class="ad__kpi-num">{{ analyticsDisp?.resumen?.dispensaciones_hoy ?? 0 }}</div>
+          <div class="ad__kpi-sub">{{ analyticsDisp?.resumen?.gramos_hoy != null ? analyticsDisp.resumen.gramos_hoy + ' g' : '—' }}</div>
         </div>
 
         <!-- 5. Balance del mes -->
@@ -258,7 +263,35 @@ async function onOnboardingCompletado() {
               </div>
             </div>
 
-            <!-- Sección 3: Pacientes con atención requerida -->
+            <!-- Sección 3: Stocks pendientes de asignación -->
+            <div class="ad__sec">
+              <button class="ad__sec-hdr" @click="sections.stocks = !sections.stocks">
+                <span class="ad__sec-title">Stocks para asignar</span>
+                <span v-if="stocksPendientes.length" class="ad__sec-badge">{{ stocksPendientes.length }}</span>
+                <i class="bi" :class="sections.stocks ? 'bi-chevron-up' : 'bi-chevron-down'" style="margin-left:auto;color:#94a3b8;font-size:.75rem"></i>
+              </button>
+              <div v-show="sections.stocks" class="ad__sec-body">
+                <template v-if="stocksPendientes.length">
+                  <RouterLink
+                    v-for="s in stocksPendientes.slice(0, 5)"
+                    :key="s.id"
+                    to="/admin/stocks/pendientes"
+                    class="ad__task-item"
+                  >
+                    <span class="ad__task-title">{{ s.forma_producto }} · {{ s.cantidad }}g</span>
+                    <span class="ad__task-meta">{{ s.lote?.codigo || `Lote #${s.lote_id}` }}</span>
+                    <i class="bi bi-arrow-right ad__task-arrow"></i>
+                  </RouterLink>
+                  <RouterLink v-if="stocksPendientes.length > 5" to="/admin/stocks/pendientes" class="ad__sec-cta ad__sec-cta--sm">
+                    Ver los {{ stocksPendientes.length }} pendientes →
+                  </RouterLink>
+                </template>
+                <p v-else class="ad__sec-empty">Todo el stock está asignado ✓</p>
+                <RouterLink to="/admin/stocks/pendientes" class="ad__sec-cta ad__sec-cta--sm">Ver stocks pendientes →</RouterLink>
+              </div>
+            </div>
+
+            <!-- Sección 4: Pacientes con atención requerida -->
             <div class="ad__sec">
               <button class="ad__sec-hdr" @click="sections.pacientes = !sections.pacientes">
                 <span class="ad__sec-title">Pacientes con atención</span>

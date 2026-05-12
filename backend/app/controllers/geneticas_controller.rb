@@ -6,7 +6,7 @@ class GeneticasController < ApplicationController
   # GET /geneticas
   def index
     club      = current_user.club
-    scope     = Genetica.where(global: true)
+    scope     = Genetica.where(global: true, registrada_inase: true)
     scope     = scope.or(Genetica.where(club_id: club.id)) if club
     scope     = scope.where(activa: true)
     scope     = scope.where(disponible: true) if params[:disponible].present?
@@ -71,7 +71,7 @@ class GeneticasController < ApplicationController
 
   def set_genetica
     club = current_user.club
-    scope = Genetica.where(global: true)
+    scope = Genetica.where(global: true, registrada_inase: true)
     scope = scope.or(Genetica.where(club_id: club.id)) if club
     @genetica = scope.find(params[:id])
   rescue ActiveRecord::RecordNotFound
@@ -136,7 +136,7 @@ class GeneticasController < ApplicationController
 
   def serialize_genetica_detail(genetica)
     club = current_user.club
-    lotes_historicos = genetica.lotes.includes(:sala).order(start_date: :desc).limit(50).map do |l|
+    lotes_historicos = genetica.lotes.where(club_id: club&.id).includes(:sala).order(start_date: :desc).limit(50).map do |l|
       peso = l.plants.where.not(peso_seco: nil).sum(:peso_seco).to_f
       {
         id:              l.id,

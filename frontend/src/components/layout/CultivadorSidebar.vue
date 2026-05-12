@@ -9,25 +9,16 @@
 
     <!-- Nav links -->
     <nav class="csb__nav">
-      <template v-for="link in NAV_LINKS" :key="link.label">
-        <RouterLink
-          v-if="link.to"
-          :to="link.to"
-          class="csb__link"
-          :class="{ 'csb__link--active': isActive(link.to) }"
-        >
-          <component :is="link.icon" :size="18" :stroke-width="1.75" class="csb__link-ico" />
-          <span>{{ link.label }}</span>
-        </RouterLink>
-        <button
-          v-else
-          class="csb__link"
-          @click="lecturaOpen = true"
-        >
-          <component :is="link.icon" :size="18" :stroke-width="1.75" class="csb__link-ico" />
-          <span>{{ link.label }}</span>
-        </button>
-      </template>
+      <RouterLink
+        v-for="link in NAV_LINKS"
+        :key="link.to"
+        :to="link.to"
+        class="csb__link"
+        :class="{ 'csb__link--active': isActive(link.to) }"
+      >
+        <component :is="link.icon" :size="18" :stroke-width="1.75" class="csb__link-ico" />
+        <span>{{ link.label }}</span>
+      </RouterLink>
     </nav>
 
     <!-- User card -->
@@ -44,34 +35,25 @@
 
   </aside>
 
-  <!-- Sheet para registrar lectura (desde sidebar) -->
-  <RegistrarLecturaSheet v-model="lecturaOpen" />
 </template>
 
 <script setup>
-import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import LeafSeal from '../../design-system/icons/LeafSeal.vue'
 import DsAvatar from '../../design-system/components/Avatar.vue'
-import RegistrarLecturaSheet from '../cultivador/RegistrarLecturaSheet.vue'
-import {
-  Home, LayoutGrid, PackageCheck, Gauge, LogOut,
-} from 'lucide-vue-next'
+import { Home, LayoutGrid, PackageCheck, LogOut } from 'lucide-vue-next'
 
 const route  = useRoute()
 const router = useRouter()
 const auth   = useAuthStore()
 const club   = useClubStore()
 
-const lecturaOpen = ref(false)
-
 const NAV_LINKS = [
-  { to: '/',          icon: Home,         label: 'Inicio' },
-  { to: '/salas',     icon: LayoutGrid,   label: 'Mis salas' },
+  { to: '/',          icon: Home,        label: 'Inicio' },
+  { to: '/salas',     icon: LayoutGrid,  label: 'Mis salas' },
   { to: '/cosechado', icon: PackageCheck, label: 'Cosechado' },
-  {                   icon: Gauge,        label: 'Registrar lectura' },
 ]
 
 function isActive(to) {

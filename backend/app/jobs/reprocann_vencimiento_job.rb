@@ -19,8 +19,9 @@ class ReprocannVencimientoJob < ApplicationJob
                    .where.not(reprocann_vencimiento: nil)
                    .where('reprocann_vencimiento < ?', hoy)
                    .where(reprocann_estado: %w[activo pendiente])
+                   .to_a
 
-    vencidos.find_each do |paciente|
+    vencidos.each do |paciente|
       next if alerta_reciente?(club, paciente, 'reprocann_vencido', dias: 1)
 
       dias_vencido = (hoy - paciente.reprocann_vencimiento).to_i
@@ -35,14 +36,16 @@ class ReprocannVencimientoJob < ApplicationJob
     end
 
     # Pacientes próximos a vencer en 30, 15 o 7 días
+    por_vencer = {}
     UMBRALES_DIAS.each do |dias|
       fecha_objetivo = hoy + dias.days
 
       proximos = club.pacientes
                      .where(reprocann_vencimiento: fecha_objetivo)
                      .where(reprocann_estado: %w[activo pendiente])
+                     .to_a
 
-      proximos.find_each do |paciente|
+      proximos.each do |paciente|
         next if alerta_reciente?(club, paciente, 'reprocann_por_vencer', dias: 2)
 
         AlertaInterna.create!(
@@ -53,7 +56,18 @@ class ReprocannVencimientoJob < ApplicationJob
           destinada_a_role: 'admin',
           contexto:         { paciente_id: paciente.id, vencimiento: paciente.reprocann_vencimiento.to_s, dias_restantes: dias }
         )
+        por_vencer[dias] ||= []
+        por_vencer[dias] << paciente
       end
+    end
+
+    # Enviar email resumen si hay algo que reportar
+    if vencidos.any? || por_vencer.values.any?(&:any?)
+      NotificacionesMailer.resumen_reprocann(
+        club:        club,
+        vencidos:    vencidos,
+        por_vencer:  por_vencer
+      ).deliver_later
     end
   end
 

@@ -1,7 +1,8 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :aprobar_manicura, :rechazar_manicura]
+  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :aprobar_manicura, :rechazar_manicura, :asignar_manicurador]
+  before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
   # GET /lotes o GET /salas/:sala_id/lotes
@@ -20,12 +21,16 @@ class LotesController < ApplicationController
     end
 
     if current_user.manicura?
-      manicura_estados = %w[secado manicura_pendiente]
-      if params[:estado].present?
-        lotes = manicura_estados.include?(params[:estado]) ? lotes.where(estado: params[:estado]) : lotes.none
-      else
-        lotes = lotes.where(estado: manicura_estados)
-      end
+      # Nuevo flujo: lotes asignados (en_manicura o manicura_pendiente con manicurador_id)
+      # Legacy: lotes en secado/manicura_pendiente sin manicurador_id
+      lotes = lotes.where(
+        lotes: { estado: 'en_manicura', manicurador_id: current_user.id }
+      ).or(lotes.where(
+        lotes: { estado: 'manicura_pendiente', manicurador_id: current_user.id }
+      )).or(lotes.where(
+        lotes: { estado: %w[secado manicura_pendiente], manicurador_id: nil }
+      ))
+      lotes = lotes.where(estado: params[:estado]) if params[:estado].present?
     elsif params[:manicura].present?
       lotes = lotes.where(estado: %w[cosecha secado curado])
     else
@@ -115,6 +120,62 @@ class LotesController < ApplicationController
     end
   end
 
+  # GET /lotes/export_csv
+  def export_csv
+    scope = current_user.club.lotes
+                        .includes(:genetica, sala: :sede)
+                        .order(created_at: :desc)
+
+    scope = scope.where(estado: params[:estado]) if params[:estado].present?
+
+    if params[:desde].present?
+      desde = Date.parse(params[:desde]) rescue nil
+      scope = scope.where('lotes.created_at >= ?', desde.beginning_of_day) if desde
+    end
+    if params[:hasta].present?
+      hasta = Date.parse(params[:hasta]) rescue nil
+      scope = scope.where('lotes.created_at <= ?', hasta.end_of_day) if hasta
+    end
+
+    require "csv"
+    csv_data = CSV.generate(col_sep: ";", encoding: "UTF-8") do |csv|
+      csv << [
+        "Código", "Estado", "Genética", "Sala", "Sede",
+        "Plantas", "Plantas obj.", "Plantas cosechadas",
+        "Rendimiento obj. (g)", "Rendimiento real (g)", "Desviación (%)",
+        "Costo total", "Costo/gramo",
+        "Inicio", "Creado"
+      ]
+      scope.each do |l|
+        desv = if l.rendimiento_real_g.present? && l.rendimiento_objetivo_g.present? && l.rendimiento_objetivo_g > 0
+                 ((l.rendimiento_real_g.to_f - l.rendimiento_objetivo_g.to_f) / l.rendimiento_objetivo_g.to_f * 100).round(1)
+               end
+        csv << [
+          l.codigo,
+          l.estado,
+          l.genetica&.nombre,
+          l.sala&.nombre,
+          l.sala&.sede&.nombre,
+          l.plants_count,
+          l.plants_count_objetivo,
+          l.plants_count_cosechadas,
+          l.rendimiento_objetivo_g&.to_f,
+          l.rendimiento_real_g&.to_f,
+          desv,
+          l.costo_lote&.costo_total&.to_f,
+          l.costo_lote&.costo_por_gramo&.to_f,
+          l.start_date&.strftime("%d/%m/%Y"),
+          l.created_at.strftime("%d/%m/%Y"),
+        ]
+      end
+    end
+
+    send_data "\xEF\xBB\xBF#{csv_data}",
+              filename:    "lotes_#{Date.today}.csv",
+              type:        "text/csv; charset=utf-8",
+              disposition: "attachment"
+  end
+
   # DELETE /lotes/:id
   def destroy
     @lote.soft_delete!
@@ -123,8 +184,10 @@ class LotesController < ApplicationController
 
   # POST /lotes/:id/transiciones
   def transiciones
-    pesada_attrs    = (params[:pesada] || {}).to_unsafe_h.symbolize_keys
-    pesadas_plantas = (params[:pesadas_plantas] || []).map { |p| p.to_unsafe_h.symbolize_keys }
+    raw_pesada      = params[:pesada] || {}
+    pesada_attrs    = raw_pesada.respond_to?(:to_unsafe_h) ? raw_pesada.to_unsafe_h.symbolize_keys : raw_pesada.to_h.symbolize_keys
+    raw_pesadas     = params[:pesadas_plantas] || []
+    pesadas_plantas = raw_pesadas.map { |p| p.respond_to?(:to_unsafe_h) ? p.to_unsafe_h.symbolize_keys : p.to_h.symbolize_keys }
     pesada_attrs[:registrado_por] = current_user
     manicurado = pesada_attrs.delete(:manicurado).in?([true, 'true', '1'])
     nueva_fase = params[:nueva_fase]
@@ -158,7 +221,36 @@ class LotesController < ApplicationController
       return render json: serialize_lote(@lote.reload, include_plants: true), status: :created
     end
 
-    # Manicura pesa un lote en secado → va a manicura_pendiente, no a curado
+    # Manicura pesa un lote en en_manicura (nuevo flujo) → manicura_pendiente
+    if manicurado && @lote.estado == 'en_manicura' && current_user.manicura?
+      ActiveRecord::Base.transaction do
+        @lote.pesadas.create!(
+          fase_origen:          'en_manicura',
+          fase_destino:         'manicura_pendiente',
+          manicurado:           true,
+          registrado_por:       current_user,
+          registrado_at:        Time.current,
+          notas:                pesada_attrs[:notas],
+          peso_seco_g:          pesada_attrs[:peso_seco_g],
+          peso_humedo_g:        pesada_attrs[:peso_humedo_g],
+          plantas_manicuradas:  pesada_attrs[:plantas_manicuradas],
+        )
+        @lote.update!(estado: 'manicura_pendiente')
+        AlertaInterna.create!(
+          club:             current_user.club,
+          tipo:             'manicura_aprobacion_pendiente',
+          mensaje:          "Manicura #{current_user.first_name} completó lote #{@lote.codigo} — #{pesada_attrs[:plantas_manicuradas]} plantas · #{pesada_attrs[:peso_seco_g]}g — pendiente aprobación",
+          severidad:        'info',
+          creada_por:       current_user,
+          destinada_a_role: 'admin',
+          contexto:         { lote_id: @lote.id, lote_codigo: @lote.codigo,
+                              peso_seco_g: pesada_attrs[:peso_seco_g], manicura_id: current_user.id }
+        )
+      end
+      return render json: serialize_lote(@lote.reload), status: :created
+    end
+
+    # Manicura pesa un lote en secado → va a manicura_pendiente (flujo legacy)
     if manicurado && @lote.estado == 'secado' && current_user.manicura?
       ActiveRecord::Base.transaction do
         pesada = @lote.pesadas.create!(
@@ -193,7 +285,8 @@ class LotesController < ApplicationController
       nueva_fase,
       pesada_attrs:          pesada_attrs,
       manicurado:            manicurado,
-      pesadas_plantas_attrs: pesadas_plantas
+      pesadas_plantas_attrs: pesadas_plantas,
+      sala_id:               params[:sala_id]
     )
     @lote.lote_eventos.create!(
       tipo:            'cambio_estado',
@@ -217,8 +310,35 @@ class LotesController < ApplicationController
   # POST /lotes/:id/aprobar_manicura
   def aprobar_manicura
     authorize @lote, :aprobar_manicura?
-    @lote.aprobar_manicura!(aprobado_por: current_user, observaciones: params[:observaciones])
+    if @lote.manicurador_id.present?
+      # Nuevo flujo: aprobar + generar stock + finalizar en un paso
+      @lote.aprobar_y_finalizar!(
+        aprobado_por:   current_user,
+        sede_id:        params.require(:sede_id),
+        peso_seco_g:    params[:peso_seco_g],
+        forma_producto: params[:forma_producto].presence || 'flor_seca',
+      )
+    else
+      # Flujo legacy: aprobar → curado
+      @lote.aprobar_manicura!(aprobado_por: current_user, observaciones: params[:observaciones])
+    end
     render json: serialize_lote(@lote.reload)
+  rescue ActionController::ParameterMissing => e
+    render json: { error: "Falta parámetro requerido: #{e.param}" }, status: :unprocessable_entity
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /lotes/:id/asignar_manicurador
+  def asignar_manicurador
+    authorize @lote, :asignar_manicurador?
+    manicurador = current_user.club.users.where(role: 'manicura').find(params[:manicurador_id])
+    @lote.asignar_manicurador!(manicurador: manicurador, asignado_por: current_user)
+    render json: serialize_lote(@lote.reload)
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Manicurador no encontrado' }, status: :not_found
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
@@ -383,7 +503,15 @@ class LotesController < ApplicationController
 
   def set_lote
     scope = current_user.club.lotes
-    scope = scope.where(estado: %w[secado manicura_pendiente]) if current_user.manicura?
+    if current_user.manicura?
+      scope = scope.where(
+        lotes: { estado: 'en_manicura', manicurador_id: current_user.id }
+      ).or(scope.where(
+        lotes: { estado: 'manicura_pendiente', manicurador_id: current_user.id }
+      )).or(scope.where(
+        lotes: { estado: %w[secado manicura_pendiente], manicurador_id: nil }
+      ))
+    end
     @lote = scope.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Lote no encontrado' }, status: :not_found
@@ -392,7 +520,9 @@ class LotesController < ApplicationController
   def lote_params
     params.require(:lote).permit(
       :codigo, :start_date, :estado, :plants_count, :strain, :notes,
-      :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta
+      :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta,
+      :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
+      :rendimiento_real_g, :plants_count_cosechadas
     )
   end
 
@@ -516,6 +646,12 @@ class LotesController < ApplicationController
     end
   end
 
+  def require_export_role!
+    unless current_user.admin? || current_user.role == 'auditor' || current_user.supervisor?
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
+  end
+
   def serialize_lote(lote, include_plants: false, include_cycle_data: false)
     idx_ciclo        = Lote::CICLO_FASES.index(lote.estado)
     proxima_fase     = idx_ciclo ? Lote::CICLO_FASES[idx_ciclo + 1] : nil
@@ -551,6 +687,13 @@ class LotesController < ApplicationController
       costo_total:       lote.costo_lote&.costo_total&.to_f,
       gramos_producidos: lote.costo_lote&.gramos_producidos&.to_f,
       tiene_costo:       lote.costo_lote.present?,
+      plants_count_objetivo:   lote.plants_count_objetivo,
+      rendimiento_objetivo_g:  lote.rendimiento_objetivo_g&.to_f,
+      fecha_cosecha_estimada:  lote.fecha_cosecha_estimada,
+      rendimiento_real_g:      lote.rendimiento_real_g&.to_f,
+      plants_count_cosechadas: lote.plants_count_cosechadas,
+      manicurador_id:   lote.manicurador_id,
+      manicurador:      lote.manicurador ? { id: lote.manicurador.id, nombre: lote.manicurador.first_name || lote.manicurador.email } : nil,
       sala: {
         id:     lote.sala.id,
         nombre: lote.sala.nombre,
@@ -601,15 +744,10 @@ class LotesController < ApplicationController
         []
       end
 
-      # Salas disponibles para la próxima fase — usadas en el frontend para el selector
-      if puede_transicion && proxima_fase
-        result[:salas_destino] = lote.club.salas.activas
-                                      .de_tipo(proxima_fase)
-                                      .order(:nombre)
-                                      .map { |s| { id: s.id, nombre: s.nombre } }
-      else
-        result[:salas_destino] = []
-      end
+      # Todas las salas activas del club — el usuario elige a cuál mover el lote
+      result[:salas_destino] = lote.club.salas.activas
+                                    .order(:nombre)
+                                    .map { |s| { id: s.id, nombre: s.nombre, kind: s.kind, actual: s.id == lote.sala_id } }
     end
 
     result

@@ -12,7 +12,7 @@ const sedes = ref([]);
 const { confirm } = useConfirm();
 
 onMounted(async () => {
-  if (!salas.items.length) salas.fetch();
+  salas.fetch();
   const { data } = await listSedes();
   sedes.value = data || [];
 });

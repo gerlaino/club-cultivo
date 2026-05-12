@@ -57,8 +57,11 @@
           <span class="mnp__row-plants">
             <Package :size="12" :stroke-width="2" /> {{ lote.plants_count }}
           </span>
-          <span class="mnp__badge" :class="lote.estado === 'secado' ? 'mnp__badge--secado' : 'mnp__badge--pendiente'">
-            {{ lote.estado === 'secado' ? 'Secado' : 'Pdte. aprobación' }}
+          <span class="mnp__badge" :class="{
+            'mnp__badge--secado':   lote.estado === 'en_manicura' || lote.estado === 'secado',
+            'mnp__badge--pendiente': lote.estado === 'manicura_pendiente'
+          }">
+            {{ lote.estado === 'manicura_pendiente' ? 'Pdte. aprobación' : 'Asignado' }}
           </span>
           <ChevronRight :size="15" class="mnp__row-arrow" />
         </div>
@@ -75,7 +78,7 @@ import { listLotes } from '../../lib/api.js'
 
 const FILTROS = [
   { key: 'todos',              label: 'Todos' },
-  { key: 'secado',             label: 'Secado' },
+  { key: 'en_manicura',        label: 'Asignados' },
   { key: 'manicura_pendiente', label: 'Pdte. aprobación' },
 ]
 
@@ -97,7 +100,7 @@ async function cargar() {
   loading.value = true
   try {
     const { data } = await listLotes()
-    lotes.value = data
+    lotes.value = (data || []).filter(l => ['en_manicura', 'secado', 'manicura_pendiente'].includes(l.estado))
   } catch {
     lotes.value = []
   } finally {

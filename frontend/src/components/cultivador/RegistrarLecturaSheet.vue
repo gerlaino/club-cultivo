@@ -79,7 +79,10 @@ import { useLotesStore } from '../../stores/lotes.js'
 import { createRegistroAmbiental } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
-const props = defineProps({ modelValue: { type: Boolean, required: true } })
+const props = defineProps({
+  modelValue:   { type: Boolean, required: true },
+  salaIdInicial: { type: [Number, String], default: null },
+})
 const emit  = defineEmits(['update:modelValue'])
 
 const open = computed({
@@ -148,7 +151,13 @@ function resetForm() {
 }
 
 watch(() => props.modelValue, (isOpen) => {
-  if (isOpen && !salasStore.items.length) salasStore.fetch()
+  if (isOpen) {
+    if (!salasStore.items.length) salasStore.fetch()
+    if (props.salaIdInicial) {
+      salaId.value = String(props.salaIdInicial)
+      onSalaChange()
+    }
+  }
 })
 
 function escapeHandler(e) {

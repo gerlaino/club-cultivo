@@ -120,7 +120,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="pnv container-fluid py-4 px-3 px-md-4">
+  <div class="pnv">
 
     <!-- Header -->
     <div class="pnv__header">
@@ -347,7 +347,8 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.pnv { font-family: system-ui, -apple-system, sans-serif; color: #0f172a; }
+.pnv { font-family: system-ui, -apple-system, sans-serif; color: #0f172a; padding: 2rem 1.75rem 3rem; max-width: 900px; margin: 0 auto; }
+@media (max-width: 768px) { .pnv { padding: 1.25rem 1rem 2rem; } }
 .pnv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
 .pnv__title { font-size: 1.75rem; font-weight: 800; margin: 0 0 .2rem; letter-spacing: -.04em; }
 .pnv__sub { font-size: .85rem; color: #64748b; margin: 0; }

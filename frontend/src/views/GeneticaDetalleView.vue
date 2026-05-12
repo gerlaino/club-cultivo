@@ -24,10 +24,11 @@ const { confirm } = useConfirm()
 
 const canUpdate = computed(() => can('geneticas', 'update'))
 
-const gen      = ref(null)
-const loading  = ref(true)
-const error    = ref(null)
-const toggling = ref(false)
+const gen            = ref(null)
+const loading        = ref(true)
+const error          = ref(null)
+const toggling       = ref(false)
+const qrDropdownOpen = ref(false)
 
 const TIPO_META = {
   indica:    { label: 'Índica',    color: '#6f42c1' },
@@ -114,11 +115,11 @@ async function eliminarFoto(fotoId) {
 
 function estadoLote(estado) {
   const MAP = {
-    activo: { label: 'Activo', cls: 'bg-success' },
-    cosechado: { label: 'Cosechado', cls: 'bg-secondary' },
-    cancelado: { label: 'Cancelado', cls: 'bg-danger' },
+    activo:    { label: 'Activo',    style: { background: '#1b5e20', color: '#fff' } },
+    cosechado: { label: 'Cosechado', style: { background: '#64748b', color: '#fff' } },
+    cancelado: { label: 'Cancelado', style: { background: '#b91c1c', color: '#fff' } },
   }
-  return MAP[estado] || { label: estado, cls: 'bg-secondary' }
+  return MAP[estado] || { label: estado, style: { background: '#64748b', color: '#fff' } }
 }
 
 function formatDate(d) {
@@ -139,15 +140,15 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="container-fluid py-4 px-3 px-md-4">
+  <div class="gdv">
 
     <!-- Loading -->
-    <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border text-success"></div>
+    <div v-if="loading" class="gdv__loading">
+      <div class="gdv__spinner"></div>
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
+    <div v-else-if="error" class="gdv__error">{{ error }}</div>
 
     <!-- Contenido -->
     <template v-else-if="gen">
@@ -155,77 +156,67 @@ onMounted(async () => {
       <Breadcrumb :items="[{ label: 'Genéticas', to: { name: 'geneticas' } }, { label: gen.nombre }]" />
 
       <!-- Hero card -->
-      <div class="hero-card mb-4" :style="{ '--tipo-color': tipoMeta.color }">
+      <div class="hero-card gdv__hero" :style="{ '--tipo-color': tipoMeta.color }">
         <div class="hero-card__bar"></div>
         <div class="hero-card__body">
 
-          <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-            <div>
-              <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                <span class="badge rounded-pill fw-semibold" :style="{ background: tipoMeta.color + '22', color: tipoMeta.color, border: '1px solid ' + tipoMeta.color + '44' }">
+          <div class="gdv__hero-row">
+            <div class="gdv__hero-info">
+              <div class="gdv__badges">
+                <span class="gdv__badge" :style="{ background: tipoMeta.color + '22', color: tipoMeta.color, border: '1px solid ' + tipoMeta.color + '44' }">
                   {{ tipoMeta.label }}
                 </span>
-                <span v-if="gen.registrada_inase" class="badge bg-warning text-dark">🏛️ INASE</span>
-                <span v-if="!gen.activa" class="badge bg-secondary">Inactiva</span>
-                <span v-if="!gen.disponible" class="badge bg-secondary">No disponible</span>
+                <span v-if="gen.registrada_inase" class="gdv__badge gdv__badge--inase">🏛️ INASE</span>
+                <span v-if="!gen.activa"     class="gdv__badge gdv__badge--muted">Inactiva</span>
+                <span v-if="!gen.disponible" class="gdv__badge gdv__badge--muted">No disponible</span>
               </div>
-              <h1 class="h2 fw-bold mb-1">{{ gen.nombre }}</h1>
-              <div v-if="gen.criador || gen.origen" class="text-muted small">
-                <span v-if="gen.criador"><i class="bi bi-person me-1"></i>{{ gen.criador }}</span>
+              <h1 class="gdv__nombre">{{ gen.nombre }}</h1>
+              <div v-if="gen.criador || gen.origen" class="gdv__sub">
+                <span v-if="gen.criador"><i class="bi bi-person"></i> {{ gen.criador }}</span>
                 <span v-if="gen.criador && gen.origen"> · </span>
-                <span v-if="gen.origen"><i class="bi bi-geo-alt me-1"></i>{{ gen.origen }}</span>
+                <span v-if="gen.origen"><i class="bi bi-geo-alt"></i> {{ gen.origen }}</span>
               </div>
             </div>
 
             <!-- Acciones header -->
-            <div class="d-flex flex-wrap gap-2">
-              <!-- QR público dropdown -->
-              <div v-if="gen.slug" class="dropdown">
-                <button
-                  class="btn btn-outline-success dropdown-toggle"
-                  data-bs-toggle="dropdown"
-                  title="QR público"
-                >
-                  <i class="bi bi-qr-code me-1"></i>
-                  <span class="d-none d-sm-inline">QR público</span>
+            <div class="gdv__hero-actions">
+              <!-- QR dropdown -->
+              <div v-if="gen.slug" class="gdv__dropdown" :class="{ 'gdv__dropdown--open': qrDropdownOpen }">
+                <button class="gdv__btn gdv__btn--outline-green" @click="qrDropdownOpen = !qrDropdownOpen">
+                  <i class="bi bi-qr-code"></i>
+                  <span class="gdv__btn-label">QR público</span>
+                  <i class="bi bi-chevron-down gdv__dropdown-arrow"></i>
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                  <li>
-                    <button class="dropdown-item small py-2 d-flex align-items-center gap-2" @click="descargarQRsvg">
-                      <i class="bi bi-file-earmark-code text-muted"></i> Descargar SVG
-                    </button>
-                  </li>
-                  <li>
-                    <button class="dropdown-item small py-2 d-flex align-items-center gap-2" @click="descargarQRpng">
-                      <i class="bi bi-file-earmark-image text-muted"></i> Descargar PNG
-                    </button>
-                  </li>
-                  <li><hr class="dropdown-divider my-1"></li>
-                  <li>
-                    <a :href="`/g/${gen.slug}`" target="_blank" class="dropdown-item small py-2 d-flex align-items-center gap-2">
-                      <i class="bi bi-box-arrow-up-right text-muted"></i> Ver ficha pública
-                    </a>
-                  </li>
-                </ul>
+                <div class="gdv__dropdown-menu" v-if="qrDropdownOpen" @mouseleave="qrDropdownOpen=false">
+                  <button class="gdv__dropdown-item" @click="descargarQRsvg(); qrDropdownOpen=false">
+                    <i class="bi bi-file-earmark-code"></i> Descargar SVG
+                  </button>
+                  <button class="gdv__dropdown-item" @click="descargarQRpng(); qrDropdownOpen=false">
+                    <i class="bi bi-file-earmark-image"></i> Descargar PNG
+                  </button>
+                  <div class="gdv__dropdown-sep"></div>
+                  <a :href="`/g/${gen.slug}`" target="_blank" class="gdv__dropdown-item">
+                    <i class="bi bi-box-arrow-up-right"></i> Ver ficha pública
+                  </a>
+                </div>
               </div>
 
               <!-- Toggle visible_web -->
               <button
                 v-if="canUpdate"
-                class="btn"
-                :class="gen.visible_web ? 'btn-success' : 'btn-outline-secondary'"
+                class="gdv__btn"
+                :class="gen.visible_web ? 'gdv__btn--green' : 'gdv__btn--ghost'"
                 :disabled="toggling"
                 @click="toggleVisibleWeb"
-                :title="gen.visible_web ? 'Publicada en web del club' : 'No visible en web del club'"
               >
                 <i class="bi" :class="gen.visible_web ? 'bi-globe2' : 'bi-globe'"></i>
-                <span class="d-none d-sm-inline ms-1">{{ gen.visible_web ? 'Publicada' : 'Publicar' }}</span>
+                <span class="gdv__btn-label">{{ gen.visible_web ? 'Publicada' : 'Publicar' }}</span>
               </button>
             </div>
           </div>
 
           <!-- KPIs rápidos -->
-          <div class="kpi-row mt-3">
+          <div class="kpi-row gdv__kpi-row">
             <div class="kpi-cell">
               <div class="kpi-cell__label">THC</div>
               <div class="kpi-cell__value" style="color:#e53935">{{ gen.thc != null ? gen.thc + '%' : '—' }}</div>
@@ -251,266 +242,226 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Cuerpo: 2 columnas en desktop -->
-      <div class="row g-4">
+      <!-- Cuerpo 2 columnas -->
+      <div class="gdv__body">
 
         <!-- Columna izquierda -->
-        <div class="col-12 col-lg-7">
+        <div class="gdv__col-main">
 
           <!-- Descripción -->
-          <div v-if="gen.descripcion" class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-              <h6 class="section-title">Descripción</h6>
-              <p class="mb-0 text-secondary lh-lg">{{ gen.descripcion }}</p>
-            </div>
+          <div v-if="gen.descripcion" class="gdv__card gdv__card--mb">
+            <h6 class="section-title">Descripción</h6>
+            <p class="gdv__desc">{{ gen.descripcion }}</p>
           </div>
 
           <!-- Datos de cultivo -->
-          <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-              <h6 class="section-title">Datos de cultivo</h6>
-              <div class="dato-grid">
-                <div v-if="gen.tiempo_floracion" class="dato-item">
-                  <span class="dato-item__icon">🌸</span>
-                  <div>
-                    <div class="dato-item__label">Floración</div>
-                    <div class="dato-item__val">{{ gen.tiempo_floracion }} días</div>
-                  </div>
-                </div>
-                <div v-if="difMeta" class="dato-item">
-                  <span class="dato-item__icon">{{ difMeta.icon }}</span>
-                  <div>
-                    <div class="dato-item__label">Dificultad</div>
-                    <div class="dato-item__val">{{ difMeta.label }}</div>
-                  </div>
-                </div>
-                <div v-if="gen.rendimiento" class="dato-item">
-                  <span class="dato-item__icon">⚖️</span>
-                  <div>
-                    <div class="dato-item__label">Rendimiento</div>
-                    <div class="dato-item__val">{{ gen.rendimiento }} g/m²</div>
-                  </div>
-                </div>
-                <div v-if="gen.altura" class="dato-item">
-                  <span class="dato-item__icon">📏</span>
-                  <div>
-                    <div class="dato-item__label">Altura</div>
-                    <div class="dato-item__val">{{ gen.altura }} cm</div>
-                  </div>
-                </div>
-                <div v-if="gen.origen" class="dato-item">
-                  <span class="dato-item__icon">🌍</span>
-                  <div>
-                    <div class="dato-item__label">Origen</div>
-                    <div class="dato-item__val">{{ gen.origen }}</div>
-                  </div>
-                </div>
-                <div v-if="gen.criador" class="dato-item">
-                  <span class="dato-item__icon">👤</span>
-                  <div>
-                    <div class="dato-item__label">Criador</div>
-                    <div class="dato-item__val">{{ gen.criador }}</div>
-                  </div>
-                </div>
+          <div class="gdv__card gdv__card--mb">
+            <h6 class="section-title">Datos de cultivo</h6>
+            <div class="dato-grid">
+              <div v-if="gen.tiempo_floracion" class="dato-item">
+                <span class="dato-item__icon">🌸</span>
+                <div><div class="dato-item__label">Floración</div><div class="dato-item__val">{{ gen.tiempo_floracion }} días</div></div>
               </div>
-              <div v-if="!gen.tiempo_floracion && !difMeta && !gen.rendimiento && !gen.altura && !gen.origen && !gen.criador"
-                   class="text-muted small fst-italic">Sin datos de cultivo registrados</div>
+              <div v-if="difMeta" class="dato-item">
+                <span class="dato-item__icon">{{ difMeta.icon }}</span>
+                <div><div class="dato-item__label">Dificultad</div><div class="dato-item__val">{{ difMeta.label }}</div></div>
+              </div>
+              <div v-if="gen.rendimiento" class="dato-item">
+                <span class="dato-item__icon">⚖️</span>
+                <div><div class="dato-item__label">Rendimiento</div><div class="dato-item__val">{{ gen.rendimiento }} g/m²</div></div>
+              </div>
+              <div v-if="gen.altura" class="dato-item">
+                <span class="dato-item__icon">📏</span>
+                <div><div class="dato-item__label">Altura</div><div class="dato-item__val">{{ gen.altura }} cm</div></div>
+              </div>
+              <div v-if="gen.origen" class="dato-item">
+                <span class="dato-item__icon">🌍</span>
+                <div><div class="dato-item__label">Origen</div><div class="dato-item__val">{{ gen.origen }}</div></div>
+              </div>
+              <div v-if="gen.criador" class="dato-item">
+                <span class="dato-item__icon">👤</span>
+                <div><div class="dato-item__label">Criador</div><div class="dato-item__val">{{ gen.criador }}</div></div>
+              </div>
             </div>
+            <div v-if="!gen.tiempo_floracion && !difMeta && !gen.rendimiento && !gen.altura && !gen.origen && !gen.criador"
+                 class="gdv__empty-note">Sin datos de cultivo registrados</div>
           </div>
 
           <!-- Terpenos -->
-          <div v-if="terpenos.length" class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-              <h6 class="section-title">Perfil terpénico</h6>
-              <div class="d-flex flex-wrap gap-2">
-                <span v-for="t in terpenos" :key="t" class="terpeno-chip">{{ t }}</span>
-              </div>
+          <div v-if="terpenos.length" class="gdv__card gdv__card--mb">
+            <h6 class="section-title">Perfil terpénico</h6>
+            <div class="gdv__terpenos">
+              <span v-for="t in terpenos" :key="t" class="terpeno-chip">{{ t }}</span>
             </div>
           </div>
 
-          <!-- Rendimiento promedio -->
-          <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-              <h6 class="section-title">📊 Rendimiento real ({{ rendimientoStats.n }} lotes)</h6>
-              <div v-if="rendimientoStats.n > 0" class="rend-stats">
-                <div class="rend-stat">
-                  <div class="rend-stat__label">Promedio</div>
-                  <div class="rend-stat__value rend-stat__value--main">{{ rendimientoStats.avg }}<span class="rend-stat__unit">g/planta</span></div>
-                </div>
-                <div class="rend-stat">
-                  <div class="rend-stat__label">Máximo</div>
-                  <div class="rend-stat__value" style="color:#1b5e20">{{ rendimientoStats.max }}<span class="rend-stat__unit">g/planta</span></div>
-                </div>
-                <div class="rend-stat">
-                  <div class="rend-stat__label">Mínimo</div>
-                  <div class="rend-stat__value" style="color:#dc2626">{{ rendimientoStats.min }}<span class="rend-stat__unit">g/planta</span></div>
-                </div>
-                <div v-if="gen.rendimiento" class="rend-stat">
-                  <div class="rend-stat__label">Est. genética</div>
-                  <div class="rend-stat__value" style="color:#64748b">{{ gen.rendimiento }}<span class="rend-stat__unit">g/m²</span></div>
-                </div>
+          <!-- Rendimiento real -->
+          <div class="gdv__card gdv__card--mb">
+            <h6 class="section-title">📊 Rendimiento real ({{ rendimientoStats.n }} lotes)</h6>
+            <div v-if="rendimientoStats.n > 0" class="rend-stats">
+              <div class="rend-stat">
+                <div class="rend-stat__label">Promedio</div>
+                <div class="rend-stat__value rend-stat__value--main">{{ rendimientoStats.avg }}<span class="rend-stat__unit">g/planta</span></div>
               </div>
-              <p v-else class="text-muted small mb-0">Marcá plantas con ⭐ para acumular datos de rendimiento real.</p>
+              <div class="rend-stat">
+                <div class="rend-stat__label">Máximo</div>
+                <div class="rend-stat__value" style="color:#1b5e20">{{ rendimientoStats.max }}<span class="rend-stat__unit">g/planta</span></div>
+              </div>
+              <div class="rend-stat">
+                <div class="rend-stat__label">Mínimo</div>
+                <div class="rend-stat__value" style="color:#dc2626">{{ rendimientoStats.min }}<span class="rend-stat__unit">g/planta</span></div>
+              </div>
+              <div v-if="gen.rendimiento" class="rend-stat">
+                <div class="rend-stat__label">Est. genética</div>
+                <div class="rend-stat__value" style="color:#64748b">{{ gen.rendimiento }}<span class="rend-stat__unit">g/m²</span></div>
+              </div>
             </div>
+            <p v-else class="gdv__empty-note">Marcá plantas con ⭐ para acumular datos de rendimiento real.</p>
           </div>
 
           <!-- Lotes históricos -->
-          <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-              <div class="d-flex align-items-center justify-content-between mb-3">
-                <h6 class="section-title mb-0">Lotes históricos</h6>
-                <span class="badge text-bg-light text-muted fw-normal">{{ lotesTotal }}</span>
+          <div class="gdv__card gdv__card--mb">
+            <div class="gdv__card-header">
+              <h6 class="section-title gdv__section-mb0">Lotes históricos</h6>
+              <span class="gdv__count-badge">{{ lotesTotal }}</span>
+            </div>
+
+            <EmptyState v-if="lotesTotal === 0" icon="🌱" title="Sin lotes registrados" compact />
+
+            <div v-else>
+              <div class="gdv__table-wrap">
+                <table class="gdv__table">
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Sala</th>
+                      <th class="gdv__col-md">Inicio</th>
+                      <th class="gdv__col-md">Cosecha</th>
+                      <th class="gdv__text-right">Plantas</th>
+                      <th class="gdv__text-right">Peso seco</th>
+                      <th class="gdv__text-right gdv__col-md">g/planta</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="lote in lotesPaginados" :key="lote.id">
+                      <td>
+                        <a class="gdv__lote-link" @click.prevent="router.push(`/lotes/${lote.id}`)">
+                          {{ lote.codigo }}
+                        </a>
+                      </td>
+                      <td class="gdv__cell-muted">{{ lote.sala || '—' }}</td>
+                      <td class="gdv__cell-muted gdv__col-md">{{ formatDate(lote.start_date) }}</td>
+                      <td class="gdv__cell-muted gdv__col-md">{{ formatDate(lote.fecha_cosecha) }}</td>
+                      <td class="gdv__text-right gdv__cell-sm">{{ lote.plants_count || '—' }}</td>
+                      <td class="gdv__text-right gdv__cell-bold">
+                        {{ lote.peso_seco_total != null ? lote.peso_seco_total + 'g' : '—' }}
+                      </td>
+                      <td class="gdv__text-right gdv__cell-muted gdv__col-md">
+                        {{ lote.rendimiento_gramos_planta != null ? lote.rendimiento_gramos_planta + 'g' : '—' }}
+                      </td>
+                      <td>
+                        <span class="gdv__estado-badge" :style="estadoLote(lote.estado).style">
+                          {{ estadoLote(lote.estado).label }}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
-              <EmptyState v-if="lotesTotal === 0" icon="🌱" title="Sin lotes registrados" compact />
-
-              <div v-else>
-                <div class="table-responsive">
-                  <table class="table table-sm table-hover align-middle mb-2">
-                    <thead>
-                      <tr class="table-header">
-                        <th>Código</th>
-                        <th>Sala</th>
-                        <th class="d-none d-md-table-cell">Inicio</th>
-                        <th class="d-none d-md-table-cell">Cosecha</th>
-                        <th class="text-end">Plantas</th>
-                        <th class="text-end">Peso seco</th>
-                        <th class="text-end d-none d-md-table-cell">g/planta</th>
-                        <th>Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="lote in lotesPaginados" :key="lote.id">
-                        <td>
-                          <a :href="`/lotes/${lote.id}`" class="fw-semibold text-decoration-none text-dark link-hover" @click.prevent="router.push(`/lotes/${lote.id}`)">
-                            {{ lote.codigo }}
-                          </a>
-                        </td>
-                        <td class="text-muted small">{{ lote.sala || '—' }}</td>
-                        <td class="text-muted small d-none d-md-table-cell">{{ formatDate(lote.start_date) }}</td>
-                        <td class="text-muted small d-none d-md-table-cell">{{ formatDate(lote.fecha_cosecha) }}</td>
-                        <td class="text-end small">{{ lote.plants_count || '—' }}</td>
-                        <td class="text-end small fw-semibold">
-                          {{ lote.peso_seco_total != null ? lote.peso_seco_total + 'g' : '—' }}
-                        </td>
-                        <td class="text-end small text-muted d-none d-md-table-cell">
-                          {{ lote.rendimiento_gramos_planta != null ? lote.rendimiento_gramos_planta + 'g' : '—' }}
-                        </td>
-                        <td>
-                          <span class="badge rounded-pill" :class="estadoLote(lote.estado).cls" style="font-size:.7rem">
-                            {{ estadoLote(lote.estado).label }}
-                          </span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <Paginator
-                  v-model:page="lotesPagina"
-                  v-model:perPage="lotesPerPage"
-                  :total="lotesTotal"
-                  :pageSizes="[10, 25]"
-                />
-              </div>
+              <Paginator
+                v-model:page="lotesPagina"
+                v-model:perPage="lotesPerPage"
+                :total="lotesTotal"
+                :pageSizes="[10, 25]"
+              />
             </div>
           </div>
 
         </div>
 
         <!-- Columna derecha -->
-        <div class="col-12 col-lg-5">
+        <div class="gdv__col-aside">
 
-          <!-- Galería de fotos -->
-          <div v-if="gen.fotos?.length" class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-              <h6 class="section-title">Fotos</h6>
-              <div class="foto-grid">
-                <div
-                  v-for="(foto, i) in gen.fotos"
-                  :key="foto.id"
-                  class="foto-thumb"
-                  @click="abrirLightbox(i)"
+          <!-- Galería -->
+          <div class="gdv__card gdv__card--mb">
+            <h6 class="section-title">Fotos</h6>
+            <div v-if="gen.fotos?.length" class="foto-grid">
+              <div
+                v-for="(foto, i) in gen.fotos"
+                :key="foto.id"
+                class="foto-thumb"
+                @click="abrirLightbox(i)"
+              >
+                <img :src="foto.url" :alt="`${gen.nombre} foto ${i + 1}`" loading="lazy" />
+                <button
+                  v-if="canUpdate"
+                  class="foto-thumb__remove"
+                  title="Eliminar foto"
+                  @click.stop="eliminarFoto(foto.id)"
                 >
-                  <img :src="foto.url" :alt="`${gen.nombre} foto ${i + 1}`" loading="lazy" />
-                  <button
-                    v-if="canUpdate"
-                    class="foto-thumb__remove"
-                    title="Eliminar foto"
-                    @click.stop="eliminarFoto(foto.id)"
-                  >
-                    <i class="bi bi-x-lg"></i>
-                  </button>
-                </div>
+                  <i class="bi bi-x-lg"></i>
+                </button>
               </div>
             </div>
+            <EmptyState v-else icon="📷" title="Sin fotos" compact />
           </div>
-          <div v-else class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-              <EmptyState icon="📷" title="Sin fotos" compact />
+
+          <!-- Cannabinoides -->
+          <div class="gdv__card gdv__card--mb">
+            <h6 class="section-title">Cannabinoides</h6>
+            <div class="cannab-row gdv__cannab-mb">
+              <div class="cannab-label" style="color:#e53935;font-weight:700">THC</div>
+              <div class="cannab-bar-wrap">
+                <div class="cannab-bar" :style="{ width: gen.thc != null ? Math.min(gen.thc, 30) / 30 * 100 + '%' : '0%', background: '#e53935' }"></div>
+              </div>
+              <div class="cannab-val">{{ gen.thc != null ? gen.thc + '%' : '—' }}</div>
+            </div>
+            <div class="cannab-row">
+              <div class="cannab-label" style="color:#1b5e20;font-weight:700">CBD</div>
+              <div class="cannab-bar-wrap">
+                <div class="cannab-bar" :style="{ width: gen.cbd != null ? Math.min(gen.cbd, 30) / 30 * 100 + '%' : '0%', background: '#1b5e20' }"></div>
+              </div>
+              <div class="cannab-val">{{ gen.cbd != null ? gen.cbd + '%' : '—' }}</div>
             </div>
           </div>
 
-          <!-- THC / CBD visual -->
-          <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-              <h6 class="section-title">Cannabinoides</h6>
-              <div class="cannab-row mb-3">
-                <div class="cannab-label fw-bold" style="color:#e53935">THC</div>
-                <div class="cannab-bar-wrap">
-                  <div class="cannab-bar" :style="{ width: gen.thc != null ? Math.min(gen.thc, 30) / 30 * 100 + '%' : '0%', background: '#e53935' }"></div>
-                </div>
-                <div class="cannab-val">{{ gen.thc != null ? gen.thc + '%' : '—' }}</div>
+          <!-- Configuración (solo admin) -->
+          <div v-if="canUpdate" class="gdv__card gdv__card--mb">
+            <h6 class="section-title">Configuración</h6>
+            <div class="gdv__config">
+              <div class="gdv__config-row">
+                <span class="gdv__config-label">Estado</span>
+                <span class="gdv__config-badge" :style="gen.activa ? { background:'#f0fdf4', color:'#15803d', border:'1px solid #bbf7d0' } : { background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0' }">
+                  {{ gen.activa ? 'Activa' : 'Inactiva' }}
+                </span>
               </div>
-              <div class="cannab-row">
-                <div class="cannab-label fw-bold" style="color:#1b5e20">CBD</div>
-                <div class="cannab-bar-wrap">
-                  <div class="cannab-bar" :style="{ width: gen.cbd != null ? Math.min(gen.cbd, 30) / 30 * 100 + '%' : '0%', background: '#1b5e20' }"></div>
-                </div>
-                <div class="cannab-val">{{ gen.cbd != null ? gen.cbd + '%' : '—' }}</div>
+              <div class="gdv__config-row">
+                <span class="gdv__config-label">Disponible</span>
+                <span class="gdv__config-badge" :style="gen.disponible ? { background:'#f0fdf4', color:'#15803d', border:'1px solid #bbf7d0' } : { background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0' }">
+                  {{ gen.disponible ? 'Sí' : 'No' }}
+                </span>
               </div>
-            </div>
-          </div>
-
-          <!-- Info técnica (solo admin) -->
-          <div v-if="canUpdate" class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-              <h6 class="section-title">Configuración</h6>
-              <div class="d-flex flex-column gap-2 small">
-                <div class="d-flex justify-content-between align-items-center">
-                  <span class="text-muted">Estado</span>
-                  <span class="badge" :class="gen.activa ? 'bg-success' : 'bg-secondary'">
-                    {{ gen.activa ? 'Activa' : 'Inactiva' }}
-                  </span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center">
-                  <span class="text-muted">Disponible</span>
-                  <span class="badge" :class="gen.disponible ? 'bg-success' : 'bg-secondary'">
-                    {{ gen.disponible ? 'Sí' : 'No' }}
-                  </span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center">
-                  <span class="text-muted">Web pública</span>
-                  <button
-                    class="btn btn-sm py-0 px-2"
-                    :class="gen.visible_web ? 'btn-success' : 'btn-outline-secondary'"
-                    :disabled="toggling"
-                    @click="toggleVisibleWeb"
-                  >
-                    {{ gen.visible_web ? 'Publicada' : 'Oculta' }}
-                  </button>
-                </div>
-                <div class="d-flex justify-content-between align-items-center">
-                  <span class="text-muted">Slug QR</span>
-                  <code class="small text-muted">{{ gen.slug || '—' }}</code>
-                </div>
-                <hr class="my-1">
-                <div class="d-flex justify-content-between text-muted">
-                  <span>Creada</span><span>{{ formatDate(gen.created_at) }}</span>
-                </div>
-                <div class="d-flex justify-content-between text-muted">
-                  <span>Actualizada</span><span>{{ formatDate(gen.updated_at) }}</span>
-                </div>
+              <div class="gdv__config-row">
+                <span class="gdv__config-label">Web pública</span>
+                <button
+                  class="gdv__toggle-sm"
+                  :class="gen.visible_web ? 'gdv__toggle-sm--on' : 'gdv__toggle-sm--off'"
+                  :disabled="toggling"
+                  @click="toggleVisibleWeb"
+                >{{ gen.visible_web ? 'Publicada' : 'Oculta' }}</button>
+              </div>
+              <div class="gdv__config-row">
+                <span class="gdv__config-label">Slug QR</span>
+                <code class="gdv__config-code">{{ gen.slug || '—' }}</code>
+              </div>
+              <div class="gdv__config-sep"></div>
+              <div class="gdv__config-row gdv__config-row--muted">
+                <span>Creada</span><span>{{ formatDate(gen.created_at) }}</span>
+              </div>
+              <div class="gdv__config-row gdv__config-row--muted">
+                <span>Actualizada</span><span>{{ formatDate(gen.updated_at) }}</span>
               </div>
             </div>
           </div>
@@ -531,70 +482,106 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* Layout */
+.gdv { padding: 2rem 1.75rem 3rem; max-width: 1200px; margin: 0 auto; }
+@media (max-width: 768px) { .gdv { padding: 1.25rem 1rem 2rem; } }
+
+/* Loading / Error */
+.gdv__loading { display: flex; justify-content: center; padding: 3rem; }
+.gdv__spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #1a3d2e; border-radius: 50%; animation: gdv-spin .8s linear infinite; }
+@keyframes gdv-spin { to { transform: rotate(360deg); } }
+.gdv__error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: .875rem 1rem; border-radius: 10px; margin-bottom: 1rem; }
+
 /* Hero */
-.hero-card {
-  background: white;
-  border-radius: 14px;
-  border: 1.5px solid rgba(0,0,0,.07);
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0,0,0,.06);
-}
+.gdv__hero { margin-bottom: 1.5rem; }
+.gdv__hero-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.gdv__hero-info { flex: 1; }
+.gdv__badges    { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .5rem; }
+.gdv__badge { display: inline-flex; align-items: center; padding: .2rem .6rem; border-radius: 99px; font-size: .75rem; font-weight: 600; }
+.gdv__badge--inase { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+.gdv__badge--muted  { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+.gdv__nombre { font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0 0 .25rem; }
+.gdv__sub    { font-size: .82rem; color: #64748b; display: flex; gap: .4rem; flex-wrap: wrap; }
+.gdv__sub i  { font-size: .75rem; }
+
+.gdv__hero-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.gdv__btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .9rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; border: 1.5px solid; transition: all .15s; white-space: nowrap; }
+.gdv__btn--green   { background: #1a3d2e; border-color: #1a3d2e; color: #fff; }
+.gdv__btn--green:hover:not(:disabled) { background: #0f2a1e; }
+.gdv__btn--outline-green { background: #fff; border-color: #1a3d2e; color: #1a3d2e; }
+.gdv__btn--outline-green:hover { background: #f0f8f4; }
+.gdv__btn--ghost   { background: #fff; border-color: #e2e8f0; color: #374151; }
+.gdv__btn--ghost:hover:not(:disabled) { background: #f8fafc; }
+.gdv__btn:disabled { opacity: .6; cursor: not-allowed; }
+.gdv__btn-label    { display: none; }
+@media (min-width: 480px) { .gdv__btn-label { display: inline; } }
+
+/* Dropdown */
+.gdv__dropdown { position: relative; }
+.gdv__dropdown-arrow { font-size: .7rem; }
+.gdv__dropdown-menu { position: absolute; right: 0; top: calc(100% + .35rem); background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.1); min-width: 180px; z-index: 100; padding: .3rem; }
+.gdv__dropdown-item { display: flex; align-items: center; gap: .5rem; padding: .5rem .75rem; font-size: .82rem; color: #374151; cursor: pointer; border-radius: 7px; text-decoration: none; background: none; border: none; width: 100%; transition: background .1s; }
+.gdv__dropdown-item:hover { background: #f8fafc; }
+.gdv__dropdown-sep { height: 1px; background: #f1f5f9; margin: .25rem 0; }
+
+.gdv__kpi-row { margin-top: 1rem; }
+
+/* Body 2-col */
+.gdv__body { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; align-items: start; margin-top: 1.25rem; }
+@media (max-width: 900px) { .gdv__body { grid-template-columns: 1fr; } }
+
+/* Cards */
+.gdv__card { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 1.25rem; }
+.gdv__card--mb { margin-bottom: 1rem; }
+.gdv__card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .875rem; }
+.gdv__section-mb0 { margin-bottom: 0; }
+.gdv__count-badge { background: #f1f5f9; color: #64748b; padding: .15rem .55rem; border-radius: 99px; font-size: .75rem; font-weight: 600; }
+.gdv__desc { color: #475569; line-height: 1.65; margin: 0; font-size: .9rem; }
+.gdv__empty-note { color: #94a3b8; font-size: .82rem; font-style: italic; }
+.gdv__terpenos { display: flex; flex-wrap: wrap; gap: .4rem; }
+.gdv__cannab-mb { margin-bottom: .75rem; }
+
+/* Hero */
+.hero-card { background: white; border-radius: 14px; border: 1.5px solid rgba(0,0,0,.07); overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
 .hero-card__bar { height: 5px; background: var(--tipo-color, #1b5e20); }
 .hero-card__body { padding: 1.25rem 1.5rem 1.5rem; }
 
 /* KPI row */
 .kpi-row { display: flex; flex-wrap: wrap; gap: .75rem; }
-.kpi-cell {
-  background: #f8f9fa;
-  border-radius: .75rem;
-  padding: .5rem .875rem;
-  min-width: 70px;
-}
+.kpi-cell { background: #f8f9fa; border-radius: .75rem; padding: .5rem .875rem; min-width: 70px; }
 .kpi-cell__label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; margin-bottom: .1rem; }
 .kpi-cell__value { font-size: 1.15rem; font-weight: 800; color: #1a2e1a; line-height: 1; }
 
 /* Section titles */
-.section-title {
-  font-size: .68rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: #6c757d;
-  font-weight: 700;
-  margin-bottom: .875rem;
-}
+.section-title { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: #6c757d; font-weight: 700; margin-bottom: .875rem; }
 
 /* Dato grid */
 .dato-grid { display: flex; flex-wrap: wrap; gap: .6rem; }
-.dato-item {
-  display: flex; align-items: center; gap: .65rem;
-  background: #f8f9fa; border-radius: .6rem; padding: .6rem .875rem;
-  flex: 1 1 140px;
-}
-.dato-item__icon { font-size: 1.25rem; flex-shrink: 0; }
+.dato-item { display: flex; align-items: center; gap: .65rem; background: #f8f9fa; border-radius: .6rem; padding: .6rem .875rem; flex: 1 1 140px; }
+.dato-item__icon  { font-size: 1.25rem; flex-shrink: 0; }
 .dato-item__label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; line-height: 1.2; }
-.dato-item__val { font-size: .875rem; font-weight: 600; color: #1a2e1a; }
+.dato-item__val   { font-size: .875rem; font-weight: 600; color: #1a2e1a; }
 
 /* Terpenos */
-.terpeno-chip {
-  padding: .3rem .75rem;
-  background: rgba(27,94,32,.1);
-  color: #1b5e20;
-  border-radius: 999px;
-  font-size: .8rem;
-  font-weight: 600;
-  border: 1px solid rgba(27,94,32,.2);
-}
+.terpeno-chip { padding: .3rem .75rem; background: rgba(27,94,32,.1); color: #1b5e20; border-radius: 999px; font-size: .8rem; font-weight: 600; border: 1px solid rgba(27,94,32,.2); }
 
-/* Tabla lotes */
-.table-header th {
-  font-size: .68rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: #6c757d;
-  font-weight: 600;
-  border-bottom-width: 1px;
-}
-.link-hover:hover { color: #1b5e20 !important; text-decoration: underline !important; }
+/* Table */
+.gdv__table-wrap { overflow-x: auto; margin-bottom: .75rem; }
+.gdv__table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.gdv__table thead th { padding: .5rem .75rem; text-align: left; font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; font-weight: 600; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+.gdv__table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; }
+.gdv__table tbody tr:last-child { border-bottom: none; }
+.gdv__table tbody tr:hover { background: #f8fafc; }
+.gdv__table td { padding: .55rem .75rem; vertical-align: middle; }
+.gdv__col-md { display: none; }
+@media (min-width: 640px) { .gdv__col-md { display: table-cell; } }
+.gdv__text-right { text-align: right; }
+.gdv__lote-link { font-weight: 600; color: #1e293b; text-decoration: none; cursor: pointer; }
+.gdv__lote-link:hover { color: #1b5e20; text-decoration: underline; }
+.gdv__cell-muted { color: #6b7280; font-size: .78rem; }
+.gdv__cell-sm    { font-size: .78rem; }
+.gdv__cell-bold  { font-weight: 600; font-size: .78rem; }
+.gdv__estado-badge { display: inline-block; padding: .15rem .5rem; border-radius: 99px; font-size: .7rem; font-weight: 600; }
 
 /* Cannabinoides */
 .cannab-row { display: flex; align-items: center; gap: .75rem; }
@@ -605,23 +592,10 @@ onMounted(async () => {
 
 /* Foto grid */
 .foto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
-.foto-thumb {
-  aspect-ratio: 1;
-  border-radius: .5rem;
-  overflow: hidden;
-  cursor: pointer;
-  position: relative;
-  background: #f0f0f0;
-}
+.foto-thumb { aspect-ratio: 1; border-radius: .5rem; overflow: hidden; cursor: pointer; position: relative; background: #f0f0f0; }
 .foto-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .2s; }
 .foto-thumb:hover img { transform: scale(1.05); }
-.foto-thumb__remove {
-  position: absolute; top: 4px; right: 4px;
-  background: rgba(0,0,0,.6); border: none; border-radius: 50%;
-  color: white; width: 22px; height: 22px; font-size: .65rem;
-  display: flex; align-items: center; justify-content: center;
-  opacity: 0; transition: opacity .15s; cursor: pointer;
-}
+.foto-thumb__remove { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,.6); border: none; border-radius: 50%; color: white; width: 22px; height: 22px; font-size: .65rem; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s; cursor: pointer; }
 .foto-thumb:hover .foto-thumb__remove { opacity: 1; }
 
 /* Rendimiento real */
@@ -631,4 +605,17 @@ onMounted(async () => {
 .rend-stat__value { font-size: 1.4rem; font-weight: 800; color: #0f172a; letter-spacing: -.04em; line-height: 1; }
 .rend-stat__value--main { color: #1b5e20; }
 .rend-stat__unit { font-size: .62rem; font-weight: 500; color: #94a3b8; margin-left: .15rem; }
+
+/* Configuración card */
+.gdv__config { display: flex; flex-direction: column; gap: .5rem; font-size: .82rem; }
+.gdv__config-row { display: flex; justify-content: space-between; align-items: center; }
+.gdv__config-row--muted { color: #64748b; }
+.gdv__config-label { color: #64748b; }
+.gdv__config-badge { display: inline-block; padding: .15rem .55rem; border-radius: 99px; font-size: .75rem; font-weight: 600; }
+.gdv__config-code  { font-size: .75rem; color: #94a3b8; font-family: monospace; }
+.gdv__config-sep   { height: 1px; background: #f1f5f9; margin: .25rem 0; }
+.gdv__toggle-sm { font-size: .72rem; font-weight: 600; padding: .2em .65em; border-radius: 6px; border: 1.5px solid; cursor: pointer; transition: all .15s; }
+.gdv__toggle-sm--on  { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+.gdv__toggle-sm--off { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
+.gdv__toggle-sm:disabled { opacity: .6; cursor: not-allowed; }
 </style>

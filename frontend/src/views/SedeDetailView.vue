@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
 import { getSede, listSalas, listLotes,
-         getSedeStocks, createStock, deleteSede } from "../lib/api"
+         getSedeStocks, createStock, updateStock, deleteSede, listGeneticas } from "../lib/api"
 import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
@@ -62,23 +62,71 @@ const loadingTienda      = ref(false)
 const showNuevoStockModal = ref(false)
 const savingNuevoStock   = ref(false)
 const nuevoStockError    = ref(null)
-const nuevoStockForm     = ref({ origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', descripcion: '' })
+const nuevoStockForm     = ref({ origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', genetica_id: null, descripcion: '' })
 
 const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '🫙 Aceite', tintura: '💧 Tintura', topico: '🧴 Tópico', otro: '📦 Otro' }
 const KIND_LABELS = { germinacion: 'Germinación', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', secado: 'Secado', curado: 'Curado', manicura: 'Manicura', mixta: 'Mixta', madre: 'Madre', madres: 'Madres' }
 function kindLabel(k) { return KIND_LABELS[k] || k || '' }
-const lotesParaStock = ref([])
+const lotesParaStock    = ref([])
 const loadingLotesStock = ref(false)
+const geneticasParaStock    = ref([])
+const loadingGeneticasStock = ref(false)
+
+const canSubmitStock = computed(() => {
+  const f = nuevoStockForm.value
+  if (!f.cantidad) return false
+  if (f.origen === 'compra_externa') return !!(f.proveedor && f.genetica_id)
+  return true
+})
+
+// ── Editar stock ─────────────────────────────────────────────────
+const showEditarStockModal = ref(false)
+const editandoStock        = ref(null)
+const editarStockForm      = ref({ cantidad: null, precio_sugerido_ars: null, costo_unitario_ars: null, descripcion: '', proveedor: '' })
+const savingEditarStock    = ref(false)
+const editarStockError     = ref(null)
+
+function abrirEditarStock(s) {
+  editandoStock.value = s
+  editarStockForm.value = {
+    cantidad:            parseFloat(s.cantidad),
+    precio_sugerido_ars: s.precio_sugerido_ars ? parseFloat(s.precio_sugerido_ars) : null,
+    costo_unitario_ars:  s.costo_unitario_ars  ? parseFloat(s.costo_unitario_ars)  : null,
+    descripcion:         s.descripcion || '',
+    proveedor:           s.proveedor   || '',
+  }
+  editarStockError.value = null
+  showEditarStockModal.value = true
+}
+
+async function confirmarEditarStock() {
+  if (!editandoStock.value) return
+  savingEditarStock.value = true; editarStockError.value = null
+  try {
+    const f = editarStockForm.value
+    const payload = { cantidad: f.cantidad }
+    if (f.precio_sugerido_ars) payload.precio_sugerido_ars = f.precio_sugerido_ars
+    if (f.costo_unitario_ars)  payload.costo_unitario_ars  = f.costo_unitario_ars
+    if (f.descripcion)         payload.descripcion         = f.descripcion
+    if (f.proveedor)           payload.proveedor           = f.proveedor
+    await updateStock(editandoStock.value.id, payload)
+    showEditarStockModal.value = false
+    await loadTiendaStocks()
+    toast.success('Stock actualizado')
+  } catch (e) {
+    editarStockError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'Error al actualizar el stock'
+  } finally { savingEditarStock.value = false }
+}
 
 async function loadTiendaStocks() {
   loadingTienda.value = true
-  try { const { data } = await getSedeStocks(sedeId, { canal: 'regulatorio' }); tiendaStocks.value = data || [] }
+  try { const { data } = await getSedeStocks(sedeId); tiendaStocks.value = data || [] }
   catch { tiendaStocks.value = [] }
   finally { loadingTienda.value = false }
 }
 
 async function abrirNuevoStockModal() {
-  nuevoStockForm.value = { origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', descripcion: '' }
+  nuevoStockForm.value = { origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', genetica_id: null, descripcion: '' }
   nuevoStockError.value = null
   showNuevoStockModal.value = true
   if (!lotesParaStock.value.length) {
@@ -86,6 +134,12 @@ async function abrirNuevoStockModal() {
     try { const { data } = await listLotes({ estado: 'finalizado' }); lotesParaStock.value = data || [] }
     catch { lotesParaStock.value = [] }
     finally { loadingLotesStock.value = false }
+  }
+  if (!geneticasParaStock.value.length) {
+    loadingGeneticasStock.value = true
+    try { const { data } = await listGeneticas({ activa: true, disponible: true }); geneticasParaStock.value = data || [] }
+    catch { geneticasParaStock.value = [] }
+    finally { loadingGeneticasStock.value = false }
   }
 }
 
@@ -95,7 +149,7 @@ async function confirmarNuevoStock() {
     const f = nuevoStockForm.value
     const payload = { origen: f.origen, sede_id: sedeId, forma_producto: f.forma_producto, unidad: f.unidad, cantidad: f.cantidad, costo_unitario_ars: f.costo_unitario_ars || undefined }
     if (f.origen === 'derivado_lote') { payload.lote_id = f.lote_id; payload.lote_origen_consumido_g = f.lote_origen_consumido_g }
-    else { payload.proveedor = f.proveedor; if (f.descripcion) payload.descripcion = f.descripcion }
+    else { payload.proveedor = f.proveedor; payload.genetica_id = f.genetica_id; if (f.descripcion) payload.descripcion = f.descripcion }
     await createStock(payload)
     showNuevoStockModal.value = false
     await loadTiendaStocks()
@@ -145,6 +199,7 @@ function onSalaCreada() {
 
 function escapeHandler(e) {
   if (e.key !== 'Escape') return
+  if (showEditarStockModal.value) { showEditarStockModal.value = false; return }
   if (showNuevoStockModal.value) showNuevoStockModal.value = false
 }
 onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
@@ -251,7 +306,10 @@ onMounted(async () => {
             </EmptyState>
             <div v-else class="sdv__tienda-grid">
               <div v-for="s in tiendaStocks" :key="s.id" class="sdv__tienda-card">
-                <div class="sdv__tienda-forma">{{ FORMA_LABELS[s.forma_producto] || s.forma_producto }}</div>
+                <div class="sdv__tienda-card-top">
+                  <div class="sdv__tienda-forma">{{ FORMA_LABELS[s.forma_producto] || s.forma_producto }}</div>
+                  <button v-if="canAddStock" class="sdv__tienda-edit-btn" @click="abrirEditarStock(s)" title="Editar"><i class="bi bi-pencil"></i></button>
+                </div>
                 <div v-if="s.genetica" class="sdv__tienda-gen">🧬 {{ s.genetica.nombre }}</div>
                 <div v-if="s.lote_codigo" class="sdv__tienda-lote">📋 {{ s.lote_codigo }}</div>
                 <div class="sdv__tienda-qty">
@@ -348,6 +406,62 @@ onMounted(async () => {
 
     <ModalCrearSala v-if="showCrearSala" :sede-id-fija="sedeId" @close="showCrearSala = false" @created="onSalaCreada" />
 
+    <!-- MODAL EDITAR STOCK -->
+    <Teleport to="body">
+      <div v-if="showEditarStockModal" class="sdv__modal-overlay" @click.self="showEditarStockModal = false">
+        <div class="sdv__modal sdv__modal--sm">
+          <div class="sdv__modal-header">
+            <div class="sdv__modal-header-icon" style="background:rgba(27,94,32,.1);color:#1b5e20"><i class="bi bi-pencil"></i></div>
+            <div>
+              <h3 class="sdv__modal-title">Editar stock</h3>
+              <p class="sdv__modal-sub">{{ FORMA_LABELS[editandoStock?.forma_producto] || editandoStock?.forma_producto }}</p>
+            </div>
+            <button class="sdv__modal-close" @click="showEditarStockModal = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="sdv__modal-body">
+            <div v-if="editarStockError" class="sdv__alert-err">{{ editarStockError }}</div>
+
+            <div class="sdv__field">
+              <label class="sdv__label">Cantidad <span style="color:#dc2626">*</span></label>
+              <div class="sdv__cant-wrap">
+                <input type="number" step="0.1" min="0" class="sdv__input sdv__input--big" v-model.number="editarStockForm.cantidad" placeholder="0" />
+                <span class="sdv__cant-suffix">{{ editandoStock?.unidad || 'g' }}</span>
+              </div>
+            </div>
+
+            <div class="sdv__grid-2">
+              <div class="sdv__field">
+                <label class="sdv__label">Costo unitario (ARS) <span class="sdv__optional">opcional</span></label>
+                <input type="number" step="0.01" min="0" class="sdv__input" v-model.number="editarStockForm.costo_unitario_ars" placeholder="ej: 1200" />
+              </div>
+              <div class="sdv__field">
+                <label class="sdv__label">Precio sugerido (ARS) <span class="sdv__optional">opcional</span></label>
+                <input type="number" step="0.01" min="0" class="sdv__input" v-model.number="editarStockForm.precio_sugerido_ars" placeholder="ej: 2500" />
+              </div>
+            </div>
+
+            <div v-if="editandoStock?.origen === 'compra_externa'" class="sdv__field">
+              <label class="sdv__label">Proveedor</label>
+              <input type="text" class="sdv__input" v-model.trim="editarStockForm.proveedor" placeholder="Nombre del proveedor" />
+            </div>
+
+            <div class="sdv__field">
+              <label class="sdv__label">Descripción <span class="sdv__optional">opcional</span></label>
+              <input type="text" class="sdv__input" v-model.trim="editarStockForm.descripcion" placeholder="Notas adicionales" />
+            </div>
+          </div>
+          <div class="sdv__modal-footer">
+            <button class="sdv__btn-ghost" :disabled="savingEditarStock" @click="showEditarStockModal = false">Cancelar</button>
+            <button class="sdv__btn-primary" :disabled="savingEditarStock || !editarStockForm.cantidad" @click="confirmarEditarStock">
+              <span v-if="savingEditarStock" class="sdv__ring sdv__ring--sm sdv__ring--white"></span>
+              <i v-else class="bi bi-check-lg"></i>
+              Guardar cambios
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- MODAL NUEVO STOCK (nuevo modelo) -->
     <Teleport to="body">
       <div v-if="showNuevoStockModal" class="sdv__modal-overlay" @click.self="showNuevoStockModal = false">
@@ -392,15 +506,23 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Proveedor/desc (compra_externa) -->
+            <!-- Proveedor / genética / desc (compra_externa) -->
             <template v-if="nuevoStockForm.origen === 'compra_externa'">
               <div class="sdv__field" style="margin-bottom:.75rem">
                 <label class="sdv__label">Proveedor <span style="color:#dc2626">*</span></label>
                 <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.proveedor" placeholder="Nombre del proveedor" />
               </div>
+              <div class="sdv__field" style="margin-bottom:.75rem">
+                <label class="sdv__label">Genética / variedad <span style="color:#dc2626">*</span></label>
+                <div v-if="loadingGeneticasStock" class="sdv__tienda-loading"><div class="sdv__ring sdv__ring--sm"></div> Cargando genéticas…</div>
+                <select v-else class="sdv__input" v-model="nuevoStockForm.genetica_id">
+                  <option :value="null" disabled>Seleccioná una variedad…</option>
+                  <option v-for="g in geneticasParaStock" :key="g.id" :value="g.id">{{ g.nombre }}</option>
+                </select>
+              </div>
               <div class="sdv__field" style="margin-bottom:1rem">
                 <label class="sdv__label">Descripción <span class="sdv__optional">opcional</span></label>
-                <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.descripcion" placeholder="Ej: Aceite CBD 10mg/ml" />
+                <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.descripcion" placeholder="Ej: batch A-12, aceite CBD 10mg/ml" />
               </div>
             </template>
 
@@ -441,7 +563,7 @@ onMounted(async () => {
           </div>
           <div class="sdv__modal-footer">
             <button class="sdv__btn-ghost" :disabled="savingNuevoStock" @click="showNuevoStockModal = false">Cancelar</button>
-            <button class="sdv__btn-primary" :disabled="savingNuevoStock || !nuevoStockForm.cantidad" @click="confirmarNuevoStock">
+            <button class="sdv__btn-primary" :disabled="savingNuevoStock || !canSubmitStock" @click="confirmarNuevoStock">
               <span v-if="savingNuevoStock" class="sdv__ring sdv__ring--sm sdv__ring--white"></span>
               <i v-else class="bi bi-check-lg"></i>
               Guardar stock
@@ -683,6 +805,9 @@ onMounted(async () => {
 .sdv__tienda-status { font-size: .68rem; font-weight: 700; padding: .2em .55em; border-radius: 6px; width: fit-content; margin-top: .2rem; }
 .sdv__tienda-status--ok { background: #dcfce7; color: #15803d; }
 .sdv__tienda-status--empty { background: #fef2f2; color: #dc2626; }
+.sdv__tienda-card-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.sdv__tienda-edit-btn { background: none; border: 1px solid #e2e8f0; border-radius: 6px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #94a3b8; font-size: .72rem; flex-shrink: 0; transition: all .15s; }
+.sdv__tienda-edit-btn:hover { border-color: #1b5e20; color: #1b5e20; background: rgba(27,94,32,.05); }
 
 /* ── Nuevo Stock Modal ────────────────────────────────────────── */
 .sdv__alert-err { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; }

@@ -52,7 +52,8 @@ class PreferencesController < ApplicationController
       :cuit, :numero_igj, :numero_resolucion_reprocann,
       :fecha_resolucion_reprocann, :tipo_organizacion,
       :descripcion_web, :whatsapp, :instagram_url,
-      :facebook_url, :horarios_atencion, :web_activa
+      :facebook_url, :horarios_atencion, :web_activa,
+      :benchmark_opt_in
     )
   end
 
@@ -81,6 +82,7 @@ class PreferencesController < ApplicationController
       facebook_url:                 club.facebook_url,
       horarios_atencion:            club.horarios_atencion,
       web_activa:                   club.web_activa,
+      benchmark_opt_in:             club.benchmark_opt_in,
     }
   end
 end

@@ -1,27 +1,48 @@
 class DispensacionesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_dispensaciones_role!
-  before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :mis_paquetes]
+  before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :mis_paquetes, :export_csv]
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
-  before_action :set_dispensacion, only: [:show, :update, :destroy, :entregar, :reportar_fallo]
+  before_action :set_dispensacion, only: [:show, :update, :destroy, :entregar, :reportar_fallo, :reprogramar]
 
   # GET /pacientes/:paciente_id/dispensaciones  OR  GET /dispensaciones?fecha=YYYY-MM-DD
+  # GET /dispensaciones?con_envio=true[&estado_envio=pendiente][&delivery_id=N][&desde=YYYY-MM-DD][&hasta=YYYY-MM-DD]
   def index
     if @paciente
       @dispensaciones = @paciente.dispensaciones
                                  .includes(:user, :indicacion_medica, :sede, stock: :lote)
                                  .recientes
+    elsif params[:con_envio] == 'true'
+      require_dispensador_o_admin
+      return if performed?
+      scope = Dispensacion
+        .joins(stock: :sede)
+        .where(sedes: { club_id: current_user.club_id })
+        .where(con_envio: true)
+        .includes(:user, :paciente, :sede, :delivery_user, stock: :lote)
+      scope = scope.where(estado_envio: params[:estado_envio]) if params[:estado_envio].present?
+      scope = scope.where(delivery_id: params[:delivery_id])   if params[:delivery_id].present?
+      scope = scope.where("fecha_dispensacion >= ?", Date.parse(params[:desde])) if params[:desde].present?
+      scope = scope.where("fecha_dispensacion <= ?", Date.parse(params[:hasta]))  if params[:hasta].present?
+      @dispensaciones = scope.order(created_at: :desc)
     else
       require_dispensador_o_admin
       return if performed?
-      fecha = params[:fecha].present? ? Date.parse(params[:fecha]) : Date.today
-      @dispensaciones = Dispensacion
+      scope = Dispensacion
         .joins(stock: :sede)
         .where(sedes: { club_id: current_user.club_id })
-        .where(fecha_dispensacion: fecha)
         .includes(:user, :paciente, :sede, stock: :lote)
-        .order(created_at: :desc)
+      if params[:desde].present? || params[:hasta].present?
+        desde = params[:desde].present? ? Date.parse(params[:desde]) : nil
+        hasta = params[:hasta].present? ? Date.parse(params[:hasta]) : Date.today
+        scope = scope.where("fecha_dispensacion >= ?", desde) if desde
+        scope = scope.where("fecha_dispensacion <= ?", hasta)
+        @dispensaciones = scope.order(fecha_dispensacion: :desc, created_at: :desc)
+      else
+        fecha = params[:fecha].present? ? Date.parse(params[:fecha]) : Date.today
+        @dispensaciones = scope.where(fecha_dispensacion: fecha).order(created_at: :desc)
+      end
     end
 
     render json: { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion(d) } }
@@ -108,8 +129,8 @@ class DispensacionesController < ApplicationController
     ids = params[:ids].to_a.map(&:to_i)
     dispensaciones = Dispensacion.del_delivery(current_user.id)
                                  .where(id: ids, estado_envio: 'pendiente')
-    dispensaciones.update_all(estado_envio: 'en_viaje')
-    render json: { updated: dispensaciones.count }
+    updated = dispensaciones.update_all(estado_envio: 'en_viaje')
+    render json: { updated: updated }
   end
 
   # PATCH /dispensaciones/:id/entregar
@@ -144,6 +165,78 @@ class DispensacionesController < ApplicationController
     render json: serialize_dispensacion_delivery(@dispensacion)
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # PATCH /dispensaciones/:id/reprogramar
+  # Solo admin. Vuelve un paquete fallido a pendiente para un nuevo intento de entrega.
+  def reprogramar
+    unless current_user.admin?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    unless @dispensacion.estado_envio == 'fallido'
+      return render json: { error: 'Solo se pueden reprogramar paquetes fallidos' }, status: :unprocessable_entity
+    end
+    @dispensacion.update!(estado_envio: 'pendiente', motivo_fallo: nil)
+    render json: serialize_dispensacion_delivery(@dispensacion)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # GET /dispensaciones/export_csv
+  def export_csv
+    unless current_user.admin? || current_user.dispensador?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    scope = Dispensacion
+      .joins(stock: :sede)
+      .where(sedes: { club_id: current_user.club_id })
+      .includes(:paciente, :user, :sede, stock: :lote)
+      .order(fecha_dispensacion: :desc, created_at: :desc)
+
+    if params[:desde].present?
+      desde = Date.parse(params[:desde]) rescue nil
+      scope = scope.where("fecha_dispensacion >= ?", desde) if desde
+    end
+    if params[:hasta].present?
+      hasta = Date.parse(params[:hasta]) rescue nil
+      scope = scope.where("fecha_dispensacion <= ?", hasta) if hasta
+    end
+    if params[:sede_id].present?
+      scope = scope.where(sedes: { id: params[:sede_id] })
+    end
+
+    require "csv"
+    csv_data = CSV.generate(col_sep: ";", encoding: "UTF-8") do |csv|
+      csv << [
+        "ID", "Fecha", "Paciente", "DNI", "Sede",
+        "Forma producto", "Cantidad (g)", "Precio unitario (ARS)", "Aporte socio (ARS)",
+        "Medio de pago", "Lote", "Con envío", "Estado envío", "Registrado por"
+      ]
+      scope.each do |d|
+        csv << [
+          d.id,
+          d.fecha_dispensacion.strftime("%d/%m/%Y"),
+          "#{d.paciente.nombre} #{d.paciente.apellido}",
+          d.paciente.dni_normalizado,
+          d.sede&.nombre,
+          d.stock&.forma_producto,
+          d.cantidad.to_f,
+          d.precio_unitario_ars&.to_f,
+          d.aporte_socio_ars&.to_f,
+          d.medio_pago,
+          d.stock&.lote&.codigo,
+          d.con_envio ? "Sí" : "No",
+          d.estado_envio,
+          d.user&.first_name || d.user&.email,
+        ]
+      end
+    end
+
+    send_data "\xEF\xBB\xBF#{csv_data}",
+              filename:    "dispensaciones_#{Date.today}.csv",
+              type:        "text/csv; charset=utf-8",
+              disposition: "attachment"
   end
 
   # DELETE /dispensaciones/:id
@@ -195,7 +288,8 @@ class DispensacionesController < ApplicationController
   def dispensacion_params_update
     params.require(:dispensacion).permit(
       :indicacion_medica_id, :stock_id, :sede_id,
-      :aporte_socio_ars, :observaciones, :fecha_dispensacion, :medio_pago
+      :aporte_socio_ars, :observaciones, :fecha_dispensacion, :medio_pago,
+      :delivery_id
     )
   end
 
@@ -385,6 +479,7 @@ class DispensacionesController < ApplicationController
       estado_envio:        d.estado_envio,
       codigo_paquete:      d.codigo_paquete,
       delivery_id:         d.delivery_id,
+      delivery_nombre:     d.delivery_user ? [d.delivery_user.first_name, d.delivery_user.last_name].compact.join(' ').strip.presence || d.delivery_user.email : nil,
       direccion_envio:     d.direccion_envio,
       contacto_nombre:     d.contacto_nombre,
       contacto_telefono:   d.contacto_telefono,

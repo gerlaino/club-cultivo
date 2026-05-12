@@ -43,6 +43,7 @@ const lightboxIndex    = ref(0)
 const lightboxImages   = computed(() => fotos.value.map(f => ({ src: f.url, alt: f.filename })))
 function openLightbox(i) { lightboxIndex.value = i; lightboxOpen.value = true }
 const qrDataUrl        = ref(null)
+const qrDropdownOpen   = ref(false)
 const { generatePNG, downloadPNG, downloadSVG } = useQRCode()
 
 function qrPlantaUrl() {
@@ -530,22 +531,18 @@ onMounted(async () => {
               <img v-if="qrDataUrl" :src="qrDataUrl" alt="QR" class="pd__qr-img" />
               <div v-else class="pd__qr-placeholder">Generando…</div>
               <div class="pd__qr-hint">Escaneá para acceder a esta planta</div>
-              <div v-if="qrDataUrl" class="dropdown">
-                <button class="pd__btn-outline pd__btn-qr-dl dropdown-toggle" data-bs-toggle="dropdown">
+              <div v-if="qrDataUrl" class="pd__qr-dd" @mouseleave="qrDropdownOpen = false">
+                <button class="pd__btn-outline pd__btn-qr-dl" @click.stop="qrDropdownOpen = !qrDropdownOpen">
                   <i class="bi bi-download"></i> Descargar QR
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                  <li>
-                    <button class="dropdown-item small py-2 d-flex align-items-center gap-2" @click="descargarQRsvg">
-                      <i class="bi bi-file-earmark-code text-muted"></i> SVG (impresión)
-                    </button>
-                  </li>
-                  <li>
-                    <button class="dropdown-item small py-2 d-flex align-items-center gap-2" @click="descargarQRpng">
-                      <i class="bi bi-file-earmark-image text-muted"></i> PNG (digital)
-                    </button>
-                  </li>
-                </ul>
+                <div v-if="qrDropdownOpen" class="pd__qr-dd-menu">
+                  <button class="pd__qr-dd-item" @click="descargarQRsvg(); qrDropdownOpen = false">
+                    <i class="bi bi-file-earmark-code"></i> SVG (impresión)
+                  </button>
+                  <button class="pd__qr-dd-item" @click="descargarQRpng(); qrDropdownOpen = false">
+                    <i class="bi bi-file-earmark-image"></i> PNG (digital)
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -859,5 +856,9 @@ onMounted(async () => {
 .pd__qr-placeholder { width: 160px; height: 160px; background: #f4f8f4; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: .8rem; }
 .pd__qr-hint { font-size: .72rem; color: #94a3b8; text-align: center; max-width: 160px; }
 .pd__btn-qr-dl { width: 100%; justify-content: center; }
+.pd__qr-dd { position: relative; width: 100%; }
+.pd__qr-dd-menu { position: absolute; top: calc(100% + .35rem); left: 0; right: 0; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.1); z-index: 100; padding: .3rem; display: flex; flex-direction: column; }
+.pd__qr-dd-item { display: flex; align-items: center; gap: .5rem; background: none; border: none; padding: .55rem .75rem; border-radius: 7px; font-size: .8rem; color: #334155; cursor: pointer; text-align: left; transition: background .12s; }
+.pd__qr-dd-item:hover { background: #f1f5f9; }
 </style>
 

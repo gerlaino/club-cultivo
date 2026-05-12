@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_12_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -79,6 +79,30 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
     t.index ["club_id"], name: "index_alertas_internas_on_club_id"
   end
 
+  create_table "ariccame_registros", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "tipo", null: false
+    t.string "estado", default: "pendiente", null: false
+    t.jsonb "payload", default: {}, null: false
+    t.jsonb "respuesta", default: {}
+    t.string "codigo_ariccame"
+    t.string "error_mensaje"
+    t.integer "intentos", default: 0
+    t.datetime "enviado_at"
+    t.datetime "confirmado_at"
+    t.bigint "stock_id"
+    t.bigint "dispensacion_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "estado"], name: "index_ariccame_registros_on_club_id_and_estado"
+    t.index ["club_id", "tipo"], name: "index_ariccame_registros_on_club_id_and_tipo"
+    t.index ["club_id"], name: "index_ariccame_registros_on_club_id"
+    t.index ["codigo_ariccame"], name: "index_ariccame_registros_on_codigo_ariccame", where: "(codigo_ariccame IS NOT NULL)"
+    t.index ["dispensacion_id"], name: "index_ariccame_registros_on_dispensacion_id"
+    t.index ["estado"], name: "index_ariccame_registros_on_estado"
+    t.index ["stock_id"], name: "index_ariccame_registros_on_stock_id"
+  end
+
   create_table "clubs", force: :cascade do |t|
     t.string "name"
     t.datetime "created_at", null: false
@@ -111,6 +135,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
     t.text "horarios_atencion"
     t.boolean "activo", default: true, null: false
     t.datetime "deleted_at"
+    t.boolean "benchmark_opt_in", default: false, null: false
+    t.index ["benchmark_opt_in"], name: "index_clubs_on_benchmark_opt_in"
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["plan"], name: "index_clubs_on_plan"
     t.index ["slug"], name: "index_clubs_on_slug", unique: true
@@ -191,6 +217,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
     t.text "notas_entrega"
     t.text "motivo_fallo"
     t.datetime "entregado_at"
+    t.boolean "ariccame_reportada", default: false, null: false
+    t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["delivery_id"], name: "index_dispensaciones_on_delivery_id"
     t.index ["estado_envio"], name: "index_dispensaciones_on_estado_envio"
@@ -301,9 +329,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
     t.boolean "visible_web", default: false, null: false
     t.string "slug", null: false
     t.boolean "global", default: false, null: false
+    t.string "numero_registro_inase"
+    t.date "fecha_registro_inase"
+    t.string "categoria_inase"
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
     t.index ["club_id"], name: "index_geneticas_on_club_id"
+    t.index ["numero_registro_inase"], name: "idx_geneticas_numero_inase", unique: true, where: "(numero_registro_inase IS NOT NULL)"
     t.index ["slug"], name: "index_geneticas_on_slug", unique: true
   end
 
@@ -414,12 +446,20 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
     t.string "sustrato_especifico"
     t.string "fotoperiodo"
     t.integer "semanas_floracion"
-    t.integer "genetica_id"
+    t.bigint "genetica_id"
     t.datetime "deleted_at"
+    t.integer "plants_count_objetivo"
+    t.decimal "rendimiento_objetivo_g", precision: 10, scale: 2
+    t.date "fecha_cosecha_estimada"
+    t.decimal "rendimiento_real_g", precision: 10, scale: 2
+    t.integer "plants_count_cosechadas"
+    t.bigint "manicurador_id"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["deleted_at"], name: "index_lotes_on_deleted_at"
     t.index ["estado"], name: "index_lotes_on_estado"
+    t.index ["genetica_id"], name: "index_lotes_on_genetica_id"
+    t.index ["manicurador_id"], name: "index_lotes_on_manicurador_id"
     t.index ["sala_id"], name: "index_lotes_on_sala_id"
   end
 
@@ -516,13 +556,24 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
     t.string "telefono"
     t.string "reprocann_numero"
     t.date "reprocann_vencimiento"
-    t.string "reprocann_adjunto"
     t.text "notas_clinicas"
     t.boolean "con_seguimiento_medico", default: true, null: false
     t.string "reprocann_estado", default: "sin_registro", null: false
     t.decimal "limite_dispensacion_mensual_g", precision: 8, scale: 2
+    t.string "carnet_token", null: false
+    t.text "motivo_consulta"
+    t.text "anamnesis"
+    t.text "antecedentes_personales"
+    t.text "antecedentes_familiares"
+    t.string "diagnostico_principal"
+    t.string "diagnostico_secundario"
+    t.text "evolucion_clinica"
+    t.text "alergias"
+    t.text "medicacion_habitual"
+    t.string "grupo_sanguineo", limit: 5
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
+    t.index ["carnet_token"], name: "index_pacientes_on_carnet_token", unique: true
     t.index ["club_id"], name: "index_pacientes_on_club_id"
     t.index ["created_at"], name: "index_pacientes_on_created_at"
     t.index ["deleted_at"], name: "index_pacientes_on_deleted_at"
@@ -634,7 +685,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
     t.string "color_hojas"
     t.boolean "es_seleccion", default: false, null: false
     t.string "pasada_cosecha"
+    t.bigint "club_id"
+    t.datetime "deleted_at"
+    t.index ["club_id"], name: "index_plants_on_club_id"
     t.index ["codigo_qr"], name: "index_plants_on_codigo_qr", unique: true
+    t.index ["deleted_at"], name: "index_plants_on_deleted_at"
     t.index ["lote_id", "es_seleccion"], name: "index_plants_on_lote_id_and_es_seleccion"
     t.index ["lote_id", "pasada_cosecha"], name: "idx_plants_lote_pasada"
     t.index ["lote_id"], name: "index_plants_on_lote_id"
@@ -696,6 +751,26 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
     t.index ["club_id", "activa"], name: "idx_reglas_club_activa"
     t.index ["sala_id"], name: "idx_reglas_sala", where: "(sala_id IS NOT NULL)"
     t.index ["sala_id"], name: "index_reglas_ambientales_on_sala_id"
+  end
+
+  create_table "reprocann_renovaciones", force: :cascade do |t|
+    t.bigint "paciente_id", null: false
+    t.bigint "club_id", null: false
+    t.string "estado", default: "en_tramite", null: false
+    t.string "numero_tramite"
+    t.date "fecha_inicio", null: false
+    t.date "fecha_aprobacion"
+    t.date "fecha_vencimiento_nueva"
+    t.text "observaciones"
+    t.string "reprocann_numero_nuevo"
+    t.bigint "iniciada_por_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_reprocann_renovaciones_on_club_id"
+    t.index ["estado"], name: "index_reprocann_renovaciones_on_estado"
+    t.index ["iniciada_por_id"], name: "index_reprocann_renovaciones_on_iniciada_por_id"
+    t.index ["paciente_id", "estado"], name: "index_reprocann_renovaciones_on_paciente_id_and_estado"
+    t.index ["paciente_id"], name: "index_reprocann_renovaciones_on_paciente_id"
   end
 
   create_table "sala_cultivadores", force: :cascade do |t|
@@ -805,10 +880,22 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "estado", default: "asignado", null: false
+    t.bigint "pesada_id"
+    t.bigint "club_id"
+    t.string "numero_lote_producto"
+    t.date "fecha_elaboracion"
+    t.date "fecha_vencimiento_est"
+    t.string "codigo_qr"
+    t.bigint "genetica_id"
+    t.index ["club_id"], name: "index_stocks_on_club_id"
+    t.index ["codigo_qr"], name: "index_stocks_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"
     t.index ["estado"], name: "index_stocks_on_estado"
+    t.index ["genetica_id"], name: "index_stocks_on_genetica_id"
     t.index ["lote_id", "forma_producto"], name: "index_stocks_on_lote_id_and_forma_producto"
     t.index ["lote_id"], name: "index_stocks_on_lote_id"
+    t.index ["numero_lote_producto"], name: "index_stocks_on_numero_lote_producto", unique: true, where: "(numero_lote_producto IS NOT NULL)"
     t.index ["origen"], name: "index_stocks_on_origen"
+    t.index ["pesada_id"], name: "index_stocks_on_pesada_id"
     t.index ["sede_id", "origen"], name: "index_stocks_on_sede_id_and_origen"
     t.index ["sede_id"], name: "index_stocks_on_sede_id"
   end
@@ -897,6 +984,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
   add_foreign_key "alertas", "users", column: "resuelta_por_id"
   add_foreign_key "alertas_internas", "clubs"
   add_foreign_key "alertas_internas", "users", column: "creada_por_id"
+  add_foreign_key "ariccame_registros", "clubs"
+  add_foreign_key "ariccame_registros", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "ariccame_registros", "stocks"
   add_foreign_key "costo_lotes", "clubs"
   add_foreign_key "costo_lotes", "lotes"
   add_foreign_key "costo_lotes", "users", column: "calculado_por_id"
@@ -933,7 +1023,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
   add_foreign_key "lote_eventos", "salas", column: "sala_origen_id"
   add_foreign_key "lote_eventos", "users"
   add_foreign_key "lotes", "clubs"
+  add_foreign_key "lotes", "geneticas", on_delete: :nullify
   add_foreign_key "lotes", "salas"
+  add_foreign_key "lotes", "users", column: "manicurador_id"
   add_foreign_key "movimientos_contables", "clubs"
   add_foreign_key "movimientos_contables", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "movimientos_contables", "lotes"
@@ -963,11 +1055,15 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
   add_foreign_key "pesadas_plantas", "plants"
   add_foreign_key "plant_activities", "plants"
   add_foreign_key "plant_activities", "users"
+  add_foreign_key "plants", "clubs"
   add_foreign_key "plants", "lotes"
   add_foreign_key "registros_ambientales", "clubs"
   add_foreign_key "registros_ambientales", "lotes"
   add_foreign_key "registros_ambientales", "users"
   add_foreign_key "reglas_ambientales", "salas"
+  add_foreign_key "reprocann_renovaciones", "clubs"
+  add_foreign_key "reprocann_renovaciones", "pacientes"
+  add_foreign_key "reprocann_renovaciones", "users", column: "iniciada_por_id"
   add_foreign_key "sala_cultivadores", "salas"
   add_foreign_key "sala_cultivadores", "users"
   add_foreign_key "salas", "clubs"
@@ -980,7 +1076,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_09_000001) do
   add_foreign_key "stock_movimientos", "sedes", column: "sede_origen_id"
   add_foreign_key "stock_movimientos", "stocks"
   add_foreign_key "stock_movimientos", "users", column: "usuario_id"
+  add_foreign_key "stocks", "clubs"
+  add_foreign_key "stocks", "geneticas"
   add_foreign_key "stocks", "lotes"
+  add_foreign_key "stocks", "pesadas"
   add_foreign_key "stocks", "sedes"
   add_foreign_key "tareas", "clubs"
   add_foreign_key "tareas", "lotes"

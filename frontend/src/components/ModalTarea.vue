@@ -150,7 +150,11 @@
                   Sala
                   <button type="button" class="mt-sala-quitar" @click="mostrarSala = false; form.sala_id = ''; form.lote_id = ''">quitar</button>
                 </label>
-                <select v-model="form.sala_id" class="mt-input" @change="form.lote_id = ''"
+                <div v-if="form.asignada_a_id && !cargandoSalas && salasDisponibles.length === 0"
+                     class="mt-hint-warn">
+                  Este usuario no tiene salas asignadas. Asignale una sala primero desde el perfil del usuario.
+                </div>
+                <select v-else v-model="form.sala_id" class="mt-input" @change="form.lote_id = ''"
                         :disabled="cargandoSalas">
                   <option value="">{{ cargandoSalas ? 'Cargando…' : 'Sin sala específica' }}</option>
                   <option v-for="s in salasDisponibles" :key="s.id" :value="s.id">{{ s.nombre }}</option>
@@ -341,12 +345,8 @@ const cargandoSalas    = ref(false)
 const salasDisponibles = computed(() => {
   if (!form.value.asignada_a_id) return props.salas
   if (cargandoSalas.value) return []
-  // Si el usuario no tiene salas asignadas, mostrar todas las salas del club
-  if (!salasDelUsuario.value.length) return props.salas
   const ids = salasDelUsuario.value.map(s => String(s.id))
-  const filtradas = props.salas.filter(s => ids.includes(String(s.id)))
-  // Fallback: si ninguna de las salas asignadas aparece en props.salas, mostrar todas
-  return filtradas.length ? filtradas : props.salas
+  return props.salas.filter(s => ids.includes(String(s.id)))
 })
 const lotesDeLaSala    = computed(() => props.lotes.filter(l => String(l.sala_id) === String(form.value.sala_id)))
 const salaSeleccionada = computed(() => props.salas.find(s => String(s.id) === String(form.value.sala_id)) || null)
@@ -631,6 +631,7 @@ async function guardar() {
 
 /* ── Info box ── */
 .mt-info-box { display: flex; align-items: center; gap: .6rem; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: .75rem 1rem; border-radius: 10px; font-size: .82rem; }
+.mt-hint-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: .65rem .9rem; border-radius: 10px; font-size: .8rem; line-height: 1.4; }
 
 /* ── Buscador ── */
 .mt-search {

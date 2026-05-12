@@ -11,10 +11,11 @@ import { useToast } from '../composables/useToast.js'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, updatePaciente, getCuentaCorriente, setLimiteCC, toggleGramosCC, setLimiteGCC, cargarGCC } from '../lib/api.js'
+import { getPacienteTimeline, updatePaciente, getCuentaCorriente, setLimiteCC, toggleGramosCC, setLimiteGCC, cargarGCC, subirReprocannDoc, eliminarReprocannDoc, listReprocannRenovaciones, createReprocannRenovacion, updateReprocannRenovacion, deleteReprocannRenovacion } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
-  Pencil, Plus, Trash2, AlertTriangle, CheckCircle, Info, X, Save, Wallet
+  Pencil, Plus, Trash2, AlertTriangle, CheckCircle, Info, X, Save, Wallet,
+  Upload, FileCheck, CreditCard
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -82,21 +83,51 @@ async function saveEdit() {
   }
 }
 
-// ── Historia clínica (notas_clinicas) ────────────────────────────────────────
-const notasClinicas      = ref('')
-const notasClinicasSaved = ref(true)
+// ── Historia clínica ──────────────────────────────────────────────────────────
+const notasClinicas       = ref('')
+const notasClinicasSaved  = ref(true)
 const notasClinicasSaving = ref(false)
 
-watch(() => s.value?.notas_clinicas, (val) => {
-  notasClinicas.value = val || ''
+const hcForm = ref({
+  motivo_consulta:         '',
+  anamnesis:               '',
+  antecedentes_personales: '',
+  antecedentes_familiares: '',
+  diagnostico_principal:   '',
+  diagnostico_secundario:  '',
+  evolucion_clinica:       '',
+  alergias:                '',
+  medicacion_habitual:     '',
+  grupo_sanguineo:         '',
+})
+
+watch(() => s.value, (val) => {
+  if (!val) return
+  notasClinicas.value = val.notas_clinicas || ''
+  hcForm.value = {
+    motivo_consulta:         val.motivo_consulta || '',
+    anamnesis:               val.anamnesis || '',
+    antecedentes_personales: val.antecedentes_personales || '',
+    antecedentes_familiares: val.antecedentes_familiares || '',
+    diagnostico_principal:   val.diagnostico_principal || '',
+    diagnostico_secundario:  val.diagnostico_secundario || '',
+    evolucion_clinica:       val.evolucion_clinica || '',
+    alergias:                val.alergias || '',
+    medicacion_habitual:     val.medicacion_habitual || '',
+    grupo_sanguineo:         val.grupo_sanguineo || '',
+  }
 }, { immediate: true })
 
 watch(notasClinicas, () => { notasClinicasSaved.value = false })
+watch(hcForm, () => { notasClinicasSaved.value = false }, { deep: true })
 
 async function saveNotasClinicas() {
   notasClinicasSaving.value = true
   try {
-    await updatePaciente(socioId, { notas_clinicas: notasClinicas.value })
+    await updatePaciente(socioId, {
+      notas_clinicas: notasClinicas.value,
+      ...hcForm.value,
+    })
     notasClinicasSaved.value = true
     toastOk('Historia clínica guardada')
   } catch {
@@ -141,6 +172,7 @@ async function loadTimeline() {
 watch(activeTab, (tab) => {
   if (tab === 'timeline') loadTimeline()
   if (tab === 'cuenta_corriente') loadCC()
+  if (tab === 'reprocann' && renovaciones.value.length === 0) loadRenovaciones()
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -194,6 +226,39 @@ const ALL_TABS = [
   { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
   { key: 'timeline',         label: 'Timeline',          icon: Clock,         roles: ['admin', 'medico', 'cultivador'] },
 ]
+
+// ── Documento REPROCANN ──────────────────────────────────────────────────────
+const reproInput      = ref(null)
+const uploadingRepro  = ref(false)
+
+async function uploadReprocann(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  uploadingRepro.value = true
+  try {
+    const { data } = await subirReprocannDoc(socioId, file)
+    await store.fetchOne(socioId)
+    store.current.reprocann_documento_url = data.reprocann_documento_url
+    toastOk('Documento subido correctamente')
+  } catch {
+    toastErr('Error al subir el documento')
+  } finally {
+    uploadingRepro.value = false
+    if (reproInput.value) reproInput.value.value = ''
+  }
+}
+
+async function eliminarReprocann() {
+  const ok = await confirm({ title: '¿Eliminar el documento REPROCANN?', confirmText: 'Eliminar' })
+  if (!ok) return
+  try {
+    await eliminarReprocannDoc(socioId)
+    await store.fetchOne(socioId)
+    toastOk('Documento eliminado')
+  } catch {
+    toastErr('Error al eliminar el documento')
+  }
+}
 
 // ── Cuenta corriente ──
 const cc              = ref(null)
@@ -294,8 +359,90 @@ const TABS = computed(() => {
   return ALL_TABS.filter(t => !t.roles || t.roles.includes(role))
 })
 
+// ── Renovaciones REPROCANN ────────────────────────────────────────────────────
+const renovaciones        = ref([])
+const loadingRenovaciones = ref(false)
+const showRenovacionForm  = ref(false)
+const savingRenovacion    = ref(false)
+const renovacionForm      = ref({ numero_tramite: '', observaciones: '' })
+const showAprobarModal    = ref(false)
+const aprobarForm         = ref({ reprocann_numero_nuevo: '', fecha_vencimiento_nueva: '' })
+const renovacionAprobar   = ref(null)
+
+async function loadRenovaciones() {
+  loadingRenovaciones.value = true
+  try {
+    const { data } = await listReprocannRenovaciones(socioId)
+    renovaciones.value = data.data || []
+  } catch { renovaciones.value = [] }
+  finally { loadingRenovaciones.value = false }
+}
+
+async function crearRenovacion() {
+  savingRenovacion.value = true
+  try {
+    const { data } = await createReprocannRenovacion(socioId, renovacionForm.value)
+    renovaciones.value.unshift(data.data)
+    showRenovacionForm.value = false
+    renovacionForm.value = { numero_tramite: '', observaciones: '' }
+    toastOk('Trámite de renovación iniciado')
+  } catch { toastErr('Error al crear la renovación') }
+  finally { savingRenovacion.value = false }
+}
+
+function openAprobar(r) {
+  renovacionAprobar.value = r
+  aprobarForm.value = { reprocann_numero_nuevo: '', fecha_vencimiento_nueva: '' }
+  showAprobarModal.value = true
+}
+
+async function aprobarRenovacion() {
+  if (!renovacionAprobar.value) return
+  savingRenovacion.value = true
+  try {
+    const { data } = await updateReprocannRenovacion(socioId, renovacionAprobar.value.id, {
+      accion: 'aprobar',
+      ...aprobarForm.value,
+    })
+    const idx = renovaciones.value.findIndex(r => r.id === renovacionAprobar.value.id)
+    if (idx !== -1) renovaciones.value[idx] = data.data
+    showAprobarModal.value = false
+    await store.fetchOne(socioId)
+    toastOk('Renovación aprobada')
+  } catch { toastErr('Error al aprobar') }
+  finally { savingRenovacion.value = false }
+}
+
+async function rechazarRenovacion(r) {
+  const ok = await confirm({ title: '¿Rechazar renovación?', confirmText: 'Rechazar', variant: 'danger' })
+  if (!ok) return
+  try {
+    const { data } = await updateReprocannRenovacion(socioId, r.id, { accion: 'rechazar' })
+    const idx = renovaciones.value.findIndex(x => x.id === r.id)
+    if (idx !== -1) renovaciones.value[idx] = data.data
+    toastOk('Renovación rechazada')
+  } catch { toastErr('Error al rechazar') }
+}
+
+async function eliminarRenovacion(r) {
+  const ok = await confirm({ title: '¿Eliminar este trámite?', confirmText: 'Eliminar', variant: 'danger' })
+  if (!ok) return
+  try {
+    await deleteReprocannRenovacion(socioId, r.id)
+    renovaciones.value = renovaciones.value.filter(x => x.id !== r.id)
+    toastOk('Trámite eliminado')
+  } catch { toastErr('Error al eliminar') }
+}
+
+const renovacionEstadoMeta = (estado) => ({
+  en_tramite: { label: 'En trámite', color: '#d97706', bg: '#fef3c7' },
+  aprobada:   { label: 'Aprobada',   color: '#15803d', bg: '#dcfce7' },
+  rechazada:  { label: 'Rechazada',  color: '#dc2626', bg: '#fee2e2' },
+}[estado] || { label: estado, color: '#64748b', bg: '#f1f5f9' })
+
 function escapeHandler(e) {
   if (e.key !== 'Escape') return
+  if (showAprobarModal.value) { showAprobarModal.value = false; return }
   if (editOpen.value) { editOpen.value = false }
 }
 onMounted(async () => {
@@ -352,8 +499,11 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             </div>
           </div>
         </div>
-        <div v-if="canEdit" class="sd__hero-actions">
-          <button class="sd__btn-edit" @click="openEdit">
+        <div class="sd__hero-actions">
+          <RouterLink v-if="s?.carnet_token" :to="`/c/${s.carnet_token}`" target="_blank" class="sd__btn-carnet">
+            <CreditCard :size="14" :stroke-width="1.75" /> Carnet
+          </RouterLink>
+          <button v-if="canEdit" class="sd__btn-edit" @click="openEdit">
             <Pencil :size="14" :stroke-width="1.75" /> Editar
           </button>
         </div>
@@ -480,13 +630,132 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
           </div>
           <IndicacionesMedicas :socio-id="socioId" />
         </div>
+
+        <!-- Documento REPROCANN -->
+        <div class="sd__card" style="margin-top:1rem">
+          <div class="sd__card-header">
+            <div class="sd__card-icon sd__card-icon--green"><Upload :size="15" /></div>
+            <span class="sd__card-title">Documento REPROCANN adjunto</span>
+          </div>
+          <div class="sd__repro-doc-body">
+            <template v-if="s.reprocann_documento_url">
+              <div class="sd__repro-doc-row">
+                <a :href="s.reprocann_documento_url" target="_blank" rel="noopener" class="sd__repro-doc-link">
+                  <FileCheck :size="15" /> Ver documento
+                </a>
+                <button v-if="canEdit" class="sd__btn-icon-danger" @click="eliminarReprocann" title="Eliminar documento">
+                  <Trash2 :size="13" />
+                </button>
+              </div>
+            </template>
+            <template v-else-if="canEdit">
+              <input ref="reproInput" type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="uploadReprocann" />
+              <div class="sd__repro-upload-row">
+                <button class="sd__btn-ghost" :disabled="uploadingRepro" @click="reproInput.click()">
+                  <Upload :size="13" /> {{ uploadingRepro ? 'Subiendo…' : 'Subir documento' }}
+                </button>
+                <span class="sd__repro-hint">PDF, JPG o PNG — máx. 10 MB</span>
+              </div>
+            </template>
+            <span v-else class="sd__val-empty" style="padding:1rem 1.25rem;display:block">Sin documento adjunto</span>
+          </div>
+        </div>
+
+        <!-- Historial de renovaciones -->
+        <div class="sd__card sd__card--mt">
+          <div class="sd__card-header">
+            <span class="sd__card-title">🔄 Renovaciones REPROCANN</span>
+            <button v-if="canEdit" class="sd__card-action" @click="showRenovacionForm = !showRenovacionForm">
+              <Plus :size="13" /> Iniciar trámite
+            </button>
+          </div>
+
+          <div v-if="showRenovacionForm" class="sd__reno-form">
+            <div class="sd__reno-row">
+              <label>N° de trámite (opcional)</label>
+              <input v-model="renovacionForm.numero_tramite" type="text" placeholder="Ej: 2024-00123" class="sd__reno-input" />
+            </div>
+            <div class="sd__reno-row">
+              <label>Observaciones</label>
+              <input v-model="renovacionForm.observaciones" type="text" placeholder="Opcional" class="sd__reno-input" />
+            </div>
+            <div class="sd__reno-actions">
+              <button class="sd__btn-ghost" @click="showRenovacionForm = false">Cancelar</button>
+              <button class="sd__btn-primary" :disabled="savingRenovacion" @click="crearRenovacion">
+                {{ savingRenovacion ? 'Guardando…' : 'Crear trámite' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="loadingRenovaciones" class="sd__reno-empty">Cargando…</div>
+          <div v-else-if="renovaciones.length === 0 && !showRenovacionForm" class="sd__reno-empty">
+            Sin renovaciones registradas
+          </div>
+          <div v-else class="sd__reno-list">
+            <div v-for="r in renovaciones" :key="r.id" class="sd__reno-item">
+              <div class="sd__reno-item-head">
+                <span class="sd__reno-estado" :style="{ background: renovacionEstadoMeta(r.estado).bg, color: renovacionEstadoMeta(r.estado).color }">
+                  {{ renovacionEstadoMeta(r.estado).label }}
+                </span>
+                <span v-if="r.numero_tramite" class="sd__reno-numero">Exp. {{ r.numero_tramite }}</span>
+                <span class="sd__reno-fecha">{{ formatDate(r.fecha_inicio) }}</span>
+                <div class="sd__reno-acciones">
+                  <button v-if="canEdit && r.estado === 'en_tramite'" class="sd__btn-tiny sd__btn-tiny--ok" @click="openAprobar(r)" title="Aprobar">
+                    <CheckCircle :size="13" />
+                  </button>
+                  <button v-if="canEdit && r.estado === 'en_tramite'" class="sd__btn-tiny sd__btn-tiny--danger" @click="rechazarRenovacion(r)" title="Rechazar">
+                    <X :size="13" />
+                  </button>
+                  <button v-if="canEdit" class="sd__btn-tiny sd__btn-tiny--ghost" @click="eliminarRenovacion(r)" title="Eliminar">
+                    <Trash2 :size="13" />
+                  </button>
+                </div>
+              </div>
+              <div v-if="r.observaciones" class="sd__reno-obs">{{ r.observaciones }}</div>
+              <div v-if="r.estado === 'aprobada' && r.fecha_aprobacion" class="sd__reno-aprobado">
+                Aprobado {{ formatDate(r.fecha_aprobacion) }}
+                <span v-if="r.reprocann_numero_nuevo"> · N° {{ r.reprocann_numero_nuevo }}</span>
+                <span v-if="r.fecha_vencimiento_nueva"> · Vence {{ formatDate(r.fecha_vencimiento_nueva) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <!-- Modal aprobar renovación -->
+      <Teleport to="body">
+        <div v-if="showAprobarModal" class="sd__overlay" @click.self="showAprobarModal = false">
+          <div class="sd__modal" style="max-width:420px">
+            <div class="sd__modal-header">
+              <h3 class="sd__modal-title">Aprobar renovación REPROCANN</h3>
+              <button class="sd__modal-close" @click="showAprobarModal = false"><X :size="16" /></button>
+            </div>
+            <div class="sd__modal-body">
+              <div class="sd__form-row">
+                <label class="sd__form-label">Nuevo N° REPROCANN</label>
+                <input v-model="aprobarForm.reprocann_numero_nuevo" type="text" class="sd__form-input" placeholder="Ej: REP-2024-00456" />
+              </div>
+              <div class="sd__form-row">
+                <label class="sd__form-label">Nueva fecha de vencimiento</label>
+                <input v-model="aprobarForm.fecha_vencimiento_nueva" type="date" class="sd__form-input" />
+              </div>
+            </div>
+            <div class="sd__modal-footer">
+              <button class="sd__btn-ghost" @click="showAprobarModal = false">Cancelar</button>
+              <button class="sd__btn-primary" :disabled="savingRenovacion" @click="aprobarRenovacion">
+                {{ savingRenovacion ? 'Guardando…' : 'Confirmar aprobación' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
 
       <!-- ── Tab: Dispensaciones ── -->
       <div v-show="activeTab === 'dispensaciones'" class="sd__tab-content">
         <div class="sd__card">
           <Dispensaciones
             :socio-id="socioId"
+            :paciente-nombre="s ? `${s.nombre} ${s.apellido}`.trim() : ''"
             :limite-mensual-g="s?.limite_dispensacion_mensual_g ? Number(s.limite_dispensacion_mensual_g) : null"
             :dispensado-mes-g="s?.dispensado_mes_actual_g ?? null"
             :saldo-cc="s?.saldo_cc ?? null"
@@ -676,17 +945,85 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
           <div class="sd__card-header">
             <div class="sd__card-icon sd__card-icon--amber"><ClipboardList :size="15" /></div>
             <div>
-              <div class="sd__card-title">Historia clínica</div>
+              <div class="sd__card-title">Historia clínica estructurada</div>
               <div class="sd__card-subtitle">Solo visible para admin y médico</div>
             </div>
           </div>
           <div class="sd__historia-body" v-if="canClinica">
-            <textarea
-              v-model="notasClinicas"
-              class="sd__textarea sd__textarea--historia"
-              rows="14"
-              placeholder="Escribí aquí las notas clínicas del paciente: diagnóstico, tratamientos previos, observaciones, contraindicaciones…"
-            ></textarea>
+
+            <!-- Sección: Datos básicos -->
+            <div class="sd__hc-section">
+              <div class="sd__hc-section-title">Datos básicos</div>
+              <div class="sd__grid">
+                <div class="sd__field">
+                  <label class="sd__label">Grupo sanguíneo</label>
+                  <input v-model="hcForm.grupo_sanguineo" class="sd__input" placeholder="Ej: A+, O-" style="max-width:120px;" />
+                </div>
+                <div class="sd__field">
+                  <label class="sd__label">Alergias</label>
+                  <input v-model="hcForm.alergias" class="sd__input" placeholder="Alergias conocidas" />
+                </div>
+                <div class="sd__field sd__field--full">
+                  <label class="sd__label">Medicación habitual</label>
+                  <input v-model="hcForm.medicacion_habitual" class="sd__input" placeholder="Medicamentos que toma regularmente" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Sección: Consulta -->
+            <div class="sd__hc-section">
+              <div class="sd__hc-section-title">Consulta</div>
+              <div class="sd__field sd__field--full">
+                <label class="sd__label">Motivo de consulta</label>
+                <textarea v-model="hcForm.motivo_consulta" class="sd__textarea" rows="3" placeholder="Razón por la que el paciente consulta…" />
+              </div>
+              <div class="sd__field sd__field--full">
+                <label class="sd__label">Anamnesis</label>
+                <textarea v-model="hcForm.anamnesis" class="sd__textarea" rows="4" placeholder="Historia de la enfermedad actual, síntomas, evolución…" />
+              </div>
+            </div>
+
+            <!-- Sección: Antecedentes -->
+            <div class="sd__hc-section">
+              <div class="sd__hc-section-title">Antecedentes</div>
+              <div class="sd__field sd__field--full">
+                <label class="sd__label">Antecedentes personales</label>
+                <textarea v-model="hcForm.antecedentes_personales" class="sd__textarea" rows="3" placeholder="Enfermedades previas, cirugías, hospitalizaciones…" />
+              </div>
+              <div class="sd__field sd__field--full">
+                <label class="sd__label">Antecedentes familiares</label>
+                <textarea v-model="hcForm.antecedentes_familiares" class="sd__textarea" rows="3" placeholder="Enfermedades en familiares directos…" />
+              </div>
+            </div>
+
+            <!-- Sección: Diagnóstico y evolución -->
+            <div class="sd__hc-section">
+              <div class="sd__hc-section-title">Diagnóstico</div>
+              <div class="sd__grid">
+                <div class="sd__field">
+                  <label class="sd__label">Diagnóstico principal</label>
+                  <input v-model="hcForm.diagnostico_principal" class="sd__input" placeholder="Diagnóstico principal (CIE-10 o libre)" />
+                </div>
+                <div class="sd__field">
+                  <label class="sd__label">Diagnóstico secundario</label>
+                  <input v-model="hcForm.diagnostico_secundario" class="sd__input" placeholder="Diagnóstico secundario (opcional)" />
+                </div>
+              </div>
+              <div class="sd__field sd__field--full">
+                <label class="sd__label">Evolución clínica</label>
+                <textarea v-model="hcForm.evolucion_clinica" class="sd__textarea" rows="4" placeholder="Evolución del paciente, respuesta al tratamiento, observaciones…" />
+              </div>
+            </div>
+
+            <!-- Sección: Notas libres (compatibilidad) -->
+            <div class="sd__hc-section">
+              <div class="sd__hc-section-title">Notas adicionales</div>
+              <div class="sd__field sd__field--full">
+                <label class="sd__label">Notas libres</label>
+                <textarea v-model="notasClinicas" class="sd__textarea" rows="5" placeholder="Cualquier otra observación clínica…" />
+              </div>
+            </div>
+
             <div class="sd__historia-foot">
               <span v-if="notasClinicasSaved" class="sd__save-ok">
                 <CheckCircle :size="13" /> Guardado
@@ -694,7 +1031,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               <span v-else class="sd__save-pending">Sin guardar</span>
               <button class="sd__btn-primary" :disabled="notasClinicasSaving || notasClinicasSaved" @click="saveNotasClinicas">
                 <Save :size="13" :stroke-width="2" />
-                {{ notasClinicasSaving ? 'Guardando…' : 'Guardar' }}
+                {{ notasClinicasSaving ? 'Guardando…' : 'Guardar historia' }}
               </button>
             </div>
           </div>
@@ -922,6 +1259,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
 /* Cards */
 .sd__card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-bottom: 1rem; }
+.sd__card--mt { margin-top: 1rem; }
 .sd__card--danger { border-color: #fecaca; border-left: 3px solid #dc2626; }
 .sd__card--warning { border-color: #fde68a; border-left: 3px solid #d97706; }
 .sd__card-header { display: flex; align-items: flex-start; gap: .65rem; padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
@@ -948,11 +1286,14 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__sys-info { display: flex; gap: 2rem; flex-wrap: wrap; padding: .875rem 1.25rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; font-size: .78rem; color: #64748b; }
 
 /* Historia clínica */
-.sd__historia-body { padding: 1.25rem; }
+.sd__historia-body { padding: 1rem 1.25rem 1.25rem; display: flex; flex-direction: column; gap: 1.25rem; }
 .sd__textarea--historia { min-height: 280px; }
-.sd__historia-foot { display: flex; justify-content: space-between; align-items: center; margin-top: .75rem; }
+.sd__historia-foot { display: flex; justify-content: space-between; align-items: center; margin-top: .5rem; }
 .sd__save-ok { font-size: .75rem; color: #15803d; display: flex; align-items: center; gap: .3rem; }
 .sd__save-pending { font-size: .75rem; color: #94a3b8; }
+.sd__hc-section { display: flex; flex-direction: column; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid #f0f4f0; }
+.sd__hc-section:last-of-type { border-bottom: none; }
+.sd__hc-section-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #8a9a8a; }
 
 /* Notas */
 .sd__nota-form { padding: 1.25rem; border-bottom: 1px solid #f1f5f9; }
@@ -985,6 +1326,8 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 /* Buttons */
 .sd__btn-edit { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #475569; border: 1.5px solid #e2e8f0; padding: .55rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .sd__btn-edit:hover { border-color: #1b5e20; color: #1b5e20; background: #f0fdf4; }
+.sd__btn-carnet { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .55rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; text-decoration: none; }
+.sd__btn-carnet:hover { background: #144a18; }
 .sd__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .sd__btn-primary:hover:not(:disabled) { background: #144a18; }
 .sd__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
@@ -1116,6 +1459,14 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__cc-input:focus { border-color: #15803d; }
 .sd__cc-form-footer { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .25rem; }
 
+/* Documento REPROCANN */
+.sd__repro-doc-body { padding: 1rem 1.25rem; }
+.sd__repro-doc-row { display: flex; align-items: center; gap: .75rem; }
+.sd__repro-doc-link { display: inline-flex; align-items: center; gap: .4rem; font-size: .875rem; font-weight: 600; color: #0369a1; text-decoration: none; padding: .45rem .9rem; border: 1.5px solid #bae6fd; border-radius: 8px; background: #f0f9ff; transition: all .15s; }
+.sd__repro-doc-link:hover { background: #e0f2fe; border-color: #0369a1; }
+.sd__repro-upload-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.sd__repro-hint { font-size: .72rem; color: #94a3b8; }
+
 .sd__cc-historial { margin-top: 1.25rem; }
 .sd__cc-historial-title { font-size: .75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .75rem; }
 .sd__cc-empty { text-align: center; color: #94a3b8; font-size: .875rem; padding: 1.5rem; }
@@ -1133,4 +1484,44 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__cc-mov--neg { color: #dc2626; }
 .sd__cc-mov-saldo { grid-column: 2; grid-row: 2; font-family: monospace; font-size: .72rem; color: #94a3b8; }
 .sd__cc-mov-meta  { grid-column: 3; grid-row: 2; font-size: .7rem; color: #94a3b8; text-align: right; }
+
+/* Modal genérico */
+.sd__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.sd__modal { background: white; border-radius: 16px; max-height: 90vh; overflow-y: auto; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+.sd__modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; }
+.sd__modal-title { font-size: 1rem; font-weight: 700; color: #1a1a1a; margin: 0; }
+.sd__modal-close { background: none; border: none; cursor: pointer; color: #94a3b8; padding: .25rem; border-radius: 6px; }
+.sd__modal-close:hover { background: #f8fafc; color: #475569; }
+.sd__modal-body { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+.sd__modal-footer { padding: 1rem 1.5rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: .75rem; }
+.sd__form-row { display: flex; flex-direction: column; gap: .35rem; }
+.sd__form-label { font-size: .75rem; font-weight: 600; color: #475569; }
+.sd__form-input { padding: .55rem .8rem; border: 1px solid #cbd5e1; border-radius: 7px; font-size: .875rem; width: 100%; box-sizing: border-box; outline: none; font-family: inherit; }
+.sd__form-input:focus { border-color: #1b5e20; box-shadow: 0 0 0 2px #dcfce7; }
+
+/* Renovaciones REPROCANN */
+.sd__reno-form { padding: .75rem 1.25rem; display: flex; flex-direction: column; gap: .6rem; border-bottom: 1px solid #f1f5f9; }
+.sd__reno-row { display: flex; flex-direction: column; gap: .25rem; }
+.sd__reno-row label { font-size: .75rem; font-weight: 600; color: #475569; }
+.sd__reno-input { width: 100%; padding: .45rem .7rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: .875rem; outline: none; }
+.sd__reno-input:focus { border-color: #1b5e20; box-shadow: 0 0 0 2px #dcfce7; }
+.sd__reno-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+.sd__reno-empty { padding: 1rem 1.25rem; color: #94a3b8; font-size: .85rem; }
+.sd__reno-list { display: flex; flex-direction: column; gap: 0; }
+.sd__reno-item { padding: .75rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
+.sd__reno-item:last-child { border-bottom: none; }
+.sd__reno-item-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.sd__reno-estado { font-size: .7rem; font-weight: 700; padding: .15rem .5rem; border-radius: 999px; }
+.sd__reno-numero { font-size: .8rem; font-weight: 600; color: #334155; }
+.sd__reno-fecha { font-size: .75rem; color: #94a3b8; margin-left: auto; }
+.sd__reno-acciones { display: flex; gap: .3rem; }
+.sd__reno-obs { margin-top: .3rem; font-size: .8rem; color: #64748b; }
+.sd__reno-aprobado { margin-top: .3rem; font-size: .78rem; color: #15803d; font-weight: 600; }
+.sd__btn-tiny { display: inline-flex; align-items: center; padding: .25rem .4rem; border: 1px solid; border-radius: 5px; cursor: pointer; background: transparent; transition: all .15s; }
+.sd__btn-tiny--ok { border-color: #bbf7d0; color: #15803d; }
+.sd__btn-tiny--ok:hover { background: #dcfce7; }
+.sd__btn-tiny--danger { border-color: #fecaca; color: #dc2626; }
+.sd__btn-tiny--danger:hover { background: #fee2e2; }
+.sd__btn-tiny--ghost { border-color: #e2e8f0; color: #94a3b8; }
+.sd__btn-tiny--ghost:hover { background: #f8fafc; color: #475569; }
 </style>

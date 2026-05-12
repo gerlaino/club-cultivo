@@ -20,11 +20,16 @@ class LotePolicy < ApplicationPolicy
     mismo_club? && admin?
   end
 
+  def asignar_manicurador?
+    mismo_club? && admin?
+  end
+
   class Scope < Scope
     def resolve
       base = scope.where(club_id: user.club_id)
       if user.manicura?
-        base.where(estado: %w[secado manicura_pendiente])
+        base.where(estado: %w[en_manicura manicura_pendiente], manicurador_id: user.id)
+           .or(base.where(estado: %w[secado manicura_pendiente]))
       else
         base
       end

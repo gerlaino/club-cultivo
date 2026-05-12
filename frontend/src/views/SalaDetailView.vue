@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref, computed } from "vue"
+import { onMounted, onUnmounted, ref, computed, watch } from "vue"
 import { logger } from '../utils/logger.js'
 import { useRoute, useRouter } from "vue-router"
 import { useSalasStore } from "../stores/salas"
@@ -63,6 +63,37 @@ const DIAS_CICLO   = { semilla:7, vegetativo:45, floracion:65, cosecha:10, curad
 
 // ── Genéticas ──────────────────────────────────────────────
 const geneticas = ref([])
+
+// ── Cámara ─────────────────────────────────────────────────
+const showCameraForm = ref(false)
+const savingCamera   = ref(false)
+const cameraError    = ref(false)
+const snapshotKey    = ref(0)
+const snapshotTs     = ref('')
+const cameraForm     = ref({ camera_stream_url: '', camera_snapshot_url: '' })
+
+const snapshotSrc = computed(() => {
+  const url = sala.value?.camera_snapshot_url || sala.value?.camera_stream_url
+  if (!url) return ''
+  return url + (url.includes('?') ? '&' : '?') + '_t=' + snapshotKey.value
+})
+
+function refreshSnapshot() {
+  cameraError.value = false
+  snapshotKey.value = Date.now()
+  snapshotTs.value  = new Date().toLocaleTimeString('es-AR')
+}
+
+async function saveCamera() {
+  savingCamera.value = true
+  try {
+    await updateSala(salaId, cameraForm.value)
+    await salas.fetchOne(salaId)
+    showCameraForm.value = false
+    toast.success('Cámara configurada')
+  } catch { toast.error('Error al guardar la cámara') }
+  finally { savingCamera.value = false }
+}
 
 // ── Editar sala ────────────────────────────────────────────
 const showEditSala   = ref(false)
@@ -128,7 +159,7 @@ onMounted(async () => {
   finally  { loading.value = false }
 
   try {
-    const res = await listGeneticas({ activa: true })
+    const res = await listGeneticas({ activa: true, disponible: true })
     geneticas.value = res.data || []
   } catch { /* genéticas no críticas */ }
 
@@ -141,6 +172,14 @@ onUnmounted(() => {
 
 const sala  = computed(() => salas.currentSala)
 const items = computed(() => lotes.bySala(salaId))
+
+watch(() => sala.value?.camera_stream_url, (url) => {
+  if (url) {
+    cameraForm.value.camera_stream_url   = url
+    cameraForm.value.camera_snapshot_url = sala.value?.camera_snapshot_url || ''
+    refreshSnapshot()
+  }
+}, { immediate: true })
 
 const contextoAsistente = computed(() => sala.value ? {
   tipo:        'sala',
@@ -583,6 +622,65 @@ const canSeeAmbiente = computed(() =>
             <div class="sd__card-notes">{{ sala.notes }}</div>
           </div>
 
+          <!-- Cámara -->
+          <div class="sd__card sd__card--mt">
+            <div class="sd__card-header">
+              <span class="sd__card-title">📷 Cámara</span>
+              <button v-if="canEdit" class="sd__link-small" @click="showCameraForm = !showCameraForm">
+                <i :class="sala.camera_stream_url ? 'bi bi-pencil' : 'bi bi-plus-lg'"></i>
+                {{ sala.camera_stream_url ? 'Editar' : 'Configurar' }}
+              </button>
+            </div>
+
+            <div v-if="showCameraForm" class="sd__cam-form">
+              <div class="sd__cam-row">
+                <label>URL de stream (MJPEG / HLS)</label>
+                <input v-model="cameraForm.camera_stream_url" type="url" placeholder="http://cam.local/stream" class="sd__cam-input" />
+              </div>
+              <div class="sd__cam-row">
+                <label>URL de snapshot (imagen estática)</label>
+                <input v-model="cameraForm.camera_snapshot_url" type="url" placeholder="http://cam.local/snapshot.jpg" class="sd__cam-input" />
+              </div>
+              <div class="sd__cam-actions">
+                <button class="sd__btn-ghost-sm" @click="showCameraForm = false">Cancelar</button>
+                <button class="sd__btn-primary-sm" :disabled="savingCamera" @click="saveCamera">
+                  {{ savingCamera ? 'Guardando…' : 'Guardar' }}
+                </button>
+              </div>
+            </div>
+
+            <template v-else-if="sala.camera_stream_url || sala.camera_snapshot_url">
+              <!-- Stream en vivo -->
+              <div v-if="sala.camera_stream_url" class="sd__cam-stream">
+                <img
+                  :src="snapshotSrc"
+                  :key="snapshotKey"
+                  class="sd__cam-img"
+                  alt="Cámara sala"
+                  @error="cameraError = true"
+                />
+                <div v-if="cameraError" class="sd__cam-error">
+                  <span>📷 Sin señal</span>
+                  <a :href="sala.camera_stream_url" target="_blank" rel="noopener" class="sd__cam-link">Abrir stream externo</a>
+                </div>
+                <div class="sd__cam-controls">
+                  <button class="sd__cam-btn" @click="refreshSnapshot" title="Actualizar imagen">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                  <span class="sd__cam-ts">{{ snapshotTs }}</span>
+                </div>
+              </div>
+              <!-- Solo snapshot -->
+              <div v-else-if="sala.camera_snapshot_url" class="sd__cam-stream">
+                <img :src="sala.camera_snapshot_url" class="sd__cam-img" alt="Snapshot sala" @error="cameraError = true" />
+              </div>
+            </template>
+
+            <div v-else class="sd__cam-empty">
+              <span>Sin cámara configurada</span>
+            </div>
+          </div>
+
         </div>
       </div>
     </template>
@@ -934,4 +1032,15 @@ const canSeeAmbiente = computed(() =>
 .sd__checkbox-row { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: #374151; cursor: pointer; user-select: none; }
 .sd__checkbox-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; flex-shrink: 0; }
 .sd__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; }
+
+/* Cámara */
+.sd__cam-form { display: flex; flex-direction: column; gap: .75rem; }
+.sd__btn-ghost-sm { background: transparent; border: 1px solid #d4e6d4; color: #60725d; padding: .4rem .8rem; border-radius: 6px; font-size: .78rem; font-weight: 500; cursor: pointer; transition: all .15s; }
+.sd__btn-ghost-sm:hover { background: #f0fdf4; color: #1b5e20; }
+.sd__btn-primary-sm { background: #1b5e20; color: #fff; border: none; padding: .4rem .9rem; border-radius: 6px; font-size: .78rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+.sd__btn-primary-sm:hover { background: #155016; }
+.sd__cam-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .25rem; }
+.sd__cam-stream { margin-top: .5rem; border-radius: 8px; overflow: hidden; border: 1px solid #d4e6d4; background: #000; }
+.sd__cam-img { width: 100%; display: block; max-height: 220px; object-fit: cover; }
+.sd__cam-empty { color: #94a3b8; font-size: .8rem; font-style: italic; text-align: center; padding: .5rem 0; }
 </style>

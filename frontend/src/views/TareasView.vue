@@ -472,6 +472,7 @@ function onTareaGuardada() {
   tareaEditando.value = null
   toast.success('Tarea guardada ✓')
   tareasStore.fetchDashboard()
+  cargarSemana()
 }
 function onTareaCompletada() {
   showModalCompletar.value = false

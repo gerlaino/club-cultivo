@@ -1,7 +1,8 @@
 class Lote < ApplicationRecord
   belongs_to :club
   belongs_to :sala
-  belongs_to :genetica, optional: true
+  belongs_to :genetica,    optional: true
+  belongs_to :manicurador, class_name: 'User', optional: true
   has_many :plants,                dependent: :destroy
   has_one  :costo_lote,            dependent: :destroy
   has_many :movimientos_contables, dependent: :nullify
@@ -12,9 +13,10 @@ class Lote < ApplicationRecord
   has_many_attached :fotos
   has_many :notas, as: :noteable, dependent: :destroy
 
-  # manicura_pendiente se inserta entre secado y curado.
-  # No forma parte de CICLO_FASES (transición controlada por pesada de manicura).
-  ESTADOS       = %w[semilla vegetativo floracion cosecha secado manicura_pendiente curado finalizado].freeze
+  # en_manicura: admin asigna un manicurador y el lote espera ser procesado.
+  # manicura_pendiente: manicurador registró pesada, espera aprobación admin.
+  # secado/curado: estados legacy — lotes anteriores al nuevo flujo.
+  ESTADOS       = %w[semilla vegetativo floracion cosecha en_manicura secado manicura_pendiente curado finalizado].freeze
   CICLO_FASES   = %w[vegetativo floracion cosecha secado curado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
   TIPOS_LUZ     = %w[led hps cmh natural mixta].freeze
@@ -55,6 +57,7 @@ class Lote < ApplicationRecord
     when 'vegetativo'          then 20
     when 'floracion'           then 40
     when 'cosecha'             then 60
+    when 'en_manicura'         then 68
     when 'secado'              then 72
     when 'manicura_pendiente'  then 82
     when 'curado'              then 90
@@ -97,7 +100,7 @@ class Lote < ApplicationRecord
   # Avanza el lote al siguiente paso del ciclo (vegetativo→floracion→secado→curado).
   # Crea la pesada y mueve el lote a la sala destino (creándola si hace falta).
   # pesada_attrs debe incluir: registrado_por (User), y el peso según fase_destino.
-  def transicionar!(nueva_fase, pesada_attrs:, manicurado: false, pesadas_plantas_attrs: [])
+  def transicionar!(nueva_fase, pesada_attrs:, manicurado: false, pesadas_plantas_attrs: [], sala_id: nil)
     raise ArgumentError, "Fase inválida: #{nueva_fase}" unless CICLO_FASES.include?(nueva_fase)
     raise "El lote ya está finalizado" if estado == 'finalizado'
 
@@ -112,11 +115,12 @@ class Lote < ApplicationRecord
     raise ArgumentError, "registrado_por es obligatorio" unless registrado_por
 
     ActiveRecord::Base.transaction do
-      sala_destino = Sala.find_or_create_proceso!(
-        sede:        sala.sede,
-        tipo:        nueva_fase,
-        created_by:  registrado_por
-      )
+      sala_destino = if sala_id.present?
+        club.salas.activas.find_by(id: sala_id) ||
+          Sala.find_or_create_proceso!(sede: sala.sede, tipo: nueva_fase, created_by: registrado_por)
+      else
+        Sala.find_or_create_proceso!(sede: sala.sede, tipo: nueva_fase, created_by: registrado_por)
+      end
 
       pesada = pesadas.create!(
         fase_origen:    estado,
@@ -170,19 +174,25 @@ class Lote < ApplicationRecord
     end
   end
 
-  # Rechaza la pesada de manicura, devuelve el lote a secado.
+  # Rechaza la pesada de manicura.
+  # Nuevo flujo: vuelve a cosecha (admin reasigna). Legacy: vuelve a secado.
   def rechazar_manicura!(rechazado_por:, motivo:)
     raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
     raise ArgumentError, "El motivo es obligatorio" if motivo.blank?
 
-    ultima_pesada = pesadas.where(fase_origen: 'secado', manicurado: true).reorder(id: :desc).first
+    fase_origen_pesada = manicurador_id.present? ? 'en_manicura' : 'secado'
+    ultima_pesada = pesadas.where(fase_origen: fase_origen_pesada, manicurado: true).reorder(id: :desc).first
 
     ActiveRecord::Base.transaction do
       ultima_pesada&.update!(rechazada_at: Time.current, rechazada_por_id: rechazado_por.id,
                              motivo_rechazo: motivo, aprobada_at: nil, aprobada_por_id: nil)
 
-      sala_secado = Sala.find_or_create_proceso!(sede: sala.sede, tipo: 'secado', created_by: rechazado_por)
-      update!(estado: 'secado', sala: sala_secado)
+      if manicurador_id.present?
+        update!(estado: 'cosecha', manicurador: nil)
+      else
+        sala_secado = Sala.find_or_create_proceso!(sede: sala.sede, tipo: 'secado', created_by: rechazado_por)
+        update!(estado: 'secado', sala: sala_secado)
+      end
 
       AlertaInterna.create!(
         club:             club,
@@ -192,6 +202,100 @@ class Lote < ApplicationRecord
         creada_por:       rechazado_por,
         destinada_a_role: 'manicura',
         contexto:         { lote_id: id, lote_codigo: codigo, motivo: motivo }
+      )
+    end
+  end
+
+  # Admin asigna un manicurador → cosecha → en_manicura (nuevo flujo).
+  def asignar_manicurador!(manicurador:, asignado_por:)
+    raise ArgumentError, "El lote no está en cosecha" unless estado == 'cosecha'
+    raise ArgumentError, "El usuario no tiene rol de manicura" unless manicurador.role == 'manicura'
+
+    ActiveRecord::Base.transaction do
+      update!(estado: 'en_manicura', manicurador: manicurador)
+      lote_eventos.create!(
+        tipo:            'cambio_estado',
+        estado_anterior: 'cosecha',
+        estado_nuevo:    'en_manicura',
+        descripcion:     "Asignado a manicura: #{manicurador.first_name || manicurador.email}",
+        user:            asignado_por,
+        club:            club,
+        registrado_en:   Time.current,
+      )
+      AlertaInterna.create!(
+        club:             club,
+        tipo:             'manicura_asignada',
+        mensaje:          "Lote #{codigo} asignado para manicura — #{plants_count_cosechadas || plants_count} plantas",
+        severidad:        'info',
+        creada_por:       asignado_por,
+        destinada_a_role: 'manicura',
+        contexto:         { lote_id: id, lote_codigo: codigo, manicurador_id: manicurador.id }
+      )
+    end
+  end
+
+  # Aprueba pesada del manicurador, genera stock y finaliza el lote en un solo paso.
+  def aprobar_y_finalizar!(aprobado_por:, sede_id:, peso_seco_g: nil, forma_producto: 'flor_seca')
+    raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
+
+    ultima_pesada = pesadas.where(fase_origen: 'en_manicura', manicurado: true).reorder(id: :desc).first
+    raise "No hay pesada de manicura para aprobar" unless ultima_pesada
+
+    sede  = club.sedes.find(sede_id)
+    peso  = peso_seco_g.present? ? peso_seco_g.to_d : ultima_pesada.peso_seco_g.to_d
+    raise ArgumentError, "El peso debe ser mayor a 0" unless peso > 0
+
+    ActiveRecord::Base.transaction do
+      ultima_pesada.update!(
+        aprobada_at:      Time.current,
+        aprobada_por_id:  aprobado_por.id,
+        peso_seco_g:      peso,
+        rechazada_at:     nil,
+        rechazada_por_id: nil,
+        motivo_rechazo:   nil,
+      )
+
+      stock = Stock.create!(
+        club:            club,
+        sede:            sede,
+        lote:            self,
+        genetica:        genetica,
+        origen:          'lote',
+        estado:          'asignado',
+        forma_producto:  forma_producto,
+        cantidad:        peso,
+        unidad:          'g',
+      )
+      stock.stock_movimientos.create!(
+        tipo:    'produccion',
+        gramos:  peso,
+        usuario: aprobado_por,
+      )
+
+      update!(
+        estado:             'finalizado',
+        rendimiento_real_g: peso,
+        manicurador:        nil,
+      )
+
+      lote_eventos.create!(
+        tipo:            'cambio_estado',
+        estado_anterior: 'manicura_pendiente',
+        estado_nuevo:    'finalizado',
+        descripcion:     "Aprobado — #{peso}g → #{sede.nombre} (#{forma_producto})",
+        user:            aprobado_por,
+        club:            club,
+        registrado_en:   Time.current,
+      )
+
+      AlertaInterna.create!(
+        club:             club,
+        tipo:             'manicura_aprobada',
+        mensaje:          "Lote #{codigo} finalizado: #{peso}g en #{sede.nombre}",
+        severidad:        'info',
+        creada_por:       aprobado_por,
+        destinada_a_role: 'manicura',
+        contexto:         { lote_id: id, lote_codigo: codigo, peso_seco_g: peso, stock_id: stock.id }
       )
     end
   end

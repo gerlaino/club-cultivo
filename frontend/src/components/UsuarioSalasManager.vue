@@ -1,67 +1,67 @@
 <template>
-  <div>
-    <div v-if="loading" class="text-center py-2">
-      <div class="spinner-border spinner-border-sm text-primary"></div>
-    </div>
-    <div v-else-if="salasAsignadas.length === 0" class="text-muted small py-1">
-      <i class="bi bi-house-dash me-1"></i>Sin sala asignada
-    </div>
-    <div v-else class="mb-3">
-      <div v-for="sala in salasAsignadas" :key="sala.id"
-           class="d-flex align-items-center justify-content-between py-2 border-bottom">
-        <div>
-          <div class="fw-semibold small">{{ sala.nombre }}</div>
-          <div class="text-muted" style="font-size:0.72rem">
-            <i class="bi bi-building me-1"></i>{{ sala.sede?.nombre || 'Sin sede' }}
-          </div>
-        </div>
-        <button v-if="puedeEditar && !esManicurador" class="btn btn-sm btn-outline-danger" @click="desasignar(sala)">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
+  <div class="usm">
+
+    <div v-if="loading" class="usm__loading">
+      <div class="usm__ring"></div>
+      <span>Cargando salas…</span>
     </div>
 
-    <div v-if="puedeEditar">
-      <div v-if="!mostrarForm" class="d-grid">
-        <button class="btn btn-sm btn-outline-success" @click="abrirForm">
-          <i class="bi bi-plus-lg me-1"></i>{{ esManicurador && salasAsignadas.length > 0 ? 'Cambiar sala' : 'Asignar sala' }}
-        </button>
+    <template v-else-if="salasParaRol.length === 0">
+      <div class="usm__empty">
+        <i class="bi bi-grid-3x3-gap"></i>
+        <span>No hay salas disponibles en sedes de producción.</span>
+      </div>
+    </template>
+
+    <template v-else>
+      <div v-if="esManicurador" class="usm__mode-hint">
+        <i class="bi bi-info-circle"></i>
+        Solo puede tener una sala asignada. Seleccioná otra para reemplazarla.
       </div>
 
-      <div v-else class="border rounded p-3 bg-light">
-        <div class="mb-2">
-          <label class="form-label small fw-semibold mb-1">Sede</label>
-          <select v-model="sedeSeleccionada" class="form-select form-select-sm" @change="salaSeleccionada = ''">
-            <option value="">Seleccioná una sede...</option>
-            <option v-for="sede in sedesDisponibles" :key="sede.id" :value="sede.id">{{ sede.nombre }}</option>
-          </select>
+      <div v-for="(grupo, sedeNombre) in salasPorSede" :key="sedeNombre" class="usm__group">
+        <div class="usm__group-label">
+          <i class="bi bi-building"></i>
+          {{ sedeNombre }}
         </div>
-
-        <div v-if="sedeSeleccionada" class="mb-3">
-          <label class="form-label small fw-semibold mb-1">Sala</label>
-          <select v-model="salaSeleccionada" class="form-select form-select-sm">
-            <option value="">Seleccioná una sala...</option>
-            <option v-for="sala in salasDeLaSede" :key="sala.id" :value="sala.id">{{ sala.nombre }}</option>
-          </select>
-          <div v-if="salasDeLaSede.length === 0" class="text-muted small mt-1">No hay salas disponibles en esta sede</div>
-        </div>
-
-        <div v-if="esManicurador && salasAsignadas.length > 0" class="alert alert-warning py-2 px-3 small mb-3">
-          <i class="bi bi-info-circle me-1"></i>
-          Esto reemplazará la sala actual ({{ salasAsignadas[0]?.nombre }}).
-        </div>
-
-        <div v-if="error" class="text-danger small mb-2">{{ error }}</div>
-
-        <div class="d-flex gap-2">
-          <button class="btn btn-sm btn-success" @click="asignar" :disabled="!salaSeleccionada || asignando">
-            <span v-if="asignando" class="spinner-border spinner-border-sm me-1"></span>
-            <i v-else class="bi bi-check-lg me-1"></i>Confirmar
+        <div class="usm__grid">
+          <button
+            v-for="sala in grupo"
+            :key="sala.id"
+            class="usm__sala"
+            :class="{
+              'usm__sala--on':      isAsignada(sala),
+              'usm__sala--spinner': toggling === sala.id,
+            }"
+            :disabled="toggling !== null || !puedeEditar"
+            @click="toggle(sala)"
+          >
+            <div class="usm__sala-ico">
+              <div v-if="toggling === sala.id" class="usm__mini-ring"></div>
+              <i v-else-if="isAsignada(sala)" class="bi bi-check-lg"></i>
+              <i v-else class="bi bi-plus-lg"></i>
+            </div>
+            <span class="usm__sala-nombre">{{ sala.nombre }}</span>
           </button>
-          <button class="btn btn-sm btn-outline-secondary" @click="cerrarForm">Cancelar</button>
         </div>
       </div>
+
+      <div class="usm__footer">
+        <div v-if="salasAsignadas.length" class="usm__chips">
+          <span v-for="s in salasAsignadas" :key="s.id" class="usm__chip">
+            <i class="bi bi-check-circle-fill"></i>
+            {{ s.nombre }}
+          </span>
+        </div>
+        <span v-else class="usm__none">Sin salas asignadas</span>
+      </div>
+    </template>
+
+    <div v-if="errorMsg" class="usm__error">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      {{ errorMsg }}
     </div>
+
   </div>
 </template>
 
@@ -70,108 +70,171 @@ import { ref, computed, onMounted } from 'vue'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { getUserSalasAsignadas, asignarSalaAUsuario, desasignarSalaAUsuario, listSalas } from '../lib/api.js'
-import { useConfirm } from '../composables/useConfirm.js'
-const { confirm } = useConfirm()
 
 const props = defineProps({
   userId:   { type: Number, required: true },
   userRole: { type: String, default: '' },
 })
 
-const auth             = useAuthStore()
-const salasAsignadas   = ref([])
-const todasLasSalas    = ref([])
-const loading          = ref(false)
-const mostrarForm      = ref(false)
-const sedeSeleccionada = ref('')
-const salaSeleccionada = ref('')
-const asignando        = ref(false)
-const error            = ref('')
+const auth           = useAuthStore()
+const salasAsignadas = ref([])
+const todasLasSalas  = ref([])
+const loading        = ref(false)
+const toggling       = ref(null)
+const errorMsg       = ref('')
 
-const puedeEditar = computed(() => ['admin', 'cultivador'].includes(auth.user?.role))
+const puedeEditar   = computed(() => auth.user?.role === 'admin')
 const esManicurador = computed(() => props.userRole === 'manicura')
 
-const salasParaRol = computed(() => {
-  return todasLasSalas.value.filter(sala => {
-    if (!['produccion', 'mixta'].includes(sala.sede?.tipo)) return false
-    if (esManicurador.value) return sala.kind === 'manicura'
-    return sala.kind !== 'manicura'
+const salasParaRol = computed(() =>
+  todasLasSalas.value.filter(s => {
+    if (!['produccion', 'mixta'].includes(s.sede?.tipo)) return false
+    return esManicurador.value ? s.kind === 'manicura' : s.kind !== 'manicura'
   })
+)
+
+const salasPorSede = computed(() => {
+  const map = {}
+  for (const sala of salasParaRol.value) {
+    const key = sala.sede?.nombre || 'Sin sede'
+    if (!map[key]) map[key] = []
+    map[key].push(sala)
+  }
+  return map
 })
 
-const salasNoAsignadas = computed(() => {
-  const asignadasIds = new Set(salasAsignadas.value.map(s => s.id))
-  return salasParaRol.value.filter(s => !asignadasIds.has(s.id))
-})
+function isAsignada(sala) {
+  return salasAsignadas.value.some(s => s.id === sala.id)
+}
 
-const sedesDisponibles = computed(() => {
-  const fuente = esManicurador.value ? salasParaRol.value : salasNoAsignadas.value
-  const map = new Map()
-  fuente.forEach(sala => {
-    if (sala.sede?.id && !map.has(sala.sede.id)) {
-      map.set(sala.sede.id, { id: sala.sede.id, nombre: sala.sede.nombre })
+async function toggle(sala) {
+  if (!puedeEditar.value) return
+  errorMsg.value = ''
+  toggling.value = sala.id
+  try {
+    if (isAsignada(sala)) {
+      await desasignarSalaAUsuario(props.userId, sala.id)
+      salasAsignadas.value = salasAsignadas.value.filter(s => s.id !== sala.id)
+    } else {
+      await asignarSalaAUsuario(props.userId, sala.id)
+      if (esManicurador.value) {
+        salasAsignadas.value = [sala]
+      } else {
+        salasAsignadas.value = [...salasAsignadas.value, sala]
+      }
     }
-  })
-  return Array.from(map.values())
-})
-
-const salasDeLaSede = computed(() => {
-  if (!sedeSeleccionada.value) return []
-  const fuente = esManicurador.value ? salasParaRol.value : salasNoAsignadas.value
-  return fuente.filter(s => s.sede?.id === sedeSeleccionada.value)
-})
+  } catch (e) {
+    errorMsg.value = e.response?.data?.error || 'Error al actualizar la sala'
+    logger.error(e)
+  } finally {
+    toggling.value = null
+  }
+}
 
 onMounted(async () => {
   loading.value = true
   try {
-    const [resSalas, resTodas] = await Promise.all([
+    const [resAsig, resTodas] = await Promise.all([
       getUserSalasAsignadas(props.userId),
-      puedeEditar.value ? listSalas() : Promise.resolve({ data: [] })
+      puedeEditar.value ? listSalas() : Promise.resolve({ data: [] }),
     ])
-    salasAsignadas.value = resSalas.data || []
+    salasAsignadas.value = resAsig.data || []
     todasLasSalas.value  = resTodas.data || []
   } catch (e) { logger.error(e) }
   finally { loading.value = false }
 })
-
-function abrirForm() {
-  sedeSeleccionada.value = ''
-  salaSeleccionada.value = ''
-  error.value = ''
-  mostrarForm.value = true
-}
-
-function cerrarForm() {
-  mostrarForm.value = false
-  sedeSeleccionada.value = ''
-  salaSeleccionada.value = ''
-  error.value = ''
-}
-
-async function asignar() {
-  if (!salaSeleccionada.value) return
-  asignando.value = true
-  error.value = ''
-  try {
-    await asignarSalaAUsuario(props.userId, salaSeleccionada.value)
-    const sala = todasLasSalas.value.find(s => s.id === salaSeleccionada.value)
-    if (esManicurador.value) {
-      salasAsignadas.value = sala ? [sala] : []
-    } else {
-      if (sala) salasAsignadas.value.push(sala)
-    }
-    cerrarForm()
-  } catch (e) {
-    error.value = e.response?.data?.error || 'Error al asignar'
-  } finally { asignando.value = false }
-}
-
-async function desasignar(sala) {
-  const ok = await confirm({ title: `¿Quitar "${sala.nombre}"?`, message: 'Se desasignará al cultivador de esta sala.', confirmText: 'Quitar' })
-  if (!ok) return
-  try {
-    await desasignarSalaAUsuario(props.userId, sala.id)
-    salasAsignadas.value = salasAsignadas.value.filter(s => s.id !== sala.id)
-  } catch (e) { error.value = e.response?.data?.error || 'Error al desasignar' }
-}
 </script>
+
+<style scoped>
+.usm { display: flex; flex-direction: column; gap: .875rem; }
+
+/* Loading */
+.usm__loading {
+  display: flex; align-items: center; gap: .65rem;
+  padding: 1rem 0; color: #94a3b8; font-size: .82rem;
+}
+.usm__ring {
+  width: 16px; height: 16px; flex-shrink: 0;
+  border: 2px solid #e2e8f0; border-top-color: #1b5e20;
+  border-radius: 50%; animation: usm-spin .7s linear infinite;
+}
+@keyframes usm-spin { to { transform: rotate(360deg); } }
+
+/* Empty */
+.usm__empty {
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .82rem; color: #94a3b8; padding: .5rem 0;
+}
+
+/* Hint manicura */
+.usm__mode-hint {
+  display: flex; align-items: flex-start; gap: .45rem;
+  background: #fffbeb; border: 1px solid #fde68a;
+  color: #92400e; padding: .6rem .875rem;
+  border-radius: 8px; font-size: .78rem; line-height: 1.4;
+}
+
+/* Grupo por sede */
+.usm__group { display: flex; flex-direction: column; gap: .45rem; }
+.usm__group-label {
+  display: flex; align-items: center; gap: .4rem;
+  font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: #94a3b8;
+}
+
+/* Grid de salas */
+.usm__grid { display: flex; flex-wrap: wrap; gap: .4rem; }
+
+.usm__sala {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .45rem .8rem; border-radius: 9px;
+  border: 1.5px solid #e2e8f0; background: #f8fafc;
+  font-size: .82rem; font-weight: 500; color: #475569;
+  cursor: pointer; transition: all .15s;
+}
+.usm__sala:hover:not(:disabled) {
+  border-color: #a5d6a7; background: #f0fdf4; color: #1b5e20;
+}
+.usm__sala--on {
+  border-color: #1b5e20; background: #e8f5e9; color: #1b5e20; font-weight: 600;
+}
+.usm__sala--on:hover:not(:disabled) {
+  border-color: #b91c1c; background: #fef2f2; color: #b91c1c;
+}
+.usm__sala:disabled { opacity: .55; cursor: not-allowed; }
+
+.usm__sala-ico {
+  width: 16px; height: 16px; display: flex;
+  align-items: center; justify-content: center;
+  font-size: .75rem; flex-shrink: 0;
+}
+.usm__mini-ring {
+  width: 12px; height: 12px;
+  border: 2px solid currentColor; border-top-color: transparent;
+  border-radius: 50%; animation: usm-spin .6s linear infinite; opacity: .6;
+}
+
+/* Footer chips */
+.usm__footer {
+  padding-top: .25rem;
+  border-top: 1px solid #f1f5f9;
+}
+.usm__chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.usm__chip {
+  display: inline-flex; align-items: center; gap: .3rem;
+  background: #e8f5e9; color: #1b5e20;
+  border: 1px solid #a5d6a7;
+  padding: .2em .65em; border-radius: 6px;
+  font-size: .75rem; font-weight: 600;
+}
+.usm__chip i { font-size: .65rem; }
+.usm__none { font-size: .78rem; color: #94a3b8; font-style: italic; }
+
+/* Error */
+.usm__error {
+  display: flex; align-items: center; gap: .45rem;
+  background: #fef2f2; border: 1px solid #fecaca;
+  color: #b91c1c; padding: .6rem .875rem;
+  border-radius: 8px; font-size: .8rem;
+}
+</style>

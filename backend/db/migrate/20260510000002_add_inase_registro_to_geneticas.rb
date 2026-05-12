@@ -1,4 +1,4 @@
-class AddInaseFieldsToGeneticas < ActiveRecord::Migration[7.2]
+class AddInaseRegistroToGeneticas < ActiveRecord::Migration[7.2]
   def change
     add_column :geneticas, :numero_registro_inase, :string
     add_column :geneticas, :fecha_registro_inase,  :date

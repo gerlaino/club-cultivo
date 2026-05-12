@@ -11,6 +11,7 @@ import {
 
 const props = defineProps({
   socioId:          { type: Number,  required: true },
+  pacienteNombre:   { type: String,  default: '' },
   limiteMensualG:   { type: Number,  default: null },
   dispensadoMesG:   { type: Number,  default: null },
   saldoCc:          { type: Number,  default: null },
@@ -142,10 +143,6 @@ async function cargarDeliveryUsers() {
   finally { loadingDelivery.value = false }
 }
 
-watch(() => form.value.con_envio, (val) => {
-  if (val) cargarDeliveryUsers()
-})
-
 // ── Formulario ────────────────────────────────────────────────────────────────
 function emptyForm() {
   return {
@@ -165,14 +162,25 @@ function emptyForm() {
   }
 }
 const form = ref(emptyForm())
+const precioUnitarioManual = ref(null)
+
+watch(() => form.value.con_envio, (val) => {
+  if (val) cargarDeliveryUsers()
+})
+watch(() => form.value.stock_id, () => { precioUnitarioManual.value = null })
 
 const stockSeleccionado = computed(() => stocks.value.find(s => s.id === form.value.stock_id) || null)
+const necesitaPrecioManual = computed(() => stockSeleccionado.value != null && !stockSeleccionado.value.precio_sugerido_ars)
 
 const precioBase = computed(() => {
   const s   = stockSeleccionado.value
   const cnt = parseFloat(form.value.cantidad) || 0
-  if (!s?.precio_sugerido_ars || cnt <= 0) return null
-  return parseFloat(s.precio_sugerido_ars) * cnt
+  if (!s || cnt <= 0) return null
+  const ppu = s.precio_sugerido_ars
+    ? parseFloat(s.precio_sugerido_ars)
+    : (parseFloat(precioUnitarioManual.value) || 0)
+  if (ppu <= 0) return null
+  return ppu * cnt
 })
 
 const precioFinal = computed(() => {
@@ -188,6 +196,7 @@ watch(precioFinal, (val) => {
 
 function openCreate() {
   form.value = emptyForm()
+  precioUnitarioManual.value = null
   formError.value = null
   showModal.value = true
   cargarStocks()
@@ -379,7 +388,9 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 
           <div class="dv__modal-header">
             <div>
-              <h3 class="dv__modal-title">Nueva dispensación</h3>
+              <h3 class="dv__modal-title">
+                Nueva dispensación<template v-if="props.pacienteNombre"> para <span class="dv__modal-title-paciente">{{ props.pacienteNombre }}</span></template>
+              </h3>
             </div>
             <button class="dv__modal-close" @click="showModal=false"><i class="bi bi-x-lg"></i></button>
           </div>
@@ -449,6 +460,23 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
                 </span>
                 <span class="dv__stock-check" v-if="form.stock_id === s.id"><i class="bi bi-check-circle-fill"></i></span>
               </button>
+            </div>
+
+            <!-- ── Precio manual (stock sin precio sugerido) ── -->
+            <div v-if="necesitaPrecioManual" class="dv__field">
+              <label class="dv__label">
+                Precio por {{ stockSeleccionado?.unidad || 'g' }}
+                <span class="dv__opt">solo para el cálculo — no se guarda</span>
+              </label>
+              <div class="dv__input-suffix-wrap">
+                <span class="dv__input-prefix">$</span>
+                <input
+                  v-model.number="precioUnitarioManual"
+                  type="number" min="0" step="1"
+                  class="dv__input dv__input--with-prefix"
+                  placeholder="0"
+                />
+              </div>
             </div>
 
             <div class="dv__divider"></div>
@@ -700,6 +728,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__modal { background: #fff; border-radius: 18px; width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.18); display: flex; flex-direction: column; }
 .dv__modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.25rem .9rem; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: #fff; z-index: 1; }
 .dv__modal-title { font-size: .95rem; font-weight: 800; color: #0f172a; margin: 0; }
+.dv__modal-title-paciente { color: var(--c-leaf-700); font-weight: 800; }
 .dv__modal-close { background: #f1f5f9; border: none; width: 28px; height: 28px; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b; }
 .dv__modal-close:hover { background: #e2e8f0; }
 .dv__modal-body { padding: 1.1rem 1.25rem; flex: 1; display: flex; flex-direction: column; gap: .9rem; }

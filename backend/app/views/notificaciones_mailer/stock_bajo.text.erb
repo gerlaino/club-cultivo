@@ -1,0 +1,15 @@
+CLUB CULTIVO — ALERTA STOCK BAJO
+<%= @club.name %> · <%= Date.today.strftime('%d/%m/%Y') %>
+================================================
+
+Los siguientes productos tienen stock por debajo del umbral mínimo (50g):
+
+<% @stocks_data.each do |s| %>
+<% next unless s[:alerta] %>
+  • <%= s[:forma] %>: <%= s[:cantidad_g] %> g
+<% end %>
+
+Ver stock: <%= ENV.fetch('APP_HOST', 'https://app.clubcultivo.app') %>/stock
+
+---
+Este es un aviso automático de Club Cultivo.

@@ -1,24 +1,22 @@
 <template>
   <div class="dv">
+
     <!-- Left: Patient search -->
     <aside class="dv__left">
-      <h2 class="dv__panel-title">Paciente</h2>
-
       <div class="dv__search-wrap">
         <Search :size="16" :stroke-width="1.75" class="dv__search-ico" />
         <input
           v-model="query"
-          class="dv__search-input"
           type="search"
-          placeholder="Buscar por nombre o DNI…"
+          class="dv__search-input"
+          placeholder="Buscar paciente…"
           autocomplete="off"
         />
       </div>
 
       <div v-if="loadingPacientes" class="dv__skel-list">
-        <div class="dv__skel" v-for="n in 4" :key="n" />
+        <div class="dv__skel" v-for="n in 5" :key="n" />
       </div>
-
       <div v-else-if="!pacientes.length && query" class="dv__empty">Sin resultados.</div>
 
       <ul v-else class="dv__paciente-list">
@@ -32,10 +30,7 @@
           <div class="dv__paciente-name">{{ p.nombre }} {{ p.apellido }}</div>
           <div class="dv__paciente-meta">
             <span class="dv__paciente-dni">{{ p.dni ?? p.numero_documento ?? '—' }}</span>
-            <span
-              class="dv__reprocann-badge"
-              :class="reprocannClass(p)"
-            >{{ reprocannLabel(p) }}</span>
+            <span class="dv__reprocann-badge" :class="reprocannClass(p)">{{ reprocannLabel(p) }}</span>
           </div>
         </li>
       </ul>
@@ -50,6 +45,36 @@
       </div>
 
       <template v-else>
+
+        <!-- Patient info bar -->
+        <div class="dv__paciente-bar">
+          <div class="dv__paciente-bar-left">
+            <span class="dv__paciente-bar-name">{{ selectedPaciente.nombre }} {{ selectedPaciente.apellido }}</span>
+            <span class="dv__reprocann-badge" :class="reprocannClass(selectedPaciente)">{{ reprocannLabel(selectedPaciente) }}</span>
+          </div>
+          <div v-if="pacienteDetalle" class="dv__limite-wrap">
+            <div class="dv__limite-row">
+              <span class="dv__limite-label">Límite mensual</span>
+              <span class="dv__limite-nums" :class="{ 'dv__limite-nums--warn': limiteExcedidoConCarrito }">
+                {{ formatG(limiteUsadoConCarrito) }} / {{ formatG(pacienteDetalle.limite_dispensacion_mensual_g) }}
+              </span>
+            </div>
+            <div class="dv__limite-bar-track">
+              <div class="dv__limite-bar-usado" :style="{ width: `${Math.min(100, pctUsado)}%` }" />
+              <div
+                v-if="cartGramos > 0"
+                class="dv__limite-bar-carrito"
+                :class="{ 'dv__limite-bar-carrito--warn': limiteExcedidoConCarrito }"
+                :style="{ width: `${Math.min(100 - Math.min(100, pctUsado), pctCarrito)}%` }"
+              />
+            </div>
+            <div v-if="limiteExcedidoConCarrito" class="dv__limite-alerta">
+              <AlertTriangle :size="13" :stroke-width="2" /> El carrito supera el límite mensual disponible
+            </div>
+          </div>
+          <div v-else-if="loadingDetalle" class="dv__limite-loading">Cargando límites…</div>
+        </div>
+
         <!-- Stock grid -->
         <div class="dv__stock-section">
           <h2 class="dv__panel-title">Stock disponible</h2>
@@ -63,11 +88,7 @@
           </div>
 
           <div v-else class="dv__stock-grid">
-            <div
-              v-for="s in stocksDisponibles"
-              :key="s.id"
-              class="dv__stock-card"
-            >
+            <div v-for="s in stocksDisponibles" :key="s.id" class="dv__stock-card">
               <div class="dv__stock-header">{{ formaLabel(s.forma_producto) }}</div>
               <div class="dv__stock-lote">{{ s.lote?.codigo ?? '—' }}</div>
               <div class="dv__stock-disponible">{{ s.cantidad }}{{ s.unidad }} disponibles</div>
@@ -142,6 +163,7 @@
                 </div>
               </div>
 
+              <!-- Medio de pago -->
               <div class="dv__modal-field">
                 <label class="dv__label">Medio de pago</label>
                 <select v-model="medioPago" class="dv__select">
@@ -150,6 +172,37 @@
                   <option value="debito">Débito</option>
                   <option value="credito">Crédito</option>
                 </select>
+              </div>
+
+              <!-- Envío a domicilio -->
+              <div class="dv__modal-field">
+                <label class="dv__label-check">
+                  <input type="checkbox" v-model="conEnvio" class="dv__checkbox" />
+                  Envío a domicilio
+                </label>
+              </div>
+
+              <template v-if="conEnvio">
+                <div class="dv__modal-field">
+                  <label class="dv__label">Dirección de entrega</label>
+                  <input v-model="direccionEnvio" type="text" class="dv__input" placeholder="Av. Corrientes 1234, CABA" />
+                </div>
+                <div class="dv__modal-row">
+                  <div class="dv__modal-field">
+                    <label class="dv__label">Nombre de contacto</label>
+                    <input v-model="contactoNombre" type="text" class="dv__input" placeholder="Nombre" />
+                  </div>
+                  <div class="dv__modal-field">
+                    <label class="dv__label">Teléfono</label>
+                    <input v-model="contactoTel" type="tel" class="dv__input" placeholder="+54 11 …" />
+                  </div>
+                </div>
+              </template>
+
+              <!-- Observaciones -->
+              <div class="dv__modal-field">
+                <label class="dv__label">Observaciones <span class="dv__label-opt">(opcional)</span></label>
+                <textarea v-model="observaciones" class="dv__textarea" rows="2" placeholder="Notas internas…" />
               </div>
 
               <div class="dv__modal-total">
@@ -175,24 +228,31 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { listPacientes, listStocks, createDispensacion } from '../lib/api.js'
+import { listPacientes, getPaciente, listStocks, createDispensacion } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
-import { Search, Users, Plus, X } from 'lucide-vue-next'
+import { Search, Users, Plus, X, AlertTriangle } from 'lucide-vue-next'
 
 const toast = useToast()
 
-const query           = ref('')
-const pacientes       = ref([])
+const query            = ref('')
+const pacientes        = ref([])
 const loadingPacientes = ref(false)
 const selectedPaciente = ref(null)
+const pacienteDetalle  = ref(null)
+const loadingDetalle   = ref(false)
 
-const stocks         = ref([])
-const loadingStocks  = ref(false)
-const cantidades     = ref({})
+const stocks       = ref([])
+const loadingStocks = ref(false)
+const cantidades   = ref({})
 
 const cart       = ref([])
 const confirmOpen = ref(false)
 const medioPago  = ref('efectivo')
+const conEnvio   = ref(false)
+const direccionEnvio = ref('')
+const contactoNombre = ref('')
+const contactoTel    = ref('')
+const observaciones  = ref('')
 const submitting  = ref(false)
 
 let searchTimeout = null
@@ -217,26 +277,58 @@ async function buscarPacientes(q) {
 
 async function selectPaciente(p) {
   selectedPaciente.value = p
-  cart.value = []
+  pacienteDetalle.value  = null
+  cart.value    = []
   cantidades.value = {}
-  loadingStocks.value = true
+
+  // Cargar detalle completo (límites, dispensado_mes_actual_g)
+  loadingDetalle.value = true
+  loadingStocks.value  = true
   try {
-    const { data } = await listStocks()
-    stocks.value = data.stocks ?? data ?? []
+    const [detRes, stockRes] = await Promise.all([
+      getPaciente(p.id),
+      listStocks(),
+    ])
+    pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
+    stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
   } catch {
     stocks.value = []
   } finally {
-    loadingStocks.value = false
+    loadingDetalle.value = false
+    loadingStocks.value  = false
   }
 }
 
-const stocksDisponibles = computed(() =>
-  stocks.value.filter(s => s.cantidad > 0)
+const stocksDisponibles = computed(() => stocks.value.filter(s => s.cantidad > 0))
+
+const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.total, 0))
+
+const cartGramos = computed(() =>
+  cart.value.filter(i => i.stock.unidad === 'g').reduce((s, i) => s + i.cantidad, 0)
 )
 
-const cartTotal = computed(() =>
-  cart.value.reduce((s, i) => s + i.total, 0)
-)
+const limiteUsadoConCarrito = computed(() => {
+  const base = Number(pacienteDetalle.value?.dispensado_mes_actual_g ?? 0)
+  return base + cartGramos.value
+})
+
+const pctUsado = computed(() => {
+  const limite = Number(pacienteDetalle.value?.limite_dispensacion_mensual_g)
+  if (!limite) return 0
+  return (Number(pacienteDetalle.value?.dispensado_mes_actual_g ?? 0) / limite) * 100
+})
+
+const pctCarrito = computed(() => {
+  const limite = Number(pacienteDetalle.value?.limite_dispensacion_mensual_g)
+  if (!limite || !cartGramos.value) return 0
+  return (cartGramos.value / limite) * 100
+})
+
+const limiteExcedidoConCarrito = computed(() => {
+  const limite = Number(pacienteDetalle.value?.limite_dispensacion_mensual_g)
+  if (!limite) return false
+  return limiteUsadoConCarrito.value > limite
+})
 
 function addToCart(s) {
   const qty = cantidades.value[s.id]
@@ -258,17 +350,35 @@ async function submitDispensacion() {
     const today = new Date().toISOString().slice(0, 10)
     await Promise.all(cart.value.map(item =>
       createDispensacion(selectedPaciente.value.id, {
-        stock_id:           item.stock.id,
-        cantidad:           item.cantidad,
+        stock_id:            item.stock.id,
+        cantidad:            item.cantidad,
         precio_unitario_ars: item.stock.precio_sugerido_ars,
-        aporte_socio_ars:   item.total,
-        fecha_dispensacion: today,
-        medio_pago:         medioPago.value,
+        aporte_socio_ars:    item.total,
+        fecha_dispensacion:  today,
+        medio_pago:          medioPago.value,
+        con_envio:           conEnvio.value,
+        ...(conEnvio.value ? {
+          direccion_envio:   direccionEnvio.value,
+          contacto_nombre:   contactoNombre.value,
+          contacto_telefono: contactoTel.value,
+        } : {}),
+        ...(observaciones.value.trim() ? { observaciones: observaciones.value.trim() } : {}),
       })
     ))
     toast.success(`Dispensación registrada para ${selectedPaciente.value.nombre}`)
-    cart.value = []
+    cart.value      = []
     confirmOpen.value = false
+    conEnvio.value    = false
+    direccionEnvio.value = ''
+    contactoNombre.value = ''
+    contactoTel.value    = ''
+    observaciones.value  = ''
+    // Refrescar detalle del paciente para actualizar la barra
+    if (selectedPaciente.value) {
+      getPaciente(selectedPaciente.value.id)
+        .then(r => { pacienteDetalle.value = r.data?.data ?? r.data ?? null })
+        .catch(() => {})
+    }
   } catch (e) {
     const msg = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar'
     toast.error(msg)
@@ -298,10 +408,13 @@ function formaLabel(f) {
   const LABELS = { flor_seca: 'Flor seca', aceite: 'Aceite', tintura: 'Tintura', crema: 'Crema', capsulas: 'Cápsulas', otro: 'Otro' }
   return LABELS[f] || f || '—'
 }
-
 function formatARS(n) {
   if (n == null) return '—'
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+}
+function formatG(g) {
+  if (g == null) return '—'
+  return `${Number(g).toLocaleString('es-AR', { maximumFractionDigits: 1 })} g`
 }
 </script>
 
@@ -330,7 +443,7 @@ function formatARS(n) {
   padding: var(--sp-6);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
+  gap: var(--sp-5);
   overflow-y: auto;
 }
 
@@ -396,6 +509,66 @@ function formatARS(n) {
 .dv__reprocann-badge--green { background: #d1fae5; color: #065f46; }
 .dv__reprocann-badge--amber { background: var(--c-amber-100); color: var(--c-amber-500); }
 .dv__reprocann-badge--gray  { background: var(--c-ink-100); color: var(--c-ink-500); }
+
+/* Patient info bar */
+.dv__paciente-bar {
+  background: #fff;
+  border: 1px solid var(--c-ink-200);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.dv__paciente-bar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.dv__paciente-bar-name {
+  font-size: var(--fs-15);
+  font-weight: 700;
+  color: var(--c-ink-900);
+}
+.dv__limite-wrap { display: flex; flex-direction: column; gap: var(--sp-1); }
+.dv__limite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dv__limite-label { font-size: var(--fs-12); font-weight: 600; color: var(--c-ink-500); text-transform: uppercase; letter-spacing: .04em; }
+.dv__limite-nums { font-family: var(--font-mono); font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700); }
+.dv__limite-nums--warn { color: var(--c-rust-600); }
+
+.dv__limite-bar-track {
+  height: 8px;
+  background: var(--c-ink-100);
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+}
+.dv__limite-bar-usado {
+  height: 100%;
+  background: var(--c-role-dispensador);
+  border-radius: 999px;
+  transition: width .3s ease;
+}
+.dv__limite-bar-carrito {
+  height: 100%;
+  background: rgba(74, 142, 166, 0.5);
+  transition: width .3s ease;
+}
+.dv__limite-bar-carrito--warn { background: rgba(220, 38, 38, 0.5); }
+.dv__limite-alerta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--c-rust-600);
+}
+.dv__limite-loading { font-size: var(--fs-12); color: var(--c-ink-400); }
 
 /* Placeholder */
 .dv__placeholder {
@@ -505,13 +678,16 @@ function formatARS(n) {
   background: #fff;
   border-radius: var(--r-xl);
   width: 100%;
-  max-width: 460px;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0,0,0,.2);
 }
 .dv__modal-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: var(--sp-5) var(--sp-6) var(--sp-4);
   border-bottom: 1px solid var(--c-ink-100);
+  position: sticky; top: 0; background: #fff; z-index: 1;
 }
 .dv__modal-title { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); margin: 0; }
 .dv__modal-close {
@@ -538,8 +714,13 @@ function formatARS(n) {
   border-top: 1px solid var(--c-ink-100);
   padding-top: var(--sp-3);
 }
-.dv__label { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700); display: block; margin-bottom: var(--sp-1); }
-.dv__select {
+.dv__modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.dv__modal-field { display: flex; flex-direction: column; gap: var(--sp-1); }
+.dv__label { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700); }
+.dv__label-opt { font-weight: 400; color: var(--c-ink-400); }
+.dv__label-check { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-14); font-weight: 500; color: var(--c-ink-800); cursor: pointer; }
+.dv__checkbox { width: 16px; height: 16px; accent-color: var(--c-role-dispensador); cursor: pointer; }
+.dv__select, .dv__input {
   width: 100%;
   padding: .5rem var(--sp-3);
   border: 1px solid var(--c-ink-300);
@@ -547,7 +728,23 @@ function formatARS(n) {
   font-size: var(--fs-14);
   background: #fff;
   color: var(--c-ink-900);
+  box-sizing: border-box;
 }
+.dv__select:focus, .dv__input:focus { outline: none; border-color: var(--c-role-dispensador); }
+.dv__textarea {
+  width: 100%;
+  padding: .5rem var(--sp-3);
+  border: 1px solid var(--c-ink-300);
+  border-radius: var(--r-md);
+  font-size: var(--fs-14);
+  background: #fff;
+  color: var(--c-ink-900);
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.dv__textarea:focus { outline: none; border-color: var(--c-role-dispensador); }
 .dv__modal-footer {
   display: flex; gap: var(--sp-3); justify-content: flex-end;
   padding: var(--sp-4) var(--sp-6);
@@ -606,5 +803,6 @@ function formatARS(n) {
 @media (max-width: 767px) {
   .dv { flex-direction: column; }
   .dv__left { width: 100%; border-right: none; border-bottom: 1px solid var(--c-ink-300); }
+  .dv__modal-row { grid-template-columns: 1fr; }
 }
 </style>

@@ -35,6 +35,7 @@ const showModal    = ref(false)
 const editingId    = ref(null)
 const editingInase = ref(false)
 const formError    = ref(null)
+const qrOpenId     = ref(null)
 
 const search       = ref('')
 const filterTipo   = ref('')
@@ -425,16 +426,16 @@ onMounted(loadGeneticas)
                 <button class="gen-edit-btn" @click="openEdit(gen)" title="Editar">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <div v-if="gen.slug" class="dropdown">
-                  <button class="gen-edit-btn" data-bs-toggle="dropdown" title="QR público">
+                <div v-if="gen.slug" class="gen-qrdd" :class="{ 'gen-qrdd--open': qrOpenId === gen.id }">
+                  <button class="gen-edit-btn" title="QR público" @click.stop="qrOpenId = qrOpenId === gen.id ? null : gen.id">
                     <i class="bi bi-qr-code"></i>
                   </button>
-                  <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                    <li><button class="dropdown-item small py-2" @click="descargarQRsvg(gen)"><i class="bi bi-file-earmark-code me-2 text-muted"></i>SVG</button></li>
-                    <li><button class="dropdown-item small py-2" @click="descargarQRpng(gen)"><i class="bi bi-file-earmark-image me-2 text-muted"></i>PNG</button></li>
-                    <li><hr class="dropdown-divider my-1"></li>
-                    <li><a :href="`/g/${gen.slug}`" target="_blank" class="dropdown-item small py-2"><i class="bi bi-box-arrow-up-right me-2 text-muted"></i>Ver pública</a></li>
-                  </ul>
+                  <div v-if="qrOpenId === gen.id" class="gen-qrdd__menu" @mouseleave="qrOpenId=null">
+                    <button class="gen-qrdd__item" @click="descargarQRsvg(gen); qrOpenId=null"><i class="bi bi-file-earmark-code"></i> SVG</button>
+                    <button class="gen-qrdd__item" @click="descargarQRpng(gen); qrOpenId=null"><i class="bi bi-file-earmark-image"></i> PNG</button>
+                    <div class="gen-qrdd__sep"></div>
+                    <a :href="`/g/${gen.slug}`" target="_blank" class="gen-qrdd__item"><i class="bi bi-box-arrow-up-right"></i> Ver pública</a>
+                  </div>
                 </div>
                 <button
                   class="gen-edit-btn gen-edit-btn--danger"
@@ -453,20 +454,20 @@ onMounted(loadGeneticas)
     </div>
 
     <!-- ===== MODAL CREAR / EDITAR ===== -->
-    <div v-if="showModal" class="modal fade show d-block" tabindex="-1" aria-modal="true">
-      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-header">
+    <Teleport to="body">
+      <div v-if="showModal" class="gv-modal-overlay" @click.self="showModal=false">
+        <div class="gv-modal">
+          <div class="gv-modal__header">
             <div>
-              <h5 class="modal-title mb-0">{{ editingId ? 'Editar genética' : 'Nueva genética' }}</h5>
-              <span v-if="editingInase" class="small text-muted">Variedad registrada en el INASE</span>
+              <h5 class="gv-modal__title">{{ editingId ? 'Editar genética' : 'Nueva genética' }}</h5>
+              <span v-if="editingInase" class="gv-modal__subtitle">Variedad registrada en el INASE</span>
             </div>
-            <button class="btn-close" @click="showModal=false"></button>
+            <button class="gv-modal__close" @click="showModal=false"><i class="bi bi-x-lg"></i></button>
           </div>
-          <div class="modal-body">
+          <div class="gv-modal__body">
 
             <!-- Aviso INASE -->
-            <div v-if="editingInase" class="inase-notice mb-4">
+            <div v-if="editingInase" class="inase-notice gv-modal__inase-notice">
               <div class="inase-notice__icon">🏛️</div>
               <div>
                 <div class="inase-notice__title">Genética registrada en el INASE</div>
@@ -477,16 +478,16 @@ onMounted(loadGeneticas)
               </div>
             </div>
 
-            <div v-if="formError" class="alert alert-danger d-flex align-items-center gap-2 mb-3">
+            <div v-if="formError" class="gv__error gv-modal__error">
               <i class="bi bi-exclamation-triangle-fill"></i>
               <span>{{ formError }}</span>
             </div>
 
-            <div class="row g-3">
+            <div class="gv-form">
 
               <!-- Foto -->
-              <div class="col-12">
-                <label class="form-label small fw-semibold">Foto de la genética</label>
+              <div class="gv-form__field gv-form__field--full">
+                <label class="gv-form__label">Foto de la genética</label>
                 <div class="foto-uploader">
                   <div v-if="fotoPreview" class="foto-preview">
                     <img :src="fotoPreview" alt="Preview" />
@@ -496,116 +497,117 @@ onMounted(loadGeneticas)
                   </div>
                   <label v-else class="foto-placeholder" :for="`foto-input-${editingId || 'new'}`">
                     <i class="bi bi-camera" style="font-size:1.5rem;color:#94a3b8"></i>
-                    <span class="small text-muted mt-1">Subir foto</span>
+                    <span style="font-size:.78rem;color:#94a3b8;margin-top:.25rem">Subir foto</span>
                   </label>
                   <input
                     :id="`foto-input-${editingId || 'new'}`"
                     ref="fotoInput"
                     type="file"
                     accept="image/*"
-                    class="d-none"
+                    style="display:none"
                     @change="onFotoChange"
                   />
                 </div>
               </div>
 
               <!-- Nombre -->
-              <div class="col-12">
-                <label class="form-label small fw-semibold">
-                  Nombre <span class="text-danger">*</span>
+              <div class="gv-form__field gv-form__field--full">
+                <label class="gv-form__label">
+                  Nombre <span class="gv-form__req">*</span>
                   <span v-if="editingInase" class="field-lock-label">🔒 Protegido INASE</span>
                 </label>
                 <input
                   v-model.trim="form.nombre"
-                  class="form-control"
-                  :class="{ 'is-invalid': formErrors.nombre, 'field-locked': editingInase }"
+                  class="gv-form__input"
+                  :class="{ 'gv-form__input--error': formErrors.nombre, 'field-locked': editingInase }"
                   :disabled="editingInase"
                   placeholder="Ej: OG Kush, White Widow…"
                 />
-                <div class="invalid-feedback">{{ formErrors.nombre }}</div>
+                <div v-if="formErrors.nombre" class="gv-form__field-error">{{ formErrors.nombre }}</div>
               </div>
 
               <!-- Tipo -->
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">
-                  Tipo <span class="text-danger">*</span>
+              <div class="gv-form__field">
+                <label class="gv-form__label">
+                  Tipo <span class="gv-form__req">*</span>
                   <span v-if="editingInase" class="field-lock-label">🔒 Protegido</span>
                 </label>
-                <div class="d-flex flex-wrap gap-2">
+                <div class="gv-form__btn-group">
                   <button
                     v-for="(meta, key) in TIPO_META" :key="key"
-                    type="button" class="btn btn-sm"
-                    :class="form.tipo === key ? 'btn-dark' : 'btn-outline-secondary'"
-                    :style="form.tipo === key ? { background: meta.color, borderColor: meta.color } : {}"
+                    type="button"
+                    class="gv-form__tipo-btn"
+                    :style="form.tipo === key ? { background: meta.color, borderColor: meta.color, color: '#fff' } : {}"
                     :disabled="editingInase"
                     @click="!editingInase && (form.tipo = key)"
                   >{{ meta.label }}</button>
                 </div>
-                <div v-if="formErrors.tipo" class="text-danger small mt-1">{{ formErrors.tipo }}</div>
+                <div v-if="formErrors.tipo" class="gv-form__field-error">{{ formErrors.tipo }}</div>
               </div>
 
               <!-- Dificultad -->
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">Dificultad de cultivo</label>
-                <div class="d-flex gap-2">
+              <div class="gv-form__field">
+                <label class="gv-form__label">Dificultad de cultivo</label>
+                <div class="gv-form__btn-group">
                   <button
                     v-for="(meta, key) in DIFICULTAD_META" :key="key"
-                    type="button" class="btn btn-sm flex-fill"
-                    :class="form.dificultad === key ? 'btn-secondary' : 'btn-outline-secondary'"
+                    type="button"
+                    class="gv-form__tipo-btn"
+                    :class="{ 'gv-form__tipo-btn--active': form.dificultad === key }"
                     @click="form.dificultad = form.dificultad === key ? '' : key"
                   >{{ meta.icon }} {{ meta.label }}</button>
                 </div>
               </div>
 
               <!-- THC / CBD -->
-              <div class="col-md-3">
-                <label class="form-label small fw-semibold">
+              <div class="gv-form__field">
+                <label class="gv-form__label">
                   THC (%) <span v-if="editingInase" class="field-lock-label">🔒</span>
                 </label>
                 <input
                   v-model.number="form.thc" type="number" step="0.01" min="0" max="100"
-                  class="form-control"
-                  :class="{ 'is-invalid': formErrors.thc, 'field-locked': editingInase }"
+                  class="gv-form__input"
+                  :class="{ 'gv-form__input--error': formErrors.thc, 'field-locked': editingInase }"
                   :disabled="editingInase" placeholder="0.0"
                 />
-                <div class="invalid-feedback">{{ formErrors.thc }}</div>
+                <div v-if="formErrors.thc" class="gv-form__field-error">{{ formErrors.thc }}</div>
               </div>
-              <div class="col-md-3">
-                <label class="form-label small fw-semibold">
+              <div class="gv-form__field">
+                <label class="gv-form__label">
                   CBD (%) <span v-if="editingInase" class="field-lock-label">🔒</span>
                 </label>
                 <input
                   v-model.number="form.cbd" type="number" step="0.01" min="0" max="100"
-                  class="form-control"
-                  :class="{ 'is-invalid': formErrors.cbd, 'field-locked': editingInase }"
+                  class="gv-form__input"
+                  :class="{ 'gv-form__input--error': formErrors.cbd, 'field-locked': editingInase }"
                   :disabled="editingInase" placeholder="0.0"
                 />
-                <div class="invalid-feedback">{{ formErrors.cbd }}</div>
+                <div v-if="formErrors.cbd" class="gv-form__field-error">{{ formErrors.cbd }}</div>
               </div>
 
               <!-- Floración / Rendimiento / Altura -->
-              <div class="col-md-2">
-                <label class="form-label small fw-semibold">Floración (días)</label>
-                <input v-model.number="form.tiempo_floracion" type="number" min="1" class="form-control" placeholder="60" />
+              <div class="gv-form__field">
+                <label class="gv-form__label">Floración (días)</label>
+                <input v-model.number="form.tiempo_floracion" type="number" min="1" class="gv-form__input" placeholder="60" />
               </div>
-              <div class="col-md-2">
-                <label class="form-label small fw-semibold">Rendimiento (g)</label>
-                <input v-model.number="form.rendimiento" type="number" min="0" class="form-control" placeholder="450" />
+              <div class="gv-form__field">
+                <label class="gv-form__label">Rendimiento (g)</label>
+                <input v-model.number="form.rendimiento" type="number" min="0" class="gv-form__input" placeholder="450" />
               </div>
-              <div class="col-md-2">
-                <label class="form-label small fw-semibold">Altura (cm)</label>
-                <input v-model.number="form.altura" type="number" min="0" class="form-control" placeholder="120" />
+              <div class="gv-form__field">
+                <label class="gv-form__label">Altura (cm)</label>
+                <input v-model.number="form.altura" type="number" min="0" class="gv-form__input" placeholder="120" />
               </div>
 
               <!-- Criador -->
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">
+              <div class="gv-form__field gv-form__field--half">
+                <label class="gv-form__label">
                   Criador / Banco
                   <span v-if="editingInase" class="field-lock-label">🔒 Protegido</span>
                 </label>
                 <input
                   v-model.trim="form.criador"
-                  class="form-control"
+                  class="gv-form__input"
                   :class="{ 'field-locked': editingInase }"
                   :disabled="editingInase"
                   placeholder="Ej: Sweed Lab Seeds…"
@@ -613,48 +615,49 @@ onMounted(loadGeneticas)
               </div>
 
               <!-- Origen -->
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">Origen</label>
-                <input v-model.trim="form.origen" class="form-control" placeholder="Ej: Argentina, California…" />
+              <div class="gv-form__field gv-form__field--half">
+                <label class="gv-form__label">Origen</label>
+                <input v-model.trim="form.origen" class="gv-form__input" placeholder="Ej: Argentina, California…" />
               </div>
 
               <!-- Terpenos -->
-              <div class="col-12">
-                <label class="form-label small fw-semibold">Terpenos</label>
-                <input v-model.trim="form.terpenos" class="form-control" placeholder="Ej: Mirceno, Limoneno, Cariofileno…" />
+              <div class="gv-form__field gv-form__field--full">
+                <label class="gv-form__label">Terpenos</label>
+                <input v-model.trim="form.terpenos" class="gv-form__input" placeholder="Ej: Mirceno, Limoneno, Cariofileno…" />
               </div>
 
               <!-- Disponible -->
-              <div class="col-12">
-                <div class="form-check form-switch">
-                  <input v-model="form.disponible" class="form-check-input" type="checkbox" id="chkDisponible" role="switch" />
-                  <label class="form-check-label" for="chkDisponible">Disponible para cultivo</label>
-                </div>
+              <div class="gv-form__field gv-form__field--full">
+                <label class="gv-form__toggle">
+                  <input v-model="form.disponible" type="checkbox" class="gv-form__toggle-input" />
+                  <span class="gv-form__toggle-track"></span>
+                  <span class="gv-form__toggle-label">Disponible para cultivo</span>
+                </label>
               </div>
 
               <!-- Descripción -->
-              <div class="col-12">
-                <label class="form-label small fw-semibold">Descripción</label>
+              <div class="gv-form__field gv-form__field--full">
+                <label class="gv-form__label">Descripción</label>
                 <textarea
                   v-model.trim="form.descripcion"
-                  class="form-control" rows="3"
+                  class="gv-form__input gv-form__textarea"
+                  rows="3"
                   placeholder="Características, efectos, sabor, aromas…"
                 ></textarea>
               </div>
 
             </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-outline-secondary" :disabled="saving" @click="showModal=false">Cancelar</button>
-            <button class="btn btn-success px-4" :disabled="saving" @click="handleSubmit">
-              <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
+          <div class="gv-modal__footer">
+            <button class="gv__btn-ghost" :disabled="saving" @click="showModal=false">Cancelar</button>
+            <button class="gv__btn-new" :disabled="saving" @click="handleSubmit">
+              <span v-if="saving" class="gv-modal__spinner"></span>
               {{ editingId ? 'Guardar cambios' : 'Crear genética' }}
             </button>
           </div>
         </div>
       </div>
-    </div>
-    <div v-if="showModal" class="modal-backdrop fade show" @click="showModal=false"></div>
+    </Teleport>
 
 
   </div>
@@ -760,6 +763,13 @@ onMounted(loadGeneticas)
 .field-lock-label { font-size: .68rem; color: #9ca3af; font-weight: 400; margin-left: .25rem; }
 .field-locked { background-color: #f9fafb !important; color: #9ca3af !important; cursor: not-allowed; border-color: #e5e7eb !important; }
 
+/* Table QR dropdown */
+.gen-qrdd { position: relative; }
+.gen-qrdd__menu { position: absolute; right: 0; top: calc(100% + .25rem); background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.1); min-width: 160px; z-index: 200; padding: .3rem; }
+.gen-qrdd__item { display: flex; align-items: center; gap: .45rem; padding: .45rem .7rem; font-size: .8rem; color: #374151; cursor: pointer; border-radius: 7px; text-decoration: none; background: none; border: none; width: 100%; transition: background .1s; }
+.gen-qrdd__item:hover { background: #f8fafc; }
+.gen-qrdd__sep  { height: 1px; background: #f1f5f9; margin: .25rem 0; }
+
 /* Foto uploader */
 .foto-uploader { display: flex; align-items: center; gap: 1rem; }
 .foto-preview { position: relative; width: 120px; height: 90px; border-radius: 10px; overflow: hidden; border: 1.5px solid #e5e7eb; }
@@ -767,4 +777,55 @@ onMounted(loadGeneticas)
 .foto-remove { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,.6); color: white; border: none; display: flex; align-items: center; justify-content: center; font-size: .65rem; cursor: pointer; }
 .foto-placeholder { width: 120px; height: 90px; border-radius: 10px; border: 1.5px dashed #d1d5db; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: border-color .15s; }
 .foto-placeholder:hover { border-color: #1b5e20; }
+
+/* DS Modal */
+.gv-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.gv-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 680px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.gv-modal__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+.gv-modal__title    { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0; }
+.gv-modal__subtitle { font-size: .78rem; color: #64748b; display: block; margin-top: .1rem; }
+.gv-modal__close    { background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 1rem; padding: .2rem; border-radius: 6px; transition: all .15s; flex-shrink: 0; }
+.gv-modal__close:hover { background: #f1f5f9; color: #475569; }
+.gv-modal__body  { overflow-y: auto; padding: 1.25rem 1.5rem; flex: 1; }
+.gv-modal__footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; flex-shrink: 0; }
+.gv-modal__inase-notice { margin-bottom: 1.25rem; }
+.gv-modal__error { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+.gv-modal__spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+
+/* Form inside modal */
+.gv-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .875rem; }
+.gv-form__field { display: flex; flex-direction: column; gap: .3rem; }
+.gv-form__field--full { grid-column: 1 / -1; }
+.gv-form__field--half { grid-column: span 1; }
+@media (max-width: 560px) { .gv-form { grid-template-columns: 1fr; } .gv-form__field--full, .gv-form__field--half { grid-column: 1; } }
+.gv-form__label     { font-size: .8rem; font-weight: 600; color: #374151; }
+.gv-form__req       { color: #dc2626; }
+.gv-form__input     { padding: .5rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; color: #1e293b; background: #fff; outline: none; transition: border-color .15s; width: 100%; box-sizing: border-box; }
+.gv-form__input:focus { border-color: #1a3d2e; }
+.gv-form__input--error { border-color: #ef4444; }
+.gv-form__textarea  { resize: vertical; min-height: 80px; }
+.gv-form__field-error { font-size: .75rem; color: #ef4444; }
+
+/* Tipo / dificultad buttons */
+.gv-form__btn-group  { display: flex; flex-wrap: wrap; gap: .35rem; }
+.gv-form__tipo-btn   { padding: .35rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 7px; font-size: .78rem; font-weight: 500; background: #fff; color: #374151; cursor: pointer; transition: all .15s; }
+.gv-form__tipo-btn:hover:not(:disabled)    { border-color: #94a3b8; }
+.gv-form__tipo-btn--active { background: #1a3d2e; border-color: #1a3d2e; color: #fff; }
+.gv-form__tipo-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Toggle switch */
+.gv-form__toggle       { display: inline-flex; align-items: center; gap: .65rem; cursor: pointer; }
+.gv-form__toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
+.gv-form__toggle-track {
+  width: 40px; height: 22px; border-radius: 11px; background: #e2e8f0;
+  position: relative; transition: background .2s; flex-shrink: 0;
+}
+.gv-form__toggle-track::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.gv-form__toggle-input:checked + .gv-form__toggle-track { background: #1a3d2e; }
+.gv-form__toggle-input:checked + .gv-form__toggle-track::after { transform: translateX(18px); }
+.gv-form__toggle-label { font-size: .875rem; color: #374151; }
 </style>

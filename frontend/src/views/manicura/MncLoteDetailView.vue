@@ -19,10 +19,10 @@
           <p class="mnl__sub">{{ lote.genetica?.nombre }} · {{ lote.sala?.nombre }}</p>
         </div>
         <div class="mnl__header-actions">
-          <span class="mnl__badge" :class="lote.estado === 'secado' ? 'mnl__badge--secado' : 'mnl__badge--pendiente'">
-            {{ lote.estado === 'secado' ? 'Secado' : 'Pdte. aprobación' }}
+          <span class="mnl__badge" :class="['en_manicura','secado'].includes(lote.estado) ? 'mnl__badge--secado' : 'mnl__badge--pendiente'">
+            {{ lote.estado === 'manicura_pendiente' ? 'Pdte. aprobación' : 'Asignado' }}
           </span>
-          <button v-if="lote.estado === 'secado'" class="mnl__btn-primary" @click="abrirModal">
+          <button v-if="['en_manicura','secado'].includes(lote.estado)" class="mnl__btn-primary" @click="abrirModal">
             <Scale :size="14" :stroke-width="2" /> Registrar por lote
           </button>
         </div>
@@ -89,7 +89,7 @@
       </div>
 
       <!-- Submit footer (per-plant flow) -->
-      <div v-if="lote.estado === 'secado' && pesadas > 0" class="mnl__footer">
+      <div v-if="['en_manicura','secado'].includes(lote.estado) && pesadas > 0" class="mnl__footer">
         <p class="mnl__footer-hint">
           {{ pesadas }} planta{{ pesadas !== 1 ? 's' : '' }} con peso registrado · {{ totalGramos }}g total
         </p>

@@ -20,6 +20,7 @@ const saving        = ref(false)
 
 const pendientes = computed(() => paquetes.value.filter(p => p.estado_envio === 'pendiente'))
 const enViaje    = computed(() => paquetes.value.filter(p => p.estado_envio === 'en_viaje'))
+const fallidos   = computed(() => paquetes.value.filter(p => p.estado_envio === 'fallido'))
 const activos    = computed(() => [...pendientes.value, ...enViaje.value])
 
 const todosSeleccionados = computed(() =>
@@ -139,6 +140,10 @@ onMounted(load)
           <span class="dlv__stat-n dlv__stat-n--green">{{ paquetes.filter(p => p.estado_envio === 'entregado').length }}</span>
           <span class="dlv__stat-l">Entregados</span>
         </div>
+        <div v-if="fallidos.length" class="dlv__stat dlv__stat--alert">
+          <span class="dlv__stat-n dlv__stat-n--red">{{ fallidos.length }}</span>
+          <span class="dlv__stat-l">Fallidos</span>
+        </div>
       </div>
 
       <!-- Barra "iniciar viaje" -->
@@ -235,6 +240,28 @@ onMounted(load)
               <button class="dlv__btn-fallo" @click.stop="abrirFallo(p)">
                 <XCircle :size="14" :stroke-width="2" /> Problema
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fallidos -->
+      <div v-if="fallidos.length" class="dlv__section dlv__section--fallidos">
+        <div class="dlv__section-title dlv__section-title--red">
+          <XCircle :size="13" :stroke-width="2" /> No entregados — pendientes de reprogramación por el admin
+        </div>
+        <div class="dlv__list">
+          <div v-for="p in fallidos" :key="p.id" class="dlv__row dlv__row--fallido">
+            <div class="dlv__row-body">
+              <div class="dlv__row-top">
+                <span class="dlv__pkg-code">{{ p.codigo_paquete }}</span>
+                <span class="dlv__badge dlv__badge--fallido">No entregado</span>
+              </div>
+              <div class="dlv__row-nombre"><User :size="12" :stroke-width="2" /> {{ p.paciente?.nombre }}</div>
+              <div class="dlv__row-dir"><MapPin :size="12" :stroke-width="2" /> {{ p.direccion_envio }}</div>
+              <div v-if="p.motivo_fallo" class="dlv__row-motivo">
+                <XCircle :size="12" :stroke-width="2" /> {{ p.motivo_fallo }}
+              </div>
             </div>
           </div>
         </div>
@@ -372,6 +399,13 @@ onMounted(load)
 .dlv__btn-entregar:hover { background: var(--c-leaf-300); }
 .dlv__btn-fallo { display: inline-flex; align-items: center; gap: var(--sp-1); background: var(--c-rust-100); color: var(--c-rust-600); border: none; padding: .45rem .75rem; border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; cursor: pointer; white-space: nowrap; transition: background var(--t-fast); }
 .dlv__btn-fallo:hover { background: #fecaca; }
+.dlv__stat--alert { border-color: #fecaca; background: #fff5f5; }
+.dlv__stat-n--red { color: #dc2626; }
+.dlv__section--fallidos { opacity: .85; }
+.dlv__section-title--red { color: #dc2626; display: flex; align-items: center; gap: .3rem; }
+.dlv__row--fallido { border-color: #fecaca; background: #fff5f5; opacity: .9; }
+.dlv__badge--fallido { background: #fee2e2; color: #dc2626; }
+.dlv__row-motivo { display: flex; align-items: flex-start; gap: var(--sp-1); font-size: var(--fs-13); color: #dc2626; margin-bottom: .2rem; font-style: italic; }
 
 /* Modal */
 .dlv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }

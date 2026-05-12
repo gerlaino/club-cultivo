@@ -32,9 +32,11 @@ RSpec.describe 'Ola 5 — AlertasInternas', type: :request do
   context 'médico GET /alertas_internas' do
     before { sign_in_as(medico) }
 
-    it 'devuelve 403' do
+    it 'devuelve 200 con alertas filtradas a su rol' do
       get '/alertas_internas', headers: auth_headers
-      expect(response).to have_http_status(:forbidden)
+      expect(response).to have_http_status(:ok)
+      body = JSON.parse(response.body)
+      expect(body).to have_key('data')
     end
   end
 

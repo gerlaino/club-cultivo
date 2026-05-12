@@ -4,7 +4,7 @@
     <!-- ── BIENVENIDA ──────────────────────────────────────────── -->
     <div class="svd__header">
       <div class="svd__header-text">
-        <h1 class="svd__saludo">Buenos días, {{ auth.user?.first_name }}</h1>
+        <h1 class="svd__saludo">{{ saludo }}, {{ auth.user?.first_name }}</h1>
         <span class="svd__sub">Supervisando {{ sedes.length }} sede{{ sedes.length !== 1 ? 's' : '' }}</span>
       </div>
     </div>
@@ -86,6 +86,9 @@ import { useAuthStore } from '../../stores/auth.js'
 import api from '../../lib/api.js'
 
 const auth = useAuthStore()
+
+const hora   = new Date().getHours()
+const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
 
 const loading = ref(true)
 const error   = ref(null)

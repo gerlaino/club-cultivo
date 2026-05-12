@@ -102,9 +102,8 @@ export const useAuthStore = defineStore("auth", {
         delete api.defaults.headers.common['Authorization'];
         const { planData } = usePlan();
         planData.value = null;
-        const { default: router } = await import("../router");
-        router.push({ name: "login" });
-        this.loading = false;
+        // Hard reload limpia todos los stores de Pinia, evitando filtraciones entre clubs
+        window.location.href = '/login';
       }
     },
 

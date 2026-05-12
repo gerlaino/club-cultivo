@@ -1,22 +1,22 @@
 class AlertasInternasController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_admin!
   before_action :set_alerta, only: [:marcar_leida]
 
   def index
     page  = (params[:pagina] || 1).to_i
     limit = (params[:limite] || 20).to_i
 
-    alertas = current_user.club.alertas_internas.recientes
+    alertas = scoped_alertas.recientes
     alertas = alertas.no_leidas if params[:solo_no_leidas].present?
 
-    total   = alertas.count
-    alertas = alertas.offset((page - 1) * limit).limit(limit)
+    total          = alertas.count
+    no_leidas_base = scoped_alertas.no_leidas
+    alertas        = alertas.offset((page - 1) * limit).limit(limit)
 
     render json: {
       data: alertas.map { |a| serialize(a) },
       meta: { pagina: page, limite: limit, total: total,
-              no_leidas: current_user.club.alertas_internas.no_leidas.count }
+              no_leidas: no_leidas_base.count }
     }
   end
 
@@ -25,16 +25,24 @@ class AlertasInternasController < ApplicationController
     render json: serialize(@alerta)
   end
 
-  private
-
-  def set_alerta
-    @alerta = current_user.club.alertas_internas.find(params[:id])
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Alerta no encontrada' }, status: :not_found
+  def marcar_todas_leidas
+    scoped_alertas.no_leidas.update_all(leida_at: Time.current)
+    render json: { ok: true }
   end
 
-  def require_admin!
-    render json: { error: 'No autorizado' }, status: :forbidden unless current_user&.admin?
+  private
+
+  def scoped_alertas
+    return AlertaInterna.none unless current_user.club
+    base = current_user.club.alertas_internas
+    return base if current_user.admin?
+    base.where(destinada_a_role: current_user.role)
+  end
+
+  def set_alerta
+    @alerta = scoped_alertas.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Alerta no encontrada' }, status: :not_found
   end
 
   def serialize(a)

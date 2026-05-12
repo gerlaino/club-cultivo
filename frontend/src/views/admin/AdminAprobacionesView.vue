@@ -7,7 +7,7 @@
         Administración
       </div>
       <h1 class="av__title">Aprobaciones de manicura</h1>
-      <p class="av__sub">Lotes procesados por manicura que esperan tu revisión antes de pasar a curado.</p>
+      <p class="av__sub">Lotes procesados por manicura. Confirmá el peso, elegí la sede y generá el stock.</p>
     </div>
 
     <div v-if="loading" class="av__loading">
@@ -36,8 +36,11 @@
             <span v-if="lote.genetica"><Leaf :size="13" :stroke-width="2" /> {{ lote.genetica.nombre }}</span>
             <span><MapPin :size="13" :stroke-width="2" /> {{ lote.sala?.nombre }}</span>
             <span><Package :size="13" :stroke-width="2" /> {{ lote.plants_count }} plantas</span>
+            <span v-if="lote.manicurador" class="av__manicurador">
+              <Scissors :size="13" :stroke-width="2" /> {{ lote.manicurador.nombre }}
+            </span>
           </div>
-          <!-- Última pesada de manicura -->
+          <!-- Pesada registrada por el manicurador -->
           <div v-if="lote.ultima_pesada_manicura" class="av__pesada">
             <Scale :size="13" :stroke-width="2" />
             <strong>{{ lote.ultima_pesada_manicura.peso_seco_g }}g</strong>
@@ -57,7 +60,13 @@
           <button class="av__btn-danger" @click="abrirRechazo(lote)">
             <XCircle :size="14" :stroke-width="2" /> Rechazar
           </button>
-          <button class="av__btn-success" :disabled="aprobando === lote.id" @click="aprobar(lote)">
+          <!-- Nuevo flujo: abre modal con sede + peso -->
+          <button v-if="lote.manicurador_id" class="av__btn-success" @click="abrirAprobacion(lote)">
+            <PackageCheck :size="14" :stroke-width="2" />
+            Aprobar y finalizar
+          </button>
+          <!-- Legacy: aprobación directa → curado -->
+          <button v-else class="av__btn-success" :disabled="aprobando === lote.id" @click="aprobarLegacy(lote)">
             <div v-if="aprobando === lote.id" class="av__spinner"></div>
             <CheckCircle v-else :size="14" :stroke-width="2" />
             Aprobar
@@ -118,25 +127,105 @@
       </Transition>
     </Teleport>
 
+    <!-- Modal aprobar y finalizar (nuevo flujo) -->
+    <Teleport to="body">
+      <Transition name="av-fade">
+        <div v-if="modalAprobacion" class="av-overlay" @click.self="cerrarAprobacion">
+          <div class="av-modal" role="dialog" aria-modal="true">
+
+            <div class="av-modal__header">
+              <div class="av-modal__ico av-modal__ico--green">
+                <PackageCheck :size="20" :stroke-width="1.75" />
+              </div>
+              <div>
+                <h2 class="av-modal__title">Aprobar y generar stock</h2>
+                <p class="av-modal__sub">Lote <strong>{{ loteAprobacion?.codigo }}</strong></p>
+              </div>
+              <button class="av-modal__close" @click="cerrarAprobacion"><X :size="18" :stroke-width="2" /></button>
+            </div>
+
+            <form class="av-modal__body" @submit.prevent="confirmarAprobacion">
+
+              <div class="av-field">
+                <label class="av-label">Peso seco confirmado (g) <span class="av-req">*</span></label>
+                <input
+                  v-model.number="aprobForm.peso_seco_g"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  class="av-input"
+                  required
+                />
+                <span class="av-hint">Registrado por manicura: {{ loteAprobacion?.ultima_pesada_manicura?.peso_seco_g }}g. Editá si corresponde.</span>
+              </div>
+
+              <div class="av-field">
+                <label class="av-label">Sede destino <span class="av-req">*</span></label>
+                <select v-model="aprobForm.sede_id" class="av-select" required>
+                  <option value="">Seleccioná una sede…</option>
+                  <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }} ({{ s.tipo }})</option>
+                </select>
+              </div>
+
+              <div class="av-field">
+                <label class="av-label">Forma del producto</label>
+                <select v-model="aprobForm.forma_producto" class="av-select">
+                  <option value="flor_seca">Flor seca</option>
+                  <option value="hash">Hash</option>
+                  <option value="aceite">Aceite</option>
+                  <option value="tintura">Tintura</option>
+                  <option value="prensado">Prensado</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+
+              <div v-if="aprobError" class="av-error">
+                <AlertCircle :size="15" :stroke-width="2" /> {{ aprobError }}
+              </div>
+
+              <div class="av-actions">
+                <button type="button" class="av-btn-cancel" @click="cerrarAprobacion">Cancelar</button>
+                <button type="submit" class="av-btn-success-solid" :disabled="aprobando !== null">
+                  <div v-if="aprobando" class="av-spinner"></div>
+                  <PackageCheck v-else :size="15" :stroke-width="2" />
+                  Confirmar y generar stock
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { ClipboardCheck, Clock, Leaf, MapPin, Package, Scale, Eye, CheckCircle, XCircle, X, AlertCircle } from 'lucide-vue-next'
-import { listLotes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
+import { ClipboardCheck, Clock, Leaf, MapPin, Package, Scale, Eye, CheckCircle, XCircle, X, AlertCircle, Scissors, PackageCheck } from 'lucide-vue-next'
+import { listLotes, listSedes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast = useToast()
-const lotes = ref([])
+const lotes   = ref([])
+const sedes   = ref([])
 const loading = ref(true)
 const aprobando = ref(null)
 
-const modalRechazo = ref(false)
-const loteRechazo = ref(null)
+// Modal rechazo
+const modalRechazo  = ref(false)
+const loteRechazo   = ref(null)
 const motivoRechazo = ref('')
-const rechazando = ref(false)
-const rechazoError = ref('')
+const rechazando    = ref(false)
+const rechazoError  = ref('')
+
+// Modal aprobación (nuevo flujo)
+const modalAprobacion = ref(false)
+const loteAprobacion  = ref(null)
+const aprobForm = ref({ peso_seco_g: null, sede_id: '', forma_producto: 'flor_seca' })
+const aprobError = ref('')
 
 function fmtDate(d) {
   if (!d) return '—'
@@ -146,8 +235,12 @@ function fmtDate(d) {
 async function cargar() {
   loading.value = true
   try {
-    const { data } = await listLotes({ estado: 'manicura_pendiente' })
-    lotes.value = data
+    const [lotesRes, sedesRes] = await Promise.all([
+      listLotes({ estado: 'manicura_pendiente' }),
+      listSedes(),
+    ])
+    lotes.value = lotesRes.data || []
+    sedes.value = sedesRes.data?.sedes || sedesRes.data || []
   } catch {
     lotes.value = []
   } finally {
@@ -155,7 +248,45 @@ async function cargar() {
   }
 }
 
-async function aprobar(lote) {
+// Nuevo flujo: abre modal con sede + peso
+function abrirAprobacion(lote) {
+  loteAprobacion.value = lote
+  aprobForm.value = {
+    peso_seco_g:    lote.ultima_pesada_manicura?.peso_seco_g ?? null,
+    sede_id:        '',
+    forma_producto: 'flor_seca',
+  }
+  aprobError.value  = ''
+  modalAprobacion.value = true
+}
+
+function cerrarAprobacion() {
+  modalAprobacion.value = false
+  loteAprobacion.value  = null
+}
+
+async function confirmarAprobacion() {
+  if (!aprobForm.value.sede_id) { aprobError.value = 'Seleccioná una sede'; return }
+  aprobando.value = loteAprobacion.value.id
+  aprobError.value = ''
+  try {
+    await aprobarManicura(loteAprobacion.value.id, {
+      sede_id:        aprobForm.value.sede_id,
+      peso_seco_g:    aprobForm.value.peso_seco_g,
+      forma_producto: aprobForm.value.forma_producto,
+    })
+    toast.success(`Lote ${loteAprobacion.value.codigo} finalizado — stock generado`)
+    cerrarAprobacion()
+    cargar()
+  } catch (e) {
+    aprobError.value = e.response?.data?.error || 'Error al aprobar'
+  } finally {
+    aprobando.value = null
+  }
+}
+
+// Legacy: aprobación directa → curado
+async function aprobarLegacy(lote) {
   aprobando.value = lote.id
   try {
     await aprobarManicura(lote.id)
@@ -171,13 +302,13 @@ async function aprobar(lote) {
 function abrirRechazo(lote) {
   loteRechazo.value = lote
   motivoRechazo.value = ''
-  rechazoError.value = ''
-  modalRechazo.value = true
+  rechazoError.value  = ''
+  modalRechazo.value  = true
 }
 
 function cerrarRechazo() {
   modalRechazo.value = false
-  loteRechazo.value = null
+  loteRechazo.value  = null
 }
 
 async function confirmarRechazo() {
@@ -186,7 +317,8 @@ async function confirmarRechazo() {
   rechazoError.value = ''
   try {
     await rechazarManicura(loteRechazo.value.id, motivoRechazo.value.trim())
-    toast.success(`Lote ${loteRechazo.value.codigo} rechazado — vuelve a secado`)
+    const destino = loteRechazo.value.manicurador_id ? 'vuelve a cosecha' : 'vuelve a secado'
+    toast.success(`Lote ${loteRechazo.value.codigo} rechazado — ${destino}`)
     cerrarRechazo()
     cargar()
   } catch (e) {
@@ -369,4 +501,24 @@ onMounted(cargar)
 
 .av-fade-enter-active, .av-fade-leave-active { transition: opacity .2s; }
 .av-fade-enter-from, .av-fade-leave-to { opacity: 0; }
+
+.av__manicurador { color: var(--c-leaf-700); font-weight: 500; }
+.av-modal__ico--green { background: #dcfce7; color: var(--c-leaf-700); }
+.av-btn-success-solid {
+  display: flex; align-items: center; gap: var(--sp-2);
+  background: var(--c-leaf-700); color: #fff;
+  border: none; padding: var(--sp-2) var(--sp-5);
+  border-radius: var(--r-md); font-size: var(--fs-14); font-weight: 600;
+  cursor: pointer; transition: opacity var(--t-fast);
+}
+.av-btn-success-solid:hover:not(:disabled) { opacity: .88; }
+.av-btn-success-solid:disabled { opacity: .5; cursor: not-allowed; }
+.av-input, .av-select {
+  width: 100%; border: 1.5px solid var(--c-ink-200);
+  border-radius: var(--r-md); padding: .5rem .75rem;
+  font-size: var(--fs-14); color: var(--c-ink-900);
+  background: var(--c-paper);
+}
+.av-input:focus, .av-select:focus { outline: none; border-color: var(--c-leaf-600); }
+.av-hint { font-size: 12px; color: var(--c-ink-400); margin-top: 2px; display: block; }
 </style>

@@ -276,7 +276,7 @@
   </Teleport>
 
   <!-- Sheet registrar lectura -->
-  <RegistrarLecturaSheet v-model="lecturaOpen" />
+  <RegistrarLecturaSheet v-model="lecturaOpen" :sala-id-inicial="lecturaSalaId" />
 </template>
 
 <script setup>
@@ -317,6 +317,7 @@ useAlertasBell()
 
 const loading      = ref(true)
 const lecturaOpen  = ref(false)
+const lecturaSalaId = ref(null)
 const semana       = ref({ desde: null, hasta: null, dias: [] })
 const loadingSem   = ref(false)
 const tareaDetalle = ref(null)
@@ -472,7 +473,10 @@ async function revertirTarea() {
   } finally { guardandoAccion.value = false }
 }
 
-function onRegistrarDesdeSala() { lecturaOpen.value = true }
+function onRegistrarDesdeSala(sala) {
+  lecturaSalaId.value = sala?.id ?? null
+  lecturaOpen.value = true
+}
 
 // ── Escape panel ──────────────────────────────────────────────
 function panelEscapeHandler(e) {

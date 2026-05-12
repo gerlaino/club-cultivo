@@ -121,7 +121,19 @@ export const getPaciente        = (id) => api.get(`/pacientes/${id}`);
 export const createPaciente     = (payload) => api.post("/pacientes", { paciente: payload });
 export const updatePaciente     = (id, payload) => api.put(`/pacientes/${id}`, { paciente: payload });
 export const deletePaciente     = (id) => api.delete(`/pacientes/${id}`);
-export const getPacienteTimeline = (id) => api.get(`/pacientes/${id}/timeline`)
+export const getPacienteTimeline  = (id) => api.get(`/pacientes/${id}/timeline`)
+export const subirReprocannDoc   = (id, file) => {
+  const fd = new FormData()
+  fd.append('archivo', file)
+  return api.post(`/pacientes/${id}/subir_reprocann`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+export const eliminarReprocannDoc = (id) => api.delete(`/pacientes/${id}/eliminar_reprocann`)
+
+export const listReprocannRenovaciones   = (pacienteId) => api.get(`/pacientes/${pacienteId}/reprocann_renovaciones`)
+export const createReprocannRenovacion   = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/reprocann_renovaciones`, payload)
+export const updateReprocannRenovacion   = (pacienteId, id, payload) => api.put(`/pacientes/${pacienteId}/reprocann_renovaciones/${id}`, payload)
+export const deleteReprocannRenovacion   = (pacienteId, id) => api.delete(`/pacientes/${pacienteId}/reprocann_renovaciones/${id}`)
+
 export const listPacienteNotas  = (pacienteId) => api.get(`/pacientes/${pacienteId}/notas`);
 export const createPacienteNota = (pacienteId, c) => api.post(`/pacientes/${pacienteId}/notas`, { nota: { contenido: c } });
 export const deletePacienteNota = (notaId) => api.delete(`/paciente_notas/${notaId}`);
@@ -151,6 +163,7 @@ export const toggleGramosCC      = (pacienteId)          => api.patch(`/paciente
 export const setLimiteGCC        = (pacienteId, g)       => api.patch(`/pacientes/${pacienteId}/cuenta_corriente/set_limite_g`, { limite_credito_g: g })
 export const cargarGCC           = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/cargar_g`, payload)
 
+export const exportPacientesCSV  = (params = {}) => api.get('/pacientes/export_csv', { params, responseType: 'blob' })
 export const listDispensaciones = (pacienteId) => api.get(`/pacientes/${pacienteId}/dispensaciones`);
 export const listDispensacionesFecha = (params = {}) => api.get('/dispensaciones', { params });
 export const getDispensacion = (id) => api.get(`/dispensaciones/${id}`);
@@ -159,11 +172,15 @@ export const updateDispensacion = (id, payload) => api.put(`/dispensaciones/${id
 export const deleteDispensacion = (id) => api.delete(`/dispensaciones/${id}`);
 
 // ── Delivery ──────────────────────────────────────────────────────────────────
+export const exportDispensacionesCSV = (params = {}) => api.get('/dispensaciones/export_csv', { params, responseType: 'blob' })
 export const getMisPaquetes   = ()                  => api.get('/dispensaciones/mis_paquetes')
 export const iniciarViaje     = (ids)               => api.patch('/dispensaciones/iniciar_viaje', { ids })
 export const entregarPaquete  = (id, notasEntrega)  => api.patch(`/dispensaciones/${id}/entregar`, { notas_entrega: notasEntrega })
 export const reportarFallo    = (id, motivoFallo)   => api.patch(`/dispensaciones/${id}/reportar_fallo`, { motivo_fallo: motivoFallo })
+export const reprogramarPaquete = (id)             => api.patch(`/dispensaciones/${id}/reprogramar`)
 export const listDeliveryUsers = ()                 => api.get('/usuarios', { params: { role: 'delivery' } })
+export const listDespachos     = (params = {})      => api.get('/dispensaciones', { params: { con_envio: 'true', ...params } })
+export const reasignarDelivery = (id, deliveryId)  => api.patch(`/dispensaciones/${id}`, { dispensacion: { delivery_id: deliveryId } })
 
 // -------- USUARIOS (equipo del club) --------
 export const listUsers         = (params = {}) => api.get('/usuarios', { params });
@@ -218,8 +235,9 @@ export const aprobarMovimiento      = (id)            => api.post(`/inventario/a
 export const rechazarMovimiento     = (id, motivo)    => api.post(`/inventario/rechazar/${id}`, { motivo })
 
 // ── Aprobación manicura ───────────────────────────────────────────────────────
-export const aprobarManicura  = (loteId, observaciones) => api.post(`/lotes/${loteId}/aprobar_manicura`, { observaciones })
-export const rechazarManicura = (loteId, motivo)        => api.post(`/lotes/${loteId}/rechazar_manicura`, { motivo })
+export const aprobarManicura    = (loteId, payload = {}) => api.post(`/lotes/${loteId}/aprobar_manicura`, payload)
+export const rechazarManicura   = (loteId, motivo)       => api.post(`/lotes/${loteId}/rechazar_manicura`, { motivo })
+export const asignarManicurador = (loteId, manicuradorId) => api.post(`/lotes/${loteId}/asignar_manicurador`, { manicurador_id: manicuradorId })
 
 // -------- PLAN --------
 export const getPlan = () => api.get('/plan')
@@ -232,6 +250,7 @@ export const createMovimiento       = (payload)      => api.post('/movimientos_c
 export const updateMovimiento       = (id, payload)  => api.put(`/movimientos_contables/${id}`, { movimiento_contable: payload })
 export const deleteMovimiento       = (id)           => api.delete(`/movimientos_contables/${id}`)
 export const exportMovimientosCSV   = (params = {})  => api.get('/movimientos_contables/export_csv', { params, responseType: 'blob' })
+export const exportLotesCSV         = (params = {})  => api.get('/lotes/export_csv', { params, responseType: 'blob' })
 
 // ── Costo por lote ────────────────────────────────────────────────────────────
 export const getCostoLote    = (loteId)           => api.get(`/lotes/${loteId}/costo`)
@@ -360,7 +379,32 @@ export const createLecturaAmbiental = (salaId, payload) => api.post(`/salas/${sa
 export const listStocks           = (params = {})         => api.get('/stocks', { params })
 export const listStocksPendientes = ()                    => api.get('/stocks', { params: { pendientes: true } })
 export const createStock          = (payload)             => api.post('/stocks', { stock: payload })
+export const updateStock          = (id, payload)         => api.patch(`/stocks/${id}`, { stock: payload })
 export const asignarStock         = (id, payload)         => api.post(`/stocks/${id}/asignar`, payload)
 export const getSedeStocks        = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/stocks`, { params })
+export const getStockTrazabilidad = (id)                  => api.get(`/stocks/${id}/trazabilidad`)
+
+// ── ARICCAME ──────────────────────────────────────────────────────────────────
+export const listAriccameRegistros = (params = {}) => api.get('/ariccame_registros', { params })
+export const getAriccameRegistro   = (id)          => api.get(`/ariccame_registros/${id}`)
+
+// ── Público — QR stocks ───────────────────────────────────────────────────────
+export const getStockPublico = (codigoQr) => axios.get(`/s/${codigoQr}`)
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+export const getAnalyticsRendimiento = () => api.get('/analytics/rendimiento_genetica')
+export const getAnalyticsDispensador = () => api.get('/analytics/dispensador')
+export const getAnalyticsProduccion  = () => api.get('/analytics/produccion')
+
+// ── Benchmark ────────────────────────────────────────────────────────────────
+export const getBenchmark = () => api.get('/benchmark')
+
+// ── Alertas internas ──────────────────────────────────────────────────────────
+export const getAlertasInternas       = (params = {}) => api.get('/alertas_internas', { params })
+export const marcarAlertaInterna      = (id)          => api.patch(`/alertas_internas/${id}/marcar_leida`)
+export const marcarTodasAlertasLeidas = ()            => api.patch('/alertas_internas/marcar_todas_leidas')
+
+// ── Carnet público ────────────────────────────────────────────────────────────
+export const getCarnetPublico = (token) => axios.get(`/c/${token}`)
 
 export default api;

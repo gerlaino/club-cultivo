@@ -258,7 +258,7 @@ async function guardarRegistro() {
   }
 }
 
-function onRegistradoPorVoz() { loadEventos(); graficosKey.value++ }
+function onRegistradoPorVoz() { lotes.fetchOne(id); loadEventos(); graficosKey.value++ }
 
 // ── Historial ─────────────────────────────────────────────
 const eventos        = ref([])
@@ -269,6 +269,7 @@ const showTransicionModal = ref(false)
 const savingTransicion    = ref(false)
 const transicionError     = ref(null)
 const transicionForm      = ref({ peso_humedo_g: null, peso_seco_g: null, manicurado: false, notas: '' })
+const transicionSalaId    = ref(null)
 
 // ── Avanzar fase: elegir sala destino ─────────────────────
 const showAvanzarSalaModal = ref(false)
@@ -300,10 +301,10 @@ function onCosechadoParcial(loteActualizado) {
   // Patch inmediato: sincroniza estados desde la respuesta para evitar flash de estado viejo
   if (loteActualizado.plants?.length) {
     const stateById = Object.fromEntries(loteActualizado.plants.map(p => [p.id, p.state]))
-    const current = plants.itemsByLote.get(String(id)) || []
-    plants.itemsByLote.set(String(id), current.map(p =>
+    const current = plants.itemsByLote[String(id)] || []
+    plants.itemsByLote[String(id)] = current.map(p =>
       p.id in stateById ? { ...p, state: stateById[p.id] } : p
-    ))
+    )
   }
   showCosechaPartialModal.value = false
   toast.success('Cosecha registrada')
@@ -359,6 +360,7 @@ function toggleFotos() {
 function openTransicionModal() {
   transicionForm.value = { peso_humedo_g: null, peso_seco_g: null, manicurado: false, notas: '' }
   transicionError.value = null
+  transicionSalaId.value = lote.value?.sala_id ?? null
   showTransicionModal.value = true
 }
 
@@ -366,10 +368,9 @@ const transicionandoRapido = ref(false)
 
 async function handleAvanzarFase() {
   if (lote.value?.proxima_fase_posible === 'cosecha') {
-    // Ensure plants are loaded before deciding which modal to use.
     // Race condition: lotes.fetchOne completes before plants.fetchByLote,
     // so plantList can be empty even when the lote has registered plants.
-    if (!plants.itemsByLote.has(String(id))) {
+    if (!plants.itemsByLote[String(id)]) {
       try { await plants.fetchByLote(id) } catch {}
     }
     if (plantList.value.length > 0) {
@@ -377,17 +378,12 @@ async function handleAvanzarFase() {
     } else {
       cosechaForm.value = { plantas_cosechadas: lote.value.plants_count || null, notas: '' }
       cosechaError.value = null
-      cosechaSalaId.value = null
+      cosechaSalaId.value = lote.value?.sala_id ?? null
       showCosechaModal.value = true
     }
   } else if (isCultivador.value) {
-    const salas = lote.value?.salas_destino || []
-    if (salas.length > 1) {
-      avanzarSalaId.value = null
-      showAvanzarSalaModal.value = true
-    } else {
-      avanzarFaseRapido(salas.length === 1 ? salas[0].id : null)
-    }
+    avanzarSalaId.value = lote.value?.sala_id ?? null
+    showAvanzarSalaModal.value = true
   } else {
     openTransicionModal()
   }
@@ -446,7 +442,7 @@ async function ejecutarTransicion() {
     }
     if (faseSig === 'curado') pesada.peso_seco_g = transicionForm.value.peso_seco_g
     if (transicionForm.value.notas) pesada.notas = transicionForm.value.notas
-    const { data } = await transicionarLote(id, { nueva_fase: faseSig, pesada })
+    const { data } = await transicionarLote(id, { nueva_fase: faseSig, pesada, sala_id: transicionSalaId.value || undefined })
     lotes.current = data
     showTransicionModal.value = false
     toast.success(`Lote avanzado a ${em(faseSig).label}`)
@@ -604,6 +600,61 @@ const splitOk = computed(() => {
   return Math.abs(sum - parseFloat(f.peso_curado_g)) < 0.01
 })
 
+// ── Plan vs Real ───────────────────────────────────────────
+const showPlanForm = ref(false)
+const savingPlan   = ref(false)
+const planForm     = ref({})
+
+function openPlanForm() {
+  const l = lote.value
+  planForm.value = {
+    plants_count_objetivo:  l.plants_count_objetivo ?? '',
+    rendimiento_objetivo_g: l.rendimiento_objetivo_g ?? '',
+    fecha_cosecha_estimada: l.fecha_cosecha_estimada ?? '',
+    rendimiento_real_g:     l.rendimiento_real_g ?? '',
+  }
+  showPlanForm.value = true
+}
+
+async function savePlan() {
+  savingPlan.value = true
+  try {
+    const payload = {
+      plants_count_objetivo:  planForm.value.plants_count_objetivo || null,
+      rendimiento_objetivo_g: planForm.value.rendimiento_objetivo_g || null,
+      fecha_cosecha_estimada: planForm.value.fecha_cosecha_estimada || null,
+      rendimiento_real_g:     planForm.value.rendimiento_real_g || null,
+    }
+    await updateLote(id, payload)
+    await lotes.fetchOne(id)
+    showPlanForm.value = false
+    toast.success('Objetivos guardados')
+  } catch { toast.error('Error al guardar objetivos') }
+  finally { savingPlan.value = false }
+}
+
+const plantasDevPct = computed(() => {
+  const obj = lote.value?.plants_count_objetivo
+  const real = lote.value?.plants_count
+  if (!obj || !real) return 0
+  return Math.round((real - obj) / obj * 100)
+})
+const plantasDevClass = computed(() => {
+  const p = plantasDevPct.value
+  return p > 0 ? 'ld__pvr-positive' : p < 0 ? 'ld__pvr-negative' : ''
+})
+
+const rendDevPct = computed(() => {
+  const obj = lote.value?.rendimiento_objetivo_g
+  const real = lote.value?.rendimiento_real_g
+  if (!obj || !real) return 0
+  return Math.round((real - obj) / obj * 100)
+})
+const rendDevClass = computed(() => {
+  const p = rendDevPct.value
+  return p > 0 ? 'ld__pvr-positive' : p < 0 ? 'ld__pvr-negative' : ''
+})
+
 // ── Editar lote ────────────────────────────────────────────
 const geneticas      = ref([])
 const showEditLote   = ref(false)
@@ -667,14 +718,19 @@ function loteEscapeHandler(e) {
 
 onMounted(async () => {
   document.addEventListener('keydown', loteEscapeHandler, true)
-  try   { await lotes.fetchOne(id) }
-  catch { error.value = "No se pudo cargar el lote." }
+  try {
+    await lotes.fetchOne(id)
+    // Seed plants store immediately from lote response to avoid empty flash
+    if (lotes.current?.plants?.length) {
+      plants.itemsByLote[String(id)] = lotes.current.plants
+    }
+  } catch { error.value = "No se pudo cargar el lote." }
   try   { await plants.fetchByLote(id) }
   catch {}
   await loadEventos()
   try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
   try { const { data } = await getCostoLote(id); costoLote.value = data?.costo || data || null } catch {}
-  try { const { data } = await listGeneticas({ activa: true }); geneticas.value = data || [] } catch {}
+  try { const { data } = await listGeneticas({ activa: true, disponible: true }); geneticas.value = data || [] } catch {}
 })
 
 onUnmounted(() => {
@@ -1063,6 +1119,73 @@ onUnmounted(() => {
             <div class="ld__card-notes">{{ lote.notes }}</div>
           </div>
 
+          <!-- Plan vs Real -->
+          <div v-if="canEdit || lote.plants_count_objetivo || lote.rendimiento_objetivo_g" class="ld__card ld__card--mt">
+            <div class="ld__card-header">
+              <span class="ld__card-title">🎯 Plan vs Real</span>
+              <button v-if="canEdit" class="ld__card-action" @click="openPlanForm">
+                <i class="bi bi-pencil"></i> {{ lote.plants_count_objetivo ? 'Editar' : 'Cargar objetivo' }}
+              </button>
+            </div>
+
+            <div v-if="showPlanForm" class="ld__costo-form">
+              <div class="ld__costo-row">
+                <label class="ld__costo-label">Plantas objetivo</label>
+                <input type="number" min="0" step="1" class="ld__costo-input" v-model.number="planForm.plants_count_objetivo" placeholder="—" />
+              </div>
+              <div class="ld__costo-row">
+                <label class="ld__costo-label">Rendimiento objetivo (g)</label>
+                <input type="number" min="0" step="0.1" class="ld__costo-input" v-model.number="planForm.rendimiento_objetivo_g" placeholder="—" />
+              </div>
+              <div class="ld__costo-row">
+                <label class="ld__costo-label">Fecha cosecha estimada</label>
+                <input type="date" class="ld__costo-input" v-model="planForm.fecha_cosecha_estimada" />
+              </div>
+              <div v-if="lote.estado === 'finalizado'" class="ld__costo-row ld__costo-row--sep">
+                <label class="ld__costo-label">Rendimiento real (g)</label>
+                <input type="number" min="0" step="0.1" class="ld__costo-input" v-model.number="planForm.rendimiento_real_g" placeholder="—" />
+              </div>
+              <div class="ld__costo-actions">
+                <button class="ld__btn-ghost" @click="showPlanForm = false">Cancelar</button>
+                <button class="ld__btn-primary" :disabled="savingPlan" @click="savePlan">
+                  {{ savingPlan ? 'Guardando…' : 'Guardar' }}
+                </button>
+              </div>
+            </div>
+
+            <template v-else-if="lote.plants_count_objetivo || lote.rendimiento_objetivo_g">
+              <div class="ld__pvr">
+                <div v-if="lote.plants_count_objetivo" class="ld__pvr-row">
+                  <span class="ld__pvr-label">Plantas</span>
+                  <span class="ld__pvr-objetivo">{{ lote.plants_count_objetivo }}</span>
+                  <span class="ld__pvr-sep">vs</span>
+                  <span class="ld__pvr-real" :class="plantasDevClass">{{ lote.plants_count ?? '—' }}</span>
+                  <span v-if="lote.plants_count && lote.plants_count_objetivo" class="ld__pvr-dev" :class="plantasDevClass">
+                    {{ plantasDevPct > 0 ? '+' : '' }}{{ plantasDevPct }}%
+                  </span>
+                </div>
+                <div v-if="lote.rendimiento_objetivo_g" class="ld__pvr-row">
+                  <span class="ld__pvr-label">Rendimiento</span>
+                  <span class="ld__pvr-objetivo">{{ lote.rendimiento_objetivo_g }}g</span>
+                  <span class="ld__pvr-sep">vs</span>
+                  <span class="ld__pvr-real" :class="rendDevClass">{{ lote.rendimiento_real_g ? lote.rendimiento_real_g + 'g' : '—' }}</span>
+                  <span v-if="lote.rendimiento_real_g && lote.rendimiento_objetivo_g" class="ld__pvr-dev" :class="rendDevClass">
+                    {{ rendDevPct > 0 ? '+' : '' }}{{ rendDevPct }}%
+                  </span>
+                </div>
+                <div v-if="lote.fecha_cosecha_estimada" class="ld__pvr-row">
+                  <span class="ld__pvr-label">Cosecha est.</span>
+                  <span class="ld__pvr-objetivo">{{ formatDate(lote.fecha_cosecha_estimada) }}</span>
+                </div>
+              </div>
+            </template>
+
+            <div v-else class="ld__costo-empty">
+              <i class="bi bi-bullseye"></i>
+              <span>Sin objetivos cargados</span>
+            </div>
+          </div>
+
           <!-- Costos de producción: solo admin -->
           <div v-if="canEdit" class="ld__card ld__card--mt">
             <div class="ld__card-header">
@@ -1447,6 +1570,16 @@ onUnmounted(() => {
               <label class="ld__label">Notas <span class="ld__optional">opcional</span></label>
               <textarea class="ld__input ld__textarea" rows="2" v-model="transicionForm.notas" placeholder="Observaciones del cambio de fase…"></textarea>
             </div>
+
+            <div class="ld__field">
+              <label class="ld__label">Sala destino</label>
+              <select v-model="transicionSalaId" class="ld__input">
+                <option :value="null">— Misma sala —</option>
+                <option v-for="s in lote?.salas_destino || []" :key="s.id" :value="s.id">
+                  {{ s.nombre }}{{ s.actual ? ' (actual)' : '' }}
+                </option>
+              </select>
+            </div>
           </div>
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" :disabled="savingTransicion" @click="showTransicionModal = false">Cancelar</button>
@@ -1481,16 +1614,13 @@ onUnmounted(() => {
               />
               <span class="ld__hint">Plantas que pasaron a cosecha (máx {{ lote?.plants_count }})</span>
             </div>
-            <div class="ld__field" v-if="(lote?.salas_destino || []).length > 0">
-              <label class="ld__label">Sala destino
-                <span class="ld__hint" v-if="(lote?.salas_destino || []).length === 1">auto-seleccionada</span>
-              </label>
-              <div v-if="(lote?.salas_destino || []).length === 1" class="ld__sala-chip">
-                <i class="bi bi-house-door"></i> {{ lote.salas_destino[0].nombre }}
-              </div>
-              <select v-else v-model="cosechaSalaId" class="ld__input">
-                <option :value="null">— Sin cambiar sala —</option>
-                <option v-for="s in lote.salas_destino" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+            <div class="ld__field">
+              <label class="ld__label">Sala destino</label>
+              <select v-model="cosechaSalaId" class="ld__input">
+                <option :value="null">— Misma sala —</option>
+                <option v-for="s in lote?.salas_destino || []" :key="s.id" :value="s.id">
+                  {{ s.nombre }}{{ s.actual ? ' (actual)' : '' }}
+                </option>
               </select>
             </div>
             <div class="ld__field">
@@ -1510,16 +1640,17 @@ onUnmounted(() => {
       </div>
     </Teleport>
 
-    <!-- ══ Modal Avanzar Fase — elegir sala destino ══ -->
+    <!-- ══ Modal Avanzar Fase (cultivador) — confirmar sala destino ══ -->
     <Teleport to="body">
       <div v-if="showAvanzarSalaModal" class="ld__overlay" @click.self="showAvanzarSalaModal = false">
-        <div class="ld__modal" style="max-width:380px">
+        <div class="ld__modal" style="max-width:400px">
           <div class="ld__modal-header">
             <div>
-              <h3 class="ld__modal-title">⬆️ Avanzar fase</h3>
+              <h3 class="ld__modal-title">
+                {{ em(lote?.estado).emoji }} → {{ em(lote?.proxima_fase_posible).emoji }} Avanzar fase
+              </h3>
               <p class="ld__modal-sub">
-                {{ lote?.codigo }} ·
-                {{ FASE_LABELS[lote?.estado] }} → {{ FASE_LABELS[lote?.proxima_fase_posible] }}
+                {{ lote?.codigo }} · {{ em(lote?.estado).label }} → {{ em(lote?.proxima_fase_posible).label }}
               </p>
             </div>
             <button class="ld__modal-close" @click="showAvanzarSalaModal = false"><i class="bi bi-x-lg"></i></button>
@@ -1528,16 +1659,19 @@ onUnmounted(() => {
             <div class="ld__field">
               <label class="ld__label">Sala destino</label>
               <select v-model="avanzarSalaId" class="ld__input">
-                <option :value="null">— Sin cambiar sala —</option>
-                <option v-for="s in lote?.salas_destino || []" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                <option :value="null">— Misma sala —</option>
+                <option v-for="s in lote?.salas_destino || []" :key="s.id" :value="s.id">
+                  {{ s.nombre }}{{ s.actual ? ' (actual)' : '' }}
+                </option>
               </select>
+              <span class="ld__optional">Si el lote no cambia de espacio físico, dejá la opción actual.</span>
             </div>
           </div>
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" @click="showAvanzarSalaModal = false">Cancelar</button>
             <button class="ld__btn-primary" :disabled="transicionandoRapido" @click="avanzarFaseRapido(avanzarSalaId)">
               <div v-if="transicionandoRapido" class="ld__spinner ld__spinner--sm"></div>
-              <i v-else class="bi bi-arrow-right-circle"></i>Avanzar
+              <i v-else class="bi bi-arrow-right-circle"></i>Confirmar avance
             </button>
           </div>
         </div>
@@ -1769,6 +1903,15 @@ onUnmounted(() => {
 .ld__costo-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .4rem; }
 .ld__costo-empty { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 1.2rem 1rem; color: #94a3b8; font-size: .8rem; }
 .ld__costo-empty i { font-size: 1.4rem; }
+.ld__pvr { padding: .5rem 1rem .8rem; display: flex; flex-direction: column; gap: .5rem; }
+.ld__pvr-row { display: flex; align-items: center; gap: .5rem; font-size: .85rem; flex-wrap: wrap; }
+.ld__pvr-label { font-size: .75rem; color: #64748b; min-width: 90px; }
+.ld__pvr-objetivo { color: #334155; font-weight: 600; }
+.ld__pvr-sep { color: #94a3b8; font-size: .7rem; }
+.ld__pvr-real { font-weight: 700; color: #1b5e20; }
+.ld__pvr-dev { font-size: .75rem; font-weight: 700; padding: .1rem .4rem; border-radius: 4px; }
+.ld__pvr-positive { color: #15803d; background: #dcfce7; }
+.ld__pvr-negative { color: #dc2626; background: #fee2e2; }
 .ld__cpg-badge { display: flex; justify-content: space-between; align-items: center; margin: 0 1rem .9rem; padding: .5rem .75rem; background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-radius: 8px; border: 1px solid #bbf7d0; }
 .ld__cpg-label { font-size: .75rem; font-weight: 600; color: #15803d; }
 .ld__cpg-value { font-family: var(--font-mono, monospace); font-size: .95rem; font-weight: 800; color: #15803d; }

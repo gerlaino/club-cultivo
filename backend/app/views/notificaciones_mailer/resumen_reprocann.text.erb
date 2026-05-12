@@ -1,0 +1,25 @@
+CLUB CULTIVO — REPROCANN
+<%= @club.name %> · <%= Date.today.strftime('%d/%m/%Y') %>
+================================================
+
+Hay <%= @total %> paciente<%= @total == 1 ? '' : 's' %> que requieren atención con su REPROCANN.
+
+<% if @vencidos.any? %>
+--- VENCIDOS (<%= @vencidos.size %>) ---
+<% @vencidos.each do |p| %>
+  • <%= p.nombre_completo %> — venció <%= p.reprocann_vencimiento.strftime('%d/%m/%Y') %> (hace <%= (Date.today - p.reprocann_vencimiento).to_i %> días)
+<% end %>
+<% end %>
+
+<% @por_vencer.each do |dias, lista| %>
+<% next if lista.empty? %>
+--- POR VENCER EN <%= dias %> DÍAS (<%= lista.size %>) ---
+<% lista.each do |p| %>
+  • <%= p.nombre_completo %> — <%= p.reprocann_vencimiento.strftime('%d/%m/%Y') %>
+<% end %>
+<% end %>
+
+Ver pacientes: <%= ENV.fetch('APP_HOST', 'https://app.clubcultivo.app') %>/pacientes?reprocann=vencidos
+
+---
+Este es un aviso automático de Club Cultivo.

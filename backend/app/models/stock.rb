@@ -1,11 +1,12 @@
 class Stock < ApplicationRecord
-  belongs_to :sede,   optional: true
-  belongs_to :lote,   optional: true
-  belongs_to :pesada, optional: true
-  belongs_to :club,   optional: true
+  belongs_to :sede,     optional: true
+  belongs_to :lote,     optional: true
+  belongs_to :pesada,   optional: true
+  belongs_to :club,     optional: true
+  belongs_to :genetica, optional: true
 
-  has_many :dispensaciones,    dependent: :nullify
   has_many :stock_movimientos, dependent: :destroy
+  has_many :dispensaciones, class_name: 'Dispensacion', dependent: :nullify
 
   ORIGENES         = %w[lote derivado_lote compra_externa].freeze
   FORMAS_PRODUCTO  = %w[flor_seca hash aceite tintura crema capsula comestible prensado otro externo].freeze
@@ -97,9 +98,9 @@ class Stock < ApplicationRecord
       errors.add(:lote_origen_consumido_g, 'debe ser mayor a 0')     if lote_origen_consumido_g.to_d <= 0
       errors.add(:forma_producto, 'no puede ser flor_seca para derivados') if forma_producto == 'flor_seca'
     when 'compra_externa'
-      errors.add(:proveedor,   'es obligatorio para compra externa')  if proveedor.blank?
-      errors.add(:descripcion, 'es obligatoria para compra externa')  if descripcion.blank?
-      errors.add(:lote_id,     'debe ser nulo para compra externa')   if lote_id.present?
+      errors.add(:proveedor,    'es obligatorio para compra externa')  if proveedor.blank?
+      errors.add(:genetica_id,  'es obligatoria para compra externa')  if genetica_id.blank?
+      errors.add(:lote_id,      'debe ser nulo para compra externa')   if lote_id.present?
     end
   end
 

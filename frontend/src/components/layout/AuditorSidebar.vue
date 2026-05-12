@@ -25,6 +25,12 @@
       <RouterLink to="/auditor/cumplimiento" class="aud-link" active-class="aud-link--active">
         <ShieldAlert :size="18" :stroke-width="1.75" /><span>Cumplimiento</span>
       </RouterLink>
+      <RouterLink to="/auditor/plan-vs-real" class="aud-link" active-class="aud-link--active">
+        <BarChart2 :size="18" :stroke-width="1.75" /><span>Plan vs Real</span>
+      </RouterLink>
+      <RouterLink to="/auditor/trazabilidad" class="aud-link" active-class="aud-link--active">
+        <GitBranch :size="18" :stroke-width="1.75" /><span>Trazabilidad</span>
+      </RouterLink>
     </nav>
 
     <div class="aud-footer">
@@ -36,7 +42,7 @@
 </template>
 
 <script setup>
-import { ShieldCheck, Home, FileCheck, Sprout, Package, Building2, ShieldAlert, LogOut } from 'lucide-vue-next'
+import { ShieldCheck, Home, FileCheck, Sprout, Package, Building2, ShieldAlert, LogOut, BarChart2, GitBranch } from 'lucide-vue-next'
 defineEmits(['logout'])
 </script>
 

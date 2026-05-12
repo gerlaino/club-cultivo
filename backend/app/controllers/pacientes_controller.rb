@@ -1,7 +1,8 @@
 class PacientesController < ApplicationController
   before_action :authenticate_user!
   before_action :check_pacientes_role!
-  before_action :set_paciente, only: [:show, :update, :destroy, :timeline]
+  before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann]
+  before_action :require_export_role!, only: [:export_csv]
   before_action :normalize_paciente_params, only: [:create, :update]
   before_action :warn_deprecated_route
 
@@ -46,7 +47,23 @@ class PacientesController < ApplicationController
       except:  :notas_clinicas
     )
     json['notas_clinicas'] = @paciente.notas_clinicas if policy(@paciente).ver_notas_clinicas?
+    json['reprocann_documento_url'] = url_for(@paciente.reprocann_documento) if @paciente.reprocann_documento.attached?
     render json: { data: json }
+  end
+
+  def subir_reprocann
+    authorize @paciente, :update?
+    unless params[:archivo].present?
+      return render json: { error: 'No se recibió ningún archivo' }, status: :unprocessable_entity
+    end
+    @paciente.reprocann_documento.attach(params[:archivo])
+    render json: { reprocann_documento_url: url_for(@paciente.reprocann_documento) }
+  end
+
+  def eliminar_reprocann
+    authorize @paciente, :update?
+    @paciente.reprocann_documento.purge if @paciente.reprocann_documento.attached?
+    head :no_content
   end
 
   def timeline
@@ -148,6 +165,60 @@ class PacientesController < ApplicationController
     head :no_content
   end
 
+  # GET /pacientes/export_csv
+  def export_csv
+    scope = policy_scope(Paciente)
+
+    case params[:reprocann]
+    when 'proximos'
+      scope = scope.where('reprocann_vencimiento > ? AND reprocann_vencimiento <= ?', Date.today, 30.days.from_now)
+    when 'vencidos'
+      scope = scope.where('reprocann_vencimiento < ?', Date.today)
+    when 'sin_rep'
+      scope = scope.where(reprocann_vencimiento: nil)
+    end
+
+    if params[:query].present?
+      q = params[:query].downcase
+      scope = scope.where("lower(nombre) LIKE :q OR lower(apellido) LIKE :q OR dni_normalizado LIKE :q", q: "%#{q}%")
+    end
+
+    scope = scope.order(apellido: :asc, nombre: :asc)
+
+    require "csv"
+    csv_data = CSV.generate(col_sep: ";", encoding: "UTF-8") do |csv|
+      csv << [
+        "ID", "Apellido", "Nombre", "DNI", "Fecha nacimiento",
+        "Email", "Teléfono",
+        "N° REPROCANN", "Vencimiento REPROCANN", "Estado REPROCANN",
+        "Con seguimiento médico", "Límite dispensación (g/mes)",
+        "Registrado"
+      ]
+      scope.each do |p|
+        csv << [
+          p.id,
+          p.apellido,
+          p.nombre,
+          p.dni_normalizado,
+          p.fecha_nacimiento&.strftime("%d/%m/%Y"),
+          p.email,
+          p.telefono,
+          p.reprocann_numero,
+          p.reprocann_vencimiento&.strftime("%d/%m/%Y"),
+          p.reprocann_estado,
+          p.con_seguimiento_medico ? "Sí" : "No",
+          p.limite_dispensacion_mensual_g,
+          p.created_at.strftime("%d/%m/%Y"),
+        ]
+      end
+    end
+
+    send_data "\xEF\xBB\xBF#{csv_data}",
+              filename:    "pacientes_#{Date.today}.csv",
+              type:        "text/csv; charset=utf-8",
+              disposition: "attachment"
+  end
+
   private
 
   def set_paciente
@@ -175,6 +246,11 @@ class PacientesController < ApplicationController
     allowed = %i[nombre apellido dni fecha_nacimiento es_paciente email telefono reprocann_numero reprocann_vencimiento reprocann_estado limite_dispensacion_mensual_g]
     allowed << :notas_clinicas          if can_edit_notas_clinicas?
     allowed << :con_seguimiento_medico  if current_user&.admin? || current_user&.medico?
+    if can_edit_notas_clinicas?
+      allowed += %i[motivo_consulta anamnesis antecedentes_personales antecedentes_familiares
+                    diagnostico_principal diagnostico_secundario evolucion_clinica
+                    alergias medicacion_habitual grupo_sanguineo]
+    end
     (params[:paciente] || params[:socio]).permit(*allowed)
   end
 
@@ -190,6 +266,12 @@ class PacientesController < ApplicationController
   def check_pacientes_role!
     blocked = %w[delivery abogado cultivador manicura auditor]
     if blocked.include?(current_user&.role)
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
+  end
+
+  def require_export_role!
+    unless %w[admin medico super_admin].include?(current_user&.role)
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end

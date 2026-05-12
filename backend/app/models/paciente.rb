@@ -10,10 +10,12 @@ class Paciente < ApplicationRecord
   has_many :dispensaciones, class_name: 'Dispensacion', dependent: :destroy
   has_many :patient_documents, dependent: :destroy
   has_one  :cuenta_corriente, dependent: :destroy
+  has_many :reprocann_renovaciones, class_name: 'ReprocannRenovacion', dependent: :destroy
 
   has_one_attached :reprocann_documento
 
   before_validation :normalize_dni!
+  before_create     :assign_carnet_token
 
   validates :nombre, :apellido, :dni, :dni_normalizado, :fecha_nacimiento, presence: true
   validates :dni_normalizado, uniqueness: true, format: { with: /\A\d{7,9}\z/, message: "debe tener 7 a 9 dígitos" }
@@ -55,6 +57,10 @@ class Paciente < ApplicationRecord
   def normalize_dni!
     return if dni.blank?
     self.dni_normalizado = dni.gsub(/\D/, "")
+  end
+
+  def assign_carnet_token
+    self.carnet_token ||= SecureRandom.uuid
   end
 
   def fecha_nacimiento_pasada

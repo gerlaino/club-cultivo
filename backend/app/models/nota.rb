@@ -1,4 +1,5 @@
 class Nota < ApplicationRecord
+  self.table_name = 'notas'
   acts_as_paranoid
 
   belongs_to :noteable, polymorphic: true

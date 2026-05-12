@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 0; color: #0f172a; }
+    .wrapper { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    .header { background: #1b5e20; padding: 28px 32px; }
+    .header-title { color: #fff; font-size: 20px; font-weight: 700; margin: 0; }
+    .header-sub { color: #a5d6a7; font-size: 13px; margin: 4px 0 0; }
+    .body { padding: 28px 32px; }
+    .intro { font-size: 15px; color: #334155; margin-bottom: 24px; }
+    .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin-bottom: 10px; }
+    .badge-danger { display: inline-block; background: #fee2e2; color: #991b1b; border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
+    .badge-warning { display: inline-block; background: #fef3c7; color: #92400e; border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px; }
+    th { text-align: left; font-size: 12px; font-weight: 700; color: #64748b; border-bottom: 2px solid #e2e8f0; padding: 6px 8px; }
+    td { padding: 8px; border-bottom: 1px solid #f1f5f9; }
+    td.danger { color: #dc2626; font-weight: 600; }
+    td.warn   { color: #d97706; }
+    .cta { text-align: center; margin: 28px 0 0; }
+    .btn { display: inline-block; background: #1b5e20; color: #fff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; }
+    .footer { background: #f8fafc; padding: 16px 32px; text-align: center; font-size: 12px; color: #94a3b8; }
+    .divider { height: 1px; background: #e2e8f0; margin: 24px 0; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <p class="header-title">🌿 Club Cultivo — REPROCANN</p>
+      <p class="header-sub"><%= @club.name %> · <%= Date.today.strftime('%d/%m/%Y') %></p>
+    </div>
+
+    <div class="body">
+      <p class="intro">
+        Hay <strong><%= @total %> paciente<%= @total == 1 ? '' : 's' %></strong> que requieren atención con su REPROCANN.
+      </p>
+
+      <% if @vencidos.any? %>
+        <p class="section-title"><span class="badge-danger">Vencidos</span></p>
+        <table>
+          <thead>
+            <tr>
+              <th>Paciente</th>
+              <th>Venció</th>
+              <th>Días vencido</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @vencidos.each do |p| %>
+              <tr>
+                <td><%= p.nombre_completo %></td>
+                <td class="danger"><%= p.reprocann_vencimiento.strftime('%d/%m/%Y') %></td>
+                <td class="danger"><%= (Date.today - p.reprocann_vencimiento).to_i %>d</td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% end %>
+
+      <% @por_vencer.each do |dias, lista| %>
+        <% next if lista.empty? %>
+        <p class="section-title"><span class="badge-warning">Vencen en <%= dias %> días</span></p>
+        <table>
+          <thead>
+            <tr>
+              <th>Paciente</th>
+              <th>Vencimiento</th>
+              <th>N° REPROCANN</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% lista.each do |p| %>
+              <tr>
+                <td><%= p.nombre_completo %></td>
+                <td class="warn"><%= p.reprocann_vencimiento.strftime('%d/%m/%Y') %></td>
+                <td><%= p.reprocann_numero.presence || '—' %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% end %>
+
+      <div class="divider"></div>
+
+      <div class="cta">
+        <a class="btn" href="<%= ENV.fetch('APP_HOST', 'https://app.clubcultivo.app') %>/pacientes?reprocann=vencidos">
+          Ver pacientes en el sistema
+        </a>
+      </div>
+    </div>
+
+    <div class="footer">
+      Club Cultivo · Plataforma de gestión de clubes cannábicos<br/>
+      Este es un aviso automático generado por el sistema.
+    </div>
+  </div>
+</body>
+</html>

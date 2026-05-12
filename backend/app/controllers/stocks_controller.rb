@@ -1,8 +1,9 @@
 class StocksController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_lectura_stock!,   only: [:index]
-  before_action :require_escritura_stock!, only: [:create, :asignar]
-  before_action :set_stock, only: [:asignar]
+  before_action :require_lectura_stock!,   only: [:index, :show]
+  before_action :require_auditor_lectura!, only: [:trazabilidad]
+  before_action :require_escritura_stock!, only: [:create, :update, :asignar]
+  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update]
 
   # GET /stocks?sede_id=&canal=regulatorio|social&incluir_pendientes=true
   # GET /sedes/:sede_id/stocks
@@ -18,7 +19,7 @@ class StocksController < ApplicationController
     # Stock asignado a sedes
     stocks = current_user.club.sedes
                          .then { |s| sede_id.present? ? s.where(id: sede_id) : s }
-                         .flat_map { |sede| sede.stocks.includes(:lote).disponibles.asignados }
+                         .flat_map { |sede| sede.stocks.includes(:lote, :genetica).disponibles.asignados }
 
     case params[:canal]
     when 'regulatorio' then stocks = stocks.select(&:regulatorio?)
@@ -26,6 +27,11 @@ class StocksController < ApplicationController
     end
 
     render json: stocks.map { |s| serialize_stock(s) }
+  end
+
+  # GET /stocks/:id
+  def show
+    render json: { data: serialize_stock(@stock) }
   end
 
   # POST /stocks
@@ -38,6 +44,76 @@ class StocksController < ApplicationController
     else
       render json: { errors: @stock.errors.full_messages }, status: :unprocessable_entity
     end
+  end
+
+  # PATCH /stocks/:id
+  def update
+    if @stock.update(stock_update_params)
+      render json: serialize_stock(@stock.reload)
+    else
+      render json: { errors: @stock.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  # GET /stocks/:id/trazabilidad
+  def trazabilidad
+    s = @stock
+
+    # Lote origen
+    lote = s.lote
+
+    # Pesada origen
+    pesada = s.pesada
+
+    # Plantas pesadas (via pesadas_plantas)
+    plantas = []
+    if pesada
+      plantas = pesada.pesadas_plantas.includes(:plant).map do |pp|
+        { id: pp.plant_id, codigo_qr: pp.plant&.codigo_qr, peso_g: pp.peso_g&.to_f }
+      end
+    end
+
+    # Dispensaciones
+    dispensaciones = s.dispensaciones.includes(:paciente).order(created_at: :desc).limit(100).map do |d|
+      {
+        id:                d.id,
+        fecha:             d.fecha_dispensacion,
+        cantidad_g:        d.cantidad&.to_f,
+        paciente_iniciales: "#{d.paciente&.nombre&.[](0)}.#{d.paciente&.apellido&.[](0)}.",
+        paciente_dni_last4: d.paciente&.dni_normalizado.to_s.last(4),
+      }
+    end
+
+    render json: {
+      stock: {
+        id:                   s.id,
+        numero_lote_producto: s.numero_lote_producto,
+        forma_producto:       s.forma_producto,
+        cantidad_g:           s.cantidad&.to_f,
+        fecha_elaboracion:    s.fecha_elaboracion,
+        codigo_qr:            s.codigo_qr,
+      },
+      lote: lote ? {
+        id:      lote.id,
+        codigo:  lote.codigo,
+        estado:  lote.estado,
+        genetica: lote.genetica ? { nombre: lote.genetica.nombre, numero_registro_inase: lote.genetica.numero_registro_inase } : nil,
+      } : nil,
+      pesada: pesada ? {
+        id:             pesada.id,
+        fase_destino:   pesada.fase_destino,
+        peso_total_g:   pesada.peso_total_g&.to_f,
+        registrado_at:  pesada.registrado_at,
+        plantas_count:  plantas.size,
+      } : nil,
+      plantas:        plantas,
+      dispensaciones: dispensaciones,
+      totales: {
+        plantas_origen:       plantas.size,
+        dispensaciones_count: dispensaciones.size,
+        gramos_dispensados:   dispensaciones.sum { |d| d[:cantidad_g].to_f }.round(2),
+      },
+    }
   end
 
   # POST /stocks/:id/asignar
@@ -71,12 +147,18 @@ class StocksController < ApplicationController
 
   private
 
+  def stock_update_params
+    params.require(:stock).permit(
+      :cantidad, :costo_unitario_ars, :precio_sugerido_ars, :descripcion, :proveedor
+    )
+  end
+
   def stock_params
     params.require(:stock).permit(
       :origen, :lote_id, :lote_origen_consumido_g,
       :forma_producto, :unidad, :cantidad,
       :costo_unitario_ars, :precio_sugerido_ars,
-      :proveedor, :descripcion, :categoria, :sede_id, :estado
+      :proveedor, :descripcion, :genetica_id, :categoria, :sede_id, :estado
     )
   end
 
@@ -120,13 +202,22 @@ class StocksController < ApplicationController
       regulatorio:             s.regulatorio?,
       del_club:                s.del_club?,
       lote: s.lote ? { id: s.lote.id, codigo: s.lote.codigo, estado: s.lote.estado,
-                       genetica: s.lote.genetica ? { nombre: s.lote.genetica.nombre } : nil } : nil,
+                       genetica: s.lote.genetica ? {
+                         id:                    s.lote.genetica.id,
+                         nombre:                s.lote.genetica.nombre,
+                         numero_registro_inase: s.lote.genetica.numero_registro_inase,
+                       } : nil } : nil,
+      genetica: s.genetica ? { id: s.genetica.id, nombre: s.genetica.nombre } : nil,
+      sede:  s.sede  ? { id: s.sede.id, nombre: s.sede.nombre } : nil,
+      club:  s.club  ? { id: s.club.id, nombre: s.club.name,
+                         logo_url: s.club.logo.attached? ? url_for(s.club.logo) : nil } : nil,
       created_at:              s.created_at,
     }
   end
 
   ROLES_LECTURA_STOCK   = %w[admin dispensador manicura].freeze
   ROLES_ESCRITURA_STOCK = %w[admin manicura].freeze
+  ROLES_AUDITOR_LECTURA = %w[admin auditor].freeze
 
   def require_lectura_stock!
     render json: { error: 'No autorizado' }, status: :forbidden unless ROLES_LECTURA_STOCK.include?(current_user&.role)
@@ -134,5 +225,9 @@ class StocksController < ApplicationController
 
   def require_escritura_stock!
     render json: { error: 'No autorizado' }, status: :forbidden unless ROLES_ESCRITURA_STOCK.include?(current_user&.role)
+  end
+
+  def require_auditor_lectura!
+    render json: { error: 'No autorizado' }, status: :forbidden unless ROLES_AUDITOR_LECTURA.include?(current_user&.role)
   end
 end
