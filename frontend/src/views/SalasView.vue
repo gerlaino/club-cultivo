@@ -58,12 +58,6 @@ function kindEmoji(k) {
   return map[k] || '🏠';
 }
 
-function ocupacionColor(pct) {
-  if (pct >= 90) return '#dc2626';
-  if (pct >= 70) return '#f59e0b';
-  return '#16a34a';
-}
-
 // ── Filtros ──────────────────────────────────────────────────
 const q           = ref("");
 const filterState = ref("");
@@ -111,7 +105,6 @@ const sorted = computed(() => {
     const pA = Number(a.plantas_totales ?? 0), pB = Number(b.plantas_totales ?? 0);
     switch (sortBy.value) {
       case 'nombre_desc':    return nA < nB ? 1 : -1;
-      case 'ocupacion_desc': return oB - oA;
       case 'plantas_desc':   return pB - pA;
       case 'updated_desc':   return new Date(b.updated_at) - new Date(a.updated_at);
       default:               return nA > nB ? 1 : -1;
@@ -132,7 +125,6 @@ const stats = computed(() => {
     total:     all.length,
     activas:   all.filter(s => s.state === 'activa').length,
     plantas:   all.reduce((a, s) => a + Number(s.plantas_totales || 0), 0),
-    capacidad: all.reduce((a, s) => a + Number(s.pots_count || s.plants_max || 0), 0),
   };
 });
 
@@ -141,13 +133,12 @@ const showCreate = ref(false);
 
 // ── Modal Editar ──────────────────────────────────────────────
 const showEdit   = ref(false);
-const editForm   = ref({ id: null, nombre: '', state: 'activa', pots_count: 0, plants_max: 0, kind: '', notes: '', sede_id: null });
+const editForm   = ref({ id: null, nombre: '', state: 'activa', kind: '', notes: '', sede_id: null });
 const editErrors = ref({});
 
 function startEdit(s) {
   editForm.value = {
     id: s.id, nombre: s.nombre || '', state: s.state || 'activa',
-    pots_count: s.pots_count ?? 0, plants_max: s.plants_max ?? 0,
     kind: s.kind || '', notes: s.notes || '', sede_id: s.sede?.id || null,
   };
   editErrors.value = {};
@@ -216,13 +207,6 @@ async function confirmDelete(s) {
           <div class="slv__kpi-lbl">Plantas totales</div>
         </div>
       </div>
-      <div class="slv__kpi">
-        <div class="slv__kpi-icon">📦</div>
-        <div class="slv__kpi-body">
-          <div class="slv__kpi-val">{{ stats.capacidad }}</div>
-          <div class="slv__kpi-lbl">Capacidad total</div>
-        </div>
-      </div>
     </div>
 
     <!-- Tabs por tipo -->
@@ -250,7 +234,6 @@ async function confirmDelete(s) {
       <select class="slv__select" v-model="sortBy">
         <option value="nombre_asc">Nombre A→Z</option>
         <option value="nombre_desc">Nombre Z→A</option>
-        <option value="ocupacion_desc">Mayor ocupación</option>
         <option value="plantas_desc">Más plantas</option>
         <option value="updated_desc">Más recientes</option>
       </select>
@@ -307,20 +290,6 @@ async function confirmDelete(s) {
             <i class="bi bi-building"></i> {{ s.sede.nombre }}
           </div>
 
-          <!-- Barra de ocupación -->
-          <div class="slv__ocu">
-            <div class="slv__ocu-row">
-              <span class="slv__ocu-label">Ocupación</span>
-              <span class="slv__ocu-nums">{{ s.plantas_totales ?? 0 }} / {{ s.pots_count || s.plants_max || '—' }}</span>
-            </div>
-            <div class="slv__ocu-bar">
-              <div class="slv__ocu-fill" :style="{ width: Math.min(s.porcentaje_ocupacion || 0, 100) + '%', background: ocupacionColor(s.porcentaje_ocupacion) }"></div>
-            </div>
-            <div class="slv__ocu-pct" :style="{ color: ocupacionColor(s.porcentaje_ocupacion) }">
-              {{ (s.porcentaje_ocupacion || 0).toFixed(0) }}%
-            </div>
-          </div>
-
           <p v-if="s.notes" class="slv__card-notes">{{ s.notes }}</p>
 
           <div class="slv__card-footer">
@@ -347,8 +316,7 @@ async function confirmDelete(s) {
           <tr>
             <th>Sala</th>
             <th>Estado</th>
-            <th>Plantas / Cap.</th>
-            <th>Ocupación</th>
+            <th>Plantas</th>
             <th>Sede</th>
             <th></th>
           </tr>
@@ -367,15 +335,7 @@ async function confirmDelete(s) {
             <td>
               <span class="slv__state-pill" :style="stateStyle(s.state)">{{ stateLabel(s.state) }}</span>
             </td>
-            <td class="slv__table-nums">{{ s.plantas_totales ?? 0 }} / {{ s.pots_count || s.plants_max || '—' }}</td>
-            <td style="min-width:110px">
-              <div class="slv__ocu-bar">
-                <div class="slv__ocu-fill" :style="{ width: Math.min(s.porcentaje_ocupacion || 0, 100) + '%', background: ocupacionColor(s.porcentaje_ocupacion) }"></div>
-              </div>
-              <div class="slv__ocu-pct" :style="{ color: ocupacionColor(s.porcentaje_ocupacion), fontSize: '.75rem' }">
-                {{ (s.porcentaje_ocupacion || 0).toFixed(0) }}%
-              </div>
-            </td>
+            <td class="slv__table-nums">{{ s.plantas_totales ?? 0 }}</td>
             <td class="slv__table-sede">{{ s.sede?.nombre || '—' }}</td>
             <td>
               <div v-if="canEdit" class="slv__table-acts">
@@ -448,10 +408,6 @@ async function confirmDelete(s) {
                 </div>
               </div>
               <div class="slv__field-row">
-                <div class="slv__field">
-                  <label class="slv__label">Capacidad (plantas)</label>
-                  <input type="number" min="0" max="9999" class="slv__input" v-model.number="editForm.pots_count" />
-                </div>
                 <div class="slv__field">
                   <label class="slv__label">Sede</label>
                   <select class="slv__input" v-model="editForm.sede_id">

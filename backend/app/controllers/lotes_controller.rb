@@ -7,7 +7,7 @@ class LotesController < ApplicationController
 
   # GET /lotes o GET /salas/:sala_id/lotes
   def index
-    lotes = current_user.club.lotes.includes(:genetica, :costo_lote, :pesadas, sala: :sede)
+    lotes = current_user.club.lotes.includes(:genetica, :costo_lote, :pesadas, :lote_eventos, sala: :sede)
     lotes = lotes.where(sala_id: @sala.id) if @sala.present?
 
     if current_user.cultivador?
@@ -657,6 +657,16 @@ class LotesController < ApplicationController
     proxima_fase     = idx_ciclo ? Lote::CICLO_FASES[idx_ciclo + 1] : nil
     puede_transicion = idx_ciclo.present? && idx_ciclo < Lote::CICLO_FASES.length - 1
 
+    eventos = lote.lote_eventos.loaded? ? lote.lote_eventos : lote.lote_eventos.to_a
+    ev_floracion = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'floracion' }.min_by(&:registrado_en)
+    ev_cosecha   = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'cosecha'   }.min_by(&:registrado_en)
+
+    fecha_inicio_floracion = ev_floracion&.registrado_en&.to_date
+    fecha_cosechado        = ev_cosecha&.registrado_en&.to_date
+
+    dias_vegetacion = (lote.start_date && fecha_inicio_floracion) ? (fecha_inicio_floracion - lote.start_date).to_i : nil
+    dias_floracion  = (fecha_inicio_floracion && fecha_cosechado)  ? (fecha_cosechado - fecha_inicio_floracion).to_i   : nil
+
     result = {
       id:                   lote.id,
       club_id:              lote.club_id,
@@ -690,6 +700,9 @@ class LotesController < ApplicationController
       plants_count_objetivo:   lote.plants_count_objetivo,
       rendimiento_objetivo_g:  lote.rendimiento_objetivo_g&.to_f,
       fecha_cosecha_estimada:  lote.fecha_cosecha_estimada,
+      fecha_cosechado:         fecha_cosechado,
+      dias_vegetacion:         dias_vegetacion,
+      dias_floracion:          dias_floracion,
       rendimiento_real_g:      lote.rendimiento_real_g&.to_f,
       plants_count_cosechadas: lote.plants_count_cosechadas,
       manicurador_id:   lote.manicurador_id,

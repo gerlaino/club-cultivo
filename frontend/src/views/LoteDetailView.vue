@@ -8,7 +8,7 @@ import { useAuthStore }   from "../stores/auth"
 import { createPlant, updatePlant,
   getRegistrosAmbientales, createRegistroAmbiental,
   getLoteEventos, createLoteEvento,
-  getLoteFotos, uploadFotoLote,
+  getLoteFotos, uploadFotoLote, deleteFotoLote,
   transicionarLote, avanzarFaseLote, cerrarCurado, getLoteTimeline,
   listSedes, getSedeStocks, deleteLote,
   getCostoLote, createCostoLote, updateCostoLote,
@@ -23,6 +23,7 @@ import Lightbox from '../components/ui/Lightbox.vue'
 import Paginator from '../components/ui/Paginator.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import { useQRCode } from '../composables/useQRCode.js'
 import { ArrowRight } from 'lucide-vue-next'
 import DsBanner from '../design-system/components/Banner.vue'
 
@@ -61,7 +62,8 @@ const id            = Number(route.params.id)
 const error         = ref(null)
 const loading       = computed(() => lotes.loading)
 const lote          = computed(() => lotes.current)
-const canEdit       = computed(() => ['admin', 'supervisor'].includes(auth.role))
+const canEdit       = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.role))
+const canAdmin      = computed(() => ['admin', 'supervisor'].includes(auth.role))
 const isCultivador  = computed(() => auth.role === "cultivador")
 
 const costoLote     = ref(null)
@@ -131,6 +133,11 @@ const lightboxIndex     = ref(0)
 const lightboxImages    = computed(() => fotos.value.map(f => ({ src: f.url, alt: f.filename })))
 function openLightbox(i) { lightboxIndex.value = i; lightboxOpen.value = true }
 
+const showFotoUploadModal   = ref(false)
+const fotoUploadFile        = ref(null)
+const fotoUploadDescripcion = ref('')
+const fotoUploadPreview     = ref(null)
+
 // ── Plantas ────────────────────────────────────────────────
 const plantasPage        = ref(1)
 const plantasPerPage     = ref(10)
@@ -139,6 +146,41 @@ const plantasMostradas   = computed(() => {
   const start = (plantasPage.value - 1) * plantasPerPage.value
   return plantList.value.slice(start, start + plantasPerPage.value)
 })
+
+// ── Bulk QR download ───────────────────────────────────────
+const { generatePNG } = useQRCode()
+const downloadingQRs  = ref(false)
+
+async function descargarTodosQRs() {
+  if (!plantList.value.length || downloadingQRs.value) return
+  downloadingQRs.value = true
+  try {
+    const JSZip  = (await import('jszip')).default
+    const zip    = new JSZip()
+    const origin = window.location.origin
+    const codigo = lote.value?.codigo || 'lote'
+    await Promise.all(
+      plantList.value
+        .filter(p => p.codigo_qr)
+        .map(async p => {
+          const dataUrl = await generatePNG(`${origin}/p/${p.codigo_qr}`)
+          const base64  = dataUrl.split(',')[1]
+          zip.file(`${p.nombre || p.codigo_qr}.png`, base64, { base64: true })
+        })
+    )
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const href = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = href
+    a.download = `QRs-${codigo}.zip`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(href)
+  } finally {
+    downloadingQRs.value = false
+  }
+}
 
 // ── Agregar planta al lote ─────────────────────────────────
 const showAddPlanta    = ref(false)
@@ -341,16 +383,45 @@ async function loadFotos() {
   try { const { data } = await getLoteFotos(id); fotos.value = data || [] }
   catch { fotos.value = [] }
 }
-async function handleFotoUpload(e) {
+function handleFotoSelect(e) {
   const file = e.target.files?.[0]
   if (!file) return
+  fotoUploadFile.value = file
+  fotoUploadDescripcion.value = ''
+  fotoUploadPreview.value = URL.createObjectURL(file)
+  showFotoUploadModal.value = true
+  if (fotoInput.value) fotoInput.value.value = ''
+}
+async function confirmarSubidaFoto() {
+  if (!fotoUploadFile.value) return
   uploadingFoto.value = true
   try {
-    const fd = new FormData(); fd.append('foto', file)
+    const fd = new FormData()
+    fd.append('foto', fotoUploadFile.value)
+    if (fotoUploadDescripcion.value.trim()) fd.append('descripcion', fotoUploadDescripcion.value.trim())
     const { data } = await uploadFotoLote(id, fd)
     fotos.value.unshift(data)
+    showFotoUploadModal.value = false
+    fotoUploadFile.value = null
+    fotoUploadPreview.value = null
+    fotoUploadDescripcion.value = ''
   } catch (err) { logger.error(err); toast.error('Error al subir la foto') }
-  finally { uploadingFoto.value = false; if (fotoInput.value) fotoInput.value.value = '' }
+  finally { uploadingFoto.value = false }
+}
+function cancelarSubidaFoto() {
+  showFotoUploadModal.value = false
+  fotoUploadFile.value = null
+  fotoUploadPreview.value = null
+  fotoUploadDescripcion.value = ''
+}
+async function eliminarFoto(foto) {
+  const ok = await confirm({ title: 'Eliminar foto', message: '¿Seguro que querés eliminar esta foto? No se puede deshacer.', confirmText: 'Eliminar', variant: 'danger' })
+  if (!ok) return
+  try {
+    await deleteFotoLote(id, foto.id)
+    fotos.value = fotos.value.filter(f => f.id !== foto.id)
+    toast.success('Foto eliminada')
+  } catch { toast.error('Error al eliminar la foto') }
 }
 function toggleFotos() {
   fotosExpanded.value = !fotosExpanded.value
@@ -703,8 +774,47 @@ async function saveEditLote() {
   }
 }
 
+// ── Trasplante de lote ────────────────────────────────────
+const showTrasplanteLote   = ref(false)
+const savingTrasplanteLote = ref(false)
+const trasplanteLoteError  = ref(null)
+const trasplanteLoteForm   = ref({ maceta_origen_l: null, maceta_destino_l: null, notas: '' })
+
+const MACETA_OPTS = [0.5, 1, 2, 3, 4.5, 6.5, 7, 10, 11, 15, 18, 20, 25, 30, 40, 50, 65, 80, 100, 200]
+
+function abrirTrasplanteLote() {
+  trasplanteLoteForm.value = {
+    maceta_origen_l:  lote.value?.tamanio_maceta || null,
+    maceta_destino_l: null,
+    notas: '',
+  }
+  trasplanteLoteError.value = null
+  showTrasplanteLote.value  = true
+}
+
+async function guardarTrasplanteLote() {
+  const f = trasplanteLoteForm.value
+  if (!f.maceta_destino_l || f.maceta_destino_l <= 0) {
+    trasplanteLoteError.value = 'Seleccioná o ingresá el tamaño de maceta destino'; return
+  }
+  savingTrasplanteLote.value = true
+  trasplanteLoteError.value  = null
+  try {
+    await updateLote(id, { tamanio_maceta: parseFloat(f.maceta_destino_l) })
+    await lotes.fetchOne(id)
+    showTrasplanteLote.value = false
+    toast.success(`Lote trasplantado a maceta ${f.maceta_destino_l}L`)
+  } catch (e) {
+    trasplanteLoteError.value = e?.response?.data?.error || 'Error al guardar'
+  } finally {
+    savingTrasplanteLote.value = false
+  }
+}
+
 function loteEscapeHandler(e) {
   if (e.key !== 'Escape') return
+  if (showFotoUploadModal.value)      { cancelarSubidaFoto(); return }
+  if (showTrasplanteLote.value)       { showTrasplanteLote.value = false; return }
   if (showEditLote.value)             { showEditLote.value = false; return }
   if (showCerrarCuradoModal.value)    { showCerrarCuradoModal.value = false; return }
   if (showCosechaPartialModal.value)  { showCosechaPartialModal.value = false; return }
@@ -796,6 +906,10 @@ onUnmounted(() => {
           <button class="ld__btn-secondary" @click="abrirRegistroModal">
             <i class="bi bi-clipboard-data"></i>Registrar lote
           </button>
+          <button v-if="canEdit && ['planificacion','vegetativo','floracion'].includes(lote.estado)"
+                  class="ld__btn-trasplante" @click="abrirTrasplanteLote" title="Trasplantar lote a nueva maceta">
+            <i class="bi bi-arrow-up-circle"></i>Trasplantar
+          </button>
           <button v-if="canEdit" class="ld__btn-edit" @click="openEditLote" title="Editar lote">
             <i class="bi bi-pencil"></i>
           </button>
@@ -863,6 +977,16 @@ onUnmounted(() => {
                   @click.stop="showCosechaPartialModal = true"
                 >
                   🌿 Cosechar
+                </button>
+                <button
+                  v-if="plantList.length > 0"
+                  class="ld__btn-sm ld__btn-sm--qr"
+                  :disabled="downloadingQRs"
+                  title="Descargar QRs de todas las plantas"
+                  @click.stop="descargarTodosQRs"
+                >
+                  <i class="bi" :class="downloadingQRs ? 'bi-hourglass-split' : 'bi-qr-code'"></i>
+                  {{ downloadingQRs ? 'Descargando…' : 'QRs' }}
                 </button>
                 <button v-if="canEdit || isCultivador" class="ld__btn-sm" @click.stop="openAddPlanta">
                   <i class="bi bi-plus-lg"></i>
@@ -1077,7 +1201,7 @@ onUnmounted(() => {
                 <i class="bi ld__chevron" :class="fotosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
               </div>
             </button>
-            <input ref="fotoInput" type="file" accept="image/*" style="display:none" @change="handleFotoUpload" />
+            <input ref="fotoInput" type="file" accept="image/*" style="display:none" @change="handleFotoSelect" />
             <div v-show="fotosExpanded" class="ld__section-body">
               <EmptyState v-if="fotos.length === 0" icon="📷" title="Sin fotos todavía" compact>
                 <template #actions>
@@ -1085,9 +1209,19 @@ onUnmounted(() => {
                 </template>
               </EmptyState>
               <div v-else class="ld__fotos-grid">
-                <div v-for="(f, i) in fotos" :key="f.id" class="ld__foto" @click="openLightbox(i)" style="cursor:pointer">
-                  <img :src="f.url" :alt="f.filename" class="ld__foto-img" />
-                  <div class="ld__foto-meta">{{ f.created_at_label }}</div>
+                <div v-for="(f, i) in fotos" :key="f.id" class="ld__foto">
+                  <div class="ld__foto-img-wrap" @click="openLightbox(i)">
+                    <img :src="f.url" :alt="f.filename" class="ld__foto-img" />
+                  </div>
+                  <div class="ld__foto-footer">
+                    <div class="ld__foto-info">
+                      <span v-if="f.descripcion" class="ld__foto-desc">{{ f.descripcion }}</span>
+                      <span class="ld__foto-date">{{ f.created_at_label }}</span>
+                    </div>
+                    <button v-if="canEdit" class="ld__foto-del" @click.stop="eliminarFoto(f)" title="Eliminar foto">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1120,10 +1254,10 @@ onUnmounted(() => {
           </div>
 
           <!-- Plan vs Real -->
-          <div v-if="canEdit || lote.plants_count_objetivo || lote.rendimiento_objetivo_g" class="ld__card ld__card--mt">
+          <div v-if="canAdmin" class="ld__card ld__card--mt">
             <div class="ld__card-header">
               <span class="ld__card-title">🎯 Plan vs Real</span>
-              <button v-if="canEdit" class="ld__card-action" @click="openPlanForm">
+              <button v-if="canAdmin" class="ld__card-action" @click="openPlanForm">
                 <i class="bi bi-pencil"></i> {{ lote.plants_count_objetivo ? 'Editar' : 'Cargar objetivo' }}
               </button>
             </div>
@@ -1186,11 +1320,11 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Costos de producción: solo admin -->
-          <div v-if="canEdit" class="ld__card ld__card--mt">
+          <!-- Costos de producción: solo admin/supervisor -->
+          <div v-if="canAdmin" class="ld__card ld__card--mt">
             <div class="ld__card-header">
               <span class="ld__card-title">💰 Costos de producción</span>
-              <button v-if="canEdit" class="ld__card-action" @click="openCostoForm">
+              <button v-if="canAdmin" class="ld__card-action" @click="openCostoForm">
                 <i :class="costoLote ? 'bi bi-pencil' : 'bi bi-plus-lg'"></i>
                 {{ costoLote ? 'Editar' : 'Cargar' }}
               </button>
@@ -1752,6 +1886,99 @@ onUnmounted(() => {
       </div>
     </Teleport>
 
+    <!-- ══ Modal Trasplante de Lote ══ -->
+    <Teleport to="body">
+      <div v-if="showTrasplanteLote" class="ld__overlay" @click.self="showTrasplanteLote = false">
+        <div class="ld__modal ld__modal--sm">
+          <div class="ld__modal-header">
+            <div>
+              <h3 class="ld__modal-title">🪴 Trasplantar lote</h3>
+              <p class="ld__modal-sub">{{ lote?.codigo }} · {{ lote?.plants_count }} plantas</p>
+            </div>
+            <button class="ld__modal-close" @click="showTrasplanteLote = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="ld__modal-body">
+            <div v-if="trasplanteLoteError" class="ld__alert">{{ trasplanteLoteError }}</div>
+
+            <div class="ld__tl-grid">
+              <div class="ld__field">
+                <label class="ld__label">Maceta actual <span class="ld__label-unit">litros</span></label>
+                <div v-if="trasplanteLoteForm.maceta_origen_l" class="ld__tl-current">
+                  <span class="ld__tl-current-val">{{ trasplanteLoteForm.maceta_origen_l }}L</span>
+                </div>
+                <div v-else class="ld__input-group">
+                  <input type="number" step="0.5" min="0" class="ld__input"
+                         v-model.number="trasplanteLoteForm.maceta_origen_l" placeholder="Ej: 7" />
+                  <span class="ld__input-suffix">L</span>
+                </div>
+              </div>
+              <div class="ld__field">
+                <label class="ld__label">Maceta destino <span class="ld__label-unit">litros</span> <span class="ld__req">*</span></label>
+                <div class="ld__input-group">
+                  <input type="number" step="0.5" min="0.5" class="ld__input"
+                         v-model.number="trasplanteLoteForm.maceta_destino_l" placeholder="Ej: 11" />
+                  <span class="ld__input-suffix">L</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="trasplanteLoteForm.maceta_origen_l && trasplanteLoteForm.maceta_destino_l"
+                 class="ld__tl-preview">
+              <span class="ld__tl-val">{{ trasplanteLoteForm.maceta_origen_l }}L</span>
+              <i class="bi bi-arrow-right ld__tl-arrow"></i>
+              <span class="ld__tl-val ld__tl-val--dest">{{ trasplanteLoteForm.maceta_destino_l }}L</span>
+              <span class="ld__tl-plants">× {{ lote?.plants_count }} plantas</span>
+            </div>
+
+            <div class="ld__field" style="margin-top: .85rem">
+              <label class="ld__label">Notas <span class="ld__optional">opcional</span></label>
+              <input type="text" class="ld__input" v-model.trim="trasplanteLoteForm.notas"
+                     placeholder="Ej: trasplante a sustrato definitivo, día 14 vegetativo…" />
+            </div>
+          </div>
+          <div class="ld__modal-footer">
+            <button class="ld__btn-ghost" @click="showTrasplanteLote = false">Cancelar</button>
+            <button class="ld__btn-primary" :disabled="savingTrasplanteLote" @click="guardarTrasplanteLote">
+              <div v-if="savingTrasplanteLote" class="ld__spinner ld__spinner--sm"></div>
+              <i v-else class="bi bi-check-lg"></i>Confirmar trasplante
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ══ Modal Subida de Foto ══ -->
+    <Teleport to="body">
+      <div v-if="showFotoUploadModal" class="ld__overlay" @click.self="cancelarSubidaFoto">
+        <div class="ld__modal ld__modal--sm">
+          <div class="ld__modal-header">
+            <div>
+              <h3 class="ld__modal-title">📷 Subir foto</h3>
+              <p class="ld__modal-sub">{{ fotoUploadFile?.name }}</p>
+            </div>
+            <button class="ld__modal-close" @click="cancelarSubidaFoto"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="ld__modal-body">
+            <div v-if="fotoUploadPreview" class="ld__foto-preview-wrap">
+              <img :src="fotoUploadPreview" class="ld__foto-preview-img" alt="Preview" />
+            </div>
+            <div class="ld__field" style="margin-top: .85rem">
+              <label class="ld__label">Descripción <span class="ld__optional">opcional</span></label>
+              <input type="text" class="ld__input" v-model.trim="fotoUploadDescripcion"
+                     placeholder="Ej: día 14 vegetativo, síntoma de deficiencia…" maxlength="200" />
+            </div>
+          </div>
+          <div class="ld__modal-footer">
+            <button class="ld__btn-ghost" @click="cancelarSubidaFoto">Cancelar</button>
+            <button class="ld__btn-primary" :disabled="uploadingFoto" @click="confirmarSubidaFoto">
+              <div v-if="uploadingFoto" class="ld__spinner ld__spinner--sm"></div>
+              <i v-else class="bi bi-cloud-upload"></i>Subir foto
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <Lightbox
       :images="lightboxImages"
       :index="lightboxIndex"
@@ -1855,10 +2082,19 @@ onUnmounted(() => {
 }
 .ld__registro-metricas { display: flex; flex-wrap: wrap; gap: .5rem; margin: .35rem 0; }
 .ld__metrica { display: flex; align-items: center; gap: .25rem; background: #f4f8f4; border: 1px solid #d4e6d4; border-radius: 6px; padding: .2em .55em; font-size: .72rem; font-weight: 600; }
-.ld__fotos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; padding: 1rem 1.1rem; }
+.ld__fotos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; padding: 1rem 1.1rem; }
 .ld__foto { border-radius: 10px; overflow: hidden; border: 1px solid #d4e6d4; }
-.ld__foto-img { width: 100%; height: 120px; object-fit: cover; display: block; }
-.ld__foto-meta { font-size: .65rem; color: #94a3b8; padding: .3rem .5rem; background: #f4f8f4; text-align: center; }
+.ld__foto-img-wrap { cursor: pointer; }
+.ld__foto-img { width: 100%; height: 120px; object-fit: cover; display: block; transition: opacity .15s; }
+.ld__foto-img-wrap:hover .ld__foto-img { opacity: .85; }
+.ld__foto-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: .25rem; padding: .35rem .5rem; background: #f4f8f4; min-height: 28px; }
+.ld__foto-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ld__foto-desc { font-size: .65rem; color: var(--c-ink-700, #334155); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.ld__foto-date { font-size: .6rem; color: #94a3b8; }
+.ld__foto-del { flex-shrink: 0; background: none; border: none; padding: 2px 3px; cursor: pointer; color: #94a3b8; border-radius: 4px; line-height: 1; font-size: .7rem; transition: color .12s, background .12s; }
+.ld__foto-del:hover { color: #dc2626; background: #fee2e2; }
+.ld__foto-preview-wrap { border-radius: 8px; overflow: hidden; border: 1px solid var(--c-ink-100, #e2e8f0); }
+.ld__foto-preview-img { width: 100%; max-height: 240px; object-fit: contain; display: block; background: #f8fafc; }
 .ld__selector { display: flex; gap: .4rem; flex-wrap: wrap; }
 .ld__sel-btn { display: flex; align-items: center; gap: .3rem; padding: .4rem .8rem; border: 1.5px solid #d4e6d4; border-radius: 8px; background: #f4f8f4; font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .15s; text-transform: capitalize; }
 .ld__sel-btn:hover { border-color: #1b5e20; }
@@ -1925,6 +2161,32 @@ onUnmounted(() => {
 .ld__btn-ghost:hover { background: #f0fdf4; }
 .ld__btn-edit { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #475569; border: 1.5px solid #e2e8f0; padding: .6rem .9rem; border-radius: 8px; font-size: .875rem; cursor: pointer; transition: all .15s; }
 .ld__btn-edit:hover { background: #f8fafc; border-color: #94a3b8; }
+.ld__btn-trasplante { display: inline-flex; align-items: center; gap: .4rem; background: #fffbeb; color: #92400e; border: 1.5px solid #fde68a; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.ld__btn-trasplante:hover { background: #fef3c7; border-color: #fcd34d; }
+
+/* Trasplante de lote */
+.ld__modal--sm { max-width: 440px; }
+.ld__tl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; margin-bottom: .75rem; }
+.ld__input-group { display: flex; }
+.ld__input-group .ld__input { border-radius: 8px 0 0 8px; }
+.ld__input-suffix { background: #e8f5e9; border: 1.5px solid #d4e6d4; border-left: none; padding: .55rem .7rem; font-size: .8rem; font-weight: 600; color: #1b5e20; border-radius: 0 8px 8px 0; white-space: nowrap; }
+.ld__tl-current {
+  background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px;
+  padding: .55rem .8rem; min-height: 38px; display: flex; align-items: center;
+}
+.ld__tl-current-val  { font-size: 1rem; font-weight: 700; color: #374151; }
+.ld__tl-current-none { font-size: .82rem; color: #94a3b8; font-style: italic; }
+.ld__label-unit { font-size: .65rem; color: #94a3b8; font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: .2rem; }
+.ld__req { color: #dc2626; font-weight: 700; }
+.ld__tl-preview {
+  display: flex; align-items: center; justify-content: center; gap: .85rem;
+  background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 10px;
+  padding: .85rem 1rem; margin-bottom: .5rem;
+}
+.ld__tl-val { font-size: 1.4rem; font-weight: 800; color: #92400e; }
+.ld__tl-val--dest { color: #1b5e20; }
+.ld__tl-arrow { color: #d97706; font-size: 1.1rem; }
+.ld__tl-plants { font-size: .75rem; color: #60725d; font-weight: 600; margin-left: .25rem; }
 .ld__btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #dc2626; color: #fff; border: none; padding: .6rem .9rem; border-radius: 8px; font-size: .875rem; cursor: pointer; transition: background .15s; }
 .ld__btn-danger:hover:not(:disabled) { background: #b91c1c; }
 .ld__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
@@ -1939,6 +2201,9 @@ onUnmounted(() => {
 .ld__btn-sm:hover { background: #1b5e20; color: #fff; }
 .ld__btn-sm--cosecha { background: #dcfce7; border-color: #86efac; color: #15803d; }
 .ld__btn-sm--cosecha:hover { background: #15803d; color: #fff; }
+.ld__btn-sm--qr { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+.ld__btn-sm--qr:hover:not(:disabled) { background: #1d4ed8; color: #fff; }
+.ld__btn-sm--qr:disabled { opacity: .6; cursor: not-allowed; }
 .ld__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
 .ld__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(27,94,32,.15); display: flex; flex-direction: column; }
 .ld__modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid #e8f0e9; position: sticky; top: 0; background: #fff; z-index: 1; }

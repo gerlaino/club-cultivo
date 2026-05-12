@@ -5,7 +5,7 @@ class Dispositivo < ApplicationRecord
 
   encrypts :metadata, deterministic: false
 
-  TIPOS   = %w[pulse bluelab tuya_plug shelly_plug melcloud_ac daikin generic].freeze
+  TIPOS   = %w[sonoff_th pulse bluelab tuya_plug shelly_plug melcloud_ac daikin generic].freeze
   ESTADOS = %w[activo mantenimiento baja].freeze
 
   validates :nombre_amigable, presence: true

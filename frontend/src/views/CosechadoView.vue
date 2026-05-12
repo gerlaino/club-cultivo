@@ -3,89 +3,107 @@
 
     <!-- Header -->
     <div class="cv__header">
-      <div>
-        <h1 class="cv__title">Cosecha</h1>
-        <p class="cv__sub">Lotes post-cosecha de tus salas asignadas</p>
+      <div class="cv__header-left">
+        <h1 class="cv__title">Mis cosechas</h1>
+        <p class="cv__sub">Lotes que cosechaste y pasaron a post-producción</p>
       </div>
-    </div>
-
-    <!-- Stats -->
-    <div class="cv__kpis">
-      <div class="cv__kpi">
-        <div class="cv__kpi-val">{{ loading ? '—' : lotesCosechados.length }}</div>
-        <div class="cv__kpi-label">Lotes</div>
+      <div v-if="!loading && lotesCosechados.length" class="cv__header-stat">
+        <span class="cv__stat-num">{{ lotesCosechados.length }}</span>
+        <span class="cv__stat-label">lote{{ lotesCosechados.length !== 1 ? 's' : '' }}</span>
       </div>
-      <div class="cv__kpi">
-        <div class="cv__kpi-val">{{ loading ? '—' : totalPlantas }}</div>
-        <div class="cv__kpi-label">Plantas cosechadas</div>
-      </div>
-      <div class="cv__kpi">
-        <div class="cv__kpi-val">{{ loading ? '—' : formatGramos(totalGramos) }}</div>
-        <div class="cv__kpi-label">Producción total</div>
-        <div class="cv__kpi-hint">solo lotes finalizados</div>
-      </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="cv__filters">
-      <button
-        v-for="f in FILTROS" :key="f.key"
-        class="cv__chip"
-        :class="{ 'cv__chip--active': filtro === f.key }"
-        @click="filtro = f.key"
-      >
-        {{ f.label }}
-        <span class="cv__chip-count">{{ contar(f.key) }}</span>
-      </button>
     </div>
 
     <!-- Loading -->
     <div v-if="loading" class="cv__loading">
-      <div class="cv__spinner"></div>
-      <span>Cargando lotes…</span>
+      <div class="cv__skeleton" v-for="i in 5" :key="i"></div>
     </div>
 
     <!-- Empty -->
-    <div v-else-if="!lotesFiltrados.length" class="cv__empty">
-      <Sprout :size="32" :stroke-width="1.25" />
-      <p>Sin lotes en esta vista</p>
-      <span v-if="filtro === 'todos'">
-        Los lotes aparecen acá cuando avanzan a cosecha o finalización.
-      </span>
-      <span v-else>Cambiá el filtro para ver otros estados.</span>
+    <div v-else-if="!lotesCosechados.length" class="cv__empty">
+      <div class="cv__empty-icon">🌿</div>
+      <p class="cv__empty-title">Todavía no hay cosechas</p>
+      <p class="cv__empty-sub">Los lotes aparecen acá cuando avanzás a cosecha desde el detalle del lote.</p>
     </div>
 
-    <!-- List -->
-    <div v-else class="cv__list">
-      <RouterLink
-        v-for="lote in lotesFiltrados"
-        :key="lote.id"
-        :to="{ name: 'lote-detail', params: { id: lote.id } }"
-        class="cv__row"
-      >
-        <div class="cv__row-av" :class="`cv__av--${lote.estado}`">
-          <Leaf :size="14" :stroke-width="2" />
-        </div>
+    <!-- Tabla -->
+    <template v-else>
+      <div class="cv__table-wrap">
+        <table class="cv__table">
+          <thead>
+            <tr>
+              <th class="cv__th cv__th--lote">Lote</th>
+              <th class="cv__th cv__th--genetica">Genética</th>
+              <th class="cv__th cv__th--sala">Sala</th>
+              <th class="cv__th cv__th--plantas">Plantas</th>
+              <th class="cv__th cv__th--veg">Días veg.</th>
+              <th class="cv__th cv__th--flor">Días flor.</th>
+              <th class="cv__th cv__th--cosecha">Fecha cosechado</th>
+              <th class="cv__th cv__th--arrow"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="lote in paginados"
+              :key="lote.id"
+              class="cv__tr"
+              @click="$router.push({ name: 'lote-detail', params: { id: lote.id } })"
+            >
+              <td class="cv__td cv__td--lote">
+                <div class="cv__lote-av">
+                  <Leaf :size="13" :stroke-width="2" />
+                </div>
+                <span class="cv__lote-codigo">{{ lote.codigo }}</span>
+              </td>
+              <td class="cv__td cv__td--genetica">
+                <span class="cv__genetica">{{ lote.genetica?.nombre || '—' }}</span>
+              </td>
+              <td class="cv__td cv__td--sala">
+                <span class="cv__sala">{{ lote.sala?.nombre || '—' }}</span>
+              </td>
+              <td class="cv__td cv__td--plantas">
+                <span class="cv__pill-plantas">{{ lote.plants_count ?? '—' }}</span>
+              </td>
+              <td class="cv__td cv__td--veg">
+                <span v-if="lote.dias_vegetacion != null" class="cv__dias">{{ lote.dias_vegetacion }}d</span>
+                <span v-else class="cv__dias cv__dias--none">—</span>
+              </td>
+              <td class="cv__td cv__td--flor">
+                <span v-if="lote.dias_floracion != null" class="cv__dias">{{ lote.dias_floracion }}d</span>
+                <span v-else class="cv__dias cv__dias--none">—</span>
+              </td>
+              <td class="cv__td cv__td--cosecha">
+                <span v-if="lote.fecha_cosechado" class="cv__fecha">{{ formatFecha(lote.fecha_cosechado) }}</span>
+                <span v-else class="cv__fecha cv__fecha--none">—</span>
+              </td>
+              <td class="cv__td cv__td--arrow">
+                <ChevronRight :size="14" class="cv__arrow" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-        <div class="cv__row-info">
-          <span class="cv__row-codigo">{{ lote.codigo }}</span>
-          <span class="cv__row-sep">·</span>
-          <span class="cv__row-cepa">{{ lote.genetica?.nombre || '—' }}</span>
-          <span class="cv__row-sep">·</span>
-          <span class="cv__row-sala">{{ lote.sala?.nombre || '—' }}</span>
+      <!-- Paginación -->
+      <div v-if="totalPaginas > 1" class="cv__pager">
+        <button class="cv__pager-btn" :disabled="pagina === 1" @click="pagina--">
+          <ChevronLeft :size="15" />
+        </button>
+        <div class="cv__pager-pages">
+          <button
+            v-for="p in paginas"
+            :key="p"
+            class="cv__pager-num"
+            :class="{ 'cv__pager-num--active': p === pagina, 'cv__pager-num--ellipsis': p === '…' }"
+            :disabled="p === '…'"
+            @click="p !== '…' && (pagina = p)"
+          >{{ p }}</button>
         </div>
-
-        <div class="cv__row-right">
-          <span v-if="pesoLote(lote)" class="cv__row-peso">
-            {{ formatGramos(pesoLote(lote)) }}
-          </span>
-          <span class="cv__badge" :class="`cv__badge--${lote.estado}`">
-            {{ ESTADO_LABEL[lote.estado] || lote.estado }}
-          </span>
-          <ChevronRight :size="15" class="cv__row-arrow" />
-        </div>
-      </RouterLink>
-    </div>
+        <button class="cv__pager-btn" :disabled="pagina === totalPaginas" @click="pagina++">
+          <ChevronRight :size="15" />
+        </button>
+        <span class="cv__pager-info">{{ desde }}–{{ hasta }} de {{ lotesCosechados.length }}</span>
+      </div>
+    </template>
 
   </div>
 </template>
@@ -93,63 +111,42 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { listLotes } from '../lib/api.js'
-import { ChevronRight, Sprout, Leaf } from 'lucide-vue-next'
+import { ChevronRight, ChevronLeft, Leaf } from 'lucide-vue-next'
 
-const ESTADOS_COSECHA = ['cosecha', 'en_manicura', 'manicura_pendiente', 'curado', 'finalizado']
-
-const ESTADO_LABEL = {
-  cosecha:            'Cosechado',
-  en_manicura:        'En manicura',
-  manicura_pendiente: 'Pdte. aprobación',
-  curado:             'Curando',
-  finalizado:         'Finalizado',
-}
-
-const FILTROS = [
-  { key: 'todos',             label: 'Todos' },
-  { key: 'cosecha',           label: 'Cosechado' },
-  { key: 'en_manicura',       label: 'En manicura' },
-  { key: 'manicura_pendiente',label: 'Pdte. aprobación' },
-  { key: 'finalizado',        label: 'Finalizado' },
-]
+const PER_PAGE = 15
 
 const loading = ref(true)
 const lotes   = ref([])
-const filtro  = ref('todos')
+const pagina  = ref(1)
 
 const lotesCosechados = computed(() =>
   lotes.value
-    .filter(l => ESTADOS_COSECHA.includes(l.estado))
+    .filter(l => l.estado === 'cosecha')
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 )
 
-const lotesFiltrados = computed(() => {
-  if (filtro.value === 'todos') return lotesCosechados.value
-  return lotesCosechados.value.filter(l => l.estado === filtro.value)
+const totalPaginas = computed(() => Math.ceil(lotesCosechados.value.length / PER_PAGE))
+const desde        = computed(() => (pagina.value - 1) * PER_PAGE + 1)
+const hasta        = computed(() => Math.min(pagina.value * PER_PAGE, lotesCosechados.value.length))
+const paginados    = computed(() => lotesCosechados.value.slice(desde.value - 1, hasta.value))
+
+const paginas = computed(() => {
+  const total = totalPaginas.value
+  const cur   = pagina.value
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages = new Set([1, total, cur, cur - 1, cur + 1].filter(p => p >= 1 && p <= total))
+  const sorted = [...pages].sort((a, b) => a - b)
+  const result = []
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('…')
+    result.push(sorted[i])
+  }
+  return result
 })
 
-function contar(key) {
-  if (key === 'todos') return lotesCosechados.value.length
-  return lotesCosechados.value.filter(l => l.estado === key).length
-}
-
-function pesoLote(lote) {
-  return lote.gramos_producidos || lote.peso_final_g || lote.ultima_pesada_manicura?.peso_seco_g || null
-}
-
-const totalGramos = computed(() =>
-  lotesCosechados.value
-    .filter(l => l.estado === 'finalizado')
-    .reduce((acc, l) => acc + (pesoLote(l) || 0), 0)
-)
-const totalPlantas = computed(() =>
-  lotesCosechados.value.reduce((acc, l) => acc + (l.plants_count || 0), 0)
-)
-
-function formatGramos(g) {
-  if (!g) return '—'
-  if (g >= 1000) return (g / 1000).toFixed(2).replace('.', ',') + ' kg'
-  return Math.round(g) + ' g'
+function formatFecha(d) {
+  if (!d) return '—'
+  return new Date(d + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 onMounted(async () => {
@@ -163,140 +160,84 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.cv { padding: var(--sp-6); max-width: 900px; }
+.cv { padding: 1.5rem 1.25rem; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 640px) { .cv { padding: 1rem .75rem; } }
 
 /* Header */
-.cv__header { margin-bottom: var(--sp-5); }
-.cv__title { font-size: var(--fs-24); font-weight: 800; color: var(--c-ink-900); margin: 0 0 var(--sp-1); }
-.cv__sub   { font-size: var(--fs-14); color: var(--c-ink-500); margin: 0; }
+.cv__header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; gap: 1rem; }
+.cv__title { font-size: 1.5rem; font-weight: 700; color: #0f2611; margin: 0 0 .25rem; }
+.cv__sub   { font-size: .85rem; color: #60725d; margin: 0; }
+.cv__header-stat { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; padding-top: 2px; }
+.cv__stat-num   { font-size: 2rem; font-weight: 700; color: #1b5e20; line-height: 1; }
+.cv__stat-label { font-size: .72rem; color: #60725d; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
 
-/* KPIs */
-.cv__kpis {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-5);
-}
-@media (max-width: 600px) { .cv__kpis { grid-template-columns: 1fr 1fr; } }
-
-.cv__kpi {
-  background: var(--c-paper);
-  border: 1px solid var(--c-ink-100);
-  border-radius: var(--r-lg);
-  padding: var(--sp-4) var(--sp-5);
-}
-.cv__kpi-val {
-  font-size: var(--fs-24);
-  font-weight: 800;
-  color: var(--c-ink-900);
-  letter-spacing: -.03em;
-  margin-bottom: 2px;
-  font-family: var(--font-mono);
-}
-.cv__kpi-label {
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: var(--c-ink-500);
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-.cv__kpi-hint {
-  font-size: var(--fs-11);
-  color: var(--c-ink-300);
-  margin-top: 2px;
-}
-
-/* Filters */
-.cv__filters { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-5); flex-wrap: wrap; }
-.cv__chip {
-  display: inline-flex; align-items: center; gap: var(--sp-2);
-  background: var(--c-paper); border: 1px solid var(--c-ink-200);
-  border-radius: 999px; padding: var(--sp-1) var(--sp-3);
-  font-size: var(--fs-13); font-weight: 500; color: var(--c-ink-600);
-  cursor: pointer; transition: all .15s;
-}
-.cv__chip:hover { border-color: var(--c-role-cultivador); color: var(--c-role-cultivador); }
-.cv__chip--active { background: var(--c-role-cultivador); border-color: var(--c-role-cultivador); color: #fff; }
-.cv__chip-count {
-  font-size: var(--fs-11); font-weight: 700;
-  background: rgba(255,255,255,.25); border-radius: 999px;
-  padding: 1px 6px; line-height: 1.4;
-}
-.cv__chip:not(.cv__chip--active) .cv__chip-count { background: var(--c-ink-100); color: var(--c-ink-500); }
-
-/* Loading */
-.cv__loading {
-  display: flex; align-items: center; gap: var(--sp-3);
-  padding: var(--sp-12) 0; justify-content: center;
-  color: var(--c-ink-400); font-size: var(--fs-14);
-}
-.cv__spinner {
-  width: 18px; height: 18px;
-  border: 2px solid var(--c-ink-200); border-top-color: var(--c-role-cultivador);
-  border-radius: 50%; animation: cv-spin .7s linear infinite;
-}
-@keyframes cv-spin { to { transform: rotate(360deg); } }
+/* Loading skeletons */
+.cv__loading { display: flex; flex-direction: column; gap: .4rem; margin-top: .5rem; }
+.cv__skeleton { height: 52px; border-radius: 10px; background: linear-gradient(90deg, #f0f4f0 25%, #e4ebe4 50%, #f0f4f0 75%); background-size: 200% 100%; animation: cv-shimmer 1.4s ease infinite; }
+.cv__skeleton:nth-child(2) { opacity: .8; }
+.cv__skeleton:nth-child(3) { opacity: .6; }
+.cv__skeleton:nth-child(4) { opacity: .4; }
+.cv__skeleton:nth-child(5) { opacity: .25; }
+@keyframes cv-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
 /* Empty */
-.cv__empty {
-  display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
-  padding: var(--sp-12) var(--sp-6); color: var(--c-ink-300); text-align: center;
-}
-.cv__empty p    { font-size: var(--fs-15); font-weight: 600; color: var(--c-ink-600); margin: 0; }
-.cv__empty span { font-size: var(--fs-13); color: var(--c-ink-400); max-width: 340px; }
+.cv__empty { display: flex; flex-direction: column; align-items: center; gap: .75rem; padding: 4rem 1.5rem; text-align: center; }
+.cv__empty-icon  { font-size: 2.5rem; line-height: 1; }
+.cv__empty-title { font-size: 1rem; font-weight: 700; color: #0f2611; margin: 0; }
+.cv__empty-sub   { font-size: .85rem; color: #60725d; margin: 0; max-width: 360px; line-height: 1.6; }
 
-/* List */
-.cv__list { display: flex; flex-direction: column; gap: 2px; }
+/* Table */
+.cv__table-wrap { background: #fff; border: 1px solid #e8f0e9; border-radius: 12px; overflow: hidden; margin-bottom: 1.25rem; }
+.cv__table      { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.cv__th { padding: .75rem 1rem; background: #f6faf6; font-weight: 600; color: #0f2611; text-align: left; border-bottom: 1px solid #e8f0e9; font-size: .78rem; white-space: nowrap; }
+.cv__th--arrow   { width: 32px; }
+.cv__th--plantas { width: 80px; text-align: center; }
+.cv__th--veg     { width: 80px; text-align: center; }
+.cv__th--flor    { width: 80px; text-align: center; }
+.cv__th--cosecha { width: 120px; }
 
-.cv__row {
-  display: flex; align-items: center; gap: var(--sp-3);
-  background: var(--c-paper); border: 1px solid var(--c-ink-100);
-  border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
-  text-decoration: none; color: inherit;
-  transition: border-color .15s, box-shadow .15s;
-}
-.cv__row:hover {
-  border-color: var(--c-role-cultivador);
-  box-shadow: 0 1px 6px rgba(8,145,178,.08);
-}
+.cv__tr { cursor: pointer; border-bottom: 1px solid #f0f4f0; transition: background .12s; }
+.cv__tr:last-child { border-bottom: none; }
+.cv__tr:hover td { background: #f8fdf8; }
 
-.cv__row-av {
-  width: 32px; height: 32px; border-radius: var(--r-sm);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.cv__av--cosecha            { background: #dcfce7; color: #15803d; }
-.cv__av--en_manicura        { background: #ede9fe; color: #7c3aed; }
-.cv__av--manicura_pendiente { background: #fff7ed; color: #c2410c; }
-.cv__av--curado             { background: #eff6ff; color: #1d4ed8; }
-.cv__av--finalizado         { background: var(--c-ink-100); color: var(--c-ink-500); }
+.cv__td { padding: .75rem 1rem; vertical-align: middle; }
 
-.cv__row-info {
-  flex: 1; min-width: 0;
-  display: flex; align-items: baseline; gap: var(--sp-2); overflow: hidden;
-}
-.cv__row-codigo {
-  font-size: var(--fs-13); font-weight: 700; color: var(--c-ink-900);
-  font-family: var(--font-mono); white-space: nowrap; flex-shrink: 0;
-}
-.cv__row-sep   { color: var(--c-ink-300); font-size: var(--fs-11); flex-shrink: 0; }
-.cv__row-cepa  { font-size: var(--fs-13); color: var(--c-ink-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cv__row-sala  { font-size: var(--fs-12); color: var(--c-ink-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Lote cell */
+.cv__td--lote  { display: flex; align-items: center; gap: .6rem; }
+.cv__lote-av   { width: 28px; height: 28px; flex-shrink: 0; border-radius: 7px; background: #dcfce7; color: #15803d; display: flex; align-items: center; justify-content: center; }
+.cv__lote-codigo { font-weight: 700; color: #0f2611; font-size: .9rem; white-space: nowrap; }
 
-.cv__row-right { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; }
-.cv__row-peso {
-  font-family: var(--font-mono); font-size: var(--fs-12);
-  font-weight: 600; color: var(--c-leaf-700);
-}
-.cv__row-arrow { color: var(--c-ink-300); }
+/* Other cells */
+.cv__genetica { color: #0f2611; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.cv__sala     { color: #60725d; }
+.cv__td--plantas { text-align: center; }
+.cv__pill-plantas { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 22px; background: #f0fdf4; border: 1px solid #c8e6c9; color: #1b5e20; font-size: .78rem; font-weight: 700; border-radius: 999px; padding: 0 .4rem; }
+.cv__td--veg, .cv__td--flor { text-align: center; }
+.cv__dias      { font-weight: 600; color: #0f2611; font-variant-numeric: tabular-nums; }
+.cv__dias--none { color: #c8e6c9; font-weight: 400; }
+.cv__fecha     { color: #60725d; }
+.cv__fecha--none { color: #c8e6c9; }
+.cv__td--arrow { text-align: center; padding-right: .5rem; }
+.cv__arrow     { color: #c8e6c9; transition: color .12s; }
+.cv__tr:hover .cv__arrow { color: #1b5e20; }
 
-/* Badge estados */
-.cv__badge {
-  font-size: 11px; font-weight: 600; padding: .2em .65em;
-  border-radius: 999px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+/* Paginación */
+.cv__pager { display: flex; gap: .3rem; justify-content: center; margin-top: .75rem; align-items: center; flex-wrap: wrap; }
+.cv__pager-btn { min-width: 34px; height: 34px; padding: 0 .5rem; border: 1px solid #e8f0e9; border-radius: 8px; background: #fff; color: #60725d; font-size: .85rem; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center; }
+.cv__pager-btn:hover:not(:disabled) { background: #f0fdf4; border-color: #1b5e20; color: #1b5e20; }
+.cv__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.cv__pager-pages { display: flex; align-items: center; gap: .25rem; }
+.cv__pager-num { min-width: 34px; height: 34px; border: 1px solid transparent; border-radius: 8px; background: transparent; font-size: .85rem; font-weight: 600; color: #60725d; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; padding: 0 .5rem; }
+.cv__pager-num:hover:not(:disabled):not(.cv__pager-num--active) { background: #f0fdf4; border-color: #e8f0e9; }
+.cv__pager-num--active  { background: #1b5e20; border-color: #1b5e20; color: #fff; cursor: default; }
+.cv__pager-num--ellipsis { cursor: default; color: #c8e6c9; }
+.cv__pager-info { margin-left: .5rem; font-size: .78rem; color: #60725d; white-space: nowrap; }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .cv__th--sala,    .cv__td--sala,
+  .cv__th--veg,     .cv__td--veg,
+  .cv__th--flor,    .cv__td--flor,
+  .cv__th--cosecha, .cv__td--cosecha { display: none; }
 }
-.cv__badge--cosecha            { background: #dcfce7; color: #15803d; }
-.cv__badge--en_manicura        { background: #ede9fe; color: #7c3aed; }
-.cv__badge--manicura_pendiente { background: #fff7ed; color: #c2410c; }
-.cv__badge--curado             { background: #eff6ff; color: #1d4ed8; }
-.cv__badge--finalizado         { background: var(--c-ink-100); color: var(--c-ink-500); }
 </style>

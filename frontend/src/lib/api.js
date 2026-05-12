@@ -272,8 +272,9 @@ export const deleteTarea       = (id)           => api.delete(`/tareas/${id}`)
 export const iniciarTarea      = (id)           => api.post(`/tareas/${id}/iniciar`)
 export const completarTarea    = (id, data)     => api.post(`/tareas/${id}/completar`, data)
 export const cancelarTarea     = (id)           => api.post(`/tareas/${id}/cancelar`)
-export const getTareasSemana   = (desde)        => api.get('/tareas/semana', { params: { desde } })
-export const cancelarSerieTarea = (id)          => api.delete(`/tareas/${id}/cancelar_serie`)
+export const getTareasSemana    = (desde)        => api.get('/tareas/semana', { params: { desde } })
+export const cancelarSerieTarea = (id)           => api.delete(`/tareas/${id}/cancelar_serie`)
+export const getHistorial       = (params = {})  => api.get('/historial', { params })
 
 // Gestión de cultivadores asignados a salas
 
@@ -319,8 +320,9 @@ export const getLoteEventos    = (loteId)          => api.get(`/lotes/${loteId}/
 export const createLoteEvento  = (loteId, payload)  => api.post(`/lotes/${loteId}/lote_eventos`, { lote_evento: payload })
 export const cosecharPlantas   = (loteId, payload)  => api.post(`/lotes/${loteId}/cosechar_plantas`, payload)
 
-export const getLoteFotos    = (loteId)        => api.get(`/lotes/${loteId}/fotos`)
+export const getLoteFotos    = (loteId)          => api.get(`/lotes/${loteId}/fotos`)
 export const uploadFotoLote  = (loteId, formData) => api.post(`/lotes/${loteId}/fotos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const deleteFotoLote  = (loteId, fotoId)   => api.delete(`/lotes/${loteId}/fotos/${fotoId}`)
 
 // ── Super Admin ──────────────────────────────────────────────────────
 export const getSuperAdminStats  = ()             => api.get('/super_admin/stats')

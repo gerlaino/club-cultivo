@@ -14,10 +14,11 @@ class WebhookJob < ApplicationJob
 
   def driver_para(tipo)
     case tipo
-    when 'generic' then Sensors::BaseDriver
+    when 'generic'   then Sensors::GenericDriver
+    when 'sonoff_th' then Sensors::SonoffDriver
     else
       klass_name = "Sensors::#{tipo.camelize}Driver"
-      klass_name.constantize rescue Sensors::BaseDriver
+      klass_name.constantize rescue Sensors::GenericDriver
     end
   end
 end

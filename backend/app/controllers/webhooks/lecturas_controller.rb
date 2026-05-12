@@ -23,8 +23,7 @@ module Webhooks
     end
 
     def payload_params
-      params.permit(:temperatura, :humedad, :co2, :luminosidad, :ppfd, :ec, :ph,
-                    :timestamp, :presion, :voc).to_h
+      params.to_unsafe_h.except('controller', 'action', 'dispositivo_id', 'format')
     end
   end
 end

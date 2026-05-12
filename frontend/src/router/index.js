@@ -135,6 +135,12 @@ const routes = [
     beforeEnter: requiresPermission("lotes", "index"),
   },
   {
+    path: "/historial-cultivador",
+    name: "historial-cultivador",
+    component: () => import("../views/HistorialCultivadorView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/rendimiento",
     name: "rendimiento",
     component: () => import("../views/RendimientoView.vue"),

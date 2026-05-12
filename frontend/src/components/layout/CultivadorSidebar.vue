@@ -43,7 +43,7 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import LeafSeal from '../../design-system/icons/LeafSeal.vue'
 import DsAvatar from '../../design-system/components/Avatar.vue'
-import { Home, LayoutGrid, PackageCheck, LogOut } from 'lucide-vue-next'
+import { Home, LayoutGrid, PackageCheck, History, LogOut } from 'lucide-vue-next'
 
 const route  = useRoute()
 const router = useRouter()
@@ -51,9 +51,10 @@ const auth   = useAuthStore()
 const club   = useClubStore()
 
 const NAV_LINKS = [
-  { to: '/',          icon: Home,        label: 'Inicio' },
-  { to: '/salas',     icon: LayoutGrid,  label: 'Mis salas' },
-  { to: '/cosechado', icon: PackageCheck, label: 'Cosechado' },
+  { to: '/',                     icon: Home,         label: 'Inicio' },
+  { to: '/salas',                icon: LayoutGrid,   label: 'Mis salas' },
+  { to: '/cosechado',            icon: PackageCheck, label: 'Cosechado' },
+  { to: '/historial-cultivador', icon: History,      label: 'Historial' },
 ]
 
 function isActive(to) {

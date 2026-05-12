@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
 import { usePlantsStore } from '../stores/plants'
@@ -9,7 +9,8 @@ import AsistenteVoz from '../components/AsistenteVoz.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import Lightbox from '../components/ui/Lightbox.vue'
-import { useToast } from '../composables/useToast.js'
+import { useToast }      from '../composables/useToast.js'
+import { useBluelabBLE } from '../composables/useBluelabBLE.js'
 
 const contextoAsistente = computed(() => planta.value ? {
   tipo:          'planta',
@@ -142,6 +143,15 @@ const ultimoRegistro = computed(() => {
   return activities.value.find(a => a.activity_type === 'registro_planta') || null
 })
 
+const ultimoTrasplante = computed(() =>
+  activities.value.find(a => a.activity_type === 'transplant') || null
+)
+
+const macetaActual = computed(() => {
+  if (ultimoTrasplante.value?.metadata?.maceta_destino_l) return ultimoTrasplante.value.metadata.maceta_destino_l
+  return planta.value?.lote?.tamanio_maceta || null
+})
+
 const alturaActual = computed(() => {
   const r = ultimoRegistro.value
   return r?.metadata?.altura_cm || planta.value?.altura_actual || null
@@ -204,6 +214,94 @@ function toggleFotos() {
 }
 async function handleFotoUpload() {
   toast.error('Subida de fotos de planta no implementada aún')
+}
+
+// ── Medición sensor (EC / pH / temperatura) ──────────────
+const ble = useBluelabBLE()
+
+const showMedicionModal = ref(false)
+const savingMedicion    = ref(false)
+const medicionError     = ref(null)
+
+function emptyMedicion() {
+  return { ec: null, ph: null, temperatura_sustrato: null, notas: '' }
+}
+const medicionForm = ref(emptyMedicion())
+
+watch(() => ble.lecturas.value.temperatura, (val) => {
+  if (val != null && showMedicionModal.value) medicionForm.value.temperatura_sustrato = val
+})
+
+function abrirMedicion() {
+  medicionForm.value = emptyMedicion()
+  medicionError.value = null
+  showMedicionModal.value = true
+}
+
+async function guardarMedicion() {
+  const m = medicionForm.value
+  if (!m.ec && !m.ph && !m.temperatura_sustrato) {
+    medicionError.value = 'Ingresá al menos un valor (EC, pH o temperatura)'; return
+  }
+  savingMedicion.value = true
+  medicionError.value  = null
+  try {
+    const meta = {}
+    if (m.ec)                   meta.ec                   = parseFloat(m.ec)
+    if (m.ph)                   meta.ph                   = parseFloat(m.ph)
+    if (m.temperatura_sustrato) meta.temperatura_sustrato = parseFloat(m.temperatura_sustrato)
+    meta.fuente = ble.conectado.value ? 'bluelab_ble' : 'manual'
+    if (ble.dispositivo.value?.name) meta.dispositivo = ble.dispositivo.value.name
+
+    const { data } = await createPlantActivity(id, {
+      activity_type: 'measurement',
+      description:   m.notas || null,
+      metadata:      meta,
+    })
+    activities.value.unshift(data)
+    showMedicionModal.value = false
+    await ble.desconectar()
+    toast.success('Medición guardada')
+  } catch (e) {
+    medicionError.value = e?.response?.data?.errors?.join(', ') || 'Error al guardar'
+  } finally {
+    savingMedicion.value = false }
+}
+
+// ── Trasplante ────────────────────────────────────────
+const showTrasplanteModal = ref(false)
+const savingTrasplante    = ref(false)
+const trasplanteError     = ref(null)
+const trasplanteForm      = ref({ maceta_origen_l: null, maceta_destino_l: null, notas: '' })
+
+function abrirTrasplante() {
+  trasplanteForm.value = { maceta_origen_l: macetaActual.value, maceta_destino_l: null, notas: '' }
+  trasplanteError.value = null
+  showTrasplanteModal.value = true
+}
+
+async function guardarTrasplante() {
+  const f = trasplanteForm.value
+  if (!f.maceta_destino_l || f.maceta_destino_l <= 0) {
+    trasplanteError.value = 'Ingresá el tamaño de la maceta destino'; return
+  }
+  savingTrasplante.value = true
+  trasplanteError.value  = null
+  try {
+    const { data } = await createPlantActivity(id, {
+      activity_type: 'transplant',
+      description:   f.notas || null,
+      metadata: {
+        maceta_origen_l:  f.maceta_origen_l  || null,
+        maceta_destino_l: parseFloat(f.maceta_destino_l),
+      },
+    })
+    activities.value.unshift(data)
+    showTrasplanteModal.value = false
+    toast.success('Trasplante registrado')
+  } catch (e) {
+    trasplanteError.value = e?.response?.data?.errors?.join(', ') || 'Error al guardar'
+  } finally { savingTrasplante.value = false }
 }
 
 // ── Manicura weight ───────────────────────────────────
@@ -283,12 +381,18 @@ onMounted(async () => {
             <span>Día {{ diasEnCiclo }}</span>
           </div>
         </div>
-        <div v-if="auth.user?.role !== 'manicura'">
+        <div v-if="auth.user?.role !== 'manicura'" class="pd__hero-actions">
           <AsistenteVoz
             v-if="contextoAsistente"
             :contexto="contextoAsistente"
             @registrado="onRegistradoPorVoz"
           />
+          <button class="pd__btn-sensor" @click="abrirMedicion" title="Registrar EC / pH / temperatura del sustrato">
+            <i class="bi bi-droplet-half"></i>EC / pH
+          </button>
+          <button class="pd__btn-trasplante" @click="abrirTrasplante" title="Registrar trasplante de maceta">
+            <i class="bi bi-arrow-up-circle"></i>Trasplantar
+          </button>
           <button class="pd__btn-primary" @click="abrirModal">
             <i class="bi bi-clipboard2-pulse"></i>Registrar planta
           </button>
@@ -323,7 +427,7 @@ onMounted(async () => {
           <div class="pd__kpi-icon">🌿</div>
           <div class="pd__kpi-body">
             <div class="pd__kpi-value">{{ planta.num_colas || ultimoRegistro?.metadata?.num_colas || '—' }}</div>
-            <div class="pd__kpi-label">Colas</div>
+            <div class="pd__kpi-label">Copas</div>
           </div>
         </div>
         <div class="pd__kpi">
@@ -393,7 +497,12 @@ onMounted(async () => {
               <div v-else class="pd__actividades">
                 <div v-for="a in activities" :key="a.id" class="pd__actividad">
                   <div class="pd__act-dot"
-                       :style="{ background: a.activity_type === 'registro_planta' ? '#0891b2' : '#64748b' }">
+                       :style="{
+                         background: a.activity_type === 'registro_planta' ? '#0891b2'
+                                   : a.activity_type === 'measurement'      ? '#16a34a'
+                                   : a.activity_type === 'transplant'       ? '#d97706'
+                                   : '#64748b'
+                       }">
                   </div>
                   <div class="pd__act-content">
                     <div class="pd__act-head">
@@ -410,7 +519,7 @@ onMounted(async () => {
                         </div>
                         <div class="pd__act-metricas">
                           <div v-if="a.metadata?.altura_cm"   class="pd__metrica"><span>📏</span><span>{{ a.metadata.altura_cm }} cm</span></div>
-                          <div v-if="a.metadata?.num_colas"   class="pd__metrica"><span>🌿</span><span>{{ a.metadata.num_colas }} colas</span></div>
+                          <div v-if="a.metadata?.num_colas"   class="pd__metrica"><span>🌿</span><span>{{ a.metadata.num_colas }} copas</span></div>
                           <div v-if="a.metadata?.color_hojas" class="pd__metrica">
                             <span>{{ chm(a.metadata.color_hojas).emoji }}</span>
                             <span>{{ chm(a.metadata.color_hojas).label }}</span>
@@ -418,6 +527,32 @@ onMounted(async () => {
                         </div>
                         <div v-if="a.metadata?.deficiencias" class="pd__act-desc">
                           <strong>Deficiencias:</strong> {{ a.metadata.deficiencias }}
+                        </div>
+                        <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
+                      </template>
+                      <template v-else-if="a.activity_type === 'measurement'">
+                        <div class="pd__act-titulo">
+                          🔬 Medición sensor
+                          <span v-if="a.metadata?.fuente === 'bluelab_ble'" class="pd__act-ble-badge">BLE</span>
+                        </div>
+                        <div class="pd__act-metricas">
+                          <div v-if="a.metadata?.ec"                   class="pd__metrica pd__metrica--sensor"><span>⚡</span><span>EC {{ a.metadata.ec }} mS/cm</span></div>
+                          <div v-if="a.metadata?.ph"                   class="pd__metrica pd__metrica--sensor"><span>🧪</span><span>pH {{ a.metadata.ph }}</span></div>
+                          <div v-if="a.metadata?.temperatura_sustrato" class="pd__metrica pd__metrica--sensor"><span>🌡️</span><span>{{ a.metadata.temperatura_sustrato }}°C sustrato</span></div>
+                        </div>
+                        <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
+                      </template>
+                      <template v-else-if="a.activity_type === 'transplant'">
+                        <div class="pd__act-titulo">🪴 Trasplante de maceta</div>
+                        <div class="pd__act-metricas">
+                          <div v-if="a.metadata?.maceta_origen_l" class="pd__metrica pd__metrica--trasplante">
+                            <span>{{ a.metadata.maceta_origen_l }}L</span>
+                            <i class="bi bi-arrow-right"></i>
+                            <span>{{ a.metadata.maceta_destino_l }}L</span>
+                          </div>
+                          <div v-else-if="a.metadata?.maceta_destino_l" class="pd__metrica pd__metrica--trasplante">
+                            <span>→ {{ a.metadata.maceta_destino_l }}L</span>
+                          </div>
                         </div>
                         <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
                       </template>
@@ -480,7 +615,7 @@ onMounted(async () => {
               <dt>Origen</dt><dd>{{ origenLabel(planta.origen) }}</dd>
               <dt>Genética</dt><dd>{{ planta.genetica?.nombre || '—' }}</dd>
               <dt>Tipo cultivo</dt><dd>{{ growLabel(planta.lote?.grow_type) }}</dd>
-              <dt>Maceta</dt><dd>{{ planta.lote?.tamanio_maceta ? planta.lote.tamanio_maceta + 'L' : '—' }}</dd>
+              <dt>Maceta</dt><dd>{{ macetaActual ? macetaActual + 'L' : '—' }}</dd>
               <dt>Sustrato</dt><dd>{{ planta.lote?.sustrato_especifico || '—' }}</dd>
               <dt>Ingreso lote</dt><dd>{{ formatDate(planta.created_at) }}</dd>
             </dl>
@@ -591,7 +726,7 @@ onMounted(async () => {
                 </div>
               </div>
               <div class="pd__field">
-                <label class="pd__label">Colas / ramas</label>
+                <label class="pd__label">Copas</label>
                 <input type="number" min="1" step="1" class="pd__input" v-model.number="form.num_colas" placeholder="4" />
               </div>
             </div>
@@ -645,6 +780,178 @@ onMounted(async () => {
             <button class="pd__btn-primary" @click="guardarRegistro" :disabled="guardando">
               <span v-if="guardando" class="pd__spinner pd__spinner--sm"></span>
               <i v-else class="bi bi-check-lg"></i>Guardar registro
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ══ Modal Medición Sensor ══ -->
+    <Teleport to="body">
+      <div v-if="showMedicionModal" class="pd__overlay" @click.self="showMedicionModal = false">
+        <div class="pd__modal">
+          <div class="pd__modal-header">
+            <div>
+              <h3 class="pd__modal-title">🔬 Medición de sustrato / solución</h3>
+              <p class="pd__modal-sub">{{ planta?.nombre || planta?.codigo_qr }}</p>
+            </div>
+            <button class="pd__modal-close" @click="showMedicionModal = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="pd__modal-body">
+            <div v-if="medicionError" class="pd__alert">{{ medicionError }}</div>
+
+            <!-- Conexión BLE -->
+            <div class="pd__ble-panel" :class="{ 'pd__ble-panel--on': ble.conectado.value }">
+              <div class="pd__ble-left">
+                <span class="pd__ble-icon">📡</span>
+                <div>
+                  <div class="pd__ble-title">
+                    <span v-if="ble.conectado.value">Conectado: {{ ble.dispositivo.value?.name || 'Sensor BLE' }}</span>
+                    <span v-else>Sensor Bluelab (BLE)</span>
+                  </div>
+                  <div class="pd__ble-sub">
+                    <span v-if="!ble.soportado.value">Web Bluetooth no disponible en este navegador</span>
+                    <span v-else-if="ble.conectado.value">Temperatura auto-leída. EC y pH: ingresalos desde la pantalla del sensor.</span>
+                    <span v-else>Conectá el sensor para auto-leer la temperatura del sustrato.</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pd__ble-right">
+                <button v-if="!ble.conectado.value && ble.soportado.value"
+                        class="pd__ble-btn"
+                        :disabled="ble.conectando.value"
+                        @click="ble.conectar()">
+                  <span v-if="ble.conectando.value" class="pd__spinner pd__spinner--sm" style="border-top-color:#1b5e20;border-color:rgba(27,94,32,.2)"></span>
+                  <i v-else class="bi bi-bluetooth"></i>
+                  {{ ble.conectando.value ? 'Buscando…' : 'Conectar' }}
+                </button>
+                <button v-else-if="ble.conectado.value" class="pd__ble-btn pd__ble-btn--off" @click="ble.desconectar()">
+                  <i class="bi bi-bluetooth-fill"></i> Desconectar
+                </button>
+              </div>
+            </div>
+            <div v-if="ble.error.value" class="pd__ble-error">{{ ble.error.value }}</div>
+
+            <!-- Campos de medición -->
+            <div class="pd__msection">Valores medidos</div>
+            <div class="pd__mgrid">
+              <div class="pd__field">
+                <label class="pd__label">
+                  EC
+                  <span class="pd__label-unit">mS/cm</span>
+                </label>
+                <input type="number" step="0.01" min="0" max="20" class="pd__input pd__input--sensor"
+                       v-model.number="medicionForm.ec" placeholder="1.80" />
+              </div>
+              <div class="pd__field">
+                <label class="pd__label">
+                  pH
+                </label>
+                <input type="number" step="0.01" min="0" max="14" class="pd__input pd__input--sensor"
+                       v-model.number="medicionForm.ph" placeholder="6.20" />
+              </div>
+              <div class="pd__field pd__field--full">
+                <label class="pd__label">
+                  Temperatura sustrato
+                  <span class="pd__label-unit">°C</span>
+                  <span v-if="ble.conectado.value && medicionForm.temperatura_sustrato" class="pd__label-ble">auto ↑</span>
+                </label>
+                <input type="number" step="0.1" min="0" max="40" class="pd__input pd__input--sensor"
+                       v-model.number="medicionForm.temperatura_sustrato" placeholder="22.0" />
+              </div>
+            </div>
+
+            <!-- Rangos de referencia -->
+            <div class="pd__ref-grid">
+              <div class="pd__ref-item">
+                <span class="pd__ref-label">EC vegetativo</span>
+                <span class="pd__ref-val">0.8 – 1.2 mS/cm</span>
+              </div>
+              <div class="pd__ref-item">
+                <span class="pd__ref-label">EC floración</span>
+                <span class="pd__ref-val">1.4 – 2.0 mS/cm</span>
+              </div>
+              <div class="pd__ref-item">
+                <span class="pd__ref-label">pH óptimo</span>
+                <span class="pd__ref-val">6.0 – 7.0</span>
+              </div>
+              <div class="pd__ref-item">
+                <span class="pd__ref-label">Temp. sustrato</span>
+                <span class="pd__ref-val">18 – 24°C</span>
+              </div>
+            </div>
+
+            <div class="pd__field">
+              <label class="pd__label">Notas <span class="pd__optional">opcional</span></label>
+              <input type="text" class="pd__input" v-model.trim="medicionForm.notas"
+                     placeholder="Ej: runoff post-riego, día 21 floración…" />
+            </div>
+          </div>
+          <div class="pd__modal-footer">
+            <button class="pd__btn-ghost" @click="showMedicionModal = false; ble.desconectar()">Cancelar</button>
+            <button class="pd__btn-primary" @click="guardarMedicion" :disabled="savingMedicion">
+              <span v-if="savingMedicion" class="pd__spinner pd__spinner--sm"></span>
+              <i v-else class="bi bi-check-lg"></i>Guardar medición
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ══ Modal Trasplante ══ -->
+    <Teleport to="body">
+      <div v-if="showTrasplanteModal" class="pd__overlay" @click.self="showTrasplanteModal = false">
+        <div class="pd__modal">
+          <div class="pd__modal-header">
+            <div>
+              <h3 class="pd__modal-title">🪴 Registrar trasplante</h3>
+              <p class="pd__modal-sub">{{ planta?.nombre || planta?.codigo_qr }}</p>
+            </div>
+            <button class="pd__modal-close" @click="showTrasplanteModal = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="pd__modal-body">
+            <div v-if="trasplanteError" class="pd__alert">{{ trasplanteError }}</div>
+
+            <div class="pd__msection">Cambio de maceta</div>
+            <div class="pd__mgrid">
+              <div class="pd__field">
+                <label class="pd__label">Maceta actual <span class="pd__label-unit">litros</span></label>
+                <div v-if="trasplanteForm.maceta_origen_l" class="pd__trasplante-current">
+                  <span class="pd__trasplante-current-val">{{ trasplanteForm.maceta_origen_l }}L</span>
+                </div>
+                <div v-else class="pd__input-group">
+                  <input type="number" step="0.5" min="0" class="pd__input"
+                         v-model.number="trasplanteForm.maceta_origen_l" placeholder="Ej: 7" />
+                  <span class="pd__input-suffix">L</span>
+                </div>
+              </div>
+              <div class="pd__field">
+                <label class="pd__label">Maceta destino <span class="pd__label-unit">litros</span> <span class="pd__req">*</span></label>
+                <div class="pd__input-group">
+                  <input type="number" step="0.5" min="0.5" class="pd__input"
+                         v-model.number="trasplanteForm.maceta_destino_l" placeholder="Ej: 11" autofocus />
+                  <span class="pd__input-suffix">L</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="trasplanteForm.maceta_origen_l && trasplanteForm.maceta_destino_l" class="pd__trasplante-preview">
+              <span class="pd__tp-val">{{ trasplanteForm.maceta_origen_l }}L</span>
+              <i class="bi bi-arrow-right pd__tp-arrow"></i>
+              <span class="pd__tp-val pd__tp-val--dest">{{ trasplanteForm.maceta_destino_l }}L</span>
+            </div>
+
+            <div class="pd__msection">Notas <span class="pd__optional">opcional</span></div>
+            <div class="pd__field pd__field--full">
+              <textarea class="pd__input pd__textarea" rows="2" v-model.trim="trasplanteForm.notas"
+                        placeholder="Ej: se mudó a maceta definitiva, sustrato nuevo…"></textarea>
+            </div>
+          </div>
+          <div class="pd__modal-footer">
+            <button class="pd__btn-ghost" @click="showTrasplanteModal = false">Cancelar</button>
+            <button class="pd__btn-primary" @click="guardarTrasplante" :disabled="savingTrasplante">
+              <span v-if="savingTrasplante" class="pd__spinner pd__spinner--sm"></span>
+              <i v-else class="bi bi-check-lg"></i>Guardar trasplante
             </button>
           </div>
         </div>
@@ -860,5 +1167,92 @@ onMounted(async () => {
 .pd__qr-dd-menu { position: absolute; top: calc(100% + .35rem); left: 0; right: 0; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.1); z-index: 100; padding: .3rem; display: flex; flex-direction: column; }
 .pd__qr-dd-item { display: flex; align-items: center; gap: .5rem; background: none; border: none; padding: .55rem .75rem; border-radius: 7px; font-size: .8rem; color: #334155; cursor: pointer; text-align: left; transition: background .12s; }
 .pd__qr-dd-item:hover { background: #f1f5f9; }
+
+/* Hero actions */
+.pd__hero-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+
+/* Botón sensor */
+.pd__btn-sensor {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: #f0fdf4; color: #15803d;
+  border: 1.5px solid #86efac;
+  padding: .55rem 1rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer;
+  transition: all .15s;
+}
+.pd__btn-sensor:hover { background: #dcfce7; border-color: #4ade80; }
+
+/* Botón trasplante */
+.pd__btn-trasplante {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: #fffbeb; color: #92400e;
+  border: 1.5px solid #fde68a;
+  padding: .55rem 1rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer;
+  transition: all .15s;
+}
+.pd__btn-trasplante:hover { background: #fef3c7; border-color: #fcd34d; }
+
+/* Medición en historial */
+.pd__metrica--sensor { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.pd__metrica--trasplante { background: #fffbeb; border-color: #fde68a; color: #92400e; display: flex; align-items: center; gap: .35rem; }
+.pd__act-ble-badge {
+  font-size: .6rem; font-weight: 800; background: #dbeafe; color: #1d4ed8;
+  padding: .1em .45em; border-radius: 5px; letter-spacing: .05em; text-transform: uppercase; vertical-align: middle;
+}
+
+/* Panel BLE */
+.pd__ble-panel {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  background: #f8fafc; border: 1.5px solid #e2e8f0;
+  border-radius: 10px; padding: .75rem 1rem; transition: all .2s;
+}
+.pd__ble-panel--on { background: #f0fdf4; border-color: #86efac; }
+.pd__ble-left { display: flex; align-items: flex-start; gap: .6rem; flex: 1; min-width: 0; }
+.pd__ble-icon { font-size: 1.2rem; flex-shrink: 0; }
+.pd__ble-title { font-size: .82rem; font-weight: 700; color: #1a1a1a; }
+.pd__ble-sub   { font-size: .72rem; color: #64748b; margin-top: .1rem; }
+.pd__ble-right { flex-shrink: 0; }
+.pd__ble-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: #fff; border: 1.5px solid #d4e6d4; color: #15803d;
+  padding: .45rem .9rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer;
+  transition: all .15s;
+}
+.pd__ble-btn:hover:not(:disabled) { background: #f0fdf4; border-color: #4ade80; }
+.pd__ble-btn:disabled { opacity: .5; cursor: not-allowed; }
+.pd__ble-btn--off { border-color: #fca5a5; color: #dc2626; }
+.pd__ble-btn--off:hover { background: #fef2f2; border-color: #f87171; }
+.pd__ble-error { font-size: .75rem; color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: .5rem .75rem; }
+
+/* Input sensor */
+.pd__input--sensor { font-family: var(--font-mono, monospace); font-size: 1rem; font-weight: 700; text-align: right; }
+.pd__label-unit { font-size: .65rem; color: #94a3b8; font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: .25rem; }
+.pd__label-ble  { font-size: .62rem; background: #dbeafe; color: #1d4ed8; font-weight: 700; padding: .1em .4em; border-radius: 4px; margin-left: .35rem; }
+
+/* Trasplante modal */
+.pd__trasplante-current {
+  background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px;
+  padding: .55rem .8rem; min-height: 38px; display: flex; align-items: center;
+}
+.pd__trasplante-current-val  { font-size: 1rem; font-weight: 700; color: #374151; }
+.pd__trasplante-current-none { font-size: .82rem; color: #94a3b8; font-style: italic; }
+.pd__req { color: #dc2626; font-weight: 700; }
+.pd__trasplante-preview {
+  display: flex; align-items: center; justify-content: center; gap: 1rem;
+  background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 10px;
+  padding: .85rem 1.25rem; margin-top: .5rem;
+}
+.pd__tp-val { font-size: 1.4rem; font-weight: 800; color: #92400e; }
+.pd__tp-val--dest { color: #1b5e20; }
+.pd__tp-arrow { color: #d97706; font-size: 1.1rem; }
+
+/* Rangos de referencia */
+.pd__ref-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem;
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 9px;
+  padding: .65rem .8rem;
+}
+.pd__ref-item { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.pd__ref-label { font-size: .68rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.pd__ref-val   { font-size: .72rem; color: #1a1a1a; font-weight: 700; font-family: monospace; }
 </style>
 

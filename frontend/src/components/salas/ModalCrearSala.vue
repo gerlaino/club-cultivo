@@ -24,12 +24,11 @@ const KINDS = [
 ]
 
 const form = ref({
-  nombre:    '',
-  state:     'activa',
-  kind:      'vegetativo',
-  pots_count: null,
-  sede_id:   props.sedeIdFija || null,
-  notes:     '',
+  nombre:  '',
+  state:   'activa',
+  kind:    'vegetativo',
+  sede_id: props.sedeIdFija || null,
+  notes:   '',
 })
 
 const errors = ref({})
@@ -42,8 +41,6 @@ const sedeSeleccionada = computed(() =>
 function validate() {
   const e = {}
   if (!form.value.nombre.trim()) e.nombre = 'El nombre es obligatorio'
-  if (form.value.pots_count !== null && form.value.pots_count < 0)
-    e.pots_count = 'La capacidad no puede ser negativa'
   errors.value = e
   return !Object.keys(e).length
 }
@@ -53,9 +50,7 @@ async function handleSubmit() {
   saving.value = true
   error.value  = null
   try {
-    const payload = { ...form.value }
-    if (!payload.pots_count) payload.pots_count = 0
-    await salas.create(payload)
+    await salas.create(form.value)
     emit('created')
     emit('close')
   } catch (e) {
@@ -129,27 +124,14 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Estado + Capacidad -->
-          <div class="mcr__grid">
-            <div class="mcr__field">
-              <label class="mcr__label">Estado inicial</label>
-              <select class="mcr__input" v-model="form.state">
-                <option value="activa">Activa</option>
-                <option value="mantenimiento">En mantenimiento</option>
-                <option value="cerrada">Cerrada</option>
-              </select>
-            </div>
-            <div class="mcr__field">
-              <label class="mcr__label">Capacidad máx. (plantas)</label>
-              <input
-                type="number" min="0" max="9999" step="1"
-                class="mcr__input" :class="{ 'mcr__input--err': errors.pots_count }"
-                v-model.number="form.pots_count"
-                placeholder="0 = sin límite"
-              />
-              <span v-if="errors.pots_count" class="mcr__err">{{ errors.pots_count }}</span>
-              <span v-else class="mcr__hint">0 = sin límite definido</span>
-            </div>
+          <!-- Estado -->
+          <div class="mcr__field">
+            <label class="mcr__label">Estado inicial</label>
+            <select class="mcr__input" v-model="form.state">
+              <option value="activa">Activa</option>
+              <option value="mantenimiento">En mantenimiento</option>
+              <option value="cerrada">Cerrada</option>
+            </select>
           </div>
 
           <!-- Sede (solo si no está fija) -->
@@ -167,13 +149,6 @@ onMounted(async () => {
           <div v-if="form.kind === 'manicura'" class="mcr__capacity-info" style="background:#fffbeb;border-color:#fde68a;color:#92400e">
             <i class="bi bi-info-circle"></i>
             La sala de manicura solo puede estar en sedes de <strong>producción</strong> o <strong>mixta</strong>.
-          </div>
-
-          <!-- Info capacidad de la sede seleccionada -->
-          <div v-if="sedeSeleccionada && form.pots_count > 0" class="mcr__capacity-info">
-            <i class="bi bi-info-circle"></i>
-            Esta sala tendrá capacidad para <strong>{{ form.pots_count }}</strong> plantas
-            <template v-if="sedeIdFija"> en <strong>{{ sedeSeleccionada.nombre }}</strong></template>.
           </div>
 
           <!-- Notas -->

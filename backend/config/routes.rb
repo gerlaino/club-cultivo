@@ -70,7 +70,7 @@ Rails.application.routes.draw do
       resource :costo, controller: :costo_lotes, only: [:show, :create, :update]
       resources :registros_ambientales, only: [:index, :create, :destroy]
       resources :lote_eventos,          only: [:index, :create]
-      resources :fotos, only: [:index, :create], controller: 'fotos_lote'
+      resources :fotos, only: [:index, :create, :destroy], controller: 'fotos_lote'
       resources :notas, only: [:index, :create]
       resources :pesadas, only: [:index, :create, :destroy]
       member do
@@ -231,6 +231,8 @@ Rails.application.routes.draw do
     end
 
     resource :informe_semestral, only: [:show], controller: :informe_semestral
+
+    get 'historial', to: 'historial#index'
 
     resources :tareas do
       collection do

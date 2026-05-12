@@ -1,9 +1,9 @@
 <template>
   <div class="cvd">
 
-    <!-- ── BIENVENIDA ──────────────────────────────────────────── -->
-    <div class="cvd__header">
-      <div class="cvd__header-text">
+    <!-- Greeting -->
+    <div class="cvd__top">
+      <div>
         <h1 class="cvd__saludo">{{ saludo }}, {{ auth.user?.first_name }}</h1>
         <span class="cvd__fecha">{{ hoy }}</span>
       </div>
@@ -11,7 +11,7 @@
 
     <!-- Alertas críticas -->
     <DsBanner
-      v-for="(a, i) in alertasCriticas.slice(0, 2)"
+      v-for="a in alertasCriticas.slice(0, 2)"
       :key="a.id"
       variant="rust"
       icon="bi-exclamation-triangle-fill"
@@ -27,83 +27,96 @@
       </template>
     </DsBanner>
 
-    <!-- ── KPIs ────────────────────────────────────────────────── -->
+    <!-- KPIs -->
     <div v-if="loading" class="cvd__kpi-row">
-      <DsCard v-for="i in 4" :key="i" variant="elevated" class="cvd__kpi-card">
-        <DsSkeleton variant="line" :rows="2" />
-      </DsCard>
+      <div v-for="i in 4" :key="i" class="cvd__kpi-card cvd__kpi-card--skeleton">
+        <div class="cvd__sk-ico"></div>
+        <div class="cvd__sk-val"></div>
+        <div class="cvd__sk-lbl"></div>
+      </div>
     </div>
     <div v-else class="cvd__kpi-row">
-      <DsCard variant="elevated" class="cvd__kpi-card">
-        <div class="cvd__kpi-ico"><Sprout :size="20" :stroke-width="1.75" /></div>
-        <DsStat label="Plantas a cargo" :value="String(totalPlantas)" />
+      <div class="cvd__kpi-card">
+        <div class="cvd__kpi-ico"><Sprout :size="18" :stroke-width="1.75" /></div>
+        <div class="cvd__kpi-val">{{ totalPlantas }}</div>
+        <div class="cvd__kpi-lbl">Plantas a cargo</div>
         <div class="cvd__kpi-sub">{{ plantasVeg }} veg · {{ plantasFlor }} flor</div>
-      </DsCard>
-      <DsCard variant="elevated" class="cvd__kpi-card">
-        <div class="cvd__kpi-ico"><LayoutGrid :size="20" :stroke-width="1.75" /></div>
-        <DsStat label="Salas activas" :value="String(salasActivas.length)" />
-        <div class="cvd__kpi-sub">de {{ salas.length }} total</div>
-      </DsCard>
-      <DsCard variant="elevated" class="cvd__kpi-card">
-        <div class="cvd__kpi-ico" :class="{ 'cvd__kpi-ico--amber': lotesListos > 0 }">
-          <GitBranch :size="20" :stroke-width="1.75" />
+      </div>
+      <div class="cvd__kpi-card">
+        <div class="cvd__kpi-ico"><LayoutGrid :size="18" :stroke-width="1.75" /></div>
+        <div class="cvd__kpi-val">{{ salasActivas.length }}</div>
+        <div class="cvd__kpi-lbl">Salas activas</div>
+        <div class="cvd__kpi-sub">de {{ salas.length }} en total</div>
+      </div>
+      <div class="cvd__kpi-card">
+        <div class="cvd__kpi-ico" :class="{ 'cvd__kpi-ico--amber': lotesListos > 0 }"><GitBranch :size="18" :stroke-width="1.75" /></div>
+        <div class="cvd__kpi-val" :class="{ 'cvd__kpi-val--amber': lotesListos > 0 }">{{ lotesEnCiclo }}</div>
+        <div class="cvd__kpi-lbl">Lotes en ciclo</div>
+        <div class="cvd__kpi-sub" :class="{ 'cvd__kpi-sub--amber': lotesListos > 0 }">
+          {{ lotesListos > 0 ? `${lotesListos} listo${lotesListos !== 1 ? 's' : ''} para avanzar` : 'sin cambios pendientes' }}
         </div>
-        <DsStat label="Lotes en ciclo" :value="String(lotesEnCiclo)" :tone="lotesListos > 0 ? 'amber' : undefined" />
-        <div class="cvd__kpi-sub">{{ lotesListos > 0 ? `${lotesListos} listos para siguiente fase` : 'sin cambios pendientes' }}</div>
-      </DsCard>
-      <DsCard variant="elevated" class="cvd__kpi-card">
-        <div class="cvd__kpi-ico" :class="{ 'cvd__kpi-ico--rust': notifCount > 0 }">
-          <AlertTriangle :size="20" :stroke-width="1.75" />
+      </div>
+      <div class="cvd__kpi-card">
+        <div class="cvd__kpi-ico" :class="{ 'cvd__kpi-ico--rust': notifCount > 0 }"><AlertTriangle :size="18" :stroke-width="1.75" /></div>
+        <div class="cvd__kpi-val" :class="{ 'cvd__kpi-val--rust': notifCount > 0 }">{{ notifCount }}</div>
+        <div class="cvd__kpi-lbl">Alertas activas</div>
+        <div class="cvd__kpi-sub" :class="{ 'cvd__kpi-sub--rust': alertasCriticas.length > 0 }">
+          {{ alertasCriticas.length > 0 ? `${alertasCriticas.length} crítica${alertasCriticas.length !== 1 ? 's' : ''}` : 'sin alertas críticas' }}
         </div>
-        <DsStat label="Alertas activas" :value="String(notifCount)" :tone="notifCount > 0 ? 'rust' : undefined" />
-        <div class="cvd__kpi-sub">{{ alertasCriticas.length > 0 ? `${alertasCriticas.length} crítica${alertasCriticas.length !== 1 ? 's' : ''}` : 'sin alertas críticas' }}</div>
-      </DsCard>
+      </div>
     </div>
 
-    <!-- ── SEMANA ──────────────────────────────────────────────── -->
-    <div class="cvd__section cvd__section--semana">
-      <div class="cvd__section-head">
-        <span class="cvd__section-dot cvd__section-dot--semana"></span>
-        <h2 class="cvd__section-title">Esta semana</h2>
-      </div>
-
-      <div class="tv__semana">
-        <div class="sem__nav">
-          <button class="sem__nav-btn" @click="semAnterior"><i class="bi bi-chevron-left"></i></button>
-          <span class="sem__nav-label">{{ labelSemana }}</span>
-          <button class="sem__nav-btn" @click="semSiguiente"><i class="bi bi-chevron-right"></i></button>
-          <button class="sem__hoy-btn" @click="irHoy">Hoy</button>
+    <!-- Semana de trabajo -->
+    <div class="cvd__section">
+      <button class="cvd__section-toggle" @click="tareasExpanded = !tareasExpanded">
+        <div class="cvd__section-toggle-left">
+          <h2 class="cvd__section-title">Semana de trabajo</h2>
+          <span v-if="totalTareasSemana" class="cvd__section-badge cvd__section-badge--amber">{{ totalTareasSemana }}</span>
         </div>
-
-        <div v-if="loadingSem" class="sem__loading"><div class="sem__ring"></div></div>
-
-        <div v-else class="sem__grid">
+        <div class="cvd__sem-nav" @click.stop>
+          <button class="cvd__sem-btn" @click="semAnterior"><i class="bi bi-chevron-left"></i></button>
+          <span class="cvd__sem-label">{{ labelSemana }}</span>
+          <button class="cvd__sem-btn" @click="semSiguiente"><i class="bi bi-chevron-right"></i></button>
+          <button class="cvd__sem-hoy" @click="irHoy">Hoy</button>
+        </div>
+        <ChevronRight :size="16" class="cvd__section-chevron" :class="{ 'cvd__section-chevron--open': tareasExpanded }" />
+      </button>
+      <div v-show="tareasExpanded">
+        <div v-if="loadingSem" class="cvd__sem-loading">
+          <div class="cvd__sem-ring"></div>
+        </div>
+        <div v-else-if="!semanaProcessed.dias?.length" class="cvd__tareas-empty">
+          Sin datos de semana disponibles.
+        </div>
+        <div v-else class="cvd__sem-grid">
           <div
-            v-for="dia in semana.dias"
+            v-for="dia in semanaProcessed.dias"
             :key="dia.fecha"
-            class="sem__col"
-            :class="{ 'sem__col--hoy': esDiaHoy(dia.fecha), 'sem__col--pasado': esPasado(dia.fecha) }"
+            class="cvd__sem-col"
+            :class="{ 'cvd__sem-col--hoy': dia.fecha === hoyISO, 'cvd__sem-col--pasado': dia.fecha < hoyISO }"
           >
-            <div class="sem__col-header">
-              <div class="sem__dia-nombre">{{ dia.dia_semana?.slice(0, 3) }}</div>
-              <div class="sem__dia-num" :class="{ 'sem__dia-num--hoy': esDiaHoy(dia.fecha) }">
+            <div class="cvd__sem-col-header">
+              <div class="cvd__sem-dia-nombre">{{ dia.dia_semana?.slice(0, 3) }}</div>
+              <div class="cvd__sem-dia-num" :class="{ 'cvd__sem-dia-num--hoy': dia.fecha === hoyISO }">
                 {{ new Date(dia.fecha + 'T00:00:00').getDate() }}
               </div>
-              <div v-if="dia.tareas.length" class="sem__col-count">{{ dia.tareas.length }}</div>
+              <div v-if="dia.tareas.length" class="cvd__sem-col-count">{{ dia.tareas.length }}</div>
             </div>
-            <div class="sem__tareas">
+            <div class="cvd__sem-tareas">
               <div
                 v-for="t in dia.tareas"
-                :key="t.id"
-                class="sem__tarea"
-                :class="['sem__tarea--' + t.prioridad, t.estado === 'completada' && 'sem__tarea--done']"
+                :key="t.id + (t._atrasada ? '-a' : '')"
+                class="cvd__sem-tarea"
+                :class="[
+                  'cvd__sem-tarea--' + t.prioridad,
+                  t.estado === 'completada' && 'cvd__sem-tarea--done',
+                  t._atrasada && 'cvd__sem-tarea--atrasada',
+                ]"
                 @click="abrirTarea(t)"
               >
-                <span class="sem__tarea-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
-                <span class="sem__tarea-titulo">{{ t.titulo }}</span>
-                <span v-if="t.asignada_a" class="sem__asig" :title="t.asignada_a.nombre">
-                  {{ t.asignada_a.nombre.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() }}
-                </span>
+                <span class="cvd__sem-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
+                <span class="cvd__sem-titulo">{{ t.titulo }}</span>
+                <span v-if="t._atrasada" class="cvd__sem-late" title="Atrasada">⏰</span>
               </div>
             </div>
           </div>
@@ -111,91 +124,37 @@
       </div>
     </div>
 
-    <!-- ── MIS TAREAS (kanban 2 cols) ──────────────────────────── -->
-    <div class="cvd__section cvd__section--tablero">
-      <div class="cvd__section-head">
-        <span class="cvd__section-dot cvd__section-dot--tablero"></span>
-        <h2 class="cvd__section-title">Mis tareas</h2>
-      </div>
-
-      <div class="tv__kanban-cols cvd__kanban-2">
-        <!-- Pendientes -->
-        <div class="tv__col">
-          <div class="tv__col-header tv__col-header--pending">
-            <span>Pendientes</span>
-            <span class="tv__col-count">{{ tareasPendientes.length }}</span>
-          </div>
-          <div class="tv__col-body">
-            <div
-              v-for="t in tareasPendientes"
-              :key="t.id"
-              class="cvd__tc"
-              @click="abrirTarea(t)"
-            >
-              <span class="cvd__tc-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
-              <div class="cvd__tc-info">
-                <span class="cvd__tc-titulo">{{ t.titulo }}</span>
-                <span v-if="t.sala" class="cvd__tc-meta">{{ t.sala.nombre }}</span>
-              </div>
-              <span v-if="t.fecha_programada && esPasado(t.fecha_programada)" class="cvd__tc-vencida" title="Vencida">⚠️</span>
-            </div>
-            <div v-if="!tareasPendientes.length" class="tv__col-empty">Sin pendientes ✓</div>
-          </div>
+    <!-- Mis salas -->
+    <div class="cvd__section">
+      <button class="cvd__section-toggle" @click="salasExpanded = !salasExpanded">
+        <div class="cvd__section-toggle-left">
+          <h2 class="cvd__section-title">Mis salas</h2>
+          <span v-if="salas.length" class="cvd__section-badge">{{ salas.length }}</span>
         </div>
-
-        <!-- Finalizadas -->
-        <div class="tv__col">
-          <div class="tv__col-header tv__col-header--done">
-            <span>Finalizadas</span>
-            <span class="tv__col-count">{{ tareasFinalizadas.length }}</span>
-          </div>
-          <div class="tv__col-body">
-            <div
-              v-for="t in tareasFinalizadas"
-              :key="t.id"
-              class="cvd__tc cvd__tc--done"
-              @click="abrirTarea(t)"
-            >
-              <span class="cvd__tc-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
-              <div class="cvd__tc-info">
-                <span class="cvd__tc-titulo">{{ t.titulo }}</span>
-                <span v-if="t.sala" class="cvd__tc-meta">{{ t.sala.nombre }}</span>
-              </div>
-            </div>
-            <div v-if="!tareasFinalizadas.length" class="tv__col-empty">Nada finalizado aún</div>
-          </div>
+        <ChevronRight :size="16" class="cvd__section-chevron" :class="{ 'cvd__section-chevron--open': salasExpanded }" />
+      </button>
+      <div v-show="salasExpanded">
+        <div v-if="loading" class="cvd__salas-grid">
+          <DsCard v-for="i in 3" :key="i" variant="elevated"><DsSkeleton variant="card" /></DsCard>
         </div>
-      </div>
-    </div>
-
-    <!-- ── MIS SALAS ──────────────────────────────────────────── -->
-    <div class="cvd__section cvd__section--salas">
-      <div class="cvd__section-head">
-        <span class="cvd__section-dot cvd__section-dot--salas"></span>
-        <h2 class="cvd__section-title">Mis salas</h2>
-        <DsBadge variant="leaf">{{ salas.length }}</DsBadge>
-      </div>
-      <div v-if="loading" class="cvd__salas-grid">
-        <DsCard v-for="i in 3" :key="i" variant="elevated"><DsSkeleton variant="card" /></DsCard>
-      </div>
-      <DsEmpty
-        v-else-if="salas.length === 0"
-        title="Todavía no tenés salas asignadas"
-        description="Hablá con el admin para que te asigne salas."
-      />
-      <div v-else class="cvd__salas-grid">
-        <SalaCard
-          v-for="sala in salas"
-          :key="sala.id"
-          :sala="sala"
-          :alertas="ambienteStore.alertasActivas"
-          :lotes="lotesStore.items.filter(l => String(l.sala_id) === String(sala.id))"
-          @registrar-lectura="onRegistrarDesdeSala"
+        <DsEmpty
+          v-else-if="salas.length === 0"
+          title="Todavía no tenés salas asignadas"
+          description="Hablá con el admin para que te asigne salas."
         />
+        <div v-else class="cvd__salas-grid">
+          <SalaCard
+            v-for="sala in salas"
+            :key="sala.id"
+            :sala="sala"
+            :alertas="ambienteStore.alertasActivas"
+            :lotes="lotesStore.items.filter(l => String(l.sala_id) === String(sala.id))"
+            @registrar-lectura="onRegistrarDesdeSala"
+          />
+        </div>
       </div>
     </div>
 
-    <!-- Footer -->
     <footer class="cvd__footer">
       <LeafHerbarium :size="12" />
       Cultivo Espacial · {{ club.name }}
@@ -203,66 +162,60 @@
 
   </div>
 
-  <!-- ── PANEL DETALLE TAREA ────────────────────────────────────── -->
+  <!-- Panel detalle tarea -->
   <Teleport to="body">
-    <div v-if="tareaDetalle" class="tv__panel-overlay" @click.self="tareaDetalle = null">
-      <div class="tv__panel">
-        <div class="tv__panel-header">
-          <h3 class="tv__panel-title">Detalle de tarea</h3>
-          <button class="tv__panel-close" @click="tareaDetalle = null"><i class="bi bi-x-lg"></i></button>
+    <div v-if="tareaDetalle" class="cvd__panel-overlay" @click.self="tareaDetalle = null">
+      <div class="cvd__panel">
+        <div class="cvd__panel-header">
+          <h3 class="cvd__panel-title">Detalle de tarea</h3>
+          <button class="cvd__panel-close" @click="tareaDetalle = null"><i class="bi bi-x-lg"></i></button>
         </div>
-
-        <div class="tv__panel-body">
-          <div class="tv__panel-tipo">
-            <span class="tv__tipo-pill">{{ TIPO_META[tareaDetalle.tipo]?.emoji }} {{ TIPO_META[tareaDetalle.tipo]?.label }}</span>
+        <div class="cvd__panel-body">
+          <div class="cvd__panel-tipo">
+            <span class="cvd__tipo-pill">{{ TIPO_META[tareaDetalle.tipo]?.emoji }} {{ TIPO_META[tareaDetalle.tipo]?.label }}</span>
           </div>
-          <h4 class="tv__panel-nombre">{{ tareaDetalle.titulo }}</h4>
-          <p v-if="tareaDetalle.descripcion" class="tv__panel-desc">{{ tareaDetalle.descripcion }}</p>
-
-          <div class="tv__panel-info">
-            <div class="tv__panel-row">
-              <span class="tv__panel-key">Estado</span>
-              <span class="tv__estado-pill" :style="estadoMeta(tareaDetalle.estado)">{{ tareaDetalle.estado?.replace('_', ' ') }}</span>
+          <h4 class="cvd__panel-nombre">{{ tareaDetalle.titulo }}</h4>
+          <p v-if="tareaDetalle.descripcion" class="cvd__panel-desc">{{ tareaDetalle.descripcion }}</p>
+          <div class="cvd__panel-info">
+            <div class="cvd__panel-row">
+              <span class="cvd__panel-key">Estado</span>
+              <span class="cvd__estado-pill" :style="estadoMeta(tareaDetalle.estado)">{{ tareaDetalle.estado?.replace('_', ' ') }}</span>
             </div>
-            <div class="tv__panel-row">
-              <span class="tv__panel-key">Prioridad</span>
+            <div class="cvd__panel-row">
+              <span class="cvd__panel-key">Prioridad</span>
               <span>{{ tareaDetalle.prioridad }}</span>
             </div>
-            <div v-if="tareaDetalle.sala" class="tv__panel-row">
-              <span class="tv__panel-key">Sala</span>
+            <div v-if="tareaDetalle.sala" class="cvd__panel-row">
+              <span class="cvd__panel-key">Sala</span>
               <span>{{ tareaDetalle.sala.nombre }}</span>
             </div>
-            <div v-if="tareaDetalle.lote" class="tv__panel-row">
-              <span class="tv__panel-key">Lote</span>
-              <RouterLink :to="`/lotes/${tareaDetalle.lote.id}`" class="tv__panel-link">
+            <div v-if="tareaDetalle.lote" class="cvd__panel-row">
+              <span class="cvd__panel-key">Lote</span>
+              <RouterLink :to="`/lotes/${tareaDetalle.lote.id}`" class="cvd__panel-link">
                 {{ tareaDetalle.lote.codigo }} <i class="bi bi-arrow-right-short"></i>
               </RouterLink>
             </div>
-            <div v-if="tareaDetalle.fecha_programada" class="tv__panel-row">
-              <span class="tv__panel-key">Fecha</span>
+            <div v-if="tareaDetalle.fecha_programada" class="cvd__panel-row">
+              <span class="cvd__panel-key">Fecha</span>
               <span>{{ formatFechaLarga(tareaDetalle.fecha_programada) }}</span>
             </div>
           </div>
-
-          <div class="tv__panel-actions">
-            <!-- Tarea futura: no se puede completar todavía -->
+          <div class="cvd__panel-actions">
             <p v-if="esTareaFutura(tareaDetalle) && tareaDetalle.estado !== 'completada'" class="cvd__futura-hint">
-              <i class="bi bi-calendar-event me-1"></i>Disponible el {{ formatFechaLarga(tareaDetalle.fecha_programada) }}
+              <i class="bi bi-calendar-event"></i> Disponible el {{ formatFechaLarga(tareaDetalle.fecha_programada) }}
             </p>
-            <!-- Finalizar: solo si no es futura y no está completada -->
             <button
               v-if="tareaDetalle.estado !== 'completada' && !esTareaFutura(tareaDetalle)"
-              class="tv__panel-btn tv__panel-btn--primary"
+              class="cvd__panel-btn cvd__panel-btn--primary"
               :disabled="guardandoAccion"
               @click="finalizarTarea"
             >
               <i class="bi bi-check-circle-fill"></i>
               {{ guardandoAccion ? 'Guardando…' : 'Finalizada' }}
             </button>
-            <!-- Sin finalizar: visible solo si está completada -->
             <button
               v-if="tareaDetalle.estado === 'completada'"
-              class="tv__panel-btn tv__panel-btn--ghost"
+              class="cvd__panel-btn cvd__panel-btn--ghost"
               :disabled="guardandoAccion"
               @click="revertirTarea"
             >
@@ -275,23 +228,21 @@
     </div>
   </Teleport>
 
-  <!-- Sheet registrar lectura -->
   <RegistrarLecturaSheet v-model="lecturaOpen" :sala-id-inicial="lecturaSalaId" />
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useAuthStore }    from '../../stores/auth'
-import { useClubStore }    from '../../stores/club'
-import { useTareasStore }  from '../../stores/tareas'
-import { useSalasStore }   from '../../stores/salas'
-import { useLotesStore }   from '../../stores/lotes'
+import { useAuthStore }     from '../../stores/auth'
+import { useClubStore }     from '../../stores/club'
+import { useTareasStore }   from '../../stores/tareas'
+import { useSalasStore }    from '../../stores/salas'
+import { useLotesStore }    from '../../stores/lotes'
 import { useAmbienteStore } from '../../stores/ambiente'
-import { useAlertasBell }  from '../../composables/useAlertasBell.js'
-import { useToast }        from '../../composables/useToast.js'
-import { storeToRefs }     from 'pinia'
-import { getTareasSemana } from '../../lib/api.js'
+import { useAlertasBell }   from '../../composables/useAlertasBell.js'
+import { useToast }         from '../../composables/useToast.js'
 import { formatFechaLarga } from '../../utils/fecha.js'
+import { getTareasSemana }  from '../../lib/api'
 
 import DsCard     from '../../design-system/components/Card.vue'
 import DsStat     from '../../design-system/components/Stat.vue'
@@ -302,76 +253,26 @@ import DsSkeleton from '../../design-system/components/Skeleton.vue'
 import LeafHerbarium from '../../design-system/icons/LeafHerbarium.vue'
 import SalaCard   from '../cultivador/SalaCard.vue'
 import RegistrarLecturaSheet from '../cultivador/RegistrarLecturaSheet.vue'
-import { LayoutGrid, Sprout, GitBranch, AlertTriangle } from 'lucide-vue-next'
+import { LayoutGrid, Sprout, GitBranch, AlertTriangle, ChevronRight } from 'lucide-vue-next'
 
-const auth        = useAuthStore()
-const club        = useClubStore()
-const tareasStore = useTareasStore()
-const salasStore  = useSalasStore()
-const lotesStore  = useLotesStore()
+const auth          = useAuthStore()
+const club          = useClubStore()
+const tareasStore   = useTareasStore()
+const salasStore    = useSalasStore()
+const lotesStore    = useLotesStore()
 const ambienteStore = useAmbienteStore()
 
-const { dashboard, kanban } = storeToRefs(tareasStore)
 const toast = useToast()
 useAlertasBell()
 
-const loading      = ref(true)
-const lecturaOpen  = ref(false)
+const loading       = ref(true)
+const lecturaOpen   = ref(false)
 const lecturaSalaId = ref(null)
-const semana       = ref({ desde: null, hasta: null, dias: [] })
-const loadingSem   = ref(false)
-const tareaDetalle = ref(null)
+const tareaDetalle  = ref(null)
 const guardandoAccion = ref(false)
+const salasExpanded  = ref(true)
+const tareasExpanded = ref(true)
 
-// ── Semana navigation ──────────────────────────────────────────
-function lunasActual() {
-  const hoy = new Date()
-  const dow  = hoy.getDay()
-  const diff = dow === 0 ? -6 : 1 - dow
-  const d = new Date(hoy)
-  d.setDate(hoy.getDate() + diff)
-  return d.toISOString().slice(0, 10)
-}
-const desdeRef = ref(lunasActual())
-
-async function cargarSemana() {
-  loadingSem.value = true
-  try {
-    const { data } = await getTareasSemana(desdeRef.value)
-    semana.value = data
-  } finally {
-    loadingSem.value = false
-  }
-}
-
-function semAnterior() {
-  const d = new Date(desdeRef.value + 'T00:00:00')
-  d.setDate(d.getDate() - 7)
-  desdeRef.value = d.toISOString().slice(0, 10)
-  cargarSemana()
-}
-function semSiguiente() {
-  const d = new Date(desdeRef.value + 'T00:00:00')
-  d.setDate(d.getDate() + 7)
-  desdeRef.value = d.toISOString().slice(0, 10)
-  cargarSemana()
-}
-function irHoy() {
-  desdeRef.value = lunasActual()
-  cargarSemana()
-}
-
-const labelSemana = computed(() => {
-  if (!semana.value.desde) return ''
-  const d = new Date(semana.value.desde + 'T00:00:00')
-  const h = new Date(semana.value.hasta  + 'T00:00:00')
-  return `${d.getDate()} — ${h.getDate()} ${h.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}`
-})
-
-function esDiaHoy(fecha) { return fecha === new Date().toISOString().slice(0, 10) }
-function esPasado(fecha)  { return fecha < new Date().toISOString().slice(0, 10) }
-
-// ── Tipo helpers ───────────────────────────────────────────────
 const TIPO_META = {
   riego:       { label: 'Riego',      emoji: '💧' },
   poda:        { label: 'Poda',       emoji: '✂️' },
@@ -395,24 +296,77 @@ function estadoMeta(estado) {
   }[estado] || { background: '#f1f5f9', color: '#64748b' }
 }
 
-// ── Kanban ─────────────────────────────────────────────────────
 function localDateISO() {
   const n = new Date()
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
 }
-const hoyISO = localDateISO()  // YYYY-MM-DD en hora local (evita off-by-one UTC−3)
+const hoyISO = localDateISO()
 
-const tareasPendientes = computed(() => {
-  const todas = [
-    ...(kanban.value.pendiente   || []),
-    ...(kanban.value.en_progreso || []),
-  ]
-  // Solo mostrar tareas sin fecha futura (sin fecha, vencidas, o de hoy)
-  return todas.filter(t => !t.fecha_programada || t.fecha_programada <= hoyISO)
+// ── Semana de trabajo ──────────────────────────────────────
+const semana     = ref({ desde: null, hasta: null, dias: [] })
+const loadingSem = ref(false)
+
+function isoLunes() {
+  const hoy = new Date()
+  const dow  = hoy.getDay()
+  const diff = dow === 0 ? -6 : 1 - dow
+  const d    = new Date(hoy)
+  d.setDate(hoy.getDate() + diff)
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+const desdeRef = ref(isoLunes())
+
+function addDays(iso, n) {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
+async function cargarSemana() {
+  loadingSem.value = true
+  try {
+    const { data } = await getTareasSemana(desdeRef.value)
+    semana.value = data
+  } finally {
+    loadingSem.value = false
+  }
+}
+function semAnterior()  { desdeRef.value = addDays(desdeRef.value, -7); cargarSemana() }
+function semSiguiente() { desdeRef.value = addDays(desdeRef.value,  7); cargarSemana() }
+function irHoy()        { desdeRef.value = isoLunes(); cargarSemana() }
+
+const labelSemana = computed(() => {
+  if (!semana.value.desde) return ''
+  const d = new Date(semana.value.desde + 'T00:00:00')
+  const h = new Date(semana.value.hasta  + 'T00:00:00')
+  return `${d.getDate()} — ${h.getDate()} ${h.toLocaleDateString('es-AR', { month: 'short' })}`
 })
-const tareasFinalizadas = computed(() => kanban.value.completada || [])
 
-// ── Saludo / fecha ─────────────────────────────────────────────
+const semanaProcessed = computed(() => {
+  if (!semana.value.dias?.length) return semana.value
+  const dias = semana.value.dias.map(d => ({ ...d, tareas: [...d.tareas] }))
+  const hoyIdx = dias.findIndex(d => d.fecha === hoyISO)
+  if (hoyIdx > 0) {
+    for (let i = 0; i < hoyIdx; i++) {
+      const overdue = dias[i].tareas.filter(t => t.estado !== 'completada' && t.estado !== 'cancelada')
+      overdue.forEach(t => dias[hoyIdx].tareas.unshift({ ...t, _atrasada: true }))
+      dias[i] = { ...dias[i], tareas: dias[i].tareas.filter(t => t.estado === 'completada' || t.estado === 'cancelada') }
+    }
+  }
+  return { ...semana.value, dias }
+})
+
+const totalTareasSemana = computed(() =>
+  semanaProcessed.value.dias?.reduce((acc, d) =>
+    acc + d.tareas.filter(t => t.estado !== 'completada' && t.estado !== 'cancelada').length, 0) || 0
+)
+
+function esTareaFutura(t) {
+  if (!t?.fecha_programada) return false
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+  return new Date(t.fecha_programada + 'T00:00:00') > hoy
+}
+
 const hora   = new Date().getHours()
 const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
 const hoy    = (() => {
@@ -420,28 +374,19 @@ const hoy    = (() => {
   return d.charAt(0).toUpperCase() + d.slice(1).toLowerCase()
 })()
 
-// ── Salas ──────────────────────────────────────────────────────
 const salas        = computed(() => salasStore.items || [])
 const salasActivas = computed(() => salas.value.filter(s => s.state === 'activa'))
 function salaNombre(salaId) {
   return salas.value.find(s => String(s.id) === String(salaId))?.nombre || `Sala #${salaId}`
 }
 
-// ── KPIs ───────────────────────────────────────────────────────
-const totalPlantas = computed(() => salas.value.reduce((acc, s) => acc + (s.plantas_totales || 0), 0))
-const plantasVeg   = computed(() => lotesStore.items.filter(l => l.estado === 'vegetativo').reduce((a, l) => a + (l.plants_count || 0), 0))
-const plantasFlor  = computed(() => lotesStore.items.filter(l => l.estado === 'floracion').reduce((a, l) => a + (l.plants_count || 0), 0))
-const lotesEnCiclo = computed(() => lotesStore.items.filter(l => ['vegetativo', 'floracion', 'secado'].includes(l.estado)).length)
-const lotesListos  = computed(() => lotesStore.items.filter(l => l.puede_transicionar === true).length)
+const totalPlantas    = computed(() => salas.value.reduce((acc, s) => acc + (s.plantas_totales || 0), 0))
+const plantasVeg      = computed(() => lotesStore.items.filter(l => l.estado === 'vegetativo').reduce((a, l) => a + (l.plants_count || 0), 0))
+const plantasFlor     = computed(() => lotesStore.items.filter(l => l.estado === 'floracion').reduce((a, l) => a + (l.plants_count || 0), 0))
+const lotesEnCiclo    = computed(() => lotesStore.items.filter(l => ['vegetativo', 'floracion', 'secado'].includes(l.estado)).length)
+const lotesListos     = computed(() => lotesStore.items.filter(l => l.puede_transicionar === true).length)
 const notifCount      = computed(() => ambienteStore.alertasCount)
 const alertasCriticas = computed(() => ambienteStore.alertasActivas.filter(a => ['temperatura', 'co2'].includes(a.tipo)))
-
-// ── Acciones de tarea ──────────────────────────────────────────
-function esTareaFutura(t) {
-  if (!t?.fecha_programada) return false
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
-  return new Date(t.fecha_programada + 'T00:00:00') > hoy
-}
 
 function abrirTarea(t) { tareaDetalle.value = t }
 
@@ -450,12 +395,11 @@ async function finalizarTarea() {
   guardandoAccion.value = true
   try {
     await tareasStore.completar(tareaDetalle.value.id, null, '')
-    await tareasStore.fetchKanban({})
     await cargarSemana()
     tareaDetalle.value = null
     toast.success('Tarea finalizada')
   } catch (e) {
-    toast.error(e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'No se pudo finalizar la tarea')
+    toast.error(e?.response?.data?.error || 'No se pudo finalizar la tarea')
   } finally { guardandoAccion.value = false }
 }
 
@@ -464,7 +408,6 @@ async function revertirTarea() {
   guardandoAccion.value = true
   try {
     await tareasStore.update(tareaDetalle.value.id, { estado: 'pendiente' })
-    await tareasStore.fetchKanban({})
     await cargarSemana()
     tareaDetalle.value = null
     toast.success('Tarea marcada como pendiente')
@@ -478,240 +421,148 @@ function onRegistrarDesdeSala(sala) {
   lecturaOpen.value = true
 }
 
-// ── Escape panel ──────────────────────────────────────────────
 function panelEscapeHandler(e) {
   if (e.key === 'Escape' && tareaDetalle.value) tareaDetalle.value = null
 }
 onMounted(() => document.addEventListener('keydown', panelEscapeHandler, true))
 onUnmounted(() => document.removeEventListener('keydown', panelEscapeHandler, true))
 
-// ── Load ───────────────────────────────────────────────────────
 onMounted(async () => {
   try {
     await Promise.all([
       salasStore.fetch(),
       lotesStore.fetch(),
-      tareasStore.fetchDashboard(),
-      tareasStore.fetchKanban({}),
+      cargarSemana(),
     ])
   } catch {} finally { loading.value = false }
-  cargarSemana()
 })
 </script>
 
 <style scoped>
-.cvd {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: var(--sp-8) var(--sp-8) var(--sp-8);
-  font-family: var(--font-ui);
-}
-@media (max-width: 767px) {
-  .cvd { padding: var(--sp-4); padding-bottom: 80px; }
-}
+.cvd { max-width: 1280px; margin: 0 auto; padding: 1.5rem 1.25rem; display: flex; flex-direction: column; gap: 1.75rem; }
+@media (max-width: 767px) { .cvd { padding: 1rem .75rem 80px; gap: 1.25rem; } }
 
-/* Header */
-.cvd__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: var(--sp-6);
-  flex-wrap: wrap;
-}
-.cvd__header-text { display: flex; flex-direction: column; gap: 4px; }
-.cvd__saludo {
-  font-family: var(--font-display);
-  font-size: var(--fs-32);
-  font-weight: 500;
-  color: var(--c-ink-900);
-  margin: 0;
-  line-height: var(--lh-tight);
-}
-@media (max-width: 767px) { .cvd__saludo { font-size: var(--fs-24); } }
-.cvd__fecha {
-  font-family: var(--font-mono);
-  font-size: var(--fs-13);
-  color: var(--c-ink-500);
-}
-.cvd__banner { margin-bottom: var(--sp-4); }
-.cvd__banner-link { font-size: var(--fs-13); font-weight: 600; text-decoration: underline; color: inherit; }
+/* Greeting */
+.cvd__top   { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.cvd__saludo { font-size: 1.5rem; font-weight: 700; color: #0f2611; margin: 0 0 .2rem; line-height: 1.2; }
+@media (max-width: 640px) { .cvd__saludo { font-size: 1.2rem; } }
+.cvd__fecha { font-size: .85rem; color: #60725d; }
+.cvd__banner { margin-bottom: 0; }
+.cvd__banner-link { font-size: .82rem; font-weight: 600; text-decoration: underline; color: inherit; }
 
 /* KPIs */
-.cvd__kpi-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-6);
-}
+.cvd__kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; }
 @media (max-width: 1023px) { .cvd__kpi-row { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 640px)  { .cvd__kpi-row { grid-template-columns: 1fr 1fr; gap: var(--sp-3); } }
-.cvd__kpi-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-4) !important;
-}
-.cvd__kpi-ico {
-  width: 36px; height: 36px;
-  border-radius: var(--r-md);
-  background: var(--c-leaf-50);
-  color: var(--c-role-cultivador);
-  display: flex; align-items: center; justify-content: center;
-}
-.cvd__kpi-ico--amber { background: var(--c-amber-100); color: var(--c-amber-500); }
-.cvd__kpi-ico--rust  { background: var(--c-rust-100);  color: var(--c-rust-600); }
-.cvd__kpi-sub { font-size: var(--fs-12); color: var(--c-ink-500); }
+@media (max-width: 480px)  { .cvd__kpi-row { grid-template-columns: 1fr 1fr; gap: .5rem; } }
+.cvd__kpi-card { background: #fff; border: 1px solid #e8f0e9; border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; gap: .35rem; }
+.cvd__kpi-card--skeleton { gap: .5rem; }
+.cvd__kpi-ico { width: 34px; height: 34px; border-radius: 8px; background: #f0fdf4; color: #1b5e20; display: flex; align-items: center; justify-content: center; margin-bottom: .15rem; }
+.cvd__kpi-ico--amber { background: #fffbeb; color: #d97706; }
+.cvd__kpi-ico--rust  { background: #fef2f2; color: #dc2626; }
+.cvd__kpi-val { font-size: 1.75rem; font-weight: 700; color: #0f2611; line-height: 1; }
+.cvd__kpi-val--amber { color: #d97706; }
+.cvd__kpi-val--rust  { color: #dc2626; }
+.cvd__kpi-lbl { font-size: .8rem; font-weight: 600; color: #0f2611; }
+.cvd__kpi-sub { font-size: .75rem; color: #60725d; }
+.cvd__kpi-sub--amber { color: #d97706; font-weight: 500; }
+.cvd__kpi-sub--rust  { color: #dc2626; font-weight: 500; }
+
+/* Skeleton KPI */
+.cvd__sk-ico { width: 34px; height: 34px; border-radius: 8px; background: #e8f0e9; animation: cvd-pulse 1.4s ease infinite; }
+.cvd__sk-val { height: 28px; width: 60%; border-radius: 6px; background: #e8f0e9; animation: cvd-pulse 1.4s ease infinite .1s; }
+.cvd__sk-lbl { height: 12px; width: 80%; border-radius: 4px; background: #e8f0e9; animation: cvd-pulse 1.4s ease infinite .2s; }
+@keyframes cvd-pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
 
 /* Sections */
-.cvd__section {
-  margin-bottom: var(--sp-6);
-  background: var(--c-paper);
-  border: 1px solid var(--c-ink-100);
-  border-radius: var(--r-2xl);
-  padding: var(--sp-5) var(--sp-6);
-  border-top-width: 3px;
+.cvd__section {}
+.cvd__section-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  background: #fff; border: 1px solid #e8f0e9; border-radius: 10px;
+  padding: .65rem 1rem; cursor: pointer; margin-bottom: 1rem;
+  transition: border-color .15s, box-shadow .15s;
 }
-@media (max-width: 767px) { .cvd__section { padding: var(--sp-4); } }
-.cvd__section--semana  { border-top-color: var(--c-role-cultivador); }
-.cvd__section--tablero { border-top-color: #6366f1; }
-.cvd__section--salas   { border-top-color: #f59e0b; }
+.cvd__section-toggle:hover { border-color: #c8e6c9; box-shadow: 0 2px 6px rgba(0,0,0,.05); }
+.cvd__section-toggle-left { display: flex; align-items: center; gap: .5rem; }
+.cvd__section-title { font-size: 1.05rem; font-weight: 700; color: #0f2611; margin: 0; }
+.cvd__section-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: 999px; background: #e8f0e9; color: #0f2611; font-size: .72rem; font-weight: 700; padding: 0 .35rem; }
+.cvd__section-badge--amber { background: #fef3c7; color: #d97706; }
+.cvd__section-chevron { color: #60725d; transition: transform .2s; flex-shrink: 0; }
+.cvd__section-chevron--open { transform: rotate(90deg); }
 
-.cvd__section-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-4);
-}
-.cvd__section-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.cvd__section-dot--semana  { background: var(--c-role-cultivador); }
-.cvd__section-dot--tablero { background: #6366f1; }
-.cvd__section-dot--salas   { background: #f59e0b; }
-.cvd__section-title {
-  font-family: var(--font-display);
-  font-size: var(--fs-18);
-  font-weight: 500;
-  color: var(--c-ink-900);
-  margin: 0;
-}
+/* Salas grid */
+.cvd__salas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+@media (max-width: 640px) { .cvd__salas-grid { grid-template-columns: 1fr; } }
 
-/* Salas */
-.cvd__salas-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--sp-6);
-}
-@media (max-width: 767px) { .cvd__salas-grid { grid-template-columns: 1fr; gap: var(--sp-4); } }
+/* Semana de trabajo */
+.cvd__sem-nav { display: flex; align-items: center; gap: .35rem; margin-left: auto; margin-right: .75rem; }
+.cvd__sem-btn { background: #f6faf6; border: 1px solid #e8f0e9; border-radius: 6px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #60725d; font-size: .75rem; transition: all .12s; }
+.cvd__sem-btn:hover { background: #e8f0e9; color: #0f2611; }
+.cvd__sem-label { font-size: .78rem; font-weight: 600; color: #0f2611; white-space: nowrap; padding: 0 .25rem; }
+.cvd__sem-hoy { background: none; border: 1px solid #e8f0e9; border-radius: 6px; padding: .2rem .55rem; font-size: .72rem; font-weight: 600; color: #60725d; cursor: pointer; transition: all .12s; white-space: nowrap; }
+.cvd__sem-hoy:hover { background: #e8f0e9; color: #0f2611; }
 
-/* Footer */
-.cvd__footer {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-family: var(--font-mono);
-  font-size: var(--fs-12);
-  color: var(--c-ink-500);
-  padding-top: var(--sp-6);
-  border-top: 1px solid var(--c-ink-100);
-}
+.cvd__tareas-empty { font-size: .85rem; color: #60725d; padding: 1rem 0; }
 
-/* ── Semana (same as TareasView) ────────────────────────────── */
-.tv__semana { padding: .25rem 0; }
-
-.sem__nav { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
-.sem__nav-btn { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; transition: all .15s; }
-.sem__nav-btn:hover { border-color: #94a3b8; color: #0f172a; }
-.sem__nav-label { flex: 1; text-align: center; font-size: .9rem; font-weight: 700; color: #0f172a; }
-.sem__hoy-btn { background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .3rem .75rem; font-size: .78rem; font-weight: 600; color: #475569; cursor: pointer; }
-.sem__hoy-btn:hover { background: #e2e8f0; }
-.sem__loading { display: flex; justify-content: center; padding: 3rem; }
-.sem__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: cvd-spin .7s linear infinite; }
+.cvd__sem-loading { display: flex; justify-content: center; padding: 2.5rem; }
+.cvd__sem-ring { width: 20px; height: 20px; border: 2px solid #e8f0e9; border-top-color: #1b5e20; border-radius: 50%; animation: cvd-spin .7s linear infinite; }
 @keyframes cvd-spin { to { transform: rotate(360deg); } }
 
-.sem__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .5rem; }
-@media (max-width: 900px) { .sem__grid { grid-template-columns: repeat(7, minmax(110px, 1fr)); overflow-x: auto; } }
+.cvd__sem-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .4rem; padding-bottom: .25rem; overflow-x: auto; }
+@media (max-width: 900px) { .cvd__sem-grid { grid-template-columns: repeat(7, minmax(105px, 1fr)); } }
 
-.sem__col { border: 1.5px solid #e2e8f0; border-radius: 10px; background: #fff; display: flex; flex-direction: column; min-height: 280px; overflow: hidden; }
-.sem__col--hoy { border-color: #3b82f6; }
-.sem__col--pasado { opacity: .65; }
-.sem__col-header { padding: .5rem .6rem; text-align: center; border-bottom: 1px solid #f1f5f9; background: #fafbfc; display: flex; flex-direction: column; align-items: center; gap: .1rem; }
-.sem__col--hoy .sem__col-header { background: #eff6ff; }
-.sem__dia-nombre { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; }
-.sem__dia-num { font-size: 1.2rem; font-weight: 800; color: #0f172a; line-height: 1; }
-.sem__dia-num--hoy { color: #2563eb; }
-.sem__col-count { font-size: .6rem; font-weight: 700; background: #e0e7ff; color: #4338ca; padding: .1em .35em; border-radius: 3px; }
-.sem__tareas { flex: 1; padding: .4rem; display: flex; flex-direction: column; gap: .3rem; }
-.sem__tarea { display: flex; align-items: center; gap: .3rem; padding: .35rem .45rem; border-radius: 6px; border-left: 3px solid #e2e8f0; background: #f8fafc; cursor: pointer; font-size: .72rem; transition: opacity .12s; }
-.sem__tarea:hover { opacity: .8; }
-.sem__tarea--urgente { border-left-color: #dc2626; }
-.sem__tarea--alta    { border-left-color: #f97316; }
-.sem__tarea--normal  { border-left-color: #3b82f6; }
-.sem__tarea--baja    { border-left-color: #9ca3af; }
-.sem__tarea--done    { opacity: .35; text-decoration: line-through; }
-.sem__tarea-emoji { flex-shrink: 0; font-size: .8rem; }
-.sem__tarea-titulo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; font-weight: 500; }
-.sem__asig { width: 18px; height: 18px; border-radius: 50%; background: #e0e7ff; color: #4338ca; font-size: .6rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.cvd__sem-col { border: 1.5px solid #e8f0e9; border-radius: 10px; background: #fff; display: flex; flex-direction: column; min-height: 200px; overflow: hidden; }
+.cvd__sem-col--hoy { border-color: #1b5e20; }
+.cvd__sem-col--pasado { opacity: .6; }
 
-/* ── Kanban 2 cols ────────────────────────────────────────────── */
-.tv__kanban-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-.cvd__kanban-2  { grid-template-columns: 1fr 1fr; }
-@media (max-width: 640px) { .cvd__kanban-2 { grid-template-columns: 1fr; } }
+.cvd__sem-col-header { padding: .45rem .5rem; text-align: center; border-bottom: 1px solid #f0f4f0; background: #f6faf6; display: flex; flex-direction: column; align-items: center; gap: .1rem; }
+.cvd__sem-col--hoy .cvd__sem-col-header { background: #f0fdf4; }
+.cvd__sem-dia-nombre { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #60725d; }
+.cvd__sem-dia-num { font-size: 1.15rem; font-weight: 800; color: #0f2611; line-height: 1; }
+.cvd__sem-dia-num--hoy { color: #1b5e20; }
+.cvd__sem-col-count { font-size: .58rem; font-weight: 700; background: #e8f0e9; color: #0f2611; padding: .1em .4em; border-radius: 3px; }
+.cvd__sem-col--hoy .cvd__sem-col-count { background: #dcfce7; color: #15803d; }
 
-.tv__col { background: #f8fafc; border-radius: 12px; overflow: hidden; }
-.tv__col-header { display: flex; align-items: center; justify-content: space-between; padding: .65rem .875rem; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-.tv__col-header--pending { background: rgba(100,116,139,.08); color: #475569; }
-.tv__col-header--done    { background: rgba(21,128,61,.1);   color: #15803d; }
-.tv__col-count { font-size: .7rem; font-weight: 700; background: rgba(0,0,0,.06); padding: .15em .5em; border-radius: 5px; }
-.tv__col-body { padding: .75rem; min-height: 100px; max-height: 65vh; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; }
-.tv__col-empty { text-align: center; color: #94a3b8; font-size: .82rem; padding: 1.5rem 0; }
+.cvd__sem-tareas { flex: 1; padding: .35rem; display: flex; flex-direction: column; gap: .25rem; }
 
-/* Tarea card (kanban) */
-.cvd__tc {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .55rem .7rem;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  transition: box-shadow .12s, border-color .12s;
-}
-.cvd__tc:hover { box-shadow: 0 2px 8px rgba(0,0,0,.07); border-color: #94a3b8; }
-.cvd__tc--done { opacity: .6; }
-.cvd__tc-emoji { font-size: .9rem; flex-shrink: 0; }
-.cvd__tc-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.cvd__tc-titulo { font-size: .82rem; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cvd__tc-meta   { font-size: .7rem; color: #94a3b8; }
-.cvd__tc-vencida { font-size: .7rem; flex-shrink: 0; }
+.cvd__sem-tarea { display: flex; align-items: center; gap: .25rem; padding: .3rem .4rem; border-radius: 6px; border-left: 3px solid #e8f0e9; background: #f6faf6; cursor: pointer; font-size: .7rem; transition: opacity .12s, box-shadow .12s; }
+.cvd__sem-tarea:hover { opacity: .85; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.cvd__sem-tarea--urgente { border-left-color: #dc2626; }
+.cvd__sem-tarea--alta    { border-left-color: #f97316; }
+.cvd__sem-tarea--normal  { border-left-color: #1b5e20; }
+.cvd__sem-tarea--baja    { border-left-color: #9ca3af; }
+.cvd__sem-tarea--done    { opacity: .35; text-decoration: line-through; }
+.cvd__sem-tarea--atrasada { background: #fff7ed; border-left-color: #f97316; }
+.cvd__sem-emoji  { flex-shrink: 0; font-size: .78rem; }
+.cvd__sem-titulo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f2611; font-weight: 500; }
+.cvd__sem-late   { flex-shrink: 0; font-size: .7rem; }
 
-/* ── Panel detalle tarea ─────────────────────────────────────── */
-.tv__panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 1040; display: flex; justify-content: flex-end; }
-.tv__panel { width: min(420px, 100vw); height: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: -8px 0 32px rgba(0,0,0,.12); animation: cvd-slide .2s ease; }
+/* Footer */
+.cvd__footer { display: flex; align-items: center; gap: .5rem; font-size: .78rem; color: #60725d; padding-top: .75rem; border-top: 1px solid #e8f0e9; }
+
+/* Panel detalle tarea */
+.cvd__panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 1040; display: flex; justify-content: flex-end; }
+.cvd__panel { width: min(420px, 100vw); height: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: -8px 0 32px rgba(0,0,0,.12); animation: cvd-slide .2s ease; }
 @keyframes cvd-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
-.tv__panel-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; }
-.tv__panel-title { font-size: .95rem; font-weight: 700; margin: 0; }
-.tv__panel-close { background: #f1f5f9; border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b; }
-.tv__panel-close:hover { background: #e2e8f0; }
-.tv__panel-body { padding: 1.5rem; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
-.tv__tipo-pill { display: inline-flex; align-items: center; gap: .35rem; background: #e8f5e9; color: #1b5e20; font-size: .75rem; font-weight: 700; padding: .25em .75em; border-radius: 6px; }
-.tv__panel-nombre { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -.03em; }
-.tv__panel-desc { font-size: .85rem; color: #64748b; margin: 0; line-height: 1.6; }
-.tv__panel-info { border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden; }
-.tv__panel-row { display: flex; justify-content: space-between; align-items: center; padding: .65rem 1rem; border-bottom: 1px solid #f8fafc; font-size: .82rem; }
-.tv__panel-row:last-child { border-bottom: none; }
-.tv__panel-key { color: #94a3b8; font-size: .72rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
-.tv__panel-link { color: #1b5e20; text-decoration: none; font-weight: 600; }
-.tv__estado-pill { font-size: .7rem; font-weight: 700; padding: .2em .65em; border-radius: 6px; text-transform: capitalize; }
-.tv__panel-actions { display: flex; flex-direction: column; gap: .5rem; padding-top: .5rem; }
-.tv__panel-btn { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .65rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
-.tv__panel-btn:disabled { opacity: .6; cursor: not-allowed; }
-.tv__panel-btn--primary { background: #1b5e20; color: #fff; }
-.tv__panel-btn--primary:not(:disabled):hover { background: #144a18; }
-.tv__panel-btn--ghost { background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; }
-.tv__panel-btn--ghost:not(:disabled):hover { background: #e2e8f0; }
+.cvd__panel-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; }
+.cvd__panel-title  { font-size: .95rem; font-weight: 700; margin: 0; }
+.cvd__panel-close  { background: #f1f5f9; border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b; }
+.cvd__panel-close:hover { background: #e2e8f0; }
+.cvd__panel-body { padding: 1.5rem; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+.cvd__tipo-pill { display: inline-flex; align-items: center; gap: .35rem; background: #e8f5e9; color: #1b5e20; font-size: .75rem; font-weight: 700; padding: .25em .75em; border-radius: 6px; }
+.cvd__panel-nombre { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -.03em; }
+.cvd__panel-desc   { font-size: .85rem; color: #64748b; margin: 0; line-height: 1.6; }
+.cvd__panel-info   { border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden; }
+.cvd__panel-row    { display: flex; justify-content: space-between; align-items: center; padding: .65rem 1rem; border-bottom: 1px solid #f8fafc; font-size: .82rem; }
+.cvd__panel-row:last-child { border-bottom: none; }
+.cvd__panel-key    { color: #94a3b8; font-size: .72rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.cvd__panel-link   { color: #1b5e20; text-decoration: none; font-weight: 600; }
+.cvd__estado-pill  { font-size: .7rem; font-weight: 700; padding: .2em .65em; border-radius: 6px; text-transform: capitalize; }
+.cvd__panel-actions { display: flex; flex-direction: column; gap: .5rem; padding-top: .5rem; }
+.cvd__panel-btn { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .65rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
+.cvd__panel-btn:disabled { opacity: .6; cursor: not-allowed; }
+.cvd__panel-btn--primary { background: #1b5e20; color: #fff; }
+.cvd__panel-btn--primary:not(:disabled):hover { background: #144a18; }
+.cvd__panel-btn--ghost { background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; }
+.cvd__panel-btn--ghost:not(:disabled):hover { background: #e2e8f0; }
 .cvd__futura-hint { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .55rem .875rem; margin: 0; }
 </style>

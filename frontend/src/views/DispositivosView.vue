@@ -1,37 +1,52 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useAmbienteStore } from '../stores/ambiente.js'
 import { useToast } from '../composables/useToast.js'
+import { listSalas } from '../lib/api.js'
 import DispositivoCard from '../components/ambiente/DispositivoCard.vue'
 
 const store = useAmbienteStore()
 const toast = useToast()
 
-const loading     = ref(false)
-const showForm    = ref(false)
-const guardando   = ref(false)
-const form        = ref(emptyForm())
-const formError   = ref(null)
+const loading   = ref(false)
+const showForm  = ref(false)
+const guardando = ref(false)
+const form      = ref(emptyForm())
+const formError = ref(null)
+const salas     = ref([])
+
+const TIPOS_DISPOSITIVO = [
+  { value: 'sonoff_th',  label: 'Sonoff TH Elite (eWeLink webhook)' },
+  { value: 'generic',    label: 'Genérico (HTTP webhook)' },
+  { value: 'bluelab',    label: 'Bluelab' },
+  { value: 'tuya_plug',  label: 'Tuya / Smart Life' },
+  { value: 'shelly_plug',label: 'Shelly' },
+  { value: 'daikin',     label: 'Daikin AC' },
+  { value: 'pulse',      label: 'Bluelab Pulse' },
+  { value: 'melcloud_ac',label: 'Mitsubishi MelCloud' },
+]
 
 function emptyForm() {
-  return { nombre: '', protocolo: 'http', sala_id: '', descripcion: '' }
+  return { nombre_amigable: '', tipo: 'sonoff_th', sala_id: null }
 }
 
 onMounted(async () => {
   loading.value = true
-  await store.cargarDispositivos()
+  await Promise.all([
+    store.cargarDispositivos(),
+    listSalas().then(r => { salas.value = r.data || [] }),
+  ])
   loading.value = false
 })
 
 async function guardar() {
-  if (!form.value.nombre) { formError.value = 'El nombre es obligatorio'; return }
-  guardando.value = true
   formError.value = null
+  if (!form.value.nombre_amigable.trim()) { formError.value = 'El nombre es obligatorio'; return }
+  if (!form.value.sala_id) { formError.value = 'Seleccioná una sala'; return }
+  guardando.value = true
   try {
-    const payload = { ...form.value }
-    if (!payload.sala_id) delete payload.sala_id
-    await store.createDispositivo(payload)
-    toast.success('Dispositivo creado')
+    await store.createDispositivo({ ...form.value })
+    toast.success('Dispositivo creado. Generá el token desde la card.')
     showForm.value = false
     form.value = emptyForm()
   } catch (e) {
@@ -39,6 +54,12 @@ async function guardar() {
   } finally {
     guardando.value = false
   }
+}
+
+function cancelar() {
+  showForm.value = false
+  form.value = emptyForm()
+  formError.value = null
 }
 </script>
 
@@ -48,7 +69,7 @@ async function guardar() {
     <div class="dv__header">
       <div>
         <h1 class="dv__title">📡 Dispositivos IoT</h1>
-        <p class="dv__sub">Sensores y dispositivos conectados al módulo ambiente.</p>
+        <p class="dv__sub">Sensores y actuadores conectados al módulo ambiente.</p>
       </div>
       <button class="dv__btn-primary" @click="showForm = !showForm">
         <i class="bi bi-plus-lg"></i> Nuevo dispositivo
@@ -62,22 +83,31 @@ async function guardar() {
       <div class="dv__form-grid">
         <div class="dv__field">
           <label class="dv__label">Nombre <span class="dv__req">*</span></label>
-          <input class="dv__input" v-model="form.nombre" placeholder="Ej: Sensor Sala 1" />
+          <input class="dv__input" v-model="form.nombre_amigable" placeholder="Ej: Sensor Sala Vegetativo" />
         </div>
         <div class="dv__field">
-          <label class="dv__label">Protocolo</label>
-          <select class="dv__input" v-model="form.protocolo">
-            <option value="http">HTTP webhook</option>
-            <option value="mqtt">MQTT</option>
+          <label class="dv__label">Tipo de dispositivo <span class="dv__req">*</span></label>
+          <select class="dv__input" v-model="form.tipo">
+            <option v-for="t in TIPOS_DISPOSITIVO" :key="t.value" :value="t.value">{{ t.label }}</option>
           </select>
         </div>
         <div class="dv__field dv__field--full">
-          <label class="dv__label">Descripción</label>
-          <input class="dv__input" v-model="form.descripcion" placeholder="Opcional…" />
+          <label class="dv__label">Sala asignada <span class="dv__req">*</span></label>
+          <select class="dv__input" v-model.number="form.sala_id">
+            <option :value="null" disabled>Seleccioná una sala…</option>
+            <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+          </select>
         </div>
       </div>
+
+      <!-- Hint Sonoff -->
+      <div v-if="form.tipo === 'sonoff_th'" class="dv__hint-box">
+        <i class="bi bi-info-circle-fill"></i>
+        Después de crear, generá el token y configurá el webhook de eWeLink apuntando a la URL que aparece en la card.
+      </div>
+
       <div class="dv__form-actions">
-        <button class="dv__btn-ghost" @click="showForm = false; form = emptyForm()">Cancelar</button>
+        <button class="dv__btn-ghost" @click="cancelar">Cancelar</button>
         <button class="dv__btn-primary" :disabled="guardando" @click="guardar">
           {{ guardando ? 'Guardando…' : 'Crear dispositivo' }}
         </button>
@@ -89,7 +119,7 @@ async function guardar() {
     <div v-else-if="!store.dispositivos.length" class="dv__empty">
       <div class="dv__empty-icon">📡</div>
       <div class="dv__empty-title">Sin dispositivos todavía</div>
-      <div class="dv__empty-sub">Registrá el primer sensor o dispositivo IoT.</div>
+      <div class="dv__empty-sub">Registrá el primer sensor para empezar a recibir lecturas automáticas.</div>
     </div>
     <div v-else class="dv__grid">
       <DispositivoCard
@@ -127,13 +157,19 @@ async function guardar() {
 .dv__form-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
 .dv__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .6rem .9rem; border-radius: 8px; font-size: .82rem; margin-bottom: .75rem; }
 
+.dv__hint-box {
+  display: flex; align-items: flex-start; gap: .5rem;
+  background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8;
+  border-radius: 9px; padding: .65rem .875rem; font-size: .8rem; margin-top: .75rem;
+}
+
 .dv__loading { padding: 3rem; text-align: center; color: #94a3b8; font-size: .875rem; }
 .dv__empty { text-align: center; padding: 4rem 1rem; }
 .dv__empty-icon { font-size: 3rem; margin-bottom: .75rem; }
 .dv__empty-title { font-size: 1rem; font-weight: 700; color: #1a1a1a; margin-bottom: .35rem; }
 .dv__empty-sub { font-size: .82rem; color: #94a3b8; }
 
-.dv__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+.dv__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
 
 .dv__btn-primary {
   display: inline-flex; align-items: center; gap: .4rem;

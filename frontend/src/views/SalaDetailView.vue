@@ -111,13 +111,10 @@ const SALA_KINDS = [
 ]
 
 function openEditSala() {
-  const limite = sala.value.plants_max || sala.value.pots_count || null
   editSalaForm.value = {
-    nombre:      sala.value.nombre || '',
-    kind:        sala.value.kind   || '',
-    tiene_limite: !!limite,
-    plants_max:  limite || '',
-    notes:       sala.value.notes  || '',
+    nombre: sala.value.nombre || '',
+    kind:   sala.value.kind   || '',
+    notes:  sala.value.notes  || '',
   }
   editSalaError.value = null
   showEditSala.value  = true
@@ -128,9 +125,7 @@ async function saveEditSala() {
   savingEditSala.value = true
   editSalaError.value  = null
   try {
-    const { tiene_limite, ...rest } = editSalaForm.value
-    const payload = { ...rest, plants_max: tiene_limite ? (Number(rest.plants_max) || null) : null }
-    await updateSala(salaId, payload)
+    await updateSala(salaId, editSalaForm.value)
     await salas.fetchSala(salaId)
     showEditSala.value = false
     toast.success('Sala actualizada')
@@ -235,8 +230,6 @@ function kindLabel(k)  { return { vegetativo:"Vegetativo", floracion:"Floración
 function salaEstadoStyle(state) {
   return { activa:{bg:"#dcfce7",color:"#15803d"}, mantenimiento:{bg:"#fef3c7",color:"#b45309"}, cerrada:{bg:"#f1f5f9",color:"#64748b"} }[state] || {bg:"#f1f5f9",color:"#64748b"}
 }
-function ocupacionColor(pct) { return pct >= 100 ? "#b91c1c" : pct >= 90 ? "#dc2626" : pct >= 70 ? "#d97706" : "#16a34a" }
-function ocupacionPct(s)     { return s?.porcentaje_ocupacion || 0 }
 function formatDate(d) {
   if (!d) return "—"
   const date = new Date(d)
@@ -302,13 +295,6 @@ function validateLote(form) {
   const n = Number(form.plants_count)
   if (!Number.isInteger(n) || n < 0 || n > 5000) {
     e.plants_count = "Debe ser 0–5000"
-  } else if (sala.value && n > 0) {
-    // capacidad_disponible es null cuando no hay límite configurado
-    const disp = sala.value.capacidad_disponible
-    if (disp !== null && disp !== undefined && n > disp) {
-      const max = sala.value.plants_max || sala.value.pots_count || 0
-      e.plants_count = `La sala solo tiene capacidad para ${disp} plantas más (máx: ${max})`
-    }
   }
   return e
 }
@@ -347,13 +333,6 @@ function closeCreate() {
   loteErrors.value   = {}
   loteApiError.value = null
 }
-
-// Usa el valor del API (null = sin límite, número = disponible)
-const capacidadDisponible = computed(() => {
-  if (!sala.value) return null
-  // capacidad_disponible viene null del API cuando no hay límite configurado
-  return sala.value.capacidad_disponible ?? null
-})
 
 // ── Mini widget ambiente ───────────────────────────────────────
 const ambienteMini = ref([])
@@ -463,19 +442,6 @@ const canSeeAmbiente = computed(() =>
 
       <!-- KPIs -->
       <div class="sd__kpis">
-        <div v-if="sala?.pots_count" class="sd__kpi sd__kpi--accent">
-          <div class="sd__kpi-icon">📊</div>
-          <div class="sd__kpi-body">
-            <div class="sd__kpi-value" :style="{ color: ocupacionColor(ocupacionPct(sala)) }">{{ ocupacionPct(sala).toFixed(0) }}%</div>
-            <div class="sd__kpi-label">
-              Ocupación
-              <span v-if="ocupacionPct(sala) > 100" style="font-size:.65rem;color:#b91c1c;font-weight:700;margin-left:.3rem">⚠ excede capacidad</span>
-            </div>
-            <div class="sd__kpi-progress">
-              <div class="sd__kpi-progress-fill" :style="{ width: Math.min(ocupacionPct(sala), 100) + '%', background: ocupacionColor(ocupacionPct(sala)) }"></div>
-            </div>
-          </div>
-        </div>
         <div class="sd__kpi">
           <div class="sd__kpi-icon">🌿</div>
           <div class="sd__kpi-body">
@@ -489,7 +455,6 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value">{{ kpis.totalPlantas }}</div>
             <div class="sd__kpi-label">Plantas activas</div>
-            <div v-if="sala?.pots_count" class="sd__kpi-sub">cap. {{ sala.pots_count }}</div>
           </div>
         </div>
         <div class="sd__kpi">
@@ -599,7 +564,6 @@ const canSeeAmbiente = computed(() =>
                 </span>
               </dd>
               <dt>Tipo</dt><dd>{{ kindLabel(sala.kind) }}</dd>
-              <dt v-if="sala.plants_max || sala.pots_count">Capacidad</dt><dd v-if="sala.plants_max || sala.pots_count">{{ sala.plants_max || sala.pots_count }} plantas</dd>
               <dt>Sede</dt><dd>{{ sala.sede?.nombre || "—" }}</dd>
               <dt>A cargo</dt><dd>{{ sala.cultivadores?.map(c => c.nombre).join(', ') || "—" }}</dd>
               <dt>Creado por</dt><dd>{{ sala.created_by_name || "—" }}</dd>
@@ -700,24 +664,6 @@ const canSeeAmbiente = computed(() =>
             <div v-if="loteApiError" class="sd__alert">{{ loteApiError }}</div>
             <div v-else-if="lotes.createError" class="sd__alert">{{ lotes.createError }}</div>
 
-            <!-- Alerta de capacidad -->
-            <div v-if="capacidadDisponible !== null" class="sd__capacity-bar">
-              <div class="sd__capacity-info">
-                <span>Capacidad disponible:</span>
-                <strong :style="capacidadDisponible <= 0 ? 'color:#dc2626' : capacidadDisponible <= 10 ? 'color:#d97706' : 'color:#16a34a'">
-                  {{ capacidadDisponible }} plantas
-                </strong>
-              </div>
-              <div class="sd__capacity-track">
-                <div class="sd__capacity-fill"
-                     :style="{
-                    width: Math.min(((sala.plantas_totales ?? kpis.totalPlantas) / (sala.plants_max || sala.pots_count)) * 100, 100) + '%',
-                    background: capacidadDisponible <= 0 ? '#dc2626' : capacidadDisponible <= 10 ? '#d97706' : '#16a34a'
-                  }">
-                </div>
-              </div>
-            </div>
-
             <div class="sd__grid">
               <div v-if="!sala?.kind" class="sd__field">
                 <label class="sd__label">Estado inicial</label>
@@ -787,7 +733,7 @@ const canSeeAmbiente = computed(() =>
           </div>
           <div class="sd__modal-footer">
             <button class="sd__btn-ghost" :disabled="lotes.creating" @click="closeCreate">Cancelar</button>
-            <button class="sd__btn-primary" :disabled="lotes.creating || capacidadDisponible === 0" @click="createLote" :title="capacidadDisponible === 0 ? 'Sala al límite de capacidad' : ''">
+            <button class="sd__btn-primary" :disabled="lotes.creating" @click="createLote">
               <div v-if="lotes.creating" class="sd__spinner sd__spinner--sm"></div>
               <i v-else class="bi bi-plus-lg"></i>Crear lote
             </button>
@@ -835,16 +781,6 @@ const canSeeAmbiente = computed(() =>
                   <option value="">Sin especificar</option>
                   <option v-for="k in SALA_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
                 </select>
-              </div>
-              <div class="sd__field">
-                <label class="sd__label">Capacidad máxima</label>
-                <label class="sd__checkbox-row">
-                  <input type="checkbox" v-model="editSalaForm.tiene_limite" />
-                  <span>Definir límite de plantas</span>
-                </label>
-                <input v-if="editSalaForm.tiene_limite" type="number" min="1" max="9999" step="1"
-                       class="sd__input" v-model.number="editSalaForm.plants_max"
-                       placeholder="Ej: 50" style="margin-top:.35rem" />
               </div>
               <div class="sd__field sd__field--full">
                 <label class="sd__label">Notas</label>
