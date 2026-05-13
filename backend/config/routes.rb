@@ -234,6 +234,24 @@ Rails.application.routes.draw do
 
     get 'historial', to: 'historial#index'
 
+    # Plan de Trabajo
+    resources :plan_trabajos do
+      collection do
+        get  :activo
+        post :interpretar_archivo
+      end
+      member do
+        post :publicar
+        post :archivar
+      end
+    end
+    scope '/plan_trabajos/:id', controller: :plan_trabajos do
+      get    'plan_tareas',       action: :plan_tareas_index
+      post   'plan_tareas',       action: :plan_tareas_create
+      patch  'plan_tareas/:tid',  action: :plan_tareas_update
+      delete 'plan_tareas/:tid',  action: :plan_tareas_destroy
+    end
+
     resources :tareas do
       collection do
         get :dashboard

@@ -276,6 +276,21 @@ export const getTareasSemana    = (desde)        => api.get('/tareas/semana', { 
 export const cancelarSerieTarea = (id)           => api.delete(`/tareas/${id}/cancelar_serie`)
 export const getHistorial       = (params = {})  => api.get('/historial', { params })
 
+// ── Plan de Trabajo ──────────────────────────────────────────
+export const listPlanTrabajos         = (params = {})         => api.get('/plan_trabajos', { params })
+export const getPlanTrabajo           = (id)                  => api.get(`/plan_trabajos/${id}`)
+export const getPlanTrabajoActivo     = ()                    => api.get('/plan_trabajos/activo')
+export const createPlanTrabajo        = (data)                => api.post('/plan_trabajos', data)
+export const updatePlanTrabajo        = (id, data)            => api.patch(`/plan_trabajos/${id}`, data)
+export const deletePlanTrabajo        = (id)                  => api.delete(`/plan_trabajos/${id}`)
+export const publicarPlanTrabajo      = (id)                  => api.post(`/plan_trabajos/${id}/publicar`)
+export const archivarPlanTrabajo      = (id)                  => api.post(`/plan_trabajos/${id}/archivar`)
+export const interpretarArchivoPlan   = (formData)            => api.post('/plan_trabajos/interpretar_archivo', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const listPlanTareas           = (planId)              => api.get(`/plan_trabajos/${planId}/plan_tareas`)
+export const createPlanTarea          = (planId, data)        => api.post(`/plan_trabajos/${planId}/plan_tareas`, { plan_tarea: data })
+export const updatePlanTarea          = (planId, tid, data, scope = 'esta') => api.patch(`/plan_trabajos/${planId}/plan_tareas/${tid}`, { plan_tarea: data, scope })
+export const deletePlanTarea          = (planId, tid)         => api.delete(`/plan_trabajos/${planId}/plan_tareas/${tid}`)
+
 // Gestión de cultivadores asignados a salas
 
 export const getSalaCultivadores = (salaId) => api.get(`/salas/${salaId}/cultivadores`)

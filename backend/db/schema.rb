@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_12_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_12_000004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -649,6 +649,53 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_12_000001) do
     t.index ["plant_id"], name: "index_pesadas_plantas_on_plant_id"
   end
 
+  create_table "plan_tareas", force: :cascade do |t|
+    t.bigint "plan_trabajo_id", null: false
+    t.bigint "responsable_id"
+    t.bigint "sala_id"
+    t.bigint "tarea_generada_id"
+    t.string "titulo"
+    t.string "tipo", default: "otro", null: false
+    t.string "prioridad", default: "normal", null: false
+    t.text "descripcion"
+    t.string "dias_semana"
+    t.string "hora"
+    t.boolean "es_recurrente", default: false, null: false
+    t.string "recurrencia_id"
+    t.date "fecha_especifica"
+    t.boolean "origen_ia", default: false, null: false
+    t.boolean "confirmada", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["plan_trabajo_id", "es_recurrente"], name: "index_plan_tareas_on_plan_trabajo_id_and_es_recurrente"
+    t.index ["plan_trabajo_id"], name: "index_plan_tareas_on_plan_trabajo_id"
+    t.index ["recurrencia_id"], name: "index_plan_tareas_on_recurrencia_id"
+    t.index ["responsable_id"], name: "index_plan_tareas_on_responsable_id"
+    t.index ["sala_id"], name: "index_plan_tareas_on_sala_id"
+    t.index ["tarea_generada_id"], name: "index_plan_tareas_on_tarea_generada_id"
+  end
+
+  create_table "plan_trabajos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "creado_por_id", null: false
+    t.bigint "sede_id"
+    t.string "titulo", null: false
+    t.integer "periodo_tipo", default: 0, null: false
+    t.date "fecha_inicio", null: false
+    t.date "fecha_fin", null: false
+    t.integer "estado", default: 0, null: false
+    t.boolean "repetir_automaticamente", default: false, null: false
+    t.text "notas"
+    t.datetime "publicado_en"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "estado"], name: "index_plan_trabajos_on_club_id_and_estado"
+    t.index ["club_id", "fecha_inicio"], name: "index_plan_trabajos_on_club_id_and_fecha_inicio"
+    t.index ["club_id"], name: "index_plan_trabajos_on_club_id"
+    t.index ["creado_por_id"], name: "index_plan_trabajos_on_creado_por_id"
+    t.index ["sede_id"], name: "index_plan_trabajos_on_sede_id"
+  end
+
   create_table "plant_activities", force: :cascade do |t|
     t.bigint "plant_id", null: false
     t.bigint "user_id", null: false
@@ -926,6 +973,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_12_000001) do
     t.date "recurrencia_hasta"
     t.integer "recurrencia_veces"
     t.integer "parent_tarea_id"
+    t.bigint "origen_plan_id"
+    t.bigint "plan_tarea_id"
     t.index ["asignada_a_id", "estado"], name: "index_tareas_on_asignada_a_id_and_estado"
     t.index ["asignada_a_id"], name: "index_tareas_on_asignada_a_id"
     t.index ["club_id", "estado"], name: "index_tareas_on_club_id_and_estado"
@@ -934,7 +983,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_12_000001) do
     t.index ["creada_por_id"], name: "index_tareas_on_creada_por_id"
     t.index ["lote_id", "horas_aplicadas_al_lote"], name: "index_tareas_on_lote_id_and_horas_aplicadas_al_lote"
     t.index ["lote_id"], name: "index_tareas_on_lote_id"
+    t.index ["origen_plan_id"], name: "index_tareas_on_origen_plan_id"
     t.index ["parent_tarea_id"], name: "index_tareas_on_parent_tarea_id"
+    t.index ["plan_tarea_id"], name: "index_tareas_on_plan_tarea_id"
     t.index ["plant_id"], name: "index_tareas_on_plant_id"
     t.index ["sala_id"], name: "index_tareas_on_sala_id"
   end
@@ -1053,6 +1104,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_12_000001) do
   add_foreign_key "pesadas", "users", column: "registrado_por_id"
   add_foreign_key "pesadas_plantas", "pesadas"
   add_foreign_key "pesadas_plantas", "plants"
+  add_foreign_key "plan_tareas", "plan_trabajos"
+  add_foreign_key "plan_tareas", "salas"
+  add_foreign_key "plan_tareas", "tareas", column: "tarea_generada_id"
+  add_foreign_key "plan_tareas", "users", column: "responsable_id"
+  add_foreign_key "plan_trabajos", "clubs"
+  add_foreign_key "plan_trabajos", "sedes"
+  add_foreign_key "plan_trabajos", "users", column: "creado_por_id"
   add_foreign_key "plant_activities", "plants"
   add_foreign_key "plant_activities", "users"
   add_foreign_key "plants", "clubs"
@@ -1083,6 +1141,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_12_000001) do
   add_foreign_key "stocks", "sedes"
   add_foreign_key "tareas", "clubs"
   add_foreign_key "tareas", "lotes"
+  add_foreign_key "tareas", "plan_tareas"
+  add_foreign_key "tareas", "plan_trabajos", column: "origen_plan_id"
   add_foreign_key "tareas", "plants"
   add_foreign_key "tareas", "salas"
   add_foreign_key "tareas", "users", column: "asignada_a_id"

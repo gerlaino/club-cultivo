@@ -141,6 +141,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/plan-trabajo",
+    name: "plan-trabajo",
+    component: () => import("../views/PlanTrabajoView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/rendimiento",
     name: "rendimiento",
     component: () => import("../views/RendimientoView.vue"),

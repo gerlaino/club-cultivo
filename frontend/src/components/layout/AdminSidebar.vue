@@ -77,6 +77,7 @@ import {
   Sprout, FileCheck, FileText, UserCog, Globe, ClipboardCheck,
   Container, BarChart3, ShieldCheck, Truck, TrendingUp, History,
   GitBranch, Layers, ChevronDown, Dna, Archive, Leaf, Boxes, Scissors,
+  ClipboardList,
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -116,7 +117,8 @@ const GRUPOS = [
       { to: '/sedes',              icon: Building2,  label: 'Sedes' },
       { to: '/stock',              icon: Boxes,      label: 'Stock' },
       { to: '/delivery/despachos', icon: Truck,      label: 'Despachos' },
-      { to: '/tareas',             icon: CheckSquare, label: 'Tareas' },
+      { to: '/tareas',             icon: CheckSquare,  label: 'Tareas' },
+      { to: '/plan-trabajo',       icon: ClipboardList, label: 'Plan de trabajo' },
       { to: '/contabilidad',       icon: Wallet,     label: 'Contabilidad' },
       { to: '/usuarios',           icon: UserCog,    label: 'Equipo' },
       { to: '/web',                icon: Globe,      label: 'Web' },
