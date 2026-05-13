@@ -508,6 +508,7 @@ class LotesController < ApplicationController
   def estado_a_state(estado)
     {
       'semilla'    => 'germinacion',
+      'esqueje'    => 'germinacion',
       'vegetativo' => 'vegetativo',
       'floracion'  => 'floracion',
       'cosecha'    => 'cosechado',
@@ -540,7 +541,7 @@ class LotesController < ApplicationController
 
   def lote_params
     params.require(:lote).permit(
-      :codigo, :start_date, :estado, :plants_count, :strain, :notes,
+      :start_date, :estado, :origen, :planta_madre_id, :plants_count, :strain, :notes,
       :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
       :rendimiento_real_g, :plants_count_cosechadas
@@ -675,8 +676,13 @@ class LotesController < ApplicationController
 
   def serialize_lote(lote, include_plants: false, include_cycle_data: false)
     idx_ciclo        = Lote::CICLO_FASES.index(lote.estado)
-    proxima_fase     = idx_ciclo ? Lote::CICLO_FASES[idx_ciclo + 1] : nil
-    puede_transicion = idx_ciclo.present? && idx_ciclo < Lote::CICLO_FASES.length - 1
+    proxima_fase     = if %w[semilla esqueje].include?(lote.estado)
+      'vegetativo'
+    elsif idx_ciclo
+      Lote::CICLO_FASES[idx_ciclo + 1]
+    end
+    puede_transicion = %w[semilla esqueje].include?(lote.estado) ||
+                       (idx_ciclo.present? && idx_ciclo < Lote::CICLO_FASES.length - 1)
 
     eventos = lote.lote_eventos.loaded? ? lote.lote_eventos : lote.lote_eventos.to_a
     ev_floracion = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'floracion' }.min_by(&:registrado_en)
@@ -693,6 +699,8 @@ class LotesController < ApplicationController
       club_id:              lote.club_id,
       sala_id:              lote.sala_id,
       codigo:               lote.codigo,
+      origen:               lote.origen,
+      planta_madre:         lote.planta_madre ? { id: lote.planta_madre.id, nombre: lote.planta_madre.nombre, codigo_qr: lote.planta_madre.codigo_qr } : nil,
       estado:               lote.estado,
       fase:                 lote.estado,
       proxima_fase_posible: proxima_fase,

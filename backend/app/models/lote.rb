@@ -2,7 +2,8 @@ class Lote < ApplicationRecord
   belongs_to :club
   belongs_to :sala
   belongs_to :genetica,    optional: true
-  belongs_to :manicurador, class_name: 'User', optional: true
+  belongs_to :manicurador,   class_name: 'User',  optional: true
+  belongs_to :planta_madre,  class_name: 'Plant', optional: true
   has_many :plants,                dependent: :destroy
   has_one  :costo_lote,            dependent: :destroy
   has_many :movimientos_contables, dependent: :nullify
@@ -16,7 +17,8 @@ class Lote < ApplicationRecord
   # en_manicura: admin asigna un manicurador y el lote espera ser procesado.
   # manicura_pendiente: manicurador registró pesada, espera aprobación admin.
   # secado/curado: estados legacy — lotes anteriores al nuevo flujo.
-  ESTADOS       = %w[semilla vegetativo floracion cosecha en_manicura secado manicura_pendiente curado finalizado].freeze
+  ESTADOS       = %w[semilla esqueje vegetativo floracion cosecha en_manicura secado manicura_pendiente curado finalizado].freeze
+  ORIGENES      = %w[semilla esqueje].freeze
   CICLO_FASES   = %w[vegetativo floracion cosecha secado curado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
   TIPOS_LUZ     = %w[led hps cmh natural mixta].freeze
@@ -53,7 +55,7 @@ class Lote < ApplicationRecord
 
   def progreso_ciclo
     case estado
-    when 'semilla'             then 0
+    when 'semilla', 'esqueje'  then 0
     when 'vegetativo'          then 20
     when 'floracion'           then 40
     when 'cosecha'             then 60
@@ -77,9 +79,13 @@ class Lote < ApplicationRecord
   # Si sala_id se provee, mueve el lote a esa sala. Si no, intenta auto-detectar:
   # si existe exactamente una sala activa del tipo destino en el club, la elige.
   def avanzar_fase!(sala_id: nil)
-    idx = CICLO_FASES.index(estado)
-    raise ArgumentError, 'Lote no puede transicionar en este estado' unless idx.present? && idx < CICLO_FASES.length - 1
-    nueva_fase = CICLO_FASES[idx + 1]
+    nueva_fase = if %w[semilla esqueje].include?(estado)
+      'vegetativo'
+    else
+      idx = CICLO_FASES.index(estado)
+      raise ArgumentError, 'Lote no puede transicionar en este estado' unless idx.present? && idx < CICLO_FASES.length - 1
+      CICLO_FASES[idx + 1]
+    end
     ActiveRecord::Base.transaction do
       sala_nueva = if sala_id.present?
         club.salas.activas.find_by(id: sala_id)

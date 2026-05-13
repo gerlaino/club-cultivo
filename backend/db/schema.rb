@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_13_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_13_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -454,12 +454,15 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_13_000001) do
     t.decimal "rendimiento_real_g", precision: 10, scale: 2
     t.integer "plants_count_cosechadas"
     t.bigint "manicurador_id"
+    t.string "origen", default: "semilla", null: false
+    t.bigint "planta_madre_id"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["deleted_at"], name: "index_lotes_on_deleted_at"
     t.index ["estado"], name: "index_lotes_on_estado"
     t.index ["genetica_id"], name: "index_lotes_on_genetica_id"
     t.index ["manicurador_id"], name: "index_lotes_on_manicurador_id"
+    t.index ["planta_madre_id"], name: "index_lotes_on_planta_madre_id"
     t.index ["sala_id"], name: "index_lotes_on_sala_id"
   end
 
@@ -1077,6 +1080,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_13_000001) do
   add_foreign_key "lote_eventos", "users"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "geneticas", on_delete: :nullify
+  add_foreign_key "lotes", "plants", column: "planta_madre_id"
   add_foreign_key "lotes", "salas"
   add_foreign_key "lotes", "users", column: "manicurador_id"
   add_foreign_key "movimientos_contables", "clubs"

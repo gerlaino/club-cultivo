@@ -8,7 +8,7 @@ import { useAuthStore } from "../stores/auth"
 import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
 import ModalCargarLote from '../components/salas/ModalCargarLote.vue'
 import RegistrarLecturaModal from '../components/salas/RegistrarLecturaModal.vue'
-import { listGeneticas, updateSala, getSalaAmbiente, deleteSala } from '../lib/api.js'
+import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 import { Gauge } from 'lucide-vue-next'
@@ -58,8 +58,8 @@ const isAgricultor   = computed(() => auth.role === "cultivador")
 const lecturaOpen   = ref(false)
 const lotesExpanded = ref(true)
 
-const ESTADOS_LOTE = ["semilla","vegetativo","floracion","cosecha","curado","finalizado"]
-const DIAS_CICLO   = { semilla:7, vegetativo:45, floracion:65, cosecha:10, curado:14, finalizado:0 }
+const ESTADOS_LOTE = ["semilla","esqueje","vegetativo","floracion","cosecha","curado","finalizado"]
+const DIAS_CICLO   = { semilla:7, esqueje:7, vegetativo:45, floracion:65, cosecha:10, curado:14, finalizado:0 }
 
 // ── Genéticas ──────────────────────────────────────────────
 const geneticas = ref([])
@@ -216,7 +216,8 @@ const kpis = computed(() => {
 })
 
 const ESTADO_META = {
-  semilla:    { label:"Semilla/Esqueje", color:"#64748b", emoji:"📋" },
+  semilla:    { label:"Semilla",  color:"#64748b", emoji:"🌱" },
+  esqueje:    { label:"Esqueje",  color:"#16a34a", emoji:"🪴" },
   vegetativo: { label:"Vegetativo",      color:"#16a34a", emoji:"🌱" },
   floracion:  { label:"Floración",       color:"#d97706", emoji:"🌸" },
   cosecha:    { label:"Cosecha",         color:"#92400e", emoji:"✂️" },
@@ -275,27 +276,59 @@ async function onLoteCargado() {
 }
 
 // ── Crear lote ─────────────────────────────────────────────
-const KIND_TO_ESTADO = { vegetativo:"vegetativo", floracion:"floracion", secado:"secado", manicura:"curado", madre:"vegetativo", clon:"vegetativo" }
+const KIND_TO_ESTADO = { floracion:"floracion", secado:"secado", manicura:"curado" }
+const KINDS_CON_ORIGEN = ['vegetativo', 'madre', 'clon', 'mixta']
 
 const showCreate   = ref(false)
 const loteForm     = ref(emptyLoteForm())
 const loteErrors   = ref({})
 const loteApiError = ref(null)
 const showUpgrade  = ref(false)
+const plantasMadre    = ref([])
+const loadingMadres   = ref(false)
 
 function emptyLoteForm() {
-  const estadoInicial = KIND_TO_ESTADO[sala.value?.kind] || "vegetativo"
-  return { estado: estadoInicial, plants_count:0, start_date:new Date().toISOString().slice(0,10), genetica_id:"", grow_type:"sustrato", light_type:"", tamanio_maceta:"", notes:"" }
+  const kind = sala.value?.kind
+  const conOrigen = !kind || KINDS_CON_ORIGEN.includes(kind)
+  const estadoInicial = conOrigen ? 'semilla' : (KIND_TO_ESTADO[kind] || 'vegetativo')
+  return {
+    estado: estadoInicial,
+    origen: conOrigen ? 'semilla' : null,
+    planta_madre_id: null,
+    plants_count: 0,
+    start_date: new Date().toISOString().slice(0, 10),
+    genetica_id: '',
+    grow_type: 'sustrato',
+    light_type: '',
+    tamanio_maceta: '',
+    notes: '',
+  }
 }
 
-// Validación con capacidad de sala
+async function setOrigen(valor) {
+  loteForm.value.origen = valor
+  loteForm.value.estado = valor
+  loteForm.value.planta_madre_id = null
+  if (valor === 'esqueje' && !plantasMadre.value.length) {
+    loadingMadres.value = true
+    try {
+      const { data } = await listPlants({ state: 'vegetativo' })
+      plantasMadre.value = data || []
+    } catch { plantasMadre.value = [] }
+    finally { loadingMadres.value = false }
+  }
+}
+
+const mostrarOrigenSelector = computed(() => {
+  const k = sala.value?.kind
+  return !k || KINDS_CON_ORIGEN.includes(k)
+})
+
 function validateLote(form) {
   const e = {}
   if (!ESTADOS_LOTE.includes(form.estado)) e.estado = "Estado inválido"
   const n = Number(form.plants_count)
-  if (!Number.isInteger(n) || n < 0 || n > 5000) {
-    e.plants_count = "Debe ser 0–5000"
-  }
+  if (!Number.isInteger(n) || n < 0 || n > 5000) e.plants_count = "Debe ser 0–5000"
   return e
 }
 
@@ -306,8 +339,10 @@ async function createLote() {
   if (Object.keys(e).length) return
   try {
     const payload = { ...loteForm.value }
-    if (!payload.genetica_id) delete payload.genetica_id
-    if (!payload.light_type)  delete payload.light_type
+    if (!payload.genetica_id)    delete payload.genetica_id
+    if (!payload.light_type)     delete payload.light_type
+    if (!payload.planta_madre_id) delete payload.planta_madre_id
+    if (!payload.origen)         delete payload.origen
     await lotes.createInSala(salaId, payload)
     closeCreate()
     lotesExpanded.value = true
@@ -665,12 +700,46 @@ const canSeeAmbiente = computed(() =>
             <div v-else-if="lotes.createError" class="sd__alert">{{ lotes.createError }}</div>
 
             <div class="sd__grid">
-              <div v-if="!sala?.kind" class="sd__field">
-                <label class="sd__label">Estado inicial</label>
-                <select class="sd__input" v-model="loteForm.estado">
-                  <option v-for="e in ESTADOS_LOTE" :key="e" :value="e">{{ estadoMeta(e).label }}</option>
+
+              <!-- Origen: semilla / esqueje -->
+              <div v-if="mostrarOrigenSelector" class="sd__field sd__field--full">
+                <label class="sd__label">¿Cómo inicia este lote?</label>
+                <div class="sd__origen-pills">
+                  <button
+                    type="button"
+                    class="sd__origen-pill"
+                    :class="{ 'sd__origen-pill--active': loteForm.origen === 'semilla' }"
+                    @click="setOrigen('semilla')"
+                  >
+                    🌱 Semilla
+                  </button>
+                  <button
+                    type="button"
+                    class="sd__origen-pill"
+                    :class="{ 'sd__origen-pill--active': loteForm.origen === 'esqueje' }"
+                    @click="setOrigen('esqueje')"
+                  >
+                    🪴 Esqueje
+                  </button>
+                </div>
+              </div>
+
+              <!-- Planta madre (solo esqueje) -->
+              <div v-if="loteForm.origen === 'esqueje'" class="sd__field sd__field--full">
+                <label class="sd__label">Planta madre <span class="sd__label-opt">(opcional)</span></label>
+                <select class="sd__input" v-model="loteForm.planta_madre_id">
+                  <option :value="null">— No especificada —</option>
+                  <template v-if="loadingMadres">
+                    <option disabled>Cargando plantas…</option>
+                  </template>
+                  <template v-else>
+                    <option v-for="p in plantasMadre" :key="p.id" :value="p.id">
+                      {{ p.nombre }}{{ p.lote?.codigo ? ` (${p.lote.codigo})` : '' }}
+                    </option>
+                  </template>
                 </select>
               </div>
+
               <div class="sd__field">
                 <label class="sd__label">Cantidad de plantas</label>
                 <input type="number" min="0" max="5000" step="1" class="sd__input"
@@ -960,6 +1029,15 @@ const canSeeAmbiente = computed(() =>
 .sd__field { display: flex; flex-direction: column; gap: .35rem; }
 .sd__field--full { grid-column: 1 / -1; }
 .sd__label { font-size: .8rem; font-weight: 600; color: #374151; }
+.sd__label-opt { font-weight: 400; color: #94a3b8; }
+.sd__origen-pills { display: flex; gap: .5rem; }
+.sd__origen-pill {
+  flex: 1; padding: .65rem 1rem; background: #f4f8f4; border: 2px solid #d4e6d4;
+  border-radius: 9px; font-size: .9rem; font-weight: 600; color: #374151;
+  cursor: pointer; transition: all .15s; text-align: center;
+}
+.sd__origen-pill:hover { border-color: #1b5e20; background: #f0fdf4; }
+.sd__origen-pill--active { background: #f0fdf4; border-color: #1b5e20; color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); }
 .sd__input { background: #f4f8f4; border: 1.5px solid #d4e6d4; border-radius: 8px; padding: .6rem .85rem; font-size: .875rem; color: #1a1a1a; width: 100%; box-sizing: border-box; transition: border .15s; }
 .sd__input:focus { outline: none; border-color: #1b5e20; background: #fff; }
 .sd__input--err { border-color: #dc2626; }
