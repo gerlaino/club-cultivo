@@ -6,7 +6,7 @@ class AlertaInterna < ApplicationRecord
 
   TIPOS      = %w[paciente_creado_por_dispensador documento_vencido reprocann_vencido
                   reprocann_por_vencer
-                  manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada otro].freeze
+                  manicura_asignada manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada otro].freeze
   SEVERIDADES = %w[info warning error].freeze
 
   validates :tipo,      inclusion: { in: TIPOS }
