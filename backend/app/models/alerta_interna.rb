@@ -36,5 +36,7 @@ class AlertaInterna < ApplicationRecord
     if dirigido_a_user_id = contexto&.dig('dirigido_a_user_id')
       ActionCable.server.broadcast("alertas_user_#{dirigido_a_user_id}", payload)
     end
+  rescue StandardError => e
+    Rails.logger.warn "AlertaInterna#broadcast_alerta falló: #{e.message}"
   end
 end
