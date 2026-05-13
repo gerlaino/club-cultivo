@@ -62,7 +62,7 @@ const loadingTienda      = ref(false)
 const showNuevoStockModal = ref(false)
 const savingNuevoStock   = ref(false)
 const nuevoStockError    = ref(null)
-const nuevoStockForm     = ref({ origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', genetica_id: null, descripcion: '' })
+const nuevoStockForm     = ref({ origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', variedad_nombre: '', descripcion: '' })
 
 const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '🫙 Aceite', tintura: '💧 Tintura', topico: '🧴 Tópico', otro: '📦 Otro' }
 const KIND_LABELS = { germinacion: 'Germinación', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', secado: 'Secado', curado: 'Curado', manicura: 'Manicura', mixta: 'Mixta', madre: 'Madre', madres: 'Madres' }
@@ -75,7 +75,7 @@ const loadingGeneticasStock = ref(false)
 const canSubmitStock = computed(() => {
   const f = nuevoStockForm.value
   if (!f.cantidad) return false
-  if (f.origen === 'compra_externa') return !!(f.proveedor && f.genetica_id)
+  if (f.origen === 'compra_externa') return !!(f.proveedor && f.variedad_nombre)
   return true
 })
 
@@ -126,7 +126,7 @@ async function loadTiendaStocks() {
 }
 
 async function abrirNuevoStockModal() {
-  nuevoStockForm.value = { origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', genetica_id: null, descripcion: '' }
+  nuevoStockForm.value = { origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', variedad_nombre: '', descripcion: '' }
   nuevoStockError.value = null
   showNuevoStockModal.value = true
   if (!lotesParaStock.value.length) {
@@ -134,12 +134,6 @@ async function abrirNuevoStockModal() {
     try { const { data } = await listLotes({ estado: 'finalizado' }); lotesParaStock.value = data || [] }
     catch { lotesParaStock.value = [] }
     finally { loadingLotesStock.value = false }
-  }
-  if (!geneticasParaStock.value.length) {
-    loadingGeneticasStock.value = true
-    try { const { data } = await listGeneticas({ activa: true, disponible: true }); geneticasParaStock.value = data || [] }
-    catch { geneticasParaStock.value = [] }
-    finally { loadingGeneticasStock.value = false }
   }
 }
 
@@ -149,7 +143,7 @@ async function confirmarNuevoStock() {
     const f = nuevoStockForm.value
     const payload = { origen: f.origen, sede_id: sedeId, forma_producto: f.forma_producto, unidad: f.unidad, cantidad: f.cantidad, costo_unitario_ars: f.costo_unitario_ars || undefined }
     if (f.origen === 'derivado_lote') { payload.lote_id = f.lote_id; payload.lote_origen_consumido_g = f.lote_origen_consumido_g }
-    else { payload.proveedor = f.proveedor; payload.genetica_id = f.genetica_id; if (f.descripcion) payload.descripcion = f.descripcion }
+    else { payload.proveedor = f.proveedor; payload.producto = f.variedad_nombre; if (f.descripcion) payload.descripcion = f.descripcion }
     await createStock(payload)
     showNuevoStockModal.value = false
     await loadTiendaStocks()
@@ -514,11 +508,7 @@ onMounted(async () => {
               </div>
               <div class="sdv__field" style="margin-bottom:.75rem">
                 <label class="sdv__label">Genética / variedad <span style="color:#dc2626">*</span></label>
-                <div v-if="loadingGeneticasStock" class="sdv__tienda-loading"><div class="sdv__ring sdv__ring--sm"></div> Cargando genéticas…</div>
-                <select v-else class="sdv__input" v-model="nuevoStockForm.genetica_id">
-                  <option :value="null" disabled>Seleccioná una variedad…</option>
-                  <option v-for="g in geneticasParaStock" :key="g.id" :value="g.id">{{ g.nombre }}</option>
-                </select>
+                <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.variedad_nombre" placeholder="Ej: OG Kush, White Widow…" />
               </div>
               <div class="sdv__field" style="margin-bottom:1rem">
                 <label class="sdv__label">Descripción <span class="sdv__optional">opcional</span></label>
