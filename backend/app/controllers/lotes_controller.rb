@@ -281,13 +281,20 @@ class LotesController < ApplicationController
 
     estado_anterior  = @lote.estado
     sala_anterior_id = @lote.sala_id
-    @lote.transicionar!(
-      nueva_fase,
-      pesada_attrs:          pesada_attrs,
-      manicurado:            manicurado,
-      pesadas_plantas_attrs: pesadas_plantas,
-      sala_id:               params[:sala_id]
-    )
+
+    # semilla/esqueje → vegetativo: no generan pesada, usan avanzar_fase!
+    if %w[semilla esqueje].include?(@lote.estado)
+      @lote.avanzar_fase!(sala_id: params[:sala_id])
+    else
+      @lote.transicionar!(
+        nueva_fase,
+        pesada_attrs:          pesada_attrs,
+        manicurado:            manicurado,
+        pesadas_plantas_attrs: pesadas_plantas,
+        sala_id:               params[:sala_id]
+      )
+    end
+
     @lote.lote_eventos.create!(
       tipo:            'cambio_estado',
       estado_anterior: estado_anterior,
