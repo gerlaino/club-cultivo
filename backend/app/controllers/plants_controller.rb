@@ -99,8 +99,9 @@ class PlantsController < ApplicationController
 
   # POST /plants/:id/registrar_peso
   def registrar_peso
-    peso = params[:peso_seco_g].to_f
-    return render json: { error: 'El peso debe ser mayor a 0' }, status: :unprocessable_entity if peso <= 0
+    peso_seco   = params[:peso_seco_g].to_f
+    peso_humedo = params[:peso_humedo_g].present? ? params[:peso_humedo_g].to_f : nil
+    return render json: { error: 'El peso debe ser mayor a 0' }, status: :unprocessable_entity if peso_seco <= 0
 
     lote = @plant.lote
     unless %w[en_manicura secado].include?(lote.estado)
@@ -113,7 +114,9 @@ class PlantsController < ApplicationController
     return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless authorized
 
     ActiveRecord::Base.transaction do
-      @plant.update!(peso_seco: peso)
+      plant_attrs = { peso_seco: peso_seco }
+      plant_attrs[:peso_humedo] = peso_humedo if peso_humedo&.positive?
+      @plant.update!(plant_attrs)
 
       pesada = lote.pesadas.find_or_initialize_by(
         borrador:     true,
@@ -128,7 +131,8 @@ class PlantsController < ApplicationController
       end
 
       pp = pesada.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
-      pp.peso_seco_g = peso
+      pp.peso_seco_g   = peso_seco
+      pp.peso_humedo_g = peso_humedo if peso_humedo&.positive?
       pp.save!
 
       total_peso = pesada.pesadas_plantas.sum(:peso_seco_g)
@@ -138,10 +142,11 @@ class PlantsController < ApplicationController
       total_plantas = lote.plants.count
       render json: {
         planta: {
-          id:        @plant.id,
-          nombre:    @plant.nombre,
-          codigo_qr: @plant.codigo_qr,
-          peso_seco: @plant.peso_seco.to_f,
+          id:          @plant.id,
+          nombre:      @plant.nombre,
+          codigo_qr:   @plant.codigo_qr,
+          peso_seco:   @plant.peso_seco.to_f,
+          peso_humedo: @plant.peso_humedo&.to_f,
         },
         progreso: {
           pesadas:       count,
@@ -205,6 +210,7 @@ class PlantsController < ApplicationController
       origen:       plant.origen,
       es_seleccion: plant.es_seleccion,
       peso_seco:    plant.peso_seco,
+      peso_humedo:  plant.peso_humedo,
       foto_url:     foto_url(plant),
       lote: {
         id:     plant.lote.id,
@@ -246,6 +252,7 @@ class PlantsController < ApplicationController
       fecha_floracion:        plant.fecha_floracion,
       fecha_cosecha:          plant.fecha_cosecha,
       peso_seco:              plant.peso_seco,
+      peso_humedo:            plant.peso_humedo,
       notas:                  plant.notas,
       dias_desde_germinacion: plant.fecha_germinacion ? (Date.today - plant.fecha_germinacion).to_i : nil,
       dias_en_vegetativo:     (plant.fecha_vegetativo && plant.fecha_floracion) ? (plant.fecha_floracion - plant.fecha_vegetativo).to_i : nil,

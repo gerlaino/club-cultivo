@@ -159,7 +159,24 @@
       <!-- Formulario de peso -->
       <div class="qr__peso-form">
         <div class="qr__field">
-          <label>Peso seco (g)</label>
+          <label>Peso húmedo <span class="qr__opt">opcional</span></label>
+          <div class="qr__peso-input-wrap">
+            <input
+              v-model="pesoHumedoInput"
+              type="number"
+              min="0.1"
+              step="0.1"
+              placeholder="0.0"
+              class="qr__peso-input"
+              :disabled="registrando"
+            />
+            <span class="qr__peso-unit">g</span>
+          </div>
+          <span class="qr__field-hint">Peso antes del recorte / secado</span>
+        </div>
+
+        <div class="qr__field">
+          <label>Peso seco post-manicura (g)</label>
           <div class="qr__peso-input-wrap">
             <input
               v-model="pesoInput"
@@ -230,13 +247,14 @@ const loginCargando = ref(false)
 const loginError    = ref(null)
 
 // Manicura pesaje
-const plantaDetalle = ref(null)
-const pesoInput     = ref('')
-const pesoAnterior  = ref(null)
-const registrando   = ref(false)
-const registroError = ref(null)
-const registroOk    = ref(false)
-const pesoInputRef  = ref(null)
+const plantaDetalle   = ref(null)
+const pesoInput       = ref('')
+const pesoHumedoInput = ref('')
+const pesoAnterior    = ref(null)
+const registrando     = ref(false)
+const registroError   = ref(null)
+const registroOk      = ref(false)
+const pesoInputRef    = ref(null)
 
 const progreso = ref({ pesadas: 0, total: 0, peso_total_g: 0, completado: false })
 
@@ -287,7 +305,10 @@ async function resolverEstado() {
       estado.value = 'manicura_pesaje'
       if (data.peso_seco && data.peso_seco > 0) {
         pesoAnterior.value = data.peso_seco
-        pesoInput.value = String(data.peso_seco)
+        pesoInput.value    = String(data.peso_seco)
+      }
+      if (data.peso_humedo && data.peso_humedo > 0) {
+        pesoHumedoInput.value = String(data.peso_humedo)
       }
       await nextTick()
       pesoInputRef.value?.focus()
@@ -323,14 +344,18 @@ async function cargarProgreso(detalle) {
 }
 
 async function registrarPeso() {
-  const peso = parseFloat(pesoInput.value)
+  const peso       = parseFloat(pesoInput.value)
+  const pesoHumedo = parseFloat(pesoHumedoInput.value)
   if (!peso || peso <= 0) return
 
-  registrando.value  = true
+  registrando.value   = true
   registroError.value = null
 
+  const payload = { peso_seco_g: peso }
+  if (pesoHumedo > 0) payload.peso_humedo_g = pesoHumedo
+
   try {
-    const { data } = await registrarPesoPlanta(plantaDetalle.value.id, { peso_seco_g: peso })
+    const { data } = await registrarPesoPlanta(plantaDetalle.value.id, payload)
     pesoAnterior.value = peso
     progreso.value     = data.progreso
     registroOk.value   = true
@@ -611,5 +636,13 @@ function irAlDashboard() {
 .qr__btn-volver {
   text-decoration: none;
   align-self: center;
+}
+
+.qr__opt {
+  font-size: .65rem; font-weight: 400; color: #94a3b8;
+  text-transform: none; letter-spacing: 0; margin-left: .2rem;
+}
+.qr__field-hint {
+  font-size: .7rem; color: #94a3b8; margin-top: .15rem;
 }
 </style>

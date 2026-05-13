@@ -28,6 +28,7 @@ class Pesada < ApplicationRecord
   private
 
   def peso_requerido_segun_destino
+    return if borrador?
     case fase_destino
     when 'curado'             then errors.add(:peso_seco_g,   'requerido para entrada a curado')   unless peso_seco_g.present?
     when 'finalizado'

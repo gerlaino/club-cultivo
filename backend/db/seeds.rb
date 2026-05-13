@@ -17,6 +17,12 @@ sa2.club_id = nil
 sa2.save!(validate: false)
 puts "  ✅ #{sa2.email}"
 
+sa3 = User.find_or_initialize_by(email: 'german.laino@gmail.com')
+sa3.assign_attributes(password: '123456Aa', role: 'super_admin', first_name: 'German', last_name: 'Laino')
+sa3.club_id = nil
+sa3.save!(validate: false)
+puts "  ✅ #{sa3.email}"
+
 # ── Club ─────────────────────────────────────────────────────
 puts "\n🏢 Club..."
 club = Club.find_or_create_by!(name: 'Mitocondria Club') do |c|
