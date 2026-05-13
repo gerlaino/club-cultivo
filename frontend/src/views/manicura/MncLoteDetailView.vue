@@ -61,34 +61,49 @@
         </div>
       </div>
 
-      <!-- Plant list -->
+      <!-- Plant table -->
       <div class="mnl__section">
         <h2 class="mnl__section-title">
           <Leaf :size="13" :stroke-width="2" /> Plantas del lote
         </h2>
-        <div class="mnl__list">
-          <RouterLink
-            v-for="(planta, i) in plantas"
-            :key="planta.id"
-            :to="`/p/${planta.codigo_qr}`"
-            class="mnl__row"
-          >
-            <div class="mnl__row-dot" :class="plantWeights[planta.id] > 0 ? 'mnl__dot--done' : 'mnl__dot--empty'"></div>
-            <div class="mnl__row-num">{{ String(i + 1).padStart(2, '0') }}</div>
-            <div class="mnl__row-info">
-              <span class="mnl__row-nombre">{{ planta.nombre || `Planta #${planta.id}` }}</span>
-              <span class="mnl__row-sep">·</span>
-              <span class="mnl__row-qr">{{ planta.codigo_qr }}</span>
-            </div>
-            <span class="mnl__peso" :class="plantWeights[planta.id] > 0 ? 'mnl__peso--done' : 'mnl__peso--empty'">
-              {{ plantWeights[planta.id] > 0 ? `${plantWeights[planta.id]}g` : '—' }}
-            </span>
-            <ChevronRight :size="14" class="mnl__row-arrow" />
-          </RouterLink>
+        <div class="mnl__table-wrap">
+          <table class="mnl__table">
+            <thead>
+              <tr>
+                <th class="mnl__th mnl__th--num">#</th>
+                <th class="mnl__th">Nombre</th>
+                <th class="mnl__th mnl__th--qr">Código QR</th>
+                <th class="mnl__th mnl__th--peso">Peso seco</th>
+                <th class="mnl__th mnl__th--estado">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(planta, i) in plantas"
+                :key="planta.id"
+                class="mnl__tr"
+                @click="irAPlanta(planta)"
+              >
+                <td class="mnl__td mnl__td--num">{{ i + 1 }}</td>
+                <td class="mnl__td mnl__td--nombre">{{ planta.nombre || `Planta #${planta.id}` }}</td>
+                <td class="mnl__td mnl__td--qr">{{ planta.codigo_qr }}</td>
+                <td class="mnl__td mnl__td--peso">
+                  <span :class="parseFloat(planta.peso_seco) > 0 ? 'mnl__peso--done' : 'mnl__peso--empty'">
+                    {{ parseFloat(planta.peso_seco) > 0 ? `${parseFloat(planta.peso_seco).toFixed(1)}g` : '—' }}
+                  </span>
+                </td>
+                <td class="mnl__td mnl__td--estado">
+                  <span class="mnl__estado-chip" :class="parseFloat(planta.peso_seco) > 0 ? 'mnl__estado-chip--done' : 'mnl__estado-chip--empty'">
+                    {{ parseFloat(planta.peso_seco) > 0 ? 'Pesada' : 'Sin pesar' }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <!-- Submit footer (per-plant flow) -->
+      <!-- Submit footer (per-plant QR flow) -->
       <div v-if="['en_manicura','secado'].includes(lote.estado) && pesadas > 0" class="mnl__footer">
         <p class="mnl__footer-hint">
           {{ pesadas }} planta{{ pesadas !== 1 ? 's' : '' }} con peso registrado · {{ totalGramos }}g total
@@ -169,10 +184,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, ChevronRight, Leaf, CheckCircle, Scale, Package, Send, X } from 'lucide-vue-next'
-import { getLote, listPlants, transicionarLote } from '../../lib/api.js'
+import { ChevronLeft, Leaf, CheckCircle, Scale, Package, Send, X } from 'lucide-vue-next'
+import { getLote, listPlants, transicionarLote, finalizarPesajeManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const route  = useRoute()
@@ -184,22 +199,19 @@ const loading = ref(true)
 const lote    = ref(null)
 const plantas = ref([])
 
-const plantWeights = reactive({})
-
-const submitting = ref(false)
-const modalOpen  = ref(false)
+const submitting  = ref(false)
+const modalOpen   = ref(false)
 const savingBatch = ref(false)
 const modalError  = ref('')
 const batchForm   = ref({ plantas_manicuradas: null, peso_seco_g: null, notas: '' })
 
 const pesadas = computed(() =>
-  plantas.value.filter(p => plantWeights[p.id] > 0).length
+  plantas.value.filter(p => parseFloat(p.peso_seco) > 0).length
 )
 
-const totalGramos = computed(() => {
-  const sum = plantas.value.reduce((acc, p) => acc + (parseFloat(plantWeights[p.id]) || 0), 0)
-  return parseFloat(sum.toFixed(1))
-})
+const totalGramos = computed(() =>
+  parseFloat(plantas.value.reduce((acc, p) => acc + (parseFloat(p.peso_seco) || 0), 0).toFixed(1))
+)
 
 async function cargar() {
   loading.value = true
@@ -210,15 +222,16 @@ async function cargar() {
     ])
     lote.value    = loteRes.data
     plantas.value = plantasRes.data || []
-    for (const p of plantas.value) {
-      plantWeights[p.id] = p.peso_seco ? parseFloat(p.peso_seco) : null
-    }
   } catch {
     toast.error('Error al cargar el lote')
     router.push('/mnc/pendientes')
   } finally {
     loading.value = false
   }
+}
+
+function irAPlanta(planta) {
+  router.push(`/p/${planta.codigo_qr}`)
 }
 
 function abrirModal() {
@@ -258,27 +271,22 @@ async function enviarAprobacion() {
   if (pesadas.value === 0 || submitting.value) return
   submitting.value = true
   try {
-    await transicionarLote(id, {
-      pesada: {
-        manicurado:          true,
-        peso_seco_g:         totalGramos.value,
-        plantas_manicuradas: pesadas.value,
-      },
-    })
+    await finalizarPesajeManicura(id)
     toast.success(`Lote ${lote.value.codigo} enviado para aprobación`)
     await cargar()
   } catch (e) {
-    toast.error(e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al enviar')
+    toast.error(e.response?.data?.error || e.response?.data?.errors?.[0] || 'Error al enviar')
   } finally {
     submitting.value = false
   }
 }
 
 onMounted(cargar)
+onActivated(cargar)
 </script>
 
 <style scoped>
-.mnl { padding: var(--sp-6); max-width: 860px; }
+.mnl { padding: var(--sp-6); max-width: 900px; }
 
 /* Back */
 .mnl__back {
@@ -330,7 +338,7 @@ onMounted(cargar)
 .mnl__kpi {
   display: flex; align-items: center; gap: var(--sp-3);
   background: var(--c-paper); border: 1px solid var(--c-ink-100); border-radius: var(--r-lg);
-  padding: var(--sp-4) var(--sp-4);
+  padding: var(--sp-4);
 }
 .mnl__kpi-icon {
   width: 38px; height: 38px; border-radius: var(--r-md);
@@ -356,41 +364,54 @@ onMounted(cargar)
   margin: 0 0 var(--sp-3);
 }
 
-/* Plant rows */
-.mnl__list { display: flex; flex-direction: column; gap: 2px; }
-.mnl__row {
-  display: flex; align-items: center; gap: var(--sp-2);
-  background: var(--c-paper); border: 1px solid var(--c-ink-100); border-radius: var(--r-md);
-  padding: var(--sp-2) var(--sp-3); text-decoration: none; color: inherit;
-  transition: border-color .15s;
+/* Table */
+.mnl__table-wrap {
+  border: 1px solid var(--c-ink-100); border-radius: var(--r-lg);
+  overflow: hidden; overflow-x: auto;
 }
-.mnl__row:hover { border-color: #5C7A4A; }
+.mnl__table {
+  width: 100%; border-collapse: collapse; min-width: 480px;
+}
+.mnl__th {
+  font-size: var(--fs-11); font-weight: 700; color: var(--c-ink-500);
+  text-transform: uppercase; letter-spacing: .05em;
+  padding: var(--sp-2) var(--sp-3); background: var(--c-ink-50);
+  border-bottom: 1px solid var(--c-ink-100); text-align: left;
+  white-space: nowrap;
+}
+.mnl__th--num    { width: 44px; text-align: center; }
+.mnl__th--qr     { color: var(--c-ink-400); }
+.mnl__th--peso   { text-align: right; }
+.mnl__th--estado { text-align: center; }
 
-.mnl__row-dot {
-  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+.mnl__tr {
+  cursor: pointer; transition: background .12s;
+  border-bottom: 1px solid var(--c-ink-50);
 }
-.mnl__dot--done  { background: #16a34a; }
-.mnl__dot--empty { background: var(--c-ink-200); }
+.mnl__tr:last-child { border-bottom: none; }
+.mnl__tr:hover { background: #f6faf4; }
 
-.mnl__row-num {
-  font-size: var(--fs-11); font-weight: 700; color: var(--c-ink-400);
-  min-width: 20px; flex-shrink: 0;
+.mnl__td {
+  padding: var(--sp-2) var(--sp-3); font-size: var(--fs-13); color: var(--c-ink-800);
+  vertical-align: middle;
 }
-.mnl__row-info {
-  flex: 1; min-width: 0;
-  display: flex; align-items: baseline; gap: var(--sp-1); overflow: hidden;
-}
-.mnl__row-nombre { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mnl__row-sep    { font-size: var(--fs-11); color: var(--c-ink-300); flex-shrink: 0; }
-.mnl__row-qr     { font-size: var(--fs-11); color: var(--c-ink-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mnl__td--num    { text-align: center; font-size: var(--fs-11); font-weight: 700; color: var(--c-ink-400); }
+.mnl__td--nombre { font-weight: 600; color: var(--c-ink-900); }
+.mnl__td--qr     { font-size: var(--fs-11); color: var(--c-ink-400); }
+.mnl__td--peso   { text-align: right; font-weight: 600; }
+.mnl__td--estado { text-align: center; }
 
-.mnl__peso {
-  font-size: 12px; font-weight: 600; flex-shrink: 0;
-}
 .mnl__peso--done  { color: #16a34a; }
 .mnl__peso--empty { color: var(--c-ink-300); }
 
-.mnl__row-arrow { color: var(--c-ink-300); flex-shrink: 0; }
+.mnl__estado-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: var(--fs-11); font-weight: 700; letter-spacing: .04em;
+  padding: 2px 8px; border-radius: 999px; text-transform: uppercase;
+  white-space: nowrap;
+}
+.mnl__estado-chip--done  { background: #dcfce7; color: #15803d; }
+.mnl__estado-chip--empty { background: var(--c-ink-100); color: var(--c-ink-400); }
 
 /* Submit footer */
 .mnl__footer {
@@ -411,14 +432,14 @@ onMounted(cargar)
 /* Loading */
 .mnl__loading {
   display: flex; align-items: center; justify-content: center;
-  padding: var(--sp-12) 0; color: var(--c-ink-400);
+  padding: var(--sp-12) 0;
 }
 .mnl__spinner {
   width: 20px; height: 20px;
   border: 2px solid var(--c-ink-200); border-top-color: #5C7A4A;
   border-radius: 50%; animation: mnl-spin .7s linear infinite;
 }
-.mnl__spinner--sm { width: 14px; height: 14px; }
+.mnl__spinner--sm    { width: 14px; height: 14px; }
 .mnl__spinner--white { border-top-color: #fff; border-color: rgba(255,255,255,.3); }
 @keyframes mnl-spin { to { transform: rotate(360deg); } }
 

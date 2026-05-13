@@ -367,10 +367,8 @@ class LotesController < ApplicationController
   end
 
   # POST /lotes/:id/finalizar_pesaje_manicura
+  # Funciona con QR flow (borrador pesada existente) y con batch flow (compute from plant.peso_seco)
   def finalizar_pesaje_manicura
-    pesada = @lote.pesadas.find_by(borrador: true, manicurado: true)
-    return render json: { error: 'No hay pesaje QR en progreso para este lote' }, status: :unprocessable_entity unless pesada
-
     unless %w[en_manicura secado].include?(@lote.estado)
       return render json: { error: 'Estado inválido para finalizar pesaje' }, status: :unprocessable_entity
     end
@@ -381,24 +379,46 @@ class LotesController < ApplicationController
     return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless authorized
 
     ActiveRecord::Base.transaction do
-      pesada.update!(borrador: false)
+      pesada = @lote.pesadas.find_by(borrador: true, manicurado: true)
+
+      if pesada
+        pesada.update!(borrador: false)
+      else
+        # Batch flow: compute totals from per-plant peso_seco
+        plantas_pesadas  = @lote.plants.where('peso_seco > 0')
+        total_peso       = plantas_pesadas.sum(:peso_seco)
+        count            = plantas_pesadas.count
+        return render json: { error: 'No hay plantas con peso registrado en este lote' }, status: :unprocessable_entity if count == 0
+
+        pesada = @lote.pesadas.create!(
+          borrador:            false,
+          manicurado:          true,
+          fase_origen:         @lote.estado,
+          fase_destino:        'finalizado',
+          peso_seco_g:         total_peso,
+          plantas_manicuradas: count,
+          registrado_por:      current_user,
+          registrado_at:       Time.current,
+        )
+      end
+
       estado_anterior = @lote.estado
       @lote.update!(estado: 'manicura_pendiente')
 
       @lote.lote_eventos.create!(
-        tipo:          'cambio_estado',
+        tipo:            'cambio_estado',
         estado_anterior: estado_anterior,
-        estado_nuevo:  'manicura_pendiente',
-        descripcion:   "Pesaje QR completado: #{pesada.plantas_manicuradas} plantas · #{pesada.peso_seco_g&.round(1)}g",
-        user:          current_user,
-        club:          current_user.club,
-        registrado_en: Time.current,
+        estado_nuevo:    'manicura_pendiente',
+        descripcion:     "Pesaje completado: #{pesada.plantas_manicuradas} plantas · #{pesada.peso_seco_g&.round(1)}g — enviado a aprobación",
+        user:            current_user,
+        club:            current_user.club,
+        registrado_en:   Time.current,
       )
 
       AlertaInterna.create!(
         club:             current_user.club,
         tipo:             'manicura_aprobacion_pendiente',
-        mensaje:          "Manicura #{current_user.first_name} completó pesaje QR de #{@lote.codigo} — #{pesada.plantas_manicuradas} plantas · #{pesada.peso_seco_g&.round(1)}g — pendiente aprobación",
+        mensaje:          "Manicura #{current_user.first_name} completó #{@lote.codigo} — #{pesada.plantas_manicuradas} plantas · #{pesada.peso_seco_g&.round(1)}g — pendiente aprobación",
         severidad:        'info',
         creada_por:       current_user,
         destinada_a_role: 'admin',

@@ -157,7 +157,7 @@
       </div>
 
       <!-- Formulario de peso -->
-      <div class="qr__peso-form" v-if="!enviado">
+      <div class="qr__peso-form">
         <div class="qr__field">
           <label>Peso seco (g)</label>
           <div class="qr__peso-input-wrap">
@@ -179,6 +179,10 @@
           <i class="bi bi-exclamation-triangle"></i> {{ registroError }}
         </div>
 
+        <div v-if="registroOk" class="qr__registro-ok">
+          <i class="bi bi-check-circle-fill"></i> Peso registrado correctamente
+        </div>
+
         <button
           class="qr__btn-primary"
           @click="registrarPeso"
@@ -188,58 +192,12 @@
           <i v-else class="bi bi-check2-circle"></i>
           {{ pesoAnterior ? 'Actualizar peso' : 'Registrar peso' }}
         </button>
-
-        <div class="qr__divider"></div>
-
-        <!-- Enviar a aprobación -->
-        <div v-if="!progreso.completado" class="qr__aviso-incompleto">
-          <i class="bi bi-info-circle"></i>
-          Aún hay plantas sin pesar. Podés enviar igualmente.
-        </div>
-
-        <button
-          class="qr__btn-enviar"
-          :class="{ 'qr__btn-enviar--warn': !progreso.completado }"
-          @click="confirmarEnvio"
-          :disabled="enviando || progreso.pesadas === 0"
-        >
-          <div v-if="enviando" class="qr__spinner qr__spinner--sm qr__spinner--dark"></div>
-          <i v-else class="bi bi-send-check"></i>
-          Enviar a aprobación
-        </button>
-        <div v-if="progreso.pesadas === 0" class="qr__hint">
-          Registrá al menos una planta antes de enviar
-        </div>
       </div>
 
-      <!-- Confirmación de envío -->
-      <div v-if="mostrarConfirmacion" class="qr__confirm-overlay" @click.self="mostrarConfirmacion = false">
-        <div class="qr__confirm-modal">
-          <div class="qr__confirm-icon">⚠️</div>
-          <h3>¿Enviar con {{ progreso.total - progreso.pesadas }} plantas sin pesar?</h3>
-          <p>El pesaje se marcará como completo. El admin recibirá una notificación.</p>
-          <div class="qr__confirm-btns">
-            <button class="qr__btn-secondary" @click="mostrarConfirmacion = false">Cancelar</button>
-            <button class="qr__btn-primary qr__btn-primary--warn" @click="enviarAprobacion" :disabled="enviando">
-              <div v-if="enviando" class="qr__spinner qr__spinner--sm"></div>
-              Confirmar envío
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Enviado con éxito -->
-      <div v-if="enviado" class="qr__success">
-        <div class="qr__success-icon">✅</div>
-        <h2 class="qr__title">Pesaje enviado</h2>
-        <p class="qr__desc">
-          El lote <strong>{{ plantaDetalle?.lote?.codigo }}</strong> fue enviado a aprobación.<br>
-          {{ progreso.pesadas }} plantas · {{ progreso.peso_total_g.toFixed(1) }}g
-        </p>
-        <button class="qr__btn-secondary" @click="irAlDashboard">
-          <i class="bi bi-house"></i> Ir al inicio
-        </button>
-      </div>
+      <!-- Volver al lote -->
+      <RouterLink :to="`/mnc/lotes/${plantaDetalle?.lote?.id}`" class="qr__btn-secondary qr__btn-volver">
+        <i class="bi bi-arrow-left"></i> Volver al lote
+      </RouterLink>
 
     </div>
 
@@ -252,7 +210,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useClubStore } from '../stores/club'
 import { usePermissions } from '../composables/usePermissions'
-import { getPlant, listPlants, registrarPesoPlanta, finalizarPesajeManicura } from '../lib/api'
+import { getPlant, listPlants, registrarPesoPlanta } from '../lib/api'
 import axios from 'axios'
 
 const route  = useRoute()
@@ -272,15 +230,13 @@ const loginCargando = ref(false)
 const loginError    = ref(null)
 
 // Manicura pesaje
-const plantaDetalle     = ref(null)
-const pesoInput         = ref('')
-const pesoAnterior      = ref(null)
-const registrando       = ref(false)
-const registroError     = ref(null)
-const enviando          = ref(false)
-const enviado           = ref(false)
-const mostrarConfirmacion = ref(false)
-const pesoInputRef      = ref(null)
+const plantaDetalle = ref(null)
+const pesoInput     = ref('')
+const pesoAnterior  = ref(null)
+const registrando   = ref(false)
+const registroError = ref(null)
+const registroOk    = ref(false)
+const pesoInputRef  = ref(null)
 
 const progreso = ref({ pesadas: 0, total: 0, peso_total_g: 0, completado: false })
 
@@ -377,32 +333,12 @@ async function registrarPeso() {
     const { data } = await registrarPesoPlanta(plantaDetalle.value.id, { peso_seco_g: peso })
     pesoAnterior.value = peso
     progreso.value     = data.progreso
+    registroOk.value   = true
+    setTimeout(() => { registroOk.value = false }, 3000)
   } catch (e) {
     registroError.value = e?.response?.data?.error || 'No se pudo registrar el peso'
   } finally {
     registrando.value = false
-  }
-}
-
-function confirmarEnvio() {
-  if (progreso.value.completado) {
-    enviarAprobacion()
-  } else {
-    mostrarConfirmacion.value = true
-  }
-}
-
-async function enviarAprobacion() {
-  mostrarConfirmacion.value = false
-  enviando.value = true
-
-  try {
-    await finalizarPesajeManicura(plantaDetalle.value.lote.id)
-    enviado.value = true
-  } catch (e) {
-    registroError.value = e?.response?.data?.error || 'No se pudo enviar a aprobación'
-  } finally {
-    enviando.value = false
   }
 }
 
@@ -639,19 +575,11 @@ function irAlDashboard() {
   display: flex; align-items: center; gap: .5rem;
 }
 
-.qr__divider {
-  border: none; border-top: 1px solid #e8f0e8; margin: .25rem 0;
-}
-
-.qr__aviso-incompleto {
+.qr__registro-ok {
   display: flex; align-items: center; gap: .4rem;
-  font-size: .75rem; color: #92400e;
-  background: #fffbeb; border: 1px solid #fde68a;
+  font-size: .78rem; font-weight: 600; color: #15803d;
+  background: #dcfce7; border: 1px solid #bbf7d0;
   border-radius: 8px; padding: .5rem .75rem;
-}
-
-.qr__hint {
-  font-size: .72rem; color: #94a3b8; text-align: center;
 }
 
 /* Buttons */
@@ -680,56 +608,8 @@ function irAlDashboard() {
 }
 .qr__btn-secondary:hover { background: #f0fdf4; border-color: #1b5e20; }
 
-.qr__btn-enviar {
-  display: flex; align-items: center; justify-content: center; gap: .5rem;
-  background: #f0fdf4; color: #1b5e20;
-  border: 1.5px solid #86efac; padding: .75rem 1.5rem;
-  border-radius: 10px; font-size: .875rem; font-weight: 600;
-  cursor: pointer; transition: all .2s; width: 100%;
-}
-.qr__btn-enviar:hover:not(:disabled) { background: #dcfce7; border-color: #22c55e; }
-.qr__btn-enviar:disabled { opacity: .5; cursor: not-allowed; }
-.qr__btn-enviar--warn {
-  border-color: #fde68a; color: #92400e; background: #fffbeb;
-}
-.qr__btn-enviar--warn:hover:not(:disabled) { background: #fef3c7; border-color: #f59e0b; }
-
-/* Success */
-.qr__success {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 1rem; text-align: center; padding-top: .5rem;
-}
-.qr__success-icon { font-size: 3rem; }
-
-/* Confirm modal */
-.qr__confirm-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.4);
-  display: flex; align-items: flex-end; justify-content: center;
-  z-index: 100;
-  padding: 1.5rem;
-}
-.qr__confirm-modal {
-  background: white; border-radius: 20px 20px 16px 16px;
-  padding: 1.75rem 1.5rem;
-  width: 100%; max-width: 400px;
-  display: flex; flex-direction: column; gap: 1rem;
-  text-align: center;
-}
-.qr__confirm-icon { font-size: 2.5rem; }
-.qr__confirm-modal h3 {
-  margin: 0; font-size: 1.05rem; font-weight: 700; color: #1a1a1a;
-}
-.qr__confirm-modal p {
-  margin: 0; font-size: .85rem; color: #6b7280; line-height: 1.5;
-}
-.qr__confirm-btns {
-  display: flex; gap: .75rem; margin-top: .25rem;
-}
-.qr__confirm-btns .qr__btn-secondary {
-  flex: 1; justify-content: center; margin-top: 0; align-self: auto;
-}
-.qr__confirm-btns .qr__btn-primary {
-  flex: 1;
+.qr__btn-volver {
+  text-decoration: none;
+  align-self: center;
 }
 </style>
