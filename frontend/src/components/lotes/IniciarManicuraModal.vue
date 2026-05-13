@@ -137,8 +137,8 @@ function resetForm() {
 async function cargarUsuarios() {
   loadingUsuarios.value = true
   try {
-    const { data } = await listUsers({ role: 'manicura,admin,supervisor' })
-    usuarios.value = (data?.usuarios || data || [])
+    const { data } = await listUsers()
+    usuarios.value = (data?.data || [])
       .filter(u => ['manicura', 'admin', 'supervisor'].includes(u.role))
   } catch {
     usuarios.value = []
