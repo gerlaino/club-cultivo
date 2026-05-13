@@ -1,6 +1,6 @@
 class PlantsController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_plant, only: [:show, :update, :destroy, :add_foto, :remove_foto]
+  before_action :set_plant, only: [:show, :update, :destroy, :add_foto, :remove_foto, :registrar_peso]
 
   # GET /plants
   def index
@@ -97,6 +97,62 @@ class PlantsController < ApplicationController
     render json: serialize_blob(blob), status: :created
   end
 
+  # POST /plants/:id/registrar_peso
+  def registrar_peso
+    peso = params[:peso_seco_g].to_f
+    return render json: { error: 'El peso debe ser mayor a 0' }, status: :unprocessable_entity if peso <= 0
+
+    lote = @plant.lote
+    unless %w[en_manicura secado].include?(lote.estado)
+      return render json: { error: 'El lote no está en una fase de manicura activa' }, status: :unprocessable_entity
+    end
+
+    authorized = current_user.admin? || current_user.supervisor? ||
+                 (current_user.manicura? && lote.manicurador_id == current_user.id) ||
+                 (current_user.manicura? && lote.manicurador_id.nil?)
+    return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless authorized
+
+    ActiveRecord::Base.transaction do
+      @plant.update!(peso_seco: peso)
+
+      pesada = lote.pesadas.find_or_initialize_by(
+        borrador:     true,
+        fase_origen:  lote.estado,
+        fase_destino: 'finalizado',
+        manicurado:   true,
+      )
+      unless pesada.persisted?
+        pesada.registrado_por = current_user
+        pesada.registrado_at  = Time.current
+        pesada.save!
+      end
+
+      pp = pesada.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
+      pp.peso_seco_g = peso
+      pp.save!
+
+      total_peso = pesada.pesadas_plantas.sum(:peso_seco_g)
+      count      = pesada.pesadas_plantas.count
+      pesada.update!(peso_seco_g: total_peso, plantas_manicuradas: count)
+
+      total_plantas = lote.plants.count
+      render json: {
+        planta: {
+          id:        @plant.id,
+          nombre:    @plant.nombre,
+          codigo_qr: @plant.codigo_qr,
+          peso_seco: @plant.peso_seco.to_f,
+        },
+        progreso: {
+          pesadas:       count,
+          total:         total_plantas,
+          peso_total_g:  total_peso.to_f,
+          completado:    count >= total_plantas,
+        }
+      }
+    end
+  end
+
   # DELETE /plants/:id/fotos/:blob_id
   def remove_foto
     blob = @plant.fotos.blobs.find_by(id: params[:blob_id])
@@ -172,10 +228,12 @@ class PlantsController < ApplicationController
       origen:    plant.origen,
       foto_url:  foto_url(plant),
       lote: {
-        id:         plant.lote.id,
-        codigo:     plant.lote.codigo,
-        estado:     plant.lote.estado,
-        genetica_id: plant.lote.genetica_id,
+        id:              plant.lote.id,
+        codigo:          plant.lote.codigo,
+        estado:          plant.lote.estado,
+        genetica_id:     plant.lote.genetica_id,
+        manicurador_id:  plant.lote.manicurador_id,
+        plants_count:    plant.lote.plants_count,
         sala: {
           id:     plant.lote.sala.id,
           nombre: plant.lote.sala.nombre,

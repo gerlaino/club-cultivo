@@ -286,6 +286,19 @@ const loteApiError = ref(null)
 const showUpgrade  = ref(false)
 const plantasMadre    = ref([])
 const loadingMadres   = ref(false)
+const madreQuery      = ref('')
+const madreFocused    = ref(false)
+
+const plantaMadreSeleccionada = computed(() =>
+  plantasMadre.value.find(p => p.id === loteForm.value.planta_madre_id)
+)
+const madreDropdown = computed(() => {
+  const q = madreQuery.value.trim().toLowerCase()
+  if (!q) return plantasMadre.value.slice(0, 30)
+  return plantasMadre.value.filter(p =>
+    p.nombre?.toLowerCase().includes(q) || p.lote?.codigo?.toLowerCase().includes(q)
+  ).slice(0, 30)
+})
 
 function emptyLoteForm() {
   const kind = sala.value?.kind
@@ -309,14 +322,33 @@ async function setOrigen(valor) {
   loteForm.value.origen = valor
   loteForm.value.estado = valor
   loteForm.value.planta_madre_id = null
-  if (valor === 'esqueje' && !plantasMadre.value.length) {
+  madreQuery.value = ''
+  if (valor === 'esqueje') {
     loadingMadres.value = true
     try {
-      const { data } = await listPlants({ state: 'vegetativo' })
+      const { data } = await listPlants({})
       plantasMadre.value = data || []
     } catch { plantasMadre.value = [] }
     finally { loadingMadres.value = false }
   }
+}
+
+let _madreFocusTimer = null
+function onMadreBlur() {
+  _madreFocusTimer = setTimeout(() => { madreFocused.value = false }, 180)
+}
+function selectMadre(plant) {
+  clearTimeout(_madreFocusTimer)
+  loteForm.value.planta_madre_id = plant.id
+  madreQuery.value = ''
+  madreFocused.value = false
+  if (plant.genetica?.id) {
+    loteForm.value.genetica_id = plant.genetica.id
+  }
+}
+function clearMadre() {
+  loteForm.value.planta_madre_id = null
+  madreQuery.value = ''
 }
 
 const mostrarOrigenSelector = computed(() => {
@@ -727,17 +759,46 @@ const canSeeAmbiente = computed(() =>
               <!-- Planta madre (solo esqueje) -->
               <div v-if="loteForm.origen === 'esqueje'" class="sd__field sd__field--full">
                 <label class="sd__label">Planta madre <span class="sd__label-opt">(opcional)</span></label>
-                <select class="sd__input" v-model="loteForm.planta_madre_id">
-                  <option :value="null">— No especificada —</option>
-                  <template v-if="loadingMadres">
-                    <option disabled>Cargando plantas…</option>
-                  </template>
-                  <template v-else>
-                    <option v-for="p in plantasMadre" :key="p.id" :value="p.id">
-                      {{ p.nombre }}{{ p.lote?.codigo ? ` (${p.lote.codigo})` : '' }}
-                    </option>
-                  </template>
-                </select>
+
+                <div v-if="loadingMadres" class="sd__input sd__input--disabled">Cargando plantas…</div>
+                <div v-else class="sd__madre-picker">
+                  <div v-if="plantaMadreSeleccionada" class="sd__madre-chip">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <strong>{{ plantaMadreSeleccionada.nombre }}</strong>
+                    <span v-if="plantaMadreSeleccionada.lote?.codigo" class="sd__madre-chip-lote">{{ plantaMadreSeleccionada.lote.codigo }}</span>
+                    <span v-if="plantaMadreSeleccionada.genetica" class="sd__madre-chip-gen">· {{ plantaMadreSeleccionada.genetica.nombre }}</span>
+                    <button type="button" class="sd__madre-clear" @click="clearMadre" title="Quitar">×</button>
+                  </div>
+                  <input
+                    v-model="madreQuery"
+                    type="text"
+                    class="sd__input"
+                    :placeholder="plantaMadreSeleccionada ? 'Cambiar planta madre…' : 'Buscar por nombre o código de lote…'"
+                    @focus="madreFocused = true"
+                    @blur="onMadreBlur"
+                    autocomplete="off"
+                  />
+                  <div v-if="madreFocused" class="sd__madre-dropdown">
+                    <template v-if="madreDropdown.length">
+                      <div
+                        v-for="p in madreDropdown"
+                        :key="p.id"
+                        class="sd__madre-opt"
+                        :class="{ 'sd__madre-opt--sel': loteForm.planta_madre_id === p.id }"
+                        @mousedown.prevent="selectMadre(p)"
+                      >
+                        <span class="sd__madre-opt-nombre">{{ p.nombre }}</span>
+                        <span class="sd__madre-opt-meta">
+                          {{ p.lote?.codigo }}
+                          <span v-if="p.genetica">· {{ p.genetica.nombre }}</span>
+                        </span>
+                      </div>
+                    </template>
+                    <div v-else class="sd__madre-empty">
+                      {{ plantasMadre.length ? 'Sin resultados para "' + madreQuery + '"' : 'No hay plantas disponibles' }}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div class="sd__field">
@@ -752,13 +813,20 @@ const canSeeAmbiente = computed(() =>
                 <input type="date" class="sd__input" v-model="loteForm.start_date" />
               </div>
               <div class="sd__field">
-                <label class="sd__label">Genética / Variedad</label>
-                <select class="sd__input" v-model="loteForm.genetica_id">
-                  <option value="">Sin especificar</option>
+                <label class="sd__label">
+                  Genética / Variedad
+                  <span v-if="loteForm.origen === 'esqueje' && loteForm.planta_madre_id" class="sd__label-heredada">Heredada de madre</span>
+                </label>
+                <select class="sd__input" v-model="loteForm.genetica_id" :disabled="!geneticas.length">
+                  <option value="">{{ geneticas.length ? 'Sin especificar' : 'Sin genéticas disponibles para cultivo' }}</option>
                   <option v-for="g in geneticas" :key="g.id" :value="g.id">
                     {{ g.nombre }}{{ g.registrada_inase ? ' 🏛️' : '' }} — {{ g.tipo }}
                   </option>
                 </select>
+                <p v-if="!geneticas.length" class="sd__genetica-hint">
+                  <i class="bi bi-info-circle"></i>
+                  Antes de crear un lote, <a href="/geneticas" class="sd__genetica-link">registrá una genética</a>.
+                </p>
               </div>
               <div class="sd__field">
                 <label class="sd__label">Tipo de cultivo</label>
@@ -1046,6 +1114,46 @@ const canSeeAmbiente = computed(() =>
 .sd__checkbox-row { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: #374151; cursor: pointer; user-select: none; }
 .sd__checkbox-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; flex-shrink: 0; }
 .sd__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; }
+.sd__input--disabled { color: #94a3b8; cursor: default; }
+
+/* Madre picker */
+.sd__madre-picker { position: relative; display: flex; flex-direction: column; gap: .4rem; }
+.sd__madre-chip {
+  display: inline-flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px;
+  padding: .4rem .75rem; font-size: .82rem; color: #1b5e20;
+}
+.sd__madre-chip i { color: #16a34a; font-size: .85rem; }
+.sd__madre-chip-lote { color: #94a3b8; font-size: .75rem; font-family: monospace; }
+.sd__madre-chip-gen  { color: #60725d; font-size: .75rem; }
+.sd__madre-clear {
+  margin-left: auto; background: none; border: none; cursor: pointer;
+  color: #6b7280; font-size: 1rem; line-height: 1; padding: 0 .1rem;
+}
+.sd__madre-clear:hover { color: #dc2626; }
+.sd__madre-dropdown {
+  position: absolute; top: calc(100% + 2px); left: 0; right: 0;
+  background: #fff; border: 1.5px solid #d4e6d4; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.1);
+  max-height: 220px; overflow-y: auto; z-index: 50;
+}
+.sd__madre-opt {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .5rem;
+  padding: .55rem .85rem; cursor: pointer; transition: background .1s;
+}
+.sd__madre-opt:hover, .sd__madre-opt--sel { background: #f0fdf4; }
+.sd__madre-opt-nombre { font-size: .875rem; font-weight: 600; color: #1a1a1a; }
+.sd__madre-opt-meta { font-size: .72rem; color: #60725d; white-space: nowrap; }
+.sd__madre-empty { padding: .75rem 1rem; font-size: .82rem; color: #94a3b8; text-align: center; }
+
+/* Genetica hints */
+.sd__label-heredada {
+  font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: #16a34a; background: #dcfce7; padding: .1rem .45rem; border-radius: 4px; margin-left: .4rem;
+}
+.sd__genetica-hint { margin: .3rem 0 0; font-size: .75rem; color: #64748b; display: flex; align-items: center; gap: .3rem; }
+.sd__genetica-link { color: #1b5e20; font-weight: 600; text-decoration: none; }
+.sd__genetica-link:hover { text-decoration: underline; }
 
 /* Cámara */
 .sd__cam-form { display: flex; flex-direction: column; gap: .75rem; }

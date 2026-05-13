@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
@@ -23,6 +23,7 @@ const contextoAsistente = computed(() => planta.value ? {
 function onRegistradoPorVoz() { loadActivities() }
 
 const route  = useRoute()
+const router = useRouter()
 const plants = usePlantsStore()
 const auth   = useAuthStore()
 const toast  = useToast()
@@ -355,6 +356,15 @@ const canManicura = computed(() =>
 onMounted(async () => {
   try {
     await plants.fetchOne(id)
+
+    // Manicura no accede a la vista de detalle — va al flujo de pesaje por QR
+    if (auth.user?.role === 'manicura' &&
+        ['en_manicura', 'secado'].includes(plants.current?.lote?.estado) &&
+        plants.current?.codigo_qr) {
+      router.replace(`/p/${plants.current.codigo_qr}`)
+      return
+    }
+
     fotos.value = plants.current?.fotos || []
     await generarQR()
     if (plants.current?.peso_seco) pesoManicura.value = parseFloat(plants.current.peso_seco)

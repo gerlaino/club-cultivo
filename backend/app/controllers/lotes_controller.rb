@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :aprobar_manicura, :rechazar_manicura, :asignar_manicurador, :completar_manicura]
+  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :aprobar_manicura, :rechazar_manicura, :asignar_manicurador, :completar_manicura, :finalizar_pesaje_manicura]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -362,6 +362,52 @@ class LotesController < ApplicationController
     render json: { error: 'Sede no encontrada' }, status: :not_found
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /lotes/:id/finalizar_pesaje_manicura
+  def finalizar_pesaje_manicura
+    pesada = @lote.pesadas.find_by(borrador: true, manicurado: true)
+    return render json: { error: 'No hay pesaje QR en progreso para este lote' }, status: :unprocessable_entity unless pesada
+
+    unless %w[en_manicura secado].include?(@lote.estado)
+      return render json: { error: 'Estado inválido para finalizar pesaje' }, status: :unprocessable_entity
+    end
+
+    authorized = current_user.admin? || current_user.supervisor? ||
+                 (current_user.manicura? && @lote.manicurador_id == current_user.id) ||
+                 (current_user.manicura? && @lote.manicurador_id.nil?)
+    return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless authorized
+
+    ActiveRecord::Base.transaction do
+      pesada.update!(borrador: false)
+      estado_anterior = @lote.estado
+      @lote.update!(estado: 'manicura_pendiente')
+
+      @lote.lote_eventos.create!(
+        tipo:          'cambio_estado',
+        estado_anterior: estado_anterior,
+        estado_nuevo:  'manicura_pendiente',
+        descripcion:   "Pesaje QR completado: #{pesada.plantas_manicuradas} plantas · #{pesada.peso_seco_g&.round(1)}g",
+        user:          current_user,
+        club:          current_user.club,
+        registrado_en: Time.current,
+      )
+
+      AlertaInterna.create!(
+        club:             current_user.club,
+        tipo:             'manicura_aprobacion_pendiente',
+        mensaje:          "Manicura #{current_user.first_name} completó pesaje QR de #{@lote.codigo} — #{pesada.plantas_manicuradas} plantas · #{pesada.peso_seco_g&.round(1)}g — pendiente aprobación",
+        severidad:        'info',
+        creada_por:       current_user,
+        destinada_a_role: 'admin',
+        contexto:         { lote_id: @lote.id, lote_codigo: @lote.codigo,
+                            peso_seco_g: pesada.peso_seco_g, manicura_id: current_user.id },
+      )
+    end
+
+    render json: { ok: true, lote: serialize_lote(@lote.reload) }
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end

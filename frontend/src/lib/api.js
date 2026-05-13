@@ -377,8 +377,10 @@ export const getPlantNotas  = (plantId)  => api.get(`/plants/${plantId}/notas`)
 export const createPlantNota = (plantId, payload) => api.post(`/plants/${plantId}/notas`, payload)
 export const deleteNota     = (id)       => api.delete(`/notas/${id}`)
 
-export const addPlantFoto    = (plantId, formData) => api.post(`/plants/${plantId}/add_foto`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-export const removePlantFoto = (plantId, blobId)   => api.delete(`/plants/${plantId}/fotos/${blobId}`)
+export const addPlantFoto       = (plantId, formData) => api.post(`/plants/${plantId}/add_foto`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const removePlantFoto    = (plantId, blobId)   => api.delete(`/plants/${plantId}/fotos/${blobId}`)
+export const registrarPesoPlanta      = (plantId, payload) => api.post(`/plants/${plantId}/registrar_peso`, payload)
+export const finalizarPesajeManicura  = (loteId)           => api.post(`/lotes/${loteId}/finalizar_pesaje_manicura`)
 
 export const getPlantaByQR = (codigoQr) => api.get(`/p/${codigoQr}`)
 

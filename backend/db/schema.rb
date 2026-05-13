@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_13_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_13_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -635,7 +635,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_13_000002) do
     t.string "motivo_rechazo"
     t.integer "plantas_manicuradas"
     t.integer "plantas_cosechadas"
+    t.boolean "borrador", default: false, null: false
     t.index ["aprobada_por_id"], name: "index_pesadas_on_aprobada_por_id"
+    t.index ["lote_id", "borrador"], name: "index_pesadas_on_lote_id_and_borrador"
     t.index ["lote_id", "registrado_at"], name: "index_pesadas_on_lote_id_and_registrado_at"
     t.index ["lote_id"], name: "index_pesadas_on_lote_id"
     t.index ["registrado_por_id"], name: "index_pesadas_on_registrado_por_id"

@@ -82,6 +82,7 @@ Rails.application.routes.draw do
         post :rechazar_manicura
         post :asignar_manicurador
         post :completar_manicura
+        post :finalizar_pesaje_manicura
         get  :timeline
       end
     end
@@ -96,6 +97,7 @@ Rails.application.routes.draw do
     resources :plants do
       member do
         post   :add_foto
+        post   :registrar_peso
         delete 'fotos/:blob_id', to: 'plants#remove_foto', as: :remove_foto
       end
       resources :plant_activities, only: [:index, :create, :destroy]

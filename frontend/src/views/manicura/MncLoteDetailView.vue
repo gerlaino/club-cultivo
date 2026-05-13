@@ -70,7 +70,7 @@
           <RouterLink
             v-for="(planta, i) in plantas"
             :key="planta.id"
-            :to="`/plantas/${planta.id}`"
+            :to="`/p/${planta.codigo_qr}`"
             class="mnl__row"
           >
             <div class="mnl__row-dot" :class="plantWeights[planta.id] > 0 ? 'mnl__dot--done' : 'mnl__dot--empty'"></div>
@@ -293,7 +293,7 @@ onMounted(cargar)
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: var(--sp-4); margin-bottom: var(--sp-5); flex-wrap: wrap;
 }
-.mnl__title { font-size: var(--fs-22); font-weight: 800; color: var(--c-ink-900); letter-spacing: -.02em; margin: 0 0 var(--sp-1); font-family: var(--font-mono, monospace); }
+.mnl__title { font-size: var(--fs-22); font-weight: 800; color: var(--c-ink-900); letter-spacing: -.02em; margin: 0 0 var(--sp-1); }
 .mnl__sub   { font-size: var(--fs-14); color: var(--c-ink-500); margin: 0; }
 .mnl__header-actions { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 
@@ -374,7 +374,7 @@ onMounted(cargar)
 
 .mnl__row-num {
   font-size: var(--fs-11); font-weight: 700; color: var(--c-ink-400);
-  font-family: var(--font-mono, monospace); min-width: 20px; flex-shrink: 0;
+  min-width: 20px; flex-shrink: 0;
 }
 .mnl__row-info {
   flex: 1; min-width: 0;
@@ -382,7 +382,7 @@ onMounted(cargar)
 }
 .mnl__row-nombre { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mnl__row-sep    { font-size: var(--fs-11); color: var(--c-ink-300); flex-shrink: 0; }
-.mnl__row-qr     { font-size: var(--fs-11); color: var(--c-ink-400); font-family: var(--font-mono, monospace); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mnl__row-qr     { font-size: var(--fs-11); color: var(--c-ink-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .mnl__peso {
   font-size: 12px; font-weight: 600; flex-shrink: 0;

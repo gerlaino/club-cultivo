@@ -37,7 +37,8 @@ class StocksController < ApplicationController
   # POST /stocks
   def create
     @stock = Stock.new(stock_params)
-    @stock.sede = sede_for_stock
+    @stock.sede  = sede_for_stock
+    @stock.club  = current_user.club
 
     if @stock.save
       render json: serialize_stock(@stock), status: :created
@@ -215,9 +216,9 @@ class StocksController < ApplicationController
     }
   end
 
-  ROLES_LECTURA_STOCK   = %w[admin dispensador manicura].freeze
-  ROLES_ESCRITURA_STOCK = %w[admin manicura].freeze
-  ROLES_AUDITOR_LECTURA = %w[admin auditor].freeze
+  ROLES_LECTURA_STOCK   = %w[admin supervisor dispensador manicura].freeze
+  ROLES_ESCRITURA_STOCK = %w[admin supervisor manicura].freeze
+  ROLES_AUDITOR_LECTURA = %w[admin auditor supervisor].freeze
 
   def require_lectura_stock!
     render json: { error: 'No autorizado' }, status: :forbidden unless ROLES_LECTURA_STOCK.include?(current_user&.role)

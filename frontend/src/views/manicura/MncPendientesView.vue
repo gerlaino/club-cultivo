@@ -186,7 +186,7 @@ onMounted(cargar)
 }
 .mnp__row-codigo {
   font-size: var(--fs-13); font-weight: 700; color: var(--c-ink-900);
-  font-family: var(--font-mono, monospace); white-space: nowrap;
+  white-space: nowrap;
 }
 .mnp__row-sep  { color: var(--c-ink-300); font-size: var(--fs-11); flex-shrink: 0; }
 .mnp__row-cepa { font-size: var(--fs-13); color: var(--c-ink-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -772,11 +772,11 @@ function openEditLote() {
 }
 
 async function saveEditLote() {
-  if (!editLoteForm.value.codigo?.trim()) { editLoteError.value = 'El código es obligatorio'; return }
+  // codigo es inmutable — no se valida ni se envía
   savingEditLote.value = true
   editLoteError.value  = null
   try {
-    const { tiene_semanas, ...rest } = editLoteForm.value
+    const { tiene_semanas, codigo, ...rest } = editLoteForm.value
     const payload = {
       ...rest,
       semanas_floracion: tiene_semanas ? (Number(rest.semanas_floracion) || null) : null,
@@ -1490,8 +1490,8 @@ onUnmounted(() => {
             <div v-if="editLoteError" class="ld__alert">{{ editLoteError }}</div>
             <div class="ld__grid">
               <div class="ld__field">
-                <label class="ld__label">Código</label>
-                <input type="text" class="ld__input" v-model.trim="editLoteForm.codigo" placeholder="Ej: LOT-2026-001" />
+                <label class="ld__label">Código <span style="font-size:.7rem;font-weight:400;color:#94a3b8;margin-left:.3rem">autogenerado · inmutable</span></label>
+                <div class="ld__input" style="color:#64748b;cursor:default;background:#f8fafc;font-family:monospace">{{ editLoteForm.codigo }}</div>
               </div>
               <div class="ld__field">
                 <label class="ld__label">Fecha de inicio</label>
