@@ -42,7 +42,7 @@ function exportCsvGeneticas() {
 }
 
 function exportCsvCiclos() {
-  const headers = ['Genética','Lotes con datos','Vegetativo (d)','Floración (d)','Cosecha (d)','Secado (d)','Curado (d)','Total (d)']
+  const headers = ['Genética','Lotes con datos','Vegetativo (d)','Floración (d)','Cosecha (d)','Manicura (d)','Curado (d)','Total (d)']
   const rows = [headers, ...ciclos.value.map(c => [
     c.nombre, c.lotes_con_datos,
     c.vegetativo ?? '', c.floracion ?? '', c.cosecha ?? '', c.secado ?? '', c.curado ?? '',
@@ -292,7 +292,7 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
                 <th class="an__th-r">Vegetativo</th>
                 <th class="an__th-r">Floración</th>
                 <th class="an__th-r">Cosecha</th>
-                <th class="an__th-r">Secado</th>
+                <th class="an__th-r">Manicura</th>
                 <th class="an__th-r">Curado</th>
                 <th class="an__th-r an__th-total">Total ciclo</th>
               </tr>

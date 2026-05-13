@@ -47,7 +47,7 @@ function estadoMeta(estado) {
     semilla:    { label: "Semilla",    color: "#64748b", bg: "rgba(100,116,139,.1)" },
     vegetativo: { label: "Vegetativo", color: "#15803d", bg: "rgba(21,128,61,.1)"  },
     floracion:  { label: "Floración",  color: "#d97706", bg: "rgba(217,119,6,.1)"  },
-    secado:     { label: "Secado",     color: "#475569", bg: "rgba(71,85,105,.1)"  },
+    secado:     { label: "Manicura",   color: "#475569", bg: "rgba(71,85,105,.1)"  },
     cosechado:  { label: "Cosechado",  color: "#0369a1", bg: "rgba(3,105,161,.1)"  },
     finalizado: { label: "Finalizado", color: "#1b5e20", bg: "rgba(27,94,32,.1)"   },
   }[estado] || { label: estado, color: "#64748b", bg: "rgba(100,116,139,.1)" }
@@ -388,7 +388,7 @@ onMounted(() => cargar())
                   <span class="ir__prod-val">{{ informe.produccion.plantas_en_floracion }}</span>
                 </div>
                 <div class="ir__prod-row">
-                  <span class="ir__prod-label">Secado</span>
+                  <span class="ir__prod-label">Manicura</span>
                   <div class="ir__prod-bar-wrap">
                     <div class="ir__prod-bar" style="background:#475569"
                          :style="{ width: informe.produccion.plantas_totales ? (informe.produccion.plantas_en_secado / informe.produccion.plantas_totales * 100) + '%' : '0%' }">

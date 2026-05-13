@@ -95,7 +95,7 @@ const alertaMax = computed(() => {
 const FASE_BADGE = {
   vegetativo:   { variant: 'leaf', label: 'Vegetativo' },
   floracion:    { variant: 'gold', label: 'Floración' },
-  secado:       { variant: 'sky',  label: 'Secado' },
+  secado:       { variant: 'sky',  label: 'Manicura' },
   cosechado:    { variant: 'ink',  label: 'Cosechado' },
   planificacion:{ variant: 'ink',  label: 'Planificación' },
   finalizado:   { variant: 'ink',  label: 'Finalizado' },

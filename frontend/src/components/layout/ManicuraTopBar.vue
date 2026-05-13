@@ -75,7 +75,7 @@ const avatarOpen = ref(false)
 const SEGMENT_LABELS = {
   mnc:     'Manicura',
   cosecha: 'En Cosecha',
-  secado:  'En Secado',
+  secado:  'En Manicura',
   curado:  'En Curado',
   stocks:  'Stocks',
   lotes:   'Lotes',

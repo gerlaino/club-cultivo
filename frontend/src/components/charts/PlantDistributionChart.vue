@@ -51,7 +51,7 @@ const createChart = () => {
     colors.push('#ffc107')
   }
   if (props.data.secado > 0) {
-    labels.push('Secado')
+    labels.push('Manicura')
     values.push(props.data.secado)
     colors.push('#17a2b8')
   }

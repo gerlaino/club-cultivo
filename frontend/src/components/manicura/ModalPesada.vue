@@ -102,7 +102,7 @@ const FASE_CONFIG = {
   cosecha: {
     fase_origen:  'cosecha',
     fase_destino: 'secado',
-    label:        'Cosecha → Secado',
+    label:        'Cosecha → Manicura',
     pesoLabel:    'Peso húmedo (g)',
     pesoKey:      'peso_humedo_g',
     showManicurado: false,
@@ -110,7 +110,7 @@ const FASE_CONFIG = {
   secado: {
     fase_origen:  'secado',
     fase_destino: 'curado',
-    label:        'Secado → Curado',
+    label:        'Manicura → Curado',
     pesoLabel:    'Peso seco (g)',
     pesoKey:      'peso_seco_g',
     showManicurado: true,

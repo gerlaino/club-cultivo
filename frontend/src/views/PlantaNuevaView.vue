@@ -24,7 +24,7 @@ const STATE_META = {
   germinacion:{ label: 'Semilla',    icon: '🌰',  color: '#92400e' },
   vegetativo: { label: 'Vegetativo', icon: '🌱',  color: '#15803d' },
   floracion:  { label: 'Floración',  icon: '🌸',  color: '#b45309' },
-  secado:     { label: 'Secado',     icon: '🍂',  color: '#64748b' },
+  secado:     { label: 'Manicura',   icon: '✂️',   color: '#64748b' },
   cosechado:  { label: 'Cosechado',  icon: '✅',  color: '#0369a1' },
 }
 

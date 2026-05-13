@@ -585,7 +585,7 @@ const ESTADO_META = {
   vegetativo:        { label: "Vegetativo",         color: "#16a34a", bg: "#dcfce7", emoji: "🍃" },
   floracion:         { label: "Floración",          color: "#d97706", bg: "#fef3c7", emoji: "🌸" },
   cosecha:           { label: "Cosecha",            color: "#059669", bg: "#d1fae5", emoji: "🌿" },
-  secado:            { label: "Secado",             color: "#78350f", bg: "#fef3c7", emoji: "💨" },
+  secado:            { label: "Manicura",            color: "#78350f", bg: "#fef3c7", emoji: "✂️" },
   manicura_pendiente:{ label: "Manicura pendiente", color: "#7c3aed", bg: "#ede9fe", emoji: "✂️" },
   curado:            { label: "Curado",             color: "#2563eb", bg: "#dbeafe", emoji: "🫙" },
   finalizado:        { label: "Finalizado",         color: "#1b5e20", bg: "#dcfce7", emoji: "✅" },
@@ -650,7 +650,7 @@ function formatDateTime(d) {
 
 const cicloIndex = computed(() => lote.value ? CICLO.indexOf(lote.value.estado) : -1)
 
-const FASE_LABELS = { vegetativo:'Vegetativo', floracion:'Floración', secado:'Secado', curado:'Curado', cosecha:'Cosecha', semilla:'Germinación', manicura:'Manicura', cerrado:'Cerrado' }
+const FASE_LABELS = { vegetativo:'Vegetativo', floracion:'Floración', secado:'Manicura', curado:'Curado', cosecha:'Cosecha', semilla:'Germinación', manicura:'Manicura', cerrado:'Cerrado' }
 function capitalizarFase(f) { return FASE_LABELS[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : '') }
 function phaseBannerMsg(estado) {
   if (estado === 'cosecha') return 'Lote cosechado. Manicura toma desde acá.'
@@ -1677,19 +1677,12 @@ onUnmounted(() => {
           <div class="ld__modal-body">
             <div v-if="transicionError" class="ld__alert">{{ transicionError }}</div>
 
-            <!-- Peso húmedo + manicurado (floracion → secado) -->
+            <!-- Peso húmedo (cosecha → manicura, opcional) -->
             <template v-if="lote?.proxima_fase_posible === 'secado'">
               <div class="ld__field" style="margin-bottom:1rem">
-                <label class="ld__label">Peso húmedo total (g) <span style="color:#dc2626">*</span></label>
+                <label class="ld__label">Peso húmedo total (g) <span class="ld__optional">opcional</span></label>
                 <input type="number" step="0.1" min="0" class="ld__input" v-model.number="transicionForm.peso_humedo_g" placeholder="ej: 1200.5" />
-                <span class="ld__optional">Peso cosechado fresco antes del secado</span>
-              </div>
-              <div class="ld__field" style="margin-bottom:1rem">
-                <label class="ld__toggle">
-                  <input type="checkbox" v-model="transicionForm.manicurado" class="ld__toggle-input" />
-                  <div class="ld__toggle-track"><div class="ld__toggle-thumb"></div></div>
-                  <span class="ld__toggle-label">Manicurado antes del secado</span>
-                </label>
+                <span class="ld__optional">Peso cosechado fresco al inicio del secado</span>
               </div>
             </template>
 

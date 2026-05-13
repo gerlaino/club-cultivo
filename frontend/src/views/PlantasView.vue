@@ -21,7 +21,7 @@ const STATE_META = {
   germinacion: { label: 'Germinación', icon: '🌰', bg: '#E0F2FE', color: '#0369a1', bar: '#0284C7' },
   vegetativo:  { label: 'Vegetativo',  icon: '🌱', bg: '#E8F0EB', color: '#1A3D2E', bar: '#1b5e20' },
   floracion:   { label: 'Floración',   icon: '🌸', bg: '#FEF3C7', color: '#92400e', bar: '#D97706' },
-  secado:      { label: 'Secado',      icon: '🍂', bg: '#F3F4F6', color: '#374151', bar: '#6B7280' },
+  secado:      { label: 'Manicura',    icon: '✂️',  bg: '#F3F4F6', color: '#374151', bar: '#6B7280' },
   cosechado:   { label: 'Cosechado',   icon: '✂️',  bg: '#F4F8F5', color: '#1A3D2E', bar: '#3F6452' },
 }
 

@@ -7,8 +7,8 @@
           <Wind :size="14" :stroke-width="2" />
           Post-cosecha
         </div>
-        <h1 class="lv__title">Lotes en Secado</h1>
-        <p class="lv__sub">Registrá pesadas de secado y avanzá los lotes a curado cuando estén listos.</p>
+        <h1 class="lv__title">Lotes en Manicura</h1>
+        <p class="lv__sub">Registrá pesadas y avanzá los lotes a curado cuando estén listos.</p>
       </div>
     </div>
 
@@ -19,8 +19,8 @@
 
     <div v-else-if="!lotes.length" class="lv__empty">
       <div class="lv__empty-ico"><Wind :size="40" :stroke-width="1.25" /></div>
-      <p class="lv__empty-title">Sin lotes en secado</p>
-      <p class="lv__empty-sub">Los lotes en cosecha avanzarán aquí después de la primera pesada de secado.</p>
+      <p class="lv__empty-title">Sin lotes en manicura</p>
+      <p class="lv__empty-sub">Los lotes en cosecha aparecerán aquí una vez iniciado el secado.</p>
     </div>
 
     <div v-else class="lv__cards">
@@ -29,7 +29,7 @@
         <div class="lv__card-body">
           <div class="lv__card-head">
             <span class="lv__card-codigo">{{ lote.codigo }}</span>
-            <span class="lv__badge lv__badge--secado">Secado</span>
+            <span class="lv__badge lv__badge--secado">Manicura</span>
           </div>
           <div class="lv__card-meta">
             <span v-if="lote.genetica"><Leaf :size="13" :stroke-width="2" /> {{ lote.genetica.nombre }}</span>

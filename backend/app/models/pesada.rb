@@ -29,7 +29,6 @@ class Pesada < ApplicationRecord
 
   def peso_requerido_segun_destino
     case fase_destino
-    when 'secado'             then errors.add(:peso_humedo_g, 'requerido para entrada a secado')  unless peso_humedo_g.present?
     when 'curado'             then errors.add(:peso_seco_g,   'requerido para entrada a curado')   unless peso_seco_g.present?
     when 'finalizado'         then errors.add(:peso_curado_g, 'requerido para cierre de curado')   unless peso_curado_g.present?
     when 'manicura_pendiente' then errors.add(:peso_seco_g,   'requerido para manicura')           unless peso_seco_g.present?
