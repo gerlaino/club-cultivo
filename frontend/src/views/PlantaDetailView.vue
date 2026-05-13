@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
-import { getPlantActivities, createPlantActivity, updatePlant } from '../lib/api'
+import { getPlantActivities, createPlantActivity, updatePlant, addPlantFoto, removePlantFoto } from '../lib/api'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
@@ -212,8 +212,31 @@ async function guardarRegistro() {
 function toggleFotos() {
   fotosExpanded.value = !fotosExpanded.value
 }
-async function handleFotoUpload() {
-  toast.error('Subida de fotos de planta no implementada aún')
+async function handleFotoUpload(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  uploadingFoto.value = true
+  try {
+    const fd = new FormData()
+    fd.append('foto', file)
+    const { data } = await addPlantFoto(planta.value.id, fd)
+    if (data) fotos.value.unshift(data)
+    fotosExpanded.value = true
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al subir la foto')
+  } finally {
+    uploadingFoto.value = false
+    event.target.value = ''
+  }
+}
+
+async function handleFotoDelete(blobId) {
+  try {
+    await removePlantFoto(planta.value.id, blobId)
+    fotos.value = fotos.value.filter(f => f.id !== blobId)
+  } catch {
+    toast.error('Error al eliminar la foto')
+  }
 }
 
 // ── Medición sensor (EC / pH / temperatura) ──────────────
@@ -332,6 +355,7 @@ const canManicura = computed(() =>
 onMounted(async () => {
   try {
     await plants.fetchOne(id)
+    fotos.value = plants.current?.fotos || []
     await generarQR()
     if (plants.current?.peso_seco) pesoManicura.value = parseFloat(plants.current.peso_seco)
   } catch { error.value = 'No se pudo cargar la planta.' }
@@ -594,9 +618,15 @@ onMounted(async () => {
                 </template>
               </EmptyState>
               <div v-else class="pd__fotos-grid">
-                <div v-for="(f, i) in fotos" :key="f.id" class="pd__foto" @click="openLightbox(i)" style="cursor:pointer">
-                  <img :src="f.url" :alt="f.filename" class="pd__foto-img" />
+                <div v-for="(f, i) in fotos" :key="f.id" class="pd__foto">
+                  <img :src="f.url" :alt="f.filename" class="pd__foto-img" @click="openLightbox(i)" style="cursor:pointer" />
                   <div class="pd__foto-meta">{{ f.created_at_label }}</div>
+                  <button
+                    v-if="auth.user?.role !== 'manicura'"
+                    class="pd__foto-del"
+                    @click.stop="handleFotoDelete(f.id)"
+                    title="Eliminar foto"
+                  ><i class="bi bi-trash3"></i></button>
                 </div>
               </div>
             </div>
@@ -1096,9 +1126,17 @@ onMounted(async () => {
 
 /* Fotos */
 .pd__fotos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: .75rem; }
-.pd__foto { border-radius: 10px; overflow: hidden; border: 1px solid #d4e6d4; }
+.pd__foto { border-radius: 10px; overflow: hidden; border: 1px solid #d4e6d4; position: relative; }
 .pd__foto-img { width: 100%; height: 110px; object-fit: cover; display: block; }
 .pd__foto-meta { font-size: .65rem; color: #94a3b8; padding: .3rem .5rem; background: #f4f8f4; text-align: center; }
+.pd__foto-del {
+  position: absolute; top: .35rem; right: .35rem;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(0,0,0,.55); color: #fff; border: none;
+  font-size: .65rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .15s;
+}
+.pd__foto:hover .pd__foto-del { opacity: 1; }
 
 /* Aside */
 .pd__aside {}

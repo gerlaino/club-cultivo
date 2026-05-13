@@ -1,6 +1,6 @@
 class PlantsController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_plant, only: [:show, :update, :destroy]
+  before_action :set_plant, only: [:show, :update, :destroy, :add_foto, :remove_foto]
 
   # GET /plants
   def index
@@ -83,6 +83,24 @@ class PlantsController < ApplicationController
     lote = @plant.lote
     @plant.soft_delete!
     lote.decrement!(:plants_count) if lote.plants_count.to_i > 0
+    head :no_content
+  end
+
+  # POST /plants/:id/add_foto
+  def add_foto
+    unless params[:foto].present?
+      return render json: { error: 'No se recibió ninguna foto' }, status: :unprocessable_entity
+    end
+    @plant.fotos.attach(params[:foto])
+    blob = @plant.fotos.blobs.order(created_at: :desc).first
+    render json: serialize_blob(blob), status: :created
+  end
+
+  # DELETE /plants/:id/fotos/:blob_id
+  def remove_foto
+    blob = @plant.fotos.blobs.find_by(id: params[:blob_id])
+    return render json: { error: 'Foto no encontrada' }, status: :not_found unless blob
+    blob.attachments.where(record: @plant, name: 'fotos').each(&:purge)
     head :no_content
   end
 
@@ -173,9 +191,22 @@ class PlantsController < ApplicationController
       dias_desde_germinacion: plant.fecha_germinacion ? (Date.today - plant.fecha_germinacion).to_i : nil,
       dias_en_vegetativo:     (plant.fecha_vegetativo && plant.fecha_floracion) ? (plant.fecha_floracion - plant.fecha_vegetativo).to_i : nil,
       dias_en_floracion:      (plant.fecha_floracion  && plant.fecha_cosecha)   ? (plant.fecha_cosecha  - plant.fecha_floracion).to_i  : nil,
+      fotos:      plant.fotos.blobs.order(created_at: :desc).map { |b| serialize_blob(b) },
       created_at: plant.created_at,
       updated_at: plant.updated_at,
     }
+  end
+
+  def serialize_blob(blob)
+    {
+      id:               blob.id,
+      filename:         blob.filename.to_s,
+      url:              url_for(blob),
+      content_type:     blob.content_type,
+      created_at_label: blob.created_at.strftime('%d/%m/%Y %H:%M'),
+    }
+  rescue
+    nil
   end
 end
 

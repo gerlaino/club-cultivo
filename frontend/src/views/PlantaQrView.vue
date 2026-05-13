@@ -114,7 +114,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useClubStore } from '../stores/club'
 import { usePermissions } from '../composables/usePermissions'
-import api from '../lib/api'
+import axios from 'axios'
 
 const route  = useRoute()
 const router = useRouter()
@@ -134,9 +134,10 @@ const loginError   = ref(null)
 onMounted(async () => {
   await auth.ensureBootstrapped()
 
-  // Buscar datos básicos de la planta (endpoint público)
+  // Buscar datos básicos de la planta (endpoint público — sin prefijo /api)
+  const backendBase = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/api\/?$/, '')
   try {
-    const { data } = await api.get(`/p/${codigoQr}`)
+    const { data } = await axios.get(`${backendBase}/p/${codigoQr}`)
     plantaInfo.value = data
     clubNombre.value = data.club_nombre || ''
     clubLogo.value   = data.club_logo   || ''

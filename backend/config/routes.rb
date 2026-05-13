@@ -94,6 +94,10 @@ Rails.application.routes.draw do
     end
 
     resources :plants do
+      member do
+        post   :add_foto
+        delete 'fotos/:blob_id', to: 'plants#remove_foto', as: :remove_foto
+      end
       resources :plant_activities, only: [:index, :create, :destroy]
       resources :notas, only: [:index, :create]
     end

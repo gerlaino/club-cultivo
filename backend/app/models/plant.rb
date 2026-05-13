@@ -9,7 +9,8 @@ class Plant < ApplicationRecord
 
   before_create :set_club_id
   before_create :generate_codigo_qr
-  has_one_attached :foto
+  has_one_attached  :foto
+  has_many_attached :fotos
 
   default_scope { where(deleted_at: nil) }
 
