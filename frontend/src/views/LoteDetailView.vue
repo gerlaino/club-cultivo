@@ -26,6 +26,7 @@ import { useConfirm } from '../composables/useConfirm.js'
 import { useQRCode } from '../composables/useQRCode.js'
 import { ArrowRight } from 'lucide-vue-next'
 import DsBanner from '../design-system/components/Banner.vue'
+import IniciarManicuraModal from '../components/lotes/IniciarManicuraModal.vue'
 
 const route    = useRoute()
 const router   = useRouter()
@@ -317,6 +318,9 @@ const transicionSalaId    = ref(null)
 const showAvanzarSalaModal = ref(false)
 const avanzarSalaId        = ref(null)
 
+// ── Iniciar Manicura (admin/supervisor, cosecha → secado) ──
+const showIniciarManicuraModal = ref(false)
+
 // ── Cosecha modal (cultivador floración → cosecha) ────────
 const showCosechaModal  = ref(false)
 const cosechaSalaId     = ref(null)
@@ -452,6 +456,8 @@ async function handleAvanzarFase() {
       cosechaSalaId.value = lote.value?.sala_id ?? null
       showCosechaModal.value = true
     }
+  } else if (lote.value?.proxima_fase_posible === 'secado' && canAdmin.value) {
+    showIniciarManicuraModal.value = true
   } else if (isCultivador.value) {
     avanzarSalaId.value = lote.value?.sala_id ?? null
     showAvanzarSalaModal.value = true
@@ -521,6 +527,12 @@ async function ejecutarTransicion() {
   } catch (e) {
     transicionError.value = e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'Error al transicionar'
   } finally { savingTransicion.value = false }
+}
+
+async function onManicuraIniciada(data) {
+  lotes.current = data
+  toast.success(`Lote ${data.codigo} — manicura iniciada`)
+  await Promise.all([loadEventos(), plants.fetchByLote(id)])
 }
 
 async function openCerrarCuradoModal() {
@@ -819,8 +831,9 @@ function loteEscapeHandler(e) {
   if (showCerrarCuradoModal.value)    { showCerrarCuradoModal.value = false; return }
   if (showCosechaPartialModal.value)  { showCosechaPartialModal.value = false; return }
   if (showCosechaModal.value)         { showCosechaModal.value = false; return }
-  if (showAvanzarSalaModal.value)     { showAvanzarSalaModal.value = false; return }
-  if (showTransicionModal.value)      { showTransicionModal.value = false; return }
+  if (showAvanzarSalaModal.value)        { showAvanzarSalaModal.value = false; return }
+  if (showIniciarManicuraModal.value)    { showIniciarManicuraModal.value = false; return }
+  if (showTransicionModal.value)         { showTransicionModal.value = false; return }
   if (showRegistroModal.value)        { showRegistroModal.value = false; return }
   if (showCostoForm.value)            { showCostoForm.value = false; return }
   if (showAddPlanta.value)            { showAddPlanta.value = false; return }
@@ -1990,6 +2003,14 @@ onUnmounted(() => {
       :salas-destino="lote.salas_destino || []"
       @cosechado="onCosechadoParcial"
       @cerrar="showCosechaPartialModal = false"
+    />
+
+    <!-- ══ Modal Iniciar Manicura ══ -->
+    <IniciarManicuraModal
+      v-model="showIniciarManicuraModal"
+      :lote="lote"
+      :salas-destino="lote?.salas_destino || []"
+      @avanzado="onManicuraIniciada"
     />
 
   </div>

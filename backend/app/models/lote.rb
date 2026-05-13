@@ -207,12 +207,20 @@ class Lote < ApplicationRecord
   end
 
   # Admin asigna un manicurador → cosecha → en_manicura (nuevo flujo).
-  def asignar_manicurador!(manicurador:, asignado_por:)
+  ROLES_MANICURA = %w[manicura admin supervisor].freeze
+
+  def asignar_manicurador!(manicurador:, asignado_por:, sala_id: nil)
     raise ArgumentError, "El lote no está en cosecha" unless estado == 'cosecha'
-    raise ArgumentError, "El usuario no tiene rol de manicura" unless manicurador.role == 'manicura'
+    raise ArgumentError, "El usuario no tiene rol válido para manicura" unless ROLES_MANICURA.include?(manicurador.role)
+
+    attrs = { estado: 'en_manicura', manicurador: manicurador }
+    if sala_id.present?
+      sala_destino = club.salas.activas.find_by(id: sala_id)
+      attrs[:sala] = sala_destino if sala_destino
+    end
 
     ActiveRecord::Base.transaction do
-      update!(estado: 'en_manicura', manicurador: manicurador)
+      update!(attrs)
       lote_eventos.create!(
         tipo:            'cambio_estado',
         estado_anterior: 'cosecha',
@@ -228,7 +236,7 @@ class Lote < ApplicationRecord
         mensaje:          "Lote #{codigo} asignado para manicura — #{plants_count_cosechadas || plants_count} plantas",
         severidad:        'info',
         creada_por:       asignado_por,
-        destinada_a_role: 'manicura',
+        destinada_a_role: manicurador.role,
         contexto:         { lote_id: id, lote_codigo: codigo, manicurador_id: manicurador.id }
       )
     end

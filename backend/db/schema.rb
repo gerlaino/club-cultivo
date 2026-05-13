@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_12_000004) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_13_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -846,10 +846,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_12_000004) do
     t.integer "plants_max", default: 0
     t.string "tipo", default: "cultivo", null: false
     t.datetime "deleted_at"
+    t.bigint "responsable_id"
     t.index ["club_id"], name: "index_salas_on_club_id"
     t.index ["created_by_id"], name: "index_salas_on_created_by_id"
     t.index ["deleted_at"], name: "index_salas_on_deleted_at"
     t.index ["nombre"], name: "index_salas_on_nombre"
+    t.index ["responsable_id"], name: "index_salas_on_responsable_id"
     t.index ["sede_id", "tipo"], name: "index_salas_on_sede_id_and_tipo"
     t.index ["sede_id"], name: "index_salas_on_sede_id"
   end
@@ -1127,6 +1129,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_12_000004) do
   add_foreign_key "salas", "clubs"
   add_foreign_key "salas", "sedes"
   add_foreign_key "salas", "users", column: "created_by_id"
+  add_foreign_key "salas", "users", column: "responsable_id"
   add_foreign_key "sedes", "clubs"
   add_foreign_key "sedes", "users", column: "created_by_id"
   add_foreign_key "setpoints_fase", "geneticas"

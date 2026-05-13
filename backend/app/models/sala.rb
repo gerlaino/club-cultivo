@@ -2,7 +2,8 @@
 class Sala < ApplicationRecord
   belongs_to :club
   belongs_to :sede, optional: true
-  belongs_to :created_by, class_name: "User", optional: true
+  belongs_to :created_by,  class_name: "User", optional: true
+  belongs_to :responsable, class_name: "User", optional: true
 
   has_many :lotes, dependent: :destroy
   has_many :sala_cultivadores, class_name: 'SalaCultivador', foreign_key: 'sala_id', dependent: :destroy

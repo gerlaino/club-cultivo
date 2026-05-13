@@ -114,7 +114,7 @@ class SalasController < ApplicationController
   def sala_params
     params.require(:sala).permit(
       :nombre, :state, :kind, :notes, :pots_count, :plants_max, :sede_id,
-      :camera_stream_url, :camera_snapshot_url
+      :camera_stream_url, :camera_snapshot_url, :responsable_id
     )
   end
 
@@ -138,6 +138,8 @@ class SalasController < ApplicationController
       created_by_name:      s.created_by_name,
       lotes_activos:        s.lotes.where(estado: ['vegetativo','floracion']).count,
       updated_at:           s.updated_at,
+      responsable_id:      s.responsable_id,
+      responsable_nombre:  s.responsable&.nombre_completo,
       cultivadores:        s.cultivadores.map { |c| { id: c.id, nombre: c.nombre_completo } },
       camera_stream_url:   s.camera_stream_url,
       camera_snapshot_url: s.camera_snapshot_url,

@@ -153,12 +153,12 @@ RSpec.describe 'Ola 4 — Manicura backend', type: :request do
       end
     end
 
-    context 'falta peso_humedo_g cuando fase_destino=secado' do
+    context 'peso_humedo_g es opcional cuando fase_destino=secado' do
       before { sign_in_as(manicura) }
-      it 'devuelve 422' do
+      it 'acepta pesada sin peso_humedo_g' do
         params = { pesada: { fase_origen: 'cosecha', fase_destino: 'secado' } }
         post "/lotes/#{lote_cosecha.id}/pesadas", params: params, headers: auth_headers
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:created)
       end
     end
 

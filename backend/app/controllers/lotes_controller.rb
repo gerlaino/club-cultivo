@@ -334,8 +334,8 @@ class LotesController < ApplicationController
   # POST /lotes/:id/asignar_manicurador
   def asignar_manicurador
     authorize @lote, :asignar_manicurador?
-    manicurador = current_user.club.users.where(role: 'manicura').find(params[:manicurador_id])
-    @lote.asignar_manicurador!(manicurador: manicurador, asignado_por: current_user)
+    manicurador = current_user.club.users.where(role: Lote::ROLES_MANICURA).find(params[:manicurador_id])
+    @lote.asignar_manicurador!(manicurador: manicurador, asignado_por: current_user, sala_id: params[:sala_id])
     render json: serialize_lote(@lote.reload)
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Manicurador no encontrado' }, status: :not_found
@@ -759,8 +759,16 @@ class LotesController < ApplicationController
 
       # Todas las salas activas del club — el usuario elige a cuál mover el lote
       result[:salas_destino] = lote.club.salas.activas
+                                    .includes(:responsable)
                                     .order(:nombre)
-                                    .map { |s| { id: s.id, nombre: s.nombre, kind: s.kind, actual: s.id == lote.sala_id } }
+                                    .map { |s| {
+                                      id:                 s.id,
+                                      nombre:             s.nombre,
+                                      kind:               s.kind,
+                                      actual:             s.id == lote.sala_id,
+                                      responsable_id:     s.responsable_id,
+                                      responsable_nombre: s.responsable&.nombre_completo,
+                                    } }
     end
 
     result
