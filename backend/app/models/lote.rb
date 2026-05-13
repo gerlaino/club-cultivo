@@ -308,6 +308,65 @@ class Lote < ApplicationRecord
     end
   end
 
+  # Admin/supervisor completa la manicura directamente desde en_manicura o secado
+  # sin pasar por manicura_pendiente. Crea pesada, stock y finaliza en un paso.
+  def completar_manicura_directa!(registrado_por:, peso_seco_g:, sede_id:, notas: nil, forma_producto: 'flor_seca')
+    raise "El lote no está en una fase de manicura activa" unless %w[en_manicura secado].include?(estado)
+
+    peso = peso_seco_g.to_d
+    raise ArgumentError, "El peso debe ser mayor a 0" unless peso > 0
+
+    sede       = club.sedes.find(sede_id)
+    fase_origen = estado
+
+    ActiveRecord::Base.transaction do
+      pesadas.create!(
+        fase_origen:     fase_origen,
+        fase_destino:    'finalizado',
+        manicurado:      true,
+        registrado_por:  registrado_por,
+        registrado_at:   Time.current,
+        notas:           notas,
+        peso_seco_g:     peso,
+        aprobada_at:     Time.current,
+        aprobada_por_id: registrado_por.id,
+      )
+
+      stock = Stock.create!(
+        club:           club,
+        sede:           sede,
+        lote:           self,
+        genetica:       genetica,
+        origen:         'lote',
+        estado:         'asignado',
+        forma_producto: forma_producto,
+        cantidad:       peso,
+        unidad:         'g',
+      )
+      stock.stock_movimientos.create!(
+        tipo:    'produccion',
+        gramos:  peso,
+        usuario: registrado_por,
+      )
+
+      update!(
+        estado:             'finalizado',
+        rendimiento_real_g: peso,
+        manicurador:        nil,
+      )
+
+      lote_eventos.create!(
+        tipo:            'cambio_estado',
+        estado_anterior: fase_origen,
+        estado_nuevo:    'finalizado',
+        descripcion:     "Manicura completada — #{peso}g → #{sede.nombre} (#{forma_producto})",
+        user:            registrado_por,
+        club:            club,
+        registrado_en:   Time.current,
+      )
+    end
+  end
+
   # Cierra el curado, genera Stock de flor_seca, marca el lote como finalizado.
   # splitter: { flor_seca: Decimal, descarte: Decimal } — debe sumar == peso_curado_g última pesada
   def cerrar_curado!(splitter:, sede_destino_id:, costo_unitario_ars:, precio_sugerido_ars:, registrado_por:, peso_curado_g: nil)

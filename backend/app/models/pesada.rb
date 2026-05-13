@@ -7,7 +7,7 @@ class Pesada < ApplicationRecord
   has_many :pesadas_plantas, class_name: 'PesadaPlanta', dependent: :destroy
   has_many :stocks,          dependent: :nullify
 
-  FASES_VALIDAS = %w[vegetativo floracion cosecha secado manicura_pendiente curado finalizado].freeze
+  FASES_VALIDAS = %w[vegetativo floracion cosecha en_manicura secado manicura_pendiente curado finalizado].freeze
 
   validates :fase_origen,  inclusion: { in: FASES_VALIDAS }
   validates :fase_destino, inclusion: { in: FASES_VALIDAS }
@@ -30,7 +30,11 @@ class Pesada < ApplicationRecord
   def peso_requerido_segun_destino
     case fase_destino
     when 'curado'             then errors.add(:peso_seco_g,   'requerido para entrada a curado')   unless peso_seco_g.present?
-    when 'finalizado'         then errors.add(:peso_curado_g, 'requerido para cierre de curado')   unless peso_curado_g.present?
+    when 'finalizado'
+      # curado → finalizado necesita peso_curado_g; en_manicura/secado → finalizado necesita peso_seco_g
+      unless peso_curado_g.present? || peso_seco_g.present?
+        errors.add(:base, 'Se requiere peso (seco o curado) para finalizar el lote')
+      end
     when 'manicura_pendiente' then errors.add(:peso_seco_g,   'requerido para manicura')           unless peso_seco_g.present?
     end
   end

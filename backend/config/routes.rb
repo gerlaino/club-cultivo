@@ -81,6 +81,7 @@ Rails.application.routes.draw do
         post :aprobar_manicura
         post :rechazar_manicura
         post :asignar_manicurador
+        post :completar_manicura
         get  :timeline
       end
     end

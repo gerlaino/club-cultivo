@@ -172,8 +172,9 @@ async function cargar() {
 async function cargarManicuradores() {
   loadingManicuradores.value = true
   try {
-    const { data } = await listUsers({ role: 'manicura' })
-    manicuradores.value = data.users || data || []
+    const { data } = await listUsers()
+    manicuradores.value = (data?.data || [])
+      .filter(u => ['manicura', 'admin', 'supervisor'].includes(u.role))
   } catch {
     manicuradores.value = []
   } finally {

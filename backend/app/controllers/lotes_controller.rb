@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :aprobar_manicura, :rechazar_manicura, :asignar_manicurador]
+  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :aprobar_manicura, :rechazar_manicura, :asignar_manicurador, :completar_manicura]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -339,6 +339,27 @@ class LotesController < ApplicationController
     render json: serialize_lote(@lote.reload)
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Manicurador no encontrado' }, status: :not_found
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /lotes/:id/completar_manicura
+  def completar_manicura
+    authorize @lote, :completar_manicura?
+    @lote.completar_manicura_directa!(
+      registrado_por: current_user,
+      peso_seco_g:    params.require(:peso_seco_g),
+      sede_id:        params.require(:sede_id),
+      notas:          params[:notas],
+      forma_producto: params[:forma_producto].presence || 'flor_seca',
+    )
+    render json: serialize_lote(@lote.reload)
+  rescue ActionController::ParameterMissing => e
+    render json: { error: "Falta parámetro requerido: #{e.param}" }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Sede no encontrada' }, status: :not_found
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e

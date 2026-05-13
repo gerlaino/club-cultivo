@@ -24,6 +24,10 @@ class LotePolicy < ApplicationPolicy
     mismo_club? && admin?
   end
 
+  def completar_manicura?
+    mismo_club? && (admin? || supervisor?)
+  end
+
   class Scope < Scope
     def resolve
       base = scope.where(club_id: user.club_id)

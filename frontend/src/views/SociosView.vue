@@ -20,6 +20,8 @@ const searchTimer  = ref(null)
 const showModal    = ref(false)
 const editing      = ref(false)
 const formError    = ref(null)
+const page         = ref(1)
+const perPage      = 50
 
 const REPRO_URL = {
   vencen_pronto: 'proximos',
@@ -170,8 +172,20 @@ const filtrados = computed(() => {
   if (filterEstado.value === 'vencidos') list = list.filter(s => reprocannDias(s) !== null && reprocannDias(s) < 0)
   if (filterEstado.value === 'proximos') list = list.filter(s => { const d = reprocannDias(s); return d !== null && d >= 0 && d <= 30 })
   if (filterEstado.value === 'sin_rep')  list = list.filter(s => !s.reprocann_vencimiento)
+  if (search.value.trim()) {
+    const q = search.value.toLowerCase()
+    list = list.filter(s =>
+      (s.nombre + ' ' + s.apellido).toLowerCase().includes(q) ||
+      s.dni?.toLowerCase().includes(q) ||
+      s.email?.toLowerCase().includes(q)
+    )
+  }
   return list
 })
+
+const totalPagesSv  = computed(() => Math.max(1, Math.ceil(filtrados.value.length / perPage)))
+const paginadosSv   = computed(() => filtrados.value.slice((page.value-1)*perPage, page.value*perPage))
+watch(filtrados, () => { page.value = 1 })
 
 onMounted(async () => {
   await store.fetch()
@@ -282,73 +296,89 @@ async function exportarCSV() {
       </template>
     </EmptyState>
 
-    <!-- Lista -->
-    <div v-else class="sv__list">
-      <RouterLink
-        v-for="s in filtrados"
-        :key="s.id"
-        :to="`/pacientes/${s.id}`"
-        class="sv__row"
-        :class="{
-          'sv__row--danger':  reprocannStatus(s)?.level === 'danger',
-          'sv__row--warning': reprocannStatus(s)?.level === 'warning',
-        }"
-      >
-        <div class="sv__row-indicator"
-             :class="{
-            'sv__ind--danger':  reprocannStatus(s)?.level === 'danger',
-            'sv__ind--warning': reprocannStatus(s)?.level === 'warning',
-            'sv__ind--caution': reprocannStatus(s)?.level === 'caution',
-            'sv__ind--ok':      reprocannStatus(s)?.level === 'ok',
-            'sv__ind--none':    !reprocannStatus(s),
-          }"
-        ></div>
-
-        <div class="sv__avatar" :class="{ 'sv__avatar--inactive': !s.es_paciente }">
-          {{ iniciales(s) }}
+    <!-- Tabla -->
+    <div v-else class="sv__table-wrap">
+      <table class="sv-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Paciente</th>
+            <th>DNI</th>
+            <th>Edad</th>
+            <th>REPROCANN</th>
+            <th>Email</th>
+            <th v-if="canEdit"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="s in paginadosSv"
+            :key="s.id"
+            class="sv-table__row"
+            :class="{
+              'sv-table__row--danger':  reprocannStatus(s)?.level === 'danger',
+              'sv-table__row--warning': reprocannStatus(s)?.level === 'warning',
+            }"
+            @click="router.push(`/pacientes/${s.id}`)"
+          >
+            <td class="sv-td-ind">
+              <div class="sv-indicator"
+                :class="{
+                  'sv-ind--danger':  reprocannStatus(s)?.level === 'danger',
+                  'sv-ind--warning': reprocannStatus(s)?.level === 'warning',
+                  'sv-ind--caution': reprocannStatus(s)?.level === 'caution',
+                  'sv-ind--ok':      reprocannStatus(s)?.level === 'ok',
+                  'sv-ind--none':    !reprocannStatus(s),
+                }"
+              ></div>
+            </td>
+            <td>
+              <div class="sv-pac-nombre">{{ s.nombre }} {{ s.apellido }}</div>
+              <span v-if="!s.es_paciente" class="sv-inactivo-tag">Inactivo</span>
+            </td>
+            <td><span class="sv-mono">{{ s.dni }}</span></td>
+            <td>
+              <span v-if="edad(s.fecha_nacimiento)" class="sv-edad">{{ edad(s.fecha_nacimiento) }}a</span>
+              <span v-else class="sv-empty">—</span>
+            </td>
+            <td>
+              <template v-if="s.reprocann_vencimiento">
+                <span class="sv-rep-badge"
+                  :class="{
+                    'sv-rep--danger':  reprocannStatus(s)?.level === 'danger',
+                    'sv-rep--warning': reprocannStatus(s)?.level === 'warning',
+                    'sv-rep--caution': reprocannStatus(s)?.level === 'caution',
+                    'sv-rep--ok':      reprocannStatus(s)?.level === 'ok',
+                  }"
+                >{{ reprocannStatus(s)?.label }}</span>
+                <div class="sv-rep-fecha">{{ formatDate(s.reprocann_vencimiento) }}</div>
+              </template>
+              <span v-else class="sv-empty">Sin REPROCANN</span>
+            </td>
+            <td>
+              <span class="sv-email-cell">{{ s.email || '—' }}</span>
+            </td>
+            <td v-if="canEdit" @click.stop>
+              <div class="sv-actions">
+                <button class="sv-action-btn" title="Editar" @click="openEdit(s)">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="sv-action-btn sv-action-btn--danger" title="Eliminar" @click="openDelete(s)">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="sv__table-footer">
+        <div class="sv__pagination" v-if="totalPagesSv > 1">
+          <button class="sv__page-btn" :disabled="page <= 1" @click="page--">«</button>
+          <span class="sv__page-info">{{ page }} / {{ totalPagesSv }}</span>
+          <button class="sv__page-btn" :disabled="page >= totalPagesSv" @click="page++">»</button>
         </div>
-
-        <div class="sv__info">
-          <div class="sv__nombre">{{ s.nombre }} {{ s.apellido }}</div>
-          <div class="sv__meta">
-            <span class="sv__dni">{{ s.dni }}</span>
-            <span v-if="edad(s.fecha_nacimiento)" class="sv__edad">{{ edad(s.fecha_nacimiento) }} años</span>
-            <span v-if="s.email" class="sv__email">{{ s.email }}</span>
-          </div>
-          <span v-if="!s.es_paciente" class="sv__inactivo">Inactivo</span>
-        </div>
-
-        <div class="sv__reprocann">
-          <template v-if="s.reprocann_vencimiento">
-            <div class="sv__rep-badge"
-                 :class="{
-                'sv__rep-badge--danger':  reprocannStatus(s)?.level === 'danger',
-                'sv__rep-badge--warning': reprocannStatus(s)?.level === 'warning',
-                'sv__rep-badge--caution': reprocannStatus(s)?.level === 'caution',
-                'sv__rep-badge--ok':      reprocannStatus(s)?.level === 'ok',
-              }"
-            >{{ reprocannStatus(s)?.label }}</div>
-            <div class="sv__rep-fecha">{{ formatDate(s.reprocann_vencimiento) }}</div>
-            <div v-if="s.reprocann_numero" class="sv__rep-num">{{ s.reprocann_numero }}</div>
-          </template>
-          <div v-else class="sv__rep-none">Sin REPROCANN</div>
-        </div>
-
-        <div class="sv__actions" @click.prevent>
-          <button v-if="canEdit" class="sv__action-btn" title="Editar" @click.prevent="openEdit(s)">
-            <i class="bi bi-pencil"></i>
-          </button>
-          <button v-if="canEdit" class="sv__action-btn sv__action-btn--danger" title="Eliminar" @click.prevent="openDelete(s)">
-            <i class="bi bi-trash"></i>
-          </button>
-          <div class="sv__action-arrow"><i class="bi bi-arrow-right"></i></div>
-        </div>
-      </RouterLink>
-    </div>
-
-    <div v-if="filtrados.length" class="sv__footer">
-      {{ filtrados.length }} paciente{{ filtrados.length !== 1 ? 's' : '' }}
-      <span v-if="filterEstado !== 'todos'"> · filtro activo</span>
+        <div class="sv__count">{{ filtrados.length }} paciente{{ filtrados.length !== 1 ? 's' : '' }}</div>
+      </div>
     </div>
 
     <!-- Modal Editar -->
@@ -483,51 +513,53 @@ async function exportarCSV() {
 @keyframes sv-spin { to { transform: rotate(360deg); } }
 
 
-.sv__list { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
+/* ── Tabla ───────────────────────────────────────── */
+.sv__table-wrap { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+.sv-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.sv-table thead th { padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb; white-space: nowrap; background: #fafafa; }
+.sv-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; cursor: pointer; }
+.sv-table tbody tr:last-child { border-bottom: none; }
+.sv-table tbody tr:hover { background: #f8fafc; }
+.sv-table td { padding: 10px 12px; vertical-align: middle; }
 
-.sv__row { display: flex; align-items: center; gap: .875rem; padding: .875rem 1.1rem; border-bottom: 1px solid #f8fafc; text-decoration: none; color: inherit; transition: background .12s; }
-.sv__row:last-child { border-bottom: none; }
-.sv__row:hover { background: #fafbfc; }
-.sv__row--danger  { background: rgba(220,38,38,.02); }
-.sv__row--warning { background: rgba(180,83,9,.02); }
+.sv-table__row--danger  { background: rgba(220,38,38,.02); }
+.sv-table__row--warning { background: rgba(180,83,9,.02); }
 
-.sv__row-indicator { width: 3px; height: 38px; border-radius: 999px; flex-shrink: 0; align-self: center; }
-.sv__ind--danger  { background: #dc2626; }
-.sv__ind--warning { background: #f59e0b; }
-.sv__ind--caution { background: #93c5fd; }
-.sv__ind--ok      { background: #86efac; }
-.sv__ind--none    { background: #e2e8f0; }
+.sv-td-ind { width: 8px; padding-right: 0 !important; }
+.sv-indicator { width: 3px; height: 32px; border-radius: 999px; }
+.sv-ind--danger  { background: #dc2626; }
+.sv-ind--warning { background: #f59e0b; }
+.sv-ind--caution { background: #93c5fd; }
+.sv-ind--ok      { background: #86efac; }
+.sv-ind--none    { background: #e2e8f0; }
 
-.sv__avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, rgba(27,94,32,.15), rgba(3,105,161,.15)); color: #1b5e20; font-size: .8rem; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; letter-spacing: .02em; }
-.sv__avatar--inactive { background: #f1f5f9; color: #94a3b8; }
+.sv-pac-nombre { font-weight: 700; color: #0f172a; font-size: .875rem; }
+.sv-inactivo-tag { display: inline-block; font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: #f1f5f9; color: #64748b; padding: .1em .45em; border-radius: 4px; margin-top: .2rem; }
+.sv-mono  { font-family: monospace; font-size: .82rem; color: #374151; }
+.sv-edad  { font-size: .82rem; color: #64748b; }
+.sv-empty { color: #cbd5e1; font-size: .82rem; }
+.sv-email-cell { font-size: .82rem; color: #64748b; }
 
-.sv__info { flex: 1; min-width: 0; }
-.sv__nombre { font-size: .9rem; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sv__meta { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-top: .1rem; }
-.sv__dni   { font-size: .72rem; color: #64748b; font-family: monospace; }
-.sv__edad  { font-size: .72rem; color: #94a3b8; }
-.sv__email { font-size: .72rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
-.sv__inactivo { display: inline-block; font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: #f1f5f9; color: #64748b; padding: .1em .45em; border-radius: 4px; margin-top: .25rem; }
+.sv-rep-badge { display: inline-block; font-size: .72rem; font-weight: 800; padding: 2px 8px; border-radius: 5px; }
+.sv-rep--danger  { background: #fef2f2; color: #dc2626; }
+.sv-rep--warning { background: #fffbeb; color: #b45309; }
+.sv-rep--caution { background: #eff6ff; color: #0369a1; }
+.sv-rep--ok      { background: #f0fdf4; color: #15803d; }
+.sv-rep-fecha { font-size: .7rem; color: #94a3b8; margin-top: .15rem; }
 
-.sv__reprocann { flex-shrink: 0; text-align: right; min-width: 100px; }
-.sv__rep-badge { display: inline-block; font-size: .72rem; font-weight: 800; padding: .2em .6em; border-radius: 6px; margin-bottom: .2rem; }
-.sv__rep-badge--danger  { background: #fef2f2; color: #dc2626; }
-.sv__rep-badge--warning { background: #fffbeb; color: #b45309; }
-.sv__rep-badge--caution { background: #eff6ff; color: #0369a1; }
-.sv__rep-badge--ok      { background: #f0fdf4; color: #15803d; }
-.sv__rep-fecha { font-size: .7rem; color: #94a3b8; }
-.sv__rep-num   { font-size: .65rem; color: #cbd5e1; font-family: monospace; margin-top: .1rem; }
-.sv__rep-none  { font-size: .75rem; color: #cbd5e1; }
+.sv-actions { display: flex; align-items: center; gap: .25rem; opacity: 0; transition: opacity .15s; }
+.sv-table tbody tr:hover .sv-actions { opacity: 1; }
+.sv-action-btn { background: none; border: none; cursor: pointer; padding: 5px 7px; border-radius: 6px; color: #6b7280; font-size: .875rem; transition: all .15s; }
+.sv-action-btn:hover { background: #f1f5f9; color: #0f172a; }
+.sv-action-btn--danger:hover { background: #fef2f2; color: #dc2626; }
 
-.sv__actions { display: flex; align-items: center; gap: .35rem; flex-shrink: 0; }
-.sv__action-btn { width: 30px; height: 30px; border-radius: 7px; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: .8rem; opacity: 0; transition: opacity .15s, background .15s; }
-.sv__row:hover .sv__action-btn { opacity: 1; }
-.sv__action-btn:hover { background: #e2e8f0; color: #0f172a; }
-.sv__action-btn--danger:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
-.sv__action-arrow { color: #cbd5e1; font-size: .8rem; transition: color .15s, transform .15s; }
-.sv__row:hover .sv__action-arrow { color: #0f172a; transform: translateX(2px); }
-
-.sv__footer { text-align: right; font-size: .75rem; color: #94a3b8; margin-top: .75rem; padding-right: .25rem; }
+.sv__table-footer { display: flex; align-items: center; justify-content: space-between; padding: .6rem 1rem; border-top: 1px solid #f1f5f9; }
+.sv__pagination { display: flex; align-items: center; gap: .5rem; }
+.sv__page-btn { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 7px; padding: .3rem .65rem; font-size: .82rem; color: #374151; cursor: pointer; transition: all .15s; }
+.sv__page-btn:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }
+.sv__page-btn:disabled { opacity: .4; cursor: not-allowed; }
+.sv__page-info { font-size: .8rem; color: #64748b; font-weight: 600; }
+.sv__count { font-size: .75rem; color: #94a3b8; }
 
 .sv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: var(--brand-primary, #1b5e20); color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s, transform .1s; text-decoration: none; white-space: nowrap; }
 .sv__btn-primary:hover { background: #144a18; transform: translateY(-1px); }

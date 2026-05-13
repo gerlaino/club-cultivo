@@ -63,7 +63,7 @@ const filterSala   = ref("");
 const filterGrow   = ref("");
 const sortBy       = ref("fecha_desc");
 const page         = ref(1);
-const perPage      = ref(9);
+const perPage      = ref(50);
 
 const filtered = computed(() => {
   const query = q.value.trim().toLowerCase();
@@ -280,87 +280,90 @@ async function exportarCSV() {
     <EmptyState v-else-if="!store.items.length" icon="🌱" title="No hay lotes todavía" message="Creá el primer lote para comenzar la trazabilidad" />
     <EmptyState v-else-if="!paginated.length" icon="🔍" title="Sin resultados" message="Probá ajustando los filtros" />
 
-    <!-- Cards -->
-    <div v-else class="lv__grid">
-      <RouterLink
-        v-for="l in paginated"
-        :key="l.id"
-        class="lv__card"
-        :to="{ name: 'lote-detail', params: { id: l.id } }"
-      >
-        <!-- barra de estado -->
-        <div class="lv__card-bar" :style="{ background: em(l.estado).bar }"></div>
-
-        <div class="lv__card-body">
-
-          <!-- Header card -->
-          <div class="lv__card-head">
-            <span class="lv__card-icon">{{ em(l.estado).icon }}</span>
-            <span class="lv__card-codigo">{{ l.codigo }}</span>
-            <span class="lv__badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }">
-              {{ estadoLabel(l.estado) }}
-            </span>
-          </div>
-
-          <!-- Strain + sala -->
-          <div class="lv__card-meta">
-            <span v-if="l.strain" class="lv__meta-item">🌿 <em>{{ l.strain }}</em></span>
-            <span class="lv__meta-item lv__meta-item--sala">📍 {{ salaName(l.sala_id) }}</span>
-          </div>
-
-          <!-- Métricas -->
-          <div class="lv__metrics">
-            <div class="lv__metric">
-              <span class="lv__metric-val">{{ l.plants_count ?? 0 }}</span>
-              <span class="lv__metric-lbl">plantas</span>
-            </div>
-            <div v-if="diasDesdeInicio(l.start_date) !== null" class="lv__metric">
-              <span class="lv__metric-val">{{ diasDesdeInicio(l.start_date) }}</span>
-              <span class="lv__metric-lbl">días</span>
-            </div>
-            <div v-if="l.grow_type" class="lv__metric">
-              <span class="lv__metric-val lv__metric-val--sm">{{ growLabel(l.grow_type) }}</span>
-              <span class="lv__metric-lbl">sistema</span>
-            </div>
-            <div v-if="l.light_type" class="lv__metric">
-              <span class="lv__metric-val lv__metric-val--sm">{{ lightLabel(l.light_type) }}</span>
-              <span class="lv__metric-lbl">luz</span>
-            </div>
-          </div>
-
-          <!-- Progreso ciclo -->
-          <div v-if="l.progreso_ciclo != null && ['vegetativo','floracion'].includes(l.estado)" class="lv__progress-wrap">
-            <div class="lv__progress-row">
-              <span class="lv__progress-lbl">Progreso ciclo</span>
-              <span class="lv__progress-pct">{{ l.progreso_ciclo }}%</span>
-            </div>
-            <div class="lv__progress-track">
-              <div class="lv__progress-bar" :style="{ width: l.progreso_ciclo + '%' }"></div>
-            </div>
-          </div>
-
-          <!-- Notas -->
-          <p v-if="l.notes" class="lv__card-notes">{{ l.notes }}</p>
-
-          <!-- Acciones -->
-          <div v-if="canEdit" class="lv__card-actions" @click.prevent>
-            <button class="lv__action-btn" title="Editar" @click.prevent="startEdit(l)">
-              <i class="bi bi-pencil"></i>
-            </button>
-            <button class="lv__action-btn lv__action-btn--danger" title="Eliminar" @click.prevent="confirmDelete(l)">
-              <i class="bi bi-trash"></i>
-            </button>
-          </div>
+    <!-- Tabla -->
+    <div v-else class="lv__table-wrap">
+      <table class="lv-table">
+        <thead>
+          <tr>
+            <th>Estado</th>
+            <th class="lv-th--sort" @click="sortBy = sortBy === 'codigo_asc' ? 'fecha_desc' : 'codigo_asc'">
+              Código <span class="lv-sort-icon">{{ sortBy === 'codigo_asc' ? '↑' : '↕' }}</span>
+            </th>
+            <th>Genética / Strain</th>
+            <th>Sala</th>
+            <th class="lv-th--sort" @click="sortBy = sortBy === 'plantas_desc' ? 'fecha_desc' : 'plantas_desc'">
+              Plantas <span class="lv-sort-icon">{{ sortBy === 'plantas_desc' ? '↓' : '↕' }}</span>
+            </th>
+            <th class="lv-th--sort" @click="sortBy = sortBy === 'fecha_asc' ? 'fecha_desc' : 'fecha_asc'">
+              Días <span class="lv-sort-icon">{{ sortBy.startsWith('fecha') ? (sortBy === 'fecha_asc' ? '↑' : '↓') : '↕' }}</span>
+            </th>
+            <th>Progreso</th>
+            <th v-if="canEdit"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="l in paginated"
+            :key="l.id"
+            class="lv-table__row"
+            @click="$router.push({ name: 'lote-detail', params: { id: l.id } })"
+          >
+            <td>
+              <span class="lv-badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }">
+                {{ em(l.estado).icon }} {{ estadoLabel(l.estado) }}
+              </span>
+            </td>
+            <td>
+              <span class="lv-codigo">{{ l.codigo }}</span>
+            </td>
+            <td>
+              <span v-if="l.genetica?.nombre" class="lv-genetica">{{ l.genetica.nombre }}</span>
+              <span v-else-if="l.strain" class="lv-strain">{{ l.strain }}</span>
+              <span v-else class="lv-empty">—</span>
+            </td>
+            <td>
+              <span class="lv-sala">{{ salaName(l.sala_id) }}</span>
+            </td>
+            <td>
+              <span class="lv-num">{{ l.plants_count ?? 0 }}</span>
+            </td>
+            <td>
+              <span v-if="diasDesdeInicio(l.start_date) !== null" class="lv-num">{{ diasDesdeInicio(l.start_date) }}d</span>
+              <span v-else class="lv-empty">—</span>
+            </td>
+            <td>
+              <template v-if="l.progreso_ciclo != null && ['vegetativo','floracion'].includes(l.estado)">
+                <div class="lv-prog-wrap">
+                  <div class="lv-prog-track">
+                    <div class="lv-prog-bar" :style="{ width: l.progreso_ciclo + '%' }"></div>
+                  </div>
+                  <span class="lv-prog-pct">{{ l.progreso_ciclo }}%</span>
+                </div>
+              </template>
+              <span v-else class="lv-empty">—</span>
+            </td>
+            <td v-if="canEdit" @click.stop>
+              <div class="lv-actions">
+                <button class="lv-action-btn" title="Editar" @click="startEdit(l)">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="lv-action-btn lv-action-btn--danger" title="Eliminar" @click="confirmDelete(l)">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="lv__table-footer">
+        <div class="lv__pagination" v-if="totalPages > 1">
+          <button class="lv__page-btn" :disabled="page <= 1" @click="page--">«</button>
+          <span class="lv__page-info">{{ page }} / {{ totalPages }}</span>
+          <button class="lv__page-btn" :disabled="page >= totalPages" @click="page++">»</button>
         </div>
-      </RouterLink>
+        <div class="lv__count">{{ filtered.length }} lotes</div>
+      </div>
     </div>
-
-    <Paginator
-      v-model:page="page"
-      v-model:perPage="perPage"
-      :total="totalItems"
-      :pageSizes="[9, 18, 36]"
-    />
 
     <!-- MODAL Crear -->
     <Teleport to="body">
@@ -607,81 +610,44 @@ async function exportarCSV() {
 @keyframes lv-spin { to { transform: rotate(360deg); } }
 .lv__alert   { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .875rem 1rem; border-radius: 10px; font-size: .875rem; margin-bottom: 1rem; }
 
-/* ── Grid de cards ───────────────────────────────────── */
-.lv__grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-@media (max-width: 960px)  { .lv__grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px)  { .lv__grid { grid-template-columns: 1fr; } }
+/* ── Tabla ───────────────────────────────────────────── */
+.lv__table-wrap { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; margin-bottom: 0; }
+.lv-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.lv-table thead th { padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb; white-space: nowrap; background: #fafafa; }
+.lv-th--sort { cursor: pointer; user-select: none; }
+.lv-th--sort:hover { color: #1b5e20; }
+.lv-sort-icon { font-size: .75rem; color: #cbd5e1; margin-left: .2rem; }
+.lv-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; cursor: pointer; }
+.lv-table tbody tr:last-child { border-bottom: none; }
+.lv-table tbody tr:hover { background: #f8fafc; }
+.lv-table td { padding: 10px 12px; vertical-align: middle; }
 
-/* ── Card ────────────────────────────────────────────── */
-.lv__card {
-  background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px;
-  overflow: hidden; text-decoration: none; color: inherit;
-  display: flex; flex-direction: column;
-  transition: border-color .15s, box-shadow .15s, transform .15s;
-}
-.lv__card:hover { border-color: #a8c9b5; box-shadow: 0 4px 16px rgba(27,94,32,.1); transform: translateY(-2px); }
+.lv-badge { display: inline-flex; align-items: center; gap: .25rem; padding: 3px 8px; border-radius: 5px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
+.lv-codigo { font-weight: 700; color: #0f172a; font-family: monospace; font-size: .85rem; }
+.lv-genetica { font-weight: 600; color: #3F6452; }
+.lv-strain { font-style: italic; color: #64748b; }
+.lv-sala { color: #64748b; font-size: .82rem; }
+.lv-num { font-weight: 600; color: #374151; }
+.lv-empty { color: #cbd5e1; }
 
-.lv__card-bar { height: 4px; width: 100%; flex-shrink: 0; }
+.lv-prog-wrap { display: flex; align-items: center; gap: .5rem; }
+.lv-prog-track { flex: 1; min-width: 60px; height: 5px; background: #e8f0eb; border-radius: 99px; overflow: hidden; }
+.lv-prog-bar { height: 100%; background: #3F6452; border-radius: 99px; transition: width .3s; }
+.lv-prog-pct { font-size: .75rem; font-weight: 700; color: #1b5e20; white-space: nowrap; }
 
-.lv__card-body { padding: 1rem; display: flex; flex-direction: column; gap: .6rem; flex: 1; }
+.lv-actions { display: flex; align-items: center; gap: .25rem; opacity: 0; transition: opacity .15s; }
+.lv-table tbody tr:hover .lv-actions { opacity: 1; }
+.lv-action-btn { background: none; border: none; cursor: pointer; padding: 5px 7px; border-radius: 6px; color: #6b7280; font-size: .875rem; transition: all .15s; }
+.lv-action-btn:hover { background: #f1f5f9; color: #0f172a; }
+.lv-action-btn--danger:hover { background: #fef2f2; color: #dc2626; }
 
-.lv__card-head { display: flex; align-items: center; gap: .5rem; }
-.lv__card-icon { font-size: 1rem; flex-shrink: 0; }
-.lv__card-codigo {
-  font-size: .9rem; font-weight: 800; color: #0f172a;
-  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  letter-spacing: -.01em;
-}
-
-.lv__badge {
-  flex-shrink: 0; font-size: .68rem; font-weight: 800;
-  padding: .2em .6em; border-radius: 6px; letter-spacing: .02em;
-}
-
-.lv__card-meta { display: flex; gap: .5rem; flex-wrap: wrap; }
-.lv__meta-item { font-size: .78rem; color: #64748b; }
-.lv__meta-item em { font-style: italic; color: #3F6452; font-weight: 600; }
-.lv__meta-item--sala { color: #94a3b8; }
-
-.lv__metrics { display: flex; gap: 1rem; }
-.lv__metric  { display: flex; flex-direction: column; align-items: center; }
-.lv__metric-val    { font-size: 1.25rem; font-weight: 800; color: #0f172a; line-height: 1; letter-spacing: -.02em; }
-.lv__metric-val--sm { font-size: .95rem; }
-.lv__metric-lbl    { font-size: .65rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #94a3b8; margin-top: .1rem; }
-
-/* Progreso */
-.lv__progress-wrap { }
-.lv__progress-row  { display: flex; justify-content: space-between; margin-bottom: .3rem; }
-.lv__progress-lbl  { font-size: .72rem; color: #94a3b8; }
-.lv__progress-pct  { font-size: .72rem; font-weight: 700; color: #1b5e20; }
-.lv__progress-track { height: 5px; background: #e8f0eb; border-radius: 99px; overflow: hidden; }
-.lv__progress-bar   { height: 100%; background: #3F6452; border-radius: 99px; transition: width .3s; }
-
-.lv__card-notes {
-  font-size: .78rem; color: #94a3b8; margin: 0;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  flex: 1;
-}
-
-.lv__card-actions {
-  display: flex; gap: .35rem; justify-content: flex-end;
-  opacity: 0; transition: opacity .15s;
-  padding-top: .5rem; border-top: 1px solid #f1f5f9;
-}
-.lv__card:hover .lv__card-actions { opacity: 1; }
-
-.lv__action-btn {
-  width: 30px; height: 30px; border-radius: 7px; border: 1px solid #e2e8f0;
-  background: #f8fafc; color: #64748b; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: .8rem; transition: background .15s, color .15s;
-}
-.lv__action-btn:hover { background: #e2e8f0; color: #0f172a; }
-.lv__action-btn--danger:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.lv__table-footer { display: flex; align-items: center; justify-content: space-between; padding: .6rem 1rem; border-top: 1px solid #f1f5f9; }
+.lv__pagination { display: flex; align-items: center; gap: .5rem; }
+.lv__page-btn { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 7px; padding: .3rem .65rem; font-size: .82rem; color: #374151; cursor: pointer; transition: all .15s; }
+.lv__page-btn:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }
+.lv__page-btn:disabled { opacity: .4; cursor: not-allowed; }
+.lv__page-info { font-size: .8rem; color: #64748b; font-weight: 600; }
+.lv__count { font-size: .75rem; color: #94a3b8; }
 
 /* ── Modal ───────────────────────────────────────────── */
 .lm-overlay {

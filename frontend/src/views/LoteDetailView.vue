@@ -27,6 +27,7 @@ import { useQRCode } from '../composables/useQRCode.js'
 import { ArrowRight } from 'lucide-vue-next'
 import DsBanner from '../design-system/components/Banner.vue'
 import IniciarManicuraModal from '../components/lotes/IniciarManicuraModal.vue'
+import CompletarManicuraModal from '../components/lotes/CompletarManicuraModal.vue'
 
 const route    = useRoute()
 const router   = useRouter()
@@ -319,7 +320,9 @@ const showAvanzarSalaModal = ref(false)
 const avanzarSalaId        = ref(null)
 
 // ── Iniciar Manicura (admin/supervisor, cosecha → secado) ──
-const showIniciarManicuraModal = ref(false)
+const showIniciarManicuraModal  = ref(false)
+// ── Completar Manicura (admin/supervisor, en_manicura/secado → finalizado) ──
+const showCompletarManicuraModal = ref(false)
 
 // ── Cosecha modal (cultivador floración → cosecha) ────────
 const showCosechaModal  = ref(false)
@@ -533,6 +536,12 @@ async function onManicuraIniciada(data) {
   lotes.current = data
   toast.success(`Lote ${data.codigo} — manicura iniciada`)
   await Promise.all([loadEventos(), plants.fetchByLote(id)])
+}
+
+async function onManicuraCompletada(data) {
+  lotes.current = data
+  toast.success(`Lote ${data.codigo} — manicura completada y stock generado`)
+  await loadEventos()
 }
 
 async function openCerrarCuradoModal() {
@@ -832,7 +841,8 @@ function loteEscapeHandler(e) {
   if (showCosechaPartialModal.value)  { showCosechaPartialModal.value = false; return }
   if (showCosechaModal.value)         { showCosechaModal.value = false; return }
   if (showAvanzarSalaModal.value)        { showAvanzarSalaModal.value = false; return }
-  if (showIniciarManicuraModal.value)    { showIniciarManicuraModal.value = false; return }
+  if (showIniciarManicuraModal.value)      { showIniciarManicuraModal.value = false; return }
+  if (showCompletarManicuraModal.value)    { showCompletarManicuraModal.value = false; return }
   if (showTransicionModal.value)         { showTransicionModal.value = false; return }
   if (showRegistroModal.value)        { showRegistroModal.value = false; return }
   if (showCostoForm.value)            { showCostoForm.value = false; return }
@@ -900,6 +910,13 @@ onUnmounted(() => {
         <div class="ld__hero-actions">
           <button v-if="canEdit && lote.puede_cerrar_curado" class="ld__btn-curado" @click="openCerrarCuradoModal">
             <i class="bi bi-box-seam"></i>Cerrar curado
+          </button>
+          <button
+            v-if="canAdmin && ['en_manicura', 'secado'].includes(lote.estado)"
+            class="ld__btn-completar-manicura"
+            @click="showCompletarManicuraModal = true"
+          >
+            <i class="bi bi-check2-circle"></i>Completar manicura
           </button>
           <button
             v-if="(canEdit || isCultivador) && lote.puede_transicionar && lote.proxima_fase_posible"
@@ -2013,6 +2030,13 @@ onUnmounted(() => {
       @avanzado="onManicuraIniciada"
     />
 
+    <!-- ══ Modal Completar Manicura ══ -->
+    <CompletarManicuraModal
+      v-model="showCompletarManicuraModal"
+      :lote="lote"
+      @completado="onManicuraCompletada"
+    />
+
   </div>
 </template>
 
@@ -2255,6 +2279,8 @@ onUnmounted(() => {
 /* Cerrar curado button */
 .ld__btn-curado { display: inline-flex; align-items: center; gap: .35rem; background: #1d4ed8; color: #fff; border: none; padding: .5rem .9rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .ld__btn-curado:hover { background: #1e40af; }
+.ld__btn-completar-manicura { display: inline-flex; align-items: center; gap: .35rem; background: #059669; color: #fff; border: none; padding: .5rem .9rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.ld__btn-completar-manicura:hover { background: #047857; }
 /* Split validator */
 .ld__split-check { font-size: .8rem; padding: .5rem .75rem; border-radius: 8px; margin-top: .25rem; }
 .ld__split-check--ok { background: #f0fdf4; color: #16a34a; }
