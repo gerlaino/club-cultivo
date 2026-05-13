@@ -98,9 +98,8 @@ class Stock < ApplicationRecord
       errors.add(:lote_origen_consumido_g, 'debe ser mayor a 0')     if lote_origen_consumido_g.to_d <= 0
       errors.add(:forma_producto, 'no puede ser flor_seca para derivados') if forma_producto == 'flor_seca'
     when 'compra_externa'
-      errors.add(:proveedor,    'es obligatorio para compra externa')  if proveedor.blank?
-      errors.add(:genetica_id,  'es obligatoria para compra externa')  if genetica_id.blank?
-      errors.add(:lote_id,      'debe ser nulo para compra externa')   if lote_id.present?
+      errors.add(:proveedor, 'es obligatorio para compra externa') if proveedor.blank?
+      errors.add(:lote_id,   'debe ser nulo para compra externa')  if lote_id.present?
     end
   end
 
