@@ -22,12 +22,14 @@ class Stock < ApplicationRecord
   validates :costo_unitario_ars,  numericality: { greater_than_or_equal_to: 0, allow_nil: true }
   validates :precio_sugerido_ars, numericality: { greater_than_or_equal_to: 0, allow_nil: true }
 
+  attr_accessor :es_split
+
   validate :validar_segun_origen
 
   before_create :set_club_id
   before_create :generar_numero_lote_producto
   before_create :generar_codigo_qr
-  before_create :descontar_lote_origen_si_corresponde
+  before_create :descontar_lote_origen_si_corresponde, unless: -> { es_split }
 
   scope :regulatorios,             -> { where(origen: %w[lote derivado_lote]) }
   scope :sociales,                 -> { where(origen: 'compra_externa') }
@@ -94,6 +96,7 @@ class Stock < ApplicationRecord
       errors.add(:lote_id, 'es obligatorio para origen lote')        if lote_id.blank?
       # cualquier forma_producto válida al cerrar curado
     when 'derivado_lote'
+      return if es_split
       errors.add(:lote_id, 'es obligatorio para derivados')           if lote_id.blank?
       errors.add(:lote_origen_consumido_g, 'debe ser mayor a 0')     if lote_origen_consumido_g.to_d <= 0
       errors.add(:forma_producto, 'no puede ser flor_seca para derivados') if forma_producto == 'flor_seca'

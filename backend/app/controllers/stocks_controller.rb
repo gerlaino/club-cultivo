@@ -131,30 +131,62 @@ class StocksController < ApplicationController
   end
 
   # POST /stocks/:id/asignar
-  # Body: { sede_id: integer | null }
+  # Body: { sede_id: integer, cantidad?: float }
+  # Si cantidad < stock.cantidad → fraccionamiento: crea nuevo stock para esa porción
   def asignar
-    unless @stock.pendiente_asignacion?
-      return render json: { error: 'Este stock no está pendiente de asignación' }, status: :unprocessable_entity
+    unless @stock.pendiente_asignacion? || @stock.asignado?
+      return render json: { error: 'Este stock no puede ser asignado' }, status: :unprocessable_entity
     end
 
-    sede_id = params[:sede_id]
+    sede_id  = params[:sede_id]
+    cantidad = params[:cantidad]&.to_f
 
-    if sede_id.present?
-      sede = current_user.club.sedes.find_by(id: sede_id)
-      return render json: { error: 'Sede no encontrada' }, status: :not_found unless sede
-      @stock.asignar!(sede: sede, usuario: current_user, notas: params[:notas])
+    return render json: { error: 'La sede es obligatoria' }, status: :unprocessable_entity if sede_id.blank?
+
+    sede = current_user.club.sedes.find_by(id: sede_id)
+    return render json: { error: 'Sede no encontrada' }, status: :not_found unless sede
+
+    cantidad_total = @stock.cantidad.to_f
+    es_parcial = cantidad.present? && cantidad > 0 && (cantidad + 0.001) < cantidad_total
+
+    if es_parcial
+      ActiveRecord::Base.transaction do
+        consumido_proporcional = @stock.lote_origen_consumido_g.present? ?
+          (@stock.lote_origen_consumido_g * (cantidad / cantidad_total)).round(2) : nil
+
+        nuevo = Stock.new(
+          club_id:                 @stock.club_id,
+          lote_id:                 @stock.lote_id,
+          pesada_id:               @stock.pesada_id,
+          origen:                  @stock.origen,
+          forma_producto:          @stock.forma_producto,
+          unidad:                  @stock.unidad,
+          cantidad:                cantidad,
+          sede:                    sede,
+          estado:                  'asignado',
+          costo_unitario_ars:      @stock.costo_unitario_ars,
+          precio_sugerido_ars:     @stock.precio_sugerido_ars,
+          genetica_id:             @stock.genetica_id,
+          descripcion:             @stock.descripcion,
+          proveedor:               @stock.proveedor,
+          lote_origen_consumido_g: consumido_proporcional,
+        )
+        nuevo.es_split = true
+        nuevo.save!
+        @stock.decrement!(:cantidad, cantidad)
+        nuevo.stock_movimientos.create!(
+          tipo:            'transferencia',
+          gramos:          cantidad,
+          sede_destino_id: sede.id,
+          usuario:         current_user,
+          notas:           "Fraccionado desde #{@stock.numero_lote_producto}",
+        )
+      end
+      render json: serialize_stock(@stock.reload)
     else
-      # Dejar como "stock del club" (pool para delivery)
-      @stock.update!(estado: 'asignado', sede: nil)
-      @stock.stock_movimientos.create!(
-        tipo:    'transferencia',
-        gramos:  @stock.cantidad,
-        usuario: current_user,
-        notas:   'Asignado como stock del club (pool delivery)',
-      )
+      @stock.asignar!(sede: sede, usuario: current_user, notas: params[:notas])
+      render json: serialize_stock(@stock.reload)
     end
-
-    render json: serialize_stock(@stock.reload)
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end

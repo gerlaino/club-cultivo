@@ -86,11 +86,20 @@
               </div>
             </div>
             <div class="stk__pa-right">
+              <div class="stk__pa-qty">
+                <input
+                  type="number" class="stk__select stk__qty-input"
+                  :max="s.cantidad" min="0.1" step="0.1"
+                  v-model="cantidades[s.id]"
+                  :placeholder="`${s.cantidad}g (todo)`"
+                />
+                <span class="stk__qty-hint">de {{ s.cantidad }}g</span>
+              </div>
               <select v-model="asignaciones[s.id]" class="stk__select">
-                <option value="">Pool del club</option>
+                <option value="">— Elegir sede —</option>
                 <option v-for="sede in sedes" :key="sede.id" :value="sede.id">{{ sede.nombre }}</option>
               </select>
-              <button class="stk__btn-primary stk__btn-sm" :disabled="asignando === s.id" @click="asignar(s)">
+              <button class="stk__btn-primary stk__btn-sm" :disabled="asignando === s.id || !asignaciones[s.id]" @click="asignar(s)">
                 <div v-if="asignando === s.id" class="stk__spin stk__spin--sm stk__spin--wh"></div>
                 <i v-else class="bi bi-check-lg"></i>
                 Asignar
@@ -137,6 +146,17 @@
                 </div>
                 <div class="stk__inv-right">
                   <span class="stk__inv-g">{{ s.cantidad }}g</span>
+                  <button class="stk__icon-btn" title="Repartir a sede" @click="openRepartir(s)">
+                    <i class="bi bi-arrows-angle-expand"></i>
+                  </button>
+                  <button
+                    v-if="s.forma_producto === 'flor_seca' && s.lote_id"
+                    class="stk__icon-btn stk__icon-btn--amber"
+                    title="Procesar derivado"
+                    @click="openProcesar(s)"
+                  >
+                    <i class="bi bi-arrow-right-square"></i>
+                  </button>
                   <RouterLink v-if="s.codigo_qr" :to="`/s/${s.codigo_qr}`" class="stk__icon-btn" title="Ver QR">
                     <i class="bi bi-qr-code"></i>
                   </RouterLink>
@@ -234,9 +254,9 @@
                   </div>
                 </div>
                 <div class="stk__field">
-                  <label class="stk__label">Sede destino <span class="stk__opt">opcional</span></label>
-                  <select class="stk__input" v-model="crearForm.sede_id">
-                    <option value="">Pool del club</option>
+                  <label class="stk__label">Sede destino <span class="stk__req">*</span></label>
+                  <select class="stk__input" v-model="crearForm.sede_id" required>
+                    <option value="">— Elegir sede —</option>
                     <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
                   </select>
                 </div>
@@ -245,7 +265,15 @@
                   <select class="stk__input" v-model="crearForm.genetica_id">
                     <option value="">Sin especificar</option>
                     <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
+                    <option value="__otro__">Otra (no registrada en el club)</option>
                   </select>
+                  <input
+                    v-if="crearForm.genetica_id === '__otro__'"
+                    type="text"
+                    class="stk__input stk__input--mt"
+                    v-model="crearForm.genetica_libre"
+                    placeholder="Nombre de la variedad…"
+                  />
                 </div>
                 <div class="stk__field">
                   <label class="stk__label">Precio sugerido (ARS/g) <span class="stk__opt">opcional</span></label>
@@ -280,6 +308,127 @@
     </Teleport>
 
   </div>
+
+    <!-- ── Modal: Repartir stock ───────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="stk-fade">
+        <div v-if="showRepartir" class="stk__overlay" @click.self="closeRepartir">
+          <div class="stk__modal">
+            <div class="stk__modal-hd">
+              <div class="stk__modal-ico"><i class="bi bi-arrows-angle-expand"></i></div>
+              <div>
+                <h2 class="stk__modal-title">Repartir stock</h2>
+                <p class="stk__modal-sub">{{ formaLabel(repartirTarget?.forma_producto) }} · {{ repartirTarget?.cantidad }}g disponibles en {{ repartirTarget?.sede?.nombre || '—' }}</p>
+              </div>
+              <button class="stk__modal-close" @click="closeRepartir"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="stk__modal-body">
+              <div v-if="repartirError" class="stk__alert">{{ repartirError }}</div>
+              <div class="stk__form-grid">
+                <div class="stk__field">
+                  <label class="stk__label">Cantidad a enviar (g) <span class="stk__req">*</span></label>
+                  <div class="stk__input-row">
+                    <input type="number" min="0.1" :max="repartirTarget?.cantidad" step="0.1"
+                      class="stk__input" v-model="repartirForm.cantidad"
+                      :placeholder="`máx ${repartirTarget?.cantidad}g`" />
+                    <span class="stk__input-suf">g</span>
+                  </div>
+                  <span v-if="repartirForm.cantidad && Number(repartirForm.cantidad) < repartirTarget?.cantidad" class="stk__field-hint">
+                    Quedan {{ (repartirTarget.cantidad - Number(repartirForm.cantidad)).toFixed(1) }}g en sede actual
+                  </span>
+                </div>
+                <div class="stk__field">
+                  <label class="stk__label">Sede destino <span class="stk__req">*</span></label>
+                  <select class="stk__input" v-model="repartirForm.sede_id">
+                    <option value="">— Elegir sede —</option>
+                    <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="stk__modal-ft">
+              <button type="button" class="stk__btn-ghost" @click="closeRepartir">Cancelar</button>
+              <button class="stk__btn-primary" :disabled="repartiendo" @click="ejecutarRepartir">
+                <div v-if="repartiendo" class="stk__spin stk__spin--sm stk__spin--wh"></div>
+                <i v-else class="bi bi-arrows-angle-expand"></i>
+                Repartir
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ── Modal: Procesar derivado ────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="stk-fade">
+        <div v-if="showProcesar" class="stk__overlay" @click.self="closeProcesar">
+          <div class="stk__modal">
+            <div class="stk__modal-hd">
+              <div class="stk__modal-ico stk__modal-ico--amber"><i class="bi bi-arrow-right-square"></i></div>
+              <div>
+                <h2 class="stk__modal-title">Procesar derivado</h2>
+                <p class="stk__modal-sub">Flor seca → derivado · {{ procesarTarget?.lote?.codigo || '' }}</p>
+              </div>
+              <button class="stk__modal-close" @click="closeProcesar"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="stk__modal-body">
+              <div v-if="procesarError" class="stk__alert">{{ procesarError }}</div>
+              <div class="stk__procesar-src">
+                <span class="stk__procesar-src-lbl">Stock origen</span>
+                <span class="stk__procesar-src-val">{{ procesarTarget?.cantidad }}g de flor seca disponibles</span>
+              </div>
+              <div class="stk__form-grid">
+                <div class="stk__field">
+                  <label class="stk__label">Gramos a consumir <span class="stk__req">*</span></label>
+                  <div class="stk__input-row">
+                    <input type="number" min="0.1" :max="procesarTarget?.cantidad" step="0.1"
+                      class="stk__input" v-model="procesarForm.gramos_consumir"
+                      :placeholder="`máx ${procesarTarget?.cantidad}g`" />
+                    <span class="stk__input-suf">g</span>
+                  </div>
+                </div>
+                <div class="stk__field">
+                  <label class="stk__label">Forma del derivado <span class="stk__req">*</span></label>
+                  <select class="stk__input" v-model="procesarForm.forma_producto">
+                    <option v-for="f in FORMAS_DERIVADO" :key="f.value" :value="f.value">{{ f.label }}</option>
+                  </select>
+                </div>
+                <div class="stk__field">
+                  <label class="stk__label">Cantidad resultante <span class="stk__req">*</span></label>
+                  <div class="stk__input-row">
+                    <input type="number" min="0.01" step="0.01"
+                      class="stk__input" v-model="procesarForm.cantidad_resultado"
+                      placeholder="0.0" />
+                    <span class="stk__input-suf">g</span>
+                  </div>
+                </div>
+                <div class="stk__field">
+                  <label class="stk__label">Sede destino <span class="stk__req">*</span></label>
+                  <select class="stk__input" v-model="procesarForm.sede_id">
+                    <option value="">— Elegir sede —</option>
+                    <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                  </select>
+                </div>
+              </div>
+              <div v-if="mermaG > 0" class="stk__merma">
+                <span class="stk__merma-ico">⚠️</span>
+                <span class="stk__merma-txt">Merma: <strong>{{ mermaG }}g ({{ mermaPct }}%)</strong></span>
+              </div>
+            </div>
+            <div class="stk__modal-ft">
+              <button type="button" class="stk__btn-ghost" @click="closeProcesar">Cancelar</button>
+              <button class="stk__btn-amber" :disabled="procesando" @click="ejecutarProcesar">
+                <div v-if="procesando" class="stk__spin stk__spin--sm stk__spin--wh"></div>
+                <i v-else class="bi bi-arrow-right-square"></i>
+                Procesar
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
 </template>
 
 <script setup>
@@ -301,6 +450,20 @@ const historialLoaded  = ref(false)
 const loadingHistorial = ref(false)
 const sedes            = ref([])
 const geneticas        = ref([])
+
+// ── Repartir ───────────────────────────────────────────────────────────────────
+const showRepartir   = ref(false)
+const repartirTarget = ref(null)
+const repartirForm   = ref({ sede_id: '', cantidad: '' })
+const repartirError  = ref(null)
+const repartiendo    = ref(false)
+
+// ── Procesar ───────────────────────────────────────────────────────────────────
+const showProcesar   = ref(false)
+const procesarTarget = ref(null)
+const procesarForm   = ref({ gramos_consumir: '', forma_producto: 'aceite', cantidad_resultado: '', sede_id: '' })
+const procesarError  = ref(null)
+const procesando     = ref(false)
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────
 const tabActiva = ref('por_asignar')
@@ -378,13 +541,13 @@ const historialFiltrado = computed(() =>
 onMounted(async () => {
   try {
     const [rPend, rInv, rSedes, rGen] = await Promise.all([
-      listStocksPendientes(), listStocks(), listSedes(), listGeneticas(),
+      listStocksPendientes(), listStocks(), listSedes(), listGeneticas({ disponible: true }),
     ])
     pendientes.value = rPend.data || []
     inventario.value = rInv.data  || []
     sedes.value      = rSedes.data || []
     geneticas.value  = rGen.data  || []
-    pendientes.value.forEach(s => { asignaciones.value[s.id] = '' })
+    pendientes.value.forEach(s => { asignaciones.value[s.id] = ''; cantidades.value[s.id] = '' })
     if (!pendientes.value.length) tabActiva.value = 'inventario'
   } catch { toast.error('Error al cargar stocks') }
   finally { loading.value = false }
@@ -393,11 +556,17 @@ onMounted(async () => {
 // ── Asignar ────────────────────────────────────────────────────────────────────
 const asignando    = ref(null)
 const asignaciones = ref({})
+const cantidades   = ref({})
 
 async function asignar(stock) {
+  const sedeId = asignaciones.value[stock.id]
+  if (!sedeId) { toast.error('Elegí una sede'); return }
   asignando.value = stock.id
   try {
-    await asignarStock(stock.id, { sede_id: asignaciones.value[stock.id] || null })
+    const payload = { sede_id: sedeId }
+    const cant = Number(cantidades.value[stock.id])
+    if (cant > 0 && cant < stock.cantidad) payload.cantidad = cant
+    await asignarStock(stock.id, payload)
     pendientes.value = pendientes.value.filter(s => s.id !== stock.id)
     const { data } = await listStocks()
     inventario.value = data || []
@@ -419,7 +588,7 @@ const crearError = ref(null)
 
 const emptyForm = () => ({
   forma_producto: 'flor_seca', cantidad: '', sede_id: '',
-  genetica_id: '', precio_sugerido_ars: '', costo_unitario_ars: '',
+  genetica_id: '', genetica_libre: '', precio_sugerido_ars: '', costo_unitario_ars: '',
   proveedor: '', descripcion: '',
 })
 const crearForm = ref(emptyForm())
@@ -435,6 +604,9 @@ async function guardarStock() {
   if (!crearForm.value.proveedor?.trim()) {
     crearError.value = 'El proveedor es obligatorio'; return
   }
+  if (!crearForm.value.sede_id) {
+    crearError.value = 'La sede es obligatoria'; return
+  }
   creando.value = true
   try {
     const p = {
@@ -444,12 +616,18 @@ async function guardarStock() {
       unidad:    'g',
       estado:    'asignado',
       proveedor: crearForm.value.proveedor,
+      sede_id:   Number(crearForm.value.sede_id),
     }
-    if (crearForm.value.sede_id)             p.sede_id             = Number(crearForm.value.sede_id)
-    if (crearForm.value.genetica_id)         p.genetica_id         = Number(crearForm.value.genetica_id)
+    if (crearForm.value.genetica_id && crearForm.value.genetica_id !== '__otro__')
+      p.genetica_id = Number(crearForm.value.genetica_id)
     if (crearForm.value.precio_sugerido_ars) p.precio_sugerido_ars = Number(crearForm.value.precio_sugerido_ars)
     if (crearForm.value.costo_unitario_ars)  p.costo_unitario_ars  = Number(crearForm.value.costo_unitario_ars)
-    if (crearForm.value.descripcion)         p.descripcion         = crearForm.value.descripcion
+    const notaGenetica = crearForm.value.genetica_id === '__otro__' && crearForm.value.genetica_libre?.trim()
+      ? `Variedad: ${crearForm.value.genetica_libre.trim()}.`
+      : ''
+    const notaAdicional = crearForm.value.descripcion?.trim() || ''
+    const descripcionFinal = [notaGenetica, notaAdicional].filter(Boolean).join(' ')
+    if (descripcionFinal) p.descripcion = descripcionFinal
 
     await createStock(p)
     toast.success('Stock externo creado')
@@ -467,6 +645,109 @@ async function guardarStock() {
   } finally { creando.value = false }
 }
 
+// ── Repartir functions ────────────────────────────────────────────────────────
+function openRepartir(stock) {
+  repartirTarget.value = stock
+  repartirForm.value   = { sede_id: '', cantidad: '' }
+  repartirError.value  = null
+  showRepartir.value   = true
+}
+function closeRepartir() { showRepartir.value = false }
+
+async function ejecutarRepartir() {
+  const s = repartirTarget.value
+  if (!repartirForm.value.sede_id) { repartirError.value = 'Elegí una sede'; return }
+  const cant = Number(repartirForm.value.cantidad)
+  if (!cant || cant <= 0) { repartirError.value = 'La cantidad es obligatoria'; return }
+  if (cant > s.cantidad) { repartirError.value = `Máximo disponible: ${s.cantidad}g`; return }
+  repartiendo.value = true
+  repartirError.value = null
+  try {
+    await asignarStock(s.id, { sede_id: repartirForm.value.sede_id, cantidad: cant })
+    toast.success('Stock repartido')
+    closeRepartir()
+    const [rPend, rInv] = await Promise.all([listStocksPendientes(), listStocks()])
+    pendientes.value = rPend.data || []
+    inventario.value = rInv.data || []
+    if (historialLoaded.value) {
+      const { data: h } = await listStocksHistorial()
+      historial.value = h || []
+    }
+  } catch (e) {
+    repartirError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al repartir'
+  } finally { repartiendo.value = false }
+}
+
+// ── Procesar functions ────────────────────────────────────────────────────────
+const FORMAS_DERIVADO = [
+  { value: 'hash',       label: 'Hash' },
+  { value: 'aceite',     label: 'Aceite' },
+  { value: 'tintura',    label: 'Tintura' },
+  { value: 'crema',      label: 'Crema' },
+  { value: 'capsula',    label: 'Cápsula' },
+  { value: 'comestible', label: 'Comestible' },
+  { value: 'prensado',   label: 'Prensado' },
+  { value: 'otro',       label: 'Otro' },
+]
+
+const mermaG = computed(() => {
+  if (!showProcesar.value) return 0
+  const consumir   = Number(procesarForm.value.gramos_consumir)
+  const resultado  = Number(procesarForm.value.cantidad_resultado)
+  if (!consumir || !resultado || resultado >= consumir) return 0
+  return parseFloat((consumir - resultado).toFixed(2))
+})
+const mermaPct = computed(() => {
+  const consumir  = Number(procesarForm.value.gramos_consumir)
+  const resultado = Number(procesarForm.value.cantidad_resultado)
+  if (!consumir || !resultado || resultado >= consumir) return 0
+  return parseFloat(((consumir - resultado) / consumir * 100).toFixed(1))
+})
+
+function openProcesar(stock) {
+  procesarTarget.value = stock
+  procesarForm.value   = { gramos_consumir: '', forma_producto: 'aceite', cantidad_resultado: '', sede_id: '' }
+  procesarError.value  = null
+  showProcesar.value   = true
+}
+function closeProcesar() { showProcesar.value = false }
+
+async function ejecutarProcesar() {
+  procesarError.value = null
+  const s        = procesarTarget.value
+  const consumir = Number(procesarForm.value.gramos_consumir)
+  const resultado = Number(procesarForm.value.cantidad_resultado)
+  if (!consumir || consumir <= 0) { procesarError.value = 'Ingresá los gramos a consumir'; return }
+  if (consumir > s.cantidad)      { procesarError.value = `Máximo disponible: ${s.cantidad}g`; return }
+  if (!resultado || resultado <= 0) { procesarError.value = 'Ingresá la cantidad resultante'; return }
+  if (!procesarForm.value.forma_producto) { procesarError.value = 'Elegí la forma del derivado'; return }
+  if (!procesarForm.value.sede_id) { procesarError.value = 'Elegí una sede'; return }
+  procesando.value = true
+  try {
+    await createStock({
+      origen:                  'derivado_lote',
+      lote_id:                 s.lote_id,
+      lote_origen_consumido_g: consumir,
+      forma_producto:          procesarForm.value.forma_producto,
+      cantidad:                resultado,
+      unidad:                  'g',
+      estado:                  'asignado',
+      sede_id:                 Number(procesarForm.value.sede_id),
+    })
+    toast.success('Derivado procesado')
+    closeProcesar()
+    const [rPend, rInv] = await Promise.all([listStocksPendientes(), listStocks()])
+    pendientes.value = rPend.data || []
+    inventario.value = rInv.data || []
+    if (historialLoaded.value) {
+      const { data: h } = await listStocksHistorial()
+      historial.value = h || []
+    }
+  } catch (e) {
+    procesarError.value = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al procesar'
+  } finally { procesando.value = false }
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const FORMAS = [
   { value: 'flor_seca',  label: 'Flor seca' },
@@ -477,7 +758,6 @@ const FORMAS = [
   { value: 'capsula',    label: 'Cápsula' },
   { value: 'comestible', label: 'Comestible' },
   { value: 'prensado',   label: 'Prensado' },
-  { value: 'externo',    label: 'Externo (merch/insumo)' },
   { value: 'otro',       label: 'Otro' },
 ]
 const FORMA_MAP = Object.fromEntries(FORMAS.map(f => [f.value, f.label]))
@@ -740,6 +1020,7 @@ function formatDate(dateStr) {
 .stk__opt        { font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
 .stk__input      { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 7px; padding: .5rem .75rem; font-size: .875rem; color: #0f172a; width: 100%; box-sizing: border-box; font-family: inherit; transition: border .15s; }
 .stk__input:focus { outline: none; border-color: #1b5e20; background: #fff; }
+.stk__input--mt   { margin-top: .35rem; }
 .stk__textarea   { resize: vertical; min-height: 60px; }
 .stk__input-row  { display: flex; }
 .stk__input-row .stk__input { border-radius: 7px 0 0 7px; }
@@ -748,4 +1029,47 @@ function formatDate(dateStr) {
 
 .stk-fade-enter-active, .stk-fade-leave-active { transition: opacity .2s; }
 .stk-fade-enter-from,  .stk-fade-leave-to      { opacity: 0; }
+
+/* ── Por asignar — qty ──────────────────────────────────────────────────────── */
+.stk__pa-qty    { display: flex; align-items: center; gap: .35rem; }
+.stk__qty-input { max-width: 140px; min-width: 100px; }
+.stk__qty-hint  { font-size: .72rem; color: #94a3b8; white-space: nowrap; flex-shrink: 0; }
+
+/* ── Inventory action buttons ───────────────────────────────────────────────── */
+.stk__icon-btn--amber { border-color: #fde68a; color: #92400e; }
+.stk__icon-btn--amber:hover { border-color: #f59e0b; color: #78350f; background: #fffbeb; }
+
+/* ── Amber button ───────────────────────────────────────────────────────────── */
+.stk__btn-amber {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: #d97706; color: #fff; border: none; border-radius: 8px;
+  padding: .55rem 1.1rem; font-size: .82rem; font-weight: 600;
+  cursor: pointer; transition: background .15s;
+}
+.stk__btn-amber:hover:not(:disabled) { background: #b45309; }
+.stk__btn-amber:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Modal amber icon ───────────────────────────────────────────────────────── */
+.stk__modal-ico--amber { background: #fffbeb; color: #d97706; }
+
+/* ── Field hint ─────────────────────────────────────────────────────────────── */
+.stk__field-hint { font-size: .72rem; color: #64748b; margin-top: .2rem; }
+
+/* ── Procesar source info ───────────────────────────────────────────────────── */
+.stk__procesar-src {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;
+  padding: .6rem .9rem; margin-bottom: 1rem;
+}
+.stk__procesar-src-lbl { font-size: .72rem; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: .04em; }
+.stk__procesar-src-val { font-size: .82rem; font-weight: 600; color: #15803d; }
+
+/* ── Merma display ──────────────────────────────────────────────────────────── */
+.stk__merma {
+  display: flex; align-items: center; gap: .5rem;
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+  padding: .6rem .9rem; margin-top: 1rem;
+}
+.stk__merma-ico { font-size: 1rem; flex-shrink: 0; }
+.stk__merma-txt { font-size: .82rem; color: #92400e; }
 </style>

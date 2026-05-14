@@ -13,11 +13,11 @@ class LotePolicy < ApplicationPolicy
   end
 
   def aprobar_manicura?
-    mismo_club? && admin?
+    mismo_club? && (admin? || supervisor?)
   end
 
   def rechazar_manicura?
-    mismo_club? && admin?
+    mismo_club? && (admin? || supervisor?)
   end
 
   def asignar_manicurador?

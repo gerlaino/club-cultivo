@@ -318,12 +318,10 @@ class LotesController < ApplicationController
   def aprobar_manicura
     authorize @lote, :aprobar_manicura?
     if @lote.manicurador_id.present?
-      # Nuevo flujo: aprobar + generar stock + finalizar en un paso
+      # Nuevo flujo: aprobar + generar stock pendiente_asignacion + finalizar
       @lote.aprobar_y_finalizar!(
-        aprobado_por:   current_user,
-        sede_id:        params.require(:sede_id),
-        peso_seco_g:    params[:peso_seco_g],
-        forma_producto: params[:forma_producto].presence || 'flor_seca',
+        aprobado_por: current_user,
+        peso_seco_g:  params[:peso_seco_g],
       )
     else
       # Flujo legacy: aprobar → curado

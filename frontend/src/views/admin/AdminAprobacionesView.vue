@@ -146,6 +146,11 @@
 
             <form class="av-modal__body" @submit.prevent="confirmarAprobacion">
 
+              <div class="av-info-box">
+                <span class="av-info-ico">📦</span>
+                <span>El stock se creará como <strong>flor seca pendiente de asignación</strong>. Desde la sección Stock podrás distribuirlo entre sedes y procesar derivados.</span>
+              </div>
+
               <div class="av-field">
                 <label class="av-label">Peso seco confirmado (g) <span class="av-req">*</span></label>
                 <input
@@ -155,28 +160,9 @@
                   step="0.1"
                   class="av-input"
                   required
+                  autofocus
                 />
-                <span class="av-hint">Registrado por manicura: {{ loteAprobacion?.ultima_pesada_manicura?.peso_seco_g }}g. Editá si corresponde.</span>
-              </div>
-
-              <div class="av-field">
-                <label class="av-label">Sede destino <span class="av-req">*</span></label>
-                <select v-model="aprobForm.sede_id" class="av-select" required>
-                  <option value="">Seleccioná una sede…</option>
-                  <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }} ({{ s.tipo }})</option>
-                </select>
-              </div>
-
-              <div class="av-field">
-                <label class="av-label">Forma del producto</label>
-                <select v-model="aprobForm.forma_producto" class="av-select">
-                  <option value="flor_seca">Flor seca</option>
-                  <option value="hash">Hash</option>
-                  <option value="aceite">Aceite</option>
-                  <option value="tintura">Tintura</option>
-                  <option value="prensado">Prensado</option>
-                  <option value="otro">Otro</option>
-                </select>
+                <span class="av-hint">Registrado por manicura: {{ loteAprobacion?.ultima_pesada_manicura?.peso_seco_g }}g. Editá si no coincide.</span>
               </div>
 
               <div v-if="aprobError" class="av-error">
@@ -205,12 +191,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ClipboardCheck, Clock, Leaf, MapPin, Package, Scale, Eye, CheckCircle, XCircle, X, AlertCircle, Scissors, PackageCheck } from 'lucide-vue-next'
-import { listLotes, listSedes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
+import { listLotes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast = useToast()
 const lotes   = ref([])
-const sedes   = ref([])
 const loading = ref(true)
 const aprobando = ref(null)
 
@@ -224,7 +209,7 @@ const rechazoError  = ref('')
 // Modal aprobación (nuevo flujo)
 const modalAprobacion = ref(false)
 const loteAprobacion  = ref(null)
-const aprobForm = ref({ peso_seco_g: null, sede_id: '', forma_producto: 'flor_seca' })
+const aprobForm = ref({ peso_seco_g: null })
 const aprobError = ref('')
 
 function fmtDate(d) {
@@ -235,12 +220,8 @@ function fmtDate(d) {
 async function cargar() {
   loading.value = true
   try {
-    const [lotesRes, sedesRes] = await Promise.all([
-      listLotes({ estado: 'manicura_pendiente' }),
-      listSedes(),
-    ])
+    const lotesRes = await listLotes({ estado: 'manicura_pendiente' })
     lotes.value = lotesRes.data || []
-    sedes.value = sedesRes.data?.sedes || sedesRes.data || []
   } catch {
     lotes.value = []
   } finally {
@@ -250,13 +231,9 @@ async function cargar() {
 
 // Nuevo flujo: abre modal con sede + peso
 function abrirAprobacion(lote) {
-  loteAprobacion.value = lote
-  aprobForm.value = {
-    peso_seco_g:    lote.ultima_pesada_manicura?.peso_seco_g ?? null,
-    sede_id:        '',
-    forma_producto: 'flor_seca',
-  }
-  aprobError.value  = ''
+  loteAprobacion.value  = lote
+  aprobForm.value       = { peso_seco_g: lote.ultima_pesada_manicura?.peso_seco_g ?? null }
+  aprobError.value      = ''
   modalAprobacion.value = true
 }
 
@@ -266,16 +243,14 @@ function cerrarAprobacion() {
 }
 
 async function confirmarAprobacion() {
-  if (!aprobForm.value.sede_id) { aprobError.value = 'Seleccioná una sede'; return }
-  aprobando.value = loteAprobacion.value.id
+  if (!aprobForm.value.peso_seco_g || aprobForm.value.peso_seco_g <= 0) {
+    aprobError.value = 'El peso debe ser mayor a 0'; return
+  }
+  aprobando.value  = loteAprobacion.value.id
   aprobError.value = ''
   try {
-    await aprobarManicura(loteAprobacion.value.id, {
-      sede_id:        aprobForm.value.sede_id,
-      peso_seco_g:    aprobForm.value.peso_seco_g,
-      forma_producto: aprobForm.value.forma_producto,
-    })
-    toast.success(`Lote ${loteAprobacion.value.codigo} finalizado — stock generado`)
+    await aprobarManicura(loteAprobacion.value.id, { peso_seco_g: aprobForm.value.peso_seco_g })
+    toast.success(`Lote ${loteAprobacion.value.codigo} finalizado — stock pendiente de asignación`)
     cerrarAprobacion()
     cargar()
   } catch (e) {
@@ -501,6 +476,13 @@ onMounted(cargar)
 
 .av-fade-enter-active, .av-fade-leave-active { transition: opacity .2s; }
 .av-fade-enter-from, .av-fade-leave-to { opacity: 0; }
+
+.av-info-box {
+  display: flex; align-items: flex-start; gap: .6rem;
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--r-md);
+  padding: .65rem .9rem; font-size: var(--fs-13); color: #1e40af; line-height: 1.45;
+}
+.av-info-ico { font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
 
 .av__manicurador { color: var(--c-leaf-700); font-weight: 500; }
 .av-modal__ico--green { background: #dcfce7; color: var(--c-leaf-700); }

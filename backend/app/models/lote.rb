@@ -249,14 +249,13 @@ class Lote < ApplicationRecord
   end
 
   # Aprueba pesada del manicurador, genera stock y finaliza el lote en un solo paso.
-  def aprobar_y_finalizar!(aprobado_por:, sede_id:, peso_seco_g: nil, forma_producto: 'flor_seca')
+  def aprobar_y_finalizar!(aprobado_por:, peso_seco_g: nil)
     raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
 
     ultima_pesada = pesadas.where(fase_origen: 'en_manicura', manicurado: true).reorder(id: :desc).first
     raise "No hay pesada de manicura para aprobar" unless ultima_pesada
 
-    sede  = club.sedes.find(sede_id)
-    peso  = peso_seco_g.present? ? peso_seco_g.to_d : ultima_pesada.peso_seco_g.to_d
+    peso = peso_seco_g.present? ? peso_seco_g.to_d : ultima_pesada.peso_seco_g.to_d
     raise ArgumentError, "El peso debe ser mayor a 0" unless peso > 0
 
     ActiveRecord::Base.transaction do
@@ -270,15 +269,15 @@ class Lote < ApplicationRecord
       )
 
       stock = Stock.create!(
-        club:            club,
-        sede:            sede,
-        lote:            self,
-        genetica:        genetica,
-        origen:          'lote',
-        estado:          'asignado',
-        forma_producto:  forma_producto,
-        cantidad:        peso,
-        unidad:          'g',
+        club:           club,
+        sede:           nil,
+        lote:           self,
+        genetica:       genetica,
+        origen:         'lote',
+        estado:         'pendiente_asignacion',
+        forma_producto: 'flor_seca',
+        cantidad:       peso,
+        unidad:         'g',
       )
       stock.stock_movimientos.create!(
         tipo:    'produccion',
@@ -296,7 +295,7 @@ class Lote < ApplicationRecord
         tipo:            'cambio_estado',
         estado_anterior: 'manicura_pendiente',
         estado_nuevo:    'finalizado',
-        descripcion:     "Aprobado — #{peso}g → #{sede.nombre} (#{forma_producto})",
+        descripcion:     "Aprobado — #{peso}g pendiente de asignación",
         user:            aprobado_por,
         club:            club,
         registrado_en:   Time.current,
@@ -305,7 +304,7 @@ class Lote < ApplicationRecord
       AlertaInterna.create!(
         club:             club,
         tipo:             'manicura_aprobada',
-        mensaje:          "Lote #{codigo} finalizado: #{peso}g en #{sede.nombre}",
+        mensaje:          "Lote #{codigo} finalizado: #{peso}g pendiente de asignación a sede",
         severidad:        'info',
         creada_por:       aprobado_por,
         destinada_a_role: 'manicura',
