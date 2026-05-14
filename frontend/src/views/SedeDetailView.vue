@@ -2,8 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
-import { getSede, listSalas, listLotes,
-         getSedeStocks, createStock, updateStock, deleteSede, listGeneticas } from "../lib/api"
+import { getSede, listSalas, getSedeStocks, updateStock, deleteSede } from "../lib/api"
 import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
@@ -46,9 +45,8 @@ const showCrearSala = ref(false)
 
 const canEdit        = computed(() => ["admin", "cultivador"].includes(auth.role))
 const puedeCrearSala = computed(() => ["admin", "supervisor"].includes(auth.role))
-const isAdmin       = computed(() => auth.user?.role === 'admin')
-const canAddStock   = computed(() => ["admin", "cultivador", "manicura"].includes(auth.user?.role))
-const esManicurador = computed(() => auth.user?.role === 'manicura')
+const isAdmin        = computed(() => auth.user?.role === 'admin')
+const canEditStock   = computed(() => ["admin", "supervisor"].includes(auth.user?.role))
 
 const tieneInv   = computed(() => ['social', 'mixta'].includes(sede.value?.tipo))
 const tieneSalas = computed(() => ['produccion', 'mixta'].includes(sede.value?.tipo))
@@ -56,28 +54,13 @@ const stockTotal = computed(() => tiendaStocks.value.reduce((a, s) => a + Number
 const itemsBajos = computed(() => tiendaStocks.value.filter(s => Number(s.cantidad) < 5).length)
 
 
-// ── Tienda social (nuevo modelo stocks) ─────────────────────────
-const tiendaStocks       = ref([])
-const loadingTienda      = ref(false)
-const showNuevoStockModal = ref(false)
-const savingNuevoStock   = ref(false)
-const nuevoStockError    = ref(null)
-const nuevoStockForm     = ref({ origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', variedad_nombre: '', descripcion: '' })
+// ── Tienda social (stocks asignados a esta sede) ─────────────────
+const tiendaStocks  = ref([])
+const loadingTienda = ref(false)
 
 const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '🫙 Aceite', tintura: '💧 Tintura', topico: '🧴 Tópico', otro: '📦 Otro' }
 const KIND_LABELS = { germinacion: 'Germinación', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', secado: 'Secado', curado: 'Curado', manicura: 'Manicura', mixta: 'Mixta', madre: 'Madre', madres: 'Madres' }
 function kindLabel(k) { return KIND_LABELS[k] || k || '' }
-const lotesParaStock    = ref([])
-const loadingLotesStock = ref(false)
-const geneticasParaStock    = ref([])
-const loadingGeneticasStock = ref(false)
-
-const canSubmitStock = computed(() => {
-  const f = nuevoStockForm.value
-  if (!f.cantidad) return false
-  if (f.origen === 'compra_externa') return !!(f.proveedor && f.variedad_nombre)
-  return true
-})
 
 // ── Editar stock ─────────────────────────────────────────────────
 const showEditarStockModal = ref(false)
@@ -125,34 +108,6 @@ async function loadTiendaStocks() {
   finally { loadingTienda.value = false }
 }
 
-async function abrirNuevoStockModal() {
-  nuevoStockForm.value = { origen: 'derivado_lote', lote_id: null, lote_origen_consumido_g: null, forma_producto: 'flor_seca', unidad: 'g', cantidad: null, costo_unitario_ars: null, proveedor: '', variedad_nombre: '', descripcion: '' }
-  nuevoStockError.value = null
-  showNuevoStockModal.value = true
-  if (!lotesParaStock.value.length) {
-    loadingLotesStock.value = true
-    try { const { data } = await listLotes({ estado: 'finalizado' }); lotesParaStock.value = data || [] }
-    catch { lotesParaStock.value = [] }
-    finally { loadingLotesStock.value = false }
-  }
-}
-
-async function confirmarNuevoStock() {
-  savingNuevoStock.value = true; nuevoStockError.value = null
-  try {
-    const f = nuevoStockForm.value
-    const payload = { origen: f.origen, sede_id: sedeId, forma_producto: f.forma_producto, unidad: f.unidad, cantidad: f.cantidad, costo_unitario_ars: f.costo_unitario_ars || undefined }
-    if (f.origen === 'derivado_lote') { payload.lote_id = f.lote_id; payload.lote_origen_consumido_g = f.lote_origen_consumido_g }
-    else { payload.proveedor = f.proveedor; payload.producto = f.variedad_nombre; if (f.descripcion) payload.descripcion = f.descripcion }
-    await createStock(payload)
-    showNuevoStockModal.value = false
-    await loadTiendaStocks()
-    toast.success('Stock agregado correctamente')
-  } catch (e) {
-    nuevoStockError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'Error al agregar stock'
-  } finally { savingNuevoStock.value = false }
-}
-
 
 // ── Original ────────────────────────────────────────────────────
 const TIPO_META = {
@@ -193,8 +148,7 @@ function onSalaCreada() {
 
 function escapeHandler(e) {
   if (e.key !== 'Escape') return
-  if (showEditarStockModal.value) { showEditarStockModal.value = false; return }
-  if (showNuevoStockModal.value) showNuevoStockModal.value = false
+  if (showEditarStockModal.value) showEditarStockModal.value = false
 }
 onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 onMounted(async () => {
@@ -252,9 +206,9 @@ onMounted(async () => {
           <button v-if="puedeCrearSala && tieneSalas" class="sdv__btn-primary" @click="showCrearSala = true">
             <i class="bi bi-plus-lg"></i> Nueva sala aquí
           </button>
-          <button v-if="canAddStock && tieneInv" class="sdv__btn-inv" @click="abrirNuevoStockModal">
-            <i class="bi bi-plus-lg"></i> Agregar stock
-          </button>
+          <RouterLink v-if="tieneInv && isAdmin" to="/admin/stock" class="sdv__btn-inv">
+            <i class="bi bi-boxes"></i> Gestionar stock
+          </RouterLink>
           <button v-if="isAdmin" class="sdv__btn-danger" :disabled="deleting" @click="eliminarSede">
             <i class="bi bi-trash3"></i> Eliminar sede
           </button>
@@ -288,21 +242,19 @@ onMounted(async () => {
                 <span class="sdv__card-title">Stock disponible</span>
                 <span class="sdv__pill">{{ tiendaStocks.length }}</span>
               </div>
-              <button v-if="canEdit" class="sdv__card-btn-green" @click="abrirNuevoStockModal">
-                <i class="bi bi-plus-lg"></i> Agregar stock
-              </button>
+              <RouterLink v-if="isAdmin" to="/admin/stock" class="sdv__card-btn">Gestionar →</RouterLink>
             </div>
             <div v-if="loadingTienda" class="sdv__tienda-loading"><div class="sdv__ring sdv__ring--sm"></div> Cargando…</div>
-            <EmptyState v-else-if="!tiendaStocks.length" icon="bi-shop" title="Sin stocks" message="No hay stocks disponibles para dispensación." compact>
+            <EmptyState v-else-if="!tiendaStocks.length" icon="bi-shop" title="Sin stock asignado" message="Esta sede no tiene stock. Asigná desde el gestor de stock." compact>
               <template #actions>
-                <button v-if="canEdit" class="sdv__btn-sm-green" @click="abrirNuevoStockModal"><i class="bi bi-plus-lg"></i> Agregar primer stock</button>
+                <RouterLink v-if="isAdmin" to="/admin/stock" class="sdv__btn-sm-green"><i class="bi bi-boxes"></i> Ir al stock</RouterLink>
               </template>
             </EmptyState>
             <div v-else class="sdv__tienda-grid">
               <div v-for="s in tiendaStocks" :key="s.id" class="sdv__tienda-card">
                 <div class="sdv__tienda-card-top">
                   <div class="sdv__tienda-forma">{{ FORMA_LABELS[s.forma_producto] || s.forma_producto }}</div>
-                  <button v-if="canAddStock" class="sdv__tienda-edit-btn" @click="abrirEditarStock(s)" title="Editar"><i class="bi bi-pencil"></i></button>
+                  <button v-if="canEditStock" class="sdv__tienda-edit-btn" @click="abrirEditarStock(s)" title="Editar"><i class="bi bi-pencil"></i></button>
                 </div>
                 <div v-if="s.genetica" class="sdv__tienda-gen">🧬 {{ s.genetica.nombre }}</div>
                 <div v-if="s.lote_codigo" class="sdv__tienda-lote">📋 {{ s.lote_codigo }}</div>
@@ -450,113 +402,6 @@ onMounted(async () => {
               <span v-if="savingEditarStock" class="sdv__ring sdv__ring--sm sdv__ring--white"></span>
               <i v-else class="bi bi-check-lg"></i>
               Guardar cambios
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- MODAL NUEVO STOCK (nuevo modelo) -->
-    <Teleport to="body">
-      <div v-if="showNuevoStockModal" class="sdv__modal-overlay" @click.self="showNuevoStockModal = false">
-        <div class="sdv__modal">
-          <div class="sdv__modal-header">
-            <div class="sdv__modal-header-icon" style="background:rgba(27,94,32,.1);color:#1b5e20"><i class="bi bi-shop"></i></div>
-            <div>
-              <h3 class="sdv__modal-title">Agregar stock</h3>
-              <p class="sdv__modal-sub">{{ sede?.nombre }}</p>
-            </div>
-            <button class="sdv__modal-close" @click="showNuevoStockModal = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="sdv__modal-body">
-            <div v-if="nuevoStockError" class="sdv__alert-err">{{ nuevoStockError }}</div>
-
-            <!-- Modo origen -->
-            <div class="sdv__field" style="margin-bottom:1.25rem">
-              <label class="sdv__label">Origen del stock</label>
-              <div class="sdv__origen-selector">
-                <button type="button" class="sdv__origen-btn" :class="{ 'sdv__origen-btn--active': nuevoStockForm.origen === 'derivado_lote' }" @click="nuevoStockForm.origen = 'derivado_lote'">
-                  <i class="bi bi-flower1"></i>
-                  <div><strong>Derivado de lote</strong><span>Stock generado desde un lote propio</span></div>
-                </button>
-                <button type="button" class="sdv__origen-btn" :class="{ 'sdv__origen-btn--active': nuevoStockForm.origen === 'compra_externa' }" @click="nuevoStockForm.origen = 'compra_externa'">
-                  <i class="bi bi-bag"></i>
-                  <div><strong>Compra externa</strong><span>Stock adquirido de proveedor externo</span></div>
-                </button>
-              </div>
-            </div>
-
-            <!-- Lote selector (derivado_lote) -->
-            <div v-if="nuevoStockForm.origen === 'derivado_lote'" class="sdv__field" style="margin-bottom:1rem">
-              <label class="sdv__label">Lote origen</label>
-              <div v-if="loadingLotesStock" class="sdv__tienda-loading"><div class="sdv__ring sdv__ring--sm"></div> Cargando lotes…</div>
-              <select v-else class="sdv__input" v-model="nuevoStockForm.lote_id">
-                <option :value="null" disabled>Seleccioná un lote…</option>
-                <option v-for="l in lotesParaStock" :key="l.id" :value="l.id">{{ l.codigo }} — {{ l.genetica?.nombre || 'Sin genética' }}</option>
-              </select>
-              <div class="sdv__field" style="margin-top:.75rem">
-                <label class="sdv__label">Gramos consumidos del lote <span class="sdv__optional">opcional</span></label>
-                <input type="number" step="0.1" min="0" class="sdv__input" v-model.number="nuevoStockForm.lote_origen_consumido_g" placeholder="ej: 320.0" />
-              </div>
-            </div>
-
-            <!-- Proveedor / genética / desc (compra_externa) -->
-            <template v-if="nuevoStockForm.origen === 'compra_externa'">
-              <div class="sdv__field" style="margin-bottom:.75rem">
-                <label class="sdv__label">Proveedor <span style="color:#dc2626">*</span></label>
-                <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.proveedor" placeholder="Nombre del proveedor" />
-              </div>
-              <div class="sdv__field" style="margin-bottom:.75rem">
-                <label class="sdv__label">Genética / variedad <span style="color:#dc2626">*</span></label>
-                <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.variedad_nombre" placeholder="Ej: OG Kush, White Widow…" />
-              </div>
-              <div class="sdv__field" style="margin-bottom:1rem">
-                <label class="sdv__label">Descripción <span class="sdv__optional">opcional</span></label>
-                <input type="text" class="sdv__input" v-model.trim="nuevoStockForm.descripcion" placeholder="Ej: batch A-12, aceite CBD 10mg/ml" />
-              </div>
-            </template>
-
-            <!-- Forma producto -->
-            <div class="sdv__field" style="margin-bottom:1rem">
-              <label class="sdv__label">Forma de producto</label>
-              <div class="sdv__forma-grid">
-                <button v-for="(label, key) in FORMA_LABELS" :key="key" type="button" class="sdv__forma-btn"
-                        :class="{ 'sdv__forma-btn--active': nuevoStockForm.forma_producto === key }"
-                        @click="nuevoStockForm.forma_producto = key">{{ label }}</button>
-              </div>
-            </div>
-
-            <!-- Cantidad + precios -->
-            <div class="sdv__grid-2" style="margin-bottom:.75rem">
-              <div class="sdv__field">
-                <label class="sdv__label">Cantidad <span style="color:#dc2626">*</span></label>
-                <div class="sdv__cant-wrap">
-                  <input type="number" step="0.1" min="0" class="sdv__input sdv__input--big" v-model.number="nuevoStockForm.cantidad" placeholder="0" />
-                  <span class="sdv__cant-suffix">{{ nuevoStockForm.unidad }}</span>
-                </div>
-              </div>
-              <div class="sdv__field">
-                <label class="sdv__label">Unidad</label>
-                <select class="sdv__input" v-model="nuevoStockForm.unidad">
-                  <option value="g">g (gramos)</option>
-                  <option value="ml">ml (mililitros)</option>
-                  <option value="u">u (unidades)</option>
-                </select>
-              </div>
-            </div>
-            <div class="sdv__grid-2">
-              <div class="sdv__field">
-                <label class="sdv__label">Costo unitario (ARS) <span class="sdv__optional">opcional</span></label>
-                <input type="number" step="0.01" min="0" class="sdv__input" v-model.number="nuevoStockForm.costo_unitario_ars" placeholder="ej: 1200" />
-              </div>
-            </div>
-          </div>
-          <div class="sdv__modal-footer">
-            <button class="sdv__btn-ghost" :disabled="savingNuevoStock" @click="showNuevoStockModal = false">Cancelar</button>
-            <button class="sdv__btn-primary" :disabled="savingNuevoStock || !canSubmitStock" @click="confirmarNuevoStock">
-              <span v-if="savingNuevoStock" class="sdv__ring sdv__ring--sm sdv__ring--white"></span>
-              <i v-else class="bi bi-check-lg"></i>
-              Guardar stock
             </button>
           </div>
         </div>

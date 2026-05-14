@@ -261,19 +261,8 @@
                   </select>
                 </div>
                 <div class="stk__field">
-                  <label class="stk__label">Genética <span class="stk__opt">opcional</span></label>
-                  <select class="stk__input" v-model="crearForm.genetica_id">
-                    <option value="">Sin especificar</option>
-                    <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
-                    <option value="__otro__">Otra (no registrada en el club)</option>
-                  </select>
-                  <input
-                    v-if="crearForm.genetica_id === '__otro__'"
-                    type="text"
-                    class="stk__input stk__input--mt"
-                    v-model="crearForm.genetica_libre"
-                    placeholder="Nombre de la variedad…"
-                  />
+                  <label class="stk__label">Variedad / Cepa <span class="stk__opt">opcional</span></label>
+                  <input type="text" class="stk__input" v-model="crearForm.genetica_libre" placeholder="Ej: OG Kush, Amnesia, …" />
                 </div>
                 <div class="stk__field">
                   <label class="stk__label">Precio sugerido (ARS/g) <span class="stk__opt">opcional</span></label>
@@ -435,7 +424,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import {
   listStocksPendientes, listStocks, listStocksHistorial,
-  asignarStock, listSedes, createStock, listGeneticas,
+  asignarStock, listSedes, createStock,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
@@ -449,7 +438,6 @@ const historial        = ref([])
 const historialLoaded  = ref(false)
 const loadingHistorial = ref(false)
 const sedes            = ref([])
-const geneticas        = ref([])
 
 // ── Repartir ───────────────────────────────────────────────────────────────────
 const showRepartir   = ref(false)
@@ -515,7 +503,7 @@ const inventarioFiltrado = computed(() =>
 const inventarioAgrupado = computed(() => {
   const grupos = {}
   for (const s of inventarioFiltrado.value) {
-    const key = s.sede?.nombre || 'Pool del club'
+    const key = s.sede?.nombre || 'Sin sede'
     if (!grupos[key]) grupos[key] = { sede_nombre: key, items: [], total: 0 }
     grupos[key].items.push(s)
     grupos[key].total = parseFloat((grupos[key].total + s.cantidad).toFixed(1))
@@ -541,12 +529,11 @@ const historialFiltrado = computed(() =>
 onMounted(async () => {
   try {
     const [rPend, rInv, rSedes, rGen] = await Promise.all([
-      listStocksPendientes(), listStocks(), listSedes(), listGeneticas({ disponible: true }),
+      listStocksPendientes(), listStocks(), listSedes(),
     ])
     pendientes.value = rPend.data || []
     inventario.value = rInv.data  || []
     sedes.value      = rSedes.data || []
-    geneticas.value  = rGen.data  || []
     pendientes.value.forEach(s => { asignaciones.value[s.id] = ''; cantidades.value[s.id] = '' })
     if (!pendientes.value.length) tabActiva.value = 'inventario'
   } catch { toast.error('Error al cargar stocks') }
@@ -588,7 +575,7 @@ const crearError = ref(null)
 
 const emptyForm = () => ({
   forma_producto: 'flor_seca', cantidad: '', sede_id: '',
-  genetica_id: '', genetica_libre: '', precio_sugerido_ars: '', costo_unitario_ars: '',
+  genetica_libre: '', precio_sugerido_ars: '', costo_unitario_ars: '',
   proveedor: '', descripcion: '',
 })
 const crearForm = ref(emptyForm())
@@ -618,15 +605,11 @@ async function guardarStock() {
       proveedor: crearForm.value.proveedor,
       sede_id:   Number(crearForm.value.sede_id),
     }
-    if (crearForm.value.genetica_id && crearForm.value.genetica_id !== '__otro__')
-      p.genetica_id = Number(crearForm.value.genetica_id)
     if (crearForm.value.precio_sugerido_ars) p.precio_sugerido_ars = Number(crearForm.value.precio_sugerido_ars)
     if (crearForm.value.costo_unitario_ars)  p.costo_unitario_ars  = Number(crearForm.value.costo_unitario_ars)
-    const notaGenetica = crearForm.value.genetica_id === '__otro__' && crearForm.value.genetica_libre?.trim()
-      ? `Variedad: ${crearForm.value.genetica_libre.trim()}.`
-      : ''
-    const notaAdicional = crearForm.value.descripcion?.trim() || ''
-    const descripcionFinal = [notaGenetica, notaAdicional].filter(Boolean).join(' ')
+    const notaVariedad   = crearForm.value.genetica_libre?.trim() ? `Variedad: ${crearForm.value.genetica_libre.trim()}.` : ''
+    const notaAdicional  = crearForm.value.descripcion?.trim() || ''
+    const descripcionFinal = [notaVariedad, notaAdicional].filter(Boolean).join(' ')
     if (descripcionFinal) p.descripcion = descripcionFinal
 
     await createStock(p)
