@@ -294,10 +294,28 @@ const plantaMadreSeleccionada = computed(() =>
 )
 const madreDropdown = computed(() => {
   const q = madreQuery.value.trim().toLowerCase()
-  if (!q) return plantasMadre.value.slice(0, 30)
+  if (!q) return []
   return plantasMadre.value.filter(p =>
-    p.nombre?.toLowerCase().includes(q) || p.lote?.codigo?.toLowerCase().includes(q)
-  ).slice(0, 30)
+    p.nombre?.toLowerCase().includes(q) ||
+    p.lote?.codigo?.toLowerCase().includes(q) ||
+    p.lote?.sala?.nombre?.toLowerCase().includes(q) ||
+    p.genetica?.nombre?.toLowerCase().includes(q)
+  ).slice(0, 40)
+})
+const madreAgrupado = computed(() => {
+  const salas = {}
+  for (const p of plantasMadre.value) {
+    const salaId     = p.lote?.sala?.id    ?? 0
+    const salaNombre = p.lote?.sala?.nombre ?? 'Sin sala'
+    const loteId     = p.lote?.id          ?? 0
+    const loteCodigo = p.lote?.codigo      ?? '–'
+    const genetica   = p.genetica?.nombre  ?? ''
+    if (!salas[salaId]) salas[salaId] = { sala_id: salaId, sala_nombre: salaNombre, lotes: {} }
+    if (!salas[salaId].lotes[loteId])
+      salas[salaId].lotes[loteId] = { lote_id: loteId, lote_codigo: loteCodigo, genetica, plants: [] }
+    salas[salaId].lotes[loteId].plants.push(p)
+  }
+  return Object.values(salas).map(s => ({ ...s, lotes: Object.values(s.lotes) }))
 })
 
 function emptyLoteForm() {
@@ -773,13 +791,15 @@ const canSeeAmbiente = computed(() =>
                     v-model="madreQuery"
                     type="text"
                     class="sd__input"
-                    :placeholder="plantaMadreSeleccionada ? 'Cambiar planta madre…' : 'Buscar por nombre o código de lote…'"
+                    :placeholder="plantaMadreSeleccionada ? 'Cambiar planta madre…' : 'Buscar por nombre, sala, lote o genética…'"
                     @focus="madreFocused = true"
                     @blur="onMadreBlur"
                     autocomplete="off"
                   />
                   <div v-if="madreFocused" class="sd__madre-dropdown">
-                    <template v-if="madreDropdown.length">
+                    <!-- Modo búsqueda: lista filtrada plana -->
+                    <template v-if="madreQuery.trim()">
+                      <div v-if="!madreDropdown.length" class="sd__madre-empty">Sin resultados para "{{ madreQuery }}"</div>
                       <div
                         v-for="p in madreDropdown"
                         :key="p.id"
@@ -789,14 +809,39 @@ const canSeeAmbiente = computed(() =>
                       >
                         <span class="sd__madre-opt-nombre">{{ p.nombre }}</span>
                         <span class="sd__madre-opt-meta">
-                          {{ p.lote?.codigo }}
+                          <span class="sd__madre-opt-sala">{{ p.lote?.sala?.nombre }}</span>
+                          · {{ p.lote?.codigo }}
                           <span v-if="p.genetica">· {{ p.genetica.nombre }}</span>
                         </span>
                       </div>
                     </template>
-                    <div v-else class="sd__madre-empty">
-                      {{ plantasMadre.length ? 'Sin resultados para "' + madreQuery + '"' : 'No hay plantas disponibles' }}
-                    </div>
+                    <!-- Modo browse: jerarquía sala → lote → planta -->
+                    <template v-else>
+                      <div v-if="!madreAgrupado.length" class="sd__madre-empty">No hay plantas disponibles</div>
+                      <template v-for="sala in madreAgrupado" :key="sala.sala_id">
+                        <div class="sd__madre-sala-hd">
+                          <span><i class="bi bi-geo-alt-fill"></i> {{ sala.sala_nombre }}</span>
+                          <span class="sd__madre-sala-cnt">{{ sala.lotes.reduce((t, l) => t + l.plants.length, 0) }} plantas</span>
+                        </div>
+                        <template v-for="lote in sala.lotes" :key="lote.lote_id">
+                          <div class="sd__madre-lote-hd">
+                            <i class="bi bi-box-seam"></i>
+                            <span>{{ lote.lote_codigo }}</span>
+                            <span v-if="lote.genetica" class="sd__madre-lote-gen">{{ lote.genetica }}</span>
+                          </div>
+                          <div
+                            v-for="p in lote.plants"
+                            :key="p.id"
+                            class="sd__madre-opt sd__madre-opt--plant"
+                            :class="{ 'sd__madre-opt--sel': loteForm.planta_madre_id === p.id }"
+                            @mousedown.prevent="selectMadre(p)"
+                          >
+                            <span class="sd__madre-opt-nombre">🌿 {{ p.nombre }}</span>
+                            <span class="sd__madre-opt-meta">{{ p.state }}</span>
+                          </div>
+                        </template>
+                      </template>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -1135,15 +1180,33 @@ const canSeeAmbiente = computed(() =>
   position: absolute; top: calc(100% + 2px); left: 0; right: 0;
   background: #fff; border: 1.5px solid #d4e6d4; border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,.1);
-  max-height: 220px; overflow-y: auto; z-index: 50;
+  max-height: 300px; overflow-y: auto; z-index: 50;
 }
+.sd__madre-sala-hd {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  padding: .4rem .85rem; background: #1a1f36; color: #e2e8f0;
+  font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  position: sticky; top: 0; z-index: 1;
+}
+.sd__madre-sala-hd i { color: #7c8db5; font-size: .72rem; }
+.sd__madre-sala-cnt { font-weight: 400; color: #64748b; font-size: .66rem; }
+.sd__madre-lote-hd {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .32rem .85rem .32rem 1.1rem;
+  background: #f8fafc; border-bottom: 1px solid #e8f0e8;
+  font-size: .72rem; font-weight: 600; color: #374151;
+}
+.sd__madre-lote-hd i { color: #9ca3af; font-size: .72rem; }
+.sd__madre-lote-gen { margin-left: auto; color: #15803d; font-size: .7rem; font-weight: 500; }
 .sd__madre-opt {
   display: flex; align-items: baseline; justify-content: space-between; gap: .5rem;
-  padding: .55rem .85rem; cursor: pointer; transition: background .1s;
+  padding: .52rem .85rem; cursor: pointer; transition: background .1s;
 }
+.sd__madre-opt--plant { padding-left: 1.75rem; }
 .sd__madre-opt:hover, .sd__madre-opt--sel { background: #f0fdf4; }
 .sd__madre-opt-nombre { font-size: .875rem; font-weight: 600; color: #1a1a1a; }
 .sd__madre-opt-meta { font-size: .72rem; color: #60725d; white-space: nowrap; }
+.sd__madre-opt-sala { color: #7c3aed; font-weight: 600; }
 .sd__madre-empty { padding: .75rem 1rem; font-size: .82rem; color: #94a3b8; text-align: center; }
 
 /* Genetica hints */

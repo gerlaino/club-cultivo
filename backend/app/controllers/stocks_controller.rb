@@ -16,13 +16,21 @@ class StocksController < ApplicationController
       return render json: stocks.map { |s| serialize_stock(s) }
     end
 
+    if params[:historial].present?
+      stocks = Stock.where(club_id: current_user.club_id)
+                    .includes(:lote, :genetica, :sede)
+                    .order(created_at: :desc)
+                    .limit(500)
+      return render json: stocks.map { |s| serialize_stock(s) }
+    end
+
     if sede_id.present?
       sede   = current_user.club.sedes.find_by(id: sede_id)
       stocks = sede ? sede.stocks.includes(:lote, :genetica).disponibles.asignados.to_a : []
     else
       sede_stocks = current_user.club.sedes
                                 .flat_map { |s| s.stocks.includes(:lote, :genetica).disponibles.asignados }
-      pool_stocks = current_user.club.stocks.includes(:lote, :genetica).disponibles.asignados.del_club.to_a
+      pool_stocks = Stock.where(club_id: current_user.club_id).includes(:lote, :genetica).disponibles.asignados.del_club.to_a
       stocks = sede_stocks + pool_stocks
     end
 

@@ -1,7 +1,7 @@
 <template>
   <div class="stk">
 
-    <!-- Header -->
+    <!-- ── Header ─────────────────────────────────────────────── -->
     <div class="stk__header">
       <div>
         <h1 class="stk__title">Stock</h1>
@@ -18,7 +18,7 @@
 
     <template v-else>
 
-      <!-- KPIs -->
+      <!-- ── KPIs ───────────────────────────────────────────────── -->
       <div class="stk__kpis">
         <div class="stk__kpi">
           <div class="stk__kpi-ico">📦</div>
@@ -31,7 +31,7 @@
           <div class="stk__kpi-ico">⏳</div>
           <div class="stk__kpi-body">
             <div class="stk__kpi-val">{{ pendientes.length }}</div>
-            <div class="stk__kpi-lbl">Pendientes asignación</div>
+            <div class="stk__kpi-lbl">Por asignar</div>
           </div>
         </div>
         <div class="stk__kpi">
@@ -50,47 +50,48 @@
         </div>
       </div>
 
-      <!-- Tabs -->
+      <!-- ── Tabs ───────────────────────────────────────────────── -->
       <div class="stk__tabs">
         <button
           v-for="tab in TABS" :key="tab.key"
-          class="stk__tab"
-          :class="{ 'stk__tab--active': tabActiva === tab.key }"
+          class="stk__tab" :class="{ 'stk__tab--active': tabActiva === tab.key }"
           @click="tabActiva = tab.key"
         >
           {{ tab.label }}
-          <span v-if="tab.count > 0" class="stk__tab-count"
-            :class="tab.key === 'pendientes' && tab.count > 0 ? 'stk__tab-count--warn' : ''">
-            {{ tab.count }}
-          </span>
+          <span
+            v-if="tab.count != null"
+            class="stk__tab-badge"
+            :class="{ 'stk__tab-badge--warn': tab.key === 'por_asignar' && pendientes.length > 0 }"
+          >{{ tab.count }}</span>
         </button>
       </div>
 
-      <!-- Tab: Pendientes -->
-      <div v-if="tabActiva === 'pendientes'">
+      <!-- ── Tab: Por asignar ───────────────────────────────────── -->
+      <div v-if="tabActiva === 'por_asignar'">
         <div v-if="!pendientes.length" class="stk__empty">
           <span class="stk__empty-ico">✅</span>
           <p class="stk__empty-title">Todo asignado</p>
           <span class="stk__empty-sub">No hay stock pendiente de asignación a sede.</span>
         </div>
-        <div v-else class="stk__list">
-          <div v-for="s in pendientes" :key="s.id" class="stk__item">
-            <div class="stk__item-left">
-              <div class="stk__item-forma">{{ formaLabel(s.forma_producto) }}</div>
-              <div class="stk__item-chips">
+        <div v-else class="stk__pa-list">
+          <div v-for="s in pendientes" :key="s.id" class="stk__pa-card">
+            <div class="stk__pa-left">
+              <div class="stk__pa-forma">{{ formaLabel(s.forma_producto) }}</div>
+              <div class="stk__pa-chips">
                 <span class="stk__chip stk__chip--g">{{ s.cantidad }}g</span>
                 <span v-if="s.lote" class="stk__chip stk__chip--lote">{{ s.lote.codigo }}</span>
                 <span v-if="s.lote?.genetica" class="stk__chip stk__chip--gen">{{ s.lote.genetica.nombre }}</span>
                 <span v-if="s.origen === 'compra_externa'" class="stk__chip stk__chip--ext">Externo</span>
+                <span class="stk__chip stk__chip--muted">{{ timeAgo(s.created_at) }}</span>
               </div>
             </div>
-            <div class="stk__item-right">
+            <div class="stk__pa-right">
               <select v-model="asignaciones[s.id]" class="stk__select">
                 <option value="">Pool del club</option>
                 <option v-for="sede in sedes" :key="sede.id" :value="sede.id">{{ sede.nombre }}</option>
               </select>
               <button class="stk__btn-primary stk__btn-sm" :disabled="asignando === s.id" @click="asignar(s)">
-                <div v-if="asignando === s.id" class="stk__spinner stk__spinner--sm"></div>
+                <div v-if="asignando === s.id" class="stk__spin stk__spin--sm stk__spin--wh"></div>
                 <i v-else class="bi bi-check-lg"></i>
                 Asignar
               </button>
@@ -99,55 +100,101 @@
         </div>
       </div>
 
-      <!-- Tab: Inventario -->
+      <!-- ── Tab: Inventario ────────────────────────────────────── -->
       <div v-if="tabActiva === 'inventario'">
         <div v-if="!inventario.length" class="stk__empty">
           <span class="stk__empty-ico">📭</span>
           <p class="stk__empty-title">Sin stock asignado</p>
-          <span class="stk__empty-sub">
-            Cuando se apruebe una cosecha o cargues stock externo aparecerá aquí.
-          </span>
+          <span class="stk__empty-sub">Asigná stock desde "Por asignar" o agregá stock externo.</span>
           <button class="stk__btn-outline stk__empty-cta" @click="openCrear">
             <i class="bi bi-plus-lg"></i> Agregar stock externo
           </button>
         </div>
         <template v-else>
-          <!-- Filtro forma -->
           <div class="stk__filters">
             <button
               v-for="f in filtrosForma" :key="f.value"
-              class="stk__chip-btn"
-              :class="{ 'stk__chip-btn--active': filtroForma === f.value }"
+              class="stk__chip-btn" :class="{ 'stk__chip-btn--active': filtroForma === f.value }"
               @click="filtroForma = f.value"
             >{{ f.label }}</button>
           </div>
-
-          <!-- Agrupado por sede -->
           <div v-for="grupo in inventarioAgrupado" :key="grupo.sede_nombre" class="stk__grupo">
-            <div class="stk__grupo-header">
+            <div class="stk__grupo-hd">
               <span class="stk__grupo-nombre">🏪 {{ grupo.sede_nombre }}</span>
               <span class="stk__grupo-total">{{ grupo.total }}g</span>
             </div>
             <div class="stk__inv-list">
-              <div v-for="s in grupo.items" :key="s.id" class="stk__inv-item">
-                <div class="stk__inv-left">
+              <div v-for="s in grupo.items" :key="s.id" class="stk__inv-row">
+                <div class="stk__inv-main">
                   <span class="stk__inv-forma">{{ formaLabel(s.forma_producto) }}</span>
                   <div class="stk__inv-chips">
                     <span v-if="s.lote" class="stk__chip stk__chip--lote">{{ s.lote.codigo }}</span>
                     <span v-if="s.lote?.genetica" class="stk__chip stk__chip--gen">{{ s.lote.genetica.nombre }}</span>
+                    <span v-else-if="s.genetica" class="stk__chip stk__chip--gen">{{ s.genetica.nombre }}</span>
                     <span v-if="s.origen === 'compra_externa'" class="stk__chip stk__chip--ext">Externo</span>
                     <span v-if="s.proveedor" class="stk__chip">{{ s.proveedor }}</span>
                   </div>
                 </div>
                 <div class="stk__inv-right">
                   <span class="stk__inv-g">{{ s.cantidad }}g</span>
-                  <RouterLink
-                    v-if="s.codigo_qr"
-                    :to="`/s/${s.codigo_qr}`"
-                    class="stk__icon-btn"
-                    title="Ver QR"
-                  ><i class="bi bi-qr-code"></i></RouterLink>
+                  <RouterLink v-if="s.codigo_qr" :to="`/s/${s.codigo_qr}`" class="stk__icon-btn" title="Ver QR">
+                    <i class="bi bi-qr-code"></i>
+                  </RouterLink>
                 </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- ── Tab: Historial ─────────────────────────────────────── -->
+      <div v-if="tabActiva === 'historial'">
+        <div v-if="loadingHistorial" class="stk__loading">
+          <div class="stk__ring"></div> Cargando historial…
+        </div>
+        <template v-else>
+          <div class="stk__filters">
+            <button
+              v-for="f in FILTROS_ESTADO" :key="f.value"
+              class="stk__chip-btn" :class="{ 'stk__chip-btn--active': filtroEstado === f.value }"
+              @click="filtroEstado = f.value"
+            >{{ f.label }}</button>
+          </div>
+          <div v-if="!historialFiltrado.length" class="stk__empty">
+            <span class="stk__empty-ico">🗂️</span>
+            <p class="stk__empty-title">Sin registros</p>
+          </div>
+          <div v-else class="stk__hist">
+            <div class="stk__hist-hd">
+              <span class="stk__hist-col stk__hist-col--estado">Estado</span>
+              <span class="stk__hist-col stk__hist-col--producto">Producto</span>
+              <span class="stk__hist-col stk__hist-col--sede">Sede</span>
+              <span class="stk__hist-col stk__hist-col--cant">Cant.</span>
+              <span class="stk__hist-col stk__hist-col--fecha">Fecha</span>
+            </div>
+            <div v-for="s in historialFiltrado" :key="s.id" class="stk__hist-row">
+              <div class="stk__hist-col stk__hist-col--estado">
+                <span class="stk__badge" :class="`stk__badge--${s.estado}`">{{ estadoLabel(s.estado) }}</span>
+              </div>
+              <div class="stk__hist-col stk__hist-col--producto">
+                <span class="stk__hist-forma">{{ formaLabel(s.forma_producto) }}</span>
+                <div class="stk__hist-chips">
+                  <span v-if="s.lote" class="stk__chip stk__chip--lote stk__chip--xs">{{ s.lote.codigo }}</span>
+                  <span v-if="s.lote?.genetica || s.genetica" class="stk__chip stk__chip--gen stk__chip--xs">
+                    {{ s.lote?.genetica?.nombre || s.genetica?.nombre }}
+                  </span>
+                  <span v-if="s.origen === 'compra_externa'" class="stk__chip stk__chip--ext stk__chip--xs">Ext.</span>
+                </div>
+              </div>
+              <div class="stk__hist-col stk__hist-col--sede">
+                <span v-if="s.sede" class="stk__hist-sede-nm">{{ s.sede.nombre }}</span>
+                <span v-else class="stk__hist-pool">Pool</span>
+              </div>
+              <div class="stk__hist-col stk__hist-col--cant">
+                <span class="stk__hist-g">{{ s.cantidad }}g</span>
+              </div>
+              <div class="stk__hist-col stk__hist-col--fecha">
+                <span class="stk__hist-fecha">{{ formatDate(s.created_at) }}</span>
               </div>
             </div>
           </div>
@@ -156,7 +203,7 @@
 
     </template>
 
-    <!-- Modal crear stock externo -->
+    <!-- ── Modal: Agregar stock externo ──────────────────────────── -->
     <Teleport to="body">
       <Transition name="stk-fade">
         <div v-if="showCrear" class="stk__overlay" @click.self="closeCrear">
@@ -172,7 +219,6 @@
 
             <form class="stk__modal-body" @submit.prevent="guardarStock">
               <div v-if="crearError" class="stk__alert">{{ crearError }}</div>
-
               <div class="stk__form-grid">
                 <div class="stk__field stk__field--full">
                   <label class="stk__label">Forma del producto <span class="stk__req">*</span></label>
@@ -180,7 +226,6 @@
                     <option v-for="f in FORMAS" :key="f.value" :value="f.value">{{ f.label }}</option>
                   </select>
                 </div>
-
                 <div class="stk__field">
                   <label class="stk__label">Cantidad (g) <span class="stk__req">*</span></label>
                   <div class="stk__input-row">
@@ -188,7 +233,6 @@
                     <span class="stk__input-suf">g</span>
                   </div>
                 </div>
-
                 <div class="stk__field">
                   <label class="stk__label">Sede destino <span class="stk__opt">opcional</span></label>
                   <select class="stk__input" v-model="crearForm.sede_id">
@@ -196,7 +240,6 @@
                     <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
                   </select>
                 </div>
-
                 <div class="stk__field">
                   <label class="stk__label">Genética <span class="stk__opt">opcional</span></label>
                   <select class="stk__input" v-model="crearForm.genetica_id">
@@ -204,22 +247,18 @@
                     <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
                   </select>
                 </div>
-
                 <div class="stk__field">
                   <label class="stk__label">Precio sugerido (ARS/g) <span class="stk__opt">opcional</span></label>
                   <input type="number" min="0" step="0.01" class="stk__input" v-model="crearForm.precio_sugerido_ars" placeholder="0.00" />
                 </div>
-
                 <div class="stk__field">
                   <label class="stk__label">Costo unitario (ARS/g) <span class="stk__opt">opcional</span></label>
                   <input type="number" min="0" step="0.01" class="stk__input" v-model="crearForm.costo_unitario_ars" placeholder="0.00" />
                 </div>
-
                 <div class="stk__field stk__field--full">
                   <label class="stk__label">Proveedor <span class="stk__req">*</span></label>
                   <input type="text" class="stk__input" v-model="crearForm.proveedor" placeholder="Nombre del proveedor o productor" required />
                 </div>
-
                 <div class="stk__field stk__field--full">
                   <label class="stk__label">Notas <span class="stk__opt">opcional</span></label>
                   <textarea class="stk__input stk__textarea" rows="2" v-model="crearForm.descripcion" placeholder="Observaciones…"></textarea>
@@ -230,7 +269,7 @@
             <div class="stk__modal-ft">
               <button type="button" class="stk__btn-ghost" @click="closeCrear">Cancelar</button>
               <button class="stk__btn-primary" :disabled="creando || !crearForm.cantidad" @click="guardarStock">
-                <div v-if="creando" class="stk__spinner stk__spinner--sm stk__spinner--white"></div>
+                <div v-if="creando" class="stk__spin stk__spin--sm stk__spin--wh"></div>
                 <i v-else class="bi bi-plus-lg"></i>
                 Crear stock
               </button>
@@ -244,36 +283,59 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { listStocksPendientes, listStocks, asignarStock, listSedes, createStock, listGeneticas } from '../../lib/api.js'
+import { ref, computed, onMounted, watch } from 'vue'
+import {
+  listStocksPendientes, listStocks, listStocksHistorial,
+  asignarStock, listSedes, createStock, listGeneticas,
+} from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast = useToast()
 
-// ── Data ─────────────────────────────────────────────────────────────────────
-const loading   = ref(true)
-const pendientes = ref([])
-const inventario = ref([])
-const sedes      = ref([])
-const geneticas  = ref([])
+// ── State ──────────────────────────────────────────────────────────────────────
+const loading          = ref(true)
+const pendientes       = ref([])
+const inventario       = ref([])
+const historial        = ref([])
+const historialLoaded  = ref(false)
+const loadingHistorial = ref(false)
+const sedes            = ref([])
+const geneticas        = ref([])
 
-// ── Tabs ─────────────────────────────────────────────────────────────────────
-const tabActiva = ref('pendientes')
+// ── Tabs ───────────────────────────────────────────────────────────────────────
+const tabActiva = ref('por_asignar')
 const TABS = computed(() => [
-  { key: 'pendientes', label: '⏳ Pendientes', count: pendientes.value.length },
-  { key: 'inventario', label: '📦 Inventario',  count: inventario.value.length },
+  { key: 'por_asignar', label: '⏳ Por asignar', count: pendientes.value.length },
+  { key: 'inventario',  label: '📦 Inventario',  count: inventario.value.length },
+  { key: 'historial',   label: '📋 Historial',   count: null },
 ])
 
-// ── KPIs ─────────────────────────────────────────────────────────────────────
+watch(tabActiva, async (val) => {
+  if (val === 'historial' && !historialLoaded.value) {
+    loadingHistorial.value = true
+    try {
+      const { data } = await listStocksHistorial()
+      historial.value = data || []
+      historialLoaded.value = true
+    } catch { toast.error('Error al cargar historial') }
+    finally { loadingHistorial.value = false }
+  }
+})
+
+// ── KPIs ───────────────────────────────────────────────────────────────────────
 const totalG = computed(() =>
-  parseFloat((inventario.value.reduce((s, x) => s + x.cantidad, 0)).toFixed(1))
+  parseFloat(inventario.value.reduce((s, x) => s + x.cantidad, 0).toFixed(1))
 )
 const stockPropio = computed(() =>
-  parseFloat((inventario.value.filter(x => x.origen !== 'compra_externa').reduce((s, x) => s + x.cantidad, 0)).toFixed(1))
+  parseFloat(inventario.value
+    .filter(x => x.origen !== 'compra_externa')
+    .reduce((s, x) => s + x.cantidad, 0).toFixed(1))
 )
-const sedesConStock = computed(() => [...new Set(inventario.value.map(x => x.sede_id).filter(Boolean))])
+const sedesConStock = computed(() =>
+  [...new Set(inventario.value.map(x => x.sede_id).filter(Boolean))]
+)
 
-// ── Inventario filtros ────────────────────────────────────────────────────────
+// ── Inventario ─────────────────────────────────────────────────────────────────
 const filtroForma = ref('todos')
 const filtrosForma = computed(() => {
   const formas = [...new Set(inventario.value.map(x => x.forma_producto))]
@@ -298,54 +360,59 @@ const inventarioAgrupado = computed(() => {
   return Object.values(grupos).sort((a, b) => b.total - a.total)
 })
 
-// ── Load ──────────────────────────────────────────────────────────────────────
+// ── Historial ──────────────────────────────────────────────────────────────────
+const filtroEstado = ref('todos')
+const FILTROS_ESTADO = [
+  { value: 'todos',                label: 'Todos' },
+  { value: 'asignado',             label: 'Asignados' },
+  { value: 'pendiente_asignacion', label: 'Por asignar' },
+  { value: 'agotado',              label: 'Agotados' },
+]
+const historialFiltrado = computed(() =>
+  filtroEstado.value === 'todos'
+    ? historial.value
+    : historial.value.filter(s => s.estado === filtroEstado.value)
+)
+
+// ── Load ───────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
     const [rPend, rInv, rSedes, rGen] = await Promise.all([
-      listStocksPendientes(),
-      listStocks(),
-      listSedes(),
-      listGeneticas(),
+      listStocksPendientes(), listStocks(), listSedes(), listGeneticas(),
     ])
     pendientes.value = rPend.data || []
     inventario.value = rInv.data  || []
     sedes.value      = rSedes.data || []
     geneticas.value  = rGen.data  || []
-
     pendientes.value.forEach(s => { asignaciones.value[s.id] = '' })
-
-    // Si no hay pendientes, abrir directamente inventario
     if (!pendientes.value.length) tabActiva.value = 'inventario'
-  } catch {
-    toast.error('Error al cargar stocks')
-  } finally {
-    loading.value = false
-  }
+  } catch { toast.error('Error al cargar stocks') }
+  finally { loading.value = false }
 })
 
-// ── Asignar ───────────────────────────────────────────────────────────────────
+// ── Asignar ────────────────────────────────────────────────────────────────────
 const asignando    = ref(null)
 const asignaciones = ref({})
 
 async function asignar(stock) {
   asignando.value = stock.id
   try {
-    const sede_id = asignaciones.value[stock.id] || null
-    await asignarStock(stock.id, { sede_id })
+    await asignarStock(stock.id, { sede_id: asignaciones.value[stock.id] || null })
     pendientes.value = pendientes.value.filter(s => s.id !== stock.id)
-    // Refrescar inventario
     const { data } = await listStocks()
     inventario.value = data || []
+    if (historialLoaded.value) {
+      const { data: h } = await listStocksHistorial()
+      historial.value = h || []
+    }
     toast.success('Stock asignado')
     if (!pendientes.value.length) tabActiva.value = 'inventario'
   } catch (e) {
     toast.error(e.response?.data?.error || 'Error al asignar')
-  } finally {
-    asignando.value = null
-  }
+  } finally { asignando.value = null }
 }
 
-// ── Crear stock externo ───────────────────────────────────────────────────────
+// ── Crear stock externo ────────────────────────────────────────────────────────
 const showCrear  = ref(false)
 const creando    = ref(false)
 const crearError = ref(null)
@@ -363,24 +430,25 @@ function closeCrear() { showCrear.value = false }
 async function guardarStock() {
   crearError.value = null
   if (!crearForm.value.cantidad || Number(crearForm.value.cantidad) <= 0) {
-    crearError.value = 'La cantidad debe ser mayor a 0'
-    return
+    crearError.value = 'La cantidad debe ser mayor a 0'; return
   }
   if (!crearForm.value.proveedor?.trim()) {
-    crearError.value = 'El proveedor es obligatorio'
-    return
+    crearError.value = 'El proveedor es obligatorio'; return
   }
   creando.value = true
   try {
     const p = {
-      origen: 'compra_externa', forma_producto: crearForm.value.forma_producto,
-      cantidad: Number(crearForm.value.cantidad), unidad: 'g', estado: 'asignado',
+      origen: 'compra_externa',
+      forma_producto: crearForm.value.forma_producto,
+      cantidad:  Number(crearForm.value.cantidad),
+      unidad:    'g',
+      estado:    'asignado',
+      proveedor: crearForm.value.proveedor,
     }
     if (crearForm.value.sede_id)             p.sede_id             = Number(crearForm.value.sede_id)
     if (crearForm.value.genetica_id)         p.genetica_id         = Number(crearForm.value.genetica_id)
     if (crearForm.value.precio_sugerido_ars) p.precio_sugerido_ars = Number(crearForm.value.precio_sugerido_ars)
     if (crearForm.value.costo_unitario_ars)  p.costo_unitario_ars  = Number(crearForm.value.costo_unitario_ars)
-    p.proveedor = crearForm.value.proveedor
     if (crearForm.value.descripcion)         p.descripcion         = crearForm.value.descripcion
 
     await createStock(p)
@@ -389,15 +457,17 @@ async function guardarStock() {
     const [rPend, rInv] = await Promise.all([listStocksPendientes(), listStocks()])
     pendientes.value = rPend.data || []
     inventario.value = rInv.data  || []
-    tabActiva.value  = 'inventario'
+    if (historialLoaded.value) {
+      const { data: h } = await listStocksHistorial()
+      historial.value = h || []
+    }
+    tabActiva.value = 'inventario'
   } catch (e) {
     crearError.value = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al crear el stock'
-  } finally {
-    creando.value = false
-  }
+  } finally { creando.value = false }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 const FORMAS = [
   { value: 'flor_seca',  label: 'Flor seca' },
   { value: 'hash',       label: 'Hash' },
@@ -412,13 +482,26 @@ const FORMAS = [
 ]
 const FORMA_MAP = Object.fromEntries(FORMAS.map(f => [f.value, f.label]))
 function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
+
+function estadoLabel(e) {
+  return { pendiente_asignacion: 'Por asignar', asignado: 'Asignado', agotado: 'Agotado' }[e] || e
+}
+function timeAgo(dateStr) {
+  const d = Math.floor((Date.now() - new Date(dateStr)) / 86400000)
+  if (d === 0) return 'hoy'
+  if (d === 1) return 'ayer'
+  return `hace ${d} días`
+}
+function formatDate(dateStr) {
+  return new Date(dateStr).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+}
 </script>
 
 <style scoped>
 .stk { padding: 1.5rem 1.75rem 3rem; }
 @media (max-width: 640px) { .stk { padding: 1rem 1rem 2rem; } }
 
-/* Header */
+/* ── Header ─────────────────────────────────────────────────────────────────── */
 .stk__header {
   display: flex; align-items: center; justify-content: space-between;
   gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap;
@@ -426,7 +509,7 @@ function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 .stk__title { font-size: 1.6rem; font-weight: 800; color: #0f172a; letter-spacing: -.04em; margin: 0 0 .2rem; }
 .stk__sub   { font-size: .82rem; color: #64748b; margin: 0; }
 
-/* Buttons */
+/* ── Buttons ────────────────────────────────────────────────────────────────── */
 .stk__btn-primary {
   display: inline-flex; align-items: center; gap: .4rem;
   background: #1b5e20; color: #fff; border: none; border-radius: 8px;
@@ -435,7 +518,7 @@ function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 }
 .stk__btn-primary:hover:not(:disabled) { background: #144a18; }
 .stk__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-.stk__btn-sm { padding: .4rem .85rem; font-size: .78rem; }
+.stk__btn-sm    { padding: .42rem .85rem; font-size: .78rem; }
 .stk__btn-ghost {
   display: inline-flex; align-items: center; gap: .4rem;
   background: transparent; color: #475569; border: 1.5px solid #e2e8f0;
@@ -451,14 +534,13 @@ function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 }
 .stk__btn-outline:hover { background: #f0fdf4; }
 
-/* KPIs */
+/* ── KPIs ───────────────────────────────────────────────────────────────────── */
 .stk__kpis {
   display: grid; grid-template-columns: repeat(4, 1fr);
   gap: .875rem; margin-bottom: 1.75rem;
 }
 @media (max-width: 700px) { .stk__kpis { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 400px) { .stk__kpis { grid-template-columns: 1fr; } }
-
 .stk__kpi {
   background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
   padding: 1rem 1.1rem; display: flex; align-items: flex-start; gap: .65rem;
@@ -471,7 +553,7 @@ function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 .stk__kpi-unit { font-size: 1rem; font-weight: 500; color: #94a3b8; margin-left: 2px; }
 .stk__kpi-lbl  { font-size: .68rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .05em; }
 
-/* Tabs */
+/* ── Tabs ───────────────────────────────────────────────────────────────────── */
 .stk__tabs { display: flex; gap: .35rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
 .stk__tab {
   display: inline-flex; align-items: center; gap: .4rem;
@@ -481,60 +563,41 @@ function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 }
 .stk__tab:hover { border-color: #a5d6a7; background: #f0fdf4; }
 .stk__tab--active { background: #0f172a; color: #fff; border-color: #0f172a; }
-.stk__tab-count {
+.stk__tab-badge {
   min-width: 18px; height: 18px; background: #e2e8f0; color: #475569;
   border-radius: 999px; font-size: .62rem; font-weight: 800;
   display: inline-flex; align-items: center; justify-content: center; padding: 0 4px;
 }
-.stk__tab--active .stk__tab-count { background: rgba(255,255,255,.2); color: #fff; }
-.stk__tab-count--warn { background: #fcd34d; color: #92400e; }
+.stk__tab--active .stk__tab-badge { background: rgba(255,255,255,.2); color: #fff; }
+.stk__tab-badge--warn { background: #fcd34d; color: #92400e; }
 
-/* Loading */
+/* ── Loading / Empty ────────────────────────────────────────────────────────── */
 .stk__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; color: #94a3b8; justify-content: center; font-size: .9rem; }
 .stk__ring    { width: 20px; height: 20px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: stk-spin .7s linear infinite; }
 @keyframes stk-spin { to { transform: rotate(360deg); } }
+.stk__spin { width: 14px; height: 14px; border: 2px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: stk-spin .6s linear infinite; }
+.stk__spin--sm { width: 12px; height: 12px; }
+.stk__spin--wh { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
 
-/* Spinners */
-.stk__spinner { width: 14px; height: 14px; border: 2px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: stk-spin .6s linear infinite; }
-.stk__spinner--sm    { width: 12px; height: 12px; }
-.stk__spinner--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
-
-/* Empty */
 .stk__empty { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3.5rem 1rem; text-align: center; }
 .stk__empty-ico   { font-size: 2.5rem; }
 .stk__empty-title { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0; }
 .stk__empty-sub   { font-size: .82rem; color: #64748b; margin: 0; }
 .stk__empty-cta   { margin-top: .75rem; }
 
-/* Pending list */
-.stk__list { display: flex; flex-direction: column; gap: .75rem; }
-.stk__item {
-  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-  padding: 1rem 1.25rem; display: flex; align-items: center;
-  justify-content: space-between; gap: 1rem; flex-wrap: wrap;
-}
-.stk__item-left  { flex: 1; min-width: 0; }
-.stk__item-forma { font-size: .95rem; font-weight: 700; color: #0f172a; margin-bottom: .35rem; }
-.stk__item-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
-.stk__item-right { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; flex-wrap: wrap; }
-
-.stk__select {
-  padding: .42rem .75rem; border: 1.5px solid #e2e8f0; border-radius: 8px;
-  font-size: .82rem; color: #0f172a; background: #fff; cursor: pointer; min-width: 160px;
-}
-.stk__select:focus { outline: none; border-color: #1b5e20; }
-
-/* Chips */
+/* ── Chips ──────────────────────────────────────────────────────────────────── */
 .stk__chip {
   font-size: .68rem; font-weight: 600; padding: .2em .6em; border-radius: 5px;
   background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
 }
+.stk__chip--xs   { font-size: .62rem; padding: .15em .5em; }
 .stk__chip--g    { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
 .stk__chip--lote { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 .stk__chip--gen  { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
 .stk__chip--ext  { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.stk__chip--muted { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
 
-/* Filter chips */
+/* ── Filters ────────────────────────────────────────────────────────────────── */
 .stk__filters { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .stk__chip-btn {
   background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
@@ -544,26 +607,42 @@ function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 .stk__chip-btn:hover { border-color: #1b5e20; color: #1b5e20; }
 .stk__chip-btn--active { background: #1b5e20; color: #fff; border-color: #1b5e20; }
 
-/* Inventory groups */
-.stk__grupo { margin-bottom: 1.25rem; }
-.stk__grupo-header {
+/* ── Por asignar ────────────────────────────────────────────────────────────── */
+.stk__pa-list { display: flex; flex-direction: column; gap: .75rem; }
+.stk__pa-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 1rem 1.25rem; display: flex; align-items: center;
+  justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+}
+.stk__pa-left  { flex: 1; min-width: 0; }
+.stk__pa-forma { font-size: .95rem; font-weight: 700; color: #0f172a; margin-bottom: .35rem; }
+.stk__pa-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+.stk__pa-right { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; flex-wrap: wrap; }
+.stk__select {
+  padding: .42rem .75rem; border: 1.5px solid #e2e8f0; border-radius: 8px;
+  font-size: .82rem; color: #0f172a; background: #fff; cursor: pointer; min-width: 160px;
+}
+.stk__select:focus { outline: none; border-color: #1b5e20; }
+
+/* ── Inventario ─────────────────────────────────────────────────────────────── */
+.stk__grupo       { margin-bottom: 1.25rem; }
+.stk__grupo-hd {
   display: flex; align-items: center; justify-content: space-between;
   padding: .5rem .75rem; background: #f8fafc; border: 1px solid #e2e8f0;
   border-radius: 8px 8px 0 0; border-bottom: none;
 }
 .stk__grupo-nombre { font-size: .8rem; font-weight: 700; color: #374151; }
 .stk__grupo-total  { font-size: .8rem; font-weight: 700; color: #15803d; }
-
 .stk__inv-list { border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px; overflow: hidden; }
-.stk__inv-item {
+.stk__inv-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: 1rem; padding: .75rem 1rem; background: #fff;
   border-bottom: 1px solid #f1f5f9;
 }
-.stk__inv-item:last-child { border-bottom: none; }
-.stk__inv-left  { flex: 1; min-width: 0; }
+.stk__inv-row:last-child { border-bottom: none; }
+.stk__inv-main  { flex: 1; min-width: 0; }
 .stk__inv-right { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
-.stk__inv-forma { font-size: .88rem; font-weight: 600; color: #0f172a; margin-bottom: .25rem; }
+.stk__inv-forma { font-size: .88rem; font-weight: 600; color: #0f172a; display: block; margin-bottom: .25rem; }
 .stk__inv-chips { display: flex; flex-wrap: wrap; gap: .25rem; }
 .stk__inv-g     { font-size: .95rem; font-weight: 800; color: #15803d; }
 .stk__icon-btn  {
@@ -573,14 +652,60 @@ function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 }
 .stk__icon-btn:hover { border-color: #1b5e20; color: #1b5e20; background: #f0fdf4; }
 
-/* Modal */
+/* ── Historial ──────────────────────────────────────────────────────────────── */
+.stk__hist { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+
+.stk__hist-hd {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .5rem 1rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+}
+.stk__hist-row {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .65rem 1rem; border-bottom: 1px solid #f1f5f9;
+  transition: background .1s;
+}
+.stk__hist-row:last-child { border-bottom: none; }
+.stk__hist-row:hover { background: #f8fafc; }
+
+.stk__hist-col { display: flex; flex-direction: column; justify-content: center; }
+.stk__hist-hd .stk__hist-col { font-size: .68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; flex-direction: row; align-items: center; }
+
+.stk__hist-col--estado  { width: 100px; flex-shrink: 0; }
+.stk__hist-col--producto { flex: 1; min-width: 0; }
+.stk__hist-col--sede    { width: 130px; flex-shrink: 0; }
+.stk__hist-col--cant    { width: 70px; flex-shrink: 0; text-align: right; }
+.stk__hist-col--fecha   { width: 80px; flex-shrink: 0; text-align: right; }
+
+@media (max-width: 640px) {
+  .stk__hist-col--sede  { display: none; }
+  .stk__hist-col--fecha { display: none; }
+  .stk__hist-hd { display: none; }
+}
+
+.stk__hist-forma   { font-size: .82rem; font-weight: 600; color: #0f172a; }
+.stk__hist-chips   { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .2rem; }
+.stk__hist-sede-nm { font-size: .78rem; color: #374151; }
+.stk__hist-pool    { font-size: .75rem; color: #94a3b8; font-style: italic; }
+.stk__hist-g       { font-size: .82rem; font-weight: 700; color: #15803d; }
+.stk__hist-fecha   { font-size: .75rem; color: #94a3b8; }
+
+/* ── Estado badges ──────────────────────────────────────────────────────────── */
+.stk__badge {
+  display: inline-flex; align-items: center;
+  padding: .22em .65em; border-radius: 5px;
+  font-size: .68rem; font-weight: 700; white-space: nowrap;
+}
+.stk__badge--pendiente_asignacion { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.stk__badge--asignado             { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.stk__badge--agotado              { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+
+/* ── Modal ──────────────────────────────────────────────────────────────────── */
 .stk__overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); backdrop-filter: blur(3px);
   display: flex; align-items: flex-end; justify-content: center;
   z-index: 200; padding: 1rem;
 }
 @media (min-width: 640px) { .stk__overlay { align-items: center; } }
-
 .stk__modal {
   background: #fff; border-radius: 16px;
   width: 100%; max-width: 540px; max-height: 92vh;
@@ -606,7 +731,6 @@ function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 .stk__modal-close:hover { background: #e2e8f0; }
 .stk__modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; }
 .stk__modal-ft   { display: flex; justify-content: flex-end; gap: .5rem; padding: 1rem 1.25rem; border-top: 1px solid #f1f5f9; }
-
 .stk__form-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: .875rem; }
 @media (max-width: 480px) { .stk__form-grid { grid-template-columns: 1fr; } }
 .stk__field      { display: flex; flex-direction: column; gap: .3rem; }

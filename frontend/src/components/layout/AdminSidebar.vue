@@ -115,7 +115,7 @@ const GRUPOS = [
     defaultOpen: false,
     items: [
       { to: '/sedes',              icon: Building2,  label: 'Sedes' },
-      { to: '/stock',              icon: Boxes,      label: 'Stock' },
+      { to: '/admin/stock', icon: Boxes, label: 'Stock' },
       { to: '/delivery/despachos', icon: Truck,      label: 'Despachos' },
       { to: '/tareas',             icon: CheckSquare,  label: 'Tareas' },
       { to: '/plan-trabajo',       icon: ClipboardList, label: 'Plan de trabajo' },

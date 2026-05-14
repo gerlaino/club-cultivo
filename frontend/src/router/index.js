@@ -386,8 +386,9 @@ const routes = [
   },
 
   {
-    path: '/admin/stocks/pendientes',
-    name: 'admin-stocks-pendientes',
+    path: '/admin/stock',
+    alias: '/admin/stocks/pendientes',
+    name: 'admin-stock',
     component: () => import('../views/admin/AdminStocksPendientesView.vue'),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {

@@ -92,8 +92,13 @@ class PlantsController < ApplicationController
     unless params[:foto].present?
       return render json: { error: 'No se recibió ninguna foto' }, status: :unprocessable_entity
     end
-    @plant.fotos.attach(params[:foto])
+    begin
+      @plant.fotos.attach(params[:foto])
+    rescue RedisClient::CannotConnectError, Redis::CannotConnectError => e
+      Rails.logger.warn "[add_foto] Redis no disponible, análisis de imagen omitido: #{e.message}"
+    end
     blob = @plant.fotos.blobs.order(created_at: :desc).first
+    return render json: { error: 'Error al guardar la foto' }, status: :unprocessable_entity unless blob
     render json: serialize_blob(blob), status: :created
   end
 
@@ -216,6 +221,7 @@ class PlantsController < ApplicationController
         id:     plant.lote.id,
         codigo: plant.lote.codigo,
         estado: plant.lote.estado,
+        sala:   plant.lote.sala ? { id: plant.lote.sala.id, nombre: plant.lote.sala.nombre } : nil,
       },
       genetica: g ? { id: g.id, nombre: g.nombre, tipo: g.tipo } : nil,
       fecha_germinacion:      plant.fecha_germinacion,
