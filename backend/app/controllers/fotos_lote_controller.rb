@@ -9,11 +9,17 @@ class FotosLoteController < ApplicationController
 
   def create
     unless params[:foto].present?
-      render json: { error: 'No se recibió ninguna foto' }, status: :unprocessable_entity and return
+      return render json: { error: 'No se recibió ninguna foto' }, status: :unprocessable_entity
     end
 
-    @lote.fotos.attach(params[:foto])
+    begin
+      @lote.fotos.attach(params[:foto])
+    rescue RedisClient::CannotConnectError, Redis::CannotConnectError => e
+      Rails.logger.warn "[fotos_lote] Redis no disponible: #{e.message}"
+    end
+
     blob = @lote.fotos.blobs.order(created_at: :desc).first
+    return render json: { error: 'Error al guardar la foto' }, status: :unprocessable_entity unless blob
 
     if params[:descripcion].present?
       blob.update!(metadata: blob.metadata.merge('descripcion' => params[:descripcion].to_s.strip))

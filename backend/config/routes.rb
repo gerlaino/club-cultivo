@@ -67,6 +67,7 @@ Rails.application.routes.draw do
     resources :lotes, only: [:index, :show, :update, :destroy] do
       collection do
         get :export_csv
+        get :proximo_codigo
       end
       resource :costo, controller: :costo_lotes, only: [:show, :create, :update]
       resources :registros_ambientales, only: [:index, :create, :destroy]

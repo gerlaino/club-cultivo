@@ -81,6 +81,7 @@ class LotesController < ApplicationController
 
     ActiveRecord::Base.transaction do
       @lote.save!
+      crear_lote_heredado(@lote, params) if params[:heredado].in?([true, 'true', '1'])
       if plantas_iniciales > 0
         state_inicial = estado_a_state(@lote.estado)
         plantas_iniciales.times do |i|
@@ -174,6 +175,19 @@ class LotesController < ApplicationController
               filename:    "lotes_#{Date.today}.csv",
               type:        "text/csv; charset=utf-8",
               disposition: "attachment"
+  end
+
+  # GET /lotes/proximo_codigo
+  def proximo_codigo
+    club      = current_user.club
+    anio      = Date.today.strftime("%y")
+    count     = club.lotes.count + 1
+    candidate = "L-#{anio}-#{count.to_s.rjust(3, '0')}"
+    while Lote.exists?(club: club, codigo: candidate)
+      count    += 1
+      candidate = "L-#{anio}-#{count.to_s.rjust(3, '0')}"
+    end
+    render json: { codigo: candidate }
   end
 
   # DELETE /lotes/:id
@@ -731,6 +745,69 @@ class LotesController < ApplicationController
     usadas = lote.plants.where.not(pasada_cosecha: nil).distinct.pluck(:pasada_cosecha)
     letra  = ('A'..'Z').find { |l| usadas.exclude?(l) }
     letra || "#{usadas.length + 1}"
+  end
+
+  def crear_lote_heredado(lote, params)
+    estado         = lote.estado
+    origen         = lote.origen || 'semilla'
+    dias_semilla   = params[:dias_semilla_esqueje].to_i
+    dias_vege      = params[:dias_vegetativo].to_i
+    dias_flora     = params[:dias_floracion].to_i
+    dias_cos       = params[:dias_cosecha].to_i
+
+    total_dias = case estado
+                 when 'semilla', 'esqueje' then dias_semilla
+                 when 'vegetativo'         then dias_semilla + dias_vege
+                 when 'floracion'          then dias_semilla + dias_vege + dias_flora
+                 when 'cosecha'            then dias_semilla + dias_vege + dias_flora + dias_cos
+                 else 0
+                 end
+
+    return if total_dias <= 0
+
+    fecha_inicio = total_dias.days.ago.to_date
+    lote.update_column(:start_date, fecha_inicio)
+
+    estado_inicial = origen == 'esqueje' ? 'esqueje' : 'semilla'
+
+    if %w[vegetativo floracion cosecha].include?(estado)
+      fecha_vege = fecha_inicio + dias_semilla
+      lote.lote_eventos.create!(
+        tipo:            'cambio_estado',
+        estado_anterior: estado_inicial,
+        estado_nuevo:    'vegetativo',
+        descripcion:     "#{estado_inicial.capitalize} → Vegetativo (carga heredada)",
+        user:            current_user,
+        club:            current_user.club,
+        registrado_en:   fecha_vege.to_time,
+      )
+    end
+
+    if %w[floracion cosecha].include?(estado)
+      fecha_flora = fecha_inicio + dias_semilla + dias_vege
+      lote.lote_eventos.create!(
+        tipo:            'cambio_estado',
+        estado_anterior: 'vegetativo',
+        estado_nuevo:    'floracion',
+        descripcion:     "Vegetativo → Floración (carga heredada)",
+        user:            current_user,
+        club:            current_user.club,
+        registrado_en:   fecha_flora.to_time,
+      )
+    end
+
+    if estado == 'cosecha'
+      fecha_cosecha = fecha_inicio + dias_semilla + dias_vege + dias_flora
+      lote.lote_eventos.create!(
+        tipo:            'cambio_estado',
+        estado_anterior: 'floracion',
+        estado_nuevo:    'cosecha',
+        descripcion:     "Floración → Cosecha (carga heredada)",
+        user:            current_user,
+        club:            current_user.club,
+        registrado_en:   fecha_cosecha.to_time,
+      )
+    end
   end
 
   def require_admin_cultivador_o_manicura

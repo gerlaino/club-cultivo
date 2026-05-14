@@ -99,6 +99,11 @@ class PlantsController < ApplicationController
     end
     blob = @plant.fotos.blobs.order(created_at: :desc).first
     return render json: { error: 'Error al guardar la foto' }, status: :unprocessable_entity unless blob
+
+    if params[:descripcion].present?
+      blob.update!(metadata: blob.metadata.merge('descripcion' => params[:descripcion].to_s.strip))
+    end
+
     render json: serialize_blob(blob), status: :created
   end
 
@@ -274,6 +279,7 @@ class PlantsController < ApplicationController
       id:               blob.id,
       filename:         blob.filename.to_s,
       url:              url_for(blob),
+      descripcion:      blob.metadata['descripcion'],
       content_type:     blob.content_type,
       created_at_label: blob.created_at.strftime('%d/%m/%Y %H:%M'),
     }

@@ -40,6 +40,10 @@ const historialExpanded= ref(true)
 const fotos            = ref([])
 const fotoInput        = ref(null)
 const uploadingFoto    = ref(false)
+const showFotoUploadModal   = ref(false)
+const fotoUploadFile        = ref(null)
+const fotoUploadDescripcion = ref('')
+const fotoUploadPreview     = ref(null)
 const lightboxOpen     = ref(false)
 const lightboxIndex    = ref(0)
 const lightboxImages   = computed(() => fotos.value.map(f => ({ src: f.url, alt: f.filename })))
@@ -213,22 +217,41 @@ async function guardarRegistro() {
 function toggleFotos() {
   fotosExpanded.value = !fotosExpanded.value
 }
-async function handleFotoUpload(event) {
+function handleFotoUpload(event) {
   const file = event.target.files?.[0]
   if (!file) return
+  fotoUploadFile.value        = file
+  fotoUploadDescripcion.value = ''
+  fotoUploadPreview.value     = URL.createObjectURL(file)
+  showFotoUploadModal.value   = true
+  event.target.value = ''
+}
+
+async function confirmarSubidaFoto() {
+  if (!fotoUploadFile.value) return
   uploadingFoto.value = true
   try {
     const fd = new FormData()
-    fd.append('foto', file)
+    fd.append('foto', fotoUploadFile.value)
+    if (fotoUploadDescripcion.value.trim()) fd.append('descripcion', fotoUploadDescripcion.value.trim())
     const { data } = await addPlantFoto(planta.value.id, fd)
     if (data) fotos.value.unshift(data)
-    fotosExpanded.value = true
+    fotosExpanded.value     = true
+    showFotoUploadModal.value = false
   } catch (e) {
     toast.error(e?.response?.data?.error || 'Error al subir la foto')
   } finally {
     uploadingFoto.value = false
-    event.target.value = ''
+    fotoUploadFile.value = null
+    fotoUploadPreview.value = null
   }
+}
+
+function cancelarSubidaFoto() {
+  showFotoUploadModal.value   = false
+  fotoUploadFile.value        = null
+  fotoUploadDescripcion.value = ''
+  fotoUploadPreview.value     = null
 }
 
 async function handleFotoDelete(blobId) {
@@ -631,6 +654,7 @@ onMounted(async () => {
                 <div v-for="(f, i) in fotos" :key="f.id" class="pd__foto">
                   <img :src="f.url" :alt="f.filename" class="pd__foto-img" @click="openLightbox(i)" style="cursor:pointer" />
                   <div class="pd__foto-meta">{{ f.created_at_label }}</div>
+                  <div v-if="f.descripcion" class="pd__foto-desc">{{ f.descripcion }}</div>
                   <button
                     v-if="auth.user?.role !== 'manicura'"
                     class="pd__foto-del"
@@ -999,6 +1023,46 @@ onMounted(async () => {
       </div>
     </Teleport>
 
+    <!-- ══ Modal subir foto ══ -->
+    <Teleport to="body">
+      <div v-if="showFotoUploadModal" class="pd__overlay" @click.self="cancelarSubidaFoto">
+        <div class="pd__modal pd__modal--foto">
+          <div class="pd__modal-header">
+            <div>
+              <h3 class="pd__modal-title">📷 Subir foto</h3>
+              <p class="pd__modal-sub">{{ planta?.nombre || planta?.codigo_qr }}</p>
+            </div>
+            <button class="pd__modal-close" @click="cancelarSubidaFoto"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="pd__modal-body">
+            <div v-if="fotoUploadPreview" class="pd__foto-preview-wrap">
+              <img :src="fotoUploadPreview" class="pd__foto-preview-img" alt="preview" />
+            </div>
+            <div class="pd__field pd__field--full" style="margin-top:.75rem">
+              <label class="pd__label">Descripción <span class="pd__optional">opcional</span></label>
+              <input
+                type="text"
+                class="pd__input"
+                v-model.trim="fotoUploadDescripcion"
+                placeholder="Ej: Día 14 floración, vista superior"
+                maxlength="200"
+                autofocus
+                @keydown.enter.prevent="confirmarSubidaFoto"
+                @keydown.esc.prevent="cancelarSubidaFoto"
+              />
+            </div>
+          </div>
+          <div class="pd__modal-footer">
+            <button class="pd__btn-ghost" @click="cancelarSubidaFoto">Cancelar</button>
+            <button class="pd__btn-primary" @click="confirmarSubidaFoto" :disabled="uploadingFoto">
+              <span v-if="uploadingFoto" class="pd__spinner pd__spinner--sm"></span>
+              <i v-else class="bi bi-cloud-upload"></i>Subir foto
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <Lightbox
       :images="lightboxImages"
       :index="lightboxIndex"
@@ -1140,6 +1204,7 @@ onMounted(async () => {
 .pd__foto { border-radius: 10px; overflow: hidden; border: 1px solid #d4e6d4; position: relative; }
 .pd__foto-img { width: 100%; height: 110px; object-fit: cover; display: block; }
 .pd__foto-meta { font-size: .65rem; color: #94a3b8; padding: .3rem .5rem; background: #f4f8f4; text-align: center; }
+.pd__foto-desc { font-size: .68rem; color: #374151; padding: .25rem .5rem .35rem; background: #f4f8f4; border-top: 1px solid #e8f0e9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pd__foto-del {
   position: absolute; top: .35rem; right: .35rem;
   width: 22px; height: 22px; border-radius: 50%;
@@ -1148,6 +1213,11 @@ onMounted(async () => {
   opacity: 0; transition: opacity .15s;
 }
 .pd__foto:hover .pd__foto-del { opacity: 1; }
+
+/* Foto upload modal */
+.pd__modal--foto { max-width: 400px; }
+.pd__foto-preview-wrap { display: flex; justify-content: center; }
+.pd__foto-preview-img { max-height: 220px; max-width: 100%; border-radius: 10px; border: 1px solid #d4e6d4; object-fit: contain; }
 
 /* Aside */
 .pd__aside {}

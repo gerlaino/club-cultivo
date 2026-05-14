@@ -8,7 +8,7 @@ import { useAuthStore } from "../stores/auth"
 import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
 import ModalCargarLote from '../components/salas/ModalCargarLote.vue'
 import RegistrarLecturaModal from '../components/salas/RegistrarLecturaModal.vue'
-import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala } from '../lib/api.js'
+import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 import { Gauge } from 'lucide-vue-next'
@@ -279,11 +279,24 @@ async function onLoteCargado() {
 const KIND_TO_ESTADO = { floracion:"floracion", secado:"secado", manicura:"curado" }
 const KINDS_CON_ORIGEN = ['vegetativo', 'madre', 'clon', 'mixta']
 
-const showCreate   = ref(false)
-const loteForm     = ref(emptyLoteForm())
-const loteErrors   = ref({})
-const loteApiError = ref(null)
-const showUpgrade  = ref(false)
+const ESTADOS_HEREDADO = [
+  { value: 'semilla',    label: 'Semilla / Esqueje' },
+  { value: 'vegetativo', label: 'Vegetativo' },
+  { value: 'floracion',  label: 'Floración' },
+  { value: 'cosecha',    label: 'Cosecha' },
+]
+
+const showCreate     = ref(false)
+const loteForm       = ref(emptyLoteForm())
+const loteErrors     = ref({})
+const loteApiError   = ref(null)
+const showUpgrade    = ref(false)
+const creandoLote    = ref(false)
+const tipoCreacion   = ref('nuevo')
+const proximoCodigo  = ref('')
+const loadingCodigo  = ref(false)
+const heredadoEstado = ref('semilla')
+const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 })
 const plantasMadre    = ref([])
 const loadingMadres   = ref(false)
 const madreQuery      = ref('')
@@ -316,6 +329,19 @@ const madreAgrupado = computed(() => {
     salas[salaId].lotes[loteId].plants.push(p)
   }
   return Object.values(salas).map(s => ({ ...s, lotes: Object.values(s.lotes) }))
+})
+
+const heredadoStartDatePreview = computed(() => {
+  const e = heredadoEstado.value
+  const d = heredadoDias.value
+  let total = d.semilla_esqueje
+  if (['vegetativo','floracion','cosecha'].includes(e)) total += d.vegetativo
+  if (['floracion','cosecha'].includes(e))              total += d.floracion
+  if (e === 'cosecha')                                  total += d.cosecha
+  if (total <= 0) return null
+  const date = new Date()
+  date.setDate(date.getDate() - total)
+  return date.toISOString().slice(0, 10)
 })
 
 function emptyLoteForm() {
@@ -383,17 +409,38 @@ function validateLote(form) {
 }
 
 async function createLote() {
+  if (tipoCreacion.value === 'existente') {
+    const estadoReal = (heredadoEstado.value === 'semilla' && loteForm.value.origen === 'esqueje')
+      ? 'esqueje' : heredadoEstado.value
+    loteForm.value.estado = estadoReal
+  }
   const e = validateLote(loteForm.value)
-  loteErrors.value = e
+  loteErrors.value   = e
   loteApiError.value = null
   if (Object.keys(e).length) return
+
+  creandoLote.value = true
   try {
     const payload = { ...loteForm.value }
-    if (!payload.genetica_id)    delete payload.genetica_id
-    if (!payload.light_type)     delete payload.light_type
+    if (!payload.genetica_id)     delete payload.genetica_id
+    if (!payload.light_type)      delete payload.light_type
     if (!payload.planta_madre_id) delete payload.planta_madre_id
-    if (!payload.origen)         delete payload.origen
-    await lotes.createInSala(salaId, payload)
+
+    if (tipoCreacion.value === 'existente') {
+      delete payload.start_date
+      if (!payload.origen) payload.origen = 'semilla'
+      await createLoteHeredado(salaId, payload, {
+        dias_semilla_esqueje: heredadoDias.value.semilla_esqueje || 0,
+        dias_vegetativo:      heredadoDias.value.vegetativo      || 0,
+        dias_floracion:       heredadoDias.value.floracion        || 0,
+        dias_cosecha:         heredadoDias.value.cosecha          || 0,
+      })
+      await lotes.fetchBySala(salaId)
+    } else {
+      if (!payload.origen) delete payload.origen
+      await lotes.createInSala(salaId, payload)
+    }
+
     closeCreate()
     lotesExpanded.value = true
     salas.fetchSala(salaId)
@@ -404,19 +451,34 @@ async function createLote() {
     } else {
       loteApiError.value = err.response?.data?.errors?.[0] || err.response?.data?.error || 'Error al crear el lote'
     }
+  } finally {
+    creandoLote.value = false
   }
 }
-function openCreate() {
-  loteForm.value     = emptyLoteForm()
-  loteErrors.value   = {}
-  loteApiError.value = null
-  showCreate.value   = true
+async function openCreate() {
+  loteForm.value       = emptyLoteForm()
+  loteErrors.value     = {}
+  loteApiError.value   = null
+  tipoCreacion.value   = 'nuevo'
+  heredadoEstado.value = 'semilla'
+  heredadoDias.value   = { semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 }
+  proximoCodigo.value  = ''
+  showCreate.value     = true
+  loadingCodigo.value  = true
+  try {
+    const { data } = await getLoteProximoCodigo()
+    proximoCodigo.value = data.codigo
+  } catch { /* no crítico */ }
+  finally { loadingCodigo.value = false }
 }
 function closeCreate() {
-  showCreate.value   = false
-  loteForm.value     = emptyLoteForm()
-  loteErrors.value   = {}
-  loteApiError.value = null
+  showCreate.value     = false
+  loteForm.value       = emptyLoteForm()
+  loteErrors.value     = {}
+  loteApiError.value   = null
+  tipoCreacion.value   = 'nuevo'
+  proximoCodigo.value  = ''
+  heredadoDias.value   = { semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 }
 }
 
 // ── Mini widget ambiente ───────────────────────────────────────
@@ -749,35 +811,124 @@ const canSeeAmbiente = computed(() =>
             <div v-if="loteApiError" class="sd__alert">{{ loteApiError }}</div>
             <div v-else-if="lotes.createError" class="sd__alert">{{ lotes.createError }}</div>
 
+            <!-- Bifurcación tipo creación -->
+            <div class="sd__tipo-tabs">
+              <button
+                type="button"
+                class="sd__tipo-tab"
+                :class="{ 'sd__tipo-tab--active': tipoCreacion === 'nuevo' }"
+                @click="tipoCreacion = 'nuevo'"
+              >
+                <i class="bi bi-plus-circle"></i>
+                Lote nuevo
+              </button>
+              <button
+                type="button"
+                class="sd__tipo-tab"
+                :class="{ 'sd__tipo-tab--active': tipoCreacion === 'existente' }"
+                @click="tipoCreacion = 'existente'"
+              >
+                <i class="bi bi-clock-history"></i>
+                Cargar lote existente
+              </button>
+            </div>
+
+            <!-- Código (siempre visible, readonly) -->
+            <div class="sd__field">
+              <label class="sd__label">Código</label>
+              <input
+                type="text"
+                class="sd__input"
+                :value="loadingCodigo ? 'Calculando…' : (proximoCodigo || '—')"
+                readonly
+                style="opacity:.75;cursor:default"
+              />
+              <span class="sd__codigo-hint">Asignado automáticamente al guardar</span>
+            </div>
+
             <div class="sd__grid">
 
-              <!-- Origen: semilla / esqueje -->
-              <div v-if="mostrarOrigenSelector" class="sd__field sd__field--full">
-                <label class="sd__label">¿Cómo inicia este lote?</label>
-                <div class="sd__origen-pills">
-                  <button
-                    type="button"
-                    class="sd__origen-pill"
-                    :class="{ 'sd__origen-pill--active': loteForm.origen === 'semilla' }"
-                    @click="setOrigen('semilla')"
-                  >
-                    🌱 Semilla
-                  </button>
-                  <button
-                    type="button"
-                    class="sd__origen-pill"
-                    :class="{ 'sd__origen-pill--active': loteForm.origen === 'esqueje' }"
-                    @click="setOrigen('esqueje')"
-                  >
-                    🪴 Esqueje
-                  </button>
+              <!-- ── LOTE EXISTENTE (heredado) ── -->
+              <template v-if="tipoCreacion === 'existente'">
+
+                <div class="sd__field sd__field--full">
+                  <label class="sd__label">¿Cómo inició este lote?</label>
+                  <div class="sd__origen-pills">
+                    <button type="button" class="sd__origen-pill"
+                      :class="{ 'sd__origen-pill--active': loteForm.origen === 'semilla' }"
+                      @click="setOrigen('semilla')">🌱 Semilla</button>
+                    <button type="button" class="sd__origen-pill"
+                      :class="{ 'sd__origen-pill--active': loteForm.origen === 'esqueje' }"
+                      @click="setOrigen('esqueje')">🪴 Esqueje</button>
+                  </div>
                 </div>
-              </div>
+
+                <div class="sd__field sd__field--full">
+                  <label class="sd__label">Estado actual del lote</label>
+                  <select class="sd__input" v-model="heredadoEstado">
+                    <option v-for="e in ESTADOS_HEREDADO" :key="e.value" :value="e.value">{{ e.label }}</option>
+                  </select>
+                </div>
+
+                <div class="sd__field">
+                  <label class="sd__label">
+                    Días en {{ loteForm.origen === 'esqueje' ? 'esqueje' : 'semilla' }}
+                    <span v-if="['vegetativo','floracion','cosecha'].includes(heredadoEstado)" class="sd__label-opt">(completados)</span>
+                  </label>
+                  <input type="number" min="0" max="999" step="1" class="sd__input" v-model.number="heredadoDias.semilla_esqueje" />
+                </div>
+
+                <div v-if="['vegetativo','floracion','cosecha'].includes(heredadoEstado)" class="sd__field">
+                  <label class="sd__label">
+                    Días en vegetativo
+                    <span v-if="['floracion','cosecha'].includes(heredadoEstado)" class="sd__label-opt">(completados)</span>
+                  </label>
+                  <input type="number" min="0" max="999" step="1" class="sd__input" v-model.number="heredadoDias.vegetativo" />
+                </div>
+
+                <div v-if="['floracion','cosecha'].includes(heredadoEstado)" class="sd__field">
+                  <label class="sd__label">
+                    Días en floración
+                    <span v-if="heredadoEstado === 'cosecha'" class="sd__label-opt">(completados)</span>
+                  </label>
+                  <input type="number" min="0" max="999" step="1" class="sd__input" v-model.number="heredadoDias.floracion" />
+                </div>
+
+                <div v-if="heredadoEstado === 'cosecha'" class="sd__field">
+                  <label class="sd__label">Días en cosecha <span class="sd__label-opt">(actual)</span></label>
+                  <input type="number" min="0" max="999" step="1" class="sd__input" v-model.number="heredadoDias.cosecha" />
+                </div>
+
+                <div v-if="heredadoStartDatePreview" class="sd__field sd__field--full">
+                  <label class="sd__label">Fecha de inicio estimada</label>
+                  <input type="text" class="sd__input" :value="heredadoStartDatePreview" readonly style="opacity:.75;cursor:default" />
+                  <span class="sd__codigo-hint">Calculada a partir de los días ingresados</span>
+                </div>
+
+              </template>
+
+              <!-- ── LOTE NUEVO ── -->
+              <template v-else>
+                <div v-if="mostrarOrigenSelector" class="sd__field sd__field--full">
+                  <label class="sd__label">¿Cómo inicia este lote?</label>
+                  <div class="sd__origen-pills">
+                    <button type="button" class="sd__origen-pill"
+                      :class="{ 'sd__origen-pill--active': loteForm.origen === 'semilla' }"
+                      @click="setOrigen('semilla')">🌱 Semilla</button>
+                    <button type="button" class="sd__origen-pill"
+                      :class="{ 'sd__origen-pill--active': loteForm.origen === 'esqueje' }"
+                      @click="setOrigen('esqueje')">🪴 Esqueje</button>
+                  </div>
+                </div>
+                <div class="sd__field">
+                  <label class="sd__label">Fecha de inicio</label>
+                  <input type="date" class="sd__input" v-model="loteForm.start_date" />
+                </div>
+              </template>
 
               <!-- Planta madre (solo esqueje) -->
               <div v-if="loteForm.origen === 'esqueje'" class="sd__field sd__field--full">
                 <label class="sd__label">Planta madre <span class="sd__label-opt">(opcional)</span></label>
-
                 <div v-if="loadingMadres" class="sd__input sd__input--disabled">Cargando plantas…</div>
                 <div v-else class="sd__madre-picker">
                   <div v-if="plantaMadreSeleccionada" class="sd__madre-chip">
@@ -797,7 +948,6 @@ const canSeeAmbiente = computed(() =>
                     autocomplete="off"
                   />
                   <div v-if="madreFocused" class="sd__madre-dropdown">
-                    <!-- Modo búsqueda: lista filtrada plana -->
                     <template v-if="madreQuery.trim()">
                       <div v-if="!madreDropdown.length" class="sd__madre-empty">Sin resultados para "{{ madreQuery }}"</div>
                       <div
@@ -815,7 +965,6 @@ const canSeeAmbiente = computed(() =>
                         </span>
                       </div>
                     </template>
-                    <!-- Modo browse: jerarquía sala → lote → planta -->
                     <template v-else>
                       <div v-if="!madreAgrupado.length" class="sd__madre-empty">No hay plantas disponibles</div>
                       <template v-for="sala in madreAgrupado" :key="sala.sala_id">
@@ -846,6 +995,7 @@ const canSeeAmbiente = computed(() =>
                 </div>
               </div>
 
+              <!-- Cantidad de plantas -->
               <div class="sd__field">
                 <label class="sd__label">Cantidad de plantas</label>
                 <input type="number" min="0" max="5000" step="1" class="sd__input"
@@ -853,10 +1003,8 @@ const canSeeAmbiente = computed(() =>
                        v-model.number="loteForm.plants_count" />
                 <span v-if="loteErrors.plants_count" class="sd__err-msg">{{ loteErrors.plants_count }}</span>
               </div>
-              <div class="sd__field">
-                <label class="sd__label">Fecha de inicio</label>
-                <input type="date" class="sd__input" v-model="loteForm.start_date" />
-              </div>
+
+              <!-- Genética -->
               <div class="sd__field">
                 <label class="sd__label">
                   Genética / Variedad
@@ -873,6 +1021,8 @@ const canSeeAmbiente = computed(() =>
                   Antes de crear un lote, <a href="/geneticas" class="sd__genetica-link">registrá una genética</a>.
                 </p>
               </div>
+
+              <!-- Tipo de cultivo -->
               <div class="sd__field">
                 <label class="sd__label">Tipo de cultivo</label>
                 <select class="sd__input" v-model="loteForm.grow_type">
@@ -881,6 +1031,8 @@ const canSeeAmbiente = computed(() =>
                   <option value="aeroponia">Aeroponia</option>
                 </select>
               </div>
+
+              <!-- Tamaño de maceta -->
               <div class="sd__field">
                 <label class="sd__label">Tamaño de maceta</label>
                 <select class="sd__input" v-model="loteForm.tamanio_maceta">
@@ -896,6 +1048,8 @@ const canSeeAmbiente = computed(() =>
                   <option value="otro">Otro</option>
                 </select>
               </div>
+
+              <!-- Tipo de luz -->
               <div class="sd__field">
                 <label class="sd__label">Tipo de luz</label>
                 <select class="sd__input" v-model="loteForm.light_type">
@@ -907,16 +1061,19 @@ const canSeeAmbiente = computed(() =>
                   <option value="mixta">Mixta</option>
                 </select>
               </div>
+
+              <!-- Notas -->
               <div class="sd__field sd__field--full">
                 <label class="sd__label">Notas</label>
                 <textarea class="sd__input sd__textarea" rows="2" v-model.trim="loteForm.notes" placeholder="Observaciones…"></textarea>
               </div>
+
             </div>
           </div>
           <div class="sd__modal-footer">
-            <button class="sd__btn-ghost" :disabled="lotes.creating" @click="closeCreate">Cancelar</button>
-            <button class="sd__btn-primary" :disabled="lotes.creating" @click="createLote">
-              <div v-if="lotes.creating" class="sd__spinner sd__spinner--sm"></div>
+            <button class="sd__btn-ghost" :disabled="lotes.creating || creandoLote" @click="closeCreate">Cancelar</button>
+            <button class="sd__btn-primary" :disabled="lotes.creating || creandoLote" @click="createLote">
+              <div v-if="lotes.creating || creandoLote" class="sd__spinner sd__spinner--sm"></div>
               <i v-else class="bi bi-plus-lg"></i>Crear lote
             </button>
           </div>
@@ -1217,6 +1374,19 @@ const canSeeAmbiente = computed(() =>
 .sd__genetica-hint { margin: .3rem 0 0; font-size: .75rem; color: #64748b; display: flex; align-items: center; gap: .3rem; }
 .sd__genetica-link { color: #1b5e20; font-weight: 600; text-decoration: none; }
 .sd__genetica-link:hover { text-decoration: underline; }
+
+/* Tipo creación tabs */
+.sd__tipo-tabs { display: flex; gap: .5rem; }
+.sd__tipo-tab {
+  flex: 1; padding: .6rem .9rem; background: #f4f8f4; border: 2px solid #d4e6d4;
+  border-radius: 9px; font-size: .82rem; font-weight: 600; color: #374151;
+  cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: .4rem;
+}
+.sd__tipo-tab:hover { border-color: #1b5e20; background: #f0fdf4; }
+.sd__tipo-tab--active { background: #f0fdf4; border-color: #1b5e20; color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); }
+
+/* Código readonly */
+.sd__codigo-hint { font-size: .72rem; color: #94a3b8; }
 
 /* Cámara */
 .sd__cam-form { display: flex; flex-direction: column; gap: .75rem; }
