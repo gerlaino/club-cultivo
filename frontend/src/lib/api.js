@@ -398,6 +398,12 @@ export const deletePesada   = (loteId, id)      => api.delete(`/lotes/${loteId}/
 // ── Lecturas ambientales ──────────────────────────────────────────────────────
 export const createLecturaAmbiental = (salaId, payload) => api.post(`/salas/${salaId}/lecturas_ambientales`, { lectura_ambiental: payload })
 
+export const aiImportCsvSala = (salaId, file) => {
+  const form = new FormData()
+  form.append('csv_file', file)
+  return api.post(`/salas/${salaId}/ai_import`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+
 // ── Stocks (nuevo modelo) ─────────────────────────────────────────────────────
 export const listStocks           = (params = {})         => api.get('/stocks', { params })
 export const listStocksPendientes = ()                    => api.get('/stocks', { params: { pendientes: true } })

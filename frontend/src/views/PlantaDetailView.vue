@@ -840,37 +840,38 @@ onMounted(async () => {
           <div class="pd__modal-body">
             <div v-if="medicionError" class="pd__alert">{{ medicionError }}</div>
 
-            <!-- Conexión BLE -->
-            <div class="pd__ble-panel" :class="{ 'pd__ble-panel--on': ble.conectado.value }">
-              <div class="pd__ble-left">
-                <span class="pd__ble-icon">📡</span>
-                <div>
-                  <div class="pd__ble-title">
-                    <span v-if="ble.conectado.value">Conectado: {{ ble.dispositivo.value?.name || 'Sensor BLE' }}</span>
-                    <span v-else>Sensor Bluelab (BLE)</span>
-                  </div>
-                  <div class="pd__ble-sub">
-                    <span v-if="!ble.soportado.value">Web Bluetooth no disponible en este navegador</span>
-                    <span v-else-if="ble.conectado.value">Temperatura auto-leída. EC y pH: ingresalos desde la pantalla del sensor.</span>
-                    <span v-else>Conectá el sensor para auto-leer la temperatura del sustrato.</span>
+            <!-- Conexión BLE (solo si el navegador lo soporta) -->
+            <template v-if="ble.soportado.value">
+              <div class="pd__ble-panel" :class="{ 'pd__ble-panel--on': ble.conectado.value }">
+                <div class="pd__ble-left">
+                  <span class="pd__ble-icon">📡</span>
+                  <div>
+                    <div class="pd__ble-title">
+                      <span v-if="ble.conectado.value">Conectado: {{ ble.dispositivo.value?.name || 'Sensor BLE' }}</span>
+                      <span v-else>Sensor Bluelab (BLE)</span>
+                    </div>
+                    <div class="pd__ble-sub">
+                      <span v-if="ble.conectado.value">Temperatura auto-leída. EC y pH: ingresalos desde la pantalla del sensor.</span>
+                      <span v-else>Conectá el sensor para auto-leer la temperatura del sustrato.</span>
+                    </div>
                   </div>
                 </div>
+                <div class="pd__ble-right">
+                  <button v-if="!ble.conectado.value"
+                          class="pd__ble-btn"
+                          :disabled="ble.conectando.value"
+                          @click="ble.conectar()">
+                    <span v-if="ble.conectando.value" class="pd__spinner pd__spinner--sm" style="border-top-color:#1b5e20;border-color:rgba(27,94,32,.2)"></span>
+                    <i v-else class="bi bi-bluetooth"></i>
+                    {{ ble.conectando.value ? 'Buscando…' : 'Conectar' }}
+                  </button>
+                  <button v-else class="pd__ble-btn pd__ble-btn--off" @click="ble.desconectar()">
+                    <i class="bi bi-bluetooth-fill"></i> Desconectar
+                  </button>
+                </div>
               </div>
-              <div class="pd__ble-right">
-                <button v-if="!ble.conectado.value && ble.soportado.value"
-                        class="pd__ble-btn"
-                        :disabled="ble.conectando.value"
-                        @click="ble.conectar()">
-                  <span v-if="ble.conectando.value" class="pd__spinner pd__spinner--sm" style="border-top-color:#1b5e20;border-color:rgba(27,94,32,.2)"></span>
-                  <i v-else class="bi bi-bluetooth"></i>
-                  {{ ble.conectando.value ? 'Buscando…' : 'Conectar' }}
-                </button>
-                <button v-else-if="ble.conectado.value" class="pd__ble-btn pd__ble-btn--off" @click="ble.desconectar()">
-                  <i class="bi bi-bluetooth-fill"></i> Desconectar
-                </button>
-              </div>
-            </div>
-            <div v-if="ble.error.value" class="pd__ble-error">{{ ble.error.value }}</div>
+              <div v-if="ble.error.value" class="pd__ble-error">{{ ble.error.value }}</div>
+            </template>
 
             <!-- Campos de medición -->
             <div class="pd__msection">Valores medidos</div>

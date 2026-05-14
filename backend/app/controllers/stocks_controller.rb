@@ -16,10 +16,15 @@ class StocksController < ApplicationController
       return render json: stocks.map { |s| serialize_stock(s) }
     end
 
-    # Stock asignado a sedes
-    stocks = current_user.club.sedes
-                         .then { |s| sede_id.present? ? s.where(id: sede_id) : s }
-                         .flat_map { |sede| sede.stocks.includes(:lote, :genetica).disponibles.asignados }
+    if sede_id.present?
+      sede   = current_user.club.sedes.find_by(id: sede_id)
+      stocks = sede ? sede.stocks.includes(:lote, :genetica).disponibles.asignados.to_a : []
+    else
+      sede_stocks = current_user.club.sedes
+                                .flat_map { |s| s.stocks.includes(:lote, :genetica).disponibles.asignados }
+      pool_stocks = current_user.club.stocks.includes(:lote, :genetica).disponibles.asignados.del_club.to_a
+      stocks = sede_stocks + pool_stocks
+    end
 
     case params[:canal]
     when 'regulatorio' then stocks = stocks.select(&:regulatorio?)

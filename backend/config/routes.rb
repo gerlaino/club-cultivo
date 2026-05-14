@@ -56,7 +56,8 @@ Rails.application.routes.draw do
       resources :cultivadores, controller: 'sala_cultivadores', only: [:index, :create, :destroy]
       resources :notas, only: [:index, :create]
       resources :lecturas_ambientales, only: [:index, :create, :destroy]
-      get :ambiente, to: 'lecturas_ambientales#ambiente'
+      get  :ambiente,    to: 'lecturas_ambientales#ambiente'
+      post :ai_import,   to: 'lecturas_ambientales/ai_imports#create'
       resources :alertas, only: [:index]
       member do
         post :cargar_lote

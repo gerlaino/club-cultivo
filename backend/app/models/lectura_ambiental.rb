@@ -34,7 +34,7 @@ class LecturaAmbiental < ApplicationRecord
 
   def medido_at_en_rango_valido
     return if medido_at.nil?
-    return if %w[manual backfill].include?(fuente)
+    return if %w[manual backfill csv_import].include?(fuente)
     if medido_at > Time.current + 5.minutes
       errors.add(:medido_at, 'no puede ser una fecha futura')
     elsif medido_at < 7.days.ago
