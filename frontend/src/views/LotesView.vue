@@ -152,11 +152,15 @@ function startEdit(l) {
 }
 
 async function submitEdit() {
-  const e = validateForm(editForm.value);
+  const e = {};
+  if (!ESTADOS.includes(editForm.value.estado)) e.estado = "Estado inválido";
+  const n = Number(editForm.value.plants_count);
+  if (!Number.isInteger(n) || n < 0 || n > 5000) e.plants_count = "Debe ser 0–5000";
+  if (!editForm.value.sala_id) e.sala_id = "Seleccioná una sala";
   editErrors.value = e;
   if (Object.keys(e).length) return;
   try {
-    const { id, sala_id, ...payload } = editForm.value;
+    const { id, codigo, sala_id, ...payload } = editForm.value;
     await store.update(id, payload, sala_id);
     showEdit.value = false;
   } catch {}
@@ -464,9 +468,8 @@ async function exportarCSV() {
             <div v-if="store.updateError" class="lm-alert">{{ store.updateError }}</div>
             <div class="lm-grid">
               <div class="lm-field">
-                <label class="lm-label">Código <span class="lm-req">*</span></label>
-                <input class="lm-input" :class="{ 'lm-input--err': editErrors.codigo }" v-model.trim="editForm.codigo" />
-                <span v-if="editErrors.codigo" class="lm-err">{{ editErrors.codigo }}</span>
+                <label class="lm-label">Código</label>
+                <input class="lm-input" :value="editForm.codigo" disabled style="opacity:.6;cursor:not-allowed;background:#f8fafc;font-family:monospace" />
               </div>
               <div class="lm-field">
                 <label class="lm-label">Sala</label>
