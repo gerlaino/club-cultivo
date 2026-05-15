@@ -245,14 +245,33 @@ const registroError     = ref(null)
 const csvFile           = ref(null)
 const csvInput          = ref(null)
 
+const TAREAS_LOTE = [
+  { key: 'riego',           label: 'Riego',           emoji: '💧' },
+  { key: 'nutricion',       label: 'Nutrición',       emoji: '🧪' },
+  { key: 'poda',            label: 'Poda',            emoji: '✂️'  },
+  { key: 'defoliacion',     label: 'Defoliación',     emoji: '🍃' },
+  { key: 'scrog_lst',       label: 'SCROG/LST',       emoji: '🪢' },
+  { key: 'revision_plagas', label: 'Revisión plagas', emoji: '🔍' },
+  { key: 'limpieza_sala',   label: 'Limpieza sala',   emoji: '🧹' },
+  { key: 'ajuste_luz',      label: 'Ajuste de luz',   emoji: '💡' },
+]
+
 function emptyRegistroForm() {
   return {
     temperatura: null, humedad: null, temperatura_sustrato: null, co2: null,
     ph: null, ec: null, ph_runoff: null, ppfd: null,
     horas_luz: null, espectro_luz: '',
     fertilizacion: false, notas_fertilizacion: '',
-    plagas_observadas: 'ninguna', estado_general: 'bueno', observaciones: ''
+    plagas_observadas: 'ninguna', estado_general: 'bueno', observaciones: '',
+    tareas_realizadas: []
   }
+}
+
+function toggleTarea(key) {
+  const t = registroForm.value.tareas_realizadas
+  const idx = t.indexOf(key)
+  if (idx === -1) t.push(key)
+  else t.splice(idx, 1)
 }
 const registroForm = ref(emptyRegistroForm())
 
@@ -282,7 +301,13 @@ async function guardarRegistro() {
     let result
     if (csvFile.value) {
       const fd = new FormData()
-      Object.entries(registroForm.value).forEach(([k, v]) => { if (v !== null && v !== '') fd.append(`registro_ambiental[${k}]`, v) })
+      Object.entries(registroForm.value).forEach(([k, v]) => {
+        if (k === 'tareas_realizadas') {
+          v.forEach(tarea => fd.append('registro_ambiental[tareas_realizadas][]', tarea))
+        } else if (v !== null && v !== '') {
+          fd.append(`registro_ambiental[${k}]`, v)
+        }
+      })
       fd.append('archivo_csv', csvFile.value)
       const { data } = await createRegistroAmbiental(id, fd, true)
       result = data
@@ -1128,6 +1153,13 @@ onUnmounted(() => {
                         <span class="ld__evento-fecha">{{ formatDateTime(e.registrado_en) }}</span>
                       </div>
                       <div class="ld__evento-meta">{{ e.usuario }}</div>
+                      <div v-if="e.tareas_realizadas?.length" class="ld__tareas-chips">
+                        <span
+                          v-for="tk in e.tareas_realizadas"
+                          :key="tk"
+                          class="ld__tarea-tag"
+                        >{{ TAREAS_LOTE.find(t => t.key === tk)?.emoji }} {{ TAREAS_LOTE.find(t => t.key === tk)?.label || tk }}</span>
+                      </div>
                       <div class="ld__registro-metricas">
                         <div v-if="e.temperatura"  class="ld__metrica"><span>🌡️</span><span>{{ e.temperatura }}°C</span></div>
                         <div v-if="e.humedad"      class="ld__metrica"><span>💧</span><span>{{ e.humedad }}%</span></div>
@@ -1579,6 +1611,22 @@ onUnmounted(() => {
           </div>
           <div class="ld__modal-body">
             <div v-if="registroError" class="ld__alert">{{ registroError }}</div>
+
+            <!-- Tareas realizadas -->
+            <div class="ld__msection">Tareas realizadas <span class="ld__optional">opcional, seleccioná todas las que apliquen</span></div>
+            <div class="ld__tareas-grid">
+              <button
+                v-for="t in TAREAS_LOTE"
+                :key="t.key"
+                type="button"
+                class="ld__tarea-chip"
+                :class="{ 'ld__tarea-chip--active': registroForm.tareas_realizadas.includes(t.key) }"
+                @click="toggleTarea(t.key)"
+              >
+                <span>{{ t.emoji }}</span> {{ t.label }}
+              </button>
+            </div>
+
             <div class="ld__grid">
               <div class="ld__field ld__field--full">
                 <label class="ld__label">Estado general</label>
@@ -2137,6 +2185,12 @@ onUnmounted(() => {
 .ld__sel-btn { display: flex; align-items: center; gap: .3rem; padding: .4rem .8rem; border: 1.5px solid #d4e6d4; border-radius: 8px; background: #f4f8f4; font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .15s; text-transform: capitalize; }
 .ld__sel-btn:hover { border-color: #1b5e20; }
 .ld__sel-btn--active { transform: translateY(-1px); }
+.ld__tareas-grid { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .25rem; }
+.ld__tarea-chip { display: inline-flex; align-items: center; gap: .3rem; padding: .38rem .8rem; border: 1.5px solid #d4e6d4; border-radius: 999px; background: #f4f8f4; font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .15s; user-select: none; }
+.ld__tarea-chip:hover { border-color: #1b5e20; background: #f0fdf4; }
+.ld__tarea-chip--active { background: #e8f5e9; border-color: #1b5e20; color: #1b5e20; box-shadow: 0 1px 4px rgba(27,94,32,.15); }
+.ld__tareas-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .4rem; }
+.ld__tarea-tag { display: inline-flex; align-items: center; gap: .25rem; background: #e8f5e9; border: 1px solid #a7d7a9; color: #1b5e20; border-radius: 999px; padding: .15em .6em; font-size: .7rem; font-weight: 600; }
 .ld__etapas-selector { display: flex; gap: .5rem; flex-wrap: wrap; }
 .ld__etapa-btn { display: flex; align-items: center; gap: .4rem; padding: .5rem 1rem; border: 1.5px solid #d4e6d4; border-radius: 10px; background: #f4f8f4; font-size: .85rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .ld__etapa-btn:hover { border-color: #1b5e20; }

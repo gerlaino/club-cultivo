@@ -48,7 +48,8 @@ class RegistrosAmbientalesController < ApplicationController
       :ml_nutrientes_litro, :notas_nutricion,
       :fertilizacion, :notas_fertilizacion,
       :estado_general, :plagas_observadas,
-      :observaciones, :fuente, :registrado_en
+      :observaciones, :fuente, :registrado_en,
+      tareas_realizadas: []
     )
   end
 
@@ -72,6 +73,7 @@ class RegistrosAmbientalesController < ApplicationController
       plagas_observadas:    r.plagas_observadas,
       observaciones:        r.observaciones,
       fuente:               r.fuente,
+      tareas_realizadas:    r.tareas_realizadas || [],
       nombre_archivo_csv:   r.nombre_archivo_csv,
       tiene_csv:            r.archivo_csv.attached?,
       registrado_en:        r.registrado_en,

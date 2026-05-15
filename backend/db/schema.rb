@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_13_100000) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_15_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -779,6 +779,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_13_100000) do
     t.string "nombre_archivo_csv"
     t.boolean "fertilizacion", default: false
     t.text "notas_fertilizacion"
+    t.jsonb "tareas_realizadas", default: [], null: false
     t.index ["club_id"], name: "index_registros_ambientales_on_club_id"
     t.index ["lote_id"], name: "index_registros_ambientales_on_lote_id"
     t.index ["registrado_en"], name: "index_registros_ambientales_on_registrado_en"
