@@ -19,7 +19,6 @@ class Dispensacion < ApplicationRecord
   validates :fecha_dispensacion, presence: true
   validates :estado_envio,       inclusion: { in: ESTADOS_ENVIO }, allow_nil: true
   validate  :fecha_no_futura
-  validate  :stock_regulatorio
   validate  :stock_disponible,   on: :create
   validate  :credito_suficiente, on: :create, if: -> { medio_pago == 'cuenta_corriente' }
   validate  :delivery_fields_presentes, if: :con_envio?
@@ -40,10 +39,6 @@ class Dispensacion < ApplicationRecord
 
   def fecha_no_futura
     errors.add(:fecha_dispensacion, 'no puede ser futura') if fecha_dispensacion.present? && fecha_dispensacion > Date.today
-  end
-
-  def stock_regulatorio
-    errors.add(:stock, 'solo se pueden dispensar stocks regulatorios (de lote propio o derivado)') unless stock&.regulatorio?
   end
 
   def stock_disponible

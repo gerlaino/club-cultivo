@@ -57,7 +57,7 @@ const FORMA_EMOJI = {
   preroll: '🚬', crema: '💊', descarte: '🗑️', otro: '📦',
 }
 
-const stocksRegulatorios = computed(() => stocks.value.filter(s => s.regulatorio && s.cantidad > 0))
+const stocksDisponibles = computed(() => stocks.value.filter(s => s.cantidad > 0))
 
 // ── Límite mensual ────────────────────────────────────────────────────────────
 const mesActual = new Date().toISOString().substring(0, 7)
@@ -127,7 +127,7 @@ const ccGInsuficiente = computed(() => {
 async function cargarStocks() {
   loadingStocks.value = true
   try {
-    const { data } = await listStocks({ canal: 'regulatorio' })
+    const { data } = await listStocks()
     stocks.value = data || []
   } catch { stocks.value = [] }
   finally { loadingStocks.value = false }
@@ -436,12 +436,12 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
             <!-- ── Selector de stock ── -->
             <div class="dv__section-label">Stock a dispensar <span class="dv__req">*</span></div>
             <div v-if="loadingStocks" class="dv__loading-inline"><div class="dv__ring dv__ring--sm"></div> Cargando stocks…</div>
-            <div v-else-if="!stocksRegulatorios.length" class="dv__warn-box">
-              <i class="bi bi-exclamation-triangle"></i> Sin stock regulatorio disponible
+            <div v-else-if="!stocksDisponibles.length" class="dv__warn-box">
+              <i class="bi bi-exclamation-triangle"></i> Sin stock disponible
             </div>
             <div v-else class="dv__stock-list">
               <button
-                v-for="s in stocksRegulatorios" :key="s.id"
+                v-for="s in stocksDisponibles" :key="s.id"
                 type="button"
                 class="dv__stock-row"
                 :class="{ 'dv__stock-row--active': form.stock_id === s.id }"

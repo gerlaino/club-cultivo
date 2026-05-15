@@ -11,11 +11,11 @@ import { useToast } from '../composables/useToast.js'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, updatePaciente, getCuentaCorriente, setLimiteCC, toggleGramosCC, setLimiteGCC, cargarGCC, subirReprocannDoc, eliminarReprocannDoc, listReprocannRenovaciones, createReprocannRenovacion, updateReprocannRenovacion, deleteReprocannRenovacion, enviarMailPaciente, getMailsPaciente } from '../lib/api.js'
+import { getPacienteTimeline, updatePaciente, getCuentaCorriente, setLimiteCC, toggleGramosCC, setLimiteGCC, cargarGCC, enviarMailPaciente, getMailsPaciente } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, Plus, Trash2, AlertTriangle, CheckCircle, Info, X, Save, Wallet,
-  Upload, FileCheck, CreditCard, Mail
+  CreditCard, Mail
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -258,7 +258,6 @@ async function submitMail() {
 watch(activeTab, (tab) => {
   if (tab === 'timeline') loadTimeline()
   if (tab === 'cuenta_corriente') loadCC()
-  if (tab === 'reprocann' && renovaciones.value.length === 0) loadRenovaciones()
   if (tab === 'correo' && mailHistory.value.length === 0) loadMailHistory()
 })
 
@@ -315,38 +314,6 @@ const ALL_TABS = [
   { key: 'correo',           label: 'Correo',            icon: Mail,          roles: ['admin', 'supervisor'] },
 ]
 
-// ── Documento REPROCANN ──────────────────────────────────────────────────────
-const reproInput      = ref(null)
-const uploadingRepro  = ref(false)
-
-async function uploadReprocann(e) {
-  const file = e.target.files?.[0]
-  if (!file) return
-  uploadingRepro.value = true
-  try {
-    const { data } = await subirReprocannDoc(socioId, file)
-    await store.fetchOne(socioId)
-    store.current.reprocann_documento_url = data.reprocann_documento_url
-    toastOk('Documento subido correctamente')
-  } catch {
-    toastErr('Error al subir el documento')
-  } finally {
-    uploadingRepro.value = false
-    if (reproInput.value) reproInput.value.value = ''
-  }
-}
-
-async function eliminarReprocann() {
-  const ok = await confirm({ title: '¿Eliminar el documento REPROCANN?', confirmText: 'Eliminar' })
-  if (!ok) return
-  try {
-    await eliminarReprocannDoc(socioId)
-    await store.fetchOne(socioId)
-    toastOk('Documento eliminado')
-  } catch {
-    toastErr('Error al eliminar el documento')
-  }
-}
 
 // ── Cuenta corriente ──
 const cc              = ref(null)
@@ -447,90 +414,9 @@ const TABS = computed(() => {
   return ALL_TABS.filter(t => !t.roles || t.roles.includes(role))
 })
 
-// ── Renovaciones REPROCANN ────────────────────────────────────────────────────
-const renovaciones        = ref([])
-const loadingRenovaciones = ref(false)
-const showRenovacionForm  = ref(false)
-const savingRenovacion    = ref(false)
-const renovacionForm      = ref({ numero_tramite: '', observaciones: '' })
-const showAprobarModal    = ref(false)
-const aprobarForm         = ref({ reprocann_numero_nuevo: '', fecha_vencimiento_nueva: '' })
-const renovacionAprobar   = ref(null)
-
-async function loadRenovaciones() {
-  loadingRenovaciones.value = true
-  try {
-    const { data } = await listReprocannRenovaciones(socioId)
-    renovaciones.value = data.data || []
-  } catch { renovaciones.value = [] }
-  finally { loadingRenovaciones.value = false }
-}
-
-async function crearRenovacion() {
-  savingRenovacion.value = true
-  try {
-    const { data } = await createReprocannRenovacion(socioId, renovacionForm.value)
-    renovaciones.value.unshift(data.data)
-    showRenovacionForm.value = false
-    renovacionForm.value = { numero_tramite: '', observaciones: '' }
-    toastOk('Trámite de renovación iniciado')
-  } catch { toastErr('Error al crear la renovación') }
-  finally { savingRenovacion.value = false }
-}
-
-function openAprobar(r) {
-  renovacionAprobar.value = r
-  aprobarForm.value = { reprocann_numero_nuevo: '', fecha_vencimiento_nueva: '' }
-  showAprobarModal.value = true
-}
-
-async function aprobarRenovacion() {
-  if (!renovacionAprobar.value) return
-  savingRenovacion.value = true
-  try {
-    const { data } = await updateReprocannRenovacion(socioId, renovacionAprobar.value.id, {
-      accion: 'aprobar',
-      ...aprobarForm.value,
-    })
-    const idx = renovaciones.value.findIndex(r => r.id === renovacionAprobar.value.id)
-    if (idx !== -1) renovaciones.value[idx] = data.data
-    showAprobarModal.value = false
-    await store.fetchOne(socioId)
-    toastOk('Renovación aprobada')
-  } catch { toastErr('Error al aprobar') }
-  finally { savingRenovacion.value = false }
-}
-
-async function rechazarRenovacion(r) {
-  const ok = await confirm({ title: '¿Rechazar renovación?', confirmText: 'Rechazar', variant: 'danger' })
-  if (!ok) return
-  try {
-    const { data } = await updateReprocannRenovacion(socioId, r.id, { accion: 'rechazar' })
-    const idx = renovaciones.value.findIndex(x => x.id === r.id)
-    if (idx !== -1) renovaciones.value[idx] = data.data
-    toastOk('Renovación rechazada')
-  } catch { toastErr('Error al rechazar') }
-}
-
-async function eliminarRenovacion(r) {
-  const ok = await confirm({ title: '¿Eliminar este trámite?', confirmText: 'Eliminar', variant: 'danger' })
-  if (!ok) return
-  try {
-    await deleteReprocannRenovacion(socioId, r.id)
-    renovaciones.value = renovaciones.value.filter(x => x.id !== r.id)
-    toastOk('Trámite eliminado')
-  } catch { toastErr('Error al eliminar') }
-}
-
-const renovacionEstadoMeta = (estado) => ({
-  en_tramite: { label: 'En trámite', color: '#d97706', bg: '#fef3c7' },
-  aprobada:   { label: 'Aprobada',   color: '#15803d', bg: '#dcfce7' },
-  rechazada:  { label: 'Rechazada',  color: '#dc2626', bg: '#fee2e2' },
-}[estado] || { label: estado, color: '#64748b', bg: '#f1f5f9' })
 
 function escapeHandler(e) {
   if (e.key !== 'Escape') return
-  if (showAprobarModal.value) { showAprobarModal.value = false; return }
   if (editOpen.value) { editOpen.value = false }
 }
 onMounted(async () => {
@@ -718,125 +604,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
           </div>
           <IndicacionesMedicas :socio-id="socioId" />
         </div>
-
-        <!-- Documento REPROCANN -->
-        <div class="sd__card" style="margin-top:1rem">
-          <div class="sd__card-header">
-            <div class="sd__card-icon sd__card-icon--green"><Upload :size="15" /></div>
-            <span class="sd__card-title">Documento REPROCANN adjunto</span>
-          </div>
-          <div class="sd__repro-doc-body">
-            <template v-if="s.reprocann_documento_url">
-              <div class="sd__repro-doc-row">
-                <a :href="s.reprocann_documento_url" target="_blank" rel="noopener" class="sd__repro-doc-link">
-                  <FileCheck :size="15" /> Ver documento
-                </a>
-                <button v-if="canEdit" class="sd__btn-icon-danger" @click="eliminarReprocann" title="Eliminar documento">
-                  <Trash2 :size="13" />
-                </button>
-              </div>
-            </template>
-            <template v-else-if="canEdit">
-              <input ref="reproInput" type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="uploadReprocann" />
-              <div class="sd__repro-upload-row">
-                <button class="sd__btn-ghost" :disabled="uploadingRepro" @click="reproInput.click()">
-                  <Upload :size="13" /> {{ uploadingRepro ? 'Subiendo…' : 'Subir documento' }}
-                </button>
-                <span class="sd__repro-hint">PDF, JPG o PNG — máx. 10 MB</span>
-              </div>
-            </template>
-            <span v-else class="sd__val-empty" style="padding:1rem 1.25rem;display:block">Sin documento adjunto</span>
-          </div>
-        </div>
-
-        <!-- Historial de renovaciones -->
-        <div class="sd__card sd__card--mt">
-          <div class="sd__card-header">
-            <span class="sd__card-title">🔄 Renovaciones REPROCANN</span>
-            <button v-if="canEdit" class="sd__card-action" @click="showRenovacionForm = !showRenovacionForm">
-              <Plus :size="13" /> Iniciar trámite
-            </button>
-          </div>
-
-          <div v-if="showRenovacionForm" class="sd__reno-form">
-            <div class="sd__reno-row">
-              <label>N° de trámite (opcional)</label>
-              <input v-model="renovacionForm.numero_tramite" type="text" placeholder="Ej: 2024-00123" class="sd__reno-input" />
-            </div>
-            <div class="sd__reno-row">
-              <label>Observaciones</label>
-              <input v-model="renovacionForm.observaciones" type="text" placeholder="Opcional" class="sd__reno-input" />
-            </div>
-            <div class="sd__reno-actions">
-              <button class="sd__btn-ghost" @click="showRenovacionForm = false">Cancelar</button>
-              <button class="sd__btn-primary" :disabled="savingRenovacion" @click="crearRenovacion">
-                {{ savingRenovacion ? 'Guardando…' : 'Crear trámite' }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="loadingRenovaciones" class="sd__reno-empty">Cargando…</div>
-          <div v-else-if="renovaciones.length === 0 && !showRenovacionForm" class="sd__reno-empty">
-            Sin renovaciones registradas
-          </div>
-          <div v-else class="sd__reno-list">
-            <div v-for="r in renovaciones" :key="r.id" class="sd__reno-item">
-              <div class="sd__reno-item-head">
-                <span class="sd__reno-estado" :style="{ background: renovacionEstadoMeta(r.estado).bg, color: renovacionEstadoMeta(r.estado).color }">
-                  {{ renovacionEstadoMeta(r.estado).label }}
-                </span>
-                <span v-if="r.numero_tramite" class="sd__reno-numero">Exp. {{ r.numero_tramite }}</span>
-                <span class="sd__reno-fecha">{{ formatDate(r.fecha_inicio) }}</span>
-                <div class="sd__reno-acciones">
-                  <button v-if="canEdit && r.estado === 'en_tramite'" class="sd__btn-tiny sd__btn-tiny--ok" @click="openAprobar(r)" title="Aprobar">
-                    <CheckCircle :size="13" />
-                  </button>
-                  <button v-if="canEdit && r.estado === 'en_tramite'" class="sd__btn-tiny sd__btn-tiny--danger" @click="rechazarRenovacion(r)" title="Rechazar">
-                    <X :size="13" />
-                  </button>
-                  <button v-if="canEdit" class="sd__btn-tiny sd__btn-tiny--ghost" @click="eliminarRenovacion(r)" title="Eliminar">
-                    <Trash2 :size="13" />
-                  </button>
-                </div>
-              </div>
-              <div v-if="r.observaciones" class="sd__reno-obs">{{ r.observaciones }}</div>
-              <div v-if="r.estado === 'aprobada' && r.fecha_aprobacion" class="sd__reno-aprobado">
-                Aprobado {{ formatDate(r.fecha_aprobacion) }}
-                <span v-if="r.reprocann_numero_nuevo"> · N° {{ r.reprocann_numero_nuevo }}</span>
-                <span v-if="r.fecha_vencimiento_nueva"> · Vence {{ formatDate(r.fecha_vencimiento_nueva) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
-
-      <!-- Modal aprobar renovación -->
-      <Teleport to="body">
-        <div v-if="showAprobarModal" class="sd__overlay" @click.self="showAprobarModal = false">
-          <div class="sd__modal" style="max-width:420px">
-            <div class="sd__modal-header">
-              <h3 class="sd__modal-title">Aprobar renovación REPROCANN</h3>
-              <button class="sd__modal-close" @click="showAprobarModal = false"><X :size="16" /></button>
-            </div>
-            <div class="sd__modal-body">
-              <div class="sd__form-row">
-                <label class="sd__form-label">Nuevo N° REPROCANN</label>
-                <input v-model="aprobarForm.reprocann_numero_nuevo" type="text" class="sd__form-input" placeholder="Ej: REP-2024-00456" />
-              </div>
-              <div class="sd__form-row">
-                <label class="sd__form-label">Nueva fecha de vencimiento</label>
-                <input v-model="aprobarForm.fecha_vencimiento_nueva" type="date" class="sd__form-input" />
-              </div>
-            </div>
-            <div class="sd__modal-footer">
-              <button class="sd__btn-ghost" @click="showAprobarModal = false">Cancelar</button>
-              <button class="sd__btn-primary" :disabled="savingRenovacion" @click="aprobarRenovacion">
-                {{ savingRenovacion ? 'Guardando…' : 'Confirmar aprobación' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </Teleport>
 
       <!-- ── Tab: Dispensaciones ── -->
       <div v-show="activeTab === 'dispensaciones'" class="sd__tab-content">
