@@ -1216,7 +1216,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             <strong>Este paciente no tiene email registrado.</strong>
             <span> Editá sus datos para agregar uno antes de enviar mensajes.</span>
           </div>
-          <button class="sd__mail-edit-link" @click="editOpen = true">Editar datos →</button>
+          <button class="sd__mail-edit-link" @click="openEdit()">Editar datos →</button>
         </div>
 
         <!-- Compose card -->

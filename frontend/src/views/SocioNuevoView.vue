@@ -2,9 +2,14 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePacientesStore } from '../stores/pacientes'
+import { useClubStore } from '../stores/club'
+import { enviarMailPaciente } from '../lib/api.js'
 
 const router = useRouter()
 const store  = usePacientesStore()
+const club   = useClubStore()
+
+const sendWelcomeMail = ref(false)
 
 function fmtFecha(iso) {
   if (!iso) return '—'
@@ -64,6 +69,16 @@ async function handleSubmit() {
     const payload = { ...form.value }
     Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k] })
     const socio = await store.create(payload)
+
+    if (sendWelcomeMail.value && socio.email) {
+      const clubNombre = club.data?.name || club.name || ''
+      await enviarMailPaciente(socio.id, {
+        tipo:   'bienvenida',
+        asunto: `Bienvenido/a a ${clubNombre}`,
+        cuerpo: `Hola ${socio.nombre},\n\nTe damos la bienvenida como paciente de ${clubNombre}.\n\nEstamos a tu disposición para cualquier consulta.\n\nSaludos,`,
+      }).catch(() => {}) // no bloquear navegación si el mail falla
+    }
+
     router.push({ name: 'paciente-detail', params: { id: socio.id } })
   } catch (e) {
     if (e.response?.status === 402) {
@@ -357,6 +372,26 @@ function sugerirVencimiento() {
             <i v-else class="bi bi-person-plus-fill"></i>
             {{ store.saving ? 'Creando paciente…' : 'Crear paciente' }}
           </button>
+
+          <!-- Checkbox mail de bienvenida -->
+          <label class="snv__welcome-mail" :class="{ 'snv__welcome-mail--disabled': !form.email }">
+            <div class="snv__welcome-mail-check">
+              <input
+                v-model="sendWelcomeMail"
+                type="checkbox"
+                class="snv__welcome-mail-input"
+                :disabled="!form.email"
+              />
+              <div class="snv__welcome-mail-box">
+                <i v-if="sendWelcomeMail && form.email" class="bi bi-check2" style="font-size:.75rem;line-height:1"></i>
+              </div>
+            </div>
+            <div class="snv__welcome-mail-text">
+              <span class="snv__welcome-mail-label">Enviar mail de bienvenida</span>
+              <span class="snv__welcome-mail-hint">{{ form.email ? form.email : 'Requiere email del paciente' }}</span>
+            </div>
+          </label>
+
           <RouterLink to="/pacientes" class="snv__btn-ghost">
             Cancelar
           </RouterLink>
@@ -704,4 +739,32 @@ function sugerirVencimiento() {
 .snv__limit-wrap { display: flex; align-items: center; gap: .5rem; }
 .snv__input--limit { max-width: 120px; }
 .snv__limit-unit { font-size: .82rem; font-weight: 600; color: #64748b; white-space: nowrap; }
+
+/* Mail de bienvenida */
+.snv__welcome-mail {
+  display: flex; align-items: flex-start; gap: .625rem;
+  padding: .75rem .875rem;
+  background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 10px;
+  cursor: pointer; transition: all .15s; user-select: none;
+}
+.snv__welcome-mail:hover:not(.snv__welcome-mail--disabled) { border-color: #4ade80; }
+.snv__welcome-mail--disabled {
+  background: #f8fafc; border-color: #e2e8f0; opacity: .6; cursor: not-allowed;
+}
+.snv__welcome-mail-check { flex-shrink: 0; margin-top: .1rem; }
+.snv__welcome-mail-input { display: none; }
+.snv__welcome-mail-box {
+  width: 18px; height: 18px; border-radius: 5px;
+  border: 2px solid #e2e8f0; background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s; color: #fff;
+}
+.snv__welcome-mail-input:checked + .snv__welcome-mail-box {
+  background: #1b5e20; border-color: #1b5e20;
+}
+.snv__welcome-mail-text { flex: 1; min-width: 0; }
+.snv__welcome-mail-label { display: block; font-size: .82rem; font-weight: 700; color: #14532d; line-height: 1.3; }
+.snv__welcome-mail-hint  { display: block; font-size: .7rem; color: #4ade80; color: #16a34a; margin-top: .1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snv__welcome-mail--disabled .snv__welcome-mail-label { color: #94a3b8; }
+.snv__welcome-mail--disabled .snv__welcome-mail-hint  { color: #94a3b8; }
 </style>
