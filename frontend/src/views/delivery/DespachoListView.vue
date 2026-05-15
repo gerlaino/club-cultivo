@@ -344,7 +344,11 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
                 <RefreshCw v-else :size="13" :stroke-width="2" />
                 Reprogramar
               </button>
-              <button class="dsp__btn-outline" @click.stop="iniciarReasignacion(d)">
+              <button
+                v-if="d.estado_envio !== 'entregado'"
+                class="dsp__btn-outline"
+                @click.stop="iniciarReasignacion(d)"
+              >
                 Reasignar
               </button>
             </template>

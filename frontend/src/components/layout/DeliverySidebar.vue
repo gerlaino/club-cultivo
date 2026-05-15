@@ -52,4 +52,5 @@ defineEmits(['logout'])
 .dlv-footer { padding: var(--sp-4) var(--sp-5); }
 .dlv-logout { display: flex; align-items: center; gap: var(--sp-2); background: none; border: none; color: rgba(255,255,255,.35); cursor: pointer; font-size: var(--fs-13); padding: 0; transition: color .15s; }
 .dlv-logout:hover { color: rgba(255,255,255,.7); }
+@media (max-width: 1023px) { .dlv-sidebar { display: none; } }
 </style>
