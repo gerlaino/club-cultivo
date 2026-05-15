@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_15_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_15_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -464,6 +464,23 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_15_000001) do
     t.index ["manicurador_id"], name: "index_lotes_on_manicurador_id"
     t.index ["planta_madre_id"], name: "index_lotes_on_planta_madre_id"
     t.index ["sala_id"], name: "index_lotes_on_sala_id"
+  end
+
+  create_table "mails_enviados", force: :cascade do |t|
+    t.bigint "paciente_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "club_id", null: false
+    t.string "asunto", null: false
+    t.text "cuerpo", null: false
+    t.string "tipo", default: "personalizado", null: false
+    t.string "email_destino", null: false
+    t.datetime "enviado_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_mails_enviados_on_club_id"
+    t.index ["paciente_id", "enviado_at"], name: "index_mails_enviados_on_paciente_id_and_enviado_at"
+    t.index ["paciente_id"], name: "index_mails_enviados_on_paciente_id"
+    t.index ["user_id"], name: "index_mails_enviados_on_user_id"
   end
 
   create_table "movimientos_contables", force: :cascade do |t|
@@ -1087,6 +1104,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_15_000001) do
   add_foreign_key "lotes", "plants", column: "planta_madre_id"
   add_foreign_key "lotes", "salas"
   add_foreign_key "lotes", "users", column: "manicurador_id"
+  add_foreign_key "mails_enviados", "clubs"
+  add_foreign_key "mails_enviados", "pacientes"
+  add_foreign_key "mails_enviados", "users"
   add_foreign_key "movimientos_contables", "clubs"
   add_foreign_key "movimientos_contables", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "movimientos_contables", "lotes"

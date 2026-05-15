@@ -1,7 +1,7 @@
 class PacientesController < ApplicationController
   before_action :authenticate_user!
   before_action :check_pacientes_role!
-  before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann]
+  before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados]
   before_action :require_export_role!, only: [:export_csv]
   before_action :normalize_paciente_params, only: [:create, :update]
   before_action :warn_deprecated_route
@@ -219,7 +219,66 @@ class PacientesController < ApplicationController
               disposition: "attachment"
   end
 
+  # POST /pacientes/:id/enviar_mail
+  def enviar_mail
+    unless %w[admin supervisor].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    unless @paciente.email.present?
+      return render json: { error: 'El paciente no tiene email registrado' }, status: :unprocessable_entity
+    end
+
+    tipo   = params.dig(:mail, :tipo).presence_in(MailEnviado::TIPOS) || 'personalizado'
+    asunto = params.dig(:mail, :asunto).to_s.strip
+    cuerpo = params.dig(:mail, :cuerpo).to_s.strip
+
+    if asunto.blank? || cuerpo.blank?
+      return render json: { error: 'El asunto y el cuerpo son obligatorios' }, status: :unprocessable_entity
+    end
+
+    mail_record = MailEnviado.new(
+      paciente:      @paciente,
+      user:          current_user,
+      club:          current_user.club,
+      asunto:        asunto,
+      cuerpo:        cuerpo,
+      tipo:          tipo,
+      email_destino: @paciente.email,
+      enviado_at:    Time.current
+    )
+
+    if mail_record.save
+      PacienteMailer.mensaje(mail_enviado: mail_record).deliver_later
+      render json: serialize_mail(mail_record), status: :created
+    else
+      render json: { errors: mail_record.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  # GET /pacientes/:id/mails_enviados
+  def mails_enviados
+    unless %w[admin supervisor].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    mails = @paciente.mails_enviados.recientes.limit(50).includes(:user)
+    render json: mails.map { |m| serialize_mail(m) }
+  end
+
   private
+
+  def serialize_mail(m)
+    {
+      id:            m.id,
+      asunto:        m.asunto,
+      cuerpo:        m.cuerpo,
+      tipo:          m.tipo,
+      email_destino: m.email_destino,
+      enviado_at:    m.enviado_at,
+      remitente:     m.user.nombre_completo
+    }
+  end
 
   def set_paciente
     @paciente = policy_scope(Paciente).find(params[:id])

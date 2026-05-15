@@ -1,0 +1,10 @@
+<%= @club.name %>
+<%= '=' * @club.name.length %>
+
+<%= @mail_enviado.asunto %>
+
+<%= @cuerpo %>
+
+---
+Enviado por: <%= @remitente.nombre_completo %> · <%= @club.name %>
+Para: <%= @paciente.nombre_completo %> (<%= @mail_enviado.email_destino %>)

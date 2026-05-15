@@ -136,6 +136,8 @@ Rails.application.routes.draw do
         get    :timeline
         post   :subir_reprocann
         delete :eliminar_reprocann
+        post   :enviar_mail
+        get    :mails_enviados
       end
     end
     resources :paciente_notas, only: [:destroy]

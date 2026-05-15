@@ -1,0 +1,14 @@
+class MailEnviado < ApplicationRecord
+  belongs_to :paciente
+  belongs_to :user
+  belongs_to :club
+
+  TIPOS = %w[bienvenida reprocann disponibilidad personalizado].freeze
+
+  validates :asunto,        presence: true
+  validates :cuerpo,        presence: true
+  validates :email_destino, presence: true
+  validates :tipo,          inclusion: { in: TIPOS }
+
+  scope :recientes, -> { order(enviado_at: :desc) }
+end

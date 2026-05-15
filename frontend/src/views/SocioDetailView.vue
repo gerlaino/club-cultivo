@@ -11,11 +11,11 @@ import { useToast } from '../composables/useToast.js'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, updatePaciente, getCuentaCorriente, setLimiteCC, toggleGramosCC, setLimiteGCC, cargarGCC, subirReprocannDoc, eliminarReprocannDoc, listReprocannRenovaciones, createReprocannRenovacion, updateReprocannRenovacion, deleteReprocannRenovacion } from '../lib/api.js'
+import { getPacienteTimeline, updatePaciente, getCuentaCorriente, setLimiteCC, toggleGramosCC, setLimiteGCC, cargarGCC, subirReprocannDoc, eliminarReprocannDoc, listReprocannRenovaciones, createReprocannRenovacion, updateReprocannRenovacion, deleteReprocannRenovacion, enviarMailPaciente, getMailsPaciente } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, Plus, Trash2, AlertTriangle, CheckCircle, Info, X, Save, Wallet,
-  Upload, FileCheck, CreditCard
+  Upload, FileCheck, CreditCard, Mail
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -169,10 +169,97 @@ async function loadTimeline() {
   }
 }
 
+// ── Correo ────────────────────────────────────────────────────────────────────
+const MAIL_TEMPLATES = [
+  {
+    key: 'bienvenida',
+    label: 'Bienvenida',
+    icon: '🌿',
+    asunto: (p, club) => `Bienvenido/a a ${club}`,
+    cuerpo:  (p)       => `Hola ${p.nombre},\n\nTe damos la bienvenida como paciente de nuestro club.\n\nEstamos a tu disposición para cualquier consulta.\n\nSaludos,`,
+  },
+  {
+    key: 'reprocann',
+    label: 'REPROCANN',
+    icon: '📋',
+    asunto: (p)  => `Renovación de REPROCANN — ${p.nombre} ${p.apellido}`,
+    cuerpo:  (p) => {
+      const venc = p.reprocann_vencimiento
+        ? new Date(p.reprocann_vencimiento).toLocaleDateString('es-AR')
+        : 'próximamente'
+      return `Hola ${p.nombre},\n\nTe recordamos que tu habilitación REPROCANN vence el ${venc}.\n\nPor favor comunicate con nosotros para gestionar la renovación antes de esa fecha.\n\nSaludos,`
+    },
+  },
+  {
+    key: 'disponibilidad',
+    label: 'Disponibilidad',
+    icon: '📦',
+    asunto: (p)  => `Aviso de disponibilidad — ${p.nombre} ${p.apellido}`,
+    cuerpo:  (p) => `Hola ${p.nombre},\n\nTe informamos que hay producto disponible para tu retiro.\n\nPodés pasar a retirar en los horarios habituales. Ante cualquier duda no dudes en contactarnos.\n\nSaludos,`,
+  },
+  {
+    key: 'personalizado',
+    label: 'Libre',
+    icon: '✏️',
+    asunto: () => '',
+    cuerpo:  () => '',
+  },
+]
+
+const mailHistory   = ref([])
+const mailLoading   = ref(false)
+const mailSending   = ref(false)
+const mailPreview   = ref(false)
+const mailTemplate  = ref('personalizado')
+const mailForm      = ref({ asunto: '', cuerpo: '' })
+
+function applyMailTemplate(key) {
+  mailTemplate.value = key
+  const tpl = MAIL_TEMPLATES.find(t => t.key === key)
+  if (!tpl || !s.value) return
+  const clubName = s.value.club_nombre || ''
+  mailForm.value.asunto = tpl.asunto(s.value, clubName)
+  mailForm.value.cuerpo = tpl.cuerpo(s.value, clubName)
+}
+
+async function loadMailHistory() {
+  mailLoading.value = true
+  try {
+    const { data } = await getMailsPaciente(socioId)
+    mailHistory.value = data
+  } catch {
+    mailHistory.value = []
+  } finally {
+    mailLoading.value = false
+  }
+}
+
+async function submitMail() {
+  if (!mailForm.value.asunto.trim() || !mailForm.value.cuerpo.trim()) return
+  mailSending.value = true
+  try {
+    const { data } = await enviarMailPaciente(socioId, {
+      tipo:   mailTemplate.value,
+      asunto: mailForm.value.asunto.trim(),
+      cuerpo: mailForm.value.cuerpo.trim(),
+    })
+    mailHistory.value = [data, ...mailHistory.value]
+    mailForm.value = { asunto: '', cuerpo: '' }
+    mailTemplate.value = 'personalizado'
+    mailPreview.value = false
+    toastOk('Mail enviado correctamente')
+  } catch (e) {
+    toastErr(e?.response?.data?.error || 'Error al enviar el mail')
+  } finally {
+    mailSending.value = false
+  }
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'timeline') loadTimeline()
   if (tab === 'cuenta_corriente') loadCC()
   if (tab === 'reprocann' && renovaciones.value.length === 0) loadRenovaciones()
+  if (tab === 'correo' && mailHistory.value.length === 0) loadMailHistory()
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -225,6 +312,7 @@ const ALL_TABS = [
   { key: 'notas',            label: 'Notas',             icon: BookOpen,      roles: ['admin', 'medico'] },
   { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
   { key: 'timeline',         label: 'Timeline',          icon: Clock,         roles: ['admin', 'medico', 'cultivador'] },
+  { key: 'correo',           label: 'Correo',            icon: Mail,          roles: ['admin', 'supervisor'] },
 ]
 
 // ── Documento REPROCANN ──────────────────────────────────────────────────────
@@ -1118,6 +1206,127 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         </div>
       </div>
 
+      <!-- ── Tab: Correo ── -->
+      <div v-show="activeTab === 'correo'" class="sd__tab-content">
+
+        <!-- Sin email: warning -->
+        <div v-if="s && !s.email" class="sd__mail-noemail">
+          <AlertTriangle :size="20" class="sd__mail-noemail-ico" />
+          <div>
+            <strong>Este paciente no tiene email registrado.</strong>
+            <span> Editá sus datos para agregar uno antes de enviar mensajes.</span>
+          </div>
+          <button class="sd__mail-edit-link" @click="editOpen = true">Editar datos →</button>
+        </div>
+
+        <!-- Compose card -->
+        <div class="sd__card sd__mail-compose" :class="{ 'sd__mail-compose--disabled': !s?.email }">
+          <!-- Header: Para -->
+          <div class="sd__mail-to">
+            <Mail :size="14" class="sd__mail-to-ico" />
+            <span class="sd__mail-to-label">Para:</span>
+            <span class="sd__mail-to-name">{{ s?.nombre }} {{ s?.apellido }}</span>
+            <span v-if="s?.email" class="sd__mail-to-email">&lt;{{ s.email }}&gt;</span>
+            <span v-else class="sd__mail-to-missing">sin email</span>
+          </div>
+
+          <!-- Templates -->
+          <div class="sd__mail-templates">
+            <button
+              v-for="tpl in MAIL_TEMPLATES"
+              :key="tpl.key"
+              class="sd__mail-tpl-chip"
+              :class="{ 'sd__mail-tpl-chip--active': mailTemplate === tpl.key }"
+              @click="applyMailTemplate(tpl.key)"
+            >
+              {{ tpl.icon }} {{ tpl.label }}
+            </button>
+          </div>
+
+          <!-- Preview mode -->
+          <div v-if="mailPreview" class="sd__mail-preview">
+            <div class="sd__mail-preview-subject">{{ mailForm.asunto || '(sin asunto)' }}</div>
+            <div class="sd__mail-preview-body">{{ mailForm.cuerpo || '(sin contenido)' }}</div>
+          </div>
+
+          <!-- Edit mode -->
+          <template v-else>
+            <div class="sd__mail-field">
+              <label class="sd__mail-field-label">Asunto</label>
+              <input
+                v-model="mailForm.asunto"
+                class="sd__mail-input"
+                placeholder="Asunto del mensaje…"
+                maxlength="200"
+                :disabled="!s?.email"
+              />
+            </div>
+            <div class="sd__mail-field">
+              <label class="sd__mail-field-label">Mensaje</label>
+              <textarea
+                v-model="mailForm.cuerpo"
+                class="sd__mail-textarea"
+                placeholder="Escribí el mensaje…"
+                rows="7"
+                maxlength="3000"
+                :disabled="!s?.email"
+              ></textarea>
+              <div class="sd__mail-charcount">{{ mailForm.cuerpo.length }} / 3000</div>
+            </div>
+          </template>
+
+          <!-- Actions -->
+          <div class="sd__mail-actions">
+            <button
+              class="sd__mail-preview-btn"
+              @click="mailPreview = !mailPreview"
+              :disabled="!mailForm.asunto && !mailForm.cuerpo"
+            >
+              {{ mailPreview ? 'Editar' : 'Vista previa' }}
+            </button>
+            <button
+              class="sd__mail-send-btn"
+              :disabled="!s?.email || mailSending || !mailForm.asunto.trim() || !mailForm.cuerpo.trim()"
+              @click="submitMail"
+            >
+              <span v-if="mailSending" class="sd__ring sd__ring--sm sd__ring--white"></span>
+              <Mail v-else :size="15" />
+              {{ mailSending ? 'Enviando…' : 'Enviar mail' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Historial -->
+        <div class="sd__mail-history-wrap">
+          <div class="sd__mail-history-title">Historial de mails enviados</div>
+
+          <div v-if="mailLoading" class="sd__loading-sm"><div class="sd__ring sd__ring--sm"></div></div>
+
+          <div v-else-if="!mailHistory.length" class="sd__empty sd__empty--sm">
+            <div class="sd__empty-icon"><Mail :size="24" /></div>
+            <div class="sd__empty-title">Todavía no se envió ningún mail</div>
+          </div>
+
+          <div v-else class="sd__mail-history">
+            <div v-for="m in mailHistory" :key="m.id" class="sd__mail-item">
+              <div class="sd__mail-item-ico">
+                <Mail :size="14" />
+              </div>
+              <div class="sd__mail-item-body">
+                <div class="sd__mail-item-subject">{{ m.asunto }}</div>
+                <div class="sd__mail-item-meta">
+                  {{ formatDateTime(m.enviado_at) }} · {{ m.remitente }} → {{ m.email_destino }}
+                </div>
+              </div>
+              <div class="sd__mail-item-tipo">
+                <span class="sd__mail-tipo-badge">{{ MAIL_TEMPLATES.find(t => t.key === m.tipo)?.icon || '📧' }} {{ m.tipo }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
     </template>
   </div>
 
@@ -1524,4 +1733,109 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__btn-tiny--danger:hover { background: #fee2e2; }
 .sd__btn-tiny--ghost { border-color: #e2e8f0; color: #94a3b8; }
 .sd__btn-tiny--ghost:hover { background: #f8fafc; color: #475569; }
+
+/* ── Correo tab ─────────────────────────────────────────── */
+.sd__mail-noemail {
+  display: flex; align-items: flex-start; gap: .75rem;
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+  padding: .875rem 1rem; margin-bottom: 1rem; font-size: .875rem; color: #92400e; flex-wrap: wrap;
+}
+.sd__mail-noemail-ico { color: #d97706; flex-shrink: 0; margin-top: .1rem; }
+.sd__mail-edit-link {
+  background: none; border: none; color: #1b5e20; font-weight: 700; font-size: .875rem;
+  cursor: pointer; margin-left: auto; white-space: nowrap; padding: 0;
+}
+.sd__mail-edit-link:hover { text-decoration: underline; }
+
+.sd__mail-compose { display: flex; flex-direction: column; gap: .875rem; }
+.sd__mail-compose--disabled { opacity: .6; pointer-events: none; }
+
+.sd__mail-to {
+  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  padding: .6rem .875rem; background: #f8fafc; border-radius: 8px;
+  font-size: .84rem; border: 1px solid #e8f0eb;
+}
+.sd__mail-to-ico { color: #1b5e20; flex-shrink: 0; }
+.sd__mail-to-label { font-weight: 700; color: #6b7280; }
+.sd__mail-to-name { font-weight: 600; color: #0f172a; }
+.sd__mail-to-email { color: #64748b; }
+.sd__mail-to-missing { color: #dc2626; font-style: italic; }
+
+.sd__mail-templates {
+  display: flex; gap: .4rem; flex-wrap: wrap;
+}
+.sd__mail-tpl-chip {
+  display: inline-flex; align-items: center; gap: .3rem;
+  background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 20px;
+  padding: .35rem .8rem; font-size: .8rem; font-weight: 600; color: #475569;
+  cursor: pointer; transition: all .15s;
+}
+.sd__mail-tpl-chip:hover { border-color: #1b5e20; color: #1b5e20; background: #f0fdf4; }
+.sd__mail-tpl-chip--active { background: #e8f5e9; border-color: #1b5e20; color: #1b5e20; }
+
+.sd__mail-field { display: flex; flex-direction: column; gap: .3rem; }
+.sd__mail-field-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
+.sd__mail-input {
+  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px;
+  padding: .65rem .875rem; font-size: .875rem; color: #0f172a;
+  width: 100%; box-sizing: border-box; transition: border .15s;
+}
+.sd__mail-input:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); background: #fff; }
+.sd__mail-textarea {
+  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px;
+  padding: .7rem .875rem; font-size: .875rem; color: #0f172a; line-height: 1.6;
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 140px;
+  transition: border .15s; font-family: inherit;
+}
+.sd__mail-textarea:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); background: #fff; }
+.sd__mail-charcount { font-size: .7rem; color: #94a3b8; text-align: right; margin-top: .2rem; }
+
+.sd__mail-preview {
+  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px;
+  padding: 1.25rem 1rem; min-height: 180px;
+}
+.sd__mail-preview-subject { font-weight: 700; color: #0f172a; font-size: .95rem; margin-bottom: .75rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .6rem; }
+.sd__mail-preview-body { font-size: .875rem; color: #334155; line-height: 1.7; white-space: pre-wrap; }
+
+.sd__mail-actions {
+  display: flex; align-items: center; justify-content: flex-end; gap: .5rem; flex-wrap: wrap;
+}
+.sd__mail-preview-btn {
+  background: transparent; border: 1.5px solid #e2e8f0; color: #475569;
+  padding: .6rem 1rem; border-radius: 8px; font-size: .84rem; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.sd__mail-preview-btn:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }
+.sd__mail-preview-btn:disabled { opacity: .4; cursor: not-allowed; }
+.sd__mail-send-btn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: #1b5e20; color: #fff; border: none;
+  padding: .65rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 700;
+  cursor: pointer; transition: background .15s;
+}
+.sd__mail-send-btn:hover:not(:disabled) { background: #144a18; }
+.sd__mail-send-btn:disabled { opacity: .55; cursor: not-allowed; }
+.sd__ring--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
+
+/* Historial */
+.sd__mail-history-wrap { margin-top: 1.5rem; }
+.sd__mail-history-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .75rem; }
+.sd__mail-history { display: flex; flex-direction: column; gap: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+.sd__mail-item {
+  display: flex; align-items: flex-start; gap: .75rem;
+  padding: .875rem 1rem; border-bottom: 1px solid #f1f5f9;
+}
+.sd__mail-item:last-child { border-bottom: none; }
+.sd__mail-item-ico {
+  width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px;
+  background: #e8f5e9; color: #1b5e20;
+  display: flex; align-items: center; justify-content: center;
+}
+.sd__mail-item-body { flex: 1; min-width: 0; }
+.sd__mail-item-subject { font-size: .875rem; font-weight: 600; color: #0f172a; margin-bottom: .15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd__mail-item-meta { font-size: .75rem; color: #94a3b8; }
+.sd__mail-item-tipo { flex-shrink: 0; }
+.sd__mail-tipo-badge { font-size: .7rem; font-weight: 600; background: #f1f5f9; color: #475569; padding: .15rem .5rem; border-radius: 5px; }
+
+.sd__empty--sm { padding: 1.5rem; }
 </style>

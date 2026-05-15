@@ -11,6 +11,7 @@ class Paciente < ApplicationRecord
   has_many :patient_documents, dependent: :destroy
   has_one  :cuenta_corriente, dependent: :destroy
   has_many :reprocann_renovaciones, class_name: 'ReprocannRenovacion', dependent: :destroy
+  has_many :mails_enviados, class_name: 'MailEnviado', dependent: :destroy
 
   has_one_attached :reprocann_documento
 

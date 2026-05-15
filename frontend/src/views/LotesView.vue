@@ -105,6 +105,7 @@ function emptyForm() {
     start_date: new Date().toISOString().slice(0,10),
     strain: "", grow_type: "sustrato", light_type: "", notes: "",
     sala_id: salas.items[0]?.id ?? "",
+    tamanio_maceta: null,
   };
 }
 
@@ -146,6 +147,7 @@ function startEdit(l) {
     start_date: l.start_date ? l.start_date.slice(0,10) : new Date().toISOString().slice(0,10),
     strain: l.strain||"", grow_type: l.grow_type||"sustrato", light_type: l.light_type||"",
     notes: l.notes||"", sala_id: l.sala_id||"",
+    tamanio_maceta: l.tamanio_maceta ?? null,
   };
   editErrors.value = {};
   showEdit.value = true;
@@ -298,10 +300,11 @@ async function exportarCSV() {
             <th class="lv-th--sort" @click="sortBy = sortBy === 'plantas_desc' ? 'fecha_desc' : 'plantas_desc'">
               Plantas <span class="lv-sort-icon">{{ sortBy === 'plantas_desc' ? '↓' : '↕' }}</span>
             </th>
+            <th>Maceta</th>
             <th class="lv-th--sort" @click="sortBy = sortBy === 'fecha_asc' ? 'fecha_desc' : 'fecha_asc'">
               Días <span class="lv-sort-icon">{{ sortBy.startsWith('fecha') ? (sortBy === 'fecha_asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
-            <th>Progreso</th>
+            <th class="lv-th--hide-tablet">Progreso</th>
             <th v-if="canEdit"></th>
           </tr>
         </thead>
@@ -312,30 +315,34 @@ async function exportarCSV() {
             class="lv-table__row"
             @click="$router.push({ name: 'lote-detail', params: { id: l.id } })"
           >
-            <td>
+            <td data-label="Estado">
               <span class="lv-badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }">
                 {{ em(l.estado).icon }} {{ estadoLabel(l.estado) }}
               </span>
             </td>
-            <td>
+            <td data-label="Código">
               <span class="lv-codigo">{{ l.codigo }}</span>
             </td>
-            <td>
+            <td data-label="Genética">
               <span v-if="l.genetica?.nombre" class="lv-genetica">{{ l.genetica.nombre }}</span>
               <span v-else-if="l.strain" class="lv-strain">{{ l.strain }}</span>
               <span v-else class="lv-empty">—</span>
             </td>
-            <td>
+            <td data-label="Sala">
               <span class="lv-sala">{{ salaName(l.sala_id) }}</span>
             </td>
-            <td>
+            <td data-label="Plantas">
               <span class="lv-num">{{ l.plants_count ?? 0 }}</span>
             </td>
-            <td>
+            <td data-label="Maceta">
+              <span v-if="l.tamanio_maceta" class="lv-num">{{ l.tamanio_maceta }}L</span>
+              <span v-else class="lv-empty">—</span>
+            </td>
+            <td data-label="Días">
               <span v-if="diasDesdeInicio(l.start_date) !== null" class="lv-num">{{ diasDesdeInicio(l.start_date) }}d</span>
               <span v-else class="lv-empty">—</span>
             </td>
-            <td>
+            <td data-label="Progreso" class="lv-th--hide-tablet">
               <template v-if="l.progreso_ciclo != null && ['vegetativo','floracion'].includes(l.estado)">
                 <div class="lv-prog-wrap">
                   <div class="lv-prog-track">
@@ -516,6 +523,10 @@ async function exportarCSV() {
                   <option value="mixta">Mixta</option>
                 </select>
               </div>
+              <div class="lm-field">
+                <label class="lm-label">Maceta <span class="lm-unit">litros</span></label>
+                <input type="number" step="0.5" min="0" class="lm-input" v-model.number="editForm.tamanio_maceta" placeholder="Ej: 11" />
+              </div>
               <div class="lm-field lm-field--full">
                 <label class="lm-label">Notas</label>
                 <textarea class="lm-input lm-textarea" rows="2" v-model.trim="editForm.notes"></textarea>
@@ -539,7 +550,7 @@ async function exportarCSV() {
 <style scoped>
 /* ── Layout ──────────────────────────────────────────── */
 .lv { padding: 2rem 1.5rem; max-width: 1100px; margin: 0 auto; }
-@media (max-width: 768px) { .lv { padding: 1.25rem 1rem; } }
+@media (max-width: 768px) { .lv { padding: 1.25rem 1rem; overflow-x: hidden; } }
 
 /* ── Header ──────────────────────────────────────────── */
 .lv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
@@ -607,6 +618,13 @@ async function exportarCSV() {
 .lv__select--sm { min-width: 120px; }
 .lv__select:focus { outline: none; border-color: #1b5e20; }
 
+@media (max-width: 640px) {
+  .lv__toolbar { gap: .4rem; }
+  .lv__search-wrap { flex: 1 1 100%; }
+  .lv__select { flex: 1 1 calc(50% - .2rem); min-width: 0; font-size: .82rem; padding: .58rem .7rem; }
+  .lv__select--sm { flex: 1 1 calc(50% - .2rem); }
+}
+
 /* ── Loading / Error ─────────────────────────────────── */
 .lv__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; color: #94a3b8; font-size: .875rem; justify-content: center; }
 .lv__ring    { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: lv-spin .7s linear infinite; flex-shrink: 0; }
@@ -627,9 +645,9 @@ async function exportarCSV() {
 
 .lv-badge { display: inline-flex; align-items: center; gap: .25rem; padding: 3px 8px; border-radius: 5px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
 .lv-codigo { font-weight: 700; color: #0f172a; font-family: monospace; font-size: .85rem; }
-.lv-genetica { font-weight: 600; color: #3F6452; }
-.lv-strain { font-style: italic; color: #64748b; }
-.lv-sala { color: #64748b; font-size: .82rem; }
+.lv-genetica { font-weight: 600; color: #3F6452; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-strain { font-style: italic; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-sala { color: #64748b; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-num { font-weight: 600; color: #374151; }
 .lv-empty { color: #cbd5e1; }
 
@@ -651,6 +669,83 @@ async function exportarCSV() {
 .lv__page-btn:disabled { opacity: .4; cursor: not-allowed; }
 .lv__page-info { font-size: .8rem; color: #64748b; font-weight: 600; }
 .lv__count { font-size: .75rem; color: #94a3b8; }
+
+/* ── Tablet: ocultar columna Progreso ────────────────── */
+@media (max-width: 900px) {
+  .lv-th--hide-tablet { display: none; }
+}
+
+/* ── Mobile: tabla → cards ───────────────────────────── */
+@media (max-width: 640px) {
+  .lv__table-wrap { background: transparent; border: none; border-radius: 0; overflow: visible; }
+  .lv-table { display: block; }
+  .lv-table thead { display: none; }
+  .lv-table tbody { display: flex; flex-direction: column; gap: .6rem; }
+
+  .lv-table tbody tr {
+    display: block;
+    background: #fff;
+    border: 1px solid #e5e7eb !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    border-radius: 12px;
+    padding: .875rem 1rem .875rem 1rem;
+    position: relative;
+    transition: box-shadow .15s;
+  }
+  .lv-table tbody tr:hover { background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.07); }
+
+  /* Todas las celdas: flex con label */
+  .lv-table td {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .18rem 0;
+    border: none;
+    font-size: .84rem;
+    min-width: 0;
+    width: 100%;
+  }
+  .lv-table td::before {
+    content: attr(data-label);
+    font-size: .65rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    min-width: 68px;
+    flex-shrink: 0;
+  }
+
+  /* Estado: sin label, badge prominente */
+  .lv-table td[data-label="Estado"] {
+    padding-bottom: .45rem;
+    margin-bottom: .1rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .lv-table td[data-label="Estado"]::before { content: none; }
+
+  /* Código: sin label, grande */
+  .lv-table td[data-label="Código"]::before { content: none; }
+  .lv-codigo { font-size: .95rem; }
+
+  /* Acciones: posición absoluta top-right */
+  .lv-table td:last-child {
+    position: absolute;
+    top: .75rem;
+    right: .75rem;
+    padding: 0;
+    display: flex;
+    align-items: center;
+  }
+  .lv-table td:last-child::before { content: none; }
+  .lv-actions { opacity: 1; }
+
+  /* Padding-right para que el contenido no choque con acciones */
+  .lv-table td[data-label="Estado"],
+  .lv-table td[data-label="Código"] { padding-right: 5rem; }
+
+  .lv__table-footer { padding: .6rem .25rem; }
+}
 
 /* ── Modal ───────────────────────────────────────────── */
 .lm-overlay {
@@ -693,6 +788,7 @@ async function exportarCSV() {
 .lm-field--full  { grid-column: 1 / -1; }
 .lm-label        { font-size: .78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
 .lm-req          { color: #dc2626; }
+.lm-unit         { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; margin-left: .2rem; }
 .lm-input {
   background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px;
   padding: .65rem .9rem; font-size: .875rem; color: #0f172a;

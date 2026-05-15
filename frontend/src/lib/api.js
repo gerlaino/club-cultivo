@@ -132,6 +132,9 @@ export const subirReprocannDoc   = (id, file) => {
 }
 export const eliminarReprocannDoc = (id) => api.delete(`/pacientes/${id}/eliminar_reprocann`)
 
+export const enviarMailPaciente  = (id, payload) => api.post(`/pacientes/${id}/enviar_mail`, { mail: payload })
+export const getMailsPaciente    = (id)           => api.get(`/pacientes/${id}/mails_enviados`)
+
 export const listReprocannRenovaciones   = (pacienteId) => api.get(`/pacientes/${pacienteId}/reprocann_renovaciones`)
 export const createReprocannRenovacion   = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/reprocann_renovaciones`, payload)
 export const updateReprocannRenovacion   = (pacienteId, id, payload) => api.put(`/pacientes/${pacienteId}/reprocann_renovaciones/${id}`, payload)
