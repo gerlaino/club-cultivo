@@ -427,4 +427,28 @@ onMounted(load)
 .dlv__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
 .dlv__spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: dlv-spin .6s linear infinite; }
 .dlv__opt { font-size: var(--fs-11); font-weight: 400; color: var(--c-ink-400); text-transform: none; letter-spacing: 0; }
+
+/* ── Mobile ──────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .dlv { padding: 1rem; }
+
+  .dlv__stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .5rem;
+  }
+  .dlv__stat { padding: .75rem .5rem; }
+  .dlv__stat-n { font-size: 1.5rem; }
+
+  .dlv__toolbar { flex-wrap: wrap; }
+  .dlv__check-all { flex: 1 1 100%; }
+  .dlv__btn-viaje { flex: 1; justify-content: center; }
+
+  /* En rows "en viaje", bajar los botones de acción debajo del cuerpo */
+  .dlv__row--enviaje { flex-wrap: wrap; }
+  .dlv__row--enviaje .dlv__row-body { width: 100%; }
+  .dlv__row-actions { flex-direction: row; width: 100%; margin-top: .5rem; }
+  .dlv__btn-entregar,
+  .dlv__btn-fallo { flex: 1; justify-content: center; }
+}
 </style>

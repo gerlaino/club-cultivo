@@ -964,6 +964,9 @@ onMounted(async () => {
 .dlv-drawer-enter-active, .dlv-drawer-leave-active { transition: opacity .2s, transform .2s; }
 .dlv-drawer-enter-from, .dlv-drawer-leave-to { opacity: 0; pointer-events: none; }
 .dlv-drawer-enter-from .dlv-drawer, .dlv-drawer-leave-to .dlv-drawer { transform: translateX(-100%); }
+@media (max-width: 1023px) {
+  .dlv-shell :deep(.dlv-sidebar) { display: none; }
+}
 
 /* ── Supervisor layout ── */
 .svr-shell { display: flex; min-height: 100vh; }
