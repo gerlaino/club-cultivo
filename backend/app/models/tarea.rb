@@ -119,7 +119,7 @@ class Tarea < ApplicationRecord
       return []
     end
 
-    scope = scope.where(asignada_a_id: [usuario.id, nil]) unless es_privilegiado
+    scope = scope.where(asignada_a_id: usuario.id) unless es_privilegiado
 
     cerradas = []
     scope.find_each do |t|
