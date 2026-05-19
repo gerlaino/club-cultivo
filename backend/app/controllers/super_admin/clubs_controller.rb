@@ -109,7 +109,8 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       :address, :city, :state, :country, :timezone,
       :plan, :plan_activo_hasta, :plan_trial, :web_activa,
       :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
-      :smtp_from, :smtp_from_name
+      :smtp_from, :smtp_from_name,
+      :ia_habilitada, :ia_tier, :ia_limite_hora
     )
   end
 
@@ -148,6 +149,9 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       smtp_user:       c.smtp_user,
       smtp_from:       c.smtp_from,
       smtp_from_name:  c.smtp_from_name,
+      ia_habilitada:   c.ia_habilitada,
+      ia_tier:         c.ia_tier,
+      ia_limite_hora:  c.ia_limite_hora,
     )
   end
 end

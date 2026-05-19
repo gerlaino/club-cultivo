@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_15_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_19_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -136,6 +136,15 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_15_000002) do
     t.boolean "activo", default: true, null: false
     t.datetime "deleted_at"
     t.boolean "benchmark_opt_in", default: false, null: false
+    t.string "smtp_host"
+    t.integer "smtp_port", default: 587
+    t.string "smtp_user"
+    t.string "smtp_pass"
+    t.string "smtp_from"
+    t.string "smtp_from_name"
+    t.boolean "ia_habilitada", default: false, null: false
+    t.string "ia_tier", default: "basico", null: false
+    t.integer "ia_limite_hora", default: 20, null: false
     t.index ["benchmark_opt_in"], name: "index_clubs_on_benchmark_opt_in"
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["plan"], name: "index_clubs_on_plan"

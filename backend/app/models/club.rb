@@ -129,6 +129,20 @@ class Club < ApplicationRecord
 
   def eliminado? = deleted_at.present?
 
+  IA_TIERS = {
+    'basico'     => { label: 'Básico',     limite_hora: 20,  color: '#64748b' },
+    'pro'        => { label: 'Pro',        limite_hora: 60,  color: '#0891b2' },
+    'enterprise' => { label: 'Enterprise', limite_hora: 200, color: '#7c3aed' },
+  }.freeze
+
+  def ia_config
+    IA_TIERS[ia_tier] || IA_TIERS['basico']
+  end
+
+  def ia_limite_efectivo
+    ia_limite_hora.positive? ? ia_limite_hora : ia_config[:limite_hora]
+  end
+
   def smtp_configured?
     smtp_host.present? && smtp_user.present? && smtp_pass.present?
   end

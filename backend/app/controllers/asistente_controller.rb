@@ -103,6 +103,8 @@ class AsistenteController < ApplicationController
 
   # POST /asistente/parsear
   def parsear
+    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+
     texto    = params[:texto].to_s.strip
     contexto = params[:contexto]
 
@@ -126,6 +128,8 @@ class AsistenteController < ApplicationController
 
   # POST /asistente/ejecutar
   def ejecutar
+    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+
     acciones = params[:acciones] || []
     contexto = params[:contexto]
     club     = current_user.club
@@ -189,11 +193,12 @@ class AsistenteController < ApplicationController
   end
 
   def rate_limited?
-    key   = "asistente:club:#{current_user.club_id}:#{Time.current.strftime('%Y%m%d%H')}"
-    redis = Redis.new(url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'))
-    count = redis.incr(key)
+    limite = current_user.club.ia_limite_efectivo
+    key    = "asistente:club:#{current_user.club_id}:#{Time.current.strftime('%Y%m%d%H')}"
+    redis  = Redis.new(url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'))
+    count  = redis.incr(key)
     redis.expire(key, 3600) if count == 1
-    count > LIMITE_LLAMADAS_POR_HORA
+    count > limite
   rescue
     false
   end

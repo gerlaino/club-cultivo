@@ -445,7 +445,14 @@ async function parsearConIA() {
     acciones.value = (data.acciones || []).map(a => ({ ...a, _expandido: false }))
     paso.value     = 'revisar'
   } catch (e) {
-    errorVoz.value = e?.response?.data?.error || 'Error al procesar con IA'
+    const status = e?.response?.status
+    if (status === 403) {
+      errorVoz.value = e?.response?.data?.error || 'El asistente de IA no está disponible en tu plan.'
+    } else if (status === 429) {
+      errorVoz.value = 'Límite de uso alcanzado. Volvé en unos minutos.'
+    } else {
+      errorVoz.value = e?.response?.data?.error || 'Error al procesar con IA'
+    }
   } finally {
     procesando.value = false
   }

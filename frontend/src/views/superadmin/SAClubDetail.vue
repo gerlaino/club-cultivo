@@ -27,6 +27,17 @@ const savingSmtp   = ref(false)
 const smtpError    = ref(null)
 const smtpSuccess  = ref(false)
 
+const iaForm       = ref({ ia_habilitada: false, ia_tier: 'basico', ia_limite_hora: 20 })
+const savingIa     = ref(false)
+const iaSuccess    = ref(false)
+
+const IA_TIERS = [
+  { value: 'basico',     label: 'Básico',     desc: '20 calls/h · Solo registro por voz',          color: '#64748b' },
+  { value: 'pro',        label: 'Pro',        desc: '60 calls/h · Voz + alertas proactivas',        color: '#0891b2' },
+  { value: 'enterprise', label: 'Enterprise', desc: '200 calls/h · Voz + alertas + predicciones',   color: '#7c3aed' },
+]
+function iaTierMeta(t) { return IA_TIERS.find(x => x.value === t) || IA_TIERS[0] }
+
 const PLAN_META = {
   semilla:    { label: 'Semilla',    color: '#64748b', bg: '#f1f5f9' },
   brote:      { label: 'Brote',      color: '#15803d', bg: '#dcfce7' },
@@ -63,6 +74,11 @@ async function cargar() {
       smtp_pass:      '',
       smtp_from:      data.smtp_from      || '',
       smtp_from_name: data.smtp_from_name || '',
+    }
+    iaForm.value = {
+      ia_habilitada:  data.ia_habilitada  ?? false,
+      ia_tier:        data.ia_tier        || 'basico',
+      ia_limite_hora: data.ia_limite_hora || 20,
     }
   } finally {
     loading.value = false
@@ -181,6 +197,19 @@ async function restaurar() {
     toast.error(e?.response?.data?.error || 'Error al restaurar')
   } finally {
     saving.value = false
+  }
+}
+
+async function guardarIa() {
+  savingIa.value = true
+  iaSuccess.value = false
+  try {
+    const { data } = await updateSuperAdminClub(id, iaForm.value)
+    club.value = { ...club.value, ...data }
+    iaSuccess.value = true
+    setTimeout(() => { iaSuccess.value = false }, 3000)
+  } finally {
+    savingIa.value = false
   }
 }
 
@@ -415,6 +444,56 @@ onMounted(cargar)
         </div>
       </div>
 
+      <!-- ══ IA ══ -->
+      <div class="scd__ia-card">
+        <div class="scd__ia-header">
+          <div class="scd__ia-title-row">
+            <span class="scd__ia-icon">🤖</span>
+            <span class="scd__ia-title">Asistente de IA</span>
+            <span v-if="club.ia_habilitada" class="scd__ia-badge scd__ia-badge--on"
+                  :style="{ background: iaTierMeta(club.ia_tier).color + '20', color: iaTierMeta(club.ia_tier).color }">
+              {{ iaTierMeta(club.ia_tier).label }}
+            </span>
+            <span v-else class="scd__ia-badge scd__ia-badge--off">Desactivado</span>
+            <span v-if="iaSuccess" class="scd__alert--ok">Guardado</span>
+          </div>
+        </div>
+        <div class="scd__ia-body">
+          <label class="scd__toggle scd__ia-toggle">
+            <input v-model="iaForm.ia_habilitada" type="checkbox" class="scd__toggle__input" />
+            <div class="scd__toggle__track"><div class="scd__toggle__thumb"></div></div>
+            <div class="scd__toggle__label">Habilitar asistente de IA para este club</div>
+          </label>
+
+          <div v-if="iaForm.ia_habilitada" class="scd__ia-tiers">
+            <button
+              v-for="tier in IA_TIERS" :key="tier.value"
+              type="button"
+              class="scd__ia-tier-btn"
+              :class="{ 'scd__ia-tier-btn--active': iaForm.ia_tier === tier.value }"
+              :style="iaForm.ia_tier === tier.value ? { borderColor: tier.color, background: tier.color + '12', color: tier.color } : {}"
+              @click="iaForm.ia_tier = tier.value; iaForm.ia_limite_hora = IA_TIERS.find(t => t.value === tier.value) ? [20,60,200][IA_TIERS.findIndex(t=>t.value===tier.value)] : 20"
+            >
+              <strong>{{ tier.label }}</strong>
+              <span>{{ tier.desc }}</span>
+            </button>
+          </div>
+
+          <div v-if="iaForm.ia_habilitada" class="scd__ia-limite">
+            <label class="scd__label">Límite de llamadas por hora</label>
+            <input v-model.number="iaForm.ia_limite_hora" type="number" min="1" max="500" class="scd__input scd__input--sm" />
+            <span class="scd__hint">Sobreescribe el límite del tier. Usar con cuidado.</span>
+          </div>
+        </div>
+        <div class="scd__ia-footer">
+          <button class="scd__btn-primary scd__btn-sm" :disabled="savingIa" @click="guardarIa">
+            <span v-if="savingIa" class="scd__spinner"></span>
+            <i v-else class="bi bi-robot"></i>
+            {{ savingIa ? 'Guardando…' : 'Guardar IA' }}
+          </button>
+        </div>
+      </div>
+
       <!-- ══ Modal cambiar plan ══ -->
       <Teleport to="body">
         <div v-if="showPlanModal" class="scd__overlay" @click.self="showPlanModal = false">
@@ -644,6 +723,32 @@ onMounted(cargar)
 @media (max-width: 600px) { .scd__smtp-grid { grid-template-columns: 1fr; } }
 .scd__smtp-footer { display: flex; justify-content: flex-end; margin-top: 1rem; }
 .scd__alert--ok { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; display: flex; align-items: center; gap: .5rem; }
+
+/* IA card */
+.scd__ia-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-top: 1.5rem; }
+.scd__ia-header { padding: 1rem 1.25rem .75rem; border-bottom: 1px solid #f1f5f9; }
+.scd__ia-title-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.scd__ia-icon { font-size: 1.1rem; }
+.scd__ia-title { font-size: .95rem; font-weight: 700; color: #0f172a; }
+.scd__ia-badge { font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: .2em .65em; border-radius: 6px; }
+.scd__ia-badge--on  { /* color set inline */ }
+.scd__ia-badge--off { background: #f1f5f9; color: #94a3b8; }
+.scd__ia-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+.scd__ia-toggle { gap: .75rem; }
+.scd__ia-tiers { display: flex; flex-direction: column; gap: .5rem; }
+.scd__ia-tier-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
+  padding: .65rem 1rem; border-radius: 8px;
+  border: 1.5px solid #e2e8f0; background: #f8fafc;
+  cursor: pointer; text-align: left; transition: all .15s;
+}
+.scd__ia-tier-btn strong { font-size: .85rem; }
+.scd__ia-tier-btn span   { font-size: .72rem; color: #64748b; }
+.scd__ia-tier-btn--active span { color: inherit; opacity: .8; }
+.scd__ia-tier-btn:hover { border-color: #94a3b8; }
+.scd__ia-limite { display: flex; flex-direction: column; gap: .3rem; max-width: 200px; }
+.scd__input--sm { width: 100%; }
+.scd__ia-footer { padding: .75rem 1.25rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; }
 
 /* Web toggle */
 .scd__web-toggle { width: 46px; height: 26px; border-radius: 13px; background: #e2e8f0; border: none; cursor: pointer; position: relative; transition: background .25s; padding: 0; flex-shrink: 0; }
