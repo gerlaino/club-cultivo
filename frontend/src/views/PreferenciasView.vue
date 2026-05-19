@@ -12,11 +12,8 @@ const logoPreview = ref(null)
 let toastTimer = null
 const { confirm } = useConfirm()
 
-// SMTP
+// SMTP — admin del club solo ve email remitente + contraseña; el host/port/user lo configura el super admin
 const smtpForm = reactive({
-  smtp_host:      '',
-  smtp_port:      587,
-  smtp_user:      '',
   smtp_pass:      '',
   smtp_from:      '',
   smtp_from_name: '',
@@ -96,10 +93,7 @@ function loadFromStore() {
   logoPreview.value = club.data.logo_url || null
   smtpConfigured.value = club.data.smtp_configured || false
   Object.assign(smtpForm, {
-    smtp_host:      club.data.smtp_host      || '',
-    smtp_port:      club.data.smtp_port      || 587,
-    smtp_user:      club.data.smtp_user      || '',
-    smtp_pass:      '',   // nunca viene del servidor
+    smtp_pass:      '',
     smtp_from:      club.data.smtp_from      || '',
     smtp_from_name: club.data.smtp_from_name || '',
   })
@@ -387,56 +381,44 @@ async function runTestSmtp() {
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:#f0fdf4;color:#15803d"><i class="bi bi-envelope-at"></i></div>
             <div>
-              <div class="pv__card-title">Configuración de correo</div>
-              <div class="pv__card-sub">SMTP del club para enviar mails a socios</div>
+              <div class="pv__card-title">Correo saliente</div>
+              <div class="pv__card-sub">Personalización del remitente para mails a socios</div>
             </div>
             <div class="pv__smtp-badge" :class="smtpConfigured ? 'pv__smtp-badge--ok' : 'pv__smtp-badge--off'">
               <i :class="smtpConfigured ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
-              {{ smtpConfigured ? 'Configurado' : 'Sin configurar' }}
+              {{ smtpConfigured ? 'Activo' : 'Sin configurar' }}
             </div>
           </div>
           <div class="pv__card-body">
 
-            <div class="pv__infobox" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
+            <div v-if="!smtpConfigured" class="pv__infobox">
               <i class="bi bi-info-circle-fill"></i>
-              <span>Los mails a socios se envían desde el servidor de correo del club. Podés usar Gmail (con contraseña de aplicación), Outlook, o cualquier proveedor SMTP.</span>
+              <span>El servidor de correo aún no está configurado. Contactá al administrador de la plataforma para activar el envío de mails.</span>
             </div>
 
             <div class="pv__grid">
-              <div class="pv__field pv__field--full">
+              <div class="pv__field">
                 <label class="pv__label">Nombre del remitente</label>
-                <input class="pv__input" v-model.trim="smtpForm.smtp_from_name" placeholder="Club Verde Cannabis" />
-                <span class="pv__hint">Nombre que verá el socio como remitente del mail</span>
+                <input class="pv__input" v-model.trim="smtpForm.smtp_from_name" placeholder="Club Verde Cannabis" :disabled="!smtpConfigured" />
+                <span class="pv__hint">El nombre que verá el socio como "De:"</span>
               </div>
               <div class="pv__field">
                 <label class="pv__label">Email remitente</label>
-                <input class="pv__input" type="email" v-model.trim="smtpForm.smtp_from" placeholder="administracion@clubverde.com" />
-                <span class="pv__hint">Puede diferir del usuario SMTP</span>
+                <input class="pv__input" type="email" v-model.trim="smtpForm.smtp_from" placeholder="no-reply@clubverde.com" :disabled="!smtpConfigured" />
+                <span class="pv__hint">Dejá vacío para usar el usuario del servidor</span>
               </div>
-              <div class="pv__field">
-                <label class="pv__label">Host SMTP <span class="pv__req">*</span></label>
-                <input class="pv__input" v-model.trim="smtpForm.smtp_host" placeholder="smtp.gmail.com" />
-              </div>
-              <div class="pv__field">
-                <label class="pv__label">Puerto</label>
-                <input class="pv__input" type="number" v-model.number="smtpForm.smtp_port" placeholder="587" />
-                <span class="pv__hint">587 (TLS) · 465 (SSL) · 25 (sin cifrado)</span>
-              </div>
-              <div class="pv__field">
-                <label class="pv__label">Usuario SMTP <span class="pv__req">*</span></label>
-                <input class="pv__input" v-model.trim="smtpForm.smtp_user" placeholder="administracion@clubverde.com" autocomplete="off" />
-              </div>
-              <div class="pv__field">
-                <label class="pv__label">Contraseña SMTP <span class="pv__req">*</span></label>
-                <input class="pv__input" type="password" v-model="smtpForm.smtp_pass" :placeholder="smtpConfigured ? '••••••••••••  (dejar vacío para no cambiar)' : 'Contraseña o App Password'" autocomplete="new-password" />
+              <div class="pv__field pv__field--full">
+                <label class="pv__label">Contraseña del servidor de correo</label>
+                <input class="pv__input" type="password" v-model="smtpForm.smtp_pass" :placeholder="smtpConfigured ? 'Dejar vacío para no cambiar' : '—'" autocomplete="new-password" :disabled="!smtpConfigured" />
+                <span class="pv__hint">Solo si necesitás actualizarla (ej: cambiaste tu App Password de Gmail)</span>
               </div>
             </div>
 
             <div class="pv__smtp-actions">
-              <button class="pv__btn-save" :disabled="smtpSaving" @click="saveSmtp">
+              <button class="pv__btn-save" :disabled="smtpSaving || !smtpConfigured" @click="saveSmtp">
                 <span v-if="smtpSaving" class="pv__spinner"></span>
                 <i v-else class="bi bi-floppy"></i>
-                {{ smtpSaving ? 'Guardando…' : 'Guardar configuración' }}
+                {{ smtpSaving ? 'Guardando…' : 'Guardar' }}
               </button>
               <button class="pv__btn-outline" :disabled="!smtpConfigured || smtpTesting" @click="runTestSmtp">
                 <span v-if="smtpTesting" class="pv__spinner pv__spinner--dark"></span>

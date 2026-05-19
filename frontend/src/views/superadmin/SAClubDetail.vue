@@ -22,6 +22,11 @@ const planForm = ref({ plan: '', plan_activo_hasta: '', trial: false })
 const userForm = ref({ first_name: '', last_name: '', email: '', password: '123456Aa', role: 'cultivador' })
 const userError = ref(null)
 
+const smtpForm     = ref({ smtp_host: '', smtp_port: 587, smtp_user: '', smtp_pass: '', smtp_from: '', smtp_from_name: '' })
+const savingSmtp   = ref(false)
+const smtpError    = ref(null)
+const smtpSuccess  = ref(false)
+
 const PLAN_META = {
   semilla:    { label: 'Semilla',    color: '#64748b', bg: '#f1f5f9' },
   brote:      { label: 'Brote',      color: '#15803d', bg: '#dcfce7' },
@@ -51,6 +56,14 @@ async function cargar() {
   try {
     const { data } = await getSuperAdminClub(id)
     club.value = data
+    smtpForm.value = {
+      smtp_host:      data.smtp_host      || '',
+      smtp_port:      data.smtp_port      || 587,
+      smtp_user:      data.smtp_user      || '',
+      smtp_pass:      '',
+      smtp_from:      data.smtp_from      || '',
+      smtp_from_name: data.smtp_from_name || '',
+    }
   } finally {
     loading.value = false
   }
@@ -168,6 +181,25 @@ async function restaurar() {
     toast.error(e?.response?.data?.error || 'Error al restaurar')
   } finally {
     saving.value = false
+  }
+}
+
+async function guardarSmtp() {
+  savingSmtp.value = true
+  smtpError.value  = null
+  smtpSuccess.value = false
+  try {
+    const payload = { ...smtpForm.value }
+    if (!payload.smtp_pass) delete payload.smtp_pass
+    const { data } = await updateSuperAdminClub(id, payload)
+    club.value = { ...club.value, ...data }
+    smtpForm.value.smtp_pass = ''
+    smtpSuccess.value = true
+    setTimeout(() => { smtpSuccess.value = false }, 3000)
+  } catch (e) {
+    smtpError.value = e?.response?.data?.errors?.join(', ') || 'Error al guardar'
+  } finally {
+    savingSmtp.value = false
   }
 }
 
@@ -329,6 +361,58 @@ onMounted(cargar)
           </div>
         </div>
 
+      </div>
+
+      <!-- ══ SMTP ══ -->
+      <div class="scd__smtp-card">
+        <div class="scd__smtp-header">
+          <div class="scd__smtp-title-row">
+            <i class="bi bi-envelope-at" style="color:#ea580c"></i>
+            <span class="scd__card-title">Correo saliente (SMTP)</span>
+            <span v-if="club.smtp_configured" class="scd__smtp-ok">Configurado</span>
+            <span v-else class="scd__smtp-missing">Sin configurar</span>
+          </div>
+        </div>
+        <div class="scd__smtp-body">
+          <div v-if="smtpError"   class="scd__alert">{{ smtpError }}</div>
+          <div v-if="smtpSuccess" class="scd__alert scd__alert--ok"><i class="bi bi-check-circle"></i> Configuración guardada</div>
+          <div class="scd__smtp-grid">
+            <div class="scd__field">
+              <label class="scd__label">Nombre remitente</label>
+              <input v-model.trim="smtpForm.smtp_from_name" class="scd__input" placeholder="Club Medicinal del Sur" />
+            </div>
+            <div class="scd__field">
+              <label class="scd__label">Email remitente</label>
+              <input v-model.trim="smtpForm.smtp_from" type="email" class="scd__input" placeholder="no-reply@clubmedicinal.org" />
+              <span class="scd__hint">Dejá vacío para usar el usuario SMTP</span>
+            </div>
+            <div class="scd__field">
+              <label class="scd__label">Host SMTP</label>
+              <input v-model.trim="smtpForm.smtp_host" class="scd__input" placeholder="smtp.gmail.com" />
+            </div>
+            <div class="scd__field">
+              <label class="scd__label">Puerto</label>
+              <input v-model.number="smtpForm.smtp_port" type="number" class="scd__input" placeholder="587" />
+              <span class="scd__hint">587 TLS · 465 SSL · 25 sin cifrado</span>
+            </div>
+            <div class="scd__field">
+              <label class="scd__label">Usuario SMTP</label>
+              <input v-model.trim="smtpForm.smtp_user" class="scd__input" placeholder="correo@gmail.com" />
+            </div>
+            <div class="scd__field">
+              <label class="scd__label">Contraseña SMTP</label>
+              <input v-model="smtpForm.smtp_pass" type="password" class="scd__input" placeholder="Dejá vacío para no cambiar" />
+              <span class="scd__hint">Para Gmail usá una App Password</span>
+            </div>
+          </div>
+          <div class="scd__smtp-footer">
+            <button class="scd__btn-primary scd__btn-sm" :disabled="savingSmtp" @click="guardarSmtp">
+              <span v-if="savingSmtp" class="scd__spinner"></span>
+              <i v-else class="bi bi-floppy"></i>
+              {{ savingSmtp ? 'Guardando…' : 'Guardar SMTP' }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- ══ Modal cambiar plan ══ -->
@@ -547,6 +631,19 @@ onMounted(cargar)
 .scd__toggle__input:checked + .scd__toggle__track .scd__toggle__thumb { left: 19px; }
 .scd__toggle__label { font-size: .875rem; font-weight: 600; color: #0f172a; }
 .scd__spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: scd-spin .6s linear infinite; }
+
+/* SMTP card */
+.scd__smtp-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-top: 1.25rem; }
+.scd__smtp-header { display: flex; align-items: center; justify-content: space-between; padding: .875rem 1.1rem; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
+.scd__smtp-title-row { display: flex; align-items: center; gap: .6rem; }
+.scd__smtp-ok      { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; background: #dcfce7; color: #15803d; padding: .2em .65em; border-radius: 6px; }
+.scd__smtp-missing { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; background: #fef3c7; color: #b45309; padding: .2em .65em; border-radius: 6px; }
+.scd__smtp-body { padding: 1.25rem 1.4rem; }
+.scd__smtp-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; }
+@media (max-width: 900px) { .scd__smtp-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .scd__smtp-grid { grid-template-columns: 1fr; } }
+.scd__smtp-footer { display: flex; justify-content: flex-end; margin-top: 1rem; }
+.scd__alert--ok { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; display: flex; align-items: center; gap: .5rem; }
 
 /* Web toggle */
 .scd__web-toggle { width: 46px; height: 26px; border-radius: 13px; background: #e2e8f0; border: none; cursor: pointer; position: relative; transition: background .25s; padding: 0; flex-shrink: 0; }

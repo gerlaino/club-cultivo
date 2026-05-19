@@ -107,7 +107,9 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     params.require(:club).permit(
       :name, :legal_name, :email, :phone, :website,
       :address, :city, :state, :country, :timezone,
-      :plan, :plan_activo_hasta, :plan_trial, :web_activa
+      :plan, :plan_activo_hasta, :plan_trial, :web_activa,
+      :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
+      :smtp_from, :smtp_from_name
     )
   end
 
@@ -135,11 +137,17 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
 
   def serialize_club_detail(c)
     serialize_club(c).merge(
-      website:   c.website,
-      address:   c.address,
-      timezone:  c.timezone,
-      usuarios:  c.users.map { |u| { id: u.id, email: u.email, role: u.role, nombre: u.nombre_completo } },
-      web_activa: c.web_activa,
-      )
+      website:        c.website,
+      address:        c.address,
+      timezone:       c.timezone,
+      usuarios:       c.users.map { |u| { id: u.id, email: u.email, role: u.role, nombre: u.nombre_completo } },
+      web_activa:     c.web_activa,
+      smtp_configured: c.smtp_configured?,
+      smtp_host:       c.smtp_host,
+      smtp_port:       c.smtp_port || 587,
+      smtp_user:       c.smtp_user,
+      smtp_from:       c.smtp_from,
+      smtp_from_name:  c.smtp_from_name,
+    )
   end
 end

@@ -34,6 +34,12 @@ const form = ref({
   plan:              'semilla',
   plan_trial:        true,
   plan_activo_hasta: '',
+  smtp_host:         'smtp.gmail.com',
+  smtp_port:         587,
+  smtp_user:         '',
+  smtp_pass:         '',
+  smtp_from:         '',
+  smtp_from_name:    '',
 })
 
 function validate() {
@@ -194,6 +200,55 @@ async function handleSubmit() {
           </div>
         </div>
 
+        <!-- SMTP -->
+        <div class="cnv__card cnv__card--mt">
+          <div class="cnv__card-header">
+            <div class="cnv__card-icon" style="background:rgba(234,88,12,.1);color:#ea580c">
+              <i class="bi bi-envelope-at"></i>
+            </div>
+            <div>
+              <div class="cnv__card-title">Correo saliente (SMTP)</div>
+              <div class="cnv__card-sub">El club usará este servidor para enviar mails a sus socios</div>
+            </div>
+          </div>
+          <div class="cnv__card-body">
+            <div class="cnv__grid">
+              <div class="cnv__field">
+                <label class="cnv__label">Nombre remitente</label>
+                <input v-model.trim="form.smtp_from_name" class="cnv__input" placeholder="Club Medicinal del Sur" />
+                <span class="cnv__hint">Aparece como "De:" en el mail recibido</span>
+              </div>
+              <div class="cnv__field">
+                <label class="cnv__label">Email remitente</label>
+                <input v-model.trim="form.smtp_from" type="email" class="cnv__input" placeholder="no-reply@clubmedicinal.org" />
+                <span class="cnv__hint">Dejá vacío para usar el usuario SMTP</span>
+              </div>
+              <div class="cnv__field">
+                <label class="cnv__label">Host SMTP</label>
+                <input v-model.trim="form.smtp_host" class="cnv__input" placeholder="smtp.gmail.com" />
+              </div>
+              <div class="cnv__field">
+                <label class="cnv__label">Puerto</label>
+                <input v-model.number="form.smtp_port" type="number" class="cnv__input" placeholder="587" />
+                <span class="cnv__hint">587 (TLS) · 465 (SSL) · 25 (sin cifrado)</span>
+              </div>
+              <div class="cnv__field">
+                <label class="cnv__label">Usuario SMTP</label>
+                <input v-model.trim="form.smtp_user" class="cnv__input" placeholder="correo@gmail.com" />
+              </div>
+              <div class="cnv__field">
+                <label class="cnv__label">Contraseña SMTP</label>
+                <input v-model="form.smtp_pass" type="password" class="cnv__input" placeholder="Contraseña o app password" />
+                <span class="cnv__hint">Para Gmail usá una App Password de 16 caracteres</span>
+              </div>
+            </div>
+            <div class="cnv__smtp-tip">
+              <i class="bi bi-info-circle"></i>
+              El admin del club podrá cambiar el email y contraseña desde Preferencias, pero no los campos técnicos de servidor.
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Aside -->
@@ -348,6 +403,10 @@ async function handleSubmit() {
 .cnv__btn-ghost:hover { background: #f8fafc; color: #0f172a; }
 .cnv__spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: cnv-spin .6s linear infinite; }
 @keyframes cnv-spin { to { transform: rotate(360deg); } }
+
+/* SMTP tip */
+.cnv__smtp-tip { display: flex; align-items: flex-start; gap: .5rem; margin-top: 1rem; padding: .75rem 1rem; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 9px; font-size: .78rem; color: #9a3412; line-height: 1.5; }
+.cnv__smtp-tip i { flex-shrink: 0; margin-top: .1rem; }
 
 /* Success */
 .cnv__success { background: #fff; border: 1px solid #bbf7d0; border-radius: 16px; padding: 3rem 2rem; text-align: center; max-width: 640px; margin: 0 auto; }
