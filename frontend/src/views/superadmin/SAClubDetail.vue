@@ -430,7 +430,7 @@ onMounted(cargar)
             </div>
             <div class="scd__field">
               <label class="scd__label">Contraseña SMTP</label>
-              <input v-model="smtpForm.smtp_pass" type="password" class="scd__input" placeholder="Dejá vacío para no cambiar" />
+              <input v-model="smtpForm.smtp_pass" type="password" class="scd__input" placeholder="Dejá vacío para no cambiar" autocomplete="new-password" />
               <span class="scd__hint">Para Gmail usá una App Password</span>
             </div>
           </div>
