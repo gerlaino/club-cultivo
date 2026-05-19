@@ -12,8 +12,21 @@ class Tarea < ApplicationRecord
   belongs_to :plan_tarea,   class_name: 'PlanTarea',   optional: true
 
   # ── Enums ──────────────────────────────────────────────────────
-  TIPOS       = %w[riego poda medicion limpieza cosecha transplante inspeccion otro].freeze
+  TIPOS       = %w[riego poda medicion limpieza cosecha transplante inspeccion otro
+                   nutricion defoliacion scrog_lst ajuste_luz revision_plagas].freeze
   ESTADOS     = %w[pendiente en_progreso completada cancelada].freeze
+
+  # Mapeo de tareas_realizadas (RegistroAmbiental) a tipo de Tarea
+  TAREAS_REALIZADAS_MAP = {
+    'riego'           => 'riego',
+    'nutricion'       => 'nutricion',
+    'poda'            => 'poda',
+    'defoliacion'     => 'defoliacion',
+    'scrog_lst'       => 'scrog_lst',
+    'revision_plagas' => 'revision_plagas',
+    'limpieza_sala'   => 'limpieza',
+    'ajuste_luz'      => 'ajuste_luz',
+  }.freeze
   PRIORIDADES = %w[baja normal alta urgente].freeze
   FRECUENCIAS = %w[diaria semanal quincenal mensual].freeze
 
@@ -85,6 +98,35 @@ class Tarea < ApplicationRecord
   # Marcar que las horas ya fueron aplicadas al lote
   def marcar_horas_aplicadas!
     update!(horas_aplicadas_al_lote: true)
+  end
+
+  # Cierra automáticamente tareas pendientes cuando se guarda un registro ambiental.
+  # es_privilegiado: admin/supervisor pueden cerrar tareas de cualquier cultivador.
+  # Devuelve array con títulos de las tareas cerradas.
+  def self.cerrar_por_registro!(tareas_realizadas:, usuario:, es_privilegiado:, lote: nil, sala: nil)
+    tipos = Array(tareas_realizadas).filter_map { |tr| TAREAS_REALIZADAS_MAP[tr] }.uniq
+    return [] if tipos.empty?
+
+    scope = activas.where(tipo: tipos)
+
+    if lote
+      scope = scope.where(lote_id: lote.id)
+    elsif sala
+      lote_ids = sala.lotes.where.not(estado: 'finalizado').pluck(:id)
+      return [] if lote_ids.empty?
+      scope = scope.where('sala_id = ? OR lote_id IN (?)', sala.id, lote_ids)
+    else
+      return []
+    end
+
+    scope = scope.where(asignada_a_id: [usuario.id, nil]) unless es_privilegiado
+
+    cerradas = []
+    scope.find_each do |t|
+      t.update!(estado: 'completada', notas_completado: 'Completada automáticamente por registro de voz')
+      cerradas << t.titulo
+    end
+    cerradas
   end
 
   def en_serie? = parent_tarea_id.present? || tareas_hijas.exists?

@@ -253,6 +253,19 @@ class AsistenteController < ApplicationController
 
   private
 
+  def cerrar_tareas_por_registro(datos, lote: nil, sala: nil)
+    Tarea.cerrar_por_registro!(
+      tareas_realizadas: Array(datos['tareas_realizadas']),
+      usuario:           current_user,
+      es_privilegiado:   current_user.admin? || current_user.supervisor?,
+      lote:              lote,
+      sala:              sala
+    )
+  rescue => e
+    Rails.logger.warn "Auto-close tareas failed: #{e.message}"
+    []
+  end
+
   def rate_limited?
     key   = "asistente:club:#{current_user.club_id}:#{Time.current.strftime('%Y%m%d%H')}"
     redis = Redis.new(url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'))
@@ -409,7 +422,10 @@ class AsistenteController < ApplicationController
 
     registro = lote.registros_ambientales.build(campos)
     if registro.save
-      { ok: true, mensaje: "Registro ambiental guardado en #{lote.codigo}" }
+      tareas_cerradas = cerrar_tareas_por_registro(datos, lote: lote)
+      msg = "Registro ambiental guardado en #{lote.codigo}"
+      msg += " · #{tareas_cerradas.size} tarea#{'s' if tareas_cerradas.size != 1} completada#{'s' if tareas_cerradas.size != 1}: #{tareas_cerradas.join(', ')}" if tareas_cerradas.any?
+      { ok: true, mensaje: msg }
     else
       { ok: false, error: registro.errors.full_messages.join(', ') }
     end
@@ -453,8 +469,10 @@ class AsistenteController < ApplicationController
     end
 
     if creados > 0
+      tareas_cerradas = cerrar_tareas_por_registro(datos, sala: sala)
       msg = "Registro ambiental guardado en #{creados} lote#{'s' if creados != 1} de #{sala.nombre}"
       msg += " (falló: #{fallidos.join(', ')})" if fallidos.any?
+      msg += " · #{tareas_cerradas.size} tarea#{'s' if tareas_cerradas.size != 1} completada#{'s' if tareas_cerradas.size != 1}: #{tareas_cerradas.join(', ')}" if tareas_cerradas.any?
       { ok: true, mensaje: msg }
     else
       { ok: false, error: "No se pudo guardar en ningún lote de #{sala.nombre}" }
