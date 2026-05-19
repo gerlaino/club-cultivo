@@ -122,6 +122,18 @@ function sm(s)  { return SALUD_META[s]     || { color:'#94a3b8', emoji:'⚪', la
 function pgm(p) { return PLAGAS_META[p]    || { color:'#94a3b8', emoji:'—', label:p||'—' } }
 function chm(c) { return COLOR_HOJAS_META[c] || { emoji:'🌿', label:c||'—', hint:'' } }
 
+const TAREAS_META = {
+  riego:           { emoji: '💧', label: 'Riego' },
+  nutricion:       { emoji: '🧪', label: 'Nutrición' },
+  poda:            { emoji: '✂️',  label: 'Poda' },
+  defoliacion:     { emoji: '🍃', label: 'Defoliación' },
+  scrog_lst:       { emoji: '🪢', label: 'SCROG/LST' },
+  revision_plagas: { emoji: '🔍', label: 'Rev. plagas' },
+  limpieza_sala:   { emoji: '🧹', label: 'Limpieza' },
+  ajuste_luz:      { emoji: '💡', label: 'Luz' },
+}
+function tm(t) { return TAREAS_META[t] || { emoji: '📌', label: t } }
+
 function growLabel(g)  { return { sustrato:'Sustrato', hidroponia:'Hidroponia', aeroponia:'Aeroponia' }[g]||g||'—' }
 function origenLabel(o){ return { semilla:'Semilla', esqueje:'Esqueje', clonacion:'Clonación' }[o]||o||'—' }
 function formatDate(d) {
@@ -555,9 +567,10 @@ onMounted(async () => {
                 <div v-for="a in activities" :key="a.id" class="pd__actividad">
                   <div class="pd__act-dot"
                        :style="{
-                         background: a.activity_type === 'registro_planta' ? '#0891b2'
-                                   : a.activity_type === 'measurement'      ? '#16a34a'
-                                   : a.activity_type === 'transplant'       ? '#d97706'
+                         background: a.activity_type === 'registro_planta'       ? '#0891b2'
+                                   : a.activity_type === 'measurement'            ? '#16a34a'
+                                   : a.activity_type === 'transplant'             ? '#d97706'
+                                   : a.activity_type === 'registro_ambiental_lote'? '#94a3b8'
                                    : '#64748b'
                        }">
                   </div>
@@ -613,6 +626,26 @@ onMounted(async () => {
                         </div>
                         <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
                       </template>
+                      <template v-else-if="a.activity_type === 'registro_ambiental_lote'">
+                        <div class="pd__act-titulo">
+                          🌿 Registro del lote
+                          <span class="pd__heredado-badge">heredado</span>
+                        </div>
+                        <div v-if="a.metadata?.tareas_realizadas?.length" class="pd__act-tareas">
+                          <span v-for="t in a.metadata.tareas_realizadas" :key="t" class="pd__tarea-chip">
+                            {{ tm(t).emoji }} {{ tm(t).label }}
+                          </span>
+                        </div>
+                        <div class="pd__act-metricas">
+                          <div v-if="a.metadata?.temperatura" class="pd__metrica"><span>🌡️</span><span>{{ a.metadata.temperatura }}°C</span></div>
+                          <div v-if="a.metadata?.humedad"     class="pd__metrica"><span>💧</span><span>{{ a.metadata.humedad }}%</span></div>
+                          <div v-if="a.metadata?.ph"          class="pd__metrica"><span>🧪</span><span>pH {{ a.metadata.ph }}</span></div>
+                          <div v-if="a.metadata?.ec"          class="pd__metrica"><span>⚡</span><span>EC {{ a.metadata.ec }}</span></div>
+                          <div v-if="a.metadata?.co2"         class="pd__metrica"><span>💨</span><span>{{ a.metadata.co2 }} ppm</span></div>
+                        </div>
+                        <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
+                      </template>
+
                       <template v-else>
                         <div class="pd__act-titulo">{{ a.activity_type }} <span v-if="a.description">· {{ a.description }}</span></div>
                       </template>
@@ -1316,6 +1349,17 @@ onMounted(async () => {
 .pd__act-ble-badge {
   font-size: .6rem; font-weight: 800; background: #dbeafe; color: #1d4ed8;
   padding: .1em .45em; border-radius: 5px; letter-spacing: .05em; text-transform: uppercase; vertical-align: middle;
+}
+.pd__heredado-badge {
+  font-size: .6rem; font-weight: 700; background: #f1f5f9; color: #64748b;
+  padding: .1em .45em; border-radius: 5px; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle;
+  border: 1px solid #e2e8f0;
+}
+.pd__act-tareas { display: flex; flex-wrap: wrap; gap: .3rem; margin: .35rem 0; }
+.pd__tarea-chip {
+  display: inline-flex; align-items: center; gap: .2rem;
+  font-size: .7rem; font-weight: 600; background: #f1f5f9; color: #475569;
+  border: 1px solid #e2e8f0; border-radius: 999px; padding: .15em .55em;
 }
 
 /* Panel BLE */

@@ -4,10 +4,18 @@ class PlantActivitiesController < ApplicationController
   skip_before_action :require_admin_o_cultivador, raise: false
 
   def index
-    activities = @plant.activities
-                       .order(occurred_at: :desc)
+    activities = @plant.activities.order(occurred_at: :desc).limit(50)
+    registros  = @plant.lote.registros_ambientales
+                       .order(registrado_en: :desc)
                        .limit(50)
-    render json: activities.map { |a| serialize(a) }
+
+    merged = activities.map { |a| serialize(a) } +
+             registros.map  { |r| serialize_registro(r) }
+
+    merged.sort_by! { |e| e[:occurred_at] || '' }.reverse!
+    merged = merged.first(60)
+
+    render json: merged
   end
 
   def create
@@ -61,6 +69,32 @@ class PlantActivitiesController < ApplicationController
       occurred_at:   a.occurred_at,
       usuario:       a.user.nombre_completo,
       created_at:    a.created_at
+    }
+  end
+
+  def serialize_registro(r)
+    {
+      id:            "ra_#{r.id}",
+      activity_type: 'registro_ambiental_lote',
+      description:   r.observaciones,
+      metadata: {
+        tareas_realizadas:    r.tareas_realizadas,
+        fertilizacion:        r.fertilizacion,
+        notas_fertilizacion:  r.notas_fertilizacion,
+        temperatura:          r.temperatura,
+        humedad:              r.humedad,
+        ph:                   r.ph,
+        ec:                   r.ec,
+        co2:                  r.co2,
+        ppfd:                 r.ppfd,
+        estado_general:       r.estado_general,
+        plagas_observadas:    r.plagas_observadas,
+        fuente:               r.fuente,
+      }.compact,
+      occurred_at: r.registrado_en,
+      usuario:     r.user&.nombre_completo || 'Sistema',
+      created_at:  r.created_at,
+      _heredado:   true,
     }
   end
 end
