@@ -61,7 +61,11 @@ class LecturasAmbientalesController < ApplicationController
     ))
 
     if lectura.save
-      EvaluarReglasJob.perform_later(@sala.id)
+      begin
+        EvaluarReglasJob.perform_later(@sala.id)
+      rescue => e
+        Rails.logger.warn "EvaluarReglasJob enqueue failed: #{e.message}"
+      end
       render json: serialize(lectura), status: :created
     else
       render json: { errors: lectura.errors.full_messages }, status: :unprocessable_entity

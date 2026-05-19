@@ -74,7 +74,11 @@ class RegistroAmbiental < ApplicationRecord
       propagadas += 1
     end
 
-    EvaluarReglasJob.perform_later(sala_id) if propagadas > 0
+    begin
+      EvaluarReglasJob.perform_later(sala_id) if propagadas > 0
+    rescue => e
+      Rails.logger.warn "EvaluarReglasJob enqueue failed: #{e.message}"
+    end
   end
 
   def calcular_vpd
