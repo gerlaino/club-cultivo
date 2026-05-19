@@ -174,7 +174,15 @@ class AsistenteController < ApplicationController
     - Si el cultivador dice "todas las plantas" o no nombra planta específica → registro_ambiental, no registro_planta.
     - Una actividad física (poda, defoliación, riego) SIN métricas igualmente genera registro_ambiental con tareas_realizadas.
     - nota_sala solo cuando no hay nada concreto medible (ej: "hoy visité la sala, todo bien").
-    - No generar múltiples acciones para el mismo evento — consolidar en una sola.
+
+    REGLA CRÍTICA — separar datos morfológicos de actividades físicas:
+    Si en una misma frase el cultivador menciona datos de LA PLANTA (altura, copas, color, estado)
+    Y TAMBIÉN actividades físicas (riego, poda, fertilización), generar DOS acciones separadas:
+      → registro_planta: solo datos morfológicos/observacionales de la planta
+      → registro_ambiental: solo las actividades físicas (tareas_realizadas, fertilizacion, etc.)
+    Ejemplo: "mide 45cm y la regué con base A y B" →
+      registro_planta { altura_cm: 45 } + registro_ambiental { tareas_realizadas: ["riego","nutricion"], fertilizacion: true }
+    NUNCA meter el riego o fertilización en el campo "notas" de registro_planta.
   PROMPT
 
   LIMITE_LLAMADAS_POR_HORA = 20
@@ -505,7 +513,8 @@ class AsistenteController < ApplicationController
       planta.update_columns(
         estado_salud:  datos['estado_salud']  || planta.estado_salud,
         altura_actual: datos['altura_cm']     || planta.altura_actual,
-        color_hojas:   datos['color_hojas']   || planta.color_hojas
+        color_hojas:   datos['color_hojas']   || planta.color_hojas,
+        num_colas:     datos['num_colas']     || planta.num_colas
       ) rescue nil
       { ok: true, mensaje: "Observación registrada en #{planta.nombre}" }
     else
