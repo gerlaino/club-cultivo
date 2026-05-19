@@ -124,6 +124,17 @@
                           Se guardará en todos los lotes activos de la sala
                         </div>
                         <div class="av__editor-grid">
+                          <div class="av__ef av__ef--full">
+                            <label>Actividades realizadas</label>
+                            <div class="av__tareas-chips">
+                              <button v-for="t in TAREAS_OPCIONES" :key="t.key" type="button"
+                                class="av__tarea-chip"
+                                :class="{ 'av__tarea-chip--on': (accion.datos.tareas_realizadas||[]).includes(t.key) }"
+                                @click="toggleTarea(accion, t.key)">
+                                {{ t.emoji }} {{ t.label }}
+                              </button>
+                            </div>
+                          </div>
                           <div class="av__ef"><label>pH</label><input type="number" step="0.1" v-model.number="accion.datos.ph" placeholder="6.2" /></div>
                           <div class="av__ef"><label>EC</label><input type="number" step="0.1" v-model.number="accion.datos.ec" placeholder="1.8" /></div>
                           <div class="av__ef"><label>Temperatura °C</label><input type="number" step="0.1" v-model.number="accion.datos.temperatura" placeholder="24" /></div>
@@ -136,10 +147,10 @@
                             </select>
                           </div>
                           <div class="av__ef av__ef--full">
-                            <label><input type="checkbox" v-model="accion.datos.fertilizacion" /> Fertilización realizada</label>
+                            <label><input type="checkbox" v-model="accion.datos.fertilizacion" /> Fertilización / nutrientes aplicados</label>
                           </div>
                           <div v-if="accion.datos.fertilizacion" class="av__ef av__ef--full">
-                            <label>Notas fertilización</label>
+                            <label>Notas nutrición</label>
                             <input type="text" v-model="accion.datos.notas_fertilizacion" placeholder="Base A + Bloom 2 pulsos..." />
                           </div>
                           <div class="av__ef av__ef--full">
@@ -267,6 +278,24 @@ const props = defineProps({
   contexto: { type: Object, default: null },
   mini:     { type: Boolean, default: false }
 })
+
+const TAREAS_OPCIONES = [
+  { key: 'riego',           label: 'Riego',        emoji: '💧' },
+  { key: 'nutricion',       label: 'Nutrición',    emoji: '🧪' },
+  { key: 'poda',            label: 'Poda',         emoji: '✂️' },
+  { key: 'defoliacion',     label: 'Defoliación',  emoji: '🍃' },
+  { key: 'scrog_lst',       label: 'SCROG/LST',    emoji: '🪢' },
+  { key: 'revision_plagas', label: 'Rev. plagas',  emoji: '🔍' },
+  { key: 'limpieza_sala',   label: 'Limpieza',     emoji: '🧹' },
+  { key: 'ajuste_luz',      label: 'Luz',          emoji: '💡' },
+]
+
+function toggleTarea(accion, key) {
+  if (!accion.datos.tareas_realizadas) accion.datos.tareas_realizadas = []
+  const idx = accion.datos.tareas_realizadas.indexOf(key)
+  if (idx === -1) accion.datos.tareas_realizadas.push(key)
+  else accion.datos.tareas_realizadas.splice(idx, 1)
+}
 const emit = defineEmits(['registrado'])
 
 const abierto               = ref(false)
@@ -600,6 +629,10 @@ function metaAccion(accion) {
 .av__ef--full { grid-column:1/-1; }
 .av__ef label { font-size:10px; font-weight:700; color:#60725d; text-transform:uppercase; letter-spacing:.05em; }
 .av__ef input,.av__ef select,.av__ef textarea { background:white; border:1.5px solid #d4e6d4; border-radius:7px; padding:5px 8px; font-size:13px; color:#1a1a1a; width:100%; box-sizing:border-box; font-family:inherit; }
+.av__tareas-chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:3px; }
+.av__tarea-chip { display:inline-flex; align-items:center; gap:4px; padding:4px 9px; border:1.5px solid #d4e6d4; border-radius:999px; background:#f8fdf8; font-size:12px; cursor:pointer; transition:all .15s; color:#4a7c59; }
+.av__tarea-chip:hover { border-color:#1b5e20; }
+.av__tarea-chip--on { background:#dcfce7; border-color:#1b5e20; color:#14532d; font-weight:600; }
 .av__ef textarea { resize:vertical; min-height:52px; }
 .av__ef input:focus,.av__ef select:focus,.av__ef textarea:focus { outline:none; border-color:#1b5e20; }
 

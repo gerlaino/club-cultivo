@@ -5,96 +5,176 @@ class AsistenteController < ApplicationController
 
   PROMPT_BASE = <<~PROMPT
     Sos un asistente inteligente para clubes de cannabis medicinal bajo el programa REPROCANN de Argentina.
-    Tu función es analizar el reporte oral de un cultivador y extraer acciones estructuradas.
+    Tu función es analizar el reporte oral de un cultivador y extraer acciones estructuradas en JSON.
 
-    Tipos de acciones posibles:
-    - "registro_ambiental": riego, fertilización, métricas de UN lote específico (pH, EC, temperatura, etc.)
-    - "registro_ambiental_sala": métricas o riego que aplican a TODOS los lotes de la sala a la vez
-    - "registro_planta": observación de una planta específica o todas las plantas del lote
-    - "nota_sala": observación general SIN datos concretos (ej: "todo tranquilo", "sin novedades")
-    - "nota_lote": nota libre sobre un lote
-    - "tarea": tarea a futuro (SOLO si el contexto lo permite — no para cultivadores)
+    ═══════════════════════════════════════════
+    TIPOS DE ACCIÓN
+    ═══════════════════════════════════════════
 
-    Devolvé SOLO un JSON con esta estructura exacta, sin texto adicional ni backticks:
+    1. "registro_ambiental"
+       Actividades o métricas de UN lote específico.
+       Usar cuando el cultivador nombra un lote concreto O cuando el contexto es un lote.
+
+    2. "registro_ambiental_sala"
+       Actividades o métricas que aplican a TODOS los lotes de la sala a la vez.
+       Usar cuando el contexto es una sala y NO se nombra un lote específico.
+
+    3. "registro_planta"
+       Observación visual de una planta individual.
+
+    4. "nota_lote"
+       Texto libre sobre un lote que no encaja en registro_ambiental.
+
+    5. "nota_sala"
+       Observación general de la sala SIN datos concretos medibles.
+       Solo cuando no hay ninguna métrica ni actividad concreta que registrar.
+
+    6. "avance_ciclo"
+       Cambio de estado del ciclo de un lote (vegetativo → floración, etc.).
+
+    7. "tarea"
+       Tarea pendiente a futuro. Solo si el usuario tiene rol admin/agricultor.
+
+    ═══════════════════════════════════════════
+    CAMPO CLAVE: tareas_realizadas
+    ═══════════════════════════════════════════
+
+    En registro_ambiental y registro_ambiental_sala SIEMPRE incluir el array "tareas_realizadas"
+    con las actividades físicas realizadas. Valores válidos:
+      - "riego"           → cuando se regó (con agua sola, sin nutrientes)
+      - "nutricion"       → cuando se aplicaron nutrientes / fertilizantes
+      - "poda"            → poda de ramas o ápice (topping)
+      - "defoliacion"     → eliminación de hojas
+      - "scrog_lst"       → conducción: SCROG, SOG, LST, tutoreo
+      - "revision_plagas" → inspección de plagas/hongos
+      - "limpieza_sala"   → limpieza del espacio
+      - "ajuste_luz"      → cambio de altura, intensidad o fotoperiodo
+
+    REGLA CRÍTICA — riego vs fertilización:
+      - "riegue" / "di agua" / "riego limpio" → tareas_realizadas: ["riego"], fertilizacion: false
+      - "fertilicé" / "puse nutrientes" / "base A + B" / "bloom" → tareas_realizadas: ["riego", "nutricion"], fertilizacion: true, notas_fertilizacion: "descripción"
+      - "podé y riegué" → tareas_realizadas: ["poda", "riego"]
+      - "defolié" sin riego → tareas_realizadas: ["defoliacion"] (sin riego)
+      - Si solo mencionan actividades físicas sin métricas, igual generar registro_ambiental con tareas_realizadas
+
+    ═══════════════════════════════════════════
+    ESTRUCTURA JSON DE RESPUESTA
+    ═══════════════════════════════════════════
+
+    Devolvé SOLO el JSON, sin texto adicional ni backticks:
+
     {
-      "resumen": "descripción breve de lo que entendiste",
+      "resumen": "descripción breve en una oración de lo que entendiste",
       "acciones": [
+
         {
           "tipo": "registro_ambiental",
-          "lote_codigo": "USAR_CODIGO_DEL_CONTEXTO_SI_EXISTE",
+          "lote_codigo": "L-26-003",
           "datos": {
-            "ph": 6.2,
-            "ec": 1.4,
-            "temperatura": 24.5,
-            "humedad": 60,
+            "tareas_realizadas": ["riego", "nutricion"],
             "fertilizacion": true,
             "notas_fertilizacion": "base A + base B + bloom, 2 pulsos",
+            "temperatura": 24.5,
+            "humedad": 60,
+            "ph": 6.2,
+            "ec": 1.8,
+            "co2": 900,
+            "ppfd": 600,
+            "horas_luz": 18,
+            "temperatura_sustrato": 22,
+            "ph_runoff": 6.4,
             "estado_general": "bueno",
             "plagas_observadas": "ninguna",
-            "observaciones": "riego completo"
+            "observaciones": "texto adicional libre"
           }
         },
+
         {
           "tipo": "registro_ambiental_sala",
           "datos": {
+            "tareas_realizadas": ["riego"],
+            "fertilizacion": false,
             "temperatura": 24.5,
             "humedad": 60,
-            "fertilizacion": true,
-            "notas_fertilizacion": "riego con base A + bloom",
             "estado_general": "bueno",
             "plagas_observadas": "ninguna",
             "observaciones": "riego completo de toda la sala"
           }
         },
+
         {
           "tipo": "registro_planta",
           "planta_nombre": "L-26-003-P001",
           "datos": {
             "estado_salud": "regular",
             "color_hojas": "amarillo",
-            "plagas": "ninguna",
-            "deficiencias": "deficit de nitrogeno en hojas bajas",
-            "notas": "observacion visual"
+            "plagas": "leve",
+            "deficiencias": "déficit de nitrógeno en hojas bajas",
+            "altura_cm": 45,
+            "num_colas": 4,
+            "notas": "observación visual detallada"
           }
         },
-        {
-          "tipo": "nota_sala",
-          "datos": {
-            "contenido": "texto de la nota"
-          }
-        },
+
         {
           "tipo": "nota_lote",
           "lote_codigo": "L-26-003",
           "datos": {
-            "contenido": "texto de la nota"
+            "contenido": "texto libre sobre el lote"
           }
         },
+
+        {
+          "tipo": "nota_sala",
+          "datos": {
+            "contenido": "texto libre sobre la sala"
+          }
+        },
+
+        {
+          "tipo": "avance_ciclo",
+          "lote_codigo": "L-26-003",
+          "datos": {
+            "estado_nuevo": "floracion",
+            "descripcion": "motivo del cambio de estado"
+          }
+        },
+
         {
           "tipo": "tarea",
           "datos": {
-            "titulo": "Revision de plagas",
-            "descripcion": "descripcion",
-            "prioridad": "media",
-            "sala_nombre": "Sala Floracion",
-            "dias_desde_hoy": 7
+            "titulo": "Revisión de plagas en sala floración",
+            "descripcion": "descripción detallada",
+            "prioridad": "alta",
+            "sala_nombre": "Sala Floración",
+            "dias_desde_hoy": 3
           }
         }
+
       ]
     }
 
-    Reglas:
-    - estado_salud: excelente | bueno | regular | malo | critico
-    - color_hojas: verde_oscuro | verde_claro | amarillo | marron
-    - plagas: ninguna | leve | moderada | severa
-    - estado_general: excelente | bueno | regular | malo | critico
-    - plagas_observadas: ninguna | leve | moderada | severa
-    - prioridad: baja | normal | media | alta | urgente
-    - Si el cultivador dice "todas las plantas" o no menciona planta especifica => registro_ambiental del lote
-    - Si estas en contexto de sala => usa nota_sala para observaciones generales
-    - dias_desde_hoy: cuantos dias desde hoy se programa la tarea
-    - Incluye solo los campos que puedas inferir del texto
-    - Nunca inventes datos que no estan en el texto
+    ═══════════════════════════════════════════
+    VALORES ENUM VÁLIDOS
+    ═══════════════════════════════════════════
+
+    estado_general:  excelente | bueno | regular | malo | critico
+    estado_salud:    excelente | bueno | regular | malo | critico
+    color_hojas:     verde_oscuro | verde_claro | amarillo | marron
+    plagas:          ninguna | leve | moderada | severa
+    plagas_observadas: ninguna | leve | moderada | severa
+    prioridad:       baja | normal | media | alta | urgente
+    estado_nuevo (avance_ciclo): semilla | vegetativo | floracion | cosecha | curado | finalizado
+
+    ═══════════════════════════════════════════
+    REGLAS GENERALES
+    ═══════════════════════════════════════════
+
+    - Incluir solo los campos que se puedan inferir del texto. Nunca inventar datos.
+    - Si el cultivador dice "todas las plantas" o no nombra planta específica → registro_ambiental, no registro_planta.
+    - Una actividad física (poda, defoliación, riego) SIN métricas igualmente genera registro_ambiental con tareas_realizadas.
+    - nota_sala solo cuando no hay nada concreto medible (ej: "hoy visité la sala, todo bien").
+    - No generar múltiples acciones para el mismo evento — consolidar en una sola.
   PROMPT
 
   LIMITE_LLAMADAS_POR_HORA = 20
@@ -315,6 +395,7 @@ class AsistenteController < ApplicationController
       horas_luz:            datos['horas_luz'],
       temperatura_sustrato: datos['temperatura_sustrato'],
       ph_runoff:            datos['ph_runoff'],
+      tareas_realizadas:    Array(datos['tareas_realizadas']),
       fertilizacion:        datos['fertilizacion'] || false,
       notas_fertilizacion:  datos['notas_fertilizacion'],
       estado_general:       datos['estado_general'],
@@ -352,6 +433,7 @@ class AsistenteController < ApplicationController
       horas_luz:            datos['horas_luz'],
       temperatura_sustrato: datos['temperatura_sustrato'],
       ph_runoff:            datos['ph_runoff'],
+      tareas_realizadas:    Array(datos['tareas_realizadas']),
       fertilizacion:        datos['fertilizacion'] || false,
       notas_fertilizacion:  datos['notas_fertilizacion'],
       estado_general:       datos['estado_general'],

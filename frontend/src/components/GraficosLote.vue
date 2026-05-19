@@ -155,15 +155,15 @@ const W = 600, H = 200
 const PAD_L = 44, PAD_R = 52, PAD_T = 12, PAD_B = 28
 
 const METRICAS = [
-  { key: 'ph',          label: 'pH',          unit: '',    color: '#1b5e20', optimo: [5.8, 6.8] },
-  { key: 'ec',          label: 'EC',          unit: ' mS', color: '#1565c0', optimo: [1.2, 2.0] },
   { key: 'temperatura', label: 'Temperatura', unit: '°C',  color: '#e65100', optimo: [20, 28] },
   { key: 'humedad',     label: 'Humedad',     unit: '%',   color: '#00695c', optimo: [50, 70] },
+  { key: 'ph',          label: 'pH',          unit: '',    color: '#1b5e20', optimo: [5.8, 6.8] },
+  { key: 'ec',          label: 'EC',          unit: ' mS', color: '#1565c0', optimo: [1.2, 2.0] },
 ]
 
 const loading       = ref(true)
 const datos         = ref([])
-const metricaActiva = ref('ph')
+const metricaActiva = ref('temperatura')
 const tooltip       = ref(null)
 
 const metrica = computed(() => METRICAS.find(m => m.key === metricaActiva.value))
@@ -302,13 +302,15 @@ function onMouseMove(e) {
     if (d < minDist) { minDist = d; closest = p }
   }
 
+  const rawX = (closest.x / W) * rect.width + 8
+  const rawY = (closest.y / H) * rect.height - 44
   tooltip.value = {
     x:       closest.x,
     y:       closest.y,
     valor:   closest.valor,
     fecha:   closest.fecha,
-    screenX: (closest.x / W) * rect.width + 8,
-    screenY: (closest.y / H) * rect.height - 40,
+    screenX: Math.min(rawX, rect.width - 110),
+    screenY: Math.max(4, rawY),
   }
 }
 
@@ -379,6 +381,7 @@ onMounted(async () => {
   border: 1px solid #e8f0e9;
   border-radius: 10px;
   padding: .75rem;
+  overflow: hidden;
 }
 
 .gl__svg {

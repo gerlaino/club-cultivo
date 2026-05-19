@@ -1090,20 +1090,6 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Gráficos ambientales -->
-          <div class="ld__section ld__section--mt">
-            <button class="ld__section-toggle" @click="graficosExpanded = !graficosExpanded">
-              <div class="ld__section-toggle-left">
-                <span class="ld__section-emoji">📊</span>
-                <span class="ld__section-title">Registros ambientales</span>
-              </div>
-              <i class="bi ld__chevron" :class="graficosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-            </button>
-            <div v-show="graficosExpanded" class="ld__section-body">
-              <GraficosLote :lote-id="id" :key="graficosKey" />
-            </div>
-          </div>
-
           <!-- 3. Historial -->
           <div class="ld__section ld__section--mt">
             <button class="ld__section-toggle" @click="historialExpanded = !historialExpanded">
@@ -1173,6 +1159,20 @@ onUnmounted(() => {
                   </template>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Gráficos ambientales -->
+          <div class="ld__section ld__section--mt">
+            <button class="ld__section-toggle" @click="graficosExpanded = !graficosExpanded">
+              <div class="ld__section-toggle-left">
+                <span class="ld__section-emoji">📊</span>
+                <span class="ld__section-title">Evolución ambiental</span>
+              </div>
+              <i class="bi ld__chevron" :class="graficosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </button>
+            <div v-show="graficosExpanded" class="ld__section-body">
+              <GraficosLote :lote-id="id" :key="graficosKey" />
             </div>
           </div>
 
