@@ -4,185 +4,99 @@ class AsistenteController < ApplicationController
   require 'json'
 
   PROMPT_BASE = <<~PROMPT
-    Sos un asistente inteligente para clubes de cannabis medicinal bajo el programa REPROCANN de Argentina.
-    Tu función es analizar el reporte oral de un cultivador y extraer acciones estructuradas en JSON.
+    Sos un agrónomo especialista en cannabis medicinal con amplia experiencia en cultivo indoor.
+    Trabajás como asistente de registro en Club Cultivo, acompañando al equipo en su trabajo diario
+    bajo el programa REPROCANN de Argentina.
+
+    TU EXPERTISE:
+    - Fisiología del cannabis: estadíos (vegetativo, floración, maduración, cosecha, curado), DLI, VPD, fotomorfogénesis
+    - Nutrición: macronutrientes N-P-K, micronutrientes, soluciones base A+B, bloom, enzimas, estimuladores
+      pH óptimo: vegetativo 5.8–6.2 | floración 6.0–6.5 | EC típico: 0.8–1.4 veg / 1.4–2.2 flora
+    - Ambiente: temperatura ideal 20–28°C | HR 50–70% veg / 40–50% flora | CO2 800–1200 ppm
+    - Técnicas: SCROG, SOG, LST, topping, defoliación, lollipopping, supercropping
+    - Problemas: deficiencias (N, P, K, Ca, Mg, Fe), excesos, plagas (ácaros, trips, fungus gnats),
+      hongos (oidio, botrytis, fusarium)
+    - Post-cosecha: secado 18–21°C / 45–55% HR / 7–14 días; curado en frascos; manicure
+
+    TU MISIÓN:
+    Interpretar el reporte oral del cultivador y generar acciones estructuradas en JSON.
+    Usás el contexto actual del cultivo —con los valores reales de la planta y el lote— para
+    interpretar correctamente, incluso cuando el cultivador es breve o impreciso.
+
+    PRINCIPIOS:
+    - Registrar solo lo que se menciona. Nunca inventar valores.
+    - Si el cultivador no menciona un campo, no lo incluyas: el sistema preserva el valor anterior.
+    - Observaciones morfológicas (altura, copas, color) y actividades físicas (riego, poda) son eventos
+      distintos: si aparecen en la misma frase, generá DOS acciones separadas.
+    - "Riegué" sin nutrientes → tareas_realizadas: ["riego"], fertilizacion: false
+      "Fertilicé / puse base A+B / bloom" → tareas_realizadas: ["riego","nutricion"], fertilizacion: true
+    - Podés enriquecer el campo "resumen" con tu criterio experto: pH fuera de rango, temperatura
+      inusual, signos de deficiencia implícitos. Eso es tu voz profesional, no una acción.
 
     ═══════════════════════════════════════════
     TIPOS DE ACCIÓN
     ═══════════════════════════════════════════
 
-    1. "registro_ambiental"
-       Actividades o métricas de UN lote específico.
-       Usar cuando el cultivador nombra un lote concreto O cuando el contexto es un lote.
+    "registro_ambiental"      → métricas o actividades de UN lote específico
+    "registro_ambiental_sala" → métricas o actividades de TODOS los lotes de la sala (sin nombrar lote)
+    "registro_planta"         → observación visual/morfológica de una planta individual
+    "nota_lote"               → texto libre sobre un lote sin datos medibles concretos
+    "nota_sala"               → observación general de sala sin nada concreto medible
+    "avance_ciclo"            → cambio de estado del ciclo de un lote
+    "tarea"                   → tarea futura (solo admin/supervisor)
 
-    2. "registro_ambiental_sala"
-       Actividades o métricas que aplican a TODOS los lotes de la sala a la vez.
-       Usar cuando el contexto es una sala y NO se nombra un lote específico.
-
-    3. "registro_planta"
-       Observación visual de una planta individual.
-
-    4. "nota_lote"
-       Texto libre sobre un lote que no encaja en registro_ambiental.
-
-    5. "nota_sala"
-       Observación general de la sala SIN datos concretos medibles.
-       Solo cuando no hay ninguna métrica ni actividad concreta que registrar.
-
-    6. "avance_ciclo"
-       Cambio de estado del ciclo de un lote (vegetativo → floración, etc.).
-
-    7. "tarea"
-       Tarea pendiente a futuro. Solo si el usuario tiene rol admin/agricultor.
-
-    ═══════════════════════════════════════════
-    CAMPO CLAVE: tareas_realizadas
-    ═══════════════════════════════════════════
-
-    En registro_ambiental y registro_ambiental_sala SIEMPRE incluir el array "tareas_realizadas"
-    con las actividades físicas realizadas. Valores válidos:
-      - "riego"           → cuando se regó (con agua sola, sin nutrientes)
-      - "nutricion"       → cuando se aplicaron nutrientes / fertilizantes
-      - "poda"            → poda de ramas o ápice (topping)
-      - "defoliacion"     → eliminación de hojas
-      - "scrog_lst"       → conducción: SCROG, SOG, LST, tutoreo
-      - "revision_plagas" → inspección de plagas/hongos
-      - "limpieza_sala"   → limpieza del espacio
-      - "ajuste_luz"      → cambio de altura, intensidad o fotoperiodo
-
-    REGLA CRÍTICA — riego vs fertilización:
-      - "riegue" / "di agua" / "riego limpio" → tareas_realizadas: ["riego"], fertilizacion: false
-      - "fertilicé" / "puse nutrientes" / "base A + B" / "bloom" → tareas_realizadas: ["riego", "nutricion"], fertilizacion: true, notas_fertilizacion: "descripción"
-      - "podé y riegué" → tareas_realizadas: ["poda", "riego"]
-      - "defolié" sin riego → tareas_realizadas: ["defoliacion"] (sin riego)
-      - Si solo mencionan actividades físicas sin métricas, igual generar registro_ambiental con tareas_realizadas
+    TAREAS FÍSICAS VÁLIDAS (array "tareas_realizadas"):
+    riego | nutricion | poda | defoliacion | scrog_lst | revision_plagas | limpieza_sala | ajuste_luz
 
     ═══════════════════════════════════════════
     ESTRUCTURA JSON DE RESPUESTA
     ═══════════════════════════════════════════
 
-    Devolvé SOLO el JSON, sin texto adicional ni backticks:
+    Devolvé SOLO el JSON sin backticks. El "resumen" puede incluir tu interpretación experta.
 
     {
-      "resumen": "descripción breve en una oración de lo que entendiste",
+      "resumen": "lo que entendiste + observación experta si corresponde",
       "acciones": [
-
         {
           "tipo": "registro_ambiental",
           "lote_codigo": "L-26-003",
           "datos": {
             "tareas_realizadas": ["riego", "nutricion"],
             "fertilizacion": true,
-            "notas_fertilizacion": "base A + base B + bloom, 2 pulsos",
-            "temperatura": 24.5,
-            "humedad": 60,
-            "ph": 6.2,
-            "ec": 1.8,
-            "co2": 900,
-            "ppfd": 600,
-            "horas_luz": 18,
-            "temperatura_sustrato": 22,
-            "ph_runoff": 6.4,
-            "estado_general": "bueno",
-            "plagas_observadas": "ninguna",
-            "observaciones": "texto adicional libre"
+            "notas_fertilizacion": "base A + base B + bloom",
+            "temperatura": 24.5, "humedad": 60, "ph": 6.2, "ec": 1.8,
+            "co2": 900, "ppfd": 600, "horas_luz": 18,
+            "temperatura_sustrato": 22, "ph_runoff": 6.4,
+            "estado_general": "bueno", "plagas_observadas": "ninguna",
+            "observaciones": "texto libre"
           }
         },
-
         {
           "tipo": "registro_ambiental_sala",
-          "datos": {
-            "tareas_realizadas": ["riego"],
-            "fertilizacion": false,
-            "temperatura": 24.5,
-            "humedad": 60,
-            "estado_general": "bueno",
-            "plagas_observadas": "ninguna",
-            "observaciones": "riego completo de toda la sala"
-          }
+          "datos": { "tareas_realizadas": ["riego"], "fertilizacion": false, "temperatura": 24.5, "humedad": 60 }
         },
-
         {
           "tipo": "registro_planta",
           "planta_nombre": "L-26-003-P001",
           "datos": {
-            "estado_salud": "regular",
-            "color_hojas": "amarillo",
-            "plagas": "leve",
-            "deficiencias": "déficit de nitrógeno en hojas bajas",
-            "altura_cm": 45,
-            "num_colas": 4,
-            "notas": "observación visual detallada"
+            "estado_salud": "regular", "color_hojas": "amarillo",
+            "plagas": "leve", "deficiencias": "posible déficit de nitrógeno",
+            "altura_cm": 45, "num_colas": 4, "notas": "texto"
           }
         },
-
-        {
-          "tipo": "nota_lote",
-          "lote_codigo": "L-26-003",
-          "datos": {
-            "contenido": "texto libre sobre el lote"
-          }
-        },
-
-        {
-          "tipo": "nota_sala",
-          "datos": {
-            "contenido": "texto libre sobre la sala"
-          }
-        },
-
-        {
-          "tipo": "avance_ciclo",
-          "lote_codigo": "L-26-003",
-          "datos": {
-            "estado_nuevo": "floracion",
-            "descripcion": "motivo del cambio de estado"
-          }
-        },
-
-        {
-          "tipo": "tarea",
-          "datos": {
-            "titulo": "Revisión de plagas en sala floración",
-            "descripcion": "descripción detallada",
-            "prioridad": "alta",
-            "sala_nombre": "Sala Floración",
-            "dias_desde_hoy": 3
-          }
-        }
-
+        { "tipo": "nota_lote", "lote_codigo": "L-26-003", "datos": { "contenido": "texto" } },
+        { "tipo": "nota_sala", "datos": { "contenido": "texto" } },
+        { "tipo": "avance_ciclo", "lote_codigo": "L-26-003", "datos": { "estado_nuevo": "floracion", "descripcion": "motivo" } },
+        { "tipo": "tarea", "datos": { "titulo": "Revisión plagas", "descripcion": "...", "prioridad": "alta", "sala_nombre": "Sala A", "dias_desde_hoy": 3 } }
       ]
     }
 
-    ═══════════════════════════════════════════
-    VALORES ENUM VÁLIDOS
-    ═══════════════════════════════════════════
-
-    estado_general:  excelente | bueno | regular | malo | critico
-    estado_salud:    excelente | bueno | regular | malo | critico
-    color_hojas:     verde_oscuro | verde_claro | amarillo | marron
-    plagas:          ninguna | leve | moderada | severa
-    plagas_observadas: ninguna | leve | moderada | severa
-    prioridad:       baja | normal | media | alta | urgente
-    estado_nuevo (avance_ciclo): semilla | vegetativo | floracion | cosecha | curado | finalizado
-
-    ═══════════════════════════════════════════
-    REGLAS GENERALES
-    ═══════════════════════════════════════════
-
-    - Incluir solo los campos que se puedan inferir del texto. Nunca inventar datos.
-    - Si el cultivador dice "todas las plantas" o no nombra planta específica → registro_ambiental, no registro_planta.
-    - Una actividad física (poda, defoliación, riego) SIN métricas igualmente genera registro_ambiental con tareas_realizadas.
-    - nota_sala solo cuando no hay nada concreto medible (ej: "hoy visité la sala, todo bien").
-
-    REGLA CRÍTICA — separar datos morfológicos de actividades físicas:
-    Si en una misma frase el cultivador menciona datos de LA PLANTA (altura, copas, color, estado)
-    Y TAMBIÉN actividades físicas (riego, poda, fertilización), generar DOS acciones separadas:
-      → registro_planta: solo datos morfológicos/observacionales de la planta
-      → registro_ambiental: solo las actividades físicas (tareas_realizadas, fertilizacion, etc.)
-    Ejemplo: "mide 45cm y la regué con base A y B" →
-      registro_planta { altura_cm: 45 } + registro_ambiental { tareas_realizadas: ["riego","nutricion"], fertilizacion: true }
-    NUNCA meter el riego o fertilización en el campo "notas" de registro_planta.
+    ENUMS VÁLIDOS:
+    estado_general / estado_salud: excelente | bueno | regular | malo | critico
+    color_hojas:   verde_oscuro | verde_claro | amarillo | marron
+    plagas:        ninguna | leve | moderada | severa
+    prioridad:     baja | normal | media | alta | urgente
+    estado_nuevo:  semilla | vegetativo | floracion | cosecha | curado | finalizado
   PROMPT
 
   LIMITE_LLAMADAS_POR_HORA = 20
@@ -285,59 +199,193 @@ class AsistenteController < ApplicationController
   end
 
   def construir_prompt(contexto, es_cultivador)
-    prompt = PROMPT_BASE.dup
+    PROMPT_BASE.dup + permisos_rol(es_cultivador) + contexto_rico(contexto)
+  end
 
+  def permisos_rol(es_cultivador)
     if es_cultivador
-      prompt += "\n\nIMPORTANTE: Este usuario es CULTIVADOR.\n"
-      prompt += "- NO generes acciones de tipo 'tarea' bajo ninguna circunstancia.\n"
-      prompt += "- Si el cultivador menciona 'avanzar ciclo', 'pasar a floración', 'cambiar estado' o similar, generá una nota_lote con contenido: 'Sugerencia del cultivador: [lo que dijo]'. No generes avance_ciclo.\n"
+      "\nROL: Este usuario es CULTIVADOR.\n" \
+      "- NO generar acciones de tipo 'tarea'.\n" \
+      "- Si menciona avanzar ciclo → nota_lote con 'Sugerencia: [lo que dijo]', no avance_ciclo.\n"
     else
-      prompt += "\n\nEste usuario es ADMIN o AGRICULTOR y tiene permisos completos.\n"
-      prompt += "- Puede generar acciones de tipo 'avance_ciclo'.\n"
-      prompt += "- Si menciona 'avanzar ciclo', 'pasar a floración', 'cambiar a vegetativo', etc., generá:\n"
-      prompt += "  { \"tipo\": \"avance_ciclo\", \"datos\": { \"estado_nuevo\": \"floracion\", \"descripcion\": \"motivo o descripción\" } }\n"
-      prompt += "- estado_nuevo debe ser uno de: semilla | vegetativo | floracion | cosecha | curado | finalizado\n"
+      "\nROL: Este usuario es ADMIN/SUPERVISOR con permisos completos.\n" \
+      "- Puede generar avance_ciclo cuando el cultivador lo mencione explícitamente.\n"
+    end
+  end
+
+  def contexto_rico(contexto)
+    return '' unless contexto.present?
+    tipo = contexto[:tipo] || contexto['tipo']
+    case tipo
+    when 'planta' then ctx_planta(contexto)
+    when 'lote'   then ctx_lote(contexto)
+    when 'sala'   then ctx_sala(contexto)
+    else ''
+    end
+  end
+
+  def ctx_planta(contexto)
+    planta = Plant.joins(:lote)
+                  .where(lotes: { club_id: current_user.club_id })
+                  .find_by(id: contexto[:planta_id] || contexto['planta_id'])
+    return '' unless planta
+
+    lote = planta.lote
+    cepa = lote.genetica&.nombre || lote.strain || 'desconocida'
+
+    ctx  = "\n═══ PLANTA: #{planta.nombre} ═══\n"
+    ctx += "Cepa: #{cepa} | Estadío del lote: #{lote.estado} | Sala: #{lote.sala&.nombre || '—'}\n"
+    ctx += "Semana #{semanas_desde(lote.start_date)} desde inicio del lote\n" if lote.start_date
+    ctx += "\n"
+
+    ctx += "ESTADO ACTUAL (no incluir estos campos si el cultivador no los menciona):\n"
+    ctx += "  Altura: #{planta.altura_actual ? "#{planta.altura_actual} cm" : 'no registrada'}\n"
+    ctx += "  Copas: #{planta.num_colas || 'no registrado'}\n"
+    ctx += "  Salud: #{planta.estado_salud || 'no evaluada'}\n"
+    ctx += "  Hojas: #{planta.color_hojas || 'no evaluado'}\n"
+    ctx += "  Maceta: #{lote.tamanio_maceta ? "#{lote.tamanio_maceta}L" : 'desconocida'}"
+    ctx += " | Sustrato: #{lote.sustrato_especifico}" if lote.sustrato_especifico.present?
+    ctx += "\n\n"
+
+    acts = planta.activities.order(occurred_at: :desc).limit(6)
+    if acts.any?
+      ctx += "ÚLTIMAS ACTIVIDADES:\n"
+      acts.each do |a|
+        f = a.occurred_at.strftime('%d/%m %H:%M')
+        if a.activity_type == 'registro_planta' && a.metadata.present?
+          m = a.metadata
+          p = [].tap do |arr|
+            arr << "#{m['altura_cm']}cm"         if m['altura_cm']
+            arr << "#{m['num_colas']} copas"      if m['num_colas']
+            arr << "salud #{m['estado_salud']}"   if m['estado_salud']
+            arr << "plagas #{m['plagas']}"        if m['plagas'] && m['plagas'] != 'ninguna'
+            arr << m['deficiencias']              if m['deficiencias'].present?
+          end
+          ctx += "  [#{f}] observación planta: #{p.join(' | ')}\n"
+        else
+          desc = a.description.present? ? " — #{a.description.truncate(60)}" : ''
+          ctx += "  [#{f}] #{a.activity_type}#{desc}\n"
+        end
+      end
+      ctx += "\n"
     end
 
-    return prompt unless contexto.present?
-
-    ctx      = "\n=== CONTEXTO ACTUAL ===\n"
-    tipo_ctx = contexto[:tipo] || contexto['tipo']
-
-    case tipo_ctx
-    when 'lote'
-      lote_id = contexto[:lote_id] || contexto['lote_id']
-      lote    = current_user.club.lotes.find_by(id: lote_id)
-      if lote
-        ctx += "Lote: #{lote.codigo} | Sala: #{lote.sala&.nombre || 'no especificada'} | Estado: #{lote.estado} | Plantas: #{lote.plants_count || 0}\n"
-        ctx += "USAR '#{lote.codigo}' como lote_codigo en registro_ambiental y nota_lote.\n"
-        ctx += "Para observaciones generales usar registro_ambiental o nota_lote, NO nota_sala.\n"
-      end
-    when 'planta'
-      planta_id = contexto[:planta_id] || contexto['planta_id']
-      planta    = Plant.joins(:lote).where(lotes: { club_id: current_user.club.id }).find_by(id: planta_id)
-      if planta
-        ctx += "Planta: #{planta.nombre} | Lote: #{planta.lote&.codigo}\n"
-        ctx += "USAR '#{planta.nombre}' como planta_nombre. Solo generar registro_planta.\n"
-        ctx += "No generes registro_ambiental ni nota_sala para esta planta individual.\n"
-      end
-    when 'sala'
-      sala_id = contexto[:sala_id] || contexto['sala_id']
-      sala    = current_user.club.salas.find_by(id: sala_id)
-      if sala
-        lotes_codigos = sala.lotes.pluck(:codigo)
-        ctx += "Sala: #{sala.nombre}\n"
-        ctx += "Lotes en esta sala: #{lotes_codigos.join(', ')}\n" if lotes_codigos.any?
-        ctx += "REGLAS para contexto de sala:\n"
-        ctx += "- Si el cultivador menciona métricas o actividades concretas (temperatura, humedad, pH, EC, riego, fertilización, CO2, PPFD) SIN nombrar un lote específico => generar UNA SOLA accion de tipo 'registro_ambiental_sala'. Se guardará en todos los lotes de la sala.\n"
-        ctx += "- Si el cultivador nombra EXPLICITAMENTE un lote (ej: 'en el lote #{lotes_codigos.first}') => generar 'registro_ambiental' para ESE lote únicamente.\n"
-        ctx += "- Si el cultivador hace una observación general SIN datos concretos (ej: 'todo bien', 'sin novedades', 'revisé las plantas') => generar 'nota_sala'.\n"
-        ctx += "- NUNCA combinar registro_ambiental_sala con nota_sala para el mismo evento. Elegir uno.\n"
-      end
+    ultimo = lote.registros_ambientales.order(registrado_en: :desc).first
+    if ultimo
+      f = ultimo.registrado_en.strftime('%d/%m %H:%M')
+      p = fmt_ambiental(ultimo)
+      ctx += "ÚLTIMO REGISTRO AMBIENTAL DEL LOTE [#{f}]: #{p}\n"
+      ctx += "  Tareas: #{ultimo.tareas_realizadas.join(', ')}\n" if ultimo.tareas_realizadas&.any?
+      ctx += "\n"
     end
 
-    ctx += "======================\n"
-    prompt + ctx
+    ctx += "INSTRUCCIONES ESTRUCTURALES:\n"
+    ctx += "  - planta_nombre = '#{planta.nombre}'\n"
+    ctx += "  - Si el cultivador menciona actividades físicas además de observar la planta\n"
+    ctx += "    → generar también registro_ambiental para el lote '#{lote.codigo}'.\n"
+    ctx += "═════════════════════════════════════\n"
+    ctx
+  end
+
+  def ctx_lote(contexto)
+    lote = current_user.club.lotes.find_by(id: contexto[:lote_id] || contexto['lote_id'])
+    return '' unless lote
+
+    cepa = lote.genetica&.nombre || lote.strain || 'desconocida'
+
+    ctx  = "\n═══ LOTE: #{lote.codigo} ═══\n"
+    ctx += "Cepa: #{cepa} | Estadío: #{lote.estado} | Sala: #{lote.sala&.nombre || '—'}\n"
+    ctx += "Plantas: #{lote.plants_count || 0}"
+    ctx += " | Semana #{semanas_desde(lote.start_date)} desde inicio" if lote.start_date
+    ctx += " | Floración estimada: #{lote.semanas_floracion} semanas" if lote.semanas_floracion
+    ctx += "\n"
+    ctx += "Maceta: #{lote.tamanio_maceta}L" if lote.tamanio_maceta
+    ctx += " | Sustrato: #{lote.sustrato_especifico}" if lote.sustrato_especifico.present?
+    ctx += " | Fotoperiodo: #{lote.fotoperiodo}" if lote.fotoperiodo.present?
+    ctx += "\n\n"
+
+    regs = lote.registros_ambientales.order(registrado_en: :desc).limit(5)
+    if regs.any?
+      ctx += "ÚLTIMOS REGISTROS AMBIENTALES:\n"
+      regs.each do |r|
+        f = r.registrado_en.strftime('%d/%m %H:%M')
+        p = fmt_ambiental(r)
+        tareas = r.tareas_realizadas&.any? ? " | tareas: #{r.tareas_realizadas.join(', ')}" : ''
+        ctx += "  [#{f}] #{p}#{tareas}\n"
+      end
+      ctx += "\n"
+    end
+
+    tareas = current_user.club.tareas.where(lote_id: lote.id).activas.order(fecha_programada: :asc).limit(5)
+    if tareas.any?
+      ctx += "TAREAS ACTIVAS DEL LOTE:\n"
+      tareas.each do |t|
+        fecha = t.fecha_programada ? " (#{t.fecha_programada.strftime('%d/%m')})" : ''
+        asig  = t.asignada_a ? " → #{t.asignada_a.nombre_completo}" : ' → sin asignar'
+        ctx += "  [#{t.tipo}] #{t.titulo}#{fecha}#{asig}\n"
+      end
+      ctx += "\n"
+    end
+
+    ctx += "INSTRUCCIONES ESTRUCTURALES:\n"
+    ctx += "  - lote_codigo = '#{lote.codigo}'\n"
+    ctx += "  - Usar registro_ambiental o nota_lote, NO nota_sala.\n"
+    ctx += "═════════════════════════════════════\n"
+    ctx
+  end
+
+  def ctx_sala(contexto)
+    sala = current_user.club.salas.find_by(id: contexto[:sala_id] || contexto['sala_id'])
+    return '' unless sala
+
+    lotes = sala.lotes.where.not(estado: 'finalizado').includes(:genetica)
+
+    ctx  = "\n═══ SALA: #{sala.nombre} ═══\n"
+    ctx += "Lotes activos: #{lotes.count}\n\n"
+
+    if lotes.any?
+      ctx += "ESTADO POR LOTE:\n"
+      lotes.each do |l|
+        cepa  = l.genetica&.nombre || l.strain || '—'
+        ctx  += "  #{l.codigo} | #{cepa} | #{l.estado} | #{l.plants_count || 0} plantas\n"
+        ultimo = l.registros_ambientales.order(registrado_en: :desc).first
+        if ultimo
+          hace = distancia_temporal(ultimo.registrado_en)
+          ctx += "    Último reg (#{hace}): #{fmt_ambiental(ultimo)}\n"
+        end
+      end
+      ctx += "\n"
+    end
+
+    ctx += "INSTRUCCIONES ESTRUCTURALES:\n"
+    ctx += "  - Métricas o actividades sin nombrar lote → registro_ambiental_sala (aplica a todos).\n"
+    ctx += "  - Lote nombrado explícitamente → registro_ambiental solo para ese lote.\n"
+    ctx += "  - Observación general sin datos concretos → nota_sala.\n"
+    ctx += "═════════════════════════════════════\n"
+    ctx
+  end
+
+  def fmt_ambiental(r)
+    [
+      (r.temperatura ? "#{r.temperatura}°C"      : nil),
+      (r.humedad     ? "HR #{r.humedad}%"         : nil),
+      (r.ph          ? "pH #{r.ph}"               : nil),
+      (r.ec          ? "EC #{r.ec}"               : nil),
+      (r.co2         ? "CO2 #{r.co2}ppm"          : nil),
+    ].compact.join(' | ').presence || 'sin métricas'
+  end
+
+  def semanas_desde(fecha)
+    return nil unless fecha
+    ((Date.current - fecha) / 7).floor
+  end
+
+  def distancia_temporal(dt)
+    return '—' unless dt
+    diff_h = ((Time.current - dt) / 3600).round
+    return 'menos de 1h' if diff_h < 1
+    return "hace #{diff_h}h"  if diff_h < 24
+    "hace #{(diff_h / 24).round}d"
   end
 
   def enriquecer_con_contexto(accion, contexto, club)
