@@ -8,9 +8,10 @@ class AsistenteController < ApplicationController
     Tu función es analizar el reporte oral de un cultivador y extraer acciones estructuradas.
 
     Tipos de acciones posibles:
-    - "registro_ambiental": riego, fertilización, métricas del lote (pH, EC, temperatura, etc.)
+    - "registro_ambiental": riego, fertilización, métricas de UN lote específico (pH, EC, temperatura, etc.)
+    - "registro_ambiental_sala": métricas o riego que aplican a TODOS los lotes de la sala a la vez
     - "registro_planta": observación de una planta específica o todas las plantas del lote
-    - "nota_sala": nota general sobre la sala (actividad del día, observaciones generales)
+    - "nota_sala": observación general SIN datos concretos (ej: "todo tranquilo", "sin novedades")
     - "nota_lote": nota libre sobre un lote
     - "tarea": tarea a futuro (SOLO si el contexto lo permite — no para cultivadores)
 
@@ -31,6 +32,18 @@ class AsistenteController < ApplicationController
             "estado_general": "bueno",
             "plagas_observadas": "ninguna",
             "observaciones": "riego completo"
+          }
+        },
+        {
+          "tipo": "registro_ambiental_sala",
+          "datos": {
+            "temperatura": 24.5,
+            "humedad": 60,
+            "fertilizacion": true,
+            "notas_fertilizacion": "riego con base A + bloom",
+            "estado_general": "bueno",
+            "plagas_observadas": "ninguna",
+            "observaciones": "riego completo de toda la sala"
           }
         },
         {
@@ -130,12 +143,13 @@ class AsistenteController < ApplicationController
       accion_e = enriquecer_con_contexto(accion, contexto, club)
 
       resultado = case tipo
-                  when 'registro_ambiental' then ejecutar_registro_ambiental(accion_e, datos, club)
-                  when 'registro_planta'    then ejecutar_registro_planta(accion_e, datos, club)
-                  when 'tarea'              then ejecutar_tarea(accion_e, datos, club, contexto)
-                  when 'nota_sala'          then ejecutar_nota_sala(datos, club, contexto)
-                  when 'nota_lote'          then ejecutar_nota_lote(accion_e, datos, club, contexto)
-                  when 'avance_ciclo'       then ejecutar_avance_ciclo(accion_e, datos, club, contexto)
+                  when 'registro_ambiental'      then ejecutar_registro_ambiental(accion_e, datos, club)
+                  when 'registro_ambiental_sala' then ejecutar_registro_ambiental_sala(datos, club, contexto)
+                  when 'registro_planta'         then ejecutar_registro_planta(accion_e, datos, club)
+                  when 'tarea'                   then ejecutar_tarea(accion_e, datos, club, contexto)
+                  when 'nota_sala'               then ejecutar_nota_sala(datos, club, contexto)
+                  when 'nota_lote'               then ejecutar_nota_lote(accion_e, datos, club, contexto)
+                  when 'avance_ciclo'            then ejecutar_avance_ciclo(accion_e, datos, club, contexto)
                   else { ok: false, error: "Tipo desconocido: #{tipo}" }
                   end
 
@@ -213,10 +227,11 @@ class AsistenteController < ApplicationController
         lotes_codigos = sala.lotes.pluck(:codigo)
         ctx += "Sala: #{sala.nombre}\n"
         ctx += "Lotes en esta sala: #{lotes_codigos.join(', ')}\n" if lotes_codigos.any?
-        ctx += "REGLAS ESTRICTAS para contexto de sala:\n"
-        ctx += "- Si el cultivador menciona condiciones generales (temperatura, humedad, estado de plantas, actividad del día) SIN nombrar un lote concreto => generar UNA SOLA accion: nota_sala. Incluir todos los datos en el contenido de texto. NO generar registro_ambiental.\n"
-        ctx += "- Si el cultivador nombra EXPLICITAMENTE un lote (ej: 'en el lote #{lotes_codigos.first}') => generar registro_ambiental para ESE lote unicamente. NO generar nota_sala adicionalmente.\n"
-        ctx += "- Nunca generar registro_ambiental para todos los lotes a la vez por inferencia.\n"
+        ctx += "REGLAS para contexto de sala:\n"
+        ctx += "- Si el cultivador menciona métricas o actividades concretas (temperatura, humedad, pH, EC, riego, fertilización, CO2, PPFD) SIN nombrar un lote específico => generar UNA SOLA accion de tipo 'registro_ambiental_sala'. Se guardará en todos los lotes de la sala.\n"
+        ctx += "- Si el cultivador nombra EXPLICITAMENTE un lote (ej: 'en el lote #{lotes_codigos.first}') => generar 'registro_ambiental' para ESE lote únicamente.\n"
+        ctx += "- Si el cultivador hace una observación general SIN datos concretos (ej: 'todo bien', 'sin novedades', 'revisé las plantas') => generar 'nota_sala'.\n"
+        ctx += "- NUNCA combinar registro_ambiental_sala con nota_sala para el mismo evento. Elegir uno.\n"
       end
     end
 
@@ -316,6 +331,51 @@ class AsistenteController < ApplicationController
       { ok: true, mensaje: "Registro ambiental guardado en #{lote.codigo}" }
     else
       { ok: false, error: registro.errors.full_messages.join(', ') }
+    end
+  end
+
+  def ejecutar_registro_ambiental_sala(datos, club, contexto)
+    sala_id = contexto&.dig('sala_id') || contexto&.dig(:sala_id)
+    sala    = club.salas.find_by(id: sala_id) if sala_id.present?
+    return { ok: false, error: 'Sala no encontrada en el contexto' } unless sala
+
+    lotes = sala.lotes.where.not(estado: 'finalizado')
+    return { ok: false, error: "No hay lotes activos en #{sala.nombre}" } if lotes.empty?
+
+    campos_base = {
+      ph:                   datos['ph'],
+      ec:                   datos['ec'],
+      temperatura:          datos['temperatura'],
+      humedad:              datos['humedad'],
+      co2:                  datos['co2'],
+      ppfd:                 datos['ppfd'],
+      horas_luz:            datos['horas_luz'],
+      temperatura_sustrato: datos['temperatura_sustrato'],
+      ph_runoff:            datos['ph_runoff'],
+      fertilizacion:        datos['fertilizacion'] || false,
+      notas_fertilizacion:  datos['notas_fertilizacion'],
+      estado_general:       datos['estado_general'],
+      plagas_observadas:    datos['plagas_observadas'],
+      observaciones:        datos['observaciones'],
+      fuente:               'asistente_voz',
+      user:                 current_user,
+      club:                 club,
+      registrado_en:        Time.current,
+    }.compact
+
+    creados      = 0
+    fallidos     = []
+    lotes.each do |lote|
+      r = lote.registros_ambientales.build(campos_base)
+      r.save ? creados += 1 : fallidos << lote.codigo
+    end
+
+    if creados > 0
+      msg = "Registro ambiental guardado en #{creados} lote#{'s' if creados != 1} de #{sala.nombre}"
+      msg += " (falló: #{fallidos.join(', ')})" if fallidos.any?
+      { ok: true, mensaje: msg }
+    else
+      { ok: false, error: "No se pudo guardar en ningún lote de #{sala.nombre}" }
     end
   end
 

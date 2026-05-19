@@ -102,6 +102,7 @@
                      :class="[`av__accion--${accion.tipo}`, accion._expandido ? 'av__accion--expandido' : '']">
                   <div class="av__accion-icono">
                     <span v-if="accion.tipo === 'registro_ambiental'">💧</span>
+                    <span v-else-if="accion.tipo === 'registro_ambiental_sala'">🏠💧</span>
                     <span v-else-if="accion.tipo === 'registro_planta'">🌿</span>
                     <span v-else-if="accion.tipo === 'tarea'">📋</span>
                     <span v-else-if="accion.tipo === 'avance_ciclo'">🔄</span>
@@ -118,7 +119,10 @@
 
                     <!-- Editor inline -->
                     <div v-if="accion._expandido" class="av__editor">
-                      <template v-if="accion.tipo === 'registro_ambiental'">
+                      <template v-if="accion.tipo === 'registro_ambiental' || accion.tipo === 'registro_ambiental_sala'">
+                        <div v-if="accion.tipo === 'registro_ambiental_sala'" class="av__sala-badge">
+                          Se guardará en todos los lotes activos de la sala
+                        </div>
                         <div class="av__editor-grid">
                           <div class="av__ef"><label>pH</label><input type="number" step="0.1" v-model.number="accion.datos.ph" placeholder="6.2" /></div>
                           <div class="av__ef"><label>EC</label><input type="number" step="0.1" v-model.number="accion.datos.ec" placeholder="1.8" /></div>
@@ -447,19 +451,26 @@ async function ejecutarAcciones() {
 function nuevaSesion() { resetear() }
 
 function labelTipo(tipo) {
-  return { registro_ambiental:'Registro ambiental', registro_planta:'Registro de planta',
-    tarea:'Nueva tarea', nota_sala:'Nota de sala', nota_lote:'Nota de lote',
-    avance_ciclo:'Avance de ciclo' }[tipo] || tipo
+  return {
+    registro_ambiental:      'Registro ambiental',
+    registro_ambiental_sala: 'Registro ambiental · toda la sala',
+    registro_planta:         'Registro de planta',
+    tarea:                   'Nueva tarea',
+    nota_sala:               'Nota de sala',
+    nota_lote:               'Nota de lote',
+    avance_ciclo:            'Avance de ciclo',
+  }[tipo] || tipo
 }
 
 function descripcionAccion(accion) {
   const d = accion.datos || {}
-  if (accion.tipo === 'registro_ambiental') {
+  if (accion.tipo === 'registro_ambiental' || accion.tipo === 'registro_ambiental_sala') {
     const p = []
     if (d.fertilizacion) p.push('Fertilización')
     if (d.ph)            p.push(`pH ${d.ph}`)
     if (d.ec)            p.push(`EC ${d.ec}`)
     if (d.temperatura)   p.push(`${d.temperatura}°C`)
+    if (d.humedad)       p.push(`${d.humedad}% HR`)
     if (d.observaciones) p.push(d.observaciones)
     return p.join(' · ') || 'Registro ambiental'
   }
@@ -479,7 +490,7 @@ function descripcionAccion(accion) {
 function metaAccion(accion) {
   const d = accion.datos || {}
   if (accion.tipo === 'tarea') return `Prioridad ${d.prioridad || 'media'} · en ${d.dias_desde_hoy || 7} días`
-  if (accion.tipo === 'registro_ambiental' && d.notas_fertilizacion) return d.notas_fertilizacion
+  if ((accion.tipo === 'registro_ambiental' || accion.tipo === 'registro_ambiental_sala') && d.notas_fertilizacion) return d.notas_fertilizacion
   if (accion.tipo === 'registro_planta' && d.color_hojas) return `Color: ${d.color_hojas} · Plagas: ${d.plagas || 'ninguna'}`
   return ''
 }
@@ -562,6 +573,7 @@ function metaAccion(accion) {
 .av__accion--expandido { border-color:#a7d7a9; background:#f0fdf4; }
 .av__accion--tarea { border-color:#ffe0b2; }
 .av__accion--registro_planta { border-color:#fce4ec; }
+.av__accion--registro_ambiental_sala { border-color:#bae6fd; background:#f0f9ff; }
 .av__accion--nota_sala,.av__accion--nota_lote { border-color:#e0e7ff; }
 .av__accion--avance_ciclo { border-color:#d1fae5; background:#f0fdf4; }
 .av__accion-icono { font-size:20px; flex-shrink:0; margin-top:1px; }
@@ -569,7 +581,9 @@ function metaAccion(accion) {
 .av__accion-tipo  { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:#6b8f71; margin-bottom:4px; }
 .av__accion--tarea .av__accion-tipo { color:#e65100; }
 .av__accion--registro_planta .av__accion-tipo { color:#c2185b; }
+.av__accion--registro_ambiental_sala .av__accion-tipo { color:#0369a1; }
 .av__accion--nota_sala .av__accion-tipo,.av__accion--nota_lote .av__accion-tipo { color:#3730a3; }
+.av__sala-badge { font-size:11px; color:#0369a1; background:#e0f2fe; border-radius:6px; padding:4px 10px; margin-bottom:10px; display:inline-block; }
 .av__accion-titulo { font-size:14px; color:#1a2e1b; line-height:1.4; margin-bottom:3px; }
 .av__accion-ref { display:inline-block; background:#f0fdf4; color:#1b5e20; font-size:11px; font-weight:600; padding:1px 7px; border-radius:4px; margin-right:6px; }
 .av__accion-meta { font-size:12px; color:#94a3b8; }
