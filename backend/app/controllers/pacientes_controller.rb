@@ -229,6 +229,10 @@ class PacientesController < ApplicationController
       return render json: { error: 'El paciente no tiene email registrado' }, status: :unprocessable_entity
     end
 
+    unless current_user.club.smtp_configured?
+      return render json: { error: 'El club no tiene servidor de correo configurado. Configuralo en Preferencias → Correo.' }, status: :unprocessable_entity
+    end
+
     tipo   = params.dig(:mail, :tipo).presence_in(MailEnviado::TIPOS) || 'personalizado'
     asunto = params.dig(:mail, :asunto).to_s.strip
     cuerpo = params.dig(:mail, :cuerpo).to_s.strip

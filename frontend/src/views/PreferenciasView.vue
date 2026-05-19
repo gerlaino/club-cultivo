@@ -3,6 +3,7 @@ import { onMounted, reactive, ref, watch } from 'vue'
 import { useClubStore } from '../stores/club'
 import Avatar from '../components/Avatar.vue'
 import { useConfirm } from '../composables/useConfirm.js'
+import { updatePreferences, testSmtp } from '../lib/api.js'
 
 const club  = useClubStore()
 const toast = ref(null)
@@ -10,6 +11,19 @@ const pristine = ref(true)
 const logoPreview = ref(null)
 let toastTimer = null
 const { confirm } = useConfirm()
+
+// SMTP
+const smtpForm = reactive({
+  smtp_host:      '',
+  smtp_port:      587,
+  smtp_user:      '',
+  smtp_pass:      '',
+  smtp_from:      '',
+  smtp_from_name: '',
+})
+const smtpSaving  = ref(false)
+const smtpTesting = ref(false)
+const smtpConfigured = ref(false)
 
 const TIPOS_ORGANIZACION = [
   { value: 'asociacion_civil',  label: 'Asociación Civil' },
@@ -80,6 +94,15 @@ function loadFromStore() {
     tipo_organizacion:           club.data.tipo_organizacion           || '',
   })
   logoPreview.value = club.data.logo_url || null
+  smtpConfigured.value = club.data.smtp_configured || false
+  Object.assign(smtpForm, {
+    smtp_host:      club.data.smtp_host      || '',
+    smtp_port:      club.data.smtp_port      || 587,
+    smtp_user:      club.data.smtp_user      || '',
+    smtp_pass:      '',   // nunca viene del servidor
+    smtp_from:      club.data.smtp_from      || '',
+    smtp_from_name: club.data.smtp_from_name || '',
+  })
   pristine.value = true
 }
 
@@ -141,6 +164,35 @@ function showToast(type, msg) {
   clearTimeout(toastTimer)
   toast.value = { type, msg }
   toastTimer = setTimeout(() => { toast.value = null }, 5000)
+}
+
+async function saveSmtp() {
+  smtpSaving.value = true
+  try {
+    const payload = { ...smtpForm }
+    if (!payload.smtp_pass) delete payload.smtp_pass  // no sobrescribir si está vacío
+    await updatePreferences(payload)
+    await club.fetch()
+    smtpConfigured.value = club.data.smtp_configured || false
+    smtpForm.smtp_pass = ''
+    showToast('success', 'Configuración de correo guardada')
+  } catch (e) {
+    showToast('danger', e?.response?.data?.errors?.join(', ') || 'Error al guardar SMTP')
+  } finally {
+    smtpSaving.value = false
+  }
+}
+
+async function runTestSmtp() {
+  smtpTesting.value = true
+  try {
+    const { data } = await testSmtp()
+    showToast('success', `Mail de prueba enviado a ${data.enviado_a}`)
+  } catch (e) {
+    showToast('danger', e?.response?.data?.error || 'Error al enviar mail de prueba')
+  } finally {
+    smtpTesting.value = false
+  }
 }
 </script>
 
@@ -330,6 +382,72 @@ function showToast(type, msg) {
           </div>
         </div>
 
+        <!-- Configuración de correo (SMTP) -->
+        <div class="pv__card pv__card--mt">
+          <div class="pv__card-header">
+            <div class="pv__card-icon" style="background:#f0fdf4;color:#15803d"><i class="bi bi-envelope-at"></i></div>
+            <div>
+              <div class="pv__card-title">Configuración de correo</div>
+              <div class="pv__card-sub">SMTP del club para enviar mails a socios</div>
+            </div>
+            <div class="pv__smtp-badge" :class="smtpConfigured ? 'pv__smtp-badge--ok' : 'pv__smtp-badge--off'">
+              <i :class="smtpConfigured ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+              {{ smtpConfigured ? 'Configurado' : 'Sin configurar' }}
+            </div>
+          </div>
+          <div class="pv__card-body">
+
+            <div class="pv__infobox" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
+              <i class="bi bi-info-circle-fill"></i>
+              <span>Los mails a socios se envían desde el servidor de correo del club. Podés usar Gmail (con contraseña de aplicación), Outlook, o cualquier proveedor SMTP.</span>
+            </div>
+
+            <div class="pv__grid">
+              <div class="pv__field pv__field--full">
+                <label class="pv__label">Nombre del remitente</label>
+                <input class="pv__input" v-model.trim="smtpForm.smtp_from_name" placeholder="Club Verde Cannabis" />
+                <span class="pv__hint">Nombre que verá el socio como remitente del mail</span>
+              </div>
+              <div class="pv__field">
+                <label class="pv__label">Email remitente</label>
+                <input class="pv__input" type="email" v-model.trim="smtpForm.smtp_from" placeholder="administracion@clubverde.com" />
+                <span class="pv__hint">Puede diferir del usuario SMTP</span>
+              </div>
+              <div class="pv__field">
+                <label class="pv__label">Host SMTP <span class="pv__req">*</span></label>
+                <input class="pv__input" v-model.trim="smtpForm.smtp_host" placeholder="smtp.gmail.com" />
+              </div>
+              <div class="pv__field">
+                <label class="pv__label">Puerto</label>
+                <input class="pv__input" type="number" v-model.number="smtpForm.smtp_port" placeholder="587" />
+                <span class="pv__hint">587 (TLS) · 465 (SSL) · 25 (sin cifrado)</span>
+              </div>
+              <div class="pv__field">
+                <label class="pv__label">Usuario SMTP <span class="pv__req">*</span></label>
+                <input class="pv__input" v-model.trim="smtpForm.smtp_user" placeholder="administracion@clubverde.com" autocomplete="off" />
+              </div>
+              <div class="pv__field">
+                <label class="pv__label">Contraseña SMTP <span class="pv__req">*</span></label>
+                <input class="pv__input" type="password" v-model="smtpForm.smtp_pass" :placeholder="smtpConfigured ? '••••••••••••  (dejar vacío para no cambiar)' : 'Contraseña o App Password'" autocomplete="new-password" />
+              </div>
+            </div>
+
+            <div class="pv__smtp-actions">
+              <button class="pv__btn-save" :disabled="smtpSaving" @click="saveSmtp">
+                <span v-if="smtpSaving" class="pv__spinner"></span>
+                <i v-else class="bi bi-floppy"></i>
+                {{ smtpSaving ? 'Guardando…' : 'Guardar configuración' }}
+              </button>
+              <button class="pv__btn-outline" :disabled="!smtpConfigured || smtpTesting" @click="runTestSmtp">
+                <span v-if="smtpTesting" class="pv__spinner pv__spinner--dark"></span>
+                <i v-else class="bi bi-send"></i>
+                {{ smtpTesting ? 'Enviando…' : 'Enviar mail de prueba' }}
+              </button>
+            </div>
+
+          </div>
+        </div>
+
         <!-- Footer save -->
         <div class="pv__footer-save">
           <button class="pv__btn-save" :disabled="club.saving || pristine" @click="save">
@@ -459,5 +577,15 @@ function showToast(type, msg) {
 
 .pv-toast-enter-active, .pv-toast-leave-active { transition: all .3s; }
 .pv-toast-enter-from, .pv-toast-leave-to { opacity: 0; transform: translateY(-8px); }
+
+.pv__smtp-badge {
+  margin-left: auto; display: inline-flex; align-items: center; gap: .35rem;
+  font-size: .72rem; font-weight: 700; padding: .25rem .7rem; border-radius: 999px;
+}
+.pv__smtp-badge--ok  { background: #dcfce7; color: #15803d; }
+.pv__smtp-badge--off { background: #f1f5f9; color: #64748b; }
+
+.pv__smtp-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.pv__spinner--dark { border-color: rgba(0,0,0,.15); border-top-color: #374151; }
 </style>
 

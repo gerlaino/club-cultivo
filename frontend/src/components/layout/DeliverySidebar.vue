@@ -9,7 +9,7 @@
       <RouterLink to="/delivery" class="dlv-link" exact-active-class="dlv-link--active">
         <Home :size="18" :stroke-width="1.75" /><span>Inicio</span>
       </RouterLink>
-      <RouterLink to="/delivery/despachos" class="dlv-link" active-class="dlv-link--active">
+      <RouterLink v-if="canSeeDespachos" to="/delivery/despachos" class="dlv-link" active-class="dlv-link--active">
         <PackageCheck :size="18" :stroke-width="1.75" /><span>Despachos</span>
       </RouterLink>
     </nav>
@@ -23,8 +23,12 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { Truck, Home, PackageCheck, LogOut } from 'lucide-vue-next'
+import { useAuthStore } from '../../stores/auth'
 defineEmits(['logout'])
+const auth = useAuthStore()
+const canSeeDespachos = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 </script>
 
 <style scoped>

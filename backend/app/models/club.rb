@@ -129,6 +129,21 @@ class Club < ApplicationRecord
 
   def eliminado? = deleted_at.present?
 
+  def smtp_configured?
+    smtp_host.present? && smtp_user.present? && smtp_pass.present?
+  end
+
+  def smtp_settings
+    {
+      address:              smtp_host,
+      port:                 smtp_port || 587,
+      user_name:            smtp_user,
+      password:             smtp_pass,
+      authentication:       :plain,
+      enable_starttls_auto: true,
+    }
+  end
+
   def soft_delete!
     update!(deleted_at: Time.current)
   end

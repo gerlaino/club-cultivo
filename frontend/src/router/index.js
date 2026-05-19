@@ -592,7 +592,16 @@ const routes = [
     },
     children: [
       { path: '', name: 'delivery-dashboard', component: () => import('../views/delivery/DeliveryDashboard.vue') },
-      { path: 'despachos', name: 'delivery-despachos', component: () => import('../views/delivery/DespachoListView.vue') },
+      {
+        path: 'despachos',
+        name: 'delivery-despachos',
+        component: () => import('../views/delivery/DespachoListView.vue'),
+        beforeEnter: (to, from, next) => {
+          const auth = useAuthStore()
+          if (!['admin', 'supervisor'].includes(auth.user?.role)) return next('/delivery')
+          next()
+        },
+      },
     ],
   },
 

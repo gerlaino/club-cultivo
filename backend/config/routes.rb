@@ -185,7 +185,8 @@ Rails.application.routes.draw do
     end
 
     resource :preferences, only: [:show, :update], controller: "preferences" do
-      post :upload_logo, on: :collection
+      post :upload_logo,  on: :collection
+      post :test_smtp,    on: :collection
     end
 
     resources :usuarios, controller: :club_users do

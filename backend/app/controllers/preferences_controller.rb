@@ -35,6 +35,25 @@ class PreferencesController < ApplicationController
     end
   end
 
+  def test_smtp
+    unless @club.smtp_configured?
+      return render json: { error: 'SMTP no configurado' }, status: :unprocessable_entity
+    end
+
+    dest = current_user.email
+    Mail.deliver do
+      from    "#{@club.smtp_from_name.presence || @club.name} <#{@club.smtp_from.presence || @club.smtp_user}>"
+      to      dest
+      subject "✓ Prueba de correo — #{@club.name}"
+      body    "Este es un correo de prueba enviado desde Club Cultivo para verificar la configuración SMTP del club #{@club.name}."
+      delivery_method :smtp, @club.smtp_settings
+    end
+
+    render json: { ok: true, enviado_a: dest }
+  rescue => e
+    render json: { error: "Error de conexión SMTP: #{e.message}" }, status: :unprocessable_entity
+  end
+
   private
 
   def require_club_user!
@@ -53,7 +72,9 @@ class PreferencesController < ApplicationController
       :fecha_resolucion_reprocann, :tipo_organizacion,
       :descripcion_web, :whatsapp, :instagram_url,
       :facebook_url, :horarios_atencion, :web_activa,
-      :benchmark_opt_in
+      :benchmark_opt_in,
+      :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
+      :smtp_from, :smtp_from_name
     )
   end
 
@@ -83,6 +104,13 @@ class PreferencesController < ApplicationController
       horarios_atencion:            club.horarios_atencion,
       web_activa:                   club.web_activa,
       benchmark_opt_in:             club.benchmark_opt_in,
+      smtp_configured:              club.smtp_configured?,
+      smtp_host:                    club.smtp_host,
+      smtp_port:                    club.smtp_port || 587,
+      smtp_user:                    club.smtp_user,
+      smtp_from:                    club.smtp_from,
+      smtp_from_name:               club.smtp_from_name,
+      # smtp_pass nunca se serializa
     }
   end
 end

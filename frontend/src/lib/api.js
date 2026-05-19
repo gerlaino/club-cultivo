@@ -112,6 +112,7 @@ export const uploadAvatar     = (file) => {
 // -------- Preferencias del Club --------
 export const getPreferences    = () => api.get("/preferences");
 export const updatePreferences = (payload) => api.put("/preferences", { club: payload });
+export const testSmtp          = () => api.post("/preferences/test_smtp");
 export const uploadClubLogo    = (file) => {
   const form = new FormData();
   form.append("logo", file);
