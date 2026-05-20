@@ -12,7 +12,7 @@ import { createPlant, updatePlant,
   transicionarLote, avanzarFaseLote, cerrarCurado, getLoteTimeline,
   listSedes, getSedeStocks, deleteLote,
   getCostoLote, createCostoLote, updateCostoLote,
-  updateLote, listGeneticas } from "../lib/api"
+  updateLote, listGeneticas, analizarLote, getHistorialAnalisis } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
@@ -66,6 +66,68 @@ const loading       = computed(() => lotes.loading)
 const lote          = computed(() => lotes.current)
 const canEdit       = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.role))
 const canAdmin      = computed(() => ['admin', 'supervisor'].includes(auth.role))
+
+// ── Análisis IA ──
+const analizandoIA       = ref(false)
+const historialAnalisis  = ref([])
+const cooldownHasta      = ref(null)
+const expandedAnalisis   = ref(null)
+
+const puedoAnalizar = computed(() =>
+  !cooldownHasta.value || new Date() > new Date(cooldownHasta.value)
+)
+
+const tiempoRestante = computed(() => {
+  if (!cooldownHasta.value) return ''
+  const mins = Math.round((new Date(cooldownHasta.value) - new Date()) / 60000)
+  if (mins <= 0) return ''
+  return mins < 60 ? `en ${mins} min` : `en ${Math.ceil(mins / 60)}h`
+})
+
+function toggleAnalisis(id) {
+  expandedAnalisis.value = expandedAnalisis.value === id ? null : id
+}
+
+async function cargarHistorialAnalisis() {
+  try {
+    const { data } = await getHistorialAnalisis(id)
+    historialAnalisis.value = data.analisis || []
+    cooldownHasta.value     = data.cooldown_hasta || null
+    if (historialAnalisis.value.length) {
+      expandedAnalisis.value = historialAnalisis.value[0].id
+    }
+  } catch {}
+}
+
+async function ejecutarAnalisisIA() {
+  if (analizandoIA.value || !puedoAnalizar.value) return
+  analizandoIA.value = true
+  try {
+    const { data } = await analizarLote(id)
+    cooldownHasta.value = data.cooldown_hasta || null
+    if (!data.cached) {
+      historialAnalisis.value = [data, ...historialAnalisis.value].slice(0, 3)
+      expandedAnalisis.value  = data.id
+    } else {
+      toast.info('Ya existe un análisis reciente. ' + (tiempoRestante.value ? `Próximo disponible ${tiempoRestante.value}.` : ''))
+    }
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al analizar con IA')
+  } finally {
+    analizandoIA.value = false
+  }
+}
+
+function formatearFechaRelativa(ts) {
+  if (!ts) return ''
+  const diff = Date.now() - new Date(ts).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 2)  return 'hace un momento'
+  if (mins < 60) return `hace ${mins} min`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24)  return `hace ${hrs}h`
+  return `hace ${Math.floor(hrs / 24)}d`
+}
 const isCultivador  = computed(() => auth.role === "cultivador")
 
 const costoLote     = ref(null)
@@ -889,6 +951,7 @@ onMounted(async () => {
   try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
   try { const { data } = await getCostoLote(id); costoLote.value = data?.costo || data || null } catch {}
   try { const { data } = await listGeneticas({ activa: true, disponible: true }); geneticas.value = data || [] } catch {}
+  cargarHistorialAnalisis()
 })
 
 onUnmounted(() => {
@@ -1452,6 +1515,44 @@ onUnmounted(() => {
             <div v-else class="ld__costo-empty">
               <i class="bi bi-calculator"></i>
               <span>Sin costos cargados</span>
+            </div>
+          </div>
+
+          <!-- Análisis IA -->
+          <div class="ld__card ld__card--mt ld__card--ia">
+            <div class="ld__card-header">
+              <span class="ld__card-title">🤖 Análisis IA</span>
+              <button class="ld__card-action ld__card-action--ia" @click="ejecutarAnalisisIA" :disabled="analizandoIA || !puedoAnalizar">
+                <span v-if="analizandoIA" class="ld__ia-spinner"></span>
+                <i v-else class="bi bi-stars"></i>
+                <span v-if="analizandoIA">Analizando…</span>
+                <span v-else-if="!puedoAnalizar">{{ tiempoRestante }}</span>
+                <span v-else>{{ historialAnalisis.length ? 'Nuevo análisis' : 'Analizar lote' }}</span>
+              </button>
+            </div>
+
+            <div v-if="historialAnalisis.length" class="ld__ia-historial">
+              <div
+                v-for="(analisis, idx) in historialAnalisis"
+                :key="analisis.id"
+                class="ld__ia-item"
+              >
+                <button class="ld__ia-item-header" @click="toggleAnalisis(analisis.id)">
+                  <div class="ld__ia-meta">
+                    <i class="bi bi-clock"></i>
+                    {{ formatearFechaRelativa(analisis.created_at) }}
+                    <span v-if="idx === 0" class="ld__ia-badge">último</span>
+                    <span v-if="analisis.tokens_usados" class="ld__ia-tokens">{{ analisis.tokens_usados }} tokens</span>
+                  </div>
+                  <i class="bi" :class="expandedAnalisis === analisis.id ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                </button>
+                <div v-if="expandedAnalisis === analisis.id" class="ld__ia-contenido">{{ analisis.contenido }}</div>
+              </div>
+            </div>
+
+            <div v-else-if="!analizandoIA" class="ld__costo-empty">
+              <i class="bi bi-stars"></i>
+              <span>Generá un análisis experto del historial de este lote</span>
             </div>
           </div>
 
@@ -2231,6 +2332,19 @@ onUnmounted(() => {
 .ld__costo-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .4rem; }
 .ld__costo-empty { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 1.2rem 1rem; color: #94a3b8; font-size: .8rem; }
 .ld__costo-empty i { font-size: 1.4rem; }
+.ld__card--ia { border-color: #e9d8fd; }
+.ld__card-action--ia { background: linear-gradient(135deg, #7c3aed, #9333ea); color: #fff; border: none; padding: .3rem .75rem; border-radius: 6px; font-size: .75rem; font-weight: 700; cursor: pointer; display:flex; align-items:center; gap:.35rem; }
+.ld__card-action--ia:disabled { opacity: .6; cursor: not-allowed; }
+.ld__ia-spinner { width:11px; height:11px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; animation:ld-spin .6s linear infinite; display:inline-block; }
+.ld__ia-historial { display:flex; flex-direction:column; }
+.ld__ia-item { border-top: 1px solid #f3e8ff; }
+.ld__ia-item:first-child { border-top: none; }
+.ld__ia-item-header { width:100%; display:flex; justify-content:space-between; align-items:center; padding:.5rem 1rem; background:none; border:none; cursor:pointer; text-align:left; }
+.ld__ia-item-header:hover { background:#faf5ff; }
+.ld__ia-meta { display:flex; align-items:center; gap:.4rem; font-size:.7rem; color:#94a3b8; }
+.ld__ia-badge { background:#7c3aed; color:#fff; padding:.1em .45em; border-radius:4px; font-size:.65rem; font-weight:700; text-transform:uppercase; }
+.ld__ia-tokens { background:#f3e8ff; color:#7c3aed; padding:.1em .45em; border-radius:4px; font-size:.68rem; font-weight:600; }
+.ld__ia-contenido { font-size:.82rem; color:#334155; line-height:1.65; white-space:pre-wrap; max-height:320px; overflow-y:auto; padding:.4rem 1rem .9rem; }
 .ld__pvr { padding: .5rem 1rem .8rem; display: flex; flex-direction: column; gap: .5rem; }
 .ld__pvr-row { display: flex; align-items: center; gap: .5rem; font-size: .85rem; flex-wrap: wrap; }
 .ld__pvr-label { font-size: .75rem; color: #64748b; min-width: 90px; }

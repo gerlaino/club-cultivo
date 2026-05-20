@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_19_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -75,8 +75,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_19_000002) do
     t.jsonb "contexto", default: {}
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "lote_id"
     t.index ["club_id", "leida_at"], name: "index_alertas_internas_on_club_id_and_leida_at"
     t.index ["club_id"], name: "index_alertas_internas_on_club_id"
+    t.index ["lote_id"], name: "index_alertas_internas_on_lote_id"
+  end
+
+  create_table "analisis_ia", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "lote_id"
+    t.bigint "user_id", null: false
+    t.string "tipo", null: false
+    t.text "contenido", null: false
+    t.integer "tokens_usados"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_analisis_ia_on_club_id"
+    t.index ["lote_id", "created_at"], name: "index_analisis_ia_on_lote_id_and_created_at"
+    t.index ["lote_id"], name: "index_analisis_ia_on_lote_id"
+    t.index ["user_id"], name: "index_analisis_ia_on_user_id"
   end
 
   create_table "ariccame_registros", force: :cascade do |t|
@@ -149,6 +166,18 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_19_000002) do
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["plan"], name: "index_clubs_on_plan"
     t.index ["slug"], name: "index_clubs_on_slug", unique: true
+  end
+
+  create_table "conversaciones_asistente", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "user_id", null: false
+    t.date "fecha", null: false
+    t.jsonb "mensajes", default: [], null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_conversaciones_asistente_on_club_id"
+    t.index ["user_id", "fecha"], name: "index_conversaciones_asistente_on_user_id_and_fecha", unique: true
+    t.index ["user_id"], name: "index_conversaciones_asistente_on_user_id"
   end
 
   create_table "costo_lotes", force: :cascade do |t|
@@ -1069,10 +1098,16 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_19_000002) do
   add_foreign_key "alertas", "users", column: "reconocida_por_id"
   add_foreign_key "alertas", "users", column: "resuelta_por_id"
   add_foreign_key "alertas_internas", "clubs"
+  add_foreign_key "alertas_internas", "lotes"
   add_foreign_key "alertas_internas", "users", column: "creada_por_id"
+  add_foreign_key "analisis_ia", "clubs"
+  add_foreign_key "analisis_ia", "lotes"
+  add_foreign_key "analisis_ia", "users"
   add_foreign_key "ariccame_registros", "clubs"
   add_foreign_key "ariccame_registros", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "ariccame_registros", "stocks"
+  add_foreign_key "conversaciones_asistente", "clubs"
+  add_foreign_key "conversaciones_asistente", "users"
   add_foreign_key "costo_lotes", "clubs"
   add_foreign_key "costo_lotes", "lotes"
   add_foreign_key "costo_lotes", "users", column: "calculado_por_id"

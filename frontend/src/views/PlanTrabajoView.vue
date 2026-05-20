@@ -262,7 +262,7 @@ async function cargarTareas() {
 }
 
 async function cargarUsuarios() {
-  try { const { data } = await listUsers({ per_page: 100 }); usuarios.value = data?.usuarios || data || [] } catch {}
+  try { const { data } = await listUsers({ per_page: 100 }); usuarios.value = Array.isArray(data) ? data : (data?.data || data?.usuarios || []) } catch {}
 }
 async function cargarSalas() {
   try { const { data } = await listSalas(); salas.value = data || [] } catch {}
@@ -277,6 +277,7 @@ async function publicar() {
   try {
     const { data } = await publicarPlanTrabajo(plan.value.id)
     plan.value = data
+    planTareas.value = data.plan_tareas || planTareas.value
   } catch (e) {
     errorMsg.value = e?.response?.data?.error || 'Error al publicar'
   } finally { saving.value = false }

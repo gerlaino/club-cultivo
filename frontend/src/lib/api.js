@@ -441,6 +441,13 @@ export const getAlertasInternas       = (params = {}) => api.get('/alertas_inter
 export const marcarAlertaInterna      = (id)          => api.patch(`/alertas_internas/${id}/marcar_leida`)
 export const marcarTodasAlertasLeidas = ()            => api.patch('/alertas_internas/marcar_todas_leidas')
 
+// ── Asistente IA ──────────────────────────────────────────────────────────────
+export const parsearAsistente  = (texto, contexto)  => api.post('/asistente/parsear',       { texto, contexto })
+export const ejecutarAsistente = (acciones, contexto) => api.post('/asistente/ejecutar',    { acciones, contexto })
+export const consultarAsistente = (texto, contexto) => api.post('/asistente/consultar',     { texto, contexto })
+export const analizarLote          = (lote_id) => api.post('/asistente/analizar_lote',       { lote_id })
+export const getHistorialAnalisis  = (lote_id) => api.get('/asistente/historial_analisis',  { params: { lote_id } })
+
 // ── Carnet público ────────────────────────────────────────────────────────────
 export const getCarnetPublico = (token) => axios.get(`/c/${token}`)
 

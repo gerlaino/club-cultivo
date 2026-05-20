@@ -105,7 +105,9 @@ class PlanTrabajosController < ApplicationController
       @plan.update!(estado: :publicado, publicado_en: Time.zone.now)
     end
 
-    render json: { ok: true, tareas_creadas: tareas_creadas }
+    plan_data = serialize_plan(@plan.reload)
+    plan_data[:plan_tareas] = @plan.plan_tareas.includes(:responsable, :sala).map { |pt| serialize_plan_tarea(pt) }
+    render json: plan_data.merge(tareas_creadas: tareas_creadas)
   rescue => e
     render json: { error: e.message }, status: :unprocessable_entity
   end

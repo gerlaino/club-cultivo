@@ -31,8 +31,18 @@
               <span v-if="contexto.planta_nombre" class="av__ctx-chip av__ctx-chip--planta">🌱 {{ contexto.planta_nombre }}</span>
             </div>
 
+            <!-- Modo -->
+            <div class="av__modo-tabs">
+              <button :class="['av__modo-tab', { 'av__modo-tab--active': modo === 'registro' }]" @click="modo = 'registro'">
+                <i class="bi bi-mic"></i> Registrar
+              </button>
+              <button :class="['av__modo-tab', { 'av__modo-tab--active': modo === 'consulta' }]" @click="modo = 'consulta'; errorVoz = null">
+                <i class="bi bi-chat-dots"></i> Consultar IA
+              </button>
+            </div>
+
             <!-- PASO 1 -->
-            <div v-if="paso === 'escuchar'" class="av__body">
+            <div v-if="modo === 'registro' && paso === 'escuchar'" class="av__body">
               <div v-if="!escuchando && !transcripcion" class="av__idle">
                 <div class="av__idle-icon">🎙️</div>
                 <div class="av__idle-title">{{ idleTitle }}</div>
@@ -87,7 +97,7 @@
             </div>
 
             <!-- PASO 2 -->
-            <div v-if="paso === 'revisar'" class="av__body">
+            <div v-if="modo === 'registro' && paso === 'revisar'" class="av__body">
               <div class="av__resumen-header">
                 <div class="av__resumen-badge">
                   <i class="bi bi-check-circle-fill"></i>
@@ -247,7 +257,7 @@
             </div>
 
             <!-- PASO 3 -->
-            <div v-if="paso === 'resultado'" class="av__body av__body--resultado">
+            <div v-if="modo === 'registro' && paso === 'resultado'" class="av__body av__body--resultado">
               <div class="av__resultado-icon">✅</div>
               <div class="av__resultado-titulo">¡Sesión registrada!</div>
               <div class="av__resultado-lista">
@@ -261,6 +271,45 @@
               <button class="av__btn-nueva-sesion" @click="nuevaSesion">
                 <i class="bi bi-mic"></i> Nueva sesión
               </button>
+            </div>
+
+            <!-- MODO CONSULTA -->
+            <div v-if="modo === 'consulta'" class="av__body av__consulta-body">
+              <div class="av__consulta-area">
+                <textarea class="av__consulta-input" v-model="consultaTexto" :placeholder="consultaPlaceholder" rows="3"></textarea>
+                <div class="av__consulta-btns">
+                  <button v-if="!escuchando" class="av__consulta-voz" @click="iniciarGrabacionConsulta" :disabled="consultandoIA">
+                    <i class="bi bi-mic"></i>
+                  </button>
+                  <button v-else class="av__consulta-voz av__consulta-voz--rec" @click="detenerGrabacionConsulta">
+                    <i class="bi bi-stop-circle-fill"></i>
+                  </button>
+                  <button class="av__consulta-enviar" @click="enviarConsulta" :disabled="consultandoIA || !consultaTexto.trim()">
+                    <span v-if="consultandoIA" class="av__mini-spinner"></span>
+                    <i v-else class="bi bi-send-fill"></i>
+                    {{ consultandoIA ? 'Consultando…' : 'Preguntar' }}
+                  </button>
+                </div>
+              </div>
+              <div v-if="escuchando && modo === 'consulta'" class="av__consulta-escuchando">
+                <div class="av__waves av__waves--sm">
+                  <div v-for="i in 5" :key="i" class="av__wave" :style="{ animationDelay: `${i * 0.1}s` }"></div>
+                </div>
+                <span>Escuchando…</span>
+              </div>
+              <div v-if="errorVoz && modo === 'consulta'" class="av__error"><i class="bi bi-exclamation-triangle"></i> {{ errorVoz }}</div>
+              <div v-if="consultaRespuesta" class="av__consulta-respuesta">
+                <div class="av__consulta-resp-label"><i class="bi bi-robot"></i> Agrónomo IA</div>
+                <div class="av__consulta-resp-body">{{ consultaRespuesta }}</div>
+                <button class="av__consulta-nueva" @click="consultaTexto = ''; consultaRespuesta = ''">
+                  <i class="bi bi-arrow-counterclockwise"></i> Nueva pregunta
+                </button>
+              </div>
+              <div v-if="!consultaRespuesta && !consultandoIA && !errorVoz" class="av__consulta-idle">
+                <div class="av__consulta-ej">💬 ¿Cómo viene el lote? ¿Debería ajustar el EC?</div>
+                <div class="av__consulta-ej">🔬 ¿Hay señales de deficiencia en estas mediciones?</div>
+                <div class="av__consulta-ej">📅 ¿Cuándo convendría pasar a floración?</div>
+              </div>
             </div>
 
           </div>
@@ -299,6 +348,7 @@ function toggleTarea(accion, key) {
 const emit = defineEmits(['registrado'])
 
 const abierto               = ref(false)
+const modo                  = ref('registro')
 const paso                  = ref('escuchar')
 const escuchando            = ref(false)
 const procesando            = ref(false)
@@ -312,6 +362,20 @@ const resultados            = ref([])
 const erroresEjecucion      = ref([])
 const errorVoz              = ref(null)
 let recognition = null
+
+// Consulta mode
+const consultaTexto     = ref('')
+const consultaRespuesta = ref('')
+const consultandoIA     = ref(false)
+
+const consultaPlaceholder = computed(() => {
+  if (!props.contexto) return '¿Qué querés saber del cultivo?'
+  const t = props.contexto.tipo
+  if (t === 'lote')   return `¿Cómo viene ${props.contexto.lote_codigo}? ¿Algo que deba revisar?`
+  if (t === 'planta') return `¿Qué opinás del estado de ${props.contexto.planta_nombre}?`
+  if (t === 'sala')   return `¿Cómo están los lotes en ${props.contexto.sala_nombre}?`
+  return '¿Qué querés saber del cultivo?'
+})
 
 const triggerLabel = computed(() => {
   if (!props.contexto) return 'Registrar sesión'
@@ -486,6 +550,47 @@ async function ejecutarAcciones() {
 
 function nuevaSesion() { resetear() }
 
+function iniciarGrabacionConsulta() {
+  errorVoz.value = null
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+  if (!SR) { errorVoz.value = 'Tu browser no soporta voz. Usá Chrome.'; return }
+  recognition = new SR()
+  recognition.lang = 'es-AR'; recognition.continuous = true; recognition.interimResults = true
+  recognition.onstart = () => { escuchando.value = true }
+  recognition.onresult = (e) => {
+    let final = ''
+    for (let i = 0; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript
+    }
+    if (final) consultaTexto.value = final
+  }
+  recognition.onerror = (e) => { if (e.error !== 'no-speech') errorVoz.value = `Error: ${e.error}`; escuchando.value = false }
+  recognition.onend  = () => { escuchando.value = false }
+  recognition.start()
+}
+
+function detenerGrabacionConsulta() {
+  if (!recognition) return
+  recognition.onend = () => { escuchando.value = false; if (consultaTexto.value.trim()) enviarConsulta() }
+  recognition.stop()
+}
+
+async function enviarConsulta() {
+  if (!consultaTexto.value.trim()) return
+  consultandoIA.value = true; errorVoz.value = null; consultaRespuesta.value = ''
+  try {
+    const payload = { texto: consultaTexto.value }
+    if (props.contexto) payload.contexto = props.contexto
+    const { data } = await api.post('/asistente/consultar', payload)
+    consultaRespuesta.value = data.respuesta || ''
+  } catch (e) {
+    const status = e?.response?.status
+    if (status === 403) errorVoz.value = e?.response?.data?.error || 'IA no disponible en tu plan.'
+    else if (status === 429) errorVoz.value = 'Límite de uso alcanzado. Volvé en unos minutos.'
+    else errorVoz.value = e?.response?.data?.error || 'Error al consultar IA'
+  } finally { consultandoIA.value = false }
+}
+
 function labelTipo(tipo) {
   return {
     registro_ambiental:      'Registro ambiental',
@@ -533,6 +638,34 @@ function metaAccion(accion) {
 </script>
 
 <style scoped>
+/* ── Modo tabs ─────────────────────────────────────────────────────── */
+.av__modo-tabs { display:flex; gap:.25rem; padding:.5rem 1.25rem .25rem; }
+.av__modo-tab { display:flex; align-items:center; gap:.35rem; padding:.35rem .875rem; border-radius:7px; border:none; background:none; font-size:.8rem; font-weight:600; color:#60725d; cursor:pointer; transition:all .12s; }
+.av__modo-tab--active { background:#1b5e20; color:#fff; }
+.av__modo-tab:not(.av__modo-tab--active):hover { background:#f0fdf4; color:#1b5e20; }
+
+/* ── Consulta body ─────────────────────────────────────────────────── */
+.av__consulta-body { display:flex; flex-direction:column; gap:1rem; }
+.av__consulta-area { display:flex; flex-direction:column; gap:.5rem; }
+.av__consulta-input { width:100%; border:1.5px solid #e2e8f0; border-radius:10px; padding:.7rem .9rem; font-size:.875rem; font-family:inherit; resize:vertical; box-sizing:border-box; background:#f8fafc; color:#0f2611; }
+.av__consulta-input:focus { outline:none; border-color:#1b5e20; background:#fff; }
+.av__consulta-btns { display:flex; gap:.5rem; justify-content:flex-end; }
+.av__consulta-voz { width:36px; height:36px; border:1.5px solid #e2e8f0; border-radius:8px; background:#f8fafc; color:#60725d; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:.9rem; transition:all .12s; flex-shrink:0; }
+.av__consulta-voz:hover { border-color:#1b5e20; color:#1b5e20; }
+.av__consulta-voz--rec { background:#fef2f2; border-color:#fecaca; color:#dc2626; animation:av-pulse 1s infinite; }
+.av__consulta-enviar { display:flex; align-items:center; gap:.4rem; background:#1b5e20; color:#fff; border:none; padding:.5rem 1rem; border-radius:8px; font-size:.82rem; font-weight:700; cursor:pointer; transition:opacity .15s; }
+.av__consulta-enviar:disabled { opacity:.5; cursor:not-allowed; }
+.av__mini-spinner { width:12px; height:12px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:av-spin .6s linear infinite; }
+.av__consulta-escuchando { display:flex; align-items:center; gap:.75rem; padding:.5rem .75rem; background:#f0fdf4; border-radius:8px; font-size:.8rem; color:#1b5e20; font-weight:600; }
+.av__waves--sm { display:flex; align-items:center; gap:2px; height:18px; }
+.av__consulta-respuesta { background:#f6faf6; border:1px solid #c8e6c9; border-radius:10px; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.75rem; }
+.av__consulta-resp-label { font-size:.72rem; font-weight:700; color:#1b5e20; text-transform:uppercase; letter-spacing:.05em; display:flex; align-items:center; gap:.35rem; }
+.av__consulta-resp-body { font-size:.875rem; color:#1a2e1a; line-height:1.65; white-space:pre-wrap; }
+.av__consulta-nueva { align-self:flex-start; display:flex; align-items:center; gap:.35rem; background:transparent; color:#1b5e20; border:1.5px solid #a5d6a7; padding:.35rem .75rem; border-radius:7px; font-size:.78rem; font-weight:600; cursor:pointer; }
+.av__consulta-nueva:hover { background:#f0fdf4; }
+.av__consulta-idle { display:flex; flex-direction:column; gap:.4rem; }
+.av__consulta-ej { font-size:.8rem; color:#94a3b8; font-style:italic; padding:.15rem 0; }
+
 .av { display: inline-block; }
 .av__trigger { display:flex; align-items:center; gap:8px; background:linear-gradient(135deg,#1b5e20,#2e7d32); color:#e8f5e9; border:none; padding:8px 16px; border-radius:9px; font-size:13px; font-weight:500; cursor:pointer; transition:opacity .2s; box-shadow:0 2px 8px #1b5e2030; }
 .av__trigger:hover,.av__trigger--activo { opacity:.88; }

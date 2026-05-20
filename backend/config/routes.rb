@@ -48,8 +48,11 @@ Rails.application.routes.draw do
 
     resource :benchmark, only: [:show], controller: :benchmark
 
-    post '/asistente/parsear',  to: 'asistente#parsear'
-    post '/asistente/ejecutar', to: 'asistente#ejecutar'
+    post '/asistente/parsear',       to: 'asistente#parsear'
+    post '/asistente/ejecutar',      to: 'asistente#ejecutar'
+    post '/asistente/consultar',     to: 'asistente#consultar'
+    post '/asistente/analizar_lote',      to: 'asistente#analizar_lote'
+    get  '/asistente/historial_analisis', to: 'asistente#historial_analisis'
 
     resources :salas do
       resources :lotes, only: [:index, :create]

@@ -23,6 +23,11 @@ Sidekiq.configure_server do |config|
         'cron'  => '0 9 * * *',
         'class' => 'StockBajoJob',
         'description' => 'Genera alertas de stock bajo (< 50g) para todos los clubes'
+      },
+      'detectar_alertas_cultivo' => {
+        'cron'  => '0 7 * * *',
+        'class' => 'DetectarAlertasJob',
+        'description' => 'Detecta anomalías de cultivo: registros vencidos, pH/EC fuera de rango, cosecha pendiente, tareas vencidas'
       }
     )
   end

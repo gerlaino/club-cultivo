@@ -3,10 +3,21 @@ class AlertaInterna < ApplicationRecord
 
   belongs_to :club
   belongs_to :creada_por, class_name: 'User', optional: true
+  belongs_to :lote, optional: true
 
-  TIPOS      = %w[paciente_creado_por_dispensador documento_vencido reprocann_vencido
-                  reprocann_por_vencer
-                  manicura_asignada manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada otro].freeze
+  TIPOS_OPERATIVOS = %w[
+    paciente_creado_por_dispensador documento_vencido reprocann_vencido reprocann_por_vencer
+    manicura_asignada manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada
+    stock_bajo otro
+  ].freeze
+
+  TIPOS_CULTIVO = %w[
+    sin_registro_ambiental ph_fuera_rango ec_fuera_rango
+    temperatura_fuera_rango humedad_fuera_rango
+    cosecha_pendiente tarea_vencida_cultivo estado_critico_lote
+  ].freeze
+
+  TIPOS       = (TIPOS_OPERATIVOS + TIPOS_CULTIVO).freeze
   SEVERIDADES = %w[info warning error].freeze
 
   validates :tipo,      inclusion: { in: TIPOS }

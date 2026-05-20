@@ -12,7 +12,8 @@ class Lote < ApplicationRecord
   has_many :pesadas,               -> { order(registrado_at: :asc) }, dependent: :destroy
   has_many :stocks,                dependent: :nullify
   has_many_attached :fotos
-  has_many :notas, as: :noteable, dependent: :destroy
+  has_many :notas,      as: :noteable,              dependent: :destroy
+  has_many :analisis_ia, class_name: 'AnalisisIa', dependent: :destroy
 
   # en_manicura: admin asigna un manicurador y el lote espera ser procesado.
   # manicura_pendiente: manicurador registró pesada, espera aprobación admin.

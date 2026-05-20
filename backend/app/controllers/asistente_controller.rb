@@ -112,18 +112,84 @@ class AsistenteController < ApplicationController
     return render json: { error: 'Límite de uso alcanzado. Volvé en unos minutos.' }, status: :too_many_requests if rate_limited?
 
     es_cultivador  = current_user.cultivador?
-    prompt_sistema = construir_prompt(contexto, es_cultivador)
+    sesion         = ConversacionAsistente.de_hoy(current_user)
+    prompt_sistema = construir_prompt(contexto, es_cultivador) + sesion.historial_para_prompt
     resultado      = llamar_claude(texto, prompt_sistema)
 
     if resultado[:error]
       render json: { error: resultado[:error] }, status: :unprocessable_entity
     else
-      # Cultivador nunca crea tareas
       if es_cultivador && resultado['acciones']
         resultado['acciones'] = resultado['acciones'].reject { |a| (a['tipo'] || a[:tipo]) == 'tarea' }
       end
+      sesion.agregar_intercambio(texto, resultado['resumen'].to_s) rescue nil
       render json: resultado
     end
+  end
+
+  # POST /asistente/consultar
+  def consultar
+    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+
+    texto    = params[:texto].to_s.strip
+    contexto = params[:contexto]
+
+    return render json: { error: 'Texto vacío' }, status: :unprocessable_entity if texto.blank?
+    return render json: { error: 'Límite de uso alcanzado. Volvé en unos minutos.' }, status: :too_many_requests if rate_limited?
+
+    sesion  = ConversacionAsistente.de_hoy(current_user)
+    prompt  = construir_prompt_consulta(contexto) + sesion.historial_para_prompt
+    result  = llamar_claude_libre(texto, prompt)
+
+    if result[:error]
+      render json: { error: result[:error] }, status: :unprocessable_entity
+    else
+      sesion.agregar_intercambio(texto, result[:texto].truncate(150)) rescue nil
+      render json: { respuesta: result[:texto] }
+    end
+  end
+
+  # POST /asistente/analizar_lote
+  def analizar_lote
+    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+    return render json: { error: 'Límite de uso alcanzado. Volvé en unos minutos.' }, status: :too_many_requests if rate_limited?
+
+    lote = current_user.club.lotes.find_by(id: params[:lote_id])
+    return render json: { error: 'Lote no encontrado' }, status: :not_found unless lote
+
+    reciente = lote.analisis_ia.where('created_at > ?', 4.hours.ago).order(created_at: :desc).first
+    if reciente
+      return render json: serializar_analisis(reciente).merge(
+        cached:         true,
+        cooldown_hasta: (reciente.created_at + 4.hours).iso8601
+      )
+    end
+
+    resultado = AnalisisLoteService.new(lote, current_user).analizar!
+
+    if resultado[:error]
+      render json: { error: resultado[:error] }, status: :unprocessable_entity
+    else
+      a = resultado[:analisis_obj] || lote.analisis_ia.order(created_at: :desc).first
+      render json: serializar_analisis(a).merge(
+        cached:         false,
+        cooldown_hasta: (a.created_at + 4.hours).iso8601
+      )
+    end
+  end
+
+  # GET /asistente/historial_analisis?lote_id=X
+  def historial_analisis
+    lote = current_user.club.lotes.find_by(id: params[:lote_id])
+    return render json: { error: 'Lote no encontrado' }, status: :not_found unless lote
+
+    analisis = lote.analisis_ia.order(created_at: :desc).limit(3)
+    reciente = analisis.first
+    cooldown_hasta = reciente ? (reciente.created_at + 4.hours).iso8601 : nil
+    render json: {
+      analisis:       analisis.map { |a| serializar_analisis(a) },
+      cooldown_hasta: cooldown_hasta
+    }
   end
 
   # POST /asistente/ejecutar
@@ -192,6 +258,10 @@ class AsistenteController < ApplicationController
     []
   end
 
+  def serializar_analisis(a)
+    { id: a.id, contenido: a.contenido, tokens_usados: a.tokens_usados, created_at: a.created_at }
+  end
+
   def rate_limited?
     limite = current_user.club.ia_limite_efectivo
     key    = "asistente:club:#{current_user.club_id}:#{Time.current.strftime('%Y%m%d%H')}"
@@ -205,6 +275,15 @@ class AsistenteController < ApplicationController
 
   def construir_prompt(contexto, es_cultivador)
     PROMPT_BASE.dup + permisos_rol(es_cultivador) + contexto_rico(contexto)
+  end
+
+  def construir_prompt_consulta(contexto)
+    base = <<~PROMPT
+      Sos un agrónomo especialista en cannabis medicinal. Respondés preguntas del equipo de cultivo
+      de forma clara, directa y útil. Podés analizar datos, identificar tendencias, y dar recomendaciones.
+      Respondés en español. Usá markdown si mejora la claridad. No generes JSON.
+    PROMPT
+    base + permisos_rol(current_user.cultivador?) + contexto_rico(contexto)
   end
 
   def permisos_rol(es_cultivador)
@@ -410,6 +489,35 @@ class AsistenteController < ApplicationController
     end
 
     accion
+  end
+
+  def llamar_claude_libre(texto, prompt_sistema)
+    api_key = ENV['ANTHROPIC_API_KEY']
+    return { error: 'API key de IA no configurada' } if api_key.blank?
+
+    uri  = URI('https://api.anthropic.com/v1/messages')
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl      = true
+    http.read_timeout = 45
+
+    request = Net::HTTP::Post.new(uri)
+    request['Content-Type']      = 'application/json'
+    request['x-api-key']         = api_key
+    request['anthropic-version'] = '2023-06-01'
+    request.body = {
+      model:      'claude-sonnet-4-6',
+      max_tokens: 1000,
+      system:     prompt_sistema,
+      messages:   [{ role: 'user', content: texto }]
+    }.to_json
+
+    response = http.request(request)
+    body     = JSON.parse(response.body)
+    return { error: "IA: #{body.dig('error', 'message')}" } if response.code.to_i != 200
+
+    { texto: body.dig('content', 0, 'text').to_s.strip }
+  rescue => e
+    { error: e.message }
   end
 
   def llamar_claude(texto, prompt_sistema)
