@@ -81,7 +81,7 @@
           <div v-else class="dv__stock-grid">
             <div v-for="s in stocksDisponibles" :key="s.id" class="dv__stock-card">
               <div class="dv__stock-header">{{ formaLabel(s.forma_producto) }}</div>
-              <div class="dv__stock-lote">{{ s.lote?.codigo ?? '—' }}</div>
+              <div class="dv__stock-lote">{{ s.lote?.codigo ?? '—' }}<span v-if="s.sede?.nombre" class="dv__stock-sede"> · {{ s.sede.nombre }}</span></div>
               <div class="dv__stock-disponible">{{ s.cantidad }}{{ s.unidad }} disponibles</div>
               <div class="dv__stock-precio">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad }}</div>
               <div class="dv__stock-add">
@@ -145,7 +145,14 @@
               <div class="dv__modal-paciente">
                 <Users :size="16" :stroke-width="1.75" />
                 <strong>{{ selectedPaciente?.nombre }} {{ selectedPaciente?.apellido }}</strong>
+                <span class="dv__reprocann-badge" :class="reprocannClass(selectedPaciente)">{{ reprocannLabel(selectedPaciente) }}</span>
               </div>
+
+              <!-- Aviso REPROCANN -->
+              <div v-if="!reprocannVigente" class="dv__modal-aviso dv__modal-aviso--warn">
+                <strong>Atención:</strong> el paciente {{ reprocannStatus(selectedPaciente) === 'vencido' ? 'tiene el REPROCANN vencido' : 'no tiene REPROCANN registrado' }}. Verificar habilitación antes de continuar.
+              </div>
+
 
               <div class="dv__modal-items">
                 <div v-for="(item, i) in cart" :key="i" class="dv__modal-item">
@@ -350,6 +357,9 @@ const gInsuficiente = computed(() =>
   medioPago.value === 'credito_gramos' && cartGramos.value > (pacienteDetalle.value?.saldo_cc_g ?? 0)
 )
 
+// REPROCANN
+const reprocannVigente = computed(() => reprocannStatus(selectedPaciente.value) === 'vigente')
+
 function addToCart(s) {
   const qty = cantidades.value[s.id]
   if (!qty || qty <= 0) { toast.warning('Ingresá una cantidad'); return }
@@ -370,8 +380,9 @@ async function submitDispensacion() {
   submitting.value = true
   try {
     const today = new Date().toISOString().slice(0, 10)
-    await Promise.all(cart.value.map(item =>
-      createDispensacion(selectedPaciente.value.id, {
+    // Procesar secuencialmente para evitar race condition en stock compartido
+    for (const item of cart.value) {
+      await createDispensacion(selectedPaciente.value.id, {
         stock_id:            item.stock.id,
         cantidad:            item.cantidad,
         precio_unitario_ars: item.stock.precio_sugerido_ars,
@@ -386,21 +397,19 @@ async function submitDispensacion() {
         } : {}),
         ...(observaciones.value.trim() ? { observaciones: observaciones.value.trim() } : {}),
       })
-    ))
+    }
     toast.success(`Dispensación registrada para ${selectedPaciente.value.nombre}`)
-    cart.value      = []
+    cart.value        = []
     confirmOpen.value = false
     conEnvio.value    = false
     direccionEnvio.value = ''
     contactoNombre.value = ''
     contactoTel.value    = ''
     observaciones.value  = ''
-    // Refrescar detalle del paciente para actualizar la barra
-    if (selectedPaciente.value) {
-      getPaciente(selectedPaciente.value.id)
-        .then(r => { pacienteDetalle.value = r.data?.data ?? r.data ?? null })
-        .catch(() => {})
-    }
+    // Refrescar detalle del paciente para actualizar la barra de crédito
+    getPaciente(selectedPaciente.value.id)
+      .then(r => { pacienteDetalle.value = r.data?.data ?? r.data ?? null })
+      .catch(() => {})
   } catch (e) {
     const msg = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar'
     toast.error(msg)
@@ -803,6 +812,19 @@ function formatG(g) {
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 
 .dv__empty { font-size: var(--fs-14); color: var(--c-ink-500); padding: var(--sp-3) 0; }
+
+/* Sede label en stock card */
+.dv__stock-sede { color: var(--c-ink-400); font-size: var(--fs-11); }
+
+/* Avisos en modal */
+.dv__modal-aviso {
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-13);
+  line-height: 1.45;
+}
+.dv__modal-aviso--warn  { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+.dv__modal-aviso--error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
 
 /* Modal transition */
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity .2s; }

@@ -31,10 +31,11 @@
           <button v-if="plan.estado === 'publicado'" class="ptv__btn-ghost" :disabled="saving" @click="archivar">
             <i class="bi bi-archive"></i> Archivar
           </button>
-          <button v-if="plan.estado === 'borrador'" class="ptv__btn-danger" :disabled="saving" @click="eliminarPlan">
+          <button v-if="plan.estado === 'borrador' || plan.estado === 'archivado'" class="ptv__btn-danger" :disabled="saving" @click="eliminarPlan">
             <i class="bi bi-trash3"></i> Eliminar
           </button>
-          <button class="ptv__btn-ghost" @click="showNuevo = true">
+          <div class="ptv__actions-sep"></div>
+          <button class="ptv__btn-new-plan" @click="showNuevo = true">
             <i class="bi bi-plus-lg"></i> Nuevo plan
           </button>
         </div>
@@ -49,6 +50,12 @@
         <button class="ptv__btn-tarea" @click="abrirNuevaTarea({})">
           <i class="bi bi-plus-lg"></i> Tarea
         </button>
+      </div>
+
+      <!-- Aviso plan archivado -->
+      <div v-if="plan.estado === 'archivado'" class="ptv__info-archivado">
+        <i class="bi bi-archive"></i>
+        Este plan está archivado. Las tareas mostradas son históricas.
       </div>
 
       <!-- Error inline -->
@@ -370,6 +377,7 @@ async function onPlanCreado(nuevoPlan) {
 .ptv__btn-tarea { display: flex; align-items: center; gap: .35rem; background: #1b5e20; color: #fff; border: none; padding: .4rem .875rem; border-radius: 7px; font-size: .82rem; font-weight: 700; cursor: pointer; }
 
 .ptv__error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .65rem .875rem; border-radius: 8px; font-size: .82rem; }
+.ptv__info-archivado { display: flex; align-items: center; gap: .5rem; background: #fafafa; border: 1px solid #e2e8f0; color: #64748b; padding: .6rem .875rem; border-radius: 8px; font-size: .8rem; }
 
 .ptv__view { background: #fff; border: 1px solid #e8f0e9; border-radius: 12px; padding: 1rem 1.25rem; overflow: hidden; }
 
@@ -381,6 +389,9 @@ async function onPlanCreado(nuevoPlan) {
 .ptv__btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: transparent; color: #dc2626; border: 1.5px solid #fecaca; padding: .5rem .875rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; }
 .ptv__btn-danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
 .ptv__btn-danger:disabled { opacity: .55; cursor: not-allowed; }
+.ptv__actions-sep { width: 1px; height: 24px; background: #e2e8f0; flex-shrink: 0; }
+.ptv__btn-new-plan { display: inline-flex; align-items: center; gap: .4rem; background: #f0fdf4; color: #15803d; border: 1.5px solid #bbf7d0; padding: .5rem .875rem; border-radius: 8px; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.ptv__btn-new-plan:hover { background: #dcfce7; border-color: #86efac; }
 
 /* Quick panel */
 .ptv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(3px); }

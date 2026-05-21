@@ -117,22 +117,29 @@ RSpec.describe Dispensacion, type: :model do
   # ── delivery fields ───────────────────────────────────────────────────────
 
   describe 'validaciones de delivery' do
-    it 'requiere dirección, contacto y delivery_id cuando con_envio es true' do
-      delivery = create(:user, :delivery, club: club)
+    it 'requiere dirección y contacto cuando con_envio es true' do
       d = nueva_dispensacion(con_envio: true)
       expect(d).not_to be_valid
       expect(d.errors[:direccion_envio]).to be_present
       expect(d.errors[:contacto_nombre]).to be_present
-      expect(d.errors[:delivery_id]).to be_present
     end
 
-    it 'es válida con todos los campos de envío completos' do
+    it 'NO requiere delivery_id al crear — se asigna después por el admin' do
+      d = nueva_dispensacion(
+        con_envio:       true,
+        direccion_envio: 'Calle 123',
+        contacto_nombre: 'Juan Pérez',
+      )
+      expect(d).to be_valid
+    end
+
+    it 'es válida con todos los campos de envío incluyendo delivery_id' do
       delivery = create(:user, :delivery, club: club)
       d = nueva_dispensacion(
-        con_envio:        true,
-        direccion_envio:  'Calle 123',
-        contacto_nombre:  'Juan Pérez',
-        delivery_id:      delivery.id,
+        con_envio:       true,
+        direccion_envio: 'Calle 123',
+        contacto_nombre: 'Juan Pérez',
+        delivery_id:     delivery.id,
       )
       expect(d).to be_valid
     end

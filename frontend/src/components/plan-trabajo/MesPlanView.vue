@@ -51,7 +51,11 @@ function parseDate(iso) {
 function isoDate(d) { return d.toISOString().slice(0, 10) }
 
 function mesInicial() {
-  const d = parseDate(props.plan.fecha_inicio)
+  const hoy = isoDate(new Date())
+  let iso = props.plan.fecha_inicio
+  if (hoy >= props.plan.fecha_inicio && hoy <= props.plan.fecha_fin) iso = hoy
+  else if (hoy > props.plan.fecha_fin) iso = props.plan.fecha_fin
+  const d = parseDate(iso)
   return { anio: d.getFullYear(), mes: d.getMonth() }
 }
 const mesRef = ref(mesInicial())

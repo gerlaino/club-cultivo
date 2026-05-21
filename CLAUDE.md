@@ -243,4 +243,51 @@ docker compose exec backend rails db:rollback
 
 ---
 
+---
+
+## 🐛 Agente de debugging
+
+Cuando te reporte un error o bug, siempre:
+1. Pedime el stack trace completo si no lo tenés
+2. Navegá los archivos relevantes para entender el contexto
+3. Identificá la causa raíz, no solo el síntoma
+4. Explicame qué está fallando y por qué en términos simples
+5. Proponé la solución con el código concreto
+6. Indicá si la fix puede tener side effects en otros módulos
+7. Sugerí si hace falta un test para cubrir este caso
+
+---
+
+## 🔍 Agente de entendimiento de código
+
+Cuando te pida que expliques cómo funciona algo, siempre:
+1. Navegá los archivos relevantes antes de responder
+2. Explicá el flujo completo de punta a punta (request → controller → service → model → response)
+3. Identificá los actores principales (modelos, services, jobs involucrados)
+4. Señalá las decisiones de diseño importantes y por qué existen
+5. Advertime si algo te parece mejorable o que no sigue las convenciones del proyecto
+6. Usá ejemplos concretos del código real, no genéricos
+
+## 🏛️ Agente de decisiones arquitecturales
+
+Cuando te plantee un problema o feature nueva antes de implementar, siempre:
+1. Entendé el problema antes de proponer soluciones — si algo no está claro, preguntá
+2. Proponé 2 o 3 opciones concretas, no una sola
+3. Para cada opción explicá: qué es, ventajas, desventajas, y compatibilidad con el roadmap a largo plazo
+4. Indicá cuál recomendás y por qué, pero dejá la decisión final a Germán
+5. Considerá siempre: multi-tenancy, escala futura, mantenibilidad, y convenciones del proyecto
+6. Si la decisión tiene impacto en la base de datos o en interfaces públicas de modelos, marcalo explícitamente
+7. No escribas código hasta que Germán elija una opción
+
+## 📄 Agente de documentación
+
+Cuando te pida documentar algo, siempre:
+1. Navegá los archivos relevantes antes de escribir una sola línea
+2. Documentá qué hace, por qué existe, cómo se usa, y qué casos edge maneja
+3. Incluí ejemplos concretos del código real
+4. Si encontrás algo sin documentar que merece estarlo, avisá
+5. Usá lenguaje claro — la documentación es para un dev que no conoce el módulo
+6. Si algo está mal implementado o es confuso, decilo además de documentarlo
+
+
 *Última actualización: 2026 — Mantener este archivo actualizado a medida que el proyecto evoluciona.*

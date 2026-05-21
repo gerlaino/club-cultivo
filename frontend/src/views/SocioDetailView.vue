@@ -7,135 +7,66 @@ import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import { useConfirm } from '../composables/useConfirm.js'
-import { useToast } from '../composables/useToast.js'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, updatePaciente, getCuentaCorriente, setLimiteCC, toggleGramosCC, setLimiteGCC, cargarGCC, enviarMailPaciente, getMailsPaciente } from '../lib/api.js'
+import { getPacienteTimeline } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, Plus, Trash2, AlertTriangle, CheckCircle, Info, X, Save, Wallet,
   CreditCard, Mail
 } from 'lucide-vue-next'
+import { useSocioEditar, REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
+import { useSocioHistoriaClinica }           from '../composables/useSocioHistoriaClinica.js'
+import { useSocioCorreo, MAIL_TEMPLATES }    from '../composables/useSocioCorreo.js'
+import { useSocioCuentaCorriente }           from '../composables/useSocioCuentaCorriente.js'
 
 const route  = useRoute()
 const store  = usePacientesStore()
 const auth   = useAuthStore()
 const { confirm } = useConfirm()
-const { success: toastOk, error: toastErr } = useToast()
-
-const REPROCANN_ESTADOS = [
-  { value: 'sin_registro', label: 'Sin registro',         color: '#94a3b8', bg: '#f8fafc' },
-  { value: 'pendiente',    label: 'Pendiente aprobación', color: '#b45309', bg: '#fffbeb' },
-  { value: 'activo',       label: 'Activo',               color: '#15803d', bg: '#f0fdf4' },
-  { value: 'inactivo',     label: 'Inactivo',             color: '#dc2626', bg: '#fef2f2' },
-]
-const reprocannEstadoMeta = computed(() =>
-  REPROCANN_ESTADOS.find(e => e.value === (s.value?.reprocann_estado || 'sin_registro'))
-)
 
 const socioId   = Number(route.params.id)
 const loading   = ref(true)
 const error     = ref(null)
 const activeTab = ref('info')
 
-const canEdit      = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
-const canClinica   = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
-const s            = computed(() => store.current)
+const canEdit    = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
+const canClinica = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
+const s          = computed(() => store.current)
 
-// ── Inline edit modal ────────────────────────────────────────────────────────
-const editOpen  = ref(false)
-const editForm  = ref({})
-const editSaving = ref(false)
-const editError  = ref(null)
+const reprocannEstadoMeta = computed(() =>
+  REPROCANN_ESTADOS.find(e => e.value === (s.value?.reprocann_estado || 'sin_registro'))
+)
 
-function openEdit() {
-  editForm.value = {
-    nombre:               s.value?.nombre || '',
-    apellido:             s.value?.apellido || '',
-    dni:                  s.value?.dni || '',
-    fecha_nacimiento:     s.value?.fecha_nacimiento || '',
-    email:                s.value?.email || '',
-    telefono:             s.value?.telefono || '',
-    reprocann_numero:     s.value?.reprocann_numero || '',
-    reprocann_vencimiento: s.value?.reprocann_vencimiento || '',
-    reprocann_estado:              s.value?.reprocann_estado || 'sin_registro',
-    es_paciente:                   s.value?.es_paciente ?? true,
-    limite_dispensacion_mensual_g: s.value?.limite_dispensacion_mensual_g ?? '',
-  }
-  editError.value = null
-  editOpen.value  = true
-}
+// ── Composables ───────────────────────────────────────────────────────────────
+const {
+  editOpen, editForm, editSaving, editError,
+  openEdit, saveEdit,
+} = useSocioEditar(socioId)
 
-async function saveEdit() {
-  editSaving.value = true
-  editError.value  = null
-  try {
-    await updatePaciente(socioId, editForm.value)
-    await store.fetchOne(socioId)
-    editOpen.value = false
-    toastOk('Paciente actualizado')
-  } catch (e) {
-    const msgs = e?.response?.data?.errors
-    editError.value = Array.isArray(msgs) ? msgs.join(', ') : 'Error al guardar'
-  } finally {
-    editSaving.value = false
-  }
-}
+const {
+  notasClinicas, notasClinicasSaved, notasClinicasSaving,
+  hcForm, saveNotasClinicas,
+} = useSocioHistoriaClinica(socioId, { s })
 
-// ── Historia clínica ──────────────────────────────────────────────────────────
-const notasClinicas       = ref('')
-const notasClinicasSaved  = ref(true)
-const notasClinicasSaving = ref(false)
+const {
+  mailHistory, mailLoading, mailSending, mailPreview, mailTemplate, mailForm,
+  applyMailTemplate, loadMailHistory, submitMail,
+} = useSocioCorreo(socioId, { s })
 
-const hcForm = ref({
-  motivo_consulta:         '',
-  anamnesis:               '',
-  antecedentes_personales: '',
-  antecedentes_familiares: '',
-  diagnostico_principal:   '',
-  diagnostico_secundario:  '',
-  evolucion_clinica:       '',
-  alergias:                '',
-  medicacion_habitual:     '',
-  grupo_sanguineo:         '',
-})
+const {
+  cc, loadingCC,
+  limiteEditOpen, limiteEditVal, savingLimite,
+  togglingGramos,
+  limiteGOpen, limiteGVal, savingLimiteG,
+  cargarGOpen, cargarGVal, savingCargarG,
+  fmtARS, ccDeudaActual, ccMargen, ccPorcentaje,
+  openLimiteEdit, loadCC, saveLimite, toggleGramos, saveLimiteG, doCargarG,
+  onDispensacionCreada: _onDispCC,
+} = useSocioCuentaCorriente(socioId)
 
-watch(() => s.value, (val) => {
-  if (!val) return
-  notasClinicas.value = val.notas_clinicas || ''
-  hcForm.value = {
-    motivo_consulta:         val.motivo_consulta || '',
-    anamnesis:               val.anamnesis || '',
-    antecedentes_personales: val.antecedentes_personales || '',
-    antecedentes_familiares: val.antecedentes_familiares || '',
-    diagnostico_principal:   val.diagnostico_principal || '',
-    diagnostico_secundario:  val.diagnostico_secundario || '',
-    evolucion_clinica:       val.evolucion_clinica || '',
-    alergias:                val.alergias || '',
-    medicacion_habitual:     val.medicacion_habitual || '',
-    grupo_sanguineo:         val.grupo_sanguineo || '',
-  }
-}, { immediate: true })
-
-watch(notasClinicas, () => { notasClinicasSaved.value = false })
-watch(hcForm, () => { notasClinicasSaved.value = false }, { deep: true })
-
-async function saveNotasClinicas() {
-  notasClinicasSaving.value = true
-  try {
-    await updatePaciente(socioId, {
-      notas_clinicas: notasClinicas.value,
-      ...hcForm.value,
-    })
-    notasClinicasSaved.value = true
-    toastOk('Historia clínica guardada')
-  } catch {
-    toastErr('Error al guardar historia clínica')
-  } finally {
-    notasClinicasSaving.value = false
-  }
-}
+function onDispensacionCreada() { _onDispCC(activeTab.value) }
 
 // ── Notas rápidas ─────────────────────────────────────────────────────────────
 const notaTexto = ref('')
@@ -166,92 +97,6 @@ async function loadTimeline() {
     timeline.value = []
   } finally {
     timelineLoading.value = false
-  }
-}
-
-// ── Correo ────────────────────────────────────────────────────────────────────
-const MAIL_TEMPLATES = [
-  {
-    key: 'bienvenida',
-    label: 'Bienvenida',
-    icon: '🌿',
-    asunto: (p, club) => `Bienvenido/a a ${club}`,
-    cuerpo:  (p)       => `Hola ${p.nombre},\n\nTe damos la bienvenida como paciente de nuestro club.\n\nEstamos a tu disposición para cualquier consulta.\n\nSaludos,`,
-  },
-  {
-    key: 'reprocann',
-    label: 'REPROCANN',
-    icon: '📋',
-    asunto: (p)  => `Renovación de REPROCANN — ${p.nombre} ${p.apellido}`,
-    cuerpo:  (p) => {
-      const venc = p.reprocann_vencimiento
-        ? new Date(p.reprocann_vencimiento).toLocaleDateString('es-AR')
-        : 'próximamente'
-      return `Hola ${p.nombre},\n\nTe recordamos que tu habilitación REPROCANN vence el ${venc}.\n\nPor favor comunicate con nosotros para gestionar la renovación antes de esa fecha.\n\nSaludos,`
-    },
-  },
-  {
-    key: 'disponibilidad',
-    label: 'Disponibilidad',
-    icon: '📦',
-    asunto: (p)  => `Aviso de disponibilidad — ${p.nombre} ${p.apellido}`,
-    cuerpo:  (p) => `Hola ${p.nombre},\n\nTe informamos que hay producto disponible para tu retiro.\n\nPodés pasar a retirar en los horarios habituales. Ante cualquier duda no dudes en contactarnos.\n\nSaludos,`,
-  },
-  {
-    key: 'personalizado',
-    label: 'Libre',
-    icon: '✏️',
-    asunto: () => '',
-    cuerpo:  () => '',
-  },
-]
-
-const mailHistory   = ref([])
-const mailLoading   = ref(false)
-const mailSending   = ref(false)
-const mailPreview   = ref(false)
-const mailTemplate  = ref('personalizado')
-const mailForm      = ref({ asunto: '', cuerpo: '' })
-
-function applyMailTemplate(key) {
-  mailTemplate.value = key
-  const tpl = MAIL_TEMPLATES.find(t => t.key === key)
-  if (!tpl || !s.value) return
-  const clubName = s.value.club_nombre || ''
-  mailForm.value.asunto = tpl.asunto(s.value, clubName)
-  mailForm.value.cuerpo = tpl.cuerpo(s.value, clubName)
-}
-
-async function loadMailHistory() {
-  mailLoading.value = true
-  try {
-    const { data } = await getMailsPaciente(socioId)
-    mailHistory.value = data
-  } catch {
-    mailHistory.value = []
-  } finally {
-    mailLoading.value = false
-  }
-}
-
-async function submitMail() {
-  if (!mailForm.value.asunto.trim() || !mailForm.value.cuerpo.trim()) return
-  mailSending.value = true
-  try {
-    const { data } = await enviarMailPaciente(socioId, {
-      tipo:   mailTemplate.value,
-      asunto: mailForm.value.asunto.trim(),
-      cuerpo: mailForm.value.cuerpo.trim(),
-    })
-    mailHistory.value = [data, ...mailHistory.value]
-    mailForm.value = { asunto: '', cuerpo: '' }
-    mailTemplate.value = 'personalizado'
-    mailPreview.value = false
-    toastOk('Mail enviado correctamente')
-  } catch (e) {
-    toastErr(e?.response?.data?.error || 'Error al enviar el mail')
-  } finally {
-    mailSending.value = false
   }
 }
 
@@ -315,105 +160,10 @@ const ALL_TABS = [
 ]
 
 
-// ── Cuenta corriente ──
-const cc              = ref(null)
-const loadingCC       = ref(false)
-const limiteEditOpen  = ref(false)
-const limiteEditVal   = ref(null)
-const savingLimite    = ref(false)
-const togglingGramos  = ref(false)
-const limiteGOpen     = ref(false)
-const limiteGVal      = ref(null)
-const savingLimiteG   = ref(false)
-const cargarGOpen     = ref(false)
-const cargarGVal      = ref(null)
-const savingCargarG   = ref(false)
-
-function openLimiteEdit() {
-  limiteEditVal.value  = cc.value?.limite_credito ?? 0
-  limiteEditOpen.value = true
-}
-
-async function saveLimite() {
-  const nuevo = Number(limiteEditVal.value)
-  if (nuevo < 0) return
-  savingLimite.value = true
-  try {
-    const { data } = await setLimiteCC(socioId, nuevo)
-    cc.value = data
-    limiteEditOpen.value = false
-    store.fetchOne(socioId)
-    toastOk('Límite actualizado')
-  } catch (e) {
-    toastErr(e?.response?.data?.error || 'Error al guardar límite')
-  } finally {
-    savingLimite.value = false
-  }
-}
-
-const fmtARS = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n || 0)
-
-// saldo positivo → pagó de más / a favor; saldo negativo → deuda
-// margen = cuánto puede seguir retirando antes de ser bloqueado
-const ccDeudaActual = computed(() => Math.max(0, -(cc.value?.saldo_disponible ?? 0)))
-const ccMargen      = computed(() => (cc.value?.saldo_disponible ?? 0) + (cc.value?.limite_credito ?? 0))
-const ccPorcentaje  = computed(() => {
-  if (!cc.value?.limite_credito) return 0
-  return Math.min(Math.round(ccDeudaActual.value / cc.value.limite_credito * 100), 100)
-})
-
-async function loadCC() {
-  if (cc.value) return
-  loadingCC.value = true
-  try { const { data } = await getCuentaCorriente(socioId); cc.value = data }
-  catch { toastErr('No se pudo cargar la cuenta corriente') }
-  finally { loadingCC.value = false }
-}
-
-async function onDispensacionCreada() {
-  store.fetchOne(socioId)
-  cc.value = null
-  if (activeTab.value === 'cuenta_corriente') await loadCC()
-}
-
-async function toggleGramos() {
-  togglingGramos.value = true
-  try { const { data } = await toggleGramosCC(socioId); cc.value = data; store.fetchOne(socioId) }
-  catch (e) { toastErr(e?.response?.data?.error || 'Error al cambiar estado') }
-  finally { togglingGramos.value = false }
-}
-
-async function saveLimiteG() {
-  const nuevo = Number(limiteGVal.value)
-  if (nuevo <= 0) return
-  savingLimiteG.value = true
-  try {
-    const { data } = await setLimiteGCC(socioId, nuevo)
-    cc.value = data; limiteGOpen.value = false
-    toastOk('Límite en gramos actualizado')
-  } catch (e) { toastErr(e?.response?.data?.error || 'Error al guardar') }
-  finally { savingLimiteG.value = false }
-}
-
-async function doCargarG() {
-  const gramos = Number(cargarGVal.value)
-  if (gramos <= 0) return
-  savingCargarG.value = true
-  try {
-    const { data } = await cargarGCC(socioId, { gramos })
-    cc.value = data; cargarGOpen.value = false; cargarGVal.value = null
-    store.fetchOne(socioId)
-    toastOk(`${gramos}g cargados`)
-  } catch (e) { toastErr(e?.response?.data?.error || 'Error al cargar') }
-  finally { savingCargarG.value = false }
-}
-
-
 const TABS = computed(() => {
   const role = auth.user?.role
   return ALL_TABS.filter(t => !t.roles || t.roles.includes(role))
 })
-
 
 function escapeHandler(e) {
   if (e.key !== 'Escape') return

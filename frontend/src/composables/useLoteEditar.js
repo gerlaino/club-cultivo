@@ -1,0 +1,67 @@
+import { ref } from 'vue'
+import { useToast } from './useToast.js'
+import { useLotesStore } from '../stores/lotes'
+import { updateLote, listGeneticas } from '../lib/api'
+
+export function useLoteEditar(loteId) {
+  const toast = useToast()
+  const lotes = useLotesStore()
+
+  const geneticas      = ref([])
+  const showEditLote   = ref(false)
+  const editLoteForm   = ref({})
+  const editLoteError  = ref(null)
+  const savingEditLote = ref(false)
+
+  async function cargarGeneticas() {
+    try {
+      const { data } = await listGeneticas({ activa: true, disponible: true })
+      geneticas.value = data || []
+    } catch {}
+  }
+
+  function openEditLote() {
+    const l = lotes.current
+    editLoteForm.value = {
+      codigo:            l.codigo            || '',
+      start_date:        l.start_date        || '',
+      genetica_id:       l.genetica?.id      || '',
+      grow_type:         l.grow_type         || '',
+      light_type:        l.light_type        || '',
+      tiene_semanas:     !!l.semanas_floracion,
+      semanas_floracion: l.semanas_floracion ?? '',
+      tamanio_maceta:    l.tamanio_maceta    ?? '',
+      notes:             l.notes             || '',
+    }
+    editLoteError.value = null
+    showEditLote.value  = true
+  }
+
+  async function saveEditLote() {
+    savingEditLote.value = true
+    editLoteError.value  = null
+    try {
+      const { tiene_semanas, codigo, ...rest } = editLoteForm.value
+      const payload = {
+        ...rest,
+        semanas_floracion: tiene_semanas ? (Number(rest.semanas_floracion) || null) : null,
+        tamanio_maceta:    rest.tamanio_maceta || null,
+      }
+      if (!payload.genetica_id) delete payload.genetica_id
+      if (!payload.light_type)  delete payload.light_type
+      await updateLote(loteId, payload)
+      await lotes.fetchOne(loteId)
+      showEditLote.value = false
+      toast.success('Lote actualizado')
+    } catch (e) {
+      editLoteError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al guardar'
+    } finally {
+      savingEditLote.value = false
+    }
+  }
+
+  return {
+    geneticas, showEditLote, editLoteForm, editLoteError, savingEditLote,
+    cargarGeneticas, openEditLote, saveEditLote,
+  }
+}

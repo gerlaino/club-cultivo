@@ -83,7 +83,13 @@ function isoLunes(from) {
   return isoDate(d)
 }
 
-const semanaStart = ref(isoLunes(props.plan.fecha_inicio))
+function initialSemana() {
+  const hoy = isoDate(new Date())
+  if (hoy >= props.plan.fecha_inicio && hoy <= props.plan.fecha_fin) return isoLunes(hoy)
+  if (hoy > props.plan.fecha_fin) return isoLunes(props.plan.fecha_fin)
+  return isoLunes(props.plan.fecha_inicio)
+}
+const semanaStart = ref(initialSemana())
 
 const weekDays = computed(() => {
   const hoy = isoDate(new Date())

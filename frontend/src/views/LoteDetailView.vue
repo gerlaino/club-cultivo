@@ -1,18 +1,12 @@
 <script setup>
-import { onMounted, onUnmounted, ref, computed, watch } from "vue"
-import { logger } from '../utils/logger.js'
+import { onMounted, onUnmounted, ref, computed } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { createPlant, updatePlant,
-  getRegistrosAmbientales, createRegistroAmbiental,
-  getLoteEventos, createLoteEvento,
-  getLoteFotos, uploadFotoLote, deleteFotoLote,
-  transicionarLote, avanzarFaseLote, cerrarCurado, getLoteTimeline,
-  listSedes, getSedeStocks, deleteLote,
-  getCostoLote, createCostoLote, updateCostoLote,
-  updateLote, listGeneticas, analizarLote, getHistorialAnalisis } from "../lib/api"
+  getRegistrosAmbientales, getLoteEventos,
+  getLoteTimeline, listSedes, deleteLote, updateLote } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
@@ -28,6 +22,12 @@ import { ArrowRight } from 'lucide-vue-next'
 import DsBanner from '../design-system/components/Banner.vue'
 import IniciarManicuraModal from '../components/lotes/IniciarManicuraModal.vue'
 import CompletarManicuraModal from '../components/lotes/CompletarManicuraModal.vue'
+import { useLoteAnalisisIA }       from '../composables/useLoteAnalisisIA.js'
+import { useLoteCostos }           from '../composables/useLoteCostos.js'
+import { useLoteRegistroAmbiental } from '../composables/useLoteRegistroAmbiental.js'
+import { useLoteFotos }            from '../composables/useLoteFotos.js'
+import { useLoteEditar }           from '../composables/useLoteEditar.js'
+import { useLoteTransiciones }     from '../composables/useLoteTransiciones.js'
 
 const route    = useRoute()
 const router   = useRouter()
@@ -36,6 +36,14 @@ const plants   = usePlantsStore()
 const auth     = useAuthStore()
 const toast    = useToast()
 const { confirm } = useConfirm()
+
+const id       = Number(route.params.id)
+const error    = ref(null)
+const loading  = computed(() => lotes.loading)
+const lote     = computed(() => lotes.current)
+const canEdit  = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.role))
+const canAdmin = computed(() => ['admin', 'supervisor'].includes(auth.role))
+const isCultivador = computed(() => auth.role === 'cultivador')
 
 const deletingLote = ref(false)
 async function eliminarLote() {
@@ -60,155 +68,66 @@ async function eliminarLote() {
   }
 }
 
-const id            = Number(route.params.id)
-const error         = ref(null)
-const loading       = computed(() => lotes.loading)
-const lote          = computed(() => lotes.current)
-const canEdit       = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.role))
-const canAdmin      = computed(() => ['admin', 'supervisor'].includes(auth.role))
+// ── Sedes ─────────────────────────────────────────────────
+const sedes = ref([])
 
-// ── Análisis IA ──
-const analizandoIA       = ref(false)
-const historialAnalisis  = ref([])
-const cooldownHasta      = ref(null)
-const expandedAnalisis   = ref(null)
+// ── Historial ─────────────────────────────────────────────
+const eventos        = ref([])
+const loadingEventos = ref(false)
 
-const puedoAnalizar = computed(() =>
-  !cooldownHasta.value || new Date() > new Date(cooldownHasta.value)
-)
-
-const tiempoRestante = computed(() => {
-  if (!cooldownHasta.value) return ''
-  const mins = Math.round((new Date(cooldownHasta.value) - new Date()) / 60000)
-  if (mins <= 0) return ''
-  return mins < 60 ? `en ${mins} min` : `en ${Math.ceil(mins / 60)}h`
-})
-
-function toggleAnalisis(id) {
-  expandedAnalisis.value = expandedAnalisis.value === id ? null : id
-}
-
-async function cargarHistorialAnalisis() {
+async function loadEventos() {
+  loadingEventos.value = true
   try {
-    const { data } = await getHistorialAnalisis(id)
-    historialAnalisis.value = data.analisis || []
-    cooldownHasta.value     = data.cooldown_hasta || null
-    if (historialAnalisis.value.length) {
-      expandedAnalisis.value = historialAnalisis.value[0].id
-    }
-  } catch {}
+    const [evRes, regRes] = await Promise.all([getLoteEventos(id), getRegistrosAmbientales(id)])
+    const evs  = (evRes.data  || []).map(e => ({ ...e, _tipo: 'evento' }))
+    const regs = (regRes.data || []).map(r => ({ ...r, _tipo: 'registro' }))
+    eventos.value = [...evs, ...regs].sort((a, b) => new Date(b.registrado_en) - new Date(a.registrado_en))
+  } catch { eventos.value = [] }
+  finally { loadingEventos.value = false }
 }
 
-async function ejecutarAnalisisIA() {
-  if (analizandoIA.value || !puedoAnalizar.value) return
-  analizandoIA.value = true
-  try {
-    const { data } = await analizarLote(id)
-    cooldownHasta.value = data.cooldown_hasta || null
-    if (!data.cached) {
-      historialAnalisis.value = [data, ...historialAnalisis.value].slice(0, 3)
-      expandedAnalisis.value  = data.id
-    } else {
-      toast.info('Ya existe un análisis reciente. ' + (tiempoRestante.value ? `Próximo disponible ${tiempoRestante.value}.` : ''))
-    }
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'Error al analizar con IA')
-  } finally {
-    analizandoIA.value = false
-  }
-}
-
-function formatearFechaRelativa(ts) {
-  if (!ts) return ''
-  const diff = Date.now() - new Date(ts).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 2)  return 'hace un momento'
-  if (mins < 60) return `hace ${mins} min`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24)  return `hace ${hrs}h`
-  return `hace ${Math.floor(hrs / 24)}d`
-}
-const isCultivador  = computed(() => auth.role === "cultivador")
-
-const costoLote     = ref(null)
-const showCostoForm = ref(false)
-const savingCosto   = ref(false)
-const costoForm     = ref({ costo_insumos: 0, costo_energia: 0, costo_mano_obra: 0, costo_prorrateado: 0, gramos_producidos: null, notas: '' })
-
-const costoTotal = computed(() => {
-  const f = costoForm.value
-  return (Number(f.costo_insumos) || 0) + (Number(f.costo_energia) || 0) + (Number(f.costo_mano_obra) || 0) + (Number(f.costo_prorrateado) || 0)
-})
-const costoPorGramo = computed(() => {
-  const g = Number(costoForm.value.gramos_producidos)
-  return g > 0 ? costoTotal.value / g : null
-})
-
-function openCostoForm() {
-  if (costoLote.value) {
-    costoForm.value = {
-      costo_insumos:    costoLote.value.costo_insumos    || 0,
-      costo_energia:    costoLote.value.costo_energia     || 0,
-      costo_mano_obra:  costoLote.value.costo_mano_obra   || 0,
-      costo_prorrateado: costoLote.value.costo_prorrateado || 0,
-      gramos_producidos: costoLote.value.gramos_producidos || null,
-      notas: costoLote.value.notas || '',
-    }
-  } else {
-    costoForm.value = { costo_insumos: 0, costo_energia: 0, costo_mano_obra: 0, costo_prorrateado: 0, gramos_producidos: null, notas: '' }
-  }
-  showCostoForm.value = true
-}
-
-async function saveCosto() {
-  savingCosto.value = true
-  try {
-    const payload = {
-      costo_insumos:    Number(costoForm.value.costo_insumos)    || 0,
-      costo_energia:    Number(costoForm.value.costo_energia)     || 0,
-      costo_mano_obra:  Number(costoForm.value.costo_mano_obra)   || 0,
-      costo_prorrateado: Number(costoForm.value.costo_prorrateado) || 0,
-      gramos_producidos: costoForm.value.gramos_producidos ? Number(costoForm.value.gramos_producidos) : null,
-      notas: costoForm.value.notas,
-    }
-    const fn = costoLote.value ? updateCostoLote : createCostoLote
-    const { data } = await fn(id, payload)
-    costoLote.value = data
-    showCostoForm.value = false
-    toast.success('Costos guardados')
-  } catch (e) {
-    toast.error('Error al guardar costos')
-  } finally {
-    savingCosto.value = false
-  }
-}
-
+// ── Section toggles ────────────────────────────────────────
 const tareasExpanded    = ref(true)
 const plantasExpanded   = ref(true)
 const historialExpanded = ref(true)
 const graficosExpanded  = ref(true)
 const graficosKey       = ref(0)
-const fotosExpanded     = ref(false)
-const fotos             = ref([])
-const uploadingFoto     = ref(false)
-const fotoInput         = ref(null)
-const lightboxOpen      = ref(false)
-const lightboxIndex     = ref(0)
-const lightboxImages    = computed(() => fotos.value.map(f => ({ src: f.url, alt: f.filename })))
-function openLightbox(i) { lightboxIndex.value = i; lightboxOpen.value = true }
 
-const showFotoUploadModal   = ref(false)
-const fotoUploadFile        = ref(null)
-const fotoUploadDescripcion = ref('')
-const fotoUploadPreview     = ref(null)
+// ── Timeline ──────────────────────────────────────────────
+const timelineExpanded = ref(false)
+const timeline         = ref(null)
+const loadingTimeline  = ref(false)
+
+function toggleTimeline() {
+  timelineExpanded.value = !timelineExpanded.value
+  if (timelineExpanded.value && !timeline.value) loadTimeline()
+}
+
+async function loadTimeline() {
+  loadingTimeline.value = true
+  try { const { data } = await getLoteTimeline(id); timeline.value = data }
+  catch { timeline.value = null }
+  finally { loadingTimeline.value = false }
+}
 
 // ── Plantas ────────────────────────────────────────────────
-const plantasPage        = ref(1)
-const plantasPerPage     = ref(10)
-const plantList          = computed(() => plants.byLote(id))
-const plantasMostradas   = computed(() => {
+const plantasPage      = ref(1)
+const plantasPerPage   = ref(10)
+const plantList        = computed(() => plants.byLote(id))
+const plantasMostradas = computed(() => {
   const start = (plantasPage.value - 1) * plantasPerPage.value
   return plantList.value.slice(start, start + plantasPerPage.value)
+})
+
+const plantasEnFloracion = computed(() => plantList.value.filter(p => p.state === 'floracion'))
+const todasCosechadas    = computed(() => plantList.value.length > 0 && plantasEnFloracion.value.length === 0)
+const pasadasUsadas      = computed(() => {
+  const pasadas = plantList.value.map(p => p.pasada_cosecha).filter(Boolean)
+  return [...new Set(pasadas)]
+})
+const siguientePasada = computed(() => {
+  const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+  return letras.find(l => !pasadasUsadas.value.includes(l)) || 'Z'
 })
 
 // ── Bulk QR download ───────────────────────────────────────
@@ -247,10 +166,10 @@ async function descargarTodosQRs() {
 }
 
 // ── Agregar planta al lote ─────────────────────────────────
-const showAddPlanta    = ref(false)
-const savingPlanta     = ref(false)
-const plantaError      = ref(null)
-const plantaForm       = ref({ state: 'vegetativo', origen: 'semilla' })
+const showAddPlanta = ref(false)
+const savingPlanta  = ref(false)
+const plantaError   = ref(null)
+const plantaForm    = ref({ state: 'vegetativo', origen: 'semilla' })
 
 const STATE_MAP = {
   semilla: 'germinacion', vegetativo: 'vegetativo',
@@ -269,11 +188,8 @@ const contextoAsistente = computed(() => lote.value ? {
 } : null)
 
 function openAddPlanta() {
-  plantaForm.value = {
-    state:  STATE_MAP[lote.value?.estado] || 'vegetativo',
-    origen: 'semilla',
-  }
-  plantaError.value  = null
+  plantaForm.value  = { state: STATE_MAP[lote.value?.estado] || 'vegetativo', origen: 'semilla' }
+  plantaError.value = null
   showAddPlanta.value = true
 }
 
@@ -285,10 +201,10 @@ async function guardarPlanta() {
     const count  = plantList.value.length + 1
     const nombre = `${lote.value.codigo}-P${String(count).padStart(3, '0')}`
     const { data } = await createPlant({
-      lote_id:    lote.value.id,
+      lote_id:     lote.value.id,
       nombre,
-      state:      plantaForm.value.state,
-      origen:     plantaForm.value.origen,
+      state:       plantaForm.value.state,
+      origen:      plantaForm.value.origen,
       genetica_id: lote.value.genetica_id || undefined,
     })
     plants.addToLote(id, data)
@@ -300,484 +216,12 @@ async function guardarPlanta() {
   }
 }
 
-// ── Registros del lote ────────────────────────────────────
-const showRegistroModal = ref(false)
-const savingRegistro    = ref(false)
-const registroError     = ref(null)
-const csvFile           = ref(null)
-const csvInput          = ref(null)
-
-const TAREAS_LOTE = [
-  { key: 'riego',           label: 'Riego',           emoji: '💧' },
-  { key: 'nutricion',       label: 'Nutrición',       emoji: '🧪' },
-  { key: 'poda',            label: 'Poda',            emoji: '✂️'  },
-  { key: 'defoliacion',     label: 'Defoliación',     emoji: '🍃' },
-  { key: 'scrog_lst',       label: 'SCROG/LST',       emoji: '🪢' },
-  { key: 'revision_plagas', label: 'Revisión plagas', emoji: '🔍' },
-  { key: 'limpieza_sala',   label: 'Limpieza sala',   emoji: '🧹' },
-  { key: 'ajuste_luz',      label: 'Ajuste de luz',   emoji: '💡' },
-]
-
-function emptyRegistroForm() {
-  return {
-    temperatura: null, humedad: null, temperatura_sustrato: null, co2: null,
-    ph: null, ec: null, ph_runoff: null, ppfd: null,
-    horas_luz: null, espectro_luz: '',
-    fertilizacion: false, notas_fertilizacion: '',
-    plagas_observadas: 'ninguna', estado_general: 'bueno', observaciones: '',
-    tareas_realizadas: []
-  }
-}
-
-function toggleTarea(key) {
-  const t = registroForm.value.tareas_realizadas
-  const idx = t.indexOf(key)
-  if (idx === -1) t.push(key)
-  else t.splice(idx, 1)
-}
-const registroForm = ref(emptyRegistroForm())
-
-const registroErrors = computed(() => {
-  const e = {}; const f = registroForm.value
-  if (f.temperatura          && (f.temperatura < 0          || f.temperatura > 60))          e.temperatura = '0–60°C'
-  if (f.temperatura_sustrato && (f.temperatura_sustrato < 0 || f.temperatura_sustrato > 60)) e.temperatura_sustrato = '0–60°C'
-  if (f.humedad              && (f.humedad < 0              || f.humedad > 100))              e.humedad = '0–100%'
-  if (f.ph                   && (f.ph < 0                   || f.ph > 14))                   e.ph = '0–14'
-  if (f.ph_runoff            && (f.ph_runoff < 0            || f.ph_runoff > 14))             e.ph_runoff = '0–14'
-  if (f.horas_luz            && (f.horas_luz < 0            || f.horas_luz > 24))             e.horas_luz = '0–24h'
-  return e
-})
-
-async function abrirRegistroModal() {
-  registroForm.value = emptyRegistroForm()
-  registroError.value = null
-  csvFile.value = null
-  showRegistroModal.value = true
-}
-function handleCsvChange(e) { csvFile.value = e.target.files?.[0] || null }
-
-async function guardarRegistro() {
-  if (Object.keys(registroErrors.value).length > 0) return
-  savingRegistro.value = true; registroError.value = null
-  try {
-    let result
-    if (csvFile.value) {
-      const fd = new FormData()
-      Object.entries(registroForm.value).forEach(([k, v]) => {
-        if (k === 'tareas_realizadas') {
-          v.forEach(tarea => fd.append('registro_ambiental[tareas_realizadas][]', tarea))
-        } else if (v !== null && v !== '') {
-          fd.append(`registro_ambiental[${k}]`, v)
-        }
-      })
-      fd.append('archivo_csv', csvFile.value)
-      const { data } = await createRegistroAmbiental(id, fd, true)
-      result = data
-    } else {
-      const { data } = await createRegistroAmbiental(id, registroForm.value)
-      result = data
-    }
-    eventos.value.unshift({ ...result, _tipo: 'registro' })
-    graficosKey.value++
-    showRegistroModal.value = false
-    registroForm.value = emptyRegistroForm()
-    csvFile.value = null
-  } catch (e) {
-    registroError.value = e?.response?.data?.errors?.join(', ') || 'Error al guardar'
-  } finally {
-    savingRegistro.value = false
-  }
-}
-
-function onRegistradoPorVoz() { lotes.fetchOne(id); loadEventos(); graficosKey.value++ }
-
-// ── Historial ─────────────────────────────────────────────
-const eventos        = ref([])
-const loadingEventos = ref(false)
-
-// ── Transición de fase ────────────────────────────────────
-const showTransicionModal = ref(false)
-const savingTransicion    = ref(false)
-const transicionError     = ref(null)
-const transicionForm      = ref({ peso_humedo_g: null, peso_seco_g: null, manicurado: false, notas: '' })
-const transicionSalaId    = ref(null)
-
-// ── Avanzar fase: elegir sala destino ─────────────────────
-const showAvanzarSalaModal = ref(false)
-const avanzarSalaId        = ref(null)
-
-// ── Iniciar Manicura (admin/supervisor, cosecha → secado) ──
-const showIniciarManicuraModal  = ref(false)
-// ── Completar Manicura (admin/supervisor, en_manicura/secado → finalizado) ──
-const showCompletarManicuraModal = ref(false)
-
-// ── Cosecha modal (cultivador floración → cosecha) ────────
-const showCosechaModal  = ref(false)
-const cosechaSalaId     = ref(null)
-const savingCosecha     = ref(false)
-const cosechaError      = ref(null)
-const cosechaForm       = ref({ plantas_cosechadas: null, notas: '' })
-
-// ── Cosecha parcial (multi-select plants) ─────────────────
-const showCosechaPartialModal = ref(false)
-
-const plantasEnFloracion = computed(() => plantList.value.filter(p => p.state === 'floracion'))
-const todasCosechadas    = computed(() => plantList.value.length > 0 && plantasEnFloracion.value.length === 0)
-const pasadasUsadas      = computed(() => {
-  const pasadas = plantList.value.map(p => p.pasada_cosecha).filter(Boolean)
-  return [...new Set(pasadas)]
-})
-const siguientePasada    = computed(() => {
-  const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-  return letras.find(l => !pasadasUsadas.value.includes(l)) || 'Z'
-})
-
-function onCosechadoParcial(loteActualizado) {
-  lotes.current = loteActualizado
-  // Patch inmediato: sincroniza estados desde la respuesta para evitar flash de estado viejo
-  if (loteActualizado.plants?.length) {
-    const stateById = Object.fromEntries(loteActualizado.plants.map(p => [p.id, p.state]))
-    const current = plants.itemsByLote[String(id)] || []
-    plants.itemsByLote[String(id)] = current.map(p =>
-      p.id in stateById ? { ...p, state: stateById[p.id] } : p
-    )
-  }
-  showCosechaPartialModal.value = false
-  toast.success('Cosecha registrada')
-  plants.fetchByLote(id)
-  loadEventos()
-}
-
-// ── Cerrar curado ─────────────────────────────────────────
-const showCerrarCuradoModal = ref(false)
-const savingCurado          = ref(false)
-const curadoError           = ref(null)
-const curadoForm            = ref({ peso_curado_g: null, flor_seca: null, descarte: null, sede_destino_id: null, costo_unitario_ars: null, precio_sugerido_ars: null })
-
-// ── Timeline ──────────────────────────────────────────────
-const timelineExpanded = ref(false)
-const timeline         = ref(null)
-const loadingTimeline  = ref(false)
-
-// ── Sedes ─────────────────────────────────────────────────
-const sedes = ref([])
-
-async function loadEventos() {
-  loadingEventos.value = true
-  try {
-    const [evRes, regRes] = await Promise.all([getLoteEventos(id), getRegistrosAmbientales(id)])
-    const evs  = (evRes.data  || []).map(e => ({ ...e, _tipo: 'evento' }))
-    const regs = (regRes.data || []).map(r => ({ ...r, _tipo: 'registro' }))
-    eventos.value = [...evs, ...regs].sort((a, b) => new Date(b.registrado_en) - new Date(a.registrado_en))
-  } catch { eventos.value = [] }
-  finally { loadingEventos.value = false }
-}
-
-async function loadFotos() {
-  try { const { data } = await getLoteFotos(id); fotos.value = data || [] }
-  catch { fotos.value = [] }
-}
-function handleFotoSelect(e) {
-  const file = e.target.files?.[0]
-  if (!file) return
-  fotoUploadFile.value = file
-  fotoUploadDescripcion.value = ''
-  fotoUploadPreview.value = URL.createObjectURL(file)
-  showFotoUploadModal.value = true
-  if (fotoInput.value) fotoInput.value.value = ''
-}
-async function confirmarSubidaFoto() {
-  if (!fotoUploadFile.value) return
-  uploadingFoto.value = true
-  try {
-    const fd = new FormData()
-    fd.append('foto', fotoUploadFile.value)
-    if (fotoUploadDescripcion.value.trim()) fd.append('descripcion', fotoUploadDescripcion.value.trim())
-    const { data } = await uploadFotoLote(id, fd)
-    fotos.value.unshift(data)
-    showFotoUploadModal.value = false
-    fotoUploadFile.value = null
-    fotoUploadPreview.value = null
-    fotoUploadDescripcion.value = ''
-  } catch (err) { logger.error(err); toast.error('Error al subir la foto') }
-  finally { uploadingFoto.value = false }
-}
-function cancelarSubidaFoto() {
-  showFotoUploadModal.value = false
-  fotoUploadFile.value = null
-  fotoUploadPreview.value = null
-  fotoUploadDescripcion.value = ''
-}
-async function eliminarFoto(foto) {
-  const ok = await confirm({ title: 'Eliminar foto', message: '¿Seguro que querés eliminar esta foto? No se puede deshacer.', confirmText: 'Eliminar', variant: 'danger' })
-  if (!ok) return
-  try {
-    await deleteFotoLote(id, foto.id)
-    fotos.value = fotos.value.filter(f => f.id !== foto.id)
-    toast.success('Foto eliminada')
-  } catch { toast.error('Error al eliminar la foto') }
-}
-function toggleFotos() {
-  fotosExpanded.value = !fotosExpanded.value
-  if (fotosExpanded.value && fotos.value.length === 0) loadFotos()
-}
-
-function openTransicionModal() {
-  transicionForm.value = { peso_humedo_g: null, peso_seco_g: null, manicurado: false, notas: '' }
-  transicionError.value = null
-  transicionSalaId.value = lote.value?.sala_id ?? null
-  showTransicionModal.value = true
-}
-
-const transicionandoRapido = ref(false)
-
-async function handleAvanzarFase() {
-  if (lote.value?.proxima_fase_posible === 'cosecha') {
-    // Race condition: lotes.fetchOne completes before plants.fetchByLote,
-    // so plantList can be empty even when the lote has registered plants.
-    if (!plants.itemsByLote[String(id)]) {
-      try { await plants.fetchByLote(id) } catch {}
-    }
-    if (plantList.value.length > 0) {
-      showCosechaPartialModal.value = true
-    } else {
-      cosechaForm.value = { plantas_cosechadas: lote.value.plants_count || null, notas: '' }
-      cosechaError.value = null
-      cosechaSalaId.value = lote.value?.sala_id ?? null
-      showCosechaModal.value = true
-    }
-  } else if (lote.value?.proxima_fase_posible === 'secado' && canAdmin.value) {
-    showIniciarManicuraModal.value = true
-  } else if (isCultivador.value) {
-    avanzarSalaId.value = lote.value?.sala_id ?? null
-    showAvanzarSalaModal.value = true
-  } else {
-    openTransicionModal()
-  }
-}
-
-async function ejecutarCosecha() {
-  if (!cosechaForm.value.plantas_cosechadas) return
-  savingCosecha.value = true; cosechaError.value = null
-  try {
-    const { data } = await transicionarLote(lote.value.id, {
-      nueva_fase: 'cosecha',
-      sala_id: cosechaSalaId.value || undefined,
-      pesada: {
-        plantas_cosechadas: cosechaForm.value.plantas_cosechadas,
-        notas: cosechaForm.value.notas || undefined,
-      }
-    })
-    lotes.current = data
-    showCosechaModal.value = false
-    toast.success('Cosecha registrada')
-    await Promise.all([loadEventos(), plants.fetchByLote(id)])
-  } catch (e) {
-    cosechaError.value = e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'Error al registrar cosecha'
-  } finally {
-    savingCosecha.value = false
-  }
-}
-
-async function avanzarFaseRapido(salaId = null) {
-  transicionandoRapido.value = true
-  showAvanzarSalaModal.value = false
-  try {
-    const payload = salaId ? { sala_id: salaId } : {}
-    const { data } = await avanzarFaseLote(lote.value.id, payload)
-    lotes.current = data
-    toast.success(`Lote avanzado a ${capitalizarFase(data.estado)}`)
-    await Promise.all([loadEventos(), plants.fetchByLote(id)])
-  } catch (e) {
-    const msg = e?.response?.data?.error || 'Error al avanzar el lote'
-    if (e?.response?.status === 422) toast.warning(msg)
-    else toast.error(msg)
-  } finally {
-    transicionandoRapido.value = false
-  }
-}
-
-async function ejecutarTransicion() {
-  const faseSig = lote.value?.proxima_fase_posible
-  if (!faseSig) return
-  savingTransicion.value = true; transicionError.value = null
-  try {
-    const pesada = {}
-    if (faseSig === 'secado') {
-      pesada.peso_humedo_g = transicionForm.value.peso_humedo_g
-      pesada.manicurado    = transicionForm.value.manicurado
-    }
-    if (faseSig === 'curado') pesada.peso_seco_g = transicionForm.value.peso_seco_g
-    if (transicionForm.value.notas) pesada.notas = transicionForm.value.notas
-    const { data } = await transicionarLote(id, { nueva_fase: faseSig, pesada, sala_id: transicionSalaId.value || undefined })
-    lotes.current = data
-    showTransicionModal.value = false
-    toast.success(`Lote avanzado a ${em(faseSig).label}`)
-    await Promise.all([loadEventos(), plants.fetchByLote(id)])
-  } catch (e) {
-    transicionError.value = e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'Error al transicionar'
-  } finally { savingTransicion.value = false }
-}
-
-async function onManicuraIniciada(data) {
-  lotes.current = data
-  toast.success(`Lote ${data.codigo} — manicura iniciada`)
-  await Promise.all([loadEventos(), plants.fetchByLote(id)])
-}
-
-async function onManicuraCompletada(data) {
-  lotes.current = data
-  toast.success(`Lote ${data.codigo} — manicura completada y stock generado`)
-  await loadEventos()
-}
-
-async function openCerrarCuradoModal() {
-  const sedeId = sedes.value[0]?.id || null
-  curadoForm.value = { peso_curado_g: pesadaUltimaCurado.value?.peso_curado_g || null, flor_seca: null, descarte: null, sede_destino_id: sedeId, costo_unitario_ars: null, precio_sugerido_ars: null }
-  curadoError.value = null
-  showCerrarCuradoModal.value = true
-  if (sedeId) {
-    try {
-      const { data } = await getSedeStocks(sedeId, { canal: 'regulatorio' })
-      const stocks = (data || []).filter(s => s.forma_producto === 'flor_seca' && s.precio_sugerido_ars != null)
-      if (stocks.length) {
-        const ultimo = stocks.reduce((a, b) => (b.id > a.id ? b : a))
-        curadoForm.value.precio_sugerido_ars = parseFloat(ultimo.precio_sugerido_ars)
-      }
-    } catch { /* silencioso — no romper el modal */ }
-  }
-}
-
-async function ejecutarCerrarCurado() {
-  savingCurado.value = true; curadoError.value = null
-  try {
-    const { data } = await cerrarCurado(id, {
-      peso_curado_g: curadoForm.value.peso_curado_g,
-      splitter: { flor_seca: curadoForm.value.flor_seca, descarte: curadoForm.value.descarte },
-      sede_destino_id: curadoForm.value.sede_destino_id,
-      costo_unitario_ars: curadoForm.value.costo_unitario_ars,
-      precio_sugerido_ars: curadoForm.value.precio_sugerido_ars,
-    })
-    lotes.current = data.lote
-    showCerrarCuradoModal.value = false
-    toast.success('Curado cerrado. Stock generado exitosamente.')
-    await loadEventos()
-  } catch (e) {
-    curadoError.value = e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'Error al cerrar curado'
-  } finally { savingCurado.value = false }
-}
-
-function toggleTimeline() {
-  timelineExpanded.value = !timelineExpanded.value
-  if (timelineExpanded.value && !timeline.value) loadTimeline()
-}
-
-async function loadTimeline() {
-  loadingTimeline.value = true
-  try { const { data } = await getLoteTimeline(id); timeline.value = data }
-  catch { timeline.value = null }
-  finally { loadingTimeline.value = false }
-}
-
 async function toggleEsSeleccion(plant) {
   const original = plant.es_seleccion
   plant.es_seleccion = !original
   try { await updatePlant(plant.id, { es_seleccion: !original }) }
   catch { plant.es_seleccion = original; toast.error('Error al actualizar selección') }
 }
-
-// ── Helpers ────────────────────────────────────────────────
-const CICLO = ["vegetativo", "floracion", "cosecha", "secado", "curado"]
-const ESTADO_META = {
-  semilla:           { label: "Semilla/Esqueje",   color: "#64748b", bg: "#f1f5f9", emoji: "🌱" },
-  vegetativo:        { label: "Vegetativo",         color: "#16a34a", bg: "#dcfce7", emoji: "🍃" },
-  floracion:         { label: "Floración",          color: "#d97706", bg: "#fef3c7", emoji: "🌸" },
-  cosecha:           { label: "Cosecha",            color: "#059669", bg: "#d1fae5", emoji: "🌿" },
-  secado:            { label: "Manicura",            color: "#78350f", bg: "#fef3c7", emoji: "✂️" },
-  manicura_pendiente:{ label: "Manicura pendiente", color: "#7c3aed", bg: "#ede9fe", emoji: "✂️" },
-  curado:            { label: "Curado",             color: "#2563eb", bg: "#dbeafe", emoji: "🫙" },
-  finalizado:        { label: "Finalizado",         color: "#1b5e20", bg: "#dcfce7", emoji: "✅" },
-}
-const PLANT_STATE_META = {
-  semilla:    { label: "Semilla",    color: "#64748b", emoji: "🌰" },
-  germinacion:{ label: "Germinación",color: "#16a34a", emoji: "🌱" },
-  esqueje:    { label: "Esqueje",    color: "#0891b2", emoji: "🌿" },
-  vegetativo: { label: "Vegetativo", color: "#16a34a", emoji: "🍃" },
-  floracion:  { label: "Floración",  color: "#d97706", emoji: "🌸" },
-  cosechado:  { label: "Cosechada",  color: "#2563eb", emoji: "✅" },
-  descartada: { label: "Descartada", color: "#dc2626", emoji: "❌" },
-}
-const ESTADO_SALUD_META = {
-  excelente: { color: "#16a34a", emoji: "🟢" },
-  bueno:     { color: "#65a30d", emoji: "🟡" },
-  regular:   { color: "#d97706", emoji: "🟠" },
-  malo:      { color: "#dc2626", emoji: "🔴" },
-  critico:   { color: "#991b1b", emoji: "🚨" },
-}
-const PLAGAS_META = {
-  ninguna:  { color: "#16a34a", emoji: "✅" },
-  leve:     { color: "#d97706", emoji: "⚠️" },
-  moderada: { color: "#ea580c", emoji: "🐛" },
-  severa:   { color: "#dc2626", emoji: "🚨" },
-}
-const MACETA_LABELS = {
-  '0.5':  'Vaso (0.5L)',
-  '1':    '1 litro',
-  '3':    '3 litros',
-  '5':    '5 litros',
-  '7':    '7 litros',
-  '10':   '10 litros',
-  '12':   '12 litros',
-  '15':   '15 litros',
-  'otro': 'Otro',
-}
-
-function em(e)  { return ESTADO_META[e]       || { label: e || "—", color: "#64748b", bg: "#f1f5f9", emoji: "•" } }
-function pm(s)  { return PLANT_STATE_META[s]  || { label: s || "—", color: "#64748b", emoji: "🌿" } }
-function sm(s)  { return ESTADO_SALUD_META[s] || { color: "#94a3b8", emoji: "⚪" } }
-function pgm(p) { return PLAGAS_META[p]       || { color: "#94a3b8", emoji: "—" } }
-function growLabel(g)  { return { sustrato: "Sustrato", hidroponia: "Hidroponia", aeroponia: "Aeroponia" }[g] || g || "—" }
-function lightLabel(l) { return { led: "LED", hps: "HPS", cmh: "CMH", natural: "Natural", mixta: "Mixta" }[l] || l || "—" }
-function macetaLabel(m) { return MACETA_LABELS[String(m)] || (m ? m + 'L' : '—') }
-function parseDate(d) {
-  if (!d) return null
-  // Date-only strings (YYYY-MM-DD) must be parsed as local time, not UTC
-  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return new Date(d + 'T00:00:00')
-  return new Date(d)
-}
-function formatDate(d) {
-  if (!d) return "—"
-  const date = parseDate(d)
-  return !date || isNaN(date.getTime()) ? "—" : date.toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" })
-}
-function formatDateTime(d) {
-  if (!d) return "—"
-  const date = parseDate(d)
-  return !date || isNaN(date.getTime()) ? "—" : date.toLocaleString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
-}
-
-const cicloIndex = computed(() => lote.value ? CICLO.indexOf(lote.value.estado) : -1)
-
-const FASE_LABELS = { vegetativo:'Vegetativo', floracion:'Floración', secado:'Manicura', curado:'Curado', cosecha:'Cosecha', semilla:'Germinación', manicura:'Manicura', cerrado:'Cerrado' }
-function capitalizarFase(f) { return FASE_LABELS[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : '') }
-function phaseBannerMsg(estado) {
-  if (estado === 'cosecha') return 'Lote cosechado. Manicura toma desde acá.'
-  if (estado === 'semilla') return 'Plantas en germinación. El sistema avanzará automáticamente cuando estén listas.'
-  if (['secado','manicura','curado','cerrado'].includes(estado)) return 'Este lote pasó tu turno. Otro rol toma desde acá.'
-  return null
-}
-
-const pesadaUltimaCurado = computed(() => {
-  if (!lote.value?.pesadas) return null
-  return [...lote.value.pesadas].reverse().find(p => p.fase_destino === 'curado') || null
-})
-
-const splitOk = computed(() => {
-  const f = curadoForm.value
-  if (!f.peso_curado_g) return false
-  const sum = (parseFloat(f.flor_seca) || 0) + (parseFloat(f.descarte) || 0)
-  return Math.abs(sum - parseFloat(f.peso_curado_g)) < 0.01
-})
 
 // ── Plan vs Real ───────────────────────────────────────────
 const showPlanForm = ref(false)
@@ -822,7 +266,6 @@ const plantasDevClass = computed(() => {
   const p = plantasDevPct.value
   return p > 0 ? 'ld__pvr-positive' : p < 0 ? 'ld__pvr-negative' : ''
 })
-
 const rendDevPct = computed(() => {
   const obj = lote.value?.rendimiento_objetivo_g
   const real = lote.value?.rendimiento_real_g
@@ -834,54 +277,6 @@ const rendDevClass = computed(() => {
   return p > 0 ? 'ld__pvr-positive' : p < 0 ? 'ld__pvr-negative' : ''
 })
 
-// ── Editar lote ────────────────────────────────────────────
-const geneticas      = ref([])
-const showEditLote   = ref(false)
-const editLoteForm   = ref({})
-const editLoteError  = ref(null)
-const savingEditLote = ref(false)
-
-function openEditLote() {
-  const l = lote.value
-  editLoteForm.value = {
-    codigo:            l.codigo            || '',
-    start_date:        l.start_date        || '',
-    genetica_id:       l.genetica?.id      || '',
-    grow_type:         l.grow_type         || '',
-    light_type:        l.light_type        || '',
-    tiene_semanas:     !!l.semanas_floracion,
-    semanas_floracion: l.semanas_floracion ?? '',
-    tamanio_maceta:    l.tamanio_maceta    ?? '',
-    notes:             l.notes             || '',
-  }
-  editLoteError.value = null
-  showEditLote.value  = true
-}
-
-async function saveEditLote() {
-  // codigo es inmutable — no se valida ni se envía
-  savingEditLote.value = true
-  editLoteError.value  = null
-  try {
-    const { tiene_semanas, codigo, ...rest } = editLoteForm.value
-    const payload = {
-      ...rest,
-      semanas_floracion: tiene_semanas ? (Number(rest.semanas_floracion) || null) : null,
-      tamanio_maceta:    rest.tamanio_maceta || null,
-    }
-    if (!payload.genetica_id) delete payload.genetica_id
-    if (!payload.light_type)  delete payload.light_type
-    await updateLote(id, payload)
-    await lotes.fetchOne(id)
-    showEditLote.value = false
-    toast.success('Lote actualizado')
-  } catch (e) {
-    editLoteError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al guardar'
-  } finally {
-    savingEditLote.value = false
-  }
-}
-
 // ── Trasplante de lote ────────────────────────────────────
 const showTrasplanteLote   = ref(false)
 const savingTrasplanteLote = ref(false)
@@ -891,11 +286,7 @@ const trasplanteLoteForm   = ref({ maceta_origen_l: null, maceta_destino_l: null
 const MACETA_OPTS = [0.5, 1, 2, 3, 4.5, 6.5, 7, 10, 11, 15, 18, 20, 25, 30, 40, 50, 65, 80, 100, 200]
 
 function abrirTrasplanteLote() {
-  trasplanteLoteForm.value = {
-    maceta_origen_l:  lote.value?.tamanio_maceta || null,
-    maceta_destino_l: null,
-    notas: '',
-  }
+  trasplanteLoteForm.value = { maceta_origen_l: lote.value?.tamanio_maceta || null, maceta_destino_l: null, notas: '' }
   trasplanteLoteError.value = null
   showTrasplanteLote.value  = true
 }
@@ -919,6 +310,142 @@ async function guardarTrasplanteLote() {
   }
 }
 
+// ── Helpers ────────────────────────────────────────────────
+const CICLO = ['vegetativo', 'floracion', 'cosecha', 'secado', 'curado']
+const ESTADO_META = {
+  semilla:            { label: 'Semilla/Esqueje',   color: '#64748b', bg: '#f1f5f9', emoji: '🌱' },
+  vegetativo:         { label: 'Vegetativo',         color: '#16a34a', bg: '#dcfce7', emoji: '🍃' },
+  floracion:          { label: 'Floración',          color: '#d97706', bg: '#fef3c7', emoji: '🌸' },
+  cosecha:            { label: 'Cosecha',            color: '#059669', bg: '#d1fae5', emoji: '🌿' },
+  secado:             { label: 'Manicura',           color: '#78350f', bg: '#fef3c7', emoji: '✂️'  },
+  manicura_pendiente: { label: 'Manicura pendiente', color: '#7c3aed', bg: '#ede9fe', emoji: '✂️'  },
+  curado:             { label: 'Curado',             color: '#2563eb', bg: '#dbeafe', emoji: '🫙' },
+  finalizado:         { label: 'Finalizado',         color: '#1b5e20', bg: '#dcfce7', emoji: '✅' },
+}
+const PLANT_STATE_META = {
+  semilla:    { label: 'Semilla',    color: '#64748b', emoji: '🌰' },
+  germinacion:{ label: 'Germinación',color: '#16a34a', emoji: '🌱' },
+  esqueje:    { label: 'Esqueje',    color: '#0891b2', emoji: '🌿' },
+  vegetativo: { label: 'Vegetativo', color: '#16a34a', emoji: '🍃' },
+  floracion:  { label: 'Floración',  color: '#d97706', emoji: '🌸' },
+  cosechado:  { label: 'Cosechada',  color: '#2563eb', emoji: '✅' },
+  descartada: { label: 'Descartada', color: '#dc2626', emoji: '❌' },
+}
+const ESTADO_SALUD_META = {
+  excelente: { color: '#16a34a', emoji: '🟢' },
+  bueno:     { color: '#65a30d', emoji: '🟡' },
+  regular:   { color: '#d97706', emoji: '🟠' },
+  malo:      { color: '#dc2626', emoji: '🔴' },
+  critico:   { color: '#991b1b', emoji: '🚨' },
+}
+const PLAGAS_META = {
+  ninguna:  { color: '#16a34a', emoji: '✅' },
+  leve:     { color: '#d97706', emoji: '⚠️' },
+  moderada: { color: '#ea580c', emoji: '🐛' },
+  severa:   { color: '#dc2626', emoji: '🚨' },
+}
+const MACETA_LABELS = {
+  '0.5': 'Vaso (0.5L)', '1': '1 litro', '3': '3 litros', '5': '5 litros',
+  '7': '7 litros', '10': '10 litros', '12': '12 litros', '15': '15 litros', 'otro': 'Otro',
+}
+const TAREAS_LOTE = [
+  { key: 'riego',           label: 'Riego',           emoji: '💧' },
+  { key: 'nutricion',       label: 'Nutrición',       emoji: '🧪' },
+  { key: 'poda',            label: 'Poda',            emoji: '✂️'  },
+  { key: 'defoliacion',     label: 'Defoliación',     emoji: '🍃' },
+  { key: 'scrog_lst',       label: 'SCROG/LST',       emoji: '🪢' },
+  { key: 'revision_plagas', label: 'Revisión plagas', emoji: '🔍' },
+  { key: 'limpieza_sala',   label: 'Limpieza sala',   emoji: '🧹' },
+  { key: 'ajuste_luz',      label: 'Ajuste de luz',   emoji: '💡' },
+]
+
+function em(e)  { return ESTADO_META[e]       || { label: e || '—', color: '#64748b', bg: '#f1f5f9', emoji: '•' } }
+function pm(s)  { return PLANT_STATE_META[s]  || { label: s || '—', color: '#64748b', emoji: '🌿' } }
+function sm(s)  { return ESTADO_SALUD_META[s] || { color: '#94a3b8', emoji: '⚪' } }
+function pgm(p) { return PLAGAS_META[p]       || { color: '#94a3b8', emoji: '—' } }
+function growLabel(g)  { return { sustrato: 'Sustrato', hidroponia: 'Hidroponia', aeroponia: 'Aeroponia' }[g] || g || '—' }
+function lightLabel(l) { return { led: 'LED', hps: 'HPS', cmh: 'CMH', natural: 'Natural', mixta: 'Mixta' }[l] || l || '—' }
+function macetaLabel(m) { return MACETA_LABELS[String(m)] || (m ? m + 'L' : '—') }
+function parseDate(d) {
+  if (!d) return null
+  // Date-only strings (YYYY-MM-DD) must be parsed as local time, not UTC
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return new Date(d + 'T00:00:00')
+  return new Date(d)
+}
+function formatDate(d) {
+  if (!d) return '—'
+  const date = parseDate(d)
+  return !date || isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+function formatDateTime(d) {
+  if (!d) return '—'
+  const date = parseDate(d)
+  return !date || isNaN(date.getTime()) ? '—' : date.toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+const cicloIndex  = computed(() => lote.value ? CICLO.indexOf(lote.value.estado) : -1)
+const FASE_LABELS = { vegetativo: 'Vegetativo', floracion: 'Floración', secado: 'Manicura', curado: 'Curado', cosecha: 'Cosecha', semilla: 'Germinación', manicura: 'Manicura', cerrado: 'Cerrado' }
+function capitalizarFase(f) { return FASE_LABELS[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : '') }
+function phaseBannerMsg(estado) {
+  if (estado === 'cosecha') return 'Lote cosechado. Manicura toma desde acá.'
+  if (estado === 'semilla') return 'Plantas en germinación. El sistema avanzará automáticamente cuando estén listas.'
+  if (['secado', 'manicura', 'curado', 'cerrado'].includes(estado)) return 'Este lote pasó tu turno. Otro rol toma desde acá.'
+  return null
+}
+
+// ── Composables ────────────────────────────────────────────
+const {
+  analizandoIA, historialAnalisis, expandedAnalisis,
+  puedoAnalizar, tiempoRestante,
+  toggleAnalisis, formatearFechaRelativa, cargarHistorialAnalisis, ejecutarAnalisisIA,
+} = useLoteAnalisisIA(id)
+
+const {
+  costoLote, showCostoForm, savingCosto, costoForm,
+  costoTotal, costoPorGramo,
+  openCostoForm, saveCosto, cargarCostos,
+} = useLoteCostos(id)
+
+const {
+  showRegistroModal, savingRegistro, registroError, csvFile, csvInput,
+  registroForm, registroErrors,
+  abrirRegistroModal, guardarRegistro, toggleTarea, handleCsvChange,
+} = useLoteRegistroAmbiental(id, {
+  onSaved: (registro) => {
+    eventos.value.unshift({ ...registro, _tipo: 'registro' })
+    graficosKey.value++
+  },
+})
+
+const {
+  fotos, uploadingFoto, fotoInput,
+  showFotoUploadModal, fotoUploadFile, fotoUploadDescripcion, fotoUploadPreview,
+  fotosExpanded, lightboxOpen, lightboxIndex, lightboxImages,
+  loadFotos, toggleFotos, openLightbox,
+  handleFotoSelect, confirmarSubidaFoto, cancelarSubidaFoto, eliminarFoto,
+} = useLoteFotos(id)
+
+const {
+  geneticas, showEditLote, editLoteForm, editLoteError, savingEditLote,
+  cargarGeneticas, openEditLote, saveEditLote,
+} = useLoteEditar(id)
+
+const {
+  showTransicionModal, savingTransicion, transicionError, transicionForm, transicionSalaId,
+  showAvanzarSalaModal, avanzarSalaId, transicionandoRapido,
+  showIniciarManicuraModal, showCompletarManicuraModal,
+  showCosechaModal, cosechaSalaId, savingCosecha, cosechaError, cosechaForm,
+  showCosechaPartialModal,
+  showCerrarCuradoModal, savingCurado, curadoError, curadoForm, splitOk, pesadaUltimaCurado,
+  handleAvanzarFase, openTransicionModal, ejecutarTransicion,
+  avanzarFaseRapido, ejecutarCosecha, onCosechadoParcial,
+  onManicuraIniciada, onManicuraCompletada,
+  openCerrarCuradoModal, ejecutarCerrarCurado,
+} = useLoteTransiciones(id, { onPhaseChange: loadEventos, sedes })
+
+function onRegistradoPorVoz() { lotes.fetchOne(id); loadEventos(); graficosKey.value++ }
+
+// ── Escape key handler ─────────────────────────────────────
 function loteEscapeHandler(e) {
   if (e.key !== 'Escape') return
   if (showFotoUploadModal.value)      { cancelarSubidaFoto(); return }
@@ -927,10 +454,10 @@ function loteEscapeHandler(e) {
   if (showCerrarCuradoModal.value)    { showCerrarCuradoModal.value = false; return }
   if (showCosechaPartialModal.value)  { showCosechaPartialModal.value = false; return }
   if (showCosechaModal.value)         { showCosechaModal.value = false; return }
-  if (showAvanzarSalaModal.value)        { showAvanzarSalaModal.value = false; return }
-  if (showIniciarManicuraModal.value)      { showIniciarManicuraModal.value = false; return }
-  if (showCompletarManicuraModal.value)    { showCompletarManicuraModal.value = false; return }
-  if (showTransicionModal.value)         { showTransicionModal.value = false; return }
+  if (showAvanzarSalaModal.value)     { showAvanzarSalaModal.value = false; return }
+  if (showIniciarManicuraModal.value) { showIniciarManicuraModal.value = false; return }
+  if (showCompletarManicuraModal.value) { showCompletarManicuraModal.value = false; return }
+  if (showTransicionModal.value)      { showTransicionModal.value = false; return }
   if (showRegistroModal.value)        { showRegistroModal.value = false; return }
   if (showCostoForm.value)            { showCostoForm.value = false; return }
   if (showAddPlanta.value)            { showAddPlanta.value = false; return }
@@ -944,13 +471,13 @@ onMounted(async () => {
     if (lotes.current?.plants?.length) {
       plants.itemsByLote[String(id)] = lotes.current.plants
     }
-  } catch { error.value = "No se pudo cargar el lote." }
+  } catch { error.value = 'No se pudo cargar el lote.' }
   try   { await plants.fetchByLote(id) }
   catch {}
   await loadEventos()
   try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
-  try { const { data } = await getCostoLote(id); costoLote.value = data?.costo || data || null } catch {}
-  try { const { data } = await listGeneticas({ activa: true, disponible: true }); geneticas.value = data || [] } catch {}
+  await cargarCostos()
+  await cargarGeneticas()
   cargarHistorialAnalisis()
 })
 

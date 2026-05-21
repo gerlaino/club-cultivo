@@ -77,9 +77,9 @@ class Dispensacion < ApplicationRecord
   end
 
   def delivery_fields_presentes
-    errors.add(:direccion_envio,  'es requerida para envíos')  if direccion_envio.blank?
-    errors.add(:contacto_nombre,  'es requerido para envíos')  if contacto_nombre.blank?
-    errors.add(:delivery_id,      'debe asignarse un delivery') if delivery_id.blank?
+    errors.add(:direccion_envio, 'es requerida para envíos') if direccion_envio.blank?
+    errors.add(:contacto_nombre, 'es requerido para envíos') if contacto_nombre.blank?
+    # delivery_id se asigna después por el admin — no se valida en creación
   end
 
   def encolar_reporte_ariccame
