@@ -113,7 +113,7 @@ RSpec.describe 'Cross-club isolation', type: :request do
   # ── Genéticas ─────────────────────────────────────────────
   describe 'GET /geneticas' do
     let!(:genetica_a) { Genetica.create!(nombre: 'Test A Only', tipo: 'indica', club_id: club_a.id, global: false, activa: true) }
-    let!(:genetica_global) { Genetica.where(global: true).first || Genetica.create!(nombre: 'Global Test', tipo: 'hibrida', global: true, club_id: nil, activa: true) }
+    let!(:genetica_global) { Genetica.where(global: true, registrada_inase: true).first || Genetica.create!(nombre: 'Global Test', tipo: 'hibrida', global: true, registrada_inase: true, club_id: nil, activa: true) }
 
     it 'includes global genetics but not club_a-specific ones' do
       get '/geneticas', headers: auth_headers

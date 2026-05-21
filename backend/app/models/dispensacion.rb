@@ -32,8 +32,9 @@ class Dispensacion < ApplicationRecord
   scope :pendientes_envio, ->                   { con_envio.where(estado_envio: 'pendiente') }
   scope :en_viaje,       ->                     { con_envio.where(estado_envio: 'en_viaje') }
 
-  after_create  :decrementar_stock
-  after_destroy :incrementar_stock
+  after_create        :decrementar_stock
+  after_create_commit :encolar_reporte_ariccame
+  after_destroy       :incrementar_stock
 
   private
 
@@ -79,6 +80,10 @@ class Dispensacion < ApplicationRecord
     errors.add(:direccion_envio,  'es requerida para envíos')  if direccion_envio.blank?
     errors.add(:contacto_nombre,  'es requerido para envíos')  if contacto_nombre.blank?
     errors.add(:delivery_id,      'debe asignarse un delivery') if delivery_id.blank?
+  end
+
+  def encolar_reporte_ariccame
+    ReportarAriccameJob.perform_later(id)
   end
 
 end

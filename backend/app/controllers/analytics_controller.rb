@@ -9,6 +9,13 @@ class AnalyticsController < ApplicationController
     end
 
     club = current_user.club
+    data = Rails.cache.fetch("analytics/rendimiento_genetica/#{club.id}", expires_in: 15.minutes) do
+      calcular_rendimiento_genetica(club)
+    end
+    render json: data
+  end
+
+  def calcular_rendimiento_genetica(club)
     lotes = club.lotes.where.not(estado: 'germinacion').includes(:genetica)
 
     # Rendimiento por genética (solo lotes con datos reales)
@@ -69,14 +76,14 @@ class AnalyticsController < ApplicationController
     lotes_finalizados = lotes.select { |l| l.rendimiento_real_g.present? }
     rendimiento_global = lotes_finalizados.any? ? (lotes_finalizados.sum { |l| l.rendimiento_real_g.to_f } / lotes_finalizados.size).round(1) : nil
 
-    render json: {
+    {
       resumen: {
         lotes_totales:        lotes.count,
         lotes_finalizados:    lotes_finalizados.size,
         geneticas_activas:    por_genetica.count { |g| g[:lotes_activos] > 0 },
         rendimiento_global_g: rendimiento_global,
       },
-      por_genetica:  por_genetica,
+      por_genetica:    por_genetica,
       lotes_recientes: lotes_recientes,
     }
   end
@@ -88,7 +95,14 @@ class AnalyticsController < ApplicationController
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 
-    club   = current_user.club
+    club = current_user.club
+    data = Rails.cache.fetch("analytics/dispensador/#{club.id}/#{Date.today}", expires_in: 10.minutes) do
+      calcular_dispensador(club)
+    end
+    render json: data
+  end
+
+  def calcular_dispensador(club)
     hoy    = Date.today
     inicio_semana = hoy.beginning_of_week
     inicio_mes    = hoy.beginning_of_month
@@ -137,7 +151,7 @@ class AnalyticsController < ApplicationController
         }
       end
 
-    render json: {
+    {
       resumen: {
         dispensaciones_hoy:    disps_hoy.count,
         gramos_hoy:            disps_hoy.sum(:cantidad).to_f.round(2),
@@ -150,8 +164,8 @@ class AnalyticsController < ApplicationController
         por_vencer: reprocann_por_vencer,
         vencidos:   reprocann_vencidos,
       },
-      stocks:         stocks_data,
-      top_pacientes:  top_pacientes,
+      stocks:        stocks_data,
+      top_pacientes: top_pacientes,
     }
   end
 
@@ -162,7 +176,16 @@ class AnalyticsController < ApplicationController
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 
-    club  = current_user.club
+    club = current_user.club
+    data = Rails.cache.fetch("analytics/produccion/#{club.id}", expires_in: 15.minutes) do
+      calcular_produccion(club)
+    end
+    render json: data
+  end
+
+  private
+
+  def calcular_produccion(club)
     lotes = club.lotes.includes(:genetica, :plants).where.not(estado: 'germinacion')
 
     # ── 1. PÉRDIDAS por cepa ───────────────────────────────────────
@@ -275,10 +298,12 @@ class AnalyticsController < ApplicationController
       }
     end.sort_by { |r| r[:nombre] }
 
-    render json: {
-      perdidas:   perdidas_por_genetica,
-      ciclos:     ciclos_por_genetica,
+    {
+      perdidas:    perdidas_por_genetica,
+      ciclos:      ciclos_por_genetica,
       comparativa: comparativa,
     }
   end
+
+  private :calcular_rendimiento_genetica, :calcular_dispensador
 end

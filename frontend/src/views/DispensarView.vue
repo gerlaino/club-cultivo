@@ -52,27 +52,18 @@
             <span class="dv__paciente-bar-name">{{ selectedPaciente.nombre }} {{ selectedPaciente.apellido }}</span>
             <span class="dv__reprocann-badge" :class="reprocannClass(selectedPaciente)">{{ reprocannLabel(selectedPaciente) }}</span>
           </div>
-          <div v-if="pacienteDetalle" class="dv__limite-wrap">
-            <div class="dv__limite-row">
-              <span class="dv__limite-label">Límite mensual</span>
-              <span class="dv__limite-nums" :class="{ 'dv__limite-nums--warn': limiteExcedidoConCarrito }">
-                {{ formatG(limiteUsadoConCarrito) }} / {{ formatG(pacienteDetalle.limite_dispensacion_mensual_g) }}
-              </span>
-            </div>
-            <div class="dv__limite-bar-track">
-              <div class="dv__limite-bar-usado" :style="{ width: `${Math.min(100, pctUsado)}%` }" />
-              <div
-                v-if="cartGramos > 0"
-                class="dv__limite-bar-carrito"
-                :class="{ 'dv__limite-bar-carrito--warn': limiteExcedidoConCarrito }"
-                :style="{ width: `${Math.min(100 - Math.min(100, pctUsado), pctCarrito)}%` }"
-              />
-            </div>
-            <div v-if="limiteExcedidoConCarrito" class="dv__limite-alerta">
-              <AlertTriangle :size="13" :stroke-width="2" /> El carrito supera el límite mensual disponible
-            </div>
+          <div v-if="pacienteDetalle" class="dv__cc-chips">
+            <span v-if="tieneCc" class="dv__cc-chip" :class="{ 'dv__cc-chip--warn': ccInsuficiente }">
+              CC: {{ formatARS(ccMargen) }}
+            </span>
+            <span v-if="tieneCcG" class="dv__cc-chip" :class="{ 'dv__cc-chip--warn': gInsuficiente }">
+              Gramos: {{ formatG(pacienteDetalle.saldo_cc_g) }}
+            </span>
+            <span v-if="!tieneCc && !tieneCcG" class="dv__cc-chip dv__cc-chip--neutral">
+              Solo efectivo
+            </span>
           </div>
-          <div v-else-if="loadingDetalle" class="dv__limite-loading">Cargando límites…</div>
+          <div v-else-if="loadingDetalle" class="dv__limite-loading">Cargando…</div>
         </div>
 
         <!-- Stock grid -->
@@ -168,10 +159,51 @@
                 <label class="dv__label">Medio de pago</label>
                 <select v-model="medioPago" class="dv__select">
                   <option value="efectivo">Efectivo</option>
-                  <option value="transferencia">Transferencia</option>
-                  <option value="debito">Débito</option>
-                  <option value="credito">Crédito</option>
+                  <option value="cuenta_corriente" :disabled="!tieneCc">
+                    Cuenta corriente{{ tieneCc ? ` — ${formatARS(ccMargen)} disponibles` : ' (sin crédito configurado)' }}
+                  </option>
+                  <option value="credito_gramos" :disabled="!tieneCcG">
+                    Crédito en gramos{{ tieneCcG ? ` — ${formatG(pacienteDetalle?.saldo_cc_g)} disponibles` : ' (no activado)' }}
+                  </option>
                 </select>
+              </div>
+
+              <!-- Panel CC -->
+              <div v-if="medioPago === 'cuenta_corriente' && tieneCc"
+                   class="dv__cc-panel"
+                   :class="ccInsuficiente ? 'dv__cc-panel--error' : 'dv__cc-panel--ok'">
+                <div class="dv__cc-panel-row">
+                  <span>Disponible</span>
+                  <strong>{{ formatARS(ccMargen) }}</strong>
+                </div>
+                <div class="dv__cc-panel-row">
+                  <span>Esta dispensación</span>
+                  <strong>{{ formatARS(cartTotal) }}</strong>
+                </div>
+                <div class="dv__cc-panel-row dv__cc-panel-row--result">
+                  <span>Saldo restante</span>
+                  <strong :class="ccInsuficiente ? 'dv__cc-negativo' : ''">{{ formatARS(ccMargen - cartTotal) }}</strong>
+                </div>
+                <div v-if="ccInsuficiente" class="dv__cc-alerta">Crédito insuficiente para esta dispensación</div>
+              </div>
+
+              <!-- Panel Gramos -->
+              <div v-if="medioPago === 'credito_gramos' && tieneCcG"
+                   class="dv__cc-panel"
+                   :class="gInsuficiente ? 'dv__cc-panel--error' : 'dv__cc-panel--ok'">
+                <div class="dv__cc-panel-row">
+                  <span>Gramos disponibles</span>
+                  <strong>{{ formatG(pacienteDetalle?.saldo_cc_g) }}</strong>
+                </div>
+                <div class="dv__cc-panel-row">
+                  <span>Esta dispensación</span>
+                  <strong>{{ formatG(cartGramos) }}</strong>
+                </div>
+                <div class="dv__cc-panel-row dv__cc-panel-row--result">
+                  <span>Saldo restante</span>
+                  <strong :class="gInsuficiente ? 'dv__cc-negativo' : ''">{{ formatG((pacienteDetalle?.saldo_cc_g ?? 0) - cartGramos) }}</strong>
+                </div>
+                <div v-if="gInsuficiente" class="dv__cc-alerta">Gramos insuficientes para esta dispensación</div>
               </div>
 
               <!-- Envío a domicilio -->
@@ -214,7 +246,7 @@
               <button class="dv__modal-cancel" @click="confirmOpen = false" :disabled="submitting">
                 Cancelar
               </button>
-              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting">
+              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || ccInsuficiente || gInsuficiente">
                 <div v-if="submitting" class="dv__spinner" />
                 <template v-else>Confirmar</template>
               </button>
@@ -230,7 +262,7 @@
 import { ref, computed, watch } from 'vue'
 import { listPacientes, getPaciente, listStocks, createDispensacion } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
-import { Search, Users, Plus, X, AlertTriangle } from 'lucide-vue-next'
+import { Search, Users, Plus, X } from 'lucide-vue-next'
 
 const toast = useToast()
 
@@ -307,28 +339,16 @@ const cartGramos = computed(() =>
   cart.value.filter(i => i.stock.unidad === 'g').reduce((s, i) => s + i.cantidad, 0)
 )
 
-const limiteUsadoConCarrito = computed(() => {
-  const base = Number(pacienteDetalle.value?.dispensado_mes_actual_g ?? 0)
-  return base + cartGramos.value
-})
+const tieneCc  = computed(() => (pacienteDetalle.value?.limite_cc ?? 0) > 0)
+const tieneCcG = computed(() => pacienteDetalle.value?.cc_gramos_activo && (pacienteDetalle.value?.limite_cc_g ?? 0) > 0)
+const ccMargen = computed(() => (pacienteDetalle.value?.saldo_cc ?? 0) + (pacienteDetalle.value?.limite_cc ?? 0))
 
-const pctUsado = computed(() => {
-  const limite = Number(pacienteDetalle.value?.limite_dispensacion_mensual_g)
-  if (!limite) return 0
-  return (Number(pacienteDetalle.value?.dispensado_mes_actual_g ?? 0) / limite) * 100
-})
-
-const pctCarrito = computed(() => {
-  const limite = Number(pacienteDetalle.value?.limite_dispensacion_mensual_g)
-  if (!limite || !cartGramos.value) return 0
-  return (cartGramos.value / limite) * 100
-})
-
-const limiteExcedidoConCarrito = computed(() => {
-  const limite = Number(pacienteDetalle.value?.limite_dispensacion_mensual_g)
-  if (!limite) return false
-  return limiteUsadoConCarrito.value > limite
-})
+const ccInsuficiente = computed(() =>
+  medioPago.value === 'cuenta_corriente' && cartTotal.value > ccMargen.value
+)
+const gInsuficiente = computed(() =>
+  medioPago.value === 'credito_gramos' && cartGramos.value > (pacienteDetalle.value?.saldo_cc_g ?? 0)
+)
 
 function addToCart(s) {
   const qty = cantidades.value[s.id]
@@ -345,6 +365,8 @@ function removeFromCart(i) {
 
 async function submitDispensacion() {
   if (!selectedPaciente.value || !cart.value.length) return
+  if (ccInsuficiente.value) { toast.error(`Crédito insuficiente (disponible: ${formatARS(ccMargen.value)})`); return }
+  if (gInsuficiente.value)  { toast.error(`Gramos insuficientes (disponible: ${formatG(pacienteDetalle.value?.saldo_cc_g ?? 0)})`); return }
   submitting.value = true
   try {
     const today = new Date().toISOString().slice(0, 10)
@@ -531,43 +553,30 @@ function formatG(g) {
   font-weight: 700;
   color: var(--c-ink-900);
 }
-.dv__limite-wrap { display: flex; flex-direction: column; gap: var(--sp-1); }
-.dv__limite-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* CC chips (patient bar) */
+.dv__cc-chips { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.dv__cc-chip {
+  font-size: var(--fs-12); font-weight: 600;
+  padding: .2rem .6rem;
+  border-radius: var(--r-pill);
+  background: #e0f2fe; color: #0369a1;
 }
-.dv__limite-label { font-size: var(--fs-12); font-weight: 600; color: var(--c-ink-500); text-transform: uppercase; letter-spacing: .04em; }
-.dv__limite-nums { font-family: var(--font-mono); font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700); }
-.dv__limite-nums--warn { color: var(--c-rust-600); }
+.dv__cc-chip--warn    { background: #fee2e2; color: #b91c1c; }
+.dv__cc-chip--neutral { background: var(--c-ink-100); color: var(--c-ink-500); }
 
-.dv__limite-bar-track {
-  height: 8px;
-  background: var(--c-ink-100);
-  border-radius: 999px;
-  overflow: hidden;
-  display: flex;
+/* CC / gramos panel (modal) */
+.dv__cc-panel {
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  font-size: var(--fs-13);
 }
-.dv__limite-bar-usado {
-  height: 100%;
-  background: var(--c-role-dispensador);
-  border-radius: 999px;
-  transition: width .3s ease;
-}
-.dv__limite-bar-carrito {
-  height: 100%;
-  background: rgba(74, 142, 166, 0.5);
-  transition: width .3s ease;
-}
-.dv__limite-bar-carrito--warn { background: rgba(220, 38, 38, 0.5); }
-.dv__limite-alerta {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: var(--c-rust-600);
-}
+.dv__cc-panel--ok    { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.dv__cc-panel--error { background: #fef2f2; border: 1px solid #fecaca; }
+.dv__cc-panel-row { display: flex; justify-content: space-between; color: var(--c-ink-700); }
+.dv__cc-panel-row--result { border-top: 1px dashed currentColor; padding-top: var(--sp-2); font-weight: 700; }
+.dv__cc-negativo { color: #b91c1c; }
+.dv__cc-alerta { font-size: var(--fs-12); font-weight: 600; color: #b91c1c; }
 .dv__limite-loading { font-size: var(--fs-12); color: var(--c-ink-400); }
 
 /* Placeholder */

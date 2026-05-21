@@ -156,6 +156,89 @@ RSpec.describe AlertaDetectorService do
     end
   end
 
+  # ── setpoints del club ────────────────────────────────────────────────────
+
+  describe '#detectar! — rango_ambiental con setpoints configurados' do
+    context 'cuando el club tiene setpoint de temperatura para la fase' do
+      before do
+        # Setpoint custom: temperatura permitida 22-30 (más amplio que el default 20-28)
+        SetpointFase.create!(
+          club_id:      club.id,
+          fase:         'vegetativo',
+          tipo_lectura: 'temperatura',
+          valor_min:    22,
+          valor_max:    30,
+        )
+        # Registros con temperatura 29, 29, 29 → fuera del default (20-28) pero dentro del setpoint (22-30)
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 1.hour.ago,  temperatura: 29)
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 2.hours.ago, temperatura: 29)
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 3.hours.ago, temperatura: 29)
+      end
+
+      it 'NO genera alerta porque los valores están dentro del setpoint del club' do
+        expect { detectar! }.not_to change { club.alertas_internas.where(tipo: 'temperatura_fuera_rango').count }
+      end
+    end
+
+    context 'cuando el club tiene setpoint más estricto que el default' do
+      before do
+        # Setpoint estricto: temperatura 24-25
+        SetpointFase.create!(
+          club_id:      club.id,
+          fase:         'vegetativo',
+          tipo_lectura: 'temperatura',
+          valor_min:    24,
+          valor_max:    25,
+        )
+        # Temperatura 22 → dentro del default (20-28) pero fuera del setpoint (24-25)
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 1.hour.ago,  temperatura: 22)
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 2.hours.ago, temperatura: 22)
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 3.hours.ago, temperatura: 22)
+      end
+
+      it 'SÍ genera alerta porque los valores están fuera del setpoint del club' do
+        expect { detectar! }.to change { club.alertas_internas.where(tipo: 'temperatura_fuera_rango').count }.by(1)
+      end
+    end
+
+    context 'cuando no hay setpoints configurados' do
+      before do
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 1.hour.ago,  ph: 7.5)
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 2.hours.ago, ph: 7.4)
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 3.hours.ago, ph: 7.3)
+      end
+
+      it 'usa los RANGOS default y genera alerta' do
+        expect { detectar! }.to change { club.alertas_internas.where(tipo: 'ph_fuera_rango').count }.by(1)
+      end
+    end
+
+    context 'setpoint específico de cepa tiene prioridad sobre genérico' do
+      let(:genetica) { create(:genetica, club: club) }
+      let(:lote) do
+        create(:lote, club: club, sala: sala, estado: 'vegetativo',
+               start_date: 30.days.ago, genetica: genetica)
+      end
+
+      before do
+        # Setpoint genérico (sin cepa): 20-28
+        SetpointFase.create!(club_id: club.id, fase: 'vegetativo', tipo_lectura: 'temperatura',
+                             valor_min: 20, valor_max: 28, genetica_id: nil)
+        # Setpoint específico para la cepa: 26-30
+        SetpointFase.create!(club_id: club.id, fase: 'vegetativo', tipo_lectura: 'temperatura',
+                             valor_min: 26, valor_max: 30, genetica_id: genetica.id)
+        # Temperatura 25 → dentro del genérico pero fuera del específico
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 1.hour.ago,  temperatura: 25)
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 2.hours.ago, temperatura: 25)
+        create(:registro_ambiental, lote: lote, user: user, registrado_en: 3.hours.ago, temperatura: 25)
+      end
+
+      it 'usa el setpoint de la cepa y genera alerta' do
+        expect { detectar! }.to change { club.alertas_internas.where(tipo: 'temperatura_fuera_rango').count }.by(1)
+      end
+    end
+  end
+
   # ── deduplicación ─────────────────────────────────────────────────────────
 
   describe 'deduplicación' do

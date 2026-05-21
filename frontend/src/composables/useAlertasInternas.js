@@ -1,25 +1,61 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { createConsumer } from '@rails/actioncable'
 import { getAlertasInternas, marcarAlertaInterna, marcarTodasAlertasLeidas } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 
-const POLL_MS = 60_000
+// Fallback poll interval — WebSocket handles real-time; poll catches missed events
+const POLL_MS = 5 * 60_000
 
-// Shared state — singleton across all consumers
-const alertas    = ref([])
-const noLeidas   = computed(() => alertas.value.filter(a => !a.leida))
-const count      = computed(() => noLeidas.value.length)
+// Singleton shared state
+const alertas  = ref([])
+const noLeidas = computed(() => alertas.value.filter(a => !a.leida))
+const count    = computed(() => noLeidas.value.length)
 
 let instanceCount = 0
 let intervalId    = null
+let consumer      = null
+
+function cableUrl() {
+  const base  = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+  const root  = base.replace(/\/api$/, '')
+  const ws    = root.replace(/^http/, 'ws')
+  const token = localStorage.getItem('jwt_token') || ''
+  return `${ws}/cable?token=${encodeURIComponent(token)}`
+}
 
 async function refresh() {
   if (document.hidden) return
   try {
     const res = await getAlertasInternas({ solo_no_leidas: 1, limite: 20 })
     alertas.value = res.data.data ?? []
-  } catch {
-    // silently ignore — avoid console noise during auth transitions
+  } catch { /* silently ignore during auth transitions */ }
+}
+
+function onVisibility() {
+  if (!document.hidden) refresh()
+}
+
+function conectarWS() {
+  if (consumer) return
+  try {
+    consumer = createConsumer(cableUrl())
+    consumer.subscriptions.create('AlertasInternasChannel', {
+      received(data) {
+        // Push nueva alerta al frente evitando duplicados
+        if (!alertas.value.find(a => a.id === data.id)) {
+          alertas.value = [{ ...data, leida: false }, ...alertas.value].slice(0, 50)
+        }
+      },
+    })
+  } catch (e) {
+    console.warn('[useAlertasInternas] WebSocket no disponible, usando polling', e.message)
   }
+}
+
+function desconectarWS() {
+  if (!consumer) return
+  consumer.disconnect()
+  consumer = null
 }
 
 function startPolling() {
@@ -35,21 +71,23 @@ function stopPolling() {
   document.removeEventListener('visibilitychange', onVisibility)
 }
 
-function onVisibility() {
-  if (!document.hidden) refresh()
-}
-
 export function useAlertasInternas() {
   const auth = useAuthStore()
 
   onMounted(() => {
     instanceCount++
-    if (instanceCount === 1 && auth.isAuthenticated) startPolling()
+    if (instanceCount === 1 && auth.isAuthenticated) {
+      startPolling()
+      conectarWS()
+    }
   })
 
   onUnmounted(() => {
     instanceCount--
-    if (instanceCount === 0) stopPolling()
+    if (instanceCount === 0) {
+      stopPolling()
+      desconectarWS()
+    }
   })
 
   async function marcarLeida(id) {

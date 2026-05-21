@@ -60,8 +60,11 @@ Rails.application.configure do
   # want to log everything, set the level to "debug".
   config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
 
-  # Use a different cache store in production.
-  # config.cache_store = :mem_cache_store
+  config.cache_store = :redis_cache_store, {
+    url:        ENV.fetch('REDIS_URL', 'redis://redis:6379/1'),
+    expires_in: 1.hour,
+    namespace:  'clubcultivo'
+  }
 
   # Use a real queuing backend for Active Job (and separate queues per environment).
   config.active_job.queue_adapter = :sidekiq

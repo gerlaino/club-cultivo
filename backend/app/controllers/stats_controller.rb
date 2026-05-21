@@ -2,38 +2,35 @@ class StatsController < ApplicationController
   before_action :authenticate_user!
 
   def show
-    club     = current_user.club
-    lote_ids = club.lotes.pluck(:id)
+    club = current_user.club
+    data = Rails.cache.fetch("stats/club/#{club.id}", expires_in: 5.minutes) do
+      lote_ids      = club.lotes.pluck(:id)
+      plantas_scope = Plant.where(lote_id: lote_ids)
+      plantas_act   = plantas_scope.where.not(state: %w[cosechado descartada])
 
-    plantas_scope     = Plant.where(lote_id: lote_ids)
-    plantas_activas   = plantas_scope.where.not(state: %w[cosechado descartada])
+      vencidos_count   = club.pacientes.where.not(reprocann_vencimiento: nil)
+                             .where('reprocann_vencimiento < ?', Date.today).count
+      por_vencer_count = club.pacientes.reprocann_por_vencer.count
 
-    vencidos_count    = club.pacientes.where.not(reprocann_vencimiento: nil)
-                            .where('reprocann_vencimiento < ?', Date.today).count
-    por_vencer_count  = club.pacientes.reprocann_por_vencer.count
-
-    render json: {
-      pacientes:         club.pacientes.count,
-      plantas:           plantas_activas.count,
-      salas:             club.salas.count,
-      lotes:             club.lotes.count,
-      vencimientos:      vencidos_count,
-      reprocann_vencidos:   vencidos_count,
-      reprocann_por_vencer: por_vencer_count,
-      # Por fase
-      germinacion:       plantas_activas.where(state: 'germinacion').count,
-      vegetativo:        plantas_activas.where(state: 'vegetativo').count,
-      floracion:         plantas_activas.where(state: 'floracion').count,
-      secado:            plantas_activas.where(state: 'secado').count,
-      # Por genética (basado en lote)
-      plantas_por_genetica: plantas_por_genetica(club, lote_ids),
-      # Ocupación de salas
-      salas_ocupacion:   salas_ocupacion(club),
-      # Plantas activas por sede (via sala → sede)
-      plantas_por_sede:  plantas_por_sede(club, lote_ids),
-      # Plantas activas por lote
-      plantas_por_lote:  plantas_activas.group(:lote_id).count,
-    }
+      {
+        pacientes:            club.pacientes.count,
+        plantas:              plantas_act.count,
+        salas:                club.salas.count,
+        lotes:                club.lotes.count,
+        vencimientos:         vencidos_count,
+        reprocann_vencidos:   vencidos_count,
+        reprocann_por_vencer: por_vencer_count,
+        germinacion:          plantas_act.where(state: 'germinacion').count,
+        vegetativo:           plantas_act.where(state: 'vegetativo').count,
+        floracion:            plantas_act.where(state: 'floracion').count,
+        secado:               plantas_act.where(state: 'secado').count,
+        plantas_por_genetica: plantas_por_genetica(club, lote_ids),
+        salas_ocupacion:      salas_ocupacion(club),
+        plantas_por_sede:     plantas_por_sede(club, lote_ids),
+        plantas_por_lote:     plantas_act.group(:lote_id).count,
+      }
+    end
+    render json: data
   end
 
   private

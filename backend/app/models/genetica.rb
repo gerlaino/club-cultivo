@@ -11,6 +11,7 @@ class Genetica < ApplicationRecord
   validates :cbd, numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 100, allow_nil: true }
   validates :tipo, inclusion: { in: %w[indica sativa hibrida], allow_nil: true }
   validates :categoria_inase, inclusion: { in: CATEGORIAS_INASE }, allow_nil: true
+  validates :registrada_inase, inclusion: { in: [true], message: 'debe ser true para genéticas globales' }, if: :global?
 
   scope :activas,      -> { where(activa: true) }
   scope :disponibles,  -> { where(disponible: true) }

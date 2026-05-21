@@ -44,6 +44,18 @@ class Paciente < ApplicationRecord
     cuenta_corriente&.limite_credito&.to_f
   end
 
+  def saldo_cc_g
+    cuenta_corriente&.saldo_disponible_g&.to_f
+  end
+
+  def limite_cc_g
+    cuenta_corriente&.limite_credito_g&.to_f
+  end
+
+  def cc_gramos_activo
+    cuenta_corriente&.credito_gramos_activo? || false
+  end
+
   def dispensado_mes_actual_g
     dispensaciones.del_mes.sum(:cantidad).to_f
   end

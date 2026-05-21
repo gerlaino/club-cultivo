@@ -3,71 +3,104 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
+import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
 
 const router = useRouter()
 const store  = useAmbienteStore()
 
 useAlertasBell()
+const internas = useAlertasInternas()
 
-const count   = computed(() => store.alertasCount)
-const alertas = computed(() => store.alertasActivas.slice(0, 5))
+const countSensor   = computed(() => store.alertasCount)
+const countInternas = computed(() => internas.count.value)
+const totalCount    = computed(() => countSensor.value + countInternas.value)
 
-const TIPO_ICON = { temperatura: '🌡️', humedad: '💧', vpd: '🌫️', co2: '🌬️', ec: '⚡', ph: '🧪' }
+const alertasSensor   = computed(() => store.alertasActivas.slice(0, 3))
+const alertasInternas = computed(() => internas.noLeidas.value.slice(0, 5))
+
+const SENSOR_ICON   = { temperatura: '🌡️', humedad: '💧', vpd: '🌫️', co2: '🌬️', ec: '⚡', ph: '🧪' }
+const INTERNA_ICON  = {
+  sin_registro_ambiental: '📋', cosecha_pendiente: '🌿', tarea_vencida_cultivo: '📌',
+  saldo_cc_bajo: '💳', saldo_gramos_bajo: '⚖️', documento_vencido: '📄',
+  reprocann_vencido: '📄', reprocann_por_vencer: '⏰', manicura_aprobacion_pendiente: '✂️',
+  stock_bajo: '📦',
+}
+const SEV_CLASS = { error: 'nb__dot--error', warning: 'nb__dot--warning', info: 'nb__dot--info' }
 
 function formatTime(ts) {
   if (!ts) return ''
   return new Date(ts).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
-
-function irAlertas() {
-  router.push({ name: 'sala-ambiente', params: { id: alertas.value[0]?.sala_id } }).catch(() => {})
-}
 </script>
 
 <template>
-  <div class="nb dropdown" v-if="count > 0 || true">
+  <div class="nb dropdown">
     <button
       class="nb__trigger"
       type="button"
       data-bs-toggle="dropdown"
       data-bs-auto-close="outside"
-      :class="{ 'nb__trigger--active': count > 0 }"
+      :class="{ 'nb__trigger--active': totalCount > 0 }"
     >
       <i class="bi bi-bell nb__icon"></i>
-      <span v-if="count > 0" class="nb__count">{{ count > 9 ? '9+' : count }}</span>
+      <span v-if="totalCount > 0" class="nb__count">{{ totalCount > 9 ? '9+' : totalCount }}</span>
     </button>
 
     <div class="dropdown-menu dropdown-menu-end nb__menu shadow border-0">
       <div class="nb__menu-header">
-        <span class="nb__menu-title">Alertas ambientales</span>
-        <span v-if="count > 0" class="nb__menu-count">{{ count }} activa{{ count !== 1 ? 's' : '' }}</span>
+        <span class="nb__menu-title">Notificaciones</span>
+        <span v-if="totalCount > 0" class="nb__menu-count">{{ totalCount }} sin leer</span>
       </div>
 
-      <div v-if="!count" class="nb__empty">
-        <i class="bi bi-check-circle text-success"></i> Sin alertas activas
+      <div v-if="!totalCount" class="nb__empty">
+        <i class="bi bi-check-circle text-success"></i> Sin notificaciones pendientes
       </div>
 
-      <div v-else class="nb__list">
-        <div v-for="a in alertas" :key="a.id" class="nb__item">
-          <span class="nb__item-icon">{{ TIPO_ICON[a.tipo] || '⚠️' }}</span>
-          <div class="nb__item-body">
-            <div class="nb__item-nombre">{{ a.regla_nombre || a.tipo }}</div>
-            <div class="nb__item-time">{{ formatTime(a.generada_at) }}</div>
-          </div>
-          <RouterLink
-            v-if="a.sala_id"
-            :to="{ name: 'sala-ambiente', params: { id: a.sala_id } }"
-            class="nb__item-link"
-            title="Ver sala"
+      <!-- Alertas internas del sistema -->
+      <template v-if="alertasInternas.length">
+        <div class="nb__section-label">Sistema</div>
+        <div class="nb__list">
+          <div
+            v-for="a in alertasInternas"
+            :key="`int-${a.id}`"
+            class="nb__item"
+            @click="internas.marcarLeida(a.id)"
           >
-            <i class="bi bi-arrow-right"></i>
-          </RouterLink>
+            <span class="nb__item-icon">{{ INTERNA_ICON[a.tipo] || '⚠️' }}</span>
+            <div class="nb__item-body">
+              <div class="nb__item-nombre">{{ a.mensaje }}</div>
+              <div class="nb__item-time">{{ formatTime(a.created_at) }}</div>
+            </div>
+            <span class="nb__dot" :class="SEV_CLASS[a.severidad]"></span>
+          </div>
         </div>
+        <div v-if="internas.noLeidas.value.length > 5" class="nb__more">
+          +{{ internas.noLeidas.value.length - 5 }} más
+          <button class="nb__mark-all" @click.stop="internas.marcarTodas()">Marcar todas leídas</button>
+        </div>
+      </template>
 
-        <div v-if="store.alertasActivas.length > 5" class="nb__more">
-          +{{ store.alertasActivas.length - 5 }} más
+      <!-- Alertas ambientales del sensor (live) -->
+      <template v-if="alertasSensor.length">
+        <div class="nb__section-label">Sensores</div>
+        <div class="nb__list">
+          <div v-for="a in alertasSensor" :key="`sen-${a.id}`" class="nb__item">
+            <span class="nb__item-icon">{{ SENSOR_ICON[a.tipo] || '📡' }}</span>
+            <div class="nb__item-body">
+              <div class="nb__item-nombre">{{ a.regla_nombre || a.tipo }}</div>
+              <div class="nb__item-time">{{ formatTime(a.generada_at) }}</div>
+            </div>
+            <RouterLink
+              v-if="a.sala_id"
+              :to="{ name: 'sala-ambiente', params: { id: a.sala_id } }"
+              class="nb__item-link"
+              title="Ver sala"
+            >
+              <i class="bi bi-arrow-right"></i>
+            </RouterLink>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -145,5 +178,25 @@ function irAlertas() {
 .nb__more {
   padding: .5rem 1rem; font-size: .75rem; color: #94a3b8;
   text-align: center; border-top: 1px solid #f1f5f9;
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
 }
+
+.nb__section-label {
+  padding: .35rem 1rem; font-size: .68rem; font-weight: 700;
+  color: #94a3b8; text-transform: uppercase; letter-spacing: .05em;
+  background: #f8fafc; border-bottom: 1px solid #f1f5f9;
+}
+
+.nb__dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.nb__dot--error   { background: #dc2626; }
+.nb__dot--warning { background: #f59e0b; }
+.nb__dot--info    { background: #3b82f6; }
+
+.nb__mark-all {
+  font-size: .68rem; color: #3b82f6; background: none; border: none;
+  cursor: pointer; padding: 0; white-space: nowrap;
+}
+.nb__mark-all:hover { text-decoration: underline; }
 </style>

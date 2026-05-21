@@ -37,12 +37,12 @@ class LotesController < ApplicationController
       lotes = lotes.where(estado: params[:estado]) if params[:estado].present?
     end
     lotes = lotes.order(created_at: :desc)
-    render json: lotes.map { |l| serialize_lote(l) }
+    render json: lotes.map { |l| LoteSerializer.serialize(l) }
   end
 
   # GET /lotes/:id
   def show
-    render json: serialize_lote(@lote, include_plants: true, include_cycle_data: true)
+    render json: LoteSerializer.serialize(@lote, include_plants: true, include_cycle_data: true)
   end
 
   # POST /salas/:sala_id/lotes
@@ -94,7 +94,7 @@ class LotesController < ApplicationController
       end
     end
 
-    render json: serialize_lote(@lote, include_plants: true), status: :created
+    render json: LoteSerializer.serialize(@lote, include_plants: true), status: :created
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
@@ -115,7 +115,7 @@ class LotesController < ApplicationController
       end
     end
     if @lote.update(lote_params)
-      render json: serialize_lote(@lote)
+      render json: LoteSerializer.serialize(@lote)
     else
       render json: { errors: @lote.errors.full_messages }, status: :unprocessable_entity
     end
@@ -232,7 +232,7 @@ class LotesController < ApplicationController
           sala_destino_id: sala_anterior_id != @lote.sala_id ? @lote.sala_id   : nil,
         )
       end
-      return render json: serialize_lote(@lote.reload, include_plants: true), status: :created
+      return render json: LoteSerializer.serialize(@lote.reload, include_plants: true), status: :created
     end
 
     # Manicura pesa un lote en en_manicura (nuevo flujo) → manicura_pendiente
@@ -261,7 +261,7 @@ class LotesController < ApplicationController
                               peso_seco_g: pesada_attrs[:peso_seco_g], manicura_id: current_user.id }
         )
       end
-      return render json: serialize_lote(@lote.reload), status: :created
+      return render json: LoteSerializer.serialize(@lote.reload), status: :created
     end
 
     # Manicura pesa un lote en secado → va a manicura_pendiente (flujo legacy)
@@ -290,7 +290,7 @@ class LotesController < ApplicationController
                               peso_seco_g: pesada_attrs[:peso_seco_g], manicura_id: current_user.id }
         )
       end
-      return render json: serialize_lote(@lote.reload), status: :created
+      return render json: LoteSerializer.serialize(@lote.reload), status: :created
     end
 
     estado_anterior  = @lote.estado
@@ -321,7 +321,7 @@ class LotesController < ApplicationController
       sala_destino_id: sala_anterior_id != @lote.sala_id ? @lote.sala_id   : nil,
     )
 
-    render json: serialize_lote(@lote.reload, include_plants: true)
+    render json: LoteSerializer.serialize(@lote.reload, include_plants: true)
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
@@ -341,7 +341,7 @@ class LotesController < ApplicationController
       # Flujo legacy: aprobar → curado
       @lote.aprobar_manicura!(aprobado_por: current_user, observaciones: params[:observaciones])
     end
-    render json: serialize_lote(@lote.reload)
+    render json: LoteSerializer.serialize(@lote.reload)
   rescue ActionController::ParameterMissing => e
     render json: { error: "Falta parámetro requerido: #{e.param}" }, status: :unprocessable_entity
   rescue ArgumentError, RuntimeError => e
@@ -355,7 +355,7 @@ class LotesController < ApplicationController
     authorize @lote, :asignar_manicurador?
     manicurador = current_user.club.users.where(role: Lote::ROLES_MANICURA).find(params[:manicurador_id])
     @lote.asignar_manicurador!(manicurador: manicurador, asignado_por: current_user, sala_id: params[:sala_id])
-    render json: serialize_lote(@lote.reload)
+    render json: LoteSerializer.serialize(@lote.reload)
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Manicurador no encontrado' }, status: :not_found
   rescue ArgumentError, RuntimeError => e
@@ -374,7 +374,7 @@ class LotesController < ApplicationController
       notas:          params[:notas],
       forma_producto: params[:forma_producto].presence || 'flor_seca',
     )
-    render json: serialize_lote(@lote.reload)
+    render json: LoteSerializer.serialize(@lote.reload)
   rescue ActionController::ParameterMissing => e
     render json: { error: "Falta parámetro requerido: #{e.param}" }, status: :unprocessable_entity
   rescue ActiveRecord::RecordNotFound
@@ -446,7 +446,7 @@ class LotesController < ApplicationController
       )
     end
 
-    render json: { ok: true, lote: serialize_lote(@lote.reload) }
+    render json: { ok: true, lote: LoteSerializer.serialize(@lote.reload) }
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
@@ -455,7 +455,7 @@ class LotesController < ApplicationController
   def rechazar_manicura
     authorize @lote, :rechazar_manicura?
     @lote.rechazar_manicura!(rechazado_por: current_user, motivo: params.require(:motivo))
-    render json: serialize_lote(@lote.reload)
+    render json: LoteSerializer.serialize(@lote.reload)
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
@@ -494,7 +494,7 @@ class LotesController < ApplicationController
       sala_origen_id:  sala_anterior_id != @lote.sala_id ? sala_anterior_id : nil,
       sala_destino_id: sala_anterior_id != @lote.sala_id ? @lote.sala_id   : nil,
     )
-    render json: serialize_lote(@lote.reload, include_plants: true)
+    render json: LoteSerializer.serialize(@lote.reload, include_plants: true)
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
@@ -564,7 +564,7 @@ class LotesController < ApplicationController
       end
     end
 
-    render json: serialize_lote(@lote.reload, include_plants: true), status: :created
+    render json: LoteSerializer.serialize(@lote.reload, include_plants: true), status: :created
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
@@ -578,9 +578,9 @@ class LotesController < ApplicationController
     dispensaciones = Dispensacion.joins(:stock).where(stocks: { lote_id: @lote.id }).includes(:paciente, :stock).recientes
 
     render json: {
-      lote:          serialize_lote(@lote, include_cycle_data: true),
-      pesadas:       pesadas.map { |p| serialize_pesada(p) },
-      stocks:        stocks.map  { |s| serialize_stock_inline(s) },
+      lote:          LoteSerializer.serialize(@lote, include_cycle_data: true),
+      pesadas:       pesadas.map { |p| PesadaSerializer.serialize(p) },
+      stocks:        stocks.map  { |s| StockSerializer.serialize_inline(s) },
       dispensaciones: dispensaciones.map { |d|
         { id: d.id, socio: "#{d.socio.nombre} #{d.socio.apellido}", fecha: d.fecha_dispensacion,
           cantidad: d.cantidad.to_f, unidad: d.stock&.unidad, forma_producto: d.stock&.forma_producto }
@@ -633,39 +633,6 @@ class LotesController < ApplicationController
     )
   end
 
-  def serialize_pesada(p)
-    {
-      id:               p.id,
-      fase_origen:      p.fase_origen,
-      fase_destino:     p.fase_destino,
-      peso_humedo_g:    p.peso_humedo_g&.to_f,
-      peso_seco_g:      p.peso_seco_g&.to_f,
-      peso_curado_g:    p.peso_curado_g&.to_f,
-      manicurado:           p.manicurado,
-      plantas_manicuradas:  p.plantas_manicuradas,
-      notas:                p.notas,
-      registrado_por:       p.registrado_por&.first_name,
-      registrado_at:    p.registrado_at,
-      merma_porcentual: p.merma_porcentual,
-      aprobada_at:      p.aprobada_at,
-      aprobada_por:     p.aprobada_por&.first_name,
-      rechazada_at:     p.rechazada_at,
-      motivo_rechazo:   p.motivo_rechazo,
-      pesadas_plantas:  p.pesadas_plantas.map { |pp|
-        { plant_id: pp.plant_id, nombre: pp.plant.nombre,
-          peso_humedo_g: pp.peso_humedo_g&.to_f, peso_seco_g: pp.peso_seco_g&.to_f }
-      },
-    }
-  end
-
-  def serialize_stock_inline(s)
-    { id: s.id, origen: s.origen, forma_producto: s.forma_producto,
-      unidad: s.unidad, cantidad: s.cantidad.to_f,
-      estado: s.estado, sede_id: s.sede_id,
-      precio_sugerido_ars: s.precio_sugerido_ars&.to_f,
-      lote_codigo: s.lote&.codigo }
-  end
-
   def cerrar_curado_con_stocks
     raise RuntimeError, 'El lote no está en curado' unless @lote.estado == 'curado'
 
@@ -713,9 +680,9 @@ class LotesController < ApplicationController
       @lote.update!(estado: 'finalizado')
 
       render json: {
-        lote:    serialize_lote(@lote.reload),
-        pesada:  serialize_pesada(pesada),
-        stocks:  stocks_creados.map { |s| serialize_stock_inline(s) },
+        lote:    LoteSerializer.serialize(@lote.reload),
+        pesada:  PesadaSerializer.serialize(pesada),
+        stocks:  stocks_creados.map { |s| StockSerializer.serialize_inline(s) },
       }, status: :created
     end
   rescue RuntimeError, ArgumentError => e
@@ -734,7 +701,7 @@ class LotesController < ApplicationController
       registrado_por:      current_user,
       peso_curado_g:       params[:peso_curado_g],
     )
-    render json: { lote: serialize_lote(@lote.reload), stock: serialize_stock_inline(stock) }, status: :created
+    render json: { lote: LoteSerializer.serialize(@lote.reload), stock: StockSerializer.serialize_inline(stock) }, status: :created
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
@@ -822,134 +789,6 @@ class LotesController < ApplicationController
     end
   end
 
-  def serialize_lote(lote, include_plants: false, include_cycle_data: false)
-    idx_ciclo        = Lote::CICLO_FASES.index(lote.estado)
-    proxima_fase     = if %w[semilla esqueje].include?(lote.estado)
-      'vegetativo'
-    elsif idx_ciclo
-      Lote::CICLO_FASES[idx_ciclo + 1]
-    end
-    puede_transicion = %w[semilla esqueje].include?(lote.estado) ||
-                       (idx_ciclo.present? && idx_ciclo < Lote::CICLO_FASES.length - 1)
-
-    eventos = lote.lote_eventos.loaded? ? lote.lote_eventos : lote.lote_eventos.to_a
-    ev_floracion = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'floracion' }.min_by(&:registrado_en)
-    ev_cosecha   = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'cosecha'   }.min_by(&:registrado_en)
-
-    fecha_inicio_floracion = ev_floracion&.registrado_en&.to_date
-    fecha_cosechado        = ev_cosecha&.registrado_en&.to_date
-
-    dias_vegetacion = (lote.start_date && fecha_inicio_floracion) ? (fecha_inicio_floracion - lote.start_date).to_i : nil
-    dias_floracion  = (fecha_inicio_floracion && fecha_cosechado)  ? (fecha_cosechado - fecha_inicio_floracion).to_i   : nil
-
-    result = {
-      id:                   lote.id,
-      club_id:              lote.club_id,
-      sala_id:              lote.sala_id,
-      codigo:               lote.codigo,
-      origen:               lote.origen,
-      planta_madre:         lote.planta_madre ? { id: lote.planta_madre.id, nombre: lote.planta_madre.nombre, codigo_qr: lote.planta_madre.codigo_qr } : nil,
-      estado:               lote.estado,
-      fase:                 lote.estado,
-      proxima_fase_posible: proxima_fase,
-      puede_transicionar:   puede_transicion,
-      puede_cerrar_curado:       lote.estado == 'curado',
-      puede_aprobar_manicura:    lote.estado == 'manicura_pendiente',
-      start_date:           lote.start_date,
-      plants_count:            lote.plants_count,
-      plantas_seleccion_count: lote.plants.where(es_seleccion: true).count,
-      plantas_cosechadas_count: lote.estado == 'floracion' ? lote.plants.where(state: 'cosechado').count : nil,
-      strain:            lote.strain,
-      notes:             lote.notes,
-      grow_type:          lote.grow_type,
-      light_type:         lote.light_type,
-      semanas_floracion:  lote.semanas_floracion,
-      tamanio_maceta:     lote.tamanio_maceta,
-      fotoperiodo:        lote.fotoperiodo,
-      genetica_id:        lote.genetica_id,
-      genetica:          lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, registrada_inase: lote.genetica.registrada_inase } : nil,
-      dias_desde_inicio: lote.dias_desde_inicio,
-      progreso_ciclo:    lote.progreso_ciclo,
-      costo_por_gramo:   lote.costo_lote&.costo_por_gramo&.to_f,
-      costo_total:       lote.costo_lote&.costo_total&.to_f,
-      gramos_producidos: lote.costo_lote&.gramos_producidos&.to_f,
-      tiene_costo:       lote.costo_lote.present?,
-      plants_count_objetivo:   lote.plants_count_objetivo,
-      rendimiento_objetivo_g:  lote.rendimiento_objetivo_g&.to_f,
-      fecha_cosecha_estimada:  lote.fecha_cosecha_estimada,
-      fecha_cosechado:         fecha_cosechado,
-      dias_vegetacion:         dias_vegetacion,
-      dias_floracion:          dias_floracion,
-      rendimiento_real_g:      lote.rendimiento_real_g&.to_f,
-      plants_count_cosechadas: lote.plants_count_cosechadas,
-      manicurador_id:   lote.manicurador_id,
-      manicurador:      lote.manicurador ? { id: lote.manicurador.id, nombre: lote.manicurador.first_name || lote.manicurador.email } : nil,
-      sala: {
-        id:     lote.sala.id,
-        nombre: lote.sala.nombre,
-        tipo:   lote.sala.tipo,
-        sede:   lote.sala.sede ? { id: lote.sala.sede_id, nombre: lote.sala.sede.nombre } : nil,
-      },
-      created_at: lote.created_at,
-      updated_at: lote.updated_at,
-    }
-
-    pm = lote.pesadas.loaded? \
-      ? lote.pesadas.select(&:manicurado).max_by { |p| p.registrado_at } \
-      : lote.pesadas.where(manicurado: true).order(registrado_at: :desc).first
-    result[:ultima_pesada_manicura] = pm ? {
-      peso_seco_g:         pm.peso_seco_g&.to_f,
-      plantas_manicuradas: pm.plantas_manicuradas,
-      notas:               pm.notas,
-      registrado_at:       pm.registrado_at,
-      registrado_por:      pm.registrado_por&.first_name,
-      aprobada_at:         pm.aprobada_at,
-    } : nil
-
-    # Mejor peso disponible de cualquier pesada (para lotes finalizados vía cerrar_curado)
-    ultima_p = lote.pesadas.loaded? \
-      ? lote.pesadas.max_by { |p| p.registrado_at } \
-      : lote.pesadas.order(registrado_at: :desc).first
-    result[:peso_final_g] = ultima_p&.peso_curado_g&.to_f || ultima_p&.peso_seco_g&.to_f
-
-    if include_cycle_data
-      result[:pesadas] = lote.pesadas.includes(:registrado_por, pesadas_plantas: :plant).map { |p| serialize_pesada(p) }
-      result[:stocks]  = lote.stocks.includes(:sede).map { |s| serialize_stock_inline(s) }
-    end
-
-    if include_plants
-      has_pasada_col = Plant.column_names.include?('pasada_cosecha')
-      result[:plants] = lote.plants.order(:nombre).map { |p|
-        { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, state: p.state,
-          es_seleccion: p.es_seleccion,
-          fecha_cosecha:  p.fecha_cosecha,
-          pasada_cosecha: has_pasada_col ? p.pasada_cosecha : nil }
-      }
-      result[:plantas_en_floracion] = lote.plants.where(state: 'floracion').count
-      result[:pasadas_cosecha] = if has_pasada_col
-        lote.plants.where.not(pasada_cosecha: nil)
-            .group(:pasada_cosecha).count
-            .sort.map { |pasada, cnt| { pasada: pasada, plantas: cnt } }
-      else
-        []
-      end
-
-      # Todas las salas activas del club — el usuario elige a cuál mover el lote
-      result[:salas_destino] = lote.club.salas.activas
-                                    .includes(:responsable)
-                                    .order(:nombre)
-                                    .map { |s| {
-                                      id:                 s.id,
-                                      nombre:             s.nombre,
-                                      kind:               s.kind,
-                                      actual:             s.id == lote.sala_id,
-                                      responsable_id:     s.responsable_id,
-                                      responsable_nombre: s.responsable&.nombre_completo,
-                                    } }
-    end
-
-    result
-  end
 end
 
 

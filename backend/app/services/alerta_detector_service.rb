@@ -1,14 +1,15 @@
 class AlertaDetectorService
+  # Rangos de fallback cuando el club no tiene setpoints configurados
   RANGOS = {
     'vegetativo' => { ph: (5.8..6.2), ec: (0.8..1.4), temperatura: (20..28), humedad: (50..70) },
     'floracion'  => { ph: (6.0..6.5), ec: (1.4..2.2), temperatura: (20..26), humedad: (40..55) },
-    'maduracion' => { ph: (6.0..6.5), ec: (1.2..1.8), temperatura: (18..24), humedad: (40..50) },
   }.freeze
+
+  CAMPOS_MONITOREADOS = %i[ph ec temperatura humedad].freeze
 
   DIAS_SIN_REGISTRO = {
     'vegetativo' => 3,
     'floracion'  => 2,
-    'maduracion' => 1,
     'cosecha'    => 1,
   }.freeze
 
@@ -19,16 +20,21 @@ class AlertaDetectorService
   end
 
   def detectar!
+    # Precargamos todos los setpoints del club para evitar N+1 por lote
+    setpoints_club = SetpointFase.del_club(@club.id).to_a
+
     lotes = @club.lotes
                  .where.not(estado: %w[finalizado curado])
                  .includes(:registros_ambientales, :genetica)
 
     lotes.find_each do |lote|
       detectar_sin_registro(lote)
-      detectar_rango_ambiental(lote)
+      detectar_rango_ambiental(lote, setpoints_club)
       detectar_cosecha_pendiente(lote)
       detectar_tareas_vencidas(lote)
     end
+
+    detectar_saldo_cc_bajo
   end
 
   private
@@ -55,6 +61,9 @@ class AlertaDetectorService
     if contexto[:tarea_id]
       scope = scope.where("contexto->>'tarea_id' = ?", contexto[:tarea_id].to_s)
     end
+    if contexto[:paciente_id]
+      scope = scope.where("contexto->>'paciente_id' = ?", contexto[:paciente_id].to_s)
+    end
 
     scope.exists?
   end
@@ -75,15 +84,15 @@ class AlertaDetectorService
     )
   end
 
-  def detectar_rango_ambiental(lote)
-    rangos = RANGOS[lote.estado]
-    return unless rangos
-
+  def detectar_rango_ambiental(lote, setpoints_club)
     ultimos = lote.registros_ambientales.order(registrado_en: :desc).limit(3).to_a
     return if ultimos.empty?
 
-    rangos.each do |campo, rango|
-      valores = ultimos.filter_map(&campo)
+    CAMPOS_MONITOREADOS.each do |campo|
+      rango = rango_para(campo, lote.estado, lote.genetica_id, setpoints_club)
+      next unless rango
+
+      valores = ultimos.filter_map { |r| v = r.public_send(campo); v&.to_f }
       next if valores.size < 2
 
       fuera = valores.count { |v| !rango.include?(v) }
@@ -99,6 +108,29 @@ class AlertaDetectorService
         mensaje:   "#{lote.codigo}: #{campo} promedio #{avg} fuera de rango #{rango.min}–#{rango.max} (#{lote.estado}). #{fuera}/#{valores.size} registros afectados.",
         contexto:  { campo: campo.to_s, avg: avg, rango_min: rango.min, rango_max: rango.max, valores: valores }
       )
+    end
+  end
+
+  # Devuelve el rango a usar para un campo/fase dado: prioriza setpoints del club,
+  # cae a RANGOS (defaults) si no hay configuración.
+  def rango_para(campo, fase, genetica_id, setpoints_club)
+    sp = setpoints_club.find do |s|
+      s.fase == fase &&
+        s.tipo_lectura == campo.to_s &&
+        s.valor_min.present? &&
+        s.valor_max.present? &&
+        (s.genetica_id.nil? || s.genetica_id == genetica_id)
+    end
+    # Si hay dos matches (genérica + específica de cepa), preferir la específica
+    if genetica_id.present?
+      sp_especifico = setpoints_club.find { |s| s.fase == fase && s.tipo_lectura == campo.to_s && s.genetica_id == genetica_id && s.valor_min.present? && s.valor_max.present? }
+      sp = sp_especifico if sp_especifico
+    end
+
+    if sp
+      (sp.valor_min.to_f..sp.valor_max.to_f)
+    else
+      RANGOS.dig(fase, campo)
     end
   end
 
@@ -133,6 +165,49 @@ class AlertaDetectorService
         severidad: tarea.prioridad == 'urgente' ? 'error' : 'warning',
         mensaje:   "Tarea '#{tarea.titulo}' (#{tarea.prioridad}) vencida hace #{dias} días en #{lote.codigo}.",
         contexto:  { tarea_id: tarea.id, titulo: tarea.titulo, dias: dias, prioridad: tarea.prioridad }
+      )
+    end
+  end
+
+  def detectar_saldo_cc_bajo
+    @club.pacientes
+         .joins(:cuenta_corriente)
+         .where('cuenta_corrientes.limite_credito > 0')
+         .includes(:cuenta_corriente)
+         .find_each do |paciente|
+      cc = paciente.cuenta_corriente
+
+      # Saldo en dinero: margen = saldo_disponible + limite_credito
+      # Si margen < 20% del límite → warning; si margen <= 0 → error
+      margen = cc.saldo_disponible + cc.limite_credito
+      pct    = (margen / cc.limite_credito * 100).round(0)
+      if pct <= 0
+        crear_alerta(
+          tipo:      'saldo_cc_bajo',
+          severidad: 'error',
+          mensaje:   "#{paciente.nombre_completo} agotó el crédito en cuenta corriente.",
+          contexto:  { paciente_id: paciente.id, margen: margen.to_f, pct: pct }
+        )
+      elsif pct <= 20
+        crear_alerta(
+          tipo:      'saldo_cc_bajo',
+          severidad: 'warning',
+          mensaje:   "#{paciente.nombre_completo} tiene solo #{pct}% de crédito disponible (#{margen.round(2)} ARS).",
+          contexto:  { paciente_id: paciente.id, margen: margen.to_f, pct: pct }
+        )
+      end
+
+      # Gramos: si activo y saldo <= 20% del límite
+      next unless cc.credito_gramos_activo? && cc.limite_credito_g.to_d > 0
+      pct_g = (cc.saldo_disponible_g.to_d / cc.limite_credito_g * 100).round(0)
+      next unless pct_g <= 20
+
+      sev = pct_g <= 0 ? 'error' : 'warning'
+      crear_alerta(
+        tipo:      'saldo_gramos_bajo',
+        severidad: sev,
+        mensaje:   "#{paciente.nombre_completo} tiene #{pct_g <= 0 ? 'sin' : "#{pct_g}%"} saldo en crédito gramos (#{cc.saldo_disponible_g.to_f.round(1)}g).",
+        contexto:  { paciente_id: paciente.id, saldo_g: cc.saldo_disponible_g.to_f, pct_g: pct_g }
       )
     end
   end

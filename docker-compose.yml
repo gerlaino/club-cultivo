@@ -16,6 +16,7 @@ services:
       - redisdata:/data
 
   backend:
+    image: clubcultivo-backend:latest
     user: "${UID}:${GID}"
     build:
       context: ./backend
@@ -36,6 +37,7 @@ services:
     depends_on: [db, redis, mailhog]
 
   sidekiq:
+    image: clubcultivo-sidekiq:latest
     user: "${UID}:${GID}"
     build:
       context: ./backend

@@ -43,7 +43,7 @@ class PacientesController < ApplicationController
 
   def show
     json = @paciente.as_json(
-      methods: [:nombre_completo, :dispensado_mes_actual_g, :porcentaje_limite_mensual, :saldo_cc, :limite_cc],
+      methods: [:nombre_completo, :dispensado_mes_actual_g, :porcentaje_limite_mensual, :saldo_cc, :limite_cc, :saldo_cc_g, :limite_cc_g, :cc_gramos_activo],
       except:  :notas_clinicas
     )
     json['notas_clinicas'] = @paciente.notas_clinicas if policy(@paciente).ver_notas_clinicas?
