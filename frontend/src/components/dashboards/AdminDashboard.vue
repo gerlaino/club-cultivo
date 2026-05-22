@@ -155,7 +155,12 @@ async function onOnboardingCompletado() {
         <div class="ad__kpi-card">
           <span class="ad__kpi-label">Pacientes activos</span>
           <div class="ad__kpi-num">{{ stats?.pacientes ?? 0 }}</div>
-          <div class="ad__kpi-sub">{{ stats?.pacientes ?? 0 }} socios habilitados</div>
+          <div class="ad__kpi-sub" :style="{ color: pacientesNecesitanAtencion ? '#d97706' : '' }">
+            <template v-if="pacientesNecesitanAtencion">
+              {{ (stats?.reprocann_vencidos || 0) + (stats?.reprocann_por_vencer || 0) }} con atención
+            </template>
+            <template v-else>habilitados ✓</template>
+          </div>
         </div>
 
         <!-- 2. Plantas en ciclo -->
@@ -197,7 +202,7 @@ async function onOnboardingCompletado() {
             <svg width="80" height="28" viewBox="0 0 80 28" fill="none">
               <path
                 :d="sparklinePath(sparklineData)"
-                stroke="#16a34a"
+                :stroke="balancePositivo ? '#16a34a' : '#dc2626'"
                 stroke-width="1.5"
                 stroke-linecap="round"
                 stroke-linejoin="round"

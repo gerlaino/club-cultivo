@@ -433,6 +433,7 @@ onMounted(async () => {
       salasStore.fetch(),
       lotesStore.fetch(),
       cargarSemana(),
+      ambienteStore.cargarAlertas(),
     ])
   } catch {} finally { loading.value = false }
 })
