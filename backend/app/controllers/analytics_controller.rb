@@ -9,14 +9,18 @@ class AnalyticsController < ApplicationController
     end
 
     club = current_user.club
-    data = Rails.cache.fetch("analytics/rendimiento_genetica/#{club.id}", expires_in: 15.minutes) do
-      calcular_rendimiento_genetica(club)
+    año  = params[:año].presence
+    cache_key = "analytics/rendimiento_genetica/#{club.id}/#{año || 'all'}"
+    Rails.cache.delete(cache_key) if params[:bust]
+    data = Rails.cache.fetch(cache_key, expires_in: 15.minutes) do
+      calcular_rendimiento_genetica(club, año: año)
     end
     render json: data
   end
 
-  def calcular_rendimiento_genetica(club)
+  def calcular_rendimiento_genetica(club, año: nil)
     lotes = club.lotes.where.not(estado: 'germinacion').includes(:genetica)
+    lotes = lotes.where('EXTRACT(YEAR FROM COALESCE(start_date, created_at)) = ?', año) if año
 
     # Rendimiento por genética (solo lotes con datos reales)
     por_genetica = lotes.group_by { |l| l.genetica_id }.filter_map do |gid, ls|
@@ -39,6 +43,9 @@ class AnalyticsController < ApplicationController
         end
       end
 
+      con_ambos     = ls.select { |l| l.rendimiento_real_g.present? && l.plants_count.present? && l.plants_count > 0 }
+      g_por_planta  = con_ambos.any? ? (con_ambos.sum { |l| l.rendimiento_real_g.to_f / l.plants_count } / con_ambos.size).round(1) : nil
+
       {
         genetica_id:          gid,
         nombre:               genetica.nombre,
@@ -48,6 +55,7 @@ class AnalyticsController < ApplicationController
         objetivo_promedio:    objetivo_avg,
         desviacion_promedio:  rendimiento_avg && objetivo_avg ? ((rendimiento_avg - objetivo_avg) / objetivo_avg * 100).round(1) : nil,
         merma_promedio_pct:   merma_avg,
+        g_por_planta:         g_por_planta,
         lotes_activos:        ls.count { |l| %w[vegetativo floracion secado curado].include?(l.estado) },
       }
     end.sort_by { |r| [-(r[:rendimiento_promedio] || 0)] }
@@ -67,6 +75,7 @@ class AnalyticsController < ApplicationController
         plants_count:        l.plants_count,
         rendimiento_real_g:  l.rendimiento_real_g&.to_f,
         rendimiento_obj_g:   l.rendimiento_objetivo_g&.to_f,
+        g_por_planta:        l.rendimiento_real_g && l.plants_count.to_i > 0 ? (l.rendimiento_real_g.to_f / l.plants_count).round(1) : nil,
         desv_pct:            l.rendimiento_real_g && l.rendimiento_objetivo_g ? ((l.rendimiento_real_g.to_f - l.rendimiento_objetivo_g.to_f) / l.rendimiento_objetivo_g.to_f * 100).round(1) : nil,
         created_at:          l.created_at,
       }
@@ -177,16 +186,20 @@ class AnalyticsController < ApplicationController
     end
 
     club = current_user.club
-    data = Rails.cache.fetch("analytics/produccion/#{club.id}", expires_in: 15.minutes) do
-      calcular_produccion(club)
+    año  = params[:año].presence
+    cache_key = "analytics/produccion/#{club.id}/#{año || 'all'}"
+    Rails.cache.delete(cache_key) if params[:bust]
+    data = Rails.cache.fetch(cache_key, expires_in: 15.minutes) do
+      calcular_produccion(club, año: año)
     end
     render json: data
   end
 
   private
 
-  def calcular_produccion(club)
+  def calcular_produccion(club, año: nil)
     lotes = club.lotes.includes(:genetica, :plants).where.not(estado: 'germinacion')
+    lotes = lotes.where('EXTRACT(YEAR FROM COALESCE(start_date, created_at)) = ?', año) if año
 
     # ── 1. PÉRDIDAS por cepa ───────────────────────────────────────
     perdidas_por_genetica = lotes.group_by(&:genetica_id).filter_map do |gid, ls|

@@ -429,11 +429,11 @@ export const getAriccameRegistro   = (id)          => api.get(`/ariccame_registr
 export const getStockPublico = (codigoQr) => axios.get(`/s/${codigoQr}`)
 
 // ── Analytics ─────────────────────────────────────────────────────────────────
-export const getAnalyticsRendimiento = () => api.get('/analytics/rendimiento_genetica')
+export const getAnalyticsRendimiento = (params = {}) => api.get('/analytics/rendimiento_genetica', { params })
 export const getAnalyticsDispensador = () => api.get('/analytics/dispensador')
-export const getAnalyticsProduccion  = () => api.get('/analytics/produccion')
+export const getAnalyticsProduccion  = (params = {}) => api.get('/analytics/produccion', { params })
 
-// ── Benchmark ────────────────────────────────────────────────────────────────
+// ── Benchmark (sin uso activo) ────────────────────────────────────────────────
 export const getBenchmark = () => api.get('/benchmark')
 
 // ── Alertas internas ──────────────────────────────────────────────────────────

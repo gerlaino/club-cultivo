@@ -2,15 +2,22 @@
 import { ref, computed, onMounted } from 'vue'
 import { getAnalyticsRendimiento, getAnalyticsProduccion } from '../lib/api.js'
 
-const tab      = ref('geneticas')
-const loading  = ref(false)
-const dataRend = ref(null)
-const dataProd = ref(null)
+const tab        = ref('geneticas')
+const loading    = ref(false)
+const dataRend   = ref(null)
+const dataProd   = ref(null)
+const añoFiltro  = ref(null)
 
-async function cargar() {
+const añoActual = new Date().getFullYear()
+const años = [null, ...Array.from({ length: 4 }, (_, i) => añoActual - i)]
+
+async function cargar(bust = false) {
   loading.value = true
+  const params = {}
+  if (añoFiltro.value) params.año = añoFiltro.value
+  if (bust) params.bust = true
   try {
-    const [r, p] = await Promise.all([getAnalyticsRendimiento(), getAnalyticsProduccion()])
+    const [r, p] = await Promise.all([getAnalyticsRendimiento(params), getAnalyticsProduccion(params)])
     dataRend.value = r.data
     dataProd.value = p.data
   } catch {
@@ -19,6 +26,12 @@ async function cargar() {
     loading.value = false
   }
 }
+
+function setAño(y) {
+  añoFiltro.value = y
+  cargar()
+}
+
 onMounted(cargar)
 
 // ── Exportaciones ─────────────────────────────────────────────────
@@ -93,9 +106,14 @@ function fmtDias(v) { return v != null ? `${v} d` : '—' }
 function fmtPct(v) { return v != null ? `${v}%` : '—' }
 
 // ── Genéticas — datos derivados ──────────────────────────────────
-const porGenetica = computed(() => dataRend.value?.por_genetica ?? [])
+const porGenetica    = computed(() => dataRend.value?.por_genetica ?? [])
 const lotesRecientes = computed(() => dataRend.value?.lotes_recientes ?? [])
-const resumen = computed(() => dataRend.value?.resumen ?? {})
+const resumen        = computed(() => dataRend.value?.resumen ?? {})
+
+const maxRendimiento = computed(() =>
+  Math.max(...porGenetica.value.map(g => Math.max(g.rendimiento_promedio || 0, g.objetivo_promedio || 0)), 1)
+)
+function barPct(val) { return val != null ? Math.min((val / maxRendimiento.value) * 100, 100) : 0 }
 
 // ── Ciclos ───────────────────────────────────────────────────────
 const ciclos = computed(() => dataProd.value?.ciclos ?? [])
@@ -120,9 +138,19 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
         <h1 class="an__title">Analítica de producción</h1>
         <p class="an__sub">Rendimiento, ciclos y pérdidas por cepa</p>
       </div>
-      <button class="an__refresh" @click="cargar" :disabled="loading" title="Actualizar">
-        <i class="bi bi-arrow-clockwise" :class="{ 'an__spin': loading }"></i>
-      </button>
+      <div class="an__header-right">
+        <div class="an__year-filter">
+          <button
+            v-for="y in años" :key="y ?? 'all'"
+            class="an__year-btn"
+            :class="{ 'an__year-btn--active': añoFiltro === y }"
+            @click="setAño(y)"
+          >{{ y ?? 'Todos' }}</button>
+        </div>
+        <button class="an__refresh" @click="cargar(true)" :disabled="loading" title="Forzar actualización">
+          <i class="bi bi-arrow-clockwise" :class="{ 'an__spin': loading }"></i>
+        </button>
+      </div>
     </div>
 
     <!-- Tabs -->
@@ -179,6 +207,32 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
         </div>
       </div>
 
+      <!-- Chart visual -->
+      <div v-if="porGenetica.length" class="an__card" style="margin-bottom:1.25rem">
+        <div class="an__card-header">
+          <span class="an__card-title">Comparación visual</span>
+          <div class="an__legend">
+            <span class="an__legend-dot an__legend-dot--real"></span><span class="an__legend-lbl">Real</span>
+            <span class="an__legend-dot an__legend-dot--obj"></span><span class="an__legend-lbl">Objetivo</span>
+          </div>
+        </div>
+        <div class="an__chart-body">
+          <div v-for="g in porGenetica" :key="g.genetica_id" class="an__chart-row">
+            <span class="an__chart-lbl" :title="g.nombre">{{ g.nombre }}</span>
+            <div class="an__chart-bars-wrap">
+              <div class="an__chart-track">
+                <div class="an__bar-real" :style="{ width: barPct(g.rendimiento_promedio) + '%' }"></div>
+              </div>
+              <div class="an__chart-track">
+                <div class="an__bar-obj" :style="{ width: barPct(g.objetivo_promedio) + '%' }"></div>
+              </div>
+            </div>
+            <span class="an__chart-val">{{ fmt(g.rendimiento_promedio) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla -->
       <div class="an__card">
         <div class="an__card-header">
           <span class="an__card-title">Rendimiento por genética</span>
@@ -194,6 +248,7 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
                 <th class="an__th-r">Lotes</th>
                 <th class="an__th-r">Activos</th>
                 <th class="an__th-r">Rend. prom.</th>
+                <th class="an__th-r">g/planta</th>
                 <th class="an__th-r">Objetivo</th>
                 <th class="an__th-r">Desvío</th>
                 <th class="an__th-r">Merma %</th>
@@ -208,6 +263,7 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
                   <span v-else class="an__nd">—</span>
                 </td>
                 <td class="an__td-r an__td-bold">{{ fmt(g.rendimiento_promedio) }}</td>
+                <td class="an__td-r an__td-muted">{{ g.g_por_planta != null ? g.g_por_planta + ' g' : '—' }}</td>
                 <td class="an__td-r">{{ fmt(g.objetivo_promedio) }}</td>
                 <td class="an__td-r">
                   <span v-if="g.desviacion_promedio != null" class="an__desv" :class="g.desviacion_promedio >= 0 ? 'an__desv--pos' : 'an__desv--neg'">
@@ -238,6 +294,7 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
                 <th>Estado</th>
                 <th class="an__th-r">Plantas</th>
                 <th class="an__th-r">Real</th>
+                <th class="an__th-r">g/planta</th>
                 <th class="an__th-r">Objetivo</th>
                 <th class="an__th-r">Desvío</th>
               </tr>
@@ -253,6 +310,7 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
                 </td>
                 <td class="an__td-r">{{ l.plants_count ?? '—' }}</td>
                 <td class="an__td-r an__td-bold">{{ fmt(l.rendimiento_real_g) }}</td>
+                <td class="an__td-r an__td-muted">{{ l.g_por_planta != null ? l.g_por_planta + ' g' : '—' }}</td>
                 <td class="an__td-r">{{ fmt(l.rendimiento_obj_g) }}</td>
                 <td class="an__td-r">
                   <span v-if="l.desv_pct != null" class="an__desv" :class="l.desv_pct >= 0 ? 'an__desv--pos' : 'an__desv--neg'">
@@ -433,13 +491,36 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
 .an { padding: 1.75rem 1.75rem 3rem; max-width: 1100px; margin: 0 auto; }
 @media (max-width: 767px) { .an { padding: 1.25rem 1rem 2rem; } }
 
-.an__header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.75rem; }
+.an__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
 .an__title { font-size: 1.6rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -.03em; }
 .an__sub { font-size: .82rem; color: #64748b; margin: .2rem 0 0; }
+.an__header-right { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
 .an__refresh { background: #f1f5f9; border: none; border-radius: 8px; padding: .5rem .65rem; cursor: pointer; color: #64748b; font-size: .9rem; transition: all .15s; }
 .an__refresh:hover { background: #e2e8f0; color: #0f172a; }
 .an__spin { display: inline-block; animation: an-spin .7s linear infinite; }
 @keyframes an-spin { to { transform: rotate(360deg); } }
+
+/* Year filter */
+.an__year-filter { display: flex; gap: .25rem; }
+.an__year-btn { padding: .3rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 6px; background: #fff; font-size: .75rem; font-weight: 600; color: #64748b; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.an__year-btn:hover { border-color: #1b5e20; color: #1b5e20; }
+.an__year-btn--active { background: #1b5e20; border-color: #1b5e20; color: #fff; }
+
+/* Chart visual */
+.an__legend { display: flex; align-items: center; gap: .6rem; }
+.an__legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+.an__legend-dot--real { background: #15803d; }
+.an__legend-dot--obj  { background: #93c5fd; }
+.an__legend-lbl { font-size: .72rem; color: #64748b; }
+.an__chart-body { padding: .75rem 1.1rem 1rem; display: flex; flex-direction: column; gap: .55rem; }
+.an__chart-row { display: grid; grid-template-columns: 140px 1fr 72px; align-items: center; gap: .75rem; }
+@media (max-width: 640px) { .an__chart-row { grid-template-columns: 100px 1fr 60px; } }
+.an__chart-lbl { font-size: .78rem; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.an__chart-bars-wrap { display: flex; flex-direction: column; gap: .2rem; }
+.an__chart-track { height: 8px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.an__bar-real { height: 100%; border-radius: 999px; background: #15803d; transition: width .5s ease; }
+.an__bar-obj  { height: 100%; border-radius: 999px; background: #93c5fd; transition: width .5s ease; }
+.an__chart-val { font-size: .8rem; font-weight: 700; color: #0f172a; text-align: right; }
 
 /* Tabs */
 .an__tabs-row { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.75rem; gap: .5rem; flex-wrap: wrap; }
