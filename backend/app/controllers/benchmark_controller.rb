@@ -2,9 +2,9 @@ class BenchmarkController < ApplicationController
   before_action :authenticate_user!
 
   # GET /api/benchmark
-  # Para: admin, super_admin
+  # Solo super_admin — uso interno de plataforma, no expuesto a clubs
   def show
-    unless %w[admin super_admin].include?(current_user.role)
+    unless current_user.role == 'super_admin'
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 

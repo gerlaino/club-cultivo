@@ -286,19 +286,6 @@ const routes = [
     },
   },
 
-  // Benchmark
-  {
-    path: "/benchmark",
-    name: "benchmark",
-    component: () => import("../views/BenchmarkView.vue"),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore();
-      if (["admin", "super_admin"].includes(auth.user?.role)) next();
-      else next("/");
-    },
-  },
-
   // Templates de documentos (solo admin)
   {
     path: "/documentos/templates",

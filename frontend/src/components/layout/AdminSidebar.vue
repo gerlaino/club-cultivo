@@ -75,7 +75,7 @@ import DsAvatar from '../../design-system/components/Avatar.vue'
 import {
   LayoutDashboard, Users, Building2, Wallet, CheckSquare,
   Sprout, FileCheck, FileText, UserCog, Globe, ClipboardCheck,
-  Container, BarChart3, ShieldCheck, Truck, TrendingUp, History,
+  Container, ShieldCheck, Truck, TrendingUp, History,
   GitBranch, Layers, ChevronDown, Dna, Archive, Leaf, Boxes, Scissors,
   ClipboardList,
 } from 'lucide-vue-next'
@@ -140,7 +140,6 @@ const GRUPOS = [
     defaultOpen: false,
     items: [
       { to: '/analitica',  icon: TrendingUp, label: 'Analítica' },
-      { to: '/benchmark',  icon: BarChart3,  label: 'Benchmark' },
     ],
   },
 ]

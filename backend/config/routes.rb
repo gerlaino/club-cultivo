@@ -9,11 +9,6 @@ Rails.application.routes.draw do
   get "/s/:codigo_qr", to: "public/stocks#show_qr",    defaults: { format: :json }
   get "/c/:token",     to: "public/carnets#show",      defaults: { format: :json }
 
-  # API pública para investigación — sin auth, datos anonimizados agregados
-  scope '/api/public', defaults: { format: :json } do
-    get 'benchmark', to: 'public/benchmark#show'
-  end
-
   # Web pública del club (accedida desde el sitio web externo del club)
   namespace :public, defaults: { format: :json } do
     resource :club, only: [:show], controller: 'club'
@@ -48,7 +43,7 @@ Rails.application.routes.draw do
       get :produccion
     end
 
-    resource :benchmark, only: [:show], controller: :benchmark
+    resource :benchmark, only: [:show], controller: :benchmark  # solo super_admin, uso interno de plataforma
 
     post '/asistente/parsear',       to: 'asistente#parsear'
     post '/asistente/ejecutar',      to: 'asistente#ejecutar'

@@ -433,9 +433,6 @@ export const getAnalyticsRendimiento = (params = {}) => api.get('/analytics/rend
 export const getAnalyticsDispensador = () => api.get('/analytics/dispensador')
 export const getAnalyticsProduccion  = (params = {}) => api.get('/analytics/produccion', { params })
 
-// ── Benchmark (sin uso activo) ────────────────────────────────────────────────
-export const getBenchmark = () => api.get('/benchmark')
-
 // ── Alertas internas ──────────────────────────────────────────────────────────
 export const getAlertasInternas       = (params = {}) => api.get('/alertas_internas', { params })
 export const marcarAlertaInterna      = (id)          => api.patch(`/alertas_internas/${id}/marcar_leida`)

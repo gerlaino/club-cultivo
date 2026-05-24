@@ -6,7 +6,7 @@ import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { createPlant, updatePlant,
   getRegistrosAmbientales, getLoteEventos,
-  getLoteTimeline, listSedes, deleteLote, updateLote } from "../lib/api"
+  getLoteTimeline, listSedes, deleteLote, updateLote, createPlantActivity } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
@@ -282,12 +282,30 @@ const showTrasplanteLote   = ref(false)
 const savingTrasplanteLote = ref(false)
 const trasplanteLoteError  = ref(null)
 const trasplanteLoteForm   = ref({ maceta_origen_l: null, maceta_destino_l: null, notas: '' })
+const trasplanteSeleccion  = ref([])
 
 const MACETA_OPTS = [0.5, 1, 2, 3, 4.5, 6.5, 7, 10, 11, 15, 18, 20, 25, 30, 40, 50, 65, 80, 100, 200]
 
+const todasTrasplanteSeleccionadas = computed(() =>
+  plantList.value.length > 0 && trasplanteSeleccion.value.length === plantList.value.length
+)
+
+function toggleTrasplantePlanta(plantId) {
+  const idx = trasplanteSeleccion.value.indexOf(plantId)
+  if (idx === -1) trasplanteSeleccion.value.push(plantId)
+  else trasplanteSeleccion.value.splice(idx, 1)
+}
+
+function toggleTrasplanteTodas() {
+  trasplanteSeleccion.value = todasTrasplanteSeleccionadas.value
+    ? []
+    : plantList.value.map(p => p.id)
+}
+
 function abrirTrasplanteLote() {
-  trasplanteLoteForm.value = { maceta_origen_l: lote.value?.tamanio_maceta || null, maceta_destino_l: null, notas: '' }
+  trasplanteLoteForm.value  = { maceta_origen_l: lote.value?.tamanio_maceta || null, maceta_destino_l: null, notas: '' }
   trasplanteLoteError.value = null
+  trasplanteSeleccion.value = plantList.value.map(p => p.id)
   showTrasplanteLote.value  = true
 }
 
@@ -296,13 +314,26 @@ async function guardarTrasplanteLote() {
   if (!f.maceta_destino_l || f.maceta_destino_l <= 0) {
     trasplanteLoteError.value = 'Seleccioná o ingresá el tamaño de maceta destino'; return
   }
+  if (!trasplanteSeleccion.value.length) {
+    trasplanteLoteError.value = 'Seleccioná al menos una planta'; return
+  }
   savingTrasplanteLote.value = true
   trasplanteLoteError.value  = null
   try {
     await updateLote(id, { tamanio_maceta: parseFloat(f.maceta_destino_l) })
     await lotes.fetchOne(id)
+    await Promise.all(
+      trasplanteSeleccion.value.map(plantId =>
+        createPlantActivity(plantId, {
+          activity_type: 'transplant',
+          description: f.notas || undefined,
+          metadata: { maceta_origen_l: f.maceta_origen_l, maceta_destino_l: parseFloat(f.maceta_destino_l) },
+        })
+      )
+    )
+    const n = trasplanteSeleccion.value.length
     showTrasplanteLote.value = false
-    toast.success(`Lote trasplantado a maceta ${f.maceta_destino_l}L`)
+    toast.success(`${n} planta${n !== 1 ? 's' : ''} trasplantada${n !== 1 ? 's' : ''} a ${f.maceta_destino_l}L`)
   } catch (e) {
     trasplanteLoteError.value = e?.response?.data?.error || 'Error al guardar'
   } finally {
@@ -1588,7 +1619,7 @@ onUnmounted(() => {
     <!-- ══ Modal Trasplante de Lote ══ -->
     <Teleport to="body">
       <div v-if="showTrasplanteLote" class="ld__overlay" @click.self="showTrasplanteLote = false">
-        <div class="ld__modal ld__modal--sm">
+        <div class="ld__modal" style="max-width:500px">
           <div class="ld__modal-header">
             <div>
               <h3 class="ld__modal-title">🪴 Trasplantar lote</h3>
@@ -1599,6 +1630,7 @@ onUnmounted(() => {
           <div class="ld__modal-body">
             <div v-if="trasplanteLoteError" class="ld__alert">{{ trasplanteLoteError }}</div>
 
+            <!-- Macetas -->
             <div class="ld__tl-grid">
               <div class="ld__field">
                 <label class="ld__label">Maceta actual <span class="ld__label-unit">litros</span></label>
@@ -1626,7 +1658,30 @@ onUnmounted(() => {
               <span class="ld__tl-val">{{ trasplanteLoteForm.maceta_origen_l }}L</span>
               <i class="bi bi-arrow-right ld__tl-arrow"></i>
               <span class="ld__tl-val ld__tl-val--dest">{{ trasplanteLoteForm.maceta_destino_l }}L</span>
-              <span class="ld__tl-plants">× {{ lote?.plants_count }} plantas</span>
+              <span class="ld__tl-plants">× {{ trasplanteSeleccion.length }} planta{{ trasplanteSeleccion.length !== 1 ? 's' : '' }}</span>
+            </div>
+
+            <!-- Selección de plantas -->
+            <div class="ld__modal-section-title" style="margin-top:.85rem">Plantas a trasplantar</div>
+            <div class="ld__tp-header">
+              <label class="ld__checkbox-row ld__tp-todas">
+                <input type="checkbox" :checked="todasTrasplanteSeleccionadas" @change="toggleTrasplanteTodas" />
+                <span>{{ todasTrasplanteSeleccionadas ? 'Quitar todas' : 'Seleccionar todas' }}</span>
+              </label>
+              <span class="ld__tp-count">{{ trasplanteSeleccion.length }}/{{ plantList.length }}</span>
+            </div>
+            <div class="ld__tp-list">
+              <label
+                v-for="p in plantList"
+                :key="p.id"
+                class="ld__tp-item"
+                :class="{ 'ld__tp-item--selected': trasplanteSeleccion.includes(p.id) }"
+              >
+                <input type="checkbox" :checked="trasplanteSeleccion.includes(p.id)" @change="toggleTrasplantePlanta(p.id)" />
+                <span class="ld__tp-dot" :style="{ background: pm(p.state).color }"></span>
+                <span class="ld__tp-nombre">{{ p.nombre || p.codigo_qr || `Planta #${p.id}` }}</span>
+                <span class="ld__tp-estado" :style="{ color: pm(p.state).color }">{{ pm(p.state).emoji }}</span>
+              </label>
             </div>
 
             <div class="ld__field" style="margin-top: .85rem">
@@ -1637,9 +1692,9 @@ onUnmounted(() => {
           </div>
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" @click="showTrasplanteLote = false">Cancelar</button>
-            <button class="ld__btn-primary" :disabled="savingTrasplanteLote" @click="guardarTrasplanteLote">
+            <button class="ld__btn-primary" :disabled="savingTrasplanteLote || !trasplanteSeleccion.length" @click="guardarTrasplanteLote">
               <div v-if="savingTrasplanteLote" class="ld__spinner ld__spinner--sm"></div>
-              <i v-else class="bi bi-check-lg"></i>Confirmar trasplante
+              <i v-else class="bi bi-check-lg"></i>Trasplantar {{ trasplanteSeleccion.length }} planta{{ trasplanteSeleccion.length !== 1 ? 's' : '' }}
             </button>
           </div>
         </div>
@@ -1896,6 +1951,18 @@ onUnmounted(() => {
 .ld__btn-edit:hover { background: #f8fafc; border-color: #94a3b8; }
 .ld__btn-trasplante { display: inline-flex; align-items: center; gap: .4rem; background: #fffbeb; color: #92400e; border: 1.5px solid #fde68a; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
 .ld__btn-trasplante:hover { background: #fef3c7; border-color: #fcd34d; }
+
+/* Selección de plantas en trasplante */
+.ld__tp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .4rem; }
+.ld__tp-todas { font-size: .82rem; color: #374151; gap: .4rem; }
+.ld__tp-count { font-size: .75rem; font-weight: 700; color: #1b5e20; background: #dcfce7; padding: .1em .5em; border-radius: 99px; }
+.ld__tp-list { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .25rem; }
+.ld__tp-item { display: flex; align-items: center; gap: .5rem; padding: .35rem .5rem; border-radius: 6px; cursor: pointer; font-size: .82rem; transition: background .12s; }
+.ld__tp-item:hover { background: #f0fdf4; }
+.ld__tp-item--selected { background: #f0fdf4; }
+.ld__tp-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ld__tp-nombre { flex: 1; color: #1e293b; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ld__tp-estado { font-size: .85rem; flex-shrink: 0; }
 
 /* Trasplante de lote */
 .ld__modal--sm { max-width: 440px; }

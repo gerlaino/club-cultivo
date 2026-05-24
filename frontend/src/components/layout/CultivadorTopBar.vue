@@ -2,6 +2,11 @@
   <header class="ctb">
     <div class="ctb__inner">
 
+      <!-- Hamburger (tablet 768-1023px) -->
+      <button class="ctb__hamburger" @click="emit('open-drawer')" aria-label="Abrir menú">
+        <Menu :size="20" :stroke-width="1.75" />
+      </button>
+
       <!-- Breadcrumb -->
       <nav class="ctb__bc" aria-label="breadcrumb">
         <template v-for="(crumb, i) in breadcrumbs" :key="i">
@@ -104,7 +109,9 @@ import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import DsDropdown from '../../design-system/components/Dropdown.vue'
 import DsAvatar   from '../../design-system/components/Avatar.vue'
 import DsEmpty    from '../../design-system/components/EmptyState.vue'
-import { Bell, User, LogOut } from 'lucide-vue-next'
+import { Bell, User, LogOut, Menu } from 'lucide-vue-next'
+
+const emit = defineEmits(['open-drawer'])
 
 const route    = useRoute()
 const router   = useRouter()
@@ -281,6 +288,24 @@ async function handleLogout() {
 .ctb__user-item--danger { color: var(--c-rust-600); }
 .ctb__user-item--danger:hover { background: var(--c-rust-100); color: var(--c-rust-600); }
 .ctb__divider { height: 1px; background: var(--c-ink-100); margin: var(--sp-1) 0; }
+
+/* Hamburger: solo visible en tablet (768-1023px) */
+.ctb__hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--c-ink-300);
+  background: transparent;
+  color: var(--c-ink-600);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--t-fast);
+}
+.ctb__hamburger:hover { background: var(--c-ink-100); }
+@media (max-width: 1023px) { .ctb__hamburger { display: flex; } }
 
 /* Hidden on mobile */
 @media (max-width: 767px) { .ctb { display: none; } }

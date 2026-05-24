@@ -51,15 +51,20 @@ router.afterEach(() => { routeLoading.value = false })
 const { can, isAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
 
 const adminDrawerOpen = ref(false);
-const svrDrawerOpen = ref(false);
-const dpvDrawerOpen = ref(false);
-const mncDrawerOpen = ref(false);
-const audDrawerOpen = ref(false);
-const medDrawerOpen = ref(false);
-const abgDrawerOpen = ref(false);
-const dlvDrawerOpen = ref(false);
+const cvdDrawerOpen  = ref(false);
+const svrDrawerOpen  = ref(false);
+const dpvDrawerOpen  = ref(false);
+const mncDrawerOpen  = ref(false);
+const audDrawerOpen  = ref(false);
+const medDrawerOpen  = ref(false);
+const abgDrawerOpen  = ref(false);
+const dlvDrawerOpen  = ref(false);
 
-watch(() => route.path, () => { adminDrawerOpen.value = false; svrDrawerOpen.value = false });
+watch(() => route.path, () => {
+  adminDrawerOpen.value = false; cvdDrawerOpen.value = false; svrDrawerOpen.value = false;
+  dpvDrawerOpen.value = false; mncDrawerOpen.value = false; audDrawerOpen.value = false;
+  medDrawerOpen.value = false; abgDrawerOpen.value = false; dlvDrawerOpen.value = false;
+});
 const { fetchPlan, planData } = usePlan();
 
 async function doLogout() {
@@ -205,7 +210,7 @@ onMounted(async () => {
       <div class="cvd-shell">
         <CultivadorSidebar />
         <div class="cvd-body">
-          <CultivadorTopBar />
+          <CultivadorTopBar @open-drawer="cvdDrawerOpen = true" />
           <CultivadorMobileHeader />
           <div class="cvd-accent-bar"></div>
           <main class="cvd-main">
@@ -214,6 +219,16 @@ onMounted(async () => {
         </div>
       </div>
       <BottomNavCultivador />
+      <!-- Drawer overlay tablet (768-1023px) -->
+      <Teleport to="body">
+        <Transition name="cvd-drawer">
+          <div v-if="cvdDrawerOpen" class="cvd-drawer-overlay" @click.self="cvdDrawerOpen = false">
+            <div class="cvd-drawer">
+              <CultivadorSidebar />
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
     </template>
 
     <!-- ── SUPERVISOR LAYOUT (sidebar + topbar desktop, sin mobile bottom-nav) ── -->
@@ -659,6 +674,31 @@ onMounted(async () => {
   display: flex;
   min-height: 100vh;
 }
+
+/* Drawer overlay cultivador (tablet 768-1023px) */
+.cvd-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 500;
+  display: flex;
+}
+.cvd-drawer {
+  width: 240px;
+  height: 100%;
+  overflow: hidden;
+}
+.cvd-drawer :deep(.csb) {
+  display: flex !important;
+  height: 100%;
+  position: static;
+}
+.cvd-drawer-enter-active,
+.cvd-drawer-leave-active { transition: opacity .2s, transform .2s; }
+.cvd-drawer-enter-from,
+.cvd-drawer-leave-to { opacity: 0; pointer-events: none; }
+.cvd-drawer-enter-from .cvd-drawer,
+.cvd-drawer-leave-to  .cvd-drawer { transform: translateX(-100%); }
 .cvd-body {
   flex: 1;
   min-width: 0;
@@ -961,6 +1001,7 @@ onMounted(async () => {
 .dlv-main { flex: 1; }
 .dlv-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
 .dlv-drawer { width: 200px; height: 100%; overflow: hidden; }
+.dlv-drawer :deep(.dlv-sidebar) { display: flex !important; height: 100%; position: static; }
 .dlv-drawer-enter-active, .dlv-drawer-leave-active { transition: opacity .2s, transform .2s; }
 .dlv-drawer-enter-from, .dlv-drawer-leave-to { opacity: 0; pointer-events: none; }
 .dlv-drawer-enter-from .dlv-drawer, .dlv-drawer-leave-to .dlv-drawer { transform: translateX(-100%); }
