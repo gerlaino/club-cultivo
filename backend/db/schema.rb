@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_24_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -372,9 +372,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.string "categoria_inase"
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
+    t.index ["club_id", "slug"], name: "index_geneticas_on_club_id_and_slug", unique: true
     t.index ["club_id"], name: "index_geneticas_on_club_id"
     t.index ["numero_registro_inase"], name: "idx_geneticas_numero_inase", unique: true, where: "(numero_registro_inase IS NOT NULL)"
-    t.index ["slug"], name: "index_geneticas_on_slug", unique: true
   end
 
   create_table "indicacion_medicas", force: :cascade do |t|
