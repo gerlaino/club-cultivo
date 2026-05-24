@@ -566,7 +566,7 @@ const canSeeAmbiente = computed(() =>
             Registrar lectura
           </button>
           <AsistenteVoz
-            v-if="club.data?.ia_habilitada && contextoAsistente"
+            v-if="club.data?.features?.ia_voz && contextoAsistente"
             :contexto="contextoAsistente"
           />
           <button

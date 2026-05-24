@@ -129,6 +129,23 @@ class Club < ApplicationRecord
 
   def eliminado? = deleted_at.present?
 
+  AVAILABLE_FEATURES = %w[
+    ia_analisis
+    ia_voz
+    web_publica
+    mailer
+    iot
+    alertas
+    ariccame
+    cuenta_corriente
+    analytics
+    multi_sede
+  ].freeze
+
+  def feature?(key)
+    features[key.to_s] == true
+  end
+
   IA_TIERS = {
     'basico'     => { label: 'Básico',     limite_hora: 20,  color: '#64748b' },
     'pro'        => { label: 'Pro',        limite_hora: 60,  color: '#0891b2' },

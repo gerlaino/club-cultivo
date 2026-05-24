@@ -454,7 +454,7 @@ onMounted(async () => {
         </div>
         <div v-if="auth.user?.role !== 'manicura'" class="pd__hero-actions">
           <AsistenteVoz
-            v-if="club.data?.ia_habilitada && contextoAsistente"
+            v-if="club.data?.features?.ia_voz && contextoAsistente"
             :contexto="contextoAsistente"
             @registrado="onRegistradoPorVoz"
           />

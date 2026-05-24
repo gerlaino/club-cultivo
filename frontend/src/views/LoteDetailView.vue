@@ -577,7 +577,7 @@ onUnmounted(() => {
             Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
           </button>
           <AsistenteVoz
-            v-if="club.data?.ia_habilitada && contextoAsistente && (canEdit || isCultivador)"
+            v-if="club.data?.features?.ia_voz && contextoAsistente && (canEdit || isCultivador)"
             :contexto="contextoAsistente"
             @registrado="onRegistradoPorVoz"
           />
@@ -1079,7 +1079,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Análisis IA — solo si el club tiene IA habilitada -->
-          <div v-if="club.data?.ia_habilitada" class="ld__card ld__card--mt ld__card--ia">
+          <div v-if="club.data?.features?.ia_analisis" class="ld__card ld__card--mt ld__card--ia">
             <div class="ld__card-header">
               <span class="ld__card-title">🤖 Análisis IA</span>
               <button class="ld__card-action ld__card-action--ia" @click="ejecutarAnalisisIA" :disabled="analizandoIA || !puedoAnalizar">

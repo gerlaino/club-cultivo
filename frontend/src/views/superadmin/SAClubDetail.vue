@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -27,16 +27,31 @@ const savingSmtp   = ref(false)
 const smtpError    = ref(null)
 const smtpSuccess  = ref(false)
 
-const iaForm       = ref({ ia_habilitada: false, ia_tier: 'basico', ia_limite_hora: 20 })
-const savingIa     = ref(false)
-const iaSuccess    = ref(false)
+const featuresForm    = ref({})
+const iaTier          = ref('basico')
+const iaLimiteHora    = ref(20)
+const savingFeatures  = ref(false)
+const featuresSuccess = ref(false)
 
 const IA_TIERS = [
-  { value: 'basico',     label: 'Básico',     desc: '20 calls/h · Solo registro por voz',          color: '#64748b' },
-  { value: 'pro',        label: 'Pro',        desc: '60 calls/h · Voz + alertas proactivas',        color: '#0891b2' },
-  { value: 'enterprise', label: 'Enterprise', desc: '200 calls/h · Voz + alertas + predicciones',   color: '#7c3aed' },
+  { value: 'basico',     label: 'Básico',     desc: '20 calls/h · Solo registro por voz',        color: '#64748b' },
+  { value: 'pro',        label: 'Pro',        desc: '60 calls/h · Voz + alertas proactivas',      color: '#0891b2' },
+  { value: 'enterprise', label: 'Enterprise', desc: '200 calls/h · Voz + alertas + predicciones', color: '#7c3aed' },
 ]
-function iaTierMeta(t) { return IA_TIERS.find(x => x.value === t) || IA_TIERS[0] }
+const FEATURE_META = {
+  ia_analisis:      { label: 'Análisis IA',      desc: 'Análisis de lotes, plantas y alertas por IA', icon: '🔬' },
+  ia_voz:           { label: 'Asistente de voz', desc: 'Registro y consultas por voz con IA',          icon: '🎙️' },
+  web_publica:      { label: 'Web pública',       desc: 'Sitio web público del club',                   icon: '🌐' },
+  mailer:           { label: 'Correo',            desc: 'Envío de correos a socios',                    icon: '✉️' },
+  iot:              { label: 'IoT / Sensores',    desc: 'Integración de sensores ambientales',           icon: '📡' },
+  alertas:          { label: 'Alertas',           desc: 'Alertas automáticas por sala y lote',          icon: '🔔' },
+  ariccame:         { label: 'ARICCAME',          desc: 'Reportes para el registro ARICCAME',           icon: '📋' },
+  cuenta_corriente: { label: 'Cuenta corriente', desc: 'Saldo y movimientos por socio',                icon: '💳' },
+  analytics:        { label: 'Analytics',         desc: 'Dashboard de analítica avanzada',              icon: '📊' },
+  multi_sede:       { label: 'Multi-sede',        desc: 'Múltiples sedes/ubicaciones',                  icon: '🏢' },
+}
+const FEATURES_ORDER = Object.keys(FEATURE_META)
+const iaActiva = computed(() => featuresForm.value.ia_analisis || featuresForm.value.ia_voz)
 
 const PLAN_META = {
   semilla:    { label: 'Semilla',    color: '#64748b', bg: '#f1f5f9' },
@@ -75,11 +90,9 @@ async function cargar() {
       smtp_from:      data.smtp_from      || '',
       smtp_from_name: data.smtp_from_name || '',
     }
-    iaForm.value = {
-      ia_habilitada:  data.ia_habilitada  ?? false,
-      ia_tier:        data.ia_tier        || 'basico',
-      ia_limite_hora: data.ia_limite_hora || 20,
-    }
+    featuresForm.value = { ...(data.features || {}) }
+    iaTier.value       = data.ia_tier        || 'basico'
+    iaLimiteHora.value = data.ia_limite_hora || 20
   } finally {
     loading.value = false
   }
@@ -200,16 +213,20 @@ async function restaurar() {
   }
 }
 
-async function guardarIa() {
-  savingIa.value = true
-  iaSuccess.value = false
+async function guardarFeatures() {
+  savingFeatures.value = true
+  featuresSuccess.value = false
   try {
-    const { data } = await updateSuperAdminClub(id, iaForm.value)
+    const { data } = await updateSuperAdminClub(id, {
+      features:       featuresForm.value,
+      ia_tier:        iaTier.value,
+      ia_limite_hora: iaLimiteHora.value,
+    })
     club.value = { ...club.value, ...data }
-    iaSuccess.value = true
-    setTimeout(() => { iaSuccess.value = false }, 3000)
+    featuresSuccess.value = true
+    setTimeout(() => { featuresSuccess.value = false }, 3000)
   } finally {
-    savingIa.value = false
+    savingFeatures.value = false
   }
 }
 
@@ -444,52 +461,62 @@ onMounted(cargar)
         </div>
       </div>
 
-      <!-- ══ IA ══ -->
-      <div class="scd__ia-card">
-        <div class="scd__ia-header">
-          <div class="scd__ia-title-row">
-            <span class="scd__ia-icon">🤖</span>
-            <span class="scd__ia-title">Asistente de IA</span>
-            <span v-if="club.ia_habilitada" class="scd__ia-badge scd__ia-badge--on"
-                  :style="{ background: iaTierMeta(club.ia_tier).color + '20', color: iaTierMeta(club.ia_tier).color }">
-              {{ iaTierMeta(club.ia_tier).label }}
-            </span>
-            <span v-else class="scd__ia-badge scd__ia-badge--off">Desactivado</span>
-            <span v-if="iaSuccess" class="scd__alert--ok">Guardado</span>
+      <!-- ══ Funcionalidades ══ -->
+      <div class="scd__feat-card">
+        <div class="scd__feat-header">
+          <div class="scd__feat-title-row">
+            <span>⚙️</span>
+            <span class="scd__card-title">Funcionalidades</span>
+            <span v-if="featuresSuccess" class="scd__smtp-ok"><i class="bi bi-check-circle"></i> Guardado</span>
           </div>
         </div>
-        <div class="scd__ia-body">
-          <label class="scd__toggle scd__ia-toggle">
-            <input v-model="iaForm.ia_habilitada" type="checkbox" class="scd__toggle__input" />
-            <div class="scd__toggle__track"><div class="scd__toggle__thumb"></div></div>
-            <div class="scd__toggle__label">Habilitar asistente de IA para este club</div>
-          </label>
-
-          <div v-if="iaForm.ia_habilitada" class="scd__ia-tiers">
-            <button
-              v-for="tier in IA_TIERS" :key="tier.value"
-              type="button"
-              class="scd__ia-tier-btn"
-              :class="{ 'scd__ia-tier-btn--active': iaForm.ia_tier === tier.value }"
-              :style="iaForm.ia_tier === tier.value ? { borderColor: tier.color, background: tier.color + '12', color: tier.color } : {}"
-              @click="iaForm.ia_tier = tier.value; iaForm.ia_limite_hora = IA_TIERS.find(t => t.value === tier.value) ? [20,60,200][IA_TIERS.findIndex(t=>t.value===tier.value)] : 20"
+        <div class="scd__feat-body">
+          <div class="scd__feat-grid">
+            <label
+              v-for="key in FEATURES_ORDER"
+              :key="key"
+              class="scd__feat-toggle"
+              :class="{ 'scd__feat-toggle--on': featuresForm[key] }"
             >
-              <strong>{{ tier.label }}</strong>
-              <span>{{ tier.desc }}</span>
-            </button>
+              <div class="scd__feat-left">
+                <span class="scd__feat-ico">{{ FEATURE_META[key].icon }}</span>
+                <div class="scd__feat-info">
+                  <div class="scd__feat-name">{{ FEATURE_META[key].label }}</div>
+                  <div class="scd__feat-desc">{{ FEATURE_META[key].desc }}</div>
+                </div>
+              </div>
+              <input v-model="featuresForm[key]" type="checkbox" class="scd__toggle__input" />
+              <div class="scd__toggle__track"><div class="scd__toggle__thumb"></div></div>
+            </label>
           </div>
 
-          <div v-if="iaForm.ia_habilitada" class="scd__ia-limite">
-            <label class="scd__label">Límite de llamadas por hora</label>
-            <input v-model.number="iaForm.ia_limite_hora" type="number" min="1" max="500" class="scd__input scd__input--sm" />
-            <span class="scd__hint">Sobreescribe el límite del tier. Usar con cuidado.</span>
-          </div>
+          <template v-if="iaActiva">
+            <div class="scd__feat-divider"><span>Configuración de IA</span></div>
+            <div class="scd__ia-tiers">
+              <button
+                v-for="tier in IA_TIERS" :key="tier.value"
+                type="button"
+                class="scd__ia-tier-btn"
+                :class="{ 'scd__ia-tier-btn--active': iaTier === tier.value }"
+                :style="iaTier === tier.value ? { borderColor: tier.color, background: tier.color + '12', color: tier.color } : {}"
+                @click="iaTier = tier.value; iaLimiteHora = [20,60,200][IA_TIERS.findIndex(t=>t.value===tier.value)]"
+              >
+                <strong>{{ tier.label }}</strong>
+                <span>{{ tier.desc }}</span>
+              </button>
+            </div>
+            <div class="scd__ia-limite">
+              <label class="scd__label">Límite de llamadas por hora</label>
+              <input v-model.number="iaLimiteHora" type="number" min="1" max="500" class="scd__input scd__input--sm" />
+              <span class="scd__hint">Sobreescribe el límite del tier.</span>
+            </div>
+          </template>
         </div>
-        <div class="scd__ia-footer">
-          <button class="scd__btn-primary scd__btn-sm" :disabled="savingIa" @click="guardarIa">
-            <span v-if="savingIa" class="scd__spinner"></span>
-            <i v-else class="bi bi-robot"></i>
-            {{ savingIa ? 'Guardando…' : 'Guardar IA' }}
+        <div class="scd__feat-footer">
+          <button class="scd__btn-primary scd__btn-sm" :disabled="savingFeatures" @click="guardarFeatures">
+            <span v-if="savingFeatures" class="scd__spinner"></span>
+            <i v-else class="bi bi-floppy"></i>
+            {{ savingFeatures ? 'Guardando…' : 'Guardar funcionalidades' }}
           </button>
         </div>
       </div>
@@ -724,17 +751,28 @@ onMounted(cargar)
 .scd__smtp-footer { display: flex; justify-content: flex-end; margin-top: 1rem; }
 .scd__alert--ok { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; display: flex; align-items: center; gap: .5rem; }
 
-/* IA card */
-.scd__ia-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-top: 1.5rem; }
-.scd__ia-header { padding: 1rem 1.25rem .75rem; border-bottom: 1px solid #f1f5f9; }
-.scd__ia-title-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
-.scd__ia-icon { font-size: 1.1rem; }
-.scd__ia-title { font-size: .95rem; font-weight: 700; color: #0f172a; }
-.scd__ia-badge { font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: .2em .65em; border-radius: 6px; }
-.scd__ia-badge--on  { /* color set inline */ }
-.scd__ia-badge--off { background: #f1f5f9; color: #94a3b8; }
-.scd__ia-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
-.scd__ia-toggle { gap: .75rem; }
+/* Features card */
+.scd__feat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-top: 1.25rem; }
+.scd__feat-header { padding: .875rem 1.1rem; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
+.scd__feat-title-row { display: flex; align-items: center; gap: .6rem; }
+.scd__feat-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+.scd__feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .5rem; }
+.scd__feat-toggle {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .75rem; border-radius: 10px;
+  border: 1.5px solid #e2e8f0; background: #f8fafc;
+  cursor: pointer; transition: border-color .15s, background .15s;
+  user-select: none;
+}
+.scd__feat-toggle--on { border-color: #bbf7d0; background: #f0fdf4; }
+.scd__feat-left { display: flex; align-items: center; gap: .6rem; flex: 1; min-width: 0; }
+.scd__feat-ico { font-size: 1rem; flex-shrink: 0; }
+.scd__feat-info { flex: 1; min-width: 0; }
+.scd__feat-name { font-size: .82rem; font-weight: 700; color: #0f172a; }
+.scd__feat-desc { font-size: .7rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scd__feat-divider { display: flex; align-items: center; gap: .75rem; color: #94a3b8; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.scd__feat-divider::before, .scd__feat-divider::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
+.scd__feat-footer { padding: .75rem 1.25rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; }
 .scd__ia-tiers { display: flex; flex-direction: column; gap: .5rem; }
 .scd__ia-tier-btn {
   display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
@@ -748,7 +786,6 @@ onMounted(cargar)
 .scd__ia-tier-btn:hover { border-color: #94a3b8; }
 .scd__ia-limite { display: flex; flex-direction: column; gap: .3rem; max-width: 200px; }
 .scd__input--sm { width: 100%; }
-.scd__ia-footer { padding: .75rem 1.25rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; }
 
 /* Web toggle */
 .scd__web-toggle { width: 46px; height: 26px; border-radius: 13px; background: #e2e8f0; border: none; cursor: pointer; position: relative; transition: background .25s; padding: 0; flex-shrink: 0; }

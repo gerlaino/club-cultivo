@@ -104,7 +104,7 @@ class PreferencesController < ApplicationController
       horarios_atencion:            club.horarios_atencion,
       web_activa:                   club.web_activa,
       benchmark_opt_in:             club.benchmark_opt_in,
-      ia_habilitada:                club.ia_habilitada,
+      features:                     club.features,
       smtp_configured:              club.smtp_configured?,
       smtp_host:                    club.smtp_host,
       smtp_port:                    club.smtp_port || 587,

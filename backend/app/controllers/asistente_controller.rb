@@ -103,7 +103,7 @@ class AsistenteController < ApplicationController
 
   # POST /asistente/parsear
   def parsear
-    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+    return render json: { error: 'El registro por voz no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_voz)
 
     texto    = params[:texto].to_s.strip
     contexto = params[:contexto]
@@ -129,7 +129,7 @@ class AsistenteController < ApplicationController
 
   # POST /asistente/consultar
   def consultar
-    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+    return render json: { error: 'El registro por voz no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_voz)
 
     texto    = params[:texto].to_s.strip
     contexto = params[:contexto]
@@ -151,7 +151,7 @@ class AsistenteController < ApplicationController
 
   # POST /asistente/analizar_lote
   def analizar_lote
-    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+    return render json: { error: 'El análisis de IA no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_analisis)
     return render json: { error: 'Límite de uso alcanzado. Volvé en unos minutos.' }, status: :too_many_requests if rate_limited?
 
     lote = current_user.club.lotes.find_by(id: params[:lote_id])
@@ -194,7 +194,7 @@ class AsistenteController < ApplicationController
 
   # POST /asistente/ejecutar
   def ejecutar
-    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+    return render json: { error: 'El registro por voz no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_voz)
 
     acciones = params[:acciones] || []
     contexto = params[:contexto]
