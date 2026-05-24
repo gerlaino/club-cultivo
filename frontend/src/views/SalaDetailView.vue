@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router"
 import { useSalasStore } from "../stores/salas"
 import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
+import { useClubStore } from "../stores/club"
 import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
 import ModalCargarLote from '../components/salas/ModalCargarLote.vue'
 import RegistrarLecturaModal from '../components/salas/RegistrarLecturaModal.vue'
@@ -22,6 +23,7 @@ const router = useRouter()
 const salas  = useSalasStore()
 const lotes  = useLotesStore()
 const auth   = useAuthStore()
+const club   = useClubStore()
 const toast  = useToast()
 const { confirm } = useConfirm()
 
@@ -564,7 +566,7 @@ const canSeeAmbiente = computed(() =>
             Registrar lectura
           </button>
           <AsistenteVoz
-            v-if="contextoAsistente"
+            v-if="club.data?.ia_habilitada && contextoAsistente"
             :contexto="contextoAsistente"
           />
           <button

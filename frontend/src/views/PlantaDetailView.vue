@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
+import { useClubStore }   from '../stores/club'
 import { getPlantActivities, createPlantActivity, updatePlant, addPlantFoto, removePlantFoto } from '../lib/api'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
@@ -26,6 +27,7 @@ const route  = useRoute()
 const router = useRouter()
 const plants = usePlantsStore()
 const auth   = useAuthStore()
+const club   = useClubStore()
 const toast  = useToast()
 
 const id           = Number(route.params.id)
@@ -452,7 +454,7 @@ onMounted(async () => {
         </div>
         <div v-if="auth.user?.role !== 'manicura'" class="pd__hero-actions">
           <AsistenteVoz
-            v-if="contextoAsistente"
+            v-if="club.data?.ia_habilitada && contextoAsistente"
             :contexto="contextoAsistente"
             @registrado="onRegistradoPorVoz"
           />

@@ -51,7 +51,7 @@
         Ver detalle
         <ChevronRight :size="14" :stroke-width="1.75" />
       </RouterLink>
-      <div class="sc__av-wrap" title="Registrar por voz (IA)">
+      <div v-if="club.data?.ia_habilitada" class="sc__av-wrap" title="Registrar por voz (IA)">
         <AsistenteVoz :mini="true" :contexto="contextoSala" />
       </div>
       <button class="sc__btn sc__btn--secondary" @click.prevent="$emit('registrar-lectura', sala)">
@@ -67,6 +67,9 @@ import { computed } from 'vue'
 import { AlertTriangle, ChevronRight, Gauge, Thermometer } from 'lucide-vue-next'
 import DsBadge from '../../design-system/components/Badge.vue'
 import AsistenteVoz from '../AsistenteVoz.vue'
+import { useClubStore } from '../../stores/club'
+
+const club = useClubStore()
 
 const props = defineProps({
   sala:    { type: Object, required: true },

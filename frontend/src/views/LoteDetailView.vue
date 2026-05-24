@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router"
 import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
+import { useClubStore }   from "../stores/club"
 import { createPlant, updatePlant,
   getRegistrosAmbientales, getLoteEventos,
   getLoteTimeline, listSedes, deleteLote, updateLote, createPlantActivity } from "../lib/api"
@@ -34,6 +35,7 @@ const router   = useRouter()
 const lotes    = useLotesStore()
 const plants   = usePlantsStore()
 const auth     = useAuthStore()
+const club     = useClubStore()
 const toast    = useToast()
 const { confirm } = useConfirm()
 
@@ -575,7 +577,7 @@ onUnmounted(() => {
             Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
           </button>
           <AsistenteVoz
-            v-if="contextoAsistente && (canEdit || isCultivador)"
+            v-if="club.data?.ia_habilitada && contextoAsistente && (canEdit || isCultivador)"
             :contexto="contextoAsistente"
             @registrado="onRegistradoPorVoz"
           />
@@ -1076,8 +1078,8 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Análisis IA -->
-          <div class="ld__card ld__card--mt ld__card--ia">
+          <!-- Análisis IA — solo si el club tiene IA habilitada -->
+          <div v-if="club.data?.ia_habilitada" class="ld__card ld__card--mt ld__card--ia">
             <div class="ld__card-header">
               <span class="ld__card-title">🤖 Análisis IA</span>
               <button class="ld__card-action ld__card-action--ia" @click="ejecutarAnalisisIA" :disabled="analizandoIA || !puedoAnalizar">
