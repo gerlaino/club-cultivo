@@ -5,8 +5,9 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import { useStatsStore } from '../../stores/stats.js'
 import { useTareasStore } from '../../stores/tareas.js'
-import OnboardingWizard from '../OnboardingWizard.vue'
-import DsSpinner from '../../design-system/components/Spinner.vue'
+import OnboardingWizard    from '../OnboardingWizard.vue'
+import OnboardingChecklist from './OnboardingChecklist.vue'
+import DsSpinner           from '../../design-system/components/Spinner.vue'
 
 const auth       = useAuthStore()
 const club       = useClubStore()
@@ -148,6 +149,9 @@ async function onOnboardingCompletado() {
           <p class="ad__fecha">{{ hoy }}</p>
         </div>
       </div>
+
+      <!-- Onboarding -->
+      <OnboardingChecklist />
 
       <!-- ZONA 2: 5 KPI Cards -->
       <div class="ad__kpis">

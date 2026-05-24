@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { logger } from '../../utils/logger.js'
-import { useRouter } from 'vue-router'
+import { logger }          from '../../utils/logger.js'
+import { useRouter }       from 'vue-router'
 import { listPacientes, listIndicaciones } from '../../lib/api.js'
-import { useAuthStore } from '../../stores/auth.js'
+import { useAuthStore }    from '../../stores/auth.js'
+import OnboardingChecklist from './OnboardingChecklist.vue'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -114,6 +115,9 @@ onMounted(async () => {
         </p>
       </div>
     </div>
+
+    <!-- Onboarding -->
+    <OnboardingChecklist />
 
     <!-- ── Loading ───────────────────────────────────────────── -->
     <div v-if="loading" class="md__loading">

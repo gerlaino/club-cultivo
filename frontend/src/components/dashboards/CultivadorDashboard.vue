@@ -9,6 +9,9 @@
       </div>
     </div>
 
+    <!-- Onboarding -->
+    <OnboardingChecklist />
+
     <!-- Alertas críticas -->
     <DsBanner
       v-for="a in alertasCriticas.slice(0, 2)"
@@ -244,6 +247,7 @@ import { useToast }         from '../../composables/useToast.js'
 import { formatFechaLarga } from '../../utils/fecha.js'
 import { getTareasSemana }  from '../../lib/api'
 
+import OnboardingChecklist from './OnboardingChecklist.vue'
 import DsCard     from '../../design-system/components/Card.vue'
 import DsStat     from '../../design-system/components/Stat.vue'
 import DsBadge    from '../../design-system/components/Badge.vue'

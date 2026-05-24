@@ -2,6 +2,9 @@
   <div class="aud-home">
     <h1 class="aud-home__title">Panel de Auditoría</h1>
     <p class="aud-home__sub">Acceso de solo lectura a los informes del club.</p>
+
+    <OnboardingChecklist />
+
     <div class="aud-home__cards">
       <RouterLink to="/auditor/reprocann" class="aud-card">
         <FileCheck :size="28" :stroke-width="1.5" />
@@ -34,6 +37,7 @@
 
 <script setup>
 import { FileCheck, Sprout, Package, Building2, ShieldAlert } from 'lucide-vue-next'
+import OnboardingChecklist from '../../components/dashboards/OnboardingChecklist.vue'
 </script>
 
 <style scoped>
