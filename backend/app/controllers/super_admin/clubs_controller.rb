@@ -13,7 +13,9 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   def create
     club = Club.new(club_params)
     if club.save
-      usuarios = club.crear_usuarios_default!
+      roles    = Array(params[:roles_a_crear]).map(&:to_s).presence || Club::ROLES_DEFAULT
+      password = params[:password_inicial].presence || Club::PASSWORD_DEFAULT
+      usuarios = club.crear_usuarios_default!(roles: roles, password: password)
       club.crear_geneticas_default!
       render json: {
         club:     serialize_club_detail(club),

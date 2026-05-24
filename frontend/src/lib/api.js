@@ -351,7 +351,7 @@ export const deleteFotoLote  = (loteId, fotoId)   => api.delete(`/lotes/${loteId
 export const getSuperAdminStats  = ()             => api.get('/super_admin/stats')
 export const listSuperAdminClubs = ()             => api.get('/super_admin/clubs')
 export const getSuperAdminClub   = (id)           => api.get(`/super_admin/clubs/${id}`)
-export const createSuperAdminClub = (payload)     => api.post('/super_admin/clubs', { club: payload })
+export const createSuperAdminClub = (payload)     => api.post('/super_admin/clubs', payload)
 export const updateSuperAdminClub = (id, payload) => api.put(`/super_admin/clubs/${id}`, { club: payload })
 export const cambiarPlanClub     = (id, payload)  => api.patch(`/super_admin/clubs/${id}/cambiar_plan`, payload)
 export const crearUsuariosDefault = (id)          => api.post(`/super_admin/clubs/${id}/crear_usuarios_default`)

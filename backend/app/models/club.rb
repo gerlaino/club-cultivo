@@ -105,18 +105,18 @@ class Club < ApplicationRecord
     },
   ].freeze
 
-  def crear_usuarios_default!
-    ROLES_DEFAULT.map do |rol|
+  def crear_usuarios_default!(roles: ROLES_DEFAULT, password: PASSWORD_DEFAULT)
+    roles.select { |r| ROLES_DEFAULT.include?(r) }.map do |rol|
       email = "#{rol}@#{slug}.clubcultivo.app"
       next if User.exists?(email: email)
       User.create!(
         club:       self,
         role:       rol,
         email:      email,
-        password:   PASSWORD_DEFAULT,
+        password:   password,
         first_name: rol.capitalize,
         last_name:  name,
-        )
+      )
     end.compact
   end
 
