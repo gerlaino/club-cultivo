@@ -55,10 +55,14 @@ const FEATURES_ORDER = Object.keys(FEATURE_META)
 
 // ── Usuarios ──────────────────────────────────────────────────────────
 const ROLES_META = {
-  admin:      { label: 'Admin',      desc: 'Acceso total al panel', required: true },
-  medico:     { label: 'Médico',     desc: 'Informes y recetas' },
-  cultivador: { label: 'Cultivador', desc: 'Salas, lotes y plantas' },
-  abogado:    { label: 'Abogado',    desc: 'Documentación y compliance' },
+  admin:       { label: 'Admin',       desc: 'Acceso total al panel',          required: true },
+  medico:      { label: 'Médico',      desc: 'Informes y recetas médicas' },
+  cultivador:  { label: 'Cultivador',  desc: 'Salas, lotes y plantas' },
+  supervisor:  { label: 'Supervisor',  desc: 'Supervisión general de salas' },
+  abogado:     { label: 'Abogado',     desc: 'Documentación y compliance' },
+  auditor:     { label: 'Auditor',     desc: 'Auditoría y trazabilidad' },
+  dispensador: { label: 'Dispensador', desc: 'Entregas y dispensaciones' },
+  manicura:    { label: 'Manicura',    desc: 'Post-cosecha y pesaje' },
 }
 const rolesSeleccionados = ref(['admin', 'medico', 'cultivador', 'abogado'])
 const passwordInicial    = ref('123456Aa')
@@ -313,7 +317,7 @@ async function handleSubmit() {
 
           <div class="cnv__field" style="max-width:260px;margin-bottom:1.5rem">
             <label class="cnv__label">Contraseña temporal</label>
-            <input v-model="passwordInicial" class="cnv__input" placeholder="123456Aa" />
+            <input v-model="passwordInicial" type="password" autocomplete="new-password" class="cnv__input" placeholder="123456Aa" />
             <span class="cnv__hint">El usuario puede cambiarla desde su perfil</span>
           </div>
 
@@ -366,8 +370,11 @@ async function handleSubmit() {
 
 <style scoped>
 .cnv {
-  padding: 2rem 2rem 3rem;
+  padding: 2rem 2.5rem 3rem;
   max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cnv__back {
@@ -557,12 +564,12 @@ async function handleSubmit() {
 .cnv__nav-spacer { flex: 1; }
 .cnv__btn-primary {
   display: inline-flex; align-items: center; gap: .45rem;
-  background: #0f172a; color: #fff; border: none;
+  background: #1b5e20; color: #fff; border: none;
   padding: .75rem 1.4rem; border-radius: 10px;
   font-size: .875rem; font-weight: 700; cursor: pointer;
   transition: background .15s; white-space: nowrap;
 }
-.cnv__btn-primary:hover:not(:disabled) { background: #1e293b; }
+.cnv__btn-primary:hover:not(:disabled) { background: #166534; }
 .cnv__btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 .cnv__btn-ghost {
   display: inline-flex; align-items: center; gap: .4rem;

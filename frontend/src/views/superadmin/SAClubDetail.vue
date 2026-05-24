@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
-import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Save, Mail, Zap, Users, Info, Globe, Phone, MapPin, CreditCard } from 'lucide-vue-next'
+import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Save, Mail, Zap, Users, Info, CreditCard } from 'lucide-vue-next'
 
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -63,13 +63,17 @@ const PLAN_META = {
 const PLANES = Object.entries(PLAN_META).map(([v, m]) => ({ value: v, ...m }))
 function planMeta(p) { return PLAN_META[p] || PLAN_META.semilla }
 
-const ROLES = ['admin', 'medico', 'cultivador', 'abogado', 'auditor']
+const ROLES = ['admin', 'medico', 'cultivador', 'supervisor', 'abogado', 'auditor', 'dispensador', 'manicura', 'delivery']
 const ROLE_META = {
-  admin:      { label: 'Admin',      color: '#0f172a', bg: '#f1f5f9' },
-  medico:     { label: 'Médico',     color: '#0369a1', bg: '#dbeafe' },
-  cultivador: { label: 'Cultivador', color: '#16a34a', bg: '#f0fdf4' },
-  abogado:    { label: 'Abogado',    color: '#7c3aed', bg: '#ede9fe' },
-  auditor:    { label: 'Auditor',    color: '#b45309', bg: '#fffbeb' },
+  admin:       { label: 'Admin',       color: '#0f172a', bg: '#f1f5f9' },
+  medico:      { label: 'Médico',      color: '#0369a1', bg: '#dbeafe' },
+  cultivador:  { label: 'Cultivador',  color: '#16a34a', bg: '#f0fdf4' },
+  supervisor:  { label: 'Supervisor',  color: '#0369a1', bg: '#e0f2fe' },
+  abogado:     { label: 'Abogado',     color: '#7c3aed', bg: '#ede9fe' },
+  auditor:     { label: 'Auditor',     color: '#b45309', bg: '#fffbeb' },
+  dispensador: { label: 'Dispensador', color: '#0f766e', bg: '#ccfbf1' },
+  manicura:    { label: 'Manicura',    color: '#9d174d', bg: '#fce7f3' },
+  delivery:    { label: 'Delivery',    color: '#374151', bg: '#f3f4f6' },
 }
 function roleMeta(r) { return ROLE_META[r] || { label: r, color: '#64748b', bg: '#f1f5f9' } }
 
@@ -91,7 +95,9 @@ async function cargar() {
       smtp_from:      data.smtp_from      || '',
       smtp_from_name: data.smtp_from_name || '',
     }
-    featuresForm.value = { ...(data.features || {}) }
+    const features = { ...(data.features || {}) }
+    if (features.web_publica === undefined) features.web_publica = data.web_activa || false
+    featuresForm.value = features
     iaTier.value       = data.ia_tier        || 'basico'
     iaLimiteHora.value = data.ia_limite_hora || 20
   } finally {
@@ -162,17 +168,6 @@ async function generarUsuarios() {
   }
 }
 
-async function toggleWeb() {
-  saving.value = true
-  try {
-    const { data } = await updateSuperAdminClub(id, { web_activa: !club.value.web_activa })
-    club.value = { ...club.value, ...data }
-  } catch {
-    toast.error('Error al actualizar')
-  } finally {
-    saving.value = false
-  }
-}
 
 async function eliminar() {
   const ok = await confirm({
@@ -222,6 +217,7 @@ async function guardarFeatures() {
       features:       featuresForm.value,
       ia_tier:        iaTier.value,
       ia_limite_hora: iaLimiteHora.value,
+      web_activa:     featuresForm.value.web_publica === true,
     })
     club.value = { ...club.value, ...data }
     featuresSuccess.value = true
@@ -343,20 +339,6 @@ onMounted(cargar)
               <p class="scd__plan-until">
                 {{ club.plan_activo_hasta ? `Vigente hasta ${formatDate(club.plan_activo_hasta)}` : 'Sin vencimiento' }}
               </p>
-            </div>
-          </div>
-          <div class="scd__card scd__web-card">
-            <div class="scd__card-hd"><Globe :size="14" :stroke-width="1.75" class="scd__card-ico" /> Web pública</div>
-            <div class="scd__web-body">
-              <div>
-                <div class="scd__web-status" :class="{ 'scd__web-status--on': club.web_activa }">
-                  {{ club.web_activa ? 'Activa' : 'Desactivada' }}
-                </div>
-                <div class="scd__hint">{{ club.web_activa ? 'Visible al público' : 'No accesible' }}</div>
-              </div>
-              <button class="scd__web-toggle" :class="{ 'scd__web-toggle--on': club.web_activa }" :disabled="saving" @click="toggleWeb">
-                <span class="scd__web-thumb"></span>
-              </button>
             </div>
           </div>
         </div>
@@ -551,7 +533,7 @@ onMounted(cargar)
                 </div>
                 <div class="scd__field">
                   <label class="scd__lbl">Contraseña inicial</label>
-                  <input v-model="userForm.password" class="scd__input" />
+                  <input v-model="userForm.password" type="password" autocomplete="new-password" class="scd__input" />
                 </div>
                 <div class="scd__field">
                   <label class="scd__lbl">Rol</label>
@@ -578,7 +560,7 @@ onMounted(cargar)
 </template>
 
 <style scoped>
-.scd { padding: 2rem 2rem 3rem; max-width: 1100px; display: flex; flex-direction: column; gap: 1rem; }
+.scd { padding: 2rem 2.5rem 3rem; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
 /* Loading */
 .scd__loading { display: flex; justify-content: center; padding: 5rem; }
 .scd__ring { width: 24px; height: 24px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: spin .7s linear infinite; }
@@ -785,11 +767,11 @@ onMounted(cargar)
 /* Buttons */
 .scd__btn-primary {
   display: inline-flex; align-items: center; gap: .4rem;
-  background: #0f172a; color: #fff; border: none;
+  background: #1b5e20; color: #fff; border: none;
   padding: .5rem .95rem; border-radius: 8px; font-size: .78rem; font-weight: 700;
   cursor: pointer; transition: background .15s; white-space: nowrap;
 }
-.scd__btn-primary:hover:not(:disabled) { background: #1e293b; }
+.scd__btn-primary:hover:not(:disabled) { background: #166534; }
 .scd__btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 .scd__btn-secondary {
   display: inline-flex; align-items: center; gap: .4rem;

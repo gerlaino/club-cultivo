@@ -189,7 +189,7 @@ onMounted(cargar)
               </div>
               <div class="sau__field sau__field--full">
                 <label class="sau__label">Contraseña inicial</label>
-                <input v-model="form.password" class="sau__input" />
+                <input v-model="form.password" type="password" autocomplete="new-password" class="sau__input" />
                 <span style="font-size:.72rem;color:#94a3b8">El usuario deberá cambiarla al ingresar</span>
               </div>
             </div>
