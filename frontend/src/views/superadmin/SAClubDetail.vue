@@ -560,7 +560,7 @@ onMounted(cargar)
 </template>
 
 <style scoped>
-.scd { padding: 2rem 2.5rem 3rem; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+.scd { padding: 2rem 2.5rem 3rem; display: flex; flex-direction: column; gap: 1rem; }
 /* Loading */
 .scd__loading { display: flex; justify-content: center; padding: 5rem; }
 .scd__ring { width: 24px; height: 24px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: spin .7s linear infinite; }

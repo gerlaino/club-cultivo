@@ -64,7 +64,7 @@ const ROLES_META = {
   dispensador: { label: 'Dispensador', desc: 'Entregas y dispensaciones' },
   manicura:    { label: 'Manicura',    desc: 'Post-cosecha y pesaje' },
 }
-const rolesSeleccionados = ref(['admin', 'medico', 'cultivador', 'abogado'])
+const rolesSeleccionados = ref(['admin'])
 const passwordInicial    = ref('123456Aa')
 
 function toggleRol(rol) {
@@ -371,10 +371,6 @@ async function handleSubmit() {
 <style scoped>
 .cnv {
   padding: 2rem 2.5rem 3rem;
-  max-width: 860px;
-  margin: 0 auto;
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .cnv__back {

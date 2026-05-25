@@ -35,7 +35,7 @@ class Club < ApplicationRecord
   before_validation :generar_slug, on: :create
   after_create :crear_geneticas_default!
 
-  ROLES_DEFAULT    = %w[admin medico cultivador abogado].freeze
+  ROLES_DEFAULT    = %w[admin].freeze
   PASSWORD_DEFAULT = '123456Aa'.freeze
 
   GENETICAS_INASE = [

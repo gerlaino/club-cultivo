@@ -136,7 +136,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.sad { padding: 2rem 2.5rem 3rem; max-width: 1100px; margin: 0 auto; }
+.sad { padding: 2rem 2.5rem 3rem; }
 
 /* Header */
 .sad__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
