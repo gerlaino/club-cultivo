@@ -107,7 +107,7 @@ class Club < ApplicationRecord
 
   def crear_usuarios_default!(roles: ROLES_DEFAULT, password: PASSWORD_DEFAULT)
     roles.select { |r| ROLES_DEFAULT.include?(r) }.map do |rol|
-      email = "#{rol}@#{slug}.clubcultivo.app"
+      email = "#{rol}@#{slug}.com"
       next if User.exists?(email: email)
       User.create!(
         club:       self,

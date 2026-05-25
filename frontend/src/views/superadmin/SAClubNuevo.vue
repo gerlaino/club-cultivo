@@ -82,7 +82,7 @@ const slugPreview = computed(() =>
     .replace(/^-+|-+$/g, '') || 'slug'
 )
 
-function emailRol(rol) { return `${rol}@${slugPreview.value}.clubcultivo.app` }
+function emailRol(rol) { return `${rol}@${slugPreview.value}.com` }
 
 // ── Validación ────────────────────────────────────────────────────────
 const errores = ref({})
