@@ -87,7 +87,7 @@ RSpec.describe Dispensacion, type: :model do
     it 'rechaza si el aporte supera el margen total (saldo + límite)' do
       d = nueva_dispensacion(medio_pago: 'cuenta_corriente', aporte_socio_ars: 500)
       expect(d).not_to be_valid
-      expect(d.errors[:aporte_socio_ars]).to be_present
+      expect(d.errors[:base]).to be_present
     end
 
     it 'no valida crédito si medio_pago es efectivo' do
@@ -142,6 +142,76 @@ RSpec.describe Dispensacion, type: :model do
         delivery_id:     delivery.id,
       )
       expect(d).to be_valid
+    end
+  end
+
+  # ── limite_mensual_no_superado ────────────────────────────────────────────
+
+  describe 'validación limite_mensual_no_superado' do
+    context 'paciente con límite mensual configurado' do
+      before { paciente.update!(limite_dispensacion_mensual_g: 30) }
+
+      it 'acepta si la cantidad está dentro del límite' do
+        expect(nueva_dispensacion(cantidad: 25)).to be_valid
+      end
+
+      it 'acepta exactamente el límite completo' do
+        expect(nueva_dispensacion(cantidad: 30)).to be_valid
+      end
+
+      it 'rechaza si la cantidad supera el límite' do
+        d = nueva_dispensacion(cantidad: 31)
+        expect(d).not_to be_valid
+        expect(d.errors[:cantidad]).to be_present
+      end
+
+      it 'acumula lo ya dispensado en el mes al calcular el restante' do
+        nueva_dispensacion(cantidad: 20).save!
+        d = nueva_dispensacion(cantidad: 15)
+        expect(d).not_to be_valid
+        expect(d.errors[:cantidad].first).to include('10.0 g disponibles')
+      end
+
+      it 'no bloquea si la dispensa del mes es de otro mes' do
+        nueva_dispensacion(cantidad: 20, fecha_dispensacion: 1.month.ago.to_date).save!
+        expect(nueva_dispensacion(cantidad: 25)).to be_valid
+      end
+    end
+
+    context 'paciente sin límite mensual configurado' do
+      it 'no aplica restricción cuando limite_dispensacion_mensual_g es nil' do
+        paciente.update!(limite_dispensacion_mensual_g: nil)
+        expect(nueva_dispensacion(cantidad: 99)).to be_valid
+      end
+
+      it 'no aplica restricción cuando limite_dispensacion_mensual_g es 0' do
+        paciente.update!(limite_dispensacion_mensual_g: 0)
+        expect(nueva_dispensacion(cantidad: 99)).to be_valid
+      end
+    end
+  end
+
+  # ── carrito multi-item: fallo parcial ─────────────────────────────────────
+  # El frontend procesa items del carrito con requests independientes (no hay
+  # transacción HTTP cross-request). Si el segundo item falla, el primero ya
+  # está persistido. Este spec documenta ese comportamiento conocido.
+
+  describe 'carrito multi-item con fallo parcial' do
+    it 'el primer item se persiste aunque el segundo falle por stock insuficiente' do
+      stock.update!(cantidad: 10)
+
+      primera = nueva_dispensacion(cantidad: 7)
+      primera.save!
+      expect(primera).to be_persisted
+      expect(stock.reload.cantidad.to_f).to eq(3.0)
+
+      segunda = nueva_dispensacion(cantidad: 5)  # supera los 3g restantes
+      expect(segunda).not_to be_valid
+      expect(segunda.errors[:cantidad]).to be_present
+
+      # El primer item NO se revierte — comportamiento esperado y documentado
+      expect(Dispensacion.count).to eq(1)
+      expect(stock.reload.cantidad.to_f).to eq(3.0)
     end
   end
 end

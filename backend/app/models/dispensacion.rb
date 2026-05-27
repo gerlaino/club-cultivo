@@ -21,8 +21,9 @@ class Dispensacion < ApplicationRecord
   validates :estado_envio,       inclusion: { in: ESTADOS_ENVIO }, allow_nil: true
   validates :medio_pago,         inclusion: { in: MEDIOS_PAGO }, allow_blank: true
   validate  :fecha_no_futura
-  validate  :stock_disponible,   on: :create
-  validate  :credito_suficiente, on: :create, if: -> { medio_pago == 'cuenta_corriente' }
+  validate  :stock_disponible,          on: :create
+  validate  :limite_mensual_no_superado, on: :create
+  validate  :credito_suficiente,        on: :create, if: -> { medio_pago == 'cuenta_corriente' }
   validate  :delivery_fields_presentes, if: :con_envio?
 
   scope :del_mes,        ->(fecha = Date.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
@@ -49,6 +50,18 @@ class Dispensacion < ApplicationRecord
     if cantidad.to_d > stock.cantidad.to_d
       errors.add(:cantidad,
         "supera el stock disponible (#{stock.cantidad.to_f} #{stock.unidad || 'g'} disponibles)")
+    end
+  end
+
+  def limite_mensual_no_superado
+    return unless paciente && cantidad.to_d > 0
+    limite = paciente.limite_dispensacion_mensual_g.to_d
+    return if limite <= 0
+    ya_dispensado = paciente.dispensado_mes_actual_g.to_d
+    restante = limite - ya_dispensado
+    if cantidad.to_d > restante
+      errors.add(:cantidad,
+        "supera el límite mensual del paciente (#{[restante, 0].max.round(1)} g disponibles de #{limite.round(1)} g/mes)")
     end
   end
 

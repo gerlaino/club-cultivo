@@ -158,6 +158,22 @@
                 </div>
               </div>
 
+              <!-- Límite mensual -->
+              <div v-if="tieneLimiteMensual" class="dv__limite-mensual" :class="{ 'dv__limite-mensual--alerta': limiteExcedido }">
+                <div class="dv__limite-row">
+                  <span class="dv__limite-label">Límite mensual</span>
+                  <span class="dv__limite-nums">
+                    {{ formatG(consumoConCarrito) }} / {{ formatG(pacienteDetalle.limite_dispensacion_mensual_g) }}
+                  </span>
+                </div>
+                <div class="dv__limite-bar-track">
+                  <div class="dv__limite-bar-fill" :style="{ width: Math.min(porcentajeConCarrito, 100) + '%' }" />
+                </div>
+                <div v-if="limiteExcedido" class="dv__limite-error">
+                  Supera el límite — reducí la cantidad antes de continuar
+                </div>
+              </div>
+
               <!-- Medio de pago -->
               <div class="dv__modal-field">
                 <label class="dv__label">Medio de pago</label>
@@ -214,7 +230,7 @@
               <button class="dv__modal-cancel" @click="confirmOpen = false" :disabled="submitting">
                 Cancelar
               </button>
-              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting">
+              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || limiteExcedido">
                 <div v-if="submitting" class="dv__spinner" />
                 <template v-else>Confirmar</template>
               </button>
@@ -307,6 +323,19 @@ const tieneCc       = computed(() => (pacienteDetalle.value?.limite_cc ?? 0) > 0
 const tieneCcG      = computed(() => pacienteDetalle.value?.cc_gramos_activo && (pacienteDetalle.value?.limite_cc_g ?? 0) > 0)
 const puedeNoAbonar = computed(() => tieneCc.value || tieneCcG.value)
 
+// Límite mensual
+const tieneLimiteMensual  = computed(() => (pacienteDetalle.value?.limite_dispensacion_mensual_g ?? 0) > 0)
+const cartTotalG          = computed(() => cart.value.reduce((s, i) => s + i.cantidad, 0))
+const consumoConCarrito   = computed(() => (pacienteDetalle.value?.dispensado_mes_actual_g ?? 0) + cartTotalG.value)
+const porcentajeConCarrito = computed(() => {
+  const limite = pacienteDetalle.value?.limite_dispensacion_mensual_g
+  if (!limite) return 0
+  return Math.round((consumoConCarrito.value / limite) * 100)
+})
+const limiteExcedido = computed(() =>
+  tieneLimiteMensual.value && consumoConCarrito.value > (pacienteDetalle.value?.limite_dispensacion_mensual_g ?? Infinity)
+)
+
 // REPROCANN
 const reprocannVigente = computed(() => reprocannStatus(selectedPaciente.value) === 'vigente')
 
@@ -355,10 +384,14 @@ async function submitDispensacion() {
     contactoNombre.value = ''
     contactoTel.value    = ''
     observaciones.value  = ''
-    // Refrescar detalle del paciente para actualizar la barra de crédito
-    getPaciente(selectedPaciente.value.id)
-      .then(r => { pacienteDetalle.value = r.data?.data ?? r.data ?? null })
-      .catch(() => {})
+    // Refrescar stock y detalle del paciente en paralelo
+    Promise.all([
+      getPaciente(selectedPaciente.value.id),
+      listStocks(),
+    ]).then(([detRes, stockRes]) => {
+      pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
+      stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
+    }).catch(() => {})
   } catch (e) {
     const msg = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar'
     toast.error(msg)
@@ -692,6 +725,57 @@ function formatFecha(d) {
   color: var(--c-ink-900);
   border-top: 1px solid var(--c-ink-100);
   padding-top: var(--sp-3);
+}
+
+/* Límite mensual */
+.dv__limite-mensual {
+  background: var(--c-ink-50);
+  border: 1px solid var(--c-ink-200);
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.dv__limite-mensual--alerta {
+  background: #fff5f5;
+  border-color: #fca5a5;
+}
+.dv__limite-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dv__limite-label {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--c-ink-500);
+}
+.dv__limite-nums {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--c-ink-700);
+  font-family: var(--font-mono);
+}
+.dv__limite-bar-track {
+  height: 6px;
+  background: var(--c-ink-200);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.dv__limite-bar-fill {
+  height: 100%;
+  background: #16a34a;
+  border-radius: 99px;
+  transition: width .3s ease;
+}
+.dv__limite-mensual--alerta .dv__limite-bar-fill { background: #dc2626; }
+.dv__limite-error {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #dc2626;
 }
 .dv__modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .dv__modal-field { display: flex; flex-direction: column; gap: var(--sp-1); }
