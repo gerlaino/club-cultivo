@@ -3,7 +3,7 @@
 
     <!-- Brand -->
     <div class="csb__brand">
-      <LeafSeal :size="24" class="csb__brand-leaf" />
+      <img src="/logo-ce-icono.png" class="csb__brand-logo" alt="Cultivo Espacial" />
       <span class="csb__brand-name">cultivoespacial</span>
     </div>
 
@@ -41,7 +41,6 @@
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
-import LeafSeal from '../../design-system/icons/LeafSeal.vue'
 import DsAvatar from '../../design-system/components/Avatar.vue'
 import { Home, LayoutGrid, PackageCheck, History, LogOut } from 'lucide-vue-next'
 
@@ -92,7 +91,7 @@ async function handleLogout() {
   padding: var(--sp-5) var(--sp-5) var(--sp-4);
   border-bottom: 1px solid rgba(168, 201, 181, 0.15);
 }
-.csb__brand-leaf { color: var(--c-leaf-300); flex-shrink: 0; }
+.csb__brand-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .csb__brand-name {
   font-family: var(--font-display);
   font-size: var(--fs-16);

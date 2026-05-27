@@ -3,7 +3,7 @@
 
     <!-- Brand -->
     <div class="asb__brand">
-      <LeafSeal :size="24" class="asb__brand-leaf" />
+      <img src="/logo-ce-icono.png" class="asb__brand-logo" alt="Cultivo Espacial" />
       <span class="asb__brand-name">cultivoespacial</span>
     </div>
 
@@ -70,7 +70,6 @@ import { reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
-import LeafSeal from '../../design-system/icons/LeafSeal.vue'
 import DsAvatar from '../../design-system/components/Avatar.vue'
 import {
   LayoutDashboard, Users, Building2, Wallet, CheckSquare,
@@ -223,7 +222,7 @@ async function handleLogout() {
   border-bottom: 1px solid rgba(168,201,181,0.15);
   flex-shrink: 0;
 }
-.asb__brand-leaf { color: var(--c-leaf-300); flex-shrink: 0; }
+.asb__brand-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .asb__brand-name {
   font-family: var(--font-display);
   font-size: var(--fs-16);

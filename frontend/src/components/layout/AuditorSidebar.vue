@@ -1,7 +1,7 @@
 <template>
   <aside class="aud-sidebar">
     <div class="aud-logo">
-      <ShieldCheck :size="22" :stroke-width="1.75" />
+      <img src="/logo-ce-icono.png" class="aud-logo-img" alt="Cultivo Espacial" />
       <span>Auditoría</span>
     </div>
     <div class="aud-banner">Solo lectura</div>
@@ -49,6 +49,7 @@ defineEmits(['logout'])
 <style scoped>
 .aud-sidebar { width: 220px; min-width: 220px; background: var(--c-role-auditor); display: flex; flex-direction: column; padding: var(--sp-4) 0; flex-shrink: 0; }
 .aud-logo { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-5) var(--sp-3); color: #c8a06a; font-weight: 700; font-size: var(--fs-16); }
+.aud-logo-img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .aud-banner { margin: 0 var(--sp-3) var(--sp-3); background: rgba(200,160,106,.12); color: #c8a06a; font-size: var(--fs-11); font-weight: 600; text-align: center; padding: 3px 8px; border-radius: var(--r-sm); letter-spacing: .04em; }
 .aud-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 0 var(--sp-3); }
 .aud-link { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); color: rgba(255,255,255,.55); border-radius: var(--r-md); text-decoration: none; font-size: var(--fs-14); font-weight: 500; transition: all .15s; }

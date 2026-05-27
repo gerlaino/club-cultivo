@@ -1,7 +1,7 @@
 <template>
   <aside class="mdc-sidebar">
     <div class="mdc-logo">
-      <Stethoscope :size="22" :stroke-width="1.75" />
+      <img src="/logo-ce-icono.png" class="mdc-logo-img" alt="Cultivo Espacial" />
       <span>Médico</span>
     </div>
 
@@ -50,6 +50,7 @@ defineEmits(['logout'])
   color: #5ab36e;
   font-weight: 700; font-size: var(--fs-16);
 }
+.mdc-logo-img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .mdc-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 0 var(--sp-3); }
 .mdc-link {
   display: flex; align-items: center; gap: var(--sp-3);
