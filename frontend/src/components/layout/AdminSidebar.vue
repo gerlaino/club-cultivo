@@ -74,10 +74,10 @@ import LeafSeal from '../../design-system/icons/LeafSeal.vue'
 import DsAvatar from '../../design-system/components/Avatar.vue'
 import {
   LayoutDashboard, Users, Building2, Wallet, CheckSquare,
-  Sprout, FileCheck, FileText, UserCog, Globe, ClipboardCheck,
-  Container, ShieldCheck, Truck, TrendingUp, History,
+  Sprout, FileCheck, FileText, UserCog, Globe,
+  ShieldCheck, Truck, TrendingUp, History,
   GitBranch, Layers, ChevronDown, Dna, Archive, Leaf, Boxes, Scissors,
-  ClipboardList,
+  ClipboardList, Package, Settings,
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -91,12 +91,10 @@ const GRUPOS = [
     icon: Sprout,
     defaultOpen: true,
     items: [
-      { to: '/lotes',         icon: Archive,       label: 'Lotes' },
-      { to: '/plantas',       icon: Leaf,          label: 'Plantas' },
-      { to: '/salas',         icon: Layers,        label: 'Salas' },
-      { to: '/geneticas',     icon: Dna,           label: 'Genéticas' },
-      { to: '/admin/cosechado', icon: Scissors,      label: 'Cosechado' },
-      { to: '/aprobaciones',   icon: ClipboardCheck, label: 'Aprobaciones' },
+      { to: '/salas',     icon: Layers,  label: 'Salas' },
+      { to: '/lotes',     icon: Archive, label: 'Lotes' },
+      { to: '/plantas',   icon: Leaf,    label: 'Plantas' },
+      { to: '/geneticas', icon: Dna,     label: 'Genéticas' },
     ],
   },
   {
@@ -104,24 +102,37 @@ const GRUPOS = [
     icon: Users,
     defaultOpen: true,
     items: [
-      { to: '/pacientes',         icon: Users,      label: 'Lista' },
-      { to: '/historial',         icon: History,    label: 'Historial' },
-      { to: '/informe-semestral', icon: FileCheck,  label: 'REPROCANN' },
+      { to: '/pacientes',         icon: Users,     label: 'Pacientes' },
+      { to: '/historial',         icon: History,   label: 'Historial' },
+      { to: '/informe-semestral', icon: FileCheck, label: 'REPROCANN' },
     ],
   },
   {
-    label: 'Gestión',
+    label: 'Operaciones',
+    icon: Package,
+    defaultOpen: true,
+    items: [
+      { to: '/admin/stock',        icon: Boxes,      label: 'Stock' },
+      { to: '/admin/cosechado',    icon: Scissors,   label: 'Post-cosecha' },
+      { to: '/delivery/despachos', icon: Truck,      label: 'Despachos' },
+      { to: '/contabilidad',       icon: Wallet,     label: 'Contabilidad' },
+    ],
+  },
+  {
+    label: 'Planificación',
+    icon: ClipboardList,
+    defaultOpen: true,
+    items: [
+      { to: '/tareas',       icon: CheckSquare, label: 'Tareas' },
+      { to: '/plan-trabajo', icon: ClipboardList, label: 'Plan de trabajo' },
+    ],
+  },
+  {
+    label: 'Infraestructura',
     icon: Building2,
     defaultOpen: false,
     items: [
-      { to: '/sedes',              icon: Building2,  label: 'Sedes' },
-      { to: '/admin/stock', icon: Boxes, label: 'Stock' },
-      { to: '/delivery/despachos', icon: Truck,      label: 'Despachos' },
-      { to: '/tareas',             icon: CheckSquare,  label: 'Tareas' },
-      { to: '/plan-trabajo',       icon: ClipboardList, label: 'Plan de trabajo' },
-      { to: '/contabilidad',       icon: Wallet,     label: 'Contabilidad' },
-      { to: '/usuarios',           icon: UserCog,    label: 'Equipo' },
-      { to: '/web',                icon: Globe,      label: 'Web' },
+      { to: '/sedes', icon: Building2, label: 'Sedes' },
     ],
   },
   {
@@ -139,7 +150,16 @@ const GRUPOS = [
     icon: TrendingUp,
     defaultOpen: false,
     items: [
-      { to: '/analitica',  icon: TrendingUp, label: 'Analítica' },
+      { to: '/analitica', icon: TrendingUp, label: 'Analítica' },
+    ],
+  },
+  {
+    label: 'Configuración',
+    icon: Settings,
+    defaultOpen: false,
+    items: [
+      { to: '/usuarios', icon: UserCog, label: 'Equipo' },
+      { to: '/web',      icon: Globe,   label: 'Sitio web' },
     ],
   },
 ]

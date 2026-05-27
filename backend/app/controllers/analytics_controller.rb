@@ -160,6 +160,10 @@ class AnalyticsController < ApplicationController
         }
       end
 
+    por_dia = (6.days.ago.to_date..Date.today).map do |date|
+      { fecha: date.strftime('%d/%m'), count: base_disps.where(fecha_dispensacion: date).count }
+    end
+
     {
       resumen: {
         dispensaciones_hoy:    disps_hoy.count,
@@ -175,6 +179,7 @@ class AnalyticsController < ApplicationController
       },
       stocks:        stocks_data,
       top_pacientes: top_pacientes,
+      por_dia:       por_dia,
     }
   end
 

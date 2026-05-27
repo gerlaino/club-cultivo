@@ -61,7 +61,7 @@ async function crearSede() {
     paso.value = 3
     setTimeout(() => {
       emit('completado')
-      router.push({ name: 'sedes' })
+      router.push('/')
     }, 2200)
   } catch (e) {
     error.value = e.response?.data?.errors?.join(', ') || 'Error al crear la sede. Intentá de nuevo.'

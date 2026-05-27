@@ -12,9 +12,6 @@
       </RouterLink>
     </div>
 
-    <!-- Onboarding -->
-    <OnboardingChecklist />
-
     <!-- KPIs periodo -->
     <div class="dd__kpis">
       <div class="dd__kpi-card">
@@ -133,7 +130,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore }     from '../../stores/auth.js'
 import { listDispensacionesFecha, getAnalyticsDispensador } from '../../lib/api.js'
-import OnboardingChecklist  from './OnboardingChecklist.vue'
 import DsStat               from '../../design-system/components/Stat.vue'
 import { PackagePlus }      from 'lucide-vue-next'
 

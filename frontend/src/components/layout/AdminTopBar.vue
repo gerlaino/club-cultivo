@@ -19,6 +19,12 @@
       <!-- Right actions -->
       <div class="atb__right">
 
+        <!-- Help -->
+        <button class="atb__icon-btn" @click="openHelp" aria-label="Ayuda" title="Ayuda">
+          <HelpCircle :size="20" :stroke-width="1.75" />
+          <span v-if="helpDot" class="atb__help-dot" />
+        </button>
+
         <!-- Notification bell -->
         <DsDropdown v-model="bellOpen" align="right">
           <template #anchor>
@@ -121,10 +127,12 @@
       </div>
     </div>
   </header>
+
+  <HelpDrawer v-model="helpOpen" />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
@@ -134,7 +142,8 @@ import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
 import DsDropdown from '../../design-system/components/Dropdown.vue'
 import DsAvatar   from '../../design-system/components/Avatar.vue'
 import DsEmpty    from '../../design-system/components/EmptyState.vue'
-import { Bell, Menu } from 'lucide-vue-next'
+import { Bell, Menu, HelpCircle } from 'lucide-vue-next'
+import HelpDrawer from '../HelpDrawer.vue'
 
 const emit = defineEmits(['toggle-drawer'])
 
@@ -149,6 +158,18 @@ const { noLeidas: internasNoLeidas, marcarLeida: marcarInternaLeida, marcarTodas
 
 const bellOpen   = ref(false)
 const avatarOpen = ref(false)
+const helpOpen   = ref(false)
+const helpDot    = ref(false)
+onMounted(() => {
+  helpDot.value = !localStorage.getItem(`help_seen_${auth.user?.id || 'u'}`)
+})
+function openHelp() {
+  helpOpen.value = true
+  if (helpDot.value) {
+    helpDot.value = false
+    localStorage.setItem(`help_seen_${auth.user?.id || 'u'}`, '1')
+  }
+}
 
 const notifCount   = computed(() => ambStore.alertasCount + internasNoLeidas.value.length)
 const alertasSlice = computed(() => ambStore.alertasActivas.slice(0, 3))
@@ -277,6 +298,15 @@ async function handleLogout() {
 }
 .atb__icon-btn:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
 .atb__icon-btn--alerta { border-color: #fca5a5; background: var(--c-rust-100); color: var(--c-rust-600); }
+
+.atb__help-dot {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 7px; height: 7px;
+  background: #3b82f6;
+  border-radius: 50%;
+  border: 1.5px solid var(--c-paper);
+}
 
 .atb__badge {
   position: absolute;

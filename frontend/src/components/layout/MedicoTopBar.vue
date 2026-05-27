@@ -5,6 +5,10 @@
     </button>
     <span class="mdc-breadcrumb">{{ pageTitle }}</span>
     <div class="mdc-right">
+      <button class="mdc-icon-btn" @click="openHelp" aria-label="Ayuda" title="Ayuda">
+        <HelpCircle :size="18" :stroke-width="1.75" />
+        <span v-if="helpDot" class="mdc-help-dot" />
+      </button>
       <button class="mdc-bell" :class="{ 'mdc-bell--active': count > 0 }" @click="bellOpen = !bellOpen" aria-label="Alertas">
         <Bell :size="18" :stroke-width="1.75" />
         <span v-if="count > 0" class="mdc-badge">{{ count > 9 ? '9+' : count }}</span>
@@ -32,15 +36,21 @@
       <span class="mdc-role-badge">Médico</span>
     </div>
   </header>
+
+  <HelpDrawer v-model="helpOpen" />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { Menu, Bell } from 'lucide-vue-next'
+import { Menu, Bell, HelpCircle } from 'lucide-vue-next'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
+import { useAuthStore } from '../../stores/auth.js'
+import HelpDrawer from '../HelpDrawer.vue'
 
 defineEmits(['open-drawer'])
+
+const auth = useAuthStore()
 
 const route = useRoute()
 const LABELS = { '/medico': 'Inicio', '/medico/pacientes': 'Mis Pacientes', '/medico/indicaciones': 'Indicaciones', '/medico/documentos': 'Documentos' }
@@ -48,6 +58,19 @@ const pageTitle = computed(() => LABELS[route.path] || 'Médico')
 
 const bellOpen = ref(false)
 const { noLeidas, count, marcarLeida, marcarTodas } = useAlertasInternas()
+
+const helpOpen = ref(false)
+const helpDot  = ref(false)
+onMounted(() => {
+  helpDot.value = !localStorage.getItem(`help_seen_${auth.user?.id || 'u'}`)
+})
+function openHelp() {
+  helpOpen.value = true
+  if (helpDot.value) {
+    helpDot.value = false
+    localStorage.setItem(`help_seen_${auth.user?.id || 'u'}`, '1')
+  }
+}
 
 function formatTime(ts) {
   if (!ts) return ''
@@ -72,6 +95,9 @@ function formatTime(ts) {
 .mdc-right { display: flex; align-items: center; gap: var(--sp-3); position: relative; }
 .mdc-role-badge { background: rgba(45,138,107,.12); color: #2D8A6B; font-size: var(--fs-12); font-weight: 600; padding: 2px 10px; border-radius: 999px; }
 @media (max-width: 1023px) { .mdc-hamburger { display: flex; } }
+.mdc-icon-btn { position: relative; background: none; border: 1px solid var(--c-ink-200); border-radius: var(--r-md); width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--c-ink-500); transition: all .15s; }
+.mdc-icon-btn:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
+.mdc-help-dot { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; background: #3b82f6; border-radius: 50%; border: 1.5px solid var(--c-paper); }
 .mdc-bell { position: relative; background: none; border: 1px solid var(--c-ink-200); border-radius: var(--r-md); width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--c-ink-500); transition: all .15s; }
 .mdc-bell:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
 .mdc-bell--active { border-color: #fca5a5; background: #fff5f5; color: #dc2626; }

@@ -23,6 +23,12 @@
       <!-- Right -->
       <div class="dtb__right">
 
+        <!-- Help -->
+        <button class="dtb__icon-btn dtb__help-btn" @click="openHelp" aria-label="Ayuda" title="Ayuda">
+          <HelpCircle :size="20" :stroke-width="1.75" />
+          <span v-if="helpDot" class="dtb__help-dot" />
+        </button>
+
         <!-- Bell (vacío, sin notificaciones para dispensador por ahora) -->
         <button class="dtb__icon-btn" aria-label="Notificaciones">
           <Bell :size="20" :stroke-width="1.75" />
@@ -60,16 +66,19 @@
       </div>
     </div>
   </header>
+
+  <HelpDrawer v-model="helpOpen" />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import DsDropdown from '../../design-system/components/Dropdown.vue'
 import DsAvatar   from '../../design-system/components/Avatar.vue'
-import { Bell, User, LogOut, Menu } from 'lucide-vue-next'
+import { Bell, User, LogOut, Menu, HelpCircle } from 'lucide-vue-next'
+import HelpDrawer from '../HelpDrawer.vue'
 
 const emit = defineEmits(['open-drawer'])
 
@@ -79,6 +88,18 @@ const auth   = useAuthStore()
 const club   = useClubStore()
 
 const avatarOpen = ref(false)
+const helpOpen   = ref(false)
+const helpDot    = ref(false)
+onMounted(() => {
+  helpDot.value = !localStorage.getItem(`help_seen_${auth.user?.id || 'u'}`)
+})
+function openHelp() {
+  helpOpen.value = true
+  if (helpDot.value) {
+    helpDot.value = false
+    localStorage.setItem(`help_seen_${auth.user?.id || 'u'}`, '1')
+  }
+}
 
 const SEGMENT_LABELS = {
   dispensar: 'Dispensar',
@@ -165,6 +186,15 @@ async function handleLogout() {
   transition: background var(--t-fast), color var(--t-fast);
 }
 .dtb__icon-btn:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
+.dtb__help-btn { position: relative; }
+.dtb__help-dot {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 7px; height: 7px;
+  background: #3b82f6;
+  border-radius: 50%;
+  border: 1.5px solid var(--c-paper);
+}
 
 /* Avatar */
 .dtb__avatar-btn { background: none; border: none; padding: 0; cursor: pointer; border-radius: 50%; display: flex; }
