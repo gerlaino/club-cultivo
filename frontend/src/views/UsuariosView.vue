@@ -55,7 +55,7 @@ const ROLES_CONFIG = {
   dispensador: { sedes: true,  salas: false, sedeRequerida: false, sedeHint: 'Sin asignar: puede dispensar en todas las sedes.' },
   delivery:    { sedes: true,  salas: false, sedeRequerida: false, sedeHint: 'Sin asignar: gestiona entregas de todas las sedes.' },
   abogado:     { sedes: false, salas: false },
-  auditor:     { sedes: false, salas: false },
+  auditor:     { sedes: true,  salas: false, sedeRequerida: false, sedeHint: 'Sin asignar: accede a informes y datos de todo el club.' },
 }
 
 function getRoleInfo(role) {
@@ -90,10 +90,10 @@ const form = ref({ id: null, first_name: "", last_name: "", email: "", role: "ad
 const roleConfig = computed(() => ROLES_CONFIG[form.value.role] || { sedes: false, salas: false })
 
 const salasDeLaSede = computed(() =>
-  todasLasSalas.value.filter(s =>
-    s.sede?.id === form.value.sede_id &&
-    ['produccion', 'mixta'].includes(s.sede?.tipo)
-  )
+  todasLasSalas.value.filter(s => {
+    if (s.sede?.id !== form.value.sede_id) return false
+    return form.value.role === 'manicura' ? s.kind === 'manicura' : s.kind !== 'manicura'
+  })
 )
 
 const formValidStep2 = computed(() => {
