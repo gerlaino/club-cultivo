@@ -77,76 +77,8 @@
 
           <!-- Logo Cultivo Espacial -->
           <div class="lv__logo">
-            <!-- SVG inspirado en el logo: cogollo + navecita + espacio -->
-            <div class="lv__logo-mark">
-              <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Fondo circular tipo espacio -->
-                <circle cx="26" cy="26" r="26" fill="#0a1a0c"/>
-                <circle cx="26" cy="26" r="26" fill="url(#space-grad)"/>
-                <!-- Estrellas del fondo -->
-                <circle cx="8"  cy="10" r="0.8" fill="white" opacity="0.6"/>
-                <circle cx="44" cy="8"  r="0.6" fill="white" opacity="0.5"/>
-                <circle cx="46" cy="20" r="0.7" fill="white" opacity="0.4"/>
-                <circle cx="6"  cy="32" r="0.5" fill="white" opacity="0.5"/>
-                <circle cx="42" cy="40" r="0.7" fill="white" opacity="0.4"/>
-                <circle cx="14" cy="44" r="0.5" fill="white" opacity="0.3"/>
-                <!-- Cogollo central (bud) -->
-                <!-- Forma principal del bud — esferas agrupadas -->
-                <ellipse cx="26" cy="28" rx="9" ry="10" fill="#3d8c3d"/>
-                <ellipse cx="22" cy="30" rx="6" ry="7" fill="#4caf50"/>
-                <ellipse cx="30" cy="30" rx="6" ry="7" fill="#4caf50"/>
-                <ellipse cx="26" cy="24" rx="7" ry="8" fill="#66bb6a"/>
-                <ellipse cx="21" cy="26" rx="5" ry="5.5" fill="#81c784"/>
-                <ellipse cx="31" cy="26" rx="5" ry="5.5" fill="#81c784"/>
-                <ellipse cx="26" cy="22" rx="5.5" ry="6" fill="#a5d6a7"/>
-                <!-- Pistils (pistilos naranjas) -->
-                <ellipse cx="23" cy="20" rx="0.8" ry="2" fill="#ff7043" transform="rotate(-10 23 20)"/>
-                <ellipse cx="27" cy="19" rx="0.8" ry="2" fill="#ff8a65" transform="rotate(5 27 19)"/>
-                <ellipse cx="30" cy="21" rx="0.8" ry="1.8" fill="#ff7043" transform="rotate(15 30 21)"/>
-                <!-- Tricomas (puntos blancos) -->
-                <circle cx="24" cy="21" r="0.9" fill="white" opacity="0.7"/>
-                <circle cx="28" cy="20" r="0.8" fill="white" opacity="0.6"/>
-                <circle cx="26" cy="23" r="0.7" fill="white" opacity="0.5"/>
-                <circle cx="22" cy="24" r="0.7" fill="white" opacity="0.5"/>
-                <circle cx="30" cy="23" r="0.8" fill="white" opacity="0.6"/>
-                <!-- Hojas de cannabis a los lados -->
-                <path d="M17 30 C14 26 10 25 8 28 C10 31 14 32 17 30Z" fill="#2e7d32" opacity="0.9"/>
-                <path d="M17 34 C13 31 9 32 8 36 C11 38 15 37 17 34Z" fill="#388e3c" opacity="0.8"/>
-                <path d="M35 30 C38 26 42 25 44 28 C42 31 38 32 35 30Z" fill="#2e7d32" opacity="0.9"/>
-                <path d="M35 34 C39 31 43 32 44 36 C41 38 37 37 35 34Z" fill="#388e3c" opacity="0.8"/>
-                <!-- Tallo -->
-                <path d="M26 38 L26 46" stroke="#1b5e20" stroke-width="2" stroke-linecap="round"/>
-                <path d="M26 43 C23 45 21 46 19 47" stroke="#2e7d32" stroke-width="1.2" stroke-linecap="round"/>
-                <path d="M26 43 C29 45 31 46 33 47" stroke="#2e7d32" stroke-width="1.2" stroke-linecap="round"/>
-                <!-- Navecita espacial (arriba derecha) -->
-                <g transform="translate(35, 10) rotate(45)">
-                  <!-- Cuerpo cohete -->
-                  <ellipse cx="0" cy="0" rx="3" ry="5.5" fill="#e0e0e0"/>
-                  <!-- Cabeza cohete -->
-                  <path d="M0 -5.5 C-2 -3 -3 0 -3 0 L3 0 C3 0 2 -3 0 -5.5Z" fill="#f5f5f5"/>
-                  <!-- Ventana -->
-                  <circle cx="0" cy="0.5" r="1.2" fill="#64b5f6" opacity="0.9"/>
-                  <!-- Aletas -->
-                  <path d="M-3 2 L-5 5 L-3 5 Z" fill="#bdbdbd"/>
-                  <path d="M3 2 L5 5 L3 5 Z" fill="#bdbdbd"/>
-                  <!-- Llama del cohete -->
-                  <path d="M-2 5 L0 9 L2 5Z" fill="#ff7043" opacity="0.9"/>
-                  <path d="M-1 5 L0 8 L1 5Z" fill="#ffcc02" opacity="0.8"/>
-                </g>
-                <!-- Estela del cohete -->
-                <path d="M36 16 C33 19 30 21 27 22" stroke="rgba(255,200,100,.4)" stroke-width="1" stroke-dasharray="1.5 2" stroke-linecap="round"/>
-                <defs>
-                  <radialGradient id="space-grad" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#0d2010"/>
-                    <stop offset="100%" stop-color="#060f07"/>
-                  </radialGradient>
-                </defs>
-              </svg>
-            </div>
-            <div>
-              <div class="lv__logo-name">Cultivo Espacial</div>
-              <div class="lv__logo-sub">Gestión medicinal profesional</div>
-            </div>
+            <img src="/logo-ce-redondo.png" class="lv__logo-img" alt="Cultivo Espacial" />
+            <div class="lv__logo-sub">Gestión medicinal profesional</div>
           </div>
 
           <div class="lv__sep"></div>
@@ -421,10 +353,16 @@ async function onSubmit() {
     inset 0 1px 0 rgba(255,255,255,.9);
 }
 
-.lv__logo { display: flex; align-items: center; gap: .9rem; padding: 1.5rem 1.5rem 1rem; }
-.lv__logo-mark { flex-shrink: 0; filter: drop-shadow(0 2px 8px rgba(27,94,32,.4)); }
-.lv__logo-name { font-size: 1.05rem; font-weight: 800; color: #0f172a; letter-spacing: -.03em; }
-.lv__logo-sub { font-size: .6rem; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; margin-top: .1rem; }
+.lv__logo {
+  display: flex; flex-direction: column; align-items: center; gap: .5rem;
+  padding: 1.75rem 1.5rem 1rem;
+}
+.lv__logo-img {
+  width: 96px; height: 96px;
+  border-radius: 50%; object-fit: cover;
+  filter: drop-shadow(0 4px 16px rgba(27,94,32,.45));
+}
+.lv__logo-sub { font-size: .6rem; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; }
 .lv__sep { height: 1px; background: #f1f5f9; margin: 0 1.5rem; }
 
 .lv__welcome { padding: 1.1rem 1.5rem 0; }

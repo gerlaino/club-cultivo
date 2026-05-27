@@ -247,7 +247,7 @@ async function onOnboardingCompletado() {
 
         <div class="ad__kpi" :class="{ 'ad__kpi--critico': stockAlerta === 'critico', 'ad__kpi--bajo': stockAlerta === 'bajo' }">
           <span class="ad__kpi-label">Stock disponible</span>
-          <div class="ad__kpi-num">{{ stockTotalG != null ? stockTotalG.toFixed(0) + ' g' : '—' }}</div>
+          <div class="ad__kpi-num">{{ stockTotalG != null ? stockTotalG.toFixed(0) + ' g' : '0 g' }}</div>
           <div class="ad__kpi-sub">{{ stockAlertaLabel }}</div>
         </div>
 
@@ -290,7 +290,6 @@ async function onOnboardingCompletado() {
         <div class="ad__prod-card">
           <span class="ad__prod-label">Próxima cosecha</span>
           <span class="ad__prod-num" v-if="proximaCosechaDias !== null">{{ proximaCosechaDias }}d</span>
-          <span class="ad__prod-num ad__prod-num--empty" v-else>—</span>
           <span class="ad__prod-sub">{{ proximaCosechaLabel }}</span>
         </div>
 
