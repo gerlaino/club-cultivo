@@ -4,7 +4,7 @@
       <!-- Brand -->
       <RouterLink to="/" class="cmh__brand">
         <img src="/logo-ce-icono.png" class="cmh__brand-logo" alt="Cultivo Espacial" />
-        <span class="cmh__brand-name">cultivoespacial</span>
+        <span class="cmh__brand-name">Cultivo Espacial</span>
       </RouterLink>
 
       <!-- Bell -->

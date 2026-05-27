@@ -4,7 +4,7 @@
     <!-- Brand -->
     <div class="asb__brand">
       <img src="/logo-ce-icono.png" class="asb__brand-logo" alt="Cultivo Espacial" />
-      <span class="asb__brand-name">cultivoespacial</span>
+      <span class="asb__brand-name">Cultivo Espacial</span>
     </div>
 
     <!-- Nav -->
