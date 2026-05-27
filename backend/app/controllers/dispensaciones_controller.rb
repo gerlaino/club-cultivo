@@ -71,21 +71,23 @@ class DispensacionesController < ApplicationController
     when 'cuenta_corriente'
       cc    = @paciente.cuenta_corriente
       monto = @dispensacion.aporte_socio_ars.to_d
-      unless cc&.limite_credito.to_f > 0
-        return render json: { error: 'El socio no tiene cuenta corriente configurada' }, status: :unprocessable_entity
-      end
-      unless cc.puede_dispensar?(monto)
-        margen = (cc.saldo_disponible + cc.limite_credito).round(2)
-        return render json: { error: "Saldo insuficiente en cuenta corriente (margen disponible: #{margen} ARS)" }, status: :unprocessable_entity
+      unless cc&.limite_credito.to_f > 0 && cc.puede_dispensar?(monto)
+        return render json: { error: 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.' }, status: :unprocessable_entity
       end
     when 'credito_gramos'
       cc     = @paciente.cuenta_corriente
       gramos = @dispensacion.cantidad.to_d
-      unless cc&.credito_gramos_activo?
-        return render json: { error: 'El socio no tiene crédito en gramos activado' }, status: :unprocessable_entity
+      unless cc&.credito_gramos_activo? && cc.puede_dispensar_g?(gramos)
+        return render json: { error: 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.' }, status: :unprocessable_entity
       end
-      unless cc.puede_dispensar_g?(gramos)
-        return render json: { error: "Gramos insuficientes en crédito (disponible: #{cc.saldo_disponible_g.round(3)}g)" }, status: :unprocessable_entity
+    when 'no_abona'
+      cc     = @paciente.cuenta_corriente
+      monto  = @dispensacion.aporte_socio_ars.to_d
+      gramos = @dispensacion.cantidad.to_d
+      has_cc = cc&.limite_credito.to_f > 0 && cc.puede_dispensar?(monto)
+      has_g  = cc&.credito_gramos_activo? && cc.puede_dispensar_g?(gramos)
+      unless has_cc || has_g
+        return render json: { error: 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.' }, status: :unprocessable_entity
       end
     end
 
@@ -93,8 +95,17 @@ class DispensacionesController < ApplicationController
       @dispensacion.save!
       crear_movimiento_contable(@dispensacion)
       case @dispensacion.medio_pago
-      when 'cuenta_corriente' then debitar_cuenta_corriente(@dispensacion)
-      when 'credito_gramos'   then debitar_gramos(@dispensacion)
+      when 'cuenta_corriente'
+        debitar_cuenta_corriente(@dispensacion)
+      when 'credito_gramos'
+        debitar_gramos(@dispensacion)
+      when 'no_abona'
+        cc = @dispensacion.paciente.cuenta_corriente
+        if cc&.limite_credito.to_f > 0 && cc.puede_dispensar?(@dispensacion.aporte_socio_ars.to_d)
+          debitar_cuenta_corriente(@dispensacion)
+        elsif cc&.credito_gramos_activo? && cc.puede_dispensar_g?(@dispensacion.cantidad.to_d)
+          debitar_gramos(@dispensacion)
+        end
       end
     end
 
@@ -243,8 +254,13 @@ class DispensacionesController < ApplicationController
   def destroy
     ActiveRecord::Base.transaction do
       case @dispensacion.medio_pago
-      when 'cuenta_corriente' then revertir_cuenta_corriente(@dispensacion)
-      when 'credito_gramos'   then revertir_gramos(@dispensacion)
+      when 'cuenta_corriente'
+        revertir_cuenta_corriente(@dispensacion)
+      when 'credito_gramos'
+        revertir_gramos(@dispensacion)
+      when 'no_abona'
+        revertir_cuenta_corriente(@dispensacion)
+        revertir_gramos(@dispensacion)
       end
       # Nullify FK references before destroy (prevents FK constraint violation)
       CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)
@@ -383,15 +399,17 @@ class DispensacionesController < ApplicationController
     cc = dispensacion.paciente.cuenta_corriente
     return unless cc
 
-    gramos = dispensacion.cantidad.to_d
-    return if gramos <= 0
+    total_g = cc.movimientos.where(dispensacion: dispensacion, tipo: 'debito')
+                .where("descripcion ILIKE ?", '%crédito gramos%')
+                .sum(:monto).abs
+    return if total_g <= 0
 
     anterior = cc.saldo_disponible_g.to_d
-    nuevo    = anterior + gramos
+    nuevo    = anterior + total_g
     cc.update!(saldo_disponible_g: nuevo)
     cc.movimientos.create!(
       tipo:           'ajuste',
-      monto:          gramos,
+      monto:          total_g,
       saldo_anterior: anterior,
       saldo_nuevo:    nuevo,
       descripcion:    "Reversa dispensación ##{dispensacion.id} (gramos)",

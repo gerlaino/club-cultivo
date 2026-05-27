@@ -25,7 +25,13 @@
       <!-- ── SEDES GRID ───────────────────────────────────────── -->
       <section class="svd__section">
         <h2 class="svd__section-title">Mis sedes</h2>
-        <div v-if="!sedes.length" class="svd__empty">No tenés sedes asignadas.</div>
+        <div v-if="!sedes.length" class="svd__empty svd__empty--warn">
+          <i class="bi bi-exclamation-triangle-fill svd__warn-icon"></i>
+          <div>
+            <strong>No tenés sedes asignadas.</strong>
+            <span> Contactá al administrador del club para que te asigne una sede.</span>
+          </div>
+        </div>
         <div v-else class="svd__sedes-grid">
           <div
             v-for="sede in sedes"
@@ -193,6 +199,22 @@ onMounted(async () => {
   font-size: var(--fs-14);
   color: var(--c-ink-400);
   padding: var(--sp-4) 0;
+}
+.svd__empty--warn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--r-md);
+  padding: var(--sp-4) var(--sp-5);
+  color: #92400e;
+}
+.svd__warn-icon {
+  font-size: var(--fs-16);
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #d97706;
 }
 
 /* Sedes grid */

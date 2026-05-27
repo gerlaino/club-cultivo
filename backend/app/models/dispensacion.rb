@@ -2,6 +2,7 @@ class Dispensacion < ApplicationRecord
   self.table_name = 'dispensaciones'
 
   ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido].freeze
+  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente credito_gramos no_abona].freeze
 
   belongs_to :paciente
   belongs_to :user
@@ -18,6 +19,7 @@ class Dispensacion < ApplicationRecord
   validates :cantidad,           presence: true, numericality: { greater_than: 0 }
   validates :fecha_dispensacion, presence: true
   validates :estado_envio,       inclusion: { in: ESTADOS_ENVIO }, allow_nil: true
+  validates :medio_pago,         inclusion: { in: MEDIOS_PAGO }, allow_blank: true
   validate  :fecha_no_futura
   validate  :stock_disponible,   on: :create
   validate  :credito_suficiente, on: :create, if: -> { medio_pago == 'cuenta_corriente' }
@@ -56,8 +58,7 @@ class Dispensacion < ApplicationRecord
     return unless cc
     margen = cc.saldo_disponible + cc.limite_credito
     if margen < aporte_socio_ars.to_d
-      errors.add(:aporte_socio_ars,
-        "supera el crédito disponible del paciente (#{margen.to_f.round(2)} ARS disponibles)")
+      errors.add(:base, 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.')
     end
   end
 

@@ -48,6 +48,14 @@ class PacientesController < ApplicationController
     )
     json['notas_clinicas'] = @paciente.notas_clinicas if policy(@paciente).ver_notas_clinicas?
     json['reprocann_documento_url'] = url_for(@paciente.reprocann_documento) if @paciente.reprocann_documento.attached?
+
+    ultima = @paciente.dispensaciones.includes(:stock).recientes.first
+    json['ultima_dispensacion'] = ultima ? {
+      fecha:          ultima.fecha_dispensacion,
+      cantidad:       ultima.cantidad,
+      forma_producto: ultima.stock&.forma_producto,
+    } : nil
+
     render json: { data: json }
   end
 

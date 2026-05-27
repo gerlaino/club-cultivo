@@ -280,7 +280,11 @@ onMounted(async () => {
             </div>
             <div class="ud__card-body">
               <UsuarioSedesManager :user-id="userId" />
-              <p class="ud__sede-total-note">
+              <p v-if="u.role === 'supervisor'" class="ud__sede-total-note ud__sede-total-note--warn">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                El supervisor requiere al menos una sede asignada para poder operar.
+              </p>
+              <p v-else class="ud__sede-total-note">
                 <i class="bi bi-info-circle me-1"></i>
                 Sin sedes asignadas = acceso a todo el club
               </p>
@@ -371,6 +375,10 @@ onMounted(async () => {
                     <i :class="['bi', r.icon]"></i>
                     {{ r.label }}
                   </button>
+                </div>
+                <div v-if="newRole === 'supervisor'" class="ud__role-warn">
+                  <i class="bi bi-exclamation-triangle-fill"></i>
+                  El supervisor requiere al menos una sede asignada. Recordá asignarla desde la sección "Sedes asignadas".
                 </div>
                 <div class="ud__role-edit-actions">
                   <button class="ud__btn-ghost" @click="editingRole = false">Cancelar</button>
@@ -474,6 +482,25 @@ onMounted(async () => {
   border-radius: 8px;
   border-left: 3px solid #cbd5e1;
 }
+.ud__sede-total-note--warn {
+  background: #fffbeb;
+  color: #92400e;
+  border-left-color: #d97706;
+}
+.ud__role-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: .6rem .875rem;
+  font-size: .78rem;
+  color: #92400e;
+  margin-bottom: .75rem;
+  line-height: 1.5;
+}
+.ud__role-warn i { color: #d97706; flex-shrink: 0; margin-top: 1px; }
 .ud__acceso-note {
   font-size: .82rem;
   color: #475569;

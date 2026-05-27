@@ -327,6 +327,14 @@ watch(showModal, async (val) => {
                 </div>
               </div>
 
+              <!-- Advertencia supervisor sin sede -->
+              <div v-if="form.role === 'supervisor'" class="uv__field uv__field--full">
+                <div class="uv__role-warn">
+                  <i class="bi bi-exclamation-triangle-fill"></i>
+                  <span>El supervisor necesita al menos una sede asignada para operar. Podés asignársela desde su perfil después de crearlo.</span>
+                </div>
+              </div>
+
               <!-- Sala para cultivador / manicura -->
               <template v-if="['cultivador', 'manicura'].includes(form.role)">
                 <div class="uv__field uv__field--full">
@@ -536,6 +544,21 @@ watch(showModal, async (val) => {
 }
 .uv__role-btn:hover { border-color: #cbd5e1; background: #f1f5f9; }
 .uv__role-btn--active { font-weight: 700; }
+
+/* Supervisor warn */
+.uv__role-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 9px;
+  padding: .65rem .875rem;
+  font-size: .78rem;
+  color: #92400e;
+  line-height: 1.5;
+}
+.uv__role-warn i { color: #d97706; flex-shrink: 0; margin-top: 2px; }
 
 /* Spinner */
 .uv__spinner {
