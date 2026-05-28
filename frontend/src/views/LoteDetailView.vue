@@ -531,7 +531,7 @@ onMounted(async () => {
   try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
   await cargarCostos()
   await cargarGeneticas()
-  cargarHistorialAnalisis()
+  if (canAdmin.value) cargarHistorialAnalisis()
 })
 
 onUnmounted(() => {
