@@ -12,7 +12,7 @@ class RegistroAmbiental < ApplicationRecord
   FASES     = %w[crecimiento floracion engorde lavado].freeze
   FUENTES   = %w[manual csv_bluelab sensor_mqtt asistente_voz].freeze
   PLAGAS    = %w[ninguna leve moderada severa].freeze
-  TAREAS    = %w[riego nutricion poda defoliacion scrog_lst revision_plagas limpieza_sala ajuste_luz].freeze
+  TAREAS    = %w[riego nutricion poda defoliacion scrog_lst revision_plagas limpieza_sala ajuste_luz registro_ambiental].freeze
 
   validates :registrado_en,  presence: true
   validates :estado_general, inclusion: { in: ESTADOS }, allow_blank: true

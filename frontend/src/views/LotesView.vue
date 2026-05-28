@@ -6,7 +6,7 @@ import { useAuthStore }  from "../stores/auth";
 import Paginator from '../components/ui/Paginator.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import { useConfirm } from '../composables/useConfirm.js';
-import { exportLotesCSV } from '../lib/api.js';
+import { exportLotesCSV, getLoteProximoCodigo } from '../lib/api.js';
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const store = useLotesStore();
@@ -110,10 +110,23 @@ function emptyForm() {
   };
 }
 
-const showCreate   = ref(false);
-const createForm   = ref(emptyForm());
-const createErrors = ref({});
-function openCreate() { createForm.value = emptyForm(); createErrors.value = {}; showCreate.value = true; }
+const showCreate      = ref(false);
+const createForm      = ref(emptyForm());
+const createErrors    = ref({});
+const proximoCodigo   = ref('…');
+
+async function openCreate() {
+  createForm.value   = emptyForm();
+  createErrors.value = {};
+  proximoCodigo.value = '…';
+  showCreate.value   = true;
+  try {
+    const res = await getLoteProximoCodigo();
+    proximoCodigo.value = res.data.codigo;
+  } catch {
+    proximoCodigo.value = 'Auto';
+  }
+}
 
 const showEdit   = ref(false);
 const editForm   = ref({ id: null, ...emptyForm() });
@@ -392,8 +405,8 @@ async function exportarCSV() {
             <div class="lm-grid">
               <div class="lm-field">
                 <label class="lm-label">Código</label>
-                <input class="lm-input" value="Se genera automáticamente" disabled
-                       style="opacity:.55;cursor:not-allowed;background:#f8fafc;font-family:monospace;font-size:.85rem" />
+                <input class="lm-input" :value="proximoCodigo" disabled
+                       style="opacity:.7;cursor:not-allowed;background:#f8fafc;font-family:monospace;font-size:.85rem" />
               </div>
               <div class="lm-field">
                 <label class="lm-label">Sala <span class="lm-req">*</span></label>

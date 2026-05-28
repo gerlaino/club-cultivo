@@ -383,14 +383,15 @@ const MACETA_LABELS = {
   '7': '7 litros', '10': '10 litros', '12': '12 litros', '15': '15 litros', 'otro': 'Otro',
 }
 const TAREAS_LOTE = [
-  { key: 'riego',           label: 'Riego',           emoji: '💧' },
-  { key: 'nutricion',       label: 'Nutrición',       emoji: '🧪' },
-  { key: 'poda',            label: 'Poda',            emoji: '✂️'  },
-  { key: 'defoliacion',     label: 'Defoliación',     emoji: '🍃' },
-  { key: 'scrog_lst',       label: 'SCROG/LST',       emoji: '🪢' },
-  { key: 'revision_plagas', label: 'Revisión plagas', emoji: '🔍' },
-  { key: 'limpieza_sala',   label: 'Limpieza sala',   emoji: '🧹' },
-  { key: 'ajuste_luz',      label: 'Ajuste de luz',   emoji: '💡' },
+  { key: 'riego',                label: 'Riego',               emoji: '💧' },
+  { key: 'nutricion',            label: 'Nutrición',           emoji: '🧪' },
+  { key: 'poda',                 label: 'Poda',                emoji: '✂️'  },
+  { key: 'defoliacion',          label: 'Defoliación',         emoji: '🍃' },
+  { key: 'scrog_lst',            label: 'SCROG/LST',           emoji: '🪢' },
+  { key: 'revision_plagas',      label: 'Revisión plagas',     emoji: '🔍' },
+  { key: 'limpieza_sala',        label: 'Limpieza sala',       emoji: '🧹' },
+  { key: 'ajuste_luz',           label: 'Ajuste de luz',       emoji: '💡' },
+  { key: 'registro_ambiental',   label: 'Registro ambiental',  emoji: '🌡️' },
 ]
 
 function em(e)  { return ESTADO_META[e]       || { label: e || '—', color: '#64748b', bg: '#f1f5f9', emoji: '•' } }

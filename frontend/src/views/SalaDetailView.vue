@@ -578,7 +578,7 @@ const canSeeAmbiente = computed(() =>
             <i class="bi bi-box-arrow-in-down"></i>
             {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
           </button>
-          <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
+          <button v-if="(canEdit || isCultivador) && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
           <button v-if="canEdit" class="sd__btn-edit" @click="openEditSala" title="Editar sala">
@@ -634,7 +634,7 @@ const canSeeAmbiente = computed(() =>
               <div v-if="lotes.loading" class="sd__placeholder">Cargando lotes…</div>
               <EmptyState v-else-if="!items.length" icon="📦" title="Sin lotes todavía" message="Esta sala no tiene lotes asignados." compact>
                 <template #actions>
-                  <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="openCreate">Crear primer lote</button>
+                  <button v-if="(canEdit || isCultivador) && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="openCreate">Crear primer lote</button>
                   <button v-else-if="puedeCargarLote" class="sd__btn-outline" style="color:#b45309;border-color:#fde68a" @click="showCargarLote=true">
                     <i class="bi bi-box-arrow-in-down"></i>
                     {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}

@@ -4,10 +4,7 @@
     <!-- Estado: cargando -->
     <div v-if="estado === 'cargando'" class="qr__loading">
       <div class="qr__logo">
-        <svg viewBox="0 0 40 40" fill="none" class="qr__logo-icon">
-          <circle cx="20" cy="20" r="18" stroke="#1b5e20" stroke-width="2" opacity=".2"/>
-          <path d="M20 4C20 4 28 10 28 20C28 30 20 36 20 36C20 36 12 30 12 20C12 10 20 4 20 4Z" fill="#1b5e20" opacity=".8"/>
-        </svg>
+        <img src="/logo-ce-icono.png" alt="Cultivo Espacial" class="qr__logo-img" />
         <span class="qr__logo-text">Cultivo Espacial</span>
       </div>
       <DsSpinner :size="36" />
@@ -48,29 +45,15 @@
     <!-- Estado: necesita login -->
     <div v-else-if="estado === 'login'" class="qr__screen">
       <div class="qr__logo qr__logo--top">
-        <svg viewBox="0 0 40 40" fill="none" class="qr__logo-icon">
-          <circle cx="20" cy="20" r="18" stroke="#1b5e20" stroke-width="2" opacity=".2"/>
-          <path d="M20 4C20 4 28 10 28 20C28 30 20 36 20 36C20 36 12 30 12 20C12 10 20 4 20 4Z" fill="#1b5e20" opacity=".8"/>
-        </svg>
-        <span class="qr__logo-text">Cultivo Espacial</span>
+        <img
+          :src="clubLogo || '/logo-ce-icono.png'"
+          :alt="clubNombre || 'Cultivo Espacial'"
+          class="qr__logo-img"
+        />
+        <span class="qr__logo-text">{{ clubNombre || 'Cultivo Espacial' }}</span>
       </div>
 
-      <div class="qr__scan-badge">
-        <i class="bi bi-qr-code-scan"></i>
-        <span>QR escaneado</span>
-      </div>
-
-      <div class="qr__plant-card" v-if="plantaInfo">
-        <div class="qr__plant-emoji">🌱</div>
-        <div class="qr__plant-info">
-          <div class="qr__plant-nombre">{{ plantaInfo.nombre }}</div>
-          <div class="qr__plant-meta">
-            <span v-if="plantaInfo.lote?.codigo">{{ plantaInfo.lote.codigo }}</span>
-          </div>
-        </div>
-      </div>
-
-      <h2 class="qr__title qr__title--login">Iniciá sesión para ver el detalle</h2>
+      <h2 class="qr__title qr__title--login">Iniciá sesión para continuar</h2>
 
       <form class="qr__form" @submit.prevent="hacerLogin">
         <div class="qr__field">
@@ -412,7 +395,7 @@ function irAlDashboard() {
   display: flex; align-items: center; gap: .6rem;
 }
 .qr__logo--top { margin-bottom: .5rem; }
-.qr__logo-icon { width: 32px; height: 32px; }
+.qr__logo-img  { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; }
 .qr__logo-text { font-size: 1.1rem; font-weight: 700; color: #1b5e20; letter-spacing: -.02em; }
 
 /* Screens */
@@ -533,14 +516,6 @@ function irAlDashboard() {
 .qr__progreso-label--ok {
   color: #16a34a; font-weight: 600;
   display: flex; align-items: center; gap: .3rem;
-}
-
-/* Scan badge */
-.qr__scan-badge {
-  display: inline-flex; align-items: center; gap: .4rem;
-  background: #dcfce7; color: #1b5e20;
-  font-size: .75rem; font-weight: 600;
-  padding: .3rem .85rem; border-radius: 999px;
 }
 
 /* Form */
