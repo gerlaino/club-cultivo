@@ -13,7 +13,17 @@ class LotesController < ApplicationController
     if current_user.cultivador?
       salas_ids = current_user.salas_ids_asignadas
       return render json: [] if salas_ids.empty?
-      lotes = lotes.where(sala_id: salas_ids)
+      if params[:cosechados].present?
+        mis_lotes_cosechados = LoteEvento.where(
+          club_id:    current_user.club_id,
+          user_id:    current_user.id,
+          tipo:       'cambio_estado',
+          estado_nuevo: 'cosecha'
+        ).select(:lote_id)
+        lotes = lotes.where(sala_id: salas_ids).or(lotes.where(id: mis_lotes_cosechados))
+      else
+        lotes = lotes.where(sala_id: salas_ids)
+      end
     elsif current_user.supervisor?
       salas_ids = current_user.salas_ids_en_sedes_asignadas
       return render json: [] if salas_ids.empty?

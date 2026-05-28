@@ -118,6 +118,9 @@
                 <span class="cvd__sem-titulo">{{ t.titulo }}</span>
                 <span v-if="t._atrasada" class="cvd__sem-late" title="Atrasada">⏰</span>
               </div>
+              <div v-if="!dia.tareas.length && dia.fecha === hoyISO" class="cvd__sem-vacio-hoy">
+                Sin tareas hoy
+              </div>
             </div>
           </div>
         </div>
@@ -446,7 +449,7 @@ onMounted(async () => {
 
 /* Greeting */
 .cvd__top   { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
-.cvd__saludo { font-size: 1.5rem; font-weight: 700; color: #0f2611; margin: 0 0 .2rem; line-height: 1.2; }
+.cvd__saludo { font-size: 1.5rem; font-weight: 600; color: #0f2611; margin: 0 0 .2rem; line-height: 1.2; letter-spacing: -0.025em; }
 @media (max-width: 640px) { .cvd__saludo { font-size: 1.2rem; } }
 .cvd__fecha { font-size: .85rem; color: #60725d; }
 .cvd__banner { margin-bottom: 0; }
@@ -458,7 +461,7 @@ onMounted(async () => {
 @media (max-width: 480px)  { .cvd__kpi-row { grid-template-columns: 1fr 1fr; gap: .5rem; } }
 .cvd__kpi-card { background: #fff; border: 1px solid #e8f0e9; border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; gap: .35rem; }
 .cvd__kpi-card--skeleton { gap: .5rem; }
-.cvd__kpi-ico { width: 34px; height: 34px; border-radius: 8px; background: #f0fdf4; color: #1b5e20; display: flex; align-items: center; justify-content: center; margin-bottom: .15rem; }
+.cvd__kpi-ico { width: 34px; height: 34px; border-radius: 8px; background: #dcfce7; color: #1b5e20; display: flex; align-items: center; justify-content: center; margin-bottom: .15rem; }
 .cvd__kpi-ico--amber { background: #fffbeb; color: #d97706; }
 .cvd__kpi-ico--rust  { background: #fef2f2; color: #dc2626; }
 .cvd__kpi-val { font-size: 1.75rem; font-weight: 700; color: #0f2611; line-height: 1; }
@@ -510,7 +513,7 @@ onMounted(async () => {
 .cvd__sem-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .4rem; padding-bottom: .25rem; overflow-x: auto; }
 @media (max-width: 900px) { .cvd__sem-grid { grid-template-columns: repeat(7, minmax(105px, 1fr)); } }
 
-.cvd__sem-col { border: 1.5px solid #e8f0e9; border-radius: 10px; background: #fff; display: flex; flex-direction: column; min-height: 200px; overflow: hidden; }
+.cvd__sem-col { border: 1.5px solid #e8f0e9; border-radius: 10px; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
 .cvd__sem-col--hoy { border-color: #1b5e20; }
 .cvd__sem-col--pasado { opacity: .6; }
 
@@ -522,7 +525,7 @@ onMounted(async () => {
 .cvd__sem-col-count { font-size: .58rem; font-weight: 700; background: #e8f0e9; color: #0f2611; padding: .1em .4em; border-radius: 3px; }
 .cvd__sem-col--hoy .cvd__sem-col-count { background: #dcfce7; color: #15803d; }
 
-.cvd__sem-tareas { flex: 1; padding: .35rem; display: flex; flex-direction: column; gap: .25rem; }
+.cvd__sem-tareas { min-height: 48px; padding: .35rem; display: flex; flex-direction: column; gap: .25rem; }
 
 .cvd__sem-tarea { display: flex; align-items: center; gap: .25rem; padding: .3rem .4rem; border-radius: 6px; border-left: 3px solid #e8f0e9; background: #f6faf6; cursor: pointer; font-size: .7rem; transition: opacity .12s, box-shadow .12s; }
 .cvd__sem-tarea:hover { opacity: .85; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
@@ -535,6 +538,7 @@ onMounted(async () => {
 .cvd__sem-emoji  { flex-shrink: 0; font-size: .78rem; }
 .cvd__sem-titulo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f2611; font-weight: 500; }
 .cvd__sem-late   { flex-shrink: 0; font-size: .7rem; }
+.cvd__sem-vacio-hoy { font-size: 11px; color: #9ca3af; text-align: center; padding: 8px 4px; align-self: center; margin: auto 0; }
 
 /* Footer */
 .cvd__footer { display: flex; align-items: center; gap: .5rem; font-size: .78rem; color: #60725d; padding-top: .75rem; border-top: 1px solid #e8f0e9; }
