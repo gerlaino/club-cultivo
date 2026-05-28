@@ -231,8 +231,6 @@ async function onOnboardingCompletado() {
           <p class="ad__fecha">{{ hoy }}</p>
         </div>
         <div class="ad__header-actions">
-          <RouterLink to="/tareas" class="ad__btn-quick">+ Nueva tarea</RouterLink>
-          <RouterLink to="/lotes"  class="ad__btn-quick ad__btn-quick--primary">+ Nuevo lote</RouterLink>
         </div>
       </div>
 
@@ -321,7 +319,7 @@ async function onOnboardingCompletado() {
               <p v-if="tareasHoy.length > 5" class="ad__item-more">y {{ tareasHoy.length - 5 }} más...</p>
             </template>
             <p v-else class="ad__empty">Sin tareas para hoy ✓</p>
-            <RouterLink to="/tareas" class="ad__widget-cta">+ Nueva tarea</RouterLink>
+            <RouterLink to="/tareas" class="ad__widget-cta">Ver todas →</RouterLink>
           </div>
 
           <div class="ad__widget ad__widget--mt">

@@ -102,7 +102,7 @@ watch([sorted, perPage], () => { if (page.value > totalPages.value) page.value =
 // ---------- Form ----------
 function emptyForm() {
   return {
-    codigo: "", estado: "vegetativo", plants_count: 0,
+    estado: "vegetativo", plants_count: 0,
     start_date: new Date().toISOString().slice(0,10),
     strain: "", grow_type: "sustrato", light_type: "", notes: "",
     sala_id: salas.items[0]?.id ?? "",
@@ -121,7 +121,6 @@ const editErrors = ref({});
 
 function validateForm(form) {
   const e = {};
-  if (!form.codigo?.trim())            e.codigo = "El código es obligatorio";
   if (!ESTADOS.includes(form.estado))  e.estado = "Estado inválido";
   const n = Number(form.plants_count);
   if (!Number.isInteger(n) || n < 0 || n > 5000) e.plants_count = "Debe ser 0–5000";
@@ -392,10 +391,9 @@ async function exportarCSV() {
             <div v-if="store.createError" class="lm-alert">{{ store.createError }}</div>
             <div class="lm-grid">
               <div class="lm-field">
-                <label class="lm-label">Código <span class="lm-req">*</span></label>
-                <input class="lm-input" :class="{ 'lm-input--err': createErrors.codigo }"
-                       v-model.trim="createForm.codigo" placeholder="Ej: LOT-2026-001" />
-                <span v-if="createErrors.codigo" class="lm-err">{{ createErrors.codigo }}</span>
+                <label class="lm-label">Código</label>
+                <input class="lm-input" value="Se genera automáticamente" disabled
+                       style="opacity:.55;cursor:not-allowed;background:#f8fafc;font-family:monospace;font-size:.85rem" />
               </div>
               <div class="lm-field">
                 <label class="lm-label">Sala <span class="lm-req">*</span></label>
