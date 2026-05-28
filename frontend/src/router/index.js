@@ -142,6 +142,13 @@ const routes = [
     beforeEnter: requiresPermission("lotes", "index"),
   },
   {
+    path: "/cosechado/:loteId/planta/:id",
+    name: "planta-cosechada-detalle",
+    component: () => import("../views/PlantaCosechadaDetalleView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("lotes", "index"),
+  },
+  {
     path: "/historial-cultivador",
     name: "historial-cultivador",
     component: () => import("../views/HistorialCultivadorView.vue"),
