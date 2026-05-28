@@ -32,7 +32,6 @@ export function usePermissions() {
       plant_activities: ['index', 'create', 'destroy'],
       lotes: ['index', 'show', 'create', 'update', 'destroy'],
       salas: ['index', 'show', 'create', 'update', 'destroy'],
-      sedes: ['index', 'show'],
       geneticas: ['index', 'show'],
       plan_trabajo: ['index', 'show', 'create', 'update'],
       tareas: ['index', 'show', 'create', 'update', 'destroy'],

@@ -56,6 +56,24 @@ class LotesController < ApplicationController
     @lote = @sala.lotes.build(lote_params)
     @lote.club = current_user.club
 
+    # En el path heredado el frontend no envía start_date (lo calcula crear_lote_heredado).
+    # Calculamos aquí también para que la validación de presencia no rechace el save!.
+    if params[:heredado].in?([true, 'true', '1']) && @lote.start_date.blank?
+      estado       = @lote.estado.to_s
+      dias_semilla = params[:dias_semilla_esqueje].to_i
+      dias_vege    = params[:dias_vegetativo].to_i
+      dias_flora   = params[:dias_floracion].to_i
+      dias_cos     = params[:dias_cosecha].to_i
+      total_dias   = case estado
+                     when 'semilla', 'esqueje' then dias_semilla
+                     when 'vegetativo'         then dias_semilla + dias_vege
+                     when 'floracion'          then dias_semilla + dias_vege + dias_flora
+                     when 'cosecha'            then dias_semilla + dias_vege + dias_flora + dias_cos
+                     else 0
+                     end
+      @lote.start_date = total_dias > 0 ? total_dias.days.ago.to_date : Date.today
+    end
+
     plantas_iniciales = lote_params[:plants_count].to_i
     if plantas_iniciales > 0 && @sala.tiene_limite_capacidad?
       disponible = @sala.capacidad_disponible

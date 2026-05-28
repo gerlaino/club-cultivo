@@ -525,8 +525,8 @@ onUnmounted(() => {
   <div class="ld">
 
     <Breadcrumb :items="[
-      { label: 'Sedes', to: { name: 'sedes' } },
-      ...(lote?.sala?.sede ? [{ label: lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: lote.sala.sede.id } } }] : []),
+      ...(!isCultivador ? [{ label: 'Sedes', to: { name: 'sedes' } }] : []),
+      ...(!isCultivador && lote?.sala?.sede ? [{ label: lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: lote.sala.sede.id } } }] : []),
       ...(lote?.sala ? [{ label: lote.sala.nombre, to: { name: 'sala-detail', params: { id: lote.sala.id } } }] : []),
       { label: lote?.codigo || `Lote #${id}` },
     ]" />

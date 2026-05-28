@@ -99,7 +99,13 @@ class SalasController < ApplicationController
   private
 
   def set_sala
-    @sala = current_user.club.salas.find(params[:id])
+    scope = current_user.club.salas
+    if current_user.cultivador?
+      scope = scope.where(id: current_user.salas_ids_asignadas)
+    elsif current_user.supervisor?
+      scope = scope.where(sede_id: current_user.sedes_ids_asignadas)
+    end
+    @sala = scope.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Sala no encontrada' }, status: :not_found
   end

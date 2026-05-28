@@ -5,16 +5,24 @@ class PlantsController < ApplicationController
   # GET /plants
   def index
     plants = Plant.joins(:lote).where(lotes: { club_id: current_user.club_id })
-    if current_user.cultivador?
-      salas_ids = current_user.salas_ids_asignadas
-      return render json: [] if salas_ids.empty?
-      plants = plants.where(lotes: { sala_id: salas_ids })
-    elsif current_user.supervisor?
-      salas_ids = current_user.salas_ids_en_sedes_asignadas
-      return render json: [] if salas_ids.empty?
-      plants = plants.where(lotes: { sala_id: salas_ids })
+
+    if params[:lote_id].present?
+      # Con lote_id explícito la unidad de acceso es el lote (ya scoped al club).
+      # No aplicamos el filtro de sala asignada: el cultivador puede ver las plantas
+      # del lote al que navega, independientemente de si está en sala_cultivadores.
+      return render json: [] unless current_user.club.lotes.exists?(id: params[:lote_id])
+      plants = plants.where(lote_id: params[:lote_id])
+    else
+      if current_user.cultivador?
+        salas_ids = current_user.salas_ids_asignadas
+        return render json: [] if salas_ids.empty?
+        plants = plants.where(lotes: { sala_id: salas_ids })
+      elsif current_user.supervisor?
+        salas_ids = current_user.salas_ids_en_sedes_asignadas
+        return render json: [] if salas_ids.empty?
+        plants = plants.where(lotes: { sala_id: salas_ids })
+      end
     end
-    plants = plants.where(lote_id: params[:lote_id]) if params[:lote_id].present?
     plants = plants.where(state: params[:state])    if params[:state].present?
     plants = plants.includes(lote: [:genetica, { sala: :sede }]).order(created_at: :desc)
     render json: plants.map { |p| serialize_plant(p) }
