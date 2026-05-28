@@ -175,7 +175,7 @@ const plantaError   = ref(null)
 const plantaForm    = ref({ state: 'vegetativo', origen: 'semilla' })
 
 const STATE_MAP = {
-  semilla: 'germinacion', vegetativo: 'vegetativo',
+  semilla: 'germinacion', esqueje: 'esqueje', vegetativo: 'vegetativo',
   floracion: 'floracion', cosecha: 'cosechado',
   curado: 'cosechado', finalizado: 'cosechado',
 }
@@ -347,8 +347,9 @@ async function guardarTrasplanteLote() {
 // ── Helpers ────────────────────────────────────────────────
 const CICLO = ['vegetativo', 'floracion', 'cosecha', 'secado', 'curado']
 const ESTADO_META = {
-  semilla:            { label: 'Semilla/Esqueje',   color: '#64748b', bg: '#f1f5f9', emoji: '🌱' },
-  vegetativo:         { label: 'Vegetativo',         color: '#16a34a', bg: '#dcfce7', emoji: '🍃' },
+  semilla:            { label: 'Germinación',        color: '#64748b', bg: '#f1f5f9', emoji: '🌱' },
+  esqueje:            { label: 'Esqueje',             color: '#0891b2', bg: '#e0f2fe', emoji: '🪴' },
+  vegetativo:         { label: 'Vegetativo',          color: '#16a34a', bg: '#dcfce7', emoji: '🍃' },
   floracion:          { label: 'Floración',          color: '#d97706', bg: '#fef3c7', emoji: '🌸' },
   cosecha:            { label: 'Cosecha',            color: '#059669', bg: '#d1fae5', emoji: '🌿' },
   secado:             { label: 'Manicura',           color: '#78350f', bg: '#fef3c7', emoji: '✂️'  },
@@ -592,7 +593,7 @@ onUnmounted(() => {
           <button class="ld__btn-secondary" @click="abrirRegistroModal">
             <i class="bi bi-clipboard-data"></i>Registrar lote
           </button>
-          <button v-if="canEdit && ['planificacion','vegetativo','floracion'].includes(lote.estado)"
+          <button v-if="canEdit && ['semilla','esqueje','planificacion','vegetativo','floracion'].includes(lote.estado)"
                   class="ld__btn-trasplante" @click="abrirTrasplanteLote" title="Trasplantar lote a nueva maceta">
             <i class="bi bi-arrow-up-circle"></i>Trasplantar
           </button>

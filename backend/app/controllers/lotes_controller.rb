@@ -621,7 +621,7 @@ class LotesController < ApplicationController
   def estado_a_state(estado)
     {
       'semilla'    => 'germinacion',
-      'esqueje'    => 'germinacion',
+      'esqueje'    => 'esqueje',
       'vegetativo' => 'vegetativo',
       'floracion'  => 'floracion',
       'cosecha'    => 'cosechado',

@@ -99,6 +99,8 @@ const alertaMax = computed(() => {
 
 // Fase dominante según lotes
 const FASE_BADGE = {
+  semilla:      { variant: 'leaf', label: 'Germinación' },
+  esqueje:      { variant: 'sky',  label: 'Esqueje' },
   vegetativo:   { variant: 'leaf', label: 'Vegetativo' },
   floracion:    { variant: 'gold', label: 'Floración' },
   secado:       { variant: 'sky',  label: 'Manicura' },
@@ -106,7 +108,7 @@ const FASE_BADGE = {
   planificacion:{ variant: 'ink',  label: 'Planificación' },
   finalizado:   { variant: 'ink',  label: 'Finalizado' },
 }
-const FASE_PRIORIDAD = ['floracion', 'vegetativo', 'secado', 'cosechado', 'planificacion', 'finalizado']
+const FASE_PRIORIDAD = ['floracion', 'vegetativo', 'esqueje', 'semilla', 'secado', 'cosechado', 'planificacion', 'finalizado']
 
 const faseDominante = computed(() => {
   if (!props.lotes.length) return null
@@ -119,7 +121,7 @@ const faseDominante = computed(() => {
 const faseBadgeVariant = computed(() => faseDominante.value ? (FASE_BADGE[faseDominante.value]?.variant || 'ink') : (props.sala.state === 'activa' ? 'leaf' : 'ink'))
 const faseBadgeLabel   = computed(() => faseDominante.value ? (FASE_BADGE[faseDominante.value]?.label || faseDominante.value) : (props.sala.state === 'activa' ? 'Activa' : props.sala.state || '—'))
 
-const FASE_CLASE = { floracion: 'sc--floracion', vegetativo: 'sc--vegetativo', germinacion: 'sc--germinacion', cosecha: 'sc--cosecha', cosechado: 'sc--cosecha' }
+const FASE_CLASE = { floracion: 'sc--floracion', vegetativo: 'sc--vegetativo', semilla: 'sc--germinacion', esqueje: 'sc--germinacion', germinacion: 'sc--germinacion', cosecha: 'sc--cosecha', cosechado: 'sc--cosecha' }
 const faseClase = computed(() => FASE_CLASE[faseDominante.value] || 'sc--default')
 
 // Última lectura placeholder — el dato real vendrá del store cuando esté disponible

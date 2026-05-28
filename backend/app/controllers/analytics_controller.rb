@@ -253,12 +253,16 @@ class AnalyticsController < ApplicationController
       evs = eventos_por_lote[l.id] || []
       next if evs.empty? && l.start_date.nil?
 
-      # Armamos un mapa fase => timestamp_inicio
+      # start_date es siempre el ancla del período vegetativo total (incluye propagación)
       fase_inicio = {}
       fase_inicio['vegetativo'] = l.start_date&.to_time
 
       evs.each do |ev|
-        fase_inicio[ev.estado_nuevo] = ev.registrado_en if ev.estado_nuevo.present?
+        next unless ev.estado_nuevo.present?
+        # No sobreescribir 'vegetativo' — start_date es el inicio real del período completo.
+        # Los eventos esqueje/semilla se guardan como sub-fases de propagación.
+        next if ev.estado_nuevo == 'vegetativo'
+        fase_inicio[ev.estado_nuevo] = ev.registrado_en
       end
 
       fases = %w[vegetativo floracion cosecha secado curado]
@@ -267,16 +271,34 @@ class AnalyticsController < ApplicationController
         inicio = fase_inicio[fase]
         siguiente = fases[idx + 1]
         fin = siguiente ? fase_inicio[siguiente] : nil
-
-        # Para lotes finalizados con fin conocido; o si lote está en esa fase (usar hoy)
         fin ||= Time.current if l.estado == fase
-
         dias[fase] = inicio && fin ? ((fin - inicio) / 86400.0).round(1) : nil
       end
 
       next if dias.values.all?(&:nil?)
 
-      { lote_id: l.id, lote_codigo: l.codigo, genetica_id: l.genetica_id, **dias }
+      # ── Sub-fases de propagación (detalle dentro del período vegetativo) ──
+      # propagacion = días desde start_date hasta transición a vegetativo pleno
+      # vegetativo_puro = días desde vegetativo pleno hasta floracion
+      ev_vegetativo = evs.find { |e| e.estado_nuevo == 'vegetativo' }
+      if ev_vegetativo && l.start_date
+        propagacion_dias = ((ev_vegetativo.registrado_en - l.start_date.to_time) / 86400.0).round(1)
+        veg_puro_fin     = fase_inicio['floracion']
+        veg_puro_fin   ||= Time.current if l.estado == 'vegetativo'
+        veg_puro_dias    = veg_puro_fin ? ((veg_puro_fin - ev_vegetativo.registrado_en) / 86400.0).round(1) : nil
+      else
+        propagacion_dias = nil
+        veg_puro_dias    = nil
+      end
+
+      {
+        lote_id:        l.id,
+        lote_codigo:    l.codigo,
+        genetica_id:    l.genetica_id,
+        propagacion:    propagacion_dias,
+        vegetativo_puro: veg_puro_dias,
+        **dias,
+      }
     end
 
     ciclos_por_genetica = ciclos_por_lote.group_by { |c| c[:genetica_id] }.filter_map do |gid, cs|
@@ -289,7 +311,18 @@ class AnalyticsController < ApplicationController
         [fase, vals.any? ? (vals.sum / vals.size).round(1) : nil]
       end.to_h
 
-      { genetica_id: gid, nombre: g.nombre, lotes_con_datos: cs.size, **promedios }
+      # Promedios de sub-fases de propagación (solo para lotes que pasaron por esa etapa)
+      prop_vals = cs.filter_map { |c| c[:propagacion] }
+      veg_puro_vals = cs.filter_map { |c| c[:vegetativo_puro] }
+
+      {
+        genetica_id:     gid,
+        nombre:          g.nombre,
+        lotes_con_datos: cs.size,
+        propagacion:     prop_vals.any? ? (prop_vals.sum / prop_vals.size).round(1) : nil,
+        vegetativo_puro: veg_puro_vals.any? ? (veg_puro_vals.sum / veg_puro_vals.size).round(1) : nil,
+        **promedios,
+      }
     end.sort_by { |r| r[:nombre] }
 
     # ── 3. COMPARATIVA — lotes finalizados por cepa ─────────────────

@@ -56,10 +56,11 @@ function exportCsvGeneticas() {
 }
 
 function exportCsvCiclos() {
-  const headers = ['Genética','Lotes con datos','Vegetativo (d)','Floración (d)','Cosecha (d)','Manicura (d)','Curado (d)','Total (d)']
+  const headers = ['Genética','Lotes con datos','Vegetativo total (d)','Propagación (d)','Vegetativo puro (d)','Floración (d)','Cosecha (d)','Manicura (d)','Curado (d)','Total (d)']
   const rows = [headers, ...ciclos.value.map(c => [
     c.nombre, c.lotes_con_datos,
-    c.vegetativo ?? '', c.floracion ?? '', c.cosecha ?? '', c.secado ?? '', c.curado ?? '',
+    c.vegetativo ?? '', c.propagacion ?? '', c.vegetativo_puro ?? '',
+    c.floracion ?? '', c.cosecha ?? '', c.secado ?? '', c.curado ?? '',
     totalCiclo(c),
   ])]
   downloadCsv(`analitica_ciclos_${fechaHoy()}.csv`, rows)
@@ -360,7 +361,13 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
               <tr v-for="c in ciclos" :key="c.genetica_id">
                 <td class="an__td-bold">{{ c.nombre }}</td>
                 <td class="an__td-r an__td-muted">{{ c.lotes_con_datos }}</td>
-                <td class="an__td-r"><span class="an__fase-chip an__fase-chip--veg">{{ fmtDias(c.vegetativo) }}</span></td>
+                <td class="an__td-r">
+                  <span class="an__fase-chip an__fase-chip--veg">{{ fmtDias(c.vegetativo) }}</span>
+                  <div v-if="c.propagacion != null" class="an__veg-detalle">
+                    <span class="an__veg-sub">🪴 {{ fmtDias(c.propagacion) }} prop.</span>
+                    <span class="an__veg-sub">🍃 {{ fmtDias(c.vegetativo_puro) }} veg.</span>
+                  </div>
+                </td>
                 <td class="an__td-r"><span class="an__fase-chip an__fase-chip--flo">{{ fmtDias(c.floracion) }}</span></td>
                 <td class="an__td-r"><span class="an__fase-chip an__fase-chip--cos">{{ fmtDias(c.cosecha) }}</span></td>
                 <td class="an__td-r"><span class="an__fase-chip an__fase-chip--sec">{{ fmtDias(c.secado) }}</span></td>
@@ -594,6 +601,8 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
 .an__fase-chip--cos { background: rgba(91,100,115,.1); color: #475569; }
 .an__fase-chip--sec { background: rgba(99,102,241,.1); color: #4338ca; }
 .an__fase-chip--cur { background: rgba(124,58,237,.1); color: #7c3aed; }
+.an__veg-detalle { display: flex; gap: .3rem; margin-top: .25rem; flex-wrap: wrap; }
+.an__veg-sub { font-size: .68rem; color: #6b7280; white-space: nowrap; }
 
 /* Pérdidas — ranking cards */
 .an__rank-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
