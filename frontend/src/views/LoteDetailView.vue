@@ -498,10 +498,16 @@ function loteEscapeHandler(e) {
   if (showAddPlanta.value)            { showAddPlanta.value = false; return }
 }
 
+const POST_HARVEST_ESTADOS = ['cosecha', 'secado', 'manicura_pendiente', 'en_manicura', 'curado', 'finalizado']
+
 onMounted(async () => {
   document.addEventListener('keydown', loteEscapeHandler, true)
   try {
     await lotes.fetchOne(id)
+    if (isCultivador.value && POST_HARVEST_ESTADOS.includes(lotes.current?.estado)) {
+      router.replace({ name: 'cosechado-detalle', params: { id } })
+      return
+    }
     // Seed plants store immediately from lote response to avoid empty flash
     if (lotes.current?.plants?.length) {
       plants.itemsByLote[String(id)] = lotes.current.plants
