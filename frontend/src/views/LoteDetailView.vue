@@ -48,6 +48,11 @@ const canEdit  = computed(() => ['admin', 'supervisor', 'cultivador'].includes(a
 const canAdmin = computed(() => ['admin', 'supervisor'].includes(auth.role))
 const isCultivador = computed(() => auth.role === 'cultivador')
 
+const POST_HARVEST_ESTADOS = ['cosecha', 'secado', 'manicura_pendiente', 'en_manicura', 'curado', 'finalizado']
+const esArchivoParaCultivador = computed(() =>
+  isCultivador.value && POST_HARVEST_ESTADOS.includes(lote.value?.estado)
+)
+
 const deletingLote = ref(false)
 async function eliminarLote() {
   const ok = await confirm({
@@ -527,7 +532,9 @@ onUnmounted(() => {
     <Breadcrumb :items="[
       ...(!isCultivador ? [{ label: 'Sedes', to: { name: 'sedes' } }] : []),
       ...(!isCultivador && lote?.sala?.sede ? [{ label: lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: lote.sala.sede.id } } }] : []),
-      ...(lote?.sala ? [{ label: lote.sala.nombre, to: { name: 'sala-detail', params: { id: lote.sala.id } } }] : []),
+      ...(esArchivoParaCultivador
+        ? [{ label: 'Mis cosechas', to: { name: 'cosechado' } }]
+        : (lote?.sala ? [{ label: lote.sala.nombre, to: { name: 'sala-detail', params: { id: lote.sala.id } } }] : [])),
       { label: lote?.codigo || `Lote #${id}` },
     ]" />
 
@@ -579,29 +586,38 @@ onUnmounted(() => {
             Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
           </button>
           <AsistenteVoz
-            v-if="club.data?.features?.ia_voz && contextoAsistente && (canEdit || isCultivador)"
+            v-if="club.data?.features?.ia_voz && contextoAsistente && (canEdit || isCultivador) && !esArchivoParaCultivador"
             :contexto="contextoAsistente"
             @registrado="onRegistradoPorVoz"
           />
-          <button class="ld__btn-secondary" @click="abrirRegistroModal">
+          <button v-if="!esArchivoParaCultivador" class="ld__btn-secondary" @click="abrirRegistroModal">
             <i class="bi bi-clipboard-data"></i>Registrar lote
           </button>
-          <button v-if="canEdit && ['planificacion','vegetativo','floracion'].includes(lote.estado)"
+          <button v-if="canEdit && !esArchivoParaCultivador && ['planificacion','vegetativo','floracion'].includes(lote.estado)"
                   class="ld__btn-trasplante" @click="abrirTrasplanteLote" title="Trasplantar lote a nueva maceta">
             <i class="bi bi-arrow-up-circle"></i>Trasplantar
           </button>
-          <button v-if="canEdit" class="ld__btn-edit" @click="openEditLote" title="Editar lote">
+          <button v-if="canEdit && !esArchivoParaCultivador" class="ld__btn-edit" @click="openEditLote" title="Editar lote">
             <i class="bi bi-pencil"></i>
           </button>
-          <button v-if="canEdit" class="ld__btn-danger" :disabled="deletingLote" @click="eliminarLote">
+          <button v-if="canEdit && !esArchivoParaCultivador" class="ld__btn-danger" :disabled="deletingLote" @click="eliminarLote">
             <i class="bi bi-trash3"></i>
           </button>
         </div>
       </div>
 
+      <!-- Banner archivo (cultivador viendo lote post-cosecha) -->
+      <DsBanner
+        v-if="esArchivoParaCultivador"
+        variant="sky"
+        class="ld__fase-banner"
+      >
+        Este lote fue cosechado y pasó a post-producción. Podés ver su historial completo, plantas y registros.
+      </DsBanner>
+
       <!-- Banner fase terminal (cultivador) -->
       <DsBanner
-        v-if="isCultivador && !lote.puede_transicionar && phaseBannerMsg(lote.estado)"
+        v-if="isCultivador && !esArchivoParaCultivador && !lote.puede_transicionar && phaseBannerMsg(lote.estado)"
         variant="sky"
         class="ld__fase-banner"
       >

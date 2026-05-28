@@ -639,8 +639,14 @@ class LotesController < ApplicationController
   def set_lote
     scope = current_user.club.lotes
     if current_user.cultivador?
-      salas_ids = current_user.salas_ids_asignadas
-      scope = scope.where(sala_id: salas_ids)
+      salas_ids        = current_user.salas_ids_asignadas
+      mis_cosechados   = LoteEvento.where(
+        club_id:     current_user.club_id,
+        user_id:     current_user.id,
+        tipo:        'cambio_estado',
+        estado_nuevo: 'cosecha'
+      ).select(:lote_id)
+      scope = scope.where(sala_id: salas_ids).or(scope.where(id: mis_cosechados))
     elsif current_user.supervisor?
       salas_ids = current_user.salas_ids_en_sedes_asignadas
       scope = scope.where(sala_id: salas_ids)
