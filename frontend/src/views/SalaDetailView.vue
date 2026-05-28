@@ -373,7 +373,7 @@ async function setOrigen(valor) {
   if (valor === 'esqueje') {
     loadingMadres.value = true
     try {
-      const { data } = await listPlants({})
+      const { data } = await listPlants({ lote_estado: 'vegetativo' })
       plantasMadre.value = data || []
     } catch { plantasMadre.value = [] }
     finally { loadingMadres.value = false }

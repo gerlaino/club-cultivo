@@ -23,7 +23,8 @@ class PlantsController < ApplicationController
         plants = plants.where(lotes: { sala_id: salas_ids })
       end
     end
-    plants = plants.where(state: params[:state])    if params[:state].present?
+    plants = plants.where(state: params[:state])                if params[:state].present?
+    plants = plants.where(lotes: { estado: params[:lote_estado] }) if params[:lote_estado].present?
     plants = plants.includes(lote: [:genetica, { sala: :sede }]).order(created_at: :desc)
     render json: plants.map { |p| serialize_plant(p) }
   end

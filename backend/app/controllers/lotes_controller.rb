@@ -15,9 +15,8 @@ class LotesController < ApplicationController
       return render json: [] if salas_ids.empty?
       if params[:cosechados].present?
         mis_lotes_cosechados = LoteEvento.where(
-          club_id:    current_user.club_id,
-          user_id:    current_user.id,
-          tipo:       'cambio_estado',
+          club_id:      current_user.club_id,
+          user_id:      current_user.id,
           estado_nuevo: 'cosecha'
         ).select(:lote_id)
         lotes = lotes.where(sala_id: salas_ids).or(lotes.where(id: mis_lotes_cosechados))
@@ -567,6 +566,7 @@ class LotesController < ApplicationController
 
       @lote.lote_eventos.create!(
         tipo:          'nota',
+        estado_nuevo:  'cosecha',
         descripcion:   "Cosecha #{pasada}: #{plantas_count} plantas cosechadas#{peso_total_g ? " · #{peso_total_g}g húmedo" : ''}",
         user:          current_user,
         club:          current_user.club,
@@ -641,9 +641,8 @@ class LotesController < ApplicationController
     if current_user.cultivador?
       salas_ids        = current_user.salas_ids_asignadas
       mis_cosechados   = LoteEvento.where(
-        club_id:     current_user.club_id,
-        user_id:     current_user.id,
-        tipo:        'cambio_estado',
+        club_id:      current_user.club_id,
+        user_id:      current_user.id,
         estado_nuevo: 'cosecha'
       ).select(:lote_id)
       scope = scope.where(sala_id: salas_ids).or(scope.where(id: mis_cosechados))
