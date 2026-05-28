@@ -146,14 +146,40 @@
           description="Hablá con el admin para que te asigne salas."
         />
         <div v-else class="cvd__salas-grid">
-          <SalaCard
+          <RouterLink
             v-for="sala in salas"
             :key="sala.id"
-            :sala="sala"
-            :alertas="ambienteStore.alertasActivas"
-            :lotes="lotesStore.items.filter(l => String(l.sala_id) === String(sala.id))"
-            @registrar-lectura="onRegistrarDesdeSala"
-          />
+            class="cvd__sc-card"
+            :to="{ name: 'sala-detail', params: { id: sala.id } }"
+          >
+            <div class="cvd__sc-top-bar" :style="{ background: kindColor(sala.kind || sala.tipo) }"></div>
+            <div class="cvd__sc-body">
+              <div class="cvd__sc-head">
+                <div class="cvd__sc-kind-icon">{{ kindEmoji(sala.kind || sala.tipo) }}</div>
+                <div class="cvd__sc-meta">
+                  <div class="cvd__sc-nombre">{{ sala.nombre }}</div>
+                  <div class="cvd__sc-tipo">{{ kindLabel(sala.kind || sala.tipo) }}</div>
+                </div>
+                <span class="cvd__sc-state-pill" :style="stateStyle(sala.state)">{{ stateLabel(sala.state) }}</span>
+              </div>
+              <div v-if="sala.sede" class="cvd__sc-sede">
+                <i class="bi bi-building"></i> {{ sala.sede.nombre }}
+              </div>
+              <p v-if="sala.notes" class="cvd__sc-notes">{{ sala.notes }}</p>
+              <div class="cvd__sc-footer">
+                <span class="cvd__sc-plantas">
+                  🌿 {{ sala.plantas_totales ?? 0 }} planta{{ sala.plantas_totales !== 1 ? 's' : '' }}
+                </span>
+                <button
+                  class="cvd__sc-registrar"
+                  @click.prevent="onRegistrarDesdeSala(sala)"
+                  title="Registrar lectura"
+                >
+                  <i class="bi bi-plus-circle"></i> Lectura
+                </button>
+              </div>
+            </div>
+          </RouterLink>
         </div>
       </div>
     </div>
@@ -249,13 +275,10 @@ import { getTareasSemana }  from '../../lib/api'
 
 import DsSpinner  from '../../design-system/components/Spinner.vue'
 import DsCard     from '../../design-system/components/Card.vue'
-import DsStat     from '../../design-system/components/Stat.vue'
-import DsBadge    from '../../design-system/components/Badge.vue'
 import DsBanner   from '../../design-system/components/Banner.vue'
 import DsEmpty    from '../../design-system/components/EmptyState.vue'
 import DsSkeleton from '../../design-system/components/Skeleton.vue'
 import LeafHerbarium from '../../design-system/icons/LeafHerbarium.vue'
-import SalaCard   from '../cultivador/SalaCard.vue'
 import RegistrarLecturaSheet from '../cultivador/RegistrarLecturaSheet.vue'
 import { LayoutGrid, Sprout, GitBranch, AlertTriangle, ChevronRight } from 'lucide-vue-next'
 
@@ -382,6 +405,44 @@ const salas        = computed(() => salasStore.items || [])
 const salasActivas = computed(() => salas.value.filter(s => s.state === 'activa'))
 function salaNombre(salaId) {
   return salas.value.find(s => String(s.id) === String(salaId))?.nombre || `Sala #${salaId}`
+}
+
+function kindColor(k) {
+  const map = {
+    vegetativo: '#15803d', floracion: '#9333ea', cosecha: '#dc2626',
+    secado: '#b45309', curado: '#0369a1', manicura: '#db2777',
+    madre: '#16a34a', clon: '#2563eb', mixta: '#7c3aed', cosechado: '#dc2626',
+  }
+  return map[k] || '#64748b'
+}
+
+function kindEmoji(k) {
+  const map = {
+    vegetativo: '🍃', floracion: '🌸', cosecha: '🌾', secado: '💨',
+    curado: '🫙', manicura: '✂️', madre: '🌱', clon: '🔁', mixta: '🔀', cosechado: '🌾',
+  }
+  return map[k] || '🏠'
+}
+
+function kindLabel(k) {
+  const map = {
+    vegetativo: 'Vegetativo', floracion: 'Floración', cosechado: 'Cosechado',
+    mixta: 'Mixta', madre: 'Madres', clon: 'Clones', secado: 'Secado',
+    curado: 'Curado', manicura: 'Manicura', cosecha: 'Cosecha',
+  }
+  return map[k] || k || '—'
+}
+
+function stateStyle(state) {
+  if (state === 'activa')        return { background: 'rgba(21,128,61,.1)',   color: '#15803d' }
+  if (state === 'mantenimiento') return { background: 'rgba(180,83,9,.1)',    color: '#b45309' }
+  return { background: 'rgba(100,116,139,.1)', color: '#475569' }
+}
+
+function stateLabel(state) {
+  if (state === 'activa')        return 'Activa'
+  if (state === 'mantenimiento') return 'Mantenimiento'
+  return 'Cerrada'
 }
 
 const totalPlantas    = computed(() => salas.value.reduce((acc, s) => acc + (s.plantas_totales || 0), 0))
@@ -569,4 +630,22 @@ onMounted(async () => {
 .cvd__panel-btn--ghost { background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; }
 .cvd__panel-btn--ghost:not(:disabled):hover { background: #e2e8f0; }
 .cvd__futura-hint { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .55rem .875rem; margin: 0; }
+
+/* Sala cards — match SalasView design */
+.cvd__sc-card { display: flex; flex-direction: column; background: #fff; border: 1px solid #e8f0e9; border-radius: 12px; overflow: hidden; text-decoration: none; color: inherit; transition: box-shadow .15s, border-color .15s; cursor: pointer; }
+.cvd__sc-card:hover { border-color: #c8e6c9; box-shadow: 0 4px 14px rgba(0,0,0,.07); }
+.cvd__sc-top-bar { height: 4px; flex-shrink: 0; }
+.cvd__sc-body { display: flex; flex-direction: column; gap: .5rem; padding: .9rem 1rem 1rem; flex: 1; }
+.cvd__sc-head { display: flex; align-items: center; gap: .6rem; }
+.cvd__sc-kind-icon { font-size: 1.35rem; flex-shrink: 0; line-height: 1; }
+.cvd__sc-meta { flex: 1; min-width: 0; }
+.cvd__sc-nombre { font-size: .95rem; font-weight: 700; color: #0f2611; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cvd__sc-tipo { font-size: .73rem; color: #60725d; font-weight: 500; margin-top: .05rem; }
+.cvd__sc-state-pill { flex-shrink: 0; font-size: .7rem; font-weight: 700; padding: .2em .6em; border-radius: 999px; white-space: nowrap; }
+.cvd__sc-sede { font-size: .78rem; color: #60725d; display: flex; align-items: center; gap: .3rem; }
+.cvd__sc-notes { font-size: .78rem; color: #60725d; margin: 0; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cvd__sc-footer { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: .5rem; border-top: 1px solid #f0f4f0; }
+.cvd__sc-plantas { font-size: .75rem; color: #60725d; }
+.cvd__sc-registrar { display: flex; align-items: center; gap: .3rem; font-size: .72rem; font-weight: 600; color: #15803d; background: #f0fdf4; border: 1px solid #c8e6c9; border-radius: 6px; padding: .25rem .6rem; cursor: pointer; transition: all .12s; }
+.cvd__sc-registrar:hover { background: #dcfce7; border-color: #86efac; }
 </style>
