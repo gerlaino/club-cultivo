@@ -45,7 +45,7 @@
               v-for="lote in paginados"
               :key="lote.id"
               class="cv__tr"
-              @click="$router.push({ name: 'lote-detail', params: { id: lote.id } })"
+              @click="$router.push({ name: 'cosechado-detalle', params: { id: lote.id } })"
             >
               <td class="cv__td cv__td--lote">
                 <div class="cv__lote-av">
