@@ -115,6 +115,7 @@ const pagina  = ref(1)
 
 const POST_HARVEST = ['cosecha', 'secado', 'manicura_pendiente', 'en_manicura', 'curado', 'finalizado']
 const ESTADO_LABEL = {
+  floracion:         'Cosecha parcial',
   cosecha:           'Cosecha',
   secado:            'Secado',
   manicura_pendiente:'Manicura pend.',
@@ -125,7 +126,7 @@ const ESTADO_LABEL = {
 
 const lotesCosechados = computed(() =>
   lotes.value
-    .filter(l => POST_HARVEST.includes(l.estado))
+    .filter(l => POST_HARVEST.includes(l.estado) || (l.estado === 'floracion' && (l.plantas_cosechadas_count ?? 0) > 0))
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 )
 
@@ -218,6 +219,7 @@ onMounted(async () => {
 .cv__td--veg, .cv__td--flor { text-align: center; }
 .cv__td--estado { vertical-align: middle; }
 .cv__estado-pill { display: inline-flex; align-items: center; font-size: .72rem; font-weight: 600; padding: .2em .6em; border-radius: 999px; white-space: nowrap; }
+.cv__estado-pill--floracion         { background: #fef3c7; color: #92400e; border: 1px dashed #fcd34d; }
 .cv__estado-pill--cosecha           { background: #fef9c3; color: #854d0e; }
 .cv__estado-pill--secado            { background: #e0f2fe; color: #0369a1; }
 .cv__estado-pill--manicura_pendiente{ background: #fce7f3; color: #9d174d; }

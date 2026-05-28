@@ -657,7 +657,7 @@ const canSeeAmbiente = computed(() =>
                       <span v-if="l.plants_count">🪴 {{ l.plants_count }} plantas</span>
                       <span v-if="l.estado === 'floracion' && l.plantas_cosechadas_count > 0"
                             class="sd__cosecha-parcial">
-                        ✅ {{ l.plantas_cosechadas_count }}/{{ l.plants_count || '?' }} cosechadas
+                        🌸 {{ (l.plants_count || 0) - l.plantas_cosechadas_count }} en floración · ✅ {{ l.plantas_cosechadas_count }} cosechadas
                       </span>
                       <span v-if="l.strain">🌿 {{ l.strain }}</span>
                       <span v-if="l.grow_type">⚗️ {{ growLabel(l.grow_type) }}</span>

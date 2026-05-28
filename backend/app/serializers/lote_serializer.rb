@@ -111,7 +111,14 @@ class LoteSerializer
       end
 
       salas_base = lote.club.salas.activas
-      salas_base = salas_base.where('tipo = ? OR kind IN (?)', 'cosecha', %w[cosecha cosechado]) if proxima_fase == 'cosecha'
+      salas_base = case proxima_fase
+        when 'cosecha'    then salas_base.where('tipo = ? OR kind IN (?)', 'cosecha', %w[cosecha cosechado])
+        when 'vegetativo' then salas_base.where('tipo = ? OR kind = ?', 'vegetativo', 'vegetativo')
+        when 'floracion'  then salas_base.where('tipo = ? OR kind = ?', 'floracion',  'floracion')
+        when 'secado'     then salas_base.where('tipo = ? OR kind = ?', 'secado',     'secado')
+        when 'curado'     then salas_base.where('tipo = ?', 'curado')
+        else salas_base
+      end
       result[:salas_destino] = salas_base
                                     .includes(:responsable)
                                     .order(:nombre)
