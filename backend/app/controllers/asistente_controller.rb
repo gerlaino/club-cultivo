@@ -151,6 +151,7 @@ class AsistenteController < ApplicationController
 
   # POST /asistente/analizar_lote
   def analizar_lote
+    return render json: { error: 'No tenés permiso para usar análisis IA.' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
     return render json: { error: 'El análisis de IA no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_analisis)
     return render json: { error: 'Límite de uso alcanzado. Volvé en unos minutos.' }, status: :too_many_requests if rate_limited?
 
@@ -180,6 +181,7 @@ class AsistenteController < ApplicationController
 
   # GET /asistente/historial_analisis?lote_id=X
   def historial_analisis
+    return render json: { error: 'No tenés permiso para usar análisis IA.' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
     lote = current_user.club.lotes.find_by(id: params[:lote_id])
     return render json: { error: 'Lote no encontrado' }, status: :not_found unless lote
 

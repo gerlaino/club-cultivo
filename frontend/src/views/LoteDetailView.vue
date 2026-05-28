@@ -117,9 +117,20 @@ async function loadTimeline() {
 const plantasPage      = ref(1)
 const plantasPerPage   = ref(10)
 const plantList        = computed(() => plants.byLote(id))
+const plantasActivas   = computed(() => plantList.value.filter(p => !['cosechado', 'descartada'].includes(p.state)))
+const plantasCosechadas = computed(() => plantList.value.filter(p => p.state === 'cosechado'))
+const plantasCosechadasPorPasada = computed(() => {
+  const grupos = {}
+  for (const p of plantasCosechadas.value) {
+    const pasada = p.pasada_cosecha || '—'
+    if (!grupos[pasada]) grupos[pasada] = []
+    grupos[pasada].push(p)
+  }
+  return Object.entries(grupos).sort(([a], [b]) => a.localeCompare(b)).map(([pasada, plantas]) => ({ pasada, plantas }))
+})
 const plantasMostradas = computed(() => {
   const start = (plantasPage.value - 1) * plantasPerPage.value
-  return plantList.value.slice(start, start + plantasPerPage.value)
+  return plantasActivas.value.slice(start, start + plantasPerPage.value)
 })
 
 const plantasEnFloracion = computed(() => plantList.value.filter(p => p.state === 'floracion'))
@@ -654,11 +665,12 @@ onUnmounted(() => {
               <div class="ld__section-toggle-left">
                 <span class="ld__section-emoji">🪴</span>
                 <span class="ld__section-title">Plantas del lote</span>
-                <span class="ld__pill">{{ plantList.length }}</span>
+                <span class="ld__pill">{{ plantasActivas.length }}</span>
+                <span v-if="plantasCosechadas.length" class="ld__pill ld__pill--cosechada">{{ plantasCosechadas.length }} cosechadas</span>
               </div>
               <div class="ld__section-toggle-right">
                 <button
-                  v-if="(canEdit || isCultivador) && lote.estado === 'floracion' && plantList.length > 0"
+                  v-if="(canEdit || isCultivador) && lote.estado === 'floracion' && plantasActivas.length > 0"
                   class="ld__btn-sm ld__btn-sm--cosecha"
                   title="Registrar cosecha parcial"
                   @click.stop="showCosechaPartialModal = true"
@@ -713,12 +725,39 @@ onUnmounted(() => {
 
               </div>
               <Paginator
-                v-if="plantList.length > plantasPerPage"
+                v-if="plantasActivas.length > plantasPerPage"
                 v-model:page="plantasPage"
                 v-model:perPage="plantasPerPage"
-                :total="plantList.length"
+                :total="plantasActivas.length"
                 :pageSizes="[10, 25, 50]"
               />
+
+              <!-- Plantas cosechadas agrupadas por pasada -->
+              <template v-if="plantasCosechadasPorPasada.length">
+                <div v-for="grupo in plantasCosechadasPorPasada" :key="grupo.pasada" class="ld__cosecha-grupo">
+                  <div class="ld__cosecha-grupo-header">
+                    <span class="ld__cosecha-grupo-label">🌿 Cosecha {{ grupo.pasada }}</span>
+                    <span class="ld__cosecha-grupo-count">{{ grupo.plantas.length }} planta{{ grupo.plantas.length !== 1 ? 's' : '' }}</span>
+                  </div>
+                  <RouterLink
+                    v-for="p in grupo.plantas"
+                    :key="p.id"
+                    :to="{ name: 'planta-detalle', params: { id: p.id } }"
+                    class="ld__planta ld__planta--cosechada"
+                  >
+                    <div class="ld__planta-dot" :style="{ background: pm(p.state).color }"></div>
+                    <div class="ld__planta-info">
+                      <div class="ld__planta-nombre">{{ p.nombre || p.codigo_qr || `Planta #${p.id}` }}</div>
+                      <div class="ld__planta-qr">{{ p.codigo_qr || '—' }}</div>
+                    </div>
+                    <span class="ld__planta-estado" :style="{ background: pm(p.state).color + '18', color: pm(p.state).color }">
+                      {{ pm(p.state).emoji }} {{ pm(p.state).label }}
+                    </span>
+                    <i class="bi bi-chevron-right ld__planta-arrow"></i>
+                  </RouterLink>
+                </div>
+              </template>
+
             </div>
           </div>
 
@@ -1088,7 +1127,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Análisis IA — solo si el club tiene IA habilitada -->
-          <div v-if="club.data?.features?.ia_analisis" class="ld__card ld__card--mt ld__card--ia">
+          <div v-if="club.data?.features?.ia_analisis && canAdmin" class="ld__card ld__card--mt ld__card--ia">
             <div class="ld__card-header">
               <span class="ld__card-title">🤖 Análisis IA</span>
               <button class="ld__card-action ld__card-action--ia" @click="ejecutarAnalisisIA" :disabled="analizandoIA || !puedoAnalizar">
@@ -1822,6 +1861,7 @@ onUnmounted(() => {
 .ld__section-emoji { font-size: 1rem; }
 .ld__section-title { font-size: .9rem; font-weight: 700; color: #1a1a1a; }
 .ld__pill { background: #e8f5e9; color: #1b5e20; font-size: .68rem; font-weight: 700; padding: .15em .55em; border-radius: 999px; }
+.ld__pill--cosechada { background: #dbeafe; color: #1d4ed8; }
 .ld__chevron { color: #60725d; font-size: .75rem; }
 .ld__section-body { border-top: 1px solid #e8f0e9; padding: 1rem 1.1rem; }
 .ld__section-body--flush { padding: 0; border-top: 1px solid #e8f0e9; }
@@ -2045,6 +2085,12 @@ onUnmounted(() => {
 .ld__planta-sel { background: none; border: none; cursor: pointer; padding: .25rem; border-radius: 5px; color: #d4e6d4; font-size: .85rem; flex-shrink: 0; transition: color .15s; }
 .ld__planta-sel:hover { color: #d97706; }
 .ld__planta-sel--on { color: #d97706; }
+.ld__cosecha-grupo { margin-top: .5rem; }
+.ld__cosecha-grupo-header { display: flex; align-items: center; justify-content: space-between; padding: .4rem .85rem; background: #f0fdf4; border-top: 1px solid #e8f0e9; border-bottom: 1px solid #e8f0e9; }
+.ld__cosecha-grupo-label { font-size: .75rem; font-weight: 700; color: #15803d; }
+.ld__cosecha-grupo-count { font-size: .72rem; color: #60725d; }
+.ld__planta--cosechada { opacity: .75; }
+.ld__planta--cosechada:hover { opacity: 1; }
 /* Cerrar curado button */
 .ld__btn-curado { display: inline-flex; align-items: center; gap: .35rem; background: #1d4ed8; color: #fff; border: none; padding: .5rem .9rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .ld__btn-curado:hover { background: #1e40af; }

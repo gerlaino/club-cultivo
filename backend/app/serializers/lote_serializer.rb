@@ -111,7 +111,7 @@ class LoteSerializer
       end
 
       salas_base = lote.club.salas.activas
-      salas_base = salas_base.de_tipo('cosecha') if proxima_fase == 'cosecha'
+      salas_base = salas_base.where('tipo = ? OR kind IN (?)', 'cosecha', %w[cosecha cosechado]) if proxima_fase == 'cosecha'
       result[:salas_destino] = salas_base
                                     .includes(:responsable)
                                     .order(:nombre)
