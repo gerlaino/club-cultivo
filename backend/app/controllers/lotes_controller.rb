@@ -628,7 +628,13 @@ class LotesController < ApplicationController
 
   def set_lote
     scope = current_user.club.lotes
-    if current_user.manicura?
+    if current_user.cultivador?
+      salas_ids = current_user.salas_ids_asignadas
+      scope = scope.where(sala_id: salas_ids)
+    elsif current_user.supervisor?
+      salas_ids = current_user.salas_ids_en_sedes_asignadas
+      scope = scope.where(sala_id: salas_ids)
+    elsif current_user.manicura?
       scope = scope.where(
         lotes: { estado: 'en_manicura', manicurador_id: current_user.id }
       ).or(scope.where(
