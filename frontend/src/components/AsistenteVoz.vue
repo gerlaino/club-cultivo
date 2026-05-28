@@ -84,7 +84,7 @@
                   <i class="bi bi-stop-circle-fill"></i> Listo, procesar
                 </button>
                 <div v-if="procesando" class="av__procesando">
-                  <div class="av__procesando-spinner"></div>
+                  <DsSpinner :size="28" />
                   <span>Analizando con IA…</span>
                 </div>
               </div>
@@ -285,7 +285,7 @@
                     <i class="bi bi-stop-circle-fill"></i>
                   </button>
                   <button class="av__consulta-enviar" @click="enviarConsulta" :disabled="consultandoIA || !consultaTexto.trim()">
-                    <span v-if="consultandoIA" class="av__mini-spinner"></span>
+                    <DsSpinner v-if="consultandoIA" :size="12" />
                     <i v-else class="bi bi-send-fill"></i>
                     {{ consultandoIA ? 'Consultando…' : 'Preguntar' }}
                   </button>
@@ -322,6 +322,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import api from '../lib/api'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const props = defineProps({
   contexto: { type: Object, default: null },
@@ -655,7 +656,6 @@ function metaAccion(accion) {
 .av__consulta-voz--rec { background:#fef2f2; border-color:#fecaca; color:#dc2626; animation:av-pulse 1s infinite; }
 .av__consulta-enviar { display:flex; align-items:center; gap:.4rem; background:#1b5e20; color:#fff; border:none; padding:.5rem 1rem; border-radius:8px; font-size:.82rem; font-weight:700; cursor:pointer; transition:opacity .15s; }
 .av__consulta-enviar:disabled { opacity:.5; cursor:not-allowed; }
-.av__mini-spinner { width:12px; height:12px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:av-spin .6s linear infinite; }
 .av__consulta-escuchando { display:flex; align-items:center; gap:.75rem; padding:.5rem .75rem; background:#f0fdf4; border-radius:8px; font-size:.8rem; color:#1b5e20; font-weight:600; }
 .av__waves--sm { display:flex; align-items:center; gap:2px; height:18px; }
 .av__consulta-respuesta { background:#f6faf6; border:1px solid #c8e6c9; border-radius:10px; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.75rem; }
@@ -726,8 +726,6 @@ function metaAccion(accion) {
 .av__btn-grabar:hover { opacity:.88; }
 .av__btn-detener { display:flex; align-items:center; gap:9px; background:#dc2626; color:white; border:none; padding:14px 36px; border-radius:12px; font-size:15px; font-weight:500; cursor:pointer; animation:av-pulse 1.5s infinite; }
 .av__procesando { display:flex; align-items:center; gap:12px; color:#4a7c59; font-size:14px; }
-.av__procesando-spinner { width:28px; height:28px; border:2px solid #e8f5e9; border-top-color:#1b5e20; border-radius:50%; animation:spin .7s linear infinite; }
-@keyframes spin { to{transform:rotate(360deg)} }
 .av__procesar-directo { display:flex; justify-content:center; margin-top:.75rem; }
 .av__btn-procesar { display:flex; align-items:center; gap:7px; background:#f0fdf4; color:#1b5e20; border:1.5px solid #c8e6c9; padding:10px 20px; border-radius:10px; font-size:13px; font-weight:500; cursor:pointer; }
 .av__btn-procesar:hover { background:#dcfce7; border-color:#1b5e20; }

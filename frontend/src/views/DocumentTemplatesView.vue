@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
 import { logger } from '../utils/logger.js'
 import {
   listDocumentTemplates, getDocumentTemplate,
@@ -208,7 +209,7 @@ onMounted(load)
 
     <!-- Loading -->
     <div v-if="loading" class="dtv__loading">
-      <div class="dtv__spinner"></div>
+      <DsSpinner />
     </div>
 
     <!-- Empty -->
@@ -334,7 +335,7 @@ onMounted(load)
           <div class="dtv-modal__footer">
             <button class="dtv__btn-ghost" :disabled="saving" @click="showModal=false">Cancelar</button>
             <button class="dtv__btn-new" :disabled="saving" @click="handleSubmit">
-              <span v-if="saving" class="dtv-modal__spinner"></span>
+              <DsSpinner v-if="saving" :size="14" />
               {{ editingId ? 'Guardar cambios' : 'Crear template' }}
             </button>
           </div>
@@ -378,9 +379,7 @@ onMounted(load)
 .dtv__pill--active { background: #1a3d2e; border-color: #1a3d2e; color: #fff; }
 
 /* Loading */
-.dtv__loading { display: flex; justify-content: center; padding: 3rem; }
-.dtv__spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #1a3d2e; border-radius: 50%; animation: dtv-spin .8s linear infinite; }
-@keyframes dtv-spin { to { transform: rotate(360deg); } }
+.dtv__loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
 
 /* Empty */
 .dtv__empty      { text-align: center; padding: 3rem 1rem; color: #64748b; }
@@ -419,7 +418,6 @@ onMounted(load)
 .dtv-modal__body   { overflow-y: auto; padding: 1.25rem 1.5rem; flex: 1; }
 .dtv-modal__footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; flex-shrink: 0; }
 .dtv-modal__error  { display: flex; align-items: center; gap: .5rem; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: .65rem .875rem; border-radius: 8px; font-size: .875rem; margin-bottom: 1rem; }
-.dtv-modal__spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: dtv-spin .7s linear infinite; display: inline-block; }
 
 /* Form */
 .dtv-form { display: grid; grid-template-columns: 1fr 1fr; gap: .875rem; margin-bottom: 1rem; }

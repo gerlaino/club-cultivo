@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useRouter } from 'vue-router'
 import { Building2, MapPin, Zap, Users, ChevronRight, ChevronLeft, Check, ArrowLeft } from 'lucide-vue-next'
 import { createSuperAdminClub } from '../../lib/api.js'
@@ -358,7 +359,7 @@ async function handleSubmit() {
           Siguiente <ChevronRight :size="16" :stroke-width="2" />
         </button>
         <button v-else class="cnv__btn-primary" :disabled="saving" @click="handleSubmit">
-          <span v-if="saving" class="cnv__spinner"></span>
+          <DsSpinner v-if="saving" :size="15" />
           <Check v-else :size="16" :stroke-width="2.5" />
           {{ saving ? 'Creando…' : 'Crear club' }}
         </button>
@@ -575,12 +576,6 @@ async function handleSubmit() {
   cursor: pointer; text-decoration: none; transition: all .15s;
 }
 .cnv__btn-ghost:hover { background: #f8fafc; color: #0f172a; }
-.cnv__spinner {
-  width: 15px; height: 15px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: cnv-spin .6s linear infinite;
-}
-@keyframes cnv-spin { to { transform: rotate(360deg); } }
 
 /* Success */
 .cnv__success {

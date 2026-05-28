@@ -134,7 +134,7 @@
             </Transition>
 
             <button class="lv__btn" type="submit" :disabled="auth.loading || !email || !password">
-              <div v-if="auth.loading" class="lv__spinner"></div>
+              <DsSpinner v-if="auth.loading" :size="18" />
               <template v-else>
                 <span>Ingresar al club</span>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -246,6 +246,7 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -397,8 +398,6 @@ async function onSubmit() {
 }
 .lv__btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(27,94,32,.55); }
 .lv__btn:disabled { opacity: .45; cursor: not-allowed; }
-.lv__spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .lv__foot { display: flex; align-items: center; justify-content: space-between; padding: .7rem 1.5rem 1.4rem; border-top: 1px solid #f1f5f9; }
 .lv__secure { display: flex; align-items: center; gap: .38rem; font-size: .65rem; color: #94a3b8; }

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send } from 'lucide-vue-next'
 import { getMisPaquetes, iniciarViaje, entregarPaquete, reportarFallo } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -121,7 +122,7 @@ onMounted(load)
 
     <!-- Loading -->
     <div v-if="loading" class="dlv__loading">
-      <div class="dlv__ring"></div> Cargando…
+      <DsSpinner />
     </div>
 
     <template v-else>
@@ -291,7 +292,7 @@ onMounted(load)
           <div class="dlv__modal-footer">
             <button class="dlv__btn-ghost" :disabled="saving" @click="modalEntregar = null">Cancelar</button>
             <button class="dlv__btn-confirm" :disabled="saving" @click="confirmarEntrega">
-              <div v-if="saving" class="dlv__spinner"></div>
+              <DsSpinner v-if="saving" :size="13" />
               <CheckCircle2 v-else :size="14" :stroke-width="2" />
               Confirmar entrega
             </button>
@@ -322,7 +323,7 @@ onMounted(load)
           <div class="dlv__modal-footer">
             <button class="dlv__btn-ghost" :disabled="saving" @click="modalFallo = null">Cancelar</button>
             <button class="dlv__btn-danger" :disabled="saving || !motivoFallo.trim()" @click="confirmarFallo">
-              <div v-if="saving" class="dlv__spinner"></div>
+              <DsSpinner v-if="saving" :size="13" />
               <XCircle v-else :size="14" :stroke-width="2" />
               Reportar
             </button>
@@ -344,9 +345,7 @@ onMounted(load)
 .dlv__sub { font-size: var(--fs-13); color: var(--c-ink-400); }
 
 /* Loading */
-.dlv__loading { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-8); color: var(--c-ink-400); justify-content: center; }
-.dlv__ring { width: 18px; height: 18px; border: 2px solid var(--c-ink-100); border-top-color: var(--c-ink-500); border-radius: 50%; animation: dlv-spin .7s linear infinite; }
-@keyframes dlv-spin { to { transform: rotate(360deg); } }
+.dlv__loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
 
 /* Stats */
 .dlv__stats { display: flex; gap: var(--sp-3); margin-bottom: var(--sp-5); }
@@ -425,7 +424,6 @@ onMounted(load)
 .dlv__btn-confirm:disabled { opacity: .5; cursor: not-allowed; }
 .dlv__btn-danger { display: inline-flex; align-items: center; gap: var(--sp-1); background: var(--c-rust-600); color: #fff; border: none; padding: .5rem 1.1rem; border-radius: var(--r-md); font-size: var(--fs-14); font-weight: 600; cursor: pointer; }
 .dlv__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
-.dlv__spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: dlv-spin .6s linear infinite; }
 .dlv__opt { font-size: var(--fs-11); font-weight: 400; color: var(--c-ink-400); text-transform: none; letter-spacing: 0; }
 
 /* ── Mobile ──────────────────────────────────────────────────────── */

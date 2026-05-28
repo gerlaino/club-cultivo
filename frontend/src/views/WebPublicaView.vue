@@ -34,7 +34,7 @@
           <p class="wpv__section-sub">Activá las genéticas que querés mostrar en la web pública del club.</p>
         </div>
       </div>
-      <div v-if="loadingGeneticas" class="wpv__loading"><div class="wpv__spinner"></div></div>
+      <div v-if="loadingGeneticas" class="wpv__loading"><DsSpinner :size="60" /></div>
       <div v-else class="wpv__geneticas-table">
         <div class="wpv__table-header">
           <span>Genética</span>
@@ -74,7 +74,7 @@
           <i class="bi bi-plus-lg"></i> Nueva noticia
         </button>
       </div>
-      <div v-if="loadingNoticias" class="wpv__loading"><div class="wpv__spinner"></div></div>
+      <div v-if="loadingNoticias" class="wpv__loading"><DsSpinner :size="60" /></div>
       <EmptyState v-else-if="noticias.length === 0" icon="bi-newspaper" title="Sin noticias todavía" message="Creá la primera noticia para tu club." />
       <div v-else class="wpv__cards-grid">
         <div v-for="n in noticias" :key="n.id" class="wpv__news-card">
@@ -111,7 +111,7 @@
           <i class="bi bi-plus-lg"></i> Nuevo evento
         </button>
       </div>
-      <div v-if="loadingEventos" class="wpv__loading"><div class="wpv__spinner"></div></div>
+      <div v-if="loadingEventos" class="wpv__loading"><DsSpinner :size="60" /></div>
       <div v-else class="wpv__eventos-layout">
         <div class="wpv__eventos-list">
           <EmptyState v-if="eventos.length === 0" icon="bi-calendar-event" title="Sin eventos" message="No hay eventos cargados todavía." compact />
@@ -416,6 +416,7 @@ import { storeToRefs } from 'pinia'
 import api from '../lib/api'
 import { useConfirm } from '../composables/useConfirm.js'
 import EmptyState from '../components/ui/EmptyState.vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const { confirm } = useConfirm()
 const clubStore = useClubStore()
@@ -693,12 +694,7 @@ onMounted(async () => {
 .wpv__section-title { font-size: 16px; font-weight: 600; color: #1a2e1b; margin-bottom: 4px; }
 .wpv__section-sub { font-size: 13px; color: #6b8f71; margin: 0; }
 
-.wpv__loading { display: flex; justify-content: center; padding: 3rem; }
-.wpv__spinner {
-  width: 28px; height: 28px; border: 2px solid #e8f5e9; border-top-color: #1b5e20;
-  border-radius: 50%; animation: spin .7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
+.wpv__loading { display: flex; align-items: center; justify-content: center; padding: 3rem; }
 
 .wpv__geneticas-table { border: 1px solid #e8f5e9; border-radius: 14px; overflow: hidden; }
 .wpv__table-header {

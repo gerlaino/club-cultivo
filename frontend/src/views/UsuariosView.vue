@@ -4,6 +4,7 @@ import { useUsuariosStore } from "../stores/usuarios"
 import { listSalas, listSedes, asignarSedeAUsuario } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const store           = useUsuariosStore()
 const toast           = useToast()
@@ -226,7 +227,7 @@ async function removeOne(u) {
 
     <!-- Loading -->
     <div v-if="store.loading" class="uv__loading">
-      <div class="uv__ring"></div><span>Cargando equipo…</span>
+      <DsSpinner />
     </div>
 
     <!-- Empty -->
@@ -485,7 +486,7 @@ async function removeOne(u) {
               :disabled="store.saving || (editing ? (!form.first_name.trim() || !form.last_name.trim() || !form.email.trim()) : !formValidStep2)"
               @click="save"
             >
-              <div v-if="store.saving" class="uv__spinner"></div>
+              <DsSpinner v-if="store.saving" :size="15" />
               <i v-else :class="editing ? 'bi bi-check-lg' : 'bi bi-person-plus'"></i>
               {{ editing ? 'Guardar cambios' : 'Crear usuario' }}
             </button>
@@ -525,9 +526,7 @@ async function removeOne(u) {
 .uv__btn-ghost:hover { background: #f8fafc; color: #0f172a; }
 
 /* Loading */
-.uv__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
-.uv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: var(--c-role-admin); border-radius: 50%; animation: uv-spin .7s linear infinite; }
-@keyframes uv-spin { to { transform: rotate(360deg); } }
+.uv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 /* Empty */
 .uv__empty { text-align: center; padding: 5rem 1rem; color: #94a3b8; }
@@ -669,5 +668,4 @@ async function removeOne(u) {
 .uv__modal-footer { display: flex; justify-content: space-between; gap: .75rem; padding: 1.1rem 1.5rem; border-top: 1px solid #f1f5f9; position: sticky; bottom: 0; background: #fff; }
 
 /* Spinner */
-.uv__spinner { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: uv-spin .6s linear infinite; }
 </style>

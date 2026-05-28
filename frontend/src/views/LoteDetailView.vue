@@ -29,6 +29,7 @@ import { useLoteRegistroAmbiental } from '../composables/useLoteRegistroAmbienta
 import { useLoteFotos }            from '../composables/useLoteFotos.js'
 import { useLoteEditar }           from '../composables/useLoteEditar.js'
 import { useLoteTransiciones }     from '../composables/useLoteTransiciones.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route    = useRoute()
 const router   = useRouter()
@@ -529,7 +530,7 @@ onUnmounted(() => {
       { label: lote?.codigo || `Lote #${id}` },
     ]" />
 
-    <div v-if="loading" class="ld__loading"><div class="ld__spinner"></div><span>Cargando lote…</span></div>
+    <div v-if="loading" class="ld__loading"><DsSpinner /></div>
     <div v-else-if="error" class="ld__error">{{ error }}</div>
     <div v-else-if="!lote" class="ld__error">Lote no encontrado.</div>
 
@@ -572,7 +573,7 @@ onUnmounted(() => {
             :disabled="transicionandoRapido"
             @click="handleAvanzarFase"
           >
-            <div v-if="transicionandoRapido" class="ld__spinner ld__spinner--sm" />
+            <DsSpinner v-if="transicionandoRapido" :size="14" />
             <ArrowRight v-else :size="15" :stroke-width="1.75" />
             Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
           </button>
@@ -880,7 +881,7 @@ onUnmounted(() => {
               </div>
               <div class="ld__section-toggle-right">
                 <button class="ld__btn-sm" @click.stop="fotoInput?.click()" :disabled="uploadingFoto">
-                  <span v-if="uploadingFoto" class="ld__spinner" style="width:12px;height:12px;border-width:1.5px"></span>
+                  <DsSpinner v-if="uploadingFoto" :size="12" />
                   <i v-else class="bi bi-camera-fill"></i>
                 </button>
                 <i class="bi ld__chevron" :class="fotosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -1083,7 +1084,7 @@ onUnmounted(() => {
             <div class="ld__card-header">
               <span class="ld__card-title">🤖 Análisis IA</span>
               <button class="ld__card-action ld__card-action--ia" @click="ejecutarAnalisisIA" :disabled="analizandoIA || !puedoAnalizar">
-                <span v-if="analizandoIA" class="ld__ia-spinner"></span>
+                <DsSpinner v-if="analizandoIA" :size="11" />
                 <i v-else class="bi bi-stars"></i>
                 <span v-if="analizandoIA">Analizando…</span>
                 <span v-else-if="!puedoAnalizar">{{ tiempoRestante }}</span>
@@ -1160,7 +1161,7 @@ onUnmounted(() => {
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" :disabled="savingPlanta" @click="showAddPlanta = false">Cancelar</button>
             <button class="ld__btn-primary" :disabled="savingPlanta" @click="guardarPlanta">
-              <div v-if="savingPlanta" class="ld__spinner ld__spinner--sm"></div>
+              <DsSpinner v-if="savingPlanta" :size="14" />
               <i v-else class="bi bi-plus-lg"></i>Agregar planta
             </button>
           </div>
@@ -1251,7 +1252,7 @@ onUnmounted(() => {
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" :disabled="savingEditLote" @click="showEditLote = false">Cancelar</button>
             <button class="ld__btn-primary" :disabled="savingEditLote" @click="saveEditLote">
-              <div v-if="savingEditLote" class="ld__spinner ld__spinner--sm"></div>
+              <DsSpinner v-if="savingEditLote" :size="14" />
               <i v-else class="bi bi-check-lg"></i>Guardar cambios
             </button>
           </div>
@@ -1390,7 +1391,7 @@ onUnmounted(() => {
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" :disabled="savingRegistro" @click="showRegistroModal = false">Cancelar</button>
             <button class="ld__btn-primary" :disabled="savingRegistro || Object.keys(registroErrors).length > 0" @click="guardarRegistro">
-              <div v-if="savingRegistro" class="ld__spinner ld__spinner--sm"></div>
+              <DsSpinner v-if="savingRegistro" :size="14" />
               <i v-else class="bi bi-check-lg"></i>Guardar registro
             </button>
           </div>
@@ -1450,7 +1451,7 @@ onUnmounted(() => {
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" :disabled="savingTransicion" @click="showTransicionModal = false">Cancelar</button>
             <button class="ld__btn-primary" :disabled="savingTransicion" @click="ejecutarTransicion">
-              <div v-if="savingTransicion" class="ld__spinner ld__spinner--sm"></div>
+              <DsSpinner v-if="savingTransicion" :size="14" />
               <i v-else class="bi bi-arrow-right-circle"></i>Avanzar fase
             </button>
           </div>
@@ -1498,7 +1499,7 @@ onUnmounted(() => {
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" :disabled="savingCosecha" @click="showCosechaModal = false">Cancelar</button>
             <button class="ld__btn-primary" :disabled="savingCosecha || !cosechaForm.plantas_cosechadas" @click="ejecutarCosecha">
-              <div v-if="savingCosecha" class="ld__spinner ld__spinner--sm"></div>
+              <DsSpinner v-if="savingCosecha" :size="14" />
               <i v-else class="bi bi-scissors"></i>Confirmar cosecha
             </button>
           </div>
@@ -1536,7 +1537,7 @@ onUnmounted(() => {
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" @click="showAvanzarSalaModal = false">Cancelar</button>
             <button class="ld__btn-primary" :disabled="transicionandoRapido" @click="avanzarFaseRapido(avanzarSalaId)">
-              <div v-if="transicionandoRapido" class="ld__spinner ld__spinner--sm"></div>
+              <DsSpinner v-if="transicionandoRapido" :size="14" />
               <i v-else class="bi bi-arrow-right-circle"></i>Confirmar avance
             </button>
           </div>
@@ -1610,7 +1611,7 @@ onUnmounted(() => {
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" :disabled="savingCurado" @click="showCerrarCuradoModal = false">Cancelar</button>
             <button class="ld__btn-primary" :disabled="savingCurado || !splitOk || !curadoForm.sede_destino_id" @click="ejecutarCerrarCurado">
-              <div v-if="savingCurado" class="ld__spinner ld__spinner--sm"></div>
+              <DsSpinner v-if="savingCurado" :size="14" />
               <i v-else class="bi bi-box-seam"></i>Cerrar curado
             </button>
           </div>
@@ -1695,7 +1696,7 @@ onUnmounted(() => {
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" @click="showTrasplanteLote = false">Cancelar</button>
             <button class="ld__btn-primary" :disabled="savingTrasplanteLote || !trasplanteSeleccion.length" @click="guardarTrasplanteLote">
-              <div v-if="savingTrasplanteLote" class="ld__spinner ld__spinner--sm"></div>
+              <DsSpinner v-if="savingTrasplanteLote" :size="14" />
               <i v-else class="bi bi-check-lg"></i>Trasplantar {{ trasplanteSeleccion.length }} planta{{ trasplanteSeleccion.length !== 1 ? 's' : '' }}
             </button>
           </div>
@@ -1727,7 +1728,7 @@ onUnmounted(() => {
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" @click="cancelarSubidaFoto">Cancelar</button>
             <button class="ld__btn-primary" :disabled="uploadingFoto" @click="confirmarSubidaFoto">
-              <div v-if="uploadingFoto" class="ld__spinner ld__spinner--sm"></div>
+              <DsSpinner v-if="uploadingFoto" :size="14" />
               <i v-else class="bi bi-cloud-upload"></i>Subir foto
             </button>
           </div>
@@ -1776,11 +1777,8 @@ onUnmounted(() => {
 <style scoped>
 .ld { padding: 1.75rem 1.5rem; max-width: 1200px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; }
 @media (max-width: 640px) { .ld { padding: 1rem; } }
-.ld__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
+.ld__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .ld__error { padding: 1rem 1.25rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 10px; }
-.ld__spinner { width: 20px; height: 20px; border: 2.5px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: ld-spin .6s linear infinite; flex-shrink: 0; }
-.ld__spinner--sm { width: 14px; height: 14px; border-color: rgba(255,255,255,.3); border-top-color: #fff; }
-@keyframes ld-spin { to { transform: rotate(360deg); } }
 .ld__hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
 .ld__hero-title-row { display: flex; align-items: center; gap: .65rem; margin-bottom: .35rem; flex-wrap: wrap; }
 .ld__hero-emoji { font-size: 1.8rem; }
@@ -1919,7 +1917,6 @@ onUnmounted(() => {
 .ld__card--ia { border-color: #e9d8fd; }
 .ld__card-action--ia { background: linear-gradient(135deg, #7c3aed, #9333ea); color: #fff; border: none; padding: .3rem .75rem; border-radius: 6px; font-size: .75rem; font-weight: 700; cursor: pointer; display:flex; align-items:center; gap:.35rem; }
 .ld__card-action--ia:disabled { opacity: .6; cursor: not-allowed; }
-.ld__ia-spinner { width:11px; height:11px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; animation:ld-spin .6s linear infinite; display:inline-block; }
 .ld__ia-historial { display:flex; flex-direction:column; }
 .ld__ia-item { border-top: 1px solid #f3e8ff; }
 .ld__ia-item:first-child { border-top: none; }

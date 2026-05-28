@@ -18,7 +18,7 @@
     </div>
 
     <div v-if="loading" class="gl__loading">
-      <div class="gl__spinner"></div>
+      <DsSpinner :size="24" />
     </div>
 
     <div v-else-if="!datos.length" class="gl__empty">
@@ -146,6 +146,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { getRegistrosAmbientales } from '../lib/api'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const props = defineProps({
   loteId: { type: Number, required: true }
@@ -356,15 +357,6 @@ onMounted(async () => {
   display: flex; align-items: center; justify-content: center;
   height: 140px;
 }
-.gl__spinner {
-  width: 24px; height: 24px;
-  border: 2.5px solid #d4e6d4;
-  border-top-color: #1b5e20;
-  border-radius: 50%;
-  animation: gl-spin .6s linear infinite;
-}
-@keyframes gl-spin { to { transform: rotate(360deg); } }
-
 .gl__empty {
   display: flex; align-items: center; gap: .75rem;
   justify-content: center; padding: 2rem;

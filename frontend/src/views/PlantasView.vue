@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { listPlants, listLotes } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import EmptyState from '../components/ui/EmptyState.vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -199,7 +200,7 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 
     <!-- Loading -->
     <div v-if="loading" class="ptv__loading">
-      <div class="ptv__spinner"></div>
+      <DsSpinner />
     </div>
 
     <!-- Error -->
@@ -333,9 +334,7 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 .ptv__pill--active { background: #1a3d2e; border-color: #1a3d2e; color: #fff; }
 
 /* Loading / Error */
-.ptv__loading { display: flex; justify-content: center; padding: 3rem; }
-.ptv__spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #1a3d2e; border-radius: 50%; animation: ptv-spin .8s linear infinite; }
-@keyframes ptv-spin { to { transform: rotate(360deg); } }
+.ptv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .ptv__error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: .875rem 1rem; border-radius: 10px; margin-bottom: 1rem; }
 
 /* Table wrap */

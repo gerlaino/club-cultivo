@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { getAnalyticsRendimiento, getAnalyticsProduccion } from '../lib/api.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const tab        = ref('geneticas')
 const loading    = ref(false)
@@ -181,7 +182,7 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
     </div>
 
     <div v-if="loading && !dataRend" class="an__loading">
-      <div class="an__ring"></div> Cargando analítica…
+      <DsSpinner /> Cargando analítica…
     </div>
 
     <div id="an-tab-content">
@@ -536,8 +537,7 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
 .an__export-btn--pdf:hover:not(:disabled) { background: #fef2f2; border-color: #b91c1c; }
 
 /* Loading */
-.an__loading { display: flex; align-items: center; gap: .6rem; padding: 4rem; color: #94a3b8; justify-content: center; }
-.an__ring { width: 20px; height: 20px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: an-spin .7s linear infinite; }
+.an__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 /* KPIs */
 .an__kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.75rem; }

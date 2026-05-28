@@ -231,7 +231,7 @@
                 Cancelar
               </button>
               <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || limiteExcedido">
-                <div v-if="submitting" class="dv__spinner" />
+                <DsSpinner v-if="submitting" :size="16" />
                 <template v-else>Confirmar</template>
               </button>
             </div>
@@ -247,6 +247,7 @@ import { ref, computed, watch } from 'vue'
 import { listPacientes, getPaciente, listStocks, createDispensacion } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { Search, Users, Plus, X } from 'lucide-vue-next'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const toast = useToast()
 
@@ -838,16 +839,6 @@ function formatFecha(d) {
 }
 .dv__modal-submit:hover:not(:disabled) { opacity: .88; }
 .dv__modal-submit:disabled { opacity: .6; cursor: not-allowed; }
-
-/* Spinner */
-.dv__spinner {
-  width: 16px; height: 16px;
-  border: 2px solid rgba(255,255,255,.4);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Skeletons */
 .dv__skel-list { display: flex; flex-direction: column; gap: var(--sp-2); }

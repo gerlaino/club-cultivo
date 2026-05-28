@@ -11,8 +11,7 @@
     </div>
 
     <div v-if="loading" class="av__loading">
-      <div class="av__ring"></div>
-      <span>Cargando lotes…</span>
+      <DsSpinner />
     </div>
 
     <div v-else-if="!lotes.length" class="av__empty">
@@ -67,7 +66,7 @@
           </button>
           <!-- Legacy: aprobación directa → curado -->
           <button v-else class="av__btn-success" :disabled="aprobando === lote.id" @click="aprobarLegacy(lote)">
-            <div v-if="aprobando === lote.id" class="av__spinner"></div>
+            <DsSpinner v-if="aprobando === lote.id" :size="13" />
             <CheckCircle v-else :size="14" :stroke-width="2" />
             Aprobar
           </button>
@@ -115,7 +114,7 @@
               <div class="av-actions">
                 <button type="button" class="av-btn-cancel" @click="cerrarRechazo">Cancelar</button>
                 <button type="submit" class="av-btn-danger-solid" :disabled="rechazando">
-                  <div v-if="rechazando" class="av-spinner"></div>
+                  <DsSpinner v-if="rechazando" :size="13" />
                   <XCircle v-else :size="15" :stroke-width="2" />
                   Confirmar rechazo
                 </button>
@@ -172,7 +171,7 @@
               <div class="av-actions">
                 <button type="button" class="av-btn-cancel" @click="cerrarAprobacion">Cancelar</button>
                 <button type="submit" class="av-btn-success-solid" :disabled="aprobando !== null">
-                  <div v-if="aprobando" class="av-spinner"></div>
+                  <DsSpinner v-if="aprobando" :size="13" />
                   <PackageCheck v-else :size="15" :stroke-width="2" />
                   Confirmar y generar stock
                 </button>
@@ -190,6 +189,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { ClipboardCheck, Clock, Leaf, MapPin, Package, Scale, Eye, CheckCircle, XCircle, X, AlertCircle, Scissors, PackageCheck } from 'lucide-vue-next'
 import { listLotes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -319,13 +319,7 @@ onMounted(cargar)
 .av__title { font-size: 1.75rem; font-weight: 800; color: var(--c-ink-900); margin: 0 0 .2rem; letter-spacing: -.03em; }
 .av__sub { font-size: var(--fs-14); color: var(--c-ink-500); margin: 0; }
 
-.av__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; justify-content: center; color: var(--c-ink-500); }
-.av__ring {
-  width: 20px; height: 20px;
-  border: 2px solid var(--c-ink-200); border-top-color: var(--c-role-admin);
-  border-radius: 50%; animation: av-spin .7s linear infinite;
-}
-@keyframes av-spin { to { transform: rotate(360deg); } }
+.av__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 .av__empty { text-align: center; padding: 4rem 2rem; }
 .av__empty-ico { color: var(--c-ink-300); margin-bottom: 1rem; display: flex; justify-content: center; }
@@ -399,11 +393,6 @@ onMounted(cargar)
 }
 .av__btn-success:hover:not(:disabled) { opacity: .88; }
 .av__btn-success:disabled { opacity: .5; cursor: not-allowed; }
-.av__spinner {
-  width: 13px; height: 13px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: av-spin .6s linear infinite;
-}
 
 /* Modal */
 .av-overlay {

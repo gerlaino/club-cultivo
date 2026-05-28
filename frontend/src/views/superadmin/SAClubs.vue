@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useRouter } from 'vue-router'
 import { listSuperAdminClubs } from '../../lib/api.js'
 
@@ -81,8 +82,7 @@ onMounted(async () => {
     </div>
 
     <div v-if="loading" class="sac__loading">
-      <div class="sac__ring"></div>
-      <span>Cargando clubs…</span>
+      <DsSpinner />
     </div>
 
     <div v-else-if="!filtrados.length" class="sac__empty">
@@ -162,9 +162,7 @@ onMounted(async () => {
 .sac__plan-filter { padding: .4rem .875rem; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #fff; font-size: .78rem; font-weight: 600; cursor: pointer; color: #64748b; transition: all .15s; }
 .sac__plan-filter:hover { border-color: #94a3b8; }
 
-.sac__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 4rem; color: #94a3b8; }
-.sac__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: sac-spin .7s linear infinite; }
-@keyframes sac-spin { to { transform: rotate(360deg); } }
+.sac__loading { display: flex; align-items: center; justify-content: center; padding: 4rem; }
 
 .sac__empty { text-align: center; padding: 4rem; background: #fafbfc; border: 1.5px dashed #e2e8f0; border-radius: 14px; color: #94a3b8; }
 .sac__empty-icon { font-size: 2.5rem; display: block; margin-bottom: .75rem; }

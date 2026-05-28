@@ -8,6 +8,7 @@ import UsuarioSedesManager  from '../components/UsuarioSedesManager.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -137,7 +138,7 @@ onMounted(async () => {
     <Breadcrumb :items="[{ label: 'Equipo', to: { name: 'usuarios' } }, { label: u ? `${u.first_name} ${u.last_name}` : `Usuario #${userId}` }]" />
 
     <div v-if="loading" class="ud__loading">
-      <div class="ud__ring"></div><span>Cargando…</span>
+      <DsSpinner />
     </div>
     <div v-else-if="error" class="ud__error">{{ error }}</div>
     <div v-else-if="!u" class="ud__error">Usuario no encontrado.</div>
@@ -238,7 +239,7 @@ onMounted(async () => {
               <div class="ud__edit-actions">
                 <button class="ud__btn-ghost" @click="editingInfo = false">Cancelar</button>
                 <button class="ud__btn-primary" :disabled="savingInfo" @click="saveInfo">
-                  <div v-if="savingInfo" class="ud__spinner ud__spinner--white"></div>
+                  <DsSpinner v-if="savingInfo" :size="14" />
                   <i v-else class="bi bi-check-lg"></i>
                   Guardar cambios
                 </button>
@@ -383,7 +384,7 @@ onMounted(async () => {
                 <div class="ud__role-edit-actions">
                   <button class="ud__btn-ghost" @click="editingRole = false">Cancelar</button>
                   <button class="ud__btn-primary" :disabled="store.saving" @click="saveRole">
-                    <div v-if="store.saving" class="ud__spinner"></div>
+                    <DsSpinner v-if="store.saving" :size="14" />
                     <i v-else class="bi bi-check-lg"></i>
                     Guardar
                   </button>
@@ -430,9 +431,7 @@ onMounted(async () => {
 /* Breadcrumb */
 
 /* Loading / Error */
-.ud__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
-.ud__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: ud-spin .7s linear infinite; }
-@keyframes ud-spin { to { transform: rotate(360deg); } }
+.ud__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .ud__error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 10px; }
 
 /* Hero */
@@ -566,8 +565,6 @@ onMounted(async () => {
 .ud__btn-danger-outline:hover { background: #fef2f2; border-color: #dc2626; }
 
 /* Spinner */
-.ud__spinner { width: 14px; height: 14px; border: 2px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: ud-spin .6s linear infinite; }
-.ud__spinner--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
 
 /* Modal delete */
 </style>

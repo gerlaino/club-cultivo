@@ -165,7 +165,7 @@
             @click="guardar"
             :disabled="guardando || !form.activity_type"
           >
-            <span v-if="guardando" class="spinner-border spinner-border-sm me-2"></span>
+            <DsSpinner v-if="guardando" :size="14" />
             <i v-else class="bi bi-check-lg me-2"></i>
             {{ modo === 'lote' ? `Registrar en ${totalPlantas} plantas` : 'Registrar' }}
           </button>
@@ -181,6 +181,7 @@
 import { ref, computed, watch } from 'vue'
 import { createPlantActivity } from '../../lib/api.js'
 import VoiceInput from '../VoiceInput.vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   show:       { type: Boolean, default: false },

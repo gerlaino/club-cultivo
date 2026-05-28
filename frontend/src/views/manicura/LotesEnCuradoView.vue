@@ -10,7 +10,7 @@
     </div>
 
     <div v-if="loading" class="lv__loading">
-      <div class="lv__ring"></div><span>Cargando lotes…</span>
+      <DsSpinner />
     </div>
 
     <div v-else-if="!lotes.length" class="lv__empty">
@@ -155,7 +155,7 @@
                   :disabled="!stocksValidos || totalStocks > disponible || !wizard.peso_curado_g || ccSaving"
                   @click="confirmarCierre"
                 >
-                  <div v-if="ccSaving" class="cc-spinner"></div>
+                  <DsSpinner v-if="ccSaving" :size="13" />
                   <PackagePlus v-else :size="14" :stroke-width="2" />
                   Confirmar cierre
                 </button>
@@ -172,6 +172,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Container, Leaf, MapPin, Package, Scale, Eye, PackagePlus, X, Plus, ArrowRight, AlertCircle } from 'lucide-vue-next'
 import { listLotes, listSedes, cerrarCurado } from '../../lib/api.js'
 import ModalPesada from '../../components/manicura/ModalPesada.vue'
@@ -304,9 +305,7 @@ onMounted(() => {
 .lv__title { font-size: 1.75rem; font-weight: 800; color: var(--c-ink-900); margin: 0 0 .2rem; letter-spacing: -.03em; display: flex; flex-direction: column; }
 .lv__sub { font-size: var(--fs-14); color: var(--c-ink-500); margin: 0; }
 
-.lv__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; justify-content: center; color: var(--c-ink-400); }
-.lv__ring { width: 20px; height: 20px; border: 2px solid var(--c-ink-200); border-top-color: #6B4FBE; border-radius: 50%; animation: lv-spin .7s linear infinite; }
-@keyframes lv-spin { to { transform: rotate(360deg); } }
+.lv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 .lv__empty { text-align: center; padding: 4rem 2rem; }
 .lv__empty-ico { color: var(--c-ink-300); margin-bottom: 1rem; display: flex; justify-content: center; }
@@ -532,14 +531,6 @@ onMounted(() => {
 .cc-btn-submit:hover:not(:disabled) { opacity: .88; }
 .cc-btn-submit:disabled { opacity: .4; cursor: not-allowed; }
 
-.cc-spinner {
-  width: 13px; height: 13px;
-  border: 2px solid rgba(255,255,255,.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: lv-spin .6s linear infinite;
-}
-@keyframes lv-spin { to { transform: rotate(360deg); } }
 
 .cc-fade-enter-active, .cc-fade-leave-active { transition: opacity .2s; }
 .cc-fade-enter-from, .cc-fade-leave-to { opacity: 0; }

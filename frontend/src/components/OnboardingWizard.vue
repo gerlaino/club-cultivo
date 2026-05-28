@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { createSede } from '../lib/api.js'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -267,7 +268,7 @@ const nombreUsuario = auth.user?.first_name || ''
                 Volver
               </button>
               <button class="ob__btn-primary ob__btn-primary--wide" @click="crearSede" :disabled="saving">
-                <div v-if="saving" class="ob__spinner"></div>
+                <DsSpinner v-if="saving" :size="18" />
                 <template v-else>
                   Crear sede y empezar
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -794,17 +795,6 @@ const nombreUsuario = auth.user?.first_name || ''
   border-radius: 10px;
   font-size: .83rem;
 }
-
-/* ── Spinner ───────────────────────────────── */
-.ob__spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: ob-spin .6s linear infinite;
-}
-@keyframes ob-spin { to { transform: rotate(360deg); } }
 
 /* ── Éxito ─────────────────────────────────── */
 .ob__success {

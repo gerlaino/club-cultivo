@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth'
 import { getDocumentos, createDocumento, deleteDocumento } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import EmptyState from '../components/ui/EmptyState.vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
 const { confirm } = useConfirm()
 
 const auth    = useAuthStore()
@@ -192,8 +193,7 @@ onMounted(async () => {
 
     <!-- Loading -->
     <div v-if="loading" class="dv__loading">
-      <div class="dv__spinner"></div>
-      <span>Cargando documentos…</span>
+      <DsSpinner />
     </div>
 
     <!-- Sin resultados -->
@@ -324,7 +324,7 @@ onMounted(async () => {
             <button class="dv__btn-ghost" @click="showModal = false">Cancelar</button>
             <button class="dv__btn-primary" @click="subirDocumento"
                     :disabled="guardando || !docForm.titulo || !docForm.tipo">
-              <span v-if="guardando" class="dv__spinner dv__spinner--sm"></span>
+              <DsSpinner v-if="guardando" :size="14" />
               <i v-else class="bi bi-check-lg"></i>Guardar documento
             </button>
           </div>
@@ -359,10 +359,7 @@ onMounted(async () => {
 .dv__pill-count { background: #d4e6d4; color: #1b5e20; font-size: .62rem; font-weight: 800; padding: .1em .45em; border-radius: 999px; }
 
 /* Loading / empty */
-.dv__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
-.dv__spinner { width: 20px; height: 20px; border: 2.5px solid #d4e6d4; border-top-color: #1b5e20; border-radius: 50%; animation: dv-spin .6s linear infinite; }
-.dv__spinner--sm { width: 14px; height: 14px; border-width: 2px; border-color: rgba(255,255,255,.3); border-top-color: #fff; }
-@keyframes dv-spin { to { transform: rotate(360deg); } }
+.dv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 /* Grid documentos */
 .dv__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }

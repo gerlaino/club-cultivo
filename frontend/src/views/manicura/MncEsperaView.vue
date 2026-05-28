@@ -9,8 +9,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="mne__loading">
-      <div class="mne__spinner"></div>
-      <span>Cargando lotes…</span>
+      <DsSpinner />
     </div>
 
     <!-- Empty -->
@@ -56,6 +55,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Clock, Scale, ChevronRight } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
 
@@ -85,16 +85,8 @@ onMounted(cargar)
 .mne__sub    { font-size: var(--fs-14); color: var(--c-ink-500); margin: 0; }
 
 .mne__loading {
-  display: flex; align-items: center; gap: var(--sp-3);
-  padding: var(--sp-12) 0; justify-content: center; color: var(--c-ink-400);
-  font-size: var(--fs-14);
+  display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px);
 }
-.mne__spinner {
-  width: 18px; height: 18px;
-  border: 2px solid var(--c-ink-200); border-top-color: #7c3aed;
-  border-radius: 50%; animation: mne-spin .7s linear infinite;
-}
-@keyframes mne-spin { to { transform: rotate(360deg); } }
 
 .mne__empty {
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);

@@ -10,6 +10,7 @@ import {
 } from '../../lib/api.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 const { confirm } = useConfirm()
 
 const props = defineProps({
@@ -217,8 +218,7 @@ const showArchivados = ref(false)
 
     <!-- Loading -->
     <div v-if="loading" class="pd__loading">
-      <div class="pd__ring"></div>
-      <span>Cargando documentos…</span>
+      <DsSpinner />
     </div>
 
     <!-- Error -->
@@ -415,7 +415,7 @@ const showArchivados = ref(false)
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" :disabled="uploading" @click="showUpload=false">Cancelar</button>
             <button class="pd__btn-primary" :disabled="uploading || !uploadForm.archivo" @click="confirmarUpload">
-              <span v-if="uploading" class="pd__spinner"></span>
+              <DsSpinner v-if="uploading" :size="14" />
               <i v-else class="bi bi-cloud-upload"></i>
               {{ uploading ? 'Subiendo…' : 'Subir documento' }}
             </button>
@@ -473,7 +473,7 @@ const showArchivados = ref(false)
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" :disabled="saving" @click="showTemplate=false">Cancelar</button>
             <button class="pd__btn-primary" :disabled="saving || !templateForm.template_id" @click="confirmarTemplate">
-              <span v-if="saving" class="pd__spinner"></span>
+              <DsSpinner v-if="saving" :size="14" />
               <i v-else class="bi bi-file-earmark-plus"></i>
               {{ saving ? 'Creando…' : 'Crear documento' }}
             </button>
@@ -512,14 +512,8 @@ const showArchivados = ref(false)
 /* Loading */
 .pd__loading {
   display: flex; align-items: center; justify-content: center;
-  gap: .75rem; padding: 3rem; color: #94a3b8; font-size: .875rem;
+  padding: 2rem;
 }
-.pd__ring {
-  width: 20px; height: 20px;
-  border: 2px solid #e2e8f0; border-top-color: #0369a1;
-  border-radius: 50%; animation: pd-spin .7s linear infinite;
-}
-@keyframes pd-spin { to { transform: rotate(360deg); } }
 
 /* Alert */
 .pd__alert {
@@ -766,10 +760,4 @@ const showArchivados = ref(false)
 .pd__template-meta { font-size: .72rem; color: #64748b; margin-top: .2rem; }
 .pd__template-firma { color: #b45309; font-weight: 600; }
 
-/* Spinner */
-.pd__spinner {
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: pd-spin .6s linear infinite; flex-shrink: 0;
-}
 </style>

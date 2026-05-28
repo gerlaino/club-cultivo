@@ -10,7 +10,7 @@
         </svg>
         <span class="qr__logo-text">Cultivo Espacial</span>
       </div>
-      <div class="qr__spinner"></div>
+      <DsSpinner :size="36" />
       <div class="qr__loading-text">Verificando planta…</div>
     </div>
 
@@ -97,7 +97,7 @@
           <i class="bi bi-exclamation-triangle"></i> {{ loginError }}
         </div>
         <button type="submit" class="qr__btn-primary" :disabled="loginCargando">
-          <div v-if="loginCargando" class="qr__spinner qr__spinner--sm"></div>
+          <DsSpinner v-if="loginCargando" :size="16" />
           <i v-else class="bi bi-box-arrow-in-right"></i>
           {{ loginCargando ? 'Ingresando…' : 'Ingresar' }}
         </button>
@@ -205,7 +205,7 @@
           @click="registrarPeso"
           :disabled="registrando || !pesoInput"
         >
-          <div v-if="registrando" class="qr__spinner qr__spinner--sm"></div>
+          <DsSpinner v-if="registrando" :size="16" />
           <i v-else class="bi bi-check2-circle"></i>
           {{ pesoAnterior ? 'Actualizar peso' : 'Registrar peso' }}
         </button>
@@ -229,6 +229,7 @@ import { useClubStore } from '../stores/club'
 import { usePermissions } from '../composables/usePermissions'
 import { getPlant, listPlants, registrarPesoPlanta } from '../lib/api'
 import axios from 'axios'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -404,16 +405,6 @@ function irAlDashboard() {
   display: flex; flex-direction: column; align-items: center; gap: 1.5rem;
   text-align: center;
 }
-.qr__spinner {
-  width: 36px; height: 36px;
-  border: 3px solid rgba(27,94,32,.15);
-  border-top-color: #1b5e20;
-  border-radius: 50%;
-  animation: qr-spin .7s linear infinite;
-}
-.qr__spinner--sm { width: 16px; height: 16px; border-width: 2px; border-top-color: #fff; border-color: rgba(255,255,255,.3); }
-.qr__spinner--dark { border-top-color: #1b5e20; border-color: rgba(27,94,32,.2); }
-@keyframes qr-spin { to { transform: rotate(360deg); } }
 .qr__loading-text { font-size: .9rem; color: #4a7c59; font-weight: 500; }
 
 /* Logo */

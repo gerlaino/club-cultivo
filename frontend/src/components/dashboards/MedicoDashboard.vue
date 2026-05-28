@@ -4,6 +4,7 @@ import { logger }          from '../../utils/logger.js'
 import { useRouter }       from 'vue-router'
 import { listPacientes, listIndicaciones } from '../../lib/api.js'
 import { useAuthStore }    from '../../stores/auth.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 const router = useRouter()
 const auth   = useAuthStore()
 
@@ -116,7 +117,7 @@ onMounted(async () => {
 
     <!-- ── Loading ───────────────────────────────────────────── -->
     <div v-if="loading" class="md__loading">
-      <div class="md__ring"></div>
+      <DsSpinner :size="24" />
       <span>Cargando datos clínicos…</span>
     </div>
 
@@ -412,14 +413,6 @@ onMounted(async () => {
   color: #94a3b8;
   font-size: .875rem;
 }
-.md__ring {
-  width: 24px; height: 24px;
-  border: 2px solid #e2e8f0;
-  border-top-color: #0369a1;
-  border-radius: 50%;
-  animation: md-spin .7s linear infinite;
-}
-@keyframes md-spin { to { transform: rotate(360deg); } }
 
 /* KPIs */
 .md__kpis {

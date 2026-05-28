@@ -7,6 +7,7 @@ import Paginator from '../components/ui/Paginator.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import { useConfirm } from '../composables/useConfirm.js';
 import { exportLotesCSV } from '../lib/api.js';
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const store = useLotesStore();
 const salas = useSalasStore();
@@ -280,7 +281,7 @@ async function exportarCSV() {
 
     <!-- Loading -->
     <div v-if="store.loading" class="lv__loading">
-      <div class="lv__ring"></div> Cargando lotes…
+      <DsSpinner />
     </div>
     <div v-else-if="store.error" class="lv__alert">{{ store.error }}</div>
     <EmptyState v-else-if="!store.items.length" icon="🌱" title="No hay lotes todavía" message="Creá el primer lote para comenzar la trazabilidad" />
@@ -452,7 +453,7 @@ async function exportarCSV() {
           <div class="lm-modal__footer">
             <button class="lm-btn-ghost" @click="showCreate = false">Cancelar</button>
             <button class="lm-btn-primary" :disabled="store.creating" @click="submitCreate">
-              <span v-if="store.creating" class="lm-spinner"></span>
+              <DsSpinner v-if="store.creating" :size="14" />
               Crear lote
             </button>
           </div>
@@ -536,7 +537,7 @@ async function exportarCSV() {
           <div class="lm-modal__footer">
             <button class="lm-btn-ghost" @click="showEdit = false">Cancelar</button>
             <button class="lm-btn-primary" :disabled="store.updating" @click="submitEdit">
-              <span v-if="store.updating" class="lm-spinner"></span>
+              <DsSpinner v-if="store.updating" :size="14" />
               Guardar cambios
             </button>
           </div>
@@ -626,9 +627,7 @@ async function exportarCSV() {
 }
 
 /* ── Loading / Error ─────────────────────────────────── */
-.lv__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; color: #94a3b8; font-size: .875rem; justify-content: center; }
-.lv__ring    { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: lv-spin .7s linear infinite; flex-shrink: 0; }
-@keyframes lv-spin { to { transform: rotate(360deg); } }
+.lv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .lv__alert   { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .875rem 1rem; border-radius: 10px; font-size: .875rem; margin-bottom: 1rem; }
 
 /* ── Tabla ───────────────────────────────────────────── */
@@ -815,9 +814,4 @@ async function exportarCSV() {
 }
 .lm-btn-ghost:hover { background: #f8fafc; color: #0f172a; }
 
-.lm-spinner {
-  display: inline-block; width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: lv-spin .7s linear infinite;
-}
 </style>

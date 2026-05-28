@@ -36,7 +36,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="miv__loading">
-      <div class="miv__ring"></div> Cargando indicaciones…
+      <DsSpinner :size="20" /> Cargando indicaciones…
     </div>
 
     <!-- Empty -->
@@ -181,6 +181,7 @@ import { Search, Plus, Pencil, Trash2, X, FileHeart } from 'lucide-vue-next'
 import { createIndicacion, updateIndicacion, deleteIndicacion } from '../../lib/api.js'
 import { usePacientesStore } from '../../stores/pacientes.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useToast } from '../../composables/useToast.js'
 import api from '../../lib/api.js'
 
@@ -422,12 +423,6 @@ onMounted(async () => {
   display: flex; align-items: center; gap: var(--sp-3);
   color: var(--c-ink-500); padding: var(--sp-8); font-size: var(--fs-14);
 }
-.miv__ring {
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 2px solid var(--c-ink-200); border-top-color: #2D8A6B;
-  animation: spin .7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 .miv__empty {
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-3);
   padding: var(--sp-12) var(--sp-6); color: var(--c-ink-300); text-align: center;

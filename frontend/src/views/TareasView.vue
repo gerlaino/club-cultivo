@@ -48,7 +48,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="tv__loading">
-      <div class="tv__ring"></div><span>Cargando tareas…</span>
+      <DsSpinner />
     </div>
 
     <template v-else>
@@ -107,7 +107,7 @@
         </div>
 
         <div v-if="loadingSem" class="sem__loading">
-          <div class="sem__ring"></div>
+          <DsSpinner :size="40" />
         </div>
 
         <div v-else class="sem__grid">
@@ -256,6 +256,7 @@ import ModalCompletarTarea from '../components/ModalCompletarTarea.vue'
 import { listSalas, listLotes, listUsers, listSedes, getTareasSemana } from '../lib/api'
 import { storeToRefs } from 'pinia'
 import { useToast } from '../composables/useToast.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 import { useConfirm } from '../composables/useConfirm.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { formatFechaLarga } from '../utils/fecha.js'
@@ -528,9 +529,7 @@ function mostrarToast(mensaje, tipo = 'success') {
 .tv__kpi-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; }
 
 /* Loading */
-.tv__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
-.tv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: tv-spin .7s linear infinite; }
-@keyframes tv-spin { to { transform: rotate(360deg); } }
+.tv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 /* Alerta */
 .tv__alerta { display: flex; align-items: center; gap: .75rem; background: #fef2f2; border: 1px solid #fecaca; color: #7f1d1d; padding: .875rem 1.1rem; border-radius: 12px; margin-bottom: 1.25rem; font-size: .875rem; flex-wrap: wrap; }
@@ -611,7 +610,6 @@ function mostrarToast(mensaje, tipo = 'success') {
 .sem__hoy-btn { background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .3rem .75rem; font-size: .78rem; font-weight: 600; color: #475569; cursor: pointer; }
 .sem__hoy-btn:hover { background: #e2e8f0; }
 .sem__loading { display: flex; justify-content: center; padding: 3rem; }
-.sem__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: spin .7s linear infinite; }
 .sem__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .5rem; }
 @media (max-width: 900px) { .sem__grid { grid-template-columns: repeat(7, minmax(110px, 1fr)); overflow-x: auto; } }
 .sem__col { border: 1.5px solid #e2e8f0; border-radius: 10px; background: #fff; display: flex; flex-direction: column; min-height: 280px; overflow: hidden; }

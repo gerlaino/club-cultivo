@@ -48,7 +48,7 @@ const route  = useRoute();
 const routeLoading = ref(false)
 router.beforeEach(() => { routeLoading.value = true })
 router.afterEach(() => { routeLoading.value = false })
-const { can, isAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
+const { can, isAdmin, isSuperAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
 
 const adminDrawerOpen = ref(false);
 const cvdDrawerOpen  = ref(false);
@@ -181,8 +181,13 @@ onMounted(async () => {
   <div v-if="routeLoading" class="route-loading-bar"></div>
   <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isSupervisor && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor && !isDelivery }">
 
+    <!-- ── SUPER ADMIN LAYOUT (manejado enteramente por SuperAdminLayout) ── -->
+    <template v-if="isSuperAdmin && auth.isAuthenticated">
+      <router-view />
+    </template>
+
     <!-- ── ADMIN LAYOUT (sidebar + topbar, desktop ≥1024px) ── -->
-    <template v-if="isAdmin && auth.isAuthenticated && !$route.meta.fullscreen">
+    <template v-else-if="isAdmin && auth.isAuthenticated && !$route.meta.fullscreen">
       <div class="admin-shell">
         <AdminSidebar />
         <div class="admin-body">

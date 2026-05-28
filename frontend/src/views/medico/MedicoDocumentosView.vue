@@ -42,7 +42,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="mdv__loading">
-      <div class="mdv__ring"></div> Cargando documentos…
+      <DsSpinner :size="20" /> Cargando documentos…
     </div>
 
     <!-- Empty -->
@@ -186,6 +186,7 @@ import {
 import api from '../../lib/api.js'
 import { usePacientesStore } from '../../stores/pacientes.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useToast } from '../../composables/useToast.js'
 
 const pacientesStore = usePacientesStore()
@@ -384,12 +385,6 @@ onMounted(async () => {
   display: flex; align-items: center; gap: var(--sp-3);
   color: var(--c-ink-500); padding: var(--sp-8); font-size: var(--fs-14);
 }
-.mdv__ring {
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 2px solid var(--c-ink-200); border-top-color: #2D8A6B;
-  animation: spin .7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 .mdv__empty {
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-3);
   padding: var(--sp-12) var(--sp-6); color: var(--c-ink-300); text-align: center;

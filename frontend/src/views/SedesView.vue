@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/auth.js'
 import { usePermissions } from '../composables/usePermissions.js'
 import { usePlan } from '../composables/usePlan.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const router   = useRouter()
 const auth     = useAuthStore()
@@ -179,8 +180,7 @@ function tieneActividad(sede) {
 
       <!-- Loading -->
       <div v-if="loading" class="agri-loading">
-        <div class="agri-loading__ring"></div>
-        <span>Cargando datos operativos…</span>
+        <DsSpinner />
       </div>
 
       <!-- Empty -->
@@ -392,8 +392,7 @@ function tieneActividad(sede) {
 
       <!-- Loading -->
       <div v-if="loading" class="loading-state">
-        <div class="spinner"></div>
-        <span>Cargando sedes…</span>
+        <DsSpinner />
       </div>
 
       <!-- Empty -->
@@ -521,7 +520,7 @@ function tieneActividad(sede) {
           <div class="modal-panel__footer">
             <button class="btn-ghost" :disabled="saving" @click="showModal=false">Cancelar</button>
             <button class="btn-primary-action" :disabled="saving" @click="handleSubmit">
-              <span v-if="saving" class="spinner spinner--sm"></span>
+              <DsSpinner v-if="saving" :size="14" />
               {{ editingId ? 'Guardar cambios' : 'Crear sede' }}
             </button>
           </div>
@@ -545,7 +544,7 @@ function tieneActividad(sede) {
             </div>
           </div>
           <div class="modal-panel__body">
-            <div v-if="loadingInv" class="loading-state"><div class="spinner"></div></div>
+            <div v-if="loadingInv" class="loading-state"><DsSpinner :size="40" /></div>
             <div v-else-if="!inventarioData.length" class="empty-state empty-state--sm">
               <div class="empty-state__icon">📦</div>
               <p class="empty-state__desc">Sin stock en esta sede</p>
@@ -679,18 +678,7 @@ function tieneActividad(sede) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: .75rem;
-  padding: 5rem;
-  color: #94a3b8;
-  font-size: .875rem;
-}
-.agri-loading__ring {
-  width: 24px;
-  height: 24px;
-  border: 2px solid #e2e8f0;
-  border-top-color: var(--brand-primary, #1b5e20);
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
+  min-height: calc(100vh - 56px);
 }
 
 /* Empty */
@@ -1071,16 +1059,13 @@ function tieneActividad(sede) {
 .kpi-card__value { font-size: 1.75rem; font-weight: 700; color: #0f172a; line-height: 1; letter-spacing: -.03em; }
 .kpi-card__label { font-size: .75rem; color: #94a3b8; margin-top: .2rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
 
-.loading-state { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 4rem; color: #94a3b8; font-size: .875rem; }
+.loading-state { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .empty-state { text-align: center; padding: 5rem 1rem; }
 .empty-state--sm { padding: 2rem 1rem; }
 .empty-state__icon { font-size: 3rem; margin-bottom: 1rem; }
 .empty-state__title { font-size: 1.25rem; font-weight: 600; color: #0f172a; margin-bottom: .5rem; }
 .empty-state__desc { color: #64748b; font-size: .875rem; margin-bottom: 1.5rem; }
 
-.spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; flex-shrink: 0; }
-.spinner--sm { width: 14px; height: 14px; }
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .sedes-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.25rem; }
 @media (max-width: 1024px) { .sedes-grid { grid-template-columns: repeat(2,1fr); } }

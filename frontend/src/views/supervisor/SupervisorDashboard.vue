@@ -11,7 +11,7 @@
 
     <!-- ── LOADING ─────────────────────────────────────────────── -->
     <div v-if="loading" class="svd__loading">
-      <div class="svd__spinner"></div>
+      <DsSpinner :size="20" />
       <span>Cargando datos…</span>
     </div>
 
@@ -90,6 +90,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
 import api from '../../lib/api.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const auth = useAuthStore()
 
@@ -168,16 +169,6 @@ onMounted(async () => {
   font-size: var(--fs-14);
   padding: var(--sp-8) 0;
 }
-.svd__spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--c-ink-200);
-  border-top-color: #0f766e;
-  border-radius: 50%;
-  animation: svd-spin 0.7s linear infinite;
-}
-@keyframes svd-spin { to { transform: rotate(360deg); } }
-
 /* Error */
 .svd__error {
   padding: var(--sp-4) var(--sp-5);

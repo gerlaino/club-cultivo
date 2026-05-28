@@ -13,7 +13,7 @@
     </div>
 
     <div v-if="loading" class="stk__loading">
-      <div class="stk__ring"></div> Cargando…
+      <DsSpinner />
     </div>
 
     <template v-else>
@@ -100,7 +100,7 @@
                 <option v-for="sede in sedes" :key="sede.id" :value="sede.id">{{ sede.nombre }}</option>
               </select>
               <button class="stk__btn-primary stk__btn-sm" :disabled="asignando === s.id || !asignaciones[s.id]" @click="asignar(s)">
-                <div v-if="asignando === s.id" class="stk__spin stk__spin--sm stk__spin--wh"></div>
+                <DsSpinner v-if="asignando === s.id" :size="12" />
                 <i v-else class="bi bi-check-lg"></i>
                 Asignar
               </button>
@@ -170,7 +170,7 @@
       <!-- ── Tab: Historial ─────────────────────────────────────── -->
       <div v-if="tabActiva === 'historial'">
         <div v-if="loadingHistorial" class="stk__loading">
-          <div class="stk__ring"></div> Cargando historial…
+          <DsSpinner />
         </div>
         <template v-else>
           <div class="stk__filters">
@@ -286,7 +286,7 @@
             <div class="stk__modal-ft">
               <button type="button" class="stk__btn-ghost" @click="closeCrear">Cancelar</button>
               <button class="stk__btn-primary" :disabled="creando || !crearForm.cantidad" @click="guardarStock">
-                <div v-if="creando" class="stk__spin stk__spin--sm stk__spin--wh"></div>
+                <DsSpinner v-if="creando" :size="12" />
                 <i v-else class="bi bi-plus-lg"></i>
                 Crear stock
               </button>
@@ -338,7 +338,7 @@
             <div class="stk__modal-ft">
               <button type="button" class="stk__btn-ghost" @click="closeRepartir">Cancelar</button>
               <button class="stk__btn-primary" :disabled="repartiendo" @click="ejecutarRepartir">
-                <div v-if="repartiendo" class="stk__spin stk__spin--sm stk__spin--wh"></div>
+                <DsSpinner v-if="repartiendo" :size="12" />
                 <i v-else class="bi bi-arrows-angle-expand"></i>
                 Repartir
               </button>
@@ -408,7 +408,7 @@
             <div class="stk__modal-ft">
               <button type="button" class="stk__btn-ghost" @click="closeProcesar">Cancelar</button>
               <button class="stk__btn-amber" :disabled="procesando" @click="ejecutarProcesar">
-                <div v-if="procesando" class="stk__spin stk__spin--sm stk__spin--wh"></div>
+                <DsSpinner v-if="procesando" :size="12" />
                 <i v-else class="bi bi-arrow-right-square"></i>
                 Procesar
               </button>
@@ -422,6 +422,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   listStocksPendientes, listStocks, listStocksHistorial,
   asignarStock, listSedes, createStock,
@@ -835,12 +836,7 @@ function formatDate(dateStr) {
 .stk__tab-badge--warn { background: #fcd34d; color: #92400e; }
 
 /* ── Loading / Empty ────────────────────────────────────────────────────────── */
-.stk__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; color: #94a3b8; justify-content: center; font-size: .9rem; }
-.stk__ring    { width: 20px; height: 20px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: stk-spin .7s linear infinite; }
-@keyframes stk-spin { to { transform: rotate(360deg); } }
-.stk__spin { width: 14px; height: 14px; border: 2px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: stk-spin .6s linear infinite; }
-.stk__spin--sm { width: 12px; height: 12px; }
-.stk__spin--wh { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
+.stk__loading { display: flex; align-items: center; justify-content: center; padding: 4rem; }
 
 .stk__empty { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3.5rem 1rem; text-align: center; }
 .stk__empty-ico   { font-size: 2.5rem; }

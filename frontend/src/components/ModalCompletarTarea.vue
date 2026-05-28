@@ -62,7 +62,7 @@
           <div class="mct__footer">
             <button class="mct__btn-ghost" @click="cerrar" :disabled="guardando">Cancelar</button>
             <button class="mct__btn-primary" @click="confirmar" :disabled="guardando">
-              <span v-if="guardando" class="mct__spinner"></span>
+              <DsSpinner v-if="guardando" :size="14" />
               <i v-else class="bi bi-check-lg me-1"></i>
               Marcar como completada
             </button>
@@ -78,6 +78,7 @@
 import { ref, watch } from 'vue'
 import { useTareasStore } from '../stores/tareas.js'
 import { useModalEscape } from '../composables/useModalEscape.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const props = defineProps({
   show:  { type: Boolean, default: false },
@@ -223,13 +224,6 @@ async function confirmar() {
 }
 .mct__btn-primary:hover:not(:disabled) { opacity: .88; }
 .mct__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-
-.mct__spinner {
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
-  border-radius: 50%; animation: mct-spin .7s linear infinite;
-}
-@keyframes mct-spin { to { transform: rotate(360deg); } }
 
 .mct-fade-enter-active { animation: mct-appear .2s ease; }
 .mct-fade-leave-active { animation: mct-appear .15s ease reverse; }

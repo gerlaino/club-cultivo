@@ -7,6 +7,7 @@ import { useQRCode } from '../composables/useQRCode.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useToast } from '../composables/useToast.js'
 import EmptyState from '../components/ui/EmptyState.vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
 import api from '../lib/api.js'
 
 const router = useRouter()
@@ -338,7 +339,7 @@ onMounted(loadGeneticas)
 
     <!-- Loading -->
     <div v-if="loading" class="gv__loading">
-      <div class="gv__spinner"></div>
+      <DsSpinner />
     </div>
 
     <!-- Error -->
@@ -651,7 +652,7 @@ onMounted(loadGeneticas)
           <div class="gv-modal__footer">
             <button class="gv__btn-ghost" :disabled="saving" @click="showModal=false">Cancelar</button>
             <button class="gv__btn-new" :disabled="saving" @click="handleSubmit">
-              <span v-if="saving" class="gv-modal__spinner"></span>
+              <DsSpinner v-if="saving" :size="14" />
               {{ editingId ? 'Guardar cambios' : 'Crear genética' }}
             </button>
           </div>
@@ -705,9 +706,7 @@ onMounted(loadGeneticas)
 .gen-inase-col { font-size: 1rem; }
 
 /* Loading / error */
-.gv__loading { display: flex; justify-content: center; padding: 3rem; }
-.gv__spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #1a3d2e; border-radius: 50%; animation: spin .8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.gv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .gv__error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: .875rem 1rem; border-radius: 10px; }
 
 /* Table */
@@ -790,7 +789,6 @@ onMounted(loadGeneticas)
 .gv-modal__footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; flex-shrink: 0; }
 .gv-modal__inase-notice { margin-bottom: 1.25rem; }
 .gv-modal__error { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
-.gv-modal__spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
 
 /* Form inside modal */
 .gv-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .875rem; }

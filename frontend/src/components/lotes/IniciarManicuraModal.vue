@@ -87,7 +87,7 @@
         <div class="imm__footer">
           <button class="imm__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
           <button class="imm__btn-primary" :disabled="saving" @click="confirmar">
-            <span v-if="saving" class="imm__spinner" />
+            <DsSpinner v-if="saving" :size="14" />
             <Scissors v-else :size="14" :stroke-width="2" />
             Iniciar Manicura
           </button>
@@ -102,6 +102,7 @@
 import { ref, computed, watch } from 'vue'
 import { Scissors, X } from 'lucide-vue-next'
 import { listUsers, asignarManicurador, transicionarLote } from '../../lib/api.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   modelValue:    { type: Boolean, required: true },
@@ -307,12 +308,4 @@ function cerrar() {
 .imm__btn-primary:hover:not(:disabled) { opacity: .88; }
 .imm__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 
-.imm__spinner {
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.35);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: imm-spin .6s linear infinite;
-}
-@keyframes imm-spin { to { transform: rotate(360deg); } }
 </style>

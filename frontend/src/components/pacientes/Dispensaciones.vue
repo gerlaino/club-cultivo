@@ -4,6 +4,7 @@ import { logger } from '../../utils/logger.js'
 import { useAuthStore } from '../../stores/auth'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   listDispensaciones, createDispensacion, deleteDispensacion,
   listStocks, listDeliveryUsers,
@@ -339,7 +340,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="dv__loading"><div class="dv__ring"></div><span>Cargando…</span></div>
+    <div v-if="loading" class="dv__loading"><DsSpinner /></div>
 
     <!-- Vacío -->
     <div v-else-if="!dispensaciones.length" class="dv__empty">
@@ -435,7 +436,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 
             <!-- ── Selector de stock ── -->
             <div class="dv__section-label">Stock a dispensar <span class="dv__req">*</span></div>
-            <div v-if="loadingStocks" class="dv__loading-inline"><div class="dv__ring dv__ring--sm"></div> Cargando stocks…</div>
+            <div v-if="loadingStocks" class="dv__loading-inline"><DsSpinner :size="13" /> Cargando stocks…</div>
             <div v-else-if="!stocksDisponibles.length" class="dv__warn-box">
               <i class="bi bi-exclamation-triangle"></i> Sin stock disponible
             </div>
@@ -623,7 +624,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
               <!-- Delivery user -->
               <div class="dv__field">
                 <label class="dv__label">Delivery asignado <span class="dv__req">*</span></label>
-                <div v-if="loadingDelivery" class="dv__loading-inline"><div class="dv__ring dv__ring--sm"></div> Cargando…</div>
+                <div v-if="loadingDelivery" class="dv__loading-inline"><DsSpinner :size="13" /> Cargando…</div>
                 <div v-else-if="!deliveryUsers.length" class="dv__warn-box">
                   <i class="bi bi-exclamation-triangle"></i> No hay usuarios delivery disponibles
                 </div>
@@ -667,7 +668,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
           <div class="dv__modal-footer">
             <button class="dv__btn-ghost" :disabled="saving" @click="showModal=false">Cancelar</button>
             <button class="dv__btn-primary" :disabled="saving || !form.stock_id" @click="handleSubmit">
-              <div v-if="saving" class="dv__spinner"></div>
+              <DsSpinner v-if="saving" :size="14" />
               <i v-else class="bi bi-check-lg"></i>
               Registrar dispensación
             </button>
@@ -683,11 +684,8 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.25rem; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; }
 .dv__header-title { font-size: .9rem; font-weight: 700; color: #0f172a; margin-bottom: .2rem; }
 .dv__header-sub { font-size: .75rem; color: #64748b; }
-.dv__loading { display: flex; align-items: center; justify-content: center; gap: .65rem; padding: 3rem; color: #94a3b8; font-size: .875rem; }
-.dv__ring { width: 18px; height: 18px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: dv-spin .7s linear infinite; }
-.dv__ring--sm { width: 13px; height: 13px; }
+.dv__loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .dv__loading-inline { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: #94a3b8; padding: .5rem 0; }
-@keyframes dv-spin { to { transform: rotate(360deg); } }
 .dv__empty { text-align: center; padding: 3rem 1rem; color: #94a3b8; }
 .dv__empty-icon { font-size: 2.5rem; margin-bottom: .75rem; opacity: .4; }
 .dv__empty-title { font-size: .9rem; font-weight: 700; color: #0f172a; margin-bottom: .4rem; }
@@ -721,7 +719,6 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .dv__btn-ghost { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .6rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 500; cursor: pointer; }
 .dv__btn-ghost:hover { background: #f8fafc; }
-.dv__spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: dv-spin .6s linear infinite; }
 
 /* Modal */
 .dv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }

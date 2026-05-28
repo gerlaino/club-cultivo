@@ -17,6 +17,7 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import SemaforoAmbiente from '../components/ambiente/SemaforoAmbiente.vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -514,7 +515,7 @@ const canSeeAmbiente = computed(() =>
       :items="[...breadcrumbs, { label: sala?.nombre || '…' }]"
     />
 
-    <div v-if="loading" class="sd__loading"><div class="sd__spinner"></div><span>Cargando sala…</span></div>
+    <div v-if="loading" class="sd__loading"><DsSpinner /></div>
     <div v-else-if="error" class="sd__error">{{ error }}</div>
     <div v-else-if="!sala" class="sd__error">Sala no encontrada.</div>
 
@@ -1075,7 +1076,7 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__modal-footer">
             <button class="sd__btn-ghost" :disabled="lotes.creating || creandoLote" @click="closeCreate">Cancelar</button>
             <button class="sd__btn-primary" :disabled="lotes.creating || creandoLote" @click="createLote">
-              <div v-if="lotes.creating || creandoLote" class="sd__spinner sd__spinner--sm"></div>
+              <DsSpinner v-if="lotes.creating || creandoLote" :size="14" />
               <i v-else class="bi bi-plus-lg"></i>Crear lote
             </button>
           </div>
@@ -1132,7 +1133,7 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__modal-footer">
             <button class="sd__btn-ghost" :disabled="savingEditSala" @click="showEditSala = false">Cancelar</button>
             <button class="sd__btn-primary" :disabled="savingEditSala" @click="saveEditSala">
-              <div v-if="savingEditSala" class="sd__spinner sd__spinner--sm"></div>
+              <DsSpinner v-if="savingEditSala" :size="14" />
               <i v-else class="bi bi-check-lg"></i>Guardar cambios
             </button>
           </div>
@@ -1161,11 +1162,8 @@ const canSeeAmbiente = computed(() =>
 @media (max-width: 640px) { .sd { padding: 1rem; } }
 
 
-.sd__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
+.sd__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .sd__error { padding: 1rem 1.25rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 10px; font-size: .875rem; }
-.sd__spinner { width: 20px; height: 20px; border: 2.5px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: sd-spin .6s linear infinite; flex-shrink: 0; }
-.sd__spinner--sm { width: 14px; height: 14px; border-top-color: #fff; border-color: rgba(255,255,255,.3); }
-@keyframes sd-spin { to { transform: rotate(360deg); } }
 
 .sd__hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
 .sd__hero-title-row { display: flex; align-items: center; gap: .65rem; margin-bottom: .3rem; flex-wrap: wrap; }

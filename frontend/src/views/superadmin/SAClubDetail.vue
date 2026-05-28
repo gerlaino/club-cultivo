@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
@@ -252,7 +253,7 @@ onMounted(cargar)
 <template>
   <div class="scd">
 
-    <div v-if="loading" class="scd__loading"><div class="scd__ring"></div></div>
+    <div v-if="loading" class="scd__loading"><DsSpinner /></div>
 
     <template v-else-if="club">
 
@@ -375,7 +376,7 @@ onMounted(cargar)
           <Zap :size="14" :stroke-width="1.75" class="scd__card-ico scd__card-ico--purple" /> Funcionalidades
           <span v-if="featuresSuccess" class="scd__saved-badge"><Check :size="11" :stroke-width="3" /> Guardado</span>
           <button class="scd__btn-sm scd__btn-primary" :disabled="savingFeatures" @click="guardarFeatures" style="margin-left:auto">
-            <span v-if="savingFeatures" class="scd__spinner"></span>
+            <DsSpinner v-if="savingFeatures" :size="13" />
             <Save v-else :size="13" :stroke-width="1.75" />
             {{ savingFeatures ? 'Guardando…' : 'Guardar' }}
           </button>
@@ -457,7 +458,7 @@ onMounted(cargar)
           </div>
           <div class="scd__smtp-footer">
             <button type="submit" class="scd__btn-sm scd__btn-primary" :disabled="savingSmtp">
-              <span v-if="savingSmtp" class="scd__spinner"></span>
+              <DsSpinner v-if="savingSmtp" :size="13" />
               <Save v-else :size="13" :stroke-width="1.75" />
               {{ savingSmtp ? 'Guardando…' : 'Guardar SMTP' }}
             </button>
@@ -499,7 +500,7 @@ onMounted(cargar)
             <div class="scd__modal-ft">
               <button class="scd__btn-ghost" @click="showPlanModal = false">Cancelar</button>
               <button class="scd__btn-primary" :disabled="saving" @click="guardarPlan">
-                <span v-if="saving" class="scd__spinner"></span>
+                <DsSpinner v-if="saving" :size="13" />
                 <Check v-else :size="14" :stroke-width="2.5" />
                 Guardar
               </button>
@@ -546,7 +547,7 @@ onMounted(cargar)
             <div class="scd__modal-ft">
               <button class="scd__btn-ghost" @click="showUserModal = false">Cancelar</button>
               <button class="scd__btn-primary" :disabled="saving" @click="crearUsuario">
-                <span v-if="saving" class="scd__spinner"></span>
+                <DsSpinner v-if="saving" :size="13" />
                 <UserPlus v-else :size="14" :stroke-width="1.75" />
                 {{ saving ? 'Creando…' : 'Crear usuario' }}
               </button>
@@ -562,9 +563,7 @@ onMounted(cargar)
 <style scoped>
 .scd { padding: 2rem 2.5rem 3rem; display: flex; flex-direction: column; gap: 1rem; }
 /* Loading */
-.scd__loading { display: flex; justify-content: center; padding: 5rem; }
-.scd__ring { width: 24px; height: 24px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: spin .7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.scd__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 /* Deleted banner */
 .scd__deleted-banner {
@@ -796,7 +795,6 @@ onMounted(cargar)
   display: inline-flex; align-items: center; gap: .4rem;
 }
 .scd__btn-ghost:hover { background: #f8fafc; }
-.scd__spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
 
 /* Modals */
 .scd__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(4px); }

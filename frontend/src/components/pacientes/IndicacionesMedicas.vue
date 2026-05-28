@@ -17,7 +17,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="text-center py-4">
-      <div class="spinner-border spinner-border-sm text-success"></div>
+      <DsSpinner :size="18" />
     </div>
 
     <!-- Lista vacía -->
@@ -220,7 +220,7 @@
               Cancelar
             </button>
             <button @click="handleSubmit" class="btn btn-success" :disabled="saving">
-              <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
+              <DsSpinner v-if="saving" :size="14" />
               {{ editingId ? 'Guardar' : 'Crear' }}
             </button>
           </div>
@@ -246,7 +246,7 @@
               Cancelar
             </button>
             <button @click="handleDelete" class="btn btn-danger" :disabled="deleting">
-              <span v-if="deleting" class="spinner-border spinner-border-sm me-2"></span>
+              <DsSpinner v-if="deleting" :size="14" />
               Desactivar
             </button>
           </div>
@@ -263,6 +263,7 @@ import { logger } from '../../utils/logger.js'
 import { useAuthStore } from '../../stores/auth'
 import api, { listIndicaciones, createIndicacion, updateIndicacion, deleteIndicacion } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   socioId: {

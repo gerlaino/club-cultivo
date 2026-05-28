@@ -2,8 +2,7 @@
   <div class="cp">
 
     <div v-if="estado === 'cargando'" class="cp__loading">
-      <div class="cp__spinner"></div>
-      <p>Verificando carnet…</p>
+      <DsSpinner :size="60" />
     </div>
 
     <div v-else-if="estado === 'no_encontrado'" class="cp__error">
@@ -70,7 +69,7 @@
       <!-- Acciones (fuera del card, no se incluyen en el PDF) -->
       <div class="cp__actions">
         <button class="cp__btn cp__btn--primary" @click="descargarPDF" :disabled="descargando">
-          <span v-if="descargando" class="cp__btn-spinner"></span>
+          <DsSpinner v-if="descargando" :size="14" />
           <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
@@ -94,6 +93,7 @@ import { useRoute } from 'vue-router'
 import axios from 'axios'
 import QRCode from 'qrcode'
 import html2pdf from 'html2pdf.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route = useRoute()
 const estado     = ref('cargando')
@@ -174,9 +174,7 @@ onMounted(cargar)
 }
 
 /* Loading */
-.cp__loading { text-align: center; color: #5b6473; }
-.cp__spinner { width: 36px; height: 36px; border: 3px solid #d4e6d4; border-top-color: #1b5e20; border-radius: 50%; animation: cp-spin .7s linear infinite; margin: 0 auto 1rem; }
-@keyframes cp-spin { to { transform: rotate(360deg); } }
+.cp__loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
 
 /* Error */
 .cp__error { text-align: center; background: #fff; border-radius: 20px; padding: 2.5rem 2rem; max-width: 340px; width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,.08); }
@@ -282,11 +280,6 @@ onMounted(cargar)
 .cp__btn--primary:disabled { opacity: .6; cursor: not-allowed; }
 .cp__btn--ghost { background: #fff; color: #475569; border: 1.5px solid #e2e8f0; }
 .cp__btn--ghost:hover { background: #f8fafc; }
-.cp__btn-spinner {
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: cp-spin .6s linear infinite; flex-shrink: 0;
-}
 
 /* ── Print ────────────────────────────────────────────────── */
 @media print {

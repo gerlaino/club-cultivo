@@ -12,6 +12,7 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import Lightbox from '../components/ui/Lightbox.vue'
 import { useToast }      from '../composables/useToast.js'
 import { useBluelabBLE } from '../composables/useBluelabBLE.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const contextoAsistente = computed(() => planta.value ? {
   tipo:          'planta',
@@ -415,8 +416,7 @@ onMounted(async () => {
   <div class="pd">
 
     <div v-if="loading" class="pd__loading">
-      <div class="pd__spinner"></div>
-      <span>Cargando planta…</span>
+      <DsSpinner />
     </div>
     <div v-else-if="error" class="pd__error">{{ error }}</div>
     <div v-else-if="!planta" class="pd__error">Planta no encontrada.</div>
@@ -535,7 +535,7 @@ onMounted(async () => {
           />
           <span class="pd__mnc-unit">g</span>
           <button class="pd__mnc-btn" :disabled="savingManicura || !pesoManicura" @click="saveManicura">
-            <div v-if="savingManicura" class="pd__mnc-spinner"></div>
+            <DsSpinner v-if="savingManicura" :size="12" />
             <i v-else class="bi bi-check-lg"></i>
             Guardar
           </button>
@@ -672,7 +672,7 @@ onMounted(async () => {
               </div>
               <div class="pd__str">
                 <button v-if="auth.user?.role !== 'manicura'" class="pd__btn-sm" @click.stop="fotoInput?.click()" :disabled="uploadingFoto">
-                  <span v-if="uploadingFoto" class="pd__spinner" style="width:12px;height:12px;border-width:1.5px"></span>
+                  <DsSpinner v-if="uploadingFoto" :size="12" />
                   <i v-else class="bi bi-camera-fill"></i>
                 </button>
                 <i class="bi pd__chevron" :class="fotosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -877,7 +877,7 @@ onMounted(async () => {
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" @click="showModal = false">Cancelar</button>
             <button class="pd__btn-primary" @click="guardarRegistro" :disabled="guardando">
-              <span v-if="guardando" class="pd__spinner pd__spinner--sm"></span>
+              <DsSpinner v-if="guardando" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Guardar registro
             </button>
           </div>
@@ -920,7 +920,7 @@ onMounted(async () => {
                           class="pd__ble-btn"
                           :disabled="ble.conectando.value"
                           @click="ble.conectar()">
-                    <span v-if="ble.conectando.value" class="pd__spinner pd__spinner--sm" style="border-top-color:#1b5e20;border-color:rgba(27,94,32,.2)"></span>
+                    <DsSpinner v-if="ble.conectando.value" :size="13" />
                     <i v-else class="bi bi-bluetooth"></i>
                     {{ ble.conectando.value ? 'Buscando…' : 'Conectar' }}
                   </button>
@@ -990,7 +990,7 @@ onMounted(async () => {
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" @click="showMedicionModal = false; ble.desconectar()">Cancelar</button>
             <button class="pd__btn-primary" @click="guardarMedicion" :disabled="savingMedicion">
-              <span v-if="savingMedicion" class="pd__spinner pd__spinner--sm"></span>
+              <DsSpinner v-if="savingMedicion" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Guardar medición
             </button>
           </div>
@@ -1050,7 +1050,7 @@ onMounted(async () => {
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" @click="showTrasplanteModal = false">Cancelar</button>
             <button class="pd__btn-primary" @click="guardarTrasplante" :disabled="savingTrasplante">
-              <span v-if="savingTrasplante" class="pd__spinner pd__spinner--sm"></span>
+              <DsSpinner v-if="savingTrasplante" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Guardar trasplante
             </button>
           </div>
@@ -1090,7 +1090,7 @@ onMounted(async () => {
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" @click="cancelarSubidaFoto">Cancelar</button>
             <button class="pd__btn-primary" @click="confirmarSubidaFoto" :disabled="uploadingFoto">
-              <span v-if="uploadingFoto" class="pd__spinner pd__spinner--sm"></span>
+              <DsSpinner v-if="uploadingFoto" :size="13" />
               <i v-else class="bi bi-cloud-upload"></i>Subir foto
             </button>
           </div>
@@ -1114,11 +1114,8 @@ onMounted(async () => {
 @media (max-width: 640px) { .pd { padding: 1rem; } }
 
 /* Loading / Error */
-.pd__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
+.pd__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .pd__error   { padding: 1rem 1.25rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 10px; font-size: .875rem; }
-.pd__spinner { width: 20px; height: 20px; border: 2.5px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: pd-spin .6s linear infinite; flex-shrink: 0; }
-.pd__spinner--sm { width: 13px; height: 13px; border-color: rgba(255,255,255,.3); border-top-color: #fff; }
-@keyframes pd-spin { to { transform: rotate(360deg); } }
 
 /* Breadcrumb */
 
@@ -1190,12 +1187,6 @@ onMounted(async () => {
 }
 .pd__mnc-btn:hover:not(:disabled) { background: #15803d; }
 .pd__mnc-btn:disabled { opacity: .45; cursor: not-allowed; }
-.pd__mnc-spinner {
-  width: 12px; height: 12px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: pd-mnc-spin .6s linear infinite;
-}
-@keyframes pd-mnc-spin { to { transform: rotate(360deg); } }
 .pd__mnc-saved {
   font-size: .75rem; color: #15803d; font-weight: 600;
   display: flex; align-items: center; gap: .3rem;

@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useSalasStore } from '../../stores/salas'
 import { listSedes } from '../../lib/api'
 import { useModalEscape } from '../../composables/useModalEscape.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   sedeIdFija: { type: Number, default: null }, // Si viene de SedeDetailView, la sede está fija
@@ -169,7 +170,7 @@ onMounted(async () => {
             Cancelar
           </button>
           <button class="mcr__btn-primary" :disabled="saving" @click="handleSubmit">
-            <span v-if="saving" class="mcr__spinner"></span>
+            <DsSpinner v-if="saving" :size="14" />
             <i v-else class="bi bi-plus-lg"></i>
             {{ saving ? 'Creando…' : 'Crear sala' }}
           </button>
@@ -295,10 +296,4 @@ onMounted(async () => {
   cursor: pointer; transition: all .15s;
 }
 .mcr__btn-ghost:hover:not(:disabled) { background: #f8fafc; }
-.mcr__spinner {
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: mcr-spin .6s linear infinite;
-}
-@keyframes mcr-spin { to { transform: rotate(360deg); } }
 </style>

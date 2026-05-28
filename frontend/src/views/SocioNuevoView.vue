@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { usePacientesStore } from '../stores/pacientes'
 import { useClubStore } from '../stores/club'
 import { enviarMailPaciente } from '../lib/api.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const router = useRouter()
 const store  = usePacientesStore()
@@ -368,7 +369,7 @@ function sugerirVencimiento() {
             :disabled="store.saving"
             @click="handleSubmit"
           >
-            <span v-if="store.saving" class="snv__spinner"></span>
+            <DsSpinner v-if="store.saving" :size="16" />
             <i v-else class="bi bi-person-plus-fill"></i>
             {{ store.saving ? 'Creando paciente…' : 'Crear paciente' }}
           </button>
@@ -713,16 +714,6 @@ function sugerirVencimiento() {
   text-align: center;
 }
 .snv__btn-ghost:hover { background: #f8fafc; color: #0f172a; }
-
-/* Spinner */
-.snv__spinner {
-  width: 16px; height: 16px;
-  border: 2px solid rgba(255,255,255,.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: snv-spin .6s linear infinite;
-}
-@keyframes snv-spin { to { transform: rotate(360deg); } }
 
 /* Legal note */
 .snv__legal {

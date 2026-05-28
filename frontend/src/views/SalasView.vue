@@ -5,6 +5,7 @@ import { useAuthStore } from "../stores/auth";
 import { listSedes } from "../lib/api";
 import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
 import { useConfirm } from '../composables/useConfirm.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const salas = useSalasStore();
 const auth  = useAuthStore();
@@ -250,7 +251,7 @@ async function confirmDelete(s) {
 
     <!-- Loading / Error / Empty -->
     <div v-if="salas.loading" class="slv__loading">
-      <div class="slv__spinner"></div> Cargando salas…
+      <DsSpinner />
     </div>
     <div v-else-if="salas.error" class="slv__alert">{{ salas.error }}</div>
     <div v-else-if="!salas.items.length" class="slv__empty">
@@ -424,7 +425,7 @@ async function confirmDelete(s) {
             <div class="slv__modal-footer">
               <button class="slv__btn-ghost" @click="showEdit = false">Cancelar</button>
               <button class="slv__btn-primary" :disabled="salas.updating" @click="submitEdit">
-                <div v-if="salas.updating" class="slv__spinner slv__spinner--sm"></div>
+                <DsSpinner v-if="salas.updating" :size="14" />
                 Guardar cambios
               </button>
             </div>
@@ -473,7 +474,7 @@ async function confirmDelete(s) {
 .slv__count-label { font-size: .8rem; color: #60725d; margin-left: auto; }
 
 /* ── States ───────────────────────────────────────────── */
-.slv__loading { display: flex; align-items: center; gap: .75rem; padding: 3rem; justify-content: center; color: #60725d; }
+.slv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .slv__alert   { padding: 1rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; color: #dc2626; }
 .slv__empty   { text-align: center; padding: 4rem 1rem; }
 .slv__empty-icon  { font-size: 3rem; margin-bottom: .75rem; }
@@ -548,9 +549,6 @@ async function confirmDelete(s) {
 .slv__page-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── Spinner ──────────────────────────────────────────── */
-.slv__spinner { width: 28px; height: 28px; border: 3px solid #d4e6d4; border-top-color: #1b5e20; border-radius: 50%; animation: slv-spin .7s linear infinite; }
-.slv__spinner--sm { width: 14px; height: 14px; border-width: 2px; }
-@keyframes slv-spin { to { transform: rotate(360deg); } }
 
 /* ── Modal ────────────────────────────────────────────── */
 .slv__modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 1rem; }

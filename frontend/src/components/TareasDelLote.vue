@@ -2,8 +2,7 @@
   <div class="tl">
 
     <div v-if="loading" class="tl__loading">
-      <div class="tl__spinner"></div>
-      <span>Cargando tareas…</span>
+      <DsSpinner :size="40" />
     </div>
 
     <div v-else-if="tareasPendientes.length === 0" class="tl__empty">
@@ -73,7 +72,7 @@
           <div class="tl__modal-footer">
             <button class="tl__btn-ghost" @click="tareaCompletando = null">Cancelar</button>
             <button class="tl__btn-success" @click="confirmarCompletar" :disabled="guardando">
-              <span v-if="guardando" class="tl__spinner tl__spinner--sm"></span>
+              <DsSpinner v-if="guardando" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Completar
             </button>
           </div>
@@ -200,7 +199,7 @@
           <div class="tl__modal-footer">
             <button class="tl__btn-ghost" @click="tareaCompletando = null">Cancelar</button>
             <button class="tl__btn-success" @click="confirmarRegistroLote" :disabled="guardando">
-              <span v-if="guardando" class="tl__spinner tl__spinner--sm"></span>
+              <DsSpinner v-if="guardando" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Guardar y completar tarea
             </button>
           </div>
@@ -215,6 +214,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { listTareas, updateTarea, createRegistroAmbiental, createLoteEvento } from '../lib/api.js'
 import { useTareasStore } from '../stores/tareas'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const props = defineProps({
   lote: { type: Object, required: true }
@@ -364,10 +364,7 @@ async function confirmarRegistroLote() {
 
 <style scoped>
 .tl { font-family: system-ui, -apple-system, sans-serif; }
-.tl__loading { display: flex; align-items: center; gap: .5rem; padding: 1.5rem; color: #94a3b8; font-size: .875rem; }
-.tl__spinner { width: 16px; height: 16px; border: 2px solid #d4e6d4; border-top-color: #1b5e20; border-radius: 50%; animation: tl-spin .6s linear infinite; }
-.tl__spinner--sm { width: 13px; height: 13px; border-color: rgba(255,255,255,.3); border-top-color: #fff; }
-@keyframes tl-spin { to { transform: rotate(360deg); } }
+.tl__loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .tl__empty { display: flex; align-items: center; gap: .75rem; padding: 1.5rem 1.1rem; color: #60725d; font-size: .875rem; }
 .tl__lista { display: flex; flex-direction: column; }
 .tl__tarea { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .85rem 1.1rem; border-bottom: 1px solid #f0fdf4; border-left: 3px solid #d4e6d4; transition: background .15s; }

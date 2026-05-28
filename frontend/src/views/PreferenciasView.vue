@@ -4,6 +4,7 @@ import { useClubStore } from '../stores/club'
 import Avatar from '../components/Avatar.vue'
 import { useConfirm } from '../composables/useConfirm.js'
 import { updatePreferences, testSmtp } from '../lib/api.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const club  = useClubStore()
 const toast = ref(null)
@@ -200,7 +201,7 @@ async function runTestSmtp() {
         <p class="pv__sub">Identidad, contacto, domicilio legal y datos regulatorios</p>
       </div>
       <button class="pv__btn-save" :disabled="club.saving || pristine" @click="save">
-        <span v-if="club.saving" class="pv__spinner"></span>
+        <DsSpinner v-if="club.saving" :size="15" />
         <i v-else class="bi bi-check-lg"></i>
         {{ club.saving ? 'Guardando…' : 'Guardar cambios' }}
       </button>
@@ -229,7 +230,7 @@ async function runTestSmtp() {
               <div class="pv__logo-preview">
                 <img v-if="logoPreview" :src="logoPreview" alt="Logo" class="pv__logo-img" />
                 <Avatar v-else :name="form.name || 'Club'" :size="88" />
-                <div v-if="club.saving" class="pv__logo-overlay"><div class="pv__spinner pv__spinner--white"></div></div>
+                <div v-if="club.saving" class="pv__logo-overlay"><DsSpinner :size="24" /></div>
               </div>
               <div class="pv__logo-actions">
                 <label class="pv__btn-outline" :class="{ 'pv__btn--disabled': club.saving }">
@@ -416,12 +417,12 @@ async function runTestSmtp() {
 
             <div class="pv__smtp-actions">
               <button class="pv__btn-save" :disabled="smtpSaving || !smtpConfigured" @click="saveSmtp">
-                <span v-if="smtpSaving" class="pv__spinner"></span>
+                <DsSpinner v-if="smtpSaving" :size="15" />
                 <i v-else class="bi bi-floppy"></i>
                 {{ smtpSaving ? 'Guardando…' : 'Guardar' }}
               </button>
               <button class="pv__btn-outline" :disabled="!smtpConfigured || smtpTesting" @click="runTestSmtp">
-                <span v-if="smtpTesting" class="pv__spinner pv__spinner--dark"></span>
+                <DsSpinner v-if="smtpTesting" :size="15" />
                 <i v-else class="bi bi-send"></i>
                 {{ smtpTesting ? 'Enviando…' : 'Enviar mail de prueba' }}
               </button>
@@ -433,7 +434,7 @@ async function runTestSmtp() {
         <!-- Footer save -->
         <div class="pv__footer-save">
           <button class="pv__btn-save" :disabled="club.saving || pristine" @click="save">
-            <span v-if="club.saving" class="pv__spinner"></span>
+            <DsSpinner v-if="club.saving" :size="15" />
             <i v-else class="bi bi-check-lg"></i>
             {{ club.saving ? 'Guardando…' : 'Guardar cambios' }}
           </button>
@@ -553,9 +554,6 @@ async function runTestSmtp() {
 .pv__toast-close { margin-left: auto; background: none; border: none; color: inherit; opacity: .6; cursor: pointer; font-size: 1rem; padding: 0; }
 .pv__toast-close:hover { opacity: 1; }
 
-.pv__spinner { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: pv-spin .6s linear infinite; flex-shrink: 0; }
-.pv__spinner--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
-@keyframes pv-spin { to { transform: rotate(360deg); } }
 
 .pv-toast-enter-active, .pv-toast-leave-active { transition: all .3s; }
 .pv-toast-enter-from, .pv-toast-leave-to { opacity: 0; transform: translateY(-8px); }
@@ -568,6 +566,5 @@ async function runTestSmtp() {
 .pv__smtp-badge--off { background: #f1f5f9; color: #64748b; }
 
 .pv__smtp-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.pv__spinner--dark { border-color: rgba(0,0,0,.15); border-top-color: #374151; }
 </style>
 

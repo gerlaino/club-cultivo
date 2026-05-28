@@ -110,7 +110,7 @@
           <div class="rlm__footer">
             <button class="rlm__btn-ghost" :disabled="saving" @click="close">Cancelar</button>
             <button class="rlm__btn-primary" :disabled="saving || !canSubmit" @click="submit">
-              <div v-if="saving" class="rlm__spinner" />
+              <DsSpinner v-if="saving" :size="16" />
               <span v-else>Registrar</span>
             </button>
           </div>
@@ -126,6 +126,7 @@ import { ref, computed, watch } from 'vue'
 import { Gauge, X, Leaf } from 'lucide-vue-next'
 import { createLecturaAmbiental, createRegistroAmbiental } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -357,11 +358,6 @@ async function submit() {
 }
 .rlm__btn-primary:hover:not(:disabled) { opacity: .88; }
 .rlm__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-.rlm__spinner {
-  width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.4);
-  border-top-color: #fff; border-radius: 50%; animation: rlm-spin .7s linear infinite;
-}
-@keyframes rlm-spin { to { transform: rotate(360deg); } }
 .rlm-fade-enter-active { animation: rlm-appear .2s ease; }
 .rlm-fade-leave-active { animation: rlm-appear .15s ease reverse; }
 @keyframes rlm-appear {

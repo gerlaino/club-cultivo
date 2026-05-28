@@ -3,7 +3,7 @@
 
     <!-- Loading inicial -->
     <div v-if="loading" class="ptv__loading">
-      <div class="ptv__spinner-lg"></div>
+      <DsSpinner />
     </div>
 
     <!-- Sin plan -->
@@ -151,7 +151,7 @@
           <div class="ptv__qp-footer">
             <button class="ptv__qp-cancel" @click="showNuevaTarea = false">Cancelar</button>
             <button class="ptv__qp-save" :disabled="quickSaving" @click="guardarNuevaTarea">
-              <span v-if="quickSaving" class="ptv__qp-spinner"></span>
+              <DsSpinner v-if="quickSaving" :size="13" />
               {{ quickSaving ? 'Guardando…' : 'Agregar' }}
             </button>
           </div>
@@ -181,6 +181,7 @@ import {
   getPlanTrabajoActivo, listPlanTrabajos, listPlanTareas, createPlanTarea,
   publicarPlanTrabajo, archivarPlanTrabajo, deletePlanTrabajo, listUsers, listSalas,
 } from '../lib/api.js'
+import DsSpinner           from '../design-system/components/Spinner.vue'
 import EmptyStatePlan      from '../components/plan-trabajo/EmptyStatePlan.vue'
 import SemanaPlanView      from '../components/plan-trabajo/SemanaPlanView.vue'
 import MesPlanView         from '../components/plan-trabajo/MesPlanView.vue'
@@ -354,9 +355,8 @@ async function onPlanCreado(nuevoPlan) {
 <style scoped>
 .ptv { display: flex; flex-direction: column; gap: 1.25rem; padding: 1.5rem 2rem; min-height: 100vh; background: #f6faf6; max-width: 1400px; margin: 0 auto; }
 
-.ptv__loading { display: flex; justify-content: center; padding: 5rem; }
+.ptv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .ptv__plan-body { display: contents; }
-.ptv__spinner-lg { width: 36px; height: 36px; border: 3px solid #e8f0e9; border-top-color: #1b5e20; border-radius: 50%; animation: ptv-spin .7s linear infinite; }
 
 .ptv__plan-hdr { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; background: #fff; border: 1px solid #e8f0e9; border-radius: 12px; padding: 1.1rem 1.4rem; }
 .ptv__plan-info { display: flex; flex-direction: column; gap: .3rem; }
@@ -418,9 +418,6 @@ async function onPlanCreado(nuevoPlan) {
 .ptv__qp-cancel { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; padding: .55rem 1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; }
 .ptv__qp-save { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 700; cursor: pointer; }
 .ptv__qp-save:disabled { opacity: .55; cursor: not-allowed; }
-.ptv__qp-spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: ptv-spin .6s linear infinite; }
-
-@keyframes ptv-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 767px) {
   .ptv { padding: 1rem; }

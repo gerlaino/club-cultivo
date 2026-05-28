@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { listSuperAdminUsers, listSuperAdminClubs, createSuperAdminUser, deleteSuperAdminUser } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { ROLES as ALL_ROLES, roleMeta } from '../../constants/roles.js'
@@ -110,7 +111,7 @@ onMounted(cargar)
     </div>
 
     <div v-if="loading" class="sau__loading">
-      <div class="sau__ring"></div>
+      <DsSpinner />
     </div>
 
     <div v-else class="sau__list">
@@ -197,7 +198,7 @@ onMounted(cargar)
           <div class="sau__modal-footer">
             <button class="sau__btn-ghost" @click="showCreate = false">Cancelar</button>
             <button class="sau__btn-primary" :disabled="saving" @click="handleCreate">
-              <span v-if="saving" class="sau__spinner"></span>
+              <DsSpinner v-if="saving" :size="14" />
               <i v-else class="bi bi-person-plus"></i>
               Crear usuario
             </button>
@@ -222,9 +223,7 @@ onMounted(cargar)
 .sau__search:focus { outline: none; border-color: #1b5e20; }
 .sau__select { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: .65rem .875rem; font-size: .82rem; color: #0f172a; cursor: pointer; }
 
-.sau__loading { display: flex; justify-content: center; padding: 4rem; }
-.sau__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: sau-spin .7s linear infinite; }
-@keyframes sau-spin { to { transform: rotate(360deg); } }
+.sau__loading { display: flex; justify-content: center; align-items: center; padding: 4rem; }
 
 .sau__list { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
 .sau__list-header { display: grid; grid-template-columns: 2fr 1.5fr 1fr 100px 50px; padding: .65rem 1.1rem; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
@@ -270,5 +269,4 @@ onMounted(cargar)
 .sau__btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 .sau__btn-ghost { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; padding: .6rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; }
 .sau__btn-ghost:hover { background: #f8fafc; }
-.sau__spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: sau-spin .6s linear infinite; }
 </style>

@@ -23,7 +23,7 @@
             @blur="onBlur"
           />
           <button class="trz__search-btn" :disabled="!query.trim() || loading" @click="buscarDesdeInput">
-            <span v-if="loading" class="trz__spin"></span>
+            <DsSpinner v-if="loading" :size="14" />
             <i v-else class="bi bi-arrow-right"></i>
           </button>
 
@@ -60,14 +60,14 @@
 
     <!-- Loading cadena -->
     <div v-if="loading" class="trz__loader">
-      <div class="trz__ring"></div>
+      <DsSpinner />
       Cargando cadena de trazabilidad…
     </div>
 
     <!-- ESTADO: listado de stocks (default) -->
     <template v-else-if="!data">
       <div v-if="loadingList" class="trz__loader">
-        <div class="trz__ring"></div> Cargando stocks…
+        <DsSpinner /> Cargando stocks…
       </div>
       <div v-else-if="!stocksList.length" class="trz__empty-plain">
         <i class="bi bi-inbox"></i> Sin stocks registrados aún.
@@ -320,6 +320,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { getStockTrazabilidad, listStocks } from '../../lib/api.js'
 
 const FORMA_LABELS = {
@@ -497,11 +498,6 @@ const formatDate = d => d
 }
 .trz__search-btn:hover:not(:disabled) { background: #144a18; }
 .trz__search-btn:disabled { opacity: .4; cursor: not-allowed; }
-.trz__spin {
-  width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3);
-  border-top-color: #fff; border-radius: 50%; animation: trz-spin .6s linear infinite;
-}
-@keyframes trz-spin { to { transform: rotate(360deg); } }
 
 .trz__autocomplete {
   position: absolute; top: calc(100% + 2px); left: 0; right: 0;
@@ -539,12 +535,7 @@ const formatDate = d => d
 
 /* Loader */
 .trz__loader {
-  display: flex; align-items: center; gap: .6rem;
-  color: #64748b; font-size: .875rem; padding: 3rem 0;
-}
-.trz__ring {
-  width: 20px; height: 20px; border: 2.5px solid #e2e8f0;
-  border-top-color: #1b5e20; border-radius: 50%; animation: trz-spin .7s linear infinite; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; padding: 2rem;
 }
 
 /* Empty plain */

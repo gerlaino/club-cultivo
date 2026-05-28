@@ -24,8 +24,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="mnp__loading">
-      <div class="mnp__spinner"></div>
-      <span>Cargando cosechas…</span>
+      <DsSpinner />
     </div>
 
     <!-- Empty -->
@@ -73,6 +72,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Scissors, Wind, Package, ChevronRight } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
 
@@ -143,16 +143,8 @@ onMounted(cargar)
 
 /* Loading */
 .mnp__loading {
-  display: flex; align-items: center; gap: var(--sp-3);
-  padding: var(--sp-12) 0; justify-content: center; color: var(--c-ink-400);
-  font-size: var(--fs-14);
+  display: flex; align-items: center; justify-content: center; padding: 2rem;
 }
-.mnp__spinner {
-  width: 18px; height: 18px;
-  border: 2px solid var(--c-ink-200); border-top-color: #5C7A4A;
-  border-radius: 50%; animation: mnp-spin .7s linear infinite;
-}
-@keyframes mnp-spin { to { transform: rotate(360deg); } }
 
 /* Empty */
 .mnp__empty {

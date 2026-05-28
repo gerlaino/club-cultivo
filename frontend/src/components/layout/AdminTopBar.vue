@@ -25,72 +25,17 @@
           <span v-if="helpDot" class="atb__help-dot" />
         </button>
 
-        <!-- Notification bell -->
-        <DsDropdown v-model="bellOpen" align="right">
-          <template #anchor>
-            <button
-              class="atb__icon-btn"
-              :class="{ 'atb__icon-btn--alerta': notifCount > 0 }"
-              @click="bellOpen = !bellOpen"
-              aria-label="Notificaciones"
-            >
-              <Bell :size="20" :stroke-width="1.75" />
-              <span v-if="notifCount > 0" class="atb__badge">{{ notifCount > 9 ? '9+' : notifCount }}</span>
-            </button>
-          </template>
-          <template #panel>
-            <div class="atb__notif-panel">
-              <div class="atb__notif-header">
-                <span class="atb__notif-title">Notificaciones</span>
-                <div style="display:flex;align-items:center;gap:.5rem;">
-                  <span v-if="notifCount > 0" class="atb__notif-count">{{ notifCount }} activa{{ notifCount !== 1 ? 's' : '' }}</span>
-                  <button v-if="internasNoLeidas.length" class="atb__notif-clear" @click="marcarTodasInternas">Leer todas</button>
-                </div>
-              </div>
-              <DsEmpty
-                v-if="!notifCount"
-                title="Estás al día. Nada pendiente."
-                class="atb__notif-empty"
-              />
-              <template v-else>
-                <!-- Alertas ambientales -->
-                <div v-if="alertasSlice.length" class="atb__notif-section">Ambiente</div>
-                <div v-if="alertasSlice.length" class="atb__notif-list">
-                  <RouterLink
-                    v-for="a in alertasSlice"
-                    :key="a.id"
-                    :to="a.sala_id ? { name: 'sala-ambiente', params: { id: a.sala_id } } : '/'"
-                    class="atb__notif-item"
-                    @click="bellOpen = false"
-                  >
-                    <span class="atb__notif-ico">{{ TIPO_ICON[a.tipo] || '⚠️' }}</span>
-                    <div class="atb__notif-body">
-                      <div class="atb__notif-msg">{{ a.regla_nombre || a.tipo }}</div>
-                      <div class="atb__notif-time">{{ formatTime(a.generada_at) }}</div>
-                    </div>
-                  </RouterLink>
-                </div>
-                <!-- Alertas internas -->
-                <div v-if="internasSlice.length" class="atb__notif-section">Sistema</div>
-                <div v-if="internasSlice.length" class="atb__notif-list">
-                  <div
-                    v-for="a in internasSlice"
-                    :key="a.id"
-                    class="atb__notif-item"
-                    :class="`atb__notif-item--${a.severidad}`"
-                    @click="marcarInternaLeida(a.id); bellOpen = false"
-                  >
-                    <span class="atb__notif-ico">{{ SEV_ICON[a.severidad] || 'ℹ️' }}</span>
-                    <div class="atb__notif-body">
-                      <div class="atb__notif-msg">{{ a.mensaje }}</div>
-                      <div class="atb__notif-time">{{ formatTime(a.created_at) }}</div>
-                    </div>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </template>
-        </DsDropdown>
+        <!-- Notification bell → opens drawer -->
+        <button
+          class="atb__icon-btn"
+          :class="{ 'atb__icon-btn--alerta': notifCount > 0 }"
+          @click="notifOpen = true"
+          aria-label="Notificaciones"
+        >
+          <Bell :size="20" :stroke-width="1.75" />
+          <span v-if="notifCount > 0" class="atb__badge">{{ notifCount > 9 ? '9+' : notifCount }}</span>
+        </button>
+        <NotificationDrawer v-model="notifOpen" />
 
         <!-- Avatar dropdown -->
         <DsDropdown v-model="avatarOpen" align="right">
@@ -139,30 +84,32 @@ import { useClubStore } from '../../stores/club.js'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
-import DsDropdown from '../../design-system/components/Dropdown.vue'
-import DsAvatar   from '../../design-system/components/Avatar.vue'
-import DsEmpty    from '../../design-system/components/EmptyState.vue'
+import DsDropdown         from '../../design-system/components/Dropdown.vue'
+import DsAvatar           from '../../design-system/components/Avatar.vue'
 import { Bell, Menu, HelpCircle } from 'lucide-vue-next'
-import HelpDrawer from '../HelpDrawer.vue'
+import HelpDrawer         from '../HelpDrawer.vue'
+import NotificationDrawer from '../ui/NotificationDrawer.vue'
 
 const emit = defineEmits(['toggle-drawer'])
 
-const route  = useRoute()
-const router = useRouter()
-const auth   = useAuthStore()
-const club   = useClubStore()
+const route    = useRoute()
+const router   = useRouter()
+const auth     = useAuthStore()
+const club     = useClubStore()
 const ambStore = useAmbienteStore()
 
 useAlertasBell()
-const { noLeidas: internasNoLeidas, marcarLeida: marcarInternaLeida, marcarTodas: marcarTodasInternas } = useAlertasInternas()
+const { noLeidas: internasNoLeidas } = useAlertasInternas()
 
-const bellOpen   = ref(false)
 const avatarOpen = ref(false)
 const helpOpen   = ref(false)
+const notifOpen  = ref(false)
 const helpDot    = ref(false)
+
 onMounted(() => {
   helpDot.value = !localStorage.getItem(`help_seen_${auth.user?.id || 'u'}`)
 })
+
 function openHelp() {
   helpOpen.value = true
   if (helpDot.value) {
@@ -171,22 +118,7 @@ function openHelp() {
   }
 }
 
-const notifCount   = computed(() => ambStore.alertasCount + internasNoLeidas.value.length)
-const alertasSlice = computed(() => ambStore.alertasActivas.slice(0, 3))
-const internasSlice = computed(() => internasNoLeidas.value.slice(0, 5))
-
-const TIPO_ICON = { temperatura: '🌡️', humedad: '💧', vpd: '🌫️', co2: '🌬️', ec: '⚡', ph: '🧪' }
-const SEV_ICON  = { info: 'ℹ️', warning: '⚠️', error: '🚨' }
-
-function formatTime(ts) {
-  if (!ts) return ''
-  const diff = Date.now() - new Date(ts).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60)  return `hace ${mins}m`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24)   return `hace ${hrs}h`
-  return `hace ${Math.floor(hrs / 24)}d`
-}
+const notifCount = computed(() => ambStore.alertasCount + internasNoLeidas.value.length)
 
 const SEGMENT_LABELS = {
   pacientes: 'Pacientes', sedes: 'Sedes', contabilidad: 'Contabilidad',
@@ -336,45 +268,6 @@ async function handleLogout() {
   display: flex;
 }
 .atb__avatar-btn:hover { opacity: .85; }
-
-/* Notification panel */
-.atb__notif-panel { width: 360px; max-height: 480px; overflow-y: auto; }
-.atb__notif-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--c-ink-100);
-  background: var(--c-ink-100);
-  position: sticky;
-  top: 0;
-}
-.atb__notif-title { font-size: var(--fs-13); font-weight: 700; color: var(--c-ink-900); }
-.atb__notif-count { font-size: var(--fs-12); font-weight: 700; color: var(--c-rust-600); }
-.atb__notif-empty { padding: var(--sp-4); }
-.atb__notif-list  { display: flex; flex-direction: column; }
-
-.atb__notif-item {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--c-ink-100);
-  text-decoration: none;
-  color: inherit;
-  transition: background var(--t-fast);
-}
-.atb__notif-item:last-child { border-bottom: none; }
-.atb__notif-item:hover { background: var(--c-leaf-50); cursor: pointer; }
-.atb__notif-item--error { background: #fff5f5; }
-.atb__notif-item--warning { background: #fffbeb; }
-.atb__notif-section { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--c-ink-400); padding: var(--sp-2) var(--sp-4) var(--sp-1); background: var(--c-ink-50); }
-.atb__notif-clear { font-size: var(--fs-11); color: var(--c-ink-500); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
-.atb__notif-clear:hover { color: var(--c-ink-900); }
-.atb__notif-ico { font-size: 20px; flex-shrink: 0; }
-.atb__notif-body { flex: 1; min-width: 0; }
-.atb__notif-msg  { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
-.atb__notif-time { font-family: var(--font-mono); font-size: var(--fs-12); color: var(--c-ink-500); margin-top: 2px; }
 
 /* User panel */
 .atb__user-panel { width: 220px; }

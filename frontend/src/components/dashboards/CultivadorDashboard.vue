@@ -83,7 +83,7 @@
       </button>
       <div v-show="tareasExpanded">
         <div v-if="loadingSem" class="cvd__sem-loading">
-          <div class="cvd__sem-ring"></div>
+          <DsSpinner />
         </div>
         <div v-else-if="!semanaProcessed.dias?.length" class="cvd__tareas-empty">
           Sin datos de semana disponibles.
@@ -244,6 +244,7 @@ import { useToast }         from '../../composables/useToast.js'
 import { formatFechaLarga } from '../../utils/fecha.js'
 import { getTareasSemana }  from '../../lib/api'
 
+import DsSpinner  from '../../design-system/components/Spinner.vue'
 import DsCard     from '../../design-system/components/Card.vue'
 import DsStat     from '../../design-system/components/Stat.vue'
 import DsBadge    from '../../design-system/components/Badge.vue'
@@ -504,9 +505,7 @@ onMounted(async () => {
 
 .cvd__tareas-empty { font-size: .85rem; color: #60725d; padding: 1rem 0; }
 
-.cvd__sem-loading { display: flex; justify-content: center; padding: 2.5rem; }
-.cvd__sem-ring { width: 20px; height: 20px; border: 2px solid #e8f0e9; border-top-color: #1b5e20; border-radius: 50%; animation: cvd-spin .7s linear infinite; }
-@keyframes cvd-spin { to { transform: rotate(360deg); } }
+.cvd__sem-loading { display: flex; justify-content: center; align-items: center; padding: 2rem; }
 
 .cvd__sem-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .4rem; padding-bottom: .25rem; overflow-x: auto; }
 @media (max-width: 900px) { .cvd__sem-grid { grid-template-columns: repeat(7, minmax(105px, 1fr)); } }

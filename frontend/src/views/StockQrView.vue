@@ -2,8 +2,7 @@
   <div class="sqr">
 
     <div v-if="estado === 'cargando'" class="sqr__loading">
-      <div class="sqr__spinner"></div>
-      <div class="sqr__loading-text">Verificando producto…</div>
+      <DsSpinner :size="60" />
     </div>
 
     <div v-else-if="estado === 'no_encontrado'" class="sqr__screen">
@@ -72,6 +71,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route    = useRoute()
 const codigoQr = route.params.codigo_qr
@@ -115,10 +115,7 @@ onMounted(async () => {
   padding: 1.5rem;
   font-family: system-ui, -apple-system, sans-serif;
 }
-.sqr__loading { display: flex; flex-direction: column; align-items: center; gap: 1.2rem; }
-.sqr__spinner { width: 36px; height: 36px; border: 3px solid rgba(27,94,32,.15); border-top-color: #1b5e20; border-radius: 50%; animation: sqr-spin .7s linear infinite; }
-@keyframes sqr-spin { to { transform: rotate(360deg); } }
-.sqr__loading-text { font-size: .9rem; color: #4a7c59; font-weight: 500; }
+.sqr__loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
 
 .sqr__screen {
   background: white; border-radius: 20px; padding: 2rem 1.75rem;

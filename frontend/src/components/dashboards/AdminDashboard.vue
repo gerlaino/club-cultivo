@@ -444,7 +444,7 @@ async function onOnboardingCompletado() {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 200px;
+  min-height: calc(100vh - 56px);
 }
 
 /* ── ZONA 1: Header ─────────────────────────────────────────────────────── */

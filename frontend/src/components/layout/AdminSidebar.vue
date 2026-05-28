@@ -50,27 +50,12 @@
       </div>
     </nav>
 
-    <!-- User card -->
-    <div class="asb__user">
-      <DsAvatar :name="auth.displayName" tone="role-admin" size="sm" />
-      <div class="asb__user-info">
-        <div class="asb__user-name">{{ auth.displayName }}</div>
-        <div class="asb__user-role">Admin · {{ club.name }}</div>
-      </div>
-      <button class="asb__logout" @click="handleLogout" title="Cerrar sesión">
-        <i class="bi bi-box-arrow-right"></i>
-      </button>
-    </div>
-
   </aside>
 </template>
 
 <script setup>
 import { reactive, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../../stores/auth.js'
-import { useClubStore } from '../../stores/club.js'
-import DsAvatar from '../../design-system/components/Avatar.vue'
+import { useRoute } from 'vue-router'
 import {
   LayoutDashboard, Users, Building2, Wallet, CheckSquare,
   Sprout, FileCheck, FileText, UserCog, Globe,
@@ -79,10 +64,7 @@ import {
   ClipboardList, Package, Settings,
 } from 'lucide-vue-next'
 
-const route  = useRoute()
-const router = useRouter()
-const auth   = useAuthStore()
-const club   = useClubStore()
+const route = useRoute()
 
 const GRUPOS = [
   {
@@ -191,12 +173,6 @@ onMounted(() => {
 })
 
 watch(() => route.path, sincronizarGrupos)
-
-async function handleLogout() {
-  await auth.logOut()
-  club.$reset()
-  router.replace('/login')
-}
 </script>
 
 <style scoped>
@@ -335,45 +311,6 @@ async function handleLogout() {
 .asb__sub-ico { flex-shrink: 0; opacity: .8; }
 .asb__sub--active .asb__sub-ico { opacity: 1; }
 
-/* User card */
-.asb__user {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-5);
-  border-top: 1px solid rgba(168,201,181,0.15);
-  flex-shrink: 0;
-}
-.asb__user-info { flex: 1; min-width: 0; }
-.asb__user-name {
-  font-size: var(--fs-13);
-  font-weight: 600;
-  color: var(--c-paper);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.asb__user-role {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--c-leaf-300);
-  margin-top: 1px;
-}
-.asb__logout {
-  background: none;
-  border: none;
-  color: var(--c-leaf-300);
-  font-size: var(--fs-16);
-  cursor: pointer;
-  padding: var(--sp-1);
-  border-radius: var(--r-sm);
-  transition: color var(--t-fast), background var(--t-fast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.asb__logout:hover { color: var(--c-paper); background: rgba(255,255,255,0.08); }
 
 @media (max-width: 1023px) { .asb { display: none; } }
 </style>

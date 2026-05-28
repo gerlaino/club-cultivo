@@ -52,7 +52,7 @@
 
     <!-- Loading -->
     <div v-if="store.loading" class="mpv__loading">
-      <div class="mpv__ring"></div> Cargando pacientes…
+      <DsSpinner :size="20" /> Cargando pacientes…
     </div>
 
     <!-- Empty -->
@@ -202,6 +202,7 @@ import { Search, UserPlus, Users, Trash2, X } from 'lucide-vue-next'
 import { usePacientesStore } from '../../stores/pacientes.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const store = usePacientesStore()
 const { confirm } = useConfirm()
@@ -408,12 +409,6 @@ onMounted(() => store.fetch())
   display: flex; align-items: center; gap: var(--sp-3);
   color: var(--c-ink-500); padding: var(--sp-8); font-size: var(--fs-14);
 }
-.mpv__ring {
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 2px solid var(--c-ink-200); border-top-color: #2D8A6B;
-  animation: spin .7s linear infinite; flex-shrink: 0;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Empty */
 .mpv__empty {

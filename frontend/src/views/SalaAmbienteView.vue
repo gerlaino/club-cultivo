@@ -12,6 +12,7 @@ import LecturaManualForm from '../components/ambiente/LecturaManualForm.vue'
 import AlertaBadge from '../components/ambiente/AlertaBadge.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import { getSala, listLotes } from '../lib/api.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
 const auth   = useAuthStore()
@@ -135,7 +136,7 @@ watch([desde, hasta, bucket], async () => {
     />
 
     <div v-if="loading" class="sav__loading">
-      <div class="sav__spinner"></div> Cargando…
+      <DsSpinner />
     </div>
 
     <template v-else>
@@ -280,9 +281,7 @@ watch([desde, hasta, bucket], async () => {
 .sav { padding: 1.75rem 1.5rem; max-width: 1100px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; }
 @media (max-width: 640px) { .sav { padding: 1rem; } }
 
-.sav__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; color: #94a3b8; justify-content: center; }
-.sav__spinner { width: 20px; height: 20px; border: 2.5px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: sav-spin .6s linear infinite; }
-@keyframes sav-spin { to { transform: rotate(360deg); } }
+.sav__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .sav__spin { animation: sav-spin .6s linear infinite; }
 
 .sav__hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }

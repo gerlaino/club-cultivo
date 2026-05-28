@@ -20,6 +20,7 @@ import { useSocioEditar, REPROCANN_ESTADOS } from '../composables/useSocioEditar
 import { useSocioHistoriaClinica }           from '../composables/useSocioHistoriaClinica.js'
 import { useSocioCorreo, MAIL_TEMPLATES }    from '../composables/useSocioCorreo.js'
 import { useSocioCuentaCorriente }           from '../composables/useSocioCuentaCorriente.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
 const store  = usePacientesStore()
@@ -188,7 +189,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
     <!-- Loading -->
     <div v-if="loading" class="sd__loading">
-      <div class="sd__ring"></div><span>Cargando paciente…</span>
+      <DsSpinner />
     </div>
     <div v-else-if="error" class="sd__error">{{ error }}</div>
     <div v-else-if="!s" class="sd__error">Paciente no encontrado.</div>
@@ -376,7 +377,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
       <!-- ── Tab: Cuenta corriente ── -->
       <div v-show="activeTab === 'cuenta_corriente'" class="sd__tab-content">
-        <div v-if="loadingCC" class="sd__cc-loading"><div class="sd__cc-spinner"></div> Cargando…</div>
+        <div v-if="loadingCC" class="sd__cc-loading"><DsSpinner :size="40" /></div>
         <template v-else-if="cc">
 
           <!-- Saldo, margen y límite -->
@@ -673,7 +674,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               </button>
             </div>
           </div>
-          <div v-if="store.notasLoading" class="sd__loading-sm"><div class="sd__ring sd__ring--sm"></div></div>
+          <div v-if="store.notasLoading" class="sd__loading-sm"><DsSpinner :size="40" /></div>
           <div v-else-if="!store.notas.length" class="sd__empty">
             <div class="sd__empty-icon"><BookOpen :size="28" /></div>
             <div class="sd__empty-title">Sin notas registradas</div>
@@ -706,7 +707,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             <div class="sd__card-icon sd__card-icon--blue"><Clock :size="15" /></div>
             <span class="sd__card-title">Timeline del paciente</span>
           </div>
-          <div v-if="timelineLoading" class="sd__loading-sm"><div class="sd__ring sd__ring--sm"></div></div>
+          <div v-if="timelineLoading" class="sd__loading-sm"><DsSpinner :size="40" /></div>
           <div v-else-if="!timeline.length" class="sd__empty">
             <div class="sd__empty-icon"><Clock :size="28" /></div>
             <div class="sd__empty-title">Sin eventos registrados</div>
@@ -807,7 +808,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               :disabled="!s?.email || mailSending || !mailForm.asunto.trim() || !mailForm.cuerpo.trim()"
               @click="submitMail"
             >
-              <span v-if="mailSending" class="sd__ring sd__ring--sm sd__ring--white"></span>
+              <DsSpinner v-if="mailSending" :size="16" />
               <Mail v-else :size="15" />
               {{ mailSending ? 'Enviando…' : 'Enviar mail' }}
             </button>
@@ -818,7 +819,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         <div class="sd__mail-history-wrap">
           <div class="sd__mail-history-title">Historial de mails enviados</div>
 
-          <div v-if="mailLoading" class="sd__loading-sm"><div class="sd__ring sd__ring--sm"></div></div>
+          <div v-if="mailLoading" class="sd__loading-sm"><DsSpinner :size="40" /></div>
 
           <div v-else-if="!mailHistory.length" class="sd__empty sd__empty--sm">
             <div class="sd__empty-icon"><Mail :size="24" /></div>
@@ -953,10 +954,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 @media (max-width: 768px) { .sd { padding: 1.25rem 1rem 2rem; } }
 
 /* Loading / Error */
-.sd__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
-.sd__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: spin .7s linear infinite; }
-.sd__ring--sm { width: 16px; height: 16px; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.sd__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .sd__error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 10px; }
 
 /* Hero */
@@ -1088,9 +1086,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd-modal-enter-from .sd-modal, .sd-modal-leave-to .sd-modal { transform: translateY(-12px); }
 
 /* ── Cuenta Corriente ── */
-.sd__cc-loading { display: flex; align-items: center; gap: .6rem; padding: 2rem; color: #64748b; font-size: .875rem; }
-.sd__cc-spinner { width: 18px; height: 18px; border: 2px solid #e2e8f0; border-top-color: #15803d; border-radius: 50%; animation: spin .7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.sd__cc-loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
 
 .sd__cc-header { display: flex; align-items: stretch; gap: 1rem; margin-bottom: 1rem; }
 .sd__cc-saldo-block, .sd__cc-margen-block, .sd__cc-limite-block { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: .2rem; }
@@ -1333,7 +1329,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 }
 .sd__mail-send-btn:hover:not(:disabled) { background: #144a18; }
 .sd__mail-send-btn:disabled { opacity: .55; cursor: not-allowed; }
-.sd__ring--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
 
 /* Historial */
 .sd__mail-history-wrap { margin-top: 1.5rem; }

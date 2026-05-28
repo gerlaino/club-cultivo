@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { listLotes } from '../lib/api.js'
 import api from '../lib/api.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const router = useRouter()
 const route  = useRoute()
@@ -290,7 +291,7 @@ onMounted(async () => {
         <!-- Botones -->
         <div class="pnv__footer">
           <button class="pnv__btn-primary" :disabled="saving" @click="handleSubmit">
-            <span v-if="saving" class="pnv__spinner"></span>
+            <DsSpinner v-if="saving" :size="16" />
             <i v-else class="bi bi-check-circle"></i>
             {{ saving ? 'Creando...' : 'Crear planta' }}
           </button>
@@ -406,8 +407,6 @@ onMounted(async () => {
 .pnv__btn-ghost { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .75rem 1.25rem; border-radius: 10px; font-size: .875rem; font-weight: 500; cursor: pointer; }
 .pnv__btn-ghost:hover { background: #f8fafc; }
 
-.pnv__spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: pnv-spin .6s linear infinite; }
-@keyframes pnv-spin { to { transform: rotate(360deg); } }
 
 .pnv__preview { padding: 1rem 0; }
 .pnv__preview-icon { font-size: 2.5rem; margin-bottom: .5rem; }

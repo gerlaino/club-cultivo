@@ -12,6 +12,7 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import Paginator  from '../components/ui/Paginator.vue'
 import Lightbox   from '../components/ui/Lightbox.vue'
 import api from '../lib/api.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const props = defineProps({ id: { type: Number, required: true } })
 
@@ -144,7 +145,7 @@ onMounted(async () => {
 
     <!-- Loading -->
     <div v-if="loading" class="gdv__loading">
-      <div class="gdv__spinner"></div>
+      <DsSpinner />
     </div>
 
     <!-- Error -->
@@ -487,9 +488,7 @@ onMounted(async () => {
 @media (max-width: 768px) { .gdv { padding: 1.25rem 1rem 2rem; } }
 
 /* Loading / Error */
-.gdv__loading { display: flex; justify-content: center; padding: 3rem; }
-.gdv__spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #1a3d2e; border-radius: 50%; animation: gdv-spin .8s linear infinite; }
-@keyframes gdv-spin { to { transform: rotate(360deg); } }
+.gdv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .gdv__error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: .875rem 1rem; border-radius: 10px; margin-bottom: 1rem; }
 
 /* Hero */

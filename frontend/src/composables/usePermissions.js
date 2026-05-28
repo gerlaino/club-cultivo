@@ -121,7 +121,8 @@ export function usePermissions() {
     return resourcePermissions.includes(action)
   }
 
-  const isAdmin       = computed(() => userRole.value === 'admin' || userRole.value === 'super_admin')
+  const isAdmin       = computed(() => userRole.value === 'admin')
+  const isSuperAdmin  = computed(() => userRole.value === 'super_admin')
   const isMedico      = computed(() => userRole.value === 'medico')
   const isCultivador  = computed(() => userRole.value === 'cultivador')
   const isSupervisor  = computed(() => userRole.value === 'supervisor')
@@ -136,6 +137,7 @@ export function usePermissions() {
   return {
     can,
     isAdmin,
+    isSuperAdmin,
     isMedico,
     isCultivador,
     isSupervisor,

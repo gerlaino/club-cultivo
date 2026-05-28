@@ -6,7 +6,7 @@
 
 <script setup>
 defineProps({
-  size: { type: [Number, String], default: 48 },
+  size: { type: [Number, String], default: 144 },
 })
 </script>
 
