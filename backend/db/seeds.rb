@@ -423,7 +423,7 @@ if lote_ciclo_flor.new_record?
   puts "    ✅ #{lote_ciclo_flor.codigo}: floracion (#{lote_ciclo_flor.pesadas.count} pesadas)"
 end
 
-# 3 — secado (2 pesadas: veg→flor, flor→secado)
+# 3 — secado (3 pesadas: veg→flor, flor→cosecha, cosecha→secado)
 lote_ciclo_sec = club.lotes.find_or_initialize_by(codigo: 'CIC-SEC-001')
 if lote_ciclo_sec.new_record?
   lote_ciclo_sec.assign_attributes(
@@ -437,14 +437,18 @@ if lote_ciclo_sec.new_record?
   lote_ciclo_sec.transicionar!('floracion', pesada_attrs: {
     registrado_por: cultivador, peso_humedo_g: 4100.0,
   })
-  lote_ciclo_sec.transicionar!('secado', pesada_attrs: {
+  lote_ciclo_sec.transicionar!('cosecha', pesada_attrs: {
     registrado_por: cultivador, peso_humedo_g: 5800.0,
     notas: 'Cosecha. 5.8kg húmedo. Manicura completada.',
   }, manicurado: true)
+  lote_ciclo_sec.transicionar!('secado', pesada_attrs: {
+    registrado_por: manicurador, peso_seco_g: 1100.0,
+    notas: 'Iniciando secado.',
+  })
   puts "    ✅ #{lote_ciclo_sec.codigo}: secado (#{lote_ciclo_sec.pesadas.count} pesadas)"
 end
 
-# 4 — curado (3 pesadas: veg→flor, flor→secado, secado→curado)
+# 4 — curado (4 pesadas: veg→flor, flor→cosecha, cosecha→secado, secado→curado)
 lote_ciclo_cur = club.lotes.find_or_initialize_by(codigo: 'CIC-CUR-001')
 if lote_ciclo_cur.new_record?
   lote_ciclo_cur.assign_attributes(
@@ -458,13 +462,17 @@ if lote_ciclo_cur.new_record?
   lote_ciclo_cur.transicionar!('floracion', pesada_attrs: {
     registrado_por: cultivador, peso_humedo_g: 6200.0,
   })
-  lote_ciclo_cur.transicionar!('secado', pesada_attrs: {
+  lote_ciclo_cur.transicionar!('cosecha', pesada_attrs: {
     registrado_por: cultivador, peso_humedo_g: 8400.0,
     notas: 'Cosecha óptima. 8.4kg húmedo.',
   }, manicurado: true)
+  lote_ciclo_cur.transicionar!('secado', pesada_attrs: {
+    registrado_por: manicurador, peso_seco_g: 1850.0,
+    notas: 'Secado 10 días. 1.85kg seco.',
+  })
   lote_ciclo_cur.transicionar!('curado', pesada_attrs: {
     registrado_por: manicurador, peso_seco_g: 1850.0, peso_curado_g: 1680.0,
-    notas: 'Secado 10 días. 1.85kg seco. Iniciando curado.',
+    notas: 'Iniciando curado.',
   }, manicurado: true)
   puts "    ✅ #{lote_ciclo_cur.codigo}: curado (#{lote_ciclo_cur.pesadas.count} pesadas)"
 end
@@ -489,7 +497,7 @@ if lote_ciclo_fin.new_record?
   lote_ciclo_fin.transicionar!('floracion', pesada_attrs: {
     registrado_por: cultivador, peso_humedo_g: 2600.0,
   })
-  lote_ciclo_fin.transicionar!('secado', pesada_attrs: {
+  lote_ciclo_fin.transicionar!('cosecha', pesada_attrs: {
     registrado_por: cultivador, peso_humedo_g: 4200.0,
     notas: 'Fenotipos A/B/C seleccionados con pesos destacados.',
   }, manicurado: true, pesadas_plantas_attrs: [
@@ -497,9 +505,13 @@ if lote_ciclo_fin.new_record?
     { plant_id: plantas_fin[1].id, peso_humedo_g: 590.0 },
     { plant_id: plantas_fin[2].id, peso_humedo_g: 520.0 },
   ])
+  lote_ciclo_fin.transicionar!('secado', pesada_attrs: {
+    registrado_por: manicurador, peso_seco_g: 920.0,
+    notas: '10 días secado. 920g seco.',
+  })
   lote_ciclo_fin.transicionar!('curado', pesada_attrs: {
     registrado_por: manicurador, peso_seco_g: 920.0, peso_curado_g: 800.0,
-    notas: '10 días secado. 920g seco. Iniciando curado en frascos.',
+    notas: 'Iniciando curado en frascos.',
   }, manicurado: true)
 
   stock_ciclo_gen = lote_ciclo_fin.cerrar_curado!(

@@ -114,7 +114,7 @@ function formaLabel(f) {
   return L[f] || f || '—'
 }
 function medioPagoLabel(m) {
-  const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', credito_gramos: 'Cred. g' }
+  const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', credito_gramos: 'Cred. g', no_abona: 'No abona' }
   return L[m] || m || '—'
 }
 </script>

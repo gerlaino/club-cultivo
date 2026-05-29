@@ -68,7 +68,7 @@ const stocks      = ref([])
 const filtroForma = ref('')
 
 const stocksFiltrados = computed(() => {
-  let s = stocks.value.filter(x => x.cantidad > 0)
+  let s = stocks.value.filter(x => x.cantidad > 0 && x.estado !== 'pendiente_asignacion')
   if (filtroForma.value) s = s.filter(x => x.forma_producto === filtroForma.value)
   return s
 })

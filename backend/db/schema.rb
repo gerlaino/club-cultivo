@@ -232,13 +232,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_29_190727) do
   end
 
   create_table "dispensaciones", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
     t.bigint "paciente_id", null: false
     t.bigint "user_id", null: false
     t.bigint "indicacion_medica_id"
     t.text "observaciones"
     t.date "fecha_dispensacion", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
     t.bigint "sede_id"
     t.decimal "aporte_socio_ars", precision: 10, scale: 2
     t.string "medio_pago", default: "efectivo", null: false
@@ -478,7 +478,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_29_190727) do
     t.bigint "club_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "grow_type"
+    t.string "grow_type", default: "sustrato", null: false
     t.string "light_type"
     t.string "estado"
     t.integer "tamanio_maceta"
@@ -901,8 +901,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_29_190727) do
     t.bigint "club_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "kind"
-    t.bigint "created_by_id", null: false
+    t.string "kind", default: "indoor", null: false
+    t.bigint "created_by_id"
     t.string "camera_stream_url"
     t.string "camera_snapshot_url"
     t.bigint "sede_id"
@@ -1219,7 +1219,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_29_190727) do
   add_foreign_key "tareas", "lotes"
   add_foreign_key "tareas", "plan_tareas"
   add_foreign_key "tareas", "plan_trabajos", column: "origen_plan_id"
-  add_foreign_key "tareas", "plants"
   add_foreign_key "tareas", "salas"
   add_foreign_key "tareas", "users", column: "asignada_a_id"
   add_foreign_key "tareas", "users", column: "creada_por_id"

@@ -26,7 +26,7 @@ class Stock < ApplicationRecord
 
   validate :validar_segun_origen
 
-  before_create :set_club_id
+  before_validation :set_club_id, on: :create
   before_create :generar_numero_lote_producto
   before_create :generar_codigo_qr
   before_create :descontar_lote_origen_si_corresponde, unless: -> { es_split }

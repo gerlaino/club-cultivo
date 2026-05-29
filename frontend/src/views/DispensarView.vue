@@ -184,6 +184,12 @@
                   <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'transferencia' }" @click="medioPago = 'transferencia'">
                     Transferencia
                   </button>
+                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'cuenta_corriente' }" :disabled="!tieneCc" :title="!tieneCc ? 'El paciente no tiene cuenta corriente configurada' : ''" @click="medioPago = 'cuenta_corriente'">
+                    Cta. corriente
+                  </button>
+                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'credito_gramos' }" :disabled="!tieneCcG" :title="!tieneCcG ? 'El paciente no tiene crédito en gramos' : ''" @click="medioPago = 'credito_gramos'">
+                    Crédito g
+                  </button>
                   <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'no_abona' }" :disabled="!puedeNoAbonar" :title="!puedeNoAbonar ? 'El paciente no tiene crédito configurado' : ''" @click="medioPago = 'no_abona'">
                     No abona
                   </button>
@@ -316,7 +322,9 @@ async function selectPaciente(p) {
   }
 }
 
-const stocksDisponibles = computed(() => stocks.value.filter(s => s.cantidad > 0))
+const stocksDisponibles = computed(() =>
+  stocks.value.filter(s => s.cantidad > 0 && s.estado !== 'pendiente_asignacion')
+)
 
 const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.total, 0))
 
@@ -343,9 +351,23 @@ const reprocannVigente = computed(() => reprocannStatus(selectedPaciente.value) 
 function addToCart(s) {
   const qty = cantidades.value[s.id]
   if (!qty || qty <= 0) { toast.warning('Ingresá una cantidad'); return }
-  if (qty > s.cantidad) { toast.warning(`Máximo disponible: ${s.cantidad}${s.unidad}`); return }
+
+  const existente   = cart.value.find(i => i.stock.id === s.id)
+  const yaEnCarrito = existente?.cantidad ?? 0
+
+  if (qty + yaEnCarrito > s.cantidad) {
+    const disponible = s.cantidad - yaEnCarrito
+    toast.warning(`Stock insuficiente: ${disponible}${s.unidad} disponibles`)
+    return
+  }
+
   const precio = s.precio_sugerido_ars ?? 0
-  cart.value.push({ stock: s, cantidad: qty, total: qty * precio })
+  if (existente) {
+    existente.cantidad += qty
+    existente.total = existente.cantidad * precio
+  } else {
+    cart.value.push({ stock: s, cantidad: qty, total: qty * precio })
+  }
   cantidades.value[s.id] = null
 }
 
@@ -355,6 +377,10 @@ function removeFromCart(i) {
 
 async function submitDispensacion() {
   if (!selectedPaciente.value || !cart.value.length) return
+  if (conEnvio.value) {
+    if (!direccionEnvio.value.trim()) { toast.warning('Ingresá la dirección de entrega'); return }
+    if (!contactoNombre.value.trim()) { toast.warning('Ingresá el nombre de contacto'); return }
+  }
   submitting.value = true
   try {
     const today = new Date().toISOString().slice(0, 10)
@@ -419,7 +445,11 @@ function reprocannLabel(p) {
 }
 
 function formaLabel(f) {
-  const LABELS = { flor_seca: 'Flor seca', aceite: 'Aceite', tintura: 'Tintura', crema: 'Crema', capsulas: 'Cápsulas', otro: 'Otro' }
+  const LABELS = {
+    flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
+    crema: 'Crema', capsula: 'Cápsulas', capsulas: 'Cápsulas',
+    comestible: 'Comestible', prensado: 'Prensado', externo: 'Externo', otro: 'Otro',
+  }
   return LABELS[f] || f || '—'
 }
 function formatARS(n) {
