@@ -97,6 +97,7 @@ class Dispensacion < ApplicationRecord
   end
 
   def encolar_reporte_ariccame
+    return unless paciente&.club&.feature?(:ariccame)
     ReportarAriccameJob.perform_later(id)
   end
 

@@ -2,7 +2,7 @@ class Stock < ApplicationRecord
   belongs_to :sede,     optional: true
   belongs_to :lote,     optional: true
   belongs_to :pesada,   optional: true
-  belongs_to :club,     optional: true
+  belongs_to :club
   belongs_to :genetica, optional: true
 
   has_many :stock_movimientos, dependent: :destroy

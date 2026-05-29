@@ -19,7 +19,10 @@ class Paciente < ApplicationRecord
   before_create     :assign_carnet_token
 
   validates :nombre, :apellido, :dni, :dni_normalizado, :fecha_nacimiento, presence: true
-  validates :dni_normalizado, uniqueness: true, format: { with: /\A\d{7,9}\z/, message: "debe tener 7 a 9 dígitos" }
+  # Unicidad global (no por club) — requisito REPROCANN: un DNI no puede estar en dos clubes a la vez.
+  validates :dni_normalizado,
+    uniqueness: { message: "ya está registrado en el sistema. Bajo REPROCANN, un DNI no puede pertenecer a dos clubes simultáneamente." },
+    format:     { with: /\A\d{7,9}\z/, message: "debe tener 7 a 9 dígitos" }
   validate :fecha_nacimiento_pasada
 
   scope :for_club,          ->(club_id) { where(club_id: club_id) }

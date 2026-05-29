@@ -36,7 +36,7 @@ class Club < ApplicationRecord
   after_create :crear_geneticas_default!
 
   ROLES_DEFAULT    = %w[admin].freeze
-  PASSWORD_DEFAULT = '123456Aa'.freeze
+  PASSWORD_DEFAULT = ENV.fetch('CLUB_DEFAULT_PASSWORD', '123456Aa').freeze
 
   GENETICAS_INASE = [
     {

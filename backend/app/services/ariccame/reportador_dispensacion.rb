@@ -7,7 +7,11 @@ module Ariccame
 
     def call
       return if @dispensacion.ariccame_reportada?
+      # Guard contra double-create si update_column falla entre reintentos del job.
+      return if AriccameRegistro.exists?(dispensacion: @dispensacion)
 
+      # TODO: ariccame_reportada se setea al crear el registro local (estado: 'pendiente').
+      # La transmisión real a ARICCAME/ANMAT aún no está implementada — ver AriccameRegistro.estado.
       AriccameRegistro.create!(
         club:         @dispensacion.paciente.club,
         dispensacion: @dispensacion,

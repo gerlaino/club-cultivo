@@ -130,6 +130,8 @@ class DispensacionesController < ApplicationController
   def mis_paquetes
     @dispensaciones = Dispensacion
       .del_delivery(current_user.id)
+      .joins(stock: :sede)
+      .where(sedes: { club_id: current_user.club_id })
       .includes(:paciente, :sede, stock: :lote)
       .order(created_at: :asc)
     render json: { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion_delivery(d) } }
@@ -138,8 +140,11 @@ class DispensacionesController < ApplicationController
   # PATCH /dispensaciones/iniciar_viaje  { ids: [1,2,3] }
   def iniciar_viaje
     ids = params[:ids].to_a.map(&:to_i)
-    dispensaciones = Dispensacion.del_delivery(current_user.id)
-                                 .where(id: ids, estado_envio: 'pendiente')
+    dispensaciones = Dispensacion
+      .del_delivery(current_user.id)
+      .joins(stock: :sede)
+      .where(sedes: { club_id: current_user.club_id })
+      .where(id: ids, estado_envio: 'pendiente')
     updated = dispensaciones.update_all(estado_envio: 'en_viaje')
     render json: { updated: updated }
   end
@@ -285,8 +290,11 @@ class DispensacionesController < ApplicationController
   end
 
   def set_dispensacion
-    @dispensacion = Dispensacion.joins(:stock).where(stocks: { sede_id: current_user.club.sede_ids })
-                                .find(params[:id])
+    club_sede_ids = current_user.club.sede_ids
+    @dispensacion = Dispensacion
+      .joins(:stock)
+      .where("stocks.sede_id IN (?) OR stocks.club_id = ?", club_sede_ids, current_user.club_id)
+      .find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Dispensación no encontrada' }, status: :not_found
   end

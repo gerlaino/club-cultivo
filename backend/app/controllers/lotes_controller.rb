@@ -141,7 +141,7 @@ class LotesController < ApplicationController
         end
       end
     end
-    if @lote.update(lote_params)
+    if @lote.update(lote_update_params)
       render json: LoteSerializer.serialize(@lote)
     else
       render json: { errors: @lote.errors.full_messages }, status: :unprocessable_entity
@@ -610,7 +610,7 @@ class LotesController < ApplicationController
       pesadas:       pesadas.map { |p| PesadaSerializer.serialize(p) },
       stocks:        stocks.map  { |s| StockSerializer.serialize_inline(s) },
       dispensaciones: dispensaciones.map { |d|
-        { id: d.id, socio: "#{d.socio.nombre} #{d.socio.apellido}", fecha: d.fecha_dispensacion,
+        { id: d.id, socio: "#{d.paciente.nombre} #{d.paciente.apellido}", fecha: d.fecha_dispensacion,
           cantidad: d.cantidad.to_f, unidad: d.stock&.unidad, forma_producto: d.stock&.forma_producto }
       },
     }
@@ -666,6 +666,15 @@ class LotesController < ApplicationController
   def lote_params
     params.require(:lote).permit(
       :start_date, :estado, :origen, :planta_madre_id, :plants_count, :strain, :notes,
+      :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta,
+      :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
+      :rendimiento_real_g, :plants_count_cosechadas
+    )
+  end
+
+  def lote_update_params
+    params.require(:lote).permit(
+      :start_date, :origen, :planta_madre_id, :plants_count, :strain, :notes,
       :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
       :rendimiento_real_g, :plants_count_cosechadas

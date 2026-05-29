@@ -1,5 +1,4 @@
-class AsistenteController < ApplicationController
-  before_action :authenticate_user!
+class AsistenteController < BaseController
   require 'net/http'
   require 'json'
 
@@ -199,6 +198,7 @@ class AsistenteController < ApplicationController
     return render json: { error: 'El registro por voz no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_voz)
 
     acciones = params[:acciones] || []
+    return render json: { error: 'Demasiadas acciones en una sola llamada (máx: 15)' }, status: :unprocessable_entity if acciones.size > 15
     contexto = params[:contexto]
     club     = current_user.club
 
@@ -266,7 +266,7 @@ class AsistenteController < ApplicationController
 
   def rate_limited?
     limite = current_user.club.ia_limite_efectivo
-    key    = "asistente:club:#{current_user.club_id}:#{Time.current.strftime('%Y%m%d%H')}"
+    key    = "asistente:user:#{current_user.id}:#{Time.current.strftime('%Y%m%d%H')}"
     redis  = Redis.new(url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'))
     count  = redis.incr(key)
     redis.expire(key, 3600) if count == 1

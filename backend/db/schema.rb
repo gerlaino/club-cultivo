@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_24_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_29_190727) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -993,7 +993,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_24_000002) do
     t.datetime "updated_at", null: false
     t.string "estado", default: "asignado", null: false
     t.bigint "pesada_id"
-    t.bigint "club_id"
+    t.bigint "club_id", null: false
     t.string "numero_lote_producto"
     t.date "fecha_elaboracion"
     t.date "fecha_vencimiento_est"
