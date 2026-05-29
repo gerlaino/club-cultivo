@@ -169,7 +169,13 @@ onUnmounted(() => {
 })
 
 const sala  = computed(() => salas.currentSala)
-const items = computed(() => lotes.bySala(salaId))
+const ESTADOS_ACTIVOS_CULTIVADOR = ['semilla', 'esqueje', 'vegetativo', 'floracion']
+const items = computed(() => {
+  const todos = lotes.bySala(salaId)
+  return isCultivador.value
+    ? todos.filter(l => ESTADOS_ACTIVOS_CULTIVADOR.includes(l.estado))
+    : todos
+})
 
 watch(() => sala.value?.camera_stream_url, (url) => {
   if (url) {

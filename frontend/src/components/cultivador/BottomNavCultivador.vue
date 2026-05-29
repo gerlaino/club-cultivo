@@ -13,10 +13,10 @@
       <span class="bnc__lbl">Salas</span>
     </RouterLink>
 
-    <!-- FAB Registrar (central elevado) -->
+    <!-- FAB Asistente de voz (central elevado) -->
     <div class="bnc__fab-wrap">
-      <button class="bnc__fab" @click="lecturaOpen = true" aria-label="Registrar lectura">
-        <Plus :size="26" :stroke-width="1.75" />
+      <button class="bnc__fab" @click="abrirAsistente" aria-label="Asistente de voz">
+        <Mic :size="26" :stroke-width="1.75" />
       </button>
     </div>
 
@@ -40,9 +40,9 @@
   <!-- Sheet: Más opciones -->
   <SheetBottom v-model="masOpen" title="Más opciones">
     <div class="bnc__mas">
-      <button class="bnc__mas-item" @click="abrirAsistente">
-        <span class="bnc__mas-ico"><Mic :size="20" :stroke-width="1.75" /></span>
-        <span class="bnc__mas-lbl">Asistente de voz</span>
+      <button class="bnc__mas-item" @click="abrirLectura">
+        <span class="bnc__mas-ico"><Plus :size="20" :stroke-width="1.75" /></span>
+        <span class="bnc__mas-lbl">Registrar lectura</span>
         <ChevronRight :size="16" :stroke-width="1.75" class="bnc__mas-arr" />
       </button>
       <RouterLink to="/lotes" class="bnc__mas-item" @click="masOpen = false">
@@ -65,8 +65,8 @@ import { useRoute } from 'vue-router'
 import SheetBottom          from './SheetBottom.vue'
 import RegistrarLecturaSheet from './RegistrarLecturaSheet.vue'
 import {
-  Home, LayoutGrid, Plus, MoreHorizontal, PackageCheck,
-  Sprout, User, ChevronRight, Mic,
+  Home, LayoutGrid, Plus, Mic, MoreHorizontal, PackageCheck,
+  Sprout, User, ChevronRight,
 } from 'lucide-vue-next'
 
 const route   = useRoute()
@@ -77,6 +77,11 @@ const masOpen     = ref(false)
 function abrirAsistente() {
   masOpen.value = false
   window.dispatchEvent(new CustomEvent('abrir-asistente-voz'))
+}
+
+function abrirLectura() {
+  masOpen.value = false
+  lecturaOpen.value = true
 }
 
 function isActive(to) {

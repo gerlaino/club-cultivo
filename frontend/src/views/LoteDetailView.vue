@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref, computed } from "vue"
+import { onMounted, onUnmounted, ref, computed, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
@@ -356,7 +356,13 @@ async function guardarTrasplanteLote() {
 }
 
 // ── Helpers ────────────────────────────────────────────────
-const CICLO = ['vegetativo', 'floracion', 'cosecha', 'secado', 'curado']
+const CICLO_BASE = ['vegetativo', 'floracion', 'cosecha', 'secado', 'curado']
+const cicloPasos = computed(() => {
+  const origen = lote.value?.origen
+  if (origen === 'semilla') return ['semilla', ...CICLO_BASE]
+  if (origen === 'esqueje') return ['esqueje', ...CICLO_BASE]
+  return CICLO_BASE
+})
 const ESTADO_META = {
   semilla:            { label: 'Germinación',        color: '#64748b', bg: '#f1f5f9', emoji: '🌱' },
   esqueje:            { label: 'Esqueje',             color: '#0891b2', bg: '#e0f2fe', emoji: '🪴' },
@@ -430,7 +436,7 @@ function formatDateTime(d) {
   return !date || isNaN(date.getTime()) ? '—' : date.toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-const cicloIndex  = computed(() => lote.value ? CICLO.indexOf(lote.value.estado) : -1)
+const cicloIndex  = computed(() => lote.value ? cicloPasos.value.indexOf(lote.value.estado) : -1)
 const FASE_LABELS = { vegetativo: 'Vegetativo', floracion: 'Floración', secado: 'Manicura', curado: 'Curado', cosecha: 'Cosecha', semilla: 'Germinación', manicura: 'Manicura', cerrado: 'Cerrado' }
 function capitalizarFase(f) { return FASE_LABELS[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : '') }
 function phaseBannerMsg(estado) {
@@ -511,6 +517,15 @@ function loteEscapeHandler(e) {
 }
 
 const POST_HARVEST_ESTADOS = ['cosecha', 'secado', 'manicura_pendiente', 'en_manicura', 'curado', 'finalizado']
+
+watch(
+  () => lotes.current?.estado,
+  (estado) => {
+    if (isCultivador.value && estado && POST_HARVEST_ESTADOS.includes(estado)) {
+      router.replace({ name: 'cosechado-detalle', params: { id } })
+    }
+  }
+)
 
 onMounted(async () => {
   document.addEventListener('keydown', loteEscapeHandler, true)
@@ -629,11 +644,11 @@ onUnmounted(() => {
       <!-- Timeline ciclo -->
       <div class="ld__ciclo">
         <div class="ld__ciclo-track">
-          <div v-for="(etapa, i) in CICLO" :key="etapa" class="ld__ciclo-step"
+          <div v-for="(etapa, i) in cicloPasos" :key="etapa" class="ld__ciclo-step"
                :class="{ 'ld__ciclo-step--done': i < cicloIndex, 'ld__ciclo-step--current': i === cicloIndex, 'ld__ciclo-step--pending': i > cicloIndex }">
             <div class="ld__ciclo-dot"><span class="ld__ciclo-emoji">{{ em(etapa).emoji }}</span></div>
             <div class="ld__ciclo-label">{{ em(etapa).label }}</div>
-            <div v-if="i < CICLO.length - 1" class="ld__ciclo-connector" :class="{ 'ld__ciclo-connector--done': i < cicloIndex }"></div>
+            <div v-if="i < cicloPasos.length - 1" class="ld__ciclo-connector" :class="{ 'ld__ciclo-connector--done': i < cicloIndex }"></div>
           </div>
         </div>
         <div v-if="lote.progreso_ciclo != null" class="ld__ciclo-progress">

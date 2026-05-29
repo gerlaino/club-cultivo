@@ -8,12 +8,17 @@ class PlantActivitiesController < ApplicationController
     registros  = @plant.lote.registros_ambientales
                        .order(registrado_en: :desc)
                        .limit(50)
+    notas      = @plant.lote.lote_eventos
+                       .where(tipo: 'nota')
+                       .order(registrado_en: :desc)
+                       .limit(30)
 
     merged = activities.map { |a| serialize(a) } +
-             registros.map  { |r| serialize_registro(r) }
+             registros.map  { |r| serialize_registro(r) } +
+             notas.map      { |e| serialize_nota(e) }
 
     merged.sort_by! { |e| e[:occurred_at] || '' }.reverse!
-    merged = merged.first(60)
+    merged = merged.first(80)
 
     render json: merged
   end
@@ -95,6 +100,19 @@ class PlantActivitiesController < ApplicationController
       usuario:     r.user&.nombre_completo || 'Sistema',
       created_at:  r.created_at,
       _heredado:   true,
+    }
+  end
+
+  def serialize_nota(e)
+    {
+      id:            "le_#{e.id}",
+      activity_type: 'lote_nota',
+      description:   e.descripcion,
+      metadata:      {},
+      occurred_at:   e.registrado_en,
+      usuario:       e.user&.nombre_completo || 'Sistema',
+      created_at:    e.created_at,
+      _heredado:     true,
     }
   end
 end

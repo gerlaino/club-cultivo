@@ -21,6 +21,9 @@
                   <div class="av__header-sub">{{ subtituloContexto }}</div>
                 </div>
               </div>
+              <button class="av__mute" @click="muteTTS = !muteTTS" :title="muteTTS ? 'Activar voz' : 'Silenciar'">
+                <i :class="muteTTS ? 'bi bi-volume-mute-fill' : 'bi bi-volume-up-fill'"></i>
+              </button>
               <button class="av__close" @click="cerrar"><i class="bi bi-x-lg"></i></button>
             </div>
 
@@ -76,12 +79,15 @@
               </div>
 
               <div class="av__controles">
-                <button v-if="!escuchando && !procesando" class="av__btn-grabar" @click="iniciarGrabacion">
-                  <i class="bi bi-mic-fill"></i>
-                  {{ transcripcion ? 'Volver a hablar' : 'Empezar a hablar' }}
-                </button>
-                <button v-if="escuchando" class="av__btn-detener" @click="detenerGrabacion">
-                  <i class="bi bi-stop-circle-fill"></i> Listo, procesar
+                <button v-if="!procesando"
+                  class="av__btn-ptt"
+                  :class="{ 'av__btn-ptt--rec': escuchando }"
+                  @pointerdown.prevent="pulsarMicrofono"
+                  @pointerup.prevent="soltarMicrofono"
+                  @pointerleave="soltarMicrofono"
+                  @contextmenu.prevent>
+                  <i :class="escuchando ? 'bi bi-stop-circle-fill' : 'bi bi-mic-fill'"></i>
+                  <span>{{ escuchando ? 'Sueltá para procesar' : (transcripcion ? 'Volver a grabar' : 'Mantené presionado') }}</span>
                 </button>
                 <div v-if="procesando" class="av__procesando">
                   <DsSpinner :size="28" />
@@ -363,6 +369,7 @@ const resultados            = ref([])
 const erroresEjecucion      = ref([])
 const errorVoz              = ref(null)
 let recognition = null
+const muteTTS   = ref(false)
 
 // Consulta mode
 const consultaTexto     = ref('')
@@ -450,6 +457,7 @@ onUnmounted(() => {
 
 function cerrar() {
   if (recognition) recognition.stop()
+  window.speechSynthesis?.cancel()
   abierto.value = false
   resetear()
 }
@@ -509,6 +517,7 @@ async function parsearConIA() {
     resumen.value  = data.resumen || ''
     acciones.value = (data.acciones || []).map(a => ({ ...a, _expandido: false }))
     paso.value     = 'revisar'
+    hablar((resumen.value || 'Listo') + '. ¿Confirmás?')
   } catch (e) {
     const status = e?.response?.status
     if (status === 403) {
@@ -550,6 +559,25 @@ async function ejecutarAcciones() {
 }
 
 function nuevaSesion() { resetear() }
+
+function hablar(texto) {
+  if (muteTTS.value || !window.speechSynthesis) return
+  window.speechSynthesis.cancel()
+  const utt = new SpeechSynthesisUtterance(texto)
+  utt.lang = 'es-AR'
+  utt.rate = 1.0
+  window.speechSynthesis.speak(utt)
+}
+
+function pulsarMicrofono() {
+  if (procesando.value) return
+  iniciarGrabacion()
+}
+
+function soltarMicrofono() {
+  if (!escuchando.value) return
+  detenerGrabacion()
+}
 
 function iniciarGrabacionConsulta() {
   errorVoz.value = null
@@ -725,6 +753,13 @@ function metaAccion(accion) {
 .av__btn-grabar { display:flex; align-items:center; gap:9px; background:linear-gradient(135deg,#1b5e20,#2e7d32); color:#e8f5e9; border:none; padding:14px 36px; border-radius:12px; font-size:15px; font-weight:500; cursor:pointer; box-shadow:0 4px 14px #1b5e2035; }
 .av__btn-grabar:hover { opacity:.88; }
 .av__btn-detener { display:flex; align-items:center; gap:9px; background:#dc2626; color:white; border:none; padding:14px 36px; border-radius:12px; font-size:15px; font-weight:500; cursor:pointer; animation:av-pulse 1.5s infinite; }
+.av__btn-ptt { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:linear-gradient(135deg,#1b5e20,#2e7d32); color:#e8f5e9; border:none; padding:22px 52px; border-radius:16px; font-size:15px; font-weight:600; cursor:pointer; box-shadow:0 4px 14px #1b5e2035; touch-action:manipulation; user-select:none; -webkit-user-select:none; transition:all .12s; min-width:220px; }
+.av__btn-ptt i { font-size:28px; }
+.av__btn-ptt:hover:not(:disabled) { opacity:.88; }
+.av__btn-ptt--rec { background:#dc2626; color:white; animation:av-pulse 1.5s infinite; }
+.av__btn-ptt:disabled { opacity:.5; cursor:not-allowed; }
+.av__mute { background:none; border:none; width:32px; height:32px; border-radius:8px; cursor:pointer; color:#94a3b8; display:flex; align-items:center; justify-content:center; font-size:14px; transition:all .15s; flex-shrink:0; }
+.av__mute:hover { background:#f1f5f9; color:#64748b; }
 .av__procesando { display:flex; align-items:center; gap:12px; color:#4a7c59; font-size:14px; }
 .av__procesar-directo { display:flex; justify-content:center; margin-top:.75rem; }
 .av__btn-procesar { display:flex; align-items:center; gap:7px; background:#f0fdf4; color:#1b5e20; border:1.5px solid #c8e6c9; padding:10px 20px; border-radius:10px; font-size:13px; font-weight:500; cursor:pointer; }

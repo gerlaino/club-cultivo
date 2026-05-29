@@ -166,19 +166,38 @@ const loteInfo          = ref(null)
 const actividades       = ref([])
 
 const ACTIVITY_LABEL = {
-  riego:                '💧 Riego',
-  poda:                 '✂️ Poda',
-  medicion:             '📏 Medición',
-  limpieza:             '🧹 Limpieza',
-  cosecha:              '🌿 Cosecha',
-  transplant:           '🪴 Trasplante',
-  inspeccion:           '🔍 Inspección',
-  state_change:         '🔄 Cambio de estado',
-  registro_planta:      '📋 Registro de planta',
+  riego:                   '💧 Riego',
+  poda:                    '✂️ Poda',
+  medicion:                '📏 Medición',
+  limpieza:                '🧹 Limpieza',
+  cosecha:                 '🌿 Cosecha',
+  transplant:              '🪴 Trasplante',
+  inspeccion:              '🔍 Inspección',
+  state_change:            '🔄 Cambio de estado',
+  registro_planta:         '📋 Registro de planta',
   registro_ambiental_lote: '🌡️ Registro ambiental',
+  lote_nota:               '📝 Nota del lote',
+}
+const TAREA_LABEL = {
+  riego:            '💧 Riego',
+  nutricion:        '🧪 Nutrición',
+  poda:             '✂️ Poda',
+  defoliacion:      '🍃 Defoliación',
+  scrog_lst:        '🪢 SCROG/LST',
+  revision_plagas:  '🔍 Rev. plagas',
+  limpieza_sala:    '🧹 Limpieza',
+  ajuste_luz:       '💡 Ajuste luz',
+  registro_ambiental: '🌡️ Registro',
 }
 function actividadLabel(act) {
-  if (act._heredado) return '🌡️ Registro ambiental del lote'
+  if (act.activity_type === 'lote_nota') return '📝 Nota del lote'
+  if (act._heredado) {
+    const tareas = act.metadata?.tareas_realizadas
+    if (tareas?.length) {
+      return tareas.map(t => TAREA_LABEL[t] || t).join(' · ') + ' — lote'
+    }
+    return '🌡️ Registro ambiental — lote'
+  }
   return ACTIVITY_LABEL[act.activity_type] || `📋 ${act.activity_type}`
 }
 
