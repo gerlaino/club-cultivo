@@ -31,15 +31,25 @@
       <div class="rf__grid">
         <div class="rf__field rf__field--full">
           <label class="rf__label">Producto</label>
-          <input type="text" class="rf__input" v-model.trim="f.producto" placeholder="Ej: Base A + Base B" />
+          <input type="text" class="rf__input" v-model.trim="f.producto" placeholder="Ej: Canna Coco A+B, BioBizz Bloom…" />
         </div>
         <div class="rf__field">
-          <label class="rf__label">Dosis <span class="rf__unit">ml/L</span></label>
+          <label class="rf__label">Dosis <span class="rf__unit">ml/g por L</span></label>
           <input type="number" step="0.1" min="0" class="rf__input" v-model.number="f.dosis" placeholder="10" />
         </div>
         <div class="rf__field">
-          <label class="rf__label">Semana nutrición</label>
+          <label class="rf__label">Semana de programa</label>
           <input type="number" step="1" min="1" class="rf__input" v-model.number="f.semana_nutricion" placeholder="3" />
+        </div>
+        <div class="rf__field rf__field--full">
+          <label class="rf__label">Método de aplicación</label>
+          <div class="rf__radios">
+            <button v-for="m in METODOS" :key="m.value" type="button"
+                    class="rf__radio-btn" :class="{ 'rf__radio-btn--sel': f.metodo_nutricion === m.value }"
+                    @click="f.metodo_nutricion = m.value">
+              {{ m.emoji }} {{ m.label }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

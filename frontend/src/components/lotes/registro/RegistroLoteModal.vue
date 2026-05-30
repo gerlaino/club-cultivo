@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="rls__overlay" @click.self="$emit('update:modelValue', false)">
+    <div v-if="modelValue" class="rls__overlay">
       <div class="rls__modal">
 
         <!-- Header -->
@@ -85,13 +85,12 @@
                 </div>
                 <div class="rls__seccion-body">
                   <RiegoForm      v-if="accionId === 'riego'"     v-model="formData.riego" />
-                  <NutricionForm  v-if="accionId === 'nutricion'" v-model="formData.nutricion" />
                   <PodaForm       v-if="accionId === 'poda'"      v-model="formData.poda" :total-plantas="lote?.plants_count" />
                   <PlagasForm     v-if="accionId === 'plagas'"    v-model="formData.plagas" />
                   <AmbientalForm  v-if="accionId === 'ambiental'" v-model="formData.ambiental" />
                   <LuzForm        v-if="accionId === 'luz'"       v-model="formData.luz" />
                   <LimpiezaForm   v-if="accionId === 'limpieza'"  v-model="formData.limpieza" />
-                  <TrasplanteForm v-if="accionId === 'trasplante'" v-model="formData.trasplante" :total-plantas="lote?.plants_count" />
+                  <TrasplanteForm v-if="accionId === 'trasplante'" v-model="formData.trasplante" :total-plantas="lote?.plants_count" :plants="plants" />
                 </div>
               </div>
 
@@ -139,7 +138,6 @@ import { useClubStore } from '../../../stores/club'
 import DsSpinner      from '../../../design-system/components/Spinner.vue'
 import AsistenteVoz   from '../../AsistenteVoz.vue'
 import RiegoForm      from './RiegoForm.vue'
-import NutricionForm  from './NutricionForm.vue'
 import PodaForm       from './PodaForm.vue'
 import PlagasForm     from './PlagasForm.vue'
 import AmbientalForm  from './AmbientalForm.vue'
@@ -151,6 +149,7 @@ const props = defineProps({
   modelValue:  { type: Boolean, default: false },
   lote:        { type: Object,  default: null },
   registrosHoy:{ type: Array,   default: () => [] },
+  plants:      { type: Array,   default: () => [] },
 })
 const emit = defineEmits(['update:modelValue', 'saved'])
 
@@ -160,7 +159,6 @@ const club  = useClubStore()
 // ── Acciones ─────────────────────────────────────────────────────────────────
 const ACCIONES = [
   { id: 'riego',      emoji: '💧', label: 'Riego' },
-  { id: 'nutricion',  emoji: '🌿', label: 'Nutrición' },
   { id: 'poda',       emoji: '✂️', label: 'Poda' },
   { id: 'plagas',     emoji: '🔍', label: 'Rev. Plagas' },
   { id: 'ambiental',  emoji: '🌡️', label: 'Ambiental' },
@@ -196,14 +194,13 @@ function emptyFormData() {
     estado_general:   'bueno',
     plagas_observadas:'ninguna',
     observaciones:    '',
-    riego:      { ph: null, ph_runoff: null, ec: null, volumen: null, fertilizo: false, producto: '', dosis: null, semana_nutricion: null, observaciones: '' },
-    nutricion:  { producto: '', dosis: null, metodo: '', semana_programa: null, observaciones: '' },
+    riego:      { ph: null, ph_runoff: null, ec: null, volumen: null, fertilizo: false, producto: '', dosis: null, semana_nutricion: null, metodo_nutricion: '', observaciones: '' },
     poda:       { tipos: [], intensidad: '', plantas_intervenidas: null, observaciones: '' },
     plagas:     { resultado: 'ninguna', tipos_detectados: [], accion_tomada: '', plantas_afectadas: null, producto_usado: '' },
     ambiental:  { temperatura: null, temperatura_sustrato: null, humedad: null, co2: null, csvFile: null },
     luz:        { horas_luz: null, espectro: '', intensidad: null, cambio_altura: false, distancia: null },
     limpieza:   { tipo: 'rutinaria', producto_usado: '' },
-    trasplante: { maceta_origen_l: null, maceta_destino_l: null, sustrato: 'mismo', sustrato_descripcion: '', todas_plantas: true, cantidad_plantas: null, estado_raices: '', observaciones: '' },
+    trasplante: { maceta_origen_l: null, maceta_destino_l: null, sustrato: 'mismo', sustrato_descripcion: '', todas_plantas: true, plantas_seleccionadas: [], estado_raices: '', observaciones: '' },
   }
 }
 
@@ -265,21 +262,13 @@ function buildPayload() {
     if (r.ph_runoff)payload.ph_runoff = r.ph_runoff
     if (r.ec)       payload.ec       = r.ec
     if (r.fertilizo) {
+      payload.tareas_realizadas.push('nutricion')
       payload.fertilizacion = true
-      const parts = [r.producto, r.dosis ? `${r.dosis}ml/L` : null, r.semana_nutricion ? `sem.${r.semana_nutricion}` : null].filter(Boolean)
+      const parts = [r.producto, r.dosis ? `${r.dosis}ml/L` : null, r.semana_nutricion ? `sem.${r.semana_nutricion}` : null, r.metodo_nutricion || null].filter(Boolean)
       payload.notas_fertilizacion = parts.join(' · ')
     }
     if (r.volumen)       extra.push(`Riego: ${r.volumen}L`)
     if (r.observaciones) extra.push(r.observaciones)
-  }
-
-  if (sel.includes('nutricion')) {
-    const n = fd.nutricion
-    payload.tareas_realizadas.push('nutricion')
-    payload.fertilizacion = true
-    const parts = [n.producto, n.dosis ? `${n.dosis}ml/L` : null, n.metodo || null].filter(Boolean)
-    payload.notas_fertilizacion = [payload.notas_fertilizacion, parts.join(' · ')].filter(Boolean).join(' / ')
-    if (n.observaciones) extra.push(`Nutrición: ${n.observaciones}`)
   }
 
   if (sel.includes('poda')) {
@@ -352,9 +341,13 @@ async function guardar() {
     if (sel.includes('trasplante')) {
       const t = fd.trasplante
       if (!t.maceta_destino_l) { error.value = 'Ingresá el tamaño de maceta destino'; saving.value = false; return }
+      if (!t.todas_plantas && !t.plantas_seleccionadas.length) { error.value = 'Seleccioná al menos una planta para trasplantar'; saving.value = false; return }
       await updateLote(props.lote.id, { tamanio_maceta: parseFloat(t.maceta_destino_l) })
-      // Si hay plantas específicas que trasplantar, se registran como actividad
-      // Simplificado: registramos la actividad en las observaciones del registro ambiental
+      if (!t.todas_plantas && t.plantas_seleccionadas.length) {
+        for (const plantId of t.plantas_seleccionadas) {
+          await createPlantActivity(plantId, { tipo: 'trasplante', descripcion: `Trasplante a maceta ${t.maceta_destino_l}L` })
+        }
+      }
     }
 
     // Registro ambiental

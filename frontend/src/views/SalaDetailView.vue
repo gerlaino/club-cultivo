@@ -144,9 +144,6 @@ const salaAcciones = computed(() => {
   if (canEdit.value || isCultivador.value) {
     items.push({ emoji: '🌡️', label: 'Registrar lectura', onClick: () => { lecturaOpen.value = true } })
   }
-  if (club.data?.features?.ia_voz) {
-    items.push({ emoji: '🎙️', label: 'Registrar por voz', onClick: () => window.dispatchEvent(new Event('abrir-asistente-voz')) })
-  }
   if (puedeCargarLote.value) {
     const lbl = esSalaSecado.value ? 'Cargar lote de floración' : 'Cargar lote de secado'
     items.push({ emoji: '📦', label: lbl, onClick: () => { showCargarLote.value = true } })
@@ -595,10 +592,7 @@ const canSeeAmbiente = computed(() =>
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
           <ActionsDropdown v-if="(canEdit || isCultivador) && salaAcciones.length" :items="salaAcciones" />
-          <!-- AsistenteVoz montado oculto para responder al evento global -->
-          <div v-if="club.data?.features?.ia_voz && contextoAsistente" style="display:none">
-            <AsistenteVoz :contexto="contextoAsistente" />
-          </div>
+          <AsistenteVoz v-if="club.data?.features?.ia_voz && contextoAsistente" :contexto="contextoAsistente" />
         </div>
       </div>
 

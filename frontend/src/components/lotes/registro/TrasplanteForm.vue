@@ -51,8 +51,19 @@
     </div>
 
     <div v-if="f.todas_plantas === false" class="tf__field">
-      <label class="tf__label">Cantidad de plantas</label>
-      <input type="number" step="1" min="1" class="tf__input" v-model.number="f.cantidad_plantas" :placeholder="totalPlantas || ''" />
+      <label class="tf__label">Seleccioná las plantas trasplantadas</label>
+      <div v-if="plants.length" class="tf__plant-list">
+        <label v-for="p in plants" :key="p.id" class="tf__plant-row" :class="{ 'tf__plant-row--sel': f.plantas_seleccionadas.includes(p.id) }">
+          <input type="checkbox" class="tf__plant-check"
+                 :value="p.id"
+                 :checked="f.plantas_seleccionadas.includes(p.id)"
+                 @change="togglePlanta(p.id)" />
+          <span class="tf__plant-dot" :style="{ background: plantaColor(p.state) }"></span>
+          <span class="tf__plant-name">{{ p.codigo || `Planta #${p.id}` }}</span>
+          <span class="tf__plant-state">{{ p.state }}</span>
+        </label>
+      </div>
+      <p v-else class="tf__plant-empty">No hay plantas activas en este lote.</p>
     </div>
 
     <div class="tf__field">
@@ -80,12 +91,28 @@ import { computed } from 'vue'
 const props = defineProps({
   modelValue:  { type: Object,  default: () => ({}) },
   totalPlantas:{ type: Number,  default: null },
+  plants:      { type: Array,   default: () => [] },
 })
 const emit = defineEmits(['update:modelValue'])
 const f = computed({
   get: () => props.modelValue,
   set: v => emit('update:modelValue', v),
 })
+
+function togglePlanta(id) {
+  const current = [...(f.value.plantas_seleccionadas || [])]
+  const idx = current.indexOf(id)
+  if (idx === -1) current.push(id)
+  else current.splice(idx, 1)
+  emit('update:modelValue', { ...f.value, plantas_seleccionadas: current })
+}
+
+const PLANT_COLORS = {
+  semilla: '#6b7280', esqueje: '#8b5cf6', vegetativo: '#16a34a',
+  floracion: '#ea580c', maduracion: '#d97706', cosechado: '#9ca3af',
+  descartada: '#ef4444',
+}
+function plantaColor(state) { return PLANT_COLORS[state] || '#9ca3af' }
 
 const SUSTRATOS = [
   { value: 'mismo',     label: '🪱 Mismo sustrato' },
@@ -121,4 +148,13 @@ const RAICES = [
 .tf__radios--wrap { flex-wrap: wrap; }
 .tf__radio-btn { display: inline-flex; align-items: center; gap: var(--sp-2); padding: .4rem .85rem; border: 1.5px solid var(--c-ink-300); border-radius: var(--r-lg); font-size: var(--fs-13); color: var(--c-ink-700); background: #fff; cursor: pointer; transition: all .12s; font-weight: 500; }
 .tf__radio-btn--sel { background: var(--c-leaf-50); border-color: var(--brand-primary); color: var(--brand-primary); font-weight: 700; }
+.tf__plant-list { display: flex; flex-direction: column; gap: .3rem; max-height: 220px; overflow-y: auto; border: 1.5px solid var(--c-ink-200); border-radius: var(--r-lg); padding: .35rem; background: #fafafa; }
+.tf__plant-row { display: flex; align-items: center; gap: var(--sp-2); padding: .4rem .6rem; border-radius: var(--r-md); cursor: pointer; transition: background .1s; }
+.tf__plant-row:hover { background: var(--c-leaf-50); }
+.tf__plant-row--sel { background: var(--c-leaf-50); }
+.tf__plant-check { accent-color: var(--brand-primary); width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; }
+.tf__plant-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tf__plant-name { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-800); flex: 1; }
+.tf__plant-state { font-size: .68rem; color: var(--c-ink-500); font-weight: 500; text-transform: capitalize; }
+.tf__plant-empty { font-size: var(--fs-13); color: var(--c-ink-400); margin: 0; padding: .5rem; }
 </style>

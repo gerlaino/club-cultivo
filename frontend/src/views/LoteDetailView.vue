@@ -305,9 +305,6 @@ const showRegistroModalNew = ref(false)
 const loteAcciones = computed(() => {
   const items = []
   items.push({ emoji: '📋', label: 'Registrar lote', onClick: () => { showRegistroModalNew.value = true } })
-  if (club.data?.features?.ia_voz && (canEdit.value || isCultivador.value)) {
-    items.push({ emoji: '🎙️', label: 'Registrar por voz', onClick: () => window.dispatchEvent(new Event('abrir-asistente-voz')) })
-  }
   if (canEdit.value && ['semilla','esqueje','planificacion','vegetativo','floracion'].includes(lote.value?.estado)) {
     items.push({ emoji: '🪴', label: 'Trasplantar', onClick: abrirTrasplanteLote })
   }
@@ -579,10 +576,6 @@ onUnmounted(() => {
             Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
           </button>
           <ActionsDropdown v-if="canEdit || isCultivador" :items="loteAcciones" />
-          <!-- AsistenteVoz montado oculto para responder al evento abrir-asistente-voz -->
-          <div v-if="club.data?.features?.ia_voz && contextoAsistente && (canEdit || isCultivador)" style="display:none">
-            <AsistenteVoz :contexto="contextoAsistente" @registrado="onRegistradoPorVoz" />
-          </div>
         </div>
       </div>
 
@@ -1297,6 +1290,7 @@ onUnmounted(() => {
     <RegistroLoteModal
       v-model="showRegistroModalNew"
       :lote="lote"
+      :plants="plantasActivas"
       @saved="loadEventos(); lotes.fetchOne(id); graficosKey++"
     />
 
