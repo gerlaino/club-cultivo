@@ -110,7 +110,11 @@ function formatARS(n) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 }
 function formaLabel(f) {
-  const L = { flor_seca: 'Flor seca', aceite: 'Aceite', tintura: 'Tintura', crema: 'Crema', capsulas: 'Cápsulas', otro: 'Otro' }
+  const L = {
+    flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
+    crema: 'Crema', capsula: 'Cápsulas', capsulas: 'Cápsulas',
+    comestible: 'Comestible', prensado: 'Prensado', externo: 'Externo', otro: 'Otro',
+  }
   return L[f] || f || '—'
 }
 function medioPagoLabel(m) {

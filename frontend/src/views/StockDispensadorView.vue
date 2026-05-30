@@ -55,12 +55,16 @@ import { RouterLink } from 'vue-router'
 import { listStocks } from '../lib/api.js'
 
 const FORMAS = [
-  { value: 'flor_seca', label: 'Flor seca' },
-  { value: 'aceite',    label: 'Aceite' },
-  { value: 'tintura',   label: 'Tintura' },
-  { value: 'crema',     label: 'Crema' },
-  { value: 'capsulas',  label: 'Cápsulas' },
-  { value: 'otro',      label: 'Otro' },
+  { value: 'flor_seca',  label: 'Flor seca' },
+  { value: 'hash',       label: 'Hash' },
+  { value: 'aceite',     label: 'Aceite' },
+  { value: 'tintura',    label: 'Tintura' },
+  { value: 'crema',      label: 'Crema' },
+  { value: 'capsulas',   label: 'Cápsulas' },
+  { value: 'comestible', label: 'Comestible' },
+  { value: 'prensado',   label: 'Prensado' },
+  { value: 'externo',    label: 'Externo' },
+  { value: 'otro',       label: 'Otro' },
 ]
 
 const loading     = ref(true)
@@ -85,7 +89,11 @@ onMounted(async () => {
 })
 
 function formaLabel(f) {
-  const L = { flor_seca: 'Flor seca', aceite: 'Aceite', tintura: 'Tintura', crema: 'Crema', capsulas: 'Cápsulas', otro: 'Otro' }
+  const L = {
+    flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
+    crema: 'Crema', capsula: 'Cápsulas', capsulas: 'Cápsulas',
+    comestible: 'Comestible', prensado: 'Prensado', externo: 'Externo', otro: 'Otro',
+  }
   return L[f] || f || '—'
 }
 

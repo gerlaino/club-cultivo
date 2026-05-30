@@ -21,8 +21,9 @@ import { useConfirm } from '../composables/useConfirm.js'
 import { useQRCode } from '../composables/useQRCode.js'
 import { ArrowRight } from 'lucide-vue-next'
 import DsBanner from '../design-system/components/Banner.vue'
-import IniciarManicuraModal from '../components/lotes/IniciarManicuraModal.vue'
-import CompletarManicuraModal from '../components/lotes/CompletarManicuraModal.vue'
+import IniciarManicuraModal   from '../components/lotes/IniciarManicuraModal.vue'
+import CompletarManicuraModal  from '../components/lotes/CompletarManicuraModal.vue'
+import LoteTrasplanteModal     from '../components/lotes/LoteTrasplanteModal.vue'
 import { useLoteAnalisisIA }       from '../composables/useLoteAnalisisIA.js'
 import { useLoteCostos }           from '../composables/useLoteCostos.js'
 import { useLoteRegistroAmbiental } from '../composables/useLoteRegistroAmbiental.js'
@@ -292,68 +293,8 @@ const rendDevClass = computed(() => {
 })
 
 // ── Trasplante de lote ────────────────────────────────────
-const showTrasplanteLote   = ref(false)
-const savingTrasplanteLote = ref(false)
-const trasplanteLoteError  = ref(null)
-const trasplanteLoteForm   = ref({ maceta_origen_l: null, maceta_destino_l: null, notas: '' })
-const trasplanteSeleccion  = ref([])
-
-const MACETA_OPTS = [0.5, 1, 2, 3, 4.5, 6.5, 7, 10, 11, 15, 18, 20, 25, 30, 40, 50, 65, 80, 100, 200]
-
-const todasTrasplanteSeleccionadas = computed(() =>
-  plantList.value.length > 0 && trasplanteSeleccion.value.length === plantList.value.length
-)
-
-function toggleTrasplantePlanta(plantId) {
-  const idx = trasplanteSeleccion.value.indexOf(plantId)
-  if (idx === -1) trasplanteSeleccion.value.push(plantId)
-  else trasplanteSeleccion.value.splice(idx, 1)
-}
-
-function toggleTrasplanteTodas() {
-  trasplanteSeleccion.value = todasTrasplanteSeleccionadas.value
-    ? []
-    : plantList.value.map(p => p.id)
-}
-
-function abrirTrasplanteLote() {
-  trasplanteLoteForm.value  = { maceta_origen_l: lote.value?.tamanio_maceta || null, maceta_destino_l: null, notas: '' }
-  trasplanteLoteError.value = null
-  trasplanteSeleccion.value = plantList.value.map(p => p.id)
-  showTrasplanteLote.value  = true
-}
-
-async function guardarTrasplanteLote() {
-  const f = trasplanteLoteForm.value
-  if (!f.maceta_destino_l || f.maceta_destino_l <= 0) {
-    trasplanteLoteError.value = 'Seleccioná o ingresá el tamaño de maceta destino'; return
-  }
-  if (!trasplanteSeleccion.value.length) {
-    trasplanteLoteError.value = 'Seleccioná al menos una planta'; return
-  }
-  savingTrasplanteLote.value = true
-  trasplanteLoteError.value  = null
-  try {
-    await updateLote(id, { tamanio_maceta: parseFloat(f.maceta_destino_l) })
-    await lotes.fetchOne(id)
-    await Promise.all(
-      trasplanteSeleccion.value.map(plantId =>
-        createPlantActivity(plantId, {
-          activity_type: 'transplant',
-          description: f.notas || undefined,
-          metadata: { maceta_origen_l: f.maceta_origen_l, maceta_destino_l: parseFloat(f.maceta_destino_l) },
-        })
-      )
-    )
-    const n = trasplanteSeleccion.value.length
-    showTrasplanteLote.value = false
-    toast.success(`${n} planta${n !== 1 ? 's' : ''} trasplantada${n !== 1 ? 's' : ''} a ${f.maceta_destino_l}L`)
-  } catch (e) {
-    trasplanteLoteError.value = e?.response?.data?.error || 'Error al guardar'
-  } finally {
-    savingTrasplanteLote.value = false
-  }
-}
+const showTrasplanteLote = ref(false)
+function abrirTrasplanteLote() { showTrasplanteLote.value = true }
 
 // ── Helpers ────────────────────────────────────────────────
 const CICLO_BASE = ['vegetativo', 'floracion', 'cosecha', 'secado', 'curado']
@@ -369,6 +310,7 @@ const ESTADO_META = {
   vegetativo:         { label: 'Vegetativo',          color: '#16a34a', bg: '#dcfce7', emoji: '🍃' },
   floracion:          { label: 'Floración',          color: '#d97706', bg: '#fef3c7', emoji: '🌸' },
   cosecha:            { label: 'Cosecha',            color: '#059669', bg: '#d1fae5', emoji: '🌿' },
+  en_manicura:        { label: 'En manicura',        color: '#7c3aed', bg: '#ede9fe', emoji: '✂️'  },
   secado:             { label: 'Manicura',           color: '#78350f', bg: '#fef3c7', emoji: '✂️'  },
   manicura_pendiente: { label: 'Manicura pendiente', color: '#7c3aed', bg: '#ede9fe', emoji: '✂️'  },
   curado:             { label: 'Curado',             color: '#2563eb', bg: '#dbeafe', emoji: '🫙' },
@@ -442,7 +384,8 @@ function capitalizarFase(f) { return FASE_LABELS[f] || (f ? f.charAt(0).toUpperC
 function phaseBannerMsg(estado) {
   if (estado === 'cosecha') return 'Lote cosechado. Manicura toma desde acá.'
   if (estado === 'semilla') return 'Plantas en germinación. El sistema avanzará automáticamente cuando estén listas.'
-  if (['secado', 'manicura', 'curado', 'cerrado'].includes(estado)) return 'Este lote pasó tu turno. Otro rol toma desde acá.'
+  if (estado === 'finalizado') return 'Lote finalizado. Stock confirmado y disponible para dispensar.'
+  if (['en_manicura', 'secado', 'manicura_pendiente', 'manicura', 'curado', 'cerrado'].includes(estado)) return 'Este lote pasó tu turno. Otro rol toma desde acá.'
   return null
 }
 
@@ -1699,89 +1642,12 @@ onUnmounted(() => {
     </Teleport>
 
     <!-- ══ Modal Trasplante de Lote ══ -->
-    <Teleport to="body">
-      <div v-if="showTrasplanteLote" class="ld__overlay">
-        <div class="ld__modal" style="max-width:500px">
-          <div class="ld__modal-header">
-            <div>
-              <h3 class="ld__modal-title">🪴 Trasplantar lote</h3>
-              <p class="ld__modal-sub">{{ lote?.codigo }} · {{ lote?.plants_count }} plantas</p>
-            </div>
-            <button class="ld__modal-close" @click="showTrasplanteLote = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="ld__modal-body">
-            <div v-if="trasplanteLoteError" class="ld__alert">{{ trasplanteLoteError }}</div>
-
-            <!-- Macetas -->
-            <div class="ld__tl-grid">
-              <div class="ld__field">
-                <label class="ld__label">Maceta actual <span class="ld__label-unit">litros</span></label>
-                <div v-if="trasplanteLoteForm.maceta_origen_l" class="ld__tl-current">
-                  <span class="ld__tl-current-val">{{ trasplanteLoteForm.maceta_origen_l }}L</span>
-                </div>
-                <div v-else class="ld__input-group">
-                  <input type="number" step="0.5" min="0" class="ld__input"
-                         v-model.number="trasplanteLoteForm.maceta_origen_l" placeholder="Ej: 7" />
-                  <span class="ld__input-suffix">L</span>
-                </div>
-              </div>
-              <div class="ld__field">
-                <label class="ld__label">Maceta destino <span class="ld__label-unit">litros</span> <span class="ld__req">*</span></label>
-                <div class="ld__input-group">
-                  <input type="number" step="0.5" min="0.5" class="ld__input"
-                         v-model.number="trasplanteLoteForm.maceta_destino_l" placeholder="Ej: 11" />
-                  <span class="ld__input-suffix">L</span>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="trasplanteLoteForm.maceta_origen_l && trasplanteLoteForm.maceta_destino_l"
-                 class="ld__tl-preview">
-              <span class="ld__tl-val">{{ trasplanteLoteForm.maceta_origen_l }}L</span>
-              <i class="bi bi-arrow-right ld__tl-arrow"></i>
-              <span class="ld__tl-val ld__tl-val--dest">{{ trasplanteLoteForm.maceta_destino_l }}L</span>
-              <span class="ld__tl-plants">× {{ trasplanteSeleccion.length }} planta{{ trasplanteSeleccion.length !== 1 ? 's' : '' }}</span>
-            </div>
-
-            <!-- Selección de plantas -->
-            <div class="ld__modal-section-title" style="margin-top:.85rem">Plantas a trasplantar</div>
-            <div class="ld__tp-header">
-              <label class="ld__checkbox-row ld__tp-todas">
-                <input type="checkbox" :checked="todasTrasplanteSeleccionadas" @change="toggleTrasplanteTodas" />
-                <span>{{ todasTrasplanteSeleccionadas ? 'Quitar todas' : 'Seleccionar todas' }}</span>
-              </label>
-              <span class="ld__tp-count">{{ trasplanteSeleccion.length }}/{{ plantList.length }}</span>
-            </div>
-            <div class="ld__tp-list">
-              <label
-                v-for="p in plantList"
-                :key="p.id"
-                class="ld__tp-item"
-                :class="{ 'ld__tp-item--selected': trasplanteSeleccion.includes(p.id) }"
-              >
-                <input type="checkbox" :checked="trasplanteSeleccion.includes(p.id)" @change="toggleTrasplantePlanta(p.id)" />
-                <span class="ld__tp-dot" :style="{ background: pm(p.state).color }"></span>
-                <span class="ld__tp-nombre">{{ p.nombre || p.codigo_qr || `Planta #${p.id}` }}</span>
-                <span class="ld__tp-estado" :style="{ color: pm(p.state).color }">{{ pm(p.state).emoji }}</span>
-              </label>
-            </div>
-
-            <div class="ld__field" style="margin-top: .85rem">
-              <label class="ld__label">Notas <span class="ld__optional">opcional</span></label>
-              <input type="text" class="ld__input" v-model.trim="trasplanteLoteForm.notas"
-                     placeholder="Ej: trasplante a sustrato definitivo, día 14 vegetativo…" />
-            </div>
-          </div>
-          <div class="ld__modal-footer">
-            <button class="ld__btn-ghost" @click="showTrasplanteLote = false">Cancelar</button>
-            <button class="ld__btn-primary" :disabled="savingTrasplanteLote || !trasplanteSeleccion.length" @click="guardarTrasplanteLote">
-              <DsSpinner v-if="savingTrasplanteLote" :size="14" />
-              <i v-else class="bi bi-check-lg"></i>Trasplantar {{ trasplanteSeleccion.length }} planta{{ trasplanteSeleccion.length !== 1 ? 's' : '' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <LoteTrasplanteModal
+      v-model="showTrasplanteLote"
+      :lote="lote"
+      :plants="plantList"
+      @saved="lotes.fetchOne(id)"
+    />
 
     <!-- ══ Modal Subida de Foto ══ -->
     <Teleport to="body">

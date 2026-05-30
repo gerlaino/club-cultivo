@@ -156,7 +156,7 @@ const ALL_TABS = [
   { key: 'historia',         label: 'Historia clínica',  icon: ClipboardList, roles: ['admin', 'medico'] },
   { key: 'notas',            label: 'Notas',             icon: BookOpen,      roles: ['admin', 'medico'] },
   { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
-  { key: 'timeline',         label: 'Timeline',          icon: Clock,         roles: ['admin', 'medico', 'cultivador'] },
+  { key: 'timeline',         label: 'Timeline',          icon: Clock,         roles: ['admin', 'medico'] },
   { key: 'correo',           label: 'Correo',            icon: Mail,          roles: ['admin', 'supervisor'] },
 ]
 

@@ -24,6 +24,44 @@ const planForm = ref({ plan: '', plan_activo_hasta: '', trial: false })
 const userForm = ref({ first_name: '', last_name: '', email: '', password: '123456Aa', role: 'cultivador' })
 const userError = ref(null)
 
+const editingInfo  = ref(false)
+const infoForm     = ref({})
+const savingInfo   = ref(false)
+const infoError    = ref(null)
+
+function abrirEditInfo() {
+  infoForm.value = {
+    name:       club.value.name       || '',
+    legal_name: club.value.legal_name || '',
+    email:      club.value.email      || '',
+    phone:      club.value.phone      || '',
+    website:    club.value.website    || '',
+    address:    club.value.address    || '',
+    city:       club.value.city       || '',
+    state:      club.value.state      || '',
+    country:    club.value.country    || '',
+    timezone:   club.value.timezone   || '',
+  }
+  infoError.value   = null
+  editingInfo.value = true
+}
+
+async function guardarInfo() {
+  if (!infoForm.value.name?.trim()) { infoError.value = 'El nombre es obligatorio'; return }
+  savingInfo.value = true
+  infoError.value  = null
+  try {
+    const { data } = await updateSuperAdminClub(id, infoForm.value)
+    club.value = { ...club.value, ...data }
+    editingInfo.value = false
+    toast.success('Información actualizada')
+  } catch (e) {
+    infoError.value = e?.response?.data?.errors?.join(', ') || 'Error al guardar'
+  } finally {
+    savingInfo.value = false
+  }
+}
+
 const smtpForm     = ref({ smtp_host: '', smtp_port: 587, smtp_user: '', smtp_pass: '', smtp_from: '', smtp_from_name: '' })
 const savingSmtp   = ref(false)
 const smtpError    = ref(null)
@@ -314,8 +352,14 @@ onMounted(cargar)
         <div class="scd__card scd__card--info">
           <div class="scd__card-hd">
             <Info :size="14" :stroke-width="1.75" class="scd__card-ico" /> Información
+            <button v-if="!editingInfo" class="scd__link-btn" @click="abrirEditInfo">
+              <Pencil :size="12" :stroke-width="2" /> Editar
+            </button>
           </div>
-          <dl class="scd__dl">
+
+          <!-- Vista -->
+          <dl v-if="!editingInfo" class="scd__dl">
+            <dt>Nombre</dt><dd>{{ club.name || '—' }}</dd>
             <dt>Razón social</dt><dd>{{ club.legal_name || '—' }}</dd>
             <dt>Email</dt><dd>{{ club.email || '—' }}</dd>
             <dt>Teléfono</dt><dd>{{ club.phone || '—' }}</dd>
@@ -323,6 +367,61 @@ onMounted(cargar)
             <dt>Dirección</dt><dd>{{ [club.address, club.city, club.state, club.country].filter(Boolean).join(', ') || '—' }}</dd>
             <dt>Timezone</dt><dd>{{ club.timezone || '—' }}</dd>
           </dl>
+
+          <!-- Edición inline -->
+          <div v-else class="scd__info-form">
+            <div v-if="infoError" class="scd__alert">{{ infoError }}</div>
+            <div class="scd__info-grid">
+              <div class="scd__field scd__field--full">
+                <label class="scd__lbl">Nombre del club <span style="color:#dc2626">*</span></label>
+                <input v-model.trim="infoForm.name" class="scd__input" placeholder="Club Cannábico del Sur" autofocus />
+              </div>
+              <div class="scd__field scd__field--full">
+                <label class="scd__lbl">Razón social</label>
+                <input v-model.trim="infoForm.legal_name" class="scd__input" placeholder="Asociación Civil Club Cannábico del Sur" />
+              </div>
+              <div class="scd__field">
+                <label class="scd__lbl">Email</label>
+                <input v-model.trim="infoForm.email" type="email" class="scd__input" placeholder="contacto@club.org" />
+              </div>
+              <div class="scd__field">
+                <label class="scd__lbl">Teléfono</label>
+                <input v-model.trim="infoForm.phone" class="scd__input" placeholder="+54 11 1234-5678" />
+              </div>
+              <div class="scd__field scd__field--full">
+                <label class="scd__lbl">Sitio web</label>
+                <input v-model.trim="infoForm.website" class="scd__input" placeholder="https://club.org" />
+              </div>
+              <div class="scd__field scd__field--full">
+                <label class="scd__lbl">Dirección</label>
+                <input v-model.trim="infoForm.address" class="scd__input" placeholder="Av. Corrientes 1234" />
+              </div>
+              <div class="scd__field">
+                <label class="scd__lbl">Ciudad</label>
+                <input v-model.trim="infoForm.city" class="scd__input" placeholder="Buenos Aires" />
+              </div>
+              <div class="scd__field">
+                <label class="scd__lbl">Provincia / Estado</label>
+                <input v-model.trim="infoForm.state" class="scd__input" placeholder="CABA" />
+              </div>
+              <div class="scd__field">
+                <label class="scd__lbl">País</label>
+                <input v-model.trim="infoForm.country" class="scd__input" placeholder="Argentina" />
+              </div>
+              <div class="scd__field">
+                <label class="scd__lbl">Timezone</label>
+                <input v-model.trim="infoForm.timezone" class="scd__input" placeholder="America/Argentina/Buenos_Aires" />
+              </div>
+            </div>
+            <div class="scd__info-footer">
+              <button class="scd__btn-ghost" :disabled="savingInfo" @click="editingInfo = false">Cancelar</button>
+              <button class="scd__btn-primary" :disabled="savingInfo" @click="guardarInfo">
+                <DsSpinner v-if="savingInfo" :size="13" />
+                <Check v-else :size="14" :stroke-width="2.5" />
+                {{ savingInfo ? 'Guardando…' : 'Guardar' }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Plan + Web -->
@@ -658,6 +757,10 @@ onMounted(cargar)
 .scd__dl { display: grid; grid-template-columns: 100px 1fr; gap: .4rem .75rem; padding: 1rem 1.1rem; margin: 0; }
 .scd__dl dt { font-size: .72rem; color: #94a3b8; font-weight: 500; }
 .scd__dl dd { font-size: .8rem; color: #0f172a; font-weight: 500; margin: 0; }
+.scd__info-form { padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .875rem; }
+.scd__info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+@media (max-width: 640px) { .scd__info-grid { grid-template-columns: 1fr; } }
+.scd__info-footer { display: flex; justify-content: flex-end; gap: .65rem; padding-top: .25rem; }
 
 /* Plan card */
 .scd__plan-pill--lg { font-size: .85rem; padding: .3em .9em; }

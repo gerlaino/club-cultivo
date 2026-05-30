@@ -382,10 +382,14 @@ async function submitDispensacion() {
     if (!contactoNombre.value.trim()) { toast.warning('Ingresá el nombre de contacto'); return }
   }
   submitting.value = true
-  try {
-    const today = new Date().toISOString().slice(0, 10)
-    // Procesar secuencialmente para evitar race condition en stock compartido
-    for (const item of cart.value) {
+
+  const today = new Date().toISOString().slice(0, 10)
+  let errorMsg = null
+
+  // Procesamos secuencialmente; cada ítem se elimina del carrito apenas es confirmado
+  // para que un fallo parcial no deje ítems ya dispensados disponibles para un segundo intento.
+  for (const item of [...cart.value]) {
+    try {
       await createDispensacion(selectedPaciente.value.id, {
         stock_id:            item.stock.id,
         cantidad:            item.cantidad,
@@ -401,30 +405,36 @@ async function submitDispensacion() {
         } : {}),
         ...(observaciones.value.trim() ? { observaciones: observaciones.value.trim() } : {}),
       })
+      cart.value = cart.value.filter(i => i !== item)
+    } catch (e) {
+      errorMsg = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar'
+      break
     }
+  }
+
+  submitting.value = false
+
+  if (errorMsg) {
+    toast.error(errorMsg)
+  } else {
     toast.success(`Dispensación registrada para ${selectedPaciente.value.nombre}`)
-    cart.value        = []
-    confirmOpen.value = false
-    medioPago.value   = 'efectivo'
-    conEnvio.value    = false
+    confirmOpen.value    = false
+    medioPago.value      = 'efectivo'
+    conEnvio.value       = false
     direccionEnvio.value = ''
     contactoNombre.value = ''
     contactoTel.value    = ''
     observaciones.value  = ''
-    // Refrescar stock y detalle del paciente en paralelo
-    Promise.all([
-      getPaciente(selectedPaciente.value.id),
-      listStocks(),
-    ]).then(([detRes, stockRes]) => {
-      pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
-      stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
-    }).catch(() => {})
-  } catch (e) {
-    const msg = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar'
-    toast.error(msg)
-  } finally {
-    submitting.value = false
   }
+
+  // Refrescar siempre (éxito total o parcial)
+  Promise.all([
+    getPaciente(selectedPaciente.value.id),
+    listStocks(),
+  ]).then(([detRes, stockRes]) => {
+    pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
+    stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
+  }).catch(() => {})
 }
 
 function reprocannStatus(p) {
