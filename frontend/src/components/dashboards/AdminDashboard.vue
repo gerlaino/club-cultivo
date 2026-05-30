@@ -28,7 +28,7 @@ const chartCanvas = ref(null)
 let   chartInstance = null
 
 const stats           = computed(() => statsStore.data ?? {})
-const mostrarOnboarding = computed(() => !loading.value && sedes.value.length === 0)
+const mostrarOnboarding = computed(() => loading.value || sedes.value.length === 0)
 
 // Greeting
 const hora   = new Date().getHours()
@@ -216,13 +216,9 @@ async function onOnboardingCompletado() {
 
 <template>
   <div class="ad">
-    <OnboardingWizard v-if="mostrarOnboarding" @completado="onOnboardingCompletado" />
+    <OnboardingWizard v-if="mostrarOnboarding" :checking="loading" @completado="onOnboardingCompletado" />
 
-    <div v-if="loading" class="ad__loading">
-      <DsSpinner />
-    </div>
-
-    <template v-else-if="!mostrarOnboarding">
+    <template v-if="!mostrarOnboarding">
 
       <!-- ── ZONA 1: Header ──────────────────────────────────────────────── -->
       <div class="ad__header">

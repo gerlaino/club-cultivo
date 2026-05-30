@@ -54,7 +54,7 @@ async function confirmar() {
 
 <template>
   <Teleport to="body">
-    <div class="mcl__overlay" @click.self="$emit('close')">
+    <div class="mcl__overlay">
       <div class="mcl__panel">
 
         <!-- Header -->

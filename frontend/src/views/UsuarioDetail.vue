@@ -30,9 +30,9 @@ const canEditRole = computed(() => auth.role === 'admin' && !isMe.value)
 const ROLES = [
   { value: "admin",       label: "Administrador", color: "#dc2626", bg: "rgba(220,38,38,.1)",   icon: "bi-shield-fill-check",   desc: "Acceso total al sistema — puede gestionar todos los módulos, usuarios y configuración." },
   { value: "medico",      label: "Médico",        color: "#15803d", bg: "rgba(21,128,61,.1)",   icon: "bi-heart-pulse-fill",    desc: "Gestión de pacientes e indicaciones médicas. Sin acceso a producción." },
-  { value: "cultivador",  label: "Cultivador",    color: "#0891b2", bg: "rgba(8,145,178,.1)",   icon: "bi-flower1",             desc: "Gestión completa de sedes, salas, lotes y plantas. Sin acceso a pacientes." },
+  { value: "cultivador",  label: "Cultivador",    color: "#0891b2", bg: "rgba(8,145,178,.1)",   icon: "bi-flower1",             desc: "Accede a las salas de vegetativo y floración de la sede que le asignes. Sin acceso a pacientes." },
   { value: "supervisor",  label: "Supervisor",    color: "#0f766e", bg: "rgba(15,118,110,.1)",  icon: "bi-binoculars-fill",     desc: "Supervisa las sedes que le asigne el admin. Puede crear y gestionar tareas en esas sedes." },
-  { value: "manicura",    label: "Manicura",      color: "#7c3aed", bg: "rgba(124,58,237,.1)",  icon: "bi-scissors",            desc: "Registra el peso de cosecha por lote en sus salas asignadas. Requiere aprobación del admin." },
+  { value: "manicura",    label: "Manicura",      color: "#7c3aed", bg: "rgba(124,58,237,.1)",  icon: "bi-scissors",            desc: "Ve todas las salas de cosecha y manicura del club. Registra peso de cosecha por lote. Requiere aprobación del admin." },
   { value: "dispensador", label: "Dispensador",   color: "#0891b2", bg: "rgba(8,145,178,.08)",  icon: "bi-bag-check-fill",      desc: "Opera el dispensario: registra entregas a socios y consulta stock disponible." },
   { value: "delivery",    label: "Delivery",      color: "#1A3D2E", bg: "rgba(26,61,46,.1)",    icon: "bi-bicycle",             desc: "Gestiona las entregas a domicilio de dispensaciones." },
   { value: "abogado",     label: "Abogado",       color: "#92400e", bg: "rgba(146,64,14,.1)",   icon: "bi-briefcase-fill",      desc: "Acceso a documentos, contabilidad y trazabilidad legal. Solo lectura clínica." },
@@ -43,9 +43,9 @@ const ROLES = [
 const PERMISOS = {
   admin:       [{ ok: true, label: "Gestión total del sistema" }, { ok: true, label: "Usuarios y configuración" }, { ok: true, label: "Contabilidad y documentos" }, { ok: true, label: "Todos los módulos" }],
   medico:      [{ ok: true, label: "Gestionar pacientes" }, { ok: true, label: "Indicaciones médicas" }, { ok: true, label: "Dispensaciones" }, { ok: false, label: "Gestión de producción" }],
-  cultivador:  [{ ok: true, label: "Sedes y salas" }, { ok: true, label: "Lotes y plantas" }, { ok: true, label: "Genéticas" }, { ok: false, label: "Pacientes y clínico" }],
+  cultivador:  [{ ok: true, label: "Salas vege/floración de su sede" }, { ok: true, label: "Lotes y plantas" }, { ok: true, label: "Genéticas" }, { ok: false, label: "Pacientes y clínico" }],
   supervisor:  [{ ok: true, label: "Sedes asignadas" }, { ok: true, label: "Crear y gestionar tareas" }, { ok: true, label: "Ver salas, lotes y plantas" }, { ok: false, label: "Usuarios y pacientes" }],
-  manicura:    [{ ok: true, label: "Registrar cosecha (pendiente aprobación)" }, { ok: true, label: "Ver lotes en sus salas asignadas" }, { ok: false, label: "Aprobar stock" }, { ok: false, label: "Dispensar o acceder a socios" }],
+  manicura:    [{ ok: true, label: "Registrar cosecha (pendiente aprobación)" }, { ok: true, label: "Ver todas las salas de cosecha/manicura" }, { ok: false, label: "Aprobar stock" }, { ok: false, label: "Dispensar o acceder a socios" }],
   dispensador: [{ ok: true, label: "Registrar dispensaciones" }, { ok: true, label: "Consultar socios" }, { ok: true, label: "Ver stock disponible" }, { ok: false, label: "Producción o contabilidad" }],
   delivery:    [{ ok: true, label: "Entregar dispensaciones a domicilio" }, { ok: true, label: "Consultar socios" }, { ok: false, label: "Crear dispensaciones" }, { ok: false, label: "Producción o contabilidad" }],
   abogado:     [{ ok: true, label: "Documentos legales" }, { ok: true, label: "Contabilidad (lectura)" }, { ok: true, label: "Trazabilidad" }, { ok: false, label: "Modificar datos clínicos" }],
@@ -54,6 +54,7 @@ const PERMISOS = {
 }
 
 const SEDE_HINTS = {
+  cultivador:  'Accede a todas las salas de vege/floración de esta sede',
   supervisor:  'Solo puede crear tareas en estas sedes',
   medico:      'Solo ve pacientes de estas sedes — sin asignar: todo el club',
   dispensador: 'Solo puede dispensar en estas sedes — sin asignar: todas',
@@ -271,7 +272,7 @@ onMounted(async () => {
           </div>
 
           <!-- Sedes asignadas — roles sede-nivel -->
-          <div v-if="['supervisor', 'medico', 'dispensador', 'delivery'].includes(u.role)" class="ud__card ud__card--mt">
+          <div v-if="['cultivador', 'supervisor', 'medico', 'dispensador', 'delivery'].includes(u.role)" class="ud__card ud__card--mt">
             <div class="ud__card-header">
               <div class="ud__card-icon" :style="{ background: roleInfo(u.role).bg, color: roleInfo(u.role).color }">
                 <i class="bi bi-building"></i>
@@ -281,9 +282,9 @@ onMounted(async () => {
             </div>
             <div class="ud__card-body">
               <UsuarioSedesManager :user-id="userId" />
-              <p v-if="u.role === 'supervisor'" class="ud__sede-total-note ud__sede-total-note--warn">
+              <p v-if="['supervisor', 'cultivador'].includes(u.role)" class="ud__sede-total-note ud__sede-total-note--warn">
                 <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                El supervisor requiere al menos una sede asignada para poder operar.
+                {{ u.role === 'cultivador' ? 'El cultivador requiere una sede asignada para ver salas y lotes.' : 'El supervisor requiere al menos una sede asignada para poder operar.' }}
               </p>
               <p v-else class="ud__sede-total-note">
                 <i class="bi bi-info-circle me-1"></i>
@@ -324,20 +325,19 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Salas asignadas — cultivador y manicura -->
-          <div v-if="['cultivador', 'manicura'].includes(u.role)" class="ud__card ud__card--mt">
+          <!-- Acceso manicura -->
+          <div v-if="u.role === 'manicura'" class="ud__card ud__card--mt">
             <div class="ud__card-header">
-              <div class="ud__card-icon"
-                   :style="u.role === 'manicura' ? 'background:rgba(124,58,237,.1);color:#7c3aed' : 'background:rgba(8,145,178,.1);color:#0891b2'">
-                <i :class="u.role === 'manicura' ? 'bi bi-scissors' : 'bi bi-grid-3x3-gap'"></i>
+              <div class="ud__card-icon" style="background:rgba(124,58,237,.1);color:#7c3aed">
+                <i class="bi bi-scissors"></i>
               </div>
-              <span class="ud__card-title">{{ u.role === 'manicura' ? 'Sala asignada' : 'Salas asignadas' }}</span>
-              <span class="ud__card-hint">
-                {{ u.role === 'manicura' ? 'Solo salas de manicura (sedes producción/mixta)' : 'Solo salas de cultivo (sedes producción/mixta)' }}
-              </span>
+              <span class="ud__card-title">Acceso a salas</span>
             </div>
             <div class="ud__card-body">
-              <UsuarioSalasManager :user-id="userId" :user-role="u.role" />
+              <p class="ud__acceso-note">
+                <i class="bi bi-info-circle me-2"></i>
+                Ve automáticamente todas las salas de cosecha y manicura del club. No requiere asignación manual.
+              </p>
             </div>
           </div>
 

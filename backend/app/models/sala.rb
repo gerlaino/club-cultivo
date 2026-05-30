@@ -14,7 +14,7 @@ class Sala < ApplicationRecord
   KINDS   = %w[vegetativo floracion manicura cosechado cosecha mixta madre clon secado].freeze
   TIPOS   = %w[cultivo vegetativo floracion cosecha secado curado madre clones].freeze
 
-  validates :nombre, presence: true, uniqueness: { scope: :club_id }
+  validates :nombre, presence: true, uniqueness: { scope: :club_id, conditions: -> { where(deleted_at: nil) } }
   validates :state,  inclusion: { in: ESTADOS }, allow_blank: false
   validates :tipo,   inclusion: { in: TIPOS }, allow_blank: true
   validate  :manicura_requiere_sede_produccion

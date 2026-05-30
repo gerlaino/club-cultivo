@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="mcp-overlay" @click.self="$emit('cerrar')">
+    <div class="mcp-overlay">
       <div class="mcp-panel">
 
         <div class="mcp-header">

@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="rlm-fade">
-      <div v-if="modelValue" class="rlm__overlay" @click.self="close">
+      <div v-if="modelValue" class="rlm__overlay">
         <div class="rlm__modal" role="dialog" aria-modal="true">
 
           <div class="rlm__header">

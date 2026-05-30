@@ -34,8 +34,21 @@ class User < ApplicationRecord
     "#{first_name} #{last_name}".strip
   end
 
+  KINDS_CULTIVADOR = %w[vegetativo floracion mixta madre clon].freeze
+  KINDS_MANICURA   = %w[manicura].freeze
+
   def salas_ids_asignadas
-    salas_asignadas.pluck(:id)
+    if cultivador?
+      Sala.where(sede_id: sedes_ids_asignadas, club_id: club_id)
+          .where(kind: KINDS_CULTIVADOR)
+          .pluck(:id)
+    elsif manicura?
+      Sala.where(club_id: club_id)
+          .where(kind: KINDS_MANICURA)
+          .pluck(:id)
+    else
+      salas_asignadas.pluck(:id)
+    end
   end
 
   def sedes_ids_asignadas

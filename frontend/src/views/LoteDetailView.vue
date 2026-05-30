@@ -928,7 +928,24 @@ onUnmounted(() => {
                   </div>
                 </div>
 
-                <EmptyState v-if="!timeline.pesadas?.length && !timeline.stocks?.length" icon="📦" title="Sin actividad de ciclo" compact />
+                <!-- Trasplantes -->
+                <div v-if="timeline.transplantes?.length" class="ld__tl-group">
+                  <div class="ld__tl-group-title">🪴 Trasplantes</div>
+                  <div v-for="(t, i) in timeline.transplantes" :key="i" class="ld__tl-row">
+                    <div class="ld__tl-fase">
+                      <span v-if="t.maceta_origen" class="ld__tl-pill" style="background:#f1f5f9;color:#475569">{{ t.maceta_origen }}L</span>
+                      <i v-if="t.maceta_origen && t.maceta_destino" class="bi bi-arrow-right" style="color:#94a3b8;font-size:.7rem"></i>
+                      <span v-if="t.maceta_destino" class="ld__tl-pill" style="background:#f0fdf4;color:#1b5e20">{{ t.maceta_destino }}L</span>
+                    </div>
+                    <div class="ld__tl-meta">
+                      {{ t.plantas }} planta{{ t.plantas !== 1 ? 's' : '' }}
+                      <template v-if="t.usuario"> · {{ t.usuario }}</template>
+                      · {{ formatDate(t.fecha) }}
+                    </div>
+                  </div>
+                </div>
+
+                <EmptyState v-if="!timeline.pesadas?.length && !timeline.stocks?.length && !timeline.transplantes?.length" icon="📦" title="Sin actividad de ciclo" compact />
               </div>
             </div>
           </div>
@@ -1185,7 +1202,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Agregar Planta ══ -->
     <Teleport to="body">
-      <div v-if="showAddPlanta" class="ld__overlay" @click.self="showAddPlanta = false">
+      <div v-if="showAddPlanta" class="ld__overlay">
         <div class="ld__modal" style="max-width:420px">
           <div class="ld__modal-header">
             <div>
@@ -1233,7 +1250,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Editar Lote ══ -->
     <Teleport to="body">
-      <div v-if="showEditLote" class="ld__overlay" @click.self="showEditLote = false">
+      <div v-if="showEditLote" class="ld__overlay">
         <div class="ld__modal">
           <div class="ld__modal-header">
             <div>
@@ -1324,7 +1341,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Registro del Lote ══ -->
     <Teleport to="body">
-      <div v-if="showRegistroModal" class="ld__overlay" @click.self="showRegistroModal = false">
+      <div v-if="showRegistroModal" class="ld__overlay">
         <div class="ld__modal">
           <div class="ld__modal-header">
             <div>
@@ -1463,7 +1480,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Avanzar Fase ══ -->
     <Teleport to="body">
-      <div v-if="showTransicionModal" class="ld__overlay" @click.self="showTransicionModal = false">
+      <div v-if="showTransicionModal" class="ld__overlay">
         <div class="ld__modal" style="max-width:440px">
           <div class="ld__modal-header">
             <div>
@@ -1523,7 +1540,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Cosecha (cultivador) ══ -->
     <Teleport to="body">
-      <div v-if="showCosechaModal" class="ld__overlay" @click.self="showCosechaModal = false">
+      <div v-if="showCosechaModal" class="ld__overlay">
         <div class="ld__modal" style="max-width:420px">
           <div class="ld__modal-header">
             <div>
@@ -1571,7 +1588,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Avanzar Fase (cultivador) — confirmar sala destino ══ -->
     <Teleport to="body">
-      <div v-if="showAvanzarSalaModal" class="ld__overlay" @click.self="showAvanzarSalaModal = false">
+      <div v-if="showAvanzarSalaModal" class="ld__overlay">
         <div class="ld__modal" style="max-width:400px">
           <div class="ld__modal-header">
             <div>
@@ -1609,7 +1626,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Cerrar Curado ══ -->
     <Teleport to="body">
-      <div v-if="showCerrarCuradoModal" class="ld__overlay" @click.self="showCerrarCuradoModal = false">
+      <div v-if="showCerrarCuradoModal" class="ld__overlay">
         <div class="ld__modal" style="max-width:500px">
           <div class="ld__modal-header">
             <div>
@@ -1683,7 +1700,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Trasplante de Lote ══ -->
     <Teleport to="body">
-      <div v-if="showTrasplanteLote" class="ld__overlay" @click.self="showTrasplanteLote = false">
+      <div v-if="showTrasplanteLote" class="ld__overlay">
         <div class="ld__modal" style="max-width:500px">
           <div class="ld__modal-header">
             <div>
@@ -1768,7 +1785,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Subida de Foto ══ -->
     <Teleport to="body">
-      <div v-if="showFotoUploadModal" class="ld__overlay" @click.self="cancelarSubidaFoto">
+      <div v-if="showFotoUploadModal" class="ld__overlay">
         <div class="ld__modal ld__modal--sm">
           <div class="ld__modal-header">
             <div>

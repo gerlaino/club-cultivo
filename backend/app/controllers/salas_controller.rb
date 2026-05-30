@@ -14,7 +14,7 @@ class SalasController < ApplicationController
                         .includes(:sede, :lotes, :created_by)
                         .order(:nombre)
 
-    if current_user.cultivador?
+    if current_user.cultivador? || current_user.manicura?
       salas = salas.where(id: current_user.salas_ids_asignadas)
     elsif current_user.supervisor?
       salas = salas.where(sede_id: current_user.sedes_ids_asignadas)
@@ -100,7 +100,7 @@ class SalasController < ApplicationController
 
   def set_sala
     scope = current_user.club.salas
-    if current_user.cultivador?
+    if current_user.cultivador? || current_user.manicura?
       scope = scope.where(id: current_user.salas_ids_asignadas)
     elsif current_user.supervisor?
       scope = scope.where(sede_id: current_user.sedes_ids_asignadas)

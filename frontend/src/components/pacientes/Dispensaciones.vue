@@ -384,7 +384,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 
     <!-- ══ Modal nueva dispensación ══ -->
     <Teleport to="body">
-      <div v-if="showModal" class="dv__overlay" @click.self="showModal=false">
+      <div v-if="showModal" class="dv__overlay">
         <div class="dv__modal">
 
           <div class="dv__modal-header">

@@ -36,6 +36,7 @@ class Club < ApplicationRecord
   after_create :crear_geneticas_default!
 
   ROLES_DEFAULT    = %w[admin].freeze
+  ROLES_VALIDOS_CLUB = %w[admin medico cultivador supervisor abogado auditor dispensador manicura delivery].freeze
   PASSWORD_DEFAULT = ENV.fetch('CLUB_DEFAULT_PASSWORD', '123456Aa').freeze
 
   GENETICAS_INASE = [
@@ -106,7 +107,7 @@ class Club < ApplicationRecord
   ].freeze
 
   def crear_usuarios_default!(roles: ROLES_DEFAULT, password: PASSWORD_DEFAULT)
-    roles.select { |r| ROLES_DEFAULT.include?(r) }.map do |rol|
+    roles.select { |r| ROLES_VALIDOS_CLUB.include?(r) }.map do |rol|
       email = "#{rol}@#{slug}.com"
       next if User.exists?(email: email)
       User.create!(

@@ -604,6 +604,19 @@ class LotesController < ApplicationController
     pesadas = @lote.pesadas.includes(:registrado_por, pesadas_plantas: :plant).order(registrado_at: :asc)
     stocks  = @lote.stocks.includes(:sede).order(created_at: :asc)
     dispensaciones = Dispensacion.joins(:stock).where(stocks: { lote_id: @lote.id }).includes(:paciente, :stock).recientes
+    transplantes_raw = PlantActivity
+      .joins(:plant, :user)
+      .where(plants: { lote_id: @lote.id }, activity_type: 'transplant')
+      .includes(:user)
+      .order(occurred_at: :asc)
+
+    transplantes = transplantes_raw
+      .group_by { |a| [a.occurred_at.to_date, a.metadata&.dig('maceta_origen_l'), a.metadata&.dig('maceta_destino_l')] }
+      .map do |(fecha, origen, destino), acts|
+        { fecha: fecha, usuario: acts.first.user&.first_name,
+          maceta_origen: origen, maceta_destino: destino,
+          plantas: acts.size, notas: acts.map(&:notes).compact.uniq.first }
+      end
 
     render json: {
       lote:          LoteSerializer.serialize(@lote, include_cycle_data: true),
@@ -613,6 +626,7 @@ class LotesController < ApplicationController
         { id: d.id, socio: "#{d.paciente.nombre} #{d.paciente.apellido}", fecha: d.fecha_dispensacion,
           cantidad: d.cantidad.to_f, unidad: d.stock&.unidad, forma_producto: d.stock&.forma_producto }
       },
+      transplantes:,
     }
   end
 

@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="mt-overlay" @click.self="$emit('cerrar')">
+    <div v-if="show" class="mt-overlay">
       <div class="mt-panel">
 
         <!-- Header -->
@@ -152,7 +152,7 @@
                 </label>
                 <div v-if="form.asignada_a_id && !cargandoSalas && salasDisponibles.length === 0"
                      class="mt-hint-warn">
-                  Este usuario no tiene salas asignadas. Asignale una sala primero desde el perfil del usuario.
+                  Este usuario no tiene salas disponibles en su sede asignada.
                 </div>
                 <select v-else v-model="form.sala_id" class="mt-input" @change="form.lote_id = ''"
                         :disabled="cargandoSalas">

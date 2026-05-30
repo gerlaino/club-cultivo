@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="mct-fade">
-      <div v-if="show" class="mct__overlay" @click.self="cerrar">
+      <div v-if="show" class="mct__overlay">
         <div class="mct__modal" role="dialog" aria-modal="true">
 
           <div class="mct__header">

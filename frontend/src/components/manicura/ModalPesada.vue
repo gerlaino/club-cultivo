@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="mp-fade">
-      <div v-if="modelValue" class="mp-overlay" @click.self="$emit('update:modelValue', false)">
+      <div v-if="modelValue" class="mp-overlay">
         <div class="mp-modal" role="dialog" aria-modal="true">
 
           <div class="mp-header">

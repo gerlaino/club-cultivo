@@ -4,6 +4,11 @@ import { createSede } from '../lib/api.js'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import BrandLogo from './BrandLogo.vue'
+
+const props = defineProps({
+  checking: { type: Boolean, default: false },
+})
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -92,17 +97,16 @@ const nombreUsuario = auth.user?.first_name || ''
 
     <!-- Logo superior -->
     <div class="ob__logo">
-      <div class="ob__logo-mark">
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M11 2C11 2 5 7 5 12a6 6 0 0012 0c0-5-6-10-6-10z" fill="white" opacity="0.9"/>
-          <path d="M11 22v-8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <span class="ob__logo-text">Cultivo Espacial</span>
+      <BrandLogo class="ob__brand-logo" />
+    </div>
+
+    <!-- Estado: verificando setup -->
+    <div v-if="checking" class="ob__checking">
+      <DsSpinner :size="32" color="rgba(255,255,255,0.5)" />
     </div>
 
     <!-- Contenido central -->
-    <div class="ob__center">
+    <div v-else class="ob__center">
 
       <!-- ── PASO 1 ── Bienvenida + Datos de sede -->
       <Transition name="ob-fade" mode="out-in">
@@ -307,7 +311,7 @@ const nombreUsuario = auth.user?.first_name || ''
     </div>
 
     <!-- Progreso -->
-    <div class="ob__progress" v-if="paso < 3">
+    <div class="ob__progress" v-if="!checking && paso < 3">
       <div class="ob__progress-step" :class="{ 'ob__progress-step--done': paso > 1, 'ob__progress-step--active': paso === 1 }">
         <div class="ob__progress-dot">
           <svg v-if="paso > 1" width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -385,18 +389,21 @@ const nombreUsuario = auth.user?.first_name || ''
   z-index: 1;
   align-self: flex-start;
 }
-.ob__logo-mark {
-  width: 36px; height: 36px;
-  background: rgba(255,255,255,0.12);
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  border: 1px solid rgba(255,255,255,0.15);
-}
-.ob__logo-text {
+/* BrandLogo en contexto oscuro */
+.ob__brand-logo :deep(.brand-name) {
+  color: rgba(255,255,255,0.75);
   font-size: .875rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.7);
   letter-spacing: .02em;
+}
+
+/* ── Checking (loader inicial) ─────────────── */
+.ob__checking {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
 }
 
 /* ── Centro ────────────────────────────────── */

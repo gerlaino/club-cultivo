@@ -6,7 +6,9 @@ class SedesController < ApplicationController
 
   def index
     sedes = case current_user.role
-            when 'cultivador', 'manicura'
+            when 'cultivador'
+              current_user.sedes_asignadas.activas
+            when 'manicura'
               salas_ids = current_user.salas_ids_asignadas
               sede_ids  = Sala.where(id: salas_ids).pluck(:sede_id).compact.uniq
               current_user.club.sedes.activas.where(id: sede_ids)

@@ -42,6 +42,7 @@ const sedeSeleccionada = computed(() =>
 function validate() {
   const e = {}
   if (!form.value.nombre.trim()) e.nombre = 'El nombre es obligatorio'
+  if (!props.sedeIdFija && !form.value.sede_id) e.sede_id = 'La sede es obligatoria'
   errors.value = e
   return !Object.keys(e).length
 }
@@ -70,7 +71,7 @@ onMounted(async () => {
 
 <template>
   <Teleport to="body">
-    <div class="mcr__overlay" @click.self="$emit('close')">
+    <div class="mcr__overlay" >
       <div class="mcr__panel">
 
         <!-- Header -->
@@ -137,13 +138,14 @@ onMounted(async () => {
 
           <!-- Sede (solo si no está fija) -->
           <div v-if="!sedeIdFija" class="mcr__field mcr__field--full">
-            <label class="mcr__label">Sede</label>
-            <select class="mcr__input" v-model="form.sede_id">
-              <option :value="null">Sin sede asignada</option>
+            <label class="mcr__label">Sede <span class="mcr__req">*</span></label>
+            <select class="mcr__input" :class="{ 'mcr__input--err': errors.sede_id }" v-model="form.sede_id">
+              <option :value="null" disabled>Seleccioná una sede</option>
               <option v-for="s in sedes.filter(s => ['produccion','mixta'].includes(s.tipo))" :key="s.id" :value="s.id">
-                {{ s.nombre }} — {{ s.tipo_label }}
+                {{ s.nombre }}
               </option>
             </select>
+            <span v-if="errors.sede_id" class="mcr__err">{{ errors.sede_id }}</span>
           </div>
 
           <!-- Nota manicura -->

@@ -38,9 +38,9 @@ onMounted(() => store.fetch())
 const ROLES = [
   { value: 'admin',       label: 'Administrador', icon: 'bi-shield-fill-check',   desc: 'Acceso total al club, usuarios y configuración.' },
   { value: 'medico',      label: 'Médico',        icon: 'bi-heart-pulse-fill',    desc: 'Gestión de pacientes e indicaciones médicas.' },
-  { value: 'cultivador',  label: 'Cultivador',    icon: 'bi-flower1',             desc: 'Salas, lotes y plantas. Sin acceso a pacientes.' },
+  { value: 'cultivador',  label: 'Cultivador',    icon: 'bi-flower1',             desc: 'Ve todas las salas de vege/floración de la sede asignada. Sin acceso a pacientes.' },
   { value: 'supervisor',  label: 'Supervisor',    icon: 'bi-binoculars-fill',     desc: 'Supervisa las sedes asignadas y gestiona tareas.' },
-  { value: 'manicura',    label: 'Manicura',      icon: 'bi-scissors',            desc: 'Post-cosecha y pesaje en sus salas asignadas.' },
+  { value: 'manicura',    label: 'Manicura',      icon: 'bi-scissors',            desc: 'Ve todas las salas de cosecha y manicura del club. Registra pesadas. Requiere aprobación del admin.' },
   { value: 'dispensador', label: 'Dispensador',   icon: 'bi-bag-check-fill',      desc: 'Opera el dispensario y registra entregas a socios.' },
   { value: 'delivery',    label: 'Delivery',      icon: 'bi-bicycle',             desc: 'Gestiona las entregas a domicilio.' },
   { value: 'abogado',     label: 'Abogado',       icon: 'bi-briefcase-fill',      desc: 'Documentos, contabilidad y trazabilidad legal.' },
@@ -50,9 +50,9 @@ const ROLES = [
 const ROLES_CONFIG = {
   admin:       { sedes: false, salas: false },
   medico:      { sedes: true,  salas: false, sedeRequerida: false, sedeHint: 'Sin asignar: accede a pacientes de todo el club.' },
-  cultivador:  { sedes: false, salas: true,  sedeRequerida: false },
+  cultivador:  { sedes: true,  salas: false, sedeRequerida: true,  sedeHint: 'El cultivador necesita una sede asignada para ver salas y lotes.' },
   supervisor:  { sedes: true,  salas: false, sedeRequerida: true },
-  manicura:    { sedes: false, salas: true,  sedeRequerida: false },
+  manicura:    { sedes: false, salas: false },
   dispensador: { sedes: true,  salas: false, sedeRequerida: false, sedeHint: 'Sin asignar: puede dispensar en todas las sedes.' },
   delivery:    { sedes: true,  salas: false, sedeRequerida: false, sedeHint: 'Sin asignar: gestiona entregas de todas las sedes.' },
   abogado:     { sedes: false, salas: false },
@@ -418,7 +418,7 @@ async function removeOne(u) {
 
                 <div v-if="roleConfig.sedeRequerida && sedesSeleccionadas.length === 0" class="uv__sede-warn">
                   <i class="bi bi-exclamation-triangle-fill"></i>
-                  El supervisor necesita al menos una sede asignada para poder operar.
+                  {{ form.role === 'cultivador' ? 'El cultivador necesita una sede asignada para ver salas y lotes.' : 'El supervisor necesita al menos una sede asignada para poder operar.' }}
                 </div>
                 <p v-else-if="roleConfig.sedeHint" class="uv__hint">{{ roleConfig.sedeHint }}</p>
               </div>

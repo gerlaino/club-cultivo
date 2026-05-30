@@ -149,6 +149,7 @@ function startEdit(s) {
 async function submitEdit() {
   const e = {};
   if (!editForm.value.nombre?.trim()) e.nombre = 'Obligatorio';
+  if (!editForm.value.sede_id) e.sede_id = 'La sede es obligatoria';
   editErrors.value = e;
   if (Object.keys(e).length) return;
   try {
@@ -371,7 +372,7 @@ async function confirmDelete(s) {
     <!-- Modal Editar -->
     <Teleport to="body">
       <Transition name="slv-modal">
-        <div v-if="showEdit" class="slv__modal-overlay" @click.self="showEdit = false">
+        <div v-if="showEdit" class="slv__modal-overlay">
           <div class="slv__modal">
             <div class="slv__modal-header">
               <h3 class="slv__modal-title">Editar sala</h3>
@@ -410,11 +411,12 @@ async function confirmDelete(s) {
               </div>
               <div class="slv__field-row">
                 <div class="slv__field">
-                  <label class="slv__label">Sede</label>
-                  <select class="slv__input" v-model="editForm.sede_id">
-                    <option :value="null">Sin sede</option>
-                    <option v-for="sede in sedes" :key="sede.id" :value="sede.id">{{ sede.nombre }}</option>
+                  <label class="slv__label">Sede <span class="slv__required">*</span></label>
+                  <select class="slv__input" :class="{ 'slv__input--err': editErrors.sede_id }" v-model="editForm.sede_id">
+                    <option :value="null" disabled>Seleccioná una sede</option>
+                    <option v-for="sede in sedes.filter(s => ['produccion','mixta'].includes(s.tipo))" :key="sede.id" :value="sede.id">{{ sede.nombre }}</option>
                   </select>
+                  <span v-if="editErrors.sede_id" class="slv__err">{{ editErrors.sede_id }}</span>
                 </div>
               </div>
               <div class="slv__field">

@@ -391,7 +391,7 @@ async function exportarCSV() {
 
     <!-- MODAL Crear -->
     <Teleport to="body">
-      <div v-if="showCreate" class="lm-overlay" @click.self="showCreate = false">
+      <div v-if="showCreate" class="lm-overlay">
         <div class="lm-modal">
           <div class="lm-modal__header">
             <div>
@@ -474,7 +474,7 @@ async function exportarCSV() {
 
     <!-- MODAL Editar -->
     <Teleport to="body">
-      <div v-if="showEdit" class="lm-overlay" @click.self="showEdit = false">
+      <div v-if="showEdit" class="lm-overlay">
         <div class="lm-modal">
           <div class="lm-modal__header">
             <div>

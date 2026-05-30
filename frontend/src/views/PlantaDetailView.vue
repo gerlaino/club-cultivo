@@ -92,14 +92,20 @@ function emptyForm() {
 const form = ref(emptyForm())
 
 // ── Constantes visuales ───────────────────────────────────
-const CICLO_PLANTA = ['semilla', 'vegetativo', 'floracion', 'cosecha', 'finalizado']
 const ESTADO_META = {
-  semilla:    { label:'Semilla',    color:'#64748b', bg:'#f1f5f9', emoji:'🌰' },
-  vegetativo: { label:'Vegetativo', color:'#16a34a', bg:'#dcfce7', emoji:'🍃' },
-  floracion:  { label:'Floración',  color:'#d97706', bg:'#fef3c7', emoji:'🌸' },
-  cosecha:    { label:'Cosecha',    color:'#92400e', bg:'#fff7ed', emoji:'✂️'  },
-  finalizado: { label:'Finalizado', color:'#1b5e20', bg:'#dcfce7', emoji:'✅' },
+  germinacion: { label:'Germinación', color:'#64748b', bg:'#f1f5f9', emoji:'🌱' },
+  esqueje:     { label:'Esqueje',     color:'#0891b2', bg:'#e0f2fe', emoji:'🪴' },
+  vegetativo:  { label:'Vegetativo',  color:'#16a34a', bg:'#dcfce7', emoji:'🍃' },
+  floracion:   { label:'Floración',   color:'#d97706', bg:'#fef3c7', emoji:'🌸' },
+  cosechado:   { label:'Cosechada',   color:'#92400e', bg:'#fff7ed', emoji:'✂️'  },
+  secado:      { label:'Secado',      color:'#7c3aed', bg:'#ede9fe', emoji:'🌬️' },
+  descartada:  { label:'Descartada',  color:'#dc2626', bg:'#fef2f2', emoji:'🗑️' },
 }
+const CICLO_PLANTA = computed(() => {
+  const origen = planta.value?.origen
+  if (origen === 'esqueje') return ['esqueje', 'vegetativo', 'floracion', 'cosechado']
+  return ['germinacion', 'vegetativo', 'floracion', 'cosechado']
+})
 const SALUD_META = {
   excelente: { color:'#16a34a', emoji:'🟢', label:'Excelente' },
   bueno:     { color:'#65a30d', emoji:'🟡', label:'Bueno'     },
@@ -151,7 +157,7 @@ function formatDateTime(d) {
 // ── Datos computados ──────────────────────────────────────
 const cicloIndex = computed(() => {
   if (!planta.value) return -1
-  return CICLO_PLANTA.indexOf(planta.value.state)
+  return CICLO_PLANTA.value.indexOf(planta.value.state)
 })
 
 const diasEnCiclo = computed(() => {
@@ -788,7 +794,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Registro de Planta ══ -->
     <Teleport to="body">
-      <div v-if="showModal" class="pd__overlay" @click.self="showModal = false">
+      <div v-if="showModal" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
@@ -887,7 +893,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Medición Sensor ══ -->
     <Teleport to="body">
-      <div v-if="showMedicionModal" class="pd__overlay" @click.self="showMedicionModal = false">
+      <div v-if="showMedicionModal" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
@@ -1000,7 +1006,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Trasplante ══ -->
     <Teleport to="body">
-      <div v-if="showTrasplanteModal" class="pd__overlay" @click.self="showTrasplanteModal = false">
+      <div v-if="showTrasplanteModal" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
@@ -1060,7 +1066,7 @@ onMounted(async () => {
 
     <!-- ══ Modal subir foto ══ -->
     <Teleport to="body">
-      <div v-if="showFotoUploadModal" class="pd__overlay" @click.self="cancelarSubidaFoto">
+      <div v-if="showFotoUploadModal" class="pd__overlay">
         <div class="pd__modal pd__modal--foto">
           <div class="pd__modal-header">
             <div>

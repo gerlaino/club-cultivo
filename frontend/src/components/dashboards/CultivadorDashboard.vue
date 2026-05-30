@@ -142,8 +142,8 @@
         </div>
         <DsEmpty
           v-else-if="salas.length === 0"
-          title="Todavía no tenés salas asignadas"
-          description="Hablá con el admin para que te asigne salas."
+          title="Sin salas activas"
+          description="No hay salas de vegetativo o floración en tu sede. Pedile al admin que cree una sala."
         />
         <div v-else class="cvd__salas-grid">
           <RouterLink

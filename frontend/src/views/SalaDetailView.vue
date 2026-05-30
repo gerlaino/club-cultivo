@@ -6,7 +6,6 @@ import { useSalasStore } from "../stores/salas"
 import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
 import { useClubStore } from "../stores/club"
-import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
 import ModalCargarLote from '../components/salas/ModalCargarLote.vue'
 import RegistrarLecturaModal from '../components/salas/RegistrarLecturaModal.vue'
 import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado } from '../lib/api.js'
@@ -295,6 +294,13 @@ const ESTADOS_HEREDADO = [
   { value: 'cosecha',    label: 'Cosecha' },
 ]
 
+const estadosHeredadoPermitidos = computed(() => {
+  const kind = sala.value?.kind
+  if (kind === 'floracion') return ESTADOS_HEREDADO.filter(e => e.value === 'floracion')
+  if (['cosecha', 'cosechado'].includes(kind)) return ESTADOS_HEREDADO.filter(e => e.value === 'cosecha')
+  return ESTADOS_HEREDADO.filter(e => ['semilla', 'vegetativo'].includes(e.value))
+})
+
 const showCreate     = ref(false)
 const loteForm       = ref(emptyLoteForm())
 const loteErrors     = ref({})
@@ -469,7 +475,7 @@ async function openCreate() {
   loteErrors.value     = {}
   loteApiError.value   = null
   tipoCreacion.value   = 'nuevo'
-  heredadoEstado.value = 'semilla'
+  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'semilla'
   heredadoDias.value   = { semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 }
   proximoCodigo.value  = ''
   showCreate.value     = true
@@ -721,20 +727,12 @@ const canSeeAmbiente = computed(() =>
               </dd>
               <dt>Tipo</dt><dd>{{ kindLabel(sala.kind) }}</dd>
               <dt>Sede</dt><dd>{{ sala.sede?.nombre || "—" }}</dd>
-              <dt>A cargo</dt><dd>{{ sala.cultivadores?.map(c => c.nombre).join(', ') || "—" }}</dd>
               <dt>Creado por</dt><dd>{{ sala.created_by_name || "—" }}</dd>
               <dt>Creado</dt><dd>{{ formatDate(sala.created_at) }}</dd>
               <dt>Actualizado</dt><dd>{{ formatDate(sala.updated_at) }}</dd>
             </dl>
           </div>
 
-          <!-- Cultivadores -->
-          <div v-if="!isCultivador" class="sd__card sd__card--mt">
-            <div class="sd__card-header"><span class="sd__card-title">👨‍🌾 Cultivadores</span></div>
-            <div class="sd__card-body">
-              <SalaCultivadoresManager :sala-id="sala.id" :sala-nombre="sala.nombre" />
-            </div>
-          </div>
 
           <!-- Notas -->
           <div v-if="sala.notes" class="sd__card sd__card--mt">
@@ -807,7 +805,7 @@ const canSeeAmbiente = computed(() =>
 
     <!-- Modal Crear Lote -->
     <Teleport to="body">
-      <div v-if="showCreate" class="sd__overlay" @click.self="closeCreate">
+      <div v-if="showCreate" class="sd__overlay">
         <div class="sd__modal">
           <div class="sd__modal-header">
             <div>
@@ -875,7 +873,7 @@ const canSeeAmbiente = computed(() =>
                 <div class="sd__field sd__field--full">
                   <label class="sd__label">Estado actual del lote</label>
                   <select class="sd__input" v-model="heredadoEstado">
-                    <option v-for="e in ESTADOS_HEREDADO" :key="e.value" :value="e.value">{{ e.label }}</option>
+                    <option v-for="e in estadosHeredadoPermitidos" :key="e.value" :value="e.value">{{ e.label }}</option>
                   </select>
                 </div>
 
@@ -1107,7 +1105,7 @@ const canSeeAmbiente = computed(() =>
 
     <!-- Modal Editar Sala -->
     <Teleport to="body">
-      <div v-if="showEditSala" class="sd__overlay" @click.self="showEditSala = false">
+      <div v-if="showEditSala" class="sd__overlay">
         <div class="sd__modal">
           <div class="sd__modal-header">
             <div>
@@ -1149,7 +1147,7 @@ const canSeeAmbiente = computed(() =>
 
     <!-- Modal upgrade plan -->
     <Teleport to="body">
-      <div v-if="showUpgrade" class="sd__overlay" @click.self="showUpgrade=false">
+      <div v-if="showUpgrade" class="sd__overlay">
         <div class="sd__modal" style="max-width:380px;text-align:center;padding:2rem">
           <div style="font-size:3rem;margin-bottom:.75rem">🚀</div>
           <h3 class="sd__modal-title" style="margin-bottom:.5rem">Límite del plan alcanzado</h3>

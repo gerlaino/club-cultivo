@@ -320,7 +320,6 @@ async function submit() {
       <div
         v-if="modelValue"
         class="nm-overlay"
-        @click.self="close"
       >
         <div
           class="nm-dialog"
