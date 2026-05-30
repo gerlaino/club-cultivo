@@ -3,10 +3,11 @@ import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
 import { getSede, listSalas, getSedeStocks, updateStock, deleteSede } from "../lib/api"
-import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
-import Breadcrumb from '../components/ui/Breadcrumb.vue'
-import EmptyState from '../components/ui/EmptyState.vue'
-import { useToast } from '../composables/useToast.js'
+import ModalCrearSala    from '../components/salas/ModalCrearSala.vue'
+import Breadcrumb         from '../components/ui/Breadcrumb.vue'
+import EmptyState         from '../components/ui/EmptyState.vue'
+import ActionsDropdown    from '../components/ui/ActionsDropdown.vue'
+import { useToast }   from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
@@ -147,6 +148,18 @@ function onSalaCreada() {
   recargarSalas()
 }
 
+const sedeAcciones = computed(() => {
+  const items = []
+  if (tieneInv.value) {
+    items.push({ emoji: '📊', label: 'Gestionar stock', onClick: () => router.push('/admin/stock') })
+  }
+  if (isAdmin.value) {
+    items.push({ divider: true })
+    items.push({ emoji: '🗑️', label: 'Eliminar sede', danger: true, onClick: eliminarSede, disabled: deleting.value })
+  }
+  return items
+})
+
 function escapeHandler(e) {
   if (e.key !== 'Escape') return
   if (showEditarStockModal.value) showEditarStockModal.value = false
@@ -204,17 +217,9 @@ onMounted(async () => {
         </div>
         <div class="sdv__header-actions">
           <button v-if="puedeCrearSala && tieneSalas" class="sdv__btn-primary" @click="showCrearSala = true">
-            <i class="bi bi-plus-lg"></i> Nueva sala aquí
+            <i class="bi bi-plus-lg"></i> Nueva sala
           </button>
-          <RouterLink v-if="tieneInv && isAdmin" to="/admin/stock" class="sdv__btn-inv">
-            <i class="bi bi-boxes"></i> Gestionar stock
-          </RouterLink>
-          <button v-if="isAdmin" class="sdv__btn-danger" :disabled="deleting" @click="eliminarSede">
-            <i class="bi bi-trash3"></i> Eliminar sede
-          </button>
-          <button class="sdv__btn-ghost" @click="router.back()">
-            <i class="bi bi-arrow-left"></i> Volver
-          </button>
+          <ActionsDropdown v-if="isAdmin && sedeAcciones.length" :items="sedeAcciones" />
         </div>
       </div>
 

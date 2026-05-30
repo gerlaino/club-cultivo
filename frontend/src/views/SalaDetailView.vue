@@ -6,8 +6,9 @@ import { useSalasStore } from "../stores/salas"
 import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
 import { useClubStore } from "../stores/club"
-import ModalCargarLote from '../components/salas/ModalCargarLote.vue'
-import RegistrarLecturaModal from '../components/salas/RegistrarLecturaModal.vue'
+import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
+import RegistrarLecturaModal  from '../components/salas/RegistrarLecturaModal.vue'
+import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
 import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
@@ -137,6 +138,26 @@ async function saveEditSala() {
     savingEditSala.value = false
   }
 }
+
+const salaAcciones = computed(() => {
+  const items = []
+  if (canEdit.value || isCultivador.value) {
+    items.push({ emoji: '🌡️', label: 'Registrar lectura', onClick: () => { lecturaOpen.value = true } })
+  }
+  if (club.data?.features?.ia_voz) {
+    items.push({ emoji: '🎙️', label: 'Registrar por voz', onClick: () => window.dispatchEvent(new Event('abrir-asistente-voz')) })
+  }
+  if (puedeCargarLote.value) {
+    const lbl = esSalaSecado.value ? 'Cargar lote de floración' : 'Cargar lote de secado'
+    items.push({ emoji: '📦', label: lbl, onClick: () => { showCargarLote.value = true } })
+  }
+  if (canEdit.value) {
+    items.push({ emoji: '✏️', label: 'Editar sala', onClick: openEditSala })
+    items.push({ divider: true })
+    items.push({ emoji: '🗑️', label: 'Eliminar sala', danger: true, onClick: eliminarSala, disabled: deleting.value })
+  }
+  return items
+})
 
 function salaEscapeHandler(e) {
   if (e.key !== 'Escape') return
@@ -570,35 +591,14 @@ const canSeeAmbiente = computed(() =>
           </p>
         </div>
         <div class="sd__hero-actions">
-          <button
-            v-if="canEdit || isCultivador"
-            class="sd__btn-lectura"
-            @click="lecturaOpen = true"
-          >
-            <Gauge :size="16" :stroke-width="1.75" />
-            Registrar lectura
-          </button>
-          <AsistenteVoz
-            v-if="club.data?.features?.ia_voz && contextoAsistente"
-            :contexto="contextoAsistente"
-          />
-          <button
-            v-if="puedeCargarLote"
-            class="sd__btn-secondary"
-            @click="showCargarLote = true"
-          >
-            <i class="bi bi-box-arrow-in-down"></i>
-            {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
-          </button>
           <button v-if="(canEdit || isCultivador) && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
-          <button v-if="canEdit" class="sd__btn-edit" @click="openEditSala" title="Editar sala">
-            <i class="bi bi-pencil"></i>
-          </button>
-          <button v-if="canEdit" class="sd__btn-danger" :disabled="deleting" @click="eliminarSala">
-            <i class="bi bi-trash3"></i>
-          </button>
+          <ActionsDropdown v-if="(canEdit || isCultivador) && salaAcciones.length" :items="salaAcciones" />
+          <!-- AsistenteVoz montado oculto para responder al evento global -->
+          <div v-if="club.data?.features?.ia_voz && contextoAsistente" style="display:none">
+            <AsistenteVoz :contexto="contextoAsistente" />
+          </div>
         </div>
       </div>
 

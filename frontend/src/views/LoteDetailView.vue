@@ -24,6 +24,8 @@ import DsBanner from '../design-system/components/Banner.vue'
 import IniciarManicuraModal   from '../components/lotes/IniciarManicuraModal.vue'
 import CompletarManicuraModal  from '../components/lotes/CompletarManicuraModal.vue'
 import LoteTrasplanteModal     from '../components/lotes/LoteTrasplanteModal.vue'
+import RegistroLoteModal       from '../components/lotes/registro/RegistroLoteModal.vue'
+import ActionsDropdown         from '../components/ui/ActionsDropdown.vue'
 import { useLoteAnalisisIA }       from '../composables/useLoteAnalisisIA.js'
 import { useLoteCostos }           from '../composables/useLoteCostos.js'
 import { useLoteRegistroAmbiental } from '../composables/useLoteRegistroAmbiental.js'
@@ -296,6 +298,27 @@ const rendDevClass = computed(() => {
 const showTrasplanteLote = ref(false)
 function abrirTrasplanteLote() { showTrasplanteLote.value = true }
 
+// ── Registro modal (nuevo) ────────────────────────────────
+const showRegistroModalNew = ref(false)
+
+// ── Acciones dropdown ─────────────────────────────────────
+const loteAcciones = computed(() => {
+  const items = []
+  items.push({ emoji: '📋', label: 'Registrar lote', onClick: () => { showRegistroModalNew.value = true } })
+  if (club.data?.features?.ia_voz && (canEdit.value || isCultivador.value)) {
+    items.push({ emoji: '🎙️', label: 'Registrar por voz', onClick: () => window.dispatchEvent(new Event('abrir-asistente-voz')) })
+  }
+  if (canEdit.value && ['semilla','esqueje','planificacion','vegetativo','floracion'].includes(lote.value?.estado)) {
+    items.push({ emoji: '🪴', label: 'Trasplantar', onClick: abrirTrasplanteLote })
+  }
+  if (canEdit.value) {
+    items.push({ emoji: '✏️', label: 'Editar lote', onClick: openEditLote })
+    items.push({ divider: true })
+    items.push({ emoji: '🗑️', label: 'Eliminar lote', danger: true, onClick: eliminarLote })
+  }
+  return items
+})
+
 // ── Helpers ────────────────────────────────────────────────
 const CICLO_BASE = ['vegetativo', 'floracion', 'cosecha', 'secado', 'curado']
 const cicloPasos = computed(() => {
@@ -445,6 +468,7 @@ function onRegistradoPorVoz() { lotes.fetchOne(id); loadEventos(); graficosKey.v
 function loteEscapeHandler(e) {
   if (e.key !== 'Escape') return
   if (showFotoUploadModal.value)      { cancelarSubidaFoto(); return }
+  if (showRegistroModalNew.value)     { showRegistroModalNew.value = false; return }
   if (showTrasplanteLote.value)       { showTrasplanteLote.value = false; return }
   if (showEditLote.value)             { showEditLote.value = false; return }
   if (showCerrarCuradoModal.value)    { showCerrarCuradoModal.value = false; return }
@@ -554,24 +578,11 @@ onUnmounted(() => {
             <ArrowRight v-else :size="15" :stroke-width="1.75" />
             Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
           </button>
-          <AsistenteVoz
-            v-if="club.data?.features?.ia_voz && contextoAsistente && (canEdit || isCultivador)"
-            :contexto="contextoAsistente"
-            @registrado="onRegistradoPorVoz"
-          />
-          <button class="ld__btn-secondary" @click="abrirRegistroModal">
-            <i class="bi bi-clipboard-data"></i>Registrar lote
-          </button>
-          <button v-if="canEdit && ['semilla','esqueje','planificacion','vegetativo','floracion'].includes(lote.estado)"
-                  class="ld__btn-trasplante" @click="abrirTrasplanteLote" title="Trasplantar lote a nueva maceta">
-            <i class="bi bi-arrow-up-circle"></i>Trasplantar
-          </button>
-          <button v-if="canEdit" class="ld__btn-edit" @click="openEditLote" title="Editar lote">
-            <i class="bi bi-pencil"></i>
-          </button>
-          <button v-if="canEdit" class="ld__btn-danger" :disabled="deletingLote" @click="eliminarLote">
-            <i class="bi bi-trash3"></i>
-          </button>
+          <ActionsDropdown v-if="canEdit || isCultivador" :items="loteAcciones" />
+          <!-- AsistenteVoz montado oculto para responder al evento abrir-asistente-voz -->
+          <div v-if="club.data?.features?.ia_voz && contextoAsistente && (canEdit || isCultivador)" style="display:none">
+            <AsistenteVoz :contexto="contextoAsistente" @registrado="onRegistradoPorVoz" />
+          </div>
         </div>
       </div>
 
@@ -1282,7 +1293,14 @@ onUnmounted(() => {
       </div>
     </Teleport>
 
-    <!-- ══ Modal Registro del Lote ══ -->
+    <!-- ══ Modal Registro del Lote (nuevo) ══ -->
+    <RegistroLoteModal
+      v-model="showRegistroModalNew"
+      :lote="lote"
+      @saved="loadEventos(); lotes.fetchOne(id); graficosKey++"
+    />
+
+    <!-- ══ Modal Registro del Lote (legacy — se puede eliminar cuando el nuevo esté validado) ══ -->
     <Teleport to="body">
       <div v-if="showRegistroModal" class="ld__overlay">
         <div class="ld__modal">
