@@ -19,11 +19,13 @@ const filters = ref({ state: '', lote_id: '', search: '' })
 const sortBy  = ref('created_at_desc')
 
 const STATE_META = {
-  germinacion: { label: 'Germinación', icon: '🌰', bg: '#E0F2FE', color: '#0369a1', bar: '#0284C7' },
-  vegetativo:  { label: 'Vegetativo',  icon: '🌱', bg: '#E8F0EB', color: '#1A3D2E', bar: '#1b5e20' },
-  floracion:   { label: 'Floración',   icon: '🌸', bg: '#FEF3C7', color: '#92400e', bar: '#D97706' },
-  secado:      { label: 'Manicura',    icon: '✂️',  bg: '#F3F4F6', color: '#374151', bar: '#6B7280' },
-  cosechado:   { label: 'Cosechado',   icon: '✂️',  bg: '#F4F8F5', color: '#1A3D2E', bar: '#3F6452' },
+  semilla:    { label: 'Germinación', icon: '🌰', bg: '#E0F2FE', color: '#0369a1', bar: '#0284C7', kpiIcon: '🌰', kpiBg: 'rgba(3,105,161,.1)' },
+  esqueje:    { label: 'Esqueje',     icon: '✂️',  bg: '#F3E8FF', color: '#7c3aed', bar: '#8b5cf6', kpiIcon: '✂️',  kpiBg: 'rgba(124,58,237,.1)' },
+  vegetativo: { label: 'Vegetativo',  icon: '🌱', bg: '#E8F0EB', color: '#1A3D2E', bar: '#1b5e20', kpiIcon: '🌱', kpiBg: 'rgba(27,94,32,.1)'   },
+  floracion:  { label: 'Floración',   icon: '🌸', bg: '#FEF3C7', color: '#92400e', bar: '#D97706', kpiIcon: '🌸', kpiBg: 'rgba(217,119,6,.12)'  },
+  maduracion: { label: 'Maduración',  icon: '🍂', bg: '#FFF7ED', color: '#c2410c', bar: '#ea580c', kpiIcon: '🍂', kpiBg: 'rgba(194,65,12,.1)'   },
+  cosechado:  { label: 'Cosechada',   icon: '🌿', bg: '#F4F8F5', color: '#1A3D2E', bar: '#3F6452', kpiIcon: '🌿', kpiBg: 'rgba(63,100,82,.1)'   },
+  descartada: { label: 'Descartada',  icon: '🗑️', bg: '#FEF2F2', color: '#b91c1c', bar: '#ef4444', kpiIcon: '🗑️', kpiBg: 'rgba(185,28,28,.1)'   },
 }
 
 function sm(s) { return STATE_META[s] || { label: s || '—', icon: '•', bg: '#f3f4f6', color: '#374151', bar: '#94a3b8' } }
@@ -32,12 +34,20 @@ function stateIcon(s)       { return sm(s).icon }
 function stateBadgeStyle(s) { const m = sm(s); return { background: m.bg, color: m.color } }
 function stateBarStyle(s)   { return { background: sm(s).bar } }
 
-const kpis = computed(() => ({
-  total:      plants.value.length,
-  vegetativo: plants.value.filter(p => p.state === 'vegetativo').length,
-  floracion:  plants.value.filter(p => p.state === 'floracion').length,
-  cosechado:  plants.value.filter(p => p.state === 'cosechado').length,
-}))
+const KPI_STATES = ['semilla', 'esqueje', 'vegetativo', 'floracion', 'maduracion', 'cosechado', 'descartada']
+
+const kpis = computed(() => {
+  const counts = {}
+  for (const s of KPI_STATES) {
+    counts[s] = plants.value.filter(p => p.state === s).length
+  }
+  return {
+    total: plants.value.length,
+    byState: KPI_STATES
+      .filter(s => counts[s] > 0)
+      .map(s => ({ state: s, count: counts[s], ...STATE_META[s] })),
+  }
+})
 
 const filtered = computed(() => {
   let list = [...plants.value]
@@ -136,25 +146,15 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 
     <!-- KPIs -->
     <div class="ptv__kpis">
-      <div class="ptv__kpi">
+      <div class="ptv__kpi ptv__kpi--total">
         <div class="ptv__kpi-icon" style="background:rgba(27,94,32,.1)">🌿</div>
         <div class="ptv__kpi-value">{{ kpis.total }}</div>
         <div class="ptv__kpi-label">Total plantas</div>
       </div>
-      <div class="ptv__kpi">
-        <div class="ptv__kpi-icon" style="background:rgba(27,94,32,.1)">🌱</div>
-        <div class="ptv__kpi-value">{{ kpis.vegetativo }}</div>
-        <div class="ptv__kpi-label">Vegetativo</div>
-      </div>
-      <div class="ptv__kpi">
-        <div class="ptv__kpi-icon" style="background:rgba(217,119,6,.12)">🌸</div>
-        <div class="ptv__kpi-value">{{ kpis.floracion }}</div>
-        <div class="ptv__kpi-label">Floración</div>
-      </div>
-      <div class="ptv__kpi">
-        <div class="ptv__kpi-icon" style="background:rgba(107,114,128,.1)">✂️</div>
-        <div class="ptv__kpi-value">{{ kpis.cosechado }}</div>
-        <div class="ptv__kpi-label">Cosechadas</div>
+      <div v-for="k in kpis.byState" :key="k.state" class="ptv__kpi">
+        <div class="ptv__kpi-icon" :style="{ background: k.kpiBg }">{{ k.kpiIcon }}</div>
+        <div class="ptv__kpi-value">{{ k.count }}</div>
+        <div class="ptv__kpi-label">{{ k.label }}</div>
       </div>
     </div>
 
@@ -305,8 +305,9 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 .ptv__btn-ghost:hover { background: #f8fafc; }
 
 /* KPIs */
-.ptv__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
-@media (max-width: 640px) { .ptv__kpis { grid-template-columns: repeat(2, 1fr); } }
+.ptv__kpis { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+.ptv__kpi  { flex: 1 1 140px; min-width: 130px; max-width: 220px; }
+.ptv__kpi--total { flex: 1 1 160px; }
 .ptv__kpi { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 1.25rem; }
 .ptv__kpi-icon  { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: .6rem; }
 .ptv__kpi-value { font-size: 1.8rem; font-weight: 800; color: #0f172a; line-height: 1; }
