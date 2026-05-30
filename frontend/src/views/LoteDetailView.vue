@@ -305,9 +305,6 @@ const showRegistroModalNew = ref(false)
 const loteAcciones = computed(() => {
   const items = []
   items.push({ emoji: '📋', label: 'Registrar lote', onClick: () => { showRegistroModalNew.value = true } })
-  if (canEdit.value && ['semilla','esqueje','planificacion','vegetativo','floracion'].includes(lote.value?.estado)) {
-    items.push({ emoji: '🪴', label: 'Trasplantar', onClick: abrirTrasplanteLote })
-  }
   if (canEdit.value) {
     items.push({ emoji: '✏️', label: 'Editar lote', onClick: openEditLote })
     items.push({ divider: true })

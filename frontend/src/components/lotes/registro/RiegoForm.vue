@@ -46,7 +46,7 @@
           <div class="rf__radios">
             <button v-for="m in METODOS" :key="m.value" type="button"
                     class="rf__radio-btn" :class="{ 'rf__radio-btn--sel': f.metodo_nutricion === m.value }"
-                    @click="f.metodo_nutricion = m.value">
+                    @click="setMetodo(m.value)">
               {{ m.emoji }} {{ m.label }}
             </button>
           </div>
@@ -70,6 +70,16 @@ const f     = computed({
   get: () => props.modelValue,
   set: v  => emit('update:modelValue', v),
 })
+
+function setMetodo(val) {
+  emit('update:modelValue', { ...props.modelValue, metodo_nutricion: val })
+}
+
+const METODOS = [
+  { value: 'foliar',     label: 'Foliar',     emoji: '🌿' },
+  { value: 'suelo',      label: 'Suelo',      emoji: '🪱' },
+  { value: 'hidroponico',label: 'Hidropónico', emoji: '💧' },
+]
 </script>
 
 <style scoped>
