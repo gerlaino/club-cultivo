@@ -218,6 +218,18 @@ class PlantsController < ApplicationController
     nil
   end
 
+  def dias_en_fase(plant)
+    ref = case plant.state
+          when 'semilla'    then plant.fecha_germinacion || plant.created_at.to_date
+          when 'esqueje'    then plant.created_at.to_date
+          when 'vegetativo' then plant.fecha_vegetativo || plant.created_at.to_date
+          when 'floracion'  then plant.fecha_floracion
+          when 'maduracion' then plant.fecha_floracion
+          when 'cosechado'  then plant.fecha_cosecha
+          end
+    ref ? (Date.today - ref.to_date).to_i : nil
+  end
+
   def serialize_plant(plant)
     g = plant.lote.genetica
     {
@@ -237,10 +249,9 @@ class PlantsController < ApplicationController
         estado: plant.lote.estado,
         sala:   plant.lote.sala ? { id: plant.lote.sala.id, nombre: plant.lote.sala.nombre } : nil,
       },
-      genetica: g ? { id: g.id, nombre: g.nombre, tipo: g.tipo } : nil,
-      fecha_germinacion:      plant.fecha_germinacion,
-      dias_desde_germinacion: plant.fecha_germinacion ? (Date.today - plant.fecha_germinacion).to_i : nil,
-      created_at: plant.created_at,
+      genetica:      g ? { id: g.id, nombre: g.nombre, tipo: g.tipo } : nil,
+      created_at:    plant.created_at,
+      dias_en_fase:  dias_en_fase(plant),
     }
   end
 

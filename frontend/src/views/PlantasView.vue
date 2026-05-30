@@ -69,12 +69,19 @@ const filtered = computed(() => {
     case 'lote_desc':     list.sort((a,b) => (b.lote?.codigo||'').localeCompare(a.lote?.codigo||'')); break
     case 'genetica_asc':  list.sort((a,b) => (a.genetica?.nombre||'').localeCompare(b.genetica?.nombre||'')); break
     case 'genetica_desc': list.sort((a,b) => (b.genetica?.nombre||'').localeCompare(a.genetica?.nombre||'')); break
-    case 'dias_asc':      list.sort((a,b) => (a.dias_desde_germinacion||0) - (b.dias_desde_germinacion||0)); break
-    case 'dias_desc':     list.sort((a,b) => (b.dias_desde_germinacion||0) - (a.dias_desde_germinacion||0)); break
+    case 'dias_asc':      list.sort((a,b) => (a.dias_en_fase||0) - (b.dias_en_fase||0)); break
+    case 'dias_desc':     list.sort((a,b) => (b.dias_en_fase||0) - (a.dias_en_fase||0)); break
+    case 'fecha_asc':     list.sort((a,b) => new Date(a.created_at) - new Date(b.created_at)); break
+    case 'fecha_desc':    list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at)); break
     default:              list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
   }
   return list
 })
+
+function formatFecha(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+}
 
 function clearFilters() {
   filters.value = { state: '', lote_id: '', search: '' }
@@ -187,15 +194,16 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
       >
         Todos {{ plants.length }}
       </button>
-      <button
-        v-for="(meta, key) in STATE_META"
-        :key="key"
-        class="ptv__pill"
-        :class="{ 'ptv__pill--active': filters.state === key }"
-        @click="filters.state = filters.state === key ? '' : key"
-      >
-        {{ meta.icon }} {{ meta.label }} {{ plants.filter(p => p.state === key).length }}
-      </button>
+      <template v-for="(meta, key) in STATE_META" :key="key">
+        <button
+          v-if="plants.filter(p => p.state === key).length > 0"
+          class="ptv__pill"
+          :class="{ 'ptv__pill--active': filters.state === key }"
+          @click="filters.state = filters.state === key ? '' : key"
+        >
+          {{ meta.icon }} {{ meta.label }} {{ plants.filter(p => p.state === key).length }}
+        </button>
+      </template>
     </div>
 
     <!-- Loading -->
@@ -228,15 +236,17 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
             <th class="pt-table__sortable" @click="onSort('nombre')">
               Nombre <span class="pt-sort-icon">{{ sortIcon('nombre') }}</span>
             </th>
-            <th>QR</th>
             <th class="pt-table__sortable" @click="onSort('lote')">
               Lote <span class="pt-sort-icon">{{ sortIcon('lote') }}</span>
             </th>
-            <th class="pt-table__sortable" @click="onSort('genetica')">
+            <th class="pt-table__sortable pt-col-genetica" @click="onSort('genetica')">
               Genética <span class="pt-sort-icon">{{ sortIcon('genetica') }}</span>
             </th>
-            <th class="pt-table__sortable" @click="onSort('dias')">
-              Días <span class="pt-sort-icon">{{ sortIcon('dias') }}</span>
+            <th class="pt-table__sortable pt-col-fecha" @click="onSort('fecha')">
+              Creación <span class="pt-sort-icon">{{ sortIcon('fecha') }}</span>
+            </th>
+            <th class="pt-table__sortable pt-col-dias" @click="onSort('dias')">
+              Días en fase <span class="pt-sort-icon">{{ sortIcon('dias') }}</span>
             </th>
             <th></th>
           </tr>
@@ -257,16 +267,19 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
               <span class="pt-nombre">{{ plant.nombre || `Planta #${plant.id}` }}</span>
             </td>
             <td>
-              <span class="pt-qr">{{ plant.codigo_qr || '—' }}</span>
-            </td>
-            <td>
               <span class="pt-lote">{{ plant.lote?.codigo || '—' }}</span>
             </td>
-            <td>
+            <td class="pt-col-genetica">
               <span class="pt-genetica">{{ plant.genetica?.nombre || '—' }}</span>
             </td>
-            <td>
-              <span class="pt-dias">{{ plant.dias_desde_germinacion || '—' }}</span>
+            <td class="pt-col-fecha">
+              <span class="pt-fecha">{{ formatFecha(plant.created_at) }}</span>
+            </td>
+            <td class="pt-col-dias">
+              <span v-if="plant.dias_en_fase != null" class="pt-dias-badge" :style="stateBadgeStyle(plant.state)">
+                {{ plant.dias_en_fase }}d
+              </span>
+              <span v-else class="pt-dias-empty">—</span>
             </td>
             <td>
               <span class="pt-arrow">→</span>
@@ -357,13 +370,14 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 .pt-table td { padding: 10px 12px; vertical-align: middle; }
 
 /* Cell styles */
-.pt-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .6rem; border-radius: 99px; font-size: .72rem; font-weight: 600; white-space: nowrap; }
-.pt-nombre { font-weight: 600; color: #1e293b; }
-.pt-qr { font-family: monospace; font-size: .75rem; color: #94a3b8; }
-.pt-lote { font-size: .82rem; color: #374151; }
-.pt-genetica { font-size: .82rem; color: #374151; }
-.pt-dias { font-size: .82rem; color: #374151; }
-.pt-arrow { color: #cbd5e1; opacity: 0; transition: opacity .15s; font-size: .9rem; }
+.pt-badge      { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .6rem; border-radius: 99px; font-size: .72rem; font-weight: 600; white-space: nowrap; }
+.pt-nombre     { font-weight: 600; color: #1e293b; }
+.pt-lote       { font-size: .82rem; color: #374151; font-weight: 500; }
+.pt-genetica   { font-size: .82rem; color: #374151; }
+.pt-fecha      { font-size: .8rem; color: #64748b; font-variant-numeric: tabular-nums; }
+.pt-dias-badge { display: inline-flex; align-items: center; padding: .15rem .5rem; border-radius: 99px; font-size: .72rem; font-weight: 700; }
+.pt-dias-empty { font-size: .82rem; color: #cbd5e1; }
+.pt-arrow      { color: #cbd5e1; opacity: 0; transition: opacity .15s; font-size: .9rem; }
 .pt-table__row:hover .pt-arrow { opacity: 1; color: #64748b; }
 
 /* Pagination */
@@ -378,10 +392,7 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 
 /* Responsive */
 @media (max-width: 640px) {
-  .pt-table thead th:nth-child(3),
-  .pt-table thead th:nth-child(5),
-  .pt-table td:nth-child(3),
-  .pt-table td:nth-child(5) { display: none; }
+  .pt-col-genetica, .pt-col-fecha { display: none; }
   .pt-arrow { opacity: 1; }
 }
 </style>
