@@ -191,6 +191,33 @@ RSpec.describe Dispensacion, type: :model do
     end
   end
 
+  # ── stock_pertenece_al_club ───────────────────────────────────────────────
+
+  describe 'validación stock_pertenece_al_club' do
+    let(:otro_club) { create(:club) }
+    let(:otro_admin) { create(:user, :admin, club: otro_club) }
+    let(:otra_sede) { create(:sede, club: otro_club, created_by: otro_admin) }
+    let(:otra_sala) { create(:sala, club: otro_club, sede: otra_sede, created_by: otro_admin) }
+    let(:otro_lote) { create(:lote, club: otro_club, sala: otra_sala) }
+    let!(:stock_ajeno) do
+      Stock.create!(
+        sede: otra_sede, lote: otro_lote,
+        origen: 'lote', forma_producto: 'flor_seca',
+        unidad: 'g', cantidad: 50
+      )
+    end
+
+    it 'rechaza stock de otro club' do
+      d = nueva_dispensacion(stock: stock_ajeno)
+      expect(d).not_to be_valid
+      expect(d.errors[:stock]).to be_present
+    end
+
+    it 'acepta stock del mismo club' do
+      expect(nueva_dispensacion(stock: stock)).to be_valid
+    end
+  end
+
   # ── carrito multi-item: fallo parcial ─────────────────────────────────────
   # El frontend procesa items del carrito con requests independientes (no hay
   # transacción HTTP cross-request). Si el segundo item falla, el primero ya

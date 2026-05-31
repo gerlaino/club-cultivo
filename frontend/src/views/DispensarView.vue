@@ -334,7 +334,7 @@ const puedeNoAbonar = computed(() => tieneCc.value || tieneCcG.value)
 
 // Límite mensual
 const tieneLimiteMensual  = computed(() => (pacienteDetalle.value?.limite_dispensacion_mensual_g ?? 0) > 0)
-const cartTotalG          = computed(() => cart.value.reduce((s, i) => s + i.cantidad, 0))
+const cartTotalG          = computed(() => cart.value.filter(i => i.stock.unidad === 'g').reduce((s, i) => s + i.cantidad, 0))
 const consumoConCarrito   = computed(() => (pacienteDetalle.value?.dispensado_mes_actual_g ?? 0) + cartTotalG.value)
 const porcentajeConCarrito = computed(() => {
   const limite = pacienteDetalle.value?.limite_dispensacion_mensual_g

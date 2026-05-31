@@ -33,8 +33,8 @@ const error     = ref(null)
 const activeTab = ref('info')
 
 const canEdit    = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
-const canClinica = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
 const s          = computed(() => store.current)
+const edadSocio  = computed(() => s.value ? edad(s.value.fecha_nacimiento) : null)
 
 const reprocannEstadoMeta = computed(() =>
   REPROCANN_ESTADOS.find(e => e.value === (s.value?.reprocann_estado || 'sin_registro'))
@@ -209,8 +209,8 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             <h1 class="sd__hero-name">{{ s.nombre }} {{ s.apellido }}</h1>
             <div class="sd__hero-meta">
               <span>DNI {{ s.dni || '—' }}</span>
-              <span v-if="edad(s.fecha_nacimiento)" class="sd__meta-sep">·</span>
-              <span v-if="edad(s.fecha_nacimiento)">{{ edad(s.fecha_nacimiento) }} años</span>
+              <span v-if="edadSocio" class="sd__meta-sep">·</span>
+              <span v-if="edadSocio">{{ edadSocio }} años</span>
             </div>
             <div class="sd__hero-badges">
               <span v-if="reprocannStatus"
@@ -282,7 +282,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             </div>
             <div class="sd__info-item">
               <div class="sd__info-label">Edad</div>
-              <div class="sd__info-val">{{ edad(s.fecha_nacimiento) ? edad(s.fecha_nacimiento) + ' años' : '—' }}</div>
+              <div class="sd__info-val">{{ edadSocio ? edadSocio + ' años' : '—' }}</div>
             </div>
             <div class="sd__info-item sd__info-item--full">
               <div class="sd__info-label">Email</div>
@@ -556,7 +556,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               <div class="sd__card-subtitle">Solo visible para admin y médico</div>
             </div>
           </div>
-          <div class="sd__historia-body" v-if="canClinica">
+          <div class="sd__historia-body" v-if="canEdit">
 
             <!-- Sección: Datos básicos -->
             <div class="sd__hc-section">
@@ -641,10 +641,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
                 {{ notasClinicasSaving ? 'Guardando…' : 'Guardar historia' }}
               </button>
             </div>
-          </div>
-          <div v-else class="sd__empty">
-            <div class="sd__empty-icon"><ClipboardList :size="32" /></div>
-            <div class="sd__empty-title">Sin acceso a historia clínica</div>
           </div>
         </div>
       </div>

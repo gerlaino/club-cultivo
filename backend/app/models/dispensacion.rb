@@ -21,6 +21,7 @@ class Dispensacion < ApplicationRecord
   validates :estado_envio,       inclusion: { in: ESTADOS_ENVIO }, allow_nil: true
   validates :medio_pago,         inclusion: { in: MEDIOS_PAGO }, allow_blank: true
   validate  :fecha_no_futura
+  validate  :stock_pertenece_al_club,   on: :create
   validate  :stock_disponible,          on: :create
   validate  :limite_mensual_no_superado, on: :create
   validate  :credito_suficiente,        on: :create, if: -> { medio_pago == 'cuenta_corriente' }
@@ -43,6 +44,14 @@ class Dispensacion < ApplicationRecord
 
   def fecha_no_futura
     errors.add(:fecha_dispensacion, 'no puede ser futura') if fecha_dispensacion.present? && fecha_dispensacion > Date.today
+  end
+
+  def stock_pertenece_al_club
+    return unless stock && paciente
+    club_id = paciente.club_id
+    unless stock.club_id == club_id || stock.sede&.club_id == club_id
+      errors.add(:stock, 'no pertenece al club')
+    end
   end
 
   def stock_disponible

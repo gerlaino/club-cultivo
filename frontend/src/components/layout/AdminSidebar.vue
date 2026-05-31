@@ -44,6 +44,7 @@
           >
             <component :is="link.icon" :size="15" :stroke-width="1.75" class="asb__sub-ico" />
             <span>{{ link.label }}</span>
+            <span v-if="link.badge?.value" class="asb__sub-badge">{{ link.badge.value }}</span>
           </RouterLink>
         </div>
 
@@ -54,15 +55,25 @@
 </template>
 
 <script setup>
-import { reactive, onMounted, watch } from 'vue'
+import { reactive, ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   LayoutDashboard, Users, Building2, Wallet, CheckSquare,
   Sprout, FileCheck, FileText, UserCog, Globe,
   ShieldCheck, Truck, TrendingUp, History,
   GitBranch, Layers, ChevronDown, Dna, Archive, Leaf, Boxes, Scissors,
-  ClipboardList, Package, Settings,
+  ClipboardList, Package, Settings, ClipboardCheck,
 } from 'lucide-vue-next'
+import { listLotes } from '../../lib/api.js'
+
+const aprobacionesPendientes = ref(0)
+
+async function fetchAprobaciones() {
+  try {
+    const { data } = await listLotes({ estado: 'manicura_pendiente' })
+    aprobacionesPendientes.value = (data || []).length
+  } catch {}
+}
 
 const route = useRoute()
 
@@ -93,10 +104,11 @@ const GRUPOS = [
     icon: Package,
     defaultOpen: true,
     items: [
-      { to: '/admin/stock',        icon: Boxes,      label: 'Stock' },
-      { to: '/admin/cosechado',    icon: Scissors,   label: 'Post-cosecha' },
-      { to: '/delivery/despachos', icon: Truck,      label: 'Despachos' },
-      { to: '/contabilidad',       icon: Wallet,     label: 'Contabilidad' },
+      { to: '/admin/stock',        icon: Boxes,          label: 'Stock' },
+      { to: '/admin/cosechado',    icon: Scissors,       label: 'Post-cosecha' },
+      { to: '/aprobaciones',       icon: ClipboardCheck, label: 'Aprobaciones', badge: aprobacionesPendientes },
+      { to: '/delivery/despachos', icon: Truck,          label: 'Despachos' },
+      { to: '/contabilidad',       icon: Wallet,         label: 'Contabilidad' },
     ],
   },
   {
@@ -170,6 +182,7 @@ onMounted(() => {
   GRUPOS.forEach(g => {
     abiertos[g.label] = g.defaultOpen || grupoTieneActivo(g)
   })
+  fetchAprobaciones()
 })
 
 watch(() => route.path, sincronizarGrupos)
@@ -310,6 +323,18 @@ watch(() => route.path, sincronizarGrupos)
 }
 .asb__sub-ico { flex-shrink: 0; opacity: .8; }
 .asb__sub--active .asb__sub-ico { opacity: 1; }
+.asb__sub-badge {
+  margin-left: auto;
+  background: #d97706;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 10px;
+  min-width: 16px;
+  text-align: center;
+}
 
 
 @media (max-width: 1023px) { .asb { display: none; } }
