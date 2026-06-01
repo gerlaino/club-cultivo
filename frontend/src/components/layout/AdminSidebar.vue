@@ -185,7 +185,10 @@ onMounted(() => {
   fetchAprobaciones()
 })
 
-watch(() => route.path, sincronizarGrupos)
+watch(() => route.path, (path, prev) => {
+  sincronizarGrupos()
+  if (prev === '/aprobaciones' || path === '/aprobaciones') fetchAprobaciones()
+})
 </script>
 
 <style scoped>
