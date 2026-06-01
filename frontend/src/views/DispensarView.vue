@@ -204,6 +204,16 @@
                 </label>
               </div>
 
+              <div v-if="sinEntregadores" class="dv__aviso-delivery">
+                <AlertTriangle :size="15" :stroke-width="2" class="dv__aviso-delivery-ico" />
+                <div>
+                  <strong>Sin repartidores configurados.</strong>
+                  El paquete quedará pendiente de asignación. Podés crear un repartidor
+                  desde <strong>Configuración → Equipo</strong> y asignarlo después en
+                  <strong>Operaciones → Despachos</strong>.
+                </div>
+              </div>
+
               <template v-if="conEnvio">
                 <div class="dv__modal-field">
                   <label class="dv__label">Dirección de entrega</label>
@@ -249,10 +259,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { listPacientes, getPaciente, listStocks, createDispensacion } from '../lib/api.js'
+import { ref, computed, watch, onMounted } from 'vue'
+import { listPacientes, getPaciente, listStocks, createDispensacion, listEntregadores } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
-import { Search, Users, Plus, X } from 'lucide-vue-next'
+import { Search, Users, Plus, X, AlertTriangle } from 'lucide-vue-next'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const toast = useToast()
@@ -276,7 +286,17 @@ const direccionEnvio = ref('')
 const contactoNombre = ref('')
 const contactoTel    = ref('')
 const observaciones  = ref('')
-const submitting  = ref(false)
+const submitting      = ref(false)
+const entregadores    = ref([])
+
+const sinEntregadores = computed(() => conEnvio.value && entregadores.value.length === 0)
+
+onMounted(async () => {
+  try {
+    const { data } = await listEntregadores()
+    entregadores.value = data.data ?? []
+  } catch {}
+})
 
 let searchTimeout = null
 
@@ -901,6 +921,20 @@ function formatFecha(d) {
 }
 .dv__modal-aviso--warn  { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
 .dv__modal-aviso--error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+
+.dv__aviso-delivery {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-13);
+  line-height: 1.5;
+}
+.dv__aviso-delivery-ico { flex-shrink: 0; margin-top: 1px; }
 
 /* Modal transition */
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity .2s; }

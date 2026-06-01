@@ -5,7 +5,7 @@ import {
   PackageCheck, Truck, CheckCircle2, XCircle, User, MapPin,
   Phone, FileText, RefreshCw, ChevronDown, ChevronUp, AlertCircle
 } from 'lucide-vue-next'
-import { listDespachos, listDeliveryUsers, reasignarDelivery, reprogramarPaquete } from '../../lib/api.js'
+import { listDespachos, listEntregadores, reasignarDelivery, reprogramarPaquete } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast = useToast()
@@ -74,10 +74,12 @@ async function load() {
   finally { loading.value = false }
 }
 
+const ROLE_LABEL = { delivery: 'Repartidor', admin: 'Admin', supervisor: 'Supervisor' }
+
 async function loadDeliveryUsers() {
   try {
-    const { data } = await listDeliveryUsers()
-    deliveryUsers.value = data.users || []
+    const { data } = await listEntregadores()
+    deliveryUsers.value = data.data || []
   } catch {}
 }
 
@@ -110,7 +112,13 @@ async function confirmarReasignacion(id) {
 function deliveryNombre(d) {
   if (d.delivery_nombre) return d.delivery_nombre
   const u = deliveryUsers.value.find(u => u.id === d.delivery_id)
-  return u ? (u.first_name || u.email) : '—'
+  return u ? entregadorLabel(u) : '—'
+}
+
+function entregadorLabel(u) {
+  const nombre = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
+  if (u.role !== 'delivery') return `${nombre} (${ROLE_LABEL[u.role] || u.role})`
+  return nombre
 }
 
 async function reprogramar(id) {
@@ -184,9 +192,9 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
         <option value="fallido">Fallido</option>
       </select>
       <select v-model="filtroDelivery" class="dsp__select" @change="load">
-        <option value="">Todos los repartidores</option>
+        <option value="">Todos los asignados</option>
         <option v-for="u in deliveryUsers" :key="u.id" :value="String(u.id)">
-          {{ u.first_name || u.email }}
+          {{ entregadorLabel(u) }}
         </option>
       </select>
       <input v-model="filtroDesde" class="dsp__input-date" type="date" title="Desde" @change="load" />
@@ -314,12 +322,19 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
           <!-- Reasignación -->
           <div class="dsp__reasign-bar">
             <template v-if="reasignandoId === d.id">
-              <span class="dsp__reasign-label">Reasignar a:</span>
+              <span class="dsp__reasign-label">Asignar a:</span>
               <select v-model="nuevoDelivery" class="dsp__reasign-select">
-                <option value="">Sin asignar</option>
-                <option v-for="u in deliveryUsers" :key="u.id" :value="String(u.id)">
-                  {{ u.first_name || u.email }}
-                </option>
+                <option value="">— Sin asignar —</option>
+                <optgroup v-if="deliveryUsers.filter(u => u.role === 'delivery').length" label="Repartidores">
+                  <option v-for="u in deliveryUsers.filter(u => u.role === 'delivery')" :key="u.id" :value="String(u.id)">
+                    {{ [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email }}
+                  </option>
+                </optgroup>
+                <optgroup v-if="deliveryUsers.filter(u => u.role !== 'delivery').length" label="Admin / Supervisor">
+                  <option v-for="u in deliveryUsers.filter(u => u.role !== 'delivery')" :key="u.id" :value="String(u.id)">
+                    {{ [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email }}
+                  </option>
+                </optgroup>
               </select>
               <button class="dsp__btn-confirm" :disabled="saving" @click="confirmarReasignacion(d.id)">
                 <DsSpinner v-if="saving" :size="12" />

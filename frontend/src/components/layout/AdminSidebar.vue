@@ -228,6 +228,21 @@ watch(() => route.path, sincronizarGrupos)
   flex-direction: column;
   gap: 1px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-leaf-600) transparent;
+}
+.asb__nav::-webkit-scrollbar {
+  width: 4px;
+}
+.asb__nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.asb__nav::-webkit-scrollbar-thumb {
+  background: var(--c-leaf-600);
+  border-radius: 4px;
+}
+.asb__nav::-webkit-scrollbar-thumb:hover {
+  background: var(--c-leaf-400);
 }
 
 /* Dashboard link — nivel raíz */

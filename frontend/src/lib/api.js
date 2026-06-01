@@ -185,7 +185,8 @@ export const iniciarViaje     = (ids)               => api.patch('/dispensacione
 export const entregarPaquete  = (id, notasEntrega)  => api.patch(`/dispensaciones/${id}/entregar`, { notas_entrega: notasEntrega })
 export const reportarFallo    = (id, motivoFallo)   => api.patch(`/dispensaciones/${id}/reportar_fallo`, { motivo_fallo: motivoFallo })
 export const reprogramarPaquete = (id)             => api.patch(`/dispensaciones/${id}/reprogramar`)
-export const listDeliveryUsers = ()                 => api.get('/usuarios', { params: { role: 'delivery' } })
+export const listDeliveryUsers  = ()                => api.get('/usuarios', { params: { role: 'delivery' } })
+export const listEntregadores   = ()                => api.get('/usuarios', { params: { roles: ['delivery', 'admin', 'supervisor'] } })
 export const listDespachos     = (params = {})      => api.get('/dispensaciones', { params: { con_envio: 'true', ...params } })
 export const reasignarDelivery = (id, deliveryId)  => api.patch(`/dispensaciones/${id}`, { dispensacion: { delivery_id: deliveryId } })
 

@@ -15,7 +15,11 @@ class ClubUsersController < ApplicationController
       )
     end
 
-    rel = rel.where(role: params[:role]) if params[:role].present?
+    if params[:roles].present?
+      rel = rel.where(role: Array(params[:roles]))
+    elsif params[:role].present?
+      rel = rel.where(role: params[:role])
+    end
 
     users = rel.order("created_at DESC")
     render json: { data: users.map { |u|
