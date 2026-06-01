@@ -37,7 +37,7 @@
     <!-- List -->
     <div v-else class="mnp__list">
       <RouterLink
-        v-for="lote in lotesFiltrados"
+        v-for="lote in paginados"
         :key="lote.id"
         :to="`/mnc/lotes/${lote.id}`"
         class="mnp__row"
@@ -67,11 +67,17 @@
       </RouterLink>
     </div>
 
+    <div v-if="totalPages > 1" class="mnp__pager">
+      <button class="mnp__pager-btn" :disabled="page <= 1" @click="page--">«</button>
+      <span class="mnp__pager-info">{{ page }} / {{ totalPages }}</span>
+      <button class="mnp__pager-btn" :disabled="page >= totalPages" @click="page++">»</button>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Scissors, Wind, Package, ChevronRight } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
@@ -90,6 +96,12 @@ const lotesFiltrados = computed(() => {
   if (filtro.value === 'todos') return lotes.value
   return lotes.value.filter(l => l.estado === filtro.value)
 })
+
+const PER_PAGE   = 10
+const page       = ref(1)
+const paginados  = computed(() => lotesFiltrados.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
+const totalPages = computed(() => Math.max(1, Math.ceil(lotesFiltrados.value.length / PER_PAGE)))
+watch([lotesFiltrados], () => { page.value = 1 })
 
 function contar(key) {
   if (key === 'todos') return lotes.value.length
@@ -199,4 +211,10 @@ onMounted(cargar)
 .mnp__badge--pendiente { background: #ede9fe; color: #7c3aed; }
 
 .mnp__row-arrow { color: var(--c-ink-300); }
+
+.mnp__pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 1.25rem 0 .5rem; }
+.mnp__pager-btn { background: #fff; border: 1.5px solid var(--c-ink-200); color: var(--c-ink-700); padding: .35rem .75rem; border-radius: 7px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.mnp__pager-btn:hover:not(:disabled) { border-color: #5C7A4A; color: #5C7A4A; }
+.mnp__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.mnp__pager-info { font-size: .82rem; color: var(--c-ink-500); font-weight: 600; min-width: 50px; text-align: center; }
 </style>

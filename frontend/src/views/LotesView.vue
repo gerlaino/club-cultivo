@@ -64,7 +64,7 @@ const filterSala   = ref("");
 const filterGrow   = ref("");
 const sortBy       = ref("fecha_desc");
 const page         = ref(1);
-const perPage      = ref(50);
+const perPage      = ref(10);
 
 const filtered = computed(() => {
   const query = q.value.trim().toLowerCase();

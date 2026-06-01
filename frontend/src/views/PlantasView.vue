@@ -94,7 +94,7 @@ const hasFilters = computed(() =>
 
 // Paginación
 const page    = ref(1)
-const perPage = 50
+const perPage = 10
 
 const paginated  = computed(() => filtered.value.slice((page.value - 1) * perPage, page.value * perPage))
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / perPage)))

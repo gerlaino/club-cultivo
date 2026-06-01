@@ -279,6 +279,12 @@ const itemsSorted = computed(() => {
   return [...items.value].sort((a,b) => order.indexOf(a.estado) - order.indexOf(b.estado))
 })
 
+const SD_PER_PAGE    = 10
+const sdPage         = ref(1)
+const itemsPaginados = computed(() => itemsSorted.value.slice((sdPage.value - 1) * SD_PER_PAGE, sdPage.value * SD_PER_PAGE))
+const sdTotalPages   = computed(() => Math.max(1, Math.ceil(itemsSorted.value.length / SD_PER_PAGE)))
+watch(itemsSorted, () => { sdPage.value = 1 })
+
 const breadcrumbs = computed(() => {
   if (isCultivador.value) return []
   const crumbs = [{ label:"Sedes", to:{ name:"sedes" } }]
@@ -648,7 +654,7 @@ const canSeeAmbiente = computed(() =>
                 </template>
               </EmptyState>
               <div v-else class="sd__lotes">
-                <RouterLink v-for="l in itemsSorted" :key="l.id" :to="{ name:'lote-detail', params:{ id:l.id } }" class="sd__lote">
+                <RouterLink v-for="l in itemsPaginados" :key="l.id" :to="{ name:'lote-detail', params:{ id:l.id } }" class="sd__lote">
                   <div class="sd__lote-stripe" :style="{ background: estadoMeta(l.estado).color }"></div>
                   <div class="sd__lote-content">
                     <div class="sd__lote-head">
@@ -678,6 +684,11 @@ const canSeeAmbiente = computed(() =>
                   </div>
                   <i class="bi bi-chevron-right sd__lote-arrow"></i>
                 </RouterLink>
+                <div v-if="sdTotalPages > 1" class="sd__lotes-pager">
+                  <button class="sd__pager-btn" :disabled="sdPage <= 1" @click="sdPage--">«</button>
+                  <span class="sd__pager-info">{{ sdPage }} / {{ sdTotalPages }}</span>
+                  <button class="sd__pager-btn" :disabled="sdPage >= sdTotalPages" @click="sdPage++">»</button>
+                </div>
               </div>
             </div>
           </div>
@@ -1241,6 +1252,11 @@ const canSeeAmbiente = computed(() =>
 .sd__lote-progress-fill { height: 100%; border-radius: 999px; transition: width .5s ease; }
 .sd__lote-progress-pct { font-size: .65rem; color: #94a3b8; font-weight: 600; flex-shrink: 0; }
 .sd__lote-arrow { color: #a7d7a9; font-size: .75rem; align-self: center; padding-right: 1rem; flex-shrink: 0; }
+.sd__lotes-pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: .75rem 1rem; border-top: 1px solid #e8f5e9; }
+.sd__pager-btn { background: #fff; border: 1.5px solid #d4e6d4; color: #2d6a4f; padding: .3rem .7rem; border-radius: 7px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.sd__pager-btn:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }
+.sd__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.sd__pager-info { font-size: .82rem; color: #64748b; font-weight: 600; min-width: 50px; text-align: center; }
 
 .sd__card { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
 .sd__card--mt { margin-top: 1rem; }

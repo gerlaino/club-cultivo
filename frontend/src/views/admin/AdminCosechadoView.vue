@@ -35,7 +35,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="lote in lotes" :key="lote.id" class="acs__row">
+        <tr v-for="lote in paginados" :key="lote.id" class="acs__row">
           <td>
             <RouterLink :to="`/lotes/${lote.id}`" class="acs__lote-link">
               {{ lote.codigo }}
@@ -67,6 +67,12 @@
         </tr>
       </tbody>
     </table>
+
+    <div v-if="totalPages > 1" class="acs__pager">
+      <button class="acs__pager-btn" :disabled="page <= 1" @click="page--">«</button>
+      <span class="acs__pager-info">{{ page }} / {{ totalPages }}</span>
+      <button class="acs__pager-btn" :disabled="page >= totalPages" @click="page++">»</button>
+    </div>
 
     <!-- Modal asignación -->
     <Teleport to="body">
@@ -135,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { RefreshCw, Scissors, UserCheck, Scale, Dna, X, AlertCircle } from 'lucide-vue-next'
 import { listLotes, listUsers, asignarManicurador } from '../../lib/api.js'
@@ -146,6 +152,12 @@ const toast = useToast()
 const lotes             = ref([])
 const loading           = ref(true)
 const manicuradores     = ref([])
+
+const PER_PAGE   = 10
+const page       = ref(1)
+const paginados  = computed(() => lotes.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
+const totalPages = computed(() => Math.max(1, Math.ceil(lotes.value.length / PER_PAGE)))
+watch(lotes, () => { page.value = 1 })
 const loadingManicuradores = ref(false)
 
 const modalLote   = ref(null)
@@ -295,6 +307,11 @@ onMounted(cargar)
   background: var(--c-ink-50, #f8fafc);
   border-bottom: 1.5px solid var(--c-ink-100);
 }
+.acs__pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 1.25rem 0 .5rem; }
+.acs__pager-btn { background: #fff; border: 1.5px solid var(--c-ink-200); color: var(--c-ink-700); padding: .35rem .75rem; border-radius: 7px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.acs__pager-btn:hover:not(:disabled) { border-color: #7c3aed; color: #7c3aed; }
+.acs__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.acs__pager-info { font-size: .82rem; color: var(--c-ink-500); font-weight: 600; min-width: 50px; text-align: center; }
 .acs__row {
   border-bottom: 1px solid var(--c-ink-100);
   transition: background .1s;

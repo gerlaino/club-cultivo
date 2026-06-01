@@ -107,7 +107,7 @@ import { ref, computed, onMounted } from 'vue'
 import { listLotes } from '../lib/api.js'
 import { ChevronRight, ChevronLeft, Leaf } from 'lucide-vue-next'
 
-const PER_PAGE = 15
+const PER_PAGE = 10
 
 const loading = ref(true)
 const lotes   = ref([])

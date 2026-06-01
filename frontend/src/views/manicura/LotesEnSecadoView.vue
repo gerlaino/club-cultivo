@@ -23,7 +23,7 @@
     </div>
 
     <div v-else class="lv__cards">
-      <div v-for="lote in lotes" :key="lote.id" class="lv__card">
+      <div v-for="lote in paginados" :key="lote.id" class="lv__card">
         <div class="lv__card-stripe lv__card-stripe--secado"></div>
         <div class="lv__card-body">
           <div class="lv__card-head">
@@ -52,6 +52,12 @@
       </div>
     </div>
 
+    <div v-if="totalPages > 1" class="lv__pager">
+      <button class="lv__pager-btn" :disabled="page <= 1" @click="page--">«</button>
+      <span class="lv__pager-info">{{ page }} / {{ totalPages }}</span>
+      <button class="lv__pager-btn" :disabled="page >= totalPages" @click="page++">»</button>
+    </div>
+
     <ModalPesada
       v-model="showModal"
       :lote="loteSeleccionado"
@@ -63,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Wind, Leaf, MapPin, Package, Scale, Eye, Container } from 'lucide-vue-next'
 import { listLotes, avanzarFaseLote } from '../../lib/api.js'
@@ -76,6 +82,12 @@ const loading = ref(true)
 const showModal = ref(false)
 const loteSeleccionado = ref(null)
 const avanzando = ref(null)
+
+const PER_PAGE   = 10
+const page       = ref(1)
+const paginados  = computed(() => lotes.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
+const totalPages = computed(() => Math.max(1, Math.ceil(lotes.value.length / PER_PAGE)))
+watch(lotes, () => { page.value = 1 })
 
 async function cargar() {
   loading.value = true
@@ -205,4 +217,9 @@ onMounted(cargar)
 }
 .lv__btn-secondary:hover { background: var(--c-ink-50); border-color: var(--c-ink-300); color: var(--c-ink-900); }
 
+.lv__pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 1.25rem 0 .5rem; }
+.lv__pager-btn { background: #fff; border: 1.5px solid var(--c-ink-200); color: var(--c-ink-700); padding: .35rem .75rem; border-radius: 7px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.lv__pager-btn:hover:not(:disabled) { border-color: #6B4FBE; color: #6B4FBE; }
+.lv__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.lv__pager-info { font-size: .82rem; color: var(--c-ink-500); font-weight: 600; min-width: 50px; text-align: center; }
 </style>
