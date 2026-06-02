@@ -276,7 +276,7 @@ class AnalyticsController < ApplicationController
         genetica:      l.genetica&.nombre,
         rendimiento_g: rend,
         objetivo_g:    obj,
-        desv_pct:      obj&.> (0) ? ((rend - obj) / obj * 100).round(1) : nil,
+        desv_pct:      (obj && obj > 0) ? ((rend - obj) / obj * 100).round(1) : nil,
         n_registros:   lecturas.size,
         **promedios,
       }
