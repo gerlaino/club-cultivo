@@ -30,7 +30,8 @@
           <div class="dv__paciente-name">{{ p.nombre }} {{ p.apellido }}</div>
           <div class="dv__paciente-meta">
             <span class="dv__paciente-dni">{{ p.dni ?? p.numero_documento ?? '—' }}</span>
-            <span class="dv__reprocann-badge" :class="reprocannClass(p)">{{ reprocannLabel(p) }}</span>
+            <span v-if="!p.es_paciente" class="dv__badge--inactivo">Dado de baja</span>
+            <span v-else class="dv__reprocann-badge" :class="reprocannClass(p)">{{ reprocannLabel(p) }}</span>
           </div>
         </li>
       </ul>
@@ -79,6 +80,7 @@
             <div v-for="s in stocksDisponibles" :key="s.id" class="dv__stock-card">
               <div class="dv__stock-header">{{ formaLabel(s.forma_producto) }}</div>
               <div class="dv__stock-lote">{{ s.lote?.codigo ?? '—' }}<span v-if="s.sede?.nombre" class="dv__stock-sede"> · {{ s.sede.nombre }}</span></div>
+              <div v-if="s.genetica?.nombre ?? s.lote?.genetica?.nombre" class="dv__stock-cepa">{{ s.genetica?.nombre ?? s.lote?.genetica?.nombre }}</div>
               <div class="dv__stock-disponible">{{ s.cantidad }}{{ s.unidad }} disponibles</div>
               <div class="dv__stock-precio">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad }}</div>
               <div class="dv__stock-add">
@@ -145,8 +147,13 @@
                 <span class="dv__reprocann-badge" :class="reprocannClass(selectedPaciente)">{{ reprocannLabel(selectedPaciente) }}</span>
               </div>
 
+              <!-- Bloqueo: paciente dado de baja -->
+              <div v-if="!pacienteActivo" class="dv__modal-aviso dv__modal-aviso--error">
+                <strong>Socio dado de baja.</strong> No se puede realizar una dispensación. Reactivá el socio desde la sección Socios antes de continuar.
+              </div>
+
               <!-- Aviso REPROCANN -->
-              <div v-if="!reprocannVigente" class="dv__modal-aviso dv__modal-aviso--warn">
+              <div v-if="reprocannVigente === false && pacienteActivo" class="dv__modal-aviso dv__modal-aviso--warn">
                 <strong>Atención:</strong> el paciente {{ reprocannStatus(selectedPaciente) === 'vencido' ? 'tiene el REPROCANN vencido' : 'no tiene REPROCANN registrado' }}. Verificar habilitación antes de continuar.
               </div>
 
@@ -194,6 +201,18 @@
                     No abona
                   </button>
                 </div>
+              </div>
+
+              <!-- Saldo según medio de pago -->
+              <div v-if="medioPago === 'cuenta_corriente' && ccBalance !== null" class="dv__balance-info" :class="{ 'dv__balance-info--alerta': ccExcedido }">
+                <span>Saldo disponible:</span>
+                <strong>{{ formatARS(ccBalance) }}</strong>
+                <span v-if="ccExcedido" class="dv__balance-error">— saldo insuficiente</span>
+              </div>
+              <div v-else-if="medioPago === 'credito_gramos' && ccGBalance !== null" class="dv__balance-info" :class="{ 'dv__balance-info--alerta': gramosExcedido }">
+                <span>Crédito en gramos:</span>
+                <strong>{{ formatG(ccGBalance) }}</strong>
+                <span v-if="gramosExcedido" class="dv__balance-error">— saldo insuficiente</span>
               </div>
 
               <!-- Envío a domicilio -->
@@ -246,7 +265,7 @@
               <button class="dv__modal-cancel" @click="confirmOpen = false" :disabled="submitting">
                 Cancelar
               </button>
-              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || limiteExcedido">
+              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || limiteExcedido || pagoExcedido || !pacienteActivo">
                 <DsSpinner v-if="submitting" :size="16" />
                 <template v-else>Confirmar</template>
               </button>
@@ -261,6 +280,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { listPacientes, getPaciente, listStocks, createDispensacion, listEntregadores } from '../lib/api.js'
+import { formaLabel, formatARS, formatG, formatFecha } from '../lib/formatters.js'
 import { useToast } from '../composables/useToast.js'
 import { Search, Users, Plus, X, AlertTriangle } from 'lucide-vue-next'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -349,8 +369,18 @@ const stocksDisponibles = computed(() =>
 const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.total, 0))
 
 const tieneCc       = computed(() => (pacienteDetalle.value?.limite_cc ?? 0) > 0)
-const tieneCcG      = computed(() => pacienteDetalle.value?.cc_gramos_activo && (pacienteDetalle.value?.limite_cc_g ?? 0) > 0)
+const tieneCcG      = computed(() => pacienteDetalle.value?.cc_gramos_activo && (pacienteDetalle.value?.saldo_cc_g ?? 0) > 0)
 const puedeNoAbonar = computed(() => tieneCc.value || tieneCcG.value)
+
+const ccBalance      = computed(() => pacienteDetalle.value?.saldo_cc  ?? null)
+const ccGBalance     = computed(() => pacienteDetalle.value?.saldo_cc_g ?? null)
+const ccExcedido     = computed(() =>
+  medioPago.value === 'cuenta_corriente' && ccBalance.value !== null && cartTotal.value > ccBalance.value
+)
+const gramosExcedido = computed(() =>
+  medioPago.value === 'credito_gramos' && ccGBalance.value !== null && cartTotalG.value > ccGBalance.value
+)
+const pagoExcedido   = computed(() => ccExcedido.value || gramosExcedido.value)
 
 // Límite mensual
 const tieneLimiteMensual  = computed(() => (pacienteDetalle.value?.limite_dispensacion_mensual_g ?? 0) > 0)
@@ -364,6 +394,9 @@ const porcentajeConCarrito = computed(() => {
 const limiteExcedido = computed(() =>
   tieneLimiteMensual.value && consumoConCarrito.value > (pacienteDetalle.value?.limite_dispensacion_mensual_g ?? Infinity)
 )
+
+// Estado del paciente
+const pacienteActivo  = computed(() => pacienteDetalle.value?.es_paciente !== false)
 
 // REPROCANN
 const reprocannVigente = computed(() => reprocannStatus(selectedPaciente.value) === 'vigente')
@@ -395,6 +428,15 @@ function removeFromCart(i) {
   cart.value.splice(i, 1)
 }
 
+function resetModal() {
+  medioPago.value      = 'efectivo'
+  conEnvio.value       = false
+  direccionEnvio.value = ''
+  contactoNombre.value = ''
+  contactoTel.value    = ''
+  observaciones.value  = ''
+}
+
 async function submitDispensacion() {
   if (!selectedPaciente.value || !cart.value.length) return
   if (conEnvio.value) {
@@ -403,14 +445,11 @@ async function submitDispensacion() {
   }
   submitting.value = true
 
-  const today = new Date().toISOString().slice(0, 10)
-  let errorMsg = null
-
-  // Procesamos secuencialmente; cada ítem se elimina del carrito apenas es confirmado
-  // para que un fallo parcial no deje ítems ya dispensados disponibles para un segundo intento.
-  for (const item of [...cart.value]) {
-    try {
-      await createDispensacion(selectedPaciente.value.id, {
+  const today  = new Date().toISOString().slice(0, 10)
+  const items  = [...cart.value]
+  const results = await Promise.allSettled(
+    items.map(item =>
+      createDispensacion(selectedPaciente.value.id, {
         stock_id:            item.stock.id,
         cantidad:            item.cantidad,
         precio_unitario_ars: item.stock.precio_sugerido_ars,
@@ -425,36 +464,38 @@ async function submitDispensacion() {
         } : {}),
         ...(observaciones.value.trim() ? { observaciones: observaciones.value.trim() } : {}),
       })
-      cart.value = cart.value.filter(i => i !== item)
-    } catch (e) {
-      errorMsg = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar'
-      break
-    }
-  }
+        .then(() => ({ ok: true, item }))
+        .catch(e => ({
+          ok:  false,
+          item,
+          msg: e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar',
+        }))
+    )
+  )
 
   submitting.value = false
 
-  if (errorMsg) {
-    toast.error(errorMsg)
-  } else {
-    toast.success(`Dispensación registrada para ${selectedPaciente.value.nombre}`)
-    confirmOpen.value    = false
-    medioPago.value      = 'efectivo'
-    conEnvio.value       = false
-    direccionEnvio.value = ''
-    contactoNombre.value = ''
-    contactoTel.value    = ''
-    observaciones.value  = ''
+  const ok     = results.map(r => r.value).filter(v => v.ok).map(v => v.item)
+  const errors = results.map(r => r.value).filter(v => !v.ok)
+
+  if (ok.length > 0) {
+    cart.value = cart.value.filter(i => !ok.includes(i))
+    Promise.all([getPaciente(selectedPaciente.value.id), listStocks()])
+      .then(([detRes, stockRes]) => {
+        pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
+        stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
+      }).catch(() => {})
   }
 
-  // Refrescar siempre (éxito total o parcial)
-  Promise.all([
-    getPaciente(selectedPaciente.value.id),
-    listStocks(),
-  ]).then(([detRes, stockRes]) => {
-    pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
-    stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
-  }).catch(() => {})
+  if (errors.length === 0) {
+    toast.success(`Dispensación registrada para ${selectedPaciente.value.nombre}`)
+    confirmOpen.value = false
+    resetModal()
+  } else if (ok.length === 0) {
+    toast.error(errors[0].msg)
+  } else {
+    toast.warning(`${ok.length} de ${items.length} ítems registrados. ${errors[0].msg}`)
+  }
 }
 
 function reprocannStatus(p) {
@@ -474,26 +515,6 @@ function reprocannLabel(p) {
   return 'Sin REPROCANN'
 }
 
-function formaLabel(f) {
-  const LABELS = {
-    flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
-    crema: 'Crema', capsula: 'Cápsulas', capsulas: 'Cápsulas',
-    comestible: 'Comestible', prensado: 'Prensado', externo: 'Externo', otro: 'Otro',
-  }
-  return LABELS[f] || f || '—'
-}
-function formatARS(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
-}
-function formatG(g) {
-  if (g == null) return '—'
-  return `${Number(g).toLocaleString('es-AR', { maximumFractionDigits: 1 })} g`
-}
-function formatFecha(d) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
-}
 </script>
 
 <style scoped>
@@ -587,6 +608,11 @@ function formatFecha(d) {
 .dv__reprocann-badge--green { background: #d1fae5; color: #065f46; }
 .dv__reprocann-badge--amber { background: var(--c-amber-100); color: var(--c-amber-500); }
 .dv__reprocann-badge--gray  { background: var(--c-ink-100); color: var(--c-ink-500); }
+.dv__badge--inactivo {
+  font-size: 10px; font-weight: 700; padding: 1px 6px;
+  border-radius: var(--r-pill); text-transform: uppercase; letter-spacing: .03em;
+  background: #fef2f2; color: #b91c1c;
+}
 
 /* Patient info bar */
 .dv__paciente-bar {
@@ -911,6 +937,19 @@ function formatFecha(d) {
 
 /* Sede label en stock card */
 .dv__stock-sede { color: var(--c-ink-400); font-size: var(--fs-11); }
+.dv__stock-cepa { font-size: var(--fs-12); color: var(--c-ink-600); font-style: italic; }
+
+/* CC / gramos balance info */
+.dv__balance-info {
+  display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-ink-50);
+  border: 1px solid var(--c-ink-200);
+  border-radius: var(--r-md);
+  font-size: var(--fs-13); color: var(--c-ink-700);
+}
+.dv__balance-info--alerta { background: #fff5f5; border-color: #fca5a5; color: #991b1b; }
+.dv__balance-error { font-weight: 700; color: #dc2626; }
 
 /* Avisos en modal */
 .dv__modal-aviso {

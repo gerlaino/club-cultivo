@@ -2,9 +2,9 @@ class AnalyticsController < ApplicationController
   before_action :authenticate_user!
 
   # GET /api/analytics/rendimiento_genetica
-  # Para: cultivador, admin, supervisor
+  # Para: admin, supervisor, super_admin
   def rendimiento_genetica
-    unless %w[admin cultivador supervisor super_admin].include?(current_user.role)
+    unless %w[admin supervisor super_admin].include?(current_user.role)
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 
@@ -184,9 +184,9 @@ class AnalyticsController < ApplicationController
   end
 
   # GET /api/analytics/produccion
-  # Para: admin, cultivador
+  # Para: admin, supervisor, super_admin
   def produccion
-    unless %w[admin cultivador supervisor super_admin].include?(current_user.role)
+    unless %w[admin supervisor super_admin].include?(current_user.role)
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 

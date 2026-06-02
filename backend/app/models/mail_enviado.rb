@@ -1,4 +1,6 @@
 class MailEnviado < ApplicationRecord
+  self.table_name = 'mails_enviados'
+
   belongs_to :paciente
   belongs_to :user
   belongs_to :club

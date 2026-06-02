@@ -241,4 +241,150 @@ RSpec.describe Dispensacion, type: :model do
       expect(stock.reload.cantidad.to_f).to eq(3.0)
     end
   end
+
+  # ── paciente_activo_como_socio ────────────────────────────────────────────
+
+  describe 'validación paciente_activo_como_socio' do
+    it 'acepta dispensar a un paciente activo' do
+      expect(nueva_dispensacion).to be_valid
+    end
+
+    it 'rechaza dispensar a un paciente dado de baja (es_paciente: false)' do
+      paciente.update!(es_paciente: false)
+      d = nueva_dispensacion
+      expect(d).not_to be_valid
+      expect(d.errors[:base]).to include('El socio no está activo en el club')
+    end
+
+    it 'solo aplica on: :create (no bloquea update de dispensa existente)' do
+      d = nueva_dispensacion
+      d.save!
+      paciente.update!(es_paciente: false)
+      d.aporte_socio_ars = 50
+      expect(d).to be_valid
+    end
+  end
+
+  # ── scopes ────────────────────────────────────────────────────────────────
+
+  describe 'scopes' do
+    let!(:dispensa_este_mes) { nueva_dispensacion(cantidad: 5, fecha_dispensacion: Date.today).tap(&:save!) }
+    let!(:dispensa_mes_pasado) do
+      nueva_dispensacion(cantidad: 3, fecha_dispensacion: 1.month.ago.to_date).tap(&:save!)
+    end
+
+    describe '.del_mes' do
+      it 'incluye dispensaciones del mes actual' do
+        expect(Dispensacion.del_mes).to include(dispensa_este_mes)
+      end
+
+      it 'excluye dispensaciones de otros meses' do
+        expect(Dispensacion.del_mes).not_to include(dispensa_mes_pasado)
+      end
+
+      it 'acepta fecha explícita para consultar otro mes' do
+        fecha = 1.month.ago.to_date
+        expect(Dispensacion.del_mes(fecha)).to include(dispensa_mes_pasado)
+        expect(Dispensacion.del_mes(fecha)).not_to include(dispensa_este_mes)
+      end
+    end
+
+    describe '.con_envio' do
+      let!(:con_env) do
+        nueva_dispensacion(
+          cantidad: 2,
+          con_envio: true,
+          direccion_envio: 'Av. Siempreviva 742',
+          contacto_nombre: 'Homero',
+        ).tap(&:save!)
+      end
+
+      it 'devuelve solo dispensaciones con envío' do
+        expect(Dispensacion.con_envio).to include(con_env)
+        expect(Dispensacion.con_envio).not_to include(dispensa_este_mes)
+      end
+    end
+
+    describe '.pendientes_envio' do
+      let!(:pendiente) do
+        nueva_dispensacion(
+          cantidad: 2,
+          con_envio: true,
+          direccion_envio: 'Calle 1',
+          contacto_nombre: 'Alguien',
+        ).tap(&:save!)
+      end
+      let!(:entregada) do
+        d = nueva_dispensacion(
+          cantidad: 2,
+          con_envio: true,
+          direccion_envio: 'Calle 2',
+          contacto_nombre: 'Otro',
+        )
+        d.save!
+        d.update_column(:estado_envio, 'entregado')
+        d
+      end
+
+      it 'incluye solo los con estado_envio pendiente' do
+        expect(Dispensacion.pendientes_envio).to include(pendiente)
+        expect(Dispensacion.pendientes_envio).not_to include(entregada)
+        expect(Dispensacion.pendientes_envio).not_to include(dispensa_este_mes)
+      end
+    end
+  end
+
+  # ── generar_codigo_paquete ────────────────────────────────────────────────
+
+  describe 'callback generar_codigo_paquete' do
+    it 'genera código de paquete al crear con con_envio: true' do
+      d = nueva_dispensacion(
+        con_envio: true,
+        direccion_envio: 'Av. 9 de Julio 100',
+        contacto_nombre: 'Contacto',
+      )
+      d.save!
+      expect(d.codigo_paquete).to match(/\APKG-\d{8}-\d{3}\z/)
+    end
+
+    it 'asigna estado_envio pendiente al crear con con_envio: true' do
+      d = nueva_dispensacion(
+        con_envio: true,
+        direccion_envio: 'Av. 9 de Julio 100',
+        contacto_nombre: 'Contacto',
+      )
+      d.save!
+      expect(d.estado_envio).to eq('pendiente')
+    end
+
+    it 'no genera código de paquete cuando con_envio es false' do
+      d = nueva_dispensacion
+      d.save!
+      expect(d.codigo_paquete).to be_nil
+    end
+  end
+
+  # ── encolar_reporte_ariccame ──────────────────────────────────────────────
+
+  describe 'callback encolar_reporte_ariccame' do
+    context 'club con feature ariccame activa' do
+      before { allow(paciente.club).to receive(:feature?).with(:ariccame).and_return(true) }
+
+      it 'encola ReportarAriccameJob al crear la dispensación' do
+        expect {
+          nueva_dispensacion.save!
+        }.to have_enqueued_job(ReportarAriccameJob)
+      end
+    end
+
+    context 'club sin feature ariccame' do
+      before { allow(paciente.club).to receive(:feature?).with(:ariccame).and_return(false) }
+
+      it 'no encola ningún job' do
+        expect {
+          nueva_dispensacion.save!
+        }.not_to have_enqueued_job(ReportarAriccameJob)
+      end
+    end
+  end
 end

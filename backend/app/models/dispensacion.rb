@@ -21,10 +21,12 @@ class Dispensacion < ApplicationRecord
   validates :estado_envio,       inclusion: { in: ESTADOS_ENVIO }, allow_nil: true
   validates :medio_pago,         inclusion: { in: MEDIOS_PAGO }, allow_blank: true
   validate  :fecha_no_futura
-  validate  :stock_pertenece_al_club,   on: :create
-  validate  :stock_disponible,          on: :create
+  validate  :paciente_activo_como_socio, on: :create
+  validate  :stock_pertenece_al_club,    on: :create
+  validate  :stock_disponible,           on: :create
   validate  :limite_mensual_no_superado, on: :create
   validate  :credito_suficiente,        on: :create, if: -> { medio_pago == 'cuenta_corriente' }
+  validate  :gramos_suficientes,        on: :create, if: -> { medio_pago == 'credito_gramos' }
   validate  :delivery_fields_presentes, if: :con_envio?
 
   scope :del_mes,        ->(fecha = Date.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
@@ -46,6 +48,11 @@ class Dispensacion < ApplicationRecord
     errors.add(:fecha_dispensacion, 'no puede ser futura') if fecha_dispensacion.present? && fecha_dispensacion > Date.today
   end
 
+  def paciente_activo_como_socio
+    return unless paciente
+    errors.add(:base, 'El socio no está activo en el club') unless paciente.es_paciente?
+  end
+
   def stock_pertenece_al_club
     return unless stock && paciente
     club_id = paciente.club_id
@@ -56,9 +63,11 @@ class Dispensacion < ApplicationRecord
 
   def stock_disponible
     return unless stock && cantidad.to_d > 0
-    if cantidad.to_d > stock.cantidad.to_d
-      errors.add(:cantidad,
-        "supera el stock disponible (#{stock.cantidad.to_f} #{stock.unidad || 'g'} disponibles)")
+    stock.with_lock do
+      if cantidad.to_d > stock.cantidad.to_d
+        errors.add(:cantidad,
+          "supera el stock disponible (#{stock.cantidad.to_f} #{stock.unidad || 'g'} disponibles)")
+      end
     end
   end
 
@@ -84,6 +93,16 @@ class Dispensacion < ApplicationRecord
     end
   end
 
+  def gramos_suficientes
+    return unless paciente_id && cantidad.to_d > 0
+    saldo = paciente.saldo_cc_g.to_d
+    if saldo <= 0
+      errors.add(:base, 'El paciente no tiene crédito en gramos disponible.')
+    elsif cantidad.to_d > saldo
+      errors.add(:cantidad, "supera el crédito en gramos disponible (#{saldo.round(2)}g disponibles)")
+    end
+  end
+
   def decrementar_stock
     stock&.decrement!(:cantidad, cantidad)
   end
@@ -93,9 +112,7 @@ class Dispensacion < ApplicationRecord
   end
 
   def generar_codigo_paquete
-    prefix = "PKG-#{Date.today.strftime('%Y%m%d')}"
-    count  = Dispensacion.where("codigo_paquete LIKE ?", "#{prefix}-%").count + 1
-    self.codigo_paquete = "#{prefix}-#{count.to_s.rjust(3, '0')}"
+    self.codigo_paquete = "PKG-#{Date.today.strftime('%Y%m%d')}-#{SecureRandom.hex(3).upcase}"
     self.estado_envio   = 'pendiente'
   end
 

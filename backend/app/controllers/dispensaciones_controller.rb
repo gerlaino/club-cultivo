@@ -351,6 +351,7 @@ class DispensacionesController < ApplicationController
     cc.update!(saldo_disponible: nuevo)
     cc.movimientos.create!(
       tipo:           'debito',
+      unidad:         'ars',
       monto:          -monto,
       saldo_anterior: anterior,
       saldo_nuevo:    nuevo,
@@ -394,6 +395,7 @@ class DispensacionesController < ApplicationController
     cc.update!(saldo_disponible_g: nuevo)
     cc.movimientos.create!(
       tipo:           'debito',
+      unidad:         'gramos',
       monto:          -gramos,
       saldo_anterior: anterior,
       saldo_nuevo:    nuevo,
@@ -407,8 +409,9 @@ class DispensacionesController < ApplicationController
     cc = dispensacion.paciente.cuenta_corriente
     return unless cc
 
+    # Busca por unidad='gramos' (nuevos registros) o por descripción como fallback (registros anteriores a la migración)
     total_g = cc.movimientos.where(dispensacion: dispensacion, tipo: 'debito')
-                .where("descripcion ILIKE ?", '%crédito gramos%')
+                .where("unidad = 'gramos' OR descripcion ILIKE ?", '%(crédito gramos)%')
                 .sum(:monto).abs
     return if total_g <= 0
 

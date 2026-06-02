@@ -42,7 +42,7 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import DsAvatar from '../../design-system/components/Avatar.vue'
 import {
-  Home, Building2, LayoutGrid, Sprout, CheckSquare, Dna, LogOut,
+  Home, Building2, LayoutGrid, Sprout, CheckSquare, Dna, TrendingUp, LogOut,
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -57,6 +57,7 @@ const NAV_LINKS = [
   { to: '/lotes',     icon: Sprout,      label: 'Lotes' },
   { to: '/tareas',    icon: CheckSquare, label: 'Tareas' },
   { to: '/geneticas', icon: Dna,         label: 'Genéticas' },
+  { to: '/analitica', icon: TrendingUp,  label: 'Analítica' },
 ]
 
 function isActive(to) {

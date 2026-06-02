@@ -1,6 +1,8 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { listDispensacionesFecha, exportDispensacionesCSV } from '../lib/api.js'
+import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
+import { RouterLink } from 'vue-router'
 import { Download, RefreshCw, Truck, Search } from 'lucide-vue-next'
 
 const hoy = new Date().toISOString().slice(0, 10)
@@ -29,15 +31,15 @@ const dispensaciones = computed(() => {
   )
 })
 
-// KPIs
+// KPIs — calculados siempre sobre el período completo, no sobre el filtro de búsqueda
 const totalRecaudado = computed(() =>
-  dispensaciones.value.reduce((s, d) => s + (d.aporte_socio_ars ?? 0), 0)
+  allDisps.value.reduce((s, d) => s + (d.aporte_socio_ars ?? 0), 0)
 )
 const totalGramos = computed(() =>
-  dispensaciones.value.reduce((s, d) => s + (d.cantidad ?? 0), 0)
+  allDisps.value.reduce((s, d) => s + (d.cantidad ?? 0), 0)
 )
 const totalConEnvio = computed(() =>
-  dispensaciones.value.filter(d => d.con_envio).length
+  allDisps.value.filter(d => d.con_envio).length
 )
 
 // Resumen por medio de pago
@@ -100,22 +102,6 @@ function setRango(dias) {
 function formatHora(ts) {
   if (!ts) return '—'
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-}
-function formatFecha(f) {
-  if (!f) return '—'
-  return new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
-}
-function formatARS(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
-}
-function formaLabel(f) {
-  const L = {
-    flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
-    crema: 'Crema', capsula: 'Cápsulas', capsulas: 'Cápsulas',
-    comestible: 'Comestible', prensado: 'Prensado', externo: 'Externo', otro: 'Otro',
-  }
-  return L[f] || f || '—'
 }
 function medioPagoLabel(m) {
   const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', credito_gramos: 'Cred. g', no_abona: 'No abona' }
@@ -186,7 +172,7 @@ function medioPagoLabel(m) {
       <!-- KPIs -->
       <div class="hd__kpis">
         <div class="hd__kpi">
-          <span class="hd__kpi-val">{{ dispensaciones.length }}</span>
+          <span class="hd__kpi-val">{{ allDisps.length }}</span>
           <span class="hd__kpi-lbl">Dispensaciones</span>
         </div>
         <div class="hd__kpi">
@@ -237,10 +223,12 @@ function medioPagoLabel(m) {
           <tbody>
             <tr v-for="d in dispensaciones" :key="d.id">
               <td class="hd__td-fecha">
-                <span class="hd__fecha-day">{{ formatFecha(d.fecha_dispensacion) }}</span>
+                <span class="hd__fecha-day">{{ formatFecha(d.fecha_dispensacion, false) }}</span>
                 <span class="hd__fecha-hora">{{ formatHora(d.created_at) }}</span>
               </td>
-              <td class="hd__td-paciente">{{ d.paciente_nombre }}</td>
+              <td class="hd__td-paciente">
+                <RouterLink :to="{ name: 'paciente-detail', params: { id: d.paciente_id } }" class="hd__link-paciente">{{ d.paciente_nombre }}</RouterLink>
+              </td>
               <td class="hd__td-producto">{{ formaLabel(d.stock?.forma_producto) }}</td>
               <td class="hd__td-num">{{ d.cantidad }}{{ d.stock?.unidad ?? 'g' }}</td>
               <td class="hd__td-num">{{ formatARS(d.precio_unitario_ars) }}</td>
@@ -473,6 +461,8 @@ function medioPagoLabel(m) {
 .hd__fecha-day { display: block; font-weight: 600; font-size: var(--fs-13); }
 .hd__fecha-hora { display: block; font-size: 11px; color: var(--c-ink-400); font-family: monospace; }
 .hd__td-paciente { font-weight: 500; }
+.hd__link-paciente { color: inherit; text-decoration: none; }
+.hd__link-paciente:hover { color: #1b5e20; text-decoration: underline; }
 .hd__td-producto { color: var(--c-ink-500); }
 .hd__td-monto { font-weight: 700; color: #15803d; }
 .hd__td-pago { font-size: var(--fs-12); }

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_29_190727) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_01_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -211,6 +211,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_29_190727) do
     t.string "descripcion"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "unidad", default: "ars", null: false
     t.index ["created_by_id"], name: "index_cuenta_corriente_movimientos_on_created_by_id"
     t.index ["cuenta_corriente_id"], name: "index_cuenta_corriente_movimientos_on_cuenta_corriente_id"
     t.index ["dispensacion_id"], name: "index_cuenta_corriente_movimientos_on_dispensacion_id"

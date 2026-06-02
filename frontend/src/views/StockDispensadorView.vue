@@ -21,6 +21,7 @@
         <thead>
           <tr>
             <th>Producto</th>
+            <th>Cepa</th>
             <th>Lote</th>
             <th>Sede</th>
             <th class="sdv__th-num">Disponible</th>
@@ -32,6 +33,7 @@
         <tbody>
           <tr v-for="s in stocksFiltrados" :key="s.id">
             <td class="sdv__td-forma">{{ formaLabel(s.forma_producto) }}</td>
+            <td class="sdv__td-cepa">{{ s.genetica?.nombre ?? s.lote?.genetica?.nombre ?? '—' }}</td>
             <td class="sdv__td-mono">{{ s.lote_codigo ?? s.lote?.codigo ?? '—' }}</td>
             <td>{{ s.sede?.nombre ?? '—' }}</td>
             <td class="sdv__td-num" :class="{ 'sdv__td-bajo': s.cantidad < 5 }">
@@ -53,6 +55,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { listStocks } from '../lib/api.js'
+import { formaLabel, formatARS } from '../lib/formatters.js'
 
 const FORMAS = [
   { value: 'flor_seca',  label: 'Flor seca' },
@@ -88,19 +91,6 @@ onMounted(async () => {
   }
 })
 
-function formaLabel(f) {
-  const L = {
-    flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
-    crema: 'Crema', capsula: 'Cápsulas', capsulas: 'Cápsulas',
-    comestible: 'Comestible', prensado: 'Prensado', externo: 'Externo', otro: 'Otro',
-  }
-  return L[f] || f || '—'
-}
-
-function formatARS(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
-}
 </script>
 
 <style scoped>
@@ -153,6 +143,7 @@ function formatARS(n) {
 .sdv__table tr:hover td { background: var(--c-leaf-50); }
 .sdv__th-num, .sdv__td-num { text-align: right; }
 .sdv__td-forma { font-weight: 600; }
+.sdv__td-cepa  { font-size: var(--fs-13); color: var(--c-ink-600); font-style: italic; }
 .sdv__td-mono  { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--c-ink-700); }
 .sdv__td-bajo  { color: var(--c-rust-600); font-weight: 700; }
 

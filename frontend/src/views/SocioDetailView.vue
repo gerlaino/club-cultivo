@@ -18,9 +18,10 @@ import {
 } from 'lucide-vue-next'
 import { useSocioEditar, REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
 import { useSocioHistoriaClinica }           from '../composables/useSocioHistoriaClinica.js'
-import { useSocioCorreo, MAIL_TEMPLATES }    from '../composables/useSocioCorreo.js'
-import { useSocioCuentaCorriente }           from '../composables/useSocioCuentaCorriente.js'
-import DsSpinner from '../design-system/components/Spinner.vue'
+import DsSpinner               from '../design-system/components/Spinner.vue'
+import SocioTabTimeline        from '../components/pacientes/SocioTabTimeline.vue'
+import SocioTabCuentaCorriente from '../components/pacientes/SocioTabCuentaCorriente.vue'
+import SocioTabCorreo          from '../components/pacientes/SocioTabCorreo.vue'
 
 const route  = useRoute()
 const store  = usePacientesStore()
@@ -51,23 +52,8 @@ const {
   hcForm, saveNotasClinicas,
 } = useSocioHistoriaClinica(socioId, { s })
 
-const {
-  mailHistory, mailLoading, mailSending, mailPreview, mailTemplate, mailForm,
-  applyMailTemplate, loadMailHistory, submitMail,
-} = useSocioCorreo(socioId, { s })
-
-const {
-  cc, loadingCC,
-  limiteEditOpen, limiteEditVal, savingLimite,
-  togglingGramos,
-  limiteGOpen, limiteGVal, savingLimiteG,
-  cargarGOpen, cargarGVal, savingCargarG,
-  fmtARS, ccDeudaActual, ccMargen, ccPorcentaje,
-  openLimiteEdit, loadCC, saveLimite, toggleGramos, saveLimiteG, doCargarG,
-  onDispensacionCreada: _onDispCC,
-} = useSocioCuentaCorriente(socioId)
-
-function onDispensacionCreada() { _onDispCC(activeTab.value) }
+const ccRefreshKey = ref(0)
+function onDispensacionCreada() { ccRefreshKey.value++ }
 
 // ── Notas rápidas ─────────────────────────────────────────────────────────────
 const notaTexto = ref('')
@@ -103,8 +89,6 @@ async function loadTimeline() {
 
 watch(activeTab, (tab) => {
   if (tab === 'timeline') loadTimeline()
-  if (tab === 'cuenta_corriente') loadCC()
-  if (tab === 'correo' && mailHistory.value.length === 0) loadMailHistory()
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -136,23 +120,11 @@ const reprocannStatus = computed(() => {
 const AVATAR_COLORS = ['#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc2626','#15803d']
 function avatarColor(id) { return AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length] }
 
-const TIMELINE_COLORS = {
-  dispensacion: '#0369a1',
-  nota: '#b45309',
-  indicacion: '#7c3aed',
-  alta: '#15803d',
-}
-function timelineColor(tipo) { return TIMELINE_COLORS[tipo] || '#64748b' }
-function timelineLabel(tipo) {
-  const L = { dispensacion: 'Dispensación', nota: 'Nota clínica', indicacion: 'Indicación médica', alta: 'Alta' }
-  return L[tipo] || tipo
-}
-
 const ALL_TABS = [
   { key: 'info',             label: 'Datos',            icon: User },
   { key: 'reprocann',        label: 'REPROCANN',         icon: ShieldCheck },
   { key: 'dispensaciones',   label: 'Dispensaciones',    icon: Pill },
-  { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin'] },
+  { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin', 'dispensador'] },
   { key: 'historia',         label: 'Historia clínica',  icon: ClipboardList, roles: ['admin', 'medico'] },
   { key: 'notas',            label: 'Notas',             icon: BookOpen,      roles: ['admin', 'medico'] },
   { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
@@ -367,9 +339,9 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             :dispensado-mes-g="s?.dispensado_mes_actual_g ?? null"
             :saldo-cc="s?.saldo_cc ?? null"
             :limite-cc="s?.limite_cc ?? null"
-            :saldo-cc-g="cc?.saldo_disponible_g ?? s?.saldo_cc_g ?? null"
-            :limite-cc-g="cc?.limite_credito_g ?? s?.limite_cc_g ?? null"
-            :cc-gramos-activo="cc?.credito_gramos_activo ?? s?.cc_gramos_activo ?? false"
+            :saldo-cc-g="s?.saldo_cc_g ?? null"
+            :limite-cc-g="s?.limite_cc_g ?? null"
+            :cc-gramos-activo="s?.cc_gramos_activo ?? false"
             @dispensacion-creada="onDispensacionCreada"
           />
         </div>
@@ -377,173 +349,11 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
       <!-- ── Tab: Cuenta corriente ── -->
       <div v-show="activeTab === 'cuenta_corriente'" class="sd__tab-content">
-        <div v-if="loadingCC" class="sd__cc-loading"><DsSpinner :size="40" /></div>
-        <template v-else-if="cc">
-
-          <!-- Saldo, margen y límite -->
-          <div class="sd__cc-header">
-
-            <!-- Saldo actual -->
-            <div class="sd__cc-saldo-block" :class="cc.saldo_disponible < 0 ? 'sd__cc-saldo-block--deuda' : ''">
-              <span class="sd__cc-saldo-label">{{ cc.saldo_disponible < 0 ? 'Deuda actual' : 'Saldo a favor' }}</span>
-              <span class="sd__cc-saldo-valor"
-                    :class="cc.saldo_disponible < 0 ? 'sd__cc-saldo--deuda' : cc.saldo_disponible > 0 ? 'sd__cc-saldo--ok' : 'sd__cc-saldo--zero'">
-                {{ cc.saldo_disponible < 0 ? '−' : '' }}{{ fmtARS(Math.abs(cc.saldo_disponible)) }}
-              </span>
-              <span class="sd__cc-saldo-hint">
-                {{ cc.saldo_disponible < 0 ? 'El socio nos debe este monto' : cc.saldo_disponible > 0 ? 'Pagó por adelantado' : 'Sin saldo ni deuda' }}
-              </span>
-            </div>
-
-            <!-- Margen disponible (el número que importa para dispensar) -->
-            <div class="sd__cc-margen-block" :class="cc.limite_credito > 0 && ccMargen <= 0 ? 'sd__cc-margen-block--agotado' : ''">
-              <span class="sd__cc-saldo-label">Puede retirar aún</span>
-              <span class="sd__cc-margen-valor" :class="!cc.limite_credito ? 'sd__cc-margen--zero' : ccMargen <= 0 ? 'sd__cc-margen--agotado' : ccMargen < cc.limite_credito * 0.2 ? 'sd__cc-margen--bajo' : 'sd__cc-margen--ok'">
-                {{ fmtARS(Math.max(0, ccMargen)) }}
-              </span>
-              <span class="sd__cc-saldo-hint">
-                {{ ccMargen <= 0 ? (cc.limite_credito === 0 ? 'Sin límite configurado' : 'Límite agotado — bloqueado') : 'Antes de ser bloqueado' }}
-              </span>
-            </div>
-
-            <!-- Límite (editable) -->
-            <div class="sd__cc-limite-block">
-              <span class="sd__cc-limite-label">Límite de crédito</span>
-              <template v-if="!limiteEditOpen">
-                <div class="sd__cc-limite-valor-row">
-                  <span class="sd__cc-limite-valor">{{ fmtARS(cc.limite_credito) }}</span>
-                  <button class="sd__cc-limite-edit-btn" @click="openLimiteEdit" title="Editar límite">
-                    <Pencil :size="12" :stroke-width="1.75" />
-                  </button>
-                </div>
-              </template>
-              <template v-else>
-                <div class="sd__cc-limite-form">
-                  <input
-                    type="number"
-                    min="0"
-                    step="100"
-                    v-model.number="limiteEditVal"
-                    class="sd__cc-limite-input"
-                    placeholder="0"
-                    @keydown.enter="saveLimite"
-                    @keydown.esc="limiteEditOpen = false"
-                  />
-                  <button class="sd__cc-btn sd__cc-btn--primary sd__cc-btn--sm" :disabled="savingLimite" @click="saveLimite">
-                    {{ savingLimite ? '…' : 'Guardar' }}
-                  </button>
-                  <button class="sd__cc-btn sd__cc-btn--ghost sd__cc-btn--sm" @click="limiteEditOpen = false">
-                    Cancelar
-                  </button>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <!-- ── Crédito en gramos ── -->
-          <div class="sd__cc-gramos-section">
-            <div class="sd__cc-gramos-header">
-              <div class="sd__cc-gramos-title">
-                <i class="bi bi-flower1"></i> Crédito en gramos
-              </div>
-              <button
-                class="sd__cc-toggle"
-                :class="cc.credito_gramos_activo ? 'sd__cc-toggle--on' : 'sd__cc-toggle--off'"
-                :disabled="togglingGramos"
-                @click="toggleGramos"
-                :title="cc.credito_gramos_activo ? 'Desactivar crédito en gramos' : 'Activar crédito en gramos'"
-              >
-                <span class="sd__cc-toggle-knob"></span>
-              </button>
-            </div>
-
-            <template v-if="cc.credito_gramos_activo">
-              <div class="sd__cc-gramos-stats">
-                <div class="sd__cc-gramos-stat">
-                  <span class="sd__cc-gramos-stat-label">Disponible</span>
-                  <span class="sd__cc-gramos-stat-val" :class="cc.saldo_disponible_g <= 0 ? 'sd__cc-gramos--agotado' : 'sd__cc-gramos--ok'">
-                    {{ (cc.saldo_disponible_g ?? 0).toFixed(1) }}g
-                  </span>
-                </div>
-                <div class="sd__cc-gramos-stat">
-                  <span class="sd__cc-gramos-stat-label">Límite</span>
-                  <span class="sd__cc-gramos-stat-val">{{ cc.limite_credito_g ? cc.limite_credito_g.toFixed(1) + 'g' : '—' }}</span>
-                </div>
-              </div>
-
-              <div class="sd__cc-gramos-actions">
-                <!-- Editar límite -->
-                <template v-if="!limiteGOpen">
-                  <button class="sd__cc-btn sd__cc-btn--ghost sd__cc-btn--sm" @click="limiteGOpen = true; limiteGVal = cc.limite_credito_g ?? null">
-                    <Pencil :size="11" :stroke-width="2" /> Límite
-                  </button>
-                </template>
-                <template v-else>
-                  <div class="sd__cc-gramos-form">
-                    <input type="number" min="0.1" step="0.5" v-model.number="limiteGVal"
-                           class="sd__cc-limite-input" placeholder="ej: 50"
-                           @keydown.enter="saveLimiteG" @keydown.esc="limiteGOpen = false" />
-                    <span class="sd__cc-gramos-unit">g</span>
-                    <button class="sd__cc-btn sd__cc-btn--primary sd__cc-btn--sm" :disabled="savingLimiteG" @click="saveLimiteG">
-                      {{ savingLimiteG ? '…' : 'OK' }}
-                    </button>
-                    <button class="sd__cc-btn sd__cc-btn--ghost sd__cc-btn--sm" @click="limiteGOpen = false">✕</button>
-                  </div>
-                </template>
-
-                <!-- Cargar gramos -->
-                <template v-if="!cargarGOpen">
-                  <button class="sd__cc-btn sd__cc-btn--primary sd__cc-btn--sm" @click="cargarGOpen = true; cargarGVal = null">
-                    + Cargar gramos
-                  </button>
-                </template>
-                <template v-else>
-                  <div class="sd__cc-gramos-form">
-                    <input type="number" min="0.1" step="0.5" v-model.number="cargarGVal"
-                           class="sd__cc-limite-input" placeholder="ej: 20"
-                           @keydown.enter="doCargarG" @keydown.esc="cargarGOpen = false" />
-                    <span class="sd__cc-gramos-unit">g</span>
-                    <button class="sd__cc-btn sd__cc-btn--primary sd__cc-btn--sm" :disabled="savingCargarG" @click="doCargarG">
-                      {{ savingCargarG ? '…' : 'Cargar' }}
-                    </button>
-                    <button class="sd__cc-btn sd__cc-btn--ghost sd__cc-btn--sm" @click="cargarGOpen = false">✕</button>
-                  </div>
-                </template>
-              </div>
-            </template>
-            <p v-else class="sd__cc-gramos-hint">Activá para permitir que el socio dispense sin pagar en el momento, descontando de un cupo en gramos.</p>
-          </div>
-
-          <!-- Barra de deuda utilizada (solo muestra si hay límite Y deuda) -->
-          <div v-if="cc.limite_credito > 0 && ccDeudaActual > 0" class="sd__cc-bar-wrap">
-            <div class="sd__cc-bar">
-              <div class="sd__cc-bar-fill"
-                   :style="{ width: ccPorcentaje + '%' }"
-                   :class="ccPorcentaje >= 90 ? 'sd__cc-bar-fill--danger' : ccPorcentaje >= 70 ? 'sd__cc-bar-fill--warn' : ''">
-              </div>
-            </div>
-            <span class="sd__cc-bar-pct">{{ ccPorcentaje }}% del crédito utilizado</span>
-          </div>
-
-          <!-- Historial de movimientos -->
-          <div class="sd__cc-historial">
-            <div class="sd__cc-historial-title">Historial</div>
-            <div v-if="!cc.movimientos?.length" class="sd__cc-empty">Sin movimientos registrados</div>
-            <div v-else class="sd__cc-movs">
-              <div v-for="m in cc.movimientos" :key="m.id" class="sd__cc-mov">
-                <div class="sd__cc-mov-tipo" :class="`sd__cc-mov-tipo--${m.tipo}`">{{ m.tipo_label }}</div>
-                <div class="sd__cc-mov-desc">{{ m.descripcion || '—' }}</div>
-                <div class="sd__cc-mov-monto" :class="m.monto >= 0 ? 'sd__cc-mov--pos' : 'sd__cc-mov--neg'">
-                  {{ m.monto >= 0 ? '+' : '' }}{{ fmtARS(m.monto) }}
-                </div>
-                <div class="sd__cc-mov-saldo">Saldo: {{ fmtARS(m.saldo_nuevo) }}</div>
-                <div class="sd__cc-mov-meta">{{ m.created_by }} · {{ new Date(m.created_at).toLocaleDateString('es-AR', { day:'numeric', month:'short', year:'numeric' }) }}</div>
-              </div>
-            </div>
-          </div>
-
-        </template>
-        <div v-else class="sd__cc-empty">No se pudo cargar la cuenta corriente.</div>
+        <SocioTabCuentaCorriente
+          :socio-id="socioId"
+          :refresh-key="ccRefreshKey"
+          :readonly="auth.user?.role === 'dispensador'"
+        />
       </div>
 
       <!-- ── Tab: Historia clínica ── -->
@@ -698,148 +508,12 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
       <!-- ── Tab: Timeline ── -->
       <div v-show="activeTab === 'timeline'" class="sd__tab-content">
-        <div class="sd__card">
-          <div class="sd__card-header">
-            <div class="sd__card-icon sd__card-icon--blue"><Clock :size="15" /></div>
-            <span class="sd__card-title">Timeline del paciente</span>
-          </div>
-          <div v-if="timelineLoading" class="sd__loading-sm"><DsSpinner :size="40" /></div>
-          <div v-else-if="!timeline.length" class="sd__empty">
-            <div class="sd__empty-icon"><Clock :size="28" /></div>
-            <div class="sd__empty-title">Sin eventos registrados</div>
-          </div>
-          <div v-else class="sd__timeline">
-            <div v-for="(ev, i) in timeline" :key="i" class="sd__tl-item">
-              <div class="sd__tl-dot" :style="{ background: timelineColor(ev.tipo) }"></div>
-              <div class="sd__tl-body">
-                <div class="sd__tl-tipo" :style="{ color: timelineColor(ev.tipo) }">{{ timelineLabel(ev.tipo) }}</div>
-                <div class="sd__tl-desc">{{ ev.descripcion }}</div>
-                <div class="sd__tl-fecha">{{ formatDateTime(ev.fecha) }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SocioTabTimeline :timeline="timeline" :timeline-loading="timelineLoading" />
       </div>
 
       <!-- ── Tab: Correo ── -->
       <div v-show="activeTab === 'correo'" class="sd__tab-content">
-
-        <!-- Sin email: warning -->
-        <div v-if="s && !s.email" class="sd__mail-noemail">
-          <AlertTriangle :size="20" class="sd__mail-noemail-ico" />
-          <div>
-            <strong>Este paciente no tiene email registrado.</strong>
-            <span> Editá sus datos para agregar uno antes de enviar mensajes.</span>
-          </div>
-          <button class="sd__mail-edit-link" @click="openEdit()">Editar datos →</button>
-        </div>
-
-        <!-- Compose card -->
-        <div class="sd__card sd__mail-compose" :class="{ 'sd__mail-compose--disabled': !s?.email }">
-          <!-- Header: Para -->
-          <div class="sd__mail-to">
-            <Mail :size="14" class="sd__mail-to-ico" />
-            <span class="sd__mail-to-label">Para:</span>
-            <span class="sd__mail-to-name">{{ s?.nombre }} {{ s?.apellido }}</span>
-            <span v-if="s?.email" class="sd__mail-to-email">&lt;{{ s.email }}&gt;</span>
-            <span v-else class="sd__mail-to-missing">sin email</span>
-          </div>
-
-          <!-- Templates -->
-          <div class="sd__mail-templates">
-            <button
-              v-for="tpl in MAIL_TEMPLATES"
-              :key="tpl.key"
-              class="sd__mail-tpl-chip"
-              :class="{ 'sd__mail-tpl-chip--active': mailTemplate === tpl.key }"
-              @click="applyMailTemplate(tpl.key)"
-            >
-              {{ tpl.icon }} {{ tpl.label }}
-            </button>
-          </div>
-
-          <!-- Preview mode -->
-          <div v-if="mailPreview" class="sd__mail-preview">
-            <div class="sd__mail-preview-subject">{{ mailForm.asunto || '(sin asunto)' }}</div>
-            <div class="sd__mail-preview-body">{{ mailForm.cuerpo || '(sin contenido)' }}</div>
-          </div>
-
-          <!-- Edit mode -->
-          <template v-else>
-            <div class="sd__mail-field">
-              <label class="sd__mail-field-label">Asunto</label>
-              <input
-                v-model="mailForm.asunto"
-                class="sd__mail-input"
-                placeholder="Asunto del mensaje…"
-                maxlength="200"
-                :disabled="!s?.email"
-              />
-            </div>
-            <div class="sd__mail-field">
-              <label class="sd__mail-field-label">Mensaje</label>
-              <textarea
-                v-model="mailForm.cuerpo"
-                class="sd__mail-textarea"
-                placeholder="Escribí el mensaje…"
-                rows="7"
-                maxlength="3000"
-                :disabled="!s?.email"
-              ></textarea>
-              <div class="sd__mail-charcount">{{ mailForm.cuerpo.length }} / 3000</div>
-            </div>
-          </template>
-
-          <!-- Actions -->
-          <div class="sd__mail-actions">
-            <button
-              class="sd__mail-preview-btn"
-              @click="mailPreview = !mailPreview"
-              :disabled="!mailForm.asunto && !mailForm.cuerpo"
-            >
-              {{ mailPreview ? 'Editar' : 'Vista previa' }}
-            </button>
-            <button
-              class="sd__mail-send-btn"
-              :disabled="!s?.email || mailSending || !mailForm.asunto.trim() || !mailForm.cuerpo.trim()"
-              @click="submitMail"
-            >
-              <DsSpinner v-if="mailSending" :size="16" />
-              <Mail v-else :size="15" />
-              {{ mailSending ? 'Enviando…' : 'Enviar mail' }}
-            </button>
-          </div>
-        </div>
-
-        <!-- Historial -->
-        <div class="sd__mail-history-wrap">
-          <div class="sd__mail-history-title">Historial de mails enviados</div>
-
-          <div v-if="mailLoading" class="sd__loading-sm"><DsSpinner :size="40" /></div>
-
-          <div v-else-if="!mailHistory.length" class="sd__empty sd__empty--sm">
-            <div class="sd__empty-icon"><Mail :size="24" /></div>
-            <div class="sd__empty-title">Todavía no se envió ningún mail</div>
-          </div>
-
-          <div v-else class="sd__mail-history">
-            <div v-for="m in mailHistory" :key="m.id" class="sd__mail-item">
-              <div class="sd__mail-item-ico">
-                <Mail :size="14" />
-              </div>
-              <div class="sd__mail-item-body">
-                <div class="sd__mail-item-subject">{{ m.asunto }}</div>
-                <div class="sd__mail-item-meta">
-                  {{ formatDateTime(m.enviado_at) }} · {{ m.remitente }} → {{ m.email_destino }}
-                </div>
-              </div>
-              <div class="sd__mail-item-tipo">
-                <span class="sd__mail-tipo-badge">{{ MAIL_TEMPLATES.find(t => t.key === m.tipo)?.icon || '📧' }} {{ m.tipo }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
+        <SocioTabCorreo :socio-id="socioId" :socio="s" @open-edit="openEdit" />
       </div>
 
     </template>
@@ -1029,15 +703,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__nota-meta { font-size: .72rem; color: #94a3b8; }
 .sd__nota-text { font-size: .85rem; color: #374151; margin: 0; line-height: 1.6; border-left: 2px solid #d4e6d4; padding-left: .75rem; }
 
-/* Timeline */
-.sd__timeline { padding: 1.25rem; display: flex; flex-direction: column; gap: 0; }
-.sd__tl-item { display: flex; gap: 1rem; padding: .875rem 0; border-bottom: 1px solid #f1f5f9; }
-.sd__tl-item:last-child { border-bottom: none; }
-.sd__tl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: .35rem; }
-.sd__tl-tipo { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .2rem; }
-.sd__tl-desc { font-size: .875rem; color: #374151; margin-bottom: .25rem; }
-.sd__tl-fecha { font-size: .72rem; color: #94a3b8; }
-
 /* Empty / loading */
 .sd__loading-sm { display: flex; justify-content: center; padding: 2rem; }
 .sd__empty { text-align: center; padding: 3rem 1rem; color: #94a3b8; }
@@ -1081,87 +746,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd-modal-enter-active .sd-modal, .sd-modal-leave-active .sd-modal { transition: transform .2s; }
 .sd-modal-enter-from .sd-modal, .sd-modal-leave-to .sd-modal { transform: translateY(-12px); }
 
-/* ── Cuenta Corriente ── */
-.sd__cc-loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
-
-.sd__cc-header { display: flex; align-items: stretch; gap: 1rem; margin-bottom: 1rem; }
-.sd__cc-saldo-block, .sd__cc-margen-block, .sd__cc-limite-block { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: .2rem; }
-.sd__cc-saldo-block { background: #f0fdf4; border-color: #bbf7d0; }
-.sd__cc-saldo-block--deuda { background: #fef2f2; border-color: #fecaca; }
-.sd__cc-margen-block { background: #eff6ff; border-color: #bfdbfe; }
-.sd__cc-margen-block--agotado { background: #fef2f2; border-color: #fecaca; }
-.sd__cc-saldo-label, .sd__cc-limite-label { font-size: .72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
-.sd__cc-saldo-hint { font-size: .7rem; color: #94a3b8; margin-top: .1rem; }
-.sd__cc-saldo-valor { font-family: monospace; font-size: 1.6rem; font-weight: 800; color: #0f172a; }
-.sd__cc-saldo--ok   { color: #15803d; }
-.sd__cc-saldo--zero { color: #94a3b8; }
-.sd__cc-saldo--deuda { color: #dc2626; }
-.sd__cc-margen-valor { font-family: monospace; font-size: 1.6rem; font-weight: 800; }
-.sd__cc-margen--ok      { color: #2563eb; }
-.sd__cc-margen--bajo    { color: #d97706; }
-.sd__cc-margen--agotado { color: #dc2626; }
-.sd__cc-margen--zero    { color: #94a3b8; }
-.sd__cc-limite-valor { font-family: monospace; font-size: 1.3rem; font-weight: 700; color: #475569; }
-.sd__cc-limite-valor-row { display: flex; align-items: center; gap: .35rem; }
-.sd__cc-limite-edit-btn { background: none; border: none; cursor: pointer; color: #94a3b8; padding: .1rem .2rem; border-radius: 4px; display: inline-flex; align-items: center; transition: color .15s; flex-shrink: 0; }
-.sd__cc-limite-edit-btn:hover { color: #475569; }
-.sd__cc-limite-form { display: flex; align-items: center; gap: .4rem; margin-top: .25rem; flex-wrap: wrap; }
-.sd__cc-limite-input { font-family: monospace; font-size: 1rem; font-weight: 600; border: 1.5px solid #6366f1; border-radius: 8px; padding: .35rem .6rem; width: 8rem; color: #1e293b; background: #fff; outline: none; }
-.sd__cc-limite-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
-.sd__cc-btn--sm { padding: .3rem .7rem; font-size: .78rem; }
-
-/* Crédito en gramos */
-.sd__cc-gramos-section { border: 1.5px solid #e2e8f0; border-radius: 12px; padding: .9rem 1rem; margin-bottom: 1rem; }
-.sd__cc-gramos-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
-.sd__cc-gramos-title { font-size: .78rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: .4rem; }
-.sd__cc-gramos-hint { font-size: .75rem; color: #94a3b8; margin: .25rem 0 0; }
-.sd__cc-gramos-stats { display: flex; gap: 1.5rem; margin-bottom: .75rem; }
-.sd__cc-gramos-stat { display: flex; flex-direction: column; gap: .15rem; }
-.sd__cc-gramos-stat-label { font-size: .68rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
-.sd__cc-gramos-stat-val { font-size: 1.1rem; font-weight: 800; font-family: monospace; color: #0f172a; }
-.sd__cc-gramos--ok { color: #15803d; }
-.sd__cc-gramos--agotado { color: #dc2626; }
-.sd__cc-gramos-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.sd__cc-gramos-form { display: flex; align-items: center; gap: .4rem; }
-.sd__cc-gramos-unit { font-size: .8rem; font-weight: 700; color: #64748b; }
-/* Toggle switch */
-.sd__cc-toggle { position: relative; width: 36px; height: 20px; border-radius: 999px; border: none; cursor: pointer; transition: background .2s; padding: 0; flex-shrink: 0; }
-.sd__cc-toggle--off { background: #cbd5e1; }
-.sd__cc-toggle--on  { background: #15803d; }
-.sd__cc-toggle:disabled { opacity: .6; cursor: not-allowed; }
-.sd__cc-toggle-knob { position: absolute; top: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
-.sd__cc-toggle--off .sd__cc-toggle-knob { left: 2px; }
-.sd__cc-toggle--on  .sd__cc-toggle-knob { left: 18px; }
-
-.sd__cc-bar-wrap { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
-.sd__cc-bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
-.sd__cc-bar-fill { height: 100%; background: #15803d; border-radius: 999px; transition: width .4s; }
-.sd__cc-bar-fill--warn { background: #d97706; }
-.sd__cc-bar-fill--danger { background: #dc2626; }
-.sd__cc-bar-pct { font-size: .72rem; color: #94a3b8; white-space: nowrap; font-family: monospace; }
-
-.sd__cc-actions { display: flex; gap: .5rem; margin-bottom: 1rem; flex-wrap: wrap; }
-.sd__cc-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem 1rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
-.sd__cc-btn--primary { background: #15803d; color: #fff; }
-.sd__cc-btn--primary:hover { background: #166534; }
-.sd__cc-btn--primary:disabled { opacity: .5; cursor: not-allowed; }
-.sd__cc-btn--ghost { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
-.sd__cc-btn--ghost:hover { background: #e2e8f0; }
-.sd__cc-btn--danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-.sd__cc-btn--danger:hover:not(:disabled) { background: #fee2e2; }
-.sd__cc-btn--danger:disabled { opacity: .5; cursor: not-allowed; }
-
-.sd__cc-signo-wrap { display: flex; gap: .4rem; }
-.sd__cc-signo-btn { flex: 1; padding: .55rem; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; color: #64748b; }
-.sd__cc-signo-btn--active-pos { background: #f0fdf4; border-color: #15803d; color: #15803d; }
-.sd__cc-signo-btn--active-neg { background: #fef2f2; border-color: #dc2626; color: #dc2626; }
-
-.sd__cc-form { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .75rem; }
-.sd__cc-form--ajuste { border-color: #fcd34d; background: #fffbeb; }
-.sd__cc-form-title { font-size: .9rem; font-weight: 700; color: #0f172a; margin: 0; }
-.sd__cc-form-hint { font-size: .75rem; color: #64748b; margin: -.25rem 0 .1rem; line-height: 1.5; }
-.sd__cc-form-sub { font-size: .78rem; color: #64748b; margin: -.25rem 0 .25rem; }
-
 .sd-modal__repro-estados { display: flex; gap: .4rem; flex-wrap: wrap; }
 .sd-modal__repro-btn { padding: .4rem .8rem; border-radius: 7px; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .sd-modal__repro-btn:hover { border-color: #94a3b8; }
@@ -1172,11 +756,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd-modal__limit-unit { font-size: .8rem; font-weight: 600; color: #64748b; white-space: nowrap; }
 .sd-modal__limit-clear { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 2px; display: flex; align-items: center; border-radius: 4px; transition: color .15s; }
 .sd-modal__limit-clear:hover { color: #dc2626; }
-.sd__cc-form-row { display: flex; flex-direction: column; gap: .3rem; }
-.sd__cc-form-row label { font-size: .75rem; font-weight: 600; color: #64748b; }
-.sd__cc-input { padding: .5rem .75rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; outline: none; transition: border-color .15s; }
-.sd__cc-input:focus { border-color: #15803d; }
-.sd__cc-form-footer { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .25rem; }
 
 /* Documento REPROCANN */
 .sd__repro-doc-body { padding: 1rem 1.25rem; }
@@ -1185,24 +764,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__repro-doc-link:hover { background: #e0f2fe; border-color: #0369a1; }
 .sd__repro-upload-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .sd__repro-hint { font-size: .72rem; color: #94a3b8; }
-
-.sd__cc-historial { margin-top: 1.25rem; }
-.sd__cc-historial-title { font-size: .75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .75rem; }
-.sd__cc-empty { text-align: center; color: #94a3b8; font-size: .875rem; padding: 1.5rem; }
-.sd__cc-movs { display: flex; flex-direction: column; gap: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
-.sd__cc-mov { display: grid; grid-template-columns: auto 1fr auto; grid-template-rows: auto auto; gap: .1rem .75rem; padding: .8rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: .82rem; }
-.sd__cc-mov:last-child { border-bottom: none; }
-.sd__cc-mov-tipo { grid-column: 1; grid-row: 1; font-size: .7rem; font-weight: 700; padding: .15rem .5rem; border-radius: 999px; white-space: nowrap; align-self: center; }
-.sd__cc-mov-tipo--carga  { background: #f0fdf4; color: #15803d; }
-.sd__cc-mov-tipo--debito { background: #fef2f2; color: #dc2626; }
-.sd__cc-mov-tipo--ajuste { background: #fffbeb; color: #b45309; }
-.sd__cc-mov-tipo--pago   { background: #eff6ff; color: #2563eb; }
-.sd__cc-mov-desc { grid-column: 2; grid-row: 1; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sd__cc-mov-monto { grid-column: 3; grid-row: 1; font-family: monospace; font-weight: 700; text-align: right; white-space: nowrap; }
-.sd__cc-mov--pos { color: #15803d; }
-.sd__cc-mov--neg { color: #dc2626; }
-.sd__cc-mov-saldo { grid-column: 2; grid-row: 2; font-family: monospace; font-size: .72rem; color: #94a3b8; }
-.sd__cc-mov-meta  { grid-column: 3; grid-row: 2; font-size: .7rem; color: #94a3b8; text-align: right; }
 
 /* Modal genérico */
 .sd__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; }
@@ -1244,107 +805,4 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__btn-tiny--ghost { border-color: #e2e8f0; color: #94a3b8; }
 .sd__btn-tiny--ghost:hover { background: #f8fafc; color: #475569; }
 
-/* ── Correo tab ─────────────────────────────────────────── */
-.sd__mail-noemail {
-  display: flex; align-items: flex-start; gap: .75rem;
-  background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
-  padding: .875rem 1rem; margin-bottom: 1rem; font-size: .875rem; color: #92400e; flex-wrap: wrap;
-}
-.sd__mail-noemail-ico { color: #d97706; flex-shrink: 0; margin-top: .1rem; }
-.sd__mail-edit-link {
-  background: none; border: none; color: #1b5e20; font-weight: 700; font-size: .875rem;
-  cursor: pointer; margin-left: auto; white-space: nowrap; padding: 0;
-}
-.sd__mail-edit-link:hover { text-decoration: underline; }
-
-.sd__mail-compose { display: flex; flex-direction: column; gap: .875rem; }
-.sd__mail-compose--disabled { opacity: .6; pointer-events: none; }
-
-.sd__mail-to {
-  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
-  padding: .6rem .875rem; background: #f8fafc; border-radius: 8px;
-  font-size: .84rem; border: 1px solid #e8f0eb;
-}
-.sd__mail-to-ico { color: #1b5e20; flex-shrink: 0; }
-.sd__mail-to-label { font-weight: 700; color: #6b7280; }
-.sd__mail-to-name { font-weight: 600; color: #0f172a; }
-.sd__mail-to-email { color: #64748b; }
-.sd__mail-to-missing { color: #dc2626; font-style: italic; }
-
-.sd__mail-templates {
-  display: flex; gap: .4rem; flex-wrap: wrap;
-}
-.sd__mail-tpl-chip {
-  display: inline-flex; align-items: center; gap: .3rem;
-  background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 20px;
-  padding: .35rem .8rem; font-size: .8rem; font-weight: 600; color: #475569;
-  cursor: pointer; transition: all .15s;
-}
-.sd__mail-tpl-chip:hover { border-color: #1b5e20; color: #1b5e20; background: #f0fdf4; }
-.sd__mail-tpl-chip--active { background: #e8f5e9; border-color: #1b5e20; color: #1b5e20; }
-
-.sd__mail-field { display: flex; flex-direction: column; gap: .3rem; }
-.sd__mail-field-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
-.sd__mail-input {
-  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px;
-  padding: .65rem .875rem; font-size: .875rem; color: #0f172a;
-  width: 100%; box-sizing: border-box; transition: border .15s;
-}
-.sd__mail-input:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); background: #fff; }
-.sd__mail-textarea {
-  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px;
-  padding: .7rem .875rem; font-size: .875rem; color: #0f172a; line-height: 1.6;
-  width: 100%; box-sizing: border-box; resize: vertical; min-height: 140px;
-  transition: border .15s; font-family: inherit;
-}
-.sd__mail-textarea:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); background: #fff; }
-.sd__mail-charcount { font-size: .7rem; color: #94a3b8; text-align: right; margin-top: .2rem; }
-
-.sd__mail-preview {
-  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px;
-  padding: 1.25rem 1rem; min-height: 180px;
-}
-.sd__mail-preview-subject { font-weight: 700; color: #0f172a; font-size: .95rem; margin-bottom: .75rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .6rem; }
-.sd__mail-preview-body { font-size: .875rem; color: #334155; line-height: 1.7; white-space: pre-wrap; }
-
-.sd__mail-actions {
-  display: flex; align-items: center; justify-content: flex-end; gap: .5rem; flex-wrap: wrap;
-}
-.sd__mail-preview-btn {
-  background: transparent; border: 1.5px solid #e2e8f0; color: #475569;
-  padding: .6rem 1rem; border-radius: 8px; font-size: .84rem; font-weight: 600;
-  cursor: pointer; transition: all .15s;
-}
-.sd__mail-preview-btn:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }
-.sd__mail-preview-btn:disabled { opacity: .4; cursor: not-allowed; }
-.sd__mail-send-btn {
-  display: inline-flex; align-items: center; gap: .4rem;
-  background: #1b5e20; color: #fff; border: none;
-  padding: .65rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 700;
-  cursor: pointer; transition: background .15s;
-}
-.sd__mail-send-btn:hover:not(:disabled) { background: #144a18; }
-.sd__mail-send-btn:disabled { opacity: .55; cursor: not-allowed; }
-
-/* Historial */
-.sd__mail-history-wrap { margin-top: 1.5rem; }
-.sd__mail-history-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .75rem; }
-.sd__mail-history { display: flex; flex-direction: column; gap: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
-.sd__mail-item {
-  display: flex; align-items: flex-start; gap: .75rem;
-  padding: .875rem 1rem; border-bottom: 1px solid #f1f5f9;
-}
-.sd__mail-item:last-child { border-bottom: none; }
-.sd__mail-item-ico {
-  width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px;
-  background: #e8f5e9; color: #1b5e20;
-  display: flex; align-items: center; justify-content: center;
-}
-.sd__mail-item-body { flex: 1; min-width: 0; }
-.sd__mail-item-subject { font-size: .875rem; font-weight: 600; color: #0f172a; margin-bottom: .15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sd__mail-item-meta { font-size: .75rem; color: #94a3b8; }
-.sd__mail-item-tipo { flex-shrink: 0; }
-.sd__mail-tipo-badge { font-size: .7rem; font-weight: 600; background: #f1f5f9; color: #475569; padding: .15rem .5rem; border-radius: 5px; }
-
-.sd__empty--sm { padding: 1.5rem; }
 </style>

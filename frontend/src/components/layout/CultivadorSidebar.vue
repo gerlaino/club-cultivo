@@ -27,13 +27,15 @@
 
 <script setup>
 import { useRoute } from 'vue-router'
-import { Home, LayoutGrid, PackageCheck, History } from 'lucide-vue-next'
+import { Home, LayoutGrid, PackageCheck, History, Layers, Leaf } from 'lucide-vue-next'
 
 const route = useRoute()
 
 const NAV_LINKS = [
   { to: '/',                     icon: Home,         label: 'Inicio' },
   { to: '/salas',                icon: LayoutGrid,   label: 'Mis salas' },
+  { to: '/lotes',                icon: Layers,       label: 'Lotes' },
+  { to: '/plantas',              icon: Leaf,         label: 'Plantas' },
   { to: '/cosechado',            icon: PackageCheck, label: 'Cosechado' },
   { to: '/historial-cultivador', icon: History,      label: 'Historial' },
 ]
