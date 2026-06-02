@@ -334,6 +334,42 @@ RSpec.describe Dispensacion, type: :model do
     end
   end
 
+  # ── gramos_suficientes ────────────────────────────────────────────────────
+
+  describe 'validación gramos_suficientes (medio_pago: credito_gramos)' do
+    before do
+      CuentaCorriente.create!(
+        paciente: paciente, club: club,
+        credito_gramos_activo: true,
+        saldo_disponible_g:    50,
+        limite_credito_g:      50,
+      )
+    end
+
+    it 'acepta si la cantidad está dentro del saldo en gramos' do
+      d = nueva_dispensacion(medio_pago: 'credito_gramos', cantidad: 30)
+      expect(d).to be_valid
+    end
+
+    it 'rechaza si la cantidad supera el saldo disponible en gramos' do
+      d = nueva_dispensacion(medio_pago: 'credito_gramos', cantidad: 60)
+      expect(d).not_to be_valid
+      expect(d.errors[:cantidad]).to be_present
+    end
+
+    it 'rechaza cuando el saldo en gramos es 0' do
+      paciente.cuenta_corriente.update!(saldo_disponible_g: 0)
+      d = nueva_dispensacion(medio_pago: 'credito_gramos', cantidad: 5)
+      expect(d).not_to be_valid
+      expect(d.errors[:base]).to be_present
+    end
+
+    it 'no aplica si medio_pago no es credito_gramos' do
+      d = nueva_dispensacion(medio_pago: 'efectivo', cantidad: 99)
+      expect(d).to be_valid
+    end
+  end
+
   # ── generar_codigo_paquete ────────────────────────────────────────────────
 
   describe 'callback generar_codigo_paquete' do
@@ -344,7 +380,7 @@ RSpec.describe Dispensacion, type: :model do
         contacto_nombre: 'Contacto',
       )
       d.save!
-      expect(d.codigo_paquete).to match(/\APKG-\d{8}-\d{3}\z/)
+      expect(d.codigo_paquete).to match(/\APKG-\d{8}-[A-F0-9]{6}\z/)
     end
 
     it 'asigna estado_envio pendiente al crear con con_envio: true' do

@@ -1,12 +1,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getAnalyticsRendimiento, getAnalyticsProduccion } from '../lib/api.js'
+import { getAnalyticsRendimiento, getAnalyticsProduccion, getAnalyticsCorrelacion } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const tab        = ref('geneticas')
 const loading    = ref(false)
 const dataRend   = ref(null)
 const dataProd   = ref(null)
+const dataCorr   = ref(null)
 const añoFiltro  = ref(null)
 
 const añoActual = new Date().getFullYear()
@@ -18,9 +19,14 @@ async function cargar(bust = false) {
   if (añoFiltro.value) params.año = añoFiltro.value
   if (bust) params.bust = true
   try {
-    const [r, p] = await Promise.all([getAnalyticsRendimiento(params), getAnalyticsProduccion(params)])
+    const [r, p, c] = await Promise.all([
+      getAnalyticsRendimiento(params),
+      getAnalyticsProduccion(params),
+      getAnalyticsCorrelacion(params),
+    ])
     dataRend.value = r.data
     dataProd.value = p.data
+    dataCorr.value = c.data
   } catch {
     // silent
   } finally {
@@ -131,6 +137,36 @@ function toggleExpand(id) { expandida.value = expandida.value === id ? null : id
 
 // ── Comparativa ──────────────────────────────────────────────────
 const comparativa = computed(() => dataProd.value?.comparativa ?? [])
+
+// ── Correlación ambiental ─────────────────────────────────────────
+const corrLotes    = computed(() => dataCorr.value?.lotes        ?? [])
+const corrVpd      = computed(() => dataCorr.value?.vpd_buckets  ?? [])
+const corrTemp     = computed(() => dataCorr.value?.temp_buckets ?? [])
+const corrPh       = computed(() => dataCorr.value?.ph_buckets   ?? [])
+const corrMeta     = computed(() => ({
+  total_con_datos:   dataCorr.value?.total_con_datos   ?? 0,
+  total_finalizados: dataCorr.value?.total_finalizados ?? 0,
+}))
+
+const corrBestLote = computed(() => corrLotes.value[0] ?? null)
+
+function exportCsvAmbiente() {
+  const headers = ['Lote','Genética','Rend. (g)','Desvío %','Temperatura','Humedad %','VPD kPa','pH','CO₂ ppm','EC mS/cm','PPFD','N° registros']
+  const rows = [headers, ...corrLotes.value.map(l => [
+    l.codigo, l.genetica ?? '—', l.rendimiento_g, l.desv_pct ?? '—',
+    l.temperatura ?? '—', l.humedad ?? '—', l.vpd ?? '—', l.ph ?? '—',
+    l.co2 ?? '—', l.ec ?? '—', l.ppfd ?? '—', l.n_registros,
+  ])]
+  downloadCsv(`analitica_ambiente_${fechaHoy()}.csv`, rows)
+}
+
+function bucketColor(desv) {
+  if (desv == null) return '#64748b'
+  if (desv >= 5)  return '#15803d'
+  if (desv >= 0)  return '#65a30d'
+  if (desv >= -10) return '#b45309'
+  return '#dc2626'
+}
 </script>
 
 <template>
@@ -170,9 +206,12 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
         <button class="an__tab" :class="{ 'an__tab--active': tab === 'comparativa' }" @click="tab = 'comparativa'">
           <i class="bi bi-bar-chart-steps"></i> Comparativa
         </button>
+        <button class="an__tab" :class="{ 'an__tab--active': tab === 'ambiente' }" @click="tab = 'ambiente'">
+          <i class="bi bi-thermometer-half"></i> Ambiente
+        </button>
       </div>
       <div v-if="dataRend || dataProd" class="an__export-btns">
-        <button class="an__export-btn" @click="tab === 'geneticas' ? exportCsvGeneticas() : tab === 'ciclos' ? exportCsvCiclos() : tab === 'perdidas' ? exportCsvPerdidas() : null"
+        <button class="an__export-btn" @click="tab === 'geneticas' ? exportCsvGeneticas() : tab === 'ciclos' ? exportCsvCiclos() : tab === 'perdidas' ? exportCsvPerdidas() : tab === 'ambiente' ? exportCsvAmbiente() : null"
                 :disabled="tab === 'comparativa'">
           <i class="bi bi-filetype-csv"></i> CSV
         </button>
@@ -490,6 +529,174 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
       </div>
     </template>
 
+    <!-- ══ TAB AMBIENTE ════════════════════════════════════════════ -->
+    <template v-if="tab === 'ambiente' && dataCorr">
+
+      <div v-if="!corrMeta.total_con_datos" class="an__empty-lg">
+        <i class="bi bi-thermometer-half"></i>
+        <p>Sin datos ambientales correlacionados aún.</p>
+        <span>Se necesitan lotes finalizados con registros ambientales cargados.</span>
+      </div>
+
+      <template v-else>
+
+        <!-- KPIs -->
+        <div class="an__kpis" style="margin-bottom:1.25rem">
+          <div class="an__kpi">
+            <span class="an__kpi-val">{{ corrMeta.total_con_datos }}</span>
+            <span class="an__kpi-lbl">Lotes con datos</span>
+          </div>
+          <div class="an__kpi">
+            <span class="an__kpi-val">{{ corrMeta.total_finalizados }}</span>
+            <span class="an__kpi-lbl">Total finalizados</span>
+          </div>
+          <div v-if="corrBestLote" class="an__kpi an__kpi--green">
+            <span class="an__kpi-val">{{ corrBestLote.rendimiento_g }} g</span>
+            <span class="an__kpi-lbl">Mejor rendimiento</span>
+          </div>
+          <div v-if="corrBestLote" class="an__kpi">
+            <span class="an__kpi-val" style="font-size:1.1rem">{{ corrBestLote.codigo }}</span>
+            <span class="an__kpi-lbl">Lote destacado</span>
+          </div>
+        </div>
+
+        <!-- Buckets: VPD / Temperatura / pH -->
+        <div class="an__corr-insights">
+
+          <!-- VPD -->
+          <div class="an__corr-card" v-if="corrVpd.length">
+            <div class="an__corr-card-title">
+              <i class="bi bi-moisture"></i> VPD (kPa)
+              <span class="an__corr-hint">Presión de vapor del déficit — clave en floración</span>
+            </div>
+            <div v-for="b in corrVpd" :key="b.label" class="an__corr-bucket">
+              <div class="an__corr-bucket-header">
+                <span class="an__corr-bucket-label">{{ b.label }}</span>
+                <span class="an__corr-bucket-count">{{ b.count }} lote{{ b.count !== 1 ? 's' : '' }}</span>
+              </div>
+              <div class="an__corr-bucket-bar-wrap">
+                <div class="an__corr-bucket-bar"
+                     :style="{ width: Math.min((b.rend_avg / Math.max(...corrVpd.map(x => x.rend_avg), 1)) * 100, 100) + '%',
+                               background: bucketColor(b.desv_avg) }"></div>
+              </div>
+              <div class="an__corr-bucket-vals">
+                <span class="an__corr-rend">{{ b.rend_avg }} g promedio</span>
+                <span v-if="b.desv_avg != null" class="an__desv" :class="b.desv_avg >= 0 ? 'an__desv--pos' : 'an__desv--neg'">
+                  {{ b.desv_avg >= 0 ? '+' : '' }}{{ b.desv_avg }}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Temperatura -->
+          <div class="an__corr-card" v-if="corrTemp.length">
+            <div class="an__corr-card-title">
+              <i class="bi bi-thermometer-half"></i> Temperatura (°C)
+            </div>
+            <div v-for="b in corrTemp" :key="b.label" class="an__corr-bucket">
+              <div class="an__corr-bucket-header">
+                <span class="an__corr-bucket-label">{{ b.label }}</span>
+                <span class="an__corr-bucket-count">{{ b.count }} lote{{ b.count !== 1 ? 's' : '' }}</span>
+              </div>
+              <div class="an__corr-bucket-bar-wrap">
+                <div class="an__corr-bucket-bar"
+                     :style="{ width: Math.min((b.rend_avg / Math.max(...corrTemp.map(x => x.rend_avg), 1)) * 100, 100) + '%',
+                               background: bucketColor(b.desv_avg) }"></div>
+              </div>
+              <div class="an__corr-bucket-vals">
+                <span class="an__corr-rend">{{ b.rend_avg }} g promedio</span>
+                <span v-if="b.desv_avg != null" class="an__desv" :class="b.desv_avg >= 0 ? 'an__desv--pos' : 'an__desv--neg'">
+                  {{ b.desv_avg >= 0 ? '+' : '' }}{{ b.desv_avg }}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- pH -->
+          <div class="an__corr-card" v-if="corrPh.length">
+            <div class="an__corr-card-title">
+              <i class="bi bi-droplet-half"></i> pH del agua
+            </div>
+            <div v-for="b in corrPh" :key="b.label" class="an__corr-bucket">
+              <div class="an__corr-bucket-header">
+                <span class="an__corr-bucket-label">{{ b.label }}</span>
+                <span class="an__corr-bucket-count">{{ b.count }} lote{{ b.count !== 1 ? 's' : '' }}</span>
+              </div>
+              <div class="an__corr-bucket-bar-wrap">
+                <div class="an__corr-bucket-bar"
+                     :style="{ width: Math.min((b.rend_avg / Math.max(...corrPh.map(x => x.rend_avg), 1)) * 100, 100) + '%',
+                               background: bucketColor(b.desv_avg) }"></div>
+              </div>
+              <div class="an__corr-bucket-vals">
+                <span class="an__corr-rend">{{ b.rend_avg }} g promedio</span>
+                <span v-if="b.desv_avg != null" class="an__desv" :class="b.desv_avg >= 0 ? 'an__desv--pos' : 'an__desv--neg'">
+                  {{ b.desv_avg >= 0 ? '+' : '' }}{{ b.desv_avg }}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Tabla individual de lotes -->
+        <div class="an__card" style="margin-top:1.25rem">
+          <div class="an__card-header">
+            <span class="an__card-title">Huella ambiental por lote</span>
+            <span class="an__pill an__pill--muted">{{ corrLotes.length }} lotes</span>
+          </div>
+          <div class="an__table-wrap">
+            <table class="an__table">
+              <thead>
+                <tr>
+                  <th>Lote</th>
+                  <th>Genética</th>
+                  <th class="an__th-r">Rend.</th>
+                  <th class="an__th-r">Desvío</th>
+                  <th class="an__th-r">Temp °C</th>
+                  <th class="an__th-r">Hum %</th>
+                  <th class="an__th-r">VPD</th>
+                  <th class="an__th-r">pH</th>
+                  <th class="an__th-r">CO₂</th>
+                  <th class="an__th-r">EC</th>
+                  <th class="an__th-r">Registros</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="l in corrLotes" :key="l.lote_id">
+                  <td>
+                    <RouterLink :to="`/lotes/${l.lote_id}`" class="an__link">{{ l.codigo }}</RouterLink>
+                  </td>
+                  <td class="an__td-muted">{{ l.genetica ?? '—' }}</td>
+                  <td class="an__td-r an__td-bold">{{ l.rendimiento_g }} g</td>
+                  <td class="an__td-r">
+                    <span v-if="l.desv_pct != null" class="an__desv" :class="l.desv_pct >= 0 ? 'an__desv--pos' : 'an__desv--neg'">
+                      {{ l.desv_pct >= 0 ? '+' : '' }}{{ l.desv_pct }}%
+                    </span>
+                    <span v-else class="an__nd">—</span>
+                  </td>
+                  <td class="an__td-r">{{ l.temperatura ?? '—' }}</td>
+                  <td class="an__td-r">{{ l.humedad ?? '—' }}</td>
+                  <td class="an__td-r">
+                    <span v-if="l.vpd != null" class="an__vpd-chip"
+                          :style="{ background: l.vpd >= 1.2 && l.vpd < 1.6 ? 'rgba(21,128,61,.1)' : l.vpd < 0.8 || l.vpd >= 2.0 ? 'rgba(220,38,38,.1)' : 'rgba(217,119,6,.1)',
+                                    color: l.vpd >= 1.2 && l.vpd < 1.6 ? '#15803d' : l.vpd < 0.8 || l.vpd >= 2.0 ? '#dc2626' : '#b45309' }">
+                      {{ l.vpd }}
+                    </span>
+                    <span v-else class="an__nd">—</span>
+                  </td>
+                  <td class="an__td-r">{{ l.ph ?? '—' }}</td>
+                  <td class="an__td-r">{{ l.co2 != null ? l.co2 + ' ppm' : '—' }}</td>
+                  <td class="an__td-r">{{ l.ec ?? '—' }}</td>
+                  <td class="an__td-r an__td-muted">{{ l.n_registros }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </template>
+    </template>
+
     </div><!-- /#an-tab-content -->
 
   </div>
@@ -628,4 +835,19 @@ const comparativa = computed(() => dataProd.value?.comparativa ?? [])
 .an__comp-obj { font-size: .75rem; color: #94a3b8; font-weight: 400; }
 .an__comp-meta { font-size: .72rem; color: #64748b; }
 .an__comp-fecha { font-size: .7rem; color: #94a3b8; margin-top: .15rem; }
+
+/* Correlación ambiental */
+.an__corr-insights { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+.an__corr-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.1rem; display: flex; flex-direction: column; gap: .75rem; }
+.an__corr-card-title { font-size: .82rem; font-weight: 700; color: #0f172a; display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.an__corr-hint { font-size: .68rem; font-weight: 400; color: #94a3b8; }
+.an__corr-bucket { display: flex; flex-direction: column; gap: .3rem; }
+.an__corr-bucket-header { display: flex; justify-content: space-between; align-items: center; }
+.an__corr-bucket-label { font-size: .75rem; color: #374151; font-weight: 500; }
+.an__corr-bucket-count { font-size: .68rem; color: #94a3b8; }
+.an__corr-bucket-bar-wrap { height: 6px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.an__corr-bucket-bar { height: 100%; border-radius: 999px; transition: width .4s; }
+.an__corr-bucket-vals { display: flex; align-items: center; justify-content: space-between; }
+.an__corr-rend { font-size: .72rem; color: #64748b; }
+.an__vpd-chip { display: inline-block; padding: .12em .45em; border-radius: 5px; font-size: .75rem; font-weight: 700; }
 </style>

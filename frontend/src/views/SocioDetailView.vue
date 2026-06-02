@@ -6,27 +6,26 @@ const props = defineProps({ backPath: { type: String, default: '/pacientes' } })
 import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
-import { useConfirm } from '../composables/useConfirm.js'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
 import { getPacienteTimeline } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
-  Pencil, Plus, Trash2, AlertTriangle, CheckCircle, Info, X, Save, Wallet,
-  CreditCard, Mail
+  Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail
 } from 'lucide-vue-next'
-import { useSocioEditar, REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
-import { useSocioHistoriaClinica }           from '../composables/useSocioHistoriaClinica.js'
+import { REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
 import DsSpinner               from '../design-system/components/Spinner.vue'
 import SocioTabTimeline        from '../components/pacientes/SocioTabTimeline.vue'
 import SocioTabCuentaCorriente from '../components/pacientes/SocioTabCuentaCorriente.vue'
 import SocioTabCorreo          from '../components/pacientes/SocioTabCorreo.vue'
+import SocioTabHistoria        from '../components/pacientes/SocioTabHistoria.vue'
+import SocioTabNotas           from '../components/pacientes/SocioTabNotas.vue'
+import SocioEditarModal        from '../components/pacientes/SocioEditarModal.vue'
 
 const route  = useRoute()
 const store  = usePacientesStore()
 const auth   = useAuthStore()
-const { confirm } = useConfirm()
 
 const socioId   = Number(route.params.id)
 const loading   = ref(true)
@@ -41,32 +40,10 @@ const reprocannEstadoMeta = computed(() =>
   REPROCANN_ESTADOS.find(e => e.value === (s.value?.reprocann_estado || 'sin_registro'))
 )
 
-// ── Composables ───────────────────────────────────────────────────────────────
-const {
-  editOpen, editForm, editSaving, editError,
-  openEdit, saveEdit,
-} = useSocioEditar(socioId)
-
-const {
-  notasClinicas, notasClinicasSaved, notasClinicasSaving,
-  hcForm, saveNotasClinicas,
-} = useSocioHistoriaClinica(socioId, { s })
+const editarOpen = ref(false)
 
 const ccRefreshKey = ref(0)
 function onDispensacionCreada() { ccRefreshKey.value++ }
-
-// ── Notas rápidas ─────────────────────────────────────────────────────────────
-const notaTexto = ref('')
-async function agregarNota() {
-  const txt = notaTexto.value.trim()
-  if (!txt) return
-  try { await store.addNota(socioId, txt); notaTexto.value = '' } catch {}
-}
-async function borrarNota(n) {
-  const ok = await confirm({ title: '¿Eliminar esta nota?', confirmText: 'Eliminar' })
-  if (!ok) return
-  try { await store.removeNota(n.id) } catch {}
-}
 
 // ── Timeline ──────────────────────────────────────────────────────────────────
 const timeline        = ref([])
@@ -99,10 +76,6 @@ function safeDate(d) {
 function formatDate(d) {
   if (!d) return '—'
   return safeDate(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-function formatDateTime(d) {
-  if (!d) return '—'
-  return new Date(d).toLocaleString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 function edad(fn) {
   if (!fn) return null
@@ -140,7 +113,7 @@ const TABS = computed(() => {
 
 function escapeHandler(e) {
   if (e.key !== 'Escape') return
-  if (editOpen.value) { editOpen.value = false }
+  if (editarOpen.value) { editarOpen.value = false }
 }
 onMounted(async () => {
   document.addEventListener('keydown', escapeHandler, true)
@@ -200,7 +173,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
           <RouterLink v-if="s?.carnet_token" :to="`/c/${s.carnet_token}`" target="_blank" class="sd__btn-carnet">
             <CreditCard :size="14" :stroke-width="1.75" /> Carnet
           </RouterLink>
-          <button v-if="canEdit" class="sd__btn-edit" @click="openEdit">
+          <button v-if="canEdit" class="sd__btn-edit" @click="editarOpen = true">
             <Pencil :size="14" :stroke-width="1.75" /> Editar
           </button>
         </div>
@@ -358,145 +331,12 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
       <!-- ── Tab: Historia clínica ── -->
       <div v-show="activeTab === 'historia'" class="sd__tab-content">
-        <div class="sd__card">
-          <div class="sd__card-header">
-            <div class="sd__card-icon sd__card-icon--amber"><ClipboardList :size="15" /></div>
-            <div>
-              <div class="sd__card-title">Historia clínica estructurada</div>
-              <div class="sd__card-subtitle">Solo visible para admin y médico</div>
-            </div>
-          </div>
-          <div class="sd__historia-body" v-if="canEdit">
-
-            <!-- Sección: Datos básicos -->
-            <div class="sd__hc-section">
-              <div class="sd__hc-section-title">Datos básicos</div>
-              <div class="sd__grid">
-                <div class="sd__field">
-                  <label class="sd__label">Grupo sanguíneo</label>
-                  <input v-model="hcForm.grupo_sanguineo" class="sd__input" placeholder="Ej: A+, O-" style="max-width:120px;" />
-                </div>
-                <div class="sd__field">
-                  <label class="sd__label">Alergias</label>
-                  <input v-model="hcForm.alergias" class="sd__input" placeholder="Alergias conocidas" />
-                </div>
-                <div class="sd__field sd__field--full">
-                  <label class="sd__label">Medicación habitual</label>
-                  <input v-model="hcForm.medicacion_habitual" class="sd__input" placeholder="Medicamentos que toma regularmente" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Sección: Consulta -->
-            <div class="sd__hc-section">
-              <div class="sd__hc-section-title">Consulta</div>
-              <div class="sd__field sd__field--full">
-                <label class="sd__label">Motivo de consulta</label>
-                <textarea v-model="hcForm.motivo_consulta" class="sd__textarea" rows="3" placeholder="Razón por la que el paciente consulta…" />
-              </div>
-              <div class="sd__field sd__field--full">
-                <label class="sd__label">Anamnesis</label>
-                <textarea v-model="hcForm.anamnesis" class="sd__textarea" rows="4" placeholder="Historia de la enfermedad actual, síntomas, evolución…" />
-              </div>
-            </div>
-
-            <!-- Sección: Antecedentes -->
-            <div class="sd__hc-section">
-              <div class="sd__hc-section-title">Antecedentes</div>
-              <div class="sd__field sd__field--full">
-                <label class="sd__label">Antecedentes personales</label>
-                <textarea v-model="hcForm.antecedentes_personales" class="sd__textarea" rows="3" placeholder="Enfermedades previas, cirugías, hospitalizaciones…" />
-              </div>
-              <div class="sd__field sd__field--full">
-                <label class="sd__label">Antecedentes familiares</label>
-                <textarea v-model="hcForm.antecedentes_familiares" class="sd__textarea" rows="3" placeholder="Enfermedades en familiares directos…" />
-              </div>
-            </div>
-
-            <!-- Sección: Diagnóstico y evolución -->
-            <div class="sd__hc-section">
-              <div class="sd__hc-section-title">Diagnóstico</div>
-              <div class="sd__grid">
-                <div class="sd__field">
-                  <label class="sd__label">Diagnóstico principal</label>
-                  <input v-model="hcForm.diagnostico_principal" class="sd__input" placeholder="Diagnóstico principal (CIE-10 o libre)" />
-                </div>
-                <div class="sd__field">
-                  <label class="sd__label">Diagnóstico secundario</label>
-                  <input v-model="hcForm.diagnostico_secundario" class="sd__input" placeholder="Diagnóstico secundario (opcional)" />
-                </div>
-              </div>
-              <div class="sd__field sd__field--full">
-                <label class="sd__label">Evolución clínica</label>
-                <textarea v-model="hcForm.evolucion_clinica" class="sd__textarea" rows="4" placeholder="Evolución del paciente, respuesta al tratamiento, observaciones…" />
-              </div>
-            </div>
-
-            <!-- Sección: Notas libres (compatibilidad) -->
-            <div class="sd__hc-section">
-              <div class="sd__hc-section-title">Notas adicionales</div>
-              <div class="sd__field sd__field--full">
-                <label class="sd__label">Notas libres</label>
-                <textarea v-model="notasClinicas" class="sd__textarea" rows="5" placeholder="Cualquier otra observación clínica…" />
-              </div>
-            </div>
-
-            <div class="sd__historia-foot">
-              <span v-if="notasClinicasSaved" class="sd__save-ok">
-                <CheckCircle :size="13" /> Guardado
-              </span>
-              <span v-else class="sd__save-pending">Sin guardar</span>
-              <button class="sd__btn-primary" :disabled="notasClinicasSaving || notasClinicasSaved" @click="saveNotasClinicas">
-                <Save :size="13" :stroke-width="2" />
-                {{ notasClinicasSaving ? 'Guardando…' : 'Guardar historia' }}
-              </button>
-            </div>
-          </div>
-        </div>
+        <SocioTabHistoria :socio-id="socioId" :s="s" />
       </div>
 
       <!-- ── Tab: Notas ── -->
       <div v-show="activeTab === 'notas'" class="sd__tab-content">
-        <div class="sd__card">
-          <div class="sd__card-header">
-            <div class="sd__card-icon sd__card-icon--amber"><BookOpen :size="15" /></div>
-            <div>
-              <div class="sd__card-title">Notas del equipo</div>
-              <div class="sd__card-subtitle">Registros internos — no visibles para el paciente</div>
-            </div>
-          </div>
-          <div v-if="canEdit" class="sd__nota-form">
-            <textarea
-              v-model.trim="notaTexto"
-              class="sd__textarea"
-              rows="3"
-              placeholder="Agregar nota, observación o seguimiento…"
-            ></textarea>
-            <div class="sd__nota-form-foot">
-              <span class="sd__char-count">{{ notaTexto.length }} caracteres</span>
-              <button class="sd__btn-primary" :disabled="store.creandoNota || !notaTexto" @click="agregarNota">
-                <Plus :size="13" />
-                Agregar nota
-              </button>
-            </div>
-          </div>
-          <div v-if="store.notasLoading" class="sd__loading-sm"><DsSpinner :size="40" /></div>
-          <div v-else-if="!store.notas.length" class="sd__empty">
-            <div class="sd__empty-icon"><BookOpen :size="28" /></div>
-            <div class="sd__empty-title">Sin notas registradas</div>
-          </div>
-          <div v-else class="sd__notas">
-            <div v-for="n in store.notas" :key="n.id" class="sd__nota">
-              <div class="sd__nota-header">
-                <div class="sd__nota-meta">{{ formatDateTime(n.created_at) }}</div>
-                <button v-if="canEdit" class="sd__btn-icon-danger" @click="borrarNota(n)">
-                  <Trash2 :size="13" />
-                </button>
-              </div>
-              <p class="sd__nota-text">{{ n.contenido }}</p>
-            </div>
-          </div>
-        </div>
+        <SocioTabNotas :socio-id="socioId" :can-edit="canEdit" />
       </div>
 
       <!-- ── Tab: Documentos ── -->
@@ -513,110 +353,13 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
       <!-- ── Tab: Correo ── -->
       <div v-show="activeTab === 'correo'" class="sd__tab-content">
-        <SocioTabCorreo :socio-id="socioId" :socio="s" @open-edit="openEdit" />
+        <SocioTabCorreo :socio-id="socioId" :socio="s" @open-edit="editarOpen = true" />
       </div>
 
     </template>
   </div>
 
-  <!-- ── Inline edit modal ── -->
-  <Teleport to="body">
-    <Transition name="sd-modal">
-      <div v-if="editOpen" class="sd-modal-overlay" @click.self="editOpen = false">
-        <div class="sd-modal">
-          <div class="sd-modal__header">
-            <h2 class="sd-modal__title">Editar paciente</h2>
-            <button class="sd-modal__close" @click="editOpen = false"><X :size="18" /></button>
-          </div>
-          <div class="sd-modal__body">
-            <div class="sd-modal__grid">
-              <div class="sd-modal__field">
-                <label class="sd-modal__label">Nombre</label>
-                <input v-model="editForm.nombre" class="sd-modal__input" type="text" />
-              </div>
-              <div class="sd-modal__field">
-                <label class="sd-modal__label">Apellido</label>
-                <input v-model="editForm.apellido" class="sd-modal__input" type="text" />
-              </div>
-              <div class="sd-modal__field">
-                <label class="sd-modal__label">DNI</label>
-                <input v-model="editForm.dni" class="sd-modal__input" type="text" />
-              </div>
-              <div class="sd-modal__field">
-                <label class="sd-modal__label">Fecha de nacimiento</label>
-                <input v-model="editForm.fecha_nacimiento" class="sd-modal__input" type="date" />
-              </div>
-              <div class="sd-modal__field">
-                <label class="sd-modal__label">Email</label>
-                <input v-model="editForm.email" class="sd-modal__input" type="email" />
-              </div>
-              <div class="sd-modal__field">
-                <label class="sd-modal__label">Teléfono</label>
-                <input v-model="editForm.telefono" class="sd-modal__input" type="tel" />
-              </div>
-              <div class="sd-modal__field">
-                <label class="sd-modal__label">N° REPROCANN</label>
-                <input v-model="editForm.reprocann_numero" class="sd-modal__input" type="text" />
-              </div>
-              <div class="sd-modal__field">
-                <label class="sd-modal__label">Vencimiento REPROCANN</label>
-                <input v-model="editForm.reprocann_vencimiento" class="sd-modal__input" type="date" />
-              </div>
-              <div class="sd-modal__field sd-modal__field--full">
-                <label class="sd-modal__label" style="margin-bottom:.4rem">Estado REPROCANN</label>
-                <div class="sd-modal__repro-estados">
-                  <button
-                    v-for="opt in REPROCANN_ESTADOS" :key="opt.value"
-                    type="button"
-                    class="sd-modal__repro-btn"
-                    :style="editForm.reprocann_estado === opt.value ? { background: opt.bg, borderColor: opt.color, color: opt.color } : {}"
-                    @click="editForm.reprocann_estado = opt.value"
-                  >{{ opt.label }}</button>
-                </div>
-              </div>
-              <div class="sd-modal__field sd-modal__field--full">
-                <label class="sd-modal__label" style="margin-bottom:.4rem">
-                  Límite de dispensación mensual
-                  <span class="sd-modal__opt">opcional — en gramos</span>
-                </label>
-                <div class="sd-modal__limit-wrap">
-                  <input
-                    v-model.number="editForm.limite_dispensacion_mensual_g"
-                    class="sd-modal__input sd-modal__input--limit"
-                    type="number" step="0.5" min="0" max="9999"
-                    placeholder="Sin límite"
-                  />
-                  <span class="sd-modal__limit-unit">g / mes</span>
-                  <button
-                    v-if="editForm.limite_dispensacion_mensual_g"
-                    type="button"
-                    class="sd-modal__limit-clear"
-                    @click="editForm.limite_dispensacion_mensual_g = ''"
-                    title="Quitar límite"
-                  ><X :size="13" /></button>
-                </div>
-                <span class="sd-modal__hint">Dejá vacío para no aplicar ningún límite a este paciente.</span>
-              </div>
-              <div class="sd-modal__field sd-modal__field--full">
-                <label class="sd-modal__label">
-                  <input v-model="editForm.es_paciente" type="checkbox" class="sd-modal__check" />
-                  En tratamiento activo
-                </label>
-              </div>
-            </div>
-            <div v-if="editError" class="sd-modal__error">{{ editError }}</div>
-          </div>
-          <div class="sd-modal__footer">
-            <button class="sd__btn-ghost" @click="editOpen = false">Cancelar</button>
-            <button class="sd__btn-primary" :disabled="editSaving" @click="saveEdit">
-              <Save :size="13" :stroke-width="2" />
-              {{ editSaving ? 'Guardando…' : 'Guardar cambios' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+  <SocioEditarModal v-model:open="editarOpen" :socio-id="socioId" @saved="store.fetchOne(socioId)" />
 </template>
 
 <style scoped>
@@ -680,35 +423,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 /* Sys info */
 .sd__sys-info { display: flex; gap: 2rem; flex-wrap: wrap; padding: .875rem 1.25rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; font-size: .78rem; color: #64748b; }
 
-/* Historia clínica */
-.sd__historia-body { padding: 1rem 1.25rem 1.25rem; display: flex; flex-direction: column; gap: 1.25rem; }
-.sd__textarea--historia { min-height: 280px; }
-.sd__historia-foot { display: flex; justify-content: space-between; align-items: center; margin-top: .5rem; }
-.sd__save-ok { font-size: .75rem; color: #15803d; display: flex; align-items: center; gap: .3rem; }
-.sd__save-pending { font-size: .75rem; color: #94a3b8; }
-.sd__hc-section { display: flex; flex-direction: column; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid #f0f4f0; }
-.sd__hc-section:last-of-type { border-bottom: none; }
-.sd__hc-section-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #8a9a8a; }
-
-/* Notas */
-.sd__nota-form { padding: 1.25rem; border-bottom: 1px solid #f1f5f9; }
-.sd__textarea { width: 100%; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: .75rem 1rem; font-size: .875rem; color: #0f172a; outline: none; resize: vertical; min-height: 80px; transition: border-color .15s; box-sizing: border-box; }
-.sd__textarea:focus { border-color: #1b5e20; background: #fff; }
-.sd__nota-form-foot { display: flex; justify-content: space-between; align-items: center; margin-top: .65rem; }
-.sd__char-count { font-size: .72rem; color: #94a3b8; }
-.sd__notas { display: flex; flex-direction: column; }
-.sd__nota { padding: .875rem 1.25rem; border-bottom: 1px solid #f8fafc; }
-.sd__nota:last-child { border-bottom: none; }
-.sd__nota-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .4rem; }
-.sd__nota-meta { font-size: .72rem; color: #94a3b8; }
-.sd__nota-text { font-size: .85rem; color: #374151; margin: 0; line-height: 1.6; border-left: 2px solid #d4e6d4; padding-left: .75rem; }
-
-/* Empty / loading */
-.sd__loading-sm { display: flex; justify-content: center; padding: 2rem; }
-.sd__empty { text-align: center; padding: 3rem 1rem; color: #94a3b8; }
-.sd__empty-icon { display: flex; justify-content: center; margin-bottom: .5rem; opacity: .4; }
-.sd__empty-title { font-size: .875rem; font-weight: 600; color: #64748b; }
-
 /* Buttons */
 .sd__btn-edit { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #475569; border: 1.5px solid #e2e8f0; padding: .55rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .sd__btn-edit:hover { border-color: #1b5e20; color: #1b5e20; background: #f0fdf4; }
@@ -719,43 +433,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .sd__btn-ghost { display: inline-flex; align-items: center; gap: .4rem; background: none; color: #475569; border: 1.5px solid #e2e8f0; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .sd__btn-ghost:hover { border-color: #94a3b8; }
-.sd__btn-icon-danger { background: none; border: none; color: #94a3b8; cursor: pointer; padding: .2rem .4rem; border-radius: 5px; display: flex; align-items: center; }
-.sd__btn-icon-danger:hover { background: #fef2f2; color: #dc2626; }
-
-/* Modal */
-.sd-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; z-index: 800; padding: 1rem; }
-.sd-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
-.sd-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; }
-.sd-modal__title { font-size: 1rem; font-weight: 700; margin: 0; }
-.sd-modal__close { background: none; border: none; color: #94a3b8; cursor: pointer; padding: .25rem; border-radius: 6px; display: flex; }
-.sd-modal__close:hover { background: #f1f5f9; color: #0f172a; }
-.sd-modal__body { padding: 1.5rem; overflow-y: auto; flex: 1; }
-.sd-modal__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.sd-modal__field { display: flex; flex-direction: column; gap: .4rem; }
-.sd-modal__field--full { grid-column: 1 / -1; }
-.sd-modal__label { font-size: .75rem; font-weight: 600; color: #64748b; display: flex; align-items: center; gap: .4rem; }
-.sd-modal__input { padding: .55rem .75rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; color: #0f172a; outline: none; transition: border-color .15s; }
-.sd-modal__input:focus { border-color: #1b5e20; }
-.sd-modal__check { width: 15px; height: 15px; accent-color: #1b5e20; }
-.sd-modal__error { margin-top: .875rem; padding: .75rem 1rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: .8rem; color: #dc2626; }
-.sd-modal__footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1.25rem 1.5rem; border-top: 1px solid #f1f5f9; }
-
-/* Transitions */
-.sd-modal-enter-active, .sd-modal-leave-active { transition: opacity .2s; }
-.sd-modal-enter-from, .sd-modal-leave-to { opacity: 0; pointer-events: none; }
-.sd-modal-enter-active .sd-modal, .sd-modal-leave-active .sd-modal { transition: transform .2s; }
-.sd-modal-enter-from .sd-modal, .sd-modal-leave-to .sd-modal { transform: translateY(-12px); }
-
-.sd-modal__repro-estados { display: flex; gap: .4rem; flex-wrap: wrap; }
-.sd-modal__repro-btn { padding: .4rem .8rem; border-radius: 7px; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; }
-.sd-modal__repro-btn:hover { border-color: #94a3b8; }
-.sd-modal__opt  { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; margin-left: .35rem; }
-.sd-modal__hint { font-size: .72rem; color: #94a3b8; margin-top: .2rem; display: block; }
-.sd-modal__limit-wrap { display: flex; align-items: center; gap: .4rem; }
-.sd-modal__input--limit { max-width: 140px; }
-.sd-modal__limit-unit { font-size: .8rem; font-weight: 600; color: #64748b; white-space: nowrap; }
-.sd-modal__limit-clear { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 2px; display: flex; align-items: center; border-radius: 4px; transition: color .15s; }
-.sd-modal__limit-clear:hover { color: #dc2626; }
 
 /* Documento REPROCANN */
 .sd__repro-doc-body { padding: 1rem 1.25rem; }

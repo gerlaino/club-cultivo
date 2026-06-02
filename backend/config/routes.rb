@@ -41,6 +41,7 @@ Rails.application.routes.draw do
       get :rendimiento_genetica
       get :dispensador
       get :produccion
+      get :correlacion_ambiental
     end
 
     resource :benchmark, only: [:show], controller: :benchmark  # solo super_admin, uso interno de plataforma

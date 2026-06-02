@@ -56,7 +56,7 @@ class AnalyticsController < ApplicationController
         desviacion_promedio:  rendimiento_avg && objetivo_avg ? ((rendimiento_avg - objetivo_avg) / objetivo_avg * 100).round(1) : nil,
         merma_promedio_pct:   merma_avg,
         g_por_planta:         g_por_planta,
-        lotes_activos:        ls.count { |l| %w[vegetativo floracion secado curado].include?(l.estado) },
+        lotes_activos:        ls.count { |l| !%w[germinacion finalizado].include?(l.estado) },
       }
     end.sort_by { |r| [-(r[:rendimiento_promedio] || 0)] }
 
@@ -183,6 +183,23 @@ class AnalyticsController < ApplicationController
     }
   end
 
+  # GET /api/analytics/correlacion_ambiental
+  # Para: admin, supervisor, super_admin
+  def correlacion_ambiental
+    unless %w[admin supervisor super_admin].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    club = current_user.club
+    año  = params[:año].presence
+    cache_key = "analytics/correlacion_ambiental/#{club.id}/#{año || 'all'}"
+    Rails.cache.delete(cache_key) if params[:bust]
+    data = Rails.cache.fetch(cache_key, expires_in: 15.minutes) do
+      calcular_correlacion_ambiental(club, año: año)
+    end
+    render json: data
+  end
+
   # GET /api/analytics/produccion
   # Para: admin, supervisor, super_admin
   def produccion
@@ -201,6 +218,98 @@ class AnalyticsController < ApplicationController
   end
 
   private
+
+  TIPOS_CORRELACION = %w[temperatura humedad vpd ph co2 ec ppfd].freeze
+
+  VPD_BUCKETS = [
+    [nil,  0.8, 'Bajo (<0.8 kPa)'],
+    [0.8,  1.2, 'Óptimo bajo (0.8–1.2 kPa)'],
+    [1.2,  1.6, 'Óptimo (1.2–1.6 kPa)'],
+    [1.6,  2.0, 'Alto (1.6–2.0 kPa)'],
+    [2.0,  nil, 'Muy alto (>2.0 kPa)'],
+  ].freeze
+
+  TEMP_BUCKETS = [
+    [nil,  20.0, 'Frío (<20°C)'],
+    [20.0, 23.0, 'Fresco (20–23°C)'],
+    [23.0, 26.0, 'Óptimo (23–26°C)'],
+    [26.0, 29.0, 'Cálido (26–29°C)'],
+    [29.0, nil,  'Caliente (>29°C)'],
+  ].freeze
+
+  PH_BUCKETS = [
+    [nil, 5.8, 'Ácido (<5.8)'],
+    [5.8, 6.2, 'Óptimo (5.8–6.2)'],
+    [6.2, 6.8, 'Normal (6.2–6.8)'],
+    [6.8, nil, 'Alcalino (>6.8)'],
+  ].freeze
+
+  def calcular_correlacion_ambiental(club, año: nil)
+    lotes = club.lotes
+                .where(estado: 'finalizado')
+                .where.not(rendimiento_real_g: nil)
+                .includes(:genetica)
+    lotes = lotes.where('EXTRACT(YEAR FROM COALESCE(start_date, created_at)) = ?', año) if año
+
+    # Precarga lecturas en memoria agrupadas por lote para evitar N+1
+    lote_ids = lotes.map(&:id)
+    lecturas_por_lote = LecturaAmbiental
+      .where(lote_id: lote_ids)
+      .group_by(&:lote_id)
+
+    lotes_data = lotes.filter_map do |l|
+      lecturas = lecturas_por_lote[l.id] || []
+      next if lecturas.empty?
+
+      promedios = TIPOS_CORRELACION.each_with_object({}) do |tipo, h|
+        vals = lecturas.select { |r| r.tipo == tipo }.map { |r| r.valor.to_f }
+        h[tipo.to_sym] = vals.any? ? (vals.sum / vals.size).round(2) : nil
+      end
+      next if promedios.values.all?(&:nil?)
+
+      rend = l.rendimiento_real_g.to_f
+      obj  = l.rendimiento_objetivo_g&.to_f
+
+      {
+        lote_id:       l.id,
+        codigo:        l.codigo,
+        genetica:      l.genetica&.nombre,
+        rendimiento_g: rend,
+        objetivo_g:    obj,
+        desv_pct:      obj&.> (0) ? ((rend - obj) / obj * 100).round(1) : nil,
+        n_registros:   lecturas.size,
+        **promedios,
+      }
+    end.sort_by { |l| -(l[:rendimiento_g] || 0) }
+
+    {
+      lotes:            lotes_data,
+      vpd_buckets:      agrupar_buckets(lotes_data, :vpd,         VPD_BUCKETS),
+      temp_buckets:     agrupar_buckets(lotes_data, :temperatura,  TEMP_BUCKETS),
+      ph_buckets:       agrupar_buckets(lotes_data, :ph,           PH_BUCKETS),
+      total_con_datos:  lotes_data.size,
+      total_finalizados: lotes.count,
+    }
+  end
+
+  def agrupar_buckets(lotes_data, campo, rangos)
+    rangos.filter_map do |min, max, label|
+      subset = lotes_data.select do |l|
+        v = l[campo]
+        next false if v.nil?
+        (min.nil? || v >= min) && (max.nil? || v < max)
+      end
+      next if subset.empty?
+
+      con_desv = subset.select { |l| l[:desv_pct] }
+      {
+        label:    label,
+        count:    subset.size,
+        rend_avg: (subset.sum { |l| l[:rendimiento_g] } / subset.size).round(1),
+        desv_avg: con_desv.any? ? (con_desv.sum { |l| l[:desv_pct] } / con_desv.size).round(1) : nil,
+      }
+    end
+  end
 
   def calcular_produccion(club, año: nil)
     lotes = club.lotes.includes(:genetica, :plants).where.not(estado: 'germinacion')
