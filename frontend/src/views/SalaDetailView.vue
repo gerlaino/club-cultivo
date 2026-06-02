@@ -7,6 +7,7 @@ import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
 import { useClubStore } from "../stores/club"
 import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
+import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vue'
 import RegistrarLecturaModal  from '../components/salas/RegistrarLecturaModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
 import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado } from '../lib/api.js'
@@ -145,7 +146,7 @@ const salaAcciones = computed(() => {
     items.push({ emoji: '🌡️', label: 'Registrar lectura', onClick: () => { lecturaOpen.value = true } })
   }
   if (puedeCargarLote.value) {
-    const lbl = esSalaSecado.value ? 'Cargar lote de floración' : 'Cargar lote de secado'
+    const lbl = esSalaSecado.value ? 'Cargar lote de floración' : esSalaManicura.value ? 'Cargar lote de cosecha' : 'Cargar lote de secado'
     items.push({ emoji: '📦', label: lbl, onClick: () => { showCargarLote.value = true } })
   }
   if (canEdit.value) {
@@ -159,6 +160,7 @@ const salaAcciones = computed(() => {
 function salaEscapeHandler(e) {
   if (e.key !== 'Escape') return
   if (showEditSala.value)    { showEditSala.value = false; return }
+  if (showCrearLoteCosecha.value) { showCrearLoteCosecha.value = false; return }
   if (showCreate.value)      { closeCreate(); return }
   if (showCargarLote.value)  { showCargarLote.value = false; return }
   if (showUpgrade.value)     { showUpgrade.value = false; return }
@@ -297,6 +299,7 @@ const showCargarLote = ref(false)
 
 const esSalaSecado   = computed(() => sala.value?.kind === 'secado')
 const esSalaManicura = computed(() => sala.value?.kind === 'manicura')
+const esSalaCosecha  = computed(() => ['cosecha', 'cosechado'].includes(sala.value?.kind))
 const puedeCargarLote = computed(() =>
   (esSalaSecado.value   && (canEdit.value || isAgricultor.value)) ||
   (esSalaManicura.value && (canEdit.value || isAgricultor.value || isManicurador.value))
@@ -325,7 +328,8 @@ const estadosHeredadoPermitidos = computed(() => {
   return ESTADOS_HEREDADO.filter(e => ['semilla', 'vegetativo'].includes(e.value))
 })
 
-const showCreate     = ref(false)
+const showCreate            = ref(false)
+const showCrearLoteCosecha  = ref(false)
 const loteForm       = ref(emptyLoteForm())
 const loteErrors     = ref({})
 const loteApiError   = ref(null)
@@ -495,6 +499,7 @@ async function createLote() {
   }
 }
 async function openCreate() {
+  if (esSalaCosecha.value) { showCrearLoteCosecha.value = true; return }
   loteForm.value       = emptyLoteForm()
   loteErrors.value     = {}
   loteApiError.value   = null
@@ -509,6 +514,12 @@ async function openCreate() {
     proximoCodigo.value = data.codigo
   } catch { /* no crítico */ }
   finally { loadingCodigo.value = false }
+}
+
+async function onLoteCosechaCreado() {
+  await lotes.fetchBySala(salaId)
+  await salas.fetchSala(salaId)
+  lotesExpanded.value = true
 }
 function closeCreate() {
   showCreate.value     = false
@@ -649,7 +660,7 @@ const canSeeAmbiente = computed(() =>
                   <button v-if="(canEdit || isCultivador) && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="openCreate">Crear primer lote</button>
                   <button v-else-if="puedeCargarLote" class="sd__btn-outline" style="color:#b45309;border-color:#fde68a" @click="showCargarLote=true">
                     <i class="bi bi-box-arrow-in-down"></i>
-                    {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
+                    {{ esSalaSecado ? 'Cargar lote de floración' : esSalaManicura ? 'Cargar lote de cosecha' : 'Cargar lote de secado' }}
                   </button>
                 </template>
               </EmptyState>
@@ -1092,6 +1103,14 @@ const canSeeAmbiente = computed(() =>
         </div>
       </div>
     </Teleport>
+
+    <!-- Wizard crear lote cosecha -->
+    <ModalCrearLoteCosecha
+      v-if="showCrearLoteCosecha && sala"
+      :sala="sala"
+      @created="onLoteCosechaCreado"
+      @close="showCrearLoteCosecha = false"
+    />
 
     <!-- Modal cargar lote (usa Teleport internamente) -->
     <ModalCargarLote
