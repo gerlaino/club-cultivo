@@ -24,12 +24,24 @@ const form = ref({
   plants_count: 0,
   genetica_id: '',
   dias: { semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 },
+  // Cultivo
   grow_type: 'sustrato',
   sustrato_especifico: '',
+  sistema_hidro: '',
+  // Luz
   light_type: '',
-  fotoperiodo: '',
+  // Fotoperiodos
+  fotoperiodo_vegetativo: '',
+  fotoperiodo: '',           // floración
   semanas_floracion: null,
-  tamanio_maceta: '',
+  // Macetas
+  tamanio_maceta_inicial: '',
+  tamanio_maceta: '',        // final
+  fecha_trasplante: '',
+  // Riego y nutrición
+  ph_riego: null,
+  fertilizacion_descripcion: '',
+  // Notas
   notes: '',
 })
 const errors = ref({})
@@ -98,11 +110,17 @@ const totalDias = computed(() => {
   return (d.semilla_esqueje || 0) + (d.vegetativo || 0) + (d.floracion || 0) + (d.cosecha || 0)
 })
 
+const hayTrasplante = computed(() => {
+  const ini = form.value.tamanio_maceta_inicial
+  const fin = form.value.tamanio_maceta
+  return ini && fin && String(ini) !== String(fin)
+})
+
 // ── Lifecycle ──────────────────────────────────────────────
 onMounted(async () => {
   try {
     const [{ data: g }, { data: c }] = await Promise.all([
-      listGeneticas({ disponible: 'true' }),
+      listGeneticas({ solo_club: 'true' }),
       getLoteProximoCodigo(),
     ])
     geneticas.value = g || []
@@ -142,14 +160,20 @@ async function crear() {
       plants_count: form.value.plants_count,
       grow_type:  form.value.grow_type || 'sustrato',
     }
-    if (form.value.genetica_id)       lotePayload.genetica_id       = form.value.genetica_id
-    if (form.value.planta_madre_id)   lotePayload.planta_madre_id   = form.value.planta_madre_id
-    if (form.value.light_type)        lotePayload.light_type        = form.value.light_type
-    if (form.value.tamanio_maceta)    lotePayload.tamanio_maceta    = form.value.tamanio_maceta
-    if (form.value.fotoperiodo)       lotePayload.fotoperiodo       = form.value.fotoperiodo
-    if (form.value.semanas_floracion) lotePayload.semanas_floracion = form.value.semanas_floracion
-    if (form.value.sustrato_especifico) lotePayload.sustrato_especifico = form.value.sustrato_especifico
-    if (form.value.notes?.trim())     lotePayload.notes             = form.value.notes.trim()
+    if (form.value.genetica_id)            lotePayload.genetica_id            = form.value.genetica_id
+    if (form.value.planta_madre_id)        lotePayload.planta_madre_id        = form.value.planta_madre_id
+    if (form.value.light_type)             lotePayload.light_type             = form.value.light_type
+    if (form.value.tamanio_maceta)         lotePayload.tamanio_maceta         = form.value.tamanio_maceta
+    if (form.value.tamanio_maceta_inicial) lotePayload.tamanio_maceta_inicial = form.value.tamanio_maceta_inicial
+    if (hayTrasplante.value && form.value.fecha_trasplante) lotePayload.fecha_trasplante = form.value.fecha_trasplante
+    if (form.value.fotoperiodo)            lotePayload.fotoperiodo            = form.value.fotoperiodo
+    if (form.value.fotoperiodo_vegetativo) lotePayload.fotoperiodo_vegetativo = form.value.fotoperiodo_vegetativo
+    if (form.value.semanas_floracion)      lotePayload.semanas_floracion      = form.value.semanas_floracion
+    if (form.value.sustrato_especifico)    lotePayload.sustrato_especifico    = form.value.sustrato_especifico
+    if (form.value.sistema_hidro)          lotePayload.sistema_hidro          = form.value.sistema_hidro
+    if (form.value.ph_riego)               lotePayload.ph_riego               = form.value.ph_riego
+    if (form.value.fertilizacion_descripcion?.trim()) lotePayload.fertilizacion_descripcion = form.value.fertilizacion_descripcion.trim()
+    if (form.value.notes?.trim())          lotePayload.notes                  = form.value.notes.trim()
 
     await createLoteHeredado(props.sala.id, lotePayload, {
       dias_semilla_esqueje: form.value.dias.semilla_esqueje || 0,
@@ -373,95 +397,206 @@ async function crear() {
               <i class="bi bi-tools"></i> Insumos y técnica
             </div>
             <p class="clc__paso-desc">
-              Todo lo que sabés de este ciclo. Podés dejar vacío y completar después desde el detalle del lote.
+              Todo opcional. Podés completar o ajustar desde el detalle del lote en cualquier momento.
             </p>
 
-            <div class="clc__grid">
+            <!-- ── Bloque 1: Cultivo ── -->
+            <div class="clc__bloque">
+              <div class="clc__bloque-title">🌱 Tipo de cultivo</div>
 
-              <div class="clc__field">
-                <label class="clc__label">Tipo de cultivo</label>
-                <select class="clc__input" v-model="form.grow_type">
-                  <option value="sustrato">Sustrato</option>
-                  <option value="hidroponia">Hidroponia</option>
-                  <option value="aeroponia">Aeroponia</option>
-                </select>
+              <div class="clc__field clc__field--full">
+                <label class="clc__label">Medio de cultivo</label>
+                <div class="clc__pills">
+                  <button type="button" class="clc__pill" :class="{ 'clc__pill--active': form.grow_type === 'sustrato' }"   @click="form.grow_type = 'sustrato'">🪨 Sustrato</button>
+                  <button type="button" class="clc__pill" :class="{ 'clc__pill--active': form.grow_type === 'hidroponia' }" @click="form.grow_type = 'hidroponia'">💧 Hidroponia</button>
+                  <button type="button" class="clc__pill" :class="{ 'clc__pill--active': form.grow_type === 'aeroponia' }"  @click="form.grow_type = 'aeroponia'">🌬️ Aeroponia</button>
+                </div>
               </div>
 
-              <div class="clc__field">
-                <label class="clc__label">Sustrato específico <span class="clc__label-opt">(opc.)</span></label>
+              <!-- Sustrato específico -->
+              <div v-if="form.grow_type === 'sustrato'" class="clc__field clc__field--full">
+                <label class="clc__label">Sustrato <span class="clc__label-opt">(opc.)</span></label>
                 <select class="clc__input" v-model="form.sustrato_especifico">
                   <option value="">Sin especificar</option>
                   <option value="tierra">Tierra</option>
                   <option value="coco">Fibra de coco</option>
                   <option value="perlita">Perlita</option>
-                  <option value="mezcla">Mezcla</option>
+                  <option value="mezcla">Mezcla (tierra + coco + perlita)</option>
                   <option value="rockwool">Rockwool</option>
+                  <option value="fibra_coco">Fibra de coco pura</option>
                 </select>
               </div>
 
-              <div class="clc__field">
-                <label class="clc__label">Tipo de luz <span class="clc__label-opt">(opc.)</span></label>
-                <select class="clc__input" v-model="form.light_type">
+              <!-- Sistema hidropónico -->
+              <div v-if="form.grow_type === 'hidroponia'" class="clc__field clc__field--full">
+                <label class="clc__label">Sistema hidropónico <span class="clc__label-opt">(opc.)</span></label>
+                <select class="clc__input" v-model="form.sistema_hidro">
                   <option value="">Sin especificar</option>
-                  <option value="led">LED</option>
-                  <option value="hps">HPS</option>
-                  <option value="cmh">CMH</option>
-                  <option value="natural">Natural</option>
-                  <option value="mixta">Mixta</option>
-                </select>
-              </div>
-
-              <div class="clc__field">
-                <label class="clc__label">Fotoperiodo floración <span class="clc__label-opt">(opc.)</span></label>
-                <select class="clc__input" v-model="form.fotoperiodo">
-                  <option value="">Sin especificar</option>
-                  <option value="20/4">20/4 hs</option>
-                  <option value="18/6">18/6 hs</option>
-                  <option value="16/8">16/8 hs</option>
-                  <option value="12/12">12/12 hs</option>
-                  <option value="auto">Auto (autofloreciente)</option>
-                </select>
-              </div>
-
-              <div class="clc__field">
-                <label class="clc__label">Semanas en floración <span class="clc__label-opt">(opc.)</span></label>
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  step="1"
-                  class="clc__input"
-                  placeholder="Ej: 9"
-                  v-model.number="form.semanas_floracion"
-                />
-              </div>
-
-              <div class="clc__field">
-                <label class="clc__label">Tamaño de maceta final <span class="clc__label-opt">(opc.)</span></label>
-                <select class="clc__input" v-model="form.tamanio_maceta">
-                  <option value="">Sin especificar</option>
-                  <option value="0.5">Vaso (0.5 L)</option>
-                  <option value="1">1 litro</option>
-                  <option value="3">3 litros</option>
-                  <option value="5">5 litros</option>
-                  <option value="7">7 litros</option>
-                  <option value="10">10 litros</option>
-                  <option value="12">12 litros</option>
-                  <option value="15">15 litros</option>
+                  <option value="dwc">DWC (Deep Water Culture)</option>
+                  <option value="nft">NFT (Nutrient Film Technique)</option>
+                  <option value="ebb_flow">Ebb & Flow (marea)</option>
+                  <option value="kratky">Kratky</option>
+                  <option value="rdwc">RDWC (Recirculating DWC)</option>
                   <option value="otro">Otro</option>
                 </select>
               </div>
 
+              <!-- Sistema aeropónico -->
+              <div v-if="form.grow_type === 'aeroponia'" class="clc__field clc__field--full">
+                <label class="clc__label">Sistema aeropónico <span class="clc__label-opt">(opc.)</span></label>
+                <select class="clc__input" v-model="form.sistema_hidro">
+                  <option value="">Sin especificar</option>
+                  <option value="aero_alta_presion">Alta presión (HP Aeroponics)</option>
+                  <option value="aero_baja_presion">Baja presión (rociadores)</option>
+                  <option value="aero_ultra">Ultra alta presión</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- ── Bloque 2: Iluminación y fotoperiodos ── -->
+            <div class="clc__bloque">
+              <div class="clc__bloque-title">💡 Iluminación</div>
+              <div class="clc__grid">
+
+                <div class="clc__field clc__field--full">
+                  <label class="clc__label">Tipo de luz <span class="clc__label-opt">(opc.)</span></label>
+                  <div class="clc__pills clc__pills--sm">
+                    <button type="button" class="clc__pill clc__pill--sm" :class="{ 'clc__pill--active': form.light_type === 'led' }"     @click="form.light_type = form.light_type === 'led'     ? '' : 'led'">LED</button>
+                    <button type="button" class="clc__pill clc__pill--sm" :class="{ 'clc__pill--active': form.light_type === 'hps' }"     @click="form.light_type = form.light_type === 'hps'     ? '' : 'hps'">HPS</button>
+                    <button type="button" class="clc__pill clc__pill--sm" :class="{ 'clc__pill--active': form.light_type === 'cmh' }"     @click="form.light_type = form.light_type === 'cmh'     ? '' : 'cmh'">CMH</button>
+                    <button type="button" class="clc__pill clc__pill--sm" :class="{ 'clc__pill--active': form.light_type === 'natural' }" @click="form.light_type = form.light_type === 'natural' ? '' : 'natural'">Natural</button>
+                    <button type="button" class="clc__pill clc__pill--sm" :class="{ 'clc__pill--active': form.light_type === 'mixta' }"   @click="form.light_type = form.light_type === 'mixta'   ? '' : 'mixta'">Mixta</button>
+                  </div>
+                </div>
+
+                <div class="clc__field">
+                  <label class="clc__label">Fotoperiodo — vegetativo <span class="clc__label-opt">(opc.)</span></label>
+                  <select class="clc__input" v-model="form.fotoperiodo_vegetativo">
+                    <option value="">Sin especificar</option>
+                    <option value="24/0">24/0 hs</option>
+                    <option value="20/4">20/4 hs</option>
+                    <option value="18/6">18/6 hs</option>
+                    <option value="16/8">16/8 hs</option>
+                    <option value="auto">Auto</option>
+                  </select>
+                </div>
+
+                <div class="clc__field">
+                  <label class="clc__label">Fotoperiodo — floración <span class="clc__label-opt">(opc.)</span></label>
+                  <select class="clc__input" v-model="form.fotoperiodo">
+                    <option value="">Sin especificar</option>
+                    <option value="14/10">14/10 hs</option>
+                    <option value="13/11">13/11 hs</option>
+                    <option value="12/12">12/12 hs</option>
+                    <option value="auto">Auto (autofloreciente)</option>
+                  </select>
+                </div>
+
+                <div class="clc__field">
+                  <label class="clc__label">Semanas en floración <span class="clc__label-opt">(opc.)</span></label>
+                  <input type="number" min="1" max="30" step="1" class="clc__input" placeholder="Ej: 9" v-model.number="form.semanas_floracion" />
+                </div>
+
+              </div>
+            </div>
+
+            <!-- ── Bloque 3: Macetas y trasplante ── -->
+            <div class="clc__bloque">
+              <div class="clc__bloque-title">🪣 Macetas y trasplante</div>
+              <div class="clc__grid">
+
+                <div class="clc__field">
+                  <label class="clc__label">Maceta inicial <span class="clc__label-opt">(opc.)</span></label>
+                  <select class="clc__input" v-model="form.tamanio_maceta_inicial">
+                    <option value="">Sin especificar</option>
+                    <option value="0.5">Vaso (0.5 L)</option>
+                    <option value="1">1 litro</option>
+                    <option value="3">3 litros</option>
+                    <option value="5">5 litros</option>
+                    <option value="7">7 litros</option>
+                    <option value="10">10 litros</option>
+                    <option value="12">12 litros</option>
+                    <option value="15">15 litros</option>
+                    <option value="20">20 litros</option>
+                  </select>
+                </div>
+
+                <div class="clc__field">
+                  <label class="clc__label">Maceta final <span class="clc__label-opt">(opc.)</span></label>
+                  <select class="clc__input" v-model="form.tamanio_maceta">
+                    <option value="">Sin especificar</option>
+                    <option value="0.5">Vaso (0.5 L)</option>
+                    <option value="1">1 litro</option>
+                    <option value="3">3 litros</option>
+                    <option value="5">5 litros</option>
+                    <option value="7">7 litros</option>
+                    <option value="10">10 litros</option>
+                    <option value="12">12 litros</option>
+                    <option value="15">15 litros</option>
+                    <option value="20">20 litros</option>
+                  </select>
+                </div>
+
+                <!-- Fecha de trasplante: solo si inicial ≠ final -->
+                <Transition name="clc-fade">
+                  <div v-if="hayTrasplante" class="clc__field clc__field--full">
+                    <label class="clc__label">
+                      Fecha de trasplante
+                      <span class="clc__label-opt">(opc.) — hubo cambio de maceta {{ form.tamanio_maceta_inicial }}L → {{ form.tamanio_maceta }}L</span>
+                    </label>
+                    <input type="date" class="clc__input" v-model="form.fecha_trasplante" />
+                  </div>
+                </Transition>
+
+              </div>
+            </div>
+
+            <!-- ── Bloque 4: Riego y nutrición ── -->
+            <div class="clc__bloque">
+              <div class="clc__bloque-title">💧 Riego y nutrición</div>
+              <div class="clc__grid">
+
+                <div class="clc__field">
+                  <label class="clc__label">pH de riego <span class="clc__label-opt">(opc.)</span></label>
+                  <div class="clc__input-with-unit">
+                    <input type="number" min="4" max="8" step="0.1" class="clc__input" placeholder="Ej: 6.2" v-model.number="form.ph_riego" />
+                    <span class="clc__unit">pH</span>
+                  </div>
+                  <span class="clc__field-hint">Rango típico en cannabis: 5.8 – 6.8</span>
+                </div>
+
+                <div class="clc__field clc__field--full">
+                  <label class="clc__label">Fertilización utilizada <span class="clc__label-opt">(opc.)</span></label>
+                  <textarea
+                    class="clc__input clc__textarea"
+                    rows="3"
+                    v-model.trim="form.fertilizacion_descripcion"
+                    placeholder="Ej: BioBizz Grow semanas 1-4, BioBizz Bloom semanas 5-9, Top Max semanas 7-9. EC 1.2-2.0 mS/cm."
+                  ></textarea>
+                </div>
+
+                <div class="clc__field clc__field--full">
+                  <div class="clc__fertilizacion-hint">
+                    <i class="bi bi-paperclip"></i>
+                    Para adjuntar un protocolo detallado de fertilización (PDF, planilla), podés hacerlo desde el <strong>detalle del lote</strong> una vez creado.
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- ── Bloque 5: Notas ── -->
+            <div class="clc__bloque clc__bloque--last">
+              <div class="clc__bloque-title">📝 Notas generales</div>
               <div class="clc__field clc__field--full">
-                <label class="clc__label">Notas del ciclo <span class="clc__label-opt">(opc.)</span></label>
                 <textarea
                   class="clc__input clc__textarea"
                   rows="3"
                   v-model.trim="form.notes"
-                  placeholder="Técnica de conducción (SCROG, SOG, LST…), fertilización usada, EC aproximado, observaciones del ciclo…"
+                  placeholder="Técnica de conducción (SCROG, SOG, LST, topping…), observaciones del ciclo, incidencias, etc."
                 ></textarea>
               </div>
-
             </div>
 
             <div v-if="apiError" class="clc__error">
@@ -741,6 +876,33 @@ async function crear() {
 }
 .clc__btn-ghost:hover:not(:disabled) { background: #f8fafc; }
 .clc__btn-ghost:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Bloques del paso 3 */
+.clc__bloque { border: 1.5px solid #f1f5f9; border-radius: 12px; padding: .875rem 1rem; margin-bottom: .875rem; }
+.clc__bloque--last { margin-bottom: 0; }
+.clc__bloque-title { font-size: .78rem; font-weight: 700; color: #475569; margin-bottom: .75rem; }
+
+/* Pills pequeñas (para luz) */
+.clc__pills--sm { flex-wrap: wrap; gap: .35rem; }
+.clc__pill--sm { flex: none; font-size: .78rem; padding: .4rem .65rem; }
+
+/* Input con unidad */
+.clc__input-with-unit { display: flex; align-items: center; gap: .4rem; }
+.clc__input-with-unit .clc__input { flex: 1; }
+.clc__unit { font-size: .8rem; font-weight: 700; color: #64748b; white-space: nowrap; }
+
+/* Hint fertilización */
+.clc__fertilizacion-hint {
+  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px;
+  padding: .65rem .875rem; font-size: .78rem; color: #64748b;
+  display: flex; align-items: flex-start; gap: .5rem; line-height: 1.5;
+}
+.clc__fertilizacion-hint i { color: #94a3b8; flex-shrink: 0; margin-top: .1rem; }
+.clc__fertilizacion-hint strong { color: #334155; }
+
+/* Transición suave fecha trasplante */
+.clc-fade-enter-active, .clc-fade-leave-active { transition: opacity .2s, transform .2s; }
+.clc-fade-enter-from, .clc-fade-leave-to { opacity: 0; transform: translateY(-6px); }
 
 @media (max-width: 500px) {
   .clc__grid { grid-template-columns: 1fr; }

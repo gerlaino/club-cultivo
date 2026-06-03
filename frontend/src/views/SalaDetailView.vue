@@ -176,7 +176,7 @@ onMounted(async () => {
   finally  { loading.value = false }
 
   try {
-    const res = await listGeneticas({ activa: true, disponible: true })
+    const res = await listGeneticas({ solo_club: 'true' })
     geneticas.value = res.data || []
   } catch { /* genéticas no críticas */ }
 

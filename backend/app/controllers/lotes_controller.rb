@@ -682,7 +682,10 @@ class LotesController < ApplicationController
       :start_date, :estado, :origen, :planta_madre_id, :plants_count, :strain, :notes,
       :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
-      :rendimiento_real_g, :plants_count_cosechadas
+      :rendimiento_real_g, :plants_count_cosechadas,
+      :fotoperiodo, :fotoperiodo_vegetativo,
+      :tamanio_maceta_inicial, :fecha_trasplante,
+      :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico
     )
   end
 
@@ -691,7 +694,10 @@ class LotesController < ApplicationController
       :start_date, :origen, :planta_madre_id, :plants_count, :strain, :notes,
       :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
-      :rendimiento_real_g, :plants_count_cosechadas
+      :rendimiento_real_g, :plants_count_cosechadas,
+      :fotoperiodo, :fotoperiodo_vegetativo,
+      :tamanio_maceta_inicial, :fecha_trasplante,
+      :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico
     )
   end
 

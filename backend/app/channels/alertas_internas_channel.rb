@@ -12,7 +12,7 @@ class AlertasInternasChannel < ApplicationCable::Channel
   private
 
   def find_verified_user
-    token = request.params[:token] || request.headers['Authorization']&.split(' ')&.last
+    token = connection.request.params[:token] || connection.request.headers['Authorization']&.split(' ')&.last
     return nil unless token
 
     payload = JWT.decode(token, Rails.application.credentials.devise_jwt_secret_key!, true,

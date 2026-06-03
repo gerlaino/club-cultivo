@@ -4,13 +4,22 @@ class GeneticasController < ApplicationController
   before_action :set_genetica, only: [:show, :update, :destroy, :destroy_foto]
 
   # GET /geneticas
+  # Params opcionales:
+  #   solo_club=true  → solo genéticas del club actual (para selects internos)
+  #   disponible=true → además filtra disponible: true
   def index
-    club      = current_user.club
-    scope     = Genetica.where(global: true, registrada_inase: true)
-    scope     = scope.or(Genetica.where(club_id: club.id)) if club
-    scope     = scope.where(activa: true)
-    scope     = scope.where(disponible: true) if params[:disponible].present?
-    geneticas = scope.order(registrada_inase: :desc, nombre: :asc)
+    club = current_user.club
+
+    scope = if params[:solo_club].present?
+      Genetica.where(club_id: club.id)
+    else
+      base = Genetica.where(global: true, registrada_inase: true)
+      club ? base.or(Genetica.where(club_id: club.id)) : base
+    end
+
+    scope = scope.where(activa: true)
+    scope = scope.where(disponible: true) if params[:disponible].present?
+    geneticas = scope.order(nombre: :asc)
     render json: geneticas.map { |g| serialize_genetica(g, club) }
   end
 
