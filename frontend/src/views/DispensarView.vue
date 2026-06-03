@@ -82,7 +82,14 @@
               <div class="dv__stock-lote">{{ s.lote?.codigo ?? '—' }}<span v-if="s.sede?.nombre" class="dv__stock-sede"> · {{ s.sede.nombre }}</span></div>
               <div v-if="s.genetica?.nombre ?? s.lote?.genetica?.nombre" class="dv__stock-cepa">{{ s.genetica?.nombre ?? s.lote?.genetica?.nombre }}</div>
               <div class="dv__stock-disponible">{{ s.cantidad }}{{ s.unidad }} disponibles</div>
-              <div class="dv__stock-precio">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad }}</div>
+              <div class="dv__stock-precio">
+                <template v-if="descuentoPaciente > 0 && s.precio_sugerido_ars">
+                  <span class="dv__precio-original">{{ formatARS(s.precio_sugerido_ars) }}</span>
+                  {{ formatARS(precioConDescuento(s.precio_sugerido_ars)) }}/{{ s.unidad }}
+                  <span class="dv__descuento-badge">-{{ descuentoPaciente }}%</span>
+                </template>
+                <template v-else>{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad }}</template>
+              </div>
               <div class="dv__stock-add">
                 <input
                   v-model.number="cantidades[s.id]"
@@ -401,6 +408,16 @@ const pacienteActivo  = computed(() => pacienteDetalle.value?.es_paciente !== fa
 // REPROCANN
 const reprocannVigente = computed(() => reprocannStatus(selectedPaciente.value) === 'vigente')
 
+const descuentoPaciente = computed(() => {
+  const d = pacienteDetalle.value?.descuento_porcentaje
+  return d != null && d > 0 ? Number(d) : 0
+})
+
+function precioConDescuento(precioBase) {
+  if (!descuentoPaciente.value) return precioBase
+  return precioBase * (1 - descuentoPaciente.value / 100)
+}
+
 function addToCart(s) {
   const qty = cantidades.value[s.id]
   if (!qty || qty <= 0) { toast.warning('Ingresá una cantidad'); return }
@@ -414,7 +431,7 @@ function addToCart(s) {
     return
   }
 
-  const precio = s.precio_sugerido_ars ?? 0
+  const precio = precioConDescuento(s.precio_sugerido_ars ?? 0)
   if (existente) {
     existente.cantidad += qty
     existente.total = existente.cantidad * precio
@@ -452,7 +469,7 @@ async function submitDispensacion() {
       createDispensacion(selectedPaciente.value.id, {
         stock_id:            item.stock.id,
         cantidad:            item.cantidad,
-        precio_unitario_ars: item.stock.precio_sugerido_ars,
+        precio_unitario_ars: precioConDescuento(item.stock.precio_sugerido_ars ?? 0),
         aporte_socio_ars:    item.total,
         fecha_dispensacion:  today,
         medio_pago:          medioPago.value,
@@ -701,7 +718,9 @@ function reprocannLabel(p) {
 .dv__stock-header { font-weight: 700; font-size: var(--fs-14); color: var(--c-ink-900); }
 .dv__stock-lote   { font-family: var(--font-mono); font-size: var(--fs-12); color: var(--c-ink-500); }
 .dv__stock-disponible { font-size: var(--fs-13); color: var(--c-leaf-600); }
-.dv__stock-precio     { font-size: var(--fs-13); color: var(--c-role-dispensador); font-weight: 600; }
+.dv__stock-precio     { font-size: var(--fs-13); color: var(--c-role-dispensador); font-weight: 600; display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.dv__precio-original  { text-decoration: line-through; color: #94a3b8; font-weight: 400; }
+.dv__descuento-badge  { font-size: .65rem; font-weight: 800; background: #dcfce7; color: #15803d; padding: .1em .45em; border-radius: 5px; }
 .dv__stock-add { display: flex; gap: var(--sp-2); align-items: center; margin-top: var(--sp-1); }
 .dv__qty-input {
   width: 70px;

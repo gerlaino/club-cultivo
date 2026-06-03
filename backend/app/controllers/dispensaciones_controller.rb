@@ -62,7 +62,9 @@ class DispensacionesController < ApplicationController
     @dispensacion.sede_id ||= @dispensacion.stock&.sede_id
 
     if @dispensacion.stock && @dispensacion.aporte_socio_ars.nil?
-      precio = @dispensacion.stock.precio_sugerido_ars.to_d
+      precio_base = @dispensacion.stock.precio_sugerido_ars.to_d
+      descuento   = @paciente.descuento_porcentaje.to_d.clamp(0, 100) / 100
+      precio      = precio_base * (1 - descuento)
       @dispensacion.aporte_socio_ars    = (precio * @dispensacion.cantidad.to_d).round(2)
       @dispensacion.precio_unitario_ars ||= precio
     end

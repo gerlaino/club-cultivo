@@ -69,39 +69,40 @@
         <template v-if="cc.credito_gramos_activo">
           <div class="scc__gramos-stats">
             <div class="scc__gramos-stat">
-              <span class="scc__gramos-stat-label">Disponible</span>
+              <span class="scc__gramos-stat-label">Disponible ahora</span>
               <span class="scc__gramos-stat-val" :class="cc.saldo_disponible_g <= 0 ? 'scc__gramos--agotado' : 'scc__gramos--ok'">
                 {{ (cc.saldo_disponible_g ?? 0).toFixed(1) }}g
               </span>
             </div>
             <div class="scc__gramos-stat">
-              <span class="scc__gramos-stat-label">Límite</span>
-              <span class="scc__gramos-stat-val">{{ cc.limite_credito_g ? cc.limite_credito_g.toFixed(1) + 'g' : '—' }}</span>
+              <span class="scc__gramos-stat-label">
+                Máximo permitido
+                <button v-if="!readonly && !limiteGOpen" class="scc__limite-edit-btn" @click="limiteGOpen = true; limiteGVal = cc.limite_credito_g ?? null" title="Editar tope máximo">
+                  <Pencil :size="11" :stroke-width="2" />
+                </button>
+              </span>
+              <template v-if="!limiteGOpen">
+                <span class="scc__gramos-stat-val">{{ cc.limite_credito_g ? cc.limite_credito_g.toFixed(1) + 'g' : 'Sin tope' }}</span>
+              </template>
+              <template v-else>
+                <div class="scc__gramos-form scc__gramos-form--inline">
+                  <input type="number" min="0" step="0.5" v-model.number="limiteGVal"
+                         class="scc__numInput scc__numInput--sm" placeholder="ej: 50"
+                         @keydown.enter="saveLimiteG" @keydown.esc="limiteGOpen = false" />
+                  <span class="scc__gramos-unit">g</span>
+                  <button class="scc__btn scc__btn--primary scc__btn--sm" :disabled="savingLimiteG" @click="saveLimiteG">
+                    {{ savingLimiteG ? '…' : 'OK' }}
+                  </button>
+                  <button class="scc__btn scc__btn--ghost scc__btn--sm" @click="limiteGOpen = false">✕</button>
+                </div>
+              </template>
             </div>
           </div>
 
           <div v-if="!readonly" class="scc__gramos-actions">
-            <template v-if="!limiteGOpen">
-              <button class="scc__btn scc__btn--ghost scc__btn--sm" @click="limiteGOpen = true; limiteGVal = cc.limite_credito_g ?? null">
-                <Pencil :size="11" :stroke-width="2" /> Límite
-              </button>
-            </template>
-            <template v-else>
-              <div class="scc__gramos-form">
-                <input type="number" min="0.1" step="0.5" v-model.number="limiteGVal"
-                       class="scc__numInput" placeholder="ej: 50"
-                       @keydown.enter="saveLimiteG" @keydown.esc="limiteGOpen = false" />
-                <span class="scc__gramos-unit">g</span>
-                <button class="scc__btn scc__btn--primary scc__btn--sm" :disabled="savingLimiteG" @click="saveLimiteG">
-                  {{ savingLimiteG ? '…' : 'OK' }}
-                </button>
-                <button class="scc__btn scc__btn--ghost scc__btn--sm" @click="limiteGOpen = false">✕</button>
-              </div>
-            </template>
-
             <template v-if="!cargarGOpen">
               <button class="scc__btn scc__btn--primary scc__btn--sm" @click="cargarGOpen = true; cargarGVal = null">
-                + Cargar gramos
+                <i class="bi bi-plus-lg" style="font-size:.75rem"></i> Acreditar gramos al saldo
               </button>
             </template>
             <template v-else>
@@ -111,7 +112,7 @@
                        @keydown.enter="doCargarG" @keydown.esc="cargarGOpen = false" />
                 <span class="scc__gramos-unit">g</span>
                 <button class="scc__btn scc__btn--primary scc__btn--sm" :disabled="savingCargarG" @click="doCargarG">
-                  {{ savingCargarG ? '…' : 'Cargar' }}
+                  {{ savingCargarG ? '…' : 'Acreditar' }}
                 </button>
                 <button class="scc__btn scc__btn--ghost scc__btn--sm" @click="cargarGOpen = false">✕</button>
               </div>
@@ -207,6 +208,8 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 .scc__limite-form { display: flex; align-items: center; gap: .4rem; margin-top: .25rem; flex-wrap: wrap; }
 .scc__numInput { font-family: monospace; font-size: 1rem; font-weight: 600; border: 1.5px solid #6366f1; border-radius: 8px; padding: .35rem .6rem; width: 8rem; color: #1e293b; background: #fff; outline: none; }
 .scc__numInput:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+.scc__numInput--sm { width: 5.5rem; font-size: .875rem; padding: .25rem .5rem; }
+.scc__gramos-form--inline { margin-top: .25rem; }
 
 /* Gramos */
 .scc__gramos-section { border: 1.5px solid #e2e8f0; border-radius: 12px; padding: .9rem 1rem; margin-bottom: 1rem; }

@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listSedes, createSede, updateSede, deleteSede,
-  getSedeStocks } from '../lib/api.js'
+  getSedeStocks, listStocks } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import { usePermissions } from '../composables/usePermissions.js'
 import { usePlan } from '../composables/usePlan.js'
@@ -29,6 +29,26 @@ const editingId      = ref(null)
 const sedeActiva     = ref(null)
 const inventarioData = ref([])
 const loadingInv     = ref(false)
+
+// Stock por sede (para mostrar en las cards)
+const stocksPorSede  = ref({}) // { sede_id: { totalG, productos } }
+
+async function cargarResumenStocks() {
+  try {
+    const { data } = await listStocks()
+    const agrupado = {}
+    for (const s of (data || [])) {
+      const sid = s.sede_id
+      if (!sid) continue
+      if (!agrupado[sid]) agrupado[sid] = { totalG: 0, productos: 0 }
+      agrupado[sid].totalG   += Number(s.cantidad || 0)
+      agrupado[sid].productos += 1
+    }
+    stocksPorSede.value = agrupado
+  } catch { /* no crítico */ }
+}
+
+function stockResumen(sedeId) { return stocksPorSede.value[sedeId] || null }
 
 const CICLO_META = {
   semilla:    { label: 'Semilla',    color: '#a16207', bg: 'rgba(161,98,7,.12)',    dot: '#ca8a04' },
@@ -75,6 +95,7 @@ onMounted(async () => {
     await fetchPlan()
     const { data } = await listSedes()
     sedes.value = data
+    cargarResumenStocks()
   } finally { loading.value = false }
 })
 
@@ -437,6 +458,19 @@ function tieneActividad(sede) {
                 <span class="sede-card__stat-value">{{ sede.salas_count || 0 }}</span>
                 <span class="sede-card__stat-label">salas</span>
               </div>
+              <template v-if="stockResumen(sede.id)">
+                <div class="sede-card__stat-sep"></div>
+                <div class="sede-card__stat sede-card__stat--stock">
+                  <span class="sede-card__stat-value" style="color:#15803d">
+                    {{ stockResumen(sede.id).totalG.toFixed(1) }}g
+                  </span>
+                  <span class="sede-card__stat-label">en stock</span>
+                </div>
+                <div class="sede-card__stat">
+                  <span class="sede-card__stat-value">{{ stockResumen(sede.id).productos }}</span>
+                  <span class="sede-card__stat-label">productos</span>
+                </div>
+              </template>
             </div>
             <div class="sede-card__actions" @click.stop>
               <button
@@ -1086,6 +1120,7 @@ function tieneActividad(sede) {
 .sede-card__stat { display: flex; align-items: baseline; gap: .3rem; }
 .sede-card__stat-value { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
 .sede-card__stat-label { font-size: .72rem; color: #94a3b8; font-weight: 500; }
+.sede-card__stat-sep { width: 1px; background: #e2e8f0; align-self: stretch; margin: 0 .25rem; }
 .sede-card__actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: auto; }
 .sede-card__btn { display: inline-flex; align-items: center; gap: .35rem; padding: .45rem .8rem; border-radius: 7px; font-size: .78rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; text-decoration: none; white-space: nowrap; }
 .sede-card__btn--primary { background: var(--brand-primary, #1b5e20); color: #fff; margin-left: auto; }

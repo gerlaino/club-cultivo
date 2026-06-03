@@ -77,6 +77,22 @@
                 <span class="sem__hint">Dejá vacío para no aplicar ningún límite.</span>
               </div>
               <div class="sem__field sem__field--full">
+                <label class="sem__label" style="margin-bottom:.4rem">
+                  Descuento por defecto
+                  <span class="sem__opt">en dispensaciones — opcional</span>
+                </label>
+                <div class="sem__limit-wrap">
+                  <input
+                    v-model.number="editForm.descuento_porcentaje"
+                    class="sem__input sem__input--limit"
+                    type="number" step="1" min="0" max="100"
+                    placeholder="0"
+                  />
+                  <span class="sem__limit-unit">%</span>
+                </div>
+                <span class="sem__hint">Se aplica automáticamente al calcular el precio en cada dispensación. 0 = sin descuento.</span>
+              </div>
+              <div class="sem__field sem__field--full">
                 <label class="sem__label">
                   <input v-model="editForm.es_paciente" type="checkbox" class="sem__check" />
                   En tratamiento activo

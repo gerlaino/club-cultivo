@@ -146,6 +146,9 @@
                 </div>
                 <div class="stk__inv-right">
                   <span class="stk__inv-g">{{ s.cantidad }}g</span>
+                  <button class="stk__icon-btn" title="Editar stock" @click="abrirEditar(s)">
+                    <i class="bi bi-pencil"></i>
+                  </button>
                   <button class="stk__icon-btn" title="Repartir a sede" @click="openRepartir(s)">
                     <i class="bi bi-arrows-angle-expand"></i>
                   </button>
@@ -298,6 +301,60 @@
 
   </div>
 
+    <!-- ── Modal: Editar stock ───────────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="stk-fade">
+        <div v-if="showEditarModal" class="stk__overlay" @click.self="showEditarModal = false">
+          <div class="stk__modal">
+            <div class="stk__modal-hd">
+              <div class="stk__modal-ico"><i class="bi bi-pencil"></i></div>
+              <div>
+                <h2 class="stk__modal-title">Editar stock</h2>
+                <p class="stk__modal-sub">{{ formaLabel(editandoStock?.forma_producto) }} · {{ editandoStock?.sede?.nombre || '—' }}</p>
+              </div>
+              <button class="stk__modal-close" @click="showEditarModal = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="stk__modal-body">
+              <div v-if="editarError" class="stk__alert">{{ editarError }}</div>
+              <div class="stk__form-grid">
+                <div class="stk__field">
+                  <label class="stk__label">Cantidad (g) <span class="stk__req">*</span></label>
+                  <div class="stk__input-row">
+                    <input type="number" min="0" step="0.1" class="stk__input" v-model.number="editarForm.cantidad" />
+                    <span class="stk__input-suf">g</span>
+                  </div>
+                </div>
+                <div class="stk__field">
+                  <label class="stk__label">Precio sugerido (ARS/g) <span class="stk__opt">opcional</span></label>
+                  <input type="number" min="0" step="0.01" class="stk__input" v-model.number="editarForm.precio_sugerido_ars" placeholder="0.00" />
+                </div>
+                <div class="stk__field">
+                  <label class="stk__label">Costo unitario (ARS/g) <span class="stk__opt">opcional</span></label>
+                  <input type="number" min="0" step="0.01" class="stk__input" v-model.number="editarForm.costo_unitario_ars" placeholder="0.00" />
+                </div>
+                <div v-if="editandoStock?.origen === 'compra_externa'" class="stk__field">
+                  <label class="stk__label">Proveedor</label>
+                  <input type="text" class="stk__input" v-model.trim="editarForm.proveedor" placeholder="Nombre del proveedor" />
+                </div>
+                <div class="stk__field stk__field--full">
+                  <label class="stk__label">Descripción <span class="stk__opt">opcional</span></label>
+                  <input type="text" class="stk__input" v-model.trim="editarForm.descripcion" placeholder="Observaciones…" />
+                </div>
+              </div>
+            </div>
+            <div class="stk__modal-ft">
+              <button type="button" class="stk__btn-ghost" @click="showEditarModal = false">Cancelar</button>
+              <button class="stk__btn-primary" :disabled="savingEditar" @click="guardarEditar">
+                <DsSpinner v-if="savingEditar" :size="12" />
+                <i v-else class="bi bi-check-lg"></i>
+                Guardar cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- ── Modal: Repartir stock ───────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="stk-fade">
@@ -425,7 +482,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   listStocksPendientes, listStocks, listStocksHistorial,
-  asignarStock, listSedes, createStock,
+  asignarStock, listSedes, createStock, updateStock,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
@@ -567,6 +624,50 @@ async function asignar(stock) {
   } catch (e) {
     toast.error(e.response?.data?.error || 'Error al asignar')
   } finally { asignando.value = null }
+}
+
+// ── Editar stock ───────────────────────────────────────────────────────────────
+const showEditarModal = ref(false)
+const editandoStock   = ref(null)
+const editarForm      = ref({ cantidad: null, precio_sugerido_ars: null, costo_unitario_ars: null, descripcion: '', proveedor: '' })
+const savingEditar    = ref(false)
+const editarError     = ref(null)
+
+function abrirEditar(s) {
+  editandoStock.value = s
+  editarForm.value = {
+    cantidad:            parseFloat(s.cantidad),
+    precio_sugerido_ars: s.precio_sugerido_ars ? parseFloat(s.precio_sugerido_ars) : null,
+    costo_unitario_ars:  s.costo_unitario_ars  ? parseFloat(s.costo_unitario_ars)  : null,
+    descripcion:         s.descripcion || '',
+    proveedor:           s.proveedor   || '',
+  }
+  editarError.value = null
+  showEditarModal.value = true
+}
+
+async function guardarEditar() {
+  savingEditar.value = true
+  editarError.value  = null
+  try {
+    const f = editarForm.value
+    const payload = { cantidad: f.cantidad }
+    if (f.precio_sugerido_ars != null) payload.precio_sugerido_ars = f.precio_sugerido_ars
+    if (f.costo_unitario_ars  != null) payload.costo_unitario_ars  = f.costo_unitario_ars
+    if (f.descripcion)                 payload.descripcion         = f.descripcion
+    if (f.proveedor)                   payload.proveedor           = f.proveedor
+    await updateStock(editandoStock.value.id, payload)
+    showEditarModal.value = false
+    const { data } = await listStocks()
+    inventario.value = data || []
+    if (historialLoaded.value) {
+      const { data: h } = await listStocksHistorial()
+      historial.value = h || []
+    }
+    toast.success('Stock actualizado')
+  } catch (e) {
+    editarError.value = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al actualizar'
+  } finally { savingEditar.value = false }
 }
 
 // ── Crear stock externo ────────────────────────────────────────────────────────
