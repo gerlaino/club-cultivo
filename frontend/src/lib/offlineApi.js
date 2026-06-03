@@ -51,10 +51,22 @@ export async function dispensarOffline(pacienteId, payload) {
         method:  'POST',
         payload: { dispensacion: payload },
       })
+      // Decrementar el stock en caché local para que la UI refleje la dispensación pendiente
+      _decrementarStockCache(payload.stock_id, payload.cantidad)
       return { offline: true, queued: true }
     }
     throw e
   }
+}
+
+function _decrementarStockCache(stockId, cantidad) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CACHE_KEYS.stock))
+    if (!raw?.data) return
+    const stock = raw.data.find(s => s.id === stockId)
+    if (stock) stock.cantidad = Math.max(0, (stock.cantidad || 0) - (cantidad || 0))
+    localStorage.setItem(CACHE_KEYS.stock, JSON.stringify(raw))
+  } catch {}
 }
 
 // ── Lectura ambiental offline-aware ───────────────────────

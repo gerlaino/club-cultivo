@@ -62,9 +62,10 @@ export const getMisMovimientos = () => api.get("/me/movimientos");
 // -------- Salas --------
 export const listSalas   = () => api.get("/salas");
 export const getSala     = (id) => api.get(`/salas/${id}`);
-export const createSala  = (payload) => api.post("/salas", { sala: payload });
-export const updateSala  = (id, payload) => api.patch(`/salas/${id}`, { sala: payload });
-export const deleteSala  = (id) => api.delete(`/salas/${id}`);
+export const createSala      = (payload)         => api.post("/salas", { sala: payload });
+export const updateSala      = (id, payload)     => api.patch(`/salas/${id}`, { sala: payload });
+export const deleteSala      = (id)              => api.delete(`/salas/${id}`);
+export const cambiarFaseSala = (id)              => api.post(`/salas/${id}/cambiar_fase`);
 
 // -------- LOTES --------
 export const listLotes = (params = null) => {

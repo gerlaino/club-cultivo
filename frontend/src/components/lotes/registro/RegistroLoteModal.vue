@@ -132,7 +132,8 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { createRegistroAmbiental, updateLote, createPlantActivity } from '../../../lib/api'
+import { updateLote, createPlantActivity, createRegistroAmbiental } from '../../../lib/api'
+import { registrarLecturaOffline } from '../../../lib/offlineApi.js'
 import { useToast }   from '../../../composables/useToast.js'
 import { useClubStore } from '../../../stores/club'
 import DsSpinner      from '../../../design-system/components/Spinner.vue'
@@ -368,9 +369,8 @@ async function guardar() {
       form.append('archivo_csv', csvFile)
       await createRegistroAmbiental(props.lote.id, form, true)
     } else {
-      // Sólo llamar si hay algo que registrar (o si solo hay trasplante, skip)
       if (restAcciones.length > 0 || payload.observaciones) {
-        await createRegistroAmbiental(props.lote.id, payload)
+        await registrarLecturaOffline({ loteId: props.lote.id, payload })
       }
     }
 

@@ -2,7 +2,7 @@
 class SalasController < ApplicationController
   before_action :authenticate_user!
   before_action :require_salas_role!
-  before_action :set_sala, only: [:show, :update, :destroy, :cargar_lote]
+  before_action :set_sala, only: [:show, :update, :destroy, :cargar_lote, :cambiar_fase]
 
   TRANSICIONES_KIND = {
     'secado'   => { desde: 'floracion', hacia: 'cosecha',  label_desde: 'floración',  label_hacia: 'cosecha'  },
@@ -94,6 +94,68 @@ class SalasController < ApplicationController
     render json: { error: 'Lote no encontrado' }, status: :not_found
   rescue => e
     render json: { errors: [e.message] }, status: :unprocessable_entity
+  end
+
+  # POST /salas/:id/cambiar_fase
+  # Cambia toda la sala de vegetativo ↔ floración. Afecta lotes y plantas activas.
+  # Accesible a admin, supervisor y cultivador.
+  def cambiar_fase
+    unless %w[admin supervisor cultivador].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    unless %w[vegetativo floracion].include?(@sala.kind)
+      return render json: { error: 'Solo las salas en vegetativo o floración pueden cambiar de fase' }, status: :unprocessable_entity
+    end
+
+    nueva_fase        = @sala.kind == 'vegetativo' ? 'floracion' : 'vegetativo'
+    plant_state_orig  = @sala.kind   # 'vegetativo' | 'floracion'
+    plant_state_dest  = nueva_fase
+
+    lotes_a_cambiar = @sala.lotes.where(estado: @sala.kind)
+
+    if lotes_a_cambiar.empty?
+      return render json: {
+        error: "No hay lotes en #{@sala.kind} en esta sala para cambiar de fase"
+      }, status: :unprocessable_entity
+    end
+
+    lotes_count   = 0
+    plantas_count = 0
+
+    ActiveRecord::Base.transaction do
+      lotes_a_cambiar.each do |lote|
+        estado_anterior = lote.estado
+        plantas = lote.plants.where(state: plant_state_orig)
+        plantas_count += plantas.count
+        plantas.update_all(state: plant_state_dest)
+
+        lote.update!(estado: nueva_fase)
+
+        lote.lote_eventos.create!(
+          tipo:            'cambio_estado',
+          estado_anterior: estado_anterior,
+          estado_nuevo:    nueva_fase,
+          descripcion:     "Cambio de fase grupal desde sala #{@sala.nombre}: #{estado_anterior} → #{nueva_fase}",
+          user:            current_user,
+          club:            current_user.club,
+          registrado_en:   Time.current,
+        )
+
+        lotes_count += 1
+      end
+
+      @sala.update!(kind: nueva_fase)
+    end
+
+    render json: {
+      sala:              serialize_sala_detail(@sala.reload),
+      nueva_fase:        nueva_fase,
+      lotes_afectados:   lotes_count,
+      plantas_afectadas: plantas_count,
+    }
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
   private

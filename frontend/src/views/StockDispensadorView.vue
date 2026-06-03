@@ -63,7 +63,7 @@ const FORMAS = [
   { value: 'aceite',     label: 'Aceite' },
   { value: 'tintura',    label: 'Tintura' },
   { value: 'crema',      label: 'Crema' },
-  { value: 'capsulas',   label: 'Cápsulas' },
+  { value: 'capsula',    label: 'Cápsula' },
   { value: 'comestible', label: 'Comestible' },
   { value: 'prensado',   label: 'Prensado' },
   { value: 'externo',    label: 'Externo' },

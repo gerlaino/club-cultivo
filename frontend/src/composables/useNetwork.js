@@ -1,8 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 
 // Singleton: una sola instancia compartida en toda la app
-const isOnline  = ref(typeof navigator !== 'undefined' ? navigator.onLine : true)
-const listeners = []
+const isOnline = ref(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
 if (typeof window !== 'undefined') {
   window.addEventListener('online',  () => { isOnline.value = true  })

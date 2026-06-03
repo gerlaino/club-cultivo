@@ -76,7 +76,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import DsSpinner   from '../../design-system/components/Spinner.vue'
 import { useSalasStore } from '../../stores/salas.js'
 import { useLotesStore } from '../../stores/lotes.js'
-import { createRegistroAmbiental } from '../../lib/api.js'
+import { registrarLecturaOffline } from '../../lib/offlineApi.js'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
@@ -132,9 +132,13 @@ async function guardar() {
     if (form.value.humedad)     payload.humedad     = parseFloat(form.value.humedad)
     if (form.value.co2)         payload.co2         = parseFloat(form.value.co2)
     if (form.value.ppfd)        payload.ppfd        = parseFloat(form.value.ppfd)
-    await createRegistroAmbiental(loteId.value, payload)
+    const res = await registrarLecturaOffline({ loteId: loteId.value, payload })
     const salaNombre = salas.value.find(s => String(s.id) === String(salaId.value))?.nombre || 'la sala'
-    toast.success(`Lectura registrada en ${salaNombre}`)
+    if (res?.queued) {
+      toast.warning(`Sin conexión — lectura guardada localmente, se enviará al reconectarse`)
+    } else {
+      toast.success(`Lectura registrada en ${salaNombre}`)
+    }
     open.value = false
     resetForm()
   } catch (e) {

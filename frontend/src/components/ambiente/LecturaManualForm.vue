@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { createRegistroAmbiental } from '../../lib/api.js'
+import { registrarLecturaOffline } from '../../lib/offlineApi.js'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
@@ -60,8 +60,12 @@ async function guardar() {
   }
   guardando.value = true
   try {
-    await createRegistroAmbiental(props.loteId, payload)
-    toast.success('Registro guardado')
+    const res = await registrarLecturaOffline({ loteId: props.loteId, payload })
+    if (res?.queued) {
+      toast.warning('Sin conexión — registro guardado localmente')
+    } else {
+      toast.success('Registro guardado')
+    }
     resetForm()
     emit('guardado')
   } catch (e) {

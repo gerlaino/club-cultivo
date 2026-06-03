@@ -10,7 +10,7 @@ import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
 import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vue'
 import RegistrarLecturaModal  from '../components/salas/RegistrarLecturaModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
-import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado } from '../lib/api.js'
+import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import AsistenteVoz from '../components/AsistenteVoz.vue'
 import { Gauge } from 'lucide-vue-next'
@@ -58,6 +58,10 @@ const canEdit        = computed(() => ['admin', 'supervisor'].includes(auth.role
 const isCultivador   = computed(() => auth.role === "cultivador")
 const isManicurador  = computed(() => auth.role === "manicura")
 const isAgricultor   = computed(() => auth.role === "cultivador")
+const canCambiarFase = computed(() =>
+  ['admin', 'supervisor', 'cultivador'].includes(auth.role) &&
+  ['vegetativo', 'floracion'].includes(sala.value?.kind)
+)
 
 const lecturaOpen   = ref(false)
 const lotesExpanded = ref(true)
@@ -149,6 +153,10 @@ const salaAcciones = computed(() => {
     const lbl = esSalaSecado.value ? 'Cargar lote de floración' : esSalaManicura.value ? 'Cargar lote de cosecha' : 'Cargar lote de secado'
     items.push({ emoji: '📦', label: lbl, onClick: () => { showCargarLote.value = true } })
   }
+  if (canCambiarFase.value) {
+    const hacia = sala.value?.kind === 'vegetativo' ? 'Floración' : 'Vegetativo'
+    items.push({ emoji: '🔄', label: `Pasar sala a ${hacia}`, onClick: () => { showCambiarFaseModal.value = true; cambiarFaseError.value = null } })
+  }
   if (canEdit.value) {
     items.push({ emoji: '✏️', label: 'Editar sala', onClick: openEditSala })
     items.push({ divider: true })
@@ -160,6 +168,7 @@ const salaAcciones = computed(() => {
 function salaEscapeHandler(e) {
   if (e.key !== 'Escape') return
   if (showEditSala.value)    { showEditSala.value = false; return }
+  if (showCambiarFaseModal.value)   { showCambiarFaseModal.value = false; return }
   if (showCrearLoteCosecha.value) { showCrearLoteCosecha.value = false; return }
   if (showCreate.value)      { closeCreate(); return }
   if (showCargarLote.value)  { showCargarLote.value = false; return }
@@ -296,6 +305,39 @@ const breadcrumbs = computed(() => {
 
 // ── Cargar lote (secado / manicura) ────────────────────────
 const showCargarLote = ref(false)
+
+// ── Cambiar fase (vege ↔ flora) ────────────────────────────
+const showCambiarFaseModal = ref(false)
+const cambiarFaseLoading   = ref(false)
+const cambiarFaseError     = ref(null)
+
+const faseSiguiente = computed(() =>
+  sala.value?.kind === 'vegetativo' ? 'floracion' : 'vegetativo'
+)
+const faseLabel = (f) => ({ vegetativo: 'Vegetativo', floracion: 'Floración' }[f] || f)
+
+const lotesAfectados = computed(() =>
+  lotes.bySala(salaId).filter(l => l.estado === sala.value?.kind)
+)
+const plantasAfectadas = computed(() =>
+  lotesAfectados.value.reduce((sum, l) => sum + (l.plants_count || 0), 0)
+)
+
+async function ejecutarCambioFase() {
+  cambiarFaseLoading.value = true
+  cambiarFaseError.value   = null
+  try {
+    const { data } = await cambiarFaseSala(salaId)
+    await salas.fetchSala(salaId)
+    await lotes.fetchBySala(salaId)
+    showCambiarFaseModal.value = false
+    toast.success(`Sala cambiada a ${faseLabel(data.nueva_fase)} — ${data.lotes_afectados} lotes, ${data.plantas_afectadas} plantas`)
+  } catch (e) {
+    cambiarFaseError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al cambiar la fase'
+  } finally {
+    cambiarFaseLoading.value = false
+  }
+}
 
 const esSalaSecado   = computed(() => sala.value?.kind === 'secado')
 const esSalaManicura = computed(() => sala.value?.kind === 'manicura')
@@ -1104,6 +1146,65 @@ const canSeeAmbiente = computed(() =>
       </div>
     </Teleport>
 
+    <!-- Modal cambiar fase (vege ↔ flora) -->
+    <Teleport to="body">
+      <div v-if="showCambiarFaseModal" class="sd__overlay">
+        <div class="sd__modal" style="max-width:420px">
+          <div class="sd__modal-header">
+            <div>
+              <h3 class="sd__modal-title">🔄 Cambiar fase de la sala</h3>
+              <p class="sd__modal-sub">{{ sala?.nombre }}</p>
+            </div>
+            <button class="sd__modal-close" @click="showCambiarFaseModal = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="sd__modal-body">
+            <div v-if="cambiarFaseError" class="sd__alert">{{ cambiarFaseError }}</div>
+
+            <!-- Flecha de transición -->
+            <div class="sd__fase-arrow">
+              <div class="sd__fase-chip sd__fase-chip--origen">
+                <i class="bi" :class="sala?.kind === 'vegetativo' ? 'bi-flower1' : 'bi-flower2'"></i>
+                {{ faseLabel(sala?.kind) }}
+              </div>
+              <i class="bi bi-arrow-right sd__fase-ico"></i>
+              <div class="sd__fase-chip sd__fase-chip--destino">
+                <i class="bi" :class="faseSiguiente === 'vegetativo' ? 'bi-flower1' : 'bi-flower2'"></i>
+                {{ faseLabel(faseSiguiente) }}
+              </div>
+            </div>
+
+            <!-- Impacto -->
+            <div v-if="lotesAfectados.length" class="sd__fase-impacto">
+              <div class="sd__fase-impacto-row">
+                <span>Lotes que cambian de estado</span>
+                <strong>{{ lotesAfectados.length }}</strong>
+              </div>
+              <div class="sd__fase-impacto-row">
+                <span>Plantas afectadas</span>
+                <strong>{{ plantasAfectadas }}</strong>
+              </div>
+            </div>
+            <div v-else class="sd__fase-warning">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              No hay lotes en estado <strong>{{ faseLabel(sala?.kind) }}</strong> en esta sala. No habrá cambios en lotes ni plantas, solo cambia el tipo de sala.
+            </div>
+
+            <p class="sd__fase-desc">
+              Esta acción cambia el estado de todos los lotes y sus plantas. Se registra un evento en cada lote para trazabilidad.
+            </p>
+          </div>
+          <div class="sd__modal-footer">
+            <button class="sd__btn-ghost" :disabled="cambiarFaseLoading" @click="showCambiarFaseModal = false">Cancelar</button>
+            <button class="sd__btn-primary" :disabled="cambiarFaseLoading" @click="ejecutarCambioFase">
+              <DsSpinner v-if="cambiarFaseLoading" :size="14" />
+              <i v-else class="bi bi-arrow-right-circle"></i>
+              Pasar a {{ faseLabel(faseSiguiente) }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Wizard crear lote cosecha -->
     <ModalCrearLoteCosecha
       v-if="showCrearLoteCosecha && sala"
@@ -1425,6 +1526,18 @@ const canSeeAmbiente = computed(() =>
 .sd__cam-form { display: flex; flex-direction: column; gap: .75rem; }
 .sd__btn-ghost-sm { background: transparent; border: 1px solid #d4e6d4; color: #60725d; padding: .4rem .8rem; border-radius: 6px; font-size: .78rem; font-weight: 500; cursor: pointer; transition: all .15s; }
 .sd__btn-ghost-sm:hover { background: #f0fdf4; color: #1b5e20; }
+
+/* Cambiar fase modal */
+.sd__fase-arrow { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 1.25rem 0; }
+.sd__fase-chip { display: flex; align-items: center; gap: .4rem; padding: .5rem 1rem; border-radius: 9px; font-size: .9rem; font-weight: 700; }
+.sd__fase-chip--origen { background: #f1f5f9; color: #475569; }
+.sd__fase-chip--destino { background: #f0fdf4; color: #15803d; border: 1.5px solid #86efac; }
+.sd__fase-ico { color: #94a3b8; font-size: 1.1rem; }
+.sd__fase-impacto { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: .75rem 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .4rem; }
+.sd__fase-impacto-row { display: flex; justify-content: space-between; align-items: center; font-size: .85rem; color: #334155; }
+.sd__fase-impacto-row strong { color: #0f172a; font-size: .95rem; }
+.sd__fase-warning { background: #fffbeb; border: 1.5px solid #fde68a; color: #92400e; border-radius: 10px; padding: .75rem 1rem; font-size: .82rem; margin-bottom: 1rem; display: flex; align-items: flex-start; gap: .5rem; }
+.sd__fase-desc { font-size: .78rem; color: #94a3b8; margin: 0; }
 .sd__btn-primary-sm { background: #1b5e20; color: #fff; border: none; padding: .4rem .9rem; border-radius: 6px; font-size: .78rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .sd__btn-primary-sm:hover { background: #155016; }
 .sd__cam-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .25rem; }

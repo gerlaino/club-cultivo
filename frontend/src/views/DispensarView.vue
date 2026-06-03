@@ -526,8 +526,16 @@ async function submitDispensacion() {
   }
 
   // Detectar items que fueron encolados (offline)
-  const queued  = ok.filter(i => i._queued)
+  const queued   = ok.filter(i => i._queued)
   const enviados = ok.filter(i => !i._queued)
+
+  // Actualizar stock local inmediatamente para los items encolados
+  if (queued.length) {
+    queued.forEach(({ item }) => {
+      const s = stocks.value.find(x => x.id === item.stock.id)
+      if (s) s.cantidad = Math.max(0, (s.cantidad || 0) - item.cantidad)
+    })
+  }
 
   if (errors.length === 0) {
     if (queued.length > 0 && enviados.length === 0) {

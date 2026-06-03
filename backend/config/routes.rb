@@ -62,6 +62,7 @@ Rails.application.routes.draw do
       resources :alertas, only: [:index]
       member do
         post :cargar_lote
+        post :cambiar_fase
       end
     end
 
