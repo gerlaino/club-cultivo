@@ -18,8 +18,18 @@
         <button
           v-if="plantList.length > 0"
           class="lps__btn-sm lps__btn-sm--qr"
+          :disabled="printingLabels"
+          title="Imprimir etiquetas con QR para todas las plantas"
+          @click="imprimirEtiquetas"
+        >
+          <i class="bi" :class="printingLabels ? 'bi-hourglass-split' : 'bi-printer'"></i>
+          {{ printingLabels ? 'Generando…' : 'Etiquetas' }}
+        </button>
+        <button
+          v-if="plantList.length > 0"
+          class="lps__btn-sm lps__btn-sm--qr"
           :disabled="downloadingQRs"
-          title="Descargar QRs de todas las plantas"
+          title="Descargar QRs individuales (ZIP)"
           @click="descargarTodosQRs"
         >
           <i class="bi" :class="downloadingQRs ? 'bi-hourglass-split' : 'bi-qr-code'"></i>
@@ -154,6 +164,7 @@
 import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { usePlantsStore } from '../../stores/plants'
+import { useClubStore }   from '../../stores/club'
 import { createPlant, updatePlant } from '../../lib/api'
 import { useQRCode } from '../../composables/useQRCode.js'
 import { useToast } from '../../composables/useToast.js'
@@ -171,6 +182,7 @@ const props = defineProps({
 const emit = defineEmits(['cosechar'])
 
 const plantsStore  = usePlantsStore()
+const clubStore    = useClubStore()
 const toast        = useToast()
 const { generatePNG } = useQRCode()
 
@@ -261,6 +273,75 @@ async function descargarTodosQRs() {
     document.body.removeChild(a); URL.revokeObjectURL(href)
   } finally {
     downloadingQRs.value = false
+  }
+}
+
+const printingLabels = ref(false)
+
+async function imprimirEtiquetas() {
+  if (!plantList.value.length || printingLabels.value) return
+  printingLabels.value = true
+  try {
+    const origen   = window.location.origin
+    const clubName = clubStore.data?.name || ''
+    const loteCode = props.lote?.codigo || 'lote'
+
+    // Genera QR PNG para cada planta
+    const labels = await Promise.all(
+      plantList.value
+        .filter(p => p.codigo_qr)
+        .map(async p => {
+          const dataUrl = await generatePNG(`${origen}/p/${p.codigo_qr}`, {
+            width: 200, margin: 1,
+            color: { dark: '#1b5e20', light: '#ffffff' },
+          })
+          return { nombre: p.nombre || p.codigo_qr, dataUrl }
+        })
+    )
+
+    // Genera HTML de etiquetas para imprimir
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Etiquetas QR — ${loteCode}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { size: A4; margin: 8mm; }
+  body { font-family: -apple-system, sans-serif; background: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
+  .label {
+    width: 100%; aspect-ratio: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: 0.4px solid #ccc; border-radius: 2mm; padding: 2mm;
+    page-break-inside: avoid; break-inside: avoid;
+  }
+  .label img { width: 80%; height: auto; display: block; }
+  .label-club { font-size: 5pt; color: #888; margin-top: 1.5mm; text-align: center; }
+  .label-code { font-size: 6.5pt; font-weight: 700; font-family: monospace; color: #000; text-align: center; margin-top: 0.5mm; }
+</style>
+</head>
+<body>
+<div class="grid">
+${labels.map(l => `
+  <div class="label">
+    <img src="${l.dataUrl}" alt="${l.nombre}" />
+    <div class="label-club">${clubName}</div>
+    <div class="label-code">${l.nombre}</div>
+  </div>`).join('')}
+</div>
+</body>
+</html>`
+
+    const win = window.open('', '_blank', 'width=800,height=900')
+    if (!win) { toast.error('Permitir ventanas emergentes para imprimir'); return }
+    win.document.write(html)
+    win.document.close()
+    setTimeout(() => { win.print() }, 600)
+  } catch (e) {
+    toast.error('Error al generar etiquetas')
+  } finally {
+    printingLabels.value = false
   }
 }
 
