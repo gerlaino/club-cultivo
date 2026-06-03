@@ -77,16 +77,17 @@ Rails.application.routes.draw do
       resources :notas, only: [:index, :create]
       resources :pesadas, only: [:index, :create, :destroy]
       member do
-        post :transiciones
-        post :cerrar_curado
-        post :avanzar_fase
-        post :cosechar_plantas
-        post :aprobar_manicura
-        post :rechazar_manicura
-        post :asignar_manicurador
-        post :completar_manicura
-        post :finalizar_pesaje_manicura
-        get  :timeline
+        post  :transiciones
+        post  :cerrar_curado
+        post  :avanzar_fase
+        post  :cosechar_plantas
+        post  :aprobar_manicura
+        post  :rechazar_manicura
+        post  :asignar_manicurador
+        post  :completar_manicura
+        post  :finalizar_pesaje_manicura
+        patch :completar_datos
+        get   :timeline
       end
     end
 

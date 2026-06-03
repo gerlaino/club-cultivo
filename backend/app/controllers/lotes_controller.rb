@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :aprobar_manicura, :rechazar_manicura, :asignar_manicurador, :completar_manicura, :finalizar_pesaje_manicura]
+  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :aprobar_manicura, :rechazar_manicura, :asignar_manicurador, :completar_manicura, :finalizar_pesaje_manicura]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -128,6 +128,10 @@ class LotesController < ApplicationController
 
   # PATCH/PUT /lotes/:id
   def update
+    if @lote.estado == 'finalizado'
+      return render json: { error: 'Los lotes finalizados son inmutables. Para correcciones de datos contactá al soporte.' }, status: :forbidden
+    end
+
     if lote_params[:plants_count].present?
       nuevas   = lote_params[:plants_count].to_i
       actuales = @lote.plants_count.to_i
@@ -489,6 +493,29 @@ class LotesController < ApplicationController
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
+  # PATCH /lotes/:id/completar_datos
+  # Exclusivamente para completar campos críticos en lotes ya finalizados.
+  # Solo acepta los campos del checklist post-finalización — no permite cambiar estado ni datos contables.
+  def completar_datos
+    unless current_user.admin? || current_user.supervisor?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    unless @lote.estado == 'finalizado'
+      return render json: { error: 'Este endpoint solo aplica a lotes finalizados' }, status: :unprocessable_entity
+    end
+
+    permitidos = params.require(:lote).permit(
+      :genetica_id, :fotoperiodo, :fotoperiodo_vegetativo,
+      :semanas_floracion, :tamanio_maceta
+    ).reject { |_, v| v.blank? }
+
+    if @lote.update(permitidos)
+      render json: LoteSerializer.serialize(@lote.reload)
+    else
+      render json: { errors: @lote.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   # POST /lotes/:id/cerrar_curado
   # Formato nuevo: { pesada: {tipo, cantidad_g, mermas_g}, stocks: [{sede_id, forma_producto, ...}] }
   # Formato legacy: { splitter:, sede_destino_id:, ... }
@@ -747,10 +774,12 @@ class LotesController < ApplicationController
 
       @lote.update!(estado: 'finalizado')
 
+      lote_final = @lote.reload
       render json: {
-        lote:    LoteSerializer.serialize(@lote.reload),
-        pesada:  PesadaSerializer.serialize(pesada),
-        stocks:  stocks_creados.map { |s| StockSerializer.serialize_inline(s) },
+        lote:               LoteSerializer.serialize(lote_final),
+        pesada:             PesadaSerializer.serialize(pesada),
+        stocks:             stocks_creados.map { |s| StockSerializer.serialize_inline(s) },
+        campos_incompletos: campos_incompletos_lote(lote_final),
       }, status: :created
     end
   rescue RuntimeError, ArgumentError => e
@@ -769,11 +798,30 @@ class LotesController < ApplicationController
       registrado_por:      current_user,
       peso_curado_g:       params[:peso_curado_g],
     )
-    render json: { lote: LoteSerializer.serialize(@lote.reload), stock: StockSerializer.serialize_inline(stock) }, status: :created
+    lote_final = @lote.reload
+    render json: {
+      lote:               LoteSerializer.serialize(lote_final),
+      stock:              StockSerializer.serialize_inline(stock),
+      campos_incompletos: campos_incompletos_lote(lote_final),
+    }, status: :created
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  CAMPOS_CRITICOS = {
+    genetica_id:            'Genética / variedad',
+    fotoperiodo:            'Fotoperiodo floración',
+    fotoperiodo_vegetativo: 'Fotoperiodo vegetativo',
+    semanas_floracion:      'Semanas en floración',
+    tamanio_maceta:         'Tamaño de maceta final',
+  }.freeze
+
+  def campos_incompletos_lote(lote)
+    CAMPOS_CRITICOS.filter_map do |campo, label|
+      { campo: campo, label: label } if lote.send(campo).blank?
+    end
   end
 
   def siguiente_pasada(lote)

@@ -46,7 +46,10 @@ const id       = Number(route.params.id)
 const error    = ref(null)
 const loading  = computed(() => lotes.loading)
 const lote     = computed(() => lotes.current)
-const canEdit  = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.role))
+const canEdit  = computed(() =>
+  ['admin', 'supervisor', 'cultivador'].includes(auth.role) &&
+  lote.value?.estado !== 'finalizado'
+)
 const canAdmin = computed(() => ['admin', 'supervisor'].includes(auth.role))
 const isCultivador = computed(() => auth.role === 'cultivador')
 
@@ -185,6 +188,7 @@ const {
   showCosechaModal, cosechaSalaId, savingCosecha, cosechaError, cosechaForm,
   showCosechaPartialModal,
   showCerrarCuradoModal, savingCurado, curadoError, curadoForm, splitOk, pesadaUltimaCurado,
+  showPreFinModal, preFinCampos, savingPreFin, geneticasPreFin, guardarCamposPreFin,
   handleAvanzarFase, openTransicionModal, ejecutarTransicion,
   avanzarFaseRapido, ejecutarCosecha, onCosechadoParcial,
   onManicuraIniciada, onManicuraCompletada,
@@ -197,6 +201,7 @@ function loteEscapeHandler(e) {
   if (editarOpen.value)               { editarOpen.value = false; return }
   if (showRegistroModalNew.value)     { showRegistroModalNew.value = false; return }
   if (showTrasplanteLote.value)       { showTrasplanteLote.value = false; return }
+  if (showPreFinModal.value)          { showPreFinModal.value = false; return }
   if (showCerrarCuradoModal.value)    { showCerrarCuradoModal.value = false; return }
   if (showCosechaPartialModal.value)  { showCosechaPartialModal.value = false; return }
   if (showCosechaModal.value)         { showCosechaModal.value = false; return }
@@ -297,6 +302,15 @@ onUnmounted(() => {
             Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
           </button>
           <ActionsDropdown v-if="canEdit || isCultivador" :items="loteAcciones" />
+        </div>
+      </div>
+
+      <!-- Banner lote finalizado (solo lectura) -->
+      <div v-if="lote.estado === 'finalizado'" class="ld__finalizado-banner">
+        <i class="bi bi-lock-fill"></i>
+        <div>
+          <strong>Lote cerrado — solo lectura.</strong>
+          Este lote completó su ciclo y sus datos son inmutables. Para correcciones contactá al soporte.
         </div>
       </div>
 
@@ -746,6 +760,88 @@ onUnmounted(() => {
       @completado="onManicuraCompletada"
     />
 
+    <!-- ══ Modal Campos Incompletos (post-finalización) ══ -->
+    <Teleport to="body">
+      <div v-if="showPreFinModal" class="ld__overlay">
+        <div class="ld__modal" style="max-width:480px">
+          <div class="ld__modal-header">
+            <div>
+              <h3 class="ld__modal-title">✅ Lote finalizado</h3>
+              <p class="ld__modal-sub">Hay campos que quedaron sin completar. Podés hacerlo ahora o saltear.</p>
+            </div>
+            <button class="ld__modal-close" @click="showPreFinModal = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="ld__modal-body">
+            <p class="ld__prefin-desc">
+              Una vez cerrado el modal, el lote queda <strong>bloqueado para edición</strong>.
+              Si completás estos datos ahora quedan registrados para analítica y trazabilidad.
+            </p>
+
+            <div v-for="campo in preFinCampos" :key="campo.campo" class="ld__field" style="margin-bottom:.875rem">
+              <label class="ld__label">{{ campo.label }}</label>
+
+              <!-- Genética -->
+              <select v-if="campo.campo === 'genetica_id'" v-model="campo.valor" class="ld__input">
+                <option value="">— No especificar —</option>
+                <option v-for="g in geneticasPreFin" :key="g.id" :value="g.id">
+                  {{ g.nombre }} — {{ g.tipo }}
+                </option>
+              </select>
+
+              <!-- Fotoperiodo floración -->
+              <select v-else-if="campo.campo === 'fotoperiodo'" v-model="campo.valor" class="ld__input">
+                <option value="">— No especificar —</option>
+                <option value="14/10">14/10 hs</option>
+                <option value="13/11">13/11 hs</option>
+                <option value="12/12">12/12 hs</option>
+                <option value="auto">Auto (autofloreciente)</option>
+              </select>
+
+              <!-- Fotoperiodo vegetativo -->
+              <select v-else-if="campo.campo === 'fotoperiodo_vegetativo'" v-model="campo.valor" class="ld__input">
+                <option value="">— No especificar —</option>
+                <option value="24/0">24/0 hs</option>
+                <option value="20/4">20/4 hs</option>
+                <option value="18/6">18/6 hs</option>
+                <option value="16/8">16/8 hs</option>
+              </select>
+
+              <!-- Semanas en floración -->
+              <input v-else-if="campo.campo === 'semanas_floracion'"
+                type="number" min="1" max="30" step="1"
+                class="ld__input" placeholder="Ej: 9" v-model.number="campo.valor" />
+
+              <!-- Tamaño de maceta final -->
+              <select v-else-if="campo.campo === 'tamanio_maceta'" v-model="campo.valor" class="ld__input">
+                <option value="">— No especificar —</option>
+                <option value="0.5">Vaso (0.5 L)</option>
+                <option value="1">1 litro</option>
+                <option value="3">3 litros</option>
+                <option value="5">5 litros</option>
+                <option value="7">7 litros</option>
+                <option value="10">10 litros</option>
+                <option value="12">12 litros</option>
+                <option value="15">15 litros</option>
+                <option value="20">20 litros</option>
+              </select>
+
+              <input v-else v-model="campo.valor" type="text" class="ld__input" />
+            </div>
+          </div>
+          <div class="ld__modal-footer">
+            <button class="ld__btn-ghost" :disabled="savingPreFin" @click="showPreFinModal = false">
+              Saltear
+            </button>
+            <button class="ld__btn-primary" :disabled="savingPreFin" @click="guardarCamposPreFin">
+              <DsSpinner v-if="savingPreFin" :size="14" />
+              <i v-else class="bi bi-check2-circle"></i>
+              Guardar y cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
@@ -909,6 +1005,19 @@ onUnmounted(() => {
 .ld__label { font-size: .78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: baseline; gap: 6px; }
 .ld__optional { font-size: .68rem; font-weight: 500; color: #94a3b8; text-transform: none; letter-spacing: 0; }
 .ld__hint { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+
+/* Banner finalizado */
+.ld__finalizado-banner {
+  display: flex; align-items: flex-start; gap: .75rem;
+  background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 10px;
+  padding: .875rem 1rem; margin-bottom: 1rem;
+  font-size: .82rem; color: #334155; line-height: 1.5;
+}
+.ld__finalizado-banner i { color: #64748b; flex-shrink: 0; margin-top: .1rem; font-size: 1rem; }
+.ld__finalizado-banner strong { color: #0f172a; }
+
+/* Modal pre-fin */
+.ld__prefin-desc { font-size: .82rem; color: #64748b; margin-bottom: 1.25rem; line-height: 1.6; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: .65rem .875rem; }
 .ld__crear-sala-link { margin-top: .4rem; }
 .ld__link-btn { background: none; border: none; color: #15803d; font-size: .78rem; font-weight: 600; cursor: pointer; padding: 0; display: inline-flex; align-items: center; gap: .3rem; }
 .ld__link-btn:hover { color: #14532d; text-decoration: underline; }

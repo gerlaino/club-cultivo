@@ -286,11 +286,15 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { listPacientes, getPaciente, listStocks, createDispensacion, listEntregadores } from '../lib/api.js'
+import { listPacientes, getPaciente, listStocks, listEntregadores } from '../lib/api.js'
+import { dispensarOffline, cacheStock, getCachedStock, cacheSocios, getCachedSocios } from '../lib/offlineApi.js'
+import { useNetwork } from '../composables/useNetwork.js'
 import { formaLabel, formatARS, formatG, formatFecha } from '../lib/formatters.js'
 import { useToast } from '../composables/useToast.js'
 import { Search, Users, Plus, X, AlertTriangle } from 'lucide-vue-next'
 import DsSpinner from '../design-system/components/Spinner.vue'
+
+const { isOnline } = useNetwork()
 
 const toast = useToast()
 
@@ -338,8 +342,20 @@ async function buscarPacientes(q) {
   try {
     const { data } = await listPacientes({ query: q, limite: 20 })
     pacientes.value = data.data ?? []
+    cacheSocios(pacientes.value)
   } catch {
-    pacientes.value = []
+    // Offline: usar caché
+    const cached = getCachedSocios()
+    if (cached) {
+      const qLow = q.toLowerCase()
+      pacientes.value = cached.filter(p =>
+        p.nombre?.toLowerCase().includes(qLow) ||
+        p.apellido?.toLowerCase().includes(qLow) ||
+        p.dni?.includes(q)
+      )
+    } else {
+      pacientes.value = []
+    }
   } finally {
     loadingPacientes.value = false
   }
@@ -360,9 +376,14 @@ async function selectPaciente(p) {
       listStocks(),
     ])
     pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
-    stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
+    const stockData = stockRes.data.stocks ?? stockRes.data ?? []
+    stocks.value = stockData
+    cacheStock(stockData)
   } catch {
-    stocks.value = []
+    // Offline: servir desde caché
+    const cached = getCachedStock()
+    stocks.value = cached ?? []
+    if (cached) toast.warning('Sin conexión — mostrando stock guardado localmente')
   } finally {
     loadingDetalle.value = false
     loadingStocks.value  = false
@@ -466,7 +487,7 @@ async function submitDispensacion() {
   const items  = [...cart.value]
   const results = await Promise.allSettled(
     items.map(item =>
-      createDispensacion(selectedPaciente.value.id, {
+      dispensarOffline(selectedPaciente.value.id, {
         stock_id:            item.stock.id,
         cantidad:            item.cantidad,
         precio_unitario_ars: precioConDescuento(item.stock.precio_sugerido_ars ?? 0),
@@ -481,7 +502,7 @@ async function submitDispensacion() {
         } : {}),
         ...(observaciones.value.trim() ? { observaciones: observaciones.value.trim() } : {}),
       })
-        .then(() => ({ ok: true, item }))
+        .then(res => ({ ok: true, item, _queued: res?.queued === true }))
         .catch(e => ({
           ok:  false,
           item,
@@ -504,8 +525,18 @@ async function submitDispensacion() {
       }).catch(() => {})
   }
 
+  // Detectar items que fueron encolados (offline)
+  const queued  = ok.filter(i => i._queued)
+  const enviados = ok.filter(i => !i._queued)
+
   if (errors.length === 0) {
-    toast.success(`Dispensación registrada para ${selectedPaciente.value.nombre}`)
+    if (queued.length > 0 && enviados.length === 0) {
+      toast.warning(`Dispensación guardada localmente. Se enviará cuando haya conexión.`)
+    } else if (queued.length > 0) {
+      toast.warning(`${enviados.length} enviados, ${queued.length} guardados offline — se sincronizarán al reconectarse.`)
+    } else {
+      toast.success(`Dispensación registrada para ${selectedPaciente.value.nombre}`)
+    }
     confirmOpen.value = false
     resetModal()
   } else if (ok.length === 0) {

@@ -14,6 +14,8 @@ import BrandLogo from "./components/BrandLogo.vue";
 import PlanBadge from "./components/PlanBadge.vue";
 import ToastProvider from "./components/ui/ToastProvider.vue";
 import ConfirmDialog from "./components/ui/ConfirmDialog.vue";
+import OfflineIndicator from "./components/ui/OfflineIndicator.vue";
+import { useOfflineSync } from "./composables/useOfflineSync.js";
 import NotificationBell from "./components/ui/NotificationBell.vue";
 import AuditorBanner from "./components/AuditorBanner.vue";
 import AdminSidebar          from "./components/layout/AdminSidebar.vue";
@@ -66,6 +68,7 @@ watch(() => route.path, () => {
   medDrawerOpen.value = false; abgDrawerOpen.value = false; dlvDrawerOpen.value = false;
 });
 const { fetchPlan, planData } = usePlan();
+useOfflineSync(); // inicia el watcher de red y auto-sync
 
 async function doLogout() {
   await auth.logOut();
@@ -178,6 +181,7 @@ onMounted(async () => {
 <template>
   <ToastProvider />
   <ConfirmDialog />
+  <OfflineIndicator />
   <div v-if="routeLoading" class="route-loading-bar"></div>
   <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isSupervisor && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor && !isDelivery }">
 

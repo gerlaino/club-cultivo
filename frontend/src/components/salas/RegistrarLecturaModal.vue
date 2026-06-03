@@ -124,7 +124,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Gauge, X, Leaf } from 'lucide-vue-next'
-import { createLecturaAmbiental, createRegistroAmbiental } from '../../lib/api.js'
+import { registrarLecturaOffline } from '../../lib/offlineApi.js'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 
@@ -210,32 +210,33 @@ async function submit() {
   errorMsg.value = null
 
   try {
+    let queued = false
+
     if (loteId.value) {
-      // Registro completo asociado al lote (propaga automáticamente a LecturaAmbiental via callback)
       const payload = {}
       const campos = ['temperatura','humedad','co2','ph','ec','ph_runoff','ec_runoff','ppfd','horas_luz','temperatura_sustrato']
       campos.forEach(c => { const v = form.value[c]; if (v != null && !Number.isNaN(v)) payload[c] = v })
       if (form.value.observaciones) payload.observaciones = form.value.observaciones
       payload.fuente = 'manual'
-      await createRegistroAmbiental(loteId.value, payload)
+      const res = await registrarLecturaOffline({ loteId: loteId.value, payload })
+      if (res?.queued) queued = true
     } else {
-      // Sin lote activo: lecturas individuales por sala
-      const promises = []
       const UNIDADES = { temperatura:'°C', humedad:'%', co2:'ppm', ph:'pH', ec:'mS/cm', ppfd:'µmol/m²s' }
-      Object.entries(UNIDADES).forEach(([tipo, unidad]) => {
+      const medido_at = new Date(form.value.medido_at).toISOString()
+      const promises = Object.entries(UNIDADES).map(([tipo, unidad]) => {
         const valor = form.value[tipo]
-        if (valor != null && !Number.isNaN(valor)) {
-          // Convert local datetime-local string back to UTC for storage
-          const medido_at = new Date(form.value.medido_at).toISOString()
-          promises.push(createLecturaAmbiental(props.salaId, {
-            tipo, valor, unidad, medido_at, fuente: 'manual',
-          }))
-        }
-      })
-      await Promise.all(promises)
+        if (valor == null || Number.isNaN(valor)) return null
+        return registrarLecturaOffline({ salaId: props.salaId, tipo, valor, unidad, medido_at })
+      }).filter(Boolean)
+      const results = await Promise.all(promises)
+      if (results.some(r => r?.queued)) queued = true
     }
 
-    toast.success('Lectura registrada')
+    if (queued) {
+      toast.warning('Sin conexión — lectura guardada localmente, se enviará al reconectarse')
+    } else {
+      toast.success('Lectura registrada')
+    }
     emit('registrada')
     emit('update:modelValue', false)
   } catch (e) {

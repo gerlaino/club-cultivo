@@ -73,7 +73,8 @@ export const listLotes = (params = null) => {
 }
 export const getLote = (id) => api.get(`/lotes/${id}`);
 export const createLote = (salaId, payload) => api.post(`/salas/${salaId}/lotes`, { lote: payload });
-export const updateLote = (id, payload) => api.put(`/lotes/${id}`, { lote: payload });
+export const updateLote         = (id, payload) => api.put(`/lotes/${id}`, { lote: payload });
+export const completarDatosLote = (id, payload) => api.patch(`/lotes/${id}/completar_datos`, { lote: payload });
 export const deleteLote = (id) => api.delete(`/lotes/${id}`);
 export const getLoteProximoCodigo = () => api.get('/lotes/proximo_codigo')
 export const createLoteHeredado = (salaId, lotePayload, diasParams) =>
