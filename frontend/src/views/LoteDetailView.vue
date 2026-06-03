@@ -5,7 +5,7 @@ import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
-import { getRegistrosAmbientales, getLoteEventos, listSedes, deleteLote } from "../lib/api"
+import { getRegistrosAmbientales, getLoteEventos, listSedes, deleteLote, createSala } from "../lib/api"
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
 import GraficosLote from '../components/GraficosLote.vue'
@@ -75,6 +75,33 @@ async function eliminarLote() {
 
 // ── Sedes ─────────────────────────────────────────────────
 const sedes = ref([])
+
+// ── Crear sala inline (desde modales de transición) ────────
+const crearSalaOpen    = ref(false)
+const crearSalaNombre  = ref('')
+const crearSalaKind    = ref('')
+const crearSalaLoading = ref(false)
+
+async function crearSalaInline(kind) {
+  const nombre = crearSalaNombre.value.trim()
+  if (!nombre) return
+  crearSalaLoading.value = true
+  try {
+    const { data } = await createSala({ nombre, kind })
+    // Inyectar la sala nueva en salas_destino del lote actual
+    if (lotes.current) {
+      lotes.current = {
+        ...lotes.current,
+        salas_destino: [...(lotes.current.salas_destino || []), data],
+      }
+    }
+    crearSalaOpen.value   = false
+    crearSalaNombre.value = ''
+    toast.success(`Sala "${nombre}" creada`)
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al crear la sala')
+  } finally { crearSalaLoading.value = false }
+}
 
 // ── Historial ─────────────────────────────────────────────
 const eventos        = ref([])
@@ -465,6 +492,22 @@ onUnmounted(() => {
                   {{ s.nombre }}{{ s.actual ? ' (actual)' : '' }}
                 </option>
               </select>
+              <div v-if="!crearSalaOpen" class="ld__crear-sala-link">
+                <button type="button" class="ld__link-btn" @click="crearSalaOpen = true; crearSalaNombre = ''">
+                  <i class="bi bi-plus-circle"></i> Crear sala nueva
+                </button>
+              </div>
+              <div v-else class="ld__crear-sala-form">
+                <input v-model.trim="crearSalaNombre" type="text" class="ld__input" placeholder="Nombre de la sala"
+                  @keydown.enter="crearSalaInline(lote?.proxima_fase_posible)"
+                  @keydown.esc="crearSalaOpen = false" autofocus />
+                <div class="ld__crear-sala-btns">
+                  <button class="ld__btn-primary ld__btn-sm" :disabled="crearSalaLoading || !crearSalaNombre.trim()" @click="crearSalaInline(lote?.proxima_fase_posible)">
+                    <DsSpinner v-if="crearSalaLoading" :size="12" /><template v-else><i class="bi bi-check-lg"></i></template> Crear
+                  </button>
+                  <button class="ld__btn-ghost ld__btn-sm" @click="crearSalaOpen = false">Cancelar</button>
+                </div>
+              </div>
             </div>
           </div>
           <div class="ld__modal-footer">
@@ -508,6 +551,21 @@ onUnmounted(() => {
                   {{ s.nombre }}{{ s.actual ? ' (actual)' : '' }}
                 </option>
               </select>
+              <div v-if="!crearSalaOpen" class="ld__crear-sala-link">
+                <button type="button" class="ld__link-btn" @click="crearSalaOpen = true; crearSalaNombre = ''">
+                  <i class="bi bi-plus-circle"></i> Crear sala nueva
+                </button>
+              </div>
+              <div v-else class="ld__crear-sala-form">
+                <input v-model.trim="crearSalaNombre" type="text" class="ld__input" placeholder="Nombre de la sala"
+                  @keydown.enter="crearSalaInline('cosecha')" @keydown.esc="crearSalaOpen = false" />
+                <div class="ld__crear-sala-btns">
+                  <button class="ld__btn-primary ld__btn-sm" :disabled="crearSalaLoading || !crearSalaNombre.trim()" @click="crearSalaInline('cosecha')">
+                    <DsSpinner v-if="crearSalaLoading" :size="12" /><template v-else><i class="bi bi-check-lg"></i></template> Crear
+                  </button>
+                  <button class="ld__btn-ghost ld__btn-sm" @click="crearSalaOpen = false">Cancelar</button>
+                </div>
+              </div>
             </div>
             <div class="ld__field">
               <label class="ld__label">Notas (opcional)</label>
@@ -551,6 +609,21 @@ onUnmounted(() => {
                 </option>
               </select>
               <span class="ld__optional">Si el lote no cambia de espacio físico, dejá la opción actual.</span>
+              <div v-if="!crearSalaOpen" class="ld__crear-sala-link">
+                <button type="button" class="ld__link-btn" @click="crearSalaOpen = true; crearSalaNombre = ''">
+                  <i class="bi bi-plus-circle"></i> Crear sala nueva
+                </button>
+              </div>
+              <div v-else class="ld__crear-sala-form">
+                <input v-model.trim="crearSalaNombre" type="text" class="ld__input" placeholder="Nombre de la sala"
+                  @keydown.enter="crearSalaInline(lote?.proxima_fase_posible)" @keydown.esc="crearSalaOpen = false" />
+                <div class="ld__crear-sala-btns">
+                  <button class="ld__btn-primary ld__btn-sm" :disabled="crearSalaLoading || !crearSalaNombre.trim()" @click="crearSalaInline(lote?.proxima_fase_posible)">
+                    <DsSpinner v-if="crearSalaLoading" :size="12" /><template v-else><i class="bi bi-check-lg"></i></template> Crear
+                  </button>
+                  <button class="ld__btn-ghost ld__btn-sm" @click="crearSalaOpen = false">Cancelar</button>
+                </div>
+              </div>
             </div>
           </div>
           <div class="ld__modal-footer">
@@ -836,6 +909,12 @@ onUnmounted(() => {
 .ld__label { font-size: .78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: baseline; gap: 6px; }
 .ld__optional { font-size: .68rem; font-weight: 500; color: #94a3b8; text-transform: none; letter-spacing: 0; }
 .ld__hint { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+.ld__crear-sala-link { margin-top: .4rem; }
+.ld__link-btn { background: none; border: none; color: #15803d; font-size: .78rem; font-weight: 600; cursor: pointer; padding: 0; display: inline-flex; align-items: center; gap: .3rem; }
+.ld__link-btn:hover { color: #14532d; text-decoration: underline; }
+.ld__crear-sala-form { margin-top: .5rem; display: flex; flex-direction: column; gap: .4rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 8px; padding: .65rem .75rem; }
+.ld__crear-sala-btns { display: flex; gap: .4rem; }
+.ld__btn-sm { padding: .35rem .75rem !important; font-size: .78rem !important; }
 .ld__sala-chip {
   display: flex; align-items: center; gap: 7px;
   padding: .55rem .85rem;

@@ -102,7 +102,7 @@ const totalDias = computed(() => {
 onMounted(async () => {
   try {
     const [{ data: g }, { data: c }] = await Promise.all([
-      listGeneticas(),
+      listGeneticas({ disponible: 'true' }),
       getLoteProximoCodigo(),
     ])
     geneticas.value = g || []
@@ -227,62 +227,6 @@ async function crear() {
               </div>
             </div>
 
-            <!-- Origen -->
-            <div class="clc__field">
-              <label class="clc__label">¿Cómo inició este lote?</label>
-              <div class="clc__pills">
-                <button
-                  type="button"
-                  class="clc__pill"
-                  :class="{ 'clc__pill--active': form.origen === 'semilla' }"
-                  @click="setOrigen('semilla')"
-                >🌱 Semilla</button>
-                <button
-                  type="button"
-                  class="clc__pill"
-                  :class="{ 'clc__pill--active': form.origen === 'esqueje' }"
-                  @click="setOrigen('esqueje')"
-                >🪴 Esqueje</button>
-              </div>
-            </div>
-
-            <!-- Planta madre (solo esqueje) -->
-            <div v-if="form.origen === 'esqueje'" class="clc__field">
-              <label class="clc__label">Planta madre <span class="clc__label-opt">(opcional)</span></label>
-              <div v-if="loadingMadres" class="clc__input clc__input--disabled">Cargando plantas…</div>
-              <div v-else class="clc__madre-picker">
-                <div v-if="plantaMadreSeleccionada" class="clc__madre-chip">
-                  <i class="bi bi-check-circle-fill"></i>
-                  <strong>{{ plantaMadreSeleccionada.nombre }}</strong>
-                  <span v-if="plantaMadreSeleccionada.lote?.codigo" class="clc__madre-chip-lote">{{ plantaMadreSeleccionada.lote.codigo }}</span>
-                  <span v-if="plantaMadreSeleccionada.genetica" class="clc__madre-chip-gen">· {{ plantaMadreSeleccionada.genetica.nombre }}</span>
-                  <button type="button" class="clc__madre-clear" @click="clearMadre">×</button>
-                </div>
-                <input
-                  v-model="madreQuery"
-                  type="text"
-                  class="clc__input"
-                  :placeholder="plantaMadreSeleccionada ? 'Cambiar planta madre…' : 'Buscar por nombre, sala o lote…'"
-                  @focus="madreFocused = true"
-                  @blur="onMadreBlur"
-                  autocomplete="off"
-                />
-                <div v-if="madreFocused && madreQuery.trim()" class="clc__madre-dropdown">
-                  <div v-if="!madreDropdown.length" class="clc__madre-empty">Sin resultados para "{{ madreQuery }}"</div>
-                  <div
-                    v-for="p in madreDropdown"
-                    :key="p.id"
-                    class="clc__madre-opt"
-                    :class="{ 'clc__madre-opt--sel': form.planta_madre_id === p.id }"
-                    @mousedown.prevent="selectMadre(p)"
-                  >
-                    <span class="clc__madre-opt-nombre">🌿 {{ p.nombre }}</span>
-                    <span class="clc__madre-opt-meta">{{ p.lote?.codigo }}<span v-if="p.genetica"> · {{ p.genetica.nombre }}</span></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <!-- Cantidad de plantas -->
             <div class="clc__field">
               <label class="clc__label">Cantidad de plantas cosechadas</label>
@@ -300,12 +244,9 @@ async function crear() {
 
             <!-- Genética -->
             <div class="clc__field">
-              <label class="clc__label">
-                Genética / Variedad
-                <span v-if="form.origen === 'esqueje' && plantaMadreSeleccionada" class="clc__label-heredada">Heredada de madre</span>
-              </label>
+              <label class="clc__label">Genética / Variedad</label>
               <select class="clc__input" v-model="form.genetica_id" :disabled="!geneticas.length">
-                <option value="">{{ geneticas.length ? 'Sin especificar' : 'Sin genéticas registradas' }}</option>
+                <option value="">{{ geneticas.length ? 'Sin especificar' : 'Sin genéticas disponibles' }}</option>
                 <option v-for="g in geneticas" :key="g.id" :value="g.id">
                   {{ g.nombre }}{{ g.registrada_inase ? ' 🏛️' : '' }} — {{ g.tipo }}
                 </option>
@@ -320,8 +261,45 @@ async function crear() {
           <!-- ── Paso 2: Historia del ciclo ── -->
           <template v-else-if="paso === 2">
             <div class="clc__paso-title">
-              <i class="bi bi-clock-history"></i> ¿Cuántos días estuvo en cada etapa?
+              <i class="bi bi-clock-history"></i> Historia del ciclo
             </div>
+
+            <!-- Origen -->
+            <div class="clc__field">
+              <label class="clc__label">¿Cómo inició este lote?</label>
+              <div class="clc__pills">
+                <button type="button" class="clc__pill" :class="{ 'clc__pill--active': form.origen === 'semilla' }" @click="setOrigen('semilla')">🌱 Semilla</button>
+                <button type="button" class="clc__pill" :class="{ 'clc__pill--active': form.origen === 'esqueje' }" @click="setOrigen('esqueje')">🪴 Esqueje</button>
+              </div>
+            </div>
+
+            <!-- Planta madre (solo esqueje) -->
+            <div v-if="form.origen === 'esqueje'" class="clc__field">
+              <label class="clc__label">Planta madre <span class="clc__label-opt">(opcional)</span></label>
+              <div v-if="loadingMadres" class="clc__input clc__input--disabled">Cargando plantas…</div>
+              <div v-else class="clc__madre-picker">
+                <div v-if="plantaMadreSeleccionada" class="clc__madre-chip">
+                  <i class="bi bi-check-circle-fill"></i>
+                  <strong>{{ plantaMadreSeleccionada.nombre }}</strong>
+                  <span v-if="plantaMadreSeleccionada.lote?.codigo" class="clc__madre-chip-lote">{{ plantaMadreSeleccionada.lote.codigo }}</span>
+                  <span v-if="plantaMadreSeleccionada.genetica" class="clc__madre-chip-gen">· {{ plantaMadreSeleccionada.genetica.nombre }}</span>
+                  <button type="button" class="clc__madre-clear" @click="clearMadre">×</button>
+                </div>
+                <input v-model="madreQuery" type="text" class="clc__input"
+                  :placeholder="plantaMadreSeleccionada ? 'Cambiar planta madre…' : 'Buscar por nombre, sala o lote…'"
+                  @focus="madreFocused = true" @blur="onMadreBlur" autocomplete="off" />
+                <div v-if="madreFocused && madreQuery.trim()" class="clc__madre-dropdown">
+                  <div v-if="!madreDropdown.length" class="clc__madre-empty">Sin resultados para "{{ madreQuery }}"</div>
+                  <div v-for="p in madreDropdown" :key="p.id" class="clc__madre-opt"
+                    :class="{ 'clc__madre-opt--sel': form.planta_madre_id === p.id }"
+                    @mousedown.prevent="selectMadre(p)">
+                    <span class="clc__madre-opt-nombre">🌿 {{ p.nombre }}</span>
+                    <span class="clc__madre-opt-meta">{{ p.lote?.codigo }}<span v-if="p.genetica"> · {{ p.genetica.nombre }}</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <p class="clc__paso-desc">
               Ingresá los días aproximados. No hace falta ser exacto — sirve para reconstruir la trazabilidad del ciclo.
             </p>

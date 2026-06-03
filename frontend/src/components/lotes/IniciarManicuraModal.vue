@@ -29,6 +29,21 @@
                 {{ s.nombre }}{{ s.responsable_nombre ? ` · ${s.responsable_nombre}` : '' }}
               </option>
             </select>
+            <div v-if="!crearSalaOpen" class="imm__crear-link">
+              <button type="button" class="imm__link-btn" @click="crearSalaOpen = true; crearSalaNombre = ''">
+                <i class="bi bi-plus-circle"></i> Crear sala de manicura
+              </button>
+            </div>
+            <div v-else class="imm__crear-form">
+              <input v-model.trim="crearSalaNombre" type="text" class="imm__input" placeholder="Nombre de la sala"
+                @keydown.enter="crearSalaInline" @keydown.esc="crearSalaOpen = false" autofocus />
+              <div class="imm__crear-btns">
+                <button class="imm__btn-primary" :disabled="crearSalaLoading || !crearSalaNombre.trim()" @click="crearSalaInline">
+                  <DsSpinner v-if="crearSalaLoading" :size="12" /><template v-else><i class="bi bi-check-lg"></i></template> Crear
+                </button>
+                <button class="imm__btn-ghost" @click="crearSalaOpen = false">Cancelar</button>
+              </div>
+            </div>
           </div>
 
           <!-- Responsable -->
@@ -101,28 +116,56 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Scissors, X } from 'lucide-vue-next'
-import { listUsers, asignarManicurador, transicionarLote } from '../../lib/api.js'
+import { listUsers, asignarManicurador, transicionarLote, createSala } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
   modelValue:    { type: Boolean, required: true },
   lote:          { type: Object,  default: null },
   salasDestino:  { type: Array,   default: () => [] },
 })
-const emit = defineEmits(['update:modelValue', 'avanzado'])
+const emit = defineEmits(['update:modelValue', 'avanzado', 'sala-creada'])
 
+const toast = useToast()
 const form = ref({ sala_id: null, responsable_id: null, peso_humedo_g: null, notas: '' })
 const error         = ref(null)
 const saving        = ref(false)
 const usuarios      = ref([])
 const loadingUsuarios = ref(false)
 
+// Crear sala inline
+const crearSalaOpen    = ref(false)
+const crearSalaNombre  = ref('')
+const crearSalaLoading = ref(false)
+const salasLocales     = ref([]) // salas creadas en esta sesión
+
+const salasManicuraConLocales = computed(() => [
+  ...props.salasDestino.filter(s => ['manicura', 'secado'].includes(s.kind)),
+  ...salasLocales.value,
+])
+
+async function crearSalaInline() {
+  const nombre = crearSalaNombre.value.trim()
+  if (!nombre) return
+  crearSalaLoading.value = true
+  try {
+    const { data } = await createSala({ nombre, kind: 'manicura' })
+    salasLocales.value.push(data)
+    form.value.sala_id = data.id
+    crearSalaOpen.value   = false
+    crearSalaNombre.value = ''
+    emit('sala-creada', data)
+    toast.success(`Sala "${nombre}" creada`)
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al crear la sala')
+  } finally { crearSalaLoading.value = false }
+}
+
 const ROLE_LABELS = { manicura: 'Manicura', admin: 'Admin', supervisor: 'Supervisor' }
 const roleLabel = (r) => ROLE_LABELS[r] || r
 
-const salasManicura = computed(() =>
-  props.salasDestino.filter(s => ['manicura', 'secado'].includes(s.kind))
-)
+const salasManicura = salasManicuraConLocales
 
 watch(() => props.modelValue, async (visible) => {
   if (!visible) return
@@ -282,6 +325,17 @@ function cerrar() {
 }
 .imm__hint--muted { color: var(--c-ink-400); }
 .imm__hint--info  { color: #6d28d9; }
+
+/* Crear sala inline */
+.imm__crear-link { margin-top: .4rem; }
+.imm__link-btn { background: none; border: none; color: #15803d; font-size: .78rem; font-weight: 600; cursor: pointer; padding: 0; display: inline-flex; align-items: center; gap: .3rem; }
+.imm__link-btn:hover { color: #14532d; text-decoration: underline; }
+.imm__crear-form { margin-top: .5rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 8px; padding: .6rem .75rem; display: flex; flex-direction: column; gap: .4rem; }
+.imm__crear-btns { display: flex; gap: .4rem; }
+.imm__btn-primary { display: inline-flex; align-items: center; gap: .35rem; background: #15803d; color: #fff; border: none; padding: .4rem .8rem; border-radius: 7px; font-size: .78rem; font-weight: 600; cursor: pointer; }
+.imm__btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+.imm__input { padding: .45rem .65rem; border: 1.5px solid #d1fae5; border-radius: 7px; font-size: .875rem; width: 100%; box-sizing: border-box; outline: none; }
+.imm__input:focus { border-color: #15803d; }
 
 /* Footer */
 .imm__footer {
