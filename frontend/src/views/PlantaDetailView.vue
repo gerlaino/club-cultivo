@@ -13,6 +13,7 @@ import Lightbox              from '../components/ui/Lightbox.vue'
 import ActionsDropdown       from '../components/ui/ActionsDropdown.vue'
 import RegistroPlantaModal   from '../components/plants/RegistroPlantaModal.vue'
 import { useToast }      from '../composables/useToast.js'
+import { useConfirm }   from '../composables/useConfirm.js'
 import { useBluelabBLE } from '../composables/useBluelabBLE.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
@@ -31,7 +32,8 @@ const router = useRouter()
 const plants = usePlantsStore()
 const auth   = useAuthStore()
 const club   = useClubStore()
-const toast  = useToast()
+const toast   = useToast()
+const { confirm } = useConfirm()
 
 const id           = Number(route.params.id)
 const error        = ref(null)
@@ -427,7 +429,7 @@ async function descartarPlanta() {
   const ok = await confirm({
     title: 'Descartar planta',
     message: `¿Seguro que querés descartar "${planta.value?.nombre}"? Quedará marcada como descartada.`,
-    confirmLabel: 'Descartar', danger: true,
+    confirmText: 'Descartar',
   })
   if (!ok) return
   try {
@@ -538,38 +540,6 @@ onMounted(async () => {
             <div class="pd__ciclo-label">{{ em(etapa).label }}</div>
             <div v-if="i < CICLO_PLANTA.length - 1" class="pd__ciclo-line"
                  :class="{ 'pd__ciclo-line--done': i < cicloIndex }"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- KPIs rápidos -->
-      <div class="pd__kpis">
-        <div class="pd__kpi" :class="{ 'pd__kpi--ok': alturaActual }">
-          <div class="pd__kpi-icon">📏</div>
-          <div class="pd__kpi-body">
-            <div class="pd__kpi-value">{{ alturaActual ? alturaActual + ' cm' : '—' }}</div>
-            <div class="pd__kpi-label">Altura actual</div>
-          </div>
-        </div>
-        <div class="pd__kpi">
-          <div class="pd__kpi-icon">🌿</div>
-          <div class="pd__kpi-body">
-            <div class="pd__kpi-value">{{ planta.num_colas || ultimoRegistro?.metadata?.num_colas || '—' }}</div>
-            <div class="pd__kpi-label">Copas</div>
-          </div>
-        </div>
-        <div class="pd__kpi">
-          <div class="pd__kpi-icon">📋</div>
-          <div class="pd__kpi-body">
-            <div class="pd__kpi-value">{{ activities.filter(a => a.activity_type === 'registro_planta').length }}</div>
-            <div class="pd__kpi-label">Registros</div>
-          </div>
-        </div>
-        <div class="pd__kpi">
-          <div class="pd__kpi-icon">📅</div>
-          <div class="pd__kpi-body">
-            <div class="pd__kpi-value">{{ diasEnCiclo }}</div>
-            <div class="pd__kpi-label">Días</div>
           </div>
         </div>
       </div>
@@ -767,13 +737,12 @@ onMounted(async () => {
           <div class="pd__card">
             <div class="pd__card-header"><span class="pd__card-title">⚙️ Datos técnicos</span></div>
             <dl class="pd__dl">
-              <dt>Código</dt><dd class="pd__mono">{{ planta.codigo_qr || '—' }}</dd>
-              <dt>Origen</dt><dd>{{ origenLabel(planta.origen) }}</dd>
+              <dt>Fecha creación</dt><dd>{{ formatDate(planta.created_at) }}</dd>
               <dt>Genética</dt><dd>{{ planta.genetica?.nombre || '—' }}</dd>
+              <dt>Origen</dt><dd>{{ origenLabel(planta.origen) }}</dd>
               <dt>Tipo cultivo</dt><dd>{{ growLabel(planta.lote?.grow_type) }}</dd>
               <dt>Maceta</dt><dd>{{ macetaActual ? macetaActual + 'L' : '—' }}</dd>
               <dt>Sustrato</dt><dd>{{ planta.lote?.sustrato_especifico || '—' }}</dd>
-              <dt>Ingreso lote</dt><dd>{{ formatDate(planta.created_at) }}</dd>
             </dl>
           </div>
 
@@ -1163,6 +1132,67 @@ onMounted(async () => {
       @update:index="lightboxIndex = $event"
     />
 
+    <!-- ══ Modal Registro de Planta (nuevo) ══ -->
+    <RegistroPlantaModal
+      v-model="showRegistroPlanta"
+      :planta="planta"
+      :registros-hoy="registrosHoyPlanta"
+      @saved="loadActivities"
+    />
+
+    <!-- ══ Modal Editar Planta ══ -->
+    <Teleport to="body">
+      <div v-if="showEditarPlanta" class="pd__overlay">
+        <div class="pd__modal" style="max-width:440px">
+          <div class="pd__modal-header">
+            <div>
+              <h3 class="pd__modal-title">✏️ Editar planta</h3>
+              <p class="pd__modal-sub">{{ planta?.nombre || planta?.codigo_qr }}</p>
+            </div>
+            <button class="pd__modal-close" @click="showEditarPlanta = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="pd__modal-body">
+            <div class="pd__msection">Nombre</div>
+            <div class="pd__field pd__field--full">
+              <input
+                type="text"
+                class="pd__input"
+                v-model.trim="editForm.nombre"
+                placeholder="Nombre de la planta"
+                autofocus
+                @keydown.enter.prevent="guardarEdicion"
+                @keydown.esc.prevent="showEditarPlanta = false"
+              />
+            </div>
+
+            <div class="pd__msection" style="margin-top:1rem">Estado</div>
+            <div class="pd__field pd__field--full">
+              <div class="pd__selector">
+                <button
+                  v-for="(meta, key) in ESTADO_META"
+                  :key="key"
+                  type="button"
+                  class="pd__sel-btn"
+                  :class="{ 'pd__sel-btn--active': editForm.state === key }"
+                  :style="editForm.state === key ? { borderColor: meta.color, background: meta.bg, color: meta.color } : {}"
+                  @click="editForm.state = key"
+                >
+                  {{ meta.emoji }} {{ meta.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="pd__modal-footer">
+            <button class="pd__btn-ghost" @click="showEditarPlanta = false">Cancelar</button>
+            <button class="pd__btn-primary" @click="guardarEdicion" :disabled="savingEditar">
+              <DsSpinner v-if="savingEditar" :size="13" />
+              <i v-else class="bi bi-check-lg"></i>Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
@@ -1199,17 +1229,6 @@ onMounted(async () => {
 .pd__ciclo-step--pending { opacity: .4; }
 .pd__ciclo-line { position: absolute; top: 16px; left: 50%; width: 100%; height: 2px; background: #d4e6d4; }
 .pd__ciclo-line--done { background: #16a34a; }
-
-/* KPIs */
-.pd__kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.75rem; }
-@media (max-width: 640px) { .pd__kpis { grid-template-columns: repeat(2,1fr); } }
-.pd__kpi { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; padding: 1rem; display: flex; align-items: center; gap: .75rem; transition: box-shadow .15s; }
-.pd__kpi:hover { box-shadow: 0 4px 16px rgba(27,94,32,.1); }
-.pd__kpi--ok { border-color: #a7d7a9; background: #f0fdf4; }
-.pd__kpi-icon { font-size: 1.4rem; flex-shrink: 0; }
-.pd__kpi-body { flex: 1; min-width: 0; }
-.pd__kpi-value { font-size: 1.4rem; font-weight: 800; color: #1a1a1a; line-height: 1; letter-spacing: -.03em; }
-.pd__kpi-label { font-size: .68rem; color: #60725d; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: .2rem; }
 
 /* Layout */
 /* Manicura weight section */
