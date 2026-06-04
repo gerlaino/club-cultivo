@@ -280,9 +280,16 @@ function cancelarSubidaFoto() {
 }
 
 async function handleFotoDelete(blobId) {
+  const ok = await confirm({
+    title: 'Eliminar foto',
+    message: '¿Seguro que querés eliminar esta foto? No se puede deshacer.',
+    confirmText: 'Eliminar',
+  })
+  if (!ok) return
   try {
     await removePlantFoto(planta.value.id, blobId)
     fotos.value = fotos.value.filter(f => f.id !== blobId)
+    toast.success('Foto eliminada')
   } catch {
     toast.error('Error al eliminar la foto')
   }
