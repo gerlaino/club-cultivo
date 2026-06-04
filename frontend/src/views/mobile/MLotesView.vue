@@ -1,94 +1,98 @@
 <template>
-  <div class="mlo">
-    <div class="mlo__topbar">
-      <div class="mlo__tabs">
-        <button class="mlo__tab" :class="{ 'mlo__tab--active': tab === 'activos' }" @click="tab = 'activos'">
-          Activos <span class="mlo__tab-n">{{ activos.length }}</span>
+  <div class="ml">
+    <div class="ml__header">
+      <div class="ml__tabs">
+        <button class="ml__tab" :class="{ 'ml__tab--on': tab === 'activos' }" @click="tab = 'activos'">
+          Activos <span class="ml__n" :class="{ 'ml__n--on': tab === 'activos' }">{{ activos.length }}</span>
         </button>
-        <button class="mlo__tab" :class="{ 'mlo__tab--active': tab === 'finalizados' }" @click="tab = 'finalizados'">
-          Finalizados <span class="mlo__tab-n">{{ finalizados.length }}</span>
+        <button class="ml__tab" :class="{ 'ml__tab--on': tab === 'finalizados' }" @click="tab = 'finalizados'">
+          Finalizados <span class="ml__n">{{ finalizados.length }}</span>
         </button>
       </div>
-      <button v-if="canCreate" class="mlo__fab" @click="showCreate = true">
+      <button v-if="canCreate" class="ml__add-btn" @click="showCrear = true">
         <i class="bi bi-plus-lg"></i>
       </button>
     </div>
 
-    <div v-if="lotesStore.loading" class="mlo__loading">Cargando…</div>
-    <div v-else-if="!listaMostrada.length" class="mlo__empty">
-      <i class="bi bi-layers"></i>
+    <div v-if="loading" class="ml__loading">
+      <i class="bi bi-arrow-repeat ml__spin"></i> Cargando…
+    </div>
+    <div v-else-if="!listaMostrada.length" class="ml__empty">
+      <i class="bi bi-layers ml__empty-icon"></i>
       <p>Sin lotes {{ tab === 'activos' ? 'activos' : 'finalizados' }}</p>
     </div>
 
-    <div v-else class="mlo__list">
+    <div v-else class="ml__list">
       <RouterLink
         v-for="lote in listaMostrada"
         :key="lote.id"
         :to="`/m/lote/${lote.id}`"
-        class="mlo__card"
+        class="ml__card"
       >
-        <div class="mlo__card-dot" :style="{ background: estadoColor(lote.estado) }"></div>
-        <div class="mlo__card-body">
-          <div class="mlo__card-top">
-            <span class="mlo__codigo">{{ lote.codigo }}</span>
-            <span class="mlo__badge" :style="{ background: estadoColor(lote.estado) + '20', color: estadoColor(lote.estado) }">
+        <div class="ml__card-stripe" :style="{ background: estadoColor(lote.estado) }"></div>
+        <div class="ml__card-body">
+          <div class="ml__card-top">
+            <span class="ml__codigo">{{ lote.codigo }}</span>
+            <span class="ml__badge" :style="{ background: estadoColor(lote.estado) + '22', color: estadoColor(lote.estado) }">
               {{ estadoLabel(lote.estado) }}
             </span>
           </div>
-          <div class="mlo__card-meta">
-            <span>{{ lote.genetica?.nombre || lote.strain || '—' }}</span>
-            <span class="mlo__meta-sep">·</span>
+          <div class="ml__card-meta">
+            <span>{{ lote.genetica?.nombre || '—' }}</span>
+            <span class="ml__dot">·</span>
             <span>{{ lote.plants_count || 0 }} plantas</span>
             <template v-if="lote.sala?.nombre">
-              <span class="mlo__meta-sep">·</span>
-              <span class="mlo__sala">{{ lote.sala.nombre }}</span>
+              <span class="ml__dot">·</span>
+              <span class="ml__sala">{{ lote.sala.nombre }}</span>
             </template>
           </div>
         </div>
-        <i class="bi bi-chevron-right mlo__chevron"></i>
+        <i class="bi bi-chevron-right ml__chevron"></i>
       </RouterLink>
     </div>
 
-    <!-- Modal crear lote -->
+    <!-- Sheet crear lote -->
     <Teleport to="body">
-      <div v-if="showCreate" class="mlo__modal-overlay" @click.self="showCreate = false">
-        <div class="mlo__modal">
-          <div class="mlo__modal-header">
-            <h3 class="mlo__modal-title">Nuevo lote</h3>
-            <button class="mlo__modal-close" @click="showCreate = false"><i class="bi bi-x-lg"></i></button>
+      <div v-if="showCrear" class="ml__overlay" @click.self="showCrear = false">
+        <div class="ml__sheet">
+          <div class="ml__sheet-handle"></div>
+          <div class="ml__sheet-header">
+            <h3 class="ml__sheet-title">Nuevo lote</h3>
+            <button class="ml__sheet-close" @click="showCrear = false"><i class="bi bi-x-lg"></i></button>
           </div>
-          <div class="mlo__modal-body">
-            <div class="mlo__field">
-              <label class="mlo__label">Sala</label>
-              <select v-model="form.sala_id" class="mlo__input">
+          <div class="ml__sheet-body">
+            <div class="ml__field">
+              <label class="ml__label">Sala <span class="ml__req">*</span></label>
+              <select v-model="form.sala_id" class="ml__input">
                 <option :value="null" disabled>Seleccioná una sala</option>
-                <option v-for="s in salasActivas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
               </select>
             </div>
-            <div class="mlo__field">
-              <label class="mlo__label">Genética</label>
-              <select v-model="form.genetica_id" class="mlo__input">
+            <div class="ml__field">
+              <label class="ml__label">Genética</label>
+              <select v-model="form.genetica_id" class="ml__input">
                 <option :value="null">Sin especificar</option>
                 <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
               </select>
             </div>
-            <div class="mlo__field">
-              <label class="mlo__label">Estado inicial</label>
-              <select v-model="form.estado" class="mlo__input">
+            <div class="ml__field">
+              <label class="ml__label">Estado inicial</label>
+              <select v-model="form.estado" class="ml__input">
                 <option value="semilla">Semilla</option>
                 <option value="esqueje">Esqueje</option>
                 <option value="vegetativo">Vegetativo</option>
                 <option value="floracion">Floración</option>
               </select>
             </div>
-            <div class="mlo__field">
-              <label class="mlo__label">Cantidad de plantas</label>
-              <input v-model.number="form.plants_count" type="number" min="1" class="mlo__input" placeholder="Ej: 10" />
+            <div class="ml__field">
+              <label class="ml__label">Cantidad de plantas</label>
+              <input v-model.number="form.plants_count" type="number" min="1" class="ml__input" placeholder="Ej: 10" />
             </div>
-            <div v-if="createError" class="mlo__error">{{ createError }}</div>
-            <div class="mlo__modal-actions">
-              <button class="mlo__btn-ghost" @click="showCreate = false">Cancelar</button>
-              <button class="mlo__btn-primary" :disabled="saving" @click="crearLote">
+            <div v-if="createError" class="ml__error">{{ createError }}</div>
+            <div class="ml__sheet-actions">
+              <button class="ml__btn-ghost" @click="showCrear = false">Cancelar</button>
+              <button class="ml__btn-primary" :disabled="saving" @click="crearLote">
+                <i v-if="!saving" class="bi bi-plus-lg"></i>
                 {{ saving ? 'Creando…' : 'Crear lote' }}
               </button>
             </div>
@@ -102,121 +106,113 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useLotesStore } from '../../stores/lotes'
-import { useSalasStore } from '../../stores/salas'
-import { useAuthStore }  from '../../stores/auth'
-import { listGeneticas, createLote, getLoteProximoCodigo } from '../../lib/api'
+import { listLotes, listSalas, listGeneticas, getLoteProximoCodigo, createLote } from '../../lib/api'
+import { useAuthStore } from '../../stores/auth'
 
-const router     = useRouter()
-const lotesStore = useLotesStore()
-const salasStore = useSalasStore()
-const auth       = useAuthStore()
+const router = useRouter()
+const auth   = useAuthStore()
 
-const tab        = ref('activos')
-const showCreate = ref(false)
+const lotes      = ref([])
+const salas      = ref([])
+const geneticas  = ref([])
+const loading    = ref(false)
+const showCrear  = ref(false)
 const saving     = ref(false)
 const createError = ref(null)
-const geneticas  = ref([])
+const tab        = ref('activos')
 
-const canCreate = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.role))
+const canCreate  = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.role))
+
+const activos     = computed(() => lotes.value.filter(l => l.estado !== 'finalizado'))
+const finalizados = computed(() => lotes.value.filter(l => l.estado === 'finalizado'))
+const listaMostrada = computed(() => tab.value === 'activos' ? activos.value : finalizados.value)
 
 const form = ref({ sala_id: null, genetica_id: null, estado: 'vegetativo', plants_count: 1 })
 
-const activos     = computed(() => lotesStore.items.filter(l => l.estado !== 'finalizado'))
-const finalizados = computed(() => lotesStore.items.filter(l => l.estado === 'finalizado'))
-const listaMostrada = computed(() => tab.value === 'activos' ? activos.value : finalizados.value)
-
-const salasActivas = computed(() => salasStore.items.filter(s => s.state === 'activa'))
-
-const ESTADO_COLORS = {
-  semilla: '#64748b', esqueje: '#0891b2', vegetativo: '#16a34a',
-  floracion: '#9333ea', cosecha: '#dc2626', en_manicura: '#d97706',
-  secado: '#d97706', curado: '#2563eb', finalizado: '#1a3d2e',
-}
-const ESTADO_LABELS = {
-  semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
-  floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'Manicura',
-  secado: 'Secado', curado: 'Curado', finalizado: 'Finalizado',
-}
-function estadoColor(e) { return ESTADO_COLORS[e] || '#64748b' }
-function estadoLabel(e)  { return ESTADO_LABELS[e] || e || '—' }
+const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', secado:'#d97706', curado:'#2563eb', finalizado:'#1a3d2e' }
+const EL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', secado:'Secado', curado:'Curado', finalizado:'Finalizado' }
+const estadoColor = e => EC[e] || '#64748b'
+const estadoLabel = e => EL[e] || e || '—'
 
 async function crearLote() {
   if (!form.value.sala_id) { createError.value = 'Seleccioná una sala'; return }
   saving.value = true; createError.value = null
   try {
-    const { data: codigoData } = await getLoteProximoCodigo()
+    const { data: cd } = await getLoteProximoCodigo()
     const { data: lote } = await createLote({
       sala_id:      form.value.sala_id,
       genetica_id:  form.value.genetica_id || undefined,
       estado:       form.value.estado,
       plants_count: form.value.plants_count || 1,
-      codigo:       codigoData.codigo,
+      codigo:       cd.codigo,
       start_date:   new Date().toISOString().slice(0, 10),
     })
-    await lotesStore.fetchAll?.()
-    showCreate.value = false
+    showCrear.value = false
     router.push(`/m/lote/${lote.id}`)
   } catch (e) {
     createError.value = e?.response?.data?.error || 'Error al crear el lote'
-  } finally {
-    saving.value = false
-  }
+  } finally { saving.value = false }
+}
+
+async function load() {
+  loading.value = true
+  try {
+    const { data } = await listLotes()
+    lotes.value = data || []
+  } catch {} finally { loading.value = false }
 }
 
 onMounted(async () => {
-  await Promise.all([
-    lotesStore.fetchAll?.(),
-    salasStore.fetchAll?.(),
-    listGeneticas({ limite: 100 }).then(r => { geneticas.value = r.data?.data || r.data || [] }).catch(() => {}),
-  ])
+  await load()
+  listSalas().then(r => { salas.value = r.data || [] }).catch(() => {})
+  listGeneticas({ limite: 100 }).then(r => { geneticas.value = r.data?.data || r.data || [] }).catch(() => {})
 })
 </script>
 
 <style scoped>
-.mlo { padding: 0 0 1rem; }
+.ml { padding: 0 0 1.5rem; }
+.ml__header { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; }
+.ml__tabs { display: flex; gap: .2rem; background: #f1f5f1; border-radius: 10px; padding: .2rem; flex: 1; }
+.ml__tab { flex: 1; padding: .45rem; border: none; background: none; border-radius: 8px; font-size: .75rem; font-weight: 600; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: .3rem; transition: all .15s; }
+.ml__tab--on { background: #fff; color: #1b5e20; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.ml__n { background: #f1f5f1; color: #94a3b8; font-size: .62rem; font-weight: 700; padding: .1em .4em; border-radius: 999px; }
+.ml__n--on { background: #1b5e20; color: #fff; }
+.ml__add-btn { width: 36px; height: 36px; border-radius: 10px; background: #1b5e20; color: #fff; border: none; font-size: 1rem; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 
-.mlo__topbar { display: flex; align-items: center; justify-content: space-between; padding: .75rem 1rem; gap: .75rem; }
-.mlo__tabs { display: flex; gap: .25rem; background: #f1f5f1; border-radius: 10px; padding: .2rem; flex: 1; }
-.mlo__tab {
-  flex: 1; padding: .45rem .5rem; border: none; background: none; border-radius: 8px;
-  font-size: .75rem; font-weight: 600; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: .3rem;
-  transition: all .15s;
-}
-.mlo__tab--active { background: #fff; color: #1b5e20; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-.mlo__tab-n { background: #e8f0e9; color: #1b5e20; font-size: .65rem; font-weight: 700; padding: .1em .4em; border-radius: 999px; }
-.mlo__tab--active .mlo__tab-n { background: #1b5e20; color: #fff; }
-.mlo__fab { width: 38px; height: 38px; border-radius: 12px; background: #1b5e20; color: #fff; border: none; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; flex-shrink: 0; }
+.ml__loading { display: flex; align-items: center; gap: .5rem; justify-content: center; padding: 2.5rem; color: #94a3b8; font-size: .875rem; }
+.ml__spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.ml__empty { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3rem 1rem; color: #94a3b8; font-size: .875rem; }
+.ml__empty-icon { font-size: 2.5rem; }
 
-.mlo__loading, .mlo__empty { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3rem 1rem; color: #94a3b8; font-size: .875rem; }
-.mlo__empty i { font-size: 2rem; }
+.ml__list { display: flex; flex-direction: column; gap: .5rem; padding: 0 1rem; }
+.ml__card { display: flex; align-items: center; background: #fff; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.07); text-decoration: none; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+.ml__card-stripe { width: 4px; align-self: stretch; flex-shrink: 0; }
+.ml__card-body { flex: 1; padding: .875rem .75rem; min-width: 0; }
+.ml__card-top { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
+.ml__codigo { font-size: .95rem; font-weight: 800; color: #0f172a; font-family: monospace; }
+.ml__badge { font-size: .62rem; font-weight: 700; padding: .2em .55em; border-radius: 999px; white-space: nowrap; }
+.ml__card-meta { font-size: .72rem; color: #64748b; display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+.ml__dot { color: #d1d5db; }
+.ml__sala { color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
+.ml__chevron { color: #d1d5db; font-size: .8rem; padding-right: .875rem; flex-shrink: 0; }
 
-.mlo__list { display: flex; flex-direction: column; gap: .5rem; padding: 0 1rem; }
-.mlo__card { display: flex; align-items: center; background: #fff; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.07); text-decoration: none; overflow: hidden; -webkit-tap-highlight-color: transparent; }
-.mlo__card-dot { width: 5px; align-self: stretch; flex-shrink: 0; }
-.mlo__card-body { flex: 1; padding: .875rem .875rem .875rem .75rem; min-width: 0; }
-.mlo__card-top { display: flex; align-items: center; gap: .5rem; margin-bottom: .3rem; }
-.mlo__codigo { font-size: .95rem; font-weight: 800; color: #0f172a; font-family: monospace; }
-.mlo__badge { font-size: .65rem; font-weight: 700; padding: .2em .6em; border-radius: 999px; white-space: nowrap; }
-.mlo__card-meta { font-size: .72rem; color: #64748b; display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-.mlo__meta-sep { color: #cbd5e1; }
-.mlo__sala { color: #94a3b8; }
-.mlo__chevron { color: #d4e6d4; font-size: .8rem; padding-right: .875rem; flex-shrink: 0; }
-
-/* Modal */
-.mlo__modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; }
-.mlo__modal { width: 100%; background: #fff; border-radius: 20px 20px 0 0; max-height: 90vh; overflow-y: auto; }
-.mlo__modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
-.mlo__modal-title { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0; }
-.mlo__modal-close { background: none; border: none; font-size: 1rem; color: #94a3b8; cursor: pointer; }
-.mlo__modal-body { padding: 1.25rem; display: flex; flex-direction: column; gap: .875rem; }
-.mlo__field { display: flex; flex-direction: column; gap: .3rem; }
-.mlo__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
-.mlo__input { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .65rem .875rem; font-size: .9rem; color: #0f172a; outline: none; }
-.mlo__input:focus { border-color: #1b5e20; }
-.mlo__error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; }
-.mlo__modal-actions { display: flex; gap: .75rem; justify-content: flex-end; padding-top: .25rem; }
-.mlo__btn-primary { background: #1b5e20; color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; }
-.mlo__btn-primary:disabled { opacity: .6; }
-.mlo__btn-ghost { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; padding: .65rem 1rem; border-radius: 9px; font-size: .875rem; cursor: pointer; }
+/* Sheet */
+.ml__overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; }
+.ml__sheet { width: 100%; background: #fff; border-radius: 20px 20px 0 0; max-height: 90vh; overflow-y: auto; }
+.ml__sheet-handle { width: 40px; height: 4px; background: #e2e8f0; border-radius: 999px; margin: .75rem auto .25rem; }
+.ml__sheet-header { display: flex; align-items: center; justify-content: space-between; padding: .5rem 1.25rem 1rem; }
+.ml__sheet-title { font-size: 1rem; font-weight: 700; margin: 0; color: #0f172a; }
+.ml__sheet-close { background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer; }
+.ml__sheet-body { padding: 0 1.25rem 2rem; display: flex; flex-direction: column; gap: .875rem; }
+.ml__field { display: flex; flex-direction: column; gap: .3rem; }
+.ml__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
+.ml__req { color: #dc2626; }
+.ml__input { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .65rem .875rem; font-size: .9rem; color: #0f172a; outline: none; width: 100%; box-sizing: border-box; }
+.ml__input:focus { border-color: #1b5e20; }
+.ml__error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; }
+.ml__sheet-actions { display: flex; gap: .75rem; justify-content: flex-end; padding-top: .25rem; }
+.ml__btn-primary { display: flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .7rem 1.25rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; }
+.ml__btn-primary:disabled { opacity: .6; }
+.ml__btn-ghost { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; padding: .7rem 1rem; border-radius: 9px; font-size: .875rem; cursor: pointer; }
 </style>

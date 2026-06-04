@@ -648,10 +648,10 @@ const routes = [
       { path: 'cultivador/plantas', component: () => import('../views/mobile/MPlantasView.vue') },
       { path: 'cultivador/tareas',  component: () => import('../views/mobile/MTareasView.vue') },
 
-      // ── Detalle: accesibles desde todas las vistas mobile ──
-      { path: 'sala/:id',   component: () => import('../views/SalaDetailView.vue') },
-      { path: 'lote/:id',   component: () => import('../views/LoteDetailView.vue') },
-      { path: 'planta/:id', component: () => import('../views/PlantaDetailView.vue') },
+      // ── Detalle mobile (vistas específicas para mobile) ──
+      { path: 'sala/:id',     component: () => import('../views/SalaDetailView.vue') },
+      { path: 'lote/:id',     component: () => import('../views/LoteDetailView.vue') },
+      { path: 'planta/:id',   component: () => import('../views/mobile/MPlantaDetailView.vue') },
       { path: 'planta/nueva', component: () => import('../views/PlantaNuevaView.vue') },
 
       // ── Manicura ──
