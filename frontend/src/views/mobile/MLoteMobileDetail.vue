@@ -57,31 +57,13 @@
       <button :disabled="pagina >= totalPaginas" @click="pagina++" class="mlot__pager-btn"><i class="bi bi-chevron-right"></i></button>
     </div>
 
-    <!-- Sheet: Registrar actividad en lote -->
-    <SheetBottom v-model="showRegistrar" title="📦 Registrar actividad">
-      <div class="mlot__sheet-body">
-        <div class="mlot__field">
-          <label class="mlot__label">Tipo de actividad</label>
-          <select v-model="actForm.tipo" class="mlot__input">
-            <option value="observacion">Observación general</option>
-            <option value="nutricion">Nutrición</option>
-            <option value="riego">Riego</option>
-            <option value="control_plagas">Control de plagas</option>
-            <option value="defoliacion">Defoliación / Poda</option>
-            <option value="otro">Otro</option>
-          </select>
-        </div>
-        <div class="mlot__field">
-          <label class="mlot__label">Descripción</label>
-          <textarea v-model="actForm.descripcion" class="mlot__input mlot__textarea" rows="3" placeholder="Detallá la actividad realizada…"></textarea>
-        </div>
-        <div v-if="actError" class="mlot__error">{{ actError }}</div>
-        <button class="mlot__btn-confirmar" :disabled="savingAct" @click="guardarActividad">
-          <i v-if="!savingAct" class="bi bi-check2-circle"></i>
-          {{ savingAct ? 'Guardando…' : 'Guardar' }}
-        </button>
-      </div>
-    </SheetBottom>
+    <!-- Modal registro lote (reutiliza el de la web) -->
+    <RegistroLoteModal
+      v-model="showRegistrar"
+      :lote="lote"
+      :plants="plantas"
+      @saved="recargarLote"
+    />
 
     <!-- Sheet: Más acciones -->
     <SheetBottom v-model="showAcciones" title="Acciones del lote">
@@ -201,11 +183,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  getLote, listPlants, createLoteEvento,
+  getLote, listPlants,
   avanzarFaseLote, updateLote, deleteLote, createPlant, uploadFotoLote,
 } from '../../lib/api'
-import { useToast } from '../../composables/useToast'
-import SheetBottom  from '../../components/cultivador/SheetBottom.vue'
+import { useToast }        from '../../composables/useToast'
+import SheetBottom         from '../../components/cultivador/SheetBottom.vue'
+import RegistroLoteModal   from '../../components/lotes/registro/RegistroLoteModal.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -222,12 +205,10 @@ const showAvanzarFase = ref(false)
 const showNuevaPlanta = ref(false)
 const showEditarLote  = ref(false)
 const showEliminar    = ref(false)
-const savingAct       = ref(false)
 const savingFase      = ref(false)
 const savingPlanta    = ref(false)
 const savingEdit      = ref(false)
 const eliminando      = ref(false)
-const actError        = ref(null)
 const faseError       = ref(null)
 const plantaError     = ref(null)
 const editError       = ref(null)
@@ -237,7 +218,6 @@ const POR_PAG         = 12
 const fotoInput       = ref(null)
 const nuevaFase       = ref('')
 
-const actForm    = ref({ tipo: 'observacion', descripcion: '' })
 const plantaForm = ref({ nombre: '', codigo_qr: '' })
 const editForm   = ref({ codigo: '', descripcion: '' })
 
@@ -277,16 +257,11 @@ const plantaLabel    = e => PL[e] || e || '—'
 
 const totalPaginas = computed(() => Math.max(1, Math.ceil(plantas.value.length / POR_PAG)))
 
-async function guardarActividad() {
-  savingAct.value = true; actError.value = null
+async function recargarLote() {
   try {
-    await createLoteEvento(id, { tipo: actForm.value.tipo, descripcion: actForm.value.descripcion })
-    toast.success('Actividad registrada')
-    showRegistrar.value = false
-    actForm.value = { tipo: 'observacion', descripcion: '' }
-  } catch (e) {
-    actError.value = e?.response?.data?.error || 'Error al guardar'
-  } finally { savingAct.value = false }
+    const { data } = await getLote(id)
+    lote.value = data
+  } catch {}
 }
 
 function abrirAvanzarFase() {

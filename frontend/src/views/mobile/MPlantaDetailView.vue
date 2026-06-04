@@ -99,59 +99,13 @@
       </div>
     </div>
 
-    <!-- Sheet: Registrar actividad -->
-    <Teleport to="body">
-      <div v-if="showRegistrar" class="mpd__overlay" @click.self="showRegistrar = false">
-        <div class="mpd__sheet">
-          <div class="mpd__sheet-handle"></div>
-          <div class="mpd__sheet-header">
-            <h3 class="mpd__sheet-title">🌱 Registrar actividad</h3>
-            <button class="mpd__sheet-close" @click="showRegistrar = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="mpd__sheet-body">
-            <div class="mpd__field">
-              <label class="mpd__label">Estado de salud</label>
-              <div class="mpd__chips">
-                <button v-for="s in SALUD_OPTS" :key="s.value" class="mpd__chip"
-                  :class="{ 'mpd__chip--on': form.estado_salud === s.value }"
-                  :style="form.estado_salud === s.value ? { borderColor: s.color, background: s.bg, color: s.color } : {}"
-                  @click="form.estado_salud = s.value">{{ s.emoji }} {{ s.label }}</button>
-              </div>
-            </div>
-            <div class="mpd__row2">
-              <div class="mpd__field">
-                <label class="mpd__label">Altura (cm)</label>
-                <input v-model.number="form.altura_cm" type="number" min="0" step="1" class="mpd__input" placeholder="—" />
-              </div>
-              <div class="mpd__field">
-                <label class="mpd__label">Colas</label>
-                <input v-model.number="form.num_colas" type="number" min="0" step="1" class="mpd__input" placeholder="—" />
-              </div>
-            </div>
-            <div class="mpd__field">
-              <label class="mpd__label">Plagas</label>
-              <select v-model="form.plagas" class="mpd__input">
-                <option value="ninguna">Ninguna</option>
-                <option value="araña">Araña roja</option>
-                <option value="trips">Trips</option>
-                <option value="mosca_blanca">Mosca blanca</option>
-                <option value="pulgon">Pulgón</option>
-                <option value="otro">Otro</option>
-              </select>
-            </div>
-            <div class="mpd__field">
-              <label class="mpd__label">Notas</label>
-              <textarea v-model="form.notas" class="mpd__input mpd__textarea" rows="3" placeholder="Observaciones adicionales…"></textarea>
-            </div>
-            <div v-if="registerError" class="mpd__error">{{ registerError }}</div>
-            <button class="mpd__btn-confirmar" :disabled="saving" @click="registrar">
-              <i v-if="!saving" class="bi bi-check2-circle"></i>
-              {{ saving ? 'Guardando…' : 'Guardar registro' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- Modal registro planta (reutiliza el de la web) -->
+    <RegistroPlantaModal
+      v-model="showRegistrar"
+      :planta="planta"
+      :registros-hoy="registrosHoy"
+      @saved="recargarActividades"
+    />
 
   </div>
   <div v-else-if="loading" class="mpd mpd--loading">
@@ -160,31 +114,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getPlant, getPlantActivities, createPlantActivity } from '../../lib/api'
-import { useToast } from '../../composables/useToast'
+import { getPlant, getPlantActivities } from '../../lib/api'
+import { useToast }          from '../../composables/useToast'
+import RegistroPlantaModal   from '../../components/plants/RegistroPlantaModal.vue'
 
 const route = useRoute()
 const toast = useToast()
 const id    = Number(route.params.id)
 
-const planta      = ref(null)
-const activities  = ref([])
-const loading     = ref(true)
+const planta     = ref(null)
+const activities = ref([])
+const loading    = ref(true)
 const showRegistrar = ref(false)
 const showAcciones  = ref(false)
-const saving        = ref(false)
-const registerError = ref(null)
-
-const form = ref({ estado_salud: 'bueno', altura_cm: null, num_colas: null, plagas: 'ninguna', notas: '' })
-
-const SALUD_OPTS = [
-  { value:'excelente', label:'Excelente', emoji:'💚', color:'#16a34a', bg:'#f0fdf4' },
-  { value:'bueno',     label:'Bueno',     emoji:'✅', color:'#15803d', bg:'#dcfce7' },
-  { value:'regular',   label:'Regular',   emoji:'⚠️', color:'#d97706', bg:'#fffbeb' },
-  { value:'malo',      label:'Malo',      emoji:'🔴', color:'#dc2626', bg:'#fef2f2' },
-]
 
 const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', secado:'#d97706', curado:'#2563eb' }
 const EL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', secado:'Secado', curado:'Curado' }
@@ -193,16 +137,26 @@ const estadoColor = e => EC[e] || '#64748b'
 const estadoLabel = e => EL[e] || e || '—'
 const estadoEmoji = e => EE[e] || '🌿'
 
-const saludLabel = s => SALUD_OPTS.find(x => x.value === s)?.label || s
-
 const AC = { registro_planta:'#0891b2', measurement:'#16a34a', transplant:'#d97706' }
 const AL = { registro_planta:'Registro', measurement:'Medición', transplant:'Trasplante' }
 const actColor = t => AC[t] || '#94a3b8'
 const actLabel = t => AL[t] || t || '—'
 
+const registrosHoy = computed(() => {
+  const hoy = new Date().toDateString()
+  return activities.value
+    .filter(a => new Date(a.created_at).toDateString() === hoy)
+    .map(a => a.activity_type)
+})
+
 const ultimoRegistro = computed(() =>
   activities.value.find(a => a.activity_type === 'registro_planta')
 )
+
+async function recargarActividades() {
+  const { data } = await getPlantActivities(id)
+  activities.value = data || []
+}
 
 function formatFecha(ts) {
   if (!ts) return ''
@@ -215,42 +169,11 @@ function accion(tipo) {
   toast.info('Usá la web para esta acción avanzada')
 }
 
-async function registrar() {
-  saving.value = true; registerError.value = null
-  try {
-    await createPlantActivity(id, {
-      activity_type: 'registro_planta',
-      metadata: {
-        estado_salud: form.value.estado_salud,
-        altura_cm:    form.value.altura_cm    || undefined,
-        num_colas:    form.value.num_colas    || undefined,
-        plagas:       form.value.plagas,
-      },
-      description: form.value.notas || undefined,
-    })
-    toast.success('Registro guardado')
-    showRegistrar.value = false
-    // Recargar actividades
-    const { data } = await getPlantActivities(id)
-    activities.value = data || []
-  } catch (e) {
-    registerError.value = e?.response?.data?.error || 'Error al guardar'
-  } finally { saving.value = false }
-}
-
 onMounted(async () => {
   try {
     const [pr, ar] = await Promise.all([getPlant(id), getPlantActivities(id)])
     planta.value     = pr.data
     activities.value = ar.data || []
-    // Pre-rellenar form con último registro
-    const ultimo = activities.value.find(a => a.activity_type === 'registro_planta')
-    if (ultimo?.metadata) {
-      form.value.estado_salud = ultimo.metadata.estado_salud || 'bueno'
-      form.value.altura_cm    = ultimo.metadata.altura_cm    || null
-      form.value.num_colas    = ultimo.metadata.num_colas    || null
-      form.value.plagas       = ultimo.metadata.plagas       || 'ninguna'
-    }
   } catch {} finally { loading.value = false }
 })
 </script>
