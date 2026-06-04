@@ -95,7 +95,7 @@ const GRUPOS = [
     defaultOpen: true,
     items: [
       { to: '/pacientes',         icon: Users,     label: 'Pacientes' },
-      { to: '/historial',         icon: History,   label: 'Historial' },
+      { to: '/historial',         icon: History,   label: 'Dispensaciones' },
       { to: '/informe-semestral', icon: FileCheck, label: 'REPROCANN' },
     ],
   },

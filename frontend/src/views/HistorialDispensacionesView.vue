@@ -3,7 +3,19 @@ import { ref, watch, computed } from 'vue'
 import { listDispensacionesFecha, exportDispensacionesCSV } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink } from 'vue-router'
-import { Download, RefreshCw, Truck, Search } from 'lucide-vue-next'
+import { Download, RefreshCw, Truck, Search, Plus } from 'lucide-vue-next'
+import DispensarView from './DispensarView.vue'
+
+const showDispensarModal = ref(false)
+
+function abrirNuevaDispensacion() {
+  showDispensarModal.value = true
+}
+
+function cerrarNuevaDispensacion() {
+  showDispensarModal.value = false
+  cargar() // refrescar lista al cerrar
+}
 
 const hoy = new Date().toISOString().slice(0, 10)
 
@@ -115,10 +127,14 @@ function medioPagoLabel(m) {
     <!-- Header -->
     <div class="hd__top">
       <div>
-        <h1 class="hd__title">Historial de dispensaciones</h1>
+        <h1 class="hd__title">Dispensaciones</h1>
         <p class="hd__sub">Consultá y exportá el historial del período seleccionado</p>
       </div>
       <div class="hd__top-actions">
+        <button class="hd__btn-nueva" @click="abrirNuevaDispensacion">
+          <Plus :size="14" :stroke-width="2.5" />
+          Nueva dispensación
+        </button>
         <button class="hd__btn-refresh" :disabled="loading" @click="cargar">
           <RefreshCw :size="14" :stroke-width="2" :class="{ 'hd__spin': loading }" />
         </button>
@@ -128,6 +144,25 @@ function medioPagoLabel(m) {
         </button>
       </div>
     </div>
+
+    <!-- Modal nueva dispensación -->
+    <Teleport to="body">
+      <Transition name="hd-modal">
+        <div v-if="showDispensarModal" class="hd__modal-overlay" @click.self="cerrarNuevaDispensacion">
+          <div class="hd__modal-box">
+            <div class="hd__modal-header">
+              <h2 class="hd__modal-title">Nueva dispensación</h2>
+              <button class="hd__modal-close" @click="cerrarNuevaDispensacion">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div class="hd__modal-body">
+              <DispensarView />
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- Filtros -->
     <div class="hd__filters">
@@ -317,6 +352,46 @@ function medioPagoLabel(m) {
 }
 .hd__btn-export:hover:not(:disabled) { background: #145218; }
 .hd__btn-export:disabled { opacity: .55; cursor: default; }
+
+.hd__btn-nueva {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: #1b5e20; color: #fff; border: none;
+  padding: .45rem .9rem; border-radius: 8px;
+  font-size: var(--fs-13); font-weight: 600; cursor: pointer;
+  transition: background .15s;
+}
+.hd__btn-nueva:hover { background: #145218; }
+
+/* Modal nueva dispensación */
+.hd__modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: stretch; justify-content: center;
+}
+.hd__modal-box {
+  background: #fff; width: 100%; max-width: 1100px;
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,.25);
+}
+@media (min-width: 768px) {
+  .hd__modal-overlay { align-items: center; padding: 1.5rem; }
+  .hd__modal-box { border-radius: 16px; max-height: 90vh; }
+}
+.hd__modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem; border-bottom: 1px solid #e8f0e9; flex-shrink: 0;
+}
+.hd__modal-title { font-size: 1rem; font-weight: 700; color: #1a1a1a; margin: 0; }
+.hd__modal-close {
+  background: none; border: none; cursor: pointer;
+  color: #94a3b8; font-size: 1rem; padding: .25rem; border-radius: 6px;
+  transition: color .15s;
+}
+.hd__modal-close:hover { color: #dc2626; }
+.hd__modal-body { flex: 1; overflow-y: auto; }
+
+.hd-modal-enter-active, .hd-modal-leave-active { transition: opacity .2s; }
+.hd-modal-enter-from, .hd-modal-leave-to { opacity: 0; }
 
 /* Filtros */
 .hd__filters {

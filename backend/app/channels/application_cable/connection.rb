@@ -15,12 +15,11 @@ module ApplicationCable
               request.headers['Authorization']&.split(' ')&.last
       return nil unless token
 
-      payload = JWT.decode(
-        token,
-        Rails.application.credentials.devise_jwt_secret_key!,
-        true,
-        algorithms: ['HS256']
-      ).first
+      secret = ENV['DEVISE_JWT_SECRET_KEY'] ||
+               Rails.application.credentials.devise_jwt_secret_key
+      return nil unless secret.present?
+
+      payload = JWT.decode(token, secret, true, algorithms: ['HS256']).first
       User.find_by(id: payload['sub'])
     rescue JWT::DecodeError, ActiveRecord::RecordNotFound
       nil

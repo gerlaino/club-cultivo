@@ -52,7 +52,7 @@ const NAV_LINKS = [
   { to: '/',          icon: Home,        label: 'Inicio' },
   { to: '/dispensar', icon: PackagePlus, label: 'Dispensar' },
   { to: '/pacientes', icon: Users,       label: 'Pacientes' },
-  { to: '/historial', icon: History,     label: 'Historial' },
+  { to: '/historial', icon: History,     label: 'Dispensaciones' },
   { to: '/stock',     icon: Boxes,       label: 'Stock' },
 ]
 
