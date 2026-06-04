@@ -290,6 +290,7 @@ class Lote < ApplicationRecord
         estado:             'finalizado',
         rendimiento_real_g: peso,
         manicurador:        nil,
+        sala_id:            nil,
       )
 
       lote_eventos.create!(
@@ -359,6 +360,7 @@ class Lote < ApplicationRecord
         estado:             'finalizado',
         rendimiento_real_g: peso,
         manicurador:        nil,
+        sala_id:            nil,
       )
 
       lote_eventos.create!(
@@ -433,7 +435,7 @@ class Lote < ApplicationRecord
         precio_sugerido_ars: precio_sugerido_ars,
       )
 
-      update!(estado: 'finalizado')
+      update!(estado: 'finalizado', sala_id: nil)
       stock
     end
   end

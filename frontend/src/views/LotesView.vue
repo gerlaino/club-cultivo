@@ -58,6 +58,7 @@ const stats = computed(() => {
 });
 
 // ---------- Filtros ----------
+const tab          = ref("activos"); // 'activos' | 'finalizados'
 const q            = ref("");
 const filterEstado = ref("");
 const filterSala   = ref("");
@@ -66,14 +67,25 @@ const sortBy       = ref("fecha_desc");
 const page         = ref(1);
 const perPage      = ref(10);
 
+function setTab(t) {
+  tab.value          = t;
+  filterEstado.value = "";
+  filterSala.value   = "";
+  filterGrow.value   = "";
+  q.value            = "";
+  page.value         = 1;
+}
+
 const filtered = computed(() => {
   const query = q.value.trim().toLowerCase();
   return store.items.filter(l => {
-    const matchText  = !query || (l.codigo||"").toLowerCase().includes(query) || (l.strain||"").toLowerCase().includes(query);
-    const matchEstado = !filterEstado.value || l.estado === filterEstado.value;
-    const matchSala   = !filterSala.value   || String(l.sala_id) === filterSala.value;
-    const matchGrow   = !filterGrow.value   || l.grow_type === filterGrow.value;
-    return matchText && matchEstado && matchSala && matchGrow;
+    const esActivo     = l.estado !== "finalizado";
+    const matchTab     = tab.value === "activos" ? esActivo : !esActivo;
+    const matchText    = !query || (l.codigo||"").toLowerCase().includes(query) || (l.strain||"").toLowerCase().includes(query);
+    const matchEstado  = !filterEstado.value || l.estado === filterEstado.value;
+    const matchSala    = !filterSala.value   || String(l.sala_id) === filterSala.value;
+    const matchGrow    = !filterGrow.value   || l.grow_type === filterGrow.value;
+    return matchTab && matchText && matchEstado && matchSala && matchGrow;
   });
 });
 
@@ -236,8 +248,20 @@ async function exportarCSV() {
       </div>
     </div>
 
+    <!-- Tabs -->
+    <div class="lv__tabs">
+      <button class="lv__tab" :class="{ 'lv__tab--active': tab === 'activos' }" @click="setTab('activos')">
+        🌱 Lotes activos
+        <span class="lv__tab-count">{{ store.items.filter(l => l.estado !== 'finalizado').length }}</span>
+      </button>
+      <button class="lv__tab" :class="{ 'lv__tab--active': tab === 'finalizados' }" @click="setTab('finalizados')">
+        ✅ Finalizados
+        <span class="lv__tab-count">{{ store.items.filter(l => l.estado === 'finalizado').length }}</span>
+      </button>
+    </div>
+
     <!-- KPIs -->
-    <div class="lv__kpis">
+    <div class="lv__kpis" v-if="tab === 'activos'">
       <button class="lv__kpi" :class="{ 'lv__kpi--active': filterEstado === '' }" @click="filterEstado = ''">
         <div class="lv__kpi-val">{{ stats.total }}</div>
         <div class="lv__kpi-lbl">Total</div>
@@ -268,9 +292,9 @@ async function exportarCSV() {
         />
         <span v-if="q" class="lv__search-count">{{ filtered.length }}</span>
       </div>
-      <select class="lv__select" v-model="filterEstado">
+      <select v-if="tab === 'activos'" class="lv__select" v-model="filterEstado">
         <option value="">Todos los estados</option>
-        <option v-for="e in ESTADOS" :key="e" :value="e">{{ estadoLabel(e) }}</option>
+        <option v-for="e in ESTADOS.filter(e => e !== 'finalizado')" :key="e" :value="e">{{ estadoLabel(e) }}</option>
       </select>
       <select class="lv__select" v-model="filterSala">
         <option value="">Todas las salas</option>
@@ -590,6 +614,12 @@ async function exportarCSV() {
 .lv__btn-export:disabled { opacity: .5; cursor: default; }
 
 /* ── KPIs ─────────────────────────────────────────────── */
+.lv__tabs { display: flex; gap: .5rem; margin-bottom: 1.25rem; border-bottom: 2px solid #e8f0e9; }
+.lv__tab { background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; padding: .55rem 1rem; font-size: .875rem; font-weight: 600; color: #60725d; cursor: pointer; display: flex; align-items: center; gap: .4rem; transition: all .15s; }
+.lv__tab:hover { color: #1b5e20; }
+.lv__tab--active { color: #1b5e20; border-bottom-color: #1b5e20; }
+.lv__tab-count { background: #e8f0e9; color: #1b5e20; font-size: .7rem; font-weight: 700; padding: .1em .45em; border-radius: 999px; }
+.lv__tab--active .lv__tab-count { background: #1b5e20; color: #fff; }
 .lv__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; margin-bottom: 1.5rem; }
 @media (max-width: 700px) { .lv__kpis { grid-template-columns: repeat(2, 1fr); } }
 
