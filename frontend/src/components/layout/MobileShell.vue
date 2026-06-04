@@ -1,12 +1,18 @@
 <template>
   <div class="msh" :class="`msh--${role}`">
 
-    <!-- Top bar — solo logo + logout -->
+    <!-- Top bar — logo + volver (en detalle) o logout -->
     <header class="msh__top">
       <div class="msh__brand">
-        <img v-if="club.data?.logo_url" :src="club.data.logo_url" class="msh__logo" />
-        <span v-else class="msh__logo-text">{{ clubInitials }}</span>
-        <span class="msh__club-name">{{ club.data?.name || 'Cultivo Espacial' }}</span>
+        <!-- En detalle: botón volver -->
+        <button v-if="isDetalle" class="msh__back" @click="router.back()">
+          <i class="bi bi-chevron-left"></i>
+        </button>
+        <template v-else>
+          <img v-if="club.data?.logo_url" :src="club.data.logo_url" class="msh__logo" />
+          <span v-else class="msh__logo-text">{{ clubInitials }}</span>
+          <span class="msh__club-name">{{ club.data?.name || 'Cultivo Espacial' }}</span>
+        </template>
       </div>
       <button class="msh__logout" @click="doLogout" title="Cerrar sesión">
         <i class="bi bi-box-arrow-right"></i>
@@ -40,17 +46,18 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useClubStore }  from '../../stores/club'
-import { useLotesStore } from '../../stores/lotes'
-import { useSalasStore } from '../../stores/salas'
 
 const route  = useRoute()
 const router = useRouter()
 const auth   = useAuthStore()
 const club   = useClubStore()
-const lotes  = useLotesStore()
-const salas  = useSalasStore()
 
 const role = computed(() => auth.user?.role || '')
+
+// Detecta si estamos en una página de detalle (muestra botón volver)
+const isDetalle = computed(() =>
+  /\/m\/(sala|lote|planta|mnc\/lotes)\//.test(route.path)
+)
 
 const clubInitials = computed(() => {
   const n = club.data?.name || 'CE'
@@ -161,6 +168,14 @@ async function doLogout() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.msh__back {
+  background: rgba(255,255,255,.1);
+  border: none; color: #fff;
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 .msh__logout {
   background: rgba(255,255,255,.1);

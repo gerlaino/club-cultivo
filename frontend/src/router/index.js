@@ -638,24 +638,28 @@ const routes = [
         }
       },
 
-      // ── Admin / Supervisor ──
-      { path: 'admin/salas',   component: () => import('../views/SalasView.vue') },
-      { path: 'admin/lotes',   component: () => import('../views/LotesView.vue') },
-      { path: 'admin/plantas', component: () => import('../views/PlantasView.vue') },
-      { path: 'admin/tareas',  component: () => import('../views/TareasView.vue') },
-      { path: 'admin/aprobar', component: () => import('../views/admin/AdminStocksPendientesView.vue') },
+      // ── Listas mobile (vistas simplificadas) ──
+      { path: 'admin/salas',        component: () => import('../views/mobile/MSalasView.vue') },
+      { path: 'admin/lotes',        component: () => import('../views/mobile/MLotesView.vue') },
+      { path: 'admin/tareas',       component: () => import('../views/mobile/MTareasView.vue') },
+      { path: 'admin/aprobar',      component: () => import('../views/admin/AdminStocksPendientesView.vue') },
+      { path: 'cultivador/salas',   component: () => import('../views/mobile/MSalasView.vue') },
+      { path: 'cultivador/lotes',   component: () => import('../views/mobile/MLotesView.vue') },
+      { path: 'cultivador/plantas', component: () => import('../views/mobile/MPlantasView.vue') },
+      { path: 'cultivador/tareas',  component: () => import('../views/mobile/MTareasView.vue') },
 
-      // ── Cultivador ──
-      { path: 'cultivador/salas',   component: () => import('../views/SalasView.vue') },
-      { path: 'cultivador/lotes',   component: () => import('../views/LotesView.vue') },
-      { path: 'cultivador/plantas', component: () => import('../views/PlantasView.vue') },
-      { path: 'cultivador/tareas',  component: () => import('../views/TareasView.vue') },
+      // ── Detalle: accesibles desde todas las vistas mobile ──
+      { path: 'sala/:id',   component: () => import('../views/SalaDetailView.vue') },
+      { path: 'lote/:id',   component: () => import('../views/LoteDetailView.vue') },
+      { path: 'planta/:id', component: () => import('../views/PlantaDetailView.vue') },
+      { path: 'planta/nueva', component: () => import('../views/PlantaNuevaView.vue') },
 
       // ── Manicura ──
       { path: 'manicura/pendientes', component: () => import('../views/manicura/MncPendientesView.vue') },
       { path: 'manicura/cosecha',    component: () => import('../views/manicura/LotesEnCosechaView.vue') },
       { path: 'manicura/secado',     component: () => import('../views/manicura/LotesEnSecadoView.vue') },
       { path: 'manicura/curado',     component: () => import('../views/manicura/LotesEnCuradoView.vue') },
+      { path: 'mnc/lotes/:id',       component: () => import('../views/manicura/MncLoteDetailView.vue') },
 
       // ── Dispensador ──
       { path: 'dispensador/dispensar', component: () => import('../views/DispensarView.vue') },
@@ -712,18 +716,29 @@ router.beforeEach(async (to) => {
   const role = auth.user?.role
   const { isPWA } = usePWA()
 
-  // En modo PWA instalada, redirigir al shell mobile si el rol lo soporta
+  // En modo PWA instalada, mantener dentro del shell mobile
   if (
     auth.isAuthenticated &&
     isPWA() &&
     MOBILE_ROLES.includes(role) &&
     !to.path.startsWith('/m') &&
-    !to.path.startsWith('/p/') &&   // QR plantas
-    !to.path.startsWith('/s/') &&   // QR stocks
-    !to.path.startsWith('/g/') &&   // Genética pública
-    !to.path.startsWith('/c/') &&   // Carnet público
+    !to.path.startsWith('/p/') &&
+    !to.path.startsWith('/s/') &&
+    !to.path.startsWith('/g/') &&
+    !to.path.startsWith('/c/') &&
     !to.path.startsWith('/login')
   ) {
+    // Si es una página de detalle conocida, redirigir a su equivalente /m/
+    // para que quede dentro del MobileShell con bottom nav
+    const detalleMatch = to.path.match(/^\/(salas|lotes|plantas)\/(\d+)/)
+    if (detalleMatch) {
+      const map = { salas: 'sala', lotes: 'lote', plantas: 'planta' }
+      return `/m/${map[detalleMatch[1]]}/${detalleMatch[2]}`
+    }
+    // Ruta de manicura → equivalente mobile
+    const mncMatch = to.path.match(/^\/mnc\/lotes\/(\d+)/)
+    if (mncMatch) return `/m/mnc/lotes/${mncMatch[1]}`
+
     return MOBILE_HOME[role]
   }
 
