@@ -112,10 +112,8 @@ const savingEditSala = ref(false)
 const SALA_KINDS = [
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración'  },
-  { value: 'mixta',      label: 'Mixta'      },
-  { value: 'madre',      label: 'Madres'     },
-  { value: 'clon',       label: 'Clones'     },
-  { value: 'secado',     label: 'Secado'     },
+  { value: 'cosecha',    label: 'Cosecha'    },
+  { value: 'manicura',   label: 'Manicura'   },
 ]
 
 function openEditSala() {
@@ -341,7 +339,7 @@ async function ejecutarCambioFase() {
 
 const esSalaSecado   = computed(() => sala.value?.kind === 'secado')
 const esSalaManicura = computed(() => sala.value?.kind === 'manicura')
-const esSalaCosecha  = computed(() => ['cosecha', 'cosechado'].includes(sala.value?.kind))
+const esSalaCosecha  = computed(() => sala.value?.kind === 'cosecha')
 const puedeCargarLote = computed(() =>
   (esSalaSecado.value   && (canEdit.value || isAgricultor.value)) ||
   (esSalaManicura.value && (canEdit.value || isAgricultor.value || isManicurador.value))
@@ -366,7 +364,7 @@ const ESTADOS_HEREDADO = [
 const estadosHeredadoPermitidos = computed(() => {
   const kind = sala.value?.kind
   if (kind === 'floracion') return ESTADOS_HEREDADO.filter(e => e.value === 'floracion')
-  if (['cosecha', 'cosechado'].includes(kind)) return ESTADOS_HEREDADO.filter(e => e.value === 'cosecha')
+  if (kind === 'cosecha') return ESTADOS_HEREDADO.filter(e => e.value === 'cosecha')
   return ESTADOS_HEREDADO.filter(e => ['semilla', 'vegetativo'].includes(e.value))
 })
 

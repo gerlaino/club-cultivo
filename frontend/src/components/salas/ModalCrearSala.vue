@@ -19,9 +19,9 @@ const error  = ref(null)
 
 const KINDS = [
   { value: 'vegetativo', label: 'Vegetativo' },
-  { value: 'floracion',  label: 'Floración' },
-  { value: 'manicura',   label: 'Manicura' },
-  { value: 'cosechado',  label: 'Cosechado' },
+  { value: 'floracion',  label: 'Floración'  },
+  { value: 'cosecha',    label: 'Cosecha'    },
+  { value: 'manicura',   label: 'Manicura'   },
 ]
 
 const form = ref({

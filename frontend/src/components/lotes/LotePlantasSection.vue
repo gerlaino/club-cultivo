@@ -25,16 +25,6 @@
           <i class="bi" :class="printingLabels ? 'bi-hourglass-split' : 'bi-printer'"></i>
           {{ printingLabels ? 'Generando…' : 'Etiquetas' }}
         </button>
-        <button
-          v-if="plantList.length > 0"
-          class="lps__btn-sm lps__btn-sm--qr"
-          :disabled="downloadingQRs"
-          title="Descargar QRs individuales (ZIP)"
-          @click="descargarTodosQRs"
-        >
-          <i class="bi" :class="downloadingQRs ? 'bi-hourglass-split' : 'bi-qr-code'"></i>
-          {{ downloadingQRs ? 'Descargando…' : 'QRs' }}
-        </button>
         <button v-if="canEdit || isCultivador" class="lps__btn-sm" @click="openAddPlanta">
           <i class="bi bi-plus-lg"></i>
         </button>
@@ -189,7 +179,6 @@ const { generatePNG } = useQRCode()
 const expanded       = ref(true)
 const plantasPage    = ref(1)
 const plantasPerPage = ref(10)
-const downloadingQRs = ref(false)
 const showAddPlanta  = ref(false)
 const savingPlanta   = ref(false)
 const plantaError    = ref(null)
@@ -248,34 +237,6 @@ async function toggleEsSeleccion(plant) {
   catch { plant.es_seleccion = original; toast.error('Error al actualizar selección') }
 }
 
-async function descargarTodosQRs() {
-  if (!plantList.value.length || downloadingQRs.value) return
-  downloadingQRs.value = true
-  try {
-    const JSZip  = (await import('jszip')).default
-    const zip    = new JSZip()
-    const origin = window.location.origin
-    const codigo = props.lote?.codigo || 'lote'
-    await Promise.all(
-      plantList.value
-        .filter(p => p.codigo_qr)
-        .map(async p => {
-          const dataUrl = await generatePNG(`${origin}/p/${p.codigo_qr}`)
-          const base64  = dataUrl.split(',')[1]
-          zip.file(`${p.nombre || p.codigo_qr}.png`, base64, { base64: true })
-        })
-    )
-    const blob = await zip.generateAsync({ type: 'blob' })
-    const href = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = href; a.download = `QRs-${codigo}.zip`
-    document.body.appendChild(a); a.click()
-    document.body.removeChild(a); URL.revokeObjectURL(href)
-  } finally {
-    downloadingQRs.value = false
-  }
-}
-
 const printingLabels = ref(false)
 
 async function imprimirEtiquetas() {
@@ -286,20 +247,18 @@ async function imprimirEtiquetas() {
     const clubName = clubStore.data?.name || ''
     const loteCode = props.lote?.codigo || 'lote'
 
-    // Genera QR PNG para cada planta
     const labels = await Promise.all(
       plantList.value
         .filter(p => p.codigo_qr)
         .map(async p => {
           const dataUrl = await generatePNG(`${origen}/p/${p.codigo_qr}`, {
-            width: 200, margin: 1,
+            width: 180, margin: 1,
             color: { dark: '#1b5e20', light: '#ffffff' },
           })
           return { nombre: p.nombre || p.codigo_qr, dataUrl }
         })
     )
 
-    // Genera HTML de etiquetas para imprimir
     const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -311,14 +270,14 @@ async function imprimirEtiquetas() {
   body { font-family: -apple-system, sans-serif; background: #fff; }
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
   .label {
-    width: 100%; aspect-ratio: 1;
+    width: 100%;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    border: 0.4px solid #ccc; border-radius: 2mm; padding: 2mm;
-    page-break-inside: avoid; break-inside: avoid;
+    border: 0.4px solid #ccc; border-radius: 2mm; padding: 3mm 2mm;
+    page-break-inside: avoid; break-inside: avoid; gap: 2mm;
   }
-  .label img { width: 80%; height: auto; display: block; }
-  .label-club { font-size: 5pt; color: #888; margin-top: 1.5mm; text-align: center; }
-  .label-code { font-size: 6.5pt; font-weight: 700; font-family: monospace; color: #000; text-align: center; margin-top: 0.5mm; }
+  .label img { width: 62%; height: auto; display: block; }
+  .label-club { font-size: 9pt; color: #444; text-align: center; line-height: 1.2; }
+  .label-code { font-size: 11pt; font-weight: 700; font-family: monospace; color: #000; text-align: center; line-height: 1.2; }
 </style>
 </head>
 <body>

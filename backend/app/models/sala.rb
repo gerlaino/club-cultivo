@@ -11,7 +11,7 @@ class Sala < ApplicationRecord
   has_many :notas, as: :noteable, dependent: :destroy
 
   ESTADOS = %w[activa mantenimiento cerrada].freeze
-  KINDS   = %w[vegetativo floracion manicura cosechado cosecha mixta madre clon secado].freeze
+  KINDS   = %w[vegetativo floracion manicura cosecha mixta madre clon secado].freeze
   TIPOS   = %w[cultivo vegetativo floracion cosecha secado curado madre clones].freeze
 
   before_validation :set_default_state, on: :create
@@ -54,7 +54,7 @@ class Sala < ApplicationRecord
   NOMBRES_TIPO = {
     'germinacion' => 'Germinación', 'vegetativo' => 'Vegetativo',
     'floracion'   => 'Floración',   'cosecha'    => 'Cosecha',
-    'cosechado'   => 'Cosechado',   'secado'     => 'Secado',
+    'secado'      => 'Secado',
     'curado'      => 'Curado',      'manicura'   => 'Manicura',
   }.freeze
 

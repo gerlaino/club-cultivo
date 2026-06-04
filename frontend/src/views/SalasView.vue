@@ -23,9 +23,9 @@ const canCreate = computed(() => ["admin","supervisor"].includes(auth.role));
 
 function kindLabel(k) {
   const map = {
-    vegetativo: "Vegetativo", floracion: "Floración", cosechado: "Cosechado",
+    vegetativo: "Vegetativo", floracion: "Floración", cosecha: "Cosecha",
     mixta: "Mixta", madre: "Madres", clon: "Clones", secado: "Secado",
-    curado: "Curado", manicura: "Manicura", cosecha: "Cosecha",
+    curado: "Curado", manicura: "Manicura",
   };
   return map[k] || k || "—";
 }
