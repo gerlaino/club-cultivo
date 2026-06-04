@@ -1,7 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { useAuthStore } from "../stores/auth";
+import { useAuthStore }   from "../stores/auth";
 import { usePermissions } from "../composables/usePermissions";
-import { useToast } from "../composables/useToast";
+import { useToast }       from "../composables/useToast";
+import { usePWA }         from "../composables/usePWA";
+
+const MOBILE_ROLES = ['admin', 'cultivador', 'manicura', 'dispensador']
+const MOBILE_HOME  = { admin: '/m/admin', cultivador: '/m/cultivador', manicura: '/m/manicura', dispensador: '/m/dispensador' }
 
 const requiresPermission = (resource, action) => {
   return (to, from, next) => {
@@ -606,6 +610,41 @@ const routes = [
     ],
   },
 
+  // ── Mobile PWA shell ─────────────────────────────────────────────────
+  {
+    path: '/m',
+    component: () => import('../components/layout/MobileShell.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      // Redirect /m → home por rol
+      { path: '', redirect: () => {
+          const role = useAuthStore().user?.role
+          const homes = { admin: '/m/admin', cultivador: '/m/cultivador', manicura: '/m/manicura', dispensador: '/m/dispensador' }
+          return homes[role] || '/m/cultivador'
+        }
+      },
+      // Admin mobile
+      { path: 'admin',         component: () => import('../views/mobile/MAdminHome.vue') },
+      { path: 'admin/aprobar', component: () => import('../views/admin/AdminStocksPendientesView.vue') },
+      { path: 'admin/alertas', component: () => import('../views/admin/AdminAprobacionesView.vue') },
+      // Cultivador mobile
+      { path: 'cultivador',        component: () => import('../views/mobile/MCultivadorHome.vue') },
+      { path: 'cultivador/salas',  component: () => import('../views/SalasView.vue') },
+      { path: 'cultivador/lotes',  component: () => import('../views/LotesView.vue') },
+      { path: 'cultivador/tareas', component: () => import('../views/TareasView.vue') },
+      // Manicura mobile
+      { path: 'manicura',              component: () => import('../views/mobile/MManicuraHome.vue') },
+      { path: 'manicura/pendientes',   component: () => import('../views/manicura/MncPendientesView.vue') },
+      { path: 'manicura/lotes',        component: () => import('../views/manicura/LotesEnCosechaView.vue') },
+      // Dispensador mobile
+      { path: 'dispensador',           component: () => import('../views/mobile/MDispensadorHome.vue') },
+      { path: 'dispensador/dispensar', component: () => import('../views/StockDispensadorView.vue') },
+      { path: 'dispensador/historial', component: () => import('../views/HistorialDispensacionesView.vue') },
+      // Perfil compartido
+      { path: 'perfil', component: () => import('../views/PerfilView.vue') },
+    ],
+  },
+
   { path: "/:pathMatch(.*)*", redirect: "/" },
 
 ];
@@ -648,6 +687,23 @@ router.beforeEach(async (to) => {
   }
 
   const role = auth.user?.role
+  const { isPWA } = usePWA()
+
+  // En modo PWA instalada, redirigir al shell mobile si el rol lo soporta
+  if (
+    auth.isAuthenticated &&
+    isPWA() &&
+    MOBILE_ROLES.includes(role) &&
+    !to.path.startsWith('/m') &&
+    !to.path.startsWith('/p/') &&   // QR plantas
+    !to.path.startsWith('/s/') &&   // QR stocks
+    !to.path.startsWith('/g/') &&   // Genética pública
+    !to.path.startsWith('/c/') &&   // Carnet público
+    !to.path.startsWith('/login')
+  ) {
+    return MOBILE_HOME[role]
+  }
+
   if (auth.isAuthenticated && ROLE_ALLOWED_PREFIX[role]) {
     const allowed = ROLE_ALLOWED_PREFIX[role].some(p => to.path === p || to.path.startsWith(p + '/'))
     if (!allowed) {

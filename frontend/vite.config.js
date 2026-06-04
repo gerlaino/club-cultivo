@@ -17,7 +17,7 @@ export default defineConfig({
         display: "standalone",
         orientation: "portrait",
         scope: "/",
-        start_url: "/",
+        start_url: "/m",
         icons: [
           { src: "logo-ce-redondo.png", sizes: "192x192", type: "image/png" },
           { src: "logo-ce-redondo.png", sizes: "512x512", type: "image/png" },
