@@ -6,10 +6,11 @@ import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
 import { getPlantActivities, createPlantActivity, updatePlant, addPlantFoto, removePlantFoto } from '../lib/api'
-import AsistenteVoz from '../components/AsistenteVoz.vue'
-import Breadcrumb from '../components/ui/Breadcrumb.vue'
-import EmptyState from '../components/ui/EmptyState.vue'
-import Lightbox from '../components/ui/Lightbox.vue'
+import AsistenteVoz      from '../components/AsistenteVoz.vue'
+import Breadcrumb         from '../components/ui/Breadcrumb.vue'
+import EmptyState         from '../components/ui/EmptyState.vue'
+import Lightbox           from '../components/ui/Lightbox.vue'
+import ActionsDropdown    from '../components/ui/ActionsDropdown.vue'
 import { useToast }      from '../composables/useToast.js'
 import { useBluelabBLE } from '../composables/useBluelabBLE.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -397,6 +398,14 @@ const canManicura = computed(() =>
   ['secado', 'manicura_pendiente'].includes(planta.value?.lote?.estado)
 )
 
+const plantaAcciones = computed(() => {
+  const items = []
+  items.push({ emoji: '📋', label: 'Registrar planta',     onClick: abrirModal })
+  items.push({ emoji: '🌡️', label: 'Registrar EC / pH',   onClick: abrirMedicion })
+  items.push({ emoji: '⬆️', label: 'Registrar trasplante', onClick: abrirTrasplante })
+  return items
+})
+
 onMounted(async () => {
   try {
     await plants.fetchOne(id)
@@ -464,15 +473,7 @@ onMounted(async () => {
             :contexto="contextoAsistente"
             @registrado="onRegistradoPorVoz"
           />
-          <button class="pd__btn-sensor" @click="abrirMedicion" title="Registrar EC / pH / temperatura del sustrato">
-            <i class="bi bi-droplet-half"></i>EC / pH
-          </button>
-          <button class="pd__btn-trasplante" @click="abrirTrasplante" title="Registrar trasplante de maceta">
-            <i class="bi bi-arrow-up-circle"></i>Trasplantar
-          </button>
-          <button class="pd__btn-primary" @click="abrirModal">
-            <i class="bi bi-clipboard2-pulse"></i>Registrar planta
-          </button>
+          <ActionsDropdown :items="plantaAcciones" />
         </div>
       </div>
 
@@ -1323,25 +1324,6 @@ onMounted(async () => {
 .pd__hero-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 
 /* Botón sensor */
-.pd__btn-sensor {
-  display: inline-flex; align-items: center; gap: .4rem;
-  background: #f0fdf4; color: #15803d;
-  border: 1.5px solid #86efac;
-  padding: .55rem 1rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer;
-  transition: all .15s;
-}
-.pd__btn-sensor:hover { background: #dcfce7; border-color: #4ade80; }
-
-/* Botón trasplante */
-.pd__btn-trasplante {
-  display: inline-flex; align-items: center; gap: .4rem;
-  background: #fffbeb; color: #92400e;
-  border: 1.5px solid #fde68a;
-  padding: .55rem 1rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer;
-  transition: all .15s;
-}
-.pd__btn-trasplante:hover { background: #fef3c7; border-color: #fcd34d; }
-
 /* Medición en historial */
 .pd__metrica--sensor { background: #f0fdf4; border-color: #86efac; color: #15803d; }
 .pd__metrica--trasplante { background: #fffbeb; border-color: #fde68a; color: #92400e; display: flex; align-items: center; gap: .35rem; }

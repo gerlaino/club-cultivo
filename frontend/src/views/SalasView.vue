@@ -292,6 +292,18 @@ async function confirmDelete(s) {
             <i class="bi bi-building"></i> {{ s.sede.nombre }}
           </div>
 
+          <div class="slv__card-stats">
+            <span class="slv__card-stat">
+              <i class="bi bi-layers"></i>
+              {{ s.lotes_count ?? 0 }} lote{{ s.lotes_count !== 1 ? 's' : '' }}
+            </span>
+            <span class="slv__card-stat-sep">·</span>
+            <span class="slv__card-stat">
+              <i class="bi bi-flower2"></i>
+              {{ s.plantas_totales ?? 0 }} planta{{ s.plantas_totales !== 1 ? 's' : '' }}
+            </span>
+          </div>
+
           <p v-if="s.notes" class="slv__card-notes">{{ s.notes }}</p>
 
           <div class="slv__card-footer">
@@ -509,6 +521,9 @@ async function confirmDelete(s) {
 .slv__ocu-fill  { height: 100%; border-radius: 999px; transition: width .3s; }
 .slv__ocu-pct   { font-size: .75rem; font-weight: 600; text-align: right; }
 
+.slv__card-stats { display: flex; align-items: center; gap: .35rem; font-size: .78rem; color: #60725d; }
+.slv__card-stat { display: flex; align-items: center; gap: .25rem; }
+.slv__card-stat-sep { color: #c8d5c0; }
 .slv__card-notes { font-size: .78rem; color: #60725d; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; flex: 1; }
 
 .slv__card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: .5rem; border-top: 1px solid #f0f4f0; }
