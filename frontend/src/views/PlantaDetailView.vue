@@ -6,7 +6,6 @@ import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
 import { getPlantActivities, createPlantActivity, updatePlant, addPlantFoto, removePlantFoto } from '../lib/api'
-import AsistenteVoz         from '../components/AsistenteVoz.vue'
 import Breadcrumb            from '../components/ui/Breadcrumb.vue'
 import EmptyState            from '../components/ui/EmptyState.vue'
 import Lightbox              from '../components/ui/Lightbox.vue'
@@ -17,15 +16,6 @@ import { useConfirm }   from '../composables/useConfirm.js'
 import { useBluelabBLE } from '../composables/useBluelabBLE.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
-const contextoAsistente = computed(() => planta.value ? {
-  tipo:          'planta',
-  planta_id:     planta.value.id,
-  planta_nombre: planta.value.nombre || planta.value.codigo_qr,
-  lote_id:       planta.value.lote?.id,
-  lote_codigo:   planta.value.lote?.codigo,
-} : null)
-
-function onRegistradoPorVoz() { loadActivities() }
 
 const route  = useRoute()
 const router = useRouter()
@@ -527,11 +517,6 @@ onMounted(async () => {
           </div>
         </div>
         <div v-if="auth.user?.role !== 'manicura'" class="pd__hero-actions">
-          <AsistenteVoz
-            v-if="club.data?.features?.ia_voz && contextoAsistente"
-            :contexto="contextoAsistente"
-            @registrado="onRegistradoPorVoz"
-          />
           <ActionsDropdown :items="plantaAcciones" />
         </div>
       </div>

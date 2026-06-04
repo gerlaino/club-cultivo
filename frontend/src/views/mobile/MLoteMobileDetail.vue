@@ -22,17 +22,10 @@
         <i class="bi bi-pencil-square"></i>
         Registrar actividad
       </button>
-      <div class="mlot__acciones-wrap" v-click-outside="() => showAcciones = false">
-        <button class="mlot__btn-acciones" @click="showAcciones = !showAcciones">
-          <i class="bi bi-three-dots-vertical"></i>
-          Acciones
-        </button>
-        <div v-if="showAcciones" class="mlot__menu">
-          <button class="mlot__menu-item" @click="showNota = true; showAcciones = false">
-            <i class="bi bi-journal-text"></i> Agregar nota
-          </button>
-        </div>
-      </div>
+      <button class="mlot__btn-acciones" @click="showAcciones = true">
+        <i class="bi bi-three-dots-vertical"></i>
+        Más
+      </button>
     </div>
 
     <!-- Plantas -->
@@ -64,98 +57,217 @@
       <button :disabled="pagina >= totalPaginas" @click="pagina++" class="mlot__pager-btn"><i class="bi bi-chevron-right"></i></button>
     </div>
 
-    <!-- Sheet registrar actividad en lote -->
-    <Teleport to="body">
-      <div v-if="showRegistrar" class="mlot__overlay" @click.self="showRegistrar = false">
-        <div class="mlot__sheet">
-          <div class="mlot__sheet-handle"></div>
-          <div class="mlot__sheet-header">
-            <h3 class="mlot__sheet-title">📦 Registrar actividad</h3>
-            <button class="mlot__sheet-close" @click="showRegistrar = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="mlot__sheet-body">
-            <div class="mlot__field">
-              <label class="mlot__label">Tipo de actividad</label>
-              <select v-model="actForm.tipo" class="mlot__input">
-                <option value="observacion">Observación general</option>
-                <option value="nutricion">Nutrición</option>
-                <option value="riego">Riego</option>
-                <option value="control_plagas">Control de plagas</option>
-                <option value="defoliacion">Defoliación / Poda</option>
-                <option value="otro">Otro</option>
-              </select>
-            </div>
-            <div class="mlot__field">
-              <label class="mlot__label">Descripción</label>
-              <textarea v-model="actForm.descripcion" class="mlot__input mlot__textarea" rows="3" placeholder="Detallá la actividad realizada…"></textarea>
-            </div>
-            <div v-if="actError" class="mlot__error">{{ actError }}</div>
-            <button class="mlot__btn-confirmar" :disabled="savingAct" @click="guardarActividad">
-              <i v-if="!savingAct" class="bi bi-check2-circle"></i>
-              {{ savingAct ? 'Guardando…' : 'Guardar' }}
-            </button>
-          </div>
+    <!-- Sheet: Registrar actividad en lote -->
+    <SheetBottom v-model="showRegistrar" title="📦 Registrar actividad">
+      <div class="mlot__sheet-body">
+        <div class="mlot__field">
+          <label class="mlot__label">Tipo de actividad</label>
+          <select v-model="actForm.tipo" class="mlot__input">
+            <option value="observacion">Observación general</option>
+            <option value="nutricion">Nutrición</option>
+            <option value="riego">Riego</option>
+            <option value="control_plagas">Control de plagas</option>
+            <option value="defoliacion">Defoliación / Poda</option>
+            <option value="otro">Otro</option>
+          </select>
         </div>
+        <div class="mlot__field">
+          <label class="mlot__label">Descripción</label>
+          <textarea v-model="actForm.descripcion" class="mlot__input mlot__textarea" rows="3" placeholder="Detallá la actividad realizada…"></textarea>
+        </div>
+        <div v-if="actError" class="mlot__error">{{ actError }}</div>
+        <button class="mlot__btn-confirmar" :disabled="savingAct" @click="guardarActividad">
+          <i v-if="!savingAct" class="bi bi-check2-circle"></i>
+          {{ savingAct ? 'Guardando…' : 'Guardar' }}
+        </button>
       </div>
+    </SheetBottom>
 
-      <!-- Sheet nota -->
-      <div v-if="showNota" class="mlot__overlay" @click.self="showNota = false">
-        <div class="mlot__sheet">
-          <div class="mlot__sheet-handle"></div>
-          <div class="mlot__sheet-header">
-            <h3 class="mlot__sheet-title">📝 Nota del lote</h3>
-            <button class="mlot__sheet-close" @click="showNota = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="mlot__sheet-body">
-            <div class="mlot__field">
-              <label class="mlot__label">Nota</label>
-              <textarea v-model="notaContenido" class="mlot__input mlot__textarea" rows="4" placeholder="Escribí tu observación…"></textarea>
-            </div>
-            <div v-if="notaError" class="mlot__error">{{ notaError }}</div>
-            <button class="mlot__btn-confirmar" :disabled="savingNota" @click="guardarNota">
-              <i v-if="!savingNota" class="bi bi-check2-circle"></i>
-              {{ savingNota ? 'Guardando…' : 'Guardar nota' }}
-            </button>
-          </div>
+    <!-- Sheet: Más acciones -->
+    <SheetBottom v-model="showAcciones" title="Acciones del lote">
+      <div class="mlot__accion-list">
+        <button class="mlot__accion-item" @click="abrirAvanzarFase">
+          <span class="mlot__accion-ico">🚀</span>
+          <span class="mlot__accion-lbl">Avanzar fase</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
+        <button class="mlot__accion-item" @click="abrirNuevaPlanta">
+          <span class="mlot__accion-ico">🌱</span>
+          <span class="mlot__accion-lbl">Nueva planta</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
+        <button class="mlot__accion-item" @click="abrirEditarLote">
+          <span class="mlot__accion-ico">✏️</span>
+          <span class="mlot__accion-lbl">Editar lote</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
+        <button class="mlot__accion-item" @click="abrirFoto">
+          <span class="mlot__accion-ico">📷</span>
+          <span class="mlot__accion-lbl">Tomar foto</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
+        <button class="mlot__accion-item mlot__accion-item--danger" @click="abrirEliminar">
+          <span class="mlot__accion-ico">🗑️</span>
+          <span class="mlot__accion-lbl">Eliminar lote</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
+      </div>
+    </SheetBottom>
+
+    <!-- Sheet: Avanzar fase -->
+    <SheetBottom v-model="showAvanzarFase" title="🚀 Avanzar fase">
+      <div class="mlot__sheet-body">
+        <p class="mlot__sheet-desc">
+          Fase actual: <strong>{{ estadoLabel(lote.estado) }}</strong>
+        </p>
+        <div class="mlot__field">
+          <label class="mlot__label">Nueva fase</label>
+          <select v-model="nuevaFase" class="mlot__input">
+            <option v-for="f in fasesSiguientes" :key="f.value" :value="f.value">
+              {{ f.emoji }} {{ f.label }}
+            </option>
+          </select>
+        </div>
+        <div v-if="faseError" class="mlot__error">{{ faseError }}</div>
+        <button class="mlot__btn-confirmar" :disabled="savingFase || !nuevaFase" @click="guardarAvanzarFase">
+          <i v-if="!savingFase" class="bi bi-arrow-right-circle"></i>
+          {{ savingFase ? 'Avanzando…' : 'Confirmar cambio' }}
+        </button>
+      </div>
+    </SheetBottom>
+
+    <!-- Sheet: Nueva planta -->
+    <SheetBottom v-model="showNuevaPlanta" title="🌱 Nueva planta">
+      <div class="mlot__sheet-body">
+        <div class="mlot__field">
+          <label class="mlot__label">Nombre <span class="mlot__opt">opcional</span></label>
+          <input v-model.trim="plantaForm.nombre" class="mlot__input" placeholder="ej: Planta A1" />
+        </div>
+        <div class="mlot__field">
+          <label class="mlot__label">Código QR <span class="mlot__opt">opcional</span></label>
+          <input v-model.trim="plantaForm.codigo_qr" class="mlot__input" placeholder="ej: QR-001" />
+        </div>
+        <div v-if="plantaError" class="mlot__error">{{ plantaError }}</div>
+        <button class="mlot__btn-confirmar" :disabled="savingPlanta" @click="guardarNuevaPlanta">
+          <i v-if="!savingPlanta" class="bi bi-check2-circle"></i>
+          {{ savingPlanta ? 'Creando…' : 'Crear planta' }}
+        </button>
+      </div>
+    </SheetBottom>
+
+    <!-- Sheet: Editar lote -->
+    <SheetBottom v-model="showEditarLote" title="✏️ Editar lote">
+      <div class="mlot__sheet-body">
+        <div class="mlot__field">
+          <label class="mlot__label">Código *</label>
+          <input v-model.trim="editForm.codigo" class="mlot__input" />
+        </div>
+        <div class="mlot__field">
+          <label class="mlot__label">Descripción <span class="mlot__opt">opcional</span></label>
+          <textarea v-model.trim="editForm.descripcion" class="mlot__input mlot__textarea" rows="2"></textarea>
+        </div>
+        <div v-if="editError" class="mlot__error">{{ editError }}</div>
+        <button class="mlot__btn-confirmar" :disabled="savingEdit || !editForm.codigo" @click="guardarEditarLote">
+          <i v-if="!savingEdit" class="bi bi-check2-circle"></i>
+          {{ savingEdit ? 'Guardando…' : 'Guardar cambios' }}
+        </button>
+      </div>
+    </SheetBottom>
+
+    <!-- Sheet: Confirmar eliminar -->
+    <SheetBottom v-model="showEliminar" title="⚠️ Eliminar lote">
+      <div class="mlot__sheet-body">
+        <p class="mlot__confirm-text">
+          ¿Seguro que querés eliminar el lote <strong>{{ lote.codigo }}</strong>?
+          Esta acción no se puede deshacer.
+        </p>
+        <div v-if="eliminarError" class="mlot__error">{{ eliminarError }}</div>
+        <div class="mlot__confirm-btns">
+          <button class="mlot__btn-ghost" @click="showEliminar = false">Cancelar</button>
+          <button class="mlot__btn-danger" :disabled="eliminando" @click="confirmarEliminar">
+            {{ eliminando ? 'Eliminando…' : 'Eliminar' }}
+          </button>
         </div>
       </div>
-    </Teleport>
+    </SheetBottom>
+
+    <!-- Input foto oculto -->
+    <input ref="fotoInput" type="file" accept="image/*" capture="environment" style="display:none" @change="subirFoto" />
   </div>
   <div v-else-if="loading" class="mlot mlot--loading"><i class="bi bi-arrow-repeat mlot__spin"></i></div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { getLote, listPlants, createLoteEvento, createLoteNota } from '../../lib/api'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  getLote, listPlants, createLoteEvento,
+  avanzarFaseLote, updateLote, deleteLote, createPlant, uploadFotoLote,
+} from '../../lib/api'
 import { useToast } from '../../composables/useToast'
+import SheetBottom  from '../../components/cultivador/SheetBottom.vue'
 
-const route = useRoute()
-const toast = useToast()
-const id    = Number(route.params.id)
+const route  = useRoute()
+const router = useRouter()
+const toast  = useToast()
+const id     = Number(route.params.id)
 
 const lote    = ref(null)
 const plantas = ref([])
 const loading         = ref(true)
 const loadingPlantas  = ref(false)
 const showRegistrar   = ref(false)
-const showNota        = ref(false)
 const showAcciones    = ref(false)
+const showAvanzarFase = ref(false)
+const showNuevaPlanta = ref(false)
+const showEditarLote  = ref(false)
+const showEliminar    = ref(false)
 const savingAct       = ref(false)
-const savingNota      = ref(false)
+const savingFase      = ref(false)
+const savingPlanta    = ref(false)
+const savingEdit      = ref(false)
+const eliminando      = ref(false)
 const actError        = ref(null)
-const notaError       = ref(null)
-const notaContenido   = ref('')
+const faseError       = ref(null)
+const plantaError     = ref(null)
+const editError       = ref(null)
+const eliminarError   = ref(null)
 const pagina          = ref(1)
 const POR_PAG         = 12
+const fotoInput       = ref(null)
+const nuevaFase       = ref('')
 
-const actForm = ref({ tipo: 'observacion', descripcion: '' })
+const actForm    = ref({ tipo: 'observacion', descripcion: '' })
+const plantaForm = ref({ nombre: '', codigo_qr: '' })
+const editForm   = ref({ codigo: '', descripcion: '' })
 
-const EG = { vegetativo:'linear-gradient(135deg,#0f2417,#1b5e20)', floracion:'linear-gradient(135deg,#1c1028,#4a1d96)', cosecha:'linear-gradient(135deg,#1c0000,#7f1d1d)', en_manicura:'linear-gradient(135deg,#1c1000,#78350f)', curado:'linear-gradient(135deg,#0c1a33,#1d4ed8)' }
+const EG = {
+  vegetativo: 'linear-gradient(135deg,#0f2417,#1b5e20)',
+  floracion:  'linear-gradient(135deg,#1c1028,#4a1d96)',
+  cosecha:    'linear-gradient(135deg,#1c0000,#7f1d1d)',
+  en_manicura:'linear-gradient(135deg,#1c1000,#78350f)',
+  curado:     'linear-gradient(135deg,#0c1a33,#1d4ed8)',
+}
 const EE = { semilla:'🌱', esqueje:'🪴', vegetativo:'🍃', floracion:'🌸', cosecha:'✂️', en_manicura:'✂️', secado:'💨', curado:'🫙' }
 const EL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', secado:'Secado', curado:'Curado' }
 const PC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', secado:'#d97706', curado:'#2563eb' }
 const PL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Veget.', floracion:'Florac.', cosecha:'Cosecha', en_manicura:'Manicura', secado:'Secado', curado:'Curado', cosechado:'Cosechado' }
+
+const FASES_ORDEN = ['semilla', 'esqueje', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'secado', 'curado']
+const FASES_META  = [
+  { value:'vegetativo',  label:'Vegetativo',  emoji:'🍃' },
+  { value:'floracion',   label:'Floración',   emoji:'🌸' },
+  { value:'cosecha',     label:'Cosecha',     emoji:'✂️' },
+  { value:'en_manicura', label:'Manicura',    emoji:'✂️' },
+  { value:'secado',      label:'Secado',      emoji:'💨' },
+  { value:'curado',      label:'Curado',      emoji:'🫙' },
+]
+
+const fasesSiguientes = computed(() => {
+  if (!lote.value) return []
+  const idx = FASES_ORDEN.indexOf(lote.value.estado)
+  return FASES_META.filter(f => FASES_ORDEN.indexOf(f.value) > idx)
+})
 
 const estadoGradient = e => EG[e] || 'linear-gradient(135deg,#0f172a,#1e293b)'
 const estadoEmoji    = e => EE[e] || '📦'
@@ -163,19 +275,12 @@ const estadoLabel    = e => EL[e] || e || '—'
 const plantaColor    = e => PC[e] || '#64748b'
 const plantaLabel    = e => PL[e] || e || '—'
 
-const totalPaginas   = computed(() => Math.max(1, Math.ceil(plantas.value.length / POR_PAG)))
-const plantasPagina  = computed(() => {
-  const s = (pagina.value - 1) * POR_PAG
-  return plantas.value.slice(s, s + POR_PAG)
-})
+const totalPaginas = computed(() => Math.max(1, Math.ceil(plantas.value.length / POR_PAG)))
 
 async function guardarActividad() {
   savingAct.value = true; actError.value = null
   try {
-    await createLoteEvento(id, {
-      tipo:        actForm.value.tipo,
-      descripcion: actForm.value.descripcion,
-    })
+    await createLoteEvento(id, { tipo: actForm.value.tipo, descripcion: actForm.value.descripcion })
     toast.success('Actividad registrada')
     showRegistrar.value = false
     actForm.value = { tipo: 'observacion', descripcion: '' }
@@ -184,15 +289,103 @@ async function guardarActividad() {
   } finally { savingAct.value = false }
 }
 
-async function guardarNota() {
-  if (!notaContenido.value.trim()) { notaError.value = 'Escribí algo'; return }
-  savingNota.value = true; notaError.value = null
+function abrirAvanzarFase() {
+  nuevaFase.value   = fasesSiguientes.value[0]?.value || ''
+  faseError.value   = null
+  showAcciones.value    = false
+  showAvanzarFase.value = true
+}
+
+async function guardarAvanzarFase() {
+  if (!nuevaFase.value) return
+  savingFase.value = true; faseError.value = null
   try {
-    await createLoteNota(id, { nota: { contenido: notaContenido.value } })
-    toast.success('Nota guardada')
-    showNota.value = false
-    notaContenido.value = ''
-  } catch { notaError.value = 'Error al guardar' } finally { savingNota.value = false }
+    const { data } = await avanzarFaseLote(id, { estado: nuevaFase.value })
+    lote.value = { ...lote.value, estado: data.estado || nuevaFase.value }
+    toast.success('Fase actualizada')
+    showAvanzarFase.value = false
+  } catch (e) {
+    faseError.value = e?.response?.data?.error || 'Error al avanzar fase'
+  } finally { savingFase.value = false }
+}
+
+function abrirNuevaPlanta() {
+  plantaForm.value  = { nombre: '', codigo_qr: '' }
+  plantaError.value = null
+  showAcciones.value    = false
+  showNuevaPlanta.value = true
+}
+
+async function guardarNuevaPlanta() {
+  savingPlanta.value = true; plantaError.value = null
+  try {
+    const { data } = await createPlant({
+      nombre:    plantaForm.value.nombre    || undefined,
+      codigo_qr: plantaForm.value.codigo_qr || undefined,
+      lote_id:   id,
+    })
+    plantas.value.unshift(data)
+    lote.value = { ...lote.value, plants_count: (lote.value.plants_count || 0) + 1 }
+    toast.success('Planta creada')
+    showNuevaPlanta.value = false
+  } catch (e) {
+    plantaError.value = e?.response?.data?.error || 'Error al crear la planta'
+  } finally { savingPlanta.value = false }
+}
+
+function abrirEditarLote() {
+  editForm.value  = { codigo: lote.value.codigo, descripcion: lote.value.descripcion || '' }
+  editError.value = null
+  showAcciones.value  = false
+  showEditarLote.value = true
+}
+
+async function guardarEditarLote() {
+  if (!editForm.value.codigo) { editError.value = 'El código es obligatorio'; return }
+  savingEdit.value = true; editError.value = null
+  try {
+    const { data } = await updateLote(id, editForm.value)
+    lote.value = { ...lote.value, ...data }
+    toast.success('Lote actualizado')
+    showEditarLote.value = false
+  } catch (e) {
+    editError.value = e?.response?.data?.error || 'Error al guardar'
+  } finally { savingEdit.value = false }
+}
+
+function abrirEliminar() {
+  eliminarError.value = null
+  showAcciones.value = false
+  showEliminar.value = true
+}
+
+async function confirmarEliminar() {
+  eliminando.value = true; eliminarError.value = null
+  try {
+    await deleteLote(id)
+    toast.success('Lote eliminado')
+    router.back()
+  } catch (e) {
+    eliminarError.value = e?.response?.data?.error || 'Error al eliminar'
+    eliminando.value = false
+  }
+}
+
+function abrirFoto() {
+  showAcciones.value = false
+  fotoInput.value?.click()
+}
+
+async function subirFoto(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  try {
+    const fd = new FormData()
+    fd.append('foto', file)
+    await uploadFotoLote(id, fd)
+    toast.success('Foto subida')
+  } catch { toast.error('Error al subir la foto') }
+  e.target.value = ''
 }
 
 onMounted(async () => {
@@ -212,18 +405,28 @@ onMounted(async () => {
 .mlot--loading { display: flex; align-items: center; justify-content: center; min-height: 40vh; }
 .mlot__spin { font-size: 2rem; color: #94a3b8; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
 .mlot__hero { padding: 1.25rem 1rem 1.1rem; }
 .mlot__hero-estado { font-size: .72rem; font-weight: 700; color: rgba(255,255,255,.7); margin-bottom: .4rem; text-transform: uppercase; letter-spacing: .06em; }
 .mlot__hero-codigo { font-size: 1.3rem; font-weight: 800; color: #fff; margin: 0 0 .3rem; font-family: monospace; }
 .mlot__hero-meta   { font-size: .78rem; color: rgba(255,255,255,.6); display: flex; gap: .4rem; flex-wrap: wrap; }
 .mlot__sep { opacity: .4; }
+
 .mlot__actions { display: flex; gap: .75rem; padding: 1rem; }
-.mlot__btn-registrar { flex: 1; display: flex; align-items: center; justify-content: center; gap: .5rem; background: #1b5e20; color: #fff; border: none; padding: .875rem; border-radius: 12px; font-size: .95rem; font-weight: 700; cursor: pointer; }
-.mlot__acciones-wrap { position: relative; }
-.mlot__btn-acciones { display: flex; align-items: center; gap: .4rem; background: #fff; color: #374151; border: 1.5px solid #e2e8f0; padding: .875rem 1rem; border-radius: 12px; font-size: .875rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.mlot__menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 50; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.12); overflow: hidden; min-width: 170px; }
-.mlot__menu-item { width: 100%; display: flex; align-items: center; gap: .6rem; padding: .85rem 1rem; border: none; background: none; text-align: left; font-size: .875rem; color: #374151; cursor: pointer; }
-.mlot__menu-item:hover { background: #f8fafc; }
+.mlot__btn-registrar {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: .5rem;
+  background: #1b5e20; color: #fff; border: none; padding: .875rem;
+  border-radius: 12px; font-size: .95rem; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mlot__btn-acciones {
+  display: flex; align-items: center; gap: .4rem;
+  background: #fff; color: #374151; border: 1.5px solid #e2e8f0;
+  padding: .875rem 1rem; border-radius: 12px;
+  font-size: .875rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .mlot__section-title { font-size: .7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; padding: .75rem 1rem .5rem; }
 .mlot__loading-plantas, .mlot__empty { padding: .75rem 1rem; color: #94a3b8; font-size: .82rem; text-align: center; }
 .mlot__list { display: flex; flex-direction: column; gap: .4rem; padding: 0 1rem; }
@@ -233,23 +436,72 @@ onMounted(async () => {
 .mlot__card-nombre { font-size: .875rem; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mlot__planta-estado { font-size: .68rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 .mlot__chevron { color: #d1d5db; font-size: .75rem; flex-shrink: 0; }
+
 .mlot__pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: .875rem; }
 .mlot__pager-btn { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: .875rem; color: #374151; cursor: pointer; }
 .mlot__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
 .mlot__pager-info { font-size: .8rem; color: #64748b; font-weight: 600; min-width: 44px; text-align: center; }
-.mlot__overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; }
-.mlot__sheet { width: 100%; background: #fff; border-radius: 20px 20px 0 0; max-height: 90vh; overflow-y: auto; }
-.mlot__sheet-handle { width: 40px; height: 4px; background: #e2e8f0; border-radius: 999px; margin: .75rem auto .25rem; }
-.mlot__sheet-header { display: flex; align-items: center; justify-content: space-between; padding: .5rem 1.25rem 1rem; }
-.mlot__sheet-title { font-size: 1rem; font-weight: 700; margin: 0; }
-.mlot__sheet-close { background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer; }
-.mlot__sheet-body { padding: 0 1.25rem 2.5rem; display: flex; flex-direction: column; gap: .875rem; }
+
+/* Acciones sheet */
+.mlot__accion-list { display: flex; flex-direction: column; gap: 2px; }
+.mlot__accion-item {
+  display: flex; align-items: center; gap: .875rem;
+  height: 56px; padding: 0 .5rem;
+  border-radius: 10px; border: none; background: none;
+  font-size: .95rem; font-weight: 500; color: #0f172a;
+  cursor: pointer; text-align: left; width: 100%;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .1s;
+}
+.mlot__accion-item:active { background: #f1f5f9; }
+.mlot__accion-item--danger { color: #dc2626; }
+.mlot__accion-ico { font-size: 1.2rem; width: 28px; text-align: center; flex-shrink: 0; }
+.mlot__accion-lbl { flex: 1; }
+.mlot__accion-arr { color: #d1d5db; font-size: .8rem; flex-shrink: 0; }
+
+/* Sheet contenido */
+.mlot__sheet-body { display: flex; flex-direction: column; gap: .875rem; }
+.mlot__sheet-desc { font-size: .875rem; color: #374151; margin: 0; }
 .mlot__field { display: flex; flex-direction: column; gap: .3rem; }
-.mlot__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
-.mlot__input { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .65rem .875rem; font-size: .9rem; color: #0f172a; outline: none; width: 100%; box-sizing: border-box; }
+.mlot__label {
+  font-size: .72rem; font-weight: 700; color: #374151;
+  text-transform: uppercase; letter-spacing: .04em;
+  display: flex; align-items: center; gap: .4rem;
+}
+.mlot__opt { font-weight: 400; text-transform: none; color: #94a3b8; font-size: .68rem; }
+.mlot__input {
+  background: #f8fafc; border: 1.5px solid #e2e8f0;
+  border-radius: 9px; padding: .65rem .875rem;
+  font-size: .9rem; color: #0f172a; outline: none;
+  width: 100%; box-sizing: border-box;
+}
 .mlot__input:focus { border-color: #1b5e20; }
 .mlot__textarea { resize: none; font-family: inherit; }
-.mlot__error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; }
-.mlot__btn-confirmar { width: 100%; display: flex; align-items: center; justify-content: center; gap: .5rem; background: #1b5e20; color: #fff; border: none; padding: .9rem; border-radius: 12px; font-size: .95rem; font-weight: 700; cursor: pointer; }
+.mlot__error {
+  background: #fef2f2; color: #dc2626;
+  border: 1px solid #fecaca; border-radius: 8px;
+  padding: .5rem .75rem; font-size: .8rem;
+}
+.mlot__btn-confirmar {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: .5rem;
+  background: #1b5e20; color: #fff; border: none;
+  padding: .9rem; border-radius: 12px;
+  font-size: .95rem; font-weight: 700; cursor: pointer;
+}
 .mlot__btn-confirmar:disabled { opacity: .6; }
+
+/* Confirmar eliminar */
+.mlot__confirm-text { font-size: .875rem; color: #374151; margin: 0; line-height: 1.5; }
+.mlot__confirm-btns { display: flex; gap: .75rem; }
+.mlot__btn-ghost {
+  flex: 1; background: #fff; border: 1.5px solid #e2e8f0;
+  color: #64748b; padding: .75rem; border-radius: 9px;
+  font-size: .875rem; font-weight: 600; cursor: pointer;
+}
+.mlot__btn-danger {
+  flex: 1; background: #dc2626; color: #fff; border: none;
+  padding: .75rem; border-radius: 9px;
+  font-size: .875rem; font-weight: 700; cursor: pointer;
+}
+.mlot__btn-danger:disabled { opacity: .6; }
 </style>

@@ -22,14 +22,6 @@
       </button>
 
       <!-- Mic IA (solo si feature habilitada) -->
-      <AsistenteVoz
-        v-if="club.data?.features?.ia_voz && contextoAsistente"
-        :contexto="contextoAsistente"
-        :mini="true"
-        @registrado="onRegistradoPorVoz"
-        class="mpd__mic"
-      />
-
       <!-- Menú acciones secundarias -->
       <div class="mpd__acciones-wrap" v-click-outside="() => showAcciones = false">
         <button class="mpd__btn-acciones" @click="showAcciones = !showAcciones">
@@ -168,29 +160,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getPlant, getPlantActivities, createPlantActivity } from '../../lib/api'
-import { useToast }    from '../../composables/useToast'
-import { useClubStore } from '../../stores/club'
-import AsistenteVoz    from '../../components/AsistenteVoz.vue'
+import { useToast } from '../../composables/useToast'
 
 const route = useRoute()
 const toast = useToast()
-const club  = useClubStore()
 const id    = Number(route.params.id)
-
-const contextoAsistente = computed(() => planta.value ? {
-  tipo:          'planta',
-  planta_id:     planta.value.id,
-  planta_nombre: planta.value.nombre || planta.value.codigo_qr,
-  lote_id:       planta.value.lote?.id,
-  lote_codigo:   planta.value.lote?.codigo,
-} : null)
-
-function onRegistradoPorVoz() {
-  getPlantActivities(id).then(r => { activities.value = r.data || [] }).catch(() => {})
-}
 
 const planta      = ref(null)
 const activities  = ref([])
@@ -299,7 +276,6 @@ onMounted(async () => {
   padding: .875rem; border-radius: 12px; font-size: .95rem; font-weight: 700;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
-.mpd__mic { flex-shrink: 0; }
 .mpd__acciones-wrap { position: relative; }
 .mpd__btn-acciones {
   display: flex; align-items: center; gap: .4rem;

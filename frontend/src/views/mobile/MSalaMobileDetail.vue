@@ -12,23 +12,16 @@
       </div>
     </div>
 
-    <!-- Botón registrar lectura ambiental -->
+    <!-- Acciones -->
     <div class="msal__actions">
       <button class="msal__btn-registrar" @click="showLectura = true">
         <i class="bi bi-thermometer-half"></i>
         Registrar lectura
       </button>
-      <div class="msal__acciones-wrap" v-click-outside="() => showAcciones = false">
-        <button class="msal__btn-acciones" @click="showAcciones = !showAcciones">
-          <i class="bi bi-three-dots-vertical"></i>
-          Acciones
-        </button>
-        <div v-if="showAcciones" class="msal__menu">
-          <button class="msal__menu-item" @click="showNota = true; showAcciones = false">
-            <i class="bi bi-journal-text"></i> Agregar nota
-          </button>
-        </div>
-      </div>
+      <button class="msal__btn-acciones" @click="showAcciones = true">
+        <i class="bi bi-three-dots-vertical"></i>
+        Más
+      </button>
     </div>
 
     <!-- Lotes de esta sala -->
@@ -59,71 +52,98 @@
       </RouterLink>
     </div>
 
-    <!-- Sheet lectura ambiental -->
-    <Teleport to="body">
-      <div v-if="showLectura" class="msal__overlay" @click.self="showLectura = false">
-        <div class="msal__sheet">
-          <div class="msal__sheet-handle"></div>
-          <div class="msal__sheet-header">
-            <h3 class="msal__sheet-title">🌡️ Lectura ambiental</h3>
-            <button class="msal__sheet-close" @click="showLectura = false"><i class="bi bi-x-lg"></i></button>
+    <!-- Sheet: Registrar lectura ambiental -->
+    <SheetBottom v-model="showLectura" title="🌡️ Lectura ambiental">
+      <div class="msal__sheet-body">
+        <div class="msal__row2">
+          <div class="msal__field">
+            <label class="msal__label">Temperatura (°C)</label>
+            <input v-model.number="lecturaForm.temperatura" type="number" step="0.1" class="msal__input" placeholder="—" />
           </div>
-          <div class="msal__sheet-body">
-            <div class="msal__row2">
-              <div class="msal__field">
-                <label class="msal__label">Temperatura (°C)</label>
-                <input v-model.number="lecturaForm.temperatura" type="number" step="0.1" class="msal__input" placeholder="—" />
-              </div>
-              <div class="msal__field">
-                <label class="msal__label">Humedad (%)</label>
-                <input v-model.number="lecturaForm.humedad" type="number" step="0.1" min="0" max="100" class="msal__input" placeholder="—" />
-              </div>
-            </div>
-            <div class="msal__row2">
-              <div class="msal__field">
-                <label class="msal__label">CO₂ (ppm)</label>
-                <input v-model.number="lecturaForm.co2" type="number" step="1" class="msal__input" placeholder="—" />
-              </div>
-              <div class="msal__field">
-                <label class="msal__label">VPD (kPa)</label>
-                <input v-model.number="lecturaForm.vpd" type="number" step="0.01" class="msal__input" placeholder="—" />
-              </div>
-            </div>
-            <div class="msal__field">
-              <label class="msal__label">Notas</label>
-              <textarea v-model="lecturaForm.notas" class="msal__input msal__textarea" rows="2" placeholder="Observaciones…"></textarea>
-            </div>
-            <div v-if="lecturaError" class="msal__error">{{ lecturaError }}</div>
-            <button class="msal__btn-confirmar" :disabled="savingLectura" @click="guardarLectura">
-              <i v-if="!savingLectura" class="bi bi-check2-circle"></i>
-              {{ savingLectura ? 'Guardando…' : 'Guardar lectura' }}
-            </button>
+          <div class="msal__field">
+            <label class="msal__label">Humedad (%)</label>
+            <input v-model.number="lecturaForm.humedad" type="number" step="0.1" min="0" max="100" class="msal__input" placeholder="—" />
           </div>
         </div>
+        <div class="msal__row2">
+          <div class="msal__field">
+            <label class="msal__label">CO₂ (ppm)</label>
+            <input v-model.number="lecturaForm.co2" type="number" step="1" class="msal__input" placeholder="—" />
+          </div>
+          <div class="msal__field">
+            <label class="msal__label">VPD (kPa)</label>
+            <input v-model.number="lecturaForm.vpd" type="number" step="0.01" class="msal__input" placeholder="—" />
+          </div>
+        </div>
+        <div class="msal__field">
+          <label class="msal__label">Notas</label>
+          <textarea v-model="lecturaForm.notas" class="msal__input msal__textarea" rows="2" placeholder="Observaciones…"></textarea>
+        </div>
+        <div v-if="lecturaError" class="msal__error">{{ lecturaError }}</div>
+        <button class="msal__btn-confirmar" :disabled="savingLectura" @click="guardarLectura">
+          <i v-if="!savingLectura" class="bi bi-check2-circle"></i>
+          {{ savingLectura ? 'Guardando…' : 'Guardar lectura' }}
+        </button>
       </div>
+    </SheetBottom>
 
-      <!-- Sheet nota -->
-      <div v-if="showNota" class="msal__overlay" @click.self="showNota = false">
-        <div class="msal__sheet">
-          <div class="msal__sheet-handle"></div>
-          <div class="msal__sheet-header">
-            <h3 class="msal__sheet-title">📝 Nota de sala</h3>
-            <button class="msal__sheet-close" @click="showNota = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="msal__sheet-body">
-            <div class="msal__field">
-              <label class="msal__label">Nota</label>
-              <textarea v-model="notaContenido" class="msal__input msal__textarea" rows="4" placeholder="Escribí tu observación…" autofocus></textarea>
-            </div>
-            <div v-if="notaError" class="msal__error">{{ notaError }}</div>
-            <button class="msal__btn-confirmar" :disabled="savingNota" @click="guardarNota">
-              <i v-if="!savingNota" class="bi bi-check2-circle"></i>
-              {{ savingNota ? 'Guardando…' : 'Guardar nota' }}
-            </button>
-          </div>
-        </div>
+    <!-- Sheet: Más acciones -->
+    <SheetBottom v-model="showAcciones" title="Acciones">
+      <div class="msal__accion-list">
+        <button class="msal__accion-item" @click="abrirNuevoLote">
+          <span class="msal__accion-ico">➕</span>
+          <span class="msal__accion-lbl">Nuevo lote</span>
+          <i class="bi bi-chevron-right msal__accion-arr"></i>
+        </button>
+        <button class="msal__accion-item" @click="abrirFoto">
+          <span class="msal__accion-ico">📷</span>
+          <span class="msal__accion-lbl">Tomar foto</span>
+          <i class="bi bi-chevron-right msal__accion-arr"></i>
+        </button>
+        <button class="msal__accion-item" @click="abrirNota">
+          <span class="msal__accion-ico">📝</span>
+          <span class="msal__accion-lbl">Agregar nota</span>
+          <i class="bi bi-chevron-right msal__accion-arr"></i>
+        </button>
       </div>
-    </Teleport>
+    </SheetBottom>
+
+    <!-- Sheet: Nuevo lote -->
+    <SheetBottom v-model="showNuevoLote" title="Nuevo lote">
+      <div class="msal__sheet-body">
+        <div class="msal__field">
+          <label class="msal__label">Código del lote *</label>
+          <input v-model.trim="loteForm.codigo" class="msal__input" placeholder="ej: GSC-05" autofocus />
+        </div>
+        <div class="msal__field">
+          <label class="msal__label">Descripción <span class="msal__opt">opcional</span></label>
+          <textarea v-model.trim="loteForm.descripcion" class="msal__input msal__textarea" rows="2" placeholder="Notas sobre el lote…"></textarea>
+        </div>
+        <div v-if="loteError" class="msal__error">{{ loteError }}</div>
+        <button class="msal__btn-confirmar" :disabled="savingLote || !loteForm.codigo" @click="guardarNuevoLote">
+          <i v-if="!savingLote" class="bi bi-check2-circle"></i>
+          {{ savingLote ? 'Creando…' : 'Crear lote' }}
+        </button>
+      </div>
+    </SheetBottom>
+
+    <!-- Sheet: Nota de sala -->
+    <SheetBottom v-model="showNota" title="📝 Nota de sala">
+      <div class="msal__sheet-body">
+        <div class="msal__field">
+          <label class="msal__label">Nota</label>
+          <textarea v-model="notaContenido" class="msal__input msal__textarea" rows="4" placeholder="Escribí tu observación…"></textarea>
+        </div>
+        <div v-if="notaError" class="msal__error">{{ notaError }}</div>
+        <button class="msal__btn-confirmar" :disabled="savingNota" @click="guardarNota">
+          <i v-if="!savingNota" class="bi bi-check2-circle"></i>
+          {{ savingNota ? 'Guardando…' : 'Guardar nota' }}
+        </button>
+      </div>
+    </SheetBottom>
+
+    <!-- Input foto oculto -->
+    <input ref="fotoInput" type="file" accept="image/*" capture="environment" style="display:none" @change="subirFoto" />
   </div>
   <div v-else-if="loading" class="msal msal--loading"><i class="bi bi-arrow-repeat msal__spin"></i></div>
 </template>
@@ -131,8 +151,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getSala, listLotes, createLecturaAmbiental, createSalaNota } from '../../lib/api'
+import { getSala, listLotes, createLecturaAmbiental, createSalaNota, createLote } from '../../lib/api'
 import { useToast } from '../../composables/useToast'
+import SheetBottom  from '../../components/cultivador/SheetBottom.vue'
 
 const route = useRoute()
 const toast = useToast()
@@ -142,15 +163,21 @@ const sala    = ref(null)
 const lotes   = ref([])
 const loading = ref(true)
 
-const showLectura   = ref(false)
-const showNota      = ref(false)
-const showAcciones  = ref(false)
-const savingLectura = ref(false)
-const savingNota    = ref(false)
-const lecturaError  = ref(null)
-const notaError     = ref(null)
-const notaContenido = ref('')
-const lecturaForm   = ref({ temperatura: null, humedad: null, co2: null, vpd: null, notas: '' })
+const showLectura    = ref(false)
+const showAcciones   = ref(false)
+const showNuevoLote  = ref(false)
+const showNota       = ref(false)
+const savingLectura  = ref(false)
+const savingLote     = ref(false)
+const savingNota     = ref(false)
+const lecturaError   = ref(null)
+const loteError      = ref(null)
+const notaError      = ref(null)
+const notaContenido  = ref('')
+const fotoInput      = ref(null)
+
+const lecturaForm = ref({ temperatura: null, humedad: null, co2: null, vpd: null, notas: '' })
+const loteForm    = ref({ codigo: '', descripcion: '' })
 
 const KIND_GRADIENT = {
   vegetativo: 'linear-gradient(135deg,#0f2417,#1b5e20)',
@@ -185,6 +212,43 @@ async function guardarLectura() {
   } catch (e) {
     lecturaError.value = e?.response?.data?.error || 'Error al guardar'
   } finally { savingLectura.value = false }
+}
+
+function abrirNuevoLote() {
+  loteForm.value  = { codigo: '', descripcion: '' }
+  loteError.value = null
+  showAcciones.value  = false
+  showNuevoLote.value = true
+}
+
+async function guardarNuevoLote() {
+  if (!loteForm.value.codigo) { loteError.value = 'El código es obligatorio'; return }
+  savingLote.value = true; loteError.value = null
+  try {
+    const { data } = await createLote(sala.value.id, loteForm.value)
+    lotes.value.unshift(data)
+    toast.success('Lote creado')
+    showNuevoLote.value = false
+  } catch (e) {
+    loteError.value = e?.response?.data?.error || 'Error al crear lote'
+  } finally { savingLote.value = false }
+}
+
+function abrirFoto() {
+  showAcciones.value = false
+  fotoInput.value?.click()
+}
+
+async function subirFoto(e) {
+  e.target.value = ''
+  // Placeholder — se puede extender con uploadFotoSala si el backend lo soporta
+}
+
+function abrirNota() {
+  notaContenido.value = ''
+  notaError.value     = null
+  showAcciones.value  = false
+  showNota.value      = true
 }
 
 async function guardarNota() {
@@ -224,12 +288,15 @@ onMounted(async () => {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: .5rem;
   background: #1b5e20; color: #fff; border: none; padding: .875rem;
   border-radius: 12px; font-size: .95rem; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.msal__acciones-wrap { position: relative; }
-.msal__btn-acciones { display: flex; align-items: center; gap: .4rem; background: #fff; color: #374151; border: 1.5px solid #e2e8f0; padding: .875rem 1rem; border-radius: 12px; font-size: .875rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.msal__menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 50; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.12); overflow: hidden; min-width: 180px; }
-.msal__menu-item { width: 100%; display: flex; align-items: center; gap: .6rem; padding: .85rem 1rem; border: none; background: none; text-align: left; font-size: .875rem; color: #374151; cursor: pointer; }
-.msal__menu-item:hover { background: #f8fafc; }
+.msal__btn-acciones {
+  display: flex; align-items: center; gap: .4rem;
+  background: #fff; color: #374151; border: 1.5px solid #e2e8f0;
+  padding: .875rem 1rem; border-radius: 12px;
+  font-size: .875rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
 
 .msal__section-title { font-size: .7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; padding: .75rem 1rem .5rem; }
 .msal__empty { padding: .75rem 1rem; color: #94a3b8; font-size: .82rem; text-align: center; }
@@ -244,20 +311,50 @@ onMounted(async () => {
 .msal__dot { color: #d1d5db; }
 .msal__chevron { color: #d1d5db; font-size: .8rem; padding-right: .875rem; flex-shrink: 0; }
 
-.msal__overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; }
-.msal__sheet { width: 100%; background: #fff; border-radius: 20px 20px 0 0; max-height: 90vh; overflow-y: auto; }
-.msal__sheet-handle { width: 40px; height: 4px; background: #e2e8f0; border-radius: 999px; margin: .75rem auto .25rem; }
-.msal__sheet-header { display: flex; align-items: center; justify-content: space-between; padding: .5rem 1.25rem 1rem; }
-.msal__sheet-title { font-size: 1rem; font-weight: 700; margin: 0; }
-.msal__sheet-close { background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer; }
-.msal__sheet-body { padding: 0 1.25rem 2.5rem; display: flex; flex-direction: column; gap: .875rem; }
+/* Acciones sheet */
+.msal__accion-list { display: flex; flex-direction: column; gap: 2px; }
+.msal__accion-item {
+  display: flex; align-items: center; gap: .875rem;
+  height: 56px; padding: 0 .5rem;
+  border-radius: 10px; border: none; background: none;
+  font-size: .95rem; font-weight: 500; color: #0f172a;
+  cursor: pointer; text-align: left; width: 100%;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .1s;
+}
+.msal__accion-item:active { background: #f1f5f9; }
+.msal__accion-ico { font-size: 1.2rem; width: 28px; text-align: center; flex-shrink: 0; }
+.msal__accion-lbl { flex: 1; }
+.msal__accion-arr { color: #d1d5db; font-size: .8rem; flex-shrink: 0; }
+
+/* Sheet contenido */
+.msal__sheet-body { display: flex; flex-direction: column; gap: .875rem; }
 .msal__field { display: flex; flex-direction: column; gap: .3rem; }
-.msal__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
-.msal__input { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .65rem .875rem; font-size: .9rem; color: #0f172a; outline: none; width: 100%; box-sizing: border-box; }
+.msal__label {
+  font-size: .72rem; font-weight: 700; color: #374151;
+  text-transform: uppercase; letter-spacing: .04em;
+  display: flex; align-items: center; gap: .4rem;
+}
+.msal__opt { font-weight: 400; text-transform: none; color: #94a3b8; font-size: .68rem; }
+.msal__input {
+  background: #f8fafc; border: 1.5px solid #e2e8f0;
+  border-radius: 9px; padding: .65rem .875rem;
+  font-size: .9rem; color: #0f172a; outline: none;
+  width: 100%; box-sizing: border-box;
+}
 .msal__input:focus { border-color: #1b5e20; }
 .msal__textarea { resize: none; font-family: inherit; }
 .msal__row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
-.msal__error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; }
-.msal__btn-confirmar { width: 100%; display: flex; align-items: center; justify-content: center; gap: .5rem; background: #1b5e20; color: #fff; border: none; padding: .9rem; border-radius: 12px; font-size: .95rem; font-weight: 700; cursor: pointer; }
+.msal__error {
+  background: #fef2f2; color: #dc2626;
+  border: 1px solid #fecaca; border-radius: 8px;
+  padding: .5rem .75rem; font-size: .8rem;
+}
+.msal__btn-confirmar {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: .5rem;
+  background: #1b5e20; color: #fff; border: none;
+  padding: .9rem; border-radius: 12px;
+  font-size: .95rem; font-weight: 700; cursor: pointer;
+}
 .msal__btn-confirmar:disabled { opacity: .6; }
 </style>
