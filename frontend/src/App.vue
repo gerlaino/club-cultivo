@@ -47,10 +47,11 @@ const plants = usePlantsStore();
 const router = useRouter();
 const route  = useRoute();
 
-const routeLoading = ref(false)
+const routeLoading  = ref(false)
 router.beforeEach(() => { routeLoading.value = true })
 router.afterEach(() => { routeLoading.value = false })
 const { can, isAdmin, isSuperAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
+const isMobileRoute = computed(() => route.path.startsWith('/m'))
 
 const adminDrawerOpen = ref(false);
 const cvdDrawerOpen  = ref(false);
@@ -185,8 +186,13 @@ onMounted(async () => {
   <div v-if="routeLoading" class="route-loading-bar"></div>
   <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isSupervisor && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor && !isDelivery }">
 
+    <!-- ── MOBILE SHELL (rutas /m/*) — sin sidebar ni topbar ── -->
+    <template v-if="isMobileRoute">
+      <router-view />
+    </template>
+
     <!-- ── SUPER ADMIN LAYOUT (manejado enteramente por SuperAdminLayout) ── -->
-    <template v-if="isSuperAdmin && auth.isAuthenticated">
+    <template v-else-if="isSuperAdmin && auth.isAuthenticated">
       <router-view />
     </template>
 

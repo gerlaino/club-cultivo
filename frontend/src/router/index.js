@@ -4,8 +4,15 @@ import { usePermissions } from "../composables/usePermissions";
 import { useToast }       from "../composables/useToast";
 import { usePWA }         from "../composables/usePWA";
 
-const MOBILE_ROLES = ['admin', 'cultivador', 'manicura', 'dispensador']
-const MOBILE_HOME  = { admin: '/m/admin', cultivador: '/m/cultivador', manicura: '/m/manicura', dispensador: '/m/dispensador' }
+const MOBILE_ROLES = ['admin', 'supervisor', 'cultivador', 'manicura', 'dispensador', 'delivery']
+const MOBILE_HOME  = {
+  admin:       '/m/admin/salas',
+  supervisor:  '/m/admin/salas',
+  cultivador:  '/m/cultivador/salas',
+  manicura:    '/m/manicura/pendientes',
+  dispensador: '/m/dispensador/dispensar',
+  delivery:    '/m/delivery/despachos',
+}
 
 const requiresPermission = (resource, action) => {
   return (to, from, next) => {
@@ -616,32 +623,48 @@ const routes = [
     component: () => import('../components/layout/MobileShell.vue'),
     meta: { requiresAuth: true },
     children: [
-      // Redirect /m → home por rol
+      // Redirect /m → primera tab del rol
       { path: '', redirect: () => {
           const role = useAuthStore().user?.role
-          const homes = { admin: '/m/admin', cultivador: '/m/cultivador', manicura: '/m/manicura', dispensador: '/m/dispensador' }
-          return homes[role] || '/m/cultivador'
+          const homes = {
+            admin:       '/m/admin/salas',
+            supervisor:  '/m/admin/salas',
+            cultivador:  '/m/cultivador/salas',
+            manicura:    '/m/manicura/pendientes',
+            dispensador: '/m/dispensador/dispensar',
+            delivery:    '/m/delivery/despachos',
+          }
+          return homes[role] || '/m/cultivador/salas'
         }
       },
-      // Admin mobile
-      { path: 'admin',         component: () => import('../views/mobile/MAdminHome.vue') },
+
+      // ── Admin / Supervisor ──
+      { path: 'admin/salas',   component: () => import('../views/SalasView.vue') },
+      { path: 'admin/lotes',   component: () => import('../views/LotesView.vue') },
+      { path: 'admin/plantas', component: () => import('../views/PlantasView.vue') },
+      { path: 'admin/tareas',  component: () => import('../views/TareasView.vue') },
       { path: 'admin/aprobar', component: () => import('../views/admin/AdminStocksPendientesView.vue') },
-      { path: 'admin/alertas', component: () => import('../views/admin/AdminAprobacionesView.vue') },
-      // Cultivador mobile
-      { path: 'cultivador',        component: () => import('../views/mobile/MCultivadorHome.vue') },
-      { path: 'cultivador/salas',  component: () => import('../views/SalasView.vue') },
-      { path: 'cultivador/lotes',  component: () => import('../views/LotesView.vue') },
-      { path: 'cultivador/tareas', component: () => import('../views/TareasView.vue') },
-      // Manicura mobile
-      { path: 'manicura',              component: () => import('../views/mobile/MManicuraHome.vue') },
-      { path: 'manicura/pendientes',   component: () => import('../views/manicura/MncPendientesView.vue') },
-      { path: 'manicura/lotes',        component: () => import('../views/manicura/LotesEnCosechaView.vue') },
-      // Dispensador mobile
-      { path: 'dispensador',           component: () => import('../views/mobile/MDispensadorHome.vue') },
-      { path: 'dispensador/dispensar', component: () => import('../views/StockDispensadorView.vue') },
+
+      // ── Cultivador ──
+      { path: 'cultivador/salas',   component: () => import('../views/SalasView.vue') },
+      { path: 'cultivador/lotes',   component: () => import('../views/LotesView.vue') },
+      { path: 'cultivador/plantas', component: () => import('../views/PlantasView.vue') },
+      { path: 'cultivador/tareas',  component: () => import('../views/TareasView.vue') },
+
+      // ── Manicura ──
+      { path: 'manicura/pendientes', component: () => import('../views/manicura/MncPendientesView.vue') },
+      { path: 'manicura/cosecha',    component: () => import('../views/manicura/LotesEnCosechaView.vue') },
+      { path: 'manicura/secado',     component: () => import('../views/manicura/LotesEnSecadoView.vue') },
+      { path: 'manicura/curado',     component: () => import('../views/manicura/LotesEnCuradoView.vue') },
+
+      // ── Dispensador ──
+      { path: 'dispensador/dispensar', component: () => import('../views/DispensarView.vue') },
       { path: 'dispensador/historial', component: () => import('../views/HistorialDispensacionesView.vue') },
-      // Perfil compartido
-      { path: 'perfil', component: () => import('../views/PerfilView.vue') },
+      { path: 'dispensador/stock',     component: () => import('../views/StockDispensadorView.vue') },
+
+      // ── Delivery ──
+      { path: 'delivery/despachos', component: () => import('../views/delivery/DespachoListView.vue') },
+      { path: 'delivery/historial', component: () => import('../views/delivery/DespachoListView.vue') },
     ],
   },
 

@@ -324,8 +324,13 @@ const sinEntregadores = computed(() => conEnvio.value && entregadores.value.leng
 
 onMounted(async () => {
   try {
-    const { data } = await listEntregadores()
-    entregadores.value = data.data ?? []
+    const [entRes, pacRes] = await Promise.all([
+      listEntregadores(),
+      listPacientes({ limite: 50 }),
+    ])
+    entregadores.value = entRes.data.data ?? []
+    pacientes.value    = pacRes.data.data ?? []
+    cacheSocios(pacientes.value)
   } catch {}
 })
 
@@ -333,14 +338,19 @@ let searchTimeout = null
 
 watch(query, (val) => {
   clearTimeout(searchTimeout)
-  if (!val.trim()) { pacientes.value = []; return }
+  if (!val.trim()) {
+    // sin query → volver a mostrar lista inicial
+    searchTimeout = setTimeout(() => buscarPacientes(''), 150)
+    return
+  }
   searchTimeout = setTimeout(() => buscarPacientes(val.trim()), 300)
 })
 
 async function buscarPacientes(q) {
   loadingPacientes.value = true
   try {
-    const { data } = await listPacientes({ query: q, limite: 20 })
+    const params = q ? { query: q, limite: 20 } : { limite: 50 }
+    const { data } = await listPacientes(params)
     pacientes.value = data.data ?? []
     cacheSocios(pacientes.value)
   } catch {
