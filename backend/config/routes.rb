@@ -5,9 +5,10 @@ Rails.application.routes.draw do
   get  "/up", to: "health#show"
 
   # QR público — sin prefijo /api para que los links de QR funcionen siempre
-  get "/p/:codigo_qr", to: "public/plantas#show_qr",   defaults: { format: :json }
-  get "/s/:codigo_qr", to: "public/stocks#show_qr",    defaults: { format: :json }
-  get "/c/:token",     to: "public/carnets#show",      defaults: { format: :json }
+  get "/p/:codigo_qr",   to: "public/plantas#show_qr",   defaults: { format: :json }
+  get "/s/:codigo_qr",   to: "public/stocks#show_qr",    defaults: { format: :json }
+  get "/c/:token",       to: "public/carnets#show",      defaults: { format: :json }
+  get "/cos/:codigo_qr", to: "public/cosechas#show_qr",  defaults: { format: :json }
 
   # Web pública del club (accedida desde el sitio web externo del club)
   namespace :public, defaults: { format: :json } do

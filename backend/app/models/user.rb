@@ -39,13 +39,12 @@ class User < ApplicationRecord
 
   def salas_ids_asignadas
     if cultivador?
-      Sala.where(sede_id: sedes_ids_asignadas, club_id: club_id)
-          .where(kind: KINDS_CULTIVADOR)
-          .pluck(:id)
+      sedes = sedes_ids_asignadas
+      scope = Sala.where(club_id: club_id).where(kind: KINDS_CULTIVADOR)
+      # Sin sedes asignadas = acceso a todas las salas del club
+      sedes.empty? ? scope.pluck(:id) : scope.where(sede_id: sedes).pluck(:id)
     elsif manicura?
-      Sala.where(club_id: club_id)
-          .where(kind: KINDS_MANICURA)
-          .pluck(:id)
+      Sala.where(club_id: club_id).where(kind: KINDS_MANICURA).pluck(:id)
     else
       salas_asignadas.pluck(:id)
     end
@@ -56,7 +55,10 @@ class User < ApplicationRecord
   end
 
   def salas_ids_en_sedes_asignadas
-    Sala.where(sede_id: sedes_ids_asignadas, club_id: club_id).pluck(:id)
+    sedes = sedes_ids_asignadas
+    scope = Sala.where(club_id: club_id)
+    # Sin sedes asignadas = acceso a todas las salas del club
+    sedes.empty? ? scope.pluck(:id) : scope.where(sede_id: sedes).pluck(:id)
   end
 
   def observando_club

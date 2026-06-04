@@ -291,7 +291,7 @@ onMounted(async () => {
   }
 
   if (!auth.isAuthenticated) {
-    estado.value = 'publico'   // ← acceso público sin login
+    estado.value = 'login'
     return
   }
 

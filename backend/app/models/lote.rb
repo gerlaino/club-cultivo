@@ -36,6 +36,7 @@ class Lote < ApplicationRecord
   validates :start_date,        presence: true
 
   before_create :generar_codigo
+  before_save   :generar_qr_cosecha, if: :estado_changed_to_cosecha?
 
   default_scope { where(deleted_at: nil) }
 
@@ -441,6 +442,14 @@ class Lote < ApplicationRecord
   end
 
   private
+
+  def estado_changed_to_cosecha?
+    estado_changed? && estado == 'cosecha' && codigo_qr_cosecha.blank?
+  end
+
+  def generar_qr_cosecha
+    self.codigo_qr_cosecha = SecureRandom.urlsafe_base64(12)
+  end
 
   def generar_codigo
     return if codigo.present?

@@ -4,14 +4,13 @@ import { usePermissions } from "../composables/usePermissions";
 import { useToast }       from "../composables/useToast";
 import { usePWA }         from "../composables/usePWA";
 
-const MOBILE_ROLES = ['admin', 'supervisor', 'cultivador', 'manicura', 'dispensador', 'delivery']
+const MOBILE_ROLES = ['admin', 'supervisor', 'cultivador', 'manicura', 'delivery']
 const MOBILE_HOME  = {
-  admin:       '/m/admin/salas',
-  supervisor:  '/m/admin/salas',
-  cultivador:  '/m/cultivador/salas',
-  manicura:    '/m/manicura/pendientes',
-  dispensador: '/m/dispensador/dispensar',
-  delivery:    '/m/delivery/despachos',
+  admin:      '/m/admin/sedes',
+  supervisor: '/m/admin/sedes',
+  cultivador: '/m/cultivador/sedes',
+  manicura:   '/m/manicura/pesar',
+  delivery:   '/m/delivery/despachos',
 }
 
 const requiresPermission = (resource, action) => {
@@ -499,6 +498,12 @@ const routes = [
     meta: { fullscreen: true },
   },
   {
+    path: '/cos/:codigo_qr',
+    name: 'cosecha-qr',
+    component: () => import('../views/CosechaQrView.vue'),
+    meta: { fullscreen: true },
+  },
+  {
     path: '/stocks/:id/etiqueta',
     name: 'stock-etiqueta',
     component: () => import('../views/EtiquetaStockView.vue'),
@@ -627,44 +632,34 @@ const routes = [
       { path: '', redirect: () => {
           const role = useAuthStore().user?.role
           const homes = {
-            admin:       '/m/admin/salas',
-            supervisor:  '/m/admin/salas',
-            cultivador:  '/m/cultivador/salas',
-            manicura:    '/m/manicura/pendientes',
-            dispensador: '/m/dispensador/dispensar',
-            delivery:    '/m/delivery/despachos',
+            admin: '/m/admin/sedes', supervisor: '/m/admin/sedes',
+            cultivador: '/m/cultivador/sedes',
+            manicura: '/m/manicura/pesar',
+            delivery: '/m/delivery/despachos',
           }
-          return homes[role] || '/m/cultivador/salas'
+          return homes[role] || '/m/cultivador/sedes'
         }
       },
 
-      // ── Listas mobile (vistas simplificadas) ──
-      { path: 'admin/salas',        component: () => import('../views/mobile/MSalasView.vue') },
-      { path: 'admin/lotes',        component: () => import('../views/mobile/MLotesView.vue') },
-      { path: 'admin/tareas',       component: () => import('../views/mobile/MTareasView.vue') },
-      { path: 'admin/aprobar',      component: () => import('../views/admin/AdminStocksPendientesView.vue') },
-      { path: 'cultivador/salas',   component: () => import('../views/mobile/MSalasView.vue') },
-      { path: 'cultivador/lotes',   component: () => import('../views/mobile/MLotesView.vue') },
-      { path: 'cultivador/plantas', component: () => import('../views/mobile/MPlantasView.vue') },
-      { path: 'cultivador/tareas',  component: () => import('../views/mobile/MTareasView.vue') },
+      // ── Cultivador ──
+      { path: 'cultivador/sedes',  component: () => import('../views/mobile/MSedesView.vue') },
+      { path: 'cultivador/tareas', component: () => import('../views/mobile/MTareasView.vue') },
 
-      // ── Detalle mobile (vistas específicas para mobile) ──
-      { path: 'sala/:id',     component: () => import('../views/SalaDetailView.vue') },
-      { path: 'lote/:id',     component: () => import('../views/LoteDetailView.vue') },
-      { path: 'planta/:id',   component: () => import('../views/mobile/MPlantaDetailView.vue') },
-      { path: 'planta/nueva', component: () => import('../views/PlantaNuevaView.vue') },
+      // ── Admin / Supervisor ──
+      { path: 'admin/sedes',   component: () => import('../views/mobile/MSedesView.vue') },
+      { path: 'admin/tareas',  component: () => import('../views/mobile/MTareasView.vue') },
+      { path: 'admin/aprobar', component: () => import('../views/admin/AdminStocksPendientesView.vue') },
+
+      // ── Detalle mobile propio ──
+      { path: 'sede/:id',   component: () => import('../views/mobile/MSedeMobileDetail.vue') },
+      { path: 'sala-m/:id', component: () => import('../views/mobile/MSalaMobileDetail.vue') },
+      { path: 'lote-m/:id', component: () => import('../views/mobile/MLoteMobileDetail.vue') },
+      { path: 'planta/:id', component: () => import('../views/mobile/MPlantaDetailView.vue') },
 
       // ── Manicura ──
-      { path: 'manicura/pendientes', component: () => import('../views/manicura/MncPendientesView.vue') },
-      { path: 'manicura/cosecha',    component: () => import('../views/manicura/LotesEnCosechaView.vue') },
-      { path: 'manicura/secado',     component: () => import('../views/manicura/LotesEnSecadoView.vue') },
-      { path: 'manicura/curado',     component: () => import('../views/manicura/LotesEnCuradoView.vue') },
-      { path: 'mnc/lotes/:id',       component: () => import('../views/manicura/MncLoteDetailView.vue') },
-
-      // ── Dispensador ──
-      { path: 'dispensador/dispensar', component: () => import('../views/DispensarView.vue') },
-      { path: 'dispensador/historial', component: () => import('../views/HistorialDispensacionesView.vue') },
-      { path: 'dispensador/stock',     component: () => import('../views/StockDispensadorView.vue') },
+      { path: 'manicura/pesar',     component: () => import('../views/mobile/MCosechasPorPesarView.vue') },
+      { path: 'manicura/aprobacion',component: () => import('../views/mobile/MPendientesAprobacionView.vue') },
+      { path: 'mnc/lotes/:id',      component: () => import('../views/manicura/MncLoteDetailView.vue') },
 
       // ── Delivery ──
       { path: 'delivery/despachos', component: () => import('../views/delivery/DespachoListView.vue') },
@@ -726,6 +721,7 @@ router.beforeEach(async (to) => {
     !to.path.startsWith('/s/') &&
     !to.path.startsWith('/g/') &&
     !to.path.startsWith('/c/') &&
+    !to.path.startsWith('/cos/') &&
     !to.path.startsWith('/login')
   ) {
     // Si es una página de detalle conocida, redirigir a su equivalente /m/

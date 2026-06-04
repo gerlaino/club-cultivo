@@ -6,6 +6,7 @@ import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
 import { getRegistrosAmbientales, getLoteEventos, listSedes, deleteLote, createSala } from "../lib/api"
+import { useQRCode } from '../composables/useQRCode.js'
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
 import GraficosLote from '../components/GraficosLote.vue'
@@ -52,6 +53,15 @@ const canEdit  = computed(() =>
 )
 const canAdmin = computed(() => ['admin', 'supervisor'].includes(auth.role))
 const isCultivador = computed(() => auth.role === 'cultivador')
+
+// QR de cosecha
+const { downloadPNG } = useQRCode()
+async function descargarQRCosecha() {
+  const codigo = lote.value?.codigo_qr_cosecha
+  if (!codigo) return
+  const url = `${window.location.origin}/cos/${codigo}`
+  await downloadPNG(url, `qr-cosecha-${lote.value.codigo}.png`)
+}
 
 const deletingLote = ref(false)
 async function eliminarLote() {
@@ -300,6 +310,14 @@ onUnmounted(() => {
             <DsSpinner v-if="transicionandoRapido" :size="14" />
             <ArrowRight v-else :size="15" :stroke-width="1.75" />
             Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
+          </button>
+          <button
+            v-if="lote.codigo_qr_cosecha && ['cosecha','en_manicura','secado','manicura_pendiente'].includes(lote.estado)"
+            class="ld__btn-sm ld__btn-sm--qr"
+            @click="descargarQRCosecha"
+            title="Descargar QR de la cosecha"
+          >
+            <i class="bi bi-qr-code"></i> QR cosecha
           </button>
           <ActionsDropdown v-if="canEdit || isCultivador" :items="loteAcciones" />
         </div>

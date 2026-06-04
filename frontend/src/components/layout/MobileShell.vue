@@ -56,7 +56,7 @@ const role = computed(() => auth.user?.role || '')
 
 // Detecta si estamos en una página de detalle (muestra botón volver)
 const isDetalle = computed(() =>
-  /\/m\/(sala|lote|planta|mnc\/lotes)\//.test(route.path)
+  /\/m\/(sede|sala-m|lote-m|planta|mnc\/lotes)\//.test(route.path)
 )
 
 const clubInitials = computed(() => {
@@ -65,38 +65,27 @@ const clubInitials = computed(() => {
 })
 
 const NAV = {
+  cultivador: [
+    { to: '/m/cultivador/sedes',  icon: 'bi-building',    label: 'Sedes'  },
+    { to: '/m/cultivador/tareas', icon: 'bi-list-check',  label: 'Tareas' },
+  ],
   admin: [
-    { to: '/m/admin/salas',   icon: 'bi-grid-3x3-gap', label: 'Salas'   },
-    { to: '/m/admin/lotes',   icon: 'bi-layers',       label: 'Lotes'   },
+    { to: '/m/admin/sedes',   icon: 'bi-building',     label: 'Sedes'   },
     { to: '/m/admin/aprobar', icon: 'bi-check2-circle', label: 'Aprobar' },
     { to: '/m/admin/tareas',  icon: 'bi-list-check',   label: 'Tareas'  },
   ],
   supervisor: [
-    { to: '/m/admin/salas',   icon: 'bi-grid-3x3-gap', label: 'Salas'   },
-    { to: '/m/admin/lotes',   icon: 'bi-layers',       label: 'Lotes'   },
+    { to: '/m/admin/sedes',   icon: 'bi-building',     label: 'Sedes'   },
     { to: '/m/admin/aprobar', icon: 'bi-check2-circle', label: 'Aprobar' },
     { to: '/m/admin/tareas',  icon: 'bi-list-check',   label: 'Tareas'  },
   ],
-  cultivador: [
-    { to: '/m/cultivador/salas',  icon: 'bi-grid-3x3-gap', label: 'Salas'   },
-    { to: '/m/cultivador/lotes',  icon: 'bi-layers',       label: 'Lotes'   },
-    { to: '/m/cultivador/plantas', icon: 'bi-flower2',     label: 'Plantas' },
-    { to: '/m/cultivador/tareas', icon: 'bi-list-check',   label: 'Tareas'  },
-  ],
   manicura: [
-    { to: '/m/manicura/pendientes', icon: 'bi-hourglass-split', label: 'Pendientes' },
-    { to: '/m/manicura/cosecha',    icon: 'bi-scissors',        label: 'Cosecha'    },
-    { to: '/m/manicura/secado',     icon: 'bi-wind',            label: 'Secado'     },
-    { to: '/m/manicura/curado',     icon: 'bi-archive',         label: 'Curado'     },
-  ],
-  dispensador: [
-    { to: '/m/dispensador/dispensar', icon: 'bi-bag-heart',     label: 'Dispensar'  },
-    { to: '/m/dispensador/historial', icon: 'bi-clock-history', label: 'Historial'  },
-    { to: '/m/dispensador/stock',     icon: 'bi-box-seam',      label: 'Stock'      },
+    { to: '/m/manicura/pesar',     icon: 'bi-scissors',       label: 'Por pesar'  },
+    { to: '/m/manicura/aprobacion',icon: 'bi-hourglass-split', label: 'Aprobación' },
   ],
   delivery: [
-    { to: '/m/delivery/despachos', icon: 'bi-truck',         label: 'Despachos'  },
-    { to: '/m/delivery/historial', icon: 'bi-clock-history', label: 'Historial'  },
+    { to: '/m/delivery/despachos', icon: 'bi-truck',         label: 'Despachos' },
+    { to: '/m/delivery/historial', icon: 'bi-clock-history', label: 'Historial' },
   ],
 }
 
