@@ -73,15 +73,18 @@ const DIAS_CICLO   = { semilla:7, esqueje:7, vegetativo:45, floracion:65, cosech
 const geneticas = ref([])
 
 // ── Cámara ─────────────────────────────────────────────────
-const showCameraForm = ref(false)
-const savingCamera   = ref(false)
-const cameraError    = ref(false)
-const snapshotKey    = ref(0)
-const snapshotTs     = ref('')
-const cameraForm     = ref({ camera_stream_url: '', camera_snapshot_url: '' })
+const showCameraForm  = ref(false)
+const savingCamera    = ref(false)
+const cameraError     = ref(false)
+const snapshotKey     = ref(0)
+const snapshotTs      = ref('')
+const cameraInputUrl  = ref('')
+const cameraTestSrc   = ref('')
+const cameraTestOk    = ref(false)
+const cameraTestError = ref(false)
 
 const snapshotSrc = computed(() => {
-  const url = sala.value?.camera_snapshot_url || sala.value?.camera_stream_url
+  const url = sala.value?.camera_stream_url || sala.value?.camera_snapshot_url
   if (!url) return ''
   return url + (url.includes('?') ? '&' : '?') + '_t=' + snapshotKey.value
 })
@@ -92,14 +95,49 @@ function refreshSnapshot() {
   snapshotTs.value  = new Date().toLocaleTimeString('es-AR')
 }
 
+function normalizarUrl(input) {
+  const s = input.trim()
+  if (!s) return ''
+  return /^https?:\/\//i.test(s) ? s : 'http://' + s
+}
+
+function abrirFormCamera() {
+  cameraInputUrl.value  = sala.value?.camera_stream_url || sala.value?.camera_snapshot_url || ''
+  cameraTestSrc.value   = ''
+  cameraTestOk.value    = false
+  cameraTestError.value = false
+  showCameraForm.value  = true
+}
+
+function probarCamara() {
+  const url = normalizarUrl(cameraInputUrl.value)
+  if (!url) return
+  cameraTestOk.value    = false
+  cameraTestError.value = false
+  cameraTestSrc.value   = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now()
+}
+
 async function saveCamera() {
+  const url = normalizarUrl(cameraInputUrl.value)
   savingCamera.value = true
   try {
-    await updateSala(salaId, cameraForm.value)
+    await updateSala(salaId, { camera_stream_url: url, camera_snapshot_url: '' })
     await salas.fetchOne(salaId)
     showCameraForm.value = false
-    toast.success('Cámara configurada')
+    toast.success('Cámara guardada')
+    refreshSnapshot()
   } catch { toast.error('Error al guardar la cámara') }
+  finally { savingCamera.value = false }
+}
+
+async function eliminarCamara() {
+  savingCamera.value = true
+  try {
+    await updateSala(salaId, { camera_stream_url: '', camera_snapshot_url: '' })
+    await salas.fetchOne(salaId)
+    cameraError.value = false
+    toast.success('Cámara eliminada')
+  } catch { toast.error('Error') }
   finally { savingCamera.value = false }
 }
 
@@ -204,11 +242,7 @@ const items = computed(() => {
 })
 
 watch(() => sala.value?.camera_stream_url, (url) => {
-  if (url) {
-    cameraForm.value.camera_stream_url   = url
-    cameraForm.value.camera_snapshot_url = sala.value?.camera_snapshot_url || ''
-    refreshSnapshot()
-  }
+  if (url) refreshSnapshot()
 }, { immediate: true })
 
 const contextoAsistente = computed(() => sala.value ? {
@@ -800,32 +834,75 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__card sd__card--mt">
             <div class="sd__card-header">
               <span class="sd__card-title">📷 Cámara</span>
-              <button v-if="canEdit" class="sd__link-small" @click="showCameraForm = !showCameraForm">
+              <button v-if="canEdit && !showCameraForm" class="sd__link-small" @click="abrirFormCamera">
                 <i :class="sala.camera_stream_url ? 'bi bi-pencil' : 'bi bi-plus-lg'"></i>
-                {{ sala.camera_stream_url ? 'Editar' : 'Configurar' }}
+                {{ sala.camera_stream_url ? 'Editar' : 'Conectar cámara' }}
               </button>
             </div>
 
+            <!-- Formulario de configuración -->
             <div v-if="showCameraForm" class="sd__cam-form">
+              <p class="sd__cam-help">
+                Ingresá la dirección IP de tu cámara. La encontrás en la configuración de la cámara o en tu router.<br>
+                <strong>Ejemplo:</strong> <code>192.168.1.50</code> o <code>http://192.168.1.50/snapshot.jpg</code>
+              </p>
               <div class="sd__cam-row">
-                <label>URL de stream (MJPEG / HLS)</label>
-                <input v-model="cameraForm.camera_stream_url" type="url" placeholder="http://cam.local/stream" class="sd__cam-input" />
+                <label class="sd__cam-label">Dirección de la cámara</label>
+                <div class="sd__cam-input-wrap">
+                  <input
+                    v-model="cameraInputUrl"
+                    type="text"
+                    placeholder="192.168.1.50  o  http://192.168.1.50/video"
+                    class="sd__cam-input"
+                    @keydown.enter="probarCamara"
+                  />
+                  <button class="sd__cam-btn-probar" :disabled="!cameraInputUrl.trim()" @click="probarCamara">
+                    Probar
+                  </button>
+                </div>
               </div>
-              <div class="sd__cam-row">
-                <label>URL de snapshot (imagen estática)</label>
-                <input v-model="cameraForm.camera_snapshot_url" type="url" placeholder="http://cam.local/snapshot.jpg" class="sd__cam-input" />
+
+              <!-- Preview de prueba -->
+              <div v-if="cameraTestSrc" class="sd__cam-test">
+                <div class="sd__cam-stream">
+                  <img
+                    :src="cameraTestSrc"
+                    class="sd__cam-img"
+                    alt="Prueba de cámara"
+                    @load="cameraTestOk = true; cameraTestError = false"
+                    @error="cameraTestError = true; cameraTestOk = false"
+                  />
+                </div>
+                <div v-if="cameraTestOk" class="sd__cam-test-ok">
+                  <i class="bi bi-check-circle-fill"></i> La cámara responde correctamente
+                </div>
+                <div v-if="cameraTestError" class="sd__cam-test-err">
+                  <i class="bi bi-exclamation-triangle"></i>
+                  No se pudo conectar. Verificá que la cámara esté encendida y en la misma red.
+                </div>
               </div>
+
               <div class="sd__cam-actions">
                 <button class="sd__btn-ghost-sm" @click="showCameraForm = false">Cancelar</button>
-                <button class="sd__btn-primary-sm" :disabled="savingCamera" @click="saveCamera">
+                <button
+                  v-if="sala.camera_stream_url"
+                  class="sd__btn-ghost-sm sd__btn-ghost-sm--danger"
+                  :disabled="savingCamera"
+                  @click="eliminarCamara"
+                >Quitar cámara</button>
+                <button
+                  class="sd__btn-primary-sm"
+                  :disabled="savingCamera || !cameraInputUrl.trim()"
+                  @click="saveCamera"
+                >
                   {{ savingCamera ? 'Guardando…' : 'Guardar' }}
                 </button>
               </div>
             </div>
 
+            <!-- Vista de cámara guardada -->
             <template v-else-if="sala.camera_stream_url || sala.camera_snapshot_url">
-              <!-- Stream en vivo -->
-              <div v-if="sala.camera_stream_url" class="sd__cam-stream">
+              <div class="sd__cam-stream">
                 <img
                   :src="snapshotSrc"
                   :key="snapshotKey"
@@ -834,8 +911,7 @@ const canSeeAmbiente = computed(() =>
                   @error="cameraError = true"
                 />
                 <div v-if="cameraError" class="sd__cam-error">
-                  <span>📷 Sin señal</span>
-                  <a :href="sala.camera_stream_url" target="_blank" rel="noopener" class="sd__cam-link">Abrir stream externo</a>
+                  <span>📷 Sin señal — verificá que la cámara esté encendida</span>
                 </div>
                 <div class="sd__cam-controls">
                   <button class="sd__cam-btn" @click="refreshSnapshot" title="Actualizar imagen">
@@ -843,10 +919,6 @@ const canSeeAmbiente = computed(() =>
                   </button>
                   <span class="sd__cam-ts">{{ snapshotTs }}</span>
                 </div>
-              </div>
-              <!-- Solo snapshot -->
-              <div v-else-if="sala.camera_snapshot_url" class="sd__cam-stream">
-                <img :src="sala.camera_snapshot_url" class="sd__cam-img" alt="Snapshot sala" @error="cameraError = true" />
               </div>
             </template>
 
@@ -1520,8 +1592,6 @@ const canSeeAmbiente = computed(() =>
 /* Código readonly */
 .sd__codigo-hint { font-size: .72rem; color: #94a3b8; }
 
-/* Cámara */
-.sd__cam-form { display: flex; flex-direction: column; gap: .75rem; }
 .sd__btn-ghost-sm { background: transparent; border: 1px solid #d4e6d4; color: #60725d; padding: .4rem .8rem; border-radius: 6px; font-size: .78rem; font-weight: 500; cursor: pointer; transition: all .15s; }
 .sd__btn-ghost-sm:hover { background: #f0fdf4; color: #1b5e20; }
 
@@ -1538,8 +1608,28 @@ const canSeeAmbiente = computed(() =>
 .sd__fase-desc { font-size: .78rem; color: #94a3b8; margin: 0; }
 .sd__btn-primary-sm { background: #1b5e20; color: #fff; border: none; padding: .4rem .9rem; border-radius: 6px; font-size: .78rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .sd__btn-primary-sm:hover { background: #155016; }
-.sd__cam-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .25rem; }
-.sd__cam-stream { margin-top: .5rem; border-radius: 8px; overflow: hidden; border: 1px solid #d4e6d4; background: #000; }
+.sd__cam-form { display: flex; flex-direction: column; gap: .75rem; padding-top: .25rem; }
+.sd__cam-help { font-size: .78rem; color: #64748b; line-height: 1.5; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .6rem .8rem; margin: 0; }
+.sd__cam-help code { background: #e2e8f0; border-radius: 4px; padding: .1em .35em; font-size: .85em; }
+.sd__cam-row { display: flex; flex-direction: column; gap: .3rem; }
+.sd__cam-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
+.sd__cam-input-wrap { display: flex; gap: .4rem; }
+.sd__cam-input { flex: 1; background: #f4f8f4; border: 1.5px solid #d4e6d4; border-radius: 8px; padding: .55rem .8rem; font-size: .875rem; color: #1a1a1a; outline: none; transition: border-color .15s; font-family: monospace; }
+.sd__cam-input:focus { border-color: #1b5e20; }
+.sd__cam-btn-probar { background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; border-radius: 8px; padding: .55rem 1rem; font-size: .82rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all .15s; }
+.sd__cam-btn-probar:hover:not(:disabled) { background: #dcfce7; }
+.sd__cam-btn-probar:disabled { opacity: .4; cursor: not-allowed; }
+.sd__cam-test { display: flex; flex-direction: column; gap: .4rem; }
+.sd__cam-test-ok  { display: flex; align-items: center; gap: .4rem; font-size: .78rem; font-weight: 700; color: #16a34a; }
+.sd__cam-test-err { display: flex; align-items: center; gap: .4rem; font-size: .78rem; color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; border-radius: 7px; padding: .5rem .7rem; }
+.sd__cam-actions { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
+.sd__btn-ghost-sm--danger { color: #dc2626; border-color: #fecaca; }
+.sd__btn-ghost-sm--danger:hover { background: #fef2f2; }
+.sd__cam-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .25rem; align-items: center; }
+.sd__cam-stream { margin-top: .25rem; border-radius: 8px; overflow: hidden; border: 1px solid #d4e6d4; background: #000; }
 .sd__cam-img { width: 100%; display: block; max-height: 220px; object-fit: cover; }
+.sd__cam-error { padding: .5rem .75rem; font-size: .78rem; color: #94a3b8; text-align: center; background: #111; }
+.sd__cam-btn { background: rgba(255,255,255,.15); border: none; color: #fff; border-radius: 5px; padding: .25rem .5rem; cursor: pointer; font-size: .78rem; }
+.sd__cam-ts { font-size: .7rem; color: rgba(255,255,255,.5); }
 .sd__cam-empty { color: #94a3b8; font-size: .8rem; font-style: italic; text-align: center; padding: .5rem 0; }
 </style>

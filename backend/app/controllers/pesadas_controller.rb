@@ -68,6 +68,8 @@ class PesadasController < ApplicationController
       registrada_por: p.registrado_por&.first_name,
       registrado_at:  p.registrado_at,
       created_at:     p.created_at,
+      aprobada_at:    p.aprobada_at,
+      aprobada_por:   p.aprobada_por&.first_name,
     }
   end
 end
