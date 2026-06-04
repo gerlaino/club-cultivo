@@ -252,13 +252,18 @@ const contextoAsistente = computed(() => sala.value ? {
 } : null)
 
 // ── Cambiar estado de sala ──────────────────────────────────
-const cambiandoEstado = ref(false)
+const cambiandoEstado  = ref(false)
+const showEstadoMenu   = ref(false)
+
+function toggleEstadoMenu() { showEstadoMenu.value = !showEstadoMenu.value }
+function cerrarEstadoMenu()  { showEstadoMenu.value = false }
 const ESTADOS_SALA = [
   { value: 'activa',        label: 'Activa',          style: 'background:#dcfce7;color:#15803d' },
   { value: 'mantenimiento', label: 'En mantenimiento', style: 'background:#fef3c7;color:#b45309' },
   { value: 'cerrada',       label: 'Cerrada',          style: 'background:#f1f5f9;color:#64748b' },
 ]
 async function cambiarEstado(nuevoEstado) {
+  cerrarEstadoMenu()
   if (!sala.value || sala.value.state === nuevoEstado) return
   cambiandoEstado.value = true
   try {
@@ -648,12 +653,13 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__hero-title-row">
             <h1 class="sd__title">{{ sala.nombre }}</h1>
             <!-- Estado con dropdown para cambiar -->
-            <div class="sd__estado-wrap" v-if="canEdit">
+            <div class="sd__estado-wrap" v-if="canEdit" v-click-outside="cerrarEstadoMenu">
               <div class="sd__estado-dropdown">
-                <span class="sd__estado-pill" :style="{ background: salaEstadoStyle(sala.state).bg, color: salaEstadoStyle(sala.state).color }">
-                  {{ sala.state }} <i class="bi bi-chevron-down" style="font-size:.6rem"></i>
+                <span class="sd__estado-pill" :style="{ background: salaEstadoStyle(sala.state).bg, color: salaEstadoStyle(sala.state).color }"
+                      @click.stop="toggleEstadoMenu">
+                  {{ sala.state }} <i class="bi" :class="showEstadoMenu ? 'bi-chevron-up' : 'bi-chevron-down'" style="font-size:.6rem"></i>
                 </span>
-                <div class="sd__estado-menu">
+                <div v-if="showEstadoMenu" class="sd__estado-menu">
                   <button
                     v-for="est in ESTADOS_SALA"
                     :key="est.value"
@@ -1374,14 +1380,13 @@ const canSeeAmbiente = computed(() =>
 /* Estado dropdown */
 .sd__estado-wrap { position: relative; }
 .sd__estado-dropdown { position: relative; }
-.sd__estado-dropdown:hover .sd__estado-menu { display: flex; }
 .sd__estado-pill {
   font-size: .68rem; font-weight: 800; text-transform: uppercase;
   letter-spacing: .08em; padding: .28em .75em; border-radius: 999px;
   cursor: pointer; user-select: none; display: inline-flex; align-items: center; gap: .3rem;
 }
 .sd__estado-menu {
-  display: none; flex-direction: column; position: absolute;
+  display: flex; flex-direction: column; position: absolute;
   top: calc(100% + 4px); left: 0; z-index: 100;
   background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,.12); overflow: hidden; min-width: 160px;
