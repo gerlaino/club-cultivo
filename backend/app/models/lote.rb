@@ -36,7 +36,7 @@ class Lote < ApplicationRecord
   validates :start_date,        presence: true
 
   before_create :generar_codigo
-  before_save   :generar_qr_cosecha, if: :estado_changed_to_cosecha?
+  before_save   :generar_qr_cosecha, if: :debe_generar_qr_cosecha?
 
   default_scope { where(deleted_at: nil) }
 
@@ -443,7 +443,8 @@ class Lote < ApplicationRecord
 
   private
 
-  def estado_changed_to_cosecha?
+  def debe_generar_qr_cosecha?
+    return false unless self.class.column_names.include?('codigo_qr_cosecha')
     estado_changed? && estado == 'cosecha' && codigo_qr_cosecha.blank?
   end
 
