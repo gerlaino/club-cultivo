@@ -6,11 +6,12 @@ import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
 import { getPlantActivities, createPlantActivity, updatePlant, addPlantFoto, removePlantFoto } from '../lib/api'
-import AsistenteVoz      from '../components/AsistenteVoz.vue'
-import Breadcrumb         from '../components/ui/Breadcrumb.vue'
-import EmptyState         from '../components/ui/EmptyState.vue'
-import Lightbox           from '../components/ui/Lightbox.vue'
-import ActionsDropdown    from '../components/ui/ActionsDropdown.vue'
+import AsistenteVoz         from '../components/AsistenteVoz.vue'
+import Breadcrumb            from '../components/ui/Breadcrumb.vue'
+import EmptyState            from '../components/ui/EmptyState.vue'
+import Lightbox              from '../components/ui/Lightbox.vue'
+import ActionsDropdown       from '../components/ui/ActionsDropdown.vue'
+import RegistroPlantaModal   from '../components/plants/RegistroPlantaModal.vue'
 import { useToast }      from '../composables/useToast.js'
 import { useBluelabBLE } from '../composables/useBluelabBLE.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -398,11 +399,60 @@ const canManicura = computed(() =>
   ['secado', 'manicura_pendiente'].includes(planta.value?.lote?.estado)
 )
 
+// ── Nuevo modal registro planta ───────────────────────────
+const showRegistroPlanta = ref(false)
+
+// ── Editar planta ──────────────────────────────────────────
+const showEditarPlanta = ref(false)
+const editForm = ref({ nombre: '', state: '' })
+const savingEditar = ref(false)
+
+function abrirEditarPlanta() {
+  editForm.value = { nombre: planta.value?.nombre || '', state: planta.value?.state || '' }
+  showEditarPlanta.value = true
+}
+
+async function guardarEdicion() {
+  savingEditar.value = true
+  try {
+    await updatePlant(id, { nombre: editForm.value.nombre, state: editForm.value.state })
+    await plants.fetchOne(id)
+    showEditarPlanta.value = false
+    toast.success('Planta actualizada')
+  } catch { toast.error('Error al guardar') } finally { savingEditar.value = false }
+}
+
+// ── Descartar planta ───────────────────────────────────────
+async function descartarPlanta() {
+  const ok = await confirm({
+    title: 'Descartar planta',
+    message: `¿Seguro que querés descartar "${planta.value?.nombre}"? Quedará marcada como descartada.`,
+    confirmLabel: 'Descartar', danger: true,
+  })
+  if (!ok) return
+  try {
+    await updatePlant(id, { state: 'descartada' })
+    await plants.fetchOne(id)
+    toast.success('Planta descartada')
+  } catch { toast.error('Error al descartar') }
+}
+
+const registrosHoyPlanta = computed(() =>
+  activities.value
+    .filter(a => {
+      const d = new Date(a.created_at)
+      const hoy = new Date()
+      return d.toDateString() === hoy.toDateString()
+    })
+    .map(a => a.activity_type)
+)
+
 const plantaAcciones = computed(() => {
   const items = []
-  items.push({ emoji: '📋', label: 'Registrar planta',     onClick: abrirModal })
-  items.push({ emoji: '🌡️', label: 'Registrar EC / pH',   onClick: abrirMedicion })
-  items.push({ emoji: '⬆️', label: 'Registrar trasplante', onClick: abrirTrasplante })
+  items.push({ emoji: '📋', label: 'Registrar planta', onClick: () => { showRegistroPlanta.value = true } })
+  items.push({ emoji: '✏️', label: 'Editar planta',    onClick: abrirEditarPlanta })
+  items.push({ divider: true })
+  items.push({ emoji: '🗑️', label: 'Descartar planta', danger: true, onClick: descartarPlanta })
   return items
 })
 
