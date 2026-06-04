@@ -8,7 +8,7 @@ import { useAuthStore } from "../stores/auth"
 import { useClubStore } from "../stores/club"
 import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
 import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vue'
-import RegistrarLecturaModal  from '../components/salas/RegistrarLecturaModal.vue'
+import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
 import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
@@ -183,7 +183,7 @@ async function saveEditSala() {
 const salaAcciones = computed(() => {
   const items = []
   if (canEdit.value || isCultivador.value) {
-    items.push({ emoji: '🌡️', label: 'Registrar lectura', onClick: () => { lecturaOpen.value = true } })
+    items.push({ emoji: '🌿', label: 'Registrar sala', onClick: () => { lecturaOpen.value = true } })
   }
   if (puedeCargarLote.value) {
     const lbl = esSalaSecado.value ? 'Cargar lote de floración' : esSalaManicura.value ? 'Cargar lote de cosecha' : 'Cargar lote de secado'
@@ -1297,11 +1297,10 @@ const canSeeAmbiente = computed(() =>
       @close="showCargarLote = false"
     />
 
-    <RegistrarLecturaModal
+    <RegistroSalaModal
       v-model="lecturaOpen"
-      :sala-id="salaId"
-      :lotes="items"
-      @registrada="cargarAmbienteMini"
+      :sala="sala"
+      @saved="cargarAmbienteMini"
     />
 
     <!-- Modal Editar Sala -->
@@ -1325,8 +1324,12 @@ const canSeeAmbiente = computed(() =>
               <div class="sd__field">
                 <label class="sd__label">Tipo de sala</label>
                 <select class="sd__input" v-model="editSalaForm.kind">
-                  <option value="">Sin especificar</option>
-                  <option v-for="k in SALA_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
+                  <option v-if="!['vegetativo','floracion'].includes(sala?.kind)" value="">Sin especificar</option>
+                  <option
+                    v-for="k in (['vegetativo','floracion'].includes(sala?.kind) ? SALA_KINDS.filter(k => ['vegetativo','floracion'].includes(k.value)) : SALA_KINDS)"
+                    :key="k.value"
+                    :value="k.value"
+                  >{{ k.label }}</option>
                 </select>
               </div>
               <div class="sd__field sd__field--full">

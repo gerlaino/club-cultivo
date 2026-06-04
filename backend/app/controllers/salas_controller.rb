@@ -2,7 +2,7 @@
 class SalasController < ApplicationController
   before_action :authenticate_user!
   before_action :require_salas_role!
-  before_action :set_sala, only: [:show, :update, :destroy, :cargar_lote, :cambiar_fase]
+  before_action :set_sala, only: [:show, :update, :destroy, :cargar_lote, :cambiar_fase, :registrar_sala]
 
   TRANSICIONES_KIND = {
     'secado'   => { desde: 'floracion', hacia: 'cosecha',  label_desde: 'floración',  label_hacia: 'cosecha'  },
@@ -43,8 +43,10 @@ class SalasController < ApplicationController
   end
 
   def update
+    kind_antes = @sala.kind
     if @sala.update(sala_params)
-      render json: serialize_sala_detail(@sala)
+      cascade_kind_a_lotes(kind_antes) if kind_cambio_veg_flo?(kind_antes)
+      render json: serialize_sala_detail(@sala.reload)
     else
       render json: { errors: @sala.errors.full_messages }, status: :unprocessable_entity
     end
@@ -94,6 +96,36 @@ class SalasController < ApplicationController
     render json: { error: 'Lote no encontrado' }, status: :not_found
   rescue => e
     render json: { errors: [e.message] }, status: :unprocessable_entity
+  end
+
+  # POST /salas/:id/registrar_sala
+  # Crea un RegistroAmbiental en todos los lotes activos de la sala.
+  def registrar_sala
+    unless %w[admin supervisor cultivador].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    lotes_activos = @sala.lotes.where(estado: %w[vegetativo floracion])
+
+    if lotes_activos.empty?
+      return render json: { error: 'No hay lotes activos en esta sala' }, status: :unprocessable_entity
+    end
+
+    count = 0
+    ActiveRecord::Base.transaction do
+      lotes_activos.each do |lote|
+        registro = lote.registros_ambientales.build(sala_registro_params)
+        registro.user          = current_user
+        registro.club          = current_user.club
+        registro.registrado_en = Time.current
+        registro.save!
+        count += 1
+      end
+    end
+
+    render json: { lotes_afectados: count }, status: :created
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
   # POST /salas/:id/cambiar_fase
@@ -177,6 +209,47 @@ class SalasController < ApplicationController
     if blocked.include?(current_user&.role)
       render json: { error: 'No autorizado' }, status: :forbidden
     end
+  end
+
+  KINDS_VEG_FLO = %w[vegetativo floracion].freeze
+
+  def kind_cambio_veg_flo?(kind_antes)
+    KINDS_VEG_FLO.include?(kind_antes) && KINDS_VEG_FLO.include?(@sala.kind) && kind_antes != @sala.kind
+  end
+
+  def cascade_kind_a_lotes(kind_antes)
+    nueva_fase = @sala.kind
+    lotes = @sala.lotes.where(estado: kind_antes)
+    return if lotes.empty?
+
+    ActiveRecord::Base.transaction do
+      lotes.each do |lote|
+        lote.plants.where(state: kind_antes).update_all(state: nueva_fase)
+        lote.update!(estado: nueva_fase)
+        lote.lote_eventos.create!(
+          tipo:            'cambio_estado',
+          estado_anterior: kind_antes,
+          estado_nuevo:    nueva_fase,
+          descripcion:     "Cambio de fase por edición de sala #{@sala.nombre}: #{kind_antes} → #{nueva_fase}",
+          user:            current_user,
+          club:            current_user.club,
+          registrado_en:   Time.current,
+        )
+      end
+    end
+  end
+
+  def sala_registro_params
+    params.require(:registro_ambiental).permit(
+      :temperatura, :humedad, :co2, :ph, :ec,
+      :temperatura_sustrato, :ph_runoff, :ec_runoff, :ppfd,
+      :horas_luz, :espectro_luz, :fase_nutricional,
+      :ml_nutrientes_litro, :notas_nutricion,
+      :fertilizacion, :notas_fertilizacion,
+      :estado_general, :plagas_observadas,
+      :observaciones, :fuente,
+      tareas_realizadas: []
+    )
   end
 
   def sala_params

@@ -64,6 +64,7 @@ Rails.application.routes.draw do
       member do
         post :cargar_lote
         post :cambiar_fase
+        post :registrar_sala
       end
     end
 

@@ -65,7 +65,8 @@ export const getSala     = (id) => api.get(`/salas/${id}`);
 export const createSala      = (payload)         => api.post("/salas", { sala: payload });
 export const updateSala      = (id, payload)     => api.patch(`/salas/${id}`, { sala: payload });
 export const deleteSala      = (id)              => api.delete(`/salas/${id}`);
-export const cambiarFaseSala = (id)              => api.post(`/salas/${id}/cambiar_fase`);
+export const cambiarFaseSala  = (id)              => api.post(`/salas/${id}/cambiar_fase`);
+export const registrarSala    = (id, payload)     => api.post(`/salas/${id}/registrar_sala`, { registro_ambiental: payload });
 
 // -------- LOTES --------
 export const listLotes = (params = null) => {
