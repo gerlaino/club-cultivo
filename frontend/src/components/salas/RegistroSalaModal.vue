@@ -10,6 +10,12 @@
             <span class="rls__subtitle">{{ sala?.nombre }} · {{ fechaHoy }}</span>
           </div>
           <div class="rls__header-right">
+            <AsistenteVoz
+              v-if="voiceEnabled && contextoAsistente"
+              :contexto="contextoAsistente"
+              :mini="true"
+              @registrado="$emit('update:modelValue', false)"
+            />
             <button class="rls__close" @click="$emit('update:modelValue', false)">✕</button>
           </div>
         </div>
@@ -123,10 +129,12 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { registrarSala } from '../../lib/api.js'
-import { useToast } from '../../composables/useToast.js'
-import DsSpinner    from '../../design-system/components/Spinner.vue'
+import { useToast }      from '../../composables/useToast.js'
+import { useClubStore }  from '../../stores/club'
+import DsSpinner         from '../../design-system/components/Spinner.vue'
+import AsistenteVoz      from '../AsistenteVoz.vue'
 import RiegoForm    from '../lotes/registro/RiegoForm.vue'
 import PodaForm     from '../lotes/registro/PodaForm.vue'
 import PlagasForm   from '../lotes/registro/PlagasForm.vue'
@@ -141,6 +149,14 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'saved'])
 
 const toast = useToast()
+const club  = useClubStore()
+
+const voiceEnabled     = computed(() => club.data?.features?.ia_voz)
+const contextoAsistente = computed(() => props.sala ? {
+  tipo:        'sala',
+  sala_id:     props.sala.id,
+  sala_nombre: props.sala.nombre,
+} : null)
 
 const ACCIONES = [
   { id: 'riego',     emoji: '💧', label: 'Riego' },

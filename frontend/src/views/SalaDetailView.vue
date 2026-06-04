@@ -12,7 +12,6 @@ import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
 import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
-import AsistenteVoz from '../components/AsistenteVoz.vue'
 import { Gauge } from 'lucide-vue-next'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
@@ -244,12 +243,6 @@ const items = computed(() => {
 watch(() => sala.value?.camera_stream_url, (url) => {
   if (url) refreshSnapshot()
 }, { immediate: true })
-
-const contextoAsistente = computed(() => sala.value ? {
-  tipo:        'sala',
-  sala_id:     sala.value.id,
-  sala_nombre: sala.value.nombre,
-} : null)
 
 // ── Cambiar estado de sala ──────────────────────────────────
 const cambiandoEstado  = ref(false)
@@ -689,7 +682,6 @@ const canSeeAmbiente = computed(() =>
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
           <ActionsDropdown v-if="(canEdit || isCultivador) && salaAcciones.length" :items="salaAcciones" />
-          <AsistenteVoz v-if="club.data?.features?.ia_voz && contextoAsistente" :contexto="contextoAsistente" />
         </div>
       </div>
 

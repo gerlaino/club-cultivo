@@ -14,9 +14,9 @@
 
     <!-- Acciones -->
     <div class="msal__actions">
-      <button class="msal__btn-registrar" @click="showLectura = true">
-        <i class="bi bi-thermometer-half"></i>
-        Registrar lectura
+      <button class="msal__btn-registrar" @click="showRegistroSala = true">
+        <i class="bi bi-pencil-square"></i>
+        Registrar sala
       </button>
       <button class="msal__btn-acciones" @click="showAcciones = true">
         <i class="bi bi-three-dots-vertical"></i>
@@ -52,40 +52,11 @@
       </RouterLink>
     </div>
 
-    <!-- Sheet: Registrar lectura ambiental -->
-    <SheetBottom v-model="showLectura" title="🌡️ Lectura ambiental">
-      <div class="msal__sheet-body">
-        <div class="msal__row2">
-          <div class="msal__field">
-            <label class="msal__label">Temperatura (°C)</label>
-            <input v-model.number="lecturaForm.temperatura" type="number" step="0.1" class="msal__input" placeholder="—" />
-          </div>
-          <div class="msal__field">
-            <label class="msal__label">Humedad (%)</label>
-            <input v-model.number="lecturaForm.humedad" type="number" step="0.1" min="0" max="100" class="msal__input" placeholder="—" />
-          </div>
-        </div>
-        <div class="msal__row2">
-          <div class="msal__field">
-            <label class="msal__label">CO₂ (ppm)</label>
-            <input v-model.number="lecturaForm.co2" type="number" step="1" class="msal__input" placeholder="—" />
-          </div>
-          <div class="msal__field">
-            <label class="msal__label">VPD (kPa)</label>
-            <input v-model.number="lecturaForm.vpd" type="number" step="0.01" class="msal__input" placeholder="—" />
-          </div>
-        </div>
-        <div class="msal__field">
-          <label class="msal__label">Notas</label>
-          <textarea v-model="lecturaForm.notas" class="msal__input msal__textarea" rows="2" placeholder="Observaciones…"></textarea>
-        </div>
-        <div v-if="lecturaError" class="msal__error">{{ lecturaError }}</div>
-        <button class="msal__btn-confirmar" :disabled="savingLectura" @click="guardarLectura">
-          <i v-if="!savingLectura" class="bi bi-check2-circle"></i>
-          {{ savingLectura ? 'Guardando…' : 'Guardar lectura' }}
-        </button>
-      </div>
-    </SheetBottom>
+    <!-- Modal registro sala (reutiliza el de la web) -->
+    <RegistroSalaModal
+      v-model="showRegistroSala"
+      :sala="sala"
+    />
 
     <!-- Sheet: Más acciones -->
     <SheetBottom v-model="showAcciones" title="Acciones">
@@ -151,9 +122,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getSala, listLotes, createLecturaAmbiental, createSalaNota, createLote } from '../../lib/api'
-import { useToast } from '../../composables/useToast'
-import SheetBottom  from '../../components/cultivador/SheetBottom.vue'
+import { getSala, listLotes, createSalaNota, createLote } from '../../lib/api'
+import { useToast }       from '../../composables/useToast'
+import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
+import RegistroSalaModal  from '../../components/salas/RegistroSalaModal.vue'
 
 const route = useRoute()
 const toast = useToast()
@@ -163,21 +135,18 @@ const sala    = ref(null)
 const lotes   = ref([])
 const loading = ref(true)
 
-const showLectura    = ref(false)
-const showAcciones   = ref(false)
-const showNuevoLote  = ref(false)
-const showNota       = ref(false)
-const savingLectura  = ref(false)
-const savingLote     = ref(false)
-const savingNota     = ref(false)
-const lecturaError   = ref(null)
-const loteError      = ref(null)
-const notaError      = ref(null)
-const notaContenido  = ref('')
-const fotoInput      = ref(null)
+const showRegistroSala = ref(false)
+const showAcciones     = ref(false)
+const showNuevoLote    = ref(false)
+const showNota         = ref(false)
+const savingLote       = ref(false)
+const savingNota       = ref(false)
+const loteError        = ref(null)
+const notaError        = ref(null)
+const notaContenido    = ref('')
+const fotoInput        = ref(null)
 
-const lecturaForm = ref({ temperatura: null, humedad: null, co2: null, vpd: null, notas: '' })
-const loteForm    = ref({ codigo: '', descripcion: '' })
+const loteForm = ref({ codigo: '', descripcion: '' })
 
 const KIND_GRADIENT = {
   vegetativo: 'linear-gradient(135deg,#0f2417,#1b5e20)',
@@ -195,24 +164,6 @@ const kindEmoji    = k => KIND_EMOJI[k] || '🏠'
 const kindLabel    = k => KIND_LABEL[k] || k || '—'
 const estadoColor  = e => EC[e] || '#64748b'
 const estadoLabel  = e => EL[e] || e || '—'
-
-async function guardarLectura() {
-  savingLectura.value = true; lecturaError.value = null
-  try {
-    await createLecturaAmbiental(id, {
-      temperatura: lecturaForm.value.temperatura || undefined,
-      humedad:     lecturaForm.value.humedad     || undefined,
-      co2:         lecturaForm.value.co2         || undefined,
-      vpd:         lecturaForm.value.vpd         || undefined,
-      notas:       lecturaForm.value.notas       || undefined,
-    })
-    toast.success('Lectura registrada')
-    showLectura.value = false
-    lecturaForm.value = { temperatura: null, humedad: null, co2: null, vpd: null, notas: '' }
-  } catch (e) {
-    lecturaError.value = e?.response?.data?.error || 'Error al guardar'
-  } finally { savingLectura.value = false }
-}
 
 function abrirNuevoLote() {
   loteForm.value  = { codigo: '', descripcion: '' }
