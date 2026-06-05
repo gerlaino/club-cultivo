@@ -50,9 +50,9 @@ const sede    = ref(null)
 const salas   = ref([])
 const loading = ref(true)
 
-const KIND_COLOR = { vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', manicura:'#d97706' }
-const KIND_EMOJI = { vegetativo:'🍃', floracion:'🌸', cosecha:'🌾', manicura:'✂️' }
-const KIND_LABEL = { vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', manicura:'Manicura' }
+const KIND_COLOR = { vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', cosechado:'#dc2626', manicura:'#d97706', secado:'#b45309', curado:'#2563eb', madre:'#0891b2', mixta:'#6b7280' }
+const KIND_EMOJI = { vegetativo:'🍃', floracion:'🌸', cosecha:'🌾', cosechado:'🌾', manicura:'✂️', secado:'🍂', curado:'💊', madre:'🌱', mixta:'🏠' }
+const KIND_LABEL = { vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', cosechado:'Cosecha', manicura:'Manicura', secado:'Secado', curado:'Curado', madre:'Madres', mixta:'Mixta' }
 const kindColor = k => KIND_COLOR[k] || '#64748b'
 const kindEmoji = k => KIND_EMOJI[k] || '🏠'
 const kindLabel = k => KIND_LABEL[k] || k || '—'

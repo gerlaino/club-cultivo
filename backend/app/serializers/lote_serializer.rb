@@ -123,17 +123,19 @@ class LoteSerializer
         when 'cosecha'    then salas_base.where('tipo = ? OR kind = ?', 'cosecha', 'cosecha')
         when 'vegetativo' then salas_base.where('tipo = ? OR kind = ?', 'vegetativo', 'vegetativo')
         when 'floracion'  then salas_base.where('tipo = ? OR kind = ?', 'floracion',  'floracion')
-        when 'secado'     then salas_base.where('tipo = ? OR kind = ?', 'secado',     'secado')
+        when 'secado'     then salas_base.where('tipo = ? OR kind IN (?)', 'secado', %w[secado manicura])
         when 'curado'     then salas_base.where('tipo = ?', 'curado')
         else salas_base
       end
       result[:salas_destino] = salas_base
-                                    .includes(:responsable)
+                                    .includes(:responsable, :sede)
                                     .order(:nombre)
                                     .map { |s| {
                                       id:                 s.id,
                                       nombre:             s.nombre,
                                       kind:               s.kind,
+                                      sede_id:            s.sede_id,
+                                      sede:               s.sede ? { id: s.sede_id, nombre: s.sede.nombre } : nil,
                                       actual:             s.id == lote.sala_id,
                                       responsable_id:     s.responsable_id,
                                       responsable_nombre: s.responsable&.nombre_completo,

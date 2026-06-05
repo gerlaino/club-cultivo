@@ -181,10 +181,15 @@ const KIND_GRADIENT = {
   vegetativo: 'linear-gradient(135deg,#0f2417,#1b5e20)',
   floracion:  'linear-gradient(135deg,#1c1028,#4a1d96)',
   cosecha:    'linear-gradient(135deg,#1c0000,#7f1d1d)',
+  cosechado:  'linear-gradient(135deg,#1c0000,#7f1d1d)',
   manicura:   'linear-gradient(135deg,#1c1500,#78350f)',
+  secado:     'linear-gradient(135deg,#1c1000,#92400e)',
+  curado:     'linear-gradient(135deg,#0c1a33,#1e3a8a)',
+  madre:      'linear-gradient(135deg,#042f2e,#0f766e)',
+  mixta:      'linear-gradient(135deg,#1e293b,#334155)',
 }
-const KIND_EMOJI = { vegetativo:'🍃', floracion:'🌸', cosecha:'🌾', manicura:'✂️' }
-const KIND_LABEL = { vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', manicura:'Manicura' }
+const KIND_EMOJI = { vegetativo:'🍃', floracion:'🌸', cosecha:'🌾', cosechado:'🌾', manicura:'✂️', secado:'🍂', curado:'💊', madre:'🌱', mixta:'🏠' }
+const KIND_LABEL = { vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', cosechado:'Cosecha', manicura:'Manicura', secado:'Secado', curado:'Curado', madre:'Madres', mixta:'Mixta' }
 const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', secado:'#d97706', curado:'#2563eb' }
 const EL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', secado:'Secado', curado:'Curado' }
 

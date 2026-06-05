@@ -17,33 +17,15 @@
         <div class="imm__body">
           <div v-if="error" class="imm__alert">{{ error }}</div>
 
-          <!-- Sala destino -->
-          <div class="imm__field">
-            <label class="imm__label">
-              Sala de manicura
-              <span class="imm__optional">recomendado</span>
-            </label>
-            <select v-model="form.sala_id" class="imm__select" @change="onSalaChange">
-              <option :value="null">— Sin cambio de sala —</option>
-              <option v-for="s in salasManicura" :key="s.id" :value="s.id">
-                {{ s.nombre }}{{ s.responsable_nombre ? ` · ${s.responsable_nombre}` : '' }}
-              </option>
-            </select>
-            <div v-if="!crearSalaOpen" class="imm__crear-link">
-              <button type="button" class="imm__link-btn" @click="crearSalaOpen = true; crearSalaNombre = ''">
-                <i class="bi bi-plus-circle"></i> Crear sala de manicura
-              </button>
-            </div>
-            <div v-else class="imm__crear-form">
-              <input v-model.trim="crearSalaNombre" type="text" class="imm__input" placeholder="Nombre de la sala"
-                @keydown.enter="crearSalaInline" @keydown.esc="crearSalaOpen = false" autofocus />
-              <div class="imm__crear-btns">
-                <button class="imm__btn-primary" :disabled="crearSalaLoading || !crearSalaNombre.trim()" @click="crearSalaInline">
-                  <DsSpinner v-if="crearSalaLoading" :size="12" /><template v-else><i class="bi bi-check-lg"></i></template> Crear
-                </button>
-                <button class="imm__btn-ghost" @click="crearSalaOpen = false">Cancelar</button>
-              </div>
-            </div>
+          <!-- Info sala destino -->
+          <div class="imm__sala-info">
+            <Scissors :size="13" :stroke-width="2" />
+            <span v-if="salaManiucuraExistente">
+              Se usará <strong>{{ salaManiucuraExistente.nombre }}</strong>
+            </span>
+            <span v-else>
+              Se creará una sala de manicura en <strong>{{ lote?.sala?.sede?.nombre || 'la sede actual' }}</strong>
+            </span>
           </div>
 
           <!-- Responsable -->
@@ -121,51 +103,30 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
-  modelValue:    { type: Boolean, required: true },
-  lote:          { type: Object,  default: null },
-  salasDestino:  { type: Array,   default: () => [] },
+  modelValue:   { type: Boolean, required: true },
+  lote:         { type: Object,  default: null },
+  salasDestino: { type: Array,   default: () => [] },
 })
 const emit = defineEmits(['update:modelValue', 'avanzado', 'sala-creada'])
 
 const toast = useToast()
-const form = ref({ sala_id: null, responsable_id: null, peso_humedo_g: null, notas: '' })
-const error         = ref(null)
-const saving        = ref(false)
-const usuarios      = ref([])
+const form  = ref({ responsable_id: null, peso_humedo_g: null, notas: '' })
+const error          = ref(null)
+const saving         = ref(false)
+const usuarios       = ref([])
 const loadingUsuarios = ref(false)
 
-// Crear sala inline
-const crearSalaOpen    = ref(false)
-const crearSalaNombre  = ref('')
-const crearSalaLoading = ref(false)
-const salasLocales     = ref([]) // salas creadas en esta sesión
-
-const salasManicuraConLocales = computed(() => [
-  ...props.salasDestino.filter(s => ['manicura', 'secado'].includes(s.kind)),
-  ...salasLocales.value,
-])
-
-async function crearSalaInline() {
-  const nombre = crearSalaNombre.value.trim()
-  if (!nombre) return
-  crearSalaLoading.value = true
-  try {
-    const { data } = await createSala({ nombre, kind: 'manicura' })
-    salasLocales.value.push(data)
-    form.value.sala_id = data.id
-    crearSalaOpen.value   = false
-    crearSalaNombre.value = ''
-    emit('sala-creada', data)
-    toast.success(`Sala "${nombre}" creada`)
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'Error al crear la sala')
-  } finally { crearSalaLoading.value = false }
-}
+// Sala de manicura ya existente en la misma sede del lote
+const salaManiucuraExistente = computed(() => {
+  const sedeId = props.lote?.sala?.sede?.id
+  if (!sedeId) return props.salasDestino.find(s => s.kind === 'manicura') || null
+  return props.salasDestino.find(
+    s => s.kind === 'manicura' && (s.sede_id === sedeId || s.sede?.id === sedeId)
+  ) || null
+})
 
 const ROLE_LABELS = { manicura: 'Manicura', admin: 'Admin', supervisor: 'Supervisor' }
 const roleLabel = (r) => ROLE_LABELS[r] || r
-
-const salasManicura = salasManicuraConLocales
 
 watch(() => props.modelValue, async (visible) => {
   if (!visible) return
@@ -174,7 +135,7 @@ watch(() => props.modelValue, async (visible) => {
 })
 
 function resetForm() {
-  form.value = { sala_id: null, responsable_id: null, peso_humedo_g: null, notas: '' }
+  form.value = { responsable_id: null, peso_humedo_g: null, notas: '' }
   error.value = null
 }
 
@@ -191,11 +152,18 @@ async function cargarUsuarios() {
   }
 }
 
-function onSalaChange() {
-  const sala = props.salasDestino.find(s => s.id === form.value.sala_id)
-  if (sala?.responsable_id) {
-    form.value.responsable_id = sala.responsable_id
-  }
+async function resolverSalaManicura() {
+  if (salaManiucuraExistente.value) return salaManiucuraExistente.value.id
+
+  const sedeId    = props.lote?.sala?.sede?.id || null
+  const sedeNombre = props.lote?.sala?.sede?.nombre || 'Sede'
+  const { data: nuevaSala } = await createSala({
+    nombre:  `Manicura · ${sedeNombre}`,
+    kind:    'manicura',
+    sede_id: sedeId,
+  })
+  emit('sala-creada', nuevaSala)
+  return nuevaSala.id
 }
 
 async function confirmar() {
@@ -203,20 +171,20 @@ async function confirmar() {
   saving.value = true
   error.value  = null
   try {
+    const sala_id = await resolverSalaManicura()
+
     let data
     if (form.value.responsable_id) {
-      // Con responsable → en_manicura
       const res = await asignarManicurador(props.lote.id, form.value.responsable_id, {
-        sala_id:       form.value.sala_id   || undefined,
+        sala_id,
         peso_humedo_g: form.value.peso_humedo_g || undefined,
         notas:         form.value.notas        || undefined,
       })
       data = res.data
     } else {
-      // Sin responsable → secado (libre)
       const res = await transicionarLote(props.lote.id, {
         nueva_fase: 'secado',
-        sala_id:    form.value.sala_id || undefined,
+        sala_id,
         pesada: {
           peso_humedo_g: form.value.peso_humedo_g || undefined,
           notas:         form.value.notas        || undefined,
@@ -251,7 +219,7 @@ function cerrar() {
   background: var(--c-paper);
   border-radius: var(--r-2xl);
   box-shadow: 0 24px 64px rgba(0,0,0,.18);
-  width: 100%; max-width: 480px;
+  width: 100%; max-width: 460px;
   display: flex; flex-direction: column;
   overflow: hidden;
 }
@@ -266,8 +234,7 @@ function cerrar() {
 .imm__icon-wrap {
   width: 36px; height: 36px; border-radius: var(--r-lg);
   background: #f0ebff; color: #7c3aed;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .imm__title { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); }
 .imm__sub   { font-size: var(--fs-12); color: var(--c-ink-400); font-family: var(--font-mono); }
@@ -288,6 +255,13 @@ function cerrar() {
   font-size: var(--fs-13); border: 1px solid #fecaca;
 }
 
+/* Info sala */
+.imm__sala-info {
+  display: flex; align-items: center; gap: .5rem;
+  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--r-md);
+  padding: .6rem .875rem; font-size: var(--fs-13); color: #15803d;
+}
+
 .imm__field { display: flex; flex-direction: column; gap: .35rem; }
 .imm__label {
   font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700);
@@ -300,17 +274,12 @@ function cerrar() {
 
 .imm__select,
 .imm__input {
-  width: 100%;
-  padding: .5rem .75rem;
-  border: 1.5px solid var(--c-ink-200);
-  border-radius: var(--r-md);
-  background: var(--c-paper);
-  font-size: var(--fs-14); color: var(--c-ink-900);
-  outline: none; transition: border-color var(--t-fast);
-  box-sizing: border-box;
+  width: 100%; padding: .5rem .75rem;
+  border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md);
+  background: var(--c-paper); font-size: var(--fs-14); color: var(--c-ink-900);
+  outline: none; transition: border-color var(--t-fast); box-sizing: border-box;
 }
-.imm__select:focus,
-.imm__input:focus  { border-color: #7c3aed; }
+.imm__select:focus, .imm__input:focus { border-color: #7c3aed; }
 .imm__select:disabled { opacity: .6; cursor: not-allowed; }
 
 .imm__input-row { display: flex; align-items: center; gap: .5rem; }
@@ -319,23 +288,9 @@ function cerrar() {
 
 .imm__textarea { resize: vertical; min-height: 60px; }
 
-.imm__hint {
-  font-size: var(--fs-12); line-height: 1.45;
-  margin: 0;
-}
+.imm__hint { font-size: var(--fs-12); line-height: 1.45; margin: 0; }
 .imm__hint--muted { color: var(--c-ink-400); }
 .imm__hint--info  { color: #6d28d9; }
-
-/* Crear sala inline */
-.imm__crear-link { margin-top: .4rem; }
-.imm__link-btn { background: none; border: none; color: #15803d; font-size: .78rem; font-weight: 600; cursor: pointer; padding: 0; display: inline-flex; align-items: center; gap: .3rem; }
-.imm__link-btn:hover { color: #14532d; text-decoration: underline; }
-.imm__crear-form { margin-top: .5rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 8px; padding: .6rem .75rem; display: flex; flex-direction: column; gap: .4rem; }
-.imm__crear-btns { display: flex; gap: .4rem; }
-.imm__btn-primary { display: inline-flex; align-items: center; gap: .35rem; background: #15803d; color: #fff; border: none; padding: .4rem .8rem; border-radius: 7px; font-size: .78rem; font-weight: 600; cursor: pointer; }
-.imm__btn-primary:disabled { opacity: .45; cursor: not-allowed; }
-.imm__input { padding: .45rem .65rem; border: 1.5px solid #d1fae5; border-radius: 7px; font-size: .875rem; width: 100%; box-sizing: border-box; outline: none; }
-.imm__input:focus { border-color: #15803d; }
 
 /* Footer */
 .imm__footer {
@@ -361,5 +316,4 @@ function cerrar() {
 }
 .imm__btn-primary:hover:not(:disabled) { opacity: .88; }
 .imm__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-
 </style>
