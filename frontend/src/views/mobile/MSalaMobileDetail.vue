@@ -245,10 +245,11 @@ async function guardarNota() {
 
 onMounted(async () => {
   try {
-    const [salaRes, lotesRes, geneticasRes] = await Promise.all([getSala(id), listLotes(), listGeneticas()])
-    sala.value     = salaRes.data
-    lotes.value    = (lotesRes.data || []).filter(l => l.sala_id === id && l.estado !== 'finalizado')
-    geneticas.value = geneticasRes.data || []
+    const [salaRes, lotesRes, geneticasRes] = await Promise.allSettled([getSala(id), listLotes(id), listGeneticas()])
+    if (salaRes.status === 'fulfilled') sala.value = salaRes.value.data
+    if (lotesRes.status === 'fulfilled')
+      lotes.value = (lotesRes.value.data || []).filter(l => l.estado !== 'finalizado')
+    if (geneticasRes.status === 'fulfilled') geneticas.value = geneticasRes.value.data || []
   } catch {} finally { loading.value = false }
 })
 </script>

@@ -69,12 +69,12 @@ class LoteSerializer
       plants_count_cosechadas: lote.plants_count_cosechadas,
       manicurador_id: lote.manicurador_id,
       manicurador:    lote.manicurador ? { id: lote.manicurador.id, nombre: lote.manicurador.first_name || lote.manicurador.email } : nil,
-      sala: {
+      sala: lote.sala ? {
         id:     lote.sala.id,
         nombre: lote.sala.nombre,
         tipo:   lote.sala.tipo,
         sede:   lote.sala.sede ? { id: lote.sala.sede_id, nombre: lote.sala.sede.nombre } : nil,
-      },
+      } : nil,
       created_at: lote.created_at,
       updated_at: lote.updated_at,
     }

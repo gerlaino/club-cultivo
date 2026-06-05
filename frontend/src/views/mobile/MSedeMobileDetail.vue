@@ -59,10 +59,10 @@ const kindLabel = k => KIND_LABEL[k] || k || '—'
 
 onMounted(async () => {
   try {
-    const [sedeRes, salasRes] = await Promise.all([getSede(id), listSalas()])
-    sede.value  = sedeRes.data
-    // Filtrar salas de esta sede
-    salas.value = (salasRes.data || []).filter(s => s.sede_id === id || s.sede?.id === id)
+    const [sedeRes, salasRes] = await Promise.allSettled([getSede(id), listSalas()])
+    if (sedeRes.status === 'fulfilled') sede.value = sedeRes.value.data
+    if (salasRes.status === 'fulfilled')
+      salas.value = (salasRes.value.data || []).filter(s => s.sede_id === id || s.sede?.id === id)
   } catch {} finally { loading.value = false }
 })
 </script>
