@@ -409,6 +409,18 @@ const routes = [
     },
   },
 
+  {
+    path: '/admin/pesajes-manicura',
+    name: 'admin-pesajes-manicura',
+    component: () => import('../views/admin/AdminPesajesManicuraView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'supervisor'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+  },
+
   // Manicura role routes
   {
     path: '/mnc',
@@ -447,6 +459,17 @@ const routes = [
     path: '/mnc/lotes/:id',
     name: 'mnc-lote-detail',
     component: () => import('../views/manicura/MncLoteDetailView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'manicura'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+  },
+  {
+    path: '/mnc/pesajes',
+    name: 'mnc-pesajes',
+    component: () => import('../views/manicura/MncPesajesView.vue'),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
@@ -658,6 +681,7 @@ const routes = [
 
       // ── Manicura ──
       { path: 'manicura/pesar',     component: () => import('../views/mobile/MCosechasPorPesarView.vue') },
+      { path: 'manicura/pesajes',   component: () => import('../views/manicura/MncPesajesView.vue') },
       { path: 'manicura/aprobacion',component: () => import('../views/mobile/MPendientesAprobacionView.vue') },
       { path: 'mnc/lotes/:id',      component: () => import('../views/manicura/MncLoteDetailView.vue') },
 

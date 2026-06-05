@@ -130,48 +130,65 @@ class PlantsController < ApplicationController
                  (current_user.manicura? && lote.manicurador_id.nil?)
     return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless authorized
 
+    pesaje_manicura_id = params[:pesaje_manicura_id]
+
     ActiveRecord::Base.transaction do
       plant_attrs = { peso_seco: peso_seco }
       plant_attrs[:peso_humedo] = peso_humedo if peso_humedo&.positive?
       @plant.update!(plant_attrs)
 
-      pesada = lote.pesadas.find_or_initialize_by(
-        borrador:     true,
-        fase_origen:  lote.estado,
-        fase_destino: 'finalizado',
-        manicurado:   true,
-      )
-      unless pesada.persisted?
-        pesada.registrado_por = current_user
-        pesada.registrado_at  = Time.current
-        pesada.save!
-      end
+      if pesaje_manicura_id.present?
+        # New flow: register against a PesajeManicura
+        pesaje = lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id)
+                                       .find(pesaje_manicura_id)
 
-      pp = pesada.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
-      pp.peso_seco_g   = peso_seco
-      pp.peso_humedo_g = peso_humedo if peso_humedo&.positive?
-      pp.save!
+        pp = pesaje.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
+        pp.pesaje_manicura = pesaje
+        pp.pesada          = nil
+        pp.peso_seco_g     = peso_seco
+        pp.peso_humedo_g   = peso_humedo if peso_humedo&.positive?
+        pp.save!
 
-      total_peso = pesada.pesadas_plantas.sum(:peso_seco_g)
-      count      = pesada.pesadas_plantas.count
-      pesada.update!(peso_seco_g: total_peso, plantas_manicuradas: count)
+        total_peso = pesaje.pesadas_plantas.sum(:peso_seco_g)
+        count      = pesaje.pesadas_plantas.count
 
-      total_plantas = lote.plants.count
-      render json: {
-        planta: {
-          id:          @plant.id,
-          nombre:      @plant.nombre,
-          codigo_qr:   @plant.codigo_qr,
-          peso_seco:   @plant.peso_seco.to_f,
-          peso_humedo: @plant.peso_humedo&.to_f,
-        },
-        progreso: {
-          pesadas:       count,
-          total:         total_plantas,
-          peso_total_g:  total_peso.to_f,
-          completado:    count >= total_plantas,
+        render json: {
+          planta:    { id: @plant.id, nombre: @plant.nombre, codigo_qr: @plant.codigo_qr,
+                       peso_seco: @plant.peso_seco.to_f, peso_humedo: @plant.peso_humedo&.to_f },
+          pesaje:    { id: pesaje.id, peso_total_g: total_peso.to_f, plantas_count: count },
+          progreso:  { pesadas: count, total: lote.plants.count,
+                       peso_total_g: total_peso.to_f, completado: count >= lote.plants.count },
         }
-      }
+      else
+        # Legacy flow: group under a borrador Pesada
+        pesada = lote.pesadas.find_or_initialize_by(
+          borrador:     true,
+          fase_origen:  lote.estado,
+          fase_destino: 'finalizado',
+          manicurado:   true,
+        )
+        unless pesada.persisted?
+          pesada.registrado_por = current_user
+          pesada.registrado_at  = Time.current
+          pesada.save!
+        end
+
+        pp = pesada.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
+        pp.peso_seco_g   = peso_seco
+        pp.peso_humedo_g = peso_humedo if peso_humedo&.positive?
+        pp.save!
+
+        total_peso = pesada.pesadas_plantas.sum(:peso_seco_g)
+        count      = pesada.pesadas_plantas.count
+        pesada.update!(peso_seco_g: total_peso, plantas_manicuradas: count)
+
+        render json: {
+          planta:   { id: @plant.id, nombre: @plant.nombre, codigo_qr: @plant.codigo_qr,
+                      peso_seco: @plant.peso_seco.to_f, peso_humedo: @plant.peso_humedo&.to_f },
+          progreso: { pesadas: count, total: lote.plants.count,
+                      peso_total_g: total_peso.to_f, completado: count >= lote.plants.count },
+        }
+      end
     end
   end
 

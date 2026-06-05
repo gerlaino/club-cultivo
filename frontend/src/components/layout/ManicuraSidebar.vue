@@ -42,7 +42,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import DsAvatar from '../../design-system/components/Avatar.vue'
-import { Scissors, Clock, LogOut } from 'lucide-vue-next'
+import { Scissors, Clock, Scale, LogOut } from 'lucide-vue-next'
 
 const route  = useRoute()
 const router = useRouter()
@@ -51,6 +51,7 @@ const club   = useClubStore()
 
 const NAV_LINKS = [
   { to: '/mnc/pendientes', icon: Scissors, label: 'Pendientes' },
+  { to: '/mnc/pesajes',    icon: Scale,    label: 'Mis pesajes' },
   { to: '/mnc/espera',     icon: Clock,    label: 'En espera' },
 ]
 

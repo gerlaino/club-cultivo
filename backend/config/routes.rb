@@ -79,6 +79,12 @@ Rails.application.routes.draw do
       resources :fotos, only: [:index, :create, :destroy], controller: 'fotos_lote'
       resources :notas, only: [:index, :create]
       resources :pesadas, only: [:index, :create, :destroy]
+      resources :pesajes_manicura, only: [:index, :show, :create] do
+        member do
+          post :enviar
+          post :confirmar
+        end
+      end
       member do
         post  :transiciones
         post  :cerrar_curado
@@ -93,6 +99,8 @@ Rails.application.routes.draw do
         get   :timeline
       end
     end
+
+    get '/pesajes_manicura', to: 'pesajes_manicura#index_admin'
 
     resources :stocks, only: [:index, :show, :create, :update] do
       member do

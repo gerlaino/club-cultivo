@@ -116,10 +116,14 @@
                 v-model.number="pesoAprobacion"
                 type="number" min="0.1" step="0.1"
                 class="maa__input"
-                placeholder="0.0"
+                :class="{ 'maa__input--warn': !pesoAprobacion || pesoAprobacion <= 0 }"
+                placeholder="Ingresá el peso en gramos"
               />
-              <span v-if="loteActivo?.ultima_pesada_manicura" class="maa__hint">
-                Registrado por manicura: {{ loteActivo.ultima_pesada_manicura.peso_seco_g }}g
+              <span v-if="loteActivo?.ultima_pesada_manicura?.peso_seco_g" class="maa__hint">
+                Pre-completado desde pesada de manicura
+              </span>
+              <span v-else-if="!pesoAprobacion || pesoAprobacion <= 0" class="maa__hint maa__hint--warn">
+                ⚠️ La pesada no tiene peso registrado — ingresalo para poder aprobar
               </span>
             </div>
             <div v-if="loteActivo?.manicurador_id" class="maa__field">
@@ -384,6 +388,8 @@ onMounted(cargar)
 }
 .maa__textarea:focus { border-color: #dc2626; background: #fff; }
 .maa__hint { font-size: .7rem; color: #94a3b8; }
+.maa__hint--warn { color: #b45309; }
+.maa__input--warn { border-color: #f59e0b; background: #fffbeb; }
 
 .maa__error {
   background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;

@@ -62,7 +62,7 @@ import {
   Sprout, FileCheck, FileText, UserCog, Globe,
   ShieldCheck, Truck, TrendingUp, History,
   GitBranch, Layers, ChevronDown, Dna, Archive, Leaf, Boxes, Scissors,
-  ClipboardList, Package, Settings, ClipboardCheck,
+  ClipboardList, Package, Settings, ClipboardCheck, Scale,
 } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
 
@@ -104,9 +104,10 @@ const GRUPOS = [
     icon: Package,
     defaultOpen: true,
     items: [
-      { to: '/admin/stock',        icon: Boxes,          label: 'Stock' },
-      { to: '/admin/cosechado',    icon: Scissors,       label: 'Post-cosecha' },
-      { to: '/aprobaciones',       icon: ClipboardCheck, label: 'Aprobaciones', badge: aprobacionesPendientes },
+      { to: '/admin/stock',                 icon: Boxes,          label: 'Stock' },
+      { to: '/admin/cosechado',             icon: Scissors,       label: 'Post-cosecha' },
+      { to: '/aprobaciones',                icon: ClipboardCheck, label: 'Aprobaciones', badge: aprobacionesPendientes },
+      { to: '/admin/pesajes-manicura',      icon: Scale,          label: 'Pesajes manicura' },
       { to: '/delivery/despachos', icon: Truck,          label: 'Despachos' },
       { to: '/contabilidad',       icon: Wallet,         label: 'Contabilidad' },
     ],

@@ -11,6 +11,7 @@ class Lote < ApplicationRecord
   has_many :lote_eventos,          dependent: :destroy
   has_many :pesadas,               -> { order(registrado_at: :asc) }, dependent: :destroy
   has_many :stocks,                dependent: :nullify
+  has_many :pesajes_manicura,      dependent: :destroy
   has_many_attached :fotos
   has_many :notas,      as: :noteable,              dependent: :destroy
   has_many :analisis_ia, class_name: 'AnalisisIa', dependent: :destroy
@@ -258,7 +259,9 @@ class Lote < ApplicationRecord
     ultima_pesada ||= pesadas.where(manicurado: true).reorder(id: :desc).first
     raise "No hay pesada de manicura para aprobar" unless ultima_pesada
 
-    peso = peso_seco_g.present? ? peso_seco_g.to_d : ultima_pesada.peso_seco_g.to_d
+    peso_base = ultima_pesada.peso_seco_g.to_d
+    peso_base = ultima_pesada.pesadas_plantas.sum(:peso_seco_g).to_d if peso_base == 0
+    peso = peso_seco_g.present? ? peso_seco_g.to_d : peso_base
     raise ArgumentError, "El peso debe ser mayor a 0" unless peso > 0
 
     sede = sede_id.present? ? club.sedes.where(tipo: %w[social mixta]).find(sede_id) : nil
@@ -443,6 +446,51 @@ class Lote < ApplicationRecord
       update!(estado: 'finalizado', sala_id: nil)
       stock
     end
+  end
+
+  # Llamado tras cada confirmación de PesajeManicura.
+  # Finaliza el lote automáticamente cuando todas las plantas del lote
+  # tienen registro en pesajes confirmados.
+  def check_and_finalize_manicura!(finalizador: nil)
+    return unless estado == 'en_manicura'
+
+    total_plantas = plants.count
+    return if total_plantas == 0
+
+    plantas_confirmadas = PesadaPlanta
+      .joins(:pesaje_manicura)
+      .where(pesajes_manicura: { lote_id: id, estado: 'confirmado' })
+      .select(:plant_id)
+      .distinct
+      .count
+
+    # Batch registrations without individual plant records
+    batch_count = pesajes_manicura
+      .where(estado: 'confirmado')
+      .where.not(plantas_count: nil)
+      .sum(:plantas_count) - plantas_confirmadas
+
+    total_procesadas = plantas_confirmadas + [batch_count, 0].max
+    return unless total_procesadas >= total_plantas
+
+    peso_total = pesajes_manicura.where(estado: 'confirmado').sum(:peso_confirmado_g).to_d
+
+    update!(
+      estado:             'finalizado',
+      rendimiento_real_g: peso_total,
+      manicurador:        nil,
+      sala_id:            nil,
+    )
+
+    lote_eventos.create!(
+      tipo:            'cambio_estado',
+      estado_anterior: 'en_manicura',
+      estado_nuevo:    'finalizado',
+      descripcion:     "Manicura completada — #{total_plantas} plantas · #{peso_total.round(1)}g acumulados en #{pesajes_manicura.confirmados.count} pesajes",
+      user:            finalizador,
+      club:            club,
+      registrado_en:   Time.current,
+    )
   end
 
   private

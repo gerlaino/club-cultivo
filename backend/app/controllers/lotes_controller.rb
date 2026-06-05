@@ -432,7 +432,14 @@ class LotesController < ApplicationController
       pesada = @lote.pesadas.find_by(borrador: true, manicurado: true)
 
       if pesada
-        pesada.update!(borrador: false)
+        # QR flow: peso_seco_g is stored in pesadas_plantas, aggregate it
+        total_qr = pesada.pesadas_plantas.sum(:peso_seco_g).to_d
+        count_qr = pesada.pesadas_plantas.count
+        pesada.update!(
+          borrador:            false,
+          peso_seco_g:         total_qr > 0 ? total_qr : pesada.peso_seco_g,
+          plantas_manicuradas: count_qr  > 0 ? count_qr  : pesada.plantas_manicuradas,
+        )
       else
         # Batch flow: compute totals from per-plant peso_seco
         plantas_pesadas  = @lote.plants.where('peso_seco > 0')

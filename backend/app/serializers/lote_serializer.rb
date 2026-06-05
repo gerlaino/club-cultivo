@@ -82,14 +82,22 @@ class LoteSerializer
     pm = lote.pesadas.loaded? \
       ? lote.pesadas.select(&:manicurado).max_by { |p| p.registrado_at } \
       : lote.pesadas.where(manicurado: true).order(registrado_at: :desc).first
-    result[:ultima_pesada_manicura] = pm ? {
-      peso_seco_g:         pm.peso_seco_g&.to_f,
-      plantas_manicuradas: pm.plantas_manicuradas,
-      notas:               pm.notas,
-      registrado_at:       pm.registrado_at,
-      registrado_por:      pm.registrado_por&.first_name,
-      aprobada_at:         pm.aprobada_at,
-    } : nil
+    if pm
+      # QR flow may leave peso_seco_g nil — fall back to sum of pesadas_plantas
+      pm_peso = pm.peso_seco_g&.to_f
+      pm_peso = pm.pesadas_plantas.sum(:peso_seco_g).to_f.round(2) if pm_peso.nil? || pm_peso == 0
+      pm_peso = nil if pm_peso == 0.0
+      result[:ultima_pesada_manicura] = {
+        peso_seco_g:         pm_peso,
+        plantas_manicuradas: pm.plantas_manicuradas || pm.pesadas_plantas.count,
+        notas:               pm.notas,
+        registrado_at:       pm.registrado_at,
+        registrado_por:      pm.registrado_por&.first_name,
+        aprobada_at:         pm.aprobada_at,
+      }
+    else
+      result[:ultima_pesada_manicura] = nil
+    end
 
     ultima_p = lote.pesadas.loaded? \
       ? lote.pesadas.max_by { |p| p.registrado_at } \
