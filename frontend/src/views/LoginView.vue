@@ -65,14 +65,14 @@
       </svg>
     </div>
 
-    <!-- Layout: 4 columnas — vacío | login | vacío | info -->
-    <div class="lv__layout">
+    <!-- Layout: 4 columnas — vacío | login | vacío | info (en PWA: solo login centrado) -->
+    <div class="lv__layout" :class="{ 'lv__layout--pwa': isPwa }">
 
-      <!-- Col 1: vacía -->
-      <div></div>
+      <!-- Col 1: vacía (oculta en PWA) -->
+      <div v-if="!isPwa"></div>
 
       <!-- Col 2: Card login -->
-      <div class="lv__col-login">
+      <div class="lv__col-login" :class="{ 'lv__col-login--pwa': isPwa }">
         <div class="lv__card">
 
           <!-- Logo Cultivo Espacial -->
@@ -153,11 +153,11 @@
         <div class="lv__ver">v0.1.0 beta</div>
       </div>
 
-      <!-- Col 3: vacía -->
-      <div></div>
+      <!-- Col 3: vacía (oculta en PWA) -->
+      <div v-if="!isPwa"></div>
 
-      <!-- Col 4: Info -->
-      <div class="lv__col-info">
+      <!-- Col 4: Info (oculta en PWA) -->
+      <div v-if="!isPwa" class="lv__col-info">
         <div class="lv__info">
 
           <div class="lv__badge">
@@ -256,6 +256,9 @@ const showPass   = ref(false)
 const focusEmail = ref(false)
 const focusPass  = ref(false)
 const yr = new Date().getFullYear()
+
+const isPwa = window.matchMedia('(display-mode: standalone)').matches
+  || window.navigator.standalone === true
 
 async function onSubmit() {
   try {
@@ -450,6 +453,20 @@ async function onSubmit() {
 .lv__nitem { display: flex; align-items: center; gap: .48rem; font-size: .72rem; color: rgba(255,255,255,.4); padding: .22rem 0; }
 .lv__nitem + .lv__nitem { border-top: 1px solid rgba(255,255,255,.04); }
 .lv__ndot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+/* PWA: solo el card, centrado */
+.lv__layout--pwa {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 0 1.25rem;
+  min-height: 100vh;
+  align-items: center;
+}
+.lv__col-login--pwa {
+  width: 100%;
+  max-width: 400px;
+  padding: 0;
+}
 </style>
 
 

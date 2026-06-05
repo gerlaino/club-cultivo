@@ -648,7 +648,7 @@ const routes = [
       // ── Admin / Supervisor ──
       { path: 'admin/sedes',   component: () => import('../views/mobile/MSedesView.vue') },
       { path: 'admin/tareas',  component: () => import('../views/mobile/MTareasView.vue') },
-      { path: 'admin/aprobar', component: () => import('../views/admin/AdminStocksPendientesView.vue') },
+      { path: 'admin/aprobar', component: () => import('../views/mobile/MAdminAprobacionView.vue') },
 
       // ── Detalle mobile propio ──
       { path: 'sede/:id',   component: () => import('../views/mobile/MSedeMobileDetail.vue') },
