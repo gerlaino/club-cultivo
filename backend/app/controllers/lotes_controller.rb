@@ -363,8 +363,10 @@ class LotesController < ApplicationController
     if @lote.manicurador_id.present?
       # Nuevo flujo: aprobar + generar stock pendiente_asignacion + finalizar
       @lote.aprobar_y_finalizar!(
-        aprobado_por: current_user,
-        peso_seco_g:  params[:peso_seco_g],
+        aprobado_por:        current_user,
+        peso_seco_g:         params[:peso_seco_g],
+        sede_id:             params[:sede_id],
+        precio_sugerido_ars: params[:precio_sugerido_ars],
       )
     else
       # Flujo legacy: aprobar → curado

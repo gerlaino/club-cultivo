@@ -151,11 +151,6 @@
 
             <form class="av-modal__body" @submit.prevent="confirmarAprobacion">
 
-              <div class="av-info-box">
-                <span class="av-info-ico">📦</span>
-                <span>El stock se creará como <strong>flor seca pendiente de asignación</strong>. Desde la sección Stock podrás distribuirlo entre sedes y procesar derivados.</span>
-              </div>
-
               <div class="av-field">
                 <label class="av-label">Peso seco confirmado (g) <span class="av-req">*</span></label>
                 <input
@@ -168,6 +163,28 @@
                   autofocus
                 />
                 <span class="av-hint">Registrado por manicura: {{ loteAprobacion?.ultima_pesada_manicura?.peso_seco_g }}g. Editá si no coincide.</span>
+              </div>
+
+              <div class="av-field">
+                <label class="av-label">Precio sugerido (ARS/g)</label>
+                <input
+                  v-model.number="aprobForm.precio_sugerido_ars"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="av-input"
+                  placeholder="0.00"
+                />
+                <span class="av-hint">Opcional — se usará al crear dispensaciones</span>
+              </div>
+
+              <div v-if="sedes.length" class="av-field">
+                <label class="av-label">Asignar a sede</label>
+                <select v-model="aprobForm.sede_id" class="av-select">
+                  <option :value="null">— Sin asignar (pendiente) —</option>
+                  <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                </select>
+                <span class="av-hint">Solo sedes sociales o mixtas. Si asignás, el estado cambia a "disponible".</span>
               </div>
 
               <div v-if="aprobError" class="av-error">
@@ -197,11 +214,12 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { ClipboardCheck, Clock, Leaf, MapPin, Package, Scale, Eye, CheckCircle, XCircle, X, AlertCircle, Scissors, PackageCheck } from 'lucide-vue-next'
-import { listLotes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
+import { listLotes, listSedes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast = useToast()
 const lotes   = ref([])
+const sedes   = ref([])
 const loading = ref(true)
 const aprobando = ref(null)
 
@@ -221,7 +239,7 @@ const rechazoError  = ref('')
 // Modal aprobación (nuevo flujo)
 const modalAprobacion = ref(false)
 const loteAprobacion  = ref(null)
-const aprobForm = ref({ peso_seco_g: null })
+const aprobForm = ref({ peso_seco_g: null, precio_sugerido_ars: null, sede_id: null })
 const aprobError = ref('')
 
 function fmtDate(d) {
@@ -232,19 +250,27 @@ function fmtDate(d) {
 async function cargar() {
   loading.value = true
   try {
-    const lotesRes = await listLotes({ estado: 'manicura_pendiente' })
-    lotes.value = lotesRes.data || []
-  } catch {
-    lotes.value = []
+    const [lotesRes, sedesRes] = await Promise.allSettled([
+      listLotes({ estado: 'manicura_pendiente' }),
+      listSedes(),
+    ])
+    lotes.value = lotesRes.status === 'fulfilled' ? (lotesRes.value.data || []) : []
+    sedes.value = sedesRes.status === 'fulfilled'
+      ? (sedesRes.value.data || []).filter(s => ['social', 'mixta'].includes(s.tipo))
+      : []
   } finally {
     loading.value = false
   }
 }
 
-// Nuevo flujo: abre modal con sede + peso
+// Nuevo flujo: abre modal con sede + peso + precio
 function abrirAprobacion(lote) {
   loteAprobacion.value  = lote
-  aprobForm.value       = { peso_seco_g: lote.ultima_pesada_manicura?.peso_seco_g ?? null }
+  aprobForm.value       = {
+    peso_seco_g:         lote.ultima_pesada_manicura?.peso_seco_g ?? null,
+    precio_sugerido_ars: null,
+    sede_id:             null,
+  }
   aprobError.value      = ''
   modalAprobacion.value = true
 }
@@ -261,8 +287,14 @@ async function confirmarAprobacion() {
   aprobando.value  = loteAprobacion.value.id
   aprobError.value = ''
   try {
-    await aprobarManicura(loteAprobacion.value.id, { peso_seco_g: aprobForm.value.peso_seco_g })
-    toast.success(`Lote ${loteAprobacion.value.codigo} finalizado — stock pendiente de asignación`)
+    const payload = { peso_seco_g: aprobForm.value.peso_seco_g }
+    if (aprobForm.value.sede_id) payload.sede_id = aprobForm.value.sede_id
+    if (aprobForm.value.precio_sugerido_ars) payload.precio_sugerido_ars = aprobForm.value.precio_sugerido_ars
+    await aprobarManicura(loteAprobacion.value.id, payload)
+    const dest = aprobForm.value.sede_id
+      ? `asignado a ${sedes.value.find(s => s.id === aprobForm.value.sede_id)?.nombre}`
+      : 'pendiente de asignación'
+    toast.success(`Lote ${loteAprobacion.value.codigo} finalizado — ${dest}`)
     cerrarAprobacion()
     cargar()
   } catch (e) {

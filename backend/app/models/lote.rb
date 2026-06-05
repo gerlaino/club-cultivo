@@ -251,14 +251,17 @@ class Lote < ApplicationRecord
   end
 
   # Aprueba pesada del manicurador, genera stock y finaliza el lote en un solo paso.
-  def aprobar_y_finalizar!(aprobado_por:, peso_seco_g: nil)
+  def aprobar_y_finalizar!(aprobado_por:, peso_seco_g: nil, sede_id: nil, precio_sugerido_ars: nil)
     raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
 
     ultima_pesada = pesadas.where(fase_origen: 'en_manicura', manicurado: true).reorder(id: :desc).first
+    ultima_pesada ||= pesadas.where(manicurado: true).reorder(id: :desc).first
     raise "No hay pesada de manicura para aprobar" unless ultima_pesada
 
     peso = peso_seco_g.present? ? peso_seco_g.to_d : ultima_pesada.peso_seco_g.to_d
     raise ArgumentError, "El peso debe ser mayor a 0" unless peso > 0
+
+    sede = sede_id.present? ? club.sedes.where(tipo: %w[social mixta]).find(sede_id) : nil
 
     ActiveRecord::Base.transaction do
       ultima_pesada.update!(
@@ -271,15 +274,16 @@ class Lote < ApplicationRecord
       )
 
       stock = Stock.create!(
-        club:           club,
-        sede:           nil,
-        lote:           self,
-        genetica:       genetica,
-        origen:         'lote',
-        estado:         'pendiente_asignacion',
-        forma_producto: 'flor_seca',
-        cantidad:       peso,
-        unidad:         'g',
+        club:                club,
+        sede:                sede,
+        lote:                self,
+        genetica:            genetica,
+        origen:              'lote',
+        estado:              sede ? 'disponible' : 'pendiente_asignacion',
+        forma_producto:      'flor_seca',
+        cantidad:            peso,
+        unidad:              'g',
+        precio_sugerido_ars: precio_sugerido_ars.present? ? precio_sugerido_ars.to_d : nil,
       )
       stock.stock_movimientos.create!(
         tipo:    'produccion',

@@ -110,9 +110,6 @@
           </div>
           <div class="maa__sheet-body">
             <p class="maa__sheet-lote">Lote <strong>{{ loteActivo?.codigo }}</strong></p>
-            <div class="maa__info-box">
-              📦 El stock se creará como <strong>flor seca pendiente de asignación</strong>.
-            </div>
             <div class="maa__field">
               <label class="maa__label">Peso seco confirmado (g) <span class="maa__req">*</span></label>
               <input
@@ -124,6 +121,24 @@
               <span v-if="loteActivo?.ultima_pesada_manicura" class="maa__hint">
                 Registrado por manicura: {{ loteActivo.ultima_pesada_manicura.peso_seco_g }}g
               </span>
+            </div>
+            <div v-if="loteActivo?.manicurador_id" class="maa__field">
+              <label class="maa__label">Precio sugerido (ARS/g)</label>
+              <input
+                v-model.number="precioAprobacion"
+                type="number" min="0" step="0.01"
+                class="maa__input"
+                placeholder="0.00"
+              />
+              <span class="maa__hint">Opcional — se usará al crear dispensaciones</span>
+            </div>
+            <div v-if="loteActivo?.manicurador_id && sedes.length" class="maa__field">
+              <label class="maa__label">Asignar a sede</label>
+              <select v-model="sedeAprobacion" class="maa__input maa__select">
+                <option :value="null">— Sin asignar (pendiente) —</option>
+                <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              </select>
+              <span class="maa__hint">Solo sedes sociales o mixtas</span>
             </div>
             <div v-if="errorMsg" class="maa__error">{{ errorMsg }}</div>
             <button
@@ -145,29 +160,37 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { listLotes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
+import { listLotes, listSedes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast   = useToast()
 const lotes   = ref([])
+const sedes   = ref([])
 const loading = ref(true)
 
-const sheetRechazo   = ref(false)
+const sheetRechazo    = ref(false)
 const sheetAprobacion = ref(false)
-const loteActivo     = ref(null)
-const motivoRechazo  = ref('')
-const pesoAprobacion = ref(null)
-const rechazando     = ref(false)
-const aprobando      = ref(false)
-const errorMsg       = ref('')
+const loteActivo      = ref(null)
+const motivoRechazo   = ref('')
+const pesoAprobacion  = ref(null)
+const sedeAprobacion  = ref(null)
+const precioAprobacion = ref(null)
+const rechazando      = ref(false)
+const aprobando       = ref(false)
+const errorMsg        = ref('')
 
 async function cargar() {
   loading.value = true
   try {
-    const { data } = await listLotes({ estado: 'manicura_pendiente' })
-    lotes.value = data || []
-  } catch { lotes.value = [] }
-  finally { loading.value = false }
+    const [lotesRes, sedesRes] = await Promise.allSettled([
+      listLotes({ estado: 'manicura_pendiente' }),
+      listSedes(),
+    ])
+    lotes.value = lotesRes.status === 'fulfilled' ? (lotesRes.value.data || []) : []
+    sedes.value = sedesRes.status === 'fulfilled'
+      ? (sedesRes.value.data || []).filter(s => ['social', 'mixta'].includes(s.tipo))
+      : []
+  } finally { loading.value = false }
 }
 
 function abrirRechazo(lote) {
@@ -183,9 +206,11 @@ function cerrarRechazo() {
 }
 
 function abrirAprobacion(lote) {
-  loteActivo.value    = lote
-  pesoAprobacion.value = lote.ultima_pesada_manicura?.peso_seco_g ?? null
-  errorMsg.value       = ''
+  loteActivo.value      = lote
+  pesoAprobacion.value  = lote.ultima_pesada_manicura?.peso_seco_g ?? null
+  sedeAprobacion.value  = null
+  precioAprobacion.value = null
+  errorMsg.value        = ''
   sheetAprobacion.value = true
 }
 
@@ -217,8 +242,14 @@ async function confirmarAprobacion() {
   errorMsg.value  = ''
   try {
     if (loteActivo.value.manicurador_id) {
-      await aprobarManicura(loteActivo.value.id, { peso_seco_g: pesoAprobacion.value })
-      toast.success(`Lote ${loteActivo.value.codigo} finalizado — stock pendiente de asignación`)
+      const payload = { peso_seco_g: pesoAprobacion.value }
+      if (sedeAprobacion.value) payload.sede_id = sedeAprobacion.value
+      if (precioAprobacion.value) payload.precio_sugerido_ars = precioAprobacion.value
+      await aprobarManicura(loteActivo.value.id, payload)
+      const dest = sedeAprobacion.value
+        ? `asignado a ${sedes.value.find(s => s.id === sedeAprobacion.value)?.nombre}`
+        : 'pendiente de asignación'
+      toast.success(`Lote ${loteActivo.value.codigo} finalizado — ${dest}`)
     } else {
       await aprobarManicura(loteActivo.value.id)
       toast.success(`Lote ${loteActivo.value.codigo} aprobado — pasa a curado`)
@@ -344,6 +375,7 @@ onMounted(cargar)
   width: 100%; box-sizing: border-box; outline: none;
 }
 .maa__input:focus { border-color: #15803d; background: #fff; }
+.maa__select { appearance: none; -webkit-appearance: none; cursor: pointer; }
 .maa__textarea {
   background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px;
   padding: .7rem .875rem; font-size: .875rem; color: #0f172a;
