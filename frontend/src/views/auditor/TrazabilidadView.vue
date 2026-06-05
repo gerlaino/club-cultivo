@@ -311,7 +311,7 @@
       </div>
 
       <div class="trz__footer-legal">
-        Informe generado por Club Cultivo · {{ hoy }} · Uso exclusivo para auditoría REPROCANN / ARICCAME
+        Informe generado por Cultivo Espacial · {{ hoy }} · Uso exclusivo para auditoría REPROCANN / ARICCAME
       </div>
     </div>
 

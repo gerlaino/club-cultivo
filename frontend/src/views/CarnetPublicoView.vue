@@ -12,7 +12,7 @@
       <div class="cp__header">
         <div class="cp__header-logo-wrap"><span class="cp__header-emoji">🌿</span></div>
         <div>
-          <div class="cp__header-club">Club Cultivo</div>
+          <div class="cp__header-club">Cultivo Espacial</div>
           <div class="cp__header-sub">Carnet de Socio</div>
         </div>
       </div>

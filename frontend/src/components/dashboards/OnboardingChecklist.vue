@@ -443,7 +443,7 @@ watch(() => auth.user, (u) => {
       <div class="oc__header-left">
         <span class="oc__leaf">🌿</span>
         <div class="oc__header-text">
-          <span class="oc__title">Primeros pasos en Club Cultivo</span>
+          <span class="oc__title">Primeros pasos en Cultivo Espacial</span>
           <span class="oc__prog-label">
             <template v-if="progresoPct < 100">
               {{ completados.size }} de {{ pasos.length }} completados

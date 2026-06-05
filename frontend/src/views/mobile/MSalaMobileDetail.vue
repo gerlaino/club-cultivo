@@ -82,16 +82,27 @@
     <!-- Sheet: Nuevo lote -->
     <SheetBottom v-model="showNuevoLote" title="Nuevo lote">
       <div class="msal__sheet-body">
-        <div class="msal__field">
-          <label class="msal__label">Código del lote *</label>
-          <input v-model.trim="loteForm.codigo" class="msal__input" placeholder="ej: GSC-05" autofocus />
+        <div class="msal__info-box" v-if="sala">
+          Estado inicial: <strong>{{ estadoLabel(estadoInicialLote) }}</strong>
+          · Fecha inicio: <strong>hoy</strong>
         </div>
         <div class="msal__field">
-          <label class="msal__label">Descripción <span class="msal__opt">opcional</span></label>
-          <textarea v-model.trim="loteForm.descripcion" class="msal__input msal__textarea" rows="2" placeholder="Notas sobre el lote…"></textarea>
+          <label class="msal__label">Cantidad de plantas <span class="msal__opt">opcional</span></label>
+          <input v-model.number="loteForm.plants_count" type="number" min="0" max="5000" class="msal__input" placeholder="0" />
+        </div>
+        <div class="msal__field">
+          <label class="msal__label">Genética <span class="msal__opt">opcional</span></label>
+          <select v-model="loteForm.genetica_id" class="msal__input">
+            <option value="">Sin especificar</option>
+            <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
+          </select>
+        </div>
+        <div class="msal__field">
+          <label class="msal__label">Notas <span class="msal__opt">opcional</span></label>
+          <textarea v-model.trim="loteForm.notes" class="msal__input msal__textarea" rows="2" placeholder="Observaciones sobre el lote…"></textarea>
         </div>
         <div v-if="loteError" class="msal__error">{{ loteError }}</div>
-        <button class="msal__btn-confirmar" :disabled="savingLote || !loteForm.codigo" @click="guardarNuevoLote">
+        <button class="msal__btn-confirmar" :disabled="savingLote" @click="guardarNuevoLote">
           <i v-if="!savingLote" class="bi bi-check2-circle"></i>
           {{ savingLote ? 'Creando…' : 'Crear lote' }}
         </button>
@@ -120,9 +131,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getSala, listLotes, createSalaNota, createLote } from '../../lib/api'
+import { getSala, listLotes, createSalaNota, createLote, listGeneticas } from '../../lib/api'
 import { useToast }       from '../../composables/useToast'
 import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 import RegistroSalaModal  from '../../components/salas/RegistroSalaModal.vue'
@@ -146,7 +157,25 @@ const notaError        = ref(null)
 const notaContenido    = ref('')
 const fotoInput        = ref(null)
 
-const loteForm = ref({ codigo: '', descripcion: '' })
+const geneticas    = ref([])
+const KIND_TO_ESTADO = { floracion: 'floracion', secado: 'secado', manicura: 'curado' }
+const KINDS_CON_ORIGEN = ['vegetativo', 'madre', 'clon', 'mixta']
+const estadoInicialLote = computed(() => {
+  const kind = sala.value?.kind
+  return KINDS_CON_ORIGEN.includes(kind) ? 'semilla' : (KIND_TO_ESTADO[kind] || 'vegetativo')
+})
+
+function emptyLoteForm() {
+  return {
+    estado:       estadoInicialLote.value,
+    start_date:   new Date().toISOString().slice(0, 10),
+    plants_count: 0,
+    genetica_id:  '',
+    grow_type:    'sustrato',
+    notes:        '',
+  }
+}
+const loteForm = ref({ estado: 'vegetativo', start_date: '', plants_count: 0, genetica_id: '', grow_type: 'sustrato', notes: '' })
 
 const KIND_GRADIENT = {
   vegetativo: 'linear-gradient(135deg,#0f2417,#1b5e20)',
@@ -166,22 +195,23 @@ const estadoColor  = e => EC[e] || '#64748b'
 const estadoLabel  = e => EL[e] || e || '—'
 
 function abrirNuevoLote() {
-  loteForm.value  = { codigo: '', descripcion: '' }
+  loteForm.value  = emptyLoteForm()
   loteError.value = null
   showAcciones.value  = false
   showNuevoLote.value = true
 }
 
 async function guardarNuevoLote() {
-  if (!loteForm.value.codigo) { loteError.value = 'El código es obligatorio'; return }
   savingLote.value = true; loteError.value = null
   try {
-    const { data } = await createLote(sala.value.id, loteForm.value)
+    const payload = { ...loteForm.value }
+    if (!payload.genetica_id) delete payload.genetica_id
+    const { data } = await createLote(sala.value.id, payload)
     lotes.value.unshift(data)
     toast.success('Lote creado')
     showNuevoLote.value = false
   } catch (e) {
-    loteError.value = e?.response?.data?.error || 'Error al crear lote'
+    loteError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'Error al crear lote'
   } finally { savingLote.value = false }
 }
 
@@ -215,9 +245,10 @@ async function guardarNota() {
 
 onMounted(async () => {
   try {
-    const [salaRes, lotesRes] = await Promise.all([getSala(id), listLotes()])
-    sala.value  = salaRes.data
-    lotes.value = (lotesRes.data || []).filter(l => l.sala_id === id && l.estado !== 'finalizado')
+    const [salaRes, lotesRes, geneticasRes] = await Promise.all([getSala(id), listLotes(), listGeneticas()])
+    sala.value     = salaRes.data
+    lotes.value    = (lotesRes.data || []).filter(l => l.sala_id === id && l.estado !== 'finalizado')
+    geneticas.value = geneticasRes.data || []
   } catch {} finally { loading.value = false }
 })
 </script>
@@ -308,4 +339,5 @@ onMounted(async () => {
   font-size: .95rem; font-weight: 700; cursor: pointer;
 }
 .msal__btn-confirmar:disabled { opacity: .6; }
+.msal__info-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 9px; padding: .6rem .875rem; font-size: .8rem; color: #15803d; }
 </style>

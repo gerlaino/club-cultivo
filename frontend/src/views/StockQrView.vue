@@ -12,7 +12,7 @@
       <div class="sqr__header">
         <div class="sqr__header-logo-wrap">🌿</div>
         <div class="sqr__header-text">
-          <div class="sqr__header-club">Club Cultivo</div>
+          <div class="sqr__header-club">Cultivo Espacial</div>
           <div class="sqr__header-sub">Verificación de producto</div>
         </div>
       </div>

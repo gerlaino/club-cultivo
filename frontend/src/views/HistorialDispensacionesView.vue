@@ -1,20 +1,55 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { listDispensacionesFecha, exportDispensacionesCSV } from '../lib/api.js'
+import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink } from 'vue-router'
-import { Download, RefreshCw, Truck, Search, Plus } from 'lucide-vue-next'
-import DispensarView from './DispensarView.vue'
+import { Download, RefreshCw, Truck, Search, Plus, X } from 'lucide-vue-next'
+import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
 
-const showDispensarModal = ref(false)
+// ── Paso 1: buscar paciente ────────────────────────────────────────────────────
+const showBuscarPaciente    = ref(false)
+const buscaPaciente         = ref('')
+const pacientesLista        = ref([])
+const loadingPacientes      = ref(false)
+const cargandoPaciente      = ref(false)
 
-function abrirNuevaDispensacion() {
-  showDispensarModal.value = true
+// ── Paso 2: modal dispensación ─────────────────────────────────────────────────
+const showDispensarModal    = ref(false)
+const pacienteSeleccionado  = ref(null)
+
+async function abrirNuevaDispensacion() {
+  buscaPaciente.value = ''
+  pacientesLista.value = []
+  showBuscarPaciente.value = true
+  await buscarPacientes()
 }
 
-function cerrarNuevaDispensacion() {
+async function buscarPacientes() {
+  loadingPacientes.value = true
+  try {
+    const params = {}
+    if (buscaPaciente.value.trim()) params.q = buscaPaciente.value.trim()
+    const { data } = await listPacientes(params)
+    pacientesLista.value = data.pacientes ?? data ?? []
+  } catch { pacientesLista.value = [] }
+  finally { loadingPacientes.value = false }
+}
+
+watch(buscaPaciente, () => buscarPacientes())
+
+async function seleccionarPaciente(paciente) {
+  cargandoPaciente.value = true
+  try {
+    const { data } = await getPaciente(paciente.id)
+    pacienteSeleccionado.value = data
+    showBuscarPaciente.value = false
+    showDispensarModal.value = true
+  } catch {} finally { cargandoPaciente.value = false }
+}
+
+function onDispensacionGuardada() {
   showDispensarModal.value = false
-  cargar() // refrescar lista al cerrar
+  cargar()
 }
 
 const hoy = new Date().toISOString().slice(0, 10)
@@ -145,24 +180,66 @@ function medioPagoLabel(m) {
       </div>
     </div>
 
-    <!-- Modal nueva dispensación -->
+    <!-- Paso 1: buscar paciente -->
     <Teleport to="body">
       <Transition name="hd-modal">
-        <div v-if="showDispensarModal" class="hd__modal-overlay" @click.self="cerrarNuevaDispensacion">
-          <div class="hd__modal-box">
+        <div v-if="showBuscarPaciente" class="hd__modal-overlay" @click.self="showBuscarPaciente = false">
+          <div class="hd__modal-box hd__modal-box--narrow">
             <div class="hd__modal-header">
-              <h2 class="hd__modal-title">Nueva dispensación</h2>
-              <button class="hd__modal-close" @click="cerrarNuevaDispensacion">
-                <i class="bi bi-x-lg"></i>
+              <h2 class="hd__modal-title">Seleccionar paciente</h2>
+              <button class="hd__modal-close" @click="showBuscarPaciente = false">
+                <X :size="16" :stroke-width="2" />
               </button>
             </div>
-            <div class="hd__modal-body">
-              <DispensarView />
+            <div class="hd__modal-body hd__buscar-body">
+              <div class="hd__buscar-search-wrap">
+                <Search :size="14" :stroke-width="2" class="hd__search-ico" />
+                <input
+                  v-model="buscaPaciente"
+                  type="search"
+                  class="hd__buscar-search"
+                  placeholder="Buscar por nombre, apellido o DNI…"
+                  autofocus
+                />
+              </div>
+              <div v-if="loadingPacientes || cargandoPaciente" class="hd__buscar-loading">
+                <i class="bi bi-arrow-repeat hd__spin" style="font-size:1.2rem;color:#94a3b8"></i>
+              </div>
+              <div v-else-if="!pacientesLista.length" class="hd__buscar-empty">
+                Sin resultados{{ buscaPaciente ? ` para "${buscaPaciente}"` : '' }}
+              </div>
+              <div v-else class="hd__buscar-lista">
+                <button
+                  v-for="p in pacientesLista"
+                  :key="p.id"
+                  class="hd__buscar-item"
+                  @click="seleccionarPaciente(p)"
+                >
+                  <div class="hd__buscar-nombre">{{ p.apellido }}, {{ p.nombre }}</div>
+                  <div v-if="p.dni" class="hd__buscar-dni">DNI {{ p.dni }}</div>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Paso 2: modal dispensación (mismo que en SocioDetail) -->
+    <ModalNuevaDispensacion
+      v-if="pacienteSeleccionado"
+      v-model="showDispensarModal"
+      :socio-id="pacienteSeleccionado.id"
+      :paciente-nombre="`${pacienteSeleccionado.apellido}, ${pacienteSeleccionado.nombre}`"
+      :limite-mensual-g="pacienteSeleccionado.limite_dispensacion_mensual_g ? Number(pacienteSeleccionado.limite_dispensacion_mensual_g) : null"
+      :dispensado-mes-g="pacienteSeleccionado.dispensado_mes_actual_g ?? null"
+      :saldo-cc="pacienteSeleccionado.saldo_cc ?? null"
+      :limite-cc="pacienteSeleccionado.limite_cc ?? null"
+      :saldo-cc-g="pacienteSeleccionado.saldo_cc_g ?? null"
+      :limite-cc-g="pacienteSeleccionado.limite_cc_g ?? null"
+      :cc-gramos-activo="pacienteSeleccionado.cc_gramos_activo ?? false"
+      @saved="onDispensacionGuardada"
+    />
 
     <!-- Filtros -->
     <div class="hd__filters">
@@ -362,33 +439,53 @@ function medioPagoLabel(m) {
 }
 .hd__btn-nueva:hover { background: #145218; }
 
-/* Modal nueva dispensación */
+/* Modal buscar paciente */
 .hd__modal-overlay {
   position: fixed; inset: 0; z-index: 200;
   background: rgba(0,0,0,.55);
-  display: flex; align-items: stretch; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem;
 }
 .hd__modal-box {
-  background: #fff; width: 100%; max-width: 1100px;
+  background: #fff; width: 100%; max-width: 540px;
   display: flex; flex-direction: column;
   box-shadow: 0 24px 80px rgba(0,0,0,.25);
+  border-radius: 16px; max-height: 80vh;
 }
-@media (min-width: 768px) {
-  .hd__modal-overlay { align-items: center; padding: 1.5rem; }
-  .hd__modal-box { border-radius: 16px; max-height: 90vh; }
-}
+.hd__modal-box--narrow { max-width: 460px; }
 .hd__modal-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 1rem 1.25rem; border-bottom: 1px solid #e8f0e9; flex-shrink: 0;
 }
 .hd__modal-title { font-size: 1rem; font-weight: 700; color: #1a1a1a; margin: 0; }
 .hd__modal-close {
-  background: none; border: none; cursor: pointer;
-  color: #94a3b8; font-size: 1rem; padding: .25rem; border-radius: 6px;
-  transition: color .15s;
+  background: #f1f5f9; border: none; width: 28px; height: 28px; border-radius: 7px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b;
 }
-.hd__modal-close:hover { color: #dc2626; }
+.hd__modal-close:hover { background: #e2e8f0; }
 .hd__modal-body { flex: 1; overflow-y: auto; }
+.hd__buscar-body { display: flex; flex-direction: column; gap: 0; }
+.hd__buscar-search-wrap {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .75rem 1.25rem; border-bottom: 1px solid #f1f5f9; flex-shrink: 0;
+}
+.hd__buscar-search {
+  flex: 1; background: none; border: none; font-size: .9rem;
+  color: var(--c-ink-900); outline: none;
+}
+.hd__buscar-loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
+.hd__buscar-empty { text-align: center; padding: 2rem 1.25rem; color: #94a3b8; font-size: .875rem; }
+.hd__buscar-lista { display: flex; flex-direction: column; overflow-y: auto; }
+.hd__buscar-item {
+  width: 100%; display: flex; flex-direction: column; gap: .15rem;
+  padding: .75rem 1.25rem; border: none; background: none;
+  text-align: left; cursor: pointer; border-bottom: 1px solid #f8fafc;
+  transition: background .1s;
+}
+.hd__buscar-item:hover { background: #f0fdf4; }
+.hd__buscar-item:last-child { border-bottom: none; }
+.hd__buscar-nombre { font-size: .875rem; font-weight: 600; color: #0f172a; }
+.hd__buscar-dni { font-size: .75rem; color: #94a3b8; font-family: monospace; }
 
 .hd-modal-enter-active, .hd-modal-leave-active { transition: opacity .2s; }
 .hd-modal-enter-from, .hd-modal-leave-to { opacity: 0; }

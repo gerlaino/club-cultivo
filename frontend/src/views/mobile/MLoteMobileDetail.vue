@@ -121,13 +121,25 @@
     <!-- Sheet: Nueva planta -->
     <SheetBottom v-model="showNuevaPlanta" title="🌱 Nueva planta">
       <div class="mlot__sheet-body">
-        <div class="mlot__field">
-          <label class="mlot__label">Nombre <span class="mlot__opt">opcional</span></label>
-          <input v-model.trim="plantaForm.nombre" class="mlot__input" placeholder="ej: Planta A1" />
+        <div class="mlot__info-box" v-if="lote">
+          Nombre auto: <strong>{{ lote.codigo }}-P{{ String(plantas.length + 1).padStart(3, '0') }}</strong>
         </div>
         <div class="mlot__field">
-          <label class="mlot__label">Código QR <span class="mlot__opt">opcional</span></label>
-          <input v-model.trim="plantaForm.codigo_qr" class="mlot__input" placeholder="ej: QR-001" />
+          <label class="mlot__label">Estado inicial</label>
+          <select v-model="plantaForm.state" class="mlot__input">
+            <option value="germinacion">🌰 Semilla/Germinación</option>
+            <option value="esqueje">✂️ Esqueje</option>
+            <option value="vegetativo">🍃 Vegetativo</option>
+            <option value="floracion">🌸 Floración</option>
+          </select>
+        </div>
+        <div class="mlot__field">
+          <label class="mlot__label">Origen</label>
+          <select v-model="plantaForm.origen" class="mlot__input">
+            <option value="semilla">🌰 Semilla</option>
+            <option value="esqueje">✂️ Esqueje</option>
+            <option value="division">🪴 División</option>
+          </select>
         </div>
         <div v-if="plantaError" class="mlot__error">{{ plantaError }}</div>
         <button class="mlot__btn-confirmar" :disabled="savingPlanta" @click="guardarNuevaPlanta">
@@ -218,7 +230,8 @@ const POR_PAG         = 12
 const fotoInput       = ref(null)
 const nuevaFase       = ref('')
 
-const plantaForm = ref({ nombre: '', codigo_qr: '' })
+const STATE_FROM_LOTE = { semilla:'germinacion', esqueje:'esqueje', vegetativo:'vegetativo', floracion:'floracion', cosecha:'cosecha' }
+const plantaForm = ref({ state: 'vegetativo', origen: 'semilla' })
 const editForm   = ref({ codigo: '', descripcion: '' })
 
 const EG = {
@@ -285,7 +298,7 @@ async function guardarAvanzarFase() {
 }
 
 function abrirNuevaPlanta() {
-  plantaForm.value  = { nombre: '', codigo_qr: '' }
+  plantaForm.value  = { state: STATE_FROM_LOTE[lote.value?.estado] || 'vegetativo', origen: 'semilla' }
   plantaError.value = null
   showAcciones.value    = false
   showNuevaPlanta.value = true
@@ -294,17 +307,20 @@ function abrirNuevaPlanta() {
 async function guardarNuevaPlanta() {
   savingPlanta.value = true; plantaError.value = null
   try {
+    const count  = plantas.value.length + 1
+    const nombre = `${lote.value.codigo}-P${String(count).padStart(3, '0')}`
     const { data } = await createPlant({
-      nombre:    plantaForm.value.nombre    || undefined,
-      codigo_qr: plantaForm.value.codigo_qr || undefined,
-      lote_id:   id,
+      lote_id: id,
+      nombre,
+      state:   plantaForm.value.state,
+      origen:  plantaForm.value.origen,
     })
     plantas.value.unshift(data)
     lote.value = { ...lote.value, plants_count: (lote.value.plants_count || 0) + 1 }
     toast.success('Planta creada')
     showNuevaPlanta.value = false
   } catch (e) {
-    plantaError.value = e?.response?.data?.error || 'Error al crear la planta'
+    plantaError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'Error al crear la planta'
   } finally { savingPlanta.value = false }
 }
 
@@ -479,4 +495,5 @@ onMounted(async () => {
   font-size: .875rem; font-weight: 700; cursor: pointer;
 }
 .mlot__btn-danger:disabled { opacity: .6; }
+.mlot__info-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 9px; padding: .6rem .875rem; font-size: .8rem; color: #15803d; }
 </style>

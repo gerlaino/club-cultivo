@@ -12,7 +12,7 @@
       <div class="qr__header">
         <div class="qr__header-logo-wrap"><span class="qr__header-emoji">🌿</span></div>
         <div>
-          <div class="qr__header-club">Club Cultivo</div>
+          <div class="qr__header-club">Cultivo Espacial</div>
           <div class="qr__header-sub">Trazabilidad de planta</div>
         </div>
       </div>
@@ -33,7 +33,7 @@
           <span v-else class="qr__header-emoji">🌿</span>
         </div>
         <div>
-          <div class="qr__header-club">{{ clubNombre || 'Club Cultivo' }}</div>
+          <div class="qr__header-club">{{ clubNombre || 'Cultivo Espacial' }}</div>
           <div class="qr__header-sub">Trazabilidad de planta</div>
         </div>
       </div>
@@ -75,7 +75,7 @@
           <span v-else class="qr__header-emoji">🌿</span>
         </div>
         <div>
-          <div class="qr__header-club">{{ clubNombre || 'Club Cultivo' }}</div>
+          <div class="qr__header-club">{{ clubNombre || 'Cultivo Espacial' }}</div>
           <div class="qr__header-sub">Trazabilidad de planta</div>
         </div>
       </div>
@@ -96,7 +96,7 @@
           <span v-else class="qr__header-emoji">🌿</span>
         </div>
         <div>
-          <div class="qr__header-club">{{ clubNombre || 'Club Cultivo' }}</div>
+          <div class="qr__header-club">{{ clubNombre || 'Cultivo Espacial' }}</div>
           <div class="qr__header-sub">Acceso del equipo</div>
         </div>
       </div>
@@ -142,7 +142,7 @@
           <span v-else class="qr__header-emoji">✂️</span>
         </div>
         <div>
-          <div class="qr__header-club">{{ clubNombre || 'Club Cultivo' }}</div>
+          <div class="qr__header-club">{{ clubNombre || 'Cultivo Espacial' }}</div>
           <div class="qr__header-sub">Pesaje de manicura</div>
         </div>
       </div>

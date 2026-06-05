@@ -29,12 +29,6 @@
           Acciones
         </button>
         <div v-if="showAcciones" class="mpd__menu">
-          <button class="mpd__menu-item" @click="accion('trasplante')">
-            <i class="bi bi-arrows-move"></i> Registrar trasplante
-          </button>
-          <button class="mpd__menu-item" @click="accion('medicion')">
-            <i class="bi bi-thermometer"></i> Medición EC/pH
-          </button>
           <button class="mpd__menu-item" @click="accion('foto')">
             <i class="bi bi-camera"></i> Agregar foto
           </button>
