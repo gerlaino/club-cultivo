@@ -2,19 +2,24 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Chart from 'chart.js/auto'
-import { listSedes, getContableDashboard, listLotes, getAnalyticsDispensador, listStocksPendientes } from '../../lib/api.js'
-import { useAuthStore } from '../../stores/auth.js'
-import { useClubStore } from '../../stores/club.js'
+import {
+  listSedes, getContableDashboard, listLotes,
+  getAnalyticsDispensador, listStocksPendientes,
+  listDispensacionesFecha,
+} from '../../lib/api.js'
+import { useAuthStore }  from '../../stores/auth.js'
+import { useClubStore }  from '../../stores/club.js'
 import { useStatsStore } from '../../stores/stats.js'
 import { useTareasStore } from '../../stores/tareas.js'
-import OnboardingWizard from '../OnboardingWizard.vue'
-import DsSpinner       from '../../design-system/components/Spinner.vue'
+import OnboardingWizard  from '../OnboardingWizard.vue'
 
-const router     = useRouter()
-const auth       = useAuthStore()
-const club       = useClubStore()
-const statsStore = useStatsStore()
+const router      = useRouter()
+const auth        = useAuthStore()
+const club        = useClubStore()
+const statsStore  = useStatsStore()
 const tareasStore = useTareasStore()
+
+// ── State ──────────────────────────────────────────────────────────────────
 
 const sedes                  = ref([])
 const contable               = ref(null)
@@ -22,21 +27,27 @@ const lotesManicuraPendiente = ref([])
 const stocksPendientes       = ref([])
 const analyticsDisp          = ref(null)
 const lotesEnFloracion       = ref([])
+const lotesActivos           = ref([])
+const dispensacionesHoy      = ref([])
 const loading                = ref(true)
 
-const chartCanvas = ref(null)
+const chartCanvas   = ref(null)
 let   chartInstance = null
 
-const stats           = computed(() => statsStore.data ?? {})
+const stats = computed(() => statsStore.data ?? {})
 const mostrarOnboarding = computed(() => loading.value || sedes.value.length === 0)
 
-// Greeting
+// ── Greeting ───────────────────────────────────────────────────────────────
+
 const hora   = new Date().getHours()
 const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
 const _hoy   = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 const hoy    = _hoy.charAt(0).toUpperCase() + _hoy.slice(1)
+const mesLabel = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+  .replace(/^\w/, c => c.toUpperCase())
 
-// Formatters
+// ── Formatters ─────────────────────────────────────────────────────────────
+
 function fmtCompacto(n) {
   if (n == null) return '—'
   const abs = Math.abs(n)
@@ -51,17 +62,16 @@ function timeAgo(ts) {
   if (diff < 60)    return 'hace un momento'
   if (diff < 3600)  return `hace ${Math.floor(diff / 60)}min`
   if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`
+  if (diff < 172800) return 'ayer'
   return `hace ${Math.floor(diff / 86400)}d`
 }
 
-function prioLabel(p) { return { alta: 'Alta', normal: 'Normal', baja: 'Baja' }[p] || p }
-
-function isVencida(t) {
-  if (!t.fecha_programada) return false
-  return new Date(t.fecha_programada + 'T00:00:00') < new Date(new Date().toDateString())
+function fmtHora(ts) {
+  if (!ts) return ''
+  return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
 
-// ── ZONA 2: KPIs operativos ────────────────────────────────────────────────
+// ── KPIs principales ────────────────────────────────────────────────────────
 
 const plantasEnCiclo = computed(() => (stats.value?.vegetativo || 0) + (stats.value?.floracion || 0))
 const balanceMes     = computed(() => contable.value?.mes_actual?.balance || 0)
@@ -81,13 +91,6 @@ const stockAlerta = computed(() => {
   return 'normal'
 })
 
-const stockAlertaLabel = computed(() => ({
-  critico:   '⚠️ Crítico — reposición urgente',
-  bajo:      '⚡ Stock bajo',
-  normal:    'Disponible ✓',
-  sin_datos: '—',
-})[stockAlerta.value])
-
 const deltaBalance = computed(() => {
   const actual   = contable.value?.mes_actual?.balance
   const anterior = contable.value?.mes_anterior?.balance
@@ -95,112 +98,253 @@ const deltaBalance = computed(() => {
   return actual - anterior
 })
 
-const pacientesNecesitanAtencion = computed(() =>
-  (stats.value?.reprocann_vencidos || 0) + (stats.value?.reprocann_por_vencer || 0) > 0
-)
+const pacientesActivos = computed(() => stats.value?.pacientes ?? null)
 
-// ── ZONA 3: Producción ────────────────────────────────────────────────────
+// ── Próxima cosecha ─────────────────────────────────────────────────────────
 
-const proximaCosechaDias = computed(() => {
-  const hoy = Date.now()
+const proximaCosecha = computed(() => {
+  const now = Date.now()
   const candidatos = lotesEnFloracion.value
     .filter(l => l.fecha_cosecha_estimada)
     .map(l => ({
-      diff: Math.ceil((new Date(l.fecha_cosecha_estimada).getTime() - hoy) / 86400000)
+      ...l,
+      diff: Math.ceil((new Date(l.fecha_cosecha_estimada).getTime() - now) / 86400000),
     }))
     .filter(l => l.diff >= 0)
     .sort((a, b) => a.diff - b.diff)
-  return candidatos[0]?.diff ?? null
+  return candidatos[0] ?? null
 })
 
-const proximaCosechaLabel = computed(() =>
-  proximaCosechaDias.value !== null ? 'lote más próximo' : 'Sin cosechas programadas'
+// ── ZONA 1: Alertas ─────────────────────────────────────────────────────────
+
+const tareasVencidas = computed(() =>
+  (tareasStore.dashboard?.vencidas || []).filter(t => t.estado !== 'completada')
 )
 
-// ── ZONA 4: Pendientes ───────────────────────────────────────────────────
+const alertas = computed(() => {
+  const list = []
 
-const tareasHoy = computed(() => {
-  const vencidas = tareasStore.dashboard?.vencidas || []
-  const hoy      = tareasStore.dashboard?.hoy      || []
-  return [...vencidas, ...hoy].filter(t => t.estado !== 'completada')
+  if (lotesManicuraPendiente.value.length > 0) {
+    list.push({
+      key:     'aprobaciones',
+      icono:   '⏳',
+      texto:   `${lotesManicuraPendiente.value.length} lote${lotesManicuraPendiente.value.length > 1 ? 's' : ''} esperando aprobación`,
+      cta:     'Ir a aprobaciones',
+      ruta:    '/aprobaciones',
+      nivel:   'amber',
+    })
+  }
+
+  if (stocksPendientes.value.length > 0) {
+    list.push({
+      key:   'stock',
+      icono: '📦',
+      texto: `${stocksPendientes.value.length} stock${stocksPendientes.value.length > 1 ? 's' : ''} sin asignar a pacientes`,
+      cta:   'Ver stock',
+      ruta:  '/admin/stocks/pendientes',
+      nivel: 'amber',
+    })
+  }
+
+  const repVencidos = stats.value?.reprocann_vencidos || 0
+  if (repVencidos > 0) {
+    list.push({
+      key:   'reprocann_vencidos',
+      icono: '⚠️',
+      texto: `${repVencidos} paciente${repVencidos > 1 ? 's' : ''} con REPROCANN vencido`,
+      cta:   'Ver pacientes',
+      ruta:  '/pacientes',
+      nivel: 'rojo',
+    })
+  }
+
+  const repPorVencer = stats.value?.reprocann_por_vencer || 0
+  if (repPorVencer > 0) {
+    list.push({
+      key:   'reprocann_proximos',
+      icono: '🕐',
+      texto: `${repPorVencer} paciente${repPorVencer > 1 ? 's' : ''} con REPROCANN por vencer en 30 días`,
+      cta:   'Ver pacientes',
+      ruta:  '/pacientes',
+      nivel: 'amber',
+    })
+  }
+
+  if (tareasVencidas.value.length > 0) {
+    list.push({
+      key:   'tareas',
+      icono: '📋',
+      texto: `${tareasVencidas.value.length} tarea${tareasVencidas.value.length > 1 ? 's' : ''} vencida${tareasVencidas.value.length > 1 ? 's' : ''}`,
+      cta:   'Ver tareas',
+      ruta:  '/tareas',
+      nivel: 'amber',
+    })
+  }
+
+  if (proximaCosecha.value && proximaCosecha.value.diff <= 7) {
+    const { diff, codigo, genetica } = proximaCosecha.value
+    list.push({
+      key:   'cosecha',
+      icono: '🌾',
+      texto: `Cosecha estimada en ${diff === 0 ? 'hoy' : diff + ' días'} — ${genetica?.nombre || ''} ${codigo}`,
+      cta:   'Ver lote',
+      ruta:  `/lotes/${proximaCosecha.value.id}`,
+      nivel: 'verde',
+    })
+  }
+
+  return list
 })
+
+// ── Pulse line (header) ────────────────────────────────────────────────────
+
+const pulseLine = computed(() => {
+  const partes = []
+  if (plantasEnCiclo.value) partes.push(`${plantasEnCiclo.value} plantas en ciclo`)
+  if (statsStore.totalLotes) partes.push(`${statsStore.totalLotes} lotes activos`)
+  if (balanceMes.value) partes.push(`${fmtCompacto(balanceMes.value)} este mes`)
+  return partes.join(' · ')
+})
+
+// ── Lotes activos (Zona 3) ─────────────────────────────────────────────────
+
+const ESTADO_COLOR = {
+  semilla:            '#64748b',
+  esqueje:            '#0891b2',
+  vegetativo:         '#16a34a',
+  floracion:          '#9333ea',
+  cosecha:            '#dc2626',
+  en_manicura:        '#d97706',
+  manicura_pendiente: '#f59e0b',
+  secado:             '#78350f',
+  curado:             '#2563eb',
+  finalizado:         '#94a3b8',
+}
+
+const ESTADO_LABEL = {
+  semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
+  floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'En manicura',
+  manicura_pendiente: 'Pdte. aprobación', secado: 'Secado', curado: 'Curado',
+  finalizado: 'Finalizado',
+}
+
+const lotesActivosFiltrados = computed(() =>
+  lotesActivos.value
+    .filter(l => l.estado !== 'finalizado')
+    .slice(0, 5)
+)
+
+// ── Actividad reciente (Zona 4) ────────────────────────────────────────────
+
+const actividadReciente = computed(() =>
+  (contable.value?.ultimos_movimientos || []).slice(0, 8)
+)
+
+function movIco(m) {
+  if (m.tipo === 'ingreso')        return '💰'
+  if (m.tipo === 'recupero_costo') return '↩️'
+  if (m.tipo === 'egreso')         return '💸'
+  return '📝'
+}
+
+// ── Sedes ──────────────────────────────────────────────────────────────────
 
 function sedeDot(sede) {
   return (sede.salas_count || 0) > 0 ? '#16a34a' : '#f59e0b'
 }
-
 const TIPO_LABEL = { produccion: 'Producción', social: 'Dispensario', mixta: 'Mixta' }
 function tipoLabel(t) { return TIPO_LABEL[t] || t }
 
-const actividadReciente = computed(() =>
-  (contable.value?.ultimos_movimientos || []).slice(0, 5)
-)
+// ── Chart financiero (Zona 5) ──────────────────────────────────────────────
 
-// ── Chart.js ─────────────────────────────────────────────────────────────
-
-function initChart(porDia) {
-  if (!chartCanvas.value) return
+function initChart(semanas) {
+  if (!chartCanvas.value || !semanas?.length) return
   if (chartInstance) { chartInstance.destroy(); chartInstance = null }
   chartInstance = new Chart(chartCanvas.value, {
     type: 'bar',
     data: {
-      labels: porDia.map(d => d.fecha),
-      datasets: [{
-        data:            porDia.map(d => d.count),
-        backgroundColor: '#16a34a',
-        hoverBackgroundColor: '#15803d',
-        borderRadius:    5,
-        barThickness:    28,
-      }]
+      labels: semanas.map(s => s.label),
+      datasets: [
+        {
+          label: 'Ingresos',
+          data: semanas.map(s => s.ingresos),
+          backgroundColor: 'rgba(22,163,74,.75)',
+          borderColor: '#16a34a',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'Egresos',
+          data: semanas.map(s => s.egresos),
+          backgroundColor: 'rgba(220,38,38,.65)',
+          borderColor: '#dc2626',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: { color: '#64748b', font: { size: 11 }, boxWidth: 10, padding: 12 },
+        },
         tooltip: {
-          callbacks: { label: (ctx) => `${ctx.raw} dispensación${ctx.raw !== 1 ? 'es' : ''}` }
-        }
+          callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmtCompacto(ctx.raw)}` },
+        },
       },
       scales: {
         y: {
           beginAtZero: true,
-          ticks: { stepSize: 1, color: '#94a3b8', font: { size: 11 } },
+          ticks: { color: '#94a3b8', font: { size: 11 }, callback: (v) => fmtCompacto(v) },
           grid:  { color: '#f1f5f9' },
         },
         x: {
           ticks: { color: '#94a3b8', font: { size: 11 } },
           grid:  { display: false },
-        }
-      }
-    }
+        },
+      },
+    },
   })
 }
 
-watch(() => analyticsDisp.value?.por_dia, (data) => {
+watch(() => contable.value?.mes_actual?.por_semana, (data) => {
   if (data?.length) initChart(data)
 })
 
+// ── Data loading ───────────────────────────────────────────────────────────
+
+const todayISO = new Date().toISOString().slice(0, 10)
+
 onMounted(async () => {
   try {
-    const [sedesRes, contableRes, manicuraRes, dispRes, stocksRes, floracionRes] = await Promise.allSettled([
-      listSedes(),
-      getContableDashboard(),
-      listLotes({ estado: 'manicura_pendiente' }),
-      getAnalyticsDispensador(),
-      listStocksPendientes(),
-      listLotes({ estado: 'floracion', limit: 20 }),
-    ])
+    const [sedesRes, contableRes, manicuraRes, dispRes, stocksRes, floracionRes, lotesRes, dispHoyRes] =
+      await Promise.allSettled([
+        listSedes(),
+        getContableDashboard(),
+        listLotes({ estado: 'manicura_pendiente' }),
+        getAnalyticsDispensador(),
+        listStocksPendientes(),
+        listLotes({ estado: 'floracion', limit: 20 }),
+        listLotes({ limit: 8 }),
+        listDispensacionesFecha({ fecha: todayISO }),
+      ])
     await Promise.allSettled([statsStore.fetchAll(), tareasStore.fetchDashboard()])
 
-    if (sedesRes.status      === 'fulfilled') sedes.value                  = sedesRes.value.data   || []
-    if (contableRes.status   === 'fulfilled') contable.value               = contableRes.value.data
-    if (manicuraRes.status   === 'fulfilled') lotesManicuraPendiente.value = manicuraRes.value.data || []
-    if (dispRes.status       === 'fulfilled') analyticsDisp.value          = dispRes.value.data
-    if (stocksRes.status     === 'fulfilled') stocksPendientes.value       = stocksRes.value.data  || []
-    if (floracionRes.status  === 'fulfilled') lotesEnFloracion.value       = floracionRes.value.data || []
+    if (sedesRes.status     === 'fulfilled') sedes.value                  = sedesRes.value.data   || []
+    if (contableRes.status  === 'fulfilled') contable.value               = contableRes.value.data
+    if (manicuraRes.status  === 'fulfilled') lotesManicuraPendiente.value = manicuraRes.value.data || []
+    if (dispRes.status      === 'fulfilled') analyticsDisp.value          = dispRes.value.data
+    if (stocksRes.status    === 'fulfilled') stocksPendientes.value       = stocksRes.value.data  || []
+    if (floracionRes.status === 'fulfilled') lotesEnFloracion.value       = floracionRes.value.data || []
+    if (lotesRes.status     === 'fulfilled') lotesActivos.value           = lotesRes.value.data   || []
+    if (dispHoyRes.status   === 'fulfilled') dispensacionesHoy.value      = dispHoyRes.value.data || []
 
-    if (analyticsDisp.value?.por_dia?.length) initChart(analyticsDisp.value.por_dia)
+    if (contable.value?.mes_actual?.por_semana?.length)
+      initChart(contable.value.mes_actual.por_semana)
   } finally {
     loading.value = false
   }
@@ -220,195 +364,213 @@ async function onOnboardingCompletado() {
 
     <template v-if="!mostrarOnboarding">
 
-      <!-- ── ZONA 1: Header ──────────────────────────────────────────────── -->
+      <!-- ── HEADER ──────────────────────────────────────────────────────── -->
       <div class="ad__header">
         <div>
           <h1 class="ad__saludo">{{ saludo }}, {{ auth.user?.first_name }}</h1>
           <p class="ad__fecha">{{ hoy }}</p>
-        </div>
-        <div class="ad__header-actions">
+          <p v-if="pulseLine" class="ad__pulse">{{ pulseLine }}</p>
         </div>
       </div>
 
-      <!-- ── ZONA 2: KPIs operativos (4 cards) ──────────────────────────── -->
-      <div class="ad__kpis">
-
-        <div class="ad__kpi">
-          <span class="ad__kpi-label">Dispensaciones hoy</span>
-          <div class="ad__kpi-num">{{ analyticsDisp?.resumen?.dispensaciones_hoy ?? 0 }}</div>
-          <div class="ad__kpi-sub">{{ analyticsDisp?.resumen?.gramos_hoy != null ? analyticsDisp.resumen.gramos_hoy + ' g dispensados' : '—' }}</div>
+      <!-- ── ZONA 1: ALERTAS ─────────────────────────────────────────────── -->
+      <div v-if="alertas.length" class="ad__alertas">
+        <div
+          v-for="a in alertas"
+          :key="a.key"
+          class="ad__alerta"
+          :class="`ad__alerta--${a.nivel}`"
+        >
+          <span class="ad__alerta-ico">{{ a.icono }}</span>
+          <span class="ad__alerta-texto">{{ a.texto }}</span>
+          <RouterLink :to="a.ruta" class="ad__alerta-cta">{{ a.cta }} →</RouterLink>
         </div>
+      </div>
 
-        <div class="ad__kpi" :class="{ 'ad__kpi--critico': stockAlerta === 'critico', 'ad__kpi--bajo': stockAlerta === 'bajo' }">
-          <span class="ad__kpi-label">Stock disponible</span>
-          <div class="ad__kpi-num">{{ stockTotalG != null ? stockTotalG.toFixed(0) + ' g' : '0 g' }}</div>
-          <div class="ad__kpi-sub">{{ stockAlertaLabel }}</div>
-        </div>
+      <!-- ── ZONA 2: KPIs en dos columnas ───────────────────────────────── -->
+      <div class="ad__kpi-cols">
 
-        <div class="ad__kpi">
-          <span class="ad__kpi-label">Aprobaciones pendientes</span>
-          <div class="ad__kpi-num">{{ lotesManicuraPendiente.length }}</div>
-          <div class="ad__kpi-sub">
-            <RouterLink v-if="lotesManicuraPendiente.length > 0" to="/aprobaciones" class="ad__kpi-link">Ver todas →</RouterLink>
-            <span v-else>Todo al día ✓</span>
+        <!-- Cultivo -->
+        <div class="ad__kpi-group">
+          <div class="ad__kpi-group-label">Cultivo</div>
+          <div class="ad__kpi-grid">
+
+            <div class="ad__kpi">
+              <span class="ad__kpi-label">Plantas en ciclo</span>
+              <div class="ad__kpi-num">{{ plantasEnCiclo }}</div>
+              <div class="ad__kpi-sub">{{ stats?.vegetativo ?? 0 }} veg · {{ stats?.floracion ?? 0 }} flor</div>
+            </div>
+
+            <div class="ad__kpi">
+              <span class="ad__kpi-label">Lotes activos</span>
+              <div class="ad__kpi-num">{{ statsStore.totalLotes }}</div>
+              <div class="ad__kpi-sub">en cultivo</div>
+            </div>
+
+            <div class="ad__kpi">
+              <span class="ad__kpi-label">Próxima cosecha</span>
+              <div class="ad__kpi-num" v-if="proximaCosecha !== null">{{ proximaCosecha.diff }}d</div>
+              <div class="ad__kpi-num ad__kpi-num--empty" v-else">—</div>
+              <div class="ad__kpi-sub">
+                <span v-if="proximaCosecha">{{ proximaCosecha.genetica?.nombre || 'Sin genética' }}</span>
+                <span v-else>Sin cosechas programadas</span>
+              </div>
+            </div>
+
+            <div class="ad__kpi">
+              <span class="ad__kpi-label">Stock disponible</span>
+              <div class="ad__kpi-num" :class="{ 'ad__kpi-num--alerta': stockAlerta === 'critico' }">
+                {{ stockTotalG != null ? stockTotalG.toFixed(0) + ' g' : '0 g' }}
+              </div>
+              <div class="ad__kpi-sub">
+                <span v-if="stockAlerta === 'critico'" style="color:#dc2626">⚠️ Reposición urgente</span>
+                <span v-else-if="stockAlerta === 'bajo'" style="color:#d97706">⚡ Stock bajo</span>
+                <span v-else>Disponible ✓</span>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <div class="ad__kpi">
-          <span class="ad__kpi-label">Balance del mes</span>
-          <div class="ad__kpi-num" :style="{ color: balancePositivo ? '#16a34a' : '#dc2626' }">{{ fmtCompacto(balanceMes) }}</div>
-          <div class="ad__kpi-sub">
-            <span v-if="deltaBalance !== null" :class="deltaBalance >= 0 ? 'ad__delta--pos' : 'ad__delta--neg'">
-              {{ deltaBalance >= 0 ? '↑' : '↓' }} vs. mes anterior
-            </span>
+        <!-- Negocio -->
+        <div class="ad__kpi-group">
+          <div class="ad__kpi-group-label">Negocio</div>
+          <div class="ad__kpi-grid">
+
+            <div class="ad__kpi">
+              <span class="ad__kpi-label">Balance del mes</span>
+              <div class="ad__kpi-num" :style="{ color: balancePositivo ? '#16a34a' : '#dc2626' }">
+                {{ fmtCompacto(balanceMes) }}
+              </div>
+              <div class="ad__kpi-sub">
+                <span v-if="deltaBalance !== null" :class="deltaBalance >= 0 ? 'ad__delta--pos' : 'ad__delta--neg'">
+                  {{ deltaBalance >= 0 ? '↑' : '↓' }} vs. mes anterior
+                </span>
+              </div>
+            </div>
+
+            <div class="ad__kpi">
+              <span class="ad__kpi-label">Dispensaciones hoy</span>
+              <div class="ad__kpi-num">{{ analyticsDisp?.resumen?.dispensaciones_hoy ?? 0 }}</div>
+              <div class="ad__kpi-sub">{{ analyticsDisp?.resumen?.gramos_hoy != null ? analyticsDisp.resumen.gramos_hoy + ' g dispensados' : '—' }}</div>
+            </div>
+
+            <div class="ad__kpi">
+              <span class="ad__kpi-label">Pacientes activos</span>
+              <div class="ad__kpi-num">{{ pacientesActivos ?? '—' }}</div>
+              <div class="ad__kpi-sub">en tratamiento</div>
+            </div>
+
+            <div class="ad__kpi">
+              <span class="ad__kpi-label">Ingresos del mes</span>
+              <div class="ad__kpi-num" style="color:#16a34a">{{ fmtCompacto(contable?.mes_actual?.ingresos) }}</div>
+              <div class="ad__kpi-sub">
+                <span v-if="contable?.mes_actual?.egresos > 0" style="color:#dc2626">
+                  - {{ fmtCompacto(contable.mes_actual.egresos) }} egresos
+                </span>
+                <span v-else>Sin egresos registrados</span>
+              </div>
+            </div>
+
           </div>
         </div>
 
       </div>
 
-      <!-- ── ZONA 3: Estado de producción (3 cards compactas) ───────────── -->
-      <div class="ad__prod">
-
-        <div class="ad__prod-card">
-          <span class="ad__prod-label">Plantas en ciclo</span>
-          <span class="ad__prod-num">{{ plantasEnCiclo }}</span>
-          <span class="ad__prod-sub">{{ stats?.vegetativo ?? 0 }} veg · {{ stats?.floracion ?? 0 }} flor</span>
+      <!-- ── ZONA 3: LOTES ACTIVOS ───────────────────────────────────────── -->
+      <div class="ad__widget ad__widget--lotes">
+        <div class="ad__widget-hdr">
+          <span class="ad__widget-title">Lotes activos</span>
+          <RouterLink to="/lotes" class="ad__widget-link">Ver todos →</RouterLink>
         </div>
 
-        <div class="ad__prod-card">
-          <span class="ad__prod-label">Lotes activos</span>
-          <span class="ad__prod-num">{{ statsStore.totalLotes }}</span>
-          <span class="ad__prod-sub">en cultivo</span>
+        <div v-if="lotesActivosFiltrados.length" class="ad__lotes-list">
+          <RouterLink
+            v-for="lote in lotesActivosFiltrados"
+            :key="lote.id"
+            :to="`/lotes/${lote.id}`"
+            class="ad__lote-card"
+          >
+            <div class="ad__lote-stripe" :style="{ background: ESTADO_COLOR[lote.estado] || '#94a3b8' }"></div>
+            <div class="ad__lote-body">
+              <div class="ad__lote-top">
+                <span class="ad__lote-codigo">{{ lote.codigo }}</span>
+                <span
+                  class="ad__lote-badge"
+                  :style="{
+                    background: (ESTADO_COLOR[lote.estado] || '#94a3b8') + '18',
+                    color: ESTADO_COLOR[lote.estado] || '#94a3b8',
+                  }"
+                >
+                  {{ ESTADO_LABEL[lote.estado] || lote.estado }}
+                </span>
+                <span v-if="lote.estado === 'manicura_pendiente'" class="ad__lote-urgente">⚡ Acción requerida</span>
+              </div>
+              <div class="ad__lote-meta">
+                <span v-if="lote.genetica?.nombre">{{ lote.genetica.nombre }}</span>
+                <span class="ad__lote-sep" v-if="lote.genetica?.nombre && lote.sala?.nombre">·</span>
+                <span v-if="lote.sala?.nombre">{{ lote.sala.nombre }}</span>
+                <span class="ad__lote-sep" v-if="lote.sala?.sede?.nombre">·</span>
+                <span v-if="lote.sala?.sede?.nombre" style="color:#94a3b8">{{ lote.sala.sede.nombre }}</span>
+              </div>
+            </div>
+            <div class="ad__lote-plantas">
+              <span class="ad__lote-plantas-num">{{ lote.plants_count || 0 }}</span>
+              <span class="ad__lote-plantas-lbl">pl.</span>
+            </div>
+            <i class="bi bi-chevron-right ad__lote-arr"></i>
+          </RouterLink>
         </div>
 
-        <div class="ad__prod-card">
-          <span class="ad__prod-label">Próxima cosecha</span>
-          <span class="ad__prod-num" v-if="proximaCosechaDias !== null">{{ proximaCosechaDias }}d</span>
-          <span class="ad__prod-sub">{{ proximaCosechaLabel }}</span>
+        <div v-else class="ad__empty ad__empty--pad">
+          Sin lotes activos ·
+          <RouterLink to="/lotes" style="color:#2563eb">Ver lotes →</RouterLink>
         </div>
-
       </div>
 
-      <!-- ── ZONA 4: Pendientes accionables (2 columnas) ────────────────── -->
+      <!-- ── ZONA 4: Pacientes hoy + Actividad reciente ─────────────────── -->
       <div class="ad__body">
 
-        <!-- Columna izquierda -->
-        <div class="ad__col">
-
-          <div class="ad__widget">
-            <div class="ad__widget-hdr">
-              <span class="ad__widget-title">Tareas de hoy</span>
-              <span v-if="tareasHoy.length" class="ad__badge">{{ tareasHoy.length }}</span>
-            </div>
-            <template v-if="tareasHoy.length">
-              <RouterLink
-                v-for="t in tareasHoy.slice(0, 5)"
-                :key="t.id"
-                to="/tareas"
-                class="ad__item"
-              >
-                <span class="ad__task-prio" :class="'ad__task-prio--' + t.prioridad">{{ prioLabel(t.prioridad) }}</span>
-                <span class="ad__item-text">{{ t.titulo }}</span>
-                <span v-if="isVencida(t)" class="ad__item-tag ad__item-tag--rojo">Vencida</span>
-                <i class="bi bi-arrow-right ad__item-arrow"></i>
-              </RouterLink>
-              <p v-if="tareasHoy.length > 5" class="ad__item-more">y {{ tareasHoy.length - 5 }} más...</p>
-            </template>
-            <p v-else class="ad__empty">Sin tareas para hoy ✓</p>
-            <RouterLink to="/tareas" class="ad__widget-cta">Ver todas →</RouterLink>
-          </div>
-
-          <div class="ad__widget ad__widget--mt">
-            <div class="ad__widget-hdr">
-              <span class="ad__widget-title">Pacientes con atención</span>
-              <span v-if="pacientesNecesitanAtencion" class="ad__badge ad__badge--amber">
-                {{ (stats?.reprocann_vencidos || 0) + (stats?.reprocann_por_vencer || 0) }}
-              </span>
-            </div>
-            <div v-if="stats?.reprocann_vencidos > 0" class="ad__item">
-              <i class="bi bi-exclamation-triangle" style="color:#dc2626;font-size:.875rem;flex-shrink:0"></i>
-              <span class="ad__item-text">{{ stats.reprocann_vencidos }} con REPROCANN vencido</span>
-              <RouterLink to="/pacientes?reprocann=vencidos" class="ad__item-arrow"><i class="bi bi-arrow-right"></i></RouterLink>
-            </div>
-            <div v-if="stats?.reprocann_por_vencer > 0" class="ad__item">
-              <i class="bi bi-clock" style="color:#d97706;font-size:.875rem;flex-shrink:0"></i>
-              <span class="ad__item-text">{{ stats.reprocann_por_vencer }} por vencer (30 días)</span>
-              <RouterLink to="/pacientes?reprocann=proximos" class="ad__item-arrow"><i class="bi bi-arrow-right"></i></RouterLink>
-            </div>
-            <p v-if="!pacientesNecesitanAtencion" class="ad__empty">Sin alertas de REPROCANN ✓</p>
-          </div>
-
-        </div>
-
-        <!-- Columna derecha -->
-        <div class="ad__col">
-
-          <div class="ad__widget">
-            <div class="ad__widget-hdr">
-              <span class="ad__widget-title">Stocks para asignar</span>
-              <span v-if="stocksPendientes.length" class="ad__badge">{{ stocksPendientes.length }}</span>
-            </div>
-            <template v-if="stocksPendientes.length">
-              <RouterLink
-                v-for="s in stocksPendientes.slice(0, 4)"
-                :key="s.id"
-                to="/admin/stocks/pendientes"
-                class="ad__item"
-              >
-                <span class="ad__item-text">{{ s.forma_producto }} · {{ s.cantidad }}g</span>
-                <span class="ad__item-meta">{{ s.lote?.codigo || `Lote #${s.lote_id}` }}</span>
-                <i class="bi bi-arrow-right ad__item-arrow"></i>
-              </RouterLink>
-            </template>
-            <p v-else class="ad__empty">Todo el stock está asignado ✓</p>
-            <RouterLink to="/admin/stocks/pendientes" class="ad__widget-cta">Ver stock →</RouterLink>
-          </div>
-
-          <div class="ad__widget ad__widget--mt">
-            <div class="ad__widget-hdr">
-              <span class="ad__widget-title">Sedes en vivo</span>
-              <RouterLink to="/sedes" class="ad__widget-link">Ver todas →</RouterLink>
-            </div>
-            <RouterLink
-              v-for="sede in sedes"
-              :key="sede.id"
-              :to="`/sedes/${sede.id}`"
-              class="ad__sede-row"
-            >
-              <span class="ad__sede-dot" :style="{ background: sedeDot(sede) }"></span>
-              <span class="ad__sede-nombre">{{ sede.nombre }}</span>
-              <span class="ad__sede-tipo">{{ tipoLabel(sede.tipo) }}</span>
-              <span class="ad__sede-info">
-                <template v-if="(sede.salas_count || 0) > 0">{{ sede.salas_count }} sala{{ sede.salas_count !== 1 ? 's' : '' }}</template>
-                <span v-else class="ad__sede-config">Configurar salas →</span>
-              </span>
-            </RouterLink>
-            <p v-if="!sedes.length" class="ad__empty">Sin sedes configuradas</p>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- ── ZONA 5: Gráfico + Actividad reciente ───────────────────────── -->
-      <div class="ad__bottom">
-
-        <div class="ad__chart-widget">
+        <!-- Pacientes hoy -->
+        <div class="ad__widget">
           <div class="ad__widget-hdr">
-            <span class="ad__widget-title">Dispensaciones — últimos 7 días</span>
+            <span class="ad__widget-title">Pacientes hoy</span>
+            <span v-if="dispensacionesHoy.length" class="ad__badge ad__badge--green">
+              {{ dispensacionesHoy.length }} disp.
+            </span>
           </div>
-          <div class="ad__chart-wrap">
-            <canvas ref="chartCanvas" />
-          </div>
+
+          <template v-if="dispensacionesHoy.length">
+            <div v-for="d in dispensacionesHoy.slice(0, 6)" :key="d.id" class="ad__disp-item">
+              <div class="ad__disp-avatar">{{ (d.paciente_nombre || '?').charAt(0).toUpperCase() }}</div>
+              <div class="ad__disp-body">
+                <span class="ad__disp-nombre">{{ d.paciente_nombre }}</span>
+                <span class="ad__disp-meta">
+                  {{ d.cantidad }}g
+                  <span v-if="d.stock?.forma_producto"> · {{ d.stock.forma_producto }}</span>
+                </span>
+              </div>
+              <span class="ad__disp-hora">{{ fmtHora(d.created_at) }}</span>
+            </div>
+            <p v-if="dispensacionesHoy.length > 6" class="ad__item-more">
+              y {{ dispensacionesHoy.length - 6 }} más hoy
+            </p>
+          </template>
+          <p v-else class="ad__empty ad__empty--pad">Sin dispensaciones hoy</p>
+
+          <RouterLink to="/historial" class="ad__widget-cta">Ver historial →</RouterLink>
         </div>
 
+        <!-- Actividad reciente -->
         <div class="ad__widget">
           <div class="ad__widget-hdr">
             <span class="ad__widget-title">Actividad reciente</span>
             <RouterLink to="/contabilidad" class="ad__widget-link">Ver libro →</RouterLink>
           </div>
+
           <template v-if="actividadReciente.length">
             <div v-for="m in actividadReciente" :key="m.id" class="ad__feed-item">
-              <span class="ad__feed-ico">{{ m.tipo === 'ingreso' ? '💰' : '💸' }}</span>
+              <span class="ad__feed-ico">{{ movIco(m) }}</span>
               <div class="ad__feed-body">
                 <span class="ad__feed-desc">{{ m.descripcion || m.categoria }}</span>
                 <span class="ad__feed-meta">{{ fmtCompacto(m.monto_ars) }} · {{ timeAgo(m.created_at) }}</span>
@@ -419,6 +581,67 @@ async function onOnboardingCompletado() {
             Sin actividad registrada ·
             <RouterLink to="/contabilidad">Registrar →</RouterLink>
           </p>
+        </div>
+
+      </div>
+
+      <!-- ── ZONA 5: Finanzas + Sedes ────────────────────────────────────── -->
+      <div class="ad__bottom">
+
+        <!-- Gráfico financiero del mes -->
+        <div class="ad__chart-widget">
+          <div class="ad__widget-hdr">
+            <span class="ad__widget-title">{{ mesLabel }}</span>
+            <RouterLink to="/contabilidad" class="ad__widget-link">Ver detalle →</RouterLink>
+          </div>
+          <div class="ad__chart-wrap">
+            <canvas ref="chartCanvas" />
+          </div>
+          <div class="ad__chart-footer">
+            <div class="ad__chart-stat">
+              <span class="ad__chart-stat-lbl">Ingresos</span>
+              <span class="ad__chart-stat-val" style="color:#16a34a">{{ fmtCompacto(contable?.mes_actual?.ingresos) }}</span>
+            </div>
+            <div class="ad__chart-divider"></div>
+            <div class="ad__chart-stat">
+              <span class="ad__chart-stat-lbl">Egresos</span>
+              <span class="ad__chart-stat-val" style="color:#dc2626">{{ fmtCompacto(contable?.mes_actual?.egresos) }}</span>
+            </div>
+            <div class="ad__chart-divider"></div>
+            <div class="ad__chart-stat">
+              <span class="ad__chart-stat-lbl">Balance</span>
+              <span class="ad__chart-stat-val" :style="{ color: balancePositivo ? '#16a34a' : '#dc2626' }">
+                {{ fmtCompacto(balanceMes) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sedes en vivo -->
+        <div class="ad__widget">
+          <div class="ad__widget-hdr">
+            <span class="ad__widget-title">Sedes en vivo</span>
+            <RouterLink to="/sedes" class="ad__widget-link">Ver todas →</RouterLink>
+          </div>
+          <RouterLink
+            v-for="sede in sedes"
+            :key="sede.id"
+            :to="`/sedes/${sede.id}`"
+            class="ad__sede-row"
+          >
+            <span class="ad__sede-dot" :style="{ background: sedeDot(sede) }"></span>
+            <div class="ad__sede-info">
+              <span class="ad__sede-nombre">{{ sede.nombre }}</span>
+              <span class="ad__sede-meta">
+                {{ tipoLabel(sede.tipo) }}
+                <template v-if="(sede.salas_count || 0) > 0">
+                  · {{ sede.salas_count }} sala{{ sede.salas_count !== 1 ? 's' : '' }}
+                </template>
+              </span>
+            </div>
+            <span v-if="!(sede.salas_count || 0)" class="ad__sede-config">Configurar →</span>
+          </RouterLink>
+          <p v-if="!sedes.length" class="ad__empty ad__empty--pad">Sin sedes configuradas</p>
         </div>
 
       </div>
@@ -434,183 +657,137 @@ async function onOnboardingCompletado() {
   margin: 0 auto;
 }
 
-.ad__loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: calc(100vh - 56px);
-}
-
-/* ── ZONA 1: Header ─────────────────────────────────────────────────────── */
+/* ── Header ──────────────────────────────────────────────────────────────── */
 .ad__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
-
 .ad__saludo {
   font-size: 1.75rem;
   font-weight: 800;
   color: #0f172a;
   margin: 0;
 }
-
 .ad__fecha {
   font-size: .875rem;
   color: #64748b;
-  margin: .25rem 0 0;
+  margin: .2rem 0 0;
+}
+.ad__pulse {
+  font-size: .825rem;
+  color: #475569;
+  margin: .4rem 0 0;
+  font-weight: 500;
 }
 
-.ad__header-actions {
+/* ── Zona 1: Alertas ─────────────────────────────────────────────────────── */
+.ad__alertas {
   display: flex;
-  gap: .625rem;
-  align-items: center;
-  flex-shrink: 0;
-  padding-top: .25rem;
-}
-
-.ad__btn-quick {
-  display: inline-flex;
-  align-items: center;
+  flex-direction: column;
   gap: .375rem;
-  padding: .5rem .875rem;
-  font-size: .8rem;
-  font-weight: 600;
-  border-radius: 8px;
-  text-decoration: none;
-  border: 1px solid #e2e8f0;
-  color: #374151;
-  background: #fff;
-  transition: background .12s, border-color .12s;
-}
-.ad__btn-quick:hover { background: #f8fafc; border-color: #cbd5e1; }
-.ad__btn-quick--primary {
-  background: #16a34a;
-  color: #fff;
-  border-color: #16a34a;
-}
-.ad__btn-quick--primary:hover { background: #15803d; border-color: #15803d; }
-
-/* ── ZONA 2: KPIs operativos ─────────────────────────────────────────────── */
-.ad__kpis {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.ad__kpi {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 1.25rem 1.25rem 1rem;
-  min-height: 110px;
-  display: flex;
-  flex-direction: column;
-  gap: .35rem;
-  transition: box-shadow .15s;
-}
-.ad__kpi:hover { box-shadow: 0 4px 16px rgba(0,0,0,.07); }
-.ad__kpi--critico { border-color: #fca5a5; background: #fff5f5; }
-.ad__kpi--bajo    { border-color: #fde68a; background: #fffbeb; }
-
-.ad__kpi-label {
-  font-size: .625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: #94a3b8;
-}
-
-.ad__kpi-num {
-  font-size: 1.875rem;
-  font-weight: 800;
-  color: #0f172a;
-  line-height: 1;
-  font-family: var(--font-display);
-}
-
-.ad__kpi-sub {
-  font-size: .75rem;
-  color: #64748b;
-  margin-top: .125rem;
-}
-
-.ad__kpi-link {
-  color: #2563eb;
-  text-decoration: none;
-  font-size: .75rem;
-}
-.ad__kpi-link:hover { text-decoration: underline; }
-
-.ad__delta--pos { color: #16a34a; font-weight: 600; }
-.ad__delta--neg { color: #dc2626; font-weight: 600; }
-
-/* ── ZONA 3: Producción ──────────────────────────────────────────────────── */
-.ad__prod {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.75rem;
-}
-
-.ad__prod-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  margin-bottom: 1.25rem;
   border-radius: 10px;
-  padding: .875rem 1rem;
+  overflow: hidden;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+}
+.ad__alerta {
   display: flex;
-  flex-direction: column;
-  gap: .2rem;
+  align-items: center;
+  gap: .625rem;
+  padding: .625rem 1rem;
+  font-size: .825rem;
+  border-bottom: 1px solid rgba(0,0,0,.04);
 }
-
-.ad__prod-label {
-  font-size: .625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: #94a3b8;
+.ad__alerta:last-child { border-bottom: none; }
+.ad__alerta--rojo  { background: #fff5f5; }
+.ad__alerta--amber { background: #fffbeb; }
+.ad__alerta--verde { background: #f0fdf4; }
+.ad__alerta-ico   { font-size: 1rem; flex-shrink: 0; }
+.ad__alerta-texto { flex: 1; color: #374151; font-weight: 500; }
+.ad__alerta-cta   {
+  flex-shrink: 0;
+  font-size: .775rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  text-decoration: none;
+  padding: .25rem .625rem;
+  background: rgba(29,78,216,.08);
+  border-radius: 6px;
+  white-space: nowrap;
 }
+.ad__alerta-cta:hover { background: rgba(29,78,216,.15); }
 
-.ad__prod-num {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #0f172a;
-  line-height: 1.1;
-  font-family: var(--font-display);
-}
-.ad__prod-num--empty { color: #cbd5e1; }
-
-.ad__prod-sub {
-  font-size: .72rem;
-  color: #64748b;
-}
-
-/* ── ZONA 4: Pendientes ──────────────────────────────────────────────────── */
-.ad__body {
+/* ── Zona 2: KPIs en columnas ────────────────────────────────────────────── */
+.ad__kpi-cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.25rem;
   margin-bottom: 1.25rem;
 }
-
-.ad__col {
+.ad__kpi-group {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ad__kpi-group-label {
+  font-size: .6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: #94a3b8;
+  padding: .75rem 1.25rem .25rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.ad__kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.ad__kpi {
+  padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
+  gap: .2rem;
+  border-right: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+  min-height: 88px;
 }
+.ad__kpi:nth-child(2n) { border-right: none; }
+.ad__kpi:nth-last-child(-n+2) { border-bottom: none; }
 
+.ad__kpi-label {
+  font-size: .6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: #94a3b8;
+}
+.ad__kpi-num {
+  font-size: 1.625rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+  font-family: var(--font-display);
+}
+.ad__kpi-num--empty  { color: #cbd5e1; }
+.ad__kpi-num--alerta { color: #dc2626; }
+.ad__kpi-sub {
+  font-size: .72rem;
+  color: #64748b;
+  margin-top: .1rem;
+}
+.ad__delta--pos { color: #16a34a; font-weight: 600; }
+.ad__delta--neg { color: #dc2626; font-weight: 600; }
+
+/* ── Widget base ─────────────────────────────────────────────────────────── */
 .ad__widget {
   background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
-  flex: 1;
 }
-
-.ad__widget--mt { margin-top: 1rem; }
-
+.ad__widget--lotes { margin-bottom: 1.25rem; }
 .ad__widget-hdr {
   display: flex;
   align-items: center;
@@ -618,21 +795,13 @@ async function onOnboardingCompletado() {
   padding: .875rem 1rem;
   border-bottom: 1px solid #f1f5f9;
 }
-
-.ad__widget-title {
-  font-size: .8rem;
-  font-weight: 700;
-  color: #374151;
-  flex: 1;
-}
-
+.ad__widget-title { font-size: .8rem; font-weight: 700; color: #374151; flex: 1; }
 .ad__widget-link {
   font-size: .73rem;
   color: #64748b;
   text-decoration: none;
 }
 .ad__widget-link:hover { color: #0f172a; text-decoration: underline; }
-
 .ad__widget-cta {
   display: block;
   font-size: .75rem;
@@ -646,75 +815,13 @@ async function onOnboardingCompletado() {
 .ad__badge {
   font-size: .6rem;
   font-weight: 700;
-  background: #fef2f2;
-  color: #dc2626;
   border-radius: 99px;
   padding: .15em .5em;
+  background: #fef2f2;
+  color: #dc2626;
 }
-.ad__badge--amber {
-  background: #fffbeb;
-  color: #d97706;
-}
-
-.ad__item {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .5rem 1rem;
-  font-size: .8rem;
-  color: #374151;
-  text-decoration: none;
-  transition: background .1s;
-}
-.ad__item:hover { background: #f8fafc; }
-
-.ad__item-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ad__item-meta {
-  font-size: .72rem;
-  color: #94a3b8;
-  flex-shrink: 0;
-}
-
-.ad__item-tag {
-  font-size: .6rem;
-  font-weight: 700;
-  padding: .15em .45em;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-.ad__item-tag--rojo { background: #fef2f2; color: #dc2626; }
-
-.ad__item-arrow {
-  color: #cbd5e1;
-  font-size: .75rem;
-  flex-shrink: 0;
-  text-decoration: none;
-}
-
-.ad__item-more {
-  font-size: .75rem;
-  color: #94a3b8;
-  padding: .25rem 1rem;
-  margin: 0;
-}
-
-.ad__task-prio {
-  font-size: .6rem;
-  font-weight: 700;
-  padding: .15em .45em;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-.ad__task-prio--alta   { background: #fef2f2; color: #dc2626; }
-.ad__task-prio--normal { background: #eff6ff; color: #2563eb; }
-.ad__task-prio--baja   { background: #f8fafc; color: #64748b; }
+.ad__badge--green  { background: #f0fdf4; color: #16a34a; }
+.ad__badge--amber  { background: #fffbeb; color: #d97706; }
 
 .ad__empty {
   font-size: .8rem;
@@ -723,47 +830,110 @@ async function onOnboardingCompletado() {
   margin: 0;
 }
 .ad__empty--pad { padding: 1rem; }
+.ad__item-more { font-size: .72rem; color: #94a3b8; padding: .25rem 1rem; margin: 0; }
 
-/* Sedes */
-.ad__sede-row {
+/* ── Zona 3: Lotes activos ───────────────────────────────────────────────── */
+.ad__lotes-list {
+  display: flex;
+  flex-direction: column;
+}
+.ad__lote-card {
   display: flex;
   align-items: center;
-  gap: .75rem;
-  padding: .5rem 1rem;
   text-decoration: none;
-  color: inherit;
   border-bottom: 1px solid #f8fafc;
   transition: background .1s;
-}
-.ad__sede-row:last-child { border-bottom: none; }
-.ad__sede-row:hover { background: #f8fafc; }
-
-.ad__sede-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.ad__sede-nombre { font-size: .825rem; font-weight: 600; color: #0f172a; flex: 1; }
-.ad__sede-tipo   { font-size: .7rem; color: #94a3b8; }
-.ad__sede-info   { font-size: .75rem; color: #64748b; }
-.ad__sede-config { color: #2563eb; font-size: .72rem; }
-
-/* ── ZONA 5: Gráfico + Actividad ─────────────────────────────────────────── */
-.ad__bottom {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 1.25rem;
-}
-
-.ad__chart-widget {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
   overflow: hidden;
 }
+.ad__lote-card:last-child { border-bottom: none; }
+.ad__lote-card:hover { background: #f8fafc; }
 
-.ad__chart-wrap {
-  height: 200px;
-  padding: 1rem 1rem .75rem;
-  position: relative;
+.ad__lote-stripe { width: 3px; align-self: stretch; flex-shrink: 0; }
+.ad__lote-body   { flex: 1; padding: .75rem .875rem; min-width: 0; }
+.ad__lote-top {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .2rem;
+  flex-wrap: wrap;
+}
+.ad__lote-codigo {
+  font-size: .875rem;
+  font-weight: 800;
+  color: #0f172a;
+  font-family: monospace;
+}
+.ad__lote-badge {
+  font-size: .62rem;
+  font-weight: 700;
+  padding: .2em .55em;
+  border-radius: 999px;
+}
+.ad__lote-urgente {
+  font-size: .62rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fef3c7;
+  padding: .2em .55em;
+  border-radius: 999px;
+}
+.ad__lote-meta {
+  font-size: .72rem;
+  color: #64748b;
+  display: flex;
+  gap: .3rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.ad__lote-sep { color: #d1d5db; }
+.ad__lote-plantas {
+  display: flex;
+  align-items: baseline;
+  gap: .15rem;
+  padding: 0 .5rem;
+  flex-shrink: 0;
+}
+.ad__lote-plantas-num { font-size: 1rem; font-weight: 700; color: #0f172a; }
+.ad__lote-plantas-lbl { font-size: .65rem; color: #94a3b8; }
+.ad__lote-arr { color: #d1d5db; font-size: .75rem; padding-right: .875rem; flex-shrink: 0; }
+
+/* ── Zona 4: 2 columnas ─────────────────────────────────────────────────── */
+.ad__body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
 }
 
+/* Pacientes hoy */
+.ad__disp-item {
+  display: flex;
+  align-items: center;
+  gap: .625rem;
+  padding: .5rem 1rem;
+  border-bottom: 1px solid #f8fafc;
+  font-size: .8rem;
+}
+.ad__disp-item:last-of-type { border-bottom: none; }
+.ad__disp-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: .75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ad__disp-body { flex: 1; min-width: 0; }
+.ad__disp-nombre { display: block; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ad__disp-meta   { display: block; font-size: .7rem; color: #64748b; }
+.ad__disp-hora   { font-size: .7rem; color: #94a3b8; flex-shrink: 0; }
+
+/* Actividad */
 .ad__feed-item {
   display: flex;
   align-items: flex-start;
@@ -773,11 +943,64 @@ async function onOnboardingCompletado() {
   font-size: .8rem;
 }
 .ad__feed-item:last-child { border-bottom: none; }
-
 .ad__feed-ico  { flex-shrink: 0; font-size: 1rem; line-height: 1.5; }
 .ad__feed-body { flex: 1; min-width: 0; }
 .ad__feed-desc { display: block; color: #374151; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ad__feed-meta { display: block; font-size: .72rem; color: #94a3b8; margin-top: .1rem; }
+.ad__feed-meta { display: block; font-size: .7rem; color: #94a3b8; margin-top: .1rem; }
+
+/* ── Zona 5: Finanzas + Sedes ────────────────────────────────────────────── */
+.ad__bottom {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.25rem;
+}
+.ad__chart-widget {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ad__chart-wrap {
+  height: 180px;
+  padding: .875rem 1rem .5rem;
+  position: relative;
+}
+.ad__chart-footer {
+  display: flex;
+  align-items: center;
+  padding: .625rem 1.25rem;
+  border-top: 1px solid #f1f5f9;
+  gap: 0;
+}
+.ad__chart-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  align-items: center;
+}
+.ad__chart-stat-lbl { font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; }
+.ad__chart-stat-val { font-size: .875rem; font-weight: 800; }
+.ad__chart-divider  { width: 1px; height: 28px; background: #f1f5f9; flex-shrink: 0; }
+
+/* Sedes */
+.ad__sede-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .625rem 1rem;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 1px solid #f8fafc;
+  transition: background .1s;
+}
+.ad__sede-row:last-child { border-bottom: none; }
+.ad__sede-row:hover { background: #f8fafc; }
+.ad__sede-dot    { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ad__sede-info   { flex: 1; min-width: 0; }
+.ad__sede-nombre { display: block; font-size: .825rem; font-weight: 600; color: #0f172a; }
+.ad__sede-meta   { display: block; font-size: .7rem; color: #94a3b8; margin-top: .1rem; }
+.ad__sede-config { font-size: .72rem; color: #2563eb; flex-shrink: 0; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 1200px) {
@@ -785,16 +1008,13 @@ async function onOnboardingCompletado() {
 }
 
 @media (max-width: 1023px) {
-  .ad__kpis  { grid-template-columns: repeat(2, 1fr); }
-  .ad__prod  { grid-template-columns: repeat(2, 1fr); }
-  .ad__body  { grid-template-columns: 1fr; }
+  .ad__kpi-cols { grid-template-columns: 1fr; }
+  .ad__body     { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
   .ad          { padding: 1rem; }
-  .ad__kpis    { grid-template-columns: repeat(2, 1fr); }
-  .ad__prod    { grid-template-columns: repeat(2, 1fr); }
-  .ad__kpi-num { font-size: 1.5rem; }
-  .ad__header  { flex-direction: column; }
+  .ad__saludo  { font-size: 1.35rem; }
+  .ad__kpi-num { font-size: 1.375rem; }
 }
 </style>
