@@ -400,6 +400,8 @@ export const transicionarLote  = (loteId, payload) => api.post(`/lotes/${loteId}
 export const avanzarFaseLote   = (loteId, payload = {}) => api.post(`/lotes/${loteId}/avanzar_fase`, payload)
 export const cerrarCurado      = (loteId, payload) => api.post(`/lotes/${loteId}/cerrar_curado`, payload)
 export const getLoteTimeline  = (loteId)          => api.get(`/lotes/${loteId}/timeline`)
+export const previewLotePlan  = (loteId, planId)  => api.get(`/lotes/${loteId}/preview_plan`, { params: { plan_trabajo_id: planId } })
+export const aplicarLotePlan  = (loteId, planId)  => api.post(`/lotes/${loteId}/aplicar_plan`, { plan_trabajo_id: planId })
 
 // ── Pesadas ───────────────────────────────────────────────────────────────────
 export const getPesadas     = (loteId)          => api.get(`/lotes/${loteId}/pesadas`)

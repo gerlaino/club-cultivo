@@ -102,6 +102,8 @@ Rails.application.routes.draw do
         post  :finalizar_pesaje_manicura
         patch :completar_datos
         get   :timeline
+        get   :preview_plan
+        post  :aplicar_plan
       end
     end
 

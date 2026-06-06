@@ -1,0 +1,80 @@
+class AplicarPlanLoteService
+  DIAS_A_WDAY = { 'lun' => 1, 'mar' => 2, 'mie' => 3, 'jue' => 4, 'vie' => 5, 'sab' => 6, 'dom' => 0 }.freeze
+
+  def initialize(lote:, plan:, ejecutado_por:)
+    @lote          = lote
+    @plan          = plan
+    @ejecutado_por = ejecutado_por
+  end
+
+  def preview
+    calcular_propuestas
+  end
+
+  def aplicar!
+    propuestas = calcular_propuestas
+    creadas    = []
+    ActiveRecord::Base.transaction do
+      propuestas.each do |td|
+        creadas << @lote.club.tareas.create!(
+          titulo:           td[:titulo],
+          tipo:             td[:tipo],
+          estado:           'pendiente',
+          prioridad:        td[:prioridad],
+          asignada_a_id:    td[:responsable_id],
+          sala_id:          @lote.sala_id,
+          lote_id:          @lote.id,
+          fecha_programada: Date.parse(td[:fecha]),
+          recurrente:       false,
+          creada_por:       @ejecutado_por,
+          origen_plan_id:   @plan.id,
+          plan_tarea_id:    td[:plan_tarea_id],
+        )
+      end
+    end
+    creadas
+  end
+
+  private
+
+  def calcular_propuestas
+    base     = @lote.start_date
+    offset   = (base - @plan.fecha_inicio).to_i
+    fin_date = @plan.fecha_fin + offset.days
+
+    tareas = []
+
+    @plan.plan_tareas.includes(:responsable).each do |pt|
+      if pt.es_recurrente? && pt.dias_semana.present?
+        wdays = pt.dias_array.filter_map { |d| DIAS_A_WDAY[d] }
+        fecha = base
+        while fecha <= fin_date
+          tareas << serializar(pt, fecha) if wdays.include?(fecha.wday)
+          fecha += 1.day
+        end
+      else
+        fecha = if pt.fecha_especifica.present?
+                  pt.fecha_especifica + offset.days
+                else
+                  base
+                end
+        tareas << serializar(pt, fecha)
+      end
+    end
+
+    tareas.sort_by { |t| t[:fecha] }
+  end
+
+  def serializar(pt, fecha)
+    {
+      plan_tarea_id:  pt.id,
+      titulo:         pt.titulo.presence || pt.tipo.humanize,
+      tipo:           pt.tipo,
+      prioridad:      pt.prioridad,
+      responsable_id: pt.responsable_id,
+      responsable:    pt.responsable&.nombre_completo,
+      es_recurrente:  pt.es_recurrente,
+      fecha:          fecha.to_s,
+    }
+  end
+end

@@ -1,6 +1,13 @@
 <template>
   <div class="tl">
 
+    <!-- Header con acción aplicar plan -->
+    <div v-if="canAdmin" class="tl__header">
+      <button class="tl__btn-plan" @click="showAplicarPlan = true">
+        <i class="bi bi-calendar2-check"></i> Aplicar plan
+      </button>
+    </div>
+
     <div v-if="loading" class="tl__loading">
       <DsSpinner :size="40" />
     </div>
@@ -207,6 +214,14 @@
       </div>
     </Teleport>
 
+    <!-- Modal aplicar plan -->
+    <LoteAplicarPlanModal
+      v-if="showAplicarPlan"
+      :lote="lote"
+      @close="showAplicarPlan = false"
+      @applied="onPlanAplicado"
+    />
+
   </div>
 </template>
 
@@ -215,11 +230,20 @@ import { ref, computed, onMounted } from 'vue'
 import { listTareas, updateTarea, createRegistroAmbiental, createLoteEvento } from '../lib/api.js'
 import { useTareasStore } from '../stores/tareas'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import LoteAplicarPlanModal from './lotes/LoteAplicarPlanModal.vue'
 
 const props = defineProps({
-  lote: { type: Object, required: true }
+  lote:     { type: Object,  required: true },
+  canAdmin: { type: Boolean, default: false },
 })
 const emit = defineEmits(['tarea-completada', 'horas-aplicadas'])
+
+const showAplicarPlan = ref(false)
+
+function onPlanAplicado() {
+  showAplicarPlan.value = false
+  cargarTareas()
+}
 
 const tareasStore = useTareasStore()
 const tareas      = ref([])
@@ -431,4 +455,12 @@ async function confirmarRegistroLote() {
 .tl__btn-success { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .tl__btn-success:hover { background: #104417; }
 .tl__btn-success:disabled { opacity: .6; cursor: not-allowed; }
+.tl__header { display: flex; justify-content: flex-end; padding: .5rem 1rem .2rem; }
+.tl__btn-plan {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: none; border: 1px solid #d4e6d4; color: #15803d;
+  font-size: .75rem; font-weight: 600; padding: .3rem .7rem;
+  border-radius: 6px; cursor: pointer; transition: all .15s;
+}
+.tl__btn-plan:hover { background: #f0fdf4; border-color: #15803d; }
 </style>

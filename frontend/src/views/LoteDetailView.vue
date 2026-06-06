@@ -370,7 +370,7 @@ onUnmounted(() => {
               <i class="bi ld__chevron" :class="tareasExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </button>
             <div v-show="tareasExpanded" class="ld__section-body">
-              <TareasDelLote :lote="lote" />
+              <TareasDelLote :lote="lote" :can-admin="canAdmin" />
             </div>
           </div>
 

@@ -535,6 +535,36 @@ class LotesController < ApplicationController
     end
   end
 
+  # GET /lotes/:id/preview_plan?plan_trabajo_id=X
+  def preview_plan
+    unless current_user.admin? || current_user.supervisor?
+      return render json: { error: 'Sin permiso' }, status: :forbidden
+    end
+    plan = current_user.club.plan_trabajos.publicados.find(params[:plan_trabajo_id])
+    tareas = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user).preview
+    render json: {
+      plan:   { id: plan.id, titulo: plan.titulo, duracion_dias: plan.duracion_dias },
+      tareas: tareas,
+      total:  tareas.size,
+    }
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Plan no encontrado' }, status: :not_found
+  end
+
+  # POST /lotes/:id/aplicar_plan
+  def aplicar_plan
+    unless current_user.admin? || current_user.supervisor?
+      return render json: { error: 'Sin permiso' }, status: :forbidden
+    end
+    plan = current_user.club.plan_trabajos.publicados.find(params[:plan_trabajo_id])
+    creadas = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user).aplicar!
+    render json: { tareas_creadas: creadas.size }
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Plan no encontrado' }, status: :not_found
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   # POST /lotes/:id/avanzar_fase
   def avanzar_fase
     authorize @lote, :avanzar_fase?
