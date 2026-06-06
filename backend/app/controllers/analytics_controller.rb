@@ -282,11 +282,17 @@ class AnalyticsController < ApplicationController
       }
     end.sort_by { |l| -(l[:rendimiento_g] || 0) }
 
+    regresiones = TIPOS_CORRELACION.each_with_object({}) do |tipo, h|
+      pairs = lotes_data.filter_map { |l| v = l[tipo.to_sym]; [v, l[:rendimiento_g]] if v }
+      h[tipo.to_sym] = regresion_lineal(pairs.map(&:first), pairs.map(&:last))
+    end
+
     {
       lotes:            lotes_data,
       vpd_buckets:      agrupar_buckets(lotes_data, :vpd,         VPD_BUCKETS),
       temp_buckets:     agrupar_buckets(lotes_data, :temperatura,  TEMP_BUCKETS),
       ph_buckets:       agrupar_buckets(lotes_data, :ph,           PH_BUCKETS),
+      regresiones:,
       total_con_datos:  lotes_data.size,
       total_finalizados: lotes.count,
     }
@@ -465,6 +471,24 @@ class AnalyticsController < ApplicationController
     }
   end
 
+  # GET /api/analytics/ejecutivo
+  # Resumen anual — KPIs del año en curso vs año anterior
+  def ejecutivo
+    unless %w[admin supervisor super_admin].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    club         = current_user.club
+    año_actual   = Date.today.year
+    año_anterior = año_actual - 1
+
+    render json: {
+      año:      año_actual,
+      actual:   kpis_anuales(club, año_actual),
+      anterior: kpis_anuales(club, año_anterior),
+    }
+  end
+
   # GET /api/analytics/pl_lotes
   # Para: admin, supervisor
   def pl_lotes
@@ -517,5 +541,90 @@ class AnalyticsController < ApplicationController
     render json: { lotes: filas }
   end
 
-  private :calcular_rendimiento_genetica, :calcular_dispensador
+  def kpis_anuales(club, año)
+    inicio = Date.new(año, 1, 1)
+    fin    = Date.new(año, 12, 31)
+
+    lotes_año = club.lotes
+                    .where("EXTRACT(YEAR FROM COALESCE(start_date, created_at::date)) = ?", año)
+
+    gramos_producidos = lotes_año.where.not(rendimiento_real_g: nil)
+                                 .sum(:rendimiento_real_g).to_f.round(2)
+    ciclos_cerrados   = lotes_año.where(estado: 'finalizado').count
+
+    base_disps = Dispensacion.joins(:stock)
+                             .where(stocks: { club_id: club.id })
+                             .where(fecha_dispensacion: inicio..fin)
+
+    ingresos           = base_disps.sum('dispensaciones.cantidad * COALESCE(dispensaciones.precio_unitario_ars, 0)').to_f.round(2)
+    gramos_dispensados = base_disps.sum(:cantidad).to_f.round(2)
+
+    costo_total = CostoLote.joins(:lote)
+                           .where(lotes: { club_id: club.id })
+                           .where("EXTRACT(YEAR FROM COALESCE(lotes.start_date, lotes.created_at::date)) = ?", año)
+                           .sum(:costo_total).to_f.round(2)
+
+    margen     = (ingresos - costo_total).round(2)
+    margen_pct = ingresos > 0 ? (margen / ingresos * 100).round(1) : nil
+
+    {
+      gramos_producidos:,
+      gramos_dispensados:,
+      ingresos:,
+      costo_total:,
+      margen:,
+      margen_pct:,
+      ciclos_cerrados:,
+    }
+  end
+
+  def pearson_r(xs, ys)
+    n = xs.size
+    return nil if n < 3
+
+    mx = xs.sum.to_f / n
+    my = ys.sum.to_f / n
+    num = xs.zip(ys).sum { |x, y| (x - mx) * (y - my) }
+    den = Math.sqrt(xs.sum { |x| (x - mx)**2 } * ys.sum { |y| (y - my)**2 })
+    return nil if den < 1e-10
+    (num / den).round(3)
+  rescue
+    nil
+  end
+
+  def regresion_lineal(xs, ys)
+    n = xs.size
+    return nil if n < 3
+
+    r = pearson_r(xs, ys)
+    return nil unless r
+
+    mx = xs.sum.to_f / n
+    my = ys.sum.to_f / n
+    ss_xy = xs.zip(ys).sum { |x, y| (x - mx) * (y - my) }
+    ss_xx = xs.sum { |x| (x - mx)**2 }
+    return nil if ss_xx < 1e-10
+
+    slope     = (ss_xy / ss_xx).round(4)
+    intercept = (my - slope * mx).round(2)
+    min_x     = xs.min.round(3)
+    max_x     = xs.max.round(3)
+
+    {
+      r:,
+      r_squared:   (r**2).round(3),
+      slope:,
+      intercept:,
+      n:,
+      x_min:       min_x,
+      x_max:       max_x,
+      y_at_xmin:   (slope * min_x + intercept).round(1),
+      y_at_xmax:   (slope * max_x + intercept).round(1),
+    }
+  rescue
+    nil
+  end
+
+  private :calcular_rendimiento_genetica, :calcular_dispensador, :kpis_anuales,
+          :pearson_r, :regresion_lineal
 end

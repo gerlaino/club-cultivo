@@ -5,7 +5,7 @@ import Chart from 'chart.js/auto'
 import {
   listSedes, getContableDashboard, listLotes,
   getAnalyticsDispensador, listStocksPendientes,
-  listDispensacionesFecha,
+  listDispensacionesFecha, getAnalyticsEjecutivo,
 } from '../../lib/api.js'
 import { useAuthStore }  from '../../stores/auth.js'
 import { useClubStore }  from '../../stores/club.js'
@@ -29,6 +29,7 @@ const analyticsDisp          = ref(null)
 const lotesEnFloracion       = ref([])
 const lotesActivos           = ref([])
 const dispensacionesHoy      = ref([])
+const ejecutivo              = ref(null)
 const loading                = ref(true)
 
 const chartCanvas   = ref(null)
@@ -206,6 +207,22 @@ const pulseLine = computed(() => {
   return partes.join(' · ')
 })
 
+// ── Resumen anual ───────────────────────────────────────────────────────────
+
+const añoActual = new Date().getFullYear()
+
+const ejActual   = computed(() => ejecutivo.value?.actual   ?? null)
+const ejAnterior = computed(() => ejecutivo.value?.anterior ?? null)
+
+function deltaAnual(campo) {
+  const a = ejActual.value?.[campo]
+  const b = ejAnterior.value?.[campo]
+  if (a == null || b == null || b === 0) return null
+  return ((a - b) / Math.abs(b) * 100).toFixed(1)
+}
+
+function fmtG(v) { return v != null ? `${Number(v).toLocaleString('es-AR')} g` : '—' }
+
 // ── Lotes activos (Zona 3) ─────────────────────────────────────────────────
 
 const ESTADO_COLOR = {
@@ -321,7 +338,7 @@ const todayISO = new Date().toISOString().slice(0, 10)
 
 onMounted(async () => {
   try {
-    const [sedesRes, contableRes, manicuraRes, dispRes, stocksRes, floracionRes, lotesRes, dispHoyRes] =
+    const [sedesRes, contableRes, manicuraRes, dispRes, stocksRes, floracionRes, lotesRes, dispHoyRes, ejecutivoRes] =
       await Promise.allSettled([
         listSedes(),
         getContableDashboard(),
@@ -331,17 +348,19 @@ onMounted(async () => {
         listLotes({ estado: 'floracion', limit: 20 }),
         listLotes({ limit: 8 }),
         listDispensacionesFecha({ fecha: todayISO }),
+        getAnalyticsEjecutivo(),
       ])
     await Promise.allSettled([statsStore.fetchAll(), tareasStore.fetchDashboard()])
 
-    if (sedesRes.status     === 'fulfilled') sedes.value                  = sedesRes.value.data   || []
-    if (contableRes.status  === 'fulfilled') contable.value               = contableRes.value.data
-    if (manicuraRes.status  === 'fulfilled') lotesManicuraPendiente.value = manicuraRes.value.data || []
-    if (dispRes.status      === 'fulfilled') analyticsDisp.value          = dispRes.value.data
-    if (stocksRes.status    === 'fulfilled') stocksPendientes.value       = stocksRes.value.data  || []
-    if (floracionRes.status === 'fulfilled') lotesEnFloracion.value       = floracionRes.value.data || []
-    if (lotesRes.status     === 'fulfilled') lotesActivos.value           = lotesRes.value.data   || []
-    if (dispHoyRes.status   === 'fulfilled') dispensacionesHoy.value      = dispHoyRes.value.data || []
+    if (sedesRes.status      === 'fulfilled') sedes.value                  = sedesRes.value.data    || []
+    if (contableRes.status   === 'fulfilled') contable.value               = contableRes.value.data
+    if (manicuraRes.status   === 'fulfilled') lotesManicuraPendiente.value = manicuraRes.value.data  || []
+    if (dispRes.status       === 'fulfilled') analyticsDisp.value          = dispRes.value.data
+    if (stocksRes.status     === 'fulfilled') stocksPendientes.value       = stocksRes.value.data   || []
+    if (floracionRes.status  === 'fulfilled') lotesEnFloracion.value       = floracionRes.value.data || []
+    if (lotesRes.status      === 'fulfilled') lotesActivos.value           = lotesRes.value.data    || []
+    if (dispHoyRes.status    === 'fulfilled') dispensacionesHoy.value      = dispHoyRes.value.data  || []
+    if (ejecutivoRes.status  === 'fulfilled') ejecutivo.value              = ejecutivoRes.value.data
 
     if (contable.value?.mes_actual?.por_semana?.length)
       initChart(contable.value.mes_actual.por_semana)
@@ -475,6 +494,57 @@ async function onOnboardingCompletado() {
           </div>
         </div>
 
+      </div>
+
+      <!-- ── ZONA 2.5: RESUMEN ANUAL ───────────────────────────────────────── -->
+      <div v-if="ejActual" class="ad__anual">
+        <div class="ad__anual-hdr">
+          <span class="ad__anual-title">Resumen {{ añoActual }}</span>
+          <RouterLink to="/analitica" class="ad__widget-link">Ver analítica →</RouterLink>
+        </div>
+        <div class="ad__anual-grid">
+
+          <div class="ad__anual-kpi">
+            <span class="ad__anual-lbl">Gramos producidos</span>
+            <span class="ad__anual-val">{{ fmtG(ejActual.gramos_producidos) }}</span>
+            <span v-if="deltaAnual('gramos_producidos')" class="ad__anual-delta"
+                  :class="Number(deltaAnual('gramos_producidos')) >= 0 ? 'ad__anual-delta--pos' : 'ad__anual-delta--neg'">
+              {{ Number(deltaAnual('gramos_producidos')) >= 0 ? '↑' : '↓' }} {{ Math.abs(deltaAnual('gramos_producidos')) }}% vs {{ añoActual - 1 }}
+            </span>
+          </div>
+
+          <div class="ad__anual-kpi">
+            <span class="ad__anual-lbl">Ingresos {{ añoActual }}</span>
+            <span class="ad__anual-val" style="color:#16a34a">{{ fmtCompacto(ejActual.ingresos) }}</span>
+            <span v-if="deltaAnual('ingresos')" class="ad__anual-delta"
+                  :class="Number(deltaAnual('ingresos')) >= 0 ? 'ad__anual-delta--pos' : 'ad__anual-delta--neg'">
+              {{ Number(deltaAnual('ingresos')) >= 0 ? '↑' : '↓' }} {{ Math.abs(deltaAnual('ingresos')) }}% vs {{ añoActual - 1 }}
+            </span>
+          </div>
+
+          <div class="ad__anual-kpi">
+            <span class="ad__anual-lbl">Margen</span>
+            <span class="ad__anual-val" :style="{ color: ejActual.margen >= 0 ? '#16a34a' : '#dc2626' }">
+              {{ fmtCompacto(ejActual.margen) }}
+              <small v-if="ejActual.margen_pct != null" style="font-size:.65em;font-weight:600">
+                ({{ ejActual.margen_pct }}%)
+              </small>
+            </span>
+            <span v-if="deltaAnual('margen')" class="ad__anual-delta"
+                  :class="Number(deltaAnual('margen')) >= 0 ? 'ad__anual-delta--pos' : 'ad__anual-delta--neg'">
+              {{ Number(deltaAnual('margen')) >= 0 ? '↑' : '↓' }} {{ Math.abs(deltaAnual('margen')) }}% vs {{ añoActual - 1 }}
+            </span>
+          </div>
+
+          <div class="ad__anual-kpi">
+            <span class="ad__anual-lbl">Ciclos cerrados</span>
+            <span class="ad__anual-val">{{ ejActual.ciclos_cerrados }}</span>
+            <span v-if="ejAnterior" class="ad__anual-delta ad__anual-delta--neutral">
+              {{ ejAnterior.ciclos_cerrados }} en {{ añoActual - 1 }}
+            </span>
+          </div>
+
+        </div>
       </div>
 
       <!-- ── ZONA 3: LOTES ACTIVOS ───────────────────────────────────────── -->
@@ -1017,4 +1087,46 @@ async function onOnboardingCompletado() {
   .ad__saludo  { font-size: 1.35rem; }
   .ad__kpi-num { font-size: 1.375rem; }
 }
+
+/* ── Resumen anual ────────────────────────────────────────────────────────── */
+.ad__anual {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+.ad__anual-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .75rem 1.25rem .375rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.ad__anual-title {
+  font-size: .6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: #94a3b8;
+}
+.ad__anual-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 767px) { .ad__anual-grid { grid-template-columns: repeat(2, 1fr); } }
+.ad__anual-kpi {
+  padding: .875rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  border-right: 1px solid #f1f5f9;
+}
+.ad__anual-kpi:last-child { border-right: none; }
+.ad__anual-lbl  { font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }
+.ad__anual-val  { font-size: 1.35rem; font-weight: 800; color: #0f172a; line-height: 1.15; letter-spacing: -.03em; }
+.ad__anual-delta { font-size: .72rem; font-weight: 600; }
+.ad__anual-delta--pos { color: #16a34a; }
+.ad__anual-delta--neg { color: #dc2626; }
+.ad__anual-delta--neutral { color: #94a3b8; }
 </style>

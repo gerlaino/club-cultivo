@@ -452,6 +452,7 @@ export const getAnalyticsDispensador      = ()            => api.get('/analytics
 export const getAnalyticsProduccion       = (params = {}) => api.get('/analytics/produccion',              { params })
 export const getAnalyticsCorrelacion      = (params = {}) => api.get('/analytics/correlacion_ambiental',   { params })
 export const getAnalyticsPL               = ()            => api.get('/analytics/pl_lotes')
+export const getAnalyticsEjecutivo        = ()            => api.get('/analytics/ejecutivo')
 export const getLotePL                    = (id)          => api.get(`/lotes/${id}/pl`)
 
 // ── Alertas internas ──────────────────────────────────────────────────────────

@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { getAnalyticsRendimiento, getAnalyticsProduccion, getAnalyticsCorrelacion } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import Chart from 'chart.js/auto'
 
 const tab        = ref('geneticas')
 const loading    = ref(false)
@@ -147,8 +148,95 @@ const corrMeta     = computed(() => ({
   total_con_datos:   dataCorr.value?.total_con_datos   ?? 0,
   total_finalizados: dataCorr.value?.total_finalizados ?? 0,
 }))
-
 const corrBestLote = computed(() => corrLotes.value[0] ?? null)
+
+// ── Scatter chart ─────────────────────────────────────────────────
+const VARS_SCATTER = ['vpd', 'temperatura', 'humedad', 'ph', 'co2', 'ec', 'ppfd']
+const VAR_LABELS   = { vpd: 'VPD (kPa)', temperatura: 'Temperatura (°C)', humedad: 'Humedad (%)',
+                       ph: 'pH', co2: 'CO₂ (ppm)', ec: 'EC (mS/cm)', ppfd: 'PPFD' }
+const corrVarSeleccionada = ref('vpd')
+const scatterCanvas       = ref(null)
+let   scatterChart        = null
+
+const corrRegresiones = computed(() => dataCorr.value?.regresiones ?? {})
+const scatterInfo     = computed(() => corrRegresiones.value[corrVarSeleccionada.value] ?? null)
+const scatterPoints   = computed(() =>
+  corrLotes.value
+    .filter(l => l[corrVarSeleccionada.value] != null)
+    .map(l => ({ x: l[corrVarSeleccionada.value], y: l.rendimiento_g, label: l.codigo }))
+)
+
+function initScatterChart() {
+  if (!scatterCanvas.value) return
+  if (scatterChart) { scatterChart.destroy(); scatterChart = null }
+  if (!scatterPoints.value.length) return
+
+  const reg      = scatterInfo.value
+  const varLabel = VAR_LABELS[corrVarSeleccionada.value] || corrVarSeleccionada.value
+  const datasets = [
+    {
+      type:            'scatter',
+      label:           'Lotes',
+      data:            scatterPoints.value,
+      backgroundColor: 'rgba(21,128,61,.65)',
+      pointRadius:     6,
+      pointHoverRadius: 8,
+    },
+  ]
+
+  if (reg) {
+    datasets.push({
+      type:            'line',
+      label:           `Tendencia (r²=${reg.r_squared})`,
+      data:            [{ x: reg.x_min, y: reg.y_at_xmin }, { x: reg.x_max, y: reg.y_at_xmax }],
+      borderColor:     'rgba(220,38,38,.7)',
+      backgroundColor: 'transparent',
+      borderWidth:     2,
+      pointRadius:     0,
+      tension:         0,
+    })
+  }
+
+  scatterChart = new Chart(scatterCanvas.value, {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: !!reg, position: 'bottom', labels: { color: '#64748b', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              if (ctx.datasetIndex === 0) return `${ctx.raw.label}: x=${ctx.raw.x}, ${ctx.raw.y} g`
+              return null
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          title: { display: true, text: varLabel, color: '#64748b', font: { size: 11 } },
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+          grid:  { color: '#f8fafc' },
+        },
+        y: {
+          title: { display: true, text: 'Rendimiento (g)', color: '#64748b', font: { size: 11 } },
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+          grid:  { color: '#f1f5f9' },
+          beginAtZero: false,
+        },
+      },
+    },
+  })
+}
+
+watch([corrVarSeleccionada, () => dataCorr.value], async () => {
+  await nextTick()
+  initScatterChart()
+})
+
+onUnmounted(() => { if (scatterChart) scatterChart.destroy() })
 
 function exportCsvAmbiente() {
   const headers = ['Lote','Genética','Rend. (g)','Desvío %','Temperatura','Humedad %','VPD kPa','pH','CO₂ ppm','EC mS/cm','PPFD','N° registros']
@@ -560,6 +648,45 @@ function bucketColor(desv) {
           </div>
         </div>
 
+        <!-- Scatter chart: variable ambiental vs rendimiento -->
+        <div class="an__card" style="margin-bottom:1.25rem">
+          <div class="an__card-header">
+            <span class="an__card-title">Correlación ambiental vs rendimiento</span>
+            <span
+              v-if="scatterInfo"
+              class="an__r2-badge"
+              :class="scatterInfo.r_squared >= 0.5 ? 'an__r2-badge--strong' : scatterInfo.r_squared >= 0.25 ? 'an__r2-badge--moderate' : 'an__r2-badge--weak'"
+            >r² = {{ scatterInfo.r_squared }} · n={{ scatterInfo.n }}</span>
+            <span v-else-if="scatterPoints.length >= 3" class="an__r2-badge an__r2-badge--weak">Sin regresión (n={{ scatterPoints.length }})</span>
+          </div>
+
+          <div class="an__scatter-vars">
+            <button
+              v-for="v in VARS_SCATTER"
+              :key="v"
+              class="an__scatter-var-btn"
+              :class="{ 'an__scatter-var-btn--active': corrVarSeleccionada === v }"
+              @click="corrVarSeleccionada = v"
+            >{{ VAR_LABELS[v] }}</button>
+          </div>
+
+          <div v-if="!scatterPoints.length" class="an__empty" style="padding:1.5rem 1.25rem">
+            Sin lotes con datos de {{ VAR_LABELS[corrVarSeleccionada] }}.
+          </div>
+          <div v-else class="an__scatter-wrap">
+            <canvas ref="scatterCanvas" />
+          </div>
+
+          <div v-if="scatterInfo" class="an__scatter-footer">
+            <span class="an__scatter-eq">
+              ŷ = {{ scatterInfo.slope >= 0 ? '+' : '' }}{{ scatterInfo.slope }}·x {{ scatterInfo.intercept >= 0 ? '+' : '' }}{{ scatterInfo.intercept }}
+            </span>
+            <span v-if="scatterInfo.n < 10" class="an__scatter-warn">
+              ⚠️ Baja confianza estadística ({{ scatterInfo.n }} lotes — se recomiendan ≥10)
+            </span>
+          </div>
+        </div>
+
         <!-- Buckets: VPD / Temperatura / pH -->
         <div class="an__corr-insights">
 
@@ -850,4 +977,18 @@ function bucketColor(desv) {
 .an__corr-bucket-vals { display: flex; align-items: center; justify-content: space-between; }
 .an__corr-rend { font-size: .72rem; color: #64748b; }
 .an__vpd-chip { display: inline-block; padding: .12em .45em; border-radius: 5px; font-size: .75rem; font-weight: 700; }
+
+/* Scatter chart */
+.an__r2-badge { font-size: .72rem; font-weight: 700; padding: .18em .6em; border-radius: 999px; }
+.an__r2-badge--strong   { background: rgba(21,128,61,.1);  color: #15803d; }
+.an__r2-badge--moderate { background: rgba(217,119,6,.1);  color: #b45309; }
+.an__r2-badge--weak     { background: #f1f5f9; color: #94a3b8; }
+.an__scatter-vars { display: flex; gap: .35rem; flex-wrap: wrap; padding: .75rem 1.1rem; border-bottom: 1px solid #f1f5f9; }
+.an__scatter-var-btn { padding: .25rem .65rem; font-size: .72rem; font-weight: 600; border: 1.5px solid #e2e8f0; border-radius: 999px; background: #f8fafc; color: #64748b; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.an__scatter-var-btn:hover { border-color: #1b5e20; color: #1b5e20; }
+.an__scatter-var-btn--active { background: #1b5e20; border-color: #1b5e20; color: #fff; }
+.an__scatter-wrap { height: 280px; padding: 1rem 1.1rem .5rem; }
+.an__scatter-footer { display: flex; align-items: center; gap: 1rem; padding: .5rem 1.1rem .875rem; flex-wrap: wrap; }
+.an__scatter-eq   { font-size: .75rem; color: #64748b; font-family: monospace; }
+.an__scatter-warn { font-size: .72rem; color: #b45309; background: rgba(217,119,6,.08); padding: .2em .55em; border-radius: 5px; }
 </style>
