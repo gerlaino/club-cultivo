@@ -290,10 +290,50 @@ class SalasController < ApplicationController
   end
 
   def serialize_sala_detail(s)
-    serialize_sala(s).merge(
-      lotes: s.lotes.order(created_at: :desc).map { |l|
-        { id: l.id, codigo: l.codigo, estado: l.estado, plants_count: l.plants_count }
+    lotes_all = s.lotes.includes(:genetica).order(start_date: :desc, created_at: :desc)
+    lote_ids  = lotes_all.map(&:id)
+
+    fecha_cosecha_por_lote =
+      lote_ids.any? ?
+        Plant.where(lote_id: lote_ids)
+             .where.not(fecha_cosecha: nil)
+             .group(:lote_id)
+             .maximum(:fecha_cosecha)
+      : {}
+
+    lotes_historial = lotes_all.map do |l|
+      fecha_cosecha = fecha_cosecha_por_lote[l.id]
+      duracion = l.start_date && fecha_cosecha ? (fecha_cosecha.to_date - l.start_date).to_i : nil
+      {
+        id:                 l.id,
+        codigo:             l.codigo,
+        estado:             l.estado,
+        start_date:         l.start_date,
+        plants_count:       l.plants_count,
+        genetica_nombre:    l.genetica&.nombre,
+        rendimiento_real_g: l.rendimiento_real_g&.to_f,
+        fecha_cosecha:      fecha_cosecha,
+        duracion_dias:      duracion,
       }
+    end
+
+    vals_rend      = lotes_historial.filter_map { |l| l[:rendimiento_real_g] }
+    ciclos_fin     = lotes_historial.count { |l| l[:estado] == 'finalizado' }
+    duraciones     = lotes_historial.filter_map { |l| l[:duracion_dias] }
+
+    historial_kpis = {
+      total_ciclos:           lotes_historial.size,
+      ciclos_finalizados:     ciclos_fin,
+      duracion_promedio_dias: duraciones.any? ? (duraciones.sum.to_f / duraciones.size).round(0).to_i : nil,
+      rendimiento_promedio_g: vals_rend.any? ? (vals_rend.sum / vals_rend.size).round(1) : nil,
+    }
+
+    serialize_sala(s).merge(
+      lotes: lotes_all.map { |l|
+        { id: l.id, codigo: l.codigo, estado: l.estado, plants_count: l.plants_count }
+      },
+      lotes_historial:,
+      historial_kpis:,
     )
   end
 end

@@ -18,6 +18,7 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import SemaforoAmbiente from '../components/ambiente/SemaforoAmbiente.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import SalaLayoutGrid from '../components/salas/SalaLayoutGrid.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -624,6 +625,15 @@ async function cargarAmbienteMini() {
 const canSeeAmbiente = computed(() =>
   auth.role === 'admin' || auth.role === 'cultivador'
 )
+
+// ── Tabs (Layout / Historial) ──────────────────────────────
+const tabActiva = ref('lotes')
+
+const lotesActivos = computed(() =>
+  (sala.value?.lotes_historial || []).filter(l => !['finalizado', 'curado'].includes(l.estado))
+)
+const historialLotes = computed(() => sala.value?.lotes_historial || [])
+const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 </script>
 
 <template>
@@ -712,11 +722,18 @@ const canSeeAmbiente = computed(() =>
         </div>
       </div>
 
+      <!-- Tabs -->
+      <div class="sd__tabs">
+        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'lotes' }" @click="tabActiva = 'lotes'">🌿 Lotes</button>
+        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'layout' }" @click="tabActiva = 'layout'">🗺 Layout</button>
+        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'historial' }" @click="tabActiva = 'historial'">📋 Historial</button>
+      </div>
+
       <div class="sd__layout">
         <div class="sd__main">
 
           <!-- Lotes -->
-          <div class="sd__section">
+          <div v-show="tabActiva === 'lotes'" class="sd__section">
             <button class="sd__section-toggle" @click="lotesExpanded = !lotesExpanded">
               <div class="sd__section-toggle-left">
                 <span class="sd__section-emoji">🌿</span>
@@ -774,6 +791,69 @@ const canSeeAmbiente = computed(() =>
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Tab: Layout -->
+          <div v-show="tabActiva === 'layout'" class="sd__tab-panel">
+            <SalaLayoutGrid :sala="sala" :lotes-activos="lotesActivos" />
+          </div>
+
+          <!-- Tab: Historial -->
+          <div v-show="tabActiva === 'historial'" class="sd__tab-panel">
+            <div v-if="historialKpis" class="sd__hist-kpis">
+              <div class="sd__hist-kpi">
+                <div class="sd__hist-kpi-val">{{ historialKpis.total_ciclos }}</div>
+                <div class="sd__hist-kpi-lbl">Total ciclos</div>
+              </div>
+              <div class="sd__hist-kpi">
+                <div class="sd__hist-kpi-val">{{ historialKpis.ciclos_finalizados }}</div>
+                <div class="sd__hist-kpi-lbl">Finalizados</div>
+              </div>
+              <div class="sd__hist-kpi">
+                <div class="sd__hist-kpi-val">
+                  {{ historialKpis.duracion_promedio_dias ?? '—' }}<small v-if="historialKpis.duracion_promedio_dias">d</small>
+                </div>
+                <div class="sd__hist-kpi-lbl">Duración prom.</div>
+              </div>
+              <div class="sd__hist-kpi">
+                <div class="sd__hist-kpi-val">
+                  {{ historialKpis.rendimiento_promedio_g != null ? historialKpis.rendimiento_promedio_g + ' g' : '—' }}
+                </div>
+                <div class="sd__hist-kpi-lbl">Rend. prom.</div>
+              </div>
+            </div>
+
+            <div v-if="historialLotes.length" class="sd__hist-wrap">
+              <table class="sd__hist-table">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Genética</th>
+                    <th>Inicio</th>
+                    <th>Días</th>
+                    <th>Rendimiento</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="l in historialLotes" :key="l.id">
+                    <td>
+                      <RouterLink :to="{ name: 'lote-detail', params: { id: l.id } }" class="sd__hist-link">{{ l.codigo }}</RouterLink>
+                    </td>
+                    <td>{{ l.genetica_nombre || '—' }}</td>
+                    <td>{{ l.start_date || '—' }}</td>
+                    <td>{{ l.duracion_dias ?? '—' }}</td>
+                    <td>{{ l.rendimiento_real_g != null ? l.rendimiento_real_g + ' g' : '—' }}</td>
+                    <td>
+                      <span class="sd__lote-badge" :style="{ background: estadoMeta(l.estado).color + '18', color: estadoMeta(l.estado).color }">
+                        {{ estadoMeta(l.estado).label }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="sd__hist-empty">Sin historial disponible para esta sala.</div>
           </div>
 
         </div>
@@ -1632,4 +1712,37 @@ const canSeeAmbiente = computed(() =>
 .sd__cam-btn { background: rgba(255,255,255,.15); border: none; color: #fff; border-radius: 5px; padding: .25rem .5rem; cursor: pointer; font-size: .78rem; }
 .sd__cam-ts { font-size: .7rem; color: rgba(255,255,255,.5); }
 .sd__cam-empty { color: #94a3b8; font-size: .8rem; font-style: italic; text-align: center; padding: .5rem 0; }
+
+/* ── Tabs ─────────────────────────────────────────────────── */
+.sd__tabs { display: flex; gap: .4rem; margin-bottom: 1rem; }
+.sd__tab {
+  padding: .45rem 1rem; background: #f4f8f4; border: 1.5px solid #d4e6d4;
+  border-radius: 8px; font-size: .82rem; font-weight: 600; color: #475569;
+  cursor: pointer; transition: all .14s; white-space: nowrap;
+}
+.sd__tab:hover { border-color: #1b5e20; color: #1b5e20; background: #f0fdf4; }
+.sd__tab--active { background: #f0fdf4; border-color: #1b5e20; color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.08); }
+
+.sd__tab-panel { padding: 1rem 0; }
+
+/* ── Historial ────────────────────────────────────────────── */
+.sd__hist-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; margin-bottom: 1.25rem; }
+.sd__hist-kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: .75rem 1rem; text-align: center; }
+.sd__hist-kpi-val { font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1; }
+.sd__hist-kpi-val small { font-size: .7rem; font-weight: 600; color: #64748b; margin-left: .1rem; }
+.sd__hist-kpi-lbl { font-size: .7rem; color: #64748b; margin-top: .25rem; font-weight: 500; }
+
+.sd__hist-wrap { overflow-x: auto; }
+.sd__hist-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.sd__hist-table th { padding: .45rem .75rem; text-align: left; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; background: #f8fafc; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+.sd__hist-table td { padding: .5rem .75rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; white-space: nowrap; }
+.sd__hist-table tbody tr:hover { background: #f8fafc; }
+.sd__hist-link { color: #1b5e20; font-weight: 700; text-decoration: none; }
+.sd__hist-link:hover { text-decoration: underline; }
+.sd__hist-empty { font-size: .82rem; color: #94a3b8; text-align: center; padding: 1.5rem 0; }
+
+@media (max-width: 600px) {
+  .sd__hist-kpis { grid-template-columns: repeat(2, 1fr); }
+  .sd__tabs { flex-wrap: wrap; }
+}
 </style>
