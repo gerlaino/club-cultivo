@@ -23,7 +23,7 @@ import LotePlanVsReal       from '../components/lotes/LotePlanVsReal.vue'
 import LoteTimelineSection  from '../components/lotes/LoteTimelineSection.vue'
 import LoteFotosSection     from '../components/lotes/LoteFotosSection.vue'
 import LoteEditarModal      from '../components/lotes/LoteEditarModal.vue'
-import LoteCostosCard       from '../components/lotes/LoteCostosCard.vue'
+import LotePLCard           from '../components/lotes/LotePLCard.vue'
 import LoteIACard           from '../components/lotes/LoteIACard.vue'
 import DsBanner from '../design-system/components/Banner.vue'
 import IniciarManicuraModal   from '../components/lotes/IniciarManicuraModal.vue'
@@ -451,8 +451,8 @@ onUnmounted(() => {
             <LotePlanVsReal :lote="lote" :lote-id="id" :can-admin="canAdmin" @saved="lotes.fetchOne(id)" />
           </div>
 
-          <!-- Costos de producción: solo admin/supervisor -->
-          <LoteCostosCard v-if="canAdmin" :lote-id="id" class="ld__card--mt" />
+          <!-- P&L del lote: solo admin/supervisor -->
+          <LotePLCard v-if="canAdmin" :lote-id="id" class="ld__card--mt" />
 
           <!-- Análisis IA — solo si el club tiene IA habilitada -->
           <LoteIACard v-if="club.data?.features?.ia_analisis && canAdmin" :lote-id="id" class="ld__card--mt" />

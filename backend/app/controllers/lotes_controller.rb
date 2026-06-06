@@ -694,7 +694,54 @@ class LotesController < ApplicationController
     }
   end
 
+  # GET /lotes/:id/pl
+  def pl
+    lote = current_user.club.lotes.includes(:costo_lote, :stocks).find(params[:id])
+    render json: calcular_pl(lote)
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Lote no encontrado' }, status: :not_found
+  end
+
   private
+
+  def calcular_pl(lote)
+    stock_ids = lote.stocks.map(&:id)
+    disps     = Dispensacion.where(stock_id: stock_ids)
+
+    ingresos           = disps.sum('cantidad * COALESCE(precio_unitario_ars, 0)').to_f.round(2)
+    gramos_dispensados = disps.sum(:cantidad).to_f.round(3)
+
+    costos      = lote.costo_lote
+    costo_total = costos&.costo_total.to_f
+
+    margen     = (ingresos - costo_total).round(2)
+    margen_pct = ingresos > 0 ? (margen / ingresos * 100).round(1) : nil
+
+    gramos_producidos = costos&.gramos_producidos&.to_f || lote.rendimiento_real_g&.to_f
+    gramos_en_stock   = lote.stocks.sum(:cantidad).to_f.round(3)
+    ingreso_por_gramo = gramos_dispensados > 0 ? (ingresos / gramos_dispensados).round(2) : nil
+
+    {
+      lote_id:            lote.id,
+      lote_codigo:        lote.codigo,
+      costo_total:        costo_total,
+      costo_insumos:      costos&.costo_insumos.to_f,
+      costo_energia:      costos&.costo_energia.to_f,
+      costo_mano_obra:    costos&.costo_mano_obra.to_f,
+      costo_prorrateado:  costos&.costo_prorrateado.to_f,
+      costo_por_gramo:    costos&.costo_por_gramo&.to_f,
+      notas_costo:        costos&.notas,
+      ingresos:           ingresos,
+      gramos_dispensados: gramos_dispensados,
+      ingreso_por_gramo:  ingreso_por_gramo,
+      margen:             margen,
+      margen_pct:         margen_pct,
+      gramos_producidos:  gramos_producidos,
+      gramos_en_stock:    gramos_en_stock,
+      tiene_costos:       costos.present?,
+      tiene_ingresos:     ingresos > 0,
+    }
+  end
 
   def estado_a_state(estado)
     {

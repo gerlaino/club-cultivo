@@ -465,5 +465,57 @@ class AnalyticsController < ApplicationController
     }
   end
 
+  # GET /api/analytics/pl_lotes
+  # Para: admin, supervisor
+  def pl_lotes
+    unless %w[admin supervisor super_admin].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    club  = current_user.club
+    lotes = club.lotes.includes(:genetica, :costo_lote).order(created_at: :desc)
+
+    # Ingresos y gramos dispensados por lote — 2 queries para todos los lotes
+    ingresos_por_lote = Dispensacion
+      .joins(:stock)
+      .where(stocks: { club_id: club.id })
+      .where.not(stocks: { lote_id: nil })
+      .group('stocks.lote_id')
+      .sum('dispensaciones.cantidad * COALESCE(dispensaciones.precio_unitario_ars, 0)')
+
+    gramos_disp_por_lote = Dispensacion
+      .joins(:stock)
+      .where(stocks: { club_id: club.id })
+      .where.not(stocks: { lote_id: nil })
+      .group('stocks.lote_id')
+      .sum(:cantidad)
+
+    filas = lotes.map do |l|
+      c           = l.costo_lote
+      ingresos    = ingresos_por_lote[l.id].to_f.round(2)
+      costo_total = c&.costo_total.to_f
+      margen      = (ingresos - costo_total).round(2)
+      margen_pct  = ingresos > 0 ? (margen / ingresos * 100).round(1) : nil
+      gramos_disp = gramos_disp_por_lote[l.id].to_f.round(3)
+      {
+        id:                 l.id,
+        codigo:             l.codigo,
+        genetica:           l.genetica&.nombre,
+        estado:             l.estado,
+        costo_total:        costo_total,
+        costo_por_gramo:    c&.costo_por_gramo&.to_f,
+        ingresos:           ingresos,
+        gramos_dispensados: gramos_disp,
+        ingreso_por_gramo:  gramos_disp > 0 ? (ingresos / gramos_disp).round(2) : nil,
+        margen:             margen,
+        margen_pct:         margen_pct,
+        tiene_costos:       c.present?,
+        tiene_ingresos:     ingresos > 0,
+      }
+    end
+
+    render json: { lotes: filas }
+  end
+
   private :calcular_rendimiento_genetica, :calcular_dispensador
 end

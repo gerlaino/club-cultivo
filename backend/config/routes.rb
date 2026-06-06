@@ -43,6 +43,7 @@ Rails.application.routes.draw do
       get :dispensador
       get :produccion
       get :correlacion_ambiental
+      get :pl_lotes
     end
 
     resource :benchmark, only: [:show], controller: :benchmark  # solo super_admin, uso interno de plataforma
@@ -104,6 +105,7 @@ Rails.application.routes.draw do
         get   :timeline
         get   :preview_plan
         post  :aplicar_plan
+        get   :pl
       end
     end
 
