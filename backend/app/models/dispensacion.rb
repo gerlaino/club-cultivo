@@ -41,6 +41,7 @@ class Dispensacion < ApplicationRecord
   after_create        :decrementar_stock
   after_create_commit :encolar_reporte_ariccame
   after_create_commit :dispatch_webhook
+  after_commit        :notificar_delivery, on: [:update]
   after_destroy       :incrementar_stock
 
   private
@@ -143,6 +144,35 @@ class Dispensacion < ApplicationRecord
         dni:    paciente.dni,
       },
     })
+  end
+
+  def notificar_delivery
+    return unless saved_change_to_estado_envio?
+    return unless estado_envio.in?(%w[entregado fallido])
+
+    club = paciente&.club
+    return unless club
+
+    nombre    = paciente&.nombre_completo || 'Socio'
+    tipo      = estado_envio == 'entregado' ? 'delivery_entregado' : 'delivery_fallido'
+    severidad = estado_envio == 'entregado' ? 'info' : 'warning'
+    mensaje   = if estado_envio == 'entregado'
+      "Entrega confirmada: #{nombre}"
+    else
+      motivo = motivo_fallo.presence || 'sin motivo especificado'
+      "Fallo de entrega: #{nombre} — #{motivo}"
+    end
+
+    AlertaInterna.create!(
+      club:             club,
+      tipo:             tipo,
+      mensaje:          mensaje,
+      severidad:        severidad,
+      destinada_a_role: 'supervisor',
+      contexto:         { dispensacion_id: id, paciente_id: paciente_id }
+    )
+  rescue StandardError => e
+    Rails.logger.warn "Dispensacion#notificar_delivery falló: #{e.message}"
   end
 
 end
