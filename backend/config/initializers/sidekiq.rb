@@ -33,6 +33,30 @@ Sidekiq.configure_server do |config|
         'cron'  => '0 8 * * *',
         'class' => 'TareasDiariasPushJob',
         'description' => 'Envía push notification con resumen de tareas del día a cada cultivador'
+      },
+      'informe_semestral_recordatorio_1' => {
+        'cron'  => '0 8 1 6 *',
+        'class' => 'InformeSemestralJob',
+        'args'  => ['recordatorio'],
+        'description' => 'Recordatorio: informe 1° semestre vence en 30 días (envía 1 de junio)'
+      },
+      'informe_semestral_recordatorio_2' => {
+        'cron'  => '0 8 1 12 *',
+        'class' => 'InformeSemestralJob',
+        'args'  => ['recordatorio'],
+        'description' => 'Recordatorio: informe 2° semestre vence en 30 días (envía 1 de diciembre)'
+      },
+      'informe_semestral_envio_1' => {
+        'cron'  => '0 8 1 7 *',
+        'class' => 'InformeSemestralJob',
+        'args'  => ['envio'],
+        'description' => 'Genera y envía informe 1° semestre al equipo admin (1 de julio)'
+      },
+      'informe_semestral_envio_2' => {
+        'cron'  => '0 8 1 1 *',
+        'class' => 'InformeSemestralJob',
+        'args'  => ['envio'],
+        'description' => 'Genera y envía informe 2° semestre al equipo admin (1 de enero)'
       }
     )
   end

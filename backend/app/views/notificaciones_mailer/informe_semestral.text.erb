@@ -1,0 +1,14 @@
+<%= @club.name %> — Informe semestral <%= @semestre %>° semestre <%= @anio %>
+<%= '-' * 60 %>
+
+<% if @modo == :recordatorio %>
+RECORDATORIO: el plazo para presentar el informe ante REPROCANN vence en 30 días.
+<% end %>
+
+SOCIOS: <%= @datos[:pacientes][:total] %> activos, <%= @datos[:pacientes][:con_reprocann] %> con REPROCANN
+<% if @datos[:pacientes][:vencidos] > 0 %>⚠ REPROCANN vencido: <%= @datos[:pacientes][:vencidos] %> socios<% end %>
+<% if @datos[:pacientes][:por_vencer] > 0 %>⚠ Por vencer (30d): <%= @datos[:pacientes][:por_vencer] %> socios<% end %>
+
+DISPENSACIONES: <%= @datos[:dispensaciones][:total] %> | <%= @datos[:dispensaciones][:total_gramos].round(1) %>g entregados
+
+Ver informe completo: <%= ENV.fetch('APP_HOST', 'https://app.clubcultivo.app') %>/informes/semestral
