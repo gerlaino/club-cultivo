@@ -7,7 +7,7 @@ RSpec.describe 'Ola 4 — Manicura backend', type: :request do
   let(:sede)       { create(:sede, club: club) }
   let(:sala)       { create(:sala, club: club, sede: sede) }
   let(:admin)      { create(:user, :admin,      club: club) }
-  let(:cultivador) { create(:user, :cultivador, club: club) }
+  let(:cultivador) { u = create(:user, :cultivador, club: club); u.sedes_asignadas << sede; u }
   let(:manicura)   { create(:user, :manicura,   club: club) }
   let(:auditor)    { create(:user, :auditor,    club: club) }
   let(:dispensador){ create(:user, :dispensador, club: club) }

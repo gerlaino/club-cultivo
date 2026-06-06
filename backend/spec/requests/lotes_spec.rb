@@ -4,7 +4,7 @@ RSpec.describe 'POST /lotes/:id/avanzar_fase', type: :request do
   let(:club)       { create(:club) }
   let(:sede)       { create(:sede, club: club) }
   let(:sala)       { create(:sala, club: club, sede: sede) }
-  let(:cultivador) { create(:user, :cultivador, club: club) }
+  let(:cultivador) { u = create(:user, :cultivador, club: club); u.sedes_asignadas << sede; u }
   let(:manicura)   { create(:user, club: club, role: 'manicura') }
   let(:admin)      { create(:user, club: club, role: 'admin') }
 

@@ -1,6 +1,7 @@
 class Lote < ApplicationRecord
   belongs_to :club
-  belongs_to :sala
+  belongs_to :sala, optional: true
+  validates :sala_id, presence: true, unless: -> { estado == 'finalizado' }
   belongs_to :genetica,    optional: true
   belongs_to :manicurador,   class_name: 'User',  optional: true
   belongs_to :planta_madre,  class_name: 'Plant', optional: true

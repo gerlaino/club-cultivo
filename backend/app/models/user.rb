@@ -41,9 +41,9 @@ class User < ApplicationRecord
   def salas_ids_asignadas
     if cultivador?
       sedes = sedes_ids_asignadas
+      return [] if sedes.empty?
       scope = Sala.where(club_id: club_id).where(kind: KINDS_CULTIVADOR)
-      # Sin sedes asignadas = acceso a todas las salas del club
-      sedes.empty? ? scope.pluck(:id) : scope.where(sede_id: sedes).pluck(:id)
+      scope.where(sede_id: sedes).pluck(:id)
     elsif manicura?
       Sala.where(club_id: club_id).where(kind: KINDS_MANICURA).pluck(:id)
     else

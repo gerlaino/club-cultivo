@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_05_000003) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_06_154026) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -475,7 +475,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_05_000003) do
     t.integer "plants_count"
     t.string "strain"
     t.text "notes"
-    t.bigint "sala_id", null: false
+    t.bigint "sala_id"
     t.bigint "club_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -1144,6 +1144,37 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_05_000003) do
     t.index ["role"], name: "index_users_on_role"
   end
 
+  create_table "webhook_deliveries", force: :cascade do |t|
+    t.bigint "webhook_id", null: false
+    t.string "event", null: false
+    t.text "payload_json"
+    t.string "status", default: "pending", null: false
+    t.integer "http_code"
+    t.integer "duration_ms"
+    t.text "error_message"
+    t.integer "attempts", default: 0, null: false
+    t.datetime "last_attempted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["status"], name: "index_webhook_deliveries_on_status"
+    t.index ["webhook_id", "created_at"], name: "index_webhook_deliveries_on_webhook_id_and_created_at"
+    t.index ["webhook_id"], name: "index_webhook_deliveries_on_webhook_id"
+  end
+
+  create_table "webhooks", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "created_by_id", null: false
+    t.string "nombre", null: false
+    t.string "url", null: false
+    t.string "secret", null: false
+    t.string "events", default: "[]", null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_webhooks_on_club_id"
+    t.index ["created_by_id"], name: "index_webhooks_on_created_by_id"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "alertas", "lecturas_ambientales", column: "lectura_id"
@@ -1286,4 +1317,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_05_000003) do
   add_foreign_key "user_sedes", "sedes"
   add_foreign_key "user_sedes", "users"
   add_foreign_key "users", "clubs"
+  add_foreign_key "webhook_deliveries", "webhooks"
+  add_foreign_key "webhooks", "clubs"
+  add_foreign_key "webhooks", "users", column: "created_by_id"
 end
