@@ -62,7 +62,7 @@ import {
   Sprout, FileCheck, FileText, UserCog, Globe,
   ShieldCheck, Truck, TrendingUp, History,
   GitBranch, Layers, ChevronDown, Dna, Archive, Leaf, Boxes, Scissors,
-  ClipboardList, Package, Settings, ClipboardCheck, Scale,
+  ClipboardList, Package, Settings, ClipboardCheck, Scale, Webhook,
 } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
 
@@ -152,8 +152,9 @@ const GRUPOS = [
     icon: Settings,
     defaultOpen: false,
     items: [
-      { to: '/usuarios', icon: UserCog, label: 'Equipo' },
-      { to: '/web',      icon: Globe,   label: 'Sitio web' },
+      { to: '/usuarios',      icon: UserCog, label: 'Equipo' },
+      { to: '/web',           icon: Globe,   label: 'Sitio web' },
+      { to: '/integraciones', icon: Webhook, label: 'Integraciones' },
     ],
   },
 ]

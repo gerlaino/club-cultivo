@@ -296,6 +296,17 @@ const routes = [
       else next("/");
     },
   },
+  {
+    path: "/integraciones",
+    name: "integraciones",
+    component: () => import("../views/IntegracionesView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (auth.user?.role === "admin") next();
+      else next("/");
+    },
+  },
 
   // ARICCAME
   {

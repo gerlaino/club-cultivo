@@ -40,6 +40,7 @@ class Dispensacion < ApplicationRecord
 
   after_create        :decrementar_stock
   after_create_commit :encolar_reporte_ariccame
+  after_create_commit :dispatch_webhook
   after_destroy       :incrementar_stock
 
   private
@@ -125,6 +126,23 @@ class Dispensacion < ApplicationRecord
   def encolar_reporte_ariccame
     return unless paciente&.club&.feature?(:ariccame)
     ReportarAriccameJob.perform_later(id)
+  end
+
+  def dispatch_webhook
+    club = paciente&.club
+    return unless club
+
+    WebhookDispatcher.dispatch(club, 'dispensacion.creada', {
+      id:                id,
+      fecha_dispensacion: fecha_dispensacion,
+      cantidad_g:         cantidad,
+      medio_pago:         medio_pago,
+      paciente: {
+        id:     paciente.id,
+        nombre: paciente.nombre_completo,
+        dni:    paciente.dni,
+      },
+    })
   end
 
 end

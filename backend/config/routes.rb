@@ -54,6 +54,9 @@ Rails.application.routes.draw do
     get  '/asistente/historial_analisis', to: 'asistente#historial_analisis'
 
     resources :push_subscriptions, only: [:create, :destroy]
+    resources :webhooks do
+      resources :webhook_deliveries, only: [:index], shallow: true
+    end
 
     resources :salas do
       resources :lotes, only: [:index, :create]

@@ -17,6 +17,7 @@ class Paciente < ApplicationRecord
 
   before_validation :normalize_dni!
   before_create     :assign_carnet_token
+  after_create_commit :dispatch_webhook
 
   validates :nombre, :apellido, :dni, :dni_normalizado, :fecha_nacimiento, presence: true
   # Unicidad global (no por club) — requisito REPROCANN: un DNI no puede estar en dos clubes a la vez.
@@ -69,6 +70,16 @@ class Paciente < ApplicationRecord
   end
 
   private
+
+  def dispatch_webhook
+    WebhookDispatcher.dispatch(club, 'paciente.creado', {
+      id:       id,
+      nombre:   nombre_completo,
+      dni:      dni,
+      email:    email,
+      telefono: telefono,
+    })
+  end
 
   def normalize_dni!
     return if dni.blank?

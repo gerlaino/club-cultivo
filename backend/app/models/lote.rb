@@ -39,6 +39,7 @@ class Lote < ApplicationRecord
   before_create :generar_codigo
   before_save   :generar_qr_cosecha, if: :debe_generar_qr_cosecha?
   after_commit  :push_manicura_pendiente, on: [:create, :update]
+  after_commit  :dispatch_webhook_avance,  on: [:create, :update]
 
   default_scope { where(deleted_at: nil) }
 
@@ -526,5 +527,23 @@ class Lote < ApplicationRecord
       body:  "Lote #{codigo} esperando tu aprobación",
       url:   '/aprobaciones'
     )
+  end
+
+  def dispatch_webhook_avance
+    return unless saved_change_to_estado?
+
+    estado_anterior, estado_nuevo = saved_change_to_estado
+
+    event = estado_nuevo == 'finalizado' ? 'cosecha.completada' : 'lote.avanzado'
+
+    WebhookDispatcher.dispatch(club, event, {
+      id:              id,
+      codigo:          codigo,
+      estado_anterior: estado_anterior,
+      estado_nuevo:    estado_nuevo,
+      genetica:        genetica&.nombre,
+      sala:            sala&.nombre,
+      plants_count:    plants_count,
+    })
   end
 end
