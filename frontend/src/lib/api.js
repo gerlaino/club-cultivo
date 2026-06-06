@@ -322,8 +322,9 @@ export const createRegistroAmbiental  = (loteId, payload)  => api.post(`/lotes/$
 export const deleteRegistroAmbiental  = (loteId, id)       => api.delete(`/lotes/${loteId}/registros_ambientales/${id}`)
 
 // ── Módulo Ambiente ──────────────────────────────────────────────────────────
-export const getSalaAmbiente     = (salaId, params = {}) => api.get(`/salas/${salaId}/ambiente`, { params })
-export const getSalaAlertas      = (salaId)              => api.get(`/salas/${salaId}/alertas`)
+export const getSalaAmbiente          = (salaId, params = {}) => api.get(`/salas/${salaId}/ambiente`, { params })
+export const getSalaAmbienteHistorico = (salaId, params = {}) => api.get(`/salas/${salaId}/historico`, { params })
+export const getSalaAlertas           = (salaId)              => api.get(`/salas/${salaId}/alertas`)
 export const listAlertas         = (params = {})         => api.get('/alertas', { params })
 export const getAlerta           = (id)                  => api.get(`/alertas/${id}`)
 export const reconocerAlerta     = (id)                  => api.post(`/alertas/${id}/reconocer`)

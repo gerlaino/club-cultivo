@@ -65,6 +65,7 @@ Rails.application.routes.draw do
       resources :notas, only: [:index, :create]
       resources :lecturas_ambientales, only: [:index, :create, :destroy]
       get  :ambiente,    to: 'lecturas_ambientales#ambiente'
+      get  :historico,   to: 'lecturas_ambientales#historico'
       post :ai_import,   to: 'lecturas_ambientales/ai_imports#create'
       resources :alertas, only: [:index]
       member do

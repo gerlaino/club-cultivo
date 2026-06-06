@@ -15,6 +15,10 @@ class LecturaAmbiental < ApplicationRecord
   validates :medido_at, presence: true
   validate  :medido_at_en_rango_valido
 
+  after_commit :calcular_vpd_automatico, on: [:create],
+               if: -> { tipo.in?(%w[temperatura humedad]) && fuente != 'backfill' }
+  after_commit :broadcast_lectura, on: [:create]
+
   scope :recientes,         -> { order(medido_at: :desc) }
   scope :del_tipo,          ->(t)       { where(tipo: t) }
   scope :de_sala,           ->(id)      { where(sala_id: id) }
@@ -31,6 +35,47 @@ class LecturaAmbiental < ApplicationRecord
   end
 
   private
+
+  def calcular_vpd_automatico
+    otro_tipo = tipo == 'temperatura' ? 'humedad' : 'temperatura'
+    otra = LecturaAmbiental
+             .de_sala(sala_id)
+             .del_tipo(otro_tipo)
+             .where(medido_at: (medido_at - 5.minutes)..(medido_at + 5.minutes))
+             .order(Arel.sql("ABS(EXTRACT(EPOCH FROM (medido_at - '#{medido_at}'::timestamptz)))"))
+             .first
+    return unless otra
+
+    temp    = tipo == 'temperatura' ? valor.to_f : otra.valor.to_f
+    hum     = tipo == 'humedad'     ? valor.to_f : otra.valor.to_f
+    vpd_val = Ambiente::VpdCalculator.call(temperatura: temp, humedad: hum)
+
+    LecturaAmbiental.find_or_initialize_by(
+      sala_id:   sala_id,
+      tipo:      'vpd',
+      medido_at: medido_at
+    ).tap do |l|
+      l.club_id = club_id
+      l.valor   = vpd_val
+      l.unidad  = 'kPa'
+      l.fuente  = 'manual'
+      l.save!
+    end
+  rescue => e
+    Rails.logger.warn "[VPD Auto] #{e.message}"
+  end
+
+  def broadcast_lectura
+    ActionCable.server.broadcast("ambiente_sala_#{sala_id}", {
+      tipo:      tipo,
+      valor:     valor.to_f,
+      unidad:    unidad,
+      medido_at: medido_at.iso8601,
+      sala_id:   sala_id,
+    })
+  rescue => e
+    Rails.logger.warn "[AmbienteChannel] broadcast falló: #{e.message}"
+  end
 
   def medido_at_en_rango_valido
     return if medido_at.nil?
