@@ -116,6 +116,9 @@ export const uploadAvatar     = (file) => {
 export const getPreferences    = () => api.get("/preferences");
 export const updatePreferences = (payload) => api.put("/preferences", { club: payload });
 export const testSmtp          = () => api.post("/preferences/test_smtp");
+export const updateTwilio      = (payload) => api.patch("/preferences/update_twilio", payload);
+export const destroyTwilio     = () => api.delete("/preferences/destroy_twilio");
+export const testTwilio        = () => api.post("/preferences/test_twilio");
 export const uploadClubLogo    = (file) => {
   const form = new FormData();
   form.append("logo", file);
@@ -185,7 +188,7 @@ export const deleteDispensacion = (id) => api.delete(`/dispensaciones/${id}`);
 export const exportDispensacionesCSV = (params = {}) => api.get('/dispensaciones/export_csv', { params, responseType: 'blob' })
 export const getMisPaquetes   = ()                  => api.get('/dispensaciones/mis_paquetes')
 export const iniciarViaje     = (ids)               => api.patch('/dispensaciones/iniciar_viaje', { ids })
-export const entregarPaquete  = (id, notasEntrega)  => api.patch(`/dispensaciones/${id}/entregar`, { notas_entrega: notasEntrega })
+export const entregarPaquete  = (id, notasEntrega, firmaData) => api.patch(`/dispensaciones/${id}/entregar`, { notas_entrega: notasEntrega, firma_entrega_data: firmaData || null })
 export const reportarFallo    = (id, motivoFallo)   => api.patch(`/dispensaciones/${id}/reportar_fallo`, { motivo_fallo: motivoFallo })
 export const reprogramarPaquete = (id)             => api.patch(`/dispensaciones/${id}/reprogramar`)
 export const listDeliveryUsers  = ()                => api.get('/usuarios', { params: { role: 'delivery' } })

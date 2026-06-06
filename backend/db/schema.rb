@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_06_154026) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_06_200002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -162,6 +162,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_06_154026) do
     t.string "ia_tier", default: "basico", null: false
     t.integer "ia_limite_hora", default: 20, null: false
     t.jsonb "features", default: {}, null: false
+    t.string "twilio_account_sid"
+    t.string "twilio_auth_token_enc"
+    t.string "twilio_whatsapp_from"
     t.index ["benchmark_opt_in"], name: "index_clubs_on_benchmark_opt_in"
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["features"], name: "index_clubs_on_features", using: :gin
@@ -258,6 +261,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_06_154026) do
     t.text "motivo_fallo"
     t.datetime "entregado_at"
     t.boolean "ariccame_reportada", default: false, null: false
+    t.text "firma_entrega_data"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["delivery_id"], name: "index_dispensaciones_on_delivery_id"

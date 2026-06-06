@@ -178,6 +178,21 @@ class Club < ApplicationRecord
     }
   end
 
+  def twilio_configurado?
+    twilio_account_sid.present? && twilio_auth_token_enc.present? && twilio_whatsapp_from.present?
+  end
+
+  def twilio_auth_token
+    return nil unless twilio_auth_token_enc.present?
+    Rails.application.message_verifier(:twilio).verify(twilio_auth_token_enc)
+  rescue ActiveSupport::MessageVerifier::InvalidSignature
+    nil
+  end
+
+  def twilio_auth_token=(raw_token)
+    self.twilio_auth_token_enc = raw_token.present? ? Rails.application.message_verifier(:twilio).generate(raw_token) : nil
+  end
+
   def soft_delete!
     update!(deleted_at: Time.current)
   end

@@ -53,6 +53,21 @@ class NotificacionesMailer < ApplicationMailer
     mail(to: admins.pluck(:email), subject: asunto)
   end
 
+  # Notificación de delivery al paciente (fallback cuando no hay WhatsApp configurado)
+  def notificacion_delivery(email:, nombre:, mensaje:, club:)
+    @nombre  = nombre
+    @mensaje = mensaje
+    @club    = club
+
+    from_addr = club&.smtp_configured? ? "#{club.smtp_from_name.presence || club.name} <#{club.smtp_from.presence || club.smtp_user}>" : default_params[:from]
+
+    mail(
+      to:      email,
+      from:    from_addr,
+      subject: "#{club&.name} — Actualización de tu paquete"
+    )
+  end
+
   # Alerta de stock bajo — enviada al admin
   def stock_bajo(club:, stocks_data:)
     @club        = club

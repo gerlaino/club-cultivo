@@ -35,6 +35,66 @@ class PreferencesController < ApplicationController
     end
   end
 
+  # PATCH /preferences/twilio
+  def update_twilio
+    unless current_user.admin? || current_user.super_admin?
+      return render json: { error: 'Sin permiso' }, status: :forbidden
+    end
+
+    raw_token = params[:twilio_auth_token]
+    @club.twilio_account_sid    = params[:twilio_account_sid]   if params[:twilio_account_sid].present?
+    @club.twilio_auth_token     = raw_token                      if raw_token.present?
+    @club.twilio_whatsapp_from  = params[:twilio_whatsapp_from] if params[:twilio_whatsapp_from].present?
+
+    if @club.save
+      render json: {
+        twilio_configurado:    @club.twilio_configurado?,
+        twilio_account_sid:    @club.twilio_account_sid,
+        twilio_whatsapp_from:  @club.twilio_whatsapp_from,
+      }
+    else
+      render json: { errors: @club.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  # DELETE /preferences/twilio
+  def destroy_twilio
+    unless current_user.admin? || current_user.super_admin?
+      return render json: { error: 'Sin permiso' }, status: :forbidden
+    end
+
+    @club.update!(twilio_account_sid: nil, twilio_auth_token_enc: nil, twilio_whatsapp_from: nil)
+    render json: { twilio_configurado: false }
+  end
+
+  # POST /preferences/test_twilio
+  def test_twilio
+    unless @club.twilio_configurado?
+      return render json: { error: 'WhatsApp no configurado' }, status: :unprocessable_entity
+    end
+
+    telefono_destino = current_user.phone.presence
+    unless telefono_destino
+      return render json: { error: 'Tu perfil no tiene número de teléfono configurado. Agregá uno en tu perfil para probar.' }, status: :unprocessable_entity
+    end
+
+    client = Twilio::REST::Client.new(@club.twilio_account_sid, @club.twilio_auth_token)
+    limpio  = telefono_destino.gsub(/[^0-9+]/, '')
+    numero  = limpio.start_with?('+') ? limpio : (limpio.start_with?('0') ? "+54#{limpio[1..]}" : "+54#{limpio}")
+
+    client.messages.create(
+      from: @club.twilio_whatsapp_from,
+      to:   "whatsapp:#{numero}",
+      body: "✅ Prueba exitosa de WhatsApp para #{@club.name}. Las notificaciones de delivery están listas."
+    )
+
+    render json: { ok: true, enviado_a: numero }
+  rescue Twilio::REST::RestError => e
+    render json: { error: "Error Twilio: #{e.message}" }, status: :unprocessable_entity
+  rescue => e
+    render json: { error: "Error de conexión: #{e.message}" }, status: :unprocessable_entity
+  end
+
   def test_smtp
     unless @club.smtp_configured?
       return render json: { error: 'SMTP no configurado' }, status: :unprocessable_entity
@@ -111,7 +171,10 @@ class PreferencesController < ApplicationController
       smtp_user:                    club.smtp_user,
       smtp_from:                    club.smtp_from,
       smtp_from_name:               club.smtp_from_name,
-      # smtp_pass nunca se serializa
+      # smtp_pass / twilio_auth_token_enc nunca se serializan
+      twilio_configurado:           club.twilio_configurado?,
+      twilio_account_sid:           club.twilio_account_sid,
+      twilio_whatsapp_from:         club.twilio_whatsapp_from,
     }
   end
 end

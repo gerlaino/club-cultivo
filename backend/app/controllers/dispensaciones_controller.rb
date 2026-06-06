@@ -148,6 +148,7 @@ class DispensacionesController < ApplicationController
       .where(sedes: { club_id: current_user.club_id })
       .where(id: ids, estado_envio: 'pendiente')
     updated = dispensaciones.update_all(estado_envio: 'en_viaje')
+    dispensaciones.each { |d| NotificacionDeliveryService.new(d).notificar_despacho }
     render json: { updated: updated }
   end
 
@@ -160,10 +161,12 @@ class DispensacionesController < ApplicationController
       return render json: { error: 'La dispensación no está en un estado válido para entregar' }, status: :unprocessable_entity
     end
     @dispensacion.update!(
-      estado_envio:  'entregado',
-      notas_entrega: params[:notas_entrega],
-      entregado_at:  Time.current
+      estado_envio:       'entregado',
+      notas_entrega:      params[:notas_entrega],
+      firma_entrega_data: params[:firma_entrega_data],
+      entregado_at:       Time.current
     )
+    NotificacionDeliveryService.new(@dispensacion).notificar_entrega
     render json: serialize_dispensacion_delivery(@dispensacion)
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
@@ -307,7 +310,8 @@ class DispensacionesController < ApplicationController
       :cantidad, :precio_unitario_ars, :aporte_socio_ars,
       :observaciones, :fecha_dispensacion, :medio_pago,
       :con_envio, :delivery_id, :direccion_envio,
-      :contacto_nombre, :contacto_telefono, :notas_envio
+      :contacto_nombre, :contacto_telefono, :notas_envio,
+      :firma_entrega_data
     )
   end
 

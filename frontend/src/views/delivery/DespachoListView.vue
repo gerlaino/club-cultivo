@@ -315,6 +315,13 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
                   <CheckCircle2 :size="13" :stroke-width="2" /> {{ d.notas_entrega }}
                 </div>
               </template>
+
+              <template v-if="d.estado_envio === 'entregado' && d.firma_entrega_data">
+                <div class="dsp__detail-label dsp__detail-label--green">Firma del receptor</div>
+                <div class="dsp__firma-preview">
+                  <img :src="d.firma_entrega_data" alt="Firma" class="dsp__firma-img" />
+                </div>
+              </template>
             </div>
 
           </div>
@@ -667,6 +674,8 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
 .dsp__detail-val--italic { font-style: italic; color: var(--c-ink-500); }
 .dsp__detail-val--red    { color: #dc2626; }
 .dsp__detail-val--green  { color: var(--c-leaf-700); }
+.dsp__firma-preview { border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; padding: .4rem; display: inline-block; }
+.dsp__firma-img { display: block; max-width: 240px; height: auto; }
 .dsp__code-sm {
   font-family: monospace;
   font-size: var(--fs-13);

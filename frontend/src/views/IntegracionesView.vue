@@ -1,14 +1,32 @@
 <template>
   <div class="int">
 
-    <div class="int__header">
-      <div>
-        <h1 class="int__title">Integraciones</h1>
-        <p class="int__sub">Webhooks salientes — notificá sistemas externos cuando ocurren eventos en el club</p>
+    <div>
+      <h1 class="int__title">Integraciones</h1>
+      <p class="int__sub">Conectá tu club con servicios externos para automatizar notificaciones y flujos de trabajo</p>
+    </div>
+
+    <!-- WhatsApp Business -->
+    <div class="int__section">
+      <div class="int__section-title">Mensajería</div>
+      <IntegracionWhatsapp
+        v-if="!loading"
+        :data="prefData"
+        @updated="onTwilioUpdated"
+      />
+    </div>
+
+    <!-- Webhooks -->
+    <div class="int__section">
+      <div class="int__section-header">
+        <div>
+          <div class="int__section-title">Webhooks salientes</div>
+          <div class="int__section-sub">Notificá sistemas externos cuando ocurren eventos en el club</div>
+        </div>
+        <button class="int__btn-nuevo" @click="abrirFormNuevo">
+          <Plus :size="16" :stroke-width="2" /> Nuevo webhook
+        </button>
       </div>
-      <button class="int__btn-nuevo" @click="abrirFormNuevo">
-        <Plus :size="16" :stroke-width="2" /> Nuevo webhook
-      </button>
     </div>
 
     <!-- Eventos disponibles (info) -->
@@ -205,6 +223,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { Plus, Pencil, Trash2, X, Activity, CheckCircle2, XCircle, Clock } from 'lucide-vue-next'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import api from '../lib/api.js'
+import { getPreferences } from '../lib/api.js'
+import IntegracionWhatsapp from '../components/integraciones/IntegracionWhatsapp.vue'
 
 const EVENTS_DISPONIBLES = [
   { key: 'dispensacion.creada',  desc: 'Cada vez que se registra una dispensación' },
@@ -213,6 +233,7 @@ const EVENTS_DISPONIBLES = [
   { key: 'cosecha.completada',   desc: 'Cuando un lote llega a finalizado' },
 ]
 
+const prefData    = ref({})
 const webhooks    = ref([])
 const loading     = ref(true)
 const saving      = ref(false)
@@ -230,11 +251,16 @@ const form = reactive({ nombre: '', url: '', events: [], active: true })
 async function cargar() {
   loading.value = true
   try {
-    const { data } = await api.get('/webhooks')
-    webhooks.value = data
+    const [whRes, wRes] = await Promise.all([getPreferences(), api.get('/webhooks')])
+    prefData.value  = whRes.data?.data || whRes.data || {}
+    webhooks.value  = wRes.data
   } finally {
     loading.value = false
   }
+}
+
+function onTwilioUpdated(data) {
+  prefData.value = { ...prefData.value, ...data }
 }
 
 function abrirFormNuevo() {
@@ -332,6 +358,11 @@ onMounted(cargar)
   margin: 0 0 var(--sp-1);
 }
 .int__sub { font-size: var(--fs-13); color: var(--c-ink-500); margin: 0; }
+
+.int__section { display: flex; flex-direction: column; gap: var(--sp-3); }
+.int__section-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-ink-400); }
+.int__section-sub   { font-size: var(--fs-13); color: var(--c-ink-500); margin-top: .15rem; }
+.int__section-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); }
 
 .int__btn-nuevo {
   display: flex; align-items: center; gap: var(--sp-2);
