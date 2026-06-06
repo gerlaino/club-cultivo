@@ -1,7 +1,7 @@
 class StockBajoJob < ApplicationJob
   queue_as :default
 
-  UMBRAL_G = 50
+  UMBRAL_G_DEFAULT = 50
 
   def perform
     Club.all.find_each { |club| procesar_club(club) }
@@ -10,10 +10,12 @@ class StockBajoJob < ApplicationJob
   private
 
   def procesar_club(club)
+    umbral = club.umbral_stock_g.presence || UMBRAL_G_DEFAULT
+
     stocks_bajos = Stock
       .where(club_id: club.id, unidad: 'g')
       .where.not(estado: 'agotado')
-      .where('cantidad < ? AND cantidad > 0', UMBRAL_G)
+      .where('cantidad < ? AND cantidad > 0', umbral)
       .to_a
 
     return if stocks_bajos.empty?
@@ -34,10 +36,10 @@ class StockBajoJob < ApplicationJob
       AlertaInterna.create!(
         club:             club,
         tipo:             'stock_bajo',
-        mensaje:          "Stock bajo: #{s[:forma]} — #{s[:cantidad_g]}g disponibles (umbral: #{UMBRAL_G}g)",
+        mensaje:          "Stock bajo: #{s[:forma]} — #{s[:cantidad_g]}g disponibles (umbral: #{umbral}g)",
         severidad:        'warning',
         destinada_a_role: 'admin',
-        contexto:         { stock_id: s[:id], cantidad_g: s[:cantidad_g], umbral_g: UMBRAL_G }
+        contexto:         { stock_id: s[:id], cantidad_g: s[:cantidad_g], umbral_g: umbral }
       )
     end
 

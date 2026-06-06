@@ -257,7 +257,11 @@ class StocksController < ApplicationController
       sede:  s.sede  ? { id: s.sede.id, nombre: s.sede.nombre } : nil,
       club:  s.club  ? { id: s.club.id, nombre: s.club.name,
                          logo_url: s.club.logo.attached? ? url_for(s.club.logo) : nil } : nil,
-      created_at:              s.created_at,
+      gramos_reservados:        s.gramos_reservados,
+      cantidad_disponible_real: s.cantidad_disponible_real,
+      dias_para_vencimiento:    s.dias_para_vencimiento,
+      estado_vencimiento:       s.estado_vencimiento,
+      created_at:               s.created_at,
     }
   end
 

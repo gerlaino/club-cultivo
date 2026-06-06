@@ -41,6 +41,8 @@ class Dispensacion < ApplicationRecord
   after_create        :decrementar_stock
   after_create_commit :encolar_reporte_ariccame
   after_create_commit :dispatch_webhook
+  after_create_commit :broadcast_stock_actualizado
+  after_update_commit :broadcast_stock_actualizado, if: :estado_envio_changed?
   after_commit        :notificar_delivery, on: [:update]
   after_destroy       :incrementar_stock
 
@@ -144,6 +146,23 @@ class Dispensacion < ApplicationRecord
         dni:    paciente.dni,
       },
     })
+  end
+
+  def broadcast_stock_actualizado
+    return unless stock_id
+    club_id = paciente&.club_id || stock&.club_id
+    return unless club_id
+
+    s = stock
+    ActionCable.server.broadcast("stocks_club_#{club_id}", {
+      tipo:      'stock_actualizado',
+      stock_id:  stock_id,
+      cantidad:  s.cantidad.to_f,
+      gramos_reservados: s.gramos_reservados,
+      cantidad_disponible_real: s.cantidad_disponible_real,
+    })
+  rescue => e
+    Rails.logger.warn "Dispensacion#broadcast_stock_actualizado falló: #{e.message}"
   end
 
   def notificar_delivery

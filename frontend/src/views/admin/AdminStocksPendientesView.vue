@@ -4,12 +4,33 @@
     <!-- ── Header ─────────────────────────────────────────────── -->
     <div class="stk__header">
       <div>
-        <h1 class="stk__title">Stock</h1>
+        <div class="stk__header-row">
+          <h1 class="stk__title">Stock</h1>
+          <span v-if="liveConectado" class="stk__live-dot">● en vivo</span>
+        </div>
         <p class="stk__sub">Inventario del club · asignación de sedes · stock externo</p>
       </div>
-      <button class="stk__btn-primary" @click="openCrear">
-        <i class="bi bi-plus-lg"></i> Agregar stock externo
-      </button>
+      <div class="stk__header-actions">
+        <!-- Umbral configurable -->
+        <div class="stk__umbral">
+          <span class="stk__umbral-label">Alerta stock bajo:</span>
+          <template v-if="umbralEditing">
+            <input v-model.number="umbralValor" type="number" min="1" max="9999" class="stk__umbral-input" />
+            <span class="stk__umbral-unit">g</span>
+            <button class="stk__umbral-save" :disabled="umbralSaving" @click="guardarUmbral">
+              {{ umbralSaving ? '…' : '✓' }}
+            </button>
+            <button class="stk__umbral-cancel" @click="umbralEditing = false">✕</button>
+          </template>
+          <template v-else>
+            <span class="stk__umbral-val">{{ umbralValor }}g</span>
+            <button class="stk__umbral-edit" @click="umbralEditing = true" title="Editar umbral">✏️</button>
+          </template>
+        </div>
+        <button class="stk__btn-primary" @click="openCrear">
+          <i class="bi bi-plus-lg"></i> Agregar stock externo
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="stk__loading">
@@ -46,6 +67,20 @@
           <div class="stk__kpi-body">
             <div class="stk__kpi-val">{{ stockPropio }}<span class="stk__kpi-unit">g</span></div>
             <div class="stk__kpi-lbl">Producción propia</div>
+          </div>
+        </div>
+        <div v-if="stocksVencidos.length" class="stk__kpi stk__kpi--error">
+          <div class="stk__kpi-ico">🚫</div>
+          <div class="stk__kpi-body">
+            <div class="stk__kpi-val">{{ stocksVencidos.length }}</div>
+            <div class="stk__kpi-lbl">Stock vencido</div>
+          </div>
+        </div>
+        <div v-if="stocksPorVencer.length" class="stk__kpi stk__kpi--warn">
+          <div class="stk__kpi-ico">⚠️</div>
+          <div class="stk__kpi-body">
+            <div class="stk__kpi-val">{{ stocksPorVencer.length }}</div>
+            <div class="stk__kpi-lbl">Por vencer</div>
           </div>
         </div>
       </div>
@@ -145,7 +180,13 @@
                   </div>
                 </div>
                 <div class="stk__inv-right">
-                  <span class="stk__inv-g">{{ s.cantidad }}g</span>
+                  <span class="stk__inv-g" :class="{ 'stk__inv-g--flash': flashIds.has(s.id) }">{{ s.cantidad_disponible_real?.toFixed(1) ?? s.cantidad }}g</span>
+                  <span v-if="s.gramos_reservados > 0" class="stk__badge-reservado" :title="`${s.gramos_reservados}g en delivery pendiente`">
+                    −{{ s.gramos_reservados?.toFixed(1) }}g
+                  </span>
+                  <span v-if="s.estado_vencimiento && s.estado_vencimiento !== 'ok'" class="stk__badge-venc" :class="`stk__badge-venc--${s.estado_vencimiento}`">
+                    {{ badgeVencLabel(s) }}
+                  </span>
                   <button class="stk__icon-btn" title="Editar stock" @click="abrirEditar(s)">
                     <i class="bi bi-pencil"></i>
                   </button>
@@ -483,8 +524,10 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   listStocksPendientes, listStocks, listStocksHistorial,
   asignarStock, listSedes, createStock, updateStock,
+  getPreferences, updatePreferences,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useStockChannel } from '../../composables/useStockChannel.js'
 
 const toast = useToast()
 
@@ -496,6 +539,11 @@ const historial        = ref([])
 const historialLoaded  = ref(false)
 const loadingHistorial = ref(false)
 const sedes            = ref([])
+const liveConectado    = ref(false)
+const flashIds         = ref(new Set())
+const umbralEditing    = ref(false)
+const umbralValor      = ref(50)
+const umbralSaving     = ref(false)
 
 // ── Repartir ───────────────────────────────────────────────────────────────────
 const showRepartir   = ref(false)
@@ -531,6 +579,42 @@ watch(tabActiva, async (val) => {
   }
 })
 
+// ── Live updates ───────────────────────────────────────────────────────────────
+function onStockActualizado(data) {
+  liveConectado.value = true
+  const idx = inventario.value.findIndex(s => s.id === data.stock_id)
+  if (idx === -1) return
+  inventario.value[idx] = {
+    ...inventario.value[idx],
+    cantidad:                 data.cantidad,
+    gramos_reservados:        data.gramos_reservados,
+    cantidad_disponible_real: data.cantidad_disponible_real,
+  }
+  const newSet = new Set(flashIds.value)
+  newSet.add(data.stock_id)
+  flashIds.value = newSet
+  setTimeout(() => {
+    const s = new Set(flashIds.value)
+    s.delete(data.stock_id)
+    flashIds.value = s
+  }, 1200)
+}
+useStockChannel(onStockActualizado)
+
+// ── Umbral configurable ────────────────────────────────────────────────────────
+async function guardarUmbral() {
+  umbralSaving.value = true
+  try {
+    await updatePreferences({ umbral_stock_g: umbralValor.value })
+    toast.success(`Umbral actualizado: ${umbralValor.value}g`)
+    umbralEditing.value = false
+  } catch {
+    toast.error('Error al guardar umbral')
+  } finally {
+    umbralSaving.value = false
+  }
+}
+
 // ── KPIs ───────────────────────────────────────────────────────────────────────
 const totalG = computed(() =>
   parseFloat(inventario.value.reduce((s, x) => s + x.cantidad, 0).toFixed(1))
@@ -542,6 +626,12 @@ const stockPropio = computed(() =>
 )
 const sedesConStock = computed(() =>
   [...new Set(inventario.value.map(x => x.sede_id).filter(Boolean))]
+)
+const stocksVencidos = computed(() =>
+  inventario.value.filter(x => x.estado_vencimiento === 'vencido')
+)
+const stocksPorVencer = computed(() =>
+  inventario.value.filter(x => ['critico', 'proximo'].includes(x.estado_vencimiento))
 )
 
 // ── Inventario ─────────────────────────────────────────────────────────────────
@@ -586,14 +676,16 @@ const historialFiltrado = computed(() =>
 // ── Load ───────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
-    const [rPend, rInv, rSedes, rGen] = await Promise.all([
-      listStocksPendientes(), listStocks(), listSedes(),
+    const [rPend, rInv, rSedes, rPref] = await Promise.all([
+      listStocksPendientes(), listStocks(), listSedes(), getPreferences(),
     ])
     pendientes.value = rPend.data || []
     inventario.value = rInv.data  || []
     sedes.value      = rSedes.data || []
+    umbralValor.value = rPref.data?.data?.umbral_stock_g ?? rPref.data?.umbral_stock_g ?? 50
     pendientes.value.forEach(s => { asignaciones.value[s.id] = ''; cantidades.value[s.id] = '' })
     if (!pendientes.value.length) tabActiva.value = 'inventario'
+    liveConectado.value = true
   } catch { toast.error('Error al cargar stocks') }
   finally { loading.value = false }
 })
@@ -848,6 +940,14 @@ const FORMAS = [
 const FORMA_MAP = Object.fromEntries(FORMAS.map(f => [f.value, f.label]))
 function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 
+function badgeVencLabel(s) {
+  const dias = s.dias_para_vencimiento
+  if (dias === null || dias === undefined) return ''
+  if (dias < 0)   return `Vencido +${Math.abs(dias)}d`
+  if (dias === 0) return 'Vence hoy'
+  return `Vence ${dias}d`
+}
+
 function estadoLabel(e) {
   return { pendiente_asignacion: 'Por asignar', asignado: 'Asignado', agotado: 'Agotado' }[e] || e
 }
@@ -871,8 +971,40 @@ function formatDate(dateStr) {
   display: flex; align-items: center; justify-content: space-between;
   gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap;
 }
+.stk__header-row { display: flex; align-items: center; gap: .6rem; }
+.stk__header-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .stk__title { font-size: 1.6rem; font-weight: 800; color: #0f172a; letter-spacing: -.04em; margin: 0 0 .2rem; }
 .stk__sub   { font-size: .82rem; color: #64748b; margin: 0; }
+.stk__live-dot { font-size: .68rem; font-weight: 700; color: #15803d; background: #dcfce7; padding: .15rem .5rem; border-radius: 99px; }
+
+/* Umbral configurable */
+.stk__umbral { display: flex; align-items: center; gap: .4rem; font-size: .8rem; }
+.stk__umbral-label { color: #64748b; font-weight: 500; }
+.stk__umbral-val   { font-weight: 700; color: #0f172a; }
+.stk__umbral-input { width: 4rem; padding: .25rem .4rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: .82rem; text-align: center; }
+.stk__umbral-unit  { color: #64748b; }
+.stk__umbral-edit, .stk__umbral-save, .stk__umbral-cancel {
+  background: none; border: none; cursor: pointer; font-size: .85rem; padding: .1rem .3rem;
+  border-radius: 4px;
+}
+.stk__umbral-save:hover  { background: #dcfce7; }
+.stk__umbral-cancel:hover { background: #fee2e2; }
+
+/* Badges inventario */
+.stk__badge-reservado {
+  font-size: .68rem; font-weight: 700; color: #d97706; background: #fef3c7;
+  padding: .1rem .4rem; border-radius: 99px; white-space: nowrap;
+}
+.stk__badge-venc {
+  font-size: .68rem; font-weight: 700; padding: .1rem .4rem; border-radius: 99px; white-space: nowrap;
+}
+.stk__badge-venc--vencido { background: #fee2e2; color: #dc2626; }
+.stk__badge-venc--critico { background: #ffedd5; color: #ea580c; }
+.stk__badge-venc--proximo { background: #fef9c3; color: #a16207; }
+
+/* Flash live update */
+.stk__inv-g--flash { animation: gFlash .6s ease-out; }
+@keyframes gFlash { 0% { color: #15803d; } 100% { color: inherit; } }
 
 /* ── Buttons ────────────────────────────────────────────────────────────────── */
 .stk__btn-primary {

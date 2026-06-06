@@ -22,7 +22,12 @@ Sidekiq.configure_server do |config|
       'stock_bajo' => {
         'cron'  => '0 9 * * *',
         'class' => 'StockBajoJob',
-        'description' => 'Genera alertas de stock bajo (< 50g) para todos los clubes'
+        'description' => 'Genera alertas de stock bajo (umbral configurable por club) para todos los clubes'
+      },
+      'stock_vencimiento' => {
+        'cron'  => '0 9 * * *',
+        'class' => 'StockVencimientoJob',
+        'description' => 'Genera alertas de stock vencido o próximo a vencer para todos los clubes'
       },
       'detectar_alertas_cultivo' => {
         'cron'  => '0 7 * * *',

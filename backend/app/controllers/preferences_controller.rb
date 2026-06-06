@@ -134,7 +134,8 @@ class PreferencesController < ApplicationController
       :facebook_url, :horarios_atencion, :web_activa,
       :benchmark_opt_in,
       :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
-      :smtp_from, :smtp_from_name
+      :smtp_from, :smtp_from_name,
+      :umbral_stock_g
     )
   end
 
@@ -175,6 +176,7 @@ class PreferencesController < ApplicationController
       twilio_configurado:           club.twilio_configurado?,
       twilio_account_sid:           club.twilio_account_sid,
       twilio_whatsapp_from:         club.twilio_whatsapp_from,
+      umbral_stock_g:               club.umbral_stock_g,
     }
   end
 end

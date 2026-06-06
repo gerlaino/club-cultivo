@@ -43,6 +43,29 @@ class Stock < ApplicationRecord
   def agotado?              = estado == 'agotado'
   def del_club?             = sede_id.nil?
 
+  def gramos_reservados
+    dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
+  end
+
+  def cantidad_disponible_real
+    [cantidad.to_f - gramos_reservados, 0].max
+  end
+
+  def dias_para_vencimiento
+    return nil unless fecha_vencimiento_est
+    (fecha_vencimiento_est - Date.today).to_i
+  end
+
+  def estado_vencimiento
+    return nil unless fecha_vencimiento_est
+    dias = dias_para_vencimiento
+    if    dias < 0  then 'vencido'
+    elsif dias <= 7 then 'critico'
+    elsif dias <= 30 then 'proximo'
+    else 'ok'
+    end
+  end
+
   def asignar!(sede:, usuario:, notas: nil)
     ActiveRecord::Base.transaction do
       update!(sede: sede, estado: 'asignado')
