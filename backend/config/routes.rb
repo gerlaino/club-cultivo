@@ -53,6 +53,8 @@ Rails.application.routes.draw do
     post '/asistente/analizar_lote',      to: 'asistente#analizar_lote'
     get  '/asistente/historial_analisis', to: 'asistente#historial_analisis'
 
+    resources :push_subscriptions, only: [:create, :destroy]
+
     resources :salas do
       resources :lotes, only: [:index, :create]
       resources :cultivadores, controller: 'sala_cultivadores', only: [:index, :create, :destroy]

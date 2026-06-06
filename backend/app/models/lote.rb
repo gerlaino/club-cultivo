@@ -38,6 +38,7 @@ class Lote < ApplicationRecord
 
   before_create :generar_codigo
   before_save   :generar_qr_cosecha, if: :debe_generar_qr_cosecha?
+  after_commit  :push_manicura_pendiente, on: [:create, :update]
 
   default_scope { where(deleted_at: nil) }
 
@@ -514,5 +515,16 @@ class Lote < ApplicationRecord
       count += 1
       self.codigo = "#{base}-#{anio}-#{count.to_s.rjust(3, '0')}"
     end
+  end
+
+  def push_manicura_pendiente
+    return unless saved_change_to_estado? && estado == 'manicura_pendiente'
+
+    PushNotificationService.notify_admins_async(
+      club,
+      title: "Aprobación requerida",
+      body:  "Lote #{codigo} esperando tu aprobación",
+      url:   '/aprobaciones'
+    )
   end
 end

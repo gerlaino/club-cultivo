@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_01_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_05_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -496,8 +496,16 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_01_000001) do
     t.bigint "manicurador_id"
     t.string "origen", default: "semilla", null: false
     t.bigint "planta_madre_id"
+    t.string "fotoperiodo_vegetativo"
+    t.integer "tamanio_maceta_inicial"
+    t.date "fecha_trasplante"
+    t.decimal "ph_riego", precision: 4, scale: 1
+    t.text "fertilizacion_descripcion"
+    t.string "sistema_hidro"
+    t.string "codigo_qr_cosecha"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
+    t.index ["codigo_qr_cosecha"], name: "index_lotes_on_codigo_qr_cosecha", unique: true
     t.index ["deleted_at"], name: "index_lotes_on_deleted_at"
     t.index ["estado"], name: "index_lotes_on_estado"
     t.index ["genetica_id"], name: "index_lotes_on_genetica_id"
@@ -631,6 +639,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_01_000001) do
     t.text "alergias"
     t.text "medicacion_habitual"
     t.string "grupo_sanguineo", limit: 5
+    t.decimal "descuento_porcentaje", precision: 5, scale: 2, default: "0.0", null: false
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["carnet_token"], name: "index_pacientes_on_carnet_token", unique: true
@@ -707,8 +716,36 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_01_000001) do
     t.decimal "peso_seco_g", precision: 8, scale: 2
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "pesaje_manicura_id"
     t.index ["pesada_id"], name: "index_pesadas_plantas_on_pesada_id"
+    t.index ["pesaje_manicura_id"], name: "index_pesadas_plantas_on_pesaje_manicura_id"
     t.index ["plant_id"], name: "index_pesadas_plantas_on_plant_id"
+  end
+
+  create_table "pesajes_manicura", force: :cascade do |t|
+    t.bigint "lote_id", null: false
+    t.bigint "manicurador_id", null: false
+    t.bigint "club_id", null: false
+    t.bigint "stock_id"
+    t.bigint "confirmado_por_id"
+    t.date "fecha_pesaje", null: false
+    t.string "estado", default: "borrador", null: false
+    t.decimal "peso_total_g", precision: 10, scale: 2
+    t.decimal "peso_confirmado_g", precision: 10, scale: 2
+    t.integer "plantas_count"
+    t.text "notas"
+    t.datetime "enviado_at"
+    t.datetime "confirmado_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "estado"], name: "index_pesajes_manicura_on_club_id_and_estado"
+    t.index ["club_id"], name: "index_pesajes_manicura_on_club_id"
+    t.index ["confirmado_por_id"], name: "index_pesajes_manicura_on_confirmado_por_id"
+    t.index ["fecha_pesaje"], name: "index_pesajes_manicura_on_fecha_pesaje"
+    t.index ["lote_id", "estado"], name: "index_pesajes_manicura_on_lote_id_and_estado"
+    t.index ["lote_id"], name: "index_pesajes_manicura_on_lote_id"
+    t.index ["manicurador_id"], name: "index_pesajes_manicura_on_manicurador_id"
+    t.index ["stock_id"], name: "index_pesajes_manicura_on_stock_id"
   end
 
   create_table "plan_tareas", force: :cascade do |t|
@@ -805,6 +842,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_01_000001) do
     t.index ["lote_id"], name: "index_plants_on_lote_id"
     t.index ["origen"], name: "index_plants_on_origen"
     t.index ["planta_madre_id"], name: "index_plants_on_planta_madre_id"
+  end
+
+  create_table "push_subscriptions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "club_id", null: false
+    t.string "endpoint", null: false
+    t.string "p256dh_key", null: false
+    t.string "auth_key", null: false
+    t.string "device_name"
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_push_subscriptions_on_club_id"
+    t.index ["endpoint"], name: "index_push_subscriptions_on_endpoint", unique: true
+    t.index ["user_id"], name: "index_push_subscriptions_on_user_id"
   end
 
   create_table "registros_ambientales", force: :cascade do |t|
@@ -1179,7 +1231,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_01_000001) do
   add_foreign_key "pesadas", "users", column: "rechazada_por_id"
   add_foreign_key "pesadas", "users", column: "registrado_por_id"
   add_foreign_key "pesadas_plantas", "pesadas"
+  add_foreign_key "pesadas_plantas", "pesajes_manicura", column: "pesaje_manicura_id"
   add_foreign_key "pesadas_plantas", "plants"
+  add_foreign_key "pesajes_manicura", "clubs"
+  add_foreign_key "pesajes_manicura", "lotes"
+  add_foreign_key "pesajes_manicura", "stocks"
+  add_foreign_key "pesajes_manicura", "users", column: "confirmado_por_id"
+  add_foreign_key "pesajes_manicura", "users", column: "manicurador_id"
   add_foreign_key "plan_tareas", "plan_trabajos"
   add_foreign_key "plan_tareas", "salas"
   add_foreign_key "plan_tareas", "tareas", column: "tarea_generada_id"
@@ -1191,6 +1249,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_01_000001) do
   add_foreign_key "plant_activities", "users"
   add_foreign_key "plants", "clubs"
   add_foreign_key "plants", "lotes"
+  add_foreign_key "push_subscriptions", "clubs"
+  add_foreign_key "push_subscriptions", "users"
   add_foreign_key "registros_ambientales", "clubs"
   add_foreign_key "registros_ambientales", "lotes"
   add_foreign_key "registros_ambientales", "users"

@@ -60,6 +60,21 @@
                 <RouterLink to="/preferencias" class="atb__user-item" @click="avatarOpen = false">
                   <i class="bi bi-gear"></i> Configuración del club
                 </RouterLink>
+
+                <!-- Push notifications toggle -->
+                <button
+                  v-if="pushSupported && !pushDenied"
+                  class="atb__user-item atb__push-item"
+                  :class="{ 'atb__push-item--on': pushSubscribed }"
+                  @click="togglePush"
+                  :disabled="pushLoading"
+                >
+                  <BellRing v-if="pushSubscribed" :size="14" :stroke-width="2" />
+                  <BellOff  v-else                :size="14" :stroke-width="2" />
+                  <span>{{ pushSubscribed ? 'Notificaciones activas' : 'Activar notificaciones' }}</span>
+                  <span class="atb__push-dot" :class="pushSubscribed ? 'atb__push-dot--on' : 'atb__push-dot--off'"></span>
+                </button>
+
                 <div class="atb__divider"></div>
                 <button class="atb__user-item atb__user-item--danger" @click="handleLogout">
                   <i class="bi bi-box-arrow-right"></i> Cerrar sesión
@@ -86,7 +101,8 @@ import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
 import DsDropdown         from '../../design-system/components/Dropdown.vue'
 import DsAvatar           from '../../design-system/components/Avatar.vue'
-import { Bell, Menu, HelpCircle } from 'lucide-vue-next'
+import { Bell, BellRing, BellOff, Menu, HelpCircle } from 'lucide-vue-next'
+import { usePushNotifications } from '../../composables/usePushNotifications.js'
 import HelpDrawer         from '../HelpDrawer.vue'
 import NotificationDrawer from '../ui/NotificationDrawer.vue'
 
@@ -105,6 +121,19 @@ const avatarOpen = ref(false)
 const helpOpen   = ref(false)
 const notifOpen  = ref(false)
 const helpDot    = ref(false)
+
+const {
+  supported: pushSupported,
+  subscribed: pushSubscribed,
+  loading: pushLoading,
+  denied: pushDenied,
+  subscribe: pushSubscribe,
+  unsubscribe: pushUnsubscribe,
+} = usePushNotifications()
+
+async function togglePush() {
+  pushSubscribed.value ? await pushUnsubscribe() : await pushSubscribe()
+}
 
 onMounted(() => {
   helpDot.value = !localStorage.getItem(`help_seen_${auth.user?.id || 'u'}`)
@@ -302,4 +331,23 @@ async function handleLogout() {
 .atb__user-item--danger { color: var(--c-rust-600); }
 .atb__user-item--danger:hover { background: var(--c-rust-100); color: var(--c-rust-600); }
 .atb__divider { height: 1px; background: var(--c-ink-100); margin: var(--sp-1) 0; }
+
+/* Push toggle */
+.atb__push-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--c-ink-500);
+}
+.atb__push-item--on { color: var(--c-leaf-700); }
+.atb__push-item:disabled { opacity: .6; cursor: wait; }
+.atb__push-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.atb__push-dot--on  { background: var(--c-leaf-500); }
+.atb__push-dot--off { background: var(--c-ink-300); }
 </style>

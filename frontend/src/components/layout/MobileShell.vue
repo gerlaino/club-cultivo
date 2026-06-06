@@ -42,10 +42,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useClubStore }  from '../../stores/club'
+import { usePushNotifications } from '../../composables/usePushNotifications.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -100,6 +101,21 @@ async function doLogout() {
   await auth.logOut?.()
   router.replace('/login')
 }
+
+// Solicitar permiso push en primer uso (solo una vez por dispositivo)
+const { supported: pushSupported, subscribed: pushSubscribed, subscribe: pushSubscribe } = usePushNotifications()
+
+onMounted(() => {
+  const key = `push_asked_${auth.user?.id || 'u'}`
+  if (!pushSupported || localStorage.getItem(key)) return
+
+  // Esperar unos segundos para no interrumpir la carga inicial
+  setTimeout(async () => {
+    if (pushSubscribed.value) return
+    const granted = await pushSubscribe()
+    if (granted !== false) localStorage.setItem(key, '1')
+  }, 4000)
+})
 </script>
 
 <style scoped>

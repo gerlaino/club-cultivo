@@ -41,6 +41,8 @@ class Tarea < ApplicationRecord
   # Al completar, registrar fecha
   before_save :set_fecha_completada, if: :completando?
 
+  after_create_commit :push_asignacion_nueva, if: -> { asignada_a.present? }
+
   # ── Scopes ────────────────────────────────────────────────────
   scope :del_club,         ->(club_id) { where(club_id: club_id) }
   scope :asignadas_a,      ->(user_id) { where(asignada_a_id: user_id) }
@@ -164,6 +166,15 @@ class Tarea < ApplicationRecord
   end
 
   private
+
+  def push_asignacion_nueva
+    PushNotificationService.notify_user_async(
+      asignada_a,
+      title: "Nueva tarea asignada",
+      body:  titulo,
+      url:   '/m/cultivador/tareas'
+    )
+  end
 
   def completando?
     estado_changed? && estado == 'completada' && fecha_completada.nil?

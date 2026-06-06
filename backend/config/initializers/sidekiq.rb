@@ -28,6 +28,11 @@ Sidekiq.configure_server do |config|
         'cron'  => '0 7 * * *',
         'class' => 'DetectarAlertasJob',
         'description' => 'Detecta anomalías de cultivo: registros vencidos, pH/EC fuera de rango, cosecha pendiente, tareas vencidas'
+      },
+      'tareas_diarias_push' => {
+        'cron'  => '0 8 * * *',
+        'class' => 'TareasDiariasPushJob',
+        'description' => 'Envía push notification con resumen de tareas del día a cada cultivador'
       }
     )
   end
