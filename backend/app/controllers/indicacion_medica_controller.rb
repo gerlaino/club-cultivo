@@ -1,8 +1,8 @@
 class IndicacionMedicaController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_medico_or_admin, except: [:index, :show, :index_medico]
+  before_action :require_medico_or_admin, except: [:index, :show, :index_medico, :prescripcion_pdf]
   before_action :set_paciente, only: [:index, :create]
-  before_action :set_indicacion, only: [:show, :update, :destroy]
+  before_action :set_indicacion, only: [:show, :update, :destroy, :prescripcion_pdf]
 
   # GET /indicaciones_medicas — standalone, scoped to medico's club patients
   def index_medico
@@ -52,6 +52,19 @@ class IndicacionMedicaController < ApplicationController
   def destroy
     @indicacion.update(activa: false)
     head :no_content
+  end
+
+  # GET /indicaciones/:id/prescripcion_pdf — renderiza HTML para impresión/PDF
+  def prescripcion_pdf
+    club    = current_user.club
+    paciente = @indicacion.paciente
+    medico  = @indicacion.user
+    render :prescripcion_pdf, layout: false, locals: {
+      club:       club,
+      paciente:   paciente,
+      medico:     medico,
+      indicacion: @indicacion,
+    }, formats: :html
   end
 
   private

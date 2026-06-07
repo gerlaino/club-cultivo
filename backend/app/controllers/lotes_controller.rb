@@ -260,6 +260,7 @@ class LotesController < ApplicationController
           sala_origen_id:  sala_anterior_id != @lote.sala_id ? sala_anterior_id : nil,
           sala_destino_id: sala_anterior_id != @lote.sala_id ? @lote.sala_id   : nil,
         )
+        TareasAutoService.new(lote: @lote, estado_nuevo: @lote.estado, user: current_user, club: current_user.club).call
       end
       return render json: LoteSerializer.serialize(@lote.reload, include_plants: true), status: :created
     end
@@ -585,6 +586,7 @@ class LotesController < ApplicationController
       sala_origen_id:  sala_anterior_id != @lote.sala_id ? sala_anterior_id : nil,
       sala_destino_id: sala_anterior_id != @lote.sala_id ? @lote.sala_id   : nil,
     )
+    TareasAutoService.new(lote: @lote, estado_nuevo: @lote.estado, user: current_user, club: current_user.club).call
     render json: LoteSerializer.serialize(@lote.reload, include_plants: true)
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity

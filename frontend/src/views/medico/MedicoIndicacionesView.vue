@@ -79,6 +79,9 @@
               <span class="miv__estado-badge" :class="estadoClass(ind)">{{ estadoLabel(ind) }}</span>
             </td>
             <td class="miv__td-actions">
+              <a class="miv__action-btn" :href="`${apiBase}/indicaciones/${ind.id}/prescripcion_pdf`" target="_blank" title="Ver prescripción PDF">
+                <FileText :size="14" />
+              </a>
               <button class="miv__action-btn" @click="openEdit(ind)" title="Editar">
                 <Pencil :size="14" />
               </button>
@@ -177,7 +180,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Search, Plus, Pencil, Trash2, X, FileHeart } from 'lucide-vue-next'
+import { Search, Plus, Pencil, Trash2, X, FileHeart, FileText } from 'lucide-vue-next'
+
+const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 import { createIndicacion, updateIndicacion, deleteIndicacion } from '../../lib/api.js'
 import { usePacientesStore } from '../../stores/pacientes.js'
 import { useConfirm } from '../../composables/useConfirm.js'

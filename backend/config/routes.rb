@@ -185,7 +185,9 @@ Rails.application.routes.draw do
     resources :socio_notas, controller: 'paciente_notas', only: [:destroy], as: :socio_notas_legacy
 
     get '/indicaciones_medicas', to: 'indicacion_medica#index_medico'
-    resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy]
+    resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy] do
+      member { get :prescripcion_pdf }
+    end
     resources :dispensaciones, only: [:index, :show, :update, :destroy] do
       collection do
         get  :mis_paquetes
