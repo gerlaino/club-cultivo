@@ -31,6 +31,7 @@ const lotesActivos           = ref([])
 const dispensacionesHoy      = ref([])
 const ejecutivo              = ref(null)
 const loading                = ref(true)
+const erroresCarga           = ref([])
 
 const chartCanvas   = ref(null)
 let   chartInstance = null
@@ -361,6 +362,7 @@ onMounted(async () => {
     if (lotesRes.status      === 'fulfilled') lotesActivos.value           = lotesRes.value.data    || []
     if (dispHoyRes.status    === 'fulfilled') dispensacionesHoy.value      = dispHoyRes.value.data  || []
     if (ejecutivoRes.status  === 'fulfilled') ejecutivo.value              = ejecutivoRes.value.data
+    else erroresCarga.value.push('resumen anual')
 
     if (contable.value?.mes_actual?.por_semana?.length)
       initChart(contable.value.mes_actual.por_semana)
@@ -382,6 +384,11 @@ async function onOnboardingCompletado() {
     <OnboardingWizard v-if="mostrarOnboarding" :checking="loading" @completado="onOnboardingCompletado" />
 
     <template v-if="!mostrarOnboarding">
+
+      <!-- ── ERRORES DE CARGA ───────────────────────────────────────────── -->
+      <div v-if="erroresCarga.length" class="ad__error-banner">
+        Algunos datos no pudieron cargarse: {{ erroresCarga.join(', ') }}. Recargá la página si el problema persiste.
+      </div>
 
       <!-- ── HEADER ──────────────────────────────────────────────────────── -->
       <div class="ad__header">
@@ -429,7 +436,7 @@ async function onOnboardingCompletado() {
             <div class="ad__kpi">
               <span class="ad__kpi-label">Próxima cosecha</span>
               <div class="ad__kpi-num" v-if="proximaCosecha !== null">{{ proximaCosecha.diff }}d</div>
-              <div class="ad__kpi-num ad__kpi-num--empty" v-else">—</div>
+              <div class="ad__kpi-num ad__kpi-num--empty" v-else>—</div>
               <div class="ad__kpi-sub">
                 <span v-if="proximaCosecha">{{ proximaCosecha.genetica?.nombre || 'Sin genética' }}</span>
                 <span v-else>Sin cosechas programadas</span>
@@ -725,6 +732,17 @@ async function onOnboardingCompletado() {
   padding: 2rem;
   max-width: 1280px;
   margin: 0 auto;
+}
+
+/* ── Error banner ───────────────────────────────────────────────────────── */
+.ad__error-banner {
+  background: #fef3c7;
+  border: 1px solid #d97706;
+  color: #92400e;
+  border-radius: 8px;
+  padding: .65rem 1rem;
+  font-size: .85rem;
+  margin-bottom: 1rem;
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */

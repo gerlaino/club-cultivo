@@ -1,13 +1,11 @@
 class AnalyticsController < ApplicationController
   before_action :authenticate_user!
+  before_action :require_analytics_access!, except: [:dispensador]
+  before_action :require_dispensador_access!, only: [:dispensador]
 
   # GET /api/analytics/rendimiento_genetica
   # Para: admin, supervisor, super_admin
   def rendimiento_genetica
-    unless %w[admin supervisor super_admin].include?(current_user.role)
-      return render json: { error: 'No autorizado' }, status: :forbidden
-    end
-
     club = current_user.club
     año  = params[:año].presence
     cache_key = "analytics/rendimiento_genetica/#{club.id}/#{año || 'all'}"
@@ -100,10 +98,6 @@ class AnalyticsController < ApplicationController
   # GET /api/analytics/dispensador
   # Para: dispensador, admin
   def dispensador
-    unless %w[admin dispensador super_admin].include?(current_user.role)
-      return render json: { error: 'No autorizado' }, status: :forbidden
-    end
-
     club = current_user.club
     data = Rails.cache.fetch("analytics/dispensador/#{club.id}/#{Date.today}", expires_in: 10.minutes) do
       calcular_dispensador(club)
@@ -186,10 +180,6 @@ class AnalyticsController < ApplicationController
   # GET /api/analytics/correlacion_ambiental
   # Para: admin, supervisor, super_admin
   def correlacion_ambiental
-    unless %w[admin supervisor super_admin].include?(current_user.role)
-      return render json: { error: 'No autorizado' }, status: :forbidden
-    end
-
     club = current_user.club
     año  = params[:año].presence
     cache_key = "analytics/correlacion_ambiental/#{club.id}/#{año || 'all'}"
@@ -203,10 +193,6 @@ class AnalyticsController < ApplicationController
   # GET /api/analytics/produccion
   # Para: admin, supervisor, super_admin
   def produccion
-    unless %w[admin supervisor super_admin].include?(current_user.role)
-      return render json: { error: 'No autorizado' }, status: :forbidden
-    end
-
     club = current_user.club
     año  = params[:año].presence
     cache_key = "analytics/produccion/#{club.id}/#{año || 'all'}"
@@ -216,8 +202,6 @@ class AnalyticsController < ApplicationController
     end
     render json: data
   end
-
-  private
 
   TIPOS_CORRELACION = %w[temperatura humedad vpd ph co2 ec ppfd].freeze
 
@@ -474,71 +458,27 @@ class AnalyticsController < ApplicationController
   # GET /api/analytics/ejecutivo
   # Resumen anual — KPIs del año en curso vs año anterior
   def ejecutivo
-    unless %w[admin supervisor super_admin].include?(current_user.role)
-      return render json: { error: 'No autorizado' }, status: :forbidden
-    end
-
     club         = current_user.club
     año_actual   = Date.today.year
     año_anterior = año_actual - 1
-
-    render json: {
-      año:      año_actual,
-      actual:   kpis_anuales(club, año_actual),
-      anterior: kpis_anuales(club, año_anterior),
-    }
+    cache_key    = "analytics/ejecutivo/#{club.id}/#{año_actual}/#{Date.today}"
+    Rails.cache.delete(cache_key) if params[:bust]
+    data = Rails.cache.fetch(cache_key, expires_in: 1.hour) do
+      { año: año_actual, actual: kpis_anuales(club, año_actual), anterior: kpis_anuales(club, año_anterior) }
+    end
+    render json: data
   end
 
   # GET /api/analytics/pl_lotes
   # Para: admin, supervisor
   def pl_lotes
-    unless %w[admin supervisor super_admin].include?(current_user.role)
-      return render json: { error: 'No autorizado' }, status: :forbidden
+    club      = current_user.club
+    cache_key = "analytics/pl_lotes/#{club.id}/#{Date.today}"
+    Rails.cache.delete(cache_key) if params[:bust]
+    data = Rails.cache.fetch(cache_key, expires_in: 15.minutes) do
+      calcular_pl_lotes(club)
     end
-
-    club  = current_user.club
-    lotes = club.lotes.includes(:genetica, :costo_lote).order(created_at: :desc)
-
-    # Ingresos y gramos dispensados por lote — 2 queries para todos los lotes
-    ingresos_por_lote = Dispensacion
-      .joins(:stock)
-      .where(stocks: { club_id: club.id })
-      .where.not(stocks: { lote_id: nil })
-      .group('stocks.lote_id')
-      .sum('dispensaciones.cantidad * COALESCE(dispensaciones.precio_unitario_ars, 0)')
-
-    gramos_disp_por_lote = Dispensacion
-      .joins(:stock)
-      .where(stocks: { club_id: club.id })
-      .where.not(stocks: { lote_id: nil })
-      .group('stocks.lote_id')
-      .sum(:cantidad)
-
-    filas = lotes.map do |l|
-      c           = l.costo_lote
-      ingresos    = ingresos_por_lote[l.id].to_f.round(2)
-      costo_total = c&.costo_total.to_f
-      margen      = (ingresos - costo_total).round(2)
-      margen_pct  = ingresos > 0 ? (margen / ingresos * 100).round(1) : nil
-      gramos_disp = gramos_disp_por_lote[l.id].to_f.round(3)
-      {
-        id:                 l.id,
-        codigo:             l.codigo,
-        genetica:           l.genetica&.nombre,
-        estado:             l.estado,
-        costo_total:        costo_total,
-        costo_por_gramo:    c&.costo_por_gramo&.to_f,
-        ingresos:           ingresos,
-        gramos_dispensados: gramos_disp,
-        ingreso_por_gramo:  gramos_disp > 0 ? (ingresos / gramos_disp).round(2) : nil,
-        margen:             margen,
-        margen_pct:         margen_pct,
-        tiene_costos:       c.present?,
-        tiene_ingresos:     ingresos > 0,
-      }
-    end
-
-    render json: { lotes: filas }
+    render json: data
   end
 
   def kpis_anuales(club, año)
@@ -625,6 +565,64 @@ class AnalyticsController < ApplicationController
     nil
   end
 
-  private :calcular_rendimiento_genetica, :calcular_dispensador, :kpis_anuales,
-          :pearson_r, :regresion_lineal
+  def calcular_pl_lotes(club)
+    lotes = club.lotes.includes(:genetica, :costo_lote).order(created_at: :desc)
+
+    ingresos_por_lote = Dispensacion
+      .joins(:stock)
+      .where(stocks: { club_id: club.id })
+      .where.not(stocks: { lote_id: nil })
+      .group('stocks.lote_id')
+      .sum('dispensaciones.cantidad * COALESCE(dispensaciones.precio_unitario_ars, 0)')
+
+    gramos_disp_por_lote = Dispensacion
+      .joins(:stock)
+      .where(stocks: { club_id: club.id })
+      .where.not(stocks: { lote_id: nil })
+      .group('stocks.lote_id')
+      .sum(:cantidad)
+
+    filas = lotes.map do |l|
+      c           = l.costo_lote
+      ingresos    = ingresos_por_lote[l.id].to_f.round(2)
+      costo_total = c&.costo_total.to_f
+      margen      = (ingresos - costo_total).round(2)
+      margen_pct  = ingresos > 0 ? (margen / ingresos * 100).round(1) : nil
+      gramos_disp = gramos_disp_por_lote[l.id].to_f.round(3)
+      {
+        id:                 l.id,
+        codigo:             l.codigo,
+        genetica:           l.genetica&.nombre,
+        estado:             l.estado,
+        costo_total:        costo_total,
+        costo_por_gramo:    c&.costo_por_gramo&.to_f,
+        ingresos:           ingresos,
+        gramos_dispensados: gramos_disp,
+        ingreso_por_gramo:  gramos_disp > 0 ? (ingresos / gramos_disp).round(2) : nil,
+        margen:             margen,
+        margen_pct:         margen_pct,
+        tiene_costos:       c.present?,
+        tiene_ingresos:     ingresos > 0,
+      }
+    end
+
+    { lotes: filas }
+  end
+
+  def require_analytics_access!
+    unless %w[admin supervisor super_admin].include?(current_user.role)
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
+  end
+
+  def require_dispensador_access!
+    unless %w[admin dispensador super_admin].include?(current_user.role)
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
+  end
+
+  private :calcular_rendimiento_genetica, :calcular_dispensador, :calcular_correlacion_ambiental,
+          :agrupar_buckets, :calcular_produccion, :calcular_pl_lotes, :kpis_anuales,
+          :pearson_r, :regresion_lineal,
+          :require_analytics_access!, :require_dispensador_access!
 end

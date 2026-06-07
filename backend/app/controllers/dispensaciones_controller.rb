@@ -33,6 +33,7 @@ class DispensacionesController < ApplicationController
         .joins(stock: :sede)
         .where(sedes: { club_id: current_user.club_id })
         .includes(:user, :paciente, :sede, stock: :lote)
+      scope = apply_dispensacion_filters(scope)
       if params[:desde].present? || params[:hasta].present?
         desde = params[:desde].present? ? Date.parse(params[:desde]) : nil
         hasta = params[:hasta].present? ? Date.parse(params[:hasta]) : Date.today
@@ -215,6 +216,8 @@ class DispensacionesController < ApplicationController
       .includes(:paciente, :user, :sede, stock: :lote)
       .order(fecha_dispensacion: :desc, created_at: :desc)
 
+    scope = apply_dispensacion_filters(scope)
+
     if params[:desde].present?
       desde = Date.parse(params[:desde]) rescue nil
       scope = scope.where("fecha_dispensacion >= ?", desde) if desde
@@ -222,9 +225,6 @@ class DispensacionesController < ApplicationController
     if params[:hasta].present?
       hasta = Date.parse(params[:hasta]) rescue nil
       scope = scope.where("fecha_dispensacion <= ?", hasta) if hasta
-    end
-    if params[:sede_id].present?
-      scope = scope.where(sedes: { id: params[:sede_id] })
     end
 
     require "csv"
@@ -280,6 +280,14 @@ class DispensacionesController < ApplicationController
   end
 
   private
+
+  def apply_dispensacion_filters(scope)
+    scope = scope.where(paciente_id: params[:paciente_id])          if params[:paciente_id].present?
+    scope = scope.where(medio_pago: params[:medio_pago])            if params[:medio_pago].present?
+    scope = scope.where(stocks: { forma_producto: params[:forma_producto] }) if params[:forma_producto].present?
+    scope = scope.where(sedes: { id: params[:sede_id] })            if params[:sede_id].present?
+    scope
+  end
 
   def set_paciente
     @paciente = current_user.club.pacientes.find(params[:paciente_id])

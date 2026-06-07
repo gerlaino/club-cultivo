@@ -1,35 +1,44 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
-import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente } from '../lib/api.js'
+import { ref, watch, computed, onMounted } from 'vue'
+import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink } from 'vue-router'
-import { Download, RefreshCw, Truck, Search, Plus, X } from 'lucide-vue-next'
+import { Download, RefreshCw, Truck, Search, Plus, X, Filter } from 'lucide-vue-next'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
 
-// ── Paso 1: buscar paciente ────────────────────────────────────────────────────
-const showBuscarPaciente    = ref(false)
-const buscaPaciente         = ref('')
-const pacientesLista        = ref([])
-const loadingPacientes      = ref(false)
-const cargandoPaciente      = ref(false)
+// ── Modal: buscar paciente (para nueva dispensación O para filtrar) ─────────────
+const showBuscarPaciente   = ref(false)
+const modoModal            = ref('dispensar') // 'dispensar' | 'filtrar'
+const buscaPaciente        = ref('')
+const pacientesLista       = ref([])
+const loadingPacientes     = ref(false)
+const cargandoPaciente     = ref(false)
 
-// ── Paso 2: modal dispensación ─────────────────────────────────────────────────
-const showDispensarModal    = ref(false)
-const pacienteSeleccionado  = ref(null)
+const showDispensarModal   = ref(false)
+const pacienteSeleccionado = ref(null)
 
 async function abrirNuevaDispensacion() {
-  buscaPaciente.value = ''
-  pacientesLista.value = []
+  modoModal.value       = 'dispensar'
+  buscaPaciente.value   = ''
+  pacientesLista.value  = []
   showBuscarPaciente.value = true
   await buscarPacientes()
+}
+
+function abrirFiltrarSocio() {
+  modoModal.value       = 'filtrar'
+  buscaPaciente.value   = ''
+  pacientesLista.value  = []
+  showBuscarPaciente.value = true
+  buscarPacientes()
 }
 
 async function buscarPacientes() {
   loadingPacientes.value = true
   try {
-    const params = {}
-    if (buscaPaciente.value.trim()) params.q = buscaPaciente.value.trim()
-    const { data } = await listPacientes(params)
+    const p = {}
+    if (buscaPaciente.value.trim()) p.q = buscaPaciente.value.trim()
+    const { data } = await listPacientes(p)
     pacientesLista.value = data.pacientes ?? data ?? []
   } catch { pacientesLista.value = [] }
   finally { loadingPacientes.value = false }
@@ -37,13 +46,18 @@ async function buscarPacientes() {
 
 watch(buscaPaciente, () => buscarPacientes())
 
-async function seleccionarPaciente(paciente) {
+async function seleccionarPacienteModal(paciente) {
+  if (modoModal.value === 'filtrar') {
+    filtroSocio.value = { id: paciente.id, nombre: `${paciente.apellido}, ${paciente.nombre}` }
+    showBuscarPaciente.value = false
+    return
+  }
   cargandoPaciente.value = true
   try {
     const { data } = await getPaciente(paciente.id)
     pacienteSeleccionado.value = data
-    showBuscarPaciente.value = false
-    showDispensarModal.value = true
+    showBuscarPaciente.value   = false
+    showDispensarModal.value   = true
   } catch {} finally { cargandoPaciente.value = false }
 }
 
@@ -52,47 +66,54 @@ function onDispensacionGuardada() {
   cargar()
 }
 
+// ── Fechas ─────────────────────────────────────────────────────────────────────
 const hoy = new Date().toISOString().slice(0, 10)
-
-// Rango de fechas — por defecto últimos 7 días
 const desdeDefault = () => {
-  const d = new Date()
-  d.setDate(d.getDate() - 6)
-  return d.toISOString().slice(0, 10)
+  const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10)
 }
 const desde = ref(desdeDefault())
-const hasta = ref(hoy)
-const busca = ref('')
+const hasta  = ref(hoy)
 
-const loading    = ref(false)
-const exporting  = ref(false)
-const allDisps   = ref([])
+// ── Filtros server-side ────────────────────────────────────────────────────────
+const filtroSede      = ref('')
+const filtroMedioPago = ref('')
+const filtroForma     = ref('')
+const filtroSocio     = ref(null) // { id, nombre }
 
-const dispensaciones = computed(() => {
-  if (!busca.value.trim()) return allDisps.value
-  const q = busca.value.toLowerCase()
-  return allDisps.value.filter(d =>
-    d.paciente_nombre?.toLowerCase().includes(q) ||
-    d.usuario?.nombre?.toLowerCase().includes(q) ||
-    d.stock?.forma_producto?.toLowerCase().includes(q)
-  )
+const sedes = ref([])
+onMounted(async () => {
+  try { const { data } = await listSedes(); sedes.value = data ?? [] } catch {}
 })
 
-// KPIs — calculados siempre sobre el período completo, no sobre el filtro de búsqueda
-const totalRecaudado = computed(() =>
-  allDisps.value.reduce((s, d) => s + (d.aporte_socio_ars ?? 0), 0)
-)
-const totalGramos = computed(() =>
-  allDisps.value.reduce((s, d) => s + (d.cantidad ?? 0), 0)
-)
-const totalConEnvio = computed(() =>
-  allDisps.value.filter(d => d.con_envio).length
+const hayFiltrosActivos = computed(() =>
+  filtroSede.value || filtroMedioPago.value || filtroForma.value || filtroSocio.value
 )
 
-// Resumen por medio de pago
+function limpiarFiltros() {
+  filtroSede.value      = ''
+  filtroMedioPago.value = ''
+  filtroForma.value     = ''
+  filtroSocio.value     = null
+}
+
+function filtrarPorSocio(d) {
+  filtroSocio.value = { id: d.paciente_id, nombre: d.paciente_nombre }
+}
+
+// ── Data ───────────────────────────────────────────────────────────────────────
+const loading   = ref(false)
+const exporting = ref(false)
+const allDisps  = ref([])
+
+const dispensaciones = computed(() => allDisps.value)
+
+const totalRecaudado = computed(() => allDisps.value.reduce((s, d) => s + (d.aporte_socio_ars ?? 0), 0))
+const totalGramos    = computed(() => allDisps.value.reduce((s, d) => s + (d.cantidad ?? 0), 0))
+const totalConEnvio  = computed(() => allDisps.value.filter(d => d.con_envio).length)
+
 const resumenPago = computed(() => {
   const map = {}
-  for (const d of dispensaciones.value) {
+  for (const d of allDisps.value) {
     const k = d.medio_pago || 'otro'
     if (!map[k]) map[k] = { count: 0, total: 0 }
     map[k].count++
@@ -101,47 +122,47 @@ const resumenPago = computed(() => {
   return Object.entries(map).map(([medio, v]) => ({ medio, ...v })).sort((a, b) => b.total - a.total)
 })
 
+function buildParams() {
+  const p = {}
+  if (desde.value)           p.desde        = desde.value
+  if (hasta.value)           p.hasta        = hasta.value
+  if (filtroSede.value)      p.sede_id      = filtroSede.value
+  if (filtroMedioPago.value) p.medio_pago   = filtroMedioPago.value
+  if (filtroForma.value)     p.forma_producto = filtroForma.value
+  if (filtroSocio.value)     p.paciente_id  = filtroSocio.value.id
+  return p
+}
+
 async function cargar() {
   if (!desde.value && !hasta.value) return
   loading.value = true
   try {
-    const params = {}
-    if (desde.value) params.desde = desde.value
-    if (hasta.value) params.hasta = hasta.value
-    const { data } = await listDispensacionesFecha(params)
+    const { data } = await listDispensacionesFecha(buildParams())
     allDisps.value = data.dispensaciones ?? []
-  } catch {
-    allDisps.value = []
-  } finally {
-    loading.value = false
-  }
+  } catch { allDisps.value = [] }
+  finally { loading.value = false }
 }
 
-watch([desde, hasta], () => {
-  if (desde.value && hasta.value && desde.value <= hasta.value) cargar()
+watch([desde, hasta, filtroSede, filtroMedioPago, filtroForma, filtroSocio], () => {
+  if (!desde.value || !hasta.value || desde.value > hasta.value) return
+  cargar()
 }, { immediate: true })
 
 async function exportar() {
   exporting.value = true
   try {
-    const params = {}
-    if (desde.value) params.desde = desde.value
-    if (hasta.value) params.hasta = hasta.value
-    const { data } = await exportDispensacionesCSV(params)
+    const { data } = await exportDispensacionesCSV(buildParams())
     const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }))
     const a   = document.createElement('a')
     a.href    = url
     a.download = `dispensaciones_${desde.value}_${hasta.value}.csv`
     a.click()
     URL.revokeObjectURL(url)
-  } catch {} finally {
-    exporting.value = false
-  }
+  } catch {} finally { exporting.value = false }
 }
 
 function setRango(dias) {
-  const d = new Date()
-  d.setDate(d.getDate() - (dias - 1))
+  const d = new Date(); d.setDate(d.getDate() - (dias - 1))
   desde.value = d.toISOString().slice(0, 10)
   hasta.value = hoy
 }
@@ -154,6 +175,21 @@ function medioPagoLabel(m) {
   const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', credito_gramos: 'Cred. g', no_abona: 'No abona' }
   return L[m] || m || '—'
 }
+
+const MEDIOS_PAGO = [
+  { value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' },
+  { value: 'debito', label: 'Débito' }, { value: 'credito', label: 'Crédito' },
+  { value: 'cuenta_corriente', label: 'Cta. corriente' }, { value: 'credito_gramos', label: 'Crédito gramos' },
+  { value: 'no_abona', label: 'No abona' },
+]
+const FORMAS = [
+  { value: 'flor_seca', label: 'Flor seca' }, { value: 'hash', label: 'Hash' },
+  { value: 'aceite', label: 'Aceite' }, { value: 'tintura', label: 'Tintura' },
+  { value: 'crema', label: 'Crema' }, { value: 'capsula', label: 'Cápsula' },
+  { value: 'comestible', label: 'Comestible' }, { value: 'prensado', label: 'Prensado' },
+  { value: 'preroll', label: 'Preroll' }, { value: 'externo', label: 'Externo' },
+  { value: 'otro', label: 'Otro' },
+]
 </script>
 
 <template>
@@ -180,13 +216,15 @@ function medioPagoLabel(m) {
       </div>
     </div>
 
-    <!-- Paso 1: buscar paciente -->
+    <!-- Modal: buscar paciente (nueva dispensación o filtro) -->
     <Teleport to="body">
       <Transition name="hd-modal">
         <div v-if="showBuscarPaciente" class="hd__modal-overlay" @click.self="showBuscarPaciente = false">
           <div class="hd__modal-box hd__modal-box--narrow">
             <div class="hd__modal-header">
-              <h2 class="hd__modal-title">Seleccionar paciente</h2>
+              <h2 class="hd__modal-title">
+                {{ modoModal === 'filtrar' ? 'Filtrar por socio' : 'Seleccionar paciente' }}
+              </h2>
               <button class="hd__modal-close" @click="showBuscarPaciente = false">
                 <X :size="16" :stroke-width="2" />
               </button>
@@ -213,7 +251,7 @@ function medioPagoLabel(m) {
                   v-for="p in pacientesLista"
                   :key="p.id"
                   class="hd__buscar-item"
-                  @click="seleccionarPaciente(p)"
+                  @click="seleccionarPacienteModal(p)"
                 >
                   <div class="hd__buscar-nombre">{{ p.apellido }}, {{ p.nombre }}</div>
                   <div v-if="p.dni" class="hd__buscar-dni">DNI {{ p.dni }}</div>
@@ -243,34 +281,55 @@ function medioPagoLabel(m) {
 
     <!-- Filtros -->
     <div class="hd__filters">
-      <!-- Accesos rápidos -->
-      <div class="hd__quick">
-        <button class="hd__quick-btn" @click="setRango(1)">Hoy</button>
-        <button class="hd__quick-btn" @click="setRango(7)">7 días</button>
-        <button class="hd__quick-btn" @click="setRango(30)">30 días</button>
-        <button class="hd__quick-btn" @click="setRango(90)">3 meses</button>
-      </div>
-      <!-- Rango fechas -->
-      <div class="hd__dates">
-        <div class="hd__date-group">
-          <label class="hd__date-label">Desde</label>
-          <input v-model="desde" type="date" class="hd__date-input" :max="hasta || hoy" />
+      <!-- Fila 1: fechas -->
+      <div class="hd__filters-row">
+        <div class="hd__quick">
+          <button class="hd__quick-btn" @click="setRango(1)">Hoy</button>
+          <button class="hd__quick-btn" @click="setRango(7)">7d</button>
+          <button class="hd__quick-btn" @click="setRango(30)">30d</button>
+          <button class="hd__quick-btn" @click="setRango(90)">3m</button>
         </div>
-        <span class="hd__date-sep">→</span>
-        <div class="hd__date-group">
-          <label class="hd__date-label">Hasta</label>
-          <input v-model="hasta" type="date" class="hd__date-input" :max="hoy" :min="desde" />
+        <div class="hd__dates">
+          <div class="hd__date-group">
+            <label class="hd__date-label">Desde</label>
+            <input v-model="desde" type="date" class="hd__date-input" :max="hasta || hoy" />
+          </div>
+          <span class="hd__date-sep">→</span>
+          <div class="hd__date-group">
+            <label class="hd__date-label">Hasta</label>
+            <input v-model="hasta" type="date" class="hd__date-input" :max="hoy" :min="desde" />
+          </div>
         </div>
       </div>
-      <!-- Búsqueda -->
-      <div class="hd__search-wrap">
-        <Search :size="14" :stroke-width="2" class="hd__search-ico" />
-        <input
-          v-model="busca"
-          type="search"
-          class="hd__search"
-          placeholder="Buscar paciente, producto…"
-        />
+      <!-- Fila 2: filtros adicionales -->
+      <div class="hd__filters-row hd__filters-row--secondary">
+        <select v-if="sedes.length > 1" v-model="filtroSede" class="hd__select">
+          <option value="">Todas las sedes</option>
+          <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+        </select>
+        <select v-model="filtroMedioPago" class="hd__select">
+          <option value="">Todos los medios de pago</option>
+          <option v-for="m in MEDIOS_PAGO" :key="m.value" :value="m.value">{{ m.label }}</option>
+        </select>
+        <select v-model="filtroForma" class="hd__select">
+          <option value="">Todas las formas</option>
+          <option v-for="f in FORMAS" :key="f.value" :value="f.value">{{ f.label }}</option>
+        </select>
+        <!-- Filtro por socio -->
+        <button v-if="!filtroSocio" class="hd__btn-socio" @click="abrirFiltrarSocio">
+          <Filter :size="13" :stroke-width="2" />
+          Filtrar por socio
+        </button>
+        <span v-else class="hd__socio-chip">
+          {{ filtroSocio.nombre }}
+          <button class="hd__socio-chip-x" @click="filtroSocio = null" title="Quitar filtro">
+            <X :size="12" :stroke-width="2.5" />
+          </button>
+        </span>
+        <!-- Limpiar todos -->
+        <button v-if="hayFiltrosActivos" class="hd__btn-limpiar" @click="limpiarFiltros">
+          <X :size="12" :stroke-width="2.5" /> Limpiar filtros
+        </button>
       </div>
     </div>
 
@@ -315,7 +374,7 @@ function medioPagoLabel(m) {
 
       <!-- Tabla -->
       <div v-if="!dispensaciones.length" class="hd__empty">
-        Sin resultados para la búsqueda "{{ busca }}".
+        Sin resultados para los filtros aplicados.
       </div>
       <div v-else class="hd__table-wrap">
         <table class="hd__table">
@@ -340,6 +399,9 @@ function medioPagoLabel(m) {
               </td>
               <td class="hd__td-paciente">
                 <RouterLink :to="{ name: 'paciente-detail', params: { id: d.paciente_id } }" class="hd__link-paciente">{{ d.paciente_nombre }}</RouterLink>
+                <button class="hd__btn-filter-socio" @click="filtrarPorSocio(d)" title="Ver solo este socio">
+                  <Filter :size="11" :stroke-width="2" />
+                </button>
               </td>
               <td class="hd__td-producto">{{ formaLabel(d.stock?.forma_producto) }}</td>
               <td class="hd__td-num">{{ d.cantidad }}{{ d.stock?.unidad ?? 'g' }}</td>
@@ -490,65 +552,23 @@ function medioPagoLabel(m) {
 .hd-modal-enter-active, .hd-modal-leave-active { transition: opacity .2s; }
 .hd-modal-enter-from, .hd-modal-leave-to { opacity: 0; }
 
-/* Filtros */
-.hd__filters {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-5);
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--c-paper);
-  border: 1.5px solid var(--c-ink-100);
-  border-radius: var(--r-lg);
-}
+/* Filtros de fecha */
 .hd__quick { display: flex; gap: var(--sp-1); }
 .hd__quick-btn {
-  background: none;
-  border: 1.5px solid var(--c-ink-200);
-  border-radius: var(--r-md);
-  padding: .3rem .65rem;
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: var(--c-ink-600);
-  cursor: pointer;
-  transition: border-color .15s, background .15s;
+  background: none; border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md);
+  padding: .3rem .65rem; font-size: var(--fs-12); font-weight: 600; color: var(--c-ink-600);
+  cursor: pointer; transition: border-color .15s, background .15s;
 }
 .hd__quick-btn:hover { border-color: #1b5e20; background: #f0fdf4; color: #1b5e20; }
 .hd__dates { display: flex; align-items: center; gap: var(--sp-2); }
 .hd__date-group { display: flex; flex-direction: column; gap: 2px; }
 .hd__date-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-ink-400); }
 .hd__date-input {
-  padding: .38rem var(--sp-3);
-  border: 1.5px solid var(--c-ink-200);
-  border-radius: var(--r-md);
-  font-size: var(--fs-13);
-  color: var(--c-ink-900);
-  background: var(--c-paper);
-  cursor: pointer;
+  padding: .38rem var(--sp-3); border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md);
+  font-size: var(--fs-13); color: var(--c-ink-900); background: var(--c-paper); cursor: pointer;
 }
 .hd__date-input:focus { outline: none; border-color: #1b5e20; }
 .hd__date-sep { color: var(--c-ink-300); font-size: var(--fs-14); }
-.hd__search-wrap {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex: 1;
-  min-width: 180px;
-  background: var(--c-ink-50, #f8fafc);
-  border: 1.5px solid var(--c-ink-200);
-  border-radius: var(--r-md);
-  padding: .38rem .7rem;
-}
-.hd__search-ico { color: var(--c-ink-400); flex-shrink: 0; }
-.hd__search {
-  flex: 1;
-  background: none;
-  border: none;
-  font-size: var(--fs-13);
-  color: var(--c-ink-900);
-  outline: none;
-}
 
 /* KPIs */
 .hd__kpis {
@@ -669,4 +689,55 @@ function medioPagoLabel(m) {
 .hd__skel-list { display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-4); }
 .hd__skel { height: 44px; background: var(--c-ink-100); border-radius: var(--r-md); animation: hd-pulse 1.4s ease-in-out infinite; }
 @keyframes hd-pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+/* Filtros — layout */
+.hd__filters { display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-5); padding: var(--sp-3) var(--sp-4); background: var(--c-paper); border: 1.5px solid var(--c-ink-100); border-radius: var(--r-lg); }
+.hd__filters-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); }
+.hd__filters-row--secondary { padding-top: var(--sp-2); border-top: 1px solid var(--c-ink-100); }
+
+/* Selects */
+.hd__select {
+  padding: .38rem var(--sp-3); border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md);
+  font-size: var(--fs-13); color: var(--c-ink-900); background: var(--c-paper); cursor: pointer;
+}
+.hd__select:focus { outline: none; border-color: #1b5e20; }
+
+/* Botón filtrar por socio */
+.hd__btn-socio {
+  display: inline-flex; align-items: center; gap: .3rem;
+  background: none; border: 1.5px dashed var(--c-ink-300); border-radius: var(--r-md);
+  padding: .38rem .75rem; font-size: var(--fs-13); color: var(--c-ink-500);
+  cursor: pointer; transition: border-color .15s, color .15s;
+}
+.hd__btn-socio:hover { border-color: #1b5e20; color: #1b5e20; }
+
+/* Chip de socio activo */
+.hd__socio-chip {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 999px;
+  padding: .25rem .65rem; font-size: var(--fs-13); font-weight: 600; color: #15803d;
+}
+.hd__socio-chip-x {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: #15803d; display: flex; align-items: center; opacity: .7;
+}
+.hd__socio-chip-x:hover { opacity: 1; }
+
+/* Botón limpiar */
+.hd__btn-limpiar {
+  display: inline-flex; align-items: center; gap: .3rem; margin-left: auto;
+  background: none; border: none; font-size: var(--fs-12); color: var(--c-ink-400);
+  cursor: pointer; padding: .25rem .5rem; border-radius: var(--r-sm);
+  transition: color .15s;
+}
+.hd__btn-limpiar:hover { color: #dc2626; }
+
+/* Botón filtrar por socio inline en tabla */
+.hd__btn-filter-socio {
+  display: inline-flex; align-items: center; background: none; border: none;
+  color: var(--c-ink-300); cursor: pointer; padding: 0 .25rem; vertical-align: middle;
+  opacity: 0; transition: opacity .15s, color .15s;
+}
+.hd__table tr:hover .hd__btn-filter-socio { opacity: 1; }
+.hd__btn-filter-socio:hover { color: #1b5e20; }
 </style>
