@@ -66,6 +66,27 @@
       </div>
     </div>
 
+    <!-- Tareas de hoy -->
+    <div v-if="tareasHoy.length > 0" class="cvd__hoy-wrap">
+      <div class="cvd__hoy-header">
+        <span class="cvd__hoy-title">Hoy · {{ tareasHoy.length }} tarea{{ tareasHoy.length !== 1 ? 's' : '' }} pendiente{{ tareasHoy.length !== 1 ? 's' : '' }}</span>
+        <span v-if="tareasVencidas > 0" class="cvd__hoy-badge">{{ tareasVencidas }} atrasada{{ tareasVencidas !== 1 ? 's' : '' }}</span>
+      </div>
+      <div class="cvd__hoy-list">
+        <div
+          v-for="t in tareasHoy"
+          :key="t.id"
+          class="cvd__hoy-pill"
+          :class="{ 'cvd__hoy-pill--atrasada': t._atrasada }"
+          @click="abrirTarea(t)"
+        >
+          <span class="cvd__hoy-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
+          <span class="cvd__hoy-txt">{{ t.titulo }}</span>
+          <span v-if="t._atrasada" class="cvd__hoy-late" title="Atrasada">⏰</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Semana de trabajo -->
     <div class="cvd__section">
       <button class="cvd__section-toggle" @click="tareasExpanded = !tareasExpanded">
@@ -124,6 +145,37 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Próximas cosechas -->
+    <div v-if="proximasCosechas.length > 0" class="cvd__cosechas-wrap">
+      <div class="cvd__cosechas-header">
+        <span class="cvd__cosechas-title">Próximas cosechas</span>
+        <span class="cvd__cosechas-sub">{{ proximasCosechas.length }} lote{{ proximasCosechas.length !== 1 ? 's' : '' }} estimado{{ proximasCosechas.length !== 1 ? 's' : '' }}</span>
+      </div>
+      <div class="cvd__cosechas-strip">
+        <RouterLink
+          v-for="lote in proximasCosechas"
+          :key="lote.id"
+          :to="`/lotes/${lote.id}`"
+          class="cvd__cosecha-card"
+        >
+          <div class="cvd__cosecha-urgency-bar" :style="{ background: urgencyColor(lote.diasRestantes) }"></div>
+          <div class="cvd__cosecha-body">
+            <div class="cvd__cosecha-dias-wrap">
+              <span class="cvd__cosecha-num" :style="{ color: urgencyColor(lote.diasRestantes) }">
+                {{ lote.diasRestantes <= 0 ? 'Hoy' : lote.diasRestantes }}
+              </span>
+              <span v-if="lote.diasRestantes > 0" class="cvd__cosecha-dunit">días</span>
+            </div>
+            <div class="cvd__cosecha-cepa">{{ lote.genetica?.nombre || lote.codigo }}</div>
+            <div class="cvd__cosecha-sala">{{ lote.sala?.nombre || '—' }}</div>
+            <span class="cvd__cosecha-estado-pill" :style="{ background: urgencyBg(lote.diasRestantes), color: urgencyColor(lote.diasRestantes) }">
+              {{ lote.estado }}
+            </span>
+          </div>
+        </RouterLink>
       </div>
     </div>
 
@@ -453,6 +505,39 @@ const lotesListos     = computed(() => lotesStore.items.filter(l => l.puede_tran
 const notifCount      = computed(() => ambienteStore.alertasCount)
 const alertasCriticas = computed(() => ambienteStore.alertasActivas.filter(a => ['temperatura', 'co2'].includes(a.tipo)))
 
+const tareasHoy = computed(() => {
+  const hoyDia = semanaProcessed.value.dias?.find(d => d.fecha === hoyISO)
+  if (!hoyDia) return []
+  return hoyDia.tareas.filter(t => t.estado !== 'completada' && t.estado !== 'cancelada')
+})
+
+const tareasVencidas = computed(() => tareasHoy.value.filter(t => t._atrasada).length)
+
+const proximasCosechas = computed(() => {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+  return lotesStore.items
+    .filter(l => l.fecha_cosecha_estimada && ['floracion', 'vegetativo'].includes(l.estado))
+    .map(l => {
+      const fecha = new Date(l.fecha_cosecha_estimada + 'T00:00:00')
+      const diasRestantes = Math.ceil((fecha - hoy) / 86400000)
+      return { ...l, diasRestantes }
+    })
+    .sort((a, b) => a.diasRestantes - b.diasRestantes)
+    .slice(0, 6)
+})
+
+function urgencyColor(dias) {
+  if (dias <= 7)  return '#dc2626'
+  if (dias <= 21) return '#d97706'
+  return '#15803d'
+}
+
+function urgencyBg(dias) {
+  if (dias <= 7)  return '#fef2f2'
+  if (dias <= 21) return '#fffbeb'
+  return '#f0fdf4'
+}
+
 function abrirTarea(t) { tareaDetalle.value = t }
 
 async function finalizarTarea() {
@@ -630,6 +715,40 @@ onMounted(async () => {
 .cvd__panel-btn--ghost { background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; }
 .cvd__panel-btn--ghost:not(:disabled):hover { background: #e2e8f0; }
 .cvd__futura-hint { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .55rem .875rem; margin: 0; }
+
+/* Tareas de hoy */
+.cvd__hoy-wrap { background: #fff; border: 1.5px solid #e8f0e9; border-radius: 12px; padding: .75rem 1rem; display: flex; flex-direction: column; gap: .6rem; }
+.cvd__hoy-header { display: flex; align-items: center; gap: .6rem; }
+.cvd__hoy-title { font-size: .82rem; font-weight: 700; color: #0f2611; }
+.cvd__hoy-badge { font-size: .7rem; font-weight: 700; background: #fef3c7; color: #d97706; padding: .15em .5em; border-radius: 6px; }
+.cvd__hoy-list { display: flex; flex-wrap: wrap; gap: .4rem; }
+.cvd__hoy-pill { display: inline-flex; align-items: center; gap: .3rem; background: #f6faf6; border: 1px solid #e8f0e9; border-radius: 8px; padding: .3rem .6rem; cursor: pointer; font-size: .78rem; transition: all .12s; max-width: 280px; }
+.cvd__hoy-pill:hover { border-color: #c8e6c9; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.cvd__hoy-pill--atrasada { background: #fff7ed; border-color: #fcd34d; }
+.cvd__hoy-emoji { flex-shrink: 0; }
+.cvd__hoy-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f2611; font-weight: 500; }
+.cvd__hoy-late { flex-shrink: 0; }
+
+/* Próximas cosechas */
+.cvd__cosechas-wrap { display: flex; flex-direction: column; gap: .75rem; }
+.cvd__cosechas-header { display: flex; align-items: baseline; gap: .5rem; }
+.cvd__cosechas-title { font-size: 1.05rem; font-weight: 700; color: #0f2611; }
+.cvd__cosechas-sub { font-size: .75rem; color: #60725d; }
+.cvd__cosechas-strip { display: flex; gap: .75rem; overflow-x: auto; padding-bottom: .25rem; }
+.cvd__cosechas-strip::-webkit-scrollbar { height: 4px; }
+.cvd__cosechas-strip::-webkit-scrollbar-track { background: #f0f4f0; border-radius: 2px; }
+.cvd__cosechas-strip::-webkit-scrollbar-thumb { background: #c8e6c9; border-radius: 2px; }
+
+.cvd__cosecha-card { display: flex; flex-direction: column; background: #fff; border: 1px solid #e8f0e9; border-radius: 12px; overflow: hidden; text-decoration: none; color: inherit; min-width: 140px; max-width: 160px; flex-shrink: 0; transition: box-shadow .15s, border-color .15s; }
+.cvd__cosecha-card:hover { border-color: #c8e6c9; box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+.cvd__cosecha-urgency-bar { height: 3px; flex-shrink: 0; }
+.cvd__cosecha-body { padding: .75rem; display: flex; flex-direction: column; gap: .35rem; }
+.cvd__cosecha-dias-wrap { display: flex; align-items: baseline; gap: .2rem; }
+.cvd__cosecha-num { font-size: 1.6rem; font-weight: 800; line-height: 1; }
+.cvd__cosecha-dunit { font-size: .7rem; font-weight: 600; color: #60725d; }
+.cvd__cosecha-cepa { font-size: .82rem; font-weight: 700; color: #0f2611; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cvd__cosecha-sala { font-size: .72rem; color: #60725d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cvd__cosecha-estado-pill { display: inline-block; font-size: .65rem; font-weight: 700; padding: .15em .5em; border-radius: 5px; text-transform: capitalize; width: fit-content; }
 
 /* Sala cards — match SalasView design */
 .cvd__sc-card { display: flex; flex-direction: column; background: #fff; border: 1px solid #e8f0e9; border-radius: 12px; overflow: hidden; text-decoration: none; color: inherit; transition: box-shadow .15s, border-color .15s; cursor: pointer; }

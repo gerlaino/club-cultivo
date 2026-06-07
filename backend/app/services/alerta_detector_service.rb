@@ -69,7 +69,7 @@ class AlertaDetectorService
   end
 
   def detectar_sin_registro(lote)
-    umbral = DIAS_SIN_REGISTRO[lote.estado] || 3
+    umbral = dias_sin_registro_para(lote.estado)
     ultimo = lote.registros_ambientales.maximum(:registrado_en)
     dias   = ultimo ? (Date.current - ultimo.to_date).to_i : 999
     return unless dias > umbral
@@ -113,6 +113,11 @@ class AlertaDetectorService
 
   # Devuelve el rango a usar para un campo/fase dado: prioriza setpoints del club,
   # cae a RANGOS (defaults) si no hay configuración.
+  def dias_sin_registro_para(estado)
+    cfg = @club.alertas_config || {}
+    (cfg.dig('dias_sin_registro', estado) || DIAS_SIN_REGISTRO[estado] || 3).to_i
+  end
+
   def rango_para(campo, fase, genetica_id, setpoints_club)
     sp = setpoints_club.find do |s|
       s.fase == fase &&
@@ -139,7 +144,8 @@ class AlertaDetectorService
 
     fecha_est    = lote.start_date + lote.semanas_floracion.weeks
     dias_pasados = (Date.current - fecha_est).to_i
-    return unless dias_pasados > 0
+    umbral_cosecha = (@club.alertas_config&.dig('cosecha_pendiente_umbral_dias') || 0).to_i
+    return unless dias_pasados > umbral_cosecha
 
     sev = dias_pasados > 7 ? 'error' : 'warning'
     crear_alerta(

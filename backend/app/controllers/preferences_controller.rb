@@ -13,6 +13,10 @@ class PreferencesController < ApplicationController
       @club.logo.purge if @club.logo.attached?
     end
 
+    if (ac = params.dig(:club, :alertas_config))
+      @club.alertas_config = ac.is_a?(ActionController::Parameters) ? ac.to_unsafe_h : ac
+    end
+
     if @club.update(club_params)
       render json: serialize(@club)
     else
@@ -177,6 +181,7 @@ class PreferencesController < ApplicationController
       twilio_account_sid:           club.twilio_account_sid,
       twilio_whatsapp_from:         club.twilio_whatsapp_from,
       umbral_stock_g:               club.umbral_stock_g,
+      alertas_config:               club.alertas_config || {},
     }
   end
 end

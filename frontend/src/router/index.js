@@ -297,6 +297,34 @@ const routes = [
     },
   },
   {
+    path: "/alertas-configuracion",
+    name: "alertas-configuracion",
+    component: () => import("../views/SetpointsConfigView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (auth.user?.role === "admin") next();
+      else next("/");
+    },
+  },
+  {
+    path: "/configuracion",
+    component: () => import("../views/ConfiguracionView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (auth.user?.role === "admin") next();
+      else next("/");
+    },
+    children: [
+      { path: '',           redirect: '/configuracion/club' },
+      { path: 'club',       name: 'config-club',        component: () => import("../views/PreferenciasView.vue") },
+      { path: 'sedes',      name: 'config-sedes',       component: () => import("../views/SedesView.vue") },
+      { path: 'equipo',     name: 'config-equipo',      component: () => import("../views/UsuariosView.vue") },
+      { path: 'suscripcion',name: 'config-suscripcion', component: () => import("../views/SuscripcionTabView.vue") },
+    ],
+  },
+  {
     path: "/integraciones",
     name: "integraciones",
     component: () => import("../views/IntegracionesView.vue"),
