@@ -68,6 +68,23 @@ class NotificacionesMailer < ApplicationMailer
     )
   end
 
+  # Aviso directo al socio cuando su REPROCANN está por vencer
+  def aviso_reprocann_paciente(paciente:, dias_restantes:, club:)
+    @paciente       = paciente
+    @dias_restantes = dias_restantes
+    @club           = club
+
+    return unless paciente.email.present? && club.smtp_configured?
+
+    from_addr = "#{club.smtp_from_name.presence || club.name} <#{club.smtp_from.presence || club.smtp_user}>"
+    mail(
+      to:      paciente.email,
+      from:    from_addr,
+      subject: "#{club.name} — Tu autorización REPROCANN vence en #{dias_restantes} día#{dias_restantes == 1 ? '' : 's'}",
+      delivery_method_options: club.smtp_settings
+    )
+  end
+
   # Alerta de stock bajo — enviada al admin
   def stock_bajo(club:, stocks_data:)
     @club        = club

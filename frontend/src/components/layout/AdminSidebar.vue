@@ -62,16 +62,24 @@ import {
   Sprout, FileCheck, FileText, UserCog, Globe,
   ShieldCheck, Truck, TrendingUp, History,
   GitBranch, Layers, ChevronDown, Dna, Archive, Leaf, Boxes, Scissors,
-  ClipboardList, Package, Settings, ClipboardCheck, Scale, Webhook, BellRing,
+  ClipboardList, Package, Settings, ClipboardCheck, Scale, Webhook, BellRing, AlertTriangle,
 } from 'lucide-vue-next'
-import { listLotes } from '../../lib/api.js'
+import { listLotes, getPacientesCriticos } from '../../lib/api.js'
 
 const aprobacionesPendientes = ref(0)
+const sociosCriticosCount    = ref(0)
 
 async function fetchAprobaciones() {
   try {
     const { data } = await listLotes({ estado: 'manicura_pendiente' })
     aprobacionesPendientes.value = (data || []).length
+  } catch {}
+}
+
+async function fetchCriticos() {
+  try {
+    const { data } = await getPacientesCriticos()
+    sociosCriticosCount.value = (data?.reprocann_vencidos?.length || 0) + (data?.reprocann_por_vencer?.filter(p => p.dias_restantes <= 7)?.length || 0)
   } catch {}
 }
 
@@ -94,7 +102,8 @@ const GRUPOS = [
     icon: Users,
     defaultOpen: true,
     items: [
-      { to: '/pacientes',         icon: Users,     label: 'Pacientes' },
+      { to: '/pacientes',         icon: Users,     label: 'Pacientes', badge: sociosCriticosCount },
+      { to: '/socios/criticos',   icon: AlertTriangle, label: 'En riesgo' },
       { to: '/historial',         icon: History,   label: 'Dispensaciones' },
       { to: '/informe-semestral', icon: FileCheck, label: 'REPROCANN' },
     ],
@@ -186,11 +195,13 @@ onMounted(() => {
     abiertos[g.label] = g.defaultOpen || grupoTieneActivo(g)
   })
   fetchAprobaciones()
+  fetchCriticos()
 })
 
 watch(() => route.path, (path, prev) => {
   sincronizarGrupos()
   if (prev === '/aprobaciones' || path === '/aprobaciones') fetchAprobaciones()
+  if (prev === '/socios/criticos' || path === '/socios/criticos') fetchCriticos()
 })
 </script>
 

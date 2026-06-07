@@ -2,7 +2,7 @@ class PacientesController < ApplicationController
   before_action :authenticate_user!
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados]
-  before_action :require_export_role!, only: [:export_csv]
+  before_action :require_export_role!, only: [:export_csv, :criticos]
   before_action :normalize_paciente_params, only: [:create, :update]
   before_action :warn_deprecated_route
 
@@ -171,6 +171,44 @@ class PacientesController < ApplicationController
     @paciente.update!(deleted_by_id: current_user.id)
     @paciente.destroy
     head :no_content
+  end
+
+  # GET /pacientes/criticos
+  def criticos
+    hoy   = Date.today
+    club  = current_user.club
+
+    reprocann_vencidos = club.pacientes
+      .where.not(reprocann_vencimiento: nil)
+      .where('reprocann_vencimiento < ?', hoy)
+      .where(reprocann_estado: %w[activo pendiente])
+      .select(:id, :nombre, :apellido, :reprocann_vencimiento, :reprocann_estado)
+      .map { |p| { id: p.id, nombre: p.nombre_completo, reprocann_vencimiento: p.reprocann_vencimiento, dias_vencido: (hoy - p.reprocann_vencimiento).to_i } }
+
+    reprocann_por_vencer = club.pacientes
+      .where('reprocann_vencimiento > ? AND reprocann_vencimiento <= ?', hoy, 30.days.from_now)
+      .where(reprocann_estado: %w[activo pendiente])
+      .select(:id, :nombre, :apellido, :reprocann_vencimiento, :reprocann_estado)
+      .map { |p| { id: p.id, nombre: p.nombre_completo, reprocann_vencimiento: p.reprocann_vencimiento, dias_restantes: (p.reprocann_vencimiento - hoy).to_i } }
+
+    sin_dispensacion_ids = club.dispensaciones
+      .where('created_at >= ?', 60.days.ago)
+      .pluck(:paciente_id).uniq
+
+    sin_dispensacion_reciente = club.pacientes
+      .where(reprocann_estado: 'activo')
+      .where.not(id: sin_dispensacion_ids)
+      .select(:id, :nombre, :apellido, :created_at)
+      .order(created_at: :asc)
+      .limit(20)
+      .map { |p| { id: p.id, nombre: p.nombre_completo } }
+
+    render json: {
+      reprocann_vencidos:,
+      reprocann_por_vencer:,
+      sin_dispensacion_reciente:,
+      total: reprocann_vencidos.size + reprocann_por_vencer.size + sin_dispensacion_reciente.size,
+    }
   end
 
   # GET /pacientes/export_csv

@@ -87,6 +87,7 @@ Rails.application.routes.draw do
       resources :fotos, only: [:index, :create, :destroy], controller: 'fotos_lote'
       resources :notas, only: [:index, :create]
       resources :pesadas, only: [:index, :create, :destroy]
+      resources :analisis_laboratorio, only: [:index, :create, :update, :destroy]
       resources :pesajes_manicura, only: [:index, :show, :create] do
         member do
           post :enviar
@@ -135,6 +136,7 @@ Rails.application.routes.draw do
     resources :pacientes do
       collection do
         get :export_csv
+        get :criticos
       end
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]

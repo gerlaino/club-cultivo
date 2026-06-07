@@ -240,6 +240,17 @@ const routes = [
     beforeEnter: requiresPermission("socios", "index"),
   },
   {
+    path: "/socios/criticos",
+    name: "socios-criticos",
+    component: () => import("../views/SociosCriticosView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (['admin', 'supervisor'].includes(auth.user?.role)) next();
+      else next('/');
+    },
+  },
+  {
     path: "/pacientes/nuevo",
     alias: ["/socios/nuevo"],
     name: "paciente-nuevo",

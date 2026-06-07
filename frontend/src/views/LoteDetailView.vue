@@ -5,7 +5,7 @@ import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
-import { getRegistrosAmbientales, getLoteEventos, listSedes, deleteLote, createSala } from "../lib/api"
+import { getRegistrosAmbientales, getLoteEventos, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio } from "../lib/api"
 import { useQRCode } from '../composables/useQRCode.js'
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
@@ -14,7 +14,7 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
-import { ArrowRight } from 'lucide-vue-next'
+import { ArrowRight, ChevronRight } from 'lucide-vue-next'
 import { em, sm, pgm, growLabel, lightLabel, macetaLabel, formatDate, formatDateTime,
   capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS } from '../lib/loteHelpers.js'
 import LoteHistorialSection from '../components/lotes/LoteHistorialSection.vue'
@@ -133,6 +133,37 @@ async function loadEventos() {
 
 // ── Section toggles ────────────────────────────────────────
 const tareasExpanded    = ref(true)
+// Lab
+const labExpanded   = ref(false)
+const labFormOpen   = ref(false)
+const loadingLab    = ref(false)
+const guardandoLab  = ref(false)
+const analisisLab   = ref([])
+const labForm       = ref({ fecha_analisis: '', laboratorio: '', thc_pct: '', cbd_pct: '', cbg_pct: '', terpenos_principales: '' })
+
+async function cargarAnalisisLab() {
+  loadingLab.value = true
+  try {
+    const { data } = await listAnalisisLaboratorio(id.value)
+    analisisLab.value = data || []
+  } finally { loadingLab.value = false }
+}
+
+async function guardarAnalisis() {
+  guardandoLab.value = true
+  try {
+    const { data } = await createAnalisisLaboratorio(id.value, labForm.value)
+    analisisLab.value.unshift(data)
+    labFormOpen.value = false
+    labForm.value = { fecha_analisis: '', laboratorio: '', thc_pct: '', cbd_pct: '', cbg_pct: '', terpenos_principales: '' }
+  } catch { /* toast handled globally */ } finally { guardandoLab.value = false }
+}
+
+async function eliminarAnalisis(a) {
+  await deleteAnalisisLaboratorio(id.value, a.id)
+  analisisLab.value = analisisLab.value.filter(x => x.id !== a.id)
+}
+
 const plantasExpanded   = ref(true)
 const historialExpanded = ref(true)
 const graficosExpanded  = ref(true)
@@ -247,6 +278,7 @@ onMounted(async () => {
   catch {}
   await loadEventos()
   try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
+  cargarAnalisisLab()
 })
 
 onUnmounted(() => {
@@ -414,7 +446,85 @@ onUnmounted(() => {
           <!-- 4. Timeline del ciclo -->
           <LoteTimelineSection :lote-id="id" />
 
-          <!-- 5. Fotos -->
+          <!-- 5. Análisis de laboratorio -->
+          <div class="ld__section ld__section--mt">
+            <button class="ld__section-toggle" @click="labExpanded = !labExpanded">
+              <div class="ld__section-toggle-left">
+                <span class="ld__section-emoji">🧪</span>
+                <span class="ld__section-title">Análisis de laboratorio</span>
+                <span v-if="analisisLab.length" class="ld__section-badge">{{ analisisLab.length }}</span>
+              </div>
+              <ChevronRight :size="16" class="ld__section-chevron" :class="{ 'ld__section-chevron--open': labExpanded }" />
+            </button>
+            <div v-show="labExpanded" class="ld__section-body ld__section-body--flush">
+              <div v-if="loadingLab" class="ld__lab-loading">Cargando…</div>
+              <div v-else>
+                <table v-if="analisisLab.length" class="ld__lab-table">
+                  <thead>
+                    <tr><th>Fecha</th><th>THC%</th><th>CBD%</th><th>CBG%</th><th>Terpenos</th><th>Lab</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="a in analisisLab" :key="a.id">
+                      <td>{{ a.fecha_analisis ? new Date(a.fecha_analisis + 'T00:00:00').toLocaleDateString('es-AR') : '—' }}</td>
+                      <td class="ld__lab-val">{{ a.thc_pct != null ? a.thc_pct + '%' : '—' }}</td>
+                      <td class="ld__lab-val">{{ a.cbd_pct != null ? a.cbd_pct + '%' : '—' }}</td>
+                      <td class="ld__lab-val">{{ a.cbg_pct != null ? a.cbg_pct + '%' : '—' }}</td>
+                      <td>{{ a.terpenos_principales || '—' }}</td>
+                      <td class="ld__lab-lab">{{ a.laboratorio || '—' }}</td>
+                      <td>
+                        <button v-if="canEdit" class="ld__lab-del" @click="eliminarAnalisis(a)" title="Eliminar">
+                          <i class="bi bi-trash3"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-else class="ld__lab-empty">Sin análisis de laboratorio cargados.</div>
+                <div v-if="canEdit" class="ld__lab-add-wrap">
+                  <button class="ld__lab-toggle-form" @click="labFormOpen = !labFormOpen">
+                    <i class="bi bi-plus-circle"></i> Cargar análisis
+                  </button>
+                  <div v-if="labFormOpen" class="ld__lab-form">
+                    <div class="ld__lab-form-row">
+                      <div class="ld__lab-field">
+                        <label class="ld__lab-label">Fecha</label>
+                        <input v-model="labForm.fecha_analisis" type="date" class="ld__lab-input" />
+                      </div>
+                      <div class="ld__lab-field">
+                        <label class="ld__lab-label">Laboratorio</label>
+                        <input v-model="labForm.laboratorio" type="text" class="ld__lab-input" placeholder="Nombre del lab" />
+                      </div>
+                    </div>
+                    <div class="ld__lab-form-row">
+                      <div class="ld__lab-field">
+                        <label class="ld__lab-label">THC%</label>
+                        <input v-model.number="labForm.thc_pct" type="number" step="0.01" min="0" max="100" class="ld__lab-input" />
+                      </div>
+                      <div class="ld__lab-field">
+                        <label class="ld__lab-label">CBD%</label>
+                        <input v-model.number="labForm.cbd_pct" type="number" step="0.01" min="0" max="100" class="ld__lab-input" />
+                      </div>
+                      <div class="ld__lab-field">
+                        <label class="ld__lab-label">CBG%</label>
+                        <input v-model.number="labForm.cbg_pct" type="number" step="0.01" min="0" max="100" class="ld__lab-input" />
+                      </div>
+                    </div>
+                    <div class="ld__lab-field">
+                      <label class="ld__lab-label">Terpenos principales</label>
+                      <input v-model="labForm.terpenos_principales" type="text" class="ld__lab-input" placeholder="Myrcene, Limonene…" />
+                    </div>
+                    <div class="ld__lab-form-actions">
+                      <button class="ld__lab-save" :disabled="guardandoLab" @click="guardarAnalisis">
+                        {{ guardandoLab ? 'Guardando…' : 'Guardar análisis' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. Fotos -->
           <LoteFotosSection :lote-id="id" :can-edit="canEdit" />
 
         </div>
@@ -1066,4 +1176,33 @@ onUnmounted(() => {
 .ld__split-check { font-size: .8rem; padding: .5rem .75rem; border-radius: 8px; margin-top: .25rem; }
 .ld__split-check--ok { background: #f0fdf4; color: #16a34a; }
 .ld__split-check--err { background: #fef2f2; color: #dc2626; }
+
+/* Sección badge + chevron */
+.ld__section-badge { display: inline-flex; align-items: center; justify-content: center; background: #d4e6d4; color: #1b5e20; border-radius: 99px; font-size: .68rem; font-weight: 700; min-width: 18px; height: 18px; padding: 0 5px; margin-left: .3rem; }
+.ld__section-chevron { color: #60725d; transition: transform .2s; flex-shrink: 0; }
+.ld__section-chevron--open { transform: rotate(90deg); }
+
+/* Lab analysis section */
+.ld__lab-loading { font-size: .82rem; color: #60725d; padding: .5rem 0; }
+.ld__lab-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.ld__lab-table th { text-align: left; font-size: .72rem; font-weight: 700; color: #60725d; text-transform: uppercase; letter-spacing: .04em; padding: .35rem .5rem; border-bottom: 1.5px solid #e8f0e9; white-space: nowrap; }
+.ld__lab-table td { padding: .45rem .5rem; border-bottom: 1px solid #f0f4f0; vertical-align: middle; }
+.ld__lab-val { font-weight: 700; color: #1b5e20; white-space: nowrap; }
+.ld__lab-lab { color: #60725d; font-size: .78rem; }
+.ld__lab-del { background: none; border: none; color: #dc2626; cursor: pointer; padding: .25rem; border-radius: 5px; display: inline-flex; align-items: center; opacity: .65; transition: opacity .15s; }
+.ld__lab-del:hover { opacity: 1; background: #fef2f2; }
+.ld__lab-empty { font-size: .82rem; color: #94a3b8; font-style: italic; padding: .5rem 0; }
+.ld__lab-add-wrap { margin-top: .75rem; }
+.ld__lab-toggle-form { display: inline-flex; align-items: center; gap: .3rem; background: #e8f5e9; color: #15803d; border: 1px solid #d4e6d4; padding: .4rem .85rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.ld__lab-toggle-form:hover { background: #dcfce7; border-color: #86efac; }
+.ld__lab-form { margin-top: .75rem; background: #f8fdf8; border: 1.5px solid #d4e6d4; border-radius: 10px; padding: .875rem 1rem; display: flex; flex-direction: column; gap: .65rem; }
+.ld__lab-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .65rem; }
+.ld__lab-field { display: flex; flex-direction: column; gap: .25rem; }
+.ld__lab-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
+.ld__lab-input { background: #fff; border: 1.5px solid #d4e6d4; border-radius: 7px; padding: .45rem .65rem; font-size: .85rem; color: #1a1a1a; width: 100%; box-sizing: border-box; transition: border .15s; }
+.ld__lab-input:focus { outline: none; border-color: #1b5e20; }
+.ld__lab-form-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .25rem; }
+.ld__lab-save { display: inline-flex; align-items: center; gap: .35rem; background: #1b5e20; color: #fff; border: none; padding: .5rem 1.1rem; border-radius: 8px; font-size: .85rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+.ld__lab-save:hover:not(:disabled) { opacity: .88; }
+.ld__lab-save:disabled { opacity: .5; cursor: not-allowed; }
 </style>

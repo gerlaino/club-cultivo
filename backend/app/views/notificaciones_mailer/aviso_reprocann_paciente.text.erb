@@ -1,0 +1,5 @@
+Hola <%= @paciente.nombre_completo %>,
+
+Tu autorización REPROCANN vence en <%= @dias_restantes %> día<%= @dias_restantes == 1 ? '' : 's' %> (<%= @paciente.reprocann_vencimiento.strftime('%d/%m/%Y') %>).
+
+Comunicarte con <%= @club.name %> para iniciar el trámite de renovación.

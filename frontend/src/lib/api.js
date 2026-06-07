@@ -126,8 +126,9 @@ export const uploadClubLogo    = (file) => {
 };
 
 // -------- PACIENTES --------
-export const listPacientes      = (params = {}) => api.get("/pacientes", { params });
-export const getPaciente        = (id) => api.get(`/pacientes/${id}`);
+export const listPacientes         = (params = {}) => api.get("/pacientes", { params });
+export const getPacientesCriticos  = () => api.get("/pacientes/criticos");
+export const getPaciente           = (id) => api.get(`/pacientes/${id}`);
 export const createPaciente     = (payload) => api.post("/pacientes", { paciente: payload });
 export const updatePaciente     = (id, payload) => api.put(`/pacientes/${id}`, { paciente: payload });
 export const deletePaciente     = (id) => api.delete(`/pacientes/${id}`);
@@ -411,6 +412,10 @@ export const aplicarLotePlan  = (loteId, planId)  => api.post(`/lotes/${loteId}/
 export const getPesadas     = (loteId)          => api.get(`/lotes/${loteId}/pesadas`)
 export const createPesada   = (loteId, payload) => api.post(`/lotes/${loteId}/pesadas`, { pesada: payload })
 export const deletePesada   = (loteId, id)      => api.delete(`/lotes/${loteId}/pesadas/${id}`)
+
+export const listAnalisisLaboratorio   = (loteId)          => api.get(`/lotes/${loteId}/analisis_laboratorio`)
+export const createAnalisisLaboratorio = (loteId, payload) => api.post(`/lotes/${loteId}/analisis_laboratorio`, { analisis_laboratorio: payload })
+export const deleteAnalisisLaboratorio = (loteId, id)      => api.delete(`/lotes/${loteId}/analisis_laboratorio/${id}`)
 
 // ── Pesajes Manicura ──────────────────────────────────────────────────────────
 export const listPesajesManicura      = (loteId)           => api.get(`/lotes/${loteId}/pesajes_manicura`)
