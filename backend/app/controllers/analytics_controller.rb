@@ -609,6 +609,79 @@ class AnalyticsController < ApplicationController
     { lotes: filas }
   end
 
+  # GET /api/analytics/contabilidad
+  # P&L mensual últimos 12 meses + proyección de lotes en curso
+  def contabilidad
+    club = current_user.club
+    cache_key = "analytics/contabilidad/#{club.id}/#{Date.today}"
+    Rails.cache.delete(cache_key) if params[:bust]
+    data = Rails.cache.fetch(cache_key, expires_in: 30.minutes) do
+      calcular_contabilidad(club)
+    end
+    render json: data
+  end
+
+  # GET /api/analytics/comparativa_salas
+  def comparativa_salas
+    club  = current_user.club
+    salas = club.salas.includes(:lotes).order(:nombre)
+
+    ultimas_lecturas = LecturaAmbiental
+      .where(sala_id: salas.map(&:id))
+      .where(tipo: %w[temperatura humedad co2])
+      .where('medido_at >= ?', 24.hours.ago)
+      .order(:sala_id, :tipo, medido_at: :desc)
+      .select('DISTINCT ON (sala_id, tipo) sala_id, tipo, valor, medido_at')
+
+    lecturas_por_sala = ultimas_lecturas.each_with_object({}) do |l, h|
+      h[l.sala_id] ||= {}
+      h[l.sala_id][l.tipo] = l.valor.to_f
+    end
+
+    filas = salas.map do |sala|
+      lotes_finalizados = sala.lotes.where(estado: 'finalizado')
+      ciclos            = lotes_finalizados.count
+      kg_producidos     = lotes_finalizados.where.not(rendimiento_real_g: nil).sum(:rendimiento_real_g).to_f / 1000.0
+      kg_por_planta     = begin
+        total_plantas = lotes_finalizados.where.not(plants_count_cosechadas: nil).sum(:plants_count_cosechadas)
+        total_g       = lotes_finalizados.where.not(rendimiento_real_g: nil).sum(:rendimiento_real_g).to_f
+        total_plantas > 0 ? (total_g / total_plantas / 1000.0).round(3) : nil
+      end
+
+      dias_promedio = begin
+        con_fechas = lotes_finalizados.where.not(start_date: nil, rendimiento_real_g: nil)
+        if con_fechas.any?
+          duraciones = con_fechas.map do |l|
+            fin = l.updated_at.to_date
+            (fin - l.start_date).to_i
+          end
+          (duraciones.sum.to_f / duraciones.size).round(0).to_i
+        end
+      end
+
+      lotes_activos = sala.lotes.where(estado: %w[vegetativo floracion maduración germinacion]).count
+
+      ambiental = lecturas_por_sala[sala.id] || {}
+
+      {
+        id:             sala.id,
+        nombre:         sala.nombre,
+        tipo:           sala.tipo,
+        plants_max:     sala.plants_max,
+        ciclos:         ciclos,
+        kg_producidos:  kg_producidos.round(3),
+        kg_por_planta:  kg_por_planta,
+        dias_promedio:  dias_promedio,
+        lotes_activos:  lotes_activos,
+        temperatura:    ambiental['temperatura'],
+        humedad:        ambiental['humedad'],
+        co2:            ambiental['co2'],
+      }
+    end
+
+    render json: { salas: filas }
+  end
+
   def require_analytics_access!
     unless %w[admin supervisor super_admin].include?(current_user.role)
       render json: { error: 'No autorizado' }, status: :forbidden
@@ -621,8 +694,69 @@ class AnalyticsController < ApplicationController
     end
   end
 
+  def calcular_contabilidad(club)
+    hoy   = Date.today
+    inicio = (hoy - 11.months).beginning_of_month
+
+    # P&L mensual — agrupado por mes
+    meses = []
+    (0..11).each do |i|
+      mes_ini = (hoy - i.months).beginning_of_month
+      mes_fin = mes_ini.end_of_month
+      label   = mes_ini.strftime('%b %Y')
+
+      ingresos = Dispensacion.joins(:stock)
+                             .where(stocks: { club_id: club.id })
+                             .where(fecha_dispensacion: mes_ini..mes_fin)
+                             .sum('dispensaciones.cantidad * COALESCE(dispensaciones.precio_unitario_ars, 0)').to_f.round(2)
+
+      costos = CostoLote.joins(:lote)
+                        .where(lotes: { club_id: club.id })
+                        .where(created_at: mes_ini..mes_fin.end_of_day)
+                        .sum(:costo_total).to_f.round(2)
+
+      meses.unshift({ mes: label, mes_ini: mes_ini, ingresos: ingresos, costos: costos, margen: (ingresos - costos).round(2) })
+    end
+
+    # Proyección: lotes en curso (vegetativo / floración) × precio sugerido × rendimiento objetivo
+    lotes_activos = club.lotes
+                        .where(estado: %w[vegetativo floracion maduración])
+                        .where.not(rendimiento_objetivo_g: nil)
+
+    proyeccion_items = lotes_activos.map do |l|
+      precio_g = club.lotes
+                     .joins(:costo)
+                     .where(genetica_id: l.genetica_id)
+                     .where.not(rendimiento_real_g: nil)
+                     .order(created_at: :desc)
+                     .first
+                     &.then { |ref| ref.rendimiento_real_g > 0 ? (CostoLote.find_by(lote: ref)&.costo_total.to_f / ref.rendimiento_real_g) : nil }
+
+      ingreso_estimado = precio_g ? (l.rendimiento_objetivo_g * precio_g).round(2) : nil
+
+      {
+        lote_id:              l.id,
+        codigo:               l.codigo,
+        estado:               l.estado,
+        genetica:             l.genetica&.nombre,
+        rendimiento_obj_g:    l.rendimiento_objetivo_g.to_f,
+        precio_g_estimado:    precio_g&.round(2),
+        ingreso_estimado:     ingreso_estimado,
+        fecha_cosecha_est:    l.fecha_cosecha_estimada,
+      }
+    end
+
+    ingreso_proy_total = proyeccion_items.sum { |p| p[:ingreso_estimado] || 0 }.round(2)
+
+    {
+      meses:                meses,
+      proyeccion_lotes:     proyeccion_items,
+      ingreso_proy_total:   ingreso_proy_total,
+    }
+  end
+
   private :calcular_rendimiento_genetica, :calcular_dispensador, :calcular_correlacion_ambiental,
           :agrupar_buckets, :calcular_produccion, :calcular_pl_lotes, :kpis_anuales,
-          :pearson_r, :regresion_lineal,
+          :pearson_r, :regresion_lineal, :calcular_contabilidad,
           :require_analytics_access!, :require_dispensador_access!
 end

@@ -45,6 +45,8 @@ Rails.application.routes.draw do
       get :correlacion_ambiental
       get :pl_lotes
       get :ejecutivo
+      get :comparativa_salas
+      get :contabilidad
     end
 
     resource :benchmark, only: [:show], controller: :benchmark  # solo super_admin, uso interno de plataforma

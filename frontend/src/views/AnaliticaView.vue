@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { getAnalyticsRendimiento, getAnalyticsProduccion, getAnalyticsCorrelacion } from '../lib/api.js'
+import { getAnalyticsRendimiento, getAnalyticsProduccion, getAnalyticsCorrelacion, getAnalyticsContabilidad } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import Chart from 'chart.js/auto'
 
@@ -9,6 +9,7 @@ const loading    = ref(false)
 const dataRend   = ref(null)
 const dataProd   = ref(null)
 const dataCorr   = ref(null)
+const dataCont   = ref(null)
 const añoFiltro  = ref(null)
 
 const añoActual = new Date().getFullYear()
@@ -41,6 +42,24 @@ function setAño(y) {
 }
 
 onMounted(cargar)
+
+async function goTab(t) {
+  tab.value = t
+  if (t === 'contabilidad' && !dataCont.value) {
+    try {
+      const { data } = await getAnalyticsContabilidad()
+      dataCont.value = data
+    } catch {}
+  }
+}
+
+// ── Contabilidad computeds ─────────────────────────────────────────
+const contMeses     = computed(() => dataCont.value?.meses ?? [])
+const contProy      = computed(() => dataCont.value?.proyeccion_lotes ?? [])
+const contProyTotal = computed(() => dataCont.value?.ingreso_proy_total ?? 0)
+const contMaxIngreso = computed(() => Math.max(...contMeses.value.map(m => m.ingresos), 1))
+const contMaxCosto   = computed(() => Math.max(...contMeses.value.map(m => m.costos), 1))
+const contMaxAbs     = computed(() => Math.max(contMaxIngreso.value, contMaxCosto.value))
 
 // ── Exportaciones ─────────────────────────────────────────────────
 function downloadCsv(filename, rows) {
@@ -282,20 +301,23 @@ function bucketColor(desv) {
     <!-- Tabs -->
     <div class="an__tabs-row">
       <div class="an__tabs">
-        <button class="an__tab" :class="{ 'an__tab--active': tab === 'geneticas' }" @click="tab = 'geneticas'">
+        <button class="an__tab" :class="{ 'an__tab--active': tab === 'geneticas' }" @click="goTab('geneticas')">
           <i class="bi bi-graph-up-arrow"></i> Genéticas
         </button>
-        <button class="an__tab" :class="{ 'an__tab--active': tab === 'ciclos' }" @click="tab = 'ciclos'">
+        <button class="an__tab" :class="{ 'an__tab--active': tab === 'ciclos' }" @click="goTab('ciclos')">
           <i class="bi bi-clock-history"></i> Ciclos
         </button>
-        <button class="an__tab" :class="{ 'an__tab--active': tab === 'perdidas' }" @click="tab = 'perdidas'">
+        <button class="an__tab" :class="{ 'an__tab--active': tab === 'perdidas' }" @click="goTab('perdidas')">
           <i class="bi bi-exclamation-triangle"></i> Pérdidas
         </button>
-        <button class="an__tab" :class="{ 'an__tab--active': tab === 'comparativa' }" @click="tab = 'comparativa'">
+        <button class="an__tab" :class="{ 'an__tab--active': tab === 'comparativa' }" @click="goTab('comparativa')">
           <i class="bi bi-bar-chart-steps"></i> Comparativa
         </button>
-        <button class="an__tab" :class="{ 'an__tab--active': tab === 'ambiente' }" @click="tab = 'ambiente'">
+        <button class="an__tab" :class="{ 'an__tab--active': tab === 'ambiente' }" @click="goTab('ambiente')">
           <i class="bi bi-thermometer-half"></i> Ambiente
+        </button>
+        <button class="an__tab" :class="{ 'an__tab--active': tab === 'contabilidad' }" @click="goTab('contabilidad')">
+          <i class="bi bi-cash-stack"></i> Contabilidad
         </button>
       </div>
       <div v-if="dataRend || dataProd" class="an__export-btns">
@@ -824,6 +846,136 @@ function bucketColor(desv) {
       </template>
     </template>
 
+    <!-- ══ TAB CONTABILIDAD ═════════════════════════════════════════ -->
+    <template v-if="tab === 'contabilidad'">
+      <div v-if="!dataCont" class="an__empty-lg">
+        <i class="bi bi-cash-stack"></i>
+        <p>Cargando datos contables…</p>
+      </div>
+
+      <template v-else>
+        <!-- KPIs del último mes -->
+        <div class="an__kpis" style="margin-bottom:1.25rem">
+          <div class="an__kpi an__kpi--green">
+            <span class="an__kpi-val">$ {{ contMeses.at(-1)?.ingresos?.toLocaleString('es-AR') ?? '—' }}</span>
+            <span class="an__kpi-lbl">Ingresos (mes actual)</span>
+          </div>
+          <div class="an__kpi">
+            <span class="an__kpi-val">$ {{ contMeses.at(-1)?.costos?.toLocaleString('es-AR') ?? '—' }}</span>
+            <span class="an__kpi-lbl">Costos (mes actual)</span>
+          </div>
+          <div class="an__kpi" :class="(contMeses.at(-1)?.margen ?? 0) >= 0 ? 'an__kpi--green' : 'an__kpi--red'">
+            <span class="an__kpi-val">$ {{ contMeses.at(-1)?.margen?.toLocaleString('es-AR') ?? '—' }}</span>
+            <span class="an__kpi-lbl">Margen (mes actual)</span>
+          </div>
+          <div v-if="contProyTotal > 0" class="an__kpi">
+            <span class="an__kpi-val">$ {{ contProyTotal.toLocaleString('es-AR') }}</span>
+            <span class="an__kpi-lbl">Ingreso proyectado</span>
+          </div>
+        </div>
+
+        <!-- Gráfico de barras: P&L mensual -->
+        <div class="an__card" style="margin-bottom:1.25rem">
+          <div class="an__card-header">
+            <span class="an__card-title">P&amp;L mensual — últimos 12 meses</span>
+          </div>
+          <div class="an__cont-chart">
+            <div v-for="m in contMeses" :key="m.mes" class="an__cont-col">
+              <div class="an__cont-bars">
+                <div class="an__cont-bar an__cont-bar--ing"
+                     :style="{ height: contMaxAbs > 0 ? (m.ingresos / contMaxAbs * 100) + '%' : '2px' }"
+                     :title="'Ingresos: $' + m.ingresos.toLocaleString('es-AR')"></div>
+                <div class="an__cont-bar an__cont-bar--cos"
+                     :style="{ height: contMaxAbs > 0 ? (m.costos / contMaxAbs * 100) + '%' : '2px' }"
+                     :title="'Costos: $' + m.costos.toLocaleString('es-AR')"></div>
+              </div>
+              <div class="an__cont-margen" :class="m.margen >= 0 ? 'an__cont-margen--pos' : 'an__cont-margen--neg'">
+                {{ m.margen >= 0 ? '+' : '' }}{{ (m.margen / 1000).toFixed(1) }}k
+              </div>
+              <div class="an__cont-label">{{ m.mes.split(' ')[0] }}</div>
+            </div>
+          </div>
+          <div class="an__cont-legend">
+            <span class="an__cont-leg-item"><span class="an__cont-leg-dot an__cont-leg-dot--ing"></span> Ingresos</span>
+            <span class="an__cont-leg-item"><span class="an__cont-leg-dot an__cont-leg-dot--cos"></span> Costos</span>
+          </div>
+        </div>
+
+        <!-- Tabla de meses -->
+        <div class="an__card" style="margin-bottom:1.25rem">
+          <div class="an__card-header">
+            <span class="an__card-title">Detalle mensual</span>
+          </div>
+          <div class="an__table-wrap">
+            <table class="an__table">
+              <thead>
+                <tr>
+                  <th>Mes</th>
+                  <th class="an__th-r">Ingresos</th>
+                  <th class="an__th-r">Costos</th>
+                  <th class="an__th-r">Margen</th>
+                  <th class="an__th-r">Margen %</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="m in [...contMeses].reverse()" :key="m.mes">
+                  <td>{{ m.mes }}</td>
+                  <td class="an__td-r">$ {{ m.ingresos.toLocaleString('es-AR') }}</td>
+                  <td class="an__td-r">$ {{ m.costos.toLocaleString('es-AR') }}</td>
+                  <td class="an__td-r an__td-bold" :class="m.margen >= 0 ? '' : 'an__td-red'">
+                    $ {{ m.margen.toLocaleString('es-AR') }}
+                  </td>
+                  <td class="an__td-r">
+                    <span v-if="m.ingresos > 0">{{ (m.margen / m.ingresos * 100).toFixed(1) }}%</span>
+                    <span v-else class="an__nd">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Proyección de lotes en curso -->
+        <div v-if="contProy.length" class="an__card">
+          <div class="an__card-header">
+            <span class="an__card-title">Proyección — lotes en curso</span>
+            <span class="an__pill an__pill--muted">{{ contProy.length }} lotes</span>
+          </div>
+          <div class="an__table-wrap">
+            <table class="an__table">
+              <thead>
+                <tr>
+                  <th>Lote</th>
+                  <th>Genética</th>
+                  <th>Estado</th>
+                  <th class="an__th-r">Rend. obj. (g)</th>
+                  <th class="an__th-r">Precio/g est.</th>
+                  <th class="an__th-r">Ingreso est.</th>
+                  <th>Cosecha est.</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in contProy" :key="p.lote_id">
+                  <td>
+                    <RouterLink :to="`/lotes/${p.lote_id}`" class="an__link">{{ p.codigo }}</RouterLink>
+                  </td>
+                  <td class="an__td-muted">{{ p.genetica ?? '—' }}</td>
+                  <td><span class="an__pill an__pill--muted">{{ p.estado }}</span></td>
+                  <td class="an__td-r">{{ p.rendimiento_obj_g?.toLocaleString('es-AR') }}</td>
+                  <td class="an__td-r">{{ p.precio_g_estimado != null ? '$ ' + p.precio_g_estimado : '—' }}</td>
+                  <td class="an__td-r an__td-bold an__td-green">
+                    {{ p.ingreso_estimado != null ? '$ ' + p.ingreso_estimado.toLocaleString('es-AR') : '—' }}
+                  </td>
+                  <td>{{ p.fecha_cosecha_est ?? '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </template>
+    </template>
+
     </div><!-- /#an-tab-content -->
 
   </div>
@@ -991,4 +1143,24 @@ function bucketColor(desv) {
 .an__scatter-footer { display: flex; align-items: center; gap: 1rem; padding: .5rem 1.1rem .875rem; flex-wrap: wrap; }
 .an__scatter-eq   { font-size: .75rem; color: #64748b; font-family: monospace; }
 .an__scatter-warn { font-size: .72rem; color: #b45309; background: rgba(217,119,6,.08); padding: .2em .55em; border-radius: 5px; }
+
+/* ── Contabilidad tab ───────────────────────────────────── */
+.an__kpi--red .an__kpi-val { color: #dc2626; }
+.an__td-red   { color: #dc2626; }
+.an__td-green { color: #15803d; }
+.an__cont-chart { display: flex; align-items: flex-end; gap: 6px; height: 180px; padding: .5rem 1.1rem 0; overflow-x: auto; }
+.an__cont-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 36px; }
+.an__cont-bars { display: flex; align-items: flex-end; gap: 2px; height: 120px; width: 100%; }
+.an__cont-bar { flex: 1; border-radius: 4px 4px 0 0; min-height: 2px; transition: height .3s; }
+.an__cont-bar--ing { background: #15803d; }
+.an__cont-bar--cos { background: #dc2626; opacity: .65; }
+.an__cont-margen { font-size: .68rem; font-weight: 700; white-space: nowrap; }
+.an__cont-margen--pos { color: #15803d; }
+.an__cont-margen--neg { color: #dc2626; }
+.an__cont-label { font-size: .65rem; color: #94a3b8; white-space: nowrap; }
+.an__cont-legend { display: flex; gap: 1rem; padding: .5rem 1.1rem .875rem; }
+.an__cont-leg-item { display: flex; align-items: center; gap: .35rem; font-size: .75rem; color: #64748b; }
+.an__cont-leg-dot { width: 10px; height: 10px; border-radius: 2px; }
+.an__cont-leg-dot--ing { background: #15803d; }
+.an__cont-leg-dot--cos { background: #dc2626; opacity: .65; }
 </style>

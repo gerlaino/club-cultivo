@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { useSalasStore } from "../stores/salas";
 import { useAuthStore } from "../stores/auth";
-import { listSedes } from "../lib/api";
+import { listSedes, getAnalyticsComparativaSalas } from "../lib/api";
 import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -129,6 +129,32 @@ const stats = computed(() => {
   };
 });
 
+// ── Comparativa de salas ──────────────────────────────────────
+const showComparativa  = ref(false);
+const comparativaData  = ref([]);
+const loadingComp      = ref(false);
+
+async function toggleComparativa() {
+  showComparativa.value = !showComparativa.value;
+  if (showComparativa.value && !comparativaData.value.length) {
+    loadingComp.value = true;
+    try {
+      const { data } = await getAnalyticsComparativaSalas();
+      comparativaData.value = data.salas || [];
+    } catch {}
+    finally { loadingComp.value = false; }
+  }
+}
+
+function fmtKg(v) {
+  if (v == null || v === 0) return '—';
+  return (v * 1000 >= 1000) ? `${v.toFixed(2)} kg` : `${Math.round(v * 1000)} g`;
+}
+
+const compSorted = computed(() =>
+  [...comparativaData.value].sort((a, b) => b.kg_producidos - a.kg_producidos)
+);
+
 // ── Modal Crear ───────────────────────────────────────────────
 const showCreate = ref(false);
 
@@ -181,9 +207,66 @@ async function confirmDelete(s) {
         <h1 class="slv__title">Salas de cultivo</h1>
         <p class="slv__sub">Gestioná los espacios físicos del club</p>
       </div>
-      <button v-if="canCreate" class="slv__btn-primary" @click="showCreate = true">
-        <i class="bi bi-plus-lg"></i> Nueva sala
-      </button>
+      <div style="display:flex;gap:.5rem;align-items:center;">
+        <button class="slv__btn-outline" :class="{ 'slv__btn-outline--on': showComparativa }" @click="toggleComparativa">
+          <i class="bi bi-bar-chart-line"></i> Comparativa
+        </button>
+        <button v-if="canCreate" class="slv__btn-primary" @click="showCreate = true">
+          <i class="bi bi-plus-lg"></i> Nueva sala
+        </button>
+      </div>
+    </div>
+
+    <!-- Panel comparativo -->
+    <div v-if="showComparativa" class="slv__comp">
+      <div v-if="loadingComp" class="slv__comp-loading"><DsSpinner /> Cargando comparativa…</div>
+      <div v-else-if="!compSorted.length" class="slv__comp-empty">Sin datos de producción todavía.</div>
+      <template v-else>
+        <div class="slv__comp-header">
+          <span class="slv__comp-title">Rendimiento por sala</span>
+          <span class="slv__comp-sub">Basado en lotes finalizados · Ambiental: última lectura 24 h</span>
+        </div>
+        <div class="slv__comp-table-wrap">
+          <table class="slv__comp-table">
+            <thead>
+              <tr>
+                <th>Sala</th>
+                <th>Ciclos</th>
+                <th>Total producido</th>
+                <th>Kg / planta</th>
+                <th>Días/ciclo</th>
+                <th>Temp</th>
+                <th>HR%</th>
+                <th>CO₂</th>
+                <th>Activos</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in compSorted" :key="s.id">
+                <td>
+                  <RouterLink :to="{ name: 'sala-detail', params: { id: s.id } }" class="slv__comp-link">
+                    {{ s.nombre }}
+                  </RouterLink>
+                  <span class="slv__comp-tipo">{{ s.tipo }}</span>
+                </td>
+                <td class="slv__comp-num">{{ s.ciclos || '—' }}</td>
+                <td class="slv__comp-num slv__comp-num--green">
+                  {{ fmtKg(s.kg_producidos) }}
+                  <div class="slv__comp-bar-wrap">
+                    <div class="slv__comp-bar" :style="{ width: compSorted[0].kg_producidos > 0 ? (s.kg_producidos / compSorted[0].kg_producidos * 100) + '%' : '0%' }"></div>
+                  </div>
+                </td>
+                <td class="slv__comp-num">{{ s.kg_por_planta != null ? (s.kg_por_planta * 1000).toFixed(1) + ' g' : '—' }}</td>
+                <td class="slv__comp-num">{{ s.dias_promedio != null ? s.dias_promedio + ' d' : '—' }}</td>
+                <td class="slv__comp-num">{{ s.temperatura != null ? s.temperatura.toFixed(1) + '°' : '—' }}</td>
+                <td class="slv__comp-num">{{ s.humedad != null ? s.humedad.toFixed(0) + '%' : '—' }}</td>
+                <td class="slv__comp-num">{{ s.co2 != null ? Math.round(s.co2) + ' ppm' : '—' }}</td>
+                <td class="slv__comp-num">{{ s.lotes_activos || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
     </div>
 
     <!-- KPIs -->
@@ -586,6 +669,31 @@ async function confirmDelete(s) {
 .slv__input--err  { border-color: #fca5a5; }
 .slv__textarea  { resize: vertical; min-height: 64px; }
 .slv__err       { font-size: .75rem; color: #dc2626; }
+
+/* ── Btn outline (comparativa toggle) ─────────────────── */
+.slv__btn-outline { display: inline-flex; align-items: center; gap: .4rem; background: transparent; color: #60725d; border: 1.5px solid #d4e6d4; padding: .55rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.slv__btn-outline:hover { border-color: #1b5e20; color: #1b5e20; background: #f0fdf4; }
+.slv__btn-outline--on { background: #1b5e20; color: #fff; border-color: #1b5e20; }
+.slv__btn-outline--on:hover { background: #104417; }
+
+/* ── Panel comparativa ────────────────────────────────── */
+.slv__comp { background: #fff; border: 1.5px solid #d4e6d4; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+.slv__comp-loading { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: #60725d; }
+.slv__comp-empty { font-size: .85rem; color: #94a3b8; font-style: italic; }
+.slv__comp-header { display: flex; align-items: baseline; gap: .75rem; margin-bottom: .875rem; flex-wrap: wrap; }
+.slv__comp-title { font-size: 1rem; font-weight: 700; color: #1a1a1a; }
+.slv__comp-sub { font-size: .75rem; color: #94a3b8; }
+.slv__comp-table-wrap { overflow-x: auto; }
+.slv__comp-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.slv__comp-table th { text-align: left; font-size: .72rem; font-weight: 700; color: #60725d; text-transform: uppercase; letter-spacing: .04em; padding: .4rem .6rem; border-bottom: 1.5px solid #e8f0e9; white-space: nowrap; }
+.slv__comp-table td { padding: .55rem .6rem; border-bottom: 1px solid #f0f4f0; vertical-align: middle; }
+.slv__comp-link { font-weight: 700; color: #1b5e20; text-decoration: none; }
+.slv__comp-link:hover { text-decoration: underline; }
+.slv__comp-tipo { display: inline-block; margin-left: .4rem; font-size: .7rem; color: #94a3b8; text-transform: capitalize; }
+.slv__comp-num { text-align: right; font-variant-numeric: tabular-nums; color: #374151; white-space: nowrap; }
+.slv__comp-num--green { color: #1b5e20; font-weight: 700; }
+.slv__comp-bar-wrap { height: 4px; background: #e8f0e9; border-radius: 2px; margin-top: 3px; min-width: 60px; }
+.slv__comp-bar { height: 4px; background: #15803d; border-radius: 2px; transition: width .4s; }
 
 /* ── Transition ───────────────────────────────────────── */
 .slv-modal-enter-active, .slv-modal-leave-active { transition: opacity .2s; }
