@@ -306,7 +306,10 @@
                 </div>
                 <div class="stk__field">
                   <label class="stk__label">Variedad / Cepa <span class="stk__opt">opcional</span></label>
-                  <input type="text" class="stk__input" v-model="crearForm.genetica_libre" placeholder="Ej: OG Kush, Amnesia, …" />
+                  <select class="stk__input" v-model="crearForm.genetica_id">
+                    <option :value="null">— Sin especificar —</option>
+                    <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
+                  </select>
                 </div>
                 <div class="stk__field">
                   <label class="stk__label">Precio sugerido (ARS/g) <span class="stk__opt">opcional</span></label>
@@ -524,7 +527,7 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   listStocksPendientes, listStocks, listStocksHistorial,
   asignarStock, listSedes, createStock, updateStock,
-  getPreferences, updatePreferences,
+  getPreferences, updatePreferences, listGeneticas,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useStockChannel } from '../../composables/useStockChannel.js'
@@ -539,6 +542,7 @@ const historial        = ref([])
 const historialLoaded  = ref(false)
 const loadingHistorial = ref(false)
 const sedes            = ref([])
+const geneticas        = ref([])
 const liveConectado    = ref(false)
 const flashIds         = ref(new Set())
 const umbralEditing    = ref(false)
@@ -769,12 +773,22 @@ const crearError = ref(null)
 
 const emptyForm = () => ({
   forma_producto: 'flor_seca', cantidad: '', sede_id: '',
-  genetica_libre: '', precio_sugerido_ars: '', costo_unitario_ars: '',
+  genetica_id: null, precio_sugerido_ars: '', costo_unitario_ars: '',
   proveedor: '', descripcion: '',
 })
 const crearForm = ref(emptyForm())
 
-function openCrear()  { crearForm.value = emptyForm(); crearError.value = null; showCrear.value = true }
+async function openCrear() {
+  crearForm.value = emptyForm()
+  crearError.value = null
+  showCrear.value = true
+  if (!geneticas.value.length) {
+    try {
+      const { data } = await listGeneticas()
+      geneticas.value = data || []
+    } catch {}
+  }
+}
 function closeCrear() { showCrear.value = false }
 
 async function guardarStock() {
@@ -801,10 +815,8 @@ async function guardarStock() {
     }
     if (crearForm.value.precio_sugerido_ars) p.precio_sugerido_ars = Number(crearForm.value.precio_sugerido_ars)
     if (crearForm.value.costo_unitario_ars)  p.costo_unitario_ars  = Number(crearForm.value.costo_unitario_ars)
-    const notaVariedad   = crearForm.value.genetica_libre?.trim() ? `Variedad: ${crearForm.value.genetica_libre.trim()}.` : ''
-    const notaAdicional  = crearForm.value.descripcion?.trim() || ''
-    const descripcionFinal = [notaVariedad, notaAdicional].filter(Boolean).join(' ')
-    if (descripcionFinal) p.descripcion = descripcionFinal
+    if (crearForm.value.genetica_id)         p.genetica_id         = Number(crearForm.value.genetica_id)
+    if (crearForm.value.descripcion?.trim()) p.descripcion         = crearForm.value.descripcion.trim()
 
     await createStock(p)
     toast.success('Stock externo creado')
