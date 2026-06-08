@@ -16,6 +16,5 @@ class CreateAnalisisLaboratorio < ActiveRecord::Migration[7.0]
     end
 
     add_index :analisis_laboratorio, :club_id
-    add_index :analisis_laboratorio, :lote_id
   end
 end

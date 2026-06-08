@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_07_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_07_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -94,6 +94,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_07_000001) do
     t.index ["lote_id", "created_at"], name: "index_analisis_ia_on_lote_id_and_created_at"
     t.index ["lote_id"], name: "index_analisis_ia_on_lote_id"
     t.index ["user_id"], name: "index_analisis_ia_on_user_id"
+  end
+
+  create_table "analisis_laboratorio", force: :cascade do |t|
+    t.bigint "lote_id", null: false
+    t.bigint "genetica_id"
+    t.bigint "club_id", null: false
+    t.bigint "user_id", null: false
+    t.date "fecha_analisis"
+    t.string "laboratorio"
+    t.decimal "thc_pct", precision: 5, scale: 2
+    t.decimal "cbd_pct", precision: 5, scale: 2
+    t.decimal "cbg_pct", precision: 5, scale: 2
+    t.string "terpenos_principales"
+    t.text "notas"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_analisis_laboratorio_on_club_id"
+    t.index ["genetica_id"], name: "index_analisis_laboratorio_on_genetica_id"
+    t.index ["lote_id"], name: "index_analisis_laboratorio_on_lote_id"
   end
 
   create_table "ariccame_registros", force: :cascade do |t|
@@ -1194,6 +1213,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_07_000001) do
   add_foreign_key "analisis_ia", "clubs"
   add_foreign_key "analisis_ia", "lotes"
   add_foreign_key "analisis_ia", "users"
+  add_foreign_key "analisis_laboratorio", "geneticas"
+  add_foreign_key "analisis_laboratorio", "lotes"
   add_foreign_key "ariccame_registros", "clubs"
   add_foreign_key "ariccame_registros", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "ariccame_registros", "stocks"
