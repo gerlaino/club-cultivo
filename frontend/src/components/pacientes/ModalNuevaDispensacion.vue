@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { createDispensacion, listStocks, listDeliveryUsers } from '../../lib/api.js'
+import { createDispensacion, listStocks, listEntregadores } from '../../lib/api.js'
 
 const props = defineProps({
   modelValue:     { type: Boolean, required: true },
@@ -116,7 +116,7 @@ async function cargarDeliveryUsers() {
   if (deliveryUsers.value.length) return
   loadingDelivery.value = true
   try {
-    const { data } = await listDeliveryUsers()
+    const { data } = await listEntregadores()
     deliveryUsers.value = data.data || data.usuarios || data || []
   } catch { deliveryUsers.value = [] }
   finally { loadingDelivery.value = false }
@@ -167,7 +167,7 @@ watch(() => props.modelValue, (open) => {
     deliveryUsers.value = []
     cargarStocks()
   }
-})
+}, { immediate: true })
 
 function cerrar() { emit('update:modelValue', false) }
 
