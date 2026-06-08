@@ -784,7 +784,7 @@ async function openCrear() {
   showCrear.value = true
   if (!geneticas.value.length) {
     try {
-      const { data } = await listGeneticas()
+      const { data } = await listGeneticas({ solo_club: true })
       geneticas.value = data || []
     } catch {}
   }
