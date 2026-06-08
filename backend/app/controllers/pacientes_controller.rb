@@ -2,7 +2,8 @@ class PacientesController < ApplicationController
   before_action :authenticate_user!
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados]
-  before_action :require_export_role!, only: [:export_csv, :criticos]
+  before_action :require_export_role!, only: [:export_csv]
+  before_action :require_criticos_role!, only: [:criticos]
   before_action :normalize_paciente_params, only: [:create, :update]
   before_action :warn_deprecated_route
 
@@ -191,8 +192,10 @@ class PacientesController < ApplicationController
       .select(:id, :nombre, :apellido, :reprocann_vencimiento, :reprocann_estado)
       .map { |p| { id: p.id, nombre: p.nombre_completo, reprocann_vencimiento: p.reprocann_vencimiento, dias_restantes: (p.reprocann_vencimiento - hoy).to_i } }
 
-    sin_dispensacion_ids = club.dispensaciones
-      .where('created_at >= ?', 60.days.ago)
+    sin_dispensacion_ids = Dispensacion
+      .joins(:paciente)
+      .where(pacientes: { club_id: club.id })
+      .where('dispensaciones.fecha_dispensacion >= ?', 60.days.ago)
       .pluck(:paciente_id).uniq
 
     sin_dispensacion_reciente = club.pacientes
@@ -381,6 +384,12 @@ class PacientesController < ApplicationController
 
   def require_export_role!
     unless %w[admin medico super_admin].include?(current_user&.role)
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
+  end
+
+  def require_criticos_role!
+    unless %w[admin supervisor super_admin].include?(current_user&.role)
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end

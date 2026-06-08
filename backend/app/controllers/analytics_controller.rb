@@ -623,12 +623,38 @@ class AnalyticsController < ApplicationController
 
   # GET /api/analytics/comparativa_salas
   def comparativa_salas
-    club  = current_user.club
-    salas = club.salas.includes(:lotes).order(:nombre)
+    club     = current_user.club
+    sala_ids = club.salas.pluck(:id)
+
+    # Agregados por sala en una sola consulta
+    stats_por_sala = Lote
+      .where(sala_id: sala_ids, estado: 'finalizado')
+      .group(:sala_id)
+      .select(
+        :sala_id,
+        'COUNT(*) AS ciclos',
+        'COALESCE(SUM(rendimiento_real_g), 0) AS total_g',
+        'COALESCE(SUM(plants_count_cosechadas), 0) AS total_plantas',
+      ).index_by(&:sala_id)
+
+    # Días promedio usando lote_eventos (fecha real de finalización)
+    dias_por_sala = LoteEvento
+      .joins(:lote)
+      .where(lotes: { sala_id: sala_ids })
+      .where(tipo: 'cambio_estado', estado_nuevo: 'finalizado')
+      .where.not('lotes.start_date': nil)
+      .select("lotes.sala_id, AVG((lote_eventos.registrado_en::date - lotes.start_date)) AS dias_prom")
+      .group('lotes.sala_id')
+      .index_by(&:sala_id)
+
+    activos_por_sala = Lote
+      .where(sala_id: sala_ids)
+      .where.not(estado: 'finalizado')
+      .group(:sala_id)
+      .count
 
     ultimas_lecturas = LecturaAmbiental
-      .where(sala_id: salas.map(&:id))
-      .where(tipo: %w[temperatura humedad co2])
+      .where(sala_id: sala_ids, tipo: %w[temperatura humedad co2])
       .where('medido_at >= ?', 24.hours.ago)
       .order(:sala_id, :tipo, medido_at: :desc)
       .select('DISTINCT ON (sala_id, tipo) sala_id, tipo, valor, medido_at')
@@ -638,30 +664,18 @@ class AnalyticsController < ApplicationController
       h[l.sala_id][l.tipo] = l.valor.to_f
     end
 
+    salas = club.salas.order(:nombre)
+
     filas = salas.map do |sala|
-      lotes_finalizados = sala.lotes.where(estado: 'finalizado')
-      ciclos            = lotes_finalizados.count
-      kg_producidos     = lotes_finalizados.where.not(rendimiento_real_g: nil).sum(:rendimiento_real_g).to_f / 1000.0
-      kg_por_planta     = begin
-        total_plantas = lotes_finalizados.where.not(plants_count_cosechadas: nil).sum(:plants_count_cosechadas)
-        total_g       = lotes_finalizados.where.not(rendimiento_real_g: nil).sum(:rendimiento_real_g).to_f
-        total_plantas > 0 ? (total_g / total_plantas / 1000.0).round(3) : nil
-      end
-
-      dias_promedio = begin
-        con_fechas = lotes_finalizados.where.not(start_date: nil, rendimiento_real_g: nil)
-        if con_fechas.any?
-          duraciones = con_fechas.map do |l|
-            fin = l.updated_at.to_date
-            (fin - l.start_date).to_i
-          end
-          (duraciones.sum.to_f / duraciones.size).round(0).to_i
-        end
-      end
-
-      lotes_activos = sala.lotes.where(estado: %w[vegetativo floracion maduración germinacion]).count
-
-      ambiental = lecturas_por_sala[sala.id] || {}
+      st          = stats_por_sala[sala.id]
+      ciclos      = st&.ciclos.to_i
+      total_g     = st&.total_g.to_f
+      total_pls   = st&.total_plantas.to_i
+      kg_producidos = total_g / 1000.0
+      kg_por_planta = total_pls > 0 ? (total_g / total_pls / 1000.0).round(3) : nil
+      dias_avg      = dias_por_sala[sala.id]&.dias_prom
+      dias_promedio = dias_avg ? dias_avg.to_f.round(0).to_i : nil
+      ambiental     = lecturas_por_sala[sala.id] || {}
 
       {
         id:             sala.id,
@@ -672,7 +686,7 @@ class AnalyticsController < ApplicationController
         kg_producidos:  kg_producidos.round(3),
         kg_por_planta:  kg_por_planta,
         dias_promedio:  dias_promedio,
-        lotes_activos:  lotes_activos,
+        lotes_activos:  activos_por_sala[sala.id] || 0,
         temperatura:    ambiental['temperatura'],
         humedad:        ambiental['humedad'],
         co2:            ambiental['co2'],
@@ -719,13 +733,14 @@ class AnalyticsController < ApplicationController
     end
 
     # Proyección: lotes en curso (vegetativo / floración) × precio sugerido × rendimiento objetivo
+    estados_en_curso = Lote::ESTADOS - ['finalizado']
     lotes_activos = club.lotes
-                        .where(estado: %w[vegetativo floracion maduración])
+                        .where(estado: estados_en_curso)
                         .where.not(rendimiento_objetivo_g: nil)
 
     proyeccion_items = lotes_activos.map do |l|
       precio_g = club.lotes
-                     .joins(:costo)
+                     .joins(:costo_lote)
                      .where(genetica_id: l.genetica_id)
                      .where.not(rendimiento_real_g: nil)
                      .order(created_at: :desc)
