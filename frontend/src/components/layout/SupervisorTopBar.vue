@@ -93,12 +93,15 @@ function openHelp() {
 }
 
 const SEGMENT_LABELS = {
-  sedes:     'Mis sedes',
-  salas:     'Salas',
-  lotes:     'Lotes',
-  tareas:    'Tareas',
-  geneticas: 'Genéticas',
-  perfil:    'Mi perfil',
+  sedes:           'Mis sedes',
+  salas:           'Salas',
+  lotes:           'Lotes',
+  tareas:          'Tareas',
+  geneticas:       'Genéticas',
+  analitica:       'Analítica',
+  perfil:          'Mi perfil',
+  configuracion:   'Configuración',
+  'plan-trabajo':  'Plan de trabajo',
 }
 
 const breadcrumbs = computed(() => {

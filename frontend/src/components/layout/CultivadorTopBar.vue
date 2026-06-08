@@ -168,9 +168,17 @@ function formatTime(ts) {
 }
 
 const SEGMENT_LABELS = {
-  salas: 'Mis salas', lotes: 'Mis lotes', tareas: 'Tareas',
-  perfil: 'Mi perfil', 'sala-ambiente': 'Ambiente',
-  ambiente: 'Ambiente',
+  salas:               'Mis salas',
+  lotes:               'Mis lotes',
+  plantas:             'Mis plantas',
+  tareas:              'Tareas',
+  geneticas:           'Genéticas',
+  cosechado:           'Cosechado',
+  perfil:              'Mi perfil',
+  ambiente:            'Ambiente',
+  'sala-ambiente':     'Ambiente',
+  'plan-trabajo':      'Plan de trabajo',
+  'historial-cultivador': 'Historial',
 }
 
 const breadcrumbs = computed(() => {

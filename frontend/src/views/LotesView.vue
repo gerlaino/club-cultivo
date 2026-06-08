@@ -415,7 +415,7 @@ async function exportarCSV() {
 
     <!-- MODAL Crear -->
     <Teleport to="body">
-      <div v-if="showCreate" class="lm-overlay">
+      <div v-if="showCreate" class="lm-overlay" @click.self="showCreate = false">
         <div class="lm-modal">
           <div class="lm-modal__header">
             <div>

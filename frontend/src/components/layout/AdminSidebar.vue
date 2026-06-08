@@ -143,9 +143,10 @@ const GRUPOS = [
     icon: ShieldCheck,
     defaultOpen: false,
     items: [
-      { to: '/auditor/trazabilidad', icon: GitBranch, label: 'Trazabilidad' },
+      { to: '/auditor',              icon: ShieldCheck, label: 'Auditoría' },
+      { to: '/auditor/trazabilidad', icon: GitBranch,   label: 'Trazabilidad' },
       { to: '/ariccame',             icon: ShieldCheck, label: 'ARICCAME' },
-      { to: '/documentos',           icon: FileText,  label: 'Documentos' },
+      { to: '/documentos',           icon: FileText,    label: 'Documentos' },
     ],
   },
   {

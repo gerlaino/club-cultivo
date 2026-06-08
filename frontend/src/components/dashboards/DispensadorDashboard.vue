@@ -185,7 +185,7 @@ onMounted(async () => {
 /* Header */
 .dd__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); margin-bottom: var(--sp-6); flex-wrap: wrap; }
 .dd__title { font-family: var(--font-display); font-size: var(--fs-24); font-weight: 600; color: var(--c-ink-900); margin: 0; }
-.dd__subtitle { font-size: var(--fs-13); color: var(--c-ink-500); margin: var(--sp-1) 0 0; text-transform: capitalize; }
+.dd__subtitle { font-size: var(--fs-13); color: var(--c-ink-500); margin: var(--sp-1) 0 0; }
 .dd__cta { display: inline-flex; align-items: center; gap: var(--sp-2); background: var(--c-role-dispensador); color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 8px; font-size: var(--fs-14); font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; transition: opacity .15s; }
 .dd__cta:hover { opacity: .88; }
 

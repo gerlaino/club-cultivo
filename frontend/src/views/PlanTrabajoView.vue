@@ -19,6 +19,7 @@
             <h1 class="ptv__plan-titulo">{{ plan.titulo || 'Plan de trabajo' }}</h1>
             <span class="ptv__badge" :class="`ptv__badge--${plan.estado}`">{{ ESTADO_LABEL[plan.estado] }}</span>
           </div>
+          <p class="ptv__plan-desc">Planificación estructurada del trabajo por ciclo de cultivo</p>
           <p class="ptv__plan-meta">
             {{ PERIODO_LABEL[plan.periodo_tipo] }} · {{ plan.fecha_inicio }} → {{ plan.fecha_fin }}
             <span v-if="plan.total_plan_tareas"> · {{ plan.total_plan_tareas }} tareas</span>
@@ -366,7 +367,8 @@ async function onPlanCreado(nuevoPlan) {
 .ptv__badge--borrador  { background: #f1f5f9; color: #64748b; }
 .ptv__badge--publicado { background: #f0fdf4; color: #15803d; }
 .ptv__badge--archivado { background: #fafafa; color: #94a3b8; }
-.ptv__plan-meta { font-size: .78rem; color: #60725d; margin: 0; }
+.ptv__plan-desc { font-size: var(--fs-13); color: var(--c-ink-500); margin: 2px 0 0; }
+.ptv__plan-meta { font-size: .78rem; color: #60725d; margin: 2px 0 0; }
 .ptv__plan-actions { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
 
 .ptv__tabs { display: flex; align-items: center; gap: .25rem; background: #fff; border: 1px solid #e8f0e9; border-radius: 10px; padding: .35rem .5rem; }

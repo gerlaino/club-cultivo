@@ -5,6 +5,7 @@
     <div class="tv__header">
       <div class="tv__header-left">
         <h1 class="tv__title">Tareas</h1>
+        <p class="tv__desc">Asignación y seguimiento de tareas operativas del club</p>
         <p class="tv__sub">{{ fechaHoy }} · {{ saludo }}</p>
       </div>
       <div class="tv__header-right">
@@ -510,6 +511,7 @@ function mostrarToast(mensaje, tipo = 'success') {
 /* Header */
 .tv__header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
 .tv__title { font-size: 1.75rem; font-weight: 800; margin: 0 0 .15rem; letter-spacing: -.04em; }
+.tv__desc { font-size: var(--fs-13); color: var(--c-ink-500); margin: 2px 0 0; }
 .tv__sub { font-size: .82rem; color: #64748b; margin: 0; }
 .tv__header-right { display: flex; align-items: center; gap: .75rem; }
 

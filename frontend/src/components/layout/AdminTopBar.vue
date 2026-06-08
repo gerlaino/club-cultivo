@@ -150,10 +150,34 @@ function openHelp() {
 const notifCount = computed(() => ambStore.alertasCount + internasNoLeidas.value.length)
 
 const SEGMENT_LABELS = {
-  pacientes: 'Pacientes', sedes: 'Sedes', contabilidad: 'Contabilidad',
-  tareas: 'Tareas', usuarios: 'Usuarios', geneticas: 'Genéticas',
-  manicura: 'Manicura', 'informe-semestral': 'REPROCANN', documentos: 'Documentos',
-  perfil: 'Mi perfil', preferencias: 'Preferencias', web: 'Web', nuevo: 'Nuevo',
+  pacientes:              'Pacientes',
+  sedes:                  'Sedes',
+  salas:                  'Salas',
+  lotes:                  'Lotes',
+  contabilidad:           'Contabilidad',
+  tareas:                 'Tareas',
+  usuarios:               'Usuarios',
+  geneticas:              'Genéticas',
+  manicura:               'Manicura',
+  analitica:              'Analítica',
+  auditor:                'Auditoría',
+  ariccame:               'ARICCAME',
+  configuracion:          'Configuración',
+  integraciones:          'Integraciones',
+  documentos:             'Documentos',
+  perfil:                 'Mi perfil',
+  preferencias:           'Preferencias',
+  web:                    'Sitio web',
+  nuevo:                  'Nuevo',
+  curado:                 'Curado',
+  cosechado:              'Cosechado',
+  stock:                  'Stock',
+  'informe-semestral':    'REPROCANN',
+  'plan-trabajo':         'Plan de trabajo',
+  'pesajes-manicura':     'Pesajes de manicura',
+  'socios-criticos':      'Socios críticos',
+  'alertas-configuracion':'Alertas',
+  'admin':                'Administración',
 }
 
 const breadcrumbs = computed(() => {
