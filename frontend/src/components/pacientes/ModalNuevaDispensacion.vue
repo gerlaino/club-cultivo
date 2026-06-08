@@ -218,6 +218,16 @@ async function handleSubmit() {
     }
     if (form.value.aporte_socio_ars != null && form.value.aporte_socio_ars !== '')
       payload.aporte_socio_ars = Number(form.value.aporte_socio_ars).toFixed(2)
+    const s = stockSeleccionado.value
+    if (s) {
+      const ppu = s.precio_sugerido_ars
+        ? parseFloat(s.precio_sugerido_ars)
+        : (parseFloat(precioUnitarioManual.value) || 0)
+      if (ppu > 0) {
+        const desc = Math.max(0, Math.min(100, Number(form.value.descuento_pct) || 0))
+        payload.precio_unitario_ars = (ppu * (1 - desc / 100)).toFixed(2)
+      }
+    }
     if (form.value.con_envio) {
       payload.delivery_id       = form.value.delivery_id
       payload.direccion_envio   = form.value.direccion_envio

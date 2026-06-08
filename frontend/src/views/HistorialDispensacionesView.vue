@@ -175,6 +175,16 @@ function medioPagoLabel(m) {
   const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', credito_gramos: 'Cred. g', no_abona: 'No abona' }
   return L[m] || m || '—'
 }
+function medioPagoClass(m) {
+  const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', credito_gramos: 'hd__pago--teal', no_abona: 'hd__pago--gris' }
+  return C[m] || 'hd__pago--gris'
+}
+function descuentoPct(d) {
+  const pu = d.precio_unitario_ars
+  const ps = d.stock?.precio_sugerido_ars
+  if (!pu || !ps || pu >= ps) return null
+  return Math.round((1 - pu / ps) * 100)
+}
 
 const MEDIOS_PAGO = [
   { value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' },
@@ -380,11 +390,12 @@ const FORMAS = [
         <table class="hd__table">
           <thead>
             <tr>
-              <th>Fecha / Hora</th>
+              <th>Fecha</th>
               <th>Paciente</th>
               <th>Producto</th>
-              <th class="hd__th-num">Cantidad</th>
-              <th class="hd__th-num">P. unitario</th>
+              <th class="hd__th-num">Cant.</th>
+              <th class="hd__th-num">P. unit.</th>
+              <th class="hd__th-num">Desc</th>
               <th class="hd__th-num">Total</th>
               <th>Pago</th>
               <th>Dispensador</th>
@@ -392,7 +403,7 @@ const FORMAS = [
             </tr>
           </thead>
           <tbody>
-            <tr v-for="d in dispensaciones" :key="d.id">
+            <tr v-for="d in dispensaciones" :key="d.id" class="hd__tr">
               <td class="hd__td-fecha">
                 <span class="hd__fecha-day">{{ formatFecha(d.fecha_dispensacion, false) }}</span>
                 <span class="hd__fecha-hora">{{ formatHora(d.created_at) }}</span>
@@ -403,11 +414,22 @@ const FORMAS = [
                   <Filter :size="11" :stroke-width="2" />
                 </button>
               </td>
-              <td class="hd__td-producto">{{ formaLabel(d.stock?.forma_producto) }}</td>
-              <td class="hd__td-num">{{ d.cantidad }}{{ d.stock?.unidad ?? 'g' }}</td>
-              <td class="hd__td-num">{{ formatARS(d.precio_unitario_ars) }}</td>
+              <td class="hd__td-producto">
+                <span class="hd__forma-chip">{{ formaLabel(d.stock?.forma_producto) }}</span>
+              </td>
+              <td class="hd__td-num hd__td-qty">{{ d.cantidad }}{{ d.stock?.unidad ?? 'g' }}</td>
+              <td class="hd__td-num hd__td-price">
+                <span v-if="d.precio_unitario_ars">{{ formatARS(d.precio_unitario_ars) }}</span>
+                <span v-else class="hd__dash">—</span>
+              </td>
+              <td class="hd__td-num">
+                <span v-if="descuentoPct(d)" class="hd__desc-badge">-{{ descuentoPct(d) }}%</span>
+                <span v-else class="hd__dash">—</span>
+              </td>
               <td class="hd__td-num hd__td-monto">{{ formatARS(d.aporte_socio_ars) }}</td>
-              <td class="hd__td-pago">{{ medioPagoLabel(d.medio_pago) }}</td>
+              <td class="hd__td-pago">
+                <span class="hd__pago-badge" :class="medioPagoClass(d.medio_pago)">{{ medioPagoLabel(d.medio_pago) }}</span>
+              </td>
               <td class="hd__td-user">{{ d.usuario?.nombre ?? '—' }}</td>
               <td class="hd__td-envio">
                 <span v-if="d.con_envio" class="hd__envio-badge" :title="d.estado_envio">
@@ -618,55 +640,98 @@ const FORMAS = [
 .hd__pago-monto { color: var(--c-ink-400); margin-left: .2em; }
 
 /* Tabla */
-.hd__table-wrap { overflow-x: auto; }
+.hd__table-wrap {
+  overflow-x: auto;
+  border: 1.5px solid var(--c-ink-100);
+  border-radius: var(--r-xl);
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
 .hd__table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-13);
-  background: var(--c-paper);
-  border: 1.5px solid var(--c-ink-100);
-  border-radius: var(--r-lg);
-  overflow: hidden;
 }
 .hd__table th {
   text-align: left;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .04em;
-  color: var(--c-ink-500);
-  padding: var(--sp-3);
+  letter-spacing: .06em;
+  color: var(--c-ink-400);
+  padding: var(--sp-3) var(--sp-4);
   background: var(--c-ink-50, #f8fafc);
   border-bottom: 1.5px solid var(--c-ink-100);
   white-space: nowrap;
 }
-.hd__table td {
-  padding: var(--sp-2) var(--sp-3);
+.hd__table th:first-child { border-radius: var(--r-lg) 0 0 0; }
+.hd__table th:last-child  { border-radius: 0 var(--r-lg) 0 0; }
+.hd__tr td {
+  padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--c-ink-50, #f8fafc);
   color: var(--c-ink-800);
   vertical-align: middle;
 }
-.hd__table tr:last-child td { border-bottom: none; }
-.hd__table tr:hover td { background: var(--c-leaf-50); }
+.hd__tr:last-child td { border-bottom: none; }
+.hd__tr:hover td { background: #f8fdf8; }
 .hd__th-num, .hd__td-num { text-align: right; }
 .hd__td-fecha { white-space: nowrap; }
-.hd__fecha-day { display: block; font-weight: 600; font-size: var(--fs-13); }
-.hd__fecha-hora { display: block; font-size: 11px; color: var(--c-ink-400); font-family: monospace; }
+.hd__fecha-day { display: block; font-weight: 600; font-size: var(--fs-13); color: var(--c-ink-900); }
+.hd__fecha-hora { display: block; font-size: 11px; color: var(--c-ink-400); font-family: var(--font-mono, monospace); margin-top: 1px; }
 .hd__td-paciente { font-weight: 500; }
-.hd__link-paciente { color: inherit; text-decoration: none; }
-.hd__link-paciente:hover { color: #1b5e20; text-decoration: underline; }
-.hd__td-producto { color: var(--c-ink-500); }
-.hd__td-monto { font-weight: 700; color: #15803d; }
-.hd__td-pago { font-size: var(--fs-12); }
+.hd__link-paciente { color: var(--c-ink-800); text-decoration: none; font-weight: 600; }
+.hd__link-paciente:hover { color: #1b5e20; }
+.hd__forma-chip {
+  display: inline-block;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hd__td-qty { font-family: var(--font-mono, monospace); font-weight: 600; color: var(--c-ink-700); }
+.hd__td-price { font-family: var(--font-mono, monospace); color: var(--c-ink-500); }
+.hd__td-monto { font-weight: 700; color: #15803d; font-family: var(--font-mono, monospace); font-size: var(--fs-14); }
+.hd__dash { color: var(--c-ink-300); }
+.hd__desc-badge {
+  display: inline-block;
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+  border-radius: var(--r-pill);
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+/* Badges de medio de pago */
+.hd__pago-badge {
+  display: inline-block;
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hd__pago--verde   { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.hd__pago--azul    { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.hd__pago--morado  { background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
+.hd__pago--amber   { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.hd__pago--teal    { background: #ccfbf1; color: #0f766e; border: 1px solid #99f6e4; }
+.hd__pago--gris    { background: var(--c-ink-100); color: var(--c-ink-600); border: 1px solid var(--c-ink-200); }
 .hd__td-user { font-size: var(--fs-12); color: var(--c-ink-400); }
-.hd__td-envio { width: 32px; }
+.hd__td-envio { width: 36px; }
 .hd__envio-badge {
   display: inline-flex;
   align-items: center;
   background: #dbeafe;
   color: #1d4ed8;
-  padding: 2px 5px;
-  border-radius: 4px;
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  gap: 3px;
 }
 
 /* Summary row */
