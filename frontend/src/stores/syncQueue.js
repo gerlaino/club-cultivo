@@ -2,9 +2,18 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 const STORAGE_KEY = 'cc_sync_queue'
+const TTL_MS = 48 * 60 * 60 * 1000 // 48h — evita acumulación de entradas huérfanas
 
 function load() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] }
+  try {
+    const now  = Date.now()
+    const all  = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    const valid = all.filter(i => !i.timestamp || now - new Date(i.timestamp).getTime() < TTL_MS)
+    if (valid.length < all.length) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(valid)) } catch {}
+    }
+    return valid
+  } catch { return [] }
 }
 function persist(items) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)) } catch {}

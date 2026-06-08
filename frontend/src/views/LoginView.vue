@@ -256,7 +256,9 @@ const showPass   = ref(false)
 const focusEmail = ref(false)
 const focusPass  = ref(false)
 const yr = new Date().getFullYear()
-const retrying   = ref(false)
+const retrying     = ref(false)
+const lastSubmitAt = ref(0)
+const COOLDOWN_MS  = 600
 
 const isPwa = window.matchMedia('(display-mode: standalone)').matches
   || window.navigator.standalone === true
@@ -271,7 +273,9 @@ async function intentarLogin() {
 }
 
 async function onSubmit() {
-  if (auth.loading || retrying.value) return
+  const now = Date.now()
+  if (auth.loading || retrying.value || now - lastSubmitAt.value < COOLDOWN_MS) return
+  lastSubmitAt.value = now
   try {
     await intentarLogin()
   } catch (e) {
