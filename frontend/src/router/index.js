@@ -262,7 +262,7 @@ const routes = [
     alias: ["/socios/:id"],
     name: "paciente-detail",
     component: () => import("../views/SocioDetailView.vue"),
-    props: true,
+    props: route => ({ backPath: '/pacientes' }),
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
       const role = auth.user?.role

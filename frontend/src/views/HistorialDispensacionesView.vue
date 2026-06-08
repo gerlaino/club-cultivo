@@ -39,7 +39,7 @@ async function buscarPacientes() {
     const p = {}
     if (buscaPaciente.value.trim()) p.q = buscaPaciente.value.trim()
     const { data } = await listPacientes(p)
-    pacientesLista.value = data.pacientes ?? data ?? []
+    pacientesLista.value = data.data ?? data.pacientes ?? []
   } catch { pacientesLista.value = [] }
   finally { loadingPacientes.value = false }
 }
@@ -55,7 +55,7 @@ async function seleccionarPacienteModal(paciente) {
   cargandoPaciente.value = true
   try {
     const { data } = await getPaciente(paciente.id)
-    pacienteSeleccionado.value = data
+    pacienteSeleccionado.value = data.data ?? data
     showBuscarPaciente.value   = false
     showDispensarModal.value   = true
   } catch {} finally { cargandoPaciente.value = false }
