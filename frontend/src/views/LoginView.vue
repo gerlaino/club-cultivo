@@ -133,8 +133,8 @@
               </div>
             </Transition>
 
-            <button class="lv__btn" type="submit" :disabled="auth.loading || !email || !password">
-              <DsSpinner v-if="auth.loading" :size="18" />
+            <button class="lv__btn" type="submit" :disabled="auth.loading || retrying || !email || !password">
+              <DsSpinner v-if="auth.loading || retrying" :size="18" />
               <template v-else>
                 <span>Ingresar al club</span>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -256,14 +256,36 @@ const showPass   = ref(false)
 const focusEmail = ref(false)
 const focusPass  = ref(false)
 const yr = new Date().getFullYear()
+const retrying   = ref(false)
 
 const isPwa = window.matchMedia('(display-mode: standalone)').matches
   || window.navigator.standalone === true
 
+function esErrorDeConexion(e) {
+  const status = e?.response?.status
+  return !status || status >= 500
+}
+
+async function intentarLogin() {
+  await auth.login(email.value, password.value, route.query.redirect || null)
+}
+
 async function onSubmit() {
+  if (auth.loading || retrying.value) return
   try {
-    await auth.login(email.value, password.value, route.query.redirect || null)
-  } catch (_) {}
+    await intentarLogin()
+  } catch (e) {
+    if (esErrorDeConexion(e)) {
+      auth.error = 'Hubo un problema al conectar. Reintentando…'
+      retrying.value = true
+      setTimeout(async () => {
+        retrying.value = false
+        try {
+          await intentarLogin()
+        } catch (_) {}
+      }, 2000)
+    }
+  }
 }
 </script>
 

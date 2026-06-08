@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useToast } from "../composables/useToast.js";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
@@ -47,6 +48,15 @@ api.interceptors.response.use(
         auth.user = null;
         auth.bootstrapped = true;
       } catch {}
+      // Redirigir al login si la sesión expiró mientras el usuario estaba usando la app
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
+
+    if (status === 500) {
+      const toast = useToast();
+      toast.error('Error en el servidor. Intentá de nuevo en unos segundos.', { timeout: 5000 });
     }
 
     return Promise.reject(error);
