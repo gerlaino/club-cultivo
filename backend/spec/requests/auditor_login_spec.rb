@@ -8,12 +8,13 @@ RSpec.describe 'Auditor login', type: :request do
   let!(:sala)    { create(:sala, club: club, created_by: admin, sede: sede) }
   let!(:paciente){ create(:paciente, club: club, created_by: admin) }
 
-  it 'POST /users/sign_in → 200 with JWT' do
+  it 'POST /users/sign_in → 200 y setea cookie httpOnly' do
     post '/users/sign_in',
          params: { user: { email: auditor.email, password: 'password123' } },
          as: :json
     expect(response).to have_http_status(:ok)
-    expect(response.headers['Authorization']).to be_present
+    expect(response.cookies['jwt_token']).to be_present
+    expect(response.headers['Authorization']).to be_nil
   end
 
   context 'after login (Ola 5: auditor usa /informes, no rutas directas)' do

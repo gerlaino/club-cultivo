@@ -17,11 +17,12 @@ async function request(method, path, body, formData) {
     body: formData ? formData : body ? JSON.stringify(body) : undefined,
   })
 
+  // Capturar JWT del Authorization header (middleware lo deja intacto para X-Mobile-Client)
+  const newToken = res.headers.get('authorization')
+  if (newToken) auth.setJwt(newToken)
+
   if (res.status === 204) return { data: null }
   const json = await res.json()
-
-  // Capturar JWT del body (solo presente en login cuando X-Mobile-Client: true)
-  if (json?.token) auth.setJwt(json.token)
 
   if (!res.ok) {
     const err = new Error(json.error || json.errors?.join(', ') || 'Error')

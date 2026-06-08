@@ -50,6 +50,9 @@ Rails.application.routes.draw do
     end
 
     resource :benchmark, only: [:show], controller: :benchmark  # solo super_admin, uso interno de plataforma
+    namespace :public do
+      resource :benchmark, only: [:show], controller: :benchmark  # público, datos anonimizados y agregados
+    end
 
     post '/asistente/parsear',       to: 'asistente#parsear'
     post '/asistente/ejecutar',      to: 'asistente#ejecutar'
