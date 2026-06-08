@@ -1,5 +1,16 @@
 <template>
-  <div class="mlot" v-if="lote">
+  <div v-if="loading" class="mlot--loading">
+    <span class="mlot__spin">📦</span>
+  </div>
+
+  <div v-else-if="!lote" class="mlot--empty">
+    <div class="mlot__empty-ico">📦</div>
+    <div class="mlot__empty-title">Lote no encontrado</div>
+    <div class="mlot__empty-desc">No existe un lote con este ID o no tenés acceso.</div>
+    <button class="mlot__empty-back" @click="router.back()">← Volver</button>
+  </div>
+
+  <div class="mlot" v-else>
 
     <!-- Hero -->
     <div class="mlot__hero" :style="{ background: estadoGradient(lote.estado) }">
@@ -394,8 +405,13 @@ onMounted(async () => {
 <style scoped>
 .mlot { padding: 0 0 2rem; }
 .mlot--loading { display: flex; align-items: center; justify-content: center; min-height: 40vh; }
-.mlot__spin { font-size: 2rem; color: #94a3b8; animation: spin .8s linear infinite; }
+.mlot__spin { font-size: 2rem; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.mlot--empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 50vh; padding: 2rem; text-align: center; gap: .75rem; }
+.mlot__empty-ico   { font-size: 3rem; }
+.mlot__empty-title { font-size: 1.1rem; font-weight: 700; color: #1e293b; }
+.mlot__empty-desc  { font-size: .85rem; color: #64748b; max-width: 260px; line-height: 1.5; }
+.mlot__empty-back  { margin-top: .5rem; background: none; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .5rem 1.25rem; font-size: .9rem; color: #475569; cursor: pointer; }
 
 .mlot__hero { padding: 1.25rem 1rem 1.1rem; }
 .mlot__hero-estado { font-size: .72rem; font-weight: 700; color: rgba(255,255,255,.7); margin-bottom: .4rem; text-transform: uppercase; letter-spacing: .06em; }

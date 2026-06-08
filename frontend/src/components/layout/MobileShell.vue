@@ -75,6 +75,7 @@ const NAV = {
     { to: '/m/admin/aprobar', icon: 'bi-check2-circle', label: 'Aprobar' },
     { to: '/m/admin/tareas',  icon: 'bi-list-check',   label: 'Tareas'  },
   ],
+  // El supervisor comparte las vistas mobile del admin — no hay rutas /m/supervisor/* separadas
   supervisor: [
     { to: '/m/admin/sedes',   icon: 'bi-building',     label: 'Sedes'   },
     { to: '/m/admin/aprobar', icon: 'bi-check2-circle', label: 'Aprobar' },

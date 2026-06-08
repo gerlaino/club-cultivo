@@ -701,16 +701,18 @@ const routes = [
     component: () => import('../components/layout/MobileShell.vue'),
     meta: { requiresAuth: true },
     children: [
-      // Redirect /m → primera tab del rol
+      // Redirect /m → primera tab del rol.
+      // Roles sin shell mobile (dispensador, medico, etc.) van a su home desktop.
       { path: '', redirect: () => {
           const role = useAuthStore().user?.role
           const homes = {
-            admin: '/m/admin/sedes', supervisor: '/m/admin/sedes',
+            admin:      '/m/admin/sedes',
+            supervisor: '/m/admin/sedes', // supervisor comparte rutas mobile de admin
             cultivador: '/m/cultivador/sedes',
-            manicura: '/m/manicura/pesar',
-            delivery: '/m/delivery/despachos',
+            manicura:   '/m/manicura/pesar',
+            delivery:   '/m/delivery/despachos',
           }
-          return homes[role] || '/m/cultivador/sedes'
+          return homes[role] || '/'
         }
       },
 

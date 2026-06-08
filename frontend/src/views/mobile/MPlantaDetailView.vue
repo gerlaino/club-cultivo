@@ -1,5 +1,16 @@
 <template>
-  <div class="mpd" v-if="planta">
+  <div v-if="loading" class="mpd--loading">
+    <span class="mpd__spin">🌿</span>
+  </div>
+
+  <div v-else-if="!planta" class="mpd--empty">
+    <div class="mpd__empty-ico">🪴</div>
+    <div class="mpd__empty-title">Planta no encontrada</div>
+    <div class="mpd__empty-desc">No existe una planta con este ID o no tenés acceso.</div>
+    <button class="mpd__empty-back" @click="router.back()">← Volver</button>
+  </div>
+
+  <div class="mpd" v-else>
 
     <!-- Hero -->
     <div class="mpd__hero">
@@ -109,13 +120,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getPlant, getPlantActivities } from '../../lib/api'
 import { useToast }          from '../../composables/useToast'
 import RegistroPlantaModal   from '../../components/plants/RegistroPlantaModal.vue'
 
-const route = useRoute()
-const toast = useToast()
+const route  = useRoute()
+const router = useRouter()
+const toast  = useToast()
 const id    = Number(route.params.id)
 
 const planta     = ref(null)
@@ -175,8 +187,13 @@ onMounted(async () => {
 <style scoped>
 .mpd { padding: 0 0 2rem; }
 .mpd--loading { display: flex; align-items: center; justify-content: center; min-height: 40vh; }
-.mpd__spin { font-size: 2rem; color: #94a3b8; animation: spin .8s linear infinite; }
+.mpd__spin { font-size: 2rem; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.mpd--empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 50vh; padding: 2rem; text-align: center; gap: .75rem; }
+.mpd__empty-ico   { font-size: 3rem; }
+.mpd__empty-title { font-size: 1.1rem; font-weight: 700; color: #1e293b; }
+.mpd__empty-desc  { font-size: .85rem; color: #64748b; max-width: 260px; line-height: 1.5; }
+.mpd__empty-back  { margin-top: .5rem; background: none; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .5rem 1.25rem; font-size: .9rem; color: #475569; cursor: pointer; }
 
 /* Hero */
 .mpd__hero { padding: 1.25rem 1rem 1rem; background: linear-gradient(135deg, #0f2417 0%, #1b5e20 100%); }
