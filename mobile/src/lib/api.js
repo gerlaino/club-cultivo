@@ -4,7 +4,9 @@ const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api')
 
 async function request(method, path, body, formData) {
   const auth = useAuthStore()
-  const headers = {}
+  const headers = {
+    'X-Mobile-Client': 'true',  // le indica al backend que devuelva el token en el body
+  }
 
   if (!formData) headers['Content-Type'] = 'application/json'
   if (auth.jwt)  headers['Authorization'] = auth.jwt
@@ -15,12 +17,12 @@ async function request(method, path, body, formData) {
     body: formData ? formData : body ? JSON.stringify(body) : undefined,
   })
 
-  // Capturar JWT del header de respuesta (Devise JWT)
-  const newToken = res.headers.get('authorization')
-  if (newToken) auth.setJwt(newToken)
-
   if (res.status === 204) return { data: null }
   const json = await res.json()
+
+  // Capturar JWT del body (solo presente en login cuando X-Mobile-Client: true)
+  if (json?.token) auth.setJwt(json.token)
+
   if (!res.ok) {
     const err = new Error(json.error || json.errors?.join(', ') || 'Error')
     err.response = { data: json, status: res.status }

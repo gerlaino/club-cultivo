@@ -16,11 +16,10 @@ let intervalId    = null
 let consumer      = null
 
 function cableUrl() {
-  const base  = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
-  const root  = base.replace(/\/api$/, '')
-  const ws    = root.replace(/^http/, 'ws')
-  const token = localStorage.getItem('jwt_token') || ''
-  return `${ws}/cable?token=${encodeURIComponent(token)}`
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+  const root = base.replace(/\/api$/, '')
+  const ws   = root.replace(/^http/, 'ws')
+  return `${ws}/cable` // httpOnly cookie se envía automáticamente en el upgrade WS
 }
 
 async function refresh() {

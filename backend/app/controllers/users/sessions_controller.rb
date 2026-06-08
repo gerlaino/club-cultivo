@@ -6,16 +6,25 @@ class Users::SessionsController < Devise::SessionsController
     sign_in(resource_name, resource)
 
     jwt = response.headers.delete('Authorization')&.sub('Bearer ', '')
-    set_jwt_cookie(jwt) if jwt.present?
 
-    render json: {
-      id: resource.id,
-      email: resource.email,
-      role: resource.role,
-      club_id: resource.club_id,
+    payload = {
+      id:         resource.id,
+      email:      resource.email,
+      role:       resource.role,
+      club_id:    resource.club_id,
       first_name: resource.first_name,
-      last_name: resource.last_name
-    }, status: :ok
+      last_name:  resource.last_name
+    }
+
+    if request.headers['X-Mobile-Client'] == 'true'
+      # App nativa: no puede leer httpOnly cookie → devolvemos el token en el body
+      payload[:token] = jwt
+    else
+      # Web SPA: httpOnly cookie, más seguro contra XSS
+      set_jwt_cookie(jwt) if jwt.present?
+    end
+
+    render json: payload, status: :ok
   end
 
   def destroy

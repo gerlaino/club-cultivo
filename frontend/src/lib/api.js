@@ -3,52 +3,27 @@ import { useToast } from "../composables/useToast.js";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
-  withCredentials: true,
+  withCredentials: true,  // envía httpOnly cookie automáticamente en cada request
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   }
 });
 
-// Restore JWT from previous session
-const storedToken = localStorage.getItem('jwt_token');
-if (storedToken) {
-  api.defaults.headers.common['Authorization'] = storedToken;
-}
-
-// REQUEST INTERCEPTOR: Attach JWT token
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('jwt_token');
-  if (token) {
-    config.headers['Authorization'] = token;
-  }
-  return config;
-});
-
-// RESPONSE INTERCEPTOR: Capture JWT + manejar errores de autenticación
+// RESPONSE INTERCEPTOR: manejar errores de autenticación y servidor
 api.interceptors.response.use(
-  (response) => {
-    const token = response.headers['authorization'];
-    if (token) {
-      localStorage.setItem('jwt_token', token);
-      api.defaults.headers.common['Authorization'] = token;
-    }
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const status = error?.response?.status;
     const url = error?.config?.url || "";
 
     if (status === 401 && !url.includes('/users/sign_in')) {
-      localStorage.removeItem('jwt_token');
-      delete api.defaults.headers.common['Authorization'];
       try {
         const { useAuthStore } = await import("../stores/auth");
         const auth = useAuthStore();
         auth.user = null;
         auth.bootstrapped = true;
       } catch {}
-      // Redirigir al login si la sesión expiró mientras el usuario estaba usando la app
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
       }

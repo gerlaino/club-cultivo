@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { signIn, signOut, me } from "../lib/api";
-import api from "../lib/api";
 import { useClubStore } from "../stores/club.js";
 import { usePlan } from '../composables/usePlan.js'
 
@@ -93,13 +92,11 @@ export const useAuthStore = defineStore("auth", {
       this.loading = true;
       this.error = null;
       try {
-        await signOut();
+        await signOut(); // el backend hace delete_cookie en el response
       } catch (_) {
       } finally {
         this.user = null;
         this.bootstrapped = true;
-        localStorage.removeItem('jwt_token');
-        delete api.defaults.headers.common['Authorization'];
         const { planData } = usePlan();
         planData.value = null;
         // Hard reload limpia todos los stores de Pinia, evitando filtraciones entre clubs

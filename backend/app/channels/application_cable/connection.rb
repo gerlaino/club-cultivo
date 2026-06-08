@@ -10,9 +10,10 @@ module ApplicationCable
     private
 
     def find_verified_user
-      # request es accesible aquí (en Connection), no en los channels
+      # Prioridad: query param (mobile) → header → httpOnly cookie (web SPA)
       token = request.params[:token] ||
-              request.headers['Authorization']&.split(' ')&.last
+              request.headers['Authorization']&.split(' ')&.last ||
+              request.cookies['jwt_token']
       return nil unless token
 
       secret = ENV['DEVISE_JWT_SECRET_KEY'] ||
