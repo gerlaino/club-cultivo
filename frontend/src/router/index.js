@@ -811,7 +811,7 @@ router.beforeEach(async (to) => {
     // para que quede dentro del MobileShell con bottom nav
     const detalleMatch = to.path.match(/^\/(salas|lotes|plantas)\/(\d+)/)
     if (detalleMatch) {
-      const map = { salas: 'sala', lotes: 'lote', plantas: 'planta' }
+      const map = { salas: 'sala-m', lotes: 'lote-m', plantas: 'planta' }
       return `/m/${map[detalleMatch[1]]}/${detalleMatch[2]}`
     }
     // Ruta de manicura → equivalente mobile
