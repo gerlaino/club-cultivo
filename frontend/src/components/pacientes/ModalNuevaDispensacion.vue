@@ -13,9 +13,10 @@ const props = defineProps({
   dispensadoMesG: { type: Number,  default: null },
   saldoCc:        { type: Number,  default: null },
   limiteCc:       { type: Number,  default: null },
-  saldoCcG:       { type: Number,  default: null },
-  limiteCcG:      { type: Number,  default: null },
-  ccGramosActivo: { type: Boolean, default: false },
+  saldoCcG:            { type: Number,  default: null },
+  limiteCcG:           { type: Number,  default: null },
+  ccGramosActivo:      { type: Boolean, default: false },
+  descuentoPorcentaje: { type: Number,  default: 0 },
 })
 
 const emit = defineEmits(['update:modelValue', 'saved'])
@@ -76,7 +77,8 @@ const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
 const ccMargen = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
 
 const ccInsuficiente = computed(() => {
-  if (!tieneCc.value || form.value.aporte_socio_ars == null) return false
+  if (!tieneCc.value || form.value.medio_pago !== 'cuenta_corriente') return false
+  if (form.value.aporte_socio_ars == null) return false
   return Number(form.value.aporte_socio_ars) > ccMargen.value
 })
 
@@ -124,7 +126,7 @@ async function cargarDeliveryUsers() {
 
 function emptyForm() {
   return {
-    stock_id: null, cantidad: null, descuento_pct: 0, aporte_socio_ars: null,
+    stock_id: null, cantidad: null, descuento_pct: props.descuentoPorcentaje ?? 0, aporte_socio_ars: null,
     fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo',
     con_envio: false, delivery_id: null, direccion_envio: '',
     contacto_nombre: '', contacto_telefono: '', notas_envio: '',
@@ -395,18 +397,18 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <!-- CC ARS -->
+          <!-- CC ARS — siempre visible como info; advertencias solo cuando medio_pago=cuenta_corriente -->
           <div v-if="tieneCc" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
             <div class="mnd__cc-row">
               <span class="mnd__cc-label"><i class="bi bi-wallet2"></i> Crédito disponible</span>
               <span class="mnd__cc-saldo" :class="{ 'mnd__cc-saldo--bajo': ccMargen <= 0 }">{{ fmt(ccMargen) }}</span>
             </div>
-            <div v-if="form.aporte_socio_ars > 0 && !ccInsuficiente" class="mnd__cc-tras">
+            <div v-if="form.medio_pago === 'cuenta_corriente' && form.aporte_socio_ars > 0 && !ccInsuficiente" class="mnd__cc-tras">
               Luego de esta dispensación: <strong>{{ fmt(ccMargen - Number(form.aporte_socio_ars)) }}</strong>
             </div>
             <div v-if="ccInsuficiente" class="mnd__cc-warn">
               <i class="bi bi-exclamation-triangle-fill"></i>
-              El aporte supera el crédito disponible ({{ fmt(ccMargen) }})
+              Crédito insuficiente para cargar en cuenta (disponible: {{ fmt(ccMargen) }})
             </div>
           </div>
 

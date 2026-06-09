@@ -286,6 +286,7 @@ const FORMAS = [
       :saldo-cc-g="pacienteSeleccionado.saldo_cc_g ?? null"
       :limite-cc-g="pacienteSeleccionado.limite_cc_g ?? null"
       :cc-gramos-activo="pacienteSeleccionado.cc_gramos_activo ?? false"
+      :descuento-porcentaje="Number(pacienteSeleccionado.descuento_porcentaje ?? 0)"
       @saved="onDispensacionGuardada"
     />
 
