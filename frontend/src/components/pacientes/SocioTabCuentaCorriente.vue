@@ -15,14 +15,8 @@
               Crédito en pesos
             </div>
             <div class="scc__config-value">
-              <template v-if="(cc.limite_credito ?? 0) > 0">
-                <template v-if="!limiteEditOpen">
-                  <span class="scc__config-val-text">{{ fmtARS(cc.limite_credito) }}</span>
-                  <button v-if="!readonly" class="scc__config-edit-btn" @click="openLimiteEdit" title="Editar">
-                    <Pencil :size="12" :stroke-width="2" />
-                  </button>
-                </template>
-                <div v-else class="scc__inline-form">
+              <template v-if="limiteEditOpen">
+                <div class="scc__inline-form">
                   <input type="number" min="0" step="100" v-model.number="limiteEditVal"
                     class="scc__inline-input" placeholder="0"
                     @keydown.enter="saveLimite" @keydown.esc="limiteEditOpen = false" autofocus />
@@ -31,6 +25,12 @@
                   </button>
                   <button class="scc__inline-cancel" @click="limiteEditOpen = false">✕</button>
                 </div>
+              </template>
+              <template v-else-if="(cc.limite_credito ?? 0) > 0">
+                <span class="scc__config-val-text">{{ fmtARS(cc.limite_credito) }}</span>
+                <button v-if="!readonly" class="scc__config-edit-btn" @click="openLimiteEdit" title="Editar">
+                  <Pencil :size="12" :stroke-width="2" />
+                </button>
               </template>
               <span v-else class="scc__config-val-off">Sin crédito configurado</span>
             </div>
@@ -128,14 +128,8 @@
               Descuento en dispensaciones
             </div>
             <div class="scc__config-value">
-              <template v-if="descuentoPorcentaje > 0">
-                <template v-if="!descuentoEditOpen">
-                  <span class="scc__config-val-text scc__config-val-text--discount">{{ descuentoPorcentaje }}%</span>
-                  <button v-if="!readonly" class="scc__config-edit-btn" @click="openDescuentoEdit" title="Editar descuento">
-                    <Pencil :size="12" :stroke-width="2" />
-                  </button>
-                </template>
-                <div v-else class="scc__inline-form">
+              <template v-if="descuentoEditOpen">
+                <div class="scc__inline-form">
                   <input type="number" min="0" max="100" step="1" v-model.number="descuentoEditVal"
                     class="scc__inline-input scc__inline-input--sm" placeholder="0"
                     @keydown.enter="saveDescuento" @keydown.esc="descuentoEditOpen = false" autofocus />
@@ -145,6 +139,12 @@
                   </button>
                   <button class="scc__inline-cancel" @click="descuentoEditOpen = false">✕</button>
                 </div>
+              </template>
+              <template v-else-if="descuentoPorcentaje > 0">
+                <span class="scc__config-val-text scc__config-val-text--discount">{{ descuentoPorcentaje }}%</span>
+                <button v-if="!readonly" class="scc__config-edit-btn" @click="openDescuentoEdit" title="Editar descuento">
+                  <Pencil :size="12" :stroke-width="2" />
+                </button>
               </template>
               <span v-else class="scc__config-val-off">Sin descuento</span>
             </div>
