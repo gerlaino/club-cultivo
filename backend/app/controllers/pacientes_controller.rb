@@ -371,7 +371,10 @@ class PacientesController < ApplicationController
   end
 
   def paciente_params
-    allowed = %i[nombre apellido dni fecha_nacimiento es_paciente email telefono reprocann_numero reprocann_vencimiento reprocann_estado limite_dispensacion_mensual_g descuento_porcentaje]
+    allowed = %i[nombre apellido dni fecha_nacimiento es_paciente email telefono reprocann_numero reprocann_vencimiento reprocann_estado]
+    if current_user&.admin? || current_user&.super_admin?
+      allowed += %i[limite_dispensacion_mensual_g descuento_porcentaje]
+    end
     allowed << :notas_clinicas          if can_edit_notas_clinicas?
     allowed << :con_seguimiento_medico  if current_user&.admin? || current_user&.medico?
     if can_edit_notas_clinicas?

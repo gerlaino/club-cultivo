@@ -53,7 +53,7 @@
                   >{{ opt.label }}</button>
                 </div>
               </div>
-              <div class="sem__field sem__field--full">
+              <div v-if="isAdmin" class="sem__field sem__field--full">
                 <label class="sem__label" style="margin-bottom:.4rem">
                   Límite de dispensación mensual
                   <span class="sem__opt">opcional — en gramos</span>
@@ -76,7 +76,7 @@
                 </div>
                 <span class="sem__hint">Dejá vacío para no aplicar ningún límite.</span>
               </div>
-              <div class="sem__field sem__field--full">
+              <div v-if="isAdmin" class="sem__field sem__field--full">
                 <label class="sem__label" style="margin-bottom:.4rem">
                   Descuento por defecto
                   <span class="sem__opt">en dispensaciones — opcional</span>
@@ -115,9 +115,10 @@
 </template>
 
 <script setup>
-import { watch } from 'vue'
+import { watch, computed } from 'vue'
 import { X, Save } from 'lucide-vue-next'
 import { useSocioEditar, REPROCANN_ESTADOS } from '../../composables/useSocioEditar.js'
+import { useAuthStore } from '../../stores/auth.js'
 
 const props = defineProps({
   open:    { type: Boolean, default: false },
@@ -126,6 +127,9 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'saved'])
 
 const { editForm, editSaving, editError, openEdit, saveEdit } = useSocioEditar(props.socioId)
+
+const auth    = useAuthStore()
+const isAdmin = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
 
 watch(() => props.open, (v) => { if (v) openEdit() })
 

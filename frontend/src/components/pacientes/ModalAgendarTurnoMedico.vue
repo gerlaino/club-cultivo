@@ -99,7 +99,7 @@ function esPasado(d) { return d < new Date(new Date().setHours(0, 0, 0, 0)) }
 
 // ── Disponibilidad helpers ────────────────────────────────────────────────────
 function bloquesFuera(dia) {
-  if (!disponibilidad.value.length) return [{ top: 0, height: ALTURA }]
+  if (!disponibilidad.value.length) return []
   const dow   = (dia.getDay() + 6) % 7
   const slots = disponibilidad.value.filter(s => s.dia_semana === dow).sort((a, b) => a.hora_inicio - b.hora_inicio)
   if (!slots.length) return [{ top: 0, height: ALTURA }]
@@ -115,9 +115,11 @@ function bloquesFuera(dia) {
 }
 
 function esDentroDisp(dia, minutos) {
-  if (!disponibilidad.value.length) return false   // sin disponibilidad = todo off
-  const dow = (dia.getDay() + 6) % 7
-  return disponibilidad.value.filter(s => s.dia_semana === dow).some(s => minutos >= s.hora_inicio && minutos < s.hora_fin)
+  if (!disponibilidad.value.length) return true    // sin configurar = todo libre
+  const dow   = (dia.getDay() + 6) % 7
+  const slots = disponibilidad.value.filter(s => s.dia_semana === dow)
+  if (!slots.length) return false                  // día no configurado = bloqueado
+  return slots.some(s => minutos >= s.hora_inicio && minutos < s.hora_fin)
 }
 
 // ── Turnos positioning ────────────────────────────────────────────────────────
