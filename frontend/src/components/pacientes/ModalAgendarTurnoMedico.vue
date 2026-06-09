@@ -4,6 +4,7 @@ import {
   getAdminMedicos, getAdminMedicoDisponibilidad,
   getAdminMedicoTurnos, createAdminTurno,
   updateAdminTurno, deleteAdminTurno,
+  getMedicoTurnos, getMedicoDisponibilidad, createMedicoTurno, updateMedicoTurno,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
@@ -15,6 +16,7 @@ import {
 const props = defineProps({
   pacienteId:     { type: Number, required: true },
   pacienteNombre: { type: String, default: '' },
+  medicoMode:     { type: Boolean, default: false },
 })
 const emit = defineEmits(['close', 'created'])
 const toast = useToast()
@@ -181,30 +183,39 @@ function onClickTurno(t, event) {
 
 // ── Cargar datos del médico seleccionado ──────────────────────────────────────
 async function cargarMedico(id) {
-  if (!id) { disponibilidad.value = []; turnosExist.value = []; return }
+  if (!id && !props.medicoMode) { disponibilidad.value = []; turnosExist.value = []; return }
   loadingCal.value = true
   resetPanel()
   try {
-    const [dRes, tRes] = await Promise.all([getAdminMedicoDisponibilidad(id), getAdminMedicoTurnos(id)])
-    disponibilidad.value = dRes.data || []
-    turnosExist.value    = tRes.data || []
+    if (props.medicoMode) {
+      const [dRes, tRes] = await Promise.all([getMedicoDisponibilidad(), getMedicoTurnos()])
+      disponibilidad.value = dRes.data || []
+      turnosExist.value    = (tRes.data || []).filter(t => t.paciente_id === props.pacienteId || true)
+    } else {
+      const [dRes, tRes] = await Promise.all([getAdminMedicoDisponibilidad(id), getAdminMedicoTurnos(id)])
+      disponibilidad.value = dRes.data || []
+      turnosExist.value    = tRes.data || []
+    }
   } finally { loadingCal.value = false }
 }
 
-watch(medicoId, cargarMedico)
+watch(medicoId, (id) => { if (!props.medicoMode) cargarMedico(id) })
 
 // ── Crear turno ───────────────────────────────────────────────────────────────
 async function crear() {
   if (!slotSel.value) return
   saving.value = true
   try {
-    const { data } = await createAdminTurno(medicoId.value, {
+    const payload = {
       paciente_id:      props.pacienteId,
-      fecha_hora:       `${slotSel.value.fecha}T${slotSel.value.hora}:00`,
+      fecha_hora:       new Date(`${slotSel.value.fecha}T${slotSel.value.hora}:00`).toISOString(),
       duracion_minutos: Number(form.value.duracion_minutos),
       tipo:             form.value.tipo,
       motivo:           form.value.motivo || undefined,
-    })
+    }
+    const { data } = props.medicoMode
+      ? await createMedicoTurno(payload)
+      : await createAdminTurno(medicoId.value, payload)
     turnosExist.value.push(data)
     toast.success('Turno agendado')
     emit('created', data)
@@ -224,7 +235,9 @@ async function actualizar() {
       motivo:           form.value.motivo || undefined,
       estado:           form.value.estado,
     }
-    const { data } = await updateAdminTurno(editTurnoId.value, payload)
+    const { data } = props.medicoMode
+      ? await updateMedicoTurno(editTurnoId.value, payload)
+      : await updateAdminTurno(editTurnoId.value, payload)
     const idx = turnosExist.value.findIndex(t => t.id === editTurnoId.value)
     if (idx !== -1) turnosExist.value[idx] = data
     toast.success('Turno actualizado')
@@ -239,7 +252,10 @@ async function cancelar() {
   if (!confirm('¿Cancelar este turno?')) return
   saving.value = true
   try {
-    await deleteAdminTurno(editTurnoId.value)
+    const payload = { estado: 'cancelado' }
+    props.medicoMode
+      ? await updateMedicoTurno(editTurnoId.value, payload)
+      : await deleteAdminTurno(editTurnoId.value)
     const idx = turnosExist.value.findIndex(t => t.id === editTurnoId.value)
     if (idx !== -1) turnosExist.value[idx] = { ...turnosExist.value[idx], estado: 'cancelado' }
     toast.success('Turno cancelado')
@@ -249,11 +265,17 @@ async function cancelar() {
 }
 
 onMounted(async () => {
-  try {
-    const { data } = await getAdminMedicos()
-    medicos.value = data || []
-    if (medicos.value.length === 1) medicoId.value = medicos.value[0].id
-  } finally { loadingMedicos.value = false }
+  if (props.medicoMode) {
+    medicoId.value = -1
+    loadingMedicos.value = false
+    await cargarMedico()
+  } else {
+    try {
+      const { data } = await getAdminMedicos()
+      medicos.value = data || []
+      if (medicos.value.length === 1) medicoId.value = medicos.value[0].id
+    } finally { loadingMedicos.value = false }
+  }
 })
 </script>
 
@@ -276,7 +298,7 @@ onMounted(async () => {
 
         <!-- Toolbar -->
         <div class="atm__toolbar">
-          <div class="atm__medico-sel">
+          <div v-if="!medicoMode" class="atm__medico-sel">
             <User2 :size="14" class="atm__toolbar-icon" />
             <select v-model.number="medicoId" class="atm__select">
               <option :value="null" disabled>— Seleccioná un médico —</option>
@@ -407,7 +429,7 @@ onMounted(async () => {
                   <span class="atm__pi-lbl">Paciente</span>
                   <span class="atm__pi-val">{{ pacienteNombre }}</span>
                 </div>
-                <div class="atm__pi-row">
+                <div v-if="!medicoMode" class="atm__pi-row">
                   <span class="atm__pi-lbl">Médico</span>
                   <span class="atm__pi-val">{{ medicos.find(m => m.id === medicoId)?.nombre_completo }}</span>
                 </div>

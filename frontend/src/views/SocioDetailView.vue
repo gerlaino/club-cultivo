@@ -45,7 +45,9 @@ const reprocannEstadoMeta = computed(() =>
 
 const editarOpen     = ref(false)
 const agendarTurnoOpen = ref(false)
-const isAdmin = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
+const isAdmin    = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
+const isMedico   = computed(() => auth.user?.role === 'medico')
+const canAgendar = computed(() => isAdmin.value || isMedico.value)
 const toast   = useToast()
 
 const ccRefreshKey = ref(0)
@@ -421,7 +423,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             <div class="sd__turnos-title">Turnos médicos</div>
             <div class="sd__turnos-sub">Historial de consultas y turnos agendados para este paciente.</div>
           </div>
-          <button v-if="isAdmin" class="sd__btn-agendar" @click="agendarTurnoOpen = true">
+          <button v-if="canAgendar" class="sd__btn-agendar" @click="agendarTurnoOpen = true">
             <CalendarPlus :size="14" :stroke-width="1.75" /> Agendar turno
           </button>
         </div>
@@ -432,7 +434,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         <div v-else-if="turnosList.length === 0" class="sd__turnos-empty">
           <CalendarDays :size="32" stroke-width="1.2" />
           <p>Sin turnos registrados para este paciente.</p>
-          <button v-if="isAdmin" class="sd__btn-agendar" @click="agendarTurnoOpen = true">
+          <button v-if="canAgendar" class="sd__btn-agendar" @click="agendarTurnoOpen = true">
             <CalendarPlus :size="14" /> Agendar primer turno
           </button>
         </div>
@@ -455,7 +457,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               <span class="turno-chip" :class="ESTADO_CLS[t.estado]">{{ ESTADO_LABEL[t.estado] || t.estado }}</span>
             </div>
             <div class="sd__turno-dur">{{ t.duracion_minutos }}min</div>
-            <div v-if="isAdmin && t.estado !== 'cancelado'" class="sd__turno-actions">
+            <div v-if="canAgendar && t.estado !== 'cancelado'" class="sd__turno-actions">
               <button class="sd__turno-btn sd__turno-btn--edit"
                 title="Reprogramar turno"
                 @click="abrirEdicion(t)">
@@ -575,6 +577,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
     v-if="agendarTurnoOpen && s"
     :paciente-id="socioId"
     :paciente-nombre="`${s.nombre} ${s.apellido}`"
+    :medico-mode="isMedico"
     @close="agendarTurnoOpen = false"
     @created="agendarTurnoOpen = false; loadTurnos()"
   />
