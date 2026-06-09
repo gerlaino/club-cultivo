@@ -115,6 +115,13 @@
 
         <div class="mpv__actions" @click.prevent>
           <button
+            class="mpv__action-btn mpv__action-btn--ficha"
+            @click.prevent="router.push(`/medico/pacientes/${p.id}/ficha`)"
+            title="Ficha clínica"
+          >
+            <FileText :size="14" />
+          </button>
+          <button
             class="mpv__action-btn mpv__action-btn--danger"
             @click.prevent="openDelete(p)"
             title="Eliminar paciente"
@@ -198,13 +205,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Search, UserPlus, Users, Trash2, X } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Search, UserPlus, Users, Trash2, X, FileText } from 'lucide-vue-next'
 import { usePacientesStore } from '../../stores/pacientes.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 
-const store = usePacientesStore()
+const store  = usePacientesStore()
+const router = useRouter()
 const { confirm } = useConfirm()
 const { success: toastOk, error: toastErr } = useToast()
 
@@ -473,6 +482,7 @@ onMounted(() => store.fetch())
   background: transparent; color: var(--c-ink-400);
 }
 .mpv__action-btn:hover            { background: var(--c-ink-50); color: var(--c-ink-700); }
+.mpv__action-btn--ficha:hover     { background: rgba(27,94,32,.1);  color: #1b5e20; }
 .mpv__action-btn--danger:hover    { background: rgba(220,38,38,.1); color: #dc2626; }
 
 /* Modal */

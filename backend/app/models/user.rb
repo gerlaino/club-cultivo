@@ -8,6 +8,8 @@ class User < ApplicationRecord
   has_many :user_sedes,        class_name: 'UserSede', foreign_key: 'user_id', dependent: :destroy
   has_many :sedes_asignadas,   through: :user_sedes, source: :sede
   has_many :push_subscriptions, dependent: :destroy
+  has_many :disponibilidad_medicos, foreign_key: :medico_id, dependent: :destroy
+  has_many :turnos_como_medico, class_name: 'Turno', foreign_key: :medico_id, dependent: :destroy
 
   devise :database_authenticatable, :recoverable, :rememberable, :validatable,
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist

@@ -106,6 +106,22 @@ class PacientesController < ApplicationController
       }
     end
 
+    @paciente.turnos.includes(:medico).order(fecha_hora: :desc).each do |t|
+      tipo_label = { 'primera_vez' => 'Primera vez', 'seguimiento' => 'Seguimiento', 'revision' => 'Revisión', 'urgencia' => 'Urgencia' }
+      estado_label = { 'programado' => 'Programado', 'confirmado' => 'Confirmado', 'realizado' => 'Realizado', 'cancelado' => 'Cancelado', 'ausente' => 'Ausente' }
+      desc = "Turno #{tipo_label[t.tipo] || t.tipo}"
+      desc += " con #{t.medico&.nombre_completo}" if t.medico
+      desc += " — #{estado_label[t.estado] || t.estado}"
+      desc += " — #{t.motivo.truncate(60)}" if t.motivo.present?
+      eventos << {
+        tipo:        'turno',
+        fecha:       t.fecha_hora,
+        descripcion: desc,
+        estado:      t.estado,
+        id:          t.id
+      }
+    end
+
     eventos << {
       tipo: 'alta',
       fecha: @paciente.created_at,

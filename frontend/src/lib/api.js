@@ -139,6 +139,7 @@ export const createPaciente     = (payload) => api.post("/pacientes", { paciente
 export const updatePaciente     = (id, payload) => api.put(`/pacientes/${id}`, { paciente: payload });
 export const deletePaciente     = (id) => api.delete(`/pacientes/${id}`);
 export const getPacienteTimeline  = (id) => api.get(`/pacientes/${id}/timeline`)
+export const getPacienteTurnos    = (id) => api.get(`/pacientes/${id}/turnos`)
 export const subirReprocannDoc   = (id, file) => {
   const fd = new FormData()
   fd.append('archivo', file)
@@ -490,5 +491,24 @@ export const getHistorialAnalisis  = (lote_id) => api.get('/asistente/historial_
 
 // ── Carnet público ────────────────────────────────────────────────────────────
 export const getCarnetPublico = (token) => axios.get(`/c/${token}`)
+
+// ── Médico — Ficha clínica ────────────────────────────────────────────────────
+export const getMedicoPacientes  = ()         => api.get('/medico/pacientes')
+export const getMedicoFicha      = (id)        => api.get(`/medico/pacientes/${id}/ficha`)
+export const getMedicoTurnos     = ()          => api.get('/medico/turnos')
+export const createMedicoTurno   = (payload)   => api.post('/medico/turnos',      { turno: payload })
+export const updateMedicoTurno   = (id, payload) => api.patch(`/medico/turnos/${id}`, { turno: payload })
+export const deleteMedicoTurno   = (id)        => api.delete(`/medico/turnos/${id}`)
+export const createCheckIn            = (payload)   => api.post('/medico/check_ins', { check_in: payload })
+export const getMedicoDisponibilidad  = ()           => api.get('/medico/disponibilidad')
+export const saveMedicoDisponibilidad = (slots)      => api.put('/medico/disponibilidad', { disponibilidad: slots })
+
+// ── Admin — Médicos ───────────────────────────────────────────────────────────
+export const getAdminMedicos              = ()        => api.get('/admin/medicos')
+export const getAdminMedicoDisponibilidad = (id)      => api.get(`/admin/medicos/${id}/disponibilidad`)
+export const getAdminMedicoTurnos         = (id)      => api.get(`/admin/medicos/${id}/turnos`)
+export const createAdminTurno             = (id, payload) => api.post(`/admin/medicos/${id}/crear_turno`, { turno: payload })
+export const updateAdminTurno             = (id, payload) => api.patch(`/admin/turnos/${id}`, { turno: payload })
+export const deleteAdminTurno             = (id)      => api.delete(`/admin/turnos/${id}`)
 
 export default api;

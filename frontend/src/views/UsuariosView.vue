@@ -1,12 +1,14 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue"
 import { useUsuariosStore } from "../stores/usuarios"
+import { useAuthStore } from "../stores/auth"
 import { listSalas, listSedes, asignarSedeAUsuario } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const store           = useUsuariosStore()
+const auth            = useAuthStore()
 const toast           = useToast()
 const { confirm }     = useConfirm()
 
@@ -18,9 +20,10 @@ const PER_PAGE    = 20
 watch(q, () => { currentPage.value = 1 })
 
 const filteredUsers = computed(() => {
-  if (!q.value.trim()) return store.items
+  const base = store.items.filter(u => u.id !== auth.user?.id)
+  if (!q.value.trim()) return base
   const s = q.value.toLowerCase()
-  return store.items.filter(u =>
+  return base.filter(u =>
     u.first_name?.toLowerCase().includes(s) ||
     u.last_name?.toLowerCase().includes(s)  ||
     u.email?.toLowerCase().includes(s)

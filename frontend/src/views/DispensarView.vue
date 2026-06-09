@@ -172,22 +172,6 @@
                 </div>
               </div>
 
-              <!-- Límite mensual -->
-              <div v-if="tieneLimiteMensual" class="dv__limite-mensual" :class="{ 'dv__limite-mensual--alerta': limiteExcedido }">
-                <div class="dv__limite-row">
-                  <span class="dv__limite-label">Límite mensual</span>
-                  <span class="dv__limite-nums">
-                    {{ formatG(consumoConCarrito) }} / {{ formatG(pacienteDetalle.limite_dispensacion_mensual_g) }}
-                  </span>
-                </div>
-                <div class="dv__limite-bar-track">
-                  <div class="dv__limite-bar-fill" :style="{ width: Math.min(porcentajeConCarrito, 100) + '%' }" />
-                </div>
-                <div v-if="limiteExcedido" class="dv__limite-error">
-                  Supera el límite — reducí la cantidad antes de continuar
-                </div>
-              </div>
-
               <!-- Medio de pago -->
               <div class="dv__modal-field">
                 <label class="dv__label">Medio de pago</label>
@@ -272,7 +256,7 @@
               <button class="dv__modal-cancel" @click="confirmOpen = false" :disabled="submitting">
                 Cancelar
               </button>
-              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || limiteExcedido || pagoExcedido || !pacienteActivo">
+              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || pagoExcedido || !pacienteActivo">
                 <DsSpinner v-if="submitting" :size="16" />
                 <template v-else>Confirmar</template>
               </button>
@@ -420,18 +404,7 @@ const gramosExcedido = computed(() =>
 )
 const pagoExcedido   = computed(() => ccExcedido.value || gramosExcedido.value)
 
-// Límite mensual
-const tieneLimiteMensual  = computed(() => (pacienteDetalle.value?.limite_dispensacion_mensual_g ?? 0) > 0)
-const cartTotalG          = computed(() => cart.value.filter(i => i.stock.unidad === 'g').reduce((s, i) => s + i.cantidad, 0))
-const consumoConCarrito   = computed(() => (pacienteDetalle.value?.dispensado_mes_actual_g ?? 0) + cartTotalG.value)
-const porcentajeConCarrito = computed(() => {
-  const limite = pacienteDetalle.value?.limite_dispensacion_mensual_g
-  if (!limite) return 0
-  return Math.round((consumoConCarrito.value / limite) * 100)
-})
-const limiteExcedido = computed(() =>
-  tieneLimiteMensual.value && consumoConCarrito.value > (pacienteDetalle.value?.limite_dispensacion_mensual_g ?? Infinity)
-)
+const cartTotalG = computed(() => cart.value.filter(i => i.stock.unidad === 'g').reduce((s, i) => s + i.cantidad, 0))
 
 // Estado del paciente
 const pacienteActivo  = computed(() => pacienteDetalle.value?.es_paciente !== false)

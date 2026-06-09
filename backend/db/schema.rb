@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_09_000004) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_09_100001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -155,6 +155,22 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_09_000004) do
     t.index ["dispensacion_id"], name: "index_ariccame_registros_on_dispensacion_id"
     t.index ["estado"], name: "index_ariccame_registros_on_estado"
     t.index ["stock_id"], name: "index_ariccame_registros_on_stock_id"
+  end
+
+  create_table "check_ins", force: :cascade do |t|
+    t.bigint "paciente_id", null: false
+    t.bigint "dispensacion_id"
+    t.bigint "club_id", null: false
+    t.integer "escala_bienestar"
+    t.jsonb "sintomas", default: {}, null: false
+    t.text "notas"
+    t.string "via_registro", default: "dispensacion", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_check_ins_on_club_id"
+    t.index ["dispensacion_id"], name: "index_check_ins_on_dispensacion_id", unique: true
+    t.index ["paciente_id", "created_at"], name: "index_check_ins_on_paciente_id_and_created_at"
+    t.index ["paciente_id"], name: "index_check_ins_on_paciente_id"
   end
 
   create_table "clubs", force: :cascade do |t|
@@ -313,6 +329,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_09_000004) do
     t.index ["sede_id"], name: "index_dispensaciones_on_sede_id"
     t.index ["stock_id"], name: "index_dispensaciones_on_stock_id"
     t.index ["user_id"], name: "index_dispensaciones_on_user_id"
+  end
+
+  create_table "disponibilidad_medicos", force: :cascade do |t|
+    t.bigint "medico_id", null: false
+    t.bigint "club_id", null: false
+    t.integer "dia_semana", null: false
+    t.integer "hora_inicio", null: false
+    t.integer "hora_fin", null: false
+    t.boolean "activa", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "medico_id"], name: "index_disponibilidad_medicos_on_club_id_and_medico_id"
+    t.index ["club_id"], name: "index_disponibilidad_medicos_on_club_id"
+    t.index ["medico_id", "dia_semana"], name: "index_disponibilidad_medicos_on_medico_id_and_dia_semana"
+    t.index ["medico_id"], name: "index_disponibilidad_medicos_on_medico_id"
   end
 
   create_table "dispositivos", force: :cascade do |t|
@@ -1158,6 +1189,26 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_09_000004) do
     t.index ["sala_id"], name: "index_tareas_on_sala_id"
   end
 
+  create_table "turnos", force: :cascade do |t|
+    t.bigint "paciente_id", null: false
+    t.bigint "medico_id", null: false
+    t.bigint "club_id", null: false
+    t.datetime "fecha_hora", null: false
+    t.integer "duracion_minutos", default: 30, null: false
+    t.string "tipo", default: "seguimiento", null: false
+    t.string "estado", default: "programado", null: false
+    t.text "motivo"
+    t.text "notas_post"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "fecha_hora"], name: "index_turnos_on_club_id_and_fecha_hora"
+    t.index ["club_id"], name: "index_turnos_on_club_id"
+    t.index ["medico_id", "fecha_hora"], name: "index_turnos_on_medico_id_and_fecha_hora"
+    t.index ["medico_id"], name: "index_turnos_on_medico_id"
+    t.index ["paciente_id", "fecha_hora"], name: "index_turnos_on_paciente_id_and_fecha_hora"
+    t.index ["paciente_id"], name: "index_turnos_on_paciente_id"
+  end
+
   create_table "user_sedes", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "sede_id", null: false
@@ -1246,6 +1297,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_09_000004) do
   add_foreign_key "ariccame_registros", "clubs"
   add_foreign_key "ariccame_registros", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "ariccame_registros", "stocks"
+  add_foreign_key "check_ins", "clubs"
+  add_foreign_key "check_ins", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "check_ins", "pacientes"
   add_foreign_key "conversaciones_asistente", "clubs"
   add_foreign_key "conversaciones_asistente", "users"
   add_foreign_key "costo_lotes", "clubs"
@@ -1262,6 +1316,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_09_000004) do
   add_foreign_key "dispensaciones", "stocks", on_delete: :nullify
   add_foreign_key "dispensaciones", "users"
   add_foreign_key "dispensaciones", "users", column: "delivery_id"
+  add_foreign_key "disponibilidad_medicos", "clubs"
+  add_foreign_key "disponibilidad_medicos", "users", column: "medico_id"
   add_foreign_key "dispositivos", "clubs"
   add_foreign_key "dispositivos", "salas"
   add_foreign_key "document_templates", "clubs"
@@ -1370,6 +1426,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_09_000004) do
   add_foreign_key "tareas", "salas"
   add_foreign_key "tareas", "users", column: "asignada_a_id"
   add_foreign_key "tareas", "users", column: "creada_por_id"
+  add_foreign_key "turnos", "clubs"
+  add_foreign_key "turnos", "pacientes"
+  add_foreign_key "turnos", "users", column: "medico_id"
   add_foreign_key "user_sedes", "sedes"
   add_foreign_key "user_sedes", "users"
   add_foreign_key "users", "clubs"

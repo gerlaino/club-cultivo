@@ -9,8 +9,6 @@ const props = defineProps({
   modelValue:     { type: Boolean, required: true },
   socioId:        { type: Number,  required: true },
   pacienteNombre: { type: String,  default: '' },
-  limiteMensualG: { type: Number,  default: null },
-  dispensadoMesG: { type: Number,  default: null },
   saldoCc:        { type: Number,  default: null },
   limiteCc:       { type: Number,  default: null },
   saldoCcG:            { type: Number,  default: null },
@@ -43,34 +41,6 @@ const FORMA_EMOJI = {
 }
 
 const stocksDisponibles = computed(() => stocks.value.filter(s => s.cantidad > 0))
-
-// ── Límite mensual ─────────────────────────────────────────────────────────────
-const consumidoEsteMes = computed(() => props.dispensadoMesG ?? 0)
-const tieneLimite      = computed(() => props.limiteMensualG != null && props.limiteMensualG > 0)
-
-const pctConsumo = computed(() => {
-  if (!tieneLimite.value) return 0
-  return Math.min(100, (consumidoEsteMes.value / props.limiteMensualG) * 100)
-})
-
-const disponibleMes = computed(() => {
-  if (!tieneLimite.value) return null
-  return Math.max(0, props.limiteMensualG - consumidoEsteMes.value)
-})
-
-const excederiaLimite = computed(() => {
-  if (!tieneLimite.value || !form.value.cantidad) return false
-  return (consumidoEsteMes.value + parseFloat(form.value.cantidad)) > props.limiteMensualG
-})
-
-const estadoLimite = computed(() => {
-  if (!tieneLimite.value) return null
-  const pct = pctConsumo.value
-  if (pct >= 100) return 'agotado'
-  if (pct >= 80)  return 'critico'
-  if (pct >= 50)  return 'advertencia'
-  return 'ok'
-})
 
 // ── Cuenta corriente ARS ───────────────────────────────────────────────────────
 const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
@@ -193,18 +163,6 @@ async function handleSubmit() {
     saving.value = false; return
   }
 
-  if (excederiaLimite.value) {
-    saving.value = false
-    const ok = await confirm({
-      title:       'Límite mensual superado',
-      message:     `Este socio consumió ${consumidoEsteMes.value.toFixed(1)}g este mes (límite: ${props.limiteMensualG.toFixed(1)}g). Esta dispensación de ${parseFloat(form.value.cantidad).toFixed(1)}g excede el cupo. ¿Confirmás de todas formas?`,
-      confirmText: 'Dispensar igualmente',
-      variant:     'danger',
-    })
-    if (!ok) return
-    saving.value = true
-  }
-
   if (form.value.con_envio) {
     if (!form.value.delivery_id) { formError.value = 'Seleccioná un delivery para asignar el envío'; saving.value = false; return }
     if (!form.value.direccion_envio?.trim()) { formError.value = 'La dirección de envío es requerida'; saving.value = false; return }
@@ -261,31 +219,6 @@ async function handleSubmit() {
 
         <div class="mnd__modal-body">
           <div v-if="formError" class="mnd__error"><i class="bi bi-exclamation-triangle-fill"></i> {{ formError }}</div>
-
-          <!-- Cupo mensual -->
-          <div v-if="tieneLimite" class="mnd__limite-box" :class="`mnd__limite-box--${estadoLimite}`">
-            <div class="mnd__limite-header">
-              <span class="mnd__limite-label"><i class="bi bi-calendar-month"></i> Cupo mensual</span>
-              <span class="mnd__limite-nums">
-                <strong>{{ consumidoEsteMes.toFixed(1) }}g</strong>
-                <span class="mnd__limite-sep">de</span>
-                {{ props.limiteMensualG }}g
-              </span>
-            </div>
-            <div class="mnd__limite-bar-track">
-              <div class="mnd__limite-bar-fill" :style="{ width: pctConsumo + '%' }"></div>
-            </div>
-            <div class="mnd__limite-footer">
-              <span v-if="estadoLimite === 'agotado'" class="mnd__limite-msg mnd__limite-msg--danger">
-                <i class="bi bi-x-circle-fill"></i> Cupo agotado este mes
-              </span>
-              <span v-else-if="estadoLimite === 'critico'" class="mnd__limite-msg mnd__limite-msg--warning">
-                <i class="bi bi-exclamation-triangle-fill"></i> Quedan solo {{ disponibleMes.toFixed(1) }}g disponibles
-              </span>
-              <span v-else class="mnd__limite-msg mnd__limite-msg--ok">Disponibles: {{ disponibleMes.toFixed(1) }}g</span>
-              <span v-if="excederiaLimite" class="mnd__limite-excede">⚠ Esta dispensación excede el cupo</span>
-            </div>
-          </div>
 
           <!-- Stock -->
           <div class="mnd__section-label">Stock a dispensar <span class="mnd__req">*</span></div>
@@ -523,27 +456,6 @@ async function handleSubmit() {
 
 .mnd__error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 9px; padding: .6rem .875rem; font-size: .82rem; display: flex; align-items: center; gap: .4rem; }
 
-/* Límite mensual */
-.mnd__limite-box { border-radius: 10px; padding: .75rem 1rem; border: 1.5px solid #e2e8f0; }
-.mnd__limite-box--agotado     { background: #fef2f2; border-color: #fecaca; }
-.mnd__limite-box--critico     { background: #fffbeb; border-color: #fde68a; }
-.mnd__limite-box--advertencia { background: #fffbeb; border-color: #fde68a; }
-.mnd__limite-box--ok          { background: #f0fdf4; border-color: #bbf7d0; }
-.mnd__limite-header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .4rem; }
-.mnd__limite-label { font-size: .75rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: .35rem; }
-.mnd__limite-nums { font-size: .8rem; color: #374151; }
-.mnd__limite-sep { margin: 0 .25rem; color: #94a3b8; }
-.mnd__limite-bar-track { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
-.mnd__limite-bar-fill { height: 100%; background: #1b5e20; border-radius: 3px; transition: width .3s; }
-.mnd__limite-box--agotado .mnd__limite-bar-fill     { background: #dc2626; }
-.mnd__limite-box--critico .mnd__limite-bar-fill     { background: #f59e0b; }
-.mnd__limite-box--advertencia .mnd__limite-bar-fill { background: #f59e0b; }
-.mnd__limite-footer { margin-top: .4rem; display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
-.mnd__limite-msg { font-size: .72rem; font-weight: 600; display: flex; align-items: center; gap: .25rem; }
-.mnd__limite-msg--ok      { color: #15803d; }
-.mnd__limite-msg--warning { color: #d97706; }
-.mnd__limite-msg--danger  { color: #dc2626; }
-.mnd__limite-excede { font-size: .72rem; font-weight: 700; color: #dc2626; }
 
 /* Stock */
 .mnd__section-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .05em; }

@@ -9,19 +9,22 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline } from '../lib/api.js'
+import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTurno } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
-  Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail
+  Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
+  CalendarDays, UserCheck, RotateCcw, X
 } from 'lucide-vue-next'
 import { REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
+import { useToast } from '../composables/useToast.js'
 import DsSpinner               from '../design-system/components/Spinner.vue'
 import SocioTabTimeline        from '../components/pacientes/SocioTabTimeline.vue'
 import SocioTabCuentaCorriente from '../components/pacientes/SocioTabCuentaCorriente.vue'
 import SocioTabCorreo          from '../components/pacientes/SocioTabCorreo.vue'
 import SocioTabHistoria        from '../components/pacientes/SocioTabHistoria.vue'
 import SocioTabNotas           from '../components/pacientes/SocioTabNotas.vue'
-import SocioEditarModal        from '../components/pacientes/SocioEditarModal.vue'
+import SocioEditarModal          from '../components/pacientes/SocioEditarModal.vue'
+import ModalAgendarTurnoMedico  from '../components/pacientes/ModalAgendarTurnoMedico.vue'
 
 const route  = useRoute()
 const store  = usePacientesStore()
@@ -40,7 +43,10 @@ const reprocannEstadoMeta = computed(() =>
   REPROCANN_ESTADOS.find(e => e.value === (s.value?.reprocann_estado || 'sin_registro'))
 )
 
-const editarOpen = ref(false)
+const editarOpen     = ref(false)
+const agendarTurnoOpen = ref(false)
+const isAdmin = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
+const toast   = useToast()
 
 const ccRefreshKey = ref(0)
 function onDispensacionCreada() { ccRefreshKey.value++ }
@@ -64,8 +70,84 @@ async function loadTimeline() {
   }
 }
 
+// ── Turnos ────────────────────────────────────────────────────────────────────
+const turnosList    = ref([])
+const turnosLoading = ref(false)
+const turnosLoaded  = ref(false)
+
+async function loadTurnos() {
+  turnosLoading.value = true
+  try {
+    const { data } = await getPacienteTurnos(socioId)
+    turnosList.value = data ?? []
+    turnosLoaded.value = true
+  } catch {
+    turnosList.value = []
+  } finally {
+    turnosLoading.value = false
+  }
+}
+
+const TIPO_LABEL   = { primera_vez: 'Primera vez', seguimiento: 'Seguimiento', revision: 'Revisión', urgencia: 'Urgencia' }
+const ESTADO_LABEL = { programado: 'Programado', confirmado: 'Confirmado', realizado: 'Realizado', cancelado: 'Cancelado', ausente: 'Ausente' }
+const ESTADO_CLS   = { programado: 'turno-chip--prog', confirmado: 'turno-chip--conf', realizado: 'turno-chip--real', cancelado: 'turno-chip--canc', ausente: 'turno-chip--aus' }
+const TIPO_CLS     = { primera_vez: 'turno-chip--pv', seguimiento: 'turno-chip--seg', revision: 'turno-chip--rev', urgencia: 'turno-chip--urg' }
+
+// ── Edición de turno ─────────────────────────────────────────────────────────
+const turnoEditando  = ref(null)   // turno completo que se está editando
+const editSaving     = ref(false)
+const editCancelling = ref(false)
+const editForm       = ref({ fecha: '', hora: '', duracion_minutos: 30, tipo: 'seguimiento', estado: 'programado', motivo: '' })
+
+function abrirEdicion(t) {
+  const d = new Date(t.fecha_hora)
+  const pad = n => String(n).padStart(2, '0')
+  editForm.value = {
+    fecha:            `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,
+    hora:             `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+    duracion_minutos: t.duracion_minutos,
+    tipo:             t.tipo,
+    estado:           t.estado,
+    motivo:           t.motivo || '',
+  }
+  turnoEditando.value = t
+}
+
+async function guardarEdicion() {
+  editSaving.value = true
+  try {
+    const fecha_hora = `${editForm.value.fecha}T${editForm.value.hora}:00`
+    const { data } = await updateAdminTurno(turnoEditando.value.id, {
+      fecha_hora,
+      duracion_minutos: Number(editForm.value.duracion_minutos),
+      tipo:    editForm.value.tipo,
+      estado:  editForm.value.estado,
+      motivo:  editForm.value.motivo || undefined,
+    })
+    const idx = turnosList.value.findIndex(t => t.id === turnoEditando.value.id)
+    if (idx !== -1) turnosList.value[idx] = { ...turnosList.value[idx], ...data }
+    turnoEditando.value = null
+    toast.success('Turno actualizado')
+  } catch { toast.error('No se pudo guardar') }
+  finally  { editSaving.value = false }
+}
+
+async function cancelarTurno(t) {
+  if (!confirm(`¿Cancelar el turno del ${new Date(t.fecha_hora).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}?`)) return
+  editCancelling.value = true
+  try {
+    await deleteAdminTurno(t.id)
+    const idx = turnosList.value.findIndex(x => x.id === t.id)
+    if (idx !== -1) turnosList.value[idx] = { ...turnosList.value[idx], estado: 'cancelado' }
+    if (turnoEditando.value?.id === t.id) turnoEditando.value = null
+    toast.success('Turno cancelado')
+  } catch { toast.error('No se pudo cancelar') }
+  finally  { editCancelling.value = false }
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'timeline') loadTimeline()
+  if (tab === 'turnos')   loadTurnos()
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -98,6 +180,7 @@ const ALL_TABS = [
   { key: 'reprocann',        label: 'REPROCANN',         icon: ShieldCheck },
   { key: 'dispensaciones',   label: 'Dispensaciones',    icon: Pill },
   { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin', 'dispensador'] },
+  { key: 'turnos',           label: 'Turnos',            icon: CalendarDays,  roles: ['admin', 'medico'] },
   { key: 'historia',         label: 'Historia clínica',  icon: ClipboardList, roles: ['admin', 'medico'] },
   { key: 'notas',            label: 'Notas',             icon: BookOpen,      roles: ['admin', 'medico'] },
   { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
@@ -110,6 +193,9 @@ const TABS = computed(() => {
   const role = auth.user?.role
   return ALL_TABS.filter(t => !t.roles || t.roles.includes(role))
 })
+
+// Solo montar el contenido de un tab si el rol actual tiene acceso a él
+const tabVisible = (key) => TABS.value.some(t => t.key === key)
 
 function escapeHandler(e) {
   if (e.key !== 'Escape') return
@@ -308,8 +394,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
           <Dispensaciones
             :socio-id="socioId"
             :paciente-nombre="s ? `${s.nombre} ${s.apellido}`.trim() : ''"
-            :limite-mensual-g="s?.limite_dispensacion_mensual_g ? Number(s.limite_dispensacion_mensual_g) : null"
-            :dispensado-mes-g="s?.dispensado_mes_actual_g ?? null"
             :saldo-cc="s?.saldo_cc ?? null"
             :limite-cc="s?.limite_cc ?? null"
             :saldo-cc-g="s?.saldo_cc_g ?? null"
@@ -322,12 +406,137 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       </div>
 
       <!-- ── Tab: Cuenta corriente ── -->
-      <div v-show="activeTab === 'cuenta_corriente'" class="sd__tab-content">
+      <div v-if="tabVisible('cuenta_corriente') && activeTab === 'cuenta_corriente'" class="sd__tab-content">
         <SocioTabCuentaCorriente
           :socio-id="socioId"
           :refresh-key="ccRefreshKey"
           :readonly="auth.user?.role === 'dispensador'"
         />
+      </div>
+
+      <!-- ── Tab: Turnos ── -->
+      <div v-show="activeTab === 'turnos'" class="sd__tab-content">
+        <div class="sd__turnos-header">
+          <div>
+            <div class="sd__turnos-title">Turnos médicos</div>
+            <div class="sd__turnos-sub">Historial de consultas y turnos agendados para este paciente.</div>
+          </div>
+          <button v-if="isAdmin" class="sd__btn-agendar" @click="agendarTurnoOpen = true">
+            <CalendarPlus :size="14" :stroke-width="1.75" /> Agendar turno
+          </button>
+        </div>
+
+        <div v-if="turnosLoading" class="sd__turnos-loading">
+          <DsSpinner :size="18" /> Cargando turnos…
+        </div>
+        <div v-else-if="turnosList.length === 0" class="sd__turnos-empty">
+          <CalendarDays :size="32" stroke-width="1.2" />
+          <p>Sin turnos registrados para este paciente.</p>
+          <button v-if="isAdmin" class="sd__btn-agendar" @click="agendarTurnoOpen = true">
+            <CalendarPlus :size="14" /> Agendar primer turno
+          </button>
+        </div>
+        <div v-else class="sd__turnos-list">
+          <div v-for="t in turnosList" :key="t.id"
+            class="sd__turno-row"
+            :class="{ 'sd__turno-row--cancelado': t.estado === 'cancelado' }">
+            <div class="sd__turno-fecha">
+              <div class="sd__turno-dia">{{ new Date(t.fecha_hora).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }) }}</div>
+              <div class="sd__turno-hora">{{ new Date(t.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) }}</div>
+            </div>
+            <div class="sd__turno-info">
+              <div class="sd__turno-medico">
+                <UserCheck :size="12" /> {{ t.medico_nombre || 'Sin asignar' }}
+              </div>
+              <div v-if="t.motivo" class="sd__turno-motivo">{{ t.motivo }}</div>
+            </div>
+            <div class="sd__turno-chips">
+              <span class="turno-chip" :class="TIPO_CLS[t.tipo]">{{ TIPO_LABEL[t.tipo] || t.tipo }}</span>
+              <span class="turno-chip" :class="ESTADO_CLS[t.estado]">{{ ESTADO_LABEL[t.estado] || t.estado }}</span>
+            </div>
+            <div class="sd__turno-dur">{{ t.duracion_minutos }}min</div>
+            <div v-if="isAdmin && t.estado !== 'cancelado'" class="sd__turno-actions">
+              <button class="sd__turno-btn sd__turno-btn--edit"
+                title="Reprogramar turno"
+                @click="abrirEdicion(t)">
+                <RotateCcw :size="13" /> Reprogramar
+              </button>
+              <button class="sd__turno-btn sd__turno-btn--cancel"
+                title="Cancelar turno"
+                :disabled="editCancelling"
+                @click="cancelarTurno(t)">
+                <X :size="13" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal edición inline -->
+        <Teleport to="body">
+          <div v-if="turnoEditando" class="sd__edit-overlay" @click.self="turnoEditando = null">
+            <div class="sd__edit-modal">
+              <div class="sd__edit-header">
+                <div class="sd__edit-title">
+                  <RotateCcw :size="15" /> Reprogramar turno
+                </div>
+                <button class="sd__edit-close" @click="turnoEditando = null"><X :size="16" /></button>
+              </div>
+
+              <div class="sd__edit-body">
+                <div class="sd__edit-row">
+                  <label class="sd__edit-lbl">Fecha</label>
+                  <input v-model="editForm.fecha" type="date" class="sd__edit-input"
+                    :min="new Date().toISOString().split('T')[0]" />
+                </div>
+                <div class="sd__edit-row">
+                  <label class="sd__edit-lbl">Hora</label>
+                  <input v-model="editForm.hora" type="time" class="sd__edit-input" step="900" />
+                </div>
+                <div class="sd__edit-row">
+                  <label class="sd__edit-lbl">Duración</label>
+                  <select v-model.number="editForm.duracion_minutos" class="sd__edit-input">
+                    <option :value="15">15 min</option>
+                    <option :value="30">30 min</option>
+                    <option :value="45">45 min</option>
+                    <option :value="60">1 hora</option>
+                    <option :value="90">1:30 h</option>
+                  </select>
+                </div>
+                <div class="sd__edit-row">
+                  <label class="sd__edit-lbl">Tipo</label>
+                  <select v-model="editForm.tipo" class="sd__edit-input">
+                    <option value="primera_vez">Primera vez</option>
+                    <option value="seguimiento">Seguimiento</option>
+                    <option value="revision">Revisión</option>
+                    <option value="urgencia">Urgencia</option>
+                  </select>
+                </div>
+                <div class="sd__edit-row">
+                  <label class="sd__edit-lbl">Estado</label>
+                  <select v-model="editForm.estado" class="sd__edit-input">
+                    <option value="programado">Programado</option>
+                    <option value="confirmado">Confirmado</option>
+                    <option value="realizado">Realizado</option>
+                    <option value="ausente">Ausente</option>
+                  </select>
+                </div>
+                <div class="sd__edit-row">
+                  <label class="sd__edit-lbl">Motivo</label>
+                  <textarea v-model="editForm.motivo" class="sd__edit-input sd__edit-textarea"
+                    rows="2" placeholder="Motivo (opcional)" />
+                </div>
+              </div>
+
+              <div class="sd__edit-footer">
+                <button class="sd__btn-ghost" @click="turnoEditando = null">Cancelar</button>
+                <button class="sd__btn-primary" :disabled="editSaving" @click="guardarEdicion">
+                  <DsSpinner v-if="editSaving" :size="13" />
+                  <template v-else><RotateCcw :size="13" /> Guardar cambios</template>
+                </button>
+              </div>
+            </div>
+          </div>
+        </Teleport>
       </div>
 
       <!-- ── Tab: Historia clínica ── -->
@@ -353,7 +562,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       </div>
 
       <!-- ── Tab: Correo ── -->
-      <div v-show="activeTab === 'correo'" class="sd__tab-content">
+      <div v-if="tabVisible('correo') && activeTab === 'correo'" class="sd__tab-content">
         <SocioTabCorreo :socio-id="socioId" :socio="s" @open-edit="editarOpen = true" />
       </div>
 
@@ -361,6 +570,14 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
   </div>
 
   <SocioEditarModal v-model:open="editarOpen" :socio-id="socioId" @saved="store.fetchOne(socioId)" />
+
+  <ModalAgendarTurnoMedico
+    v-if="agendarTurnoOpen && s"
+    :paciente-id="socioId"
+    :paciente-nombre="`${s.nombre} ${s.apellido}`"
+    @close="agendarTurnoOpen = false"
+    @created="agendarTurnoOpen = false; loadTurnos()"
+  />
 </template>
 
 <style scoped>
@@ -425,6 +642,8 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__sys-info { display: flex; gap: 2rem; flex-wrap: wrap; padding: .875rem 1.25rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; font-size: .78rem; color: #64748b; }
 
 /* Buttons */
+.sd__btn-agendar { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .55rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+.sd__btn-agendar:hover { background: #14532d; }
 .sd__btn-edit { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #475569; border: 1.5px solid #e2e8f0; padding: .55rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .sd__btn-edit:hover { border-color: #1b5e20; color: #1b5e20; background: #f0fdf4; }
 .sd__btn-carnet { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .55rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; text-decoration: none; }
@@ -482,5 +701,90 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__btn-tiny--danger:hover { background: #fee2e2; }
 .sd__btn-tiny--ghost { border-color: #e2e8f0; color: #94a3b8; }
 .sd__btn-tiny--ghost:hover { background: #f8fafc; color: #475569; }
+
+/* Turnos tab */
+.sd__turnos-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.sd__turnos-title  { font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: .2rem; }
+.sd__turnos-sub    { font-size: .8rem; color: #64748b; }
+.sd__turnos-loading { display: flex; align-items: center; gap: .65rem; padding: 2rem; color: #64748b; font-size: .88rem; }
+.sd__turnos-empty  { display: flex; flex-direction: column; align-items: center; gap: .75rem; padding: 3rem; text-align: center; color: #94a3b8; }
+.sd__turnos-empty p { margin: 0; font-size: .88rem; }
+.sd__turnos-list   { display: flex; flex-direction: column; gap: .5rem; }
+.sd__turno-row {
+  display: flex; align-items: center; gap: 1rem;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: .75rem 1rem; flex-wrap: wrap;
+  transition: box-shadow .12s;
+}
+.sd__turno-row:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.sd__turno-fecha { min-width: 88px; }
+.sd__turno-dia   { font-size: .8rem; font-weight: 700; color: #0f172a; text-transform: capitalize; }
+.sd__turno-hora  { font-size: .78rem; color: #64748b; }
+.sd__turno-info  { flex: 1; min-width: 0; }
+.sd__turno-medico { font-size: .82rem; font-weight: 600; color: #334155; display: flex; align-items: center; gap: .35rem; }
+.sd__turno-motivo { font-size: .78rem; color: #64748b; margin-top: .15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sd__turno-chips  { display: flex; gap: .35rem; flex-wrap: wrap; }
+.sd__turno-dur    { font-size: .78rem; color: #94a3b8; white-space: nowrap; }
+.turno-chip { font-size: .65rem; font-weight: 700; padding: .2em .65em; border-radius: 999px; }
+.turno-chip--prog { background: #dbeafe; color: #1d4ed8; }
+.turno-chip--conf { background: #d1fae5; color: #065f46; }
+.turno-chip--real { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.turno-chip--canc { background: #fee2e2; color: #dc2626; }
+.turno-chip--aus  { background: #fef3c7; color: #b45309; }
+.turno-chip--pv   { background: #ede9fe; color: #7c3aed; }
+.turno-chip--seg  { background: #f0fdf4; color: #15803d; }
+.turno-chip--rev  { background: #dbeafe; color: #1d4ed8; }
+.turno-chip--urg  { background: #fee2e2; color: #dc2626; }
+.sd__turno-row--cancelado { opacity: .55; background: #f8fafc; }
+.sd__turno-actions { display: flex; gap: .35rem; align-items: center; margin-left: auto; flex-shrink: 0; }
+.sd__turno-btn {
+  display: inline-flex; align-items: center; gap: .3rem;
+  border-radius: 7px; padding: .3rem .6rem; font-size: .72rem; font-weight: 600;
+  cursor: pointer; transition: all .12s; border: 1.5px solid;
+}
+.sd__turno-btn--edit  { border-color: #bfdbfe; color: #1d4ed8; background: #eff6ff; }
+.sd__turno-btn--edit:hover  { background: #dbeafe; }
+.sd__turno-btn--cancel { border-color: #fecaca; color: #dc2626; background: none; padding: .3rem .45rem; }
+.sd__turno-btn--cancel:hover:not(:disabled) { background: #fee2e2; }
+.sd__turno-btn--cancel:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Modal edición turno */
+.sd__edit-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1200; padding: 1rem; backdrop-filter: blur(2px);
+}
+.sd__edit-modal {
+  background: #fff; border-radius: 14px; width: 100%; max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.22); display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sd__edit-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .9rem 1.25rem; border-bottom: 1px solid #e2e8f0; background: #fafafa;
+}
+.sd__edit-title {
+  display: flex; align-items: center; gap: .45rem;
+  font-size: .88rem; font-weight: 800; color: #1d4ed8;
+}
+.sd__edit-close {
+  background: none; border: none; cursor: pointer; color: #94a3b8;
+  border-radius: 6px; padding: .2rem; transition: color .12s;
+}
+.sd__edit-close:hover { color: #0f172a; }
+.sd__edit-body { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: .75rem; }
+.sd__edit-row  { display: flex; flex-direction: column; gap: .2rem; }
+.sd__edit-lbl  { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; }
+.sd__edit-input {
+  padding: .42rem .65rem; border: 1.5px solid #e2e8f0; border-radius: 8px;
+  font-size: .83rem; color: #0f172a; outline: none; transition: border-color .15s;
+  font-family: inherit;
+}
+.sd__edit-input:focus { border-color: #1b5e20; }
+.sd__edit-textarea { resize: none; }
+.sd__edit-footer {
+  display: flex; gap: .5rem; justify-content: flex-end;
+  padding: .85rem 1.25rem; border-top: 1px solid #e2e8f0;
+}
 
 </style>

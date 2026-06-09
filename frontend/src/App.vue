@@ -51,7 +51,7 @@ const routeLoading  = ref(false)
 router.beforeEach(() => { routeLoading.value = true })
 router.afterEach(() => { routeLoading.value = false })
 const { can, isAdmin, isSuperAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
-const isMobileRoute = computed(() => route.path.startsWith('/m'))
+const isMobileRoute = computed(() => route.path.startsWith('/m/'))
 
 const adminDrawerOpen = ref(false);
 const cvdDrawerOpen  = ref(false);
@@ -980,7 +980,8 @@ onMounted(async () => {
 .med-shell { display: flex; min-height: 100vh; }
 .med-body { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--c-paper); }
 .med-accent-bar { height: 4px; background: #2D8A6B; flex-shrink: 0; }
-.med-main { flex: 1; }
+.med-main { flex: 1; overflow-y: auto; }
+.med-main > * { max-width: 1200px; margin: 0 auto; }
 .med-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
 .med-drawer { width: 240px; height: 100%; overflow: hidden; }
 .med-drawer-enter-active, .med-drawer-leave-active { transition: opacity .2s, transform .2s; }

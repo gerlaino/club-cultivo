@@ -10,10 +10,17 @@
       <div class="stl__empty-title">Sin eventos registrados</div>
     </div>
     <div v-else class="stl__timeline">
-      <div v-for="(ev, i) in timeline" :key="i" class="stl__item">
+      <div v-for="(ev, i) in timeline" :key="i" class="stl__item"
+        :class="{ 'stl__item--turno': ev.tipo === 'turno' }">
         <div class="stl__dot" :style="{ background: timelineColor(ev.tipo) }"></div>
         <div class="stl__body">
-          <div class="stl__tipo" :style="{ color: timelineColor(ev.tipo) }">{{ timelineLabel(ev.tipo) }}</div>
+          <div class="stl__tipo-row">
+            <div class="stl__tipo" :style="{ color: timelineColor(ev.tipo) }">{{ timelineLabel(ev.tipo) }}</div>
+            <span v-if="ev.tipo === 'turno' && ev.estado"
+              class="stl__turno-chip" :class="ESTADO_CLS[ev.estado]">
+              {{ ESTADO_LABEL[ev.estado] || ev.estado }}
+            </span>
+          </div>
           <div class="stl__desc">{{ ev.descripcion }}</div>
           <div class="stl__fecha">{{ formatDateTime(ev.fecha) }}</div>
         </div>
@@ -32,12 +39,29 @@ defineProps({
 })
 
 const TIMELINE_COLORS = {
-  dispensacion: '#0369a1', nota: '#b45309', indicacion: '#7c3aed', alta: '#15803d',
+  dispensacion: '#0369a1',
+  nota:         '#b45309',
+  indicacion:   '#7c3aed',
+  alta:         '#15803d',
+  turno:        '#0891b2',
 }
+const TIMELINE_LABELS = {
+  dispensacion: 'Dispensación',
+  nota:         'Nota clínica',
+  indicacion:   'Indicación médica',
+  alta:         'Alta',
+  turno:        'Turno médico',
+}
+const ESTADO_CLS = {
+  programado: 'stl__turno-chip--prog',
+  confirmado: 'stl__turno-chip--conf',
+  realizado:  'stl__turno-chip--real',
+  cancelado:  'stl__turno-chip--canc',
+  ausente:    'stl__turno-chip--aus',
+}
+const ESTADO_LABEL = { programado: 'Programado', confirmado: 'Confirmado', realizado: 'Realizado', cancelado: 'Cancelado', ausente: 'Ausente' }
 function timelineColor(tipo) { return TIMELINE_COLORS[tipo] || '#64748b' }
-function timelineLabel(tipo) {
-  return { dispensacion: 'Dispensación', nota: 'Nota clínica', indicacion: 'Indicación médica', alta: 'Alta' }[tipo] || tipo
-}
+function timelineLabel(tipo) { return TIMELINE_LABELS[tipo] || tipo }
 function formatDateTime(d) {
   if (!d) return '—'
   return new Date(d).toLocaleString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -57,7 +81,18 @@ function formatDateTime(d) {
 .stl__item { display: flex; gap: 1rem; padding: .875rem 0; border-bottom: 1px solid #f1f5f9; }
 .stl__item:last-child { border-bottom: none; }
 .stl__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: .35rem; }
-.stl__tipo { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .2rem; }
+.stl__tipo-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .2rem; }
+.stl__tipo { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .stl__desc { font-size: .875rem; color: #374151; margin-bottom: .25rem; }
 .stl__fecha { font-size: .72rem; color: #94a3b8; }
+.stl__item--turno { background: #f0f9ff; border-radius: 8px; padding: .875rem .75rem; margin: 0 -.75rem; }
+.stl__turno-chip {
+  font-size: .6rem; font-weight: 700; padding: .15em .55em; border-radius: 999px;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.stl__turno-chip--prog { background: #dbeafe; color: #1d4ed8; }
+.stl__turno-chip--conf { background: #d1fae5; color: #065f46; }
+.stl__turno-chip--real { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.stl__turno-chip--canc { background: #fee2e2; color: #dc2626; }
+.stl__turno-chip--aus  { background: #fef3c7; color: #b45309; }
 </style>

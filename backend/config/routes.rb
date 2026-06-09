@@ -148,6 +148,7 @@ Rails.application.routes.draw do
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
       resources :dispensaciones, only: [:index, :create]
       resources :reprocann_renovaciones, only: [:index, :create, :update, :destroy]
+      resources :turnos, controller: "paciente_turnos", only: [:index]
       resources :documents, controller: 'patient_documents' do
         member do
           post  :firmar
@@ -189,6 +190,27 @@ Rails.application.routes.draw do
     resources :socio_notas, controller: 'paciente_notas', only: [:destroy], as: :socio_notas_legacy
 
     get '/indicaciones_medicas', to: 'indicacion_medica#index_medico'
+
+    # Médico — ficha clínica + turnos
+    namespace :medico do
+      resources :pacientes, only: [:index] do
+        member { get :ficha }
+      end
+      resources :turnos, only: [:index, :create, :update, :destroy]
+      resources :check_ins, only: [:create]
+      resource  :disponibilidad, only: [:index, :update], controller: 'disponibilidad'
+    end
+
+    namespace :admin do
+      resources :medicos, only: [:index] do
+        member do
+          get  :disponibilidad
+          get  :turnos
+          post :crear_turno
+        end
+      end
+      resources :turnos, only: [:update, :destroy]
+    end
     resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy] do
       member { get :prescripcion_pdf }
     end

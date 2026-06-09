@@ -12,8 +12,6 @@ import ModalNuevaDispensacion from './ModalNuevaDispensacion.vue'
 const props = defineProps({
   socioId:          { type: Number,  required: true },
   pacienteNombre:   { type: String,  default: '' },
-  limiteMensualG:   { type: Number,  default: null },
-  dispensadoMesG:   { type: Number,  default: null },
   saldoCc:          { type: Number,  default: null },
   limiteCc:         { type: Number,  default: null },
   saldoCcG:            { type: Number,  default: null },
@@ -155,8 +153,6 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       v-model="showModal"
       :socio-id="props.socioId"
       :paciente-nombre="props.pacienteNombre"
-      :limite-mensual-g="props.limiteMensualG"
-      :dispensado-mes-g="props.dispensadoMesG"
       :saldo-cc="props.saldoCc"
       :limite-cc="props.limiteCc"
       :saldo-cc-g="props.saldoCcG"
