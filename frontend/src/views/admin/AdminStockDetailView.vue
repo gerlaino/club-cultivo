@@ -480,7 +480,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
-  updateStock, asignarStock, ajustarStock, descartarStock,
+  getStock, updateStock, asignarStock, ajustarStock, descartarStock,
   getStockMovimientos, listSedes, createStock,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -500,13 +500,13 @@ onMounted(async () => {
   const id = route.params.id
   try {
     const [rStock, rMov, rSedes] = await Promise.all([
-      fetch(`/api/stocks/${id}`, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } }).then(r => r.json()),
-      import('../../lib/api.js').then(({ getStockMovimientos }) => getStockMovimientos(id)),
+      getStock(id),
+      getStockMovimientos(id),
       listSedes(),
     ])
-    stock.value      = rStock.data || rStock
+    stock.value       = rStock.data?.data || rStock.data
     movimientos.value = rMov.data || []
-    sedes.value      = rSedes.data || []
+    sedes.value       = rSedes.data || []
   } catch {
     toast.error('Error al cargar el stock')
   } finally {
@@ -516,11 +516,8 @@ onMounted(async () => {
 
 async function recargar() {
   const id = route.params.id
-  const [rStock, rMov] = await Promise.all([
-    fetch(`/api/stocks/${id}`, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } }).then(r => r.json()),
-    getStockMovimientos(id),
-  ])
-  stock.value       = rStock.data || rStock
+  const [rStock, rMov] = await Promise.all([getStock(id), getStockMovimientos(id)])
+  stock.value       = rStock.data?.data || rStock.data
   movimientos.value = rMov.data || []
 }
 

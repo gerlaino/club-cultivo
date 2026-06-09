@@ -143,7 +143,7 @@ class StocksController < ApplicationController
         tipo:            m.tipo,
         gramos:          m.gramos.to_f,
         notas:           m.notas,
-        usuario:         m.usuario ? { id: m.usuario.id, nombre: "#{m.usuario.nombre} #{m.usuario.apellido}".strip } : nil,
+        usuario:         m.usuario ? { id: m.usuario.id, nombre: m.usuario.nombre_completo } : nil,
         sede_origen:     m.sede_origen  ? { id: m.sede_origen.id,  nombre: m.sede_origen.nombre  } : nil,
         sede_destino:    m.sede_destino ? { id: m.sede_destino.id, nombre: m.sede_destino.nombre } : nil,
         created_at:      m.created_at,

@@ -453,6 +453,7 @@ export const aiImportCsvSala = (salaId, file) => {
 export const listStocks           = (params = {})         => api.get('/stocks', { params })
 export const listStocksPendientes = ()                    => api.get('/stocks', { params: { pendientes: true } })
 export const listStocksHistorial  = (params = {})         => api.get('/stocks', { params: { historial: true, ...params } })
+export const getStock             = (id)                  => api.get(`/stocks/${id}`)
 export const createStock          = (payload)             => api.post('/stocks', { stock: payload })
 export const updateStock          = (id, payload)         => api.patch(`/stocks/${id}`, { stock: payload })
 export const asignarStock         = (id, payload)         => api.post(`/stocks/${id}/asignar`, payload)
