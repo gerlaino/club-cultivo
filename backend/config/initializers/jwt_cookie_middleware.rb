@@ -26,7 +26,7 @@ class JwtCookieMiddleware
         expires:   Time.now + 12 * 3600,
         httponly:  true,
         secure:    ENV.fetch('RAILS_ENV', 'development') == 'production',
-        same_site: ENV.fetch('RAILS_ENV', 'development') == 'production' ? 'Strict' : 'Lax',
+        same_site: ENV.fetch('RAILS_ENV', 'development') == 'production' ? 'None' : 'Lax',
       })
     end
     # Mobile: Authorization header se mantiene intacto para que la app lo lea
