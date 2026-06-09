@@ -10,9 +10,6 @@
         <p class="mpd__sub">{{ fechaHoy }}</p>
       </div>
       <div class="mpd__actions">
-        <RouterLink to="/medico/turnos" class="mpd__btn-secondary">
-          <Calendar :size="15" :stroke-width="1.75" /> Turnera
-        </RouterLink>
         <RouterLink to="/medico/indicaciones" class="mpd__btn-primary">
           <FilePlus :size="15" :stroke-width="1.75" /> Nueva indicación
         </RouterLink>
@@ -51,14 +48,14 @@
       </RouterLink>
     </div>
 
-    <!-- Cuerpo dos columnas -->
+    <!-- Cuerpo una columna -->
     <div v-if="!loading" class="mpd__body">
 
-      <!-- Columna izquierda: Turnos de hoy -->
-      <div class="mpd__col">
+      <!-- Turnos de hoy -->
+      <div class="mpd__col mpd__col--turnos">
         <div class="mpd__section-head">
           <h2 class="mpd__section-title"><Clock :size="14" /> Turnos de hoy</h2>
-          <RouterLink to="/medico/turnos" class="mpd__section-link">Ver turnera →</RouterLink>
+          <RouterLink to="/medico/turnos" class="mpd__section-link">Ver agenda completa →</RouterLink>
         </div>
 
         <div v-if="turnosHoy.length === 0" class="mpd__empty-col">
@@ -71,8 +68,9 @@
           <div
             v-for="t in turnosHoy"
             :key="t.id"
-            class="mpd__turno"
+            class="mpd__turno mpd__turno--clickable"
             :class="`mpd__turno--${t.tipo}`"
+            @click="turnoSeleccionado = t"
           >
             <div class="mpd__turno-hora">{{ fmtHora(t.fecha_hora) }}</div>
             <div class="mpd__turno-info">
@@ -86,8 +84,8 @@
         </div>
       </div>
 
-      <!-- Columna derecha: Alertas -->
-      <div class="mpd__col">
+      <!-- Alertas clínicas -->
+      <div class="mpd__col mpd__col--alertas">
         <div class="mpd__section-head">
           <h2 class="mpd__section-title"><AlertTriangle :size="14" /> Alertas clínicas</h2>
         </div>
@@ -142,6 +140,14 @@
 
     </div>
 
+    <!-- Detalle turno -->
+    <TurnoDetallePanel
+      v-if="turnoSeleccionado"
+      :turno="turnoSeleccionado"
+      @close="turnoSeleccionado = null"
+      @updated="onTurnoUpdated"
+    />
+
   </div>
 </template>
 
@@ -154,13 +160,15 @@ import {
 import { listPacientes, getMedicoTurnos } from '../../lib/api.js'
 import api from '../../lib/api.js'
 import { useAuthStore } from '../../stores/auth.js'
+import TurnoDetallePanel from '../../components/TurnoDetallePanel.vue'
 
 const auth = useAuthStore()
 
-const loading      = ref(true)
-const pacientes    = ref([])
-const indicaciones = ref([])
-const turnos       = ref([])
+const loading           = ref(true)
+const pacientes         = ref([])
+const indicaciones      = ref([])
+const turnos            = ref([])
+const turnoSeleccionado = ref(null)
 
 const TIPO_LABEL  = { primera_vez: 'Primera vez', seguimiento: 'Seguimiento', revision: 'Revisión', urgencia: 'Urgencia' }
 const ESTADO_LABEL = { programado: 'Pendiente', confirmado: 'Confirmado', realizado: 'Realizado', cancelado: 'Cancelado', ausente: 'Ausente' }
@@ -178,6 +186,12 @@ async function cargar() {
   } finally {
     loading.value = false
   }
+}
+
+function onTurnoUpdated(data) {
+  const idx = turnos.value.findIndex(t => t.id === data.id)
+  if (idx > -1) turnos.value[idx] = data
+  if (turnoSeleccionado.value?.id === data.id) turnoSeleccionado.value = data
 }
 
 function safeDate(d) {
@@ -308,10 +322,15 @@ onMounted(cargar)
 .mpd__kpi-val { font-size: var(--fs-22); font-weight: 800; color: var(--c-ink-900); line-height: 1; }
 .mpd__kpi-lbl { font-size: var(--fs-12); color: var(--c-ink-500); margin-top: 2px; }
 
-/* Body two columns */
-.mpd__body { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-6); }
-@media (max-width: 768px) { .mpd__body { grid-template-columns: 1fr; } }
-.mpd__col { display: flex; flex-direction: column; min-width: 0; }
+/* Body una columna */
+.mpd__body { display: flex; flex-direction: column; gap: var(--sp-4); }
+.mpd__col {
+  display: flex; flex-direction: column; min-width: 0;
+  background: var(--c-paper); border-radius: var(--r-lg);
+  padding: var(--sp-5); border: 1px solid var(--c-ink-100);
+}
+.mpd__col--turnos { border-top: 3px solid #1b5e20; }
+.mpd__col--alertas { border-top: 3px solid #d97706; }
 
 .mpd__section-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -344,6 +363,8 @@ onMounted(cargar)
 .mpd__turno--seguimiento { border-left-color: #1b5e20; }
 .mpd__turno--revision    { border-left-color: #1d4ed8; }
 .mpd__turno--urgencia    { border-left-color: #dc2626; }
+.mpd__turno--clickable { cursor: pointer; }
+.mpd__turno--clickable:hover { background: var(--c-ink-50); }
 .mpd__turno-hora { font-size: var(--fs-13); font-weight: 800; color: var(--c-ink-900); flex-shrink: 0; min-width: 44px; font-variant-numeric: tabular-nums; }
 .mpd__turno-info { flex: 1; min-width: 0; }
 .mpd__turno-nombre { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

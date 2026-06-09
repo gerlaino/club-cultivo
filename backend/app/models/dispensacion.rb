@@ -68,9 +68,9 @@ class Dispensacion < ApplicationRecord
   def stock_disponible
     return unless stock && cantidad.to_d > 0
     stock.with_lock do
-      if cantidad.to_d > stock.cantidad.to_d
+      if cantidad.to_d > stock.cantidad_disponible_real
         errors.add(:cantidad,
-          "supera el stock disponible (#{stock.cantidad.to_f} #{stock.unidad || 'g'} disponibles)")
+          "supera el stock disponible (#{stock.cantidad_disponible_real.round(2)} #{stock.unidad || 'g'} disponibles)")
       end
     end
   end
@@ -108,7 +108,16 @@ class Dispensacion < ApplicationRecord
   end
 
   def decrementar_stock
-    stock&.decrement!(:cantidad, cantidad)
+    return unless stock
+    ActiveRecord::Base.transaction do
+      stock.decrement!(:cantidad, cantidad)
+      stock.stock_movimientos.create!(
+        tipo:    'dispensacion',
+        gramos:  -cantidad,
+        usuario: user,
+        notas:   "Dispensación ##{id} — #{paciente&.nombre_completo}",
+      )
+    end
   end
 
   def incrementar_stock

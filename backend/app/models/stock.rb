@@ -97,13 +97,11 @@ class Stock < ApplicationRecord
     return if numero_lote_producto.present?
     return unless club_id
     year = Date.today.strftime("%y")
-    n    = Stock.where(club_id: club_id).count + 1
-    candidate = "ST-#{year}-#{n.to_s.rjust(4, '0')}"
-    while Stock.exists?(numero_lote_producto: candidate)
-      n += 1
-      candidate = "ST-#{year}-#{n.to_s.rjust(4, '0')}"
-    end
-    self.numero_lote_producto = candidate
+    result = ActiveRecord::Base.connection.execute(
+      "UPDATE clubs SET lote_numero_seq = COALESCE(lote_numero_seq, 0) + 1 WHERE id = #{club_id.to_i} RETURNING lote_numero_seq"
+    )
+    seq = result.first['lote_numero_seq']
+    self.numero_lote_producto = "ST-#{year}-#{seq.to_s.rjust(4, '0')}"
   end
 
   def generar_codigo_qr
@@ -123,6 +121,9 @@ class Stock < ApplicationRecord
       errors.add(:lote_id, 'es obligatorio para derivados')           if lote_id.blank?
       errors.add(:lote_origen_consumido_g, 'debe ser mayor a 0')     if lote_origen_consumido_g.to_d <= 0
       errors.add(:forma_producto, 'no puede ser flor_seca para derivados') if forma_producto == 'flor_seca'
+      if cantidad.to_d > lote_origen_consumido_g.to_d
+        errors.add(:cantidad, "no puede superar los gramos consumidos (#{lote_origen_consumido_g}g consumidos → #{cantidad}g resultado)")
+      end
     when 'compra_externa'
       errors.add(:proveedor, 'es obligatorio para compra externa') if proveedor.blank?
       errors.add(:lote_id,   'debe ser nulo para compra externa')  if lote_id.present?

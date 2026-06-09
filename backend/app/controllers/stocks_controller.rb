@@ -1,9 +1,9 @@
 class StocksController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_lectura_stock!,   only: [:index, :show]
+  before_action :require_lectura_stock!,   only: [:index, :show, :movimientos]
   before_action :require_auditor_lectura!, only: [:trazabilidad]
-  before_action :require_escritura_stock!, only: [:create, :update, :asignar]
-  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update]
+  before_action :require_escritura_stock!, only: [:create, :update, :asignar, :ajuste, :descartar]
+  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :movimientos]
 
   # GET /stocks?sede_id=&canal=regulatorio|social&incluir_pendientes=true
   # GET /sedes/:sede_id/stocks
@@ -62,11 +62,93 @@ class StocksController < ApplicationController
 
   # PATCH /stocks/:id
   def update
+    cantidad_anterior = @stock.cantidad.to_f
     if @stock.update(stock_update_params)
+      nueva_cantidad = @stock.cantidad.to_f
+      if nueva_cantidad != cantidad_anterior
+        delta = nueva_cantidad - cantidad_anterior
+        @stock.stock_movimientos.create!(
+          tipo:    'ajuste',
+          gramos:  delta,
+          usuario: current_user,
+          notas:   "Edición manual: #{cantidad_anterior}g → #{nueva_cantidad}g",
+        )
+      end
       render json: serialize_stock(@stock.reload)
     else
       render json: { errors: @stock.errors.full_messages }, status: :unprocessable_entity
     end
+  end
+
+  # POST /stocks/:id/ajuste
+  # Body: { tipo: merma|reconteo|perdida, gramos: float, motivo: string }
+  def ajuste
+    tipo_ajuste = params[:tipo].presence
+    gramos      = params[:gramos].to_f
+    motivo      = params[:motivo].to_s.strip
+
+    return render json: { error: 'Tipo de ajuste inválido' }, status: :unprocessable_entity unless %w[merma reconteo perdida].include?(tipo_ajuste)
+    return render json: { error: 'Los gramos deben ser distinto de 0' }, status: :unprocessable_entity if gramos.zero?
+    return render json: { error: 'El motivo es obligatorio' }, status: :unprocessable_entity if motivo.blank?
+
+    nueva_cantidad = @stock.cantidad.to_f + gramos
+    return render json: { error: "La cantidad resultante sería negativa (#{nueva_cantidad.round(2)}g)" }, status: :unprocessable_entity if nueva_cantidad < 0
+
+    ActiveRecord::Base.transaction do
+      @stock.update!(cantidad: nueva_cantidad)
+      @stock.stock_movimientos.create!(
+        tipo:    'ajuste',
+        gramos:  gramos,
+        usuario: current_user,
+        notas:   "[#{tipo_ajuste.upcase}] #{motivo}",
+      )
+      @stock.update!(estado: 'agotado') if nueva_cantidad == 0
+    end
+    render json: serialize_stock(@stock.reload)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /stocks/:id/descartar
+  # Body: { motivo: string }
+  def descartar
+    motivo = params[:motivo].to_s.strip
+    return render json: { error: 'El motivo es obligatorio para descartar stock' }, status: :unprocessable_entity if motivo.blank?
+    return render json: { error: 'El stock ya está agotado' }, status: :unprocessable_entity if @stock.agotado?
+
+    gramos_descartados = @stock.cantidad.to_f
+    ActiveRecord::Base.transaction do
+      @stock.stock_movimientos.create!(
+        tipo:    'merma',
+        gramos:  -gramos_descartados,
+        usuario: current_user,
+        notas:   "[DESCARTE] #{motivo}",
+      )
+      @stock.update!(cantidad: 0, estado: 'agotado')
+    end
+    render json: serialize_stock(@stock.reload)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # GET /stocks/:id/movimientos
+  def movimientos
+    movs = @stock.stock_movimientos
+                 .includes(:usuario, :sede_origen, :sede_destino)
+                 .order(created_at: :desc)
+                 .limit(200)
+    render json: movs.map { |m|
+      {
+        id:              m.id,
+        tipo:            m.tipo,
+        gramos:          m.gramos.to_f,
+        notas:           m.notas,
+        usuario:         m.usuario ? { id: m.usuario.id, nombre: "#{m.usuario.nombre} #{m.usuario.apellido}".strip } : nil,
+        sede_origen:     m.sede_origen  ? { id: m.sede_origen.id,  nombre: m.sede_origen.nombre  } : nil,
+        sede_destino:    m.sede_destino ? { id: m.sede_destino.id, nombre: m.sede_destino.nombre } : nil,
+        created_at:      m.created_at,
+      }
+    }
   end
 
   # GET /stocks/:id/trazabilidad

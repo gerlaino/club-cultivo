@@ -124,6 +124,9 @@ Rails.application.routes.draw do
       member do
         post :asignar
         get  :trazabilidad
+        post :ajuste
+        post :descartar
+        get  :movimientos
       end
     end
 

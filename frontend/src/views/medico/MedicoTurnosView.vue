@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { getMedicoTurnos, getMedicoPacientes, createMedicoTurno, updateMedicoTurno, getMedicoDisponibilidad } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import TurnoDetallePanel from '../../components/TurnoDetallePanel.vue'
 import {
   ChevronLeft, ChevronRight, Plus, X, Clock, User2,
   CheckCircle2, XCircle, AlertCircle, Calendar,
@@ -105,42 +106,6 @@ const form       = ref(defForm())
 const searchPac  = ref('')
 const pacOpen    = ref(false)
 const saving     = ref(false)
-
-// Edit notas
-const editingNotas = ref(false)
-const notasForm    = ref('')
-
-// Reprogramar
-const editingFecha   = ref(false)
-const reprogramForm  = ref({ fecha: '', hora: '', duracion_minutos: 30 })
-const reprogramSaving = ref(false)
-
-function abrirReprogramar(t) {
-  const d   = new Date(t.fecha_hora)
-  const pad = n => String(n).padStart(2, '0')
-  reprogramForm.value = {
-    fecha:            `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,
-    hora:             `${pad(d.getHours())}:${pad(d.getMinutes())}`,
-    duracion_minutos: t.duracion_minutos,
-  }
-  editingFecha.value = true
-}
-
-async function guardarReprogramacion() {
-  if (!turnoDetalle.value) return
-  reprogramSaving.value = true
-  try {
-    const fecha_hora = `${reprogramForm.value.fecha}T${reprogramForm.value.hora}:00`
-    const { data } = await updateMedicoTurno(turnoDetalle.value.id, {
-      fecha_hora,
-      duracion_minutos: Number(reprogramForm.value.duracion_minutos),
-    })
-    patchTurno(data)
-    editingFecha.value = false
-    toast.success('Turno reprogramado')
-  } catch { toast.error('No se pudo reprogramar') }
-  finally  { reprogramSaving.value = false }
-}
 
 // ── Week ──────────────────────────────────────────────────────────────────────
 const diasSemana = computed(() => {
@@ -266,7 +231,7 @@ async function crearTurno() {
   try {
     const { data } = await createMedicoTurno({
       paciente_id:      form.value.paciente_id,
-      fecha_hora:       `${form.value.fecha}T${form.value.hora}:00`,
+      fecha_hora:       fechaHora.toISOString(),
       duracion_minutos: Number(form.value.duracion_minutos),
       tipo:             form.value.tipo,
       motivo:           form.value.motivo || undefined,
@@ -278,25 +243,6 @@ async function crearTurno() {
   finally { saving.value = false }
 }
 
-// ── Update estado ─────────────────────────────────────────────────────────────
-async function cambiarEstado(turno, estado) {
-  try {
-    const { data } = await updateMedicoTurno(turno.id, { estado })
-    patchTurno(data)
-    toast.success(ESTADO_CFG[estado]?.label)
-  } catch { toast.error('No se pudo actualizar') }
-}
-
-async function guardarNotas() {
-  if (!turnoDetalle.value) return
-  try {
-    const { data } = await updateMedicoTurno(turnoDetalle.value.id, { notas_post: notasForm.value })
-    patchTurno(data)
-    editingNotas.value = false
-    toast.success('Notas guardadas')
-  } catch { toast.error('Error al guardar') }
-}
-
 function patchTurno(data) {
   const idx = turnos.value.findIndex(t => t.id === data.id)
   if (idx > -1) turnos.value[idx] = data
@@ -304,10 +250,7 @@ function patchTurno(data) {
 }
 
 function abrirDetalle(t) {
-  turnoDetalle.value  = t
-  editingNotas.value  = false
-  editingFecha.value  = false
-  notasForm.value     = t.notas_post || ''
+  turnoDetalle.value = t
 }
 
 // ── Format helpers ────────────────────────────────────────────────────────────
@@ -328,10 +271,18 @@ function fmtHoraFin(fechaHora, mins) {
 // ── Load ──────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
-    const [tRes, pRes, dRes] = await Promise.all([getMedicoTurnos(), getMedicoPacientes(), getMedicoDisponibilidad()])
-    turnos.value        = tRes.data || []
-    pacientes.value     = pRes.data?.data ?? pRes.data ?? []
-    disponibilidad.value = dRes.data || []
+    const [tRes, pRes] = await Promise.all([
+      getMedicoTurnos(),
+      getMedicoPacientes(),
+    ])
+    turnos.value    = tRes.data || []
+    pacientes.value = pRes.data?.data ?? pRes.data ?? []
+    getMedicoDisponibilidad()
+      .then(dRes => { disponibilidad.value = dRes.data || [] })
+      .catch(() => {})
+  } catch (e) {
+    toast.error('Error al cargar la agenda')
+    console.error('[turnera] load error:', e)
   } finally { loading.value = false }
 
   tickInterval = setInterval(() => { ahora.value = new Date() }, 60000)
@@ -595,145 +546,12 @@ onUnmounted(() => clearInterval(tickInterval))
     </Teleport>
 
     <!-- ── Panel lateral: Detalle turno ── -->
-    <Teleport to="body">
-      <Transition name="slide-right">
-        <div v-if="turnoDetalle" class="tv__detail-overlay" @click.self="turnoDetalle = null">
-          <div class="tv__detail">
-            <div class="tv__detail-header">
-              <div class="tv__detail-tipo" :style="{ background: TIPO_CFG[turnoDetalle.tipo]?.bg, color: TIPO_CFG[turnoDetalle.tipo]?.color }">
-                {{ TIPO_CFG[turnoDetalle.tipo]?.label }}
-              </div>
-              <button class="tv__modal-close" @click="turnoDetalle = null"><X :size="18" /></button>
-            </div>
-
-            <!-- Paciente -->
-            <div class="tv__detail-pac">
-              <div class="tv__detail-av">
-                {{ (turnoDetalle.paciente_nombre?.split(' ').map(w => w[0]).join('').slice(0,2) || 'P').toUpperCase() }}
-              </div>
-              <div class="tv__detail-pac-info">
-                <div class="tv__detail-pac-nombre">{{ turnoDetalle.paciente_nombre }}</div>
-                <button
-                  class="tv__detail-ficha-link"
-                  @click="() => { const pid = turnoDetalle.paciente_id; turnoDetalle = null; router.push(`/medico/pacientes/${pid}/ficha`) }"
-                >Ver ficha clínica →</button>
-              </div>
-            </div>
-
-            <!-- Info -->
-            <div class="tv__detail-info-grid">
-              <div class="tv__detail-item">
-                <span class="tv__detail-lbl">Fecha</span>
-                <span class="tv__detail-val">{{ fmtFechaCompleta(turnoDetalle.fecha_hora) }}</span>
-              </div>
-              <div class="tv__detail-item">
-                <span class="tv__detail-lbl">Horario</span>
-                <span class="tv__detail-val">
-                  {{ fmtHora(turnoDetalle.fecha_hora) }} – {{ fmtHoraFin(turnoDetalle.fecha_hora, turnoDetalle.duracion_minutos) }}
-                  <span class="tv__detail-dur">({{ turnoDetalle.duracion_minutos }} min)</span>
-                </span>
-              </div>
-              <div class="tv__detail-item">
-                <span class="tv__detail-lbl">Estado</span>
-                <span class="tv__estado-badge" :class="ESTADO_CFG[turnoDetalle.estado]?.cls">
-                  {{ ESTADO_CFG[turnoDetalle.estado]?.label }}
-                </span>
-              </div>
-              <div v-if="turnoDetalle.motivo" class="tv__detail-item tv__detail-item--full">
-                <span class="tv__detail-lbl">Motivo</span>
-                <span class="tv__detail-val tv__detail-val--text">{{ turnoDetalle.motivo }}</span>
-              </div>
-            </div>
-
-            <!-- Acciones de estado -->
-            <div class="tv__detail-acciones">
-              <button
-                v-if="turnoDetalle.estado === 'programado'"
-                class="tv__accion tv__accion--ok"
-                @click="cambiarEstado(turnoDetalle, 'confirmado')"
-              ><CheckCircle2 :size="14" /> Confirmar</button>
-              <button
-                v-if="['programado','confirmado'].includes(turnoDetalle.estado)"
-                class="tv__accion tv__accion--primary"
-                @click="cambiarEstado(turnoDetalle, 'realizado')"
-              ><CheckCircle2 :size="14" /> Marcar realizado</button>
-              <button
-                v-if="['programado','confirmado'].includes(turnoDetalle.estado)"
-                class="tv__accion tv__accion--warn"
-                @click="cambiarEstado(turnoDetalle, 'ausente')"
-              ><AlertCircle :size="14" /> Ausente</button>
-              <button
-                v-if="!['cancelado','realizado'].includes(turnoDetalle.estado)"
-                class="tv__accion tv__accion--reprog"
-                @click="abrirReprogramar(turnoDetalle)"
-              ><Pencil :size="14" /> Reprogramar</button>
-              <button
-                v-if="!['cancelado','realizado'].includes(turnoDetalle.estado)"
-                class="tv__accion tv__accion--danger"
-                @click="cambiarEstado(turnoDetalle, 'cancelado')"
-              ><XCircle :size="14" /> Cancelar</button>
-            </div>
-
-            <!-- Form reprogramar -->
-            <div v-if="editingFecha" class="tv__reprog-form">
-              <div class="tv__reprog-title">Reprogramar turno</div>
-              <div class="tv__reprog-fields">
-                <div class="tv__reprog-field">
-                  <label class="tv__label">Fecha</label>
-                  <input v-model="reprogramForm.fecha" type="date" class="tv__input"
-                    :min="new Date().toISOString().split('T')[0]" />
-                </div>
-                <div class="tv__reprog-field">
-                  <label class="tv__label">Hora</label>
-                  <input v-model="reprogramForm.hora" type="time" class="tv__input" step="900" />
-                </div>
-                <div class="tv__reprog-field">
-                  <label class="tv__label">Duración</label>
-                  <select v-model.number="reprogramForm.duracion_minutos" class="tv__input">
-                    <option :value="15">15 min</option>
-                    <option :value="30">30 min</option>
-                    <option :value="45">45 min</option>
-                    <option :value="60">1 hora</option>
-                    <option :value="90">1:30 h</option>
-                  </select>
-                </div>
-              </div>
-              <div class="tv__notas-actions">
-                <button class="tv__btn-ghost tv__btn-xs" @click="editingFecha = false">Cancelar</button>
-                <button class="tv__btn-primary tv__btn-xs" :disabled="reprogramSaving" @click="guardarReprogramacion">
-                  <DsSpinner v-if="reprogramSaving" :size="12" /> Confirmar
-                </button>
-              </div>
-            </div>
-
-            <!-- Notas post-consulta -->
-            <div class="tv__detail-notas">
-              <div class="tv__detail-notas-header">
-                <span class="tv__detail-lbl">Notas de la consulta</span>
-                <button v-if="!editingNotas" class="tv__notas-edit" @click="editingNotas = true">
-                  <Pencil :size="13" /> Editar
-                </button>
-              </div>
-              <template v-if="editingNotas">
-                <textarea
-                  v-model="notasForm"
-                  class="tv__input tv__textarea"
-                  rows="4"
-                  placeholder="Observaciones, diagnóstico, indicaciones…"
-                ></textarea>
-                <div class="tv__notas-actions">
-                  <button class="tv__btn-ghost tv__btn-xs" @click="editingNotas = false">Cancelar</button>
-                  <button class="tv__btn-primary tv__btn-xs" @click="guardarNotas">Guardar</button>
-                </div>
-              </template>
-              <p v-else-if="turnoDetalle.notas_post" class="tv__detail-notas-text">{{ turnoDetalle.notas_post }}</p>
-              <p v-else class="tv__detail-notas-empty">Sin notas. Hacé click en Editar para agregar.</p>
-            </div>
-
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <TurnoDetallePanel
+      v-if="turnoDetalle"
+      :turno="turnoDetalle"
+      @close="turnoDetalle = null"
+      @updated="patchTurno"
+    />
 
   </div>
 </template>

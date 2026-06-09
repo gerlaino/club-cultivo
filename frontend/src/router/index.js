@@ -458,6 +458,17 @@ const routes = [
       next()
     },
   },
+  {
+    path: '/admin/stock/:id',
+    name: 'admin-stock-detail',
+    component: () => import('../views/admin/AdminStockDetailView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role !== 'admin') return next('/')
+      next()
+    },
+  },
 
   {
     path: '/admin/pesajes-manicura',

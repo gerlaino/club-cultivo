@@ -60,7 +60,7 @@ module Medico
         indicacion_activa:  indicacion ? serialize_indicacion(indicacion) : nil,
         proximo_turno:      proximo_turno ? serialize_turno(proximo_turno) : nil,
         dispensaciones:     disp_serialized,
-        total_dispensaciones: @paciente.dispensaciones.where(deleted_at: nil).count,
+        total_dispensaciones: @paciente.dispensaciones.count,
         resumen_consumo: {
           total_g_90d:          total_90d,
           promedio_mensual_g:   prom_mens,

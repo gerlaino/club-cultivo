@@ -168,7 +168,11 @@
               <span class="stk__grupo-total">{{ grupo.total }}g</span>
             </div>
             <div class="stk__inv-list">
-              <div v-for="s in grupo.items" :key="s.id" class="stk__inv-row">
+              <RouterLink
+                v-for="s in grupo.items" :key="s.id"
+                :to="`/admin/stock/${s.id}`"
+                class="stk__inv-row stk__inv-row--link"
+              >
                 <div class="stk__inv-main">
                   <span class="stk__inv-forma">{{ formaLabel(s.forma_producto) }}</span>
                   <div class="stk__inv-chips">
@@ -187,25 +191,9 @@
                   <span v-if="s.estado_vencimiento && s.estado_vencimiento !== 'ok'" class="stk__badge-venc" :class="`stk__badge-venc--${s.estado_vencimiento}`">
                     {{ badgeVencLabel(s) }}
                   </span>
-                  <button class="stk__icon-btn" title="Editar stock" @click="abrirEditar(s)">
-                    <i class="bi bi-pencil"></i>
-                  </button>
-                  <button class="stk__icon-btn" title="Repartir a sede" @click="openRepartir(s)">
-                    <i class="bi bi-arrows-angle-expand"></i>
-                  </button>
-                  <button
-                    v-if="s.forma_producto === 'flor_seca' && s.lote_id"
-                    class="stk__icon-btn stk__icon-btn--amber"
-                    title="Procesar derivado"
-                    @click="openProcesar(s)"
-                  >
-                    <i class="bi bi-arrow-right-square"></i>
-                  </button>
-                  <RouterLink v-if="s.codigo_qr" :to="`/s/${s.codigo_qr}`" class="stk__icon-btn" title="Ver QR">
-                    <i class="bi bi-qr-code"></i>
-                  </RouterLink>
+                  <i class="bi bi-chevron-right stk__inv-arrow"></i>
                 </div>
-              </div>
+              </RouterLink>
             </div>
           </div>
         </template>
@@ -519,6 +507,153 @@
       </Transition>
     </Teleport>
 
+    <!-- ── Modal: Ajustar stock ────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="stk-fade">
+        <div v-if="showAjustar" class="stk__overlay" @click.self="closeAjustar">
+          <div class="stk__modal">
+            <div class="stk__modal-hd">
+              <div class="stk__modal-ico"><i class="bi bi-sliders"></i></div>
+              <div>
+                <h2 class="stk__modal-title">Ajustar stock</h2>
+                <p class="stk__modal-sub">{{ formaLabel(ajustarTarget?.forma_producto) }} · {{ ajustarTarget?.sede?.nombre || '—' }}</p>
+              </div>
+              <button class="stk__modal-close" @click="closeAjustar"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="stk__modal-body">
+              <div v-if="ajustarError" class="stk__alert">{{ ajustarError }}</div>
+              <div class="stk__form-grid">
+                <div class="stk__field">
+                  <label class="stk__label">Tipo de ajuste <span class="stk__req">*</span></label>
+                  <select class="stk__input" v-model="ajustarForm.tipo">
+                    <option value="merma">Merma (pérdida de proceso)</option>
+                    <option value="perdida">Pérdida / daño / robo</option>
+                    <option value="reconteo">Reconteo (corrección de inventario)</option>
+                  </select>
+                </div>
+                <div class="stk__field" v-if="ajustarForm.tipo !== 'reconteo'">
+                  <label class="stk__label">Gramos a descontar <span class="stk__req">*</span></label>
+                  <div class="stk__input-row">
+                    <input type="number" min="0.01" :max="ajustarTarget?.cantidad" step="0.01"
+                      class="stk__input" v-model.number="ajustarForm.gramos"
+                      :placeholder="`máx ${ajustarTarget?.cantidad}g`" />
+                    <span class="stk__input-suf">g</span>
+                  </div>
+                </div>
+                <div class="stk__field" v-else>
+                  <label class="stk__label">Nueva cantidad real (g) <span class="stk__req">*</span></label>
+                  <div class="stk__input-row">
+                    <input type="number" min="0" step="0.01"
+                      class="stk__input" v-model.number="ajustarForm.nuevaCantidad"
+                      :placeholder="`actual: ${ajustarTarget?.cantidad}g`" />
+                    <span class="stk__input-suf">g</span>
+                  </div>
+                </div>
+                <div class="stk__field stk__field--full">
+                  <label class="stk__label">Motivo <span class="stk__req">*</span></label>
+                  <textarea class="stk__input stk__textarea" rows="2" v-model="ajustarForm.motivo" placeholder="Describí el motivo del ajuste…"></textarea>
+                </div>
+              </div>
+              <div v-if="ajustarPreview !== null" class="stk__ajuste-preview" :class="ajustarPreviewClass">
+                <span>Resultado: <strong>{{ ajustarPreview.toFixed(2) }}g</strong></span>
+                <span class="stk__ajuste-preview-delta">{{ ajustarDelta >= 0 ? '+' : '' }}{{ ajustarDelta.toFixed(2) }}g</span>
+              </div>
+            </div>
+            <div class="stk__modal-ft">
+              <button type="button" class="stk__btn-ghost" @click="closeAjustar">Cancelar</button>
+              <button class="stk__btn-primary" :disabled="ajustando" @click="ejecutarAjustar">
+                <DsSpinner v-if="ajustando" :size="12" />
+                <i v-else class="bi bi-check-lg"></i>
+                Confirmar ajuste
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ── Modal: Descartar stock ──────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="stk-fade">
+        <div v-if="showDescartar" class="stk__overlay" @click.self="closeDescartar">
+          <div class="stk__modal">
+            <div class="stk__modal-hd">
+              <div class="stk__modal-ico stk__modal-ico--danger"><i class="bi bi-trash"></i></div>
+              <div>
+                <h2 class="stk__modal-title">Descartar stock</h2>
+                <p class="stk__modal-sub">{{ formaLabel(descartarTarget?.forma_producto) }} · {{ descartarTarget?.cantidad }}g · {{ descartarTarget?.sede?.nombre || '—' }}</p>
+              </div>
+              <button class="stk__modal-close" @click="closeDescartar"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="stk__modal-body">
+              <div v-if="descartarError" class="stk__alert">{{ descartarError }}</div>
+              <div class="stk__descarte-warn">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                Esta acción marcará el stock como <strong>agotado</strong> y registrará una merma de <strong>{{ descartarTarget?.cantidad }}g</strong>. No se puede revertir.
+              </div>
+              <div class="stk__form-grid">
+                <div class="stk__field stk__field--full">
+                  <label class="stk__label">Motivo del descarte <span class="stk__req">*</span></label>
+                  <textarea class="stk__input stk__textarea" rows="3" v-model="descartarForm.motivo" placeholder="Ej: vencimiento, contaminación, pérdida irreversible…"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="stk__modal-ft">
+              <button type="button" class="stk__btn-ghost" @click="closeDescartar">Cancelar</button>
+              <button class="stk__btn-danger" :disabled="descartando || !descartarForm.motivo.trim()" @click="ejecutarDescartar">
+                <DsSpinner v-if="descartando" :size="12" />
+                <i v-else class="bi bi-trash"></i>
+                Descartar {{ descartarTarget?.cantidad }}g
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ── Modal: Movimientos ──────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="stk-fade">
+        <div v-if="showMovimientos" class="stk__overlay" @click.self="closeMovimientos">
+          <div class="stk__modal stk__modal--wide">
+            <div class="stk__modal-hd">
+              <div class="stk__modal-ico"><i class="bi bi-clock-history"></i></div>
+              <div>
+                <h2 class="stk__modal-title">Historial de movimientos</h2>
+                <p class="stk__modal-sub">{{ formaLabel(movimientosTarget?.forma_producto) }} · {{ movimientosTarget?.numero_lote_producto }}</p>
+              </div>
+              <button class="stk__modal-close" @click="closeMovimientos"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="stk__modal-body stk__modal-body--scroll">
+              <div v-if="loadingMovimientos" class="stk__loading"><DsSpinner /></div>
+              <div v-else-if="!movimientos.length" class="stk__empty">
+                <span class="stk__empty-ico">📋</span>
+                <p class="stk__empty-title">Sin movimientos registrados</p>
+                <span class="stk__empty-sub">Las operaciones futuras quedarán registradas aquí.</span>
+              </div>
+              <div v-else class="stk__movs">
+                <div v-for="m in movimientos" :key="m.id" class="stk__mov">
+                  <div class="stk__mov-left">
+                    <span class="stk__mov-tipo" :class="`stk__mov-tipo--${m.tipo}`">{{ movTipoLabel(m.tipo) }}</span>
+                    <span class="stk__mov-fecha">{{ formatDate(m.created_at) }}</span>
+                  </div>
+                  <div class="stk__mov-center">
+                    <span class="stk__mov-notas">{{ m.notas || '—' }}</span>
+                    <span v-if="m.usuario" class="stk__mov-user">{{ m.usuario.nombre }}</span>
+                  </div>
+                  <div class="stk__mov-right">
+                    <span class="stk__mov-g" :class="m.gramos >= 0 ? 'stk__mov-g--pos' : 'stk__mov-g--neg'">
+                      {{ m.gramos >= 0 ? '+' : '' }}{{ m.gramos.toFixed(2) }}g
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
 </template>
 
 <script setup>
@@ -526,7 +661,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   listStocksPendientes, listStocks, listStocksHistorial,
-  asignarStock, listSedes, createStock, updateStock,
+  asignarStock, ajustarStock, descartarStock, getStockMovimientos,
+  listSedes, createStock, updateStock,
   getPreferences, updatePreferences, listGeneticas,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -937,6 +1073,136 @@ async function ejecutarProcesar() {
   } finally { procesando.value = false }
 }
 
+// ── Ajustar ────────────────────────────────────────────────────────────────────
+const showAjustar   = ref(false)
+const ajustarTarget = ref(null)
+const ajustarForm   = ref({ tipo: 'merma', gramos: null, nuevaCantidad: null, motivo: '' })
+const ajustarError  = ref(null)
+const ajustando     = ref(false)
+
+const ajustarDelta = computed(() => {
+  if (!ajustarTarget.value) return 0
+  const actual = parseFloat(ajustarTarget.value.cantidad)
+  if (ajustarForm.value.tipo !== 'reconteo') {
+    return -(ajustarForm.value.gramos || 0)
+  }
+  const nueva = ajustarForm.value.nuevaCantidad
+  return nueva != null ? nueva - actual : 0
+})
+const ajustarPreview = computed(() => {
+  if (!ajustarTarget.value) return null
+  const actual = parseFloat(ajustarTarget.value.cantidad)
+  if (ajustarForm.value.tipo !== 'reconteo') {
+    if (!ajustarForm.value.gramos) return null
+    return Math.max(0, actual - ajustarForm.value.gramos)
+  }
+  return ajustarForm.value.nuevaCantidad != null ? ajustarForm.value.nuevaCantidad : null
+})
+const ajustarPreviewClass = computed(() => {
+  if (ajustarDelta.value > 0) return 'stk__ajuste-preview--pos'
+  if (ajustarDelta.value < 0) return 'stk__ajuste-preview--neg'
+  return ''
+})
+
+function openAjustar(s) {
+  ajustarTarget.value = s
+  ajustarForm.value   = { tipo: 'merma', gramos: null, nuevaCantidad: null, motivo: '' }
+  ajustarError.value  = null
+  showAjustar.value   = true
+}
+function closeAjustar() { showAjustar.value = false }
+
+async function ejecutarAjustar() {
+  ajustarError.value = null
+  const actual = parseFloat(ajustarTarget.value.cantidad)
+  let gramos, motivo = ajustarForm.value.motivo.trim()
+  if (!motivo) { ajustarError.value = 'El motivo es obligatorio'; return }
+
+  if (ajustarForm.value.tipo !== 'reconteo') {
+    if (!ajustarForm.value.gramos || ajustarForm.value.gramos <= 0) { ajustarError.value = 'Ingresá los gramos a descontar'; return }
+    gramos = -ajustarForm.value.gramos
+  } else {
+    if (ajustarForm.value.nuevaCantidad == null) { ajustarError.value = 'Ingresá la nueva cantidad'; return }
+    gramos = ajustarForm.value.nuevaCantidad - actual
+    if (gramos === 0) { ajustarError.value = 'La nueva cantidad es igual a la actual'; return }
+  }
+
+  ajustando.value = true
+  try {
+    await ajustarStock(ajustarTarget.value.id, { tipo: ajustarForm.value.tipo, gramos, motivo })
+    closeAjustar()
+    const [rPend, rInv] = await Promise.all([listStocksPendientes(), listStocks()])
+    pendientes.value = rPend.data || []
+    inventario.value = rInv.data || []
+    if (historialLoaded.value) {
+      const { data: h } = await listStocksHistorial()
+      historial.value = h || []
+    }
+    toast.success('Stock ajustado')
+  } catch (e) {
+    ajustarError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al ajustar'
+  } finally { ajustando.value = false }
+}
+
+// ── Descartar ──────────────────────────────────────────────────────────────────
+const showDescartar   = ref(false)
+const descartarTarget = ref(null)
+const descartarForm   = ref({ motivo: '' })
+const descartarError  = ref(null)
+const descartando     = ref(false)
+
+function openDescartar(s) {
+  descartarTarget.value = s
+  descartarForm.value   = { motivo: '' }
+  descartarError.value  = null
+  showDescartar.value   = true
+}
+function closeDescartar() { showDescartar.value = false }
+
+async function ejecutarDescartar() {
+  descartarError.value = null
+  const motivo = descartarForm.value.motivo.trim()
+  if (!motivo) { descartarError.value = 'El motivo es obligatorio'; return }
+  descartando.value = true
+  try {
+    await descartarStock(descartarTarget.value.id, { motivo })
+    closeDescartar()
+    const [rPend, rInv] = await Promise.all([listStocksPendientes(), listStocks()])
+    pendientes.value = rPend.data || []
+    inventario.value = rInv.data || []
+    if (historialLoaded.value) {
+      const { data: h } = await listStocksHistorial()
+      historial.value = h || []
+    }
+    toast.success('Stock descartado')
+  } catch (e) {
+    descartarError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al descartar'
+  } finally { descartando.value = false }
+}
+
+// ── Movimientos ────────────────────────────────────────────────────────────────
+const showMovimientos    = ref(false)
+const movimientosTarget  = ref(null)
+const movimientos        = ref([])
+const loadingMovimientos = ref(false)
+
+function movTipoLabel(tipo) {
+  return { produccion: 'Producción', transferencia: 'Transferencia', dispensacion: 'Dispensación', ajuste: 'Ajuste', merma: 'Merma' }[tipo] || tipo
+}
+
+async function openMovimientos(s) {
+  movimientosTarget.value = s
+  movimientos.value       = []
+  loadingMovimientos.value = true
+  showMovimientos.value   = true
+  try {
+    const { data } = await getStockMovimientos(s.id)
+    movimientos.value = data || []
+  } catch { toast.error('Error al cargar movimientos') }
+  finally { loadingMovimientos.value = false }
+}
+function closeMovimientos() { showMovimientos.value = false }
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const FORMAS = [
   { value: 'flor_seca',  label: 'Flor seca' },
@@ -1144,8 +1410,15 @@ function formatDate(dateStr) {
   border-bottom: 1px solid #f1f5f9;
 }
 .stk__inv-row:last-child { border-bottom: none; }
+.stk__inv-row--link {
+  text-decoration: none; cursor: pointer;
+  transition: background .12s;
+}
+.stk__inv-row--link:hover { background: #f8fafc; }
 .stk__inv-main  { flex: 1; min-width: 0; }
 .stk__inv-right { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+.stk__inv-arrow { font-size: .7rem; color: #cbd5e1; margin-left: .25rem; }
+.stk__inv-row--link:hover .stk__inv-arrow { color: #1b5e20; }
 .stk__inv-forma { font-size: .88rem; font-weight: 600; color: #0f172a; display: block; margin-bottom: .25rem; }
 .stk__inv-chips { display: flex; flex-wrap: wrap; gap: .25rem; }
 .stk__inv-g     { font-size: .95rem; font-weight: 800; color: #15803d; }
@@ -1278,6 +1551,76 @@ function formatDate(dateStr) {
 
 /* ── Field hint ─────────────────────────────────────────────────────────────── */
 .stk__field-hint { font-size: .72rem; color: #64748b; margin-top: .2rem; }
+
+/* ── Icon button danger ────────────────────────────────────────────────────── */
+.stk__icon-btn--danger { border-color: #fecaca; color: #dc2626; }
+.stk__icon-btn--danger:hover { border-color: #dc2626; color: #b91c1c; background: #fef2f2; }
+
+/* ── Danger button ──────────────────────────────────────────────────────────── */
+.stk__btn-danger {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: #dc2626; color: #fff; border: none; border-radius: 8px;
+  padding: .55rem 1.1rem; font-size: .82rem; font-weight: 600;
+  cursor: pointer; transition: background .15s;
+}
+.stk__btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.stk__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Modal danger icon ──────────────────────────────────────────────────────── */
+.stk__modal-ico--danger { background: #fef2f2; color: #dc2626; }
+
+/* ── Modal wide ─────────────────────────────────────────────────────────────── */
+.stk__modal--wide { max-width: 680px; }
+.stk__modal-body--scroll { max-height: 65vh; overflow-y: auto; }
+
+/* ── Descarte warning ───────────────────────────────────────────────────────── */
+.stk__descarte-warn {
+  display: flex; align-items: flex-start; gap: .5rem;
+  background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;
+  padding: .75rem .9rem; margin-bottom: 1rem; font-size: .82rem; color: #7f1d1d;
+}
+.stk__descarte-warn i { color: #dc2626; flex-shrink: 0; margin-top: .1rem; }
+
+/* ── Ajuste preview ─────────────────────────────────────────────────────────── */
+.stk__ajuste-preview {
+  display: flex; align-items: center; justify-content: space-between;
+  border-radius: 8px; padding: .6rem .9rem; margin-top: 1rem;
+  font-size: .82rem; font-weight: 500;
+  border: 1px solid #e2e8f0; background: #f8fafc; color: #374151;
+}
+.stk__ajuste-preview--pos { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.stk__ajuste-preview--neg { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.stk__ajuste-preview-delta { font-weight: 800; font-size: .88rem; }
+
+/* ── Movimientos ────────────────────────────────────────────────────────────── */
+.stk__movs { display: flex; flex-direction: column; gap: 0; }
+.stk__mov {
+  display: flex; align-items: flex-start; gap: 1rem;
+  padding: .75rem 0; border-bottom: 1px solid #f1f5f9;
+}
+.stk__mov:last-child { border-bottom: none; }
+.stk__mov-left  { min-width: 130px; display: flex; flex-direction: column; gap: .2rem; }
+.stk__mov-center { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .2rem; }
+.stk__mov-right { flex-shrink: 0; text-align: right; }
+
+.stk__mov-tipo {
+  display: inline-flex; align-items: center;
+  padding: .2em .6em; border-radius: 5px;
+  font-size: .68rem; font-weight: 700; white-space: nowrap;
+  background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+}
+.stk__mov-tipo--produccion   { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+.stk__mov-tipo--transferencia { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.stk__mov-tipo--dispensacion { background: #fdf4ff; color: #7e22ce; border-color: #e9d5ff; }
+.stk__mov-tipo--ajuste       { background: #fefce8; color: #854d0e; border-color: #fef08a; }
+.stk__mov-tipo--merma        { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+
+.stk__mov-fecha { font-size: .7rem; color: #94a3b8; }
+.stk__mov-notas { font-size: .8rem; color: #374151; word-break: break-word; }
+.stk__mov-user  { font-size: .7rem; color: #94a3b8; }
+.stk__mov-g     { font-size: .9rem; font-weight: 800; }
+.stk__mov-g--pos { color: #15803d; }
+.stk__mov-g--neg { color: #dc2626; }
 
 /* ── Procesar source info ───────────────────────────────────────────────────── */
 .stk__procesar-src {
