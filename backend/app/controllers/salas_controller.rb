@@ -14,8 +14,20 @@ class SalasController < ApplicationController
                         .includes(:sede, :lotes, :created_by)
                         .order(:nombre)
 
-    if current_user.cultivador? || current_user.manicura?
-      salas = salas.where(id: current_user.salas_ids_asignadas)
+    if current_user.cultivador?
+      ids = current_user.salas_ids_asignadas
+      if ids.any?
+        salas = salas.where(id: ids)
+      else
+        salas = salas.where(kind: %w[vegetativo floracion])
+      end
+    elsif current_user.manicura?
+      ids = current_user.salas_ids_asignadas
+      if ids.any?
+        salas = salas.where(id: ids)
+      else
+        salas = salas.where(kind: 'manicura')
+      end
     elsif current_user.supervisor?
       salas = salas.where(sede_id: current_user.sedes_ids_asignadas)
     end
@@ -77,12 +89,6 @@ class SalasController < ApplicationController
     unless lote.estado == transicion[:desde]
       return render json: {
         error: "El lote debe estar en '#{transicion[:label_desde]}' para ingresar a esta sala (estado actual: #{lote.estado})"
-      }, status: :unprocessable_entity
-    end
-
-    if @sala.tiene_limite_capacidad? && lote.plants_count.to_i > @sala.capacidad_disponible
-      return render json: {
-        error: "La sala '#{@sala.nombre}' no tiene capacidad para #{lote.plants_count} plantas (disponible: #{@sala.capacidad_disponible} de #{@sala.capacidad_maxima})"
       }, status: :unprocessable_entity
     end
 
@@ -194,8 +200,20 @@ class SalasController < ApplicationController
 
   def set_sala
     scope = current_user.club.salas
-    if current_user.cultivador? || current_user.manicura?
-      scope = scope.where(id: current_user.salas_ids_asignadas)
+    if current_user.cultivador?
+      ids = current_user.salas_ids_asignadas
+      if ids.any?
+        scope = scope.where(id: ids)
+      else
+        scope = scope.where(kind: %w[vegetativo floracion])
+      end
+    elsif current_user.manicura?
+      ids = current_user.salas_ids_asignadas
+      if ids.any?
+        scope = scope.where(id: ids)
+      else
+        scope = scope.where(kind: 'manicura')
+      end
     elsif current_user.supervisor?
       scope = scope.where(sede_id: current_user.sedes_ids_asignadas)
     end

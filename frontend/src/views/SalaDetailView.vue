@@ -156,9 +156,11 @@ const SALA_KINDS = [
 
 function openEditSala() {
   editSalaForm.value = {
-    nombre: sala.value.nombre || '',
-    kind:   sala.value.kind   || '',
-    notes:  sala.value.notes  || '',
+    nombre:     sala.value.nombre     || '',
+    kind:       sala.value.kind       || '',
+    state:      sala.value.state      || 'activa',
+    pots_count: sala.value.pots_count ?? '',
+    notes:      sala.value.notes      || '',
   }
   editSalaError.value = null
   showEditSala.value  = true
@@ -1404,6 +1406,24 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                   >{{ k.label }}</option>
                 </select>
               </div>
+              <div class="sd__field">
+                <label class="sd__label">Estado</label>
+                <select class="sd__input" v-model="editSalaForm.state">
+                  <option value="activa">Activa</option>
+                  <option value="mantenimiento">En mantenimiento</option>
+                  <option value="cerrada">Cerrada</option>
+                </select>
+              </div>
+              <div class="sd__field">
+                <label class="sd__label">Slots para lotes</label>
+                <input
+                  type="number" min="0" step="1"
+                  class="sd__input"
+                  v-model.number="editSalaForm.pots_count"
+                  placeholder="Ej: 6"
+                />
+                <span class="sd__hint">Cantidad de lotes que pueden estar simultáneamente en esta sala. Define el layout visual.</span>
+              </div>
               <div class="sd__field sd__field--full">
                 <label class="sd__label">Notas</label>
                 <textarea class="sd__input sd__textarea" rows="3" v-model.trim="editSalaForm.notes" placeholder="Observaciones internas…"></textarea>
@@ -1601,6 +1621,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__checkbox-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; flex-shrink: 0; }
 .sd__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; }
 .sd__input--disabled { color: #94a3b8; cursor: default; }
+.sd__hint { font-size: .72rem; color: #94a3b8; line-height: 1.3; }
 
 /* Madre picker */
 .sd__madre-picker { position: relative; display: flex; flex-direction: column; gap: .4rem; }

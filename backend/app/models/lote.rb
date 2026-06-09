@@ -38,7 +38,7 @@ class Lote < ApplicationRecord
   validates :start_date,        presence: true
 
   before_create :generar_codigo
-  before_save   :generar_qr_cosecha, if: :debe_generar_qr_cosecha?
+  before_create :generar_codigo_qr
   after_commit  :push_manicura_pendiente, on: [:create, :update]
   after_commit  :dispatch_webhook_avance,  on: [:create, :update]
 
@@ -498,13 +498,8 @@ class Lote < ApplicationRecord
 
   private
 
-  def debe_generar_qr_cosecha?
-    return false unless self.class.column_names.include?('codigo_qr_cosecha')
-    estado_changed? && estado == 'cosecha' && codigo_qr_cosecha.blank?
-  end
-
-  def generar_qr_cosecha
-    self.codigo_qr_cosecha = SecureRandom.urlsafe_base64(12)
+  def generar_codigo_qr
+    self.codigo_qr = "L-#{club_id}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"
   end
 
   def generar_codigo

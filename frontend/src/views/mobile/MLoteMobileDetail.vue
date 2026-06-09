@@ -199,7 +199,6 @@
     <!-- Input foto oculto -->
     <input ref="fotoInput" type="file" accept="image/*" capture="environment" style="display:none" @change="subirFoto" />
   </div>
-  <div v-else-if="loading" class="mlot mlot--loading"><i class="bi bi-arrow-repeat mlot__spin"></i></div>
 </template>
 
 <script setup>

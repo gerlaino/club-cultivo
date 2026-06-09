@@ -22,6 +22,7 @@ class Club < ApplicationRecord
   has_many :alertas_internas, class_name: 'AlertaInterna', dependent: :destroy
   has_many :ariccame_registros, class_name: 'AriccameRegistro', dependent: :destroy
   has_many :plan_trabajos,      dependent: :destroy
+  has_many :aplicacion_planes,  class_name: 'AplicacionPlan', dependent: :destroy
   has_many :pesajes_manicura,   class_name: 'PesajeManicura', dependent: :destroy
   has_many :webhooks,           dependent: :destroy
 

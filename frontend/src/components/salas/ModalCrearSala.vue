@@ -25,11 +25,12 @@ const KINDS = [
 ]
 
 const form = ref({
-  nombre:  '',
-  state:   'activa',
-  kind:    'vegetativo',
-  sede_id: props.sedeIdFija || null,
-  notes:   '',
+  nombre:     '',
+  state:      'activa',
+  kind:       'vegetativo',
+  sede_id:    props.sedeIdFija || null,
+  pots_count: null,
+  notes:      '',
 })
 
 const errors = ref({})
@@ -126,14 +127,26 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Estado -->
-          <div class="mcr__field">
-            <label class="mcr__label">Estado inicial</label>
-            <select class="mcr__input" v-model="form.state">
-              <option value="activa">Activa</option>
-              <option value="mantenimiento">En mantenimiento</option>
-              <option value="cerrada">Cerrada</option>
-            </select>
+          <!-- Estado + Pots en grilla -->
+          <div class="mcr__grid">
+            <div class="mcr__field">
+              <label class="mcr__label">Estado inicial</label>
+              <select class="mcr__input" v-model="form.state">
+                <option value="activa">Activa</option>
+                <option value="mantenimiento">En mantenimiento</option>
+                <option value="cerrada">Cerrada</option>
+              </select>
+            </div>
+            <div class="mcr__field">
+              <label class="mcr__label">Slots para lotes</label>
+              <input
+                type="number" min="0" step="1"
+                class="mcr__input"
+                v-model.number="form.pots_count"
+                placeholder="Ej: 6"
+              />
+              <span class="mcr__hint">Capacidad de lotes simultáneos</span>
+            </div>
           </div>
 
           <!-- Sede (solo si no está fija) -->
@@ -251,6 +264,7 @@ onMounted(async () => {
 .mcr__input--err { border-color: #dc2626 !important; }
 .mcr__textarea { resize: vertical; min-height: 68px; }
 .mcr__err  { font-size: .72rem; color: #dc2626; font-weight: 600; }
+.mcr__hint { font-size: .72rem; color: #94a3b8; }
 .mcr__hint { font-size: .72rem; color: #94a3b8; }
 
 /* Kinds selector */

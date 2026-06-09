@@ -85,6 +85,7 @@ Rails.application.routes.draw do
       collection do
         get :export_csv
         get :proximo_codigo
+        get 'por_qr/:codigo_qr', action: :por_qr
       end
       resource :costo, controller: :costo_lotes, only: [:show, :create, :update]
       resources :registros_ambientales, only: [:index, :create, :destroy]
@@ -291,6 +292,7 @@ Rails.application.routes.draw do
       member do
         post :publicar
         post :archivar
+        get  :export_csv
       end
     end
     scope '/plan_trabajos/:id', controller: :plan_trabajos do
@@ -298,6 +300,11 @@ Rails.application.routes.draw do
       post   'plan_tareas',       action: :plan_tareas_create
       patch  'plan_tareas/:tid',  action: :plan_tareas_update
       delete 'plan_tareas/:tid',  action: :plan_tareas_destroy
+    end
+
+    # Aplicación de plantillas de plan
+    resources :aplicacion_planes, only: [:index, :create, :show, :destroy] do
+      member { post :cancelar }
     end
 
     resources :tareas do

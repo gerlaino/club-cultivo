@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_07_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_09_000004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -113,6 +113,24 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_07_000002) do
     t.index ["club_id"], name: "index_analisis_laboratorio_on_club_id"
     t.index ["genetica_id"], name: "index_analisis_laboratorio_on_genetica_id"
     t.index ["lote_id"], name: "index_analisis_laboratorio_on_lote_id"
+  end
+
+  create_table "aplicacion_planes", force: :cascade do |t|
+    t.bigint "plan_trabajo_id", null: false
+    t.bigint "club_id", null: false
+    t.bigint "aplicado_por_id", null: false
+    t.string "objetivo_tipo"
+    t.integer "objetivo_id"
+    t.date "fecha_inicio", null: false
+    t.string "estado", default: "activo", null: false
+    t.integer "tareas_creadas", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["aplicado_por_id"], name: "index_aplicacion_planes_on_aplicado_por_id"
+    t.index ["club_id", "estado"], name: "index_aplicacion_planes_on_club_id_and_estado"
+    t.index ["club_id"], name: "index_aplicacion_planes_on_club_id"
+    t.index ["objetivo_tipo", "objetivo_id"], name: "index_aplicacion_planes_on_objetivo_tipo_and_objetivo_id"
+    t.index ["plan_trabajo_id"], name: "index_aplicacion_planes_on_plan_trabajo_id"
   end
 
   create_table "ariccame_registros", force: :cascade do |t|
@@ -528,8 +546,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_07_000002) do
     t.text "fertilizacion_descripcion"
     t.string "sistema_hidro"
     t.string "codigo_qr_cosecha"
+    t.string "codigo_qr"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
+    t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"
     t.index ["codigo_qr_cosecha"], name: "index_lotes_on_codigo_qr_cosecha", unique: true
     t.index ["deleted_at"], name: "index_lotes_on_deleted_at"
     t.index ["estado"], name: "index_lotes_on_estado"
@@ -791,6 +811,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_07_000002) do
     t.boolean "confirmada", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "dia_relativo"
+    t.string "rol_sugerido"
     t.index ["plan_trabajo_id", "es_recurrente"], name: "index_plan_tareas_on_plan_trabajo_id_and_es_recurrente"
     t.index ["plan_trabajo_id"], name: "index_plan_tareas_on_plan_trabajo_id"
     t.index ["recurrencia_id"], name: "index_plan_tareas_on_recurrencia_id"
@@ -804,15 +826,16 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_07_000002) do
     t.bigint "creado_por_id", null: false
     t.bigint "sede_id"
     t.string "titulo", null: false
-    t.integer "periodo_tipo", default: 0, null: false
-    t.date "fecha_inicio", null: false
-    t.date "fecha_fin", null: false
+    t.integer "periodo_tipo", default: 0
+    t.date "fecha_inicio"
+    t.date "fecha_fin"
     t.integer "estado", default: 0, null: false
     t.boolean "repetir_automaticamente", default: false, null: false
     t.text "notas"
     t.datetime "publicado_en"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "es_plantilla", default: false, null: false
     t.index ["club_id", "estado"], name: "index_plan_trabajos_on_club_id_and_estado"
     t.index ["club_id", "fecha_inicio"], name: "index_plan_trabajos_on_club_id_and_fecha_inicio"
     t.index ["club_id"], name: "index_plan_trabajos_on_club_id"
@@ -1118,6 +1141,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_07_000002) do
     t.integer "parent_tarea_id"
     t.bigint "origen_plan_id"
     t.bigint "plan_tarea_id"
+    t.bigint "aplicacion_plan_id"
+    t.index ["aplicacion_plan_id"], name: "index_tareas_on_aplicacion_plan_id"
     t.index ["asignada_a_id", "estado"], name: "index_tareas_on_asignada_a_id_and_estado"
     t.index ["asignada_a_id"], name: "index_tareas_on_asignada_a_id"
     t.index ["club_id", "estado"], name: "index_tareas_on_club_id_and_estado"
@@ -1215,6 +1240,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_07_000002) do
   add_foreign_key "analisis_ia", "users"
   add_foreign_key "analisis_laboratorio", "geneticas"
   add_foreign_key "analisis_laboratorio", "lotes"
+  add_foreign_key "aplicacion_planes", "clubs"
+  add_foreign_key "aplicacion_planes", "plan_trabajos"
+  add_foreign_key "aplicacion_planes", "users", column: "aplicado_por_id"
   add_foreign_key "ariccame_registros", "clubs"
   add_foreign_key "ariccame_registros", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "ariccame_registros", "stocks"
@@ -1334,6 +1362,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_07_000002) do
   add_foreign_key "stocks", "lotes"
   add_foreign_key "stocks", "pesadas"
   add_foreign_key "stocks", "sedes"
+  add_foreign_key "tareas", "aplicacion_planes", column: "aplicacion_plan_id"
   add_foreign_key "tareas", "clubs"
   add_foreign_key "tareas", "lotes"
   add_foreign_key "tareas", "plan_tareas"

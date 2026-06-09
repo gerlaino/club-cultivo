@@ -54,13 +54,12 @@ const canEdit  = computed(() =>
 const canAdmin = computed(() => ['admin', 'supervisor'].includes(auth.role))
 const isCultivador = computed(() => auth.role === 'cultivador')
 
-// QR de cosecha
 const { downloadPNG } = useQRCode()
-async function descargarQRCosecha() {
-  const codigo = lote.value?.codigo_qr_cosecha
+async function descargarQR() {
+  const codigo = lote.value?.codigo_qr
   if (!codigo) return
-  const url = `${window.location.origin}/cos/${codigo}`
-  await downloadPNG(url, `qr-cosecha-${lote.value.codigo}.png`)
+  const url = `${window.location.origin}/l/${codigo}`
+  await downloadPNG(url, `qr-lote-${lote.value.codigo}.png`)
 }
 
 const deletingLote = ref(false)
@@ -344,12 +343,12 @@ onUnmounted(() => {
             Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
           </button>
           <button
-            v-if="lote.codigo_qr_cosecha && ['cosecha','en_manicura','secado','manicura_pendiente'].includes(lote.estado)"
+            v-if="lote.codigo_qr"
             class="ld__btn-sm ld__btn-sm--qr"
-            @click="descargarQRCosecha"
-            title="Descargar QR de la cosecha"
+            @click="descargarQR"
+            title="Descargar QR del lote"
           >
-            <i class="bi bi-qr-code"></i> QR cosecha
+            <i class="bi bi-qr-code"></i> QR lote
           </button>
           <ActionsDropdown v-if="canEdit || isCultivador" :items="loteAcciones" />
         </div>

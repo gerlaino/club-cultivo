@@ -7,11 +7,12 @@ class LotesController < ApplicationController
 
   # GET /lotes o GET /salas/:sala_id/lotes
   def index
-    lotes = current_user.club.lotes.includes(:genetica, :costo_lote, :pesadas, :lote_eventos, sala: :sede)
+    lotes = current_user.club.lotes.includes(:costo_lote, :pesadas, :lote_eventos, sala: :sede, genetica: { fotos_attachments: :blob })
     lotes = lotes.where(sala_id: @sala.id) if @sala.present?
 
     if current_user.cultivador?
       salas_ids = current_user.salas_ids_asignadas
+      salas_ids = current_user.club.salas.where(kind: %w[vegetativo floracion]).ids if salas_ids.empty?
       if params[:cosechados].present?
         mis_lotes_cosechados = LoteEvento.where(
           club_id:      current_user.club_id,
@@ -44,12 +45,32 @@ class LotesController < ApplicationController
       lotes = lotes.where(estado: params[:estado]) if params[:estado].present?
     end
     lotes = lotes.order(created_at: :desc)
-    render json: lotes.map { |l| LoteSerializer.serialize(l) }
+    render json: lotes.map { |l|
+      s = LoteSerializer.serialize(l)
+      if s[:genetica] && l.genetica&.fotos&.attached?
+        s[:genetica][:foto_url] = url_for(l.genetica.fotos.first) rescue nil
+      end
+      s
+    }
   end
 
   # GET /lotes/:id
   def show
     render json: LoteSerializer.serialize(@lote, include_plants: true, include_cycle_data: true)
+  end
+
+  # GET /lotes/por_qr/:codigo_qr
+  def por_qr
+    lote = current_user.club.lotes.find_by(codigo_qr: params[:codigo_qr])
+    return render json: { error: 'Lote no encontrado' }, status: :not_found unless lote
+
+    render json: {
+      id:        lote.id,
+      codigo:    lote.codigo,
+      estado:    lote.estado,
+      genetica:  lote.genetica&.nombre,
+      sala:      lote.sala&.nombre,
+    }
   end
 
   # POST /salas/:sala_id/lotes
@@ -82,14 +103,6 @@ class LotesController < ApplicationController
     end
 
     plantas_iniciales = lote_params[:plants_count].to_i
-    if plantas_iniciales > 0 && @sala.tiene_limite_capacidad?
-      disponible = @sala.capacidad_disponible
-      if plantas_iniciales > disponible
-        return render json: {
-          errors: ["La sala '#{@sala.nombre}' solo tiene capacidad para #{disponible} plantas más (máx: #{@sala.capacidad_maxima})"]
-        }, status: :unprocessable_entity
-      end
-    end
 
     if plantas_iniciales > 0
       enforcer2 = PlanEnforcer.new(current_user.club)
@@ -134,14 +147,6 @@ class LotesController < ApplicationController
       nuevas   = lote_params[:plants_count].to_i
       actuales = @lote.plants_count.to_i
       delta    = nuevas - actuales
-      if delta > 0 && @lote.sala.tiene_limite_capacidad?
-        disponible = @lote.sala.capacidad_disponible
-        if delta > disponible
-          return render json: {
-            errors: ["La sala '#{@lote.sala.nombre}' solo tiene capacidad para #{disponible} plantas más (máx: #{@lote.sala.capacidad_maxima})"]
-          }, status: :unprocessable_entity
-        end
-      end
     end
     if @lote.update(lote_update_params)
       render json: LoteSerializer.serialize(@lote)
@@ -766,8 +771,9 @@ class LotesController < ApplicationController
   def set_lote
     scope = current_user.club.lotes
     if current_user.cultivador?
-      salas_ids        = current_user.salas_ids_asignadas
-      mis_cosechados   = LoteEvento.where(
+      salas_ids = current_user.salas_ids_asignadas
+      salas_ids = current_user.club.salas.where(kind: %w[vegetativo floracion]).ids if salas_ids.empty?
+      mis_cosechados = LoteEvento.where(
         club_id:      current_user.club_id,
         user_id:      current_user.id,
         estado_nuevo: 'cosecha'

@@ -113,9 +113,6 @@
     />
 
   </div>
-  <div v-else-if="loading" class="mpd mpd--loading">
-    <i class="bi bi-arrow-repeat mpd__spin"></i>
-  </div>
 </template>
 
 <script setup>

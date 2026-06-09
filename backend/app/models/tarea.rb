@@ -8,8 +8,9 @@ class Tarea < ApplicationRecord
   belongs_to :plant, optional: true
   belongs_to :parent_tarea, class_name: 'Tarea', optional: true
   has_many   :tareas_hijas, class_name: 'Tarea', foreign_key: :parent_tarea_id, dependent: :nullify
-  belongs_to :origen_plan,  class_name: 'PlanTrabajo', optional: true
-  belongs_to :plan_tarea,   class_name: 'PlanTarea',   optional: true
+  belongs_to :origen_plan,    class_name: 'PlanTrabajo',   optional: true
+  belongs_to :plan_tarea,     class_name: 'PlanTarea',     optional: true
+  belongs_to :aplicacion_plan, class_name: 'AplicacionPlan', optional: true
 
   # ── Enums ──────────────────────────────────────────────────────
   TIPOS       = %w[riego poda medicion limpieza cosecha transplante inspeccion otro

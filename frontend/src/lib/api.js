@@ -58,7 +58,8 @@ export const listLotes = (params = null) => {
   if (typeof params === 'number') return api.get(`/salas/${params}/lotes`)
   return api.get('/lotes', { params: params || undefined })
 }
-export const getLote = (id) => api.get(`/lotes/${id}`);
+export const getLote      = (id)         => api.get(`/lotes/${id}`)
+export const getLotePorQR = (codigoQr)   => api.get(`/lotes/por_qr/${codigoQr}`)
 export const createLote = (salaId, payload) => api.post(`/salas/${salaId}/lotes`, { lote: payload });
 export const updateLote         = (id, payload) => api.put(`/lotes/${id}`, { lote: payload });
 export const completarDatosLote = (id, payload) => api.patch(`/lotes/${id}/completar_datos`, { lote: payload });
@@ -287,10 +288,18 @@ export const deletePlanTrabajo        = (id)                  => api.delete(`/pl
 export const publicarPlanTrabajo      = (id)                  => api.post(`/plan_trabajos/${id}/publicar`)
 export const archivarPlanTrabajo      = (id)                  => api.post(`/plan_trabajos/${id}/archivar`)
 export const interpretarArchivoPlan   = (formData)            => api.post('/plan_trabajos/interpretar_archivo', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const exportPlanCSV            = (id, params = {})     => api.get(`/plan_trabajos/${id}/export_csv`, { params, responseType: 'blob' })
 export const listPlanTareas           = (planId)              => api.get(`/plan_trabajos/${planId}/plan_tareas`)
 export const createPlanTarea          = (planId, data)        => api.post(`/plan_trabajos/${planId}/plan_tareas`, { plan_tarea: data })
 export const updatePlanTarea          = (planId, tid, data, scope = 'esta') => api.patch(`/plan_trabajos/${planId}/plan_tareas/${tid}`, { plan_tarea: data, scope })
 export const deletePlanTarea          = (planId, tid)         => api.delete(`/plan_trabajos/${planId}/plan_tareas/${tid}`)
+
+// ── Aplicaciones de plantillas ────────────────────────────────
+export const listAplicaciones         = (params = {})         => api.get('/aplicacion_planes', { params })
+export const getAplicacion            = (id)                  => api.get(`/aplicacion_planes/${id}`)
+export const createAplicacion         = (data)                => api.post('/aplicacion_planes', data)
+export const cancelarAplicacion       = (id)                  => api.post(`/aplicacion_planes/${id}/cancelar`)
+export const deleteAplicacion         = (id)                  => api.delete(`/aplicacion_planes/${id}`)
 
 // Gestión de cultivadores asignados a salas
 

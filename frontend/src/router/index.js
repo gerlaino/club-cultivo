@@ -577,6 +577,12 @@ const routes = [
     meta: { fullscreen: true },
   },
   {
+    path: '/l/:codigo_qr',
+    name: 'lote-qr',
+    component: () => import('../views/LoteQrView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/stocks/:id/etiqueta',
     name: 'stock-etiqueta',
     component: () => import('../views/EtiquetaStockView.vue'),
@@ -798,6 +804,7 @@ router.beforeEach(async (to) => {
     !to.path.startsWith('/g/') &&
     !to.path.startsWith('/c/') &&
     !to.path.startsWith('/cos/') &&
+    !to.path.startsWith('/l/') &&
     !to.path.startsWith('/login')
   ) {
     // Si es una página de detalle conocida, redirigir a su equivalente /m/
