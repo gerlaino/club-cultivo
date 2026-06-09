@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { signIn, signOut, me } from "../lib/api";
+import { signIn, signOut, me, clearAuthToken } from "../lib/api";
 import { useClubStore } from "../stores/club.js";
 import { usePlan } from '../composables/usePlan.js'
 
@@ -60,6 +60,10 @@ export const useAuthStore = defineStore("auth", {
         await signIn(email, password);
         await this.fetchMe();
 
+        if (!this.user) {
+          throw Object.assign(new Error("No se pudo verificar la sesión"), { response: { status: 500 } });
+        }
+
         const { default: router } = await import("../router");
         const ROLE_HOME = {
           super_admin: '/super-admin',
@@ -92,11 +96,12 @@ export const useAuthStore = defineStore("auth", {
       this.loading = true;
       this.error = null;
       try {
-        await signOut(); // el backend hace delete_cookie en el response
+        await signOut();
       } catch (_) {
       } finally {
         this.user = null;
         this.bootstrapped = true;
+        clearAuthToken();
         const { planData } = usePlan();
         planData.value = null;
         // Hard reload limpia todos los stores de Pinia, evitando filtraciones entre clubs

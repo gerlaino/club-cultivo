@@ -17,9 +17,8 @@ class JwtCookieMiddleware
     request = Rack::Request.new(env)
 
     unless request.get_header('HTTP_X_MOBILE_CLIENT') == 'true'
-      # Web SPA: mueve el token del header visible a cookie httpOnly
-      headers.delete('Authorization')
-      headers.delete('authorization')
+      # Web SPA: setea cookie httpOnly Y mantiene el Authorization header
+      # para que el frontend pueda leerlo y almacenarlo (cross-origin safe).
       Rack::Utils.set_cookie_header!(headers, 'jwt_token', {
         value:     jwt,
         path:      '/',
@@ -29,7 +28,7 @@ class JwtCookieMiddleware
         same_site: ENV.fetch('RAILS_ENV', 'development') == 'production' ? 'None' : 'Lax',
       })
     end
-    # Mobile: Authorization header se mantiene intacto para que la app lo lea
+    # Authorization header se mantiene en todos los casos (mobile + web)
 
     [status, headers, body]
   end
