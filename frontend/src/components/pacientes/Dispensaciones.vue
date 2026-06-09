@@ -16,9 +16,10 @@ const props = defineProps({
   dispensadoMesG:   { type: Number,  default: null },
   saldoCc:          { type: Number,  default: null },
   limiteCc:         { type: Number,  default: null },
-  saldoCcG:         { type: Number,  default: null },
-  limiteCcG:        { type: Number,  default: null },
-  ccGramosActivo:   { type: Boolean, default: false },
+  saldoCcG:            { type: Number,  default: null },
+  limiteCcG:           { type: Number,  default: null },
+  ccGramosActivo:      { type: Boolean, default: false },
+  descuentoPorcentaje: { type: Number,  default: 0 },
 })
 
 const emit = defineEmits(['dispensacion-creada'])
@@ -161,6 +162,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       :saldo-cc-g="props.saldoCcG"
       :limite-cc-g="props.limiteCcG"
       :cc-gramos-activo="props.ccGramosActivo"
+      :descuento-porcentaje="props.descuentoPorcentaje"
       @saved="onDispensacionGuardada"
     />
   </div>

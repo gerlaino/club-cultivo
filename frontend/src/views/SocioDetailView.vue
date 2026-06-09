@@ -315,6 +315,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             :saldo-cc-g="s?.saldo_cc_g ?? null"
             :limite-cc-g="s?.limite_cc_g ?? null"
             :cc-gramos-activo="s?.cc_gramos_activo ?? false"
+            :descuento-porcentaje="Number(s?.descuento_porcentaje ?? 0)"
             @dispensacion-creada="onDispensacionCreada"
           />
         </div>
