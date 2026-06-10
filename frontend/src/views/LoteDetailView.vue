@@ -313,6 +313,7 @@ onUnmounted(() => {
           </div>
           <p class="ld__subtitle">
             <span v-if="lote.genetica">🌿 {{ lote.genetica.nombre }}</span>
+            <span v-else-if="lote.strain" class="ld__strain-fallback">🌿 {{ lote.strain }}</span>
             <span v-if="lote.sala" class="ld__subtitle-sep">·</span>
             <span v-if="lote.sala">📍 {{ lote.sala.nombre }}</span>
             <span v-if="lote.start_date" class="ld__subtitle-sep">·</span>
@@ -539,7 +540,7 @@ onUnmounted(() => {
               <dt>Maceta</dt><dd>{{ macetaLabel(lote.tamanio_maceta) }}</dd>
               <dt>Tipo cultivo</dt><dd>{{ growLabel(lote.grow_type) }}</dd>
               <dt>Luminaria</dt><dd>{{ lightLabel(lote.light_type) }}</dd>
-              <dt>Genética</dt><dd>{{ lote.genetica?.nombre || '—' }}</dd>
+              <dt>Genética</dt><dd>{{ lote.genetica?.nombre || lote.strain || '—' }}</dd>
               <dt>Fotoperiodo</dt><dd>{{ lote.fotoperiodo || '—' }}</dd>
               <dt>Semanas flor.</dt><dd>{{ lote.semanas_floracion ? lote.semanas_floracion + ' sem.' : '—' }}</dd>
               <dt>Inicio</dt><dd>{{ lote.start_date || '—' }}</dd>
@@ -985,6 +986,7 @@ onUnmounted(() => {
 .ld__estado-pill { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; padding: .28em .75em; border-radius: 999px; }
 .ld__subtitle { font-size: .85rem; color: #60725d; margin: 0; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
 .ld__subtitle-sep { color: #cbd5e1; }
+.ld__strain-fallback { font-style: italic; color: #94a3b8; }
 .ld__dias-badge { background: #e8f5e9; color: #1b5e20; font-size: .75rem; font-weight: 700; padding: .2em .6em; border-radius: 6px; }
 .ld__hero-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .ld__ciclo { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; padding: 1.25rem 1.5rem 1rem; margin-bottom: 1.5rem; overflow-x: auto; }

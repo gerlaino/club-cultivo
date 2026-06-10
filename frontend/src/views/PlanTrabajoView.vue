@@ -81,16 +81,19 @@ function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace
 
 async function eliminar(plan) {
   const ok = await confirm.confirm({
-    title:       'Eliminar plantilla',
-    message:     `¿Eliminás "${plan.titulo}"? Esta acción no se puede deshacer.`,
-    confirmText: 'Eliminar',
+    title:       'Eliminar plan de trabajo',
+    message:     `¿Eliminás "${plan.titulo}"?\n\nTodas las tareas futuras (pendientes o en progreso) generadas por este plan serán eliminadas. Las tareas ya completadas se conservan. Esta acción no se puede deshacer.`,
+    confirmText: 'Sí, eliminar',
     variant:     'danger',
   })
   if (!ok) return
   try {
-    await deletePlanTrabajo(plan.id)
+    const { data } = await deletePlanTrabajo(plan.id)
     plantillas.value = plantillas.value.filter(p => p.id !== plan.id)
-    toast.success('Plantilla eliminada')
+    const n = data?.tareas_eliminadas ?? 0
+    toast.success(n > 0
+      ? `Plan eliminado. Se eliminaron ${n} tarea${n === 1 ? '' : 's'} pendiente${n === 1 ? '' : 's'}.`
+      : 'Plan eliminado.')
   } catch (e) {
     toast.error(e.response?.data?.error || 'Error al eliminar')
   }

@@ -773,7 +773,8 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                             class="sd__cosecha-parcial">
                         🌸 {{ (l.plants_count || 0) - l.plantas_cosechadas_count }} en floración · ✅ {{ l.plantas_cosechadas_count }} cosechadas
                       </span>
-                      <span v-if="l.strain">🌿 {{ l.strain }}</span>
+                      <span v-if="l.genetica?.nombre" class="sd__lote-gen">🌿 {{ l.genetica.nombre }}</span>
+                      <span v-else-if="l.strain" class="sd__lote-strain">🌿 {{ l.strain }}</span>
                       <span v-if="l.grow_type">⚗️ {{ growLabel(l.grow_type) }}</span>
                       <span v-if="l.start_date">📅 {{ l.start_date }}</span>
                     </div>
@@ -1536,6 +1537,8 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__lote-badge { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .2em .6em; border-radius: 6px; }
 .sd__lote-dias { font-size: .72rem; font-weight: 700; color: #60725d; background: #e8f5e9; padding: .2em .6em; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
 .sd__lote-meta { display: flex; gap: .6rem; flex-wrap: wrap; font-size: .73rem; color: #94a3b8; margin-bottom: .5rem; }
+.sd__lote-gen    { color: #3F6452; font-weight: 600; }
+.sd__lote-strain { color: #94a3b8; font-style: italic; }
 .sd__cosecha-parcial { color: #15803d; font-weight: 600; }
 .sd__lote-progress-wrap { display: flex; align-items: center; gap: .6rem; }
 .sd__lote-progress-track { flex: 1; height: 3px; background: #e8f5e9; border-radius: 999px; overflow: hidden; }

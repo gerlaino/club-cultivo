@@ -38,10 +38,11 @@ const editingInase = ref(false)
 const formError    = ref(null)
 const qrOpenId     = ref(null)
 
-const search       = ref('')
-const filterTipo   = ref('')
-const filterOrigen = ref('')  // '' | 'inase' | 'propias'
-const sortBy       = ref('inase_first')
+const search            = ref('')
+const filterTipo        = ref('')
+const filterOrigen      = ref('')  // '' | 'inase' | 'propias'
+const filterDisponible  = ref(true) // true = solo disponibles (default), false = todas
+const sortBy            = ref('inase_first')
 
 // Foto
 const fotoFile     = ref(null)
@@ -75,6 +76,7 @@ const kpis = computed(() => ({
 
 const filtered = computed(() => {
   let list = [...geneticas.value]
+  if (filterDisponible.value) list = list.filter(g => g.disponible)
   if (search.value.trim()) {
     const q = search.value.toLowerCase()
     list = list.filter(g =>
@@ -101,8 +103,8 @@ const filtered = computed(() => {
   return list
 })
 
-const hasFilters = computed(() => search.value.trim() || filterTipo.value || filterOrigen.value)
-function clearFilters() { search.value = ''; filterTipo.value = ''; filterOrigen.value = ''; sortBy.value = 'inase_first' }
+const hasFilters = computed(() => search.value.trim() || filterTipo.value || filterOrigen.value || !filterDisponible.value)
+function clearFilters() { search.value = ''; filterTipo.value = ''; filterOrigen.value = ''; filterDisponible.value = true; sortBy.value = 'inase_first' }
 
 function emptyForm() {
   return {
@@ -315,6 +317,14 @@ onMounted(loadGeneticas)
       </div>
       <div class="gv__filter-row gv__filter-row--pills">
         <div class="gv__filter-group">
+          <span class="gv__filter-label">Estado</span>
+          <div class="gv__pills">
+            <button class="gv__pill gv__pill--disp" :class="{ 'gv__pill--active': filterDisponible }" @click="filterDisponible = true">Disponibles</button>
+            <button class="gv__pill" :class="{ 'gv__pill--active': !filterDisponible }" @click="filterDisponible = false">Todas</button>
+          </div>
+        </div>
+        <div class="gv__filter-sep"></div>
+        <div class="gv__filter-group">
           <span class="gv__filter-label">Origen</span>
           <div class="gv__pills">
             <button class="gv__pill" :class="{ 'gv__pill--active': !filterOrigen }" @click="filterOrigen = ''">Todas</button>
@@ -451,7 +461,7 @@ onMounted(loadGeneticas)
           </tr>
         </tbody>
       </table>
-      <div class="gv__count">{{ filtered.length }} de {{ geneticas.length }} genéticas</div>
+      <div class="gv__count">{{ filtered.length }} de {{ filterDisponible ? geneticas.filter(g => g.disponible).length : geneticas.length }} genéticas{{ filterDisponible ? ' disponibles' : '' }}</div>
     </div>
 
     <!-- ===== MODAL CREAR / EDITAR ===== -->
@@ -703,6 +713,7 @@ onMounted(loadGeneticas)
 .gv__filter-sep { width: 1px; height: 20px; background: #e2e8f0; }
 .gv__pill--propias.gv__pill--active { background: #ede9fe; color: #7c3aed; border-color: #c4b5fd; }
 .gv__pill--inase.gv__pill--active  { background: #dbeafe; color: #0369a1; border-color: #93c5fd; }
+.gv__pill--disp.gv__pill--active   { background: #dcfce7; color: #15803d; border-color: #86efac; }
 .gen-inase-col { font-size: 1rem; }
 
 /* Loading / error */

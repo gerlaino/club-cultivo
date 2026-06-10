@@ -573,7 +573,7 @@ const routes = [
     path: '/s/:codigo_qr',
     name: 'stock-qr',
     component: () => import('../views/StockQrView.vue'),
-    meta: { fullscreen: true },
+    meta: { requiresAuth: true },
   },
   {
     path: '/c/:token',

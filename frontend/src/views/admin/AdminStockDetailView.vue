@@ -236,14 +236,27 @@
             </div>
 
             <!-- QR -->
-            <RouterLink v-if="stock.codigo_qr" :to="`/s/${stock.codigo_qr}`" target="_blank" class="sd__qr-btn">
-              <i class="bi bi-qr-code"></i>
-              <div>
-                <div class="sd__qr-lbl">Ver / imprimir QR</div>
-                <div class="sd__qr-code">{{ stock.codigo_qr }}</div>
+            <div v-if="stock.codigo_qr" class="sd__qr-block">
+              <div class="sd__qr-block-hd">
+                <span class="sd__qr-block-title">Código QR</span>
+                <RouterLink :to="`/s/${stock.codigo_qr}`" target="_blank" class="sd__qr-preview-link">
+                  <i class="bi bi-box-arrow-up-right"></i> Vista previa
+                </RouterLink>
               </div>
-              <i class="bi bi-box-arrow-up-right sd__qr-ext"></i>
-            </RouterLink>
+              <div class="sd__qr-img-wrap">
+                <img v-if="qrDataUrl" :src="qrDataUrl" class="sd__qr-img" alt="QR del stock" />
+                <div v-else class="sd__qr-img-placeholder"><DsSpinner :size="20" /></div>
+              </div>
+              <div class="sd__qr-code-mono">{{ stock.codigo_qr }}</div>
+              <div class="sd__qr-actions">
+                <button class="sd__qr-dl-btn" @click="descargarPNG">
+                  <i class="bi bi-download"></i> PNG
+                </button>
+                <button class="sd__qr-dl-btn" @click="descargarSVG">
+                  <i class="bi bi-download"></i> SVG
+                </button>
+              </div>
+            </div>
           </div>
 
         </aside>
@@ -476,7 +489,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
@@ -484,14 +497,17 @@ import {
   getStockMovimientos, listSedes, createStock,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useQRCode } from '../../composables/useQRCode.js'
 
 const route  = useRoute()
 const router = useRouter()
 const toast  = useToast()
+const { generatePNG, generateSVG, downloadPNG, downloadSVG } = useQRCode()
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 const loading    = ref(true)
 const stock      = ref(null)
+const qrDataUrl  = ref(null)
 const movimientos = ref([])
 const loadingMov = ref(false)
 const sedes      = ref([])
@@ -507,6 +523,7 @@ onMounted(async () => {
     stock.value       = rStock.data?.data || rStock.data
     movimientos.value = rMov.data || []
     sedes.value       = rSedes.data || []
+    if (stock.value?.codigo_qr) generarQR()
   } catch {
     toast.error('Error al cargar el stock')
   } finally {
@@ -519,6 +536,21 @@ async function recargar() {
   const [rStock, rMov] = await Promise.all([getStock(id), getStockMovimientos(id)])
   stock.value       = rStock.data?.data || rStock.data
   movimientos.value = rMov.data || []
+}
+
+// ── QR ────────────────────────────────────────────────────────────────────────
+function qrUrl() {
+  const base = window.location.origin
+  return `${base}/s/${stock.value.codigo_qr}`
+}
+async function generarQR() {
+  qrDataUrl.value = await generatePNG(qrUrl(), { width: 280, margin: 2 })
+}
+async function descargarPNG() {
+  await downloadPNG(qrUrl(), `stock-qr-${stock.value.codigo_qr}.png`)
+}
+async function descargarSVG() {
+  await downloadSVG(qrUrl(), `stock-qr-${stock.value.codigo_qr}.svg`)
 }
 
 // ── Edit datos ─────────────────────────────────────────────────────────────────
@@ -620,9 +652,8 @@ async function ejecutarDescartar() {
   descartando.value = true
   try {
     await descartarStock(stock.value.id, { motivo })
-    showDescartar.value = false
-    await recargar()
     toast.success('Stock descartado')
+    router.push('/admin/stock')
   } catch (e) {
     descartarError.value = e?.response?.data?.error || 'Error al descartar'
   } finally { descartando.value = false }
@@ -744,7 +775,7 @@ function badgeVencLabel(s) {
 </script>
 
 <style scoped>
-.sd { padding: 1.5rem 1.75rem 3rem; max-width: 1100px; }
+.sd { padding: 1.5rem 1.75rem 3rem; max-width: 1100px; margin: 0 auto; }
 @media (max-width: 640px) { .sd { padding: 1rem 1rem 2rem; } }
 
 /* Back */
@@ -877,18 +908,47 @@ function badgeVencLabel(s) {
 .sd__action-sub { font-size: .7rem; color: #94a3b8; margin-top: 1px; }
 .sd__actions-sep { height: 1px; background: #f1f5f9; margin: .25rem 0; }
 
-/* QR button */
-.sd__qr-btn {
-  display: flex; align-items: center; gap: .75rem;
-  margin-top: 1rem; padding: .65rem .9rem; border-radius: 8px;
-  border: 1.5px dashed #cbd5e1; color: #475569; text-decoration: none;
-  transition: all .15s;
+/* QR block */
+.sd__qr-block {
+  margin-top: 1.25rem; padding-top: 1.125rem;
+  border-top: 1px solid #f1f5f9;
+  display: flex; flex-direction: column; align-items: center; gap: .75rem;
 }
-.sd__qr-btn:hover { border-color: #1b5e20; color: #1b5e20; background: #f9fefb; }
-.sd__qr-btn > i:first-child { font-size: 1.1rem; flex-shrink: 0; }
-.sd__qr-lbl  { font-size: .78rem; font-weight: 700; }
-.sd__qr-code { font-size: .65rem; font-family: monospace; color: #94a3b8; margin-top: 1px; word-break: break-all; }
-.sd__qr-ext  { margin-left: auto; font-size: .7rem; opacity: .6; }
+.sd__qr-block-hd {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+}
+.sd__qr-block-title {
+  font-size: .75rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em;
+}
+.sd__qr-preview-link {
+  display: inline-flex; align-items: center; gap: .25rem;
+  font-size: .72rem; font-weight: 600; color: #1b5e20; text-decoration: none;
+  transition: color .15s;
+}
+.sd__qr-preview-link:hover { color: #144a18; text-decoration: underline; }
+.sd__qr-img-wrap {
+  width: 160px; height: 160px; border-radius: 12px; overflow: hidden;
+  border: 2px solid #e2e8f0; background: #f8fafc;
+  display: flex; align-items: center; justify-content: center;
+}
+.sd__qr-img { width: 100%; height: 100%; display: block; }
+.sd__qr-img-placeholder {
+  display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;
+}
+.sd__qr-code-mono {
+  font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  font-size: .62rem; color: #94a3b8; word-break: break-all; text-align: center;
+}
+.sd__qr-actions {
+  display: flex; gap: .5rem; width: 100%;
+}
+.sd__qr-dl-btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 7px;
+  padding: .45rem .75rem; font-size: .75rem; font-weight: 600; color: #374151;
+  cursor: pointer; transition: all .15s;
+}
+.sd__qr-dl-btn:hover { background: #f0fdf4; border-color: #86efac; color: #1b5e20; }
 
 /* ── Movimientos timeline ──────────────────────────────────────────────────── */
 .sd__movs { display: flex; flex-direction: column; }

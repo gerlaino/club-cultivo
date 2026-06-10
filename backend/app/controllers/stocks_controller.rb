@@ -1,8 +1,9 @@
 class StocksController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_lectura_stock!,   only: [:index, :show, :movimientos]
-  before_action :require_auditor_lectura!, only: [:trazabilidad]
-  before_action :require_escritura_stock!, only: [:create, :update, :asignar, :ajuste, :descartar]
+  before_action :require_lectura_stock!,        only: [:index, :show, :movimientos]
+  before_action :require_auditor_lectura!,      only: [:trazabilidad]
+  before_action :require_escritura_stock!,      only: [:create, :update, :asignar, :ajuste, :descartar]
+  before_action :require_admin_o_supervisor!,   only: [:show_by_qr]
   before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :movimientos]
 
   # GET /stocks?sede_id=&canal=regulatorio|social&incluir_pendientes=true
@@ -45,6 +46,44 @@ class StocksController < ApplicationController
   # GET /stocks/:id
   def show
     render json: { data: serialize_stock(@stock) }
+  end
+
+  # GET /stocks/qr/:codigo_qr — para admin/supervisor al escanear un QR
+  def show_by_qr
+    stock = Stock.joins(:club)
+                 .where(codigo_qr: params[:codigo_qr], club_id: current_user.club_id)
+                 .includes(:lote, :sede, lote: :genetica)
+                 .first
+
+    return render json: { error: 'Producto no encontrado' }, status: :not_found unless stock
+
+    en_delivery = stock.gramos_reservados
+
+    render json: {
+      id:                       stock.id,
+      numero_lote_producto:     stock.numero_lote_producto,
+      codigo_qr:                stock.codigo_qr,
+      forma_producto:           stock.forma_producto,
+      unidad:                   stock.unidad,
+      cantidad_total:           stock.cantidad.to_f,
+      cantidad_disponible_real: stock.cantidad_disponible_real,
+      en_delivery_g:            en_delivery,
+      fecha_elaboracion:       stock.fecha_elaboracion,
+      fecha_vencimiento_est:   stock.fecha_vencimiento_est,
+      estado:                  stock.estado,
+      lote: stock.lote ? {
+        codigo:   stock.lote.codigo,
+        genetica: stock.lote.genetica ? {
+          nombre:                stock.lote.genetica.nombre,
+          numero_registro_inase: stock.lote.genetica.numero_registro_inase,
+        } : nil,
+      } : nil,
+      club: {
+        nombre: current_user.club.name,
+        logo:   current_user.club.logo.attached? ? url_for(current_user.club.logo) : nil,
+      },
+      sede: stock.sede ? { nombre: stock.sede.nombre } : nil,
+    }
   end
 
   # POST /stocks
@@ -378,5 +417,9 @@ class StocksController < ApplicationController
 
   def require_auditor_lectura!
     render json: { error: 'No autorizado' }, status: :forbidden unless ROLES_AUDITOR_LECTURA.include?(current_user&.role)
+  end
+
+  def require_admin_o_supervisor!
+    render json: { error: 'No autorizado' }, status: :forbidden unless %w[admin supervisor].include?(current_user&.role)
   end
 end

@@ -9,7 +9,7 @@ class TareasController < ApplicationController
   # GET /api/v1/tareas
   # Soporta filtros: estado, asignada_a_id, sala_id, lote_id, tipo, fecha_desde, fecha_hasta, scope
   def index
-    tareas = @club.tareas.includes(:asignada_a, :creada_por, :sala, :lote, :plant)
+    tareas = @club.tareas.includes(:asignada_a, :creada_por, :sala, :lote, :plant, :origen_plan)
 
     # Supervisor solo ve tareas de sus sedes
     if current_user.supervisor?
@@ -71,7 +71,7 @@ class TareasController < ApplicationController
   # GET /api/v1/tareas/kanban
   # Devuelve tareas agrupadas por estado para el kanban
   def kanban
-    tareas = @club.tareas.includes(:asignada_a, :creada_por, :sala, :lote)
+    tareas = @club.tareas.includes(:asignada_a, :creada_por, :sala, :lote, :origen_plan)
 
     # Cultivadores solo ven las suyas
     if current_user.cultivador?
@@ -87,9 +87,16 @@ class TareasController < ApplicationController
                    .por_prioridad.order(updated_at: :desc)
 
     render json: {
-      pendiente:   tareas.select { |t| t.estado == 'pendiente' }.map { |t| serialize_tarea(t) },
-      en_progreso: tareas.select { |t| t.estado == 'en_progreso' }.map { |t| serialize_tarea(t) },
-      completada:  tareas.select { |t| t.estado == 'completada' }.first(20).map { |t| serialize_tarea(t) }
+      pendiente:   tareas.select { |t| t.estado == 'pendiente' }
+                         .sort_by { |t| [t.fecha_programada || Date.today + 3650, t.id] }
+                         .map { |t| serialize_tarea(t) },
+      en_progreso: tareas.select { |t| t.estado == 'en_progreso' }
+                         .sort_by { |t| [t.fecha_programada || Date.today + 3650, t.id] }
+                         .map { |t| serialize_tarea(t) },
+      completada:  tareas.select { |t| t.estado == 'completada' }
+                         .sort_by { |t| [t.fecha_completada || Date.today, t.id] }
+                         .reverse.first(20)
+                         .map { |t| serialize_tarea(t) }
     }
   end
 
@@ -201,7 +208,7 @@ class TareasController < ApplicationController
 
     tareas = base.where(fecha_programada: desde..hasta)
                  .where.not(estado: %w[cancelada])
-                 .includes(:asignada_a, :sala, :lote)
+                 .includes(:asignada_a, :sala, :lote, :origen_plan)
                  .order(:fecha_programada, :prioridad)
 
     dias = (0..6).map do |offset|
@@ -291,6 +298,9 @@ class TareasController < ApplicationController
       recurrente:        t.recurrente,
       frecuencia:        t.frecuencia,
       parent_tarea_id:   t.parent_tarea_id,
+      origen_plan_id:    t.origen_plan_id,
+      origen_plan_titulo: t.origen_plan_titulo,
+      origen_plan:       t.origen_plan ? { id: t.origen_plan.id, titulo: t.origen_plan.titulo } : nil,
       created_at:        t.created_at,
       updated_at:        t.updated_at
     }

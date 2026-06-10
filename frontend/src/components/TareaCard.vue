@@ -8,6 +8,11 @@
     <div class="tarea-card__header">
       <div class="d-flex align-items-center gap-2">
         <span class="badge tipo-badge">{{ TIPO_LABELS[tarea.tipo] || tarea.tipo }}</span>
+        <span
+          v-if="tarea.origen_plan_id || tarea.origen_plan_titulo"
+          class="badge tarea-card__badge-plan"
+          :title="planTooltip(tarea)"
+        >Plan</span>
         <span v-if="tarea.vencida" class="badge bg-danger">Vencida</span>
         <span v-if="tarea.parent_tarea_id || tarea.recurrente" class="badge bg-light text-muted" title="Tarea recurrente" style="font-size:.65rem">🔁</span>
       </div>
@@ -62,7 +67,7 @@
       </span>
     </div>
 
-    <!-- Footer: fecha + horas + asignado -->
+    <!-- Footer: fecha + horas + avatares -->
     <div class="tarea-card__footer">
       <div class="d-flex align-items-center gap-2">
         <!-- Fecha programada -->
@@ -74,9 +79,18 @@
           <i class="bi bi-clock me-1"></i>{{ tarea.horas_estimadas }}h
         </span>
       </div>
-      <!-- Avatar asignado -->
-      <div v-if="tarea.asignada_a" class="tarea-card__avatar" :title="tarea.asignada_a.nombre">
-        {{ iniciales(tarea.asignada_a.nombre) }}
+      <!-- Avatares: creador + asignado -->
+      <div class="tarea-card__avatares">
+        <div
+          v-if="tarea.creada_por && tarea.creada_por.id !== tarea.asignada_a?.id"
+          class="tarea-card__avatar tarea-card__avatar--creador"
+          :title="`Creó: ${tarea.creada_por.nombre}`"
+        >
+          {{ iniciales(tarea.creada_por.nombre) }}
+        </div>
+        <div v-if="tarea.asignada_a" class="tarea-card__avatar" :title="`Asignado: ${tarea.asignada_a.nombre}`">
+          {{ iniciales(tarea.asignada_a.nombre) }}
+        </div>
       </div>
     </div>
 
@@ -139,6 +153,11 @@ function formatFecha(fecha) {
 function iniciales(nombre) {
   if (!nombre) return '?'
   return nombre.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
+}
+
+function planTooltip(t) {
+  const titulo = t.origen_plan?.titulo || t.origen_plan_titulo
+  return titulo ? `Plan: ${titulo}` : 'Generada por plan de trabajo'
 }
 </script>
 
@@ -213,6 +232,11 @@ function iniciales(nombre) {
   align-items: center;
 }
 
+.tarea-card__avatares {
+  display: flex;
+  align-items: center;
+  gap: -4px;
+}
 .tarea-card__avatar {
   width: 26px;
   height: 26px;
@@ -225,6 +249,22 @@ function iniciales(nombre) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border: 2px solid var(--bs-body-bg);
+}
+.tarea-card__avatar--creador {
+  background: linear-gradient(135deg, #64748b, #94a3b8);
+  margin-right: -6px;
+  z-index: 0;
+}
+.tarea-card__avatar:not(.tarea-card__avatar--creador) {
+  z-index: 1;
+}
+
+/* Badge plan de trabajo */
+.tarea-card__badge-plan {
+  background: #7c3aed; color: #fff;
+  font-size: .62rem; font-weight: 700; letter-spacing: .02em;
+  padding: .15em .5em; border-radius: 4px;
 }
 
 /* Badge de horas pendientes */

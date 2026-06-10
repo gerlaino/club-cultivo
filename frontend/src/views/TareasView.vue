@@ -130,11 +130,20 @@
                 v-for="t in dia.tareas"
                 :key="t.id"
                 class="sem__tarea"
-                :class="['sem__tarea--' + t.prioridad, t.estado === 'completada' && 'sem__tarea--done']"
+                :class="[
+                  'sem__tarea--' + t.prioridad,
+                  t.estado === 'completada' && 'sem__tarea--done',
+                  t.origen_plan_id && 'sem__tarea--plan',
+                ]"
                 @click="abrirTarea(t)"
               >
                 <span class="sem__tarea-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
                 <span class="sem__tarea-titulo">{{ t.titulo }}</span>
+                <span
+                  v-if="t.origen_plan_id"
+                  class="sem__plan-badge"
+                  :title="t.origen_plan?.titulo ? `Plan: ${t.origen_plan.titulo}` : 'Del plan de trabajo'"
+                >Plan</span>
                 <span v-if="t.parent_tarea_id || t.recurrente" class="sem__recurrente" title="Tarea recurrente">🔁</span>
                 <span v-if="t.asignada_a" class="sem__asig" :title="t.asignada_a.nombre">
                   {{ t.asignada_a.nombre.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() }}
@@ -631,6 +640,12 @@ function mostrarToast(mensaje, tipo = 'success') {
 .sem__tarea--normal  { border-left-color: #3b82f6; }
 .sem__tarea--baja    { border-left-color: #9ca3af; }
 .sem__tarea--done    { opacity: .35; text-decoration: line-through; }
+.sem__tarea--plan    { background: #f5f3ff; border-left-color: #7c3aed; }
+.sem__plan-badge {
+  font-size: .6rem; font-weight: 700; letter-spacing: .02em;
+  background: #7c3aed; color: #fff;
+  padding: .1em .4em; border-radius: 4px; flex-shrink: 0;
+}
 .sem__tarea-emoji { flex-shrink: 0; font-size: .8rem; }
 .sem__tarea-titulo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; font-weight: 500; }
 .sem__recurrente { font-size: .65rem; flex-shrink: 0; }

@@ -67,10 +67,20 @@ class PlanTrabajosController < ApplicationController
   # DELETE /api/plan_trabajos/:id
   def destroy
     if @plan.publicado?
-      return render json: { error: 'No se puede eliminar un plan publicado' }, status: :unprocessable_entity
+      return render json: { error: 'No se puede eliminar un plan publicado. Archivalo primero.' }, status: :unprocessable_entity
     end
+
+    tareas_eliminadas = @plan.tareas_generadas
+                             .where(estado: %w[pendiente en_progreso])
+                             .destroy_all
+                             .size
+
+    # Nullify plan_tarea_id en las tareas restantes (completadas/canceladas)
+    # antes de que dependent: :destroy borre los plan_tareas y viole la FK
+    @plan.tareas_generadas.update_all(plan_tarea_id: nil)
+
     @plan.destroy
-    head :no_content
+    render json: { tareas_eliminadas: tareas_eliminadas }
   end
 
   # POST /api/plan_trabajos/:id/publicar
@@ -284,18 +294,19 @@ class PlanTrabajosController < ApplicationController
 
   def crear_tarea!(plan_tarea, fecha)
     @club.tareas.create!(
-      titulo:          plan_tarea.titulo.presence || plan_tarea.tipo,
-      descripcion:     plan_tarea.descripcion,
-      tipo:            plan_tarea.tipo,
-      estado:          'pendiente',
-      prioridad:       plan_tarea.prioridad,
-      asignada_a_id:   plan_tarea.responsable_id,
-      sala_id:         plan_tarea.sala_id,
-      fecha_programada: fecha,
-      recurrente:      plan_tarea.es_recurrente,
-      creada_por:      current_user,
-      origen_plan_id:  @plan.id,
-      plan_tarea_id:   plan_tarea.id
+      titulo:             plan_tarea.titulo.presence || plan_tarea.tipo,
+      descripcion:        plan_tarea.descripcion,
+      tipo:               plan_tarea.tipo,
+      estado:             'pendiente',
+      prioridad:          plan_tarea.prioridad,
+      asignada_a_id:      plan_tarea.responsable_id,
+      sala_id:            plan_tarea.sala_id,
+      fecha_programada:   fecha,
+      recurrente:         plan_tarea.es_recurrente,
+      creada_por:         current_user,
+      origen_plan_id:     @plan.id,
+      origen_plan_titulo: @plan.titulo,
+      plan_tarea_id:      plan_tarea.id
     )
   end
 

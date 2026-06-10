@@ -465,7 +465,8 @@ export const listAriccameRegistros = (params = {}) => api.get('/ariccame_registr
 export const getAriccameRegistro   = (id)          => api.get(`/ariccame_registros/${id}`)
 
 // ── Público — QR stocks ───────────────────────────────────────────────────────
-export const getStockPublico = (codigoQr) => axios.get(`/s/${codigoQr}`)
+export const getStockPublico  = (codigoQr) => axios.get(`/s/${codigoQr}`)
+export const getStockByQR     = (codigoQr) => api.get(`/stocks/qr/${codigoQr}`)
 
 // ── Analytics ─────────────────────────────────────────────────────────────────
 export const getAnalyticsRendimiento      = (params = {}) => api.get('/analytics/rendimiento_genetica',   { params })

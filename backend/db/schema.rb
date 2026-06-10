@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_09_200001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_10_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1174,6 +1174,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_09_200001) do
     t.bigint "origen_plan_id"
     t.bigint "plan_tarea_id"
     t.bigint "aplicacion_plan_id"
+    t.string "origen_plan_titulo"
     t.index ["aplicacion_plan_id"], name: "index_tareas_on_aplicacion_plan_id"
     t.index ["asignada_a_id", "estado"], name: "index_tareas_on_asignada_a_id_and_estado"
     t.index ["asignada_a_id"], name: "index_tareas_on_asignada_a_id"
