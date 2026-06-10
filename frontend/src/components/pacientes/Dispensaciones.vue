@@ -7,16 +7,13 @@ import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { listDispensaciones, deleteDispensacion } from '../../lib/api.js'
 import ModalNuevaDispensacion from './ModalNuevaDispensacion.vue'
-// useConfirm + useToast still used for delete confirmation below
+import ModalEditarDispensacion from './ModalEditarDispensacion.vue'
 
 const props = defineProps({
   socioId:          { type: Number,  required: true },
   pacienteNombre:   { type: String,  default: '' },
   saldoCc:          { type: Number,  default: null },
   limiteCc:         { type: Number,  default: null },
-  saldoCcG:            { type: Number,  default: null },
-  limiteCcG:           { type: Number,  default: null },
-  ccGramosActivo:      { type: Boolean, default: false },
   descuentoPorcentaje: { type: Number,  default: 0 },
 })
 
@@ -30,8 +27,13 @@ const dispensaciones = ref([])
 const loading        = ref(true)
 const showModal      = ref(false)
 
+// Edit modal state
+const editModal  = ref(false)
+const editTarget = ref(null)
+
 const canCreate = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
 const canDelete = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
+const canEdit   = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 
 const fmt = n => n == null ? '—' :
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(n)
@@ -65,6 +67,11 @@ async function handleDelete(d) {
     await loadDispensaciones()
     toast.success('Dispensación eliminada')
   } catch { toast.error('Error al eliminar') }
+}
+
+function openEdit(d) {
+  editTarget.value = d
+  editModal.value  = true
 }
 
 async function loadDispensaciones() {
@@ -142,11 +149,25 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
           <div v-if="d.aporte_socio_ars" class="dv__item-aporte">{{ fmt(d.aporte_socio_ars) }}</div>
           <div v-if="d.usuario?.nombre" class="dv__item-usuario">{{ d.usuario.nombre }}</div>
         </div>
-        <button v-if="canDelete" class="dv__icon-btn dv__icon-btn--danger" @click="handleDelete(d)" title="Eliminar">
-          <i class="bi bi-trash"></i>
-        </button>
+        <div v-if="canEdit || canDelete" class="dv__item-actions">
+          <button v-if="canEdit" class="dv__icon-btn" @click="openEdit(d)" title="Editar">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button v-if="canDelete" class="dv__icon-btn dv__icon-btn--danger" @click="handleDelete(d)" title="Eliminar">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- Modal editar dispensación -->
+    <ModalEditarDispensacion
+      v-model="editModal"
+      :dispensacion="editTarget"
+      :saldo-cc="props.saldoCc"
+      :limite-cc="props.limiteCc"
+      @saved="loadDispensaciones"
+    />
 
     <!-- Modal nueva dispensación -->
     <ModalNuevaDispensacion
@@ -155,9 +176,6 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       :paciente-nombre="props.pacienteNombre"
       :saldo-cc="props.saldoCc"
       :limite-cc="props.limiteCc"
-      :saldo-cc-g="props.saldoCcG"
-      :limite-cc-g="props.limiteCcG"
-      :cc-gramos-activo="props.ccGramosActivo"
       :descuento-porcentaje="props.descuentoPorcentaje"
       @saved="onDispensacionGuardada"
     />
@@ -195,8 +213,11 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__item-cantidad { font-size: 1.05rem; font-weight: 800; color: #1b5e20; letter-spacing: -.03em; }
 .dv__item-aporte { font-size: .72rem; color: #64748b; margin-top: .1rem; }
 .dv__item-usuario { font-size: .7rem; color: #94a3b8; }
+.dv__item-actions { display: flex; gap: .3rem; flex-shrink: 0; }
 .dv__icon-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: .75rem; transition: all .15s; flex-shrink: 0; }
+.dv__icon-btn:hover { background: #f1f5f9; color: #334155; }
 .dv__icon-btn--danger:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+
 
 /* Buttons */
 .dv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }

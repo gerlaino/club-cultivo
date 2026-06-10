@@ -62,7 +62,9 @@ class DispensacionesController < ApplicationController
     @dispensacion.user = current_user
     @dispensacion.sede_id ||= @dispensacion.stock&.sede_id
 
-    if @dispensacion.stock && @dispensacion.aporte_socio_ars.nil?
+    needs_autocalc = @dispensacion.aporte_socio_ars.nil? ||
+                     (@dispensacion.aporte_socio_ars.to_d <= 0 && @dispensacion.medio_pago == 'no_abona')
+    if @dispensacion.stock && needs_autocalc
       precio_base = @dispensacion.stock.precio_sugerido_ars.to_d
       descuento   = @paciente.descuento_porcentaje.to_d.clamp(0, 100) / 100
       precio      = precio_base * (1 - descuento)
@@ -74,23 +76,23 @@ class DispensacionesController < ApplicationController
     when 'cuenta_corriente'
       cc    = @paciente.cuenta_corriente
       monto = @dispensacion.aporte_socio_ars.to_d
+      if monto <= 0
+        return render json: { error: 'El aporte del socio debe ser mayor a $0 para cobrar por cuenta corriente.' }, status: :unprocessable_entity
+      end
       unless cc&.limite_credito.to_f > 0 && cc.puede_dispensar?(monto)
         return render json: { error: 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.' }, status: :unprocessable_entity
       end
-    when 'credito_gramos'
-      cc     = @paciente.cuenta_corriente
-      gramos = @dispensacion.cantidad.to_d
-      unless cc&.credito_gramos_activo? && cc.puede_dispensar_g?(gramos)
-        return render json: { error: 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.' }, status: :unprocessable_entity
-      end
     when 'no_abona'
-      cc     = @paciente.cuenta_corriente
-      monto  = @dispensacion.aporte_socio_ars.to_d
-      gramos = @dispensacion.cantidad.to_d
-      has_cc = cc&.limite_credito.to_f > 0 && cc.puede_dispensar?(monto)
-      has_g  = cc&.credito_gramos_activo? && cc.puede_dispensar_g?(gramos)
-      unless has_cc || has_g
-        return render json: { error: 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.' }, status: :unprocessable_entity
+      cc    = @paciente.cuenta_corriente
+      monto = @dispensacion.aporte_socio_ars.to_d
+      if cc.nil? || cc.limite_credito.to_f <= 0
+        return render json: { error: 'El paciente no tiene crédito configurado. Consultá con el administrador.' }, status: :unprocessable_entity
+      end
+      if monto <= 0
+        return render json: { error: 'No se puede determinar el valor del producto. Configurá el precio del stock.' }, status: :unprocessable_entity
+      end
+      unless cc.puede_dispensar?(monto)
+        return render json: { error: 'Crédito insuficiente para realizar la dispensa.' }, status: :unprocessable_entity
       end
     end
 
@@ -100,15 +102,8 @@ class DispensacionesController < ApplicationController
       case @dispensacion.medio_pago
       when 'cuenta_corriente'
         debitar_cuenta_corriente(@dispensacion)
-      when 'credito_gramos'
-        debitar_gramos(@dispensacion)
       when 'no_abona'
-        cc = @dispensacion.paciente.cuenta_corriente
-        if cc&.limite_credito.to_f > 0 && cc.puede_dispensar?(@dispensacion.aporte_socio_ars.to_d)
-          debitar_cuenta_corriente(@dispensacion)
-        elsif cc&.credito_gramos_activo? && cc.puede_dispensar_g?(@dispensacion.cantidad.to_d)
-          debitar_gramos(@dispensacion)
-        end
+        debitar_cuenta_corriente(@dispensacion)
       end
     end
 
@@ -264,13 +259,8 @@ class DispensacionesController < ApplicationController
   def destroy
     ActiveRecord::Base.transaction do
       case @dispensacion.medio_pago
-      when 'cuenta_corriente'
+      when 'cuenta_corriente', 'no_abona'
         revertir_cuenta_corriente(@dispensacion)
-      when 'credito_gramos'
-        revertir_gramos(@dispensacion)
-      when 'no_abona'
-        revertir_cuenta_corriente(@dispensacion)
-        revertir_gramos(@dispensacion)
       end
       # Nullify FK references before destroy (prevents FK constraint violation)
       CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)

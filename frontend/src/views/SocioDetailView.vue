@@ -25,6 +25,7 @@ import SocioTabHistoria        from '../components/pacientes/SocioTabHistoria.vu
 import SocioTabNotas           from '../components/pacientes/SocioTabNotas.vue'
 import SocioEditarModal          from '../components/pacientes/SocioEditarModal.vue'
 import ModalAgendarTurnoMedico  from '../components/pacientes/ModalAgendarTurnoMedico.vue'
+import TurnoDetallePanel        from '../components/TurnoDetallePanel.vue'
 
 const route  = useRoute()
 const store  = usePacientesStore()
@@ -96,7 +97,14 @@ const ESTADO_CLS   = { programado: 'turno-chip--prog', confirmado: 'turno-chip--
 const TIPO_CLS     = { primera_vez: 'turno-chip--pv', seguimiento: 'turno-chip--seg', revision: 'turno-chip--rev', urgencia: 'turno-chip--urg' }
 
 // ── Edición de turno ─────────────────────────────────────────────────────────
-const turnoEditando  = ref(null)   // turno completo que se está editando
+const turnoEditando    = ref(null)   // turno completo que se está editando
+const turnoSeleccionado = ref(null)
+
+function onTurnoUpdated(data) {
+  const idx = turnosList.value.findIndex(t => t.id === data.id)
+  if (idx !== -1) turnosList.value[idx] = { ...turnosList.value[idx], ...data }
+  turnoSeleccionado.value = { ...turnoSeleccionado.value, ...data }
+}
 const editSaving     = ref(false)
 const editCancelling = ref(false)
 const editForm       = ref({ fecha: '', hora: '', duracion_minutos: 30, tipo: 'seguimiento', estado: 'programado', motivo: '' })
@@ -398,9 +406,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             :paciente-nombre="s ? `${s.nombre} ${s.apellido}`.trim() : ''"
             :saldo-cc="s?.saldo_cc ?? null"
             :limite-cc="s?.limite_cc ?? null"
-            :saldo-cc-g="s?.saldo_cc_g ?? null"
-            :limite-cc-g="s?.limite_cc_g ?? null"
-            :cc-gramos-activo="s?.cc_gramos_activo ?? false"
             :descuento-porcentaje="Number(s?.descuento_porcentaje ?? 0)"
             @dispensacion-creada="onDispensacionCreada"
           />
@@ -440,8 +445,9 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         </div>
         <div v-else class="sd__turnos-list">
           <div v-for="t in turnosList" :key="t.id"
-            class="sd__turno-row"
-            :class="{ 'sd__turno-row--cancelado': t.estado === 'cancelado' }">
+            class="sd__turno-row sd__turno-row--clickable"
+            :class="{ 'sd__turno-row--cancelado': t.estado === 'cancelado' }"
+            @click="turnoSeleccionado = t">
             <div class="sd__turno-fecha">
               <div class="sd__turno-dia">{{ new Date(t.fecha_hora).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }) }}</div>
               <div class="sd__turno-hora">{{ new Date(t.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) }}</div>
@@ -457,7 +463,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               <span class="turno-chip" :class="ESTADO_CLS[t.estado]">{{ ESTADO_LABEL[t.estado] || t.estado }}</span>
             </div>
             <div class="sd__turno-dur">{{ t.duracion_minutos }}min</div>
-            <div v-if="canAgendar && t.estado !== 'cancelado'" class="sd__turno-actions">
+            <div v-if="canAgendar && t.estado !== 'cancelado'" class="sd__turno-actions" @click.stop>
               <button class="sd__turno-btn sd__turno-btn--edit"
                 title="Reprogramar turno"
                 @click="abrirEdicion(t)">
@@ -580,6 +586,14 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
     :medico-mode="isMedico"
     @close="agendarTurnoOpen = false"
     @created="agendarTurnoOpen = false; loadTurnos()"
+  />
+
+  <TurnoDetallePanel
+    v-if="turnoSeleccionado"
+    :turno="turnoSeleccionado"
+    :admin-mode="isAdmin"
+    @close="turnoSeleccionado = null"
+    @updated="onTurnoUpdated"
   />
 </template>
 
@@ -720,6 +734,8 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
   transition: box-shadow .12s;
 }
 .sd__turno-row:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.sd__turno-row--clickable { cursor: pointer; }
+.sd__turno-row--clickable:hover { border-color: #bbf7d0; background: #f0fdf4; }
 .sd__turno-fecha { min-width: 88px; }
 .sd__turno-dia   { font-size: .8rem; font-weight: 700; color: #0f172a; text-transform: capitalize; }
 .sd__turno-hora  { font-size: .78rem; color: #64748b; }

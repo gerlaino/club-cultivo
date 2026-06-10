@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import { useToast } from './useToast.js'
 import { usePacientesStore } from '../stores/pacientes'
-import { getCuentaCorriente, setLimiteCC, toggleGramosCC, setLimiteGCC, cargarGCC, updatePaciente } from '../lib/api.js'
+import { getCuentaCorriente, setLimiteCC, updatePaciente } from '../lib/api.js'
 
 export function useSocioCuentaCorriente(socioId) {
   const { success: toastOk, error: toastErr } = useToast()
@@ -15,21 +15,11 @@ export function useSocioCuentaCorriente(socioId) {
   const limiteEditVal  = ref(null)
   const savingLimite   = ref(false)
 
-  // ── Crédito gramos ────────────────────────────────────────
-  const togglingGramos = ref(false)
-  const limiteGOpen    = ref(false)
-  const limiteGVal     = ref(null)
-  const savingLimiteG  = ref(false)
-  const cargarGOpen    = ref(false)
-  const cargarGVal     = ref(null)
-  const savingCargarG  = ref(false)
-
   // ── Descuento ────────────────────────────────────────────
   const descuentoEditOpen = ref(false)
   const descuentoEditVal  = ref(null)
   const savingDescuento   = ref(false)
 
-  // Lee el descuento directamente del store del paciente (reactivo)
   const descuentoPorcentaje = computed(() => store.current?.descuento_porcentaje ?? 0)
 
   // ── Formateo ──────────────────────────────────────────────
@@ -62,7 +52,6 @@ export function useSocioCuentaCorriente(socioId) {
   // ── Toggle crédito ARS ────────────────────────────────────
   async function toggleLimite() {
     if ((cc.value?.limite_credito ?? 0) > 0) {
-      // Desactivar → poner en 0
       savingLimite.value = true
       try {
         const { data } = await setLimiteCC(socioId, 0)
@@ -75,7 +64,6 @@ export function useSocioCuentaCorriente(socioId) {
         savingLimite.value = false
       }
     } else {
-      // Activar → abrir input
       limiteEditVal.value  = null
       limiteEditOpen.value = true
     }
@@ -100,54 +88,6 @@ export function useSocioCuentaCorriente(socioId) {
       toastErr(e?.response?.data?.error || 'Error al guardar límite')
     } finally {
       savingLimite.value = false
-    }
-  }
-
-  // ── Toggle crédito gramos ─────────────────────────────────
-  async function toggleGramos() {
-    togglingGramos.value = true
-    try {
-      const { data } = await toggleGramosCC(socioId)
-      cc.value = data
-      store.fetchOne(socioId)
-    } catch (e) {
-      toastErr(e?.response?.data?.error || 'Error al cambiar estado')
-    } finally {
-      togglingGramos.value = false
-    }
-  }
-
-  async function saveLimiteG() {
-    const nuevo = Number(limiteGVal.value)
-    if (nuevo <= 0) return
-    savingLimiteG.value = true
-    try {
-      const { data } = await setLimiteGCC(socioId, nuevo)
-      cc.value = data
-      limiteGOpen.value = false
-      toastOk('Cupo en gramos actualizado')
-    } catch (e) {
-      toastErr(e?.response?.data?.error || 'Error al guardar')
-    } finally {
-      savingLimiteG.value = false
-    }
-  }
-
-  async function doCargarG() {
-    const gramos = Number(cargarGVal.value)
-    if (gramos <= 0) return
-    savingCargarG.value = true
-    try {
-      const { data } = await cargarGCC(socioId, { gramos })
-      cc.value = data
-      cargarGOpen.value = false
-      cargarGVal.value  = null
-      store.fetchOne(socioId)
-      toastOk(`${gramos}g acreditados`)
-    } catch (e) {
-      toastErr(e?.response?.data?.error || 'Error al acreditar')
-    } finally {
-      savingCargarG.value = false
     }
   }
 
@@ -197,11 +137,6 @@ export function useSocioCuentaCorriente(socioId) {
     // Crédito ARS
     limiteEditOpen, limiteEditVal, savingLimite,
     toggleLimite, openLimiteEdit, saveLimite,
-    // Gramos
-    togglingGramos,
-    limiteGOpen, limiteGVal, savingLimiteG,
-    cargarGOpen, cargarGVal, savingCargarG,
-    toggleGramos, saveLimiteG, doCargarG,
     // Descuento
     descuentoPorcentaje, descuentoEditOpen, descuentoEditVal, savingDescuento,
     toggleDescuento, openDescuentoEdit, saveDescuento,

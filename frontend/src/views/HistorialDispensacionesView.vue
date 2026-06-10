@@ -1,10 +1,41 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
-import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes } from '../lib/api.js'
+import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, deleteDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink } from 'vue-router'
-import { Download, RefreshCw, Truck, Search, Plus, X, Filter } from 'lucide-vue-next'
+import { Download, RefreshCw, Truck, Search, Plus, X, Filter, Pencil, Trash2 } from 'lucide-vue-next'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
+import ModalEditarDispensacion from '../components/pacientes/ModalEditarDispensacion.vue'
+import { useAuthStore } from '../stores/auth'
+import { useConfirm } from '../composables/useConfirm.js'
+import { useToast } from '../composables/useToast.js'
+
+const auth    = useAuthStore()
+const { confirm } = useConfirm()
+const toast   = useToast()
+
+const canEdit   = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
+const canDelete = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
+
+// Edit modal
+const editModal  = ref(false)
+const editTarget = ref(null)
+
+function openEdit(d) {
+  editTarget.value = d
+  editModal.value  = true
+}
+
+async function handleDelete(d) {
+  const label = `${d.cantidad}g · ${d.paciente_nombre} · ${formatFecha(d.fecha_dispensacion, false)}`
+  const ok = await confirm({ title: '¿Eliminar dispensación?', message: label, confirmText: 'Eliminar', variant: 'danger' })
+  if (!ok) return
+  try {
+    await deleteDispensacion(d.id)
+    await cargar()
+    toast.success('Dispensación eliminada')
+  } catch { toast.error('Error al eliminar') }
+}
 
 // ── Modal: buscar paciente (para nueva dispensación O para filtrar) ─────────────
 const showBuscarPaciente   = ref(false)
@@ -172,11 +203,11 @@ function formatHora(ts) {
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
 function medioPagoLabel(m) {
-  const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', credito_gramos: 'Cred. g', no_abona: 'No abona' }
+  const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', no_abona: 'No abona' }
   return L[m] || m || '—'
 }
 function medioPagoClass(m) {
-  const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', credito_gramos: 'hd__pago--teal', no_abona: 'hd__pago--gris' }
+  const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', no_abona: 'hd__pago--gris' }
   return C[m] || 'hd__pago--gris'
 }
 function descuentoPct(d) {
@@ -189,7 +220,7 @@ function descuentoPct(d) {
 const MEDIOS_PAGO = [
   { value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' },
   { value: 'debito', label: 'Débito' }, { value: 'credito', label: 'Crédito' },
-  { value: 'cuenta_corriente', label: 'Cta. corriente' }, { value: 'credito_gramos', label: 'Crédito gramos' },
+  { value: 'cuenta_corriente', label: 'Cta. corriente' },
   { value: 'no_abona', label: 'No abona' },
 ]
 const FORMAS = [
@@ -281,9 +312,6 @@ const FORMAS = [
       :paciente-nombre="`${pacienteSeleccionado.apellido}, ${pacienteSeleccionado.nombre}`"
       :saldo-cc="pacienteSeleccionado.saldo_cc ?? null"
       :limite-cc="pacienteSeleccionado.limite_cc ?? null"
-      :saldo-cc-g="pacienteSeleccionado.saldo_cc_g ?? null"
-      :limite-cc-g="pacienteSeleccionado.limite_cc_g ?? null"
-      :cc-gramos-activo="pacienteSeleccionado.cc_gramos_activo ?? false"
       :descuento-porcentaje="Number(pacienteSeleccionado.descuento_porcentaje ?? 0)"
       @saved="onDispensacionGuardada"
     />
@@ -399,6 +427,7 @@ const FORMAS = [
               <th>Pago</th>
               <th>Dispensador</th>
               <th></th>
+              <th v-if="canEdit || canDelete"></th>
             </tr>
           </thead>
           <tbody>
@@ -435,6 +464,14 @@ const FORMAS = [
                   <Truck :size="12" :stroke-width="2" />
                 </span>
               </td>
+              <td class="hd__td-actions">
+                <button v-if="canEdit" class="hd__action-btn" @click="openEdit(d)" title="Editar">
+                  <Pencil :size="13" :stroke-width="2" />
+                </button>
+                <button v-if="canDelete" class="hd__action-btn hd__action-btn--danger" @click="handleDelete(d)" title="Eliminar">
+                  <Trash2 :size="13" :stroke-width="2" />
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -454,6 +491,13 @@ const FORMAS = [
       Sin dispensaciones en el período seleccionado.
     </div>
 
+    <!-- Modal editar dispensación -->
+    <ModalEditarDispensacion
+      v-model="editModal"
+      :dispensacion="editTarget"
+      @saved="cargar"
+    />
+
   </div>
 </template>
 
@@ -461,6 +505,9 @@ const FORMAS = [
 .hd {
   padding: var(--sp-6) var(--sp-8);
   max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 @media (max-width: 767px) { .hd { padding: var(--sp-4); } }
 
@@ -732,6 +779,18 @@ const FORMAS = [
   font-size: 11px;
   gap: 3px;
 }
+
+/* Action buttons in table */
+.hd__td-actions { width: 60px; white-space: nowrap; }
+.hd__action-btn {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .15s;
+}
+.hd__action-btn:hover { background: #f1f5f9; color: #334155; }
+.hd__action-btn--danger:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+
 
 /* Summary row */
 .hd__summary {

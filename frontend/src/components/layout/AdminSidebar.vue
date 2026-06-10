@@ -1,5 +1,5 @@
 <template>
-  <aside class="asb">
+  <aside class="asb" :class="{ 'asb--collapsed': collapsed }">
 
     <!-- Brand -->
     <div class="asb__brand">
@@ -11,9 +11,9 @@
     <nav class="asb__nav">
 
       <!-- Dashboard — siempre visible -->
-      <RouterLink to="/" class="asb__link" :class="{ 'asb__link--active': route.path === '/' }">
+      <RouterLink to="/" class="asb__link" :class="{ 'asb__link--active': route.path === '/' }" :title="collapsed ? 'Dashboard' : undefined">
         <LayoutDashboard :size="18" :stroke-width="1.75" class="asb__link-ico" />
-        <span>Dashboard</span>
+        <span class="asb__label">Dashboard</span>
       </RouterLink>
 
       <!-- Grupos colapsables -->
@@ -22,11 +22,13 @@
         <button
           class="asb__group-hdr"
           :class="{ 'asb__group-hdr--active': grupoTieneActivo(grupo) }"
-          @click="toggleGrupo(grupo.label)"
+          @click="!collapsed && toggleGrupo(grupo.label)"
+          :title="collapsed ? grupo.label : undefined"
         >
           <component :is="grupo.icon" :size="15" :stroke-width="1.75" class="asb__group-ico" />
-          <span class="asb__group-label">{{ grupo.label }}</span>
+          <span class="asb__label asb__group-label">{{ grupo.label }}</span>
           <ChevronDown
+            v-if="!collapsed"
             :size="13"
             :stroke-width="2.5"
             class="asb__chevron"
@@ -34,7 +36,7 @@
           />
         </button>
 
-        <div v-show="abiertos[grupo.label]" class="asb__group-items">
+        <div v-show="!collapsed && abiertos[grupo.label]" class="asb__group-items">
           <RouterLink
             v-for="link in grupo.items"
             :key="link.to"
@@ -43,13 +45,19 @@
             :class="{ 'asb__sub--active': isActive(link.to) }"
           >
             <component :is="link.icon" :size="15" :stroke-width="1.75" class="asb__sub-ico" />
-            <span>{{ link.label }}</span>
+            <span class="asb__label">{{ link.label }}</span>
             <span v-if="link.badge?.value" class="asb__sub-badge">{{ link.badge.value }}</span>
           </RouterLink>
         </div>
 
       </div>
     </nav>
+
+    <!-- Collapse toggle -->
+    <button class="asb__collapse-btn" @click="toggleCollapse" :title="collapsed ? 'Expandir menú' : 'Contraer menú'">
+      <PanelLeftClose v-if="!collapsed" :size="15" :stroke-width="1.75" />
+      <PanelLeftOpen  v-else            :size="15" :stroke-width="1.75" />
+    </button>
 
   </aside>
 </template>
@@ -63,8 +71,16 @@ import {
   ShieldCheck, Truck, TrendingUp, History,
   GitBranch, Layers, ChevronDown, Dna, Archive, Leaf, Boxes, Scissors,
   ClipboardList, Package, Settings, ClipboardCheck, Scale, Webhook, BellRing,
+  PanelLeftClose, PanelLeftOpen,
 } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
+
+const collapsed = ref(localStorage.getItem('asb-collapsed') === '1')
+
+function toggleCollapse() {
+  collapsed.value = !collapsed.value
+  localStorage.setItem('asb-collapsed', collapsed.value ? '1' : '0')
+}
 
 const aprobacionesPendientes = ref(0)
 
@@ -208,7 +224,29 @@ watch(() => route.path, (path, prev) => {
   top: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  transition: width .25s cubic-bezier(.4,0,.2,1);
 }
+.asb--collapsed {
+  width: 54px;
+}
+.asb--collapsed .asb__brand-name,
+.asb--collapsed .asb__label,
+.asb--collapsed .asb__sub-badge { display: none; }
+.asb--collapsed .asb__brand    { justify-content: center; padding: 1.1rem .5rem; }
+.asb--collapsed .asb__link     { justify-content: center; padding: 9px 0; }
+.asb--collapsed .asb__group-hdr { justify-content: center; padding: 8px 0; }
+.asb--collapsed .asb__sub      { justify-content: center; padding: 7px 0; }
+.asb--collapsed .asb__nav      { padding: var(--sp-3) var(--sp-1); }
+
+/* Collapse button */
+.asb__collapse-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 38px; border: none; background: none;
+  color: rgba(168,201,181,0.4); cursor: pointer; flex-shrink: 0;
+  transition: color .15s, background .15s;
+  border-top: 1px solid rgba(168,201,181,0.1);
+}
+.asb__collapse-btn:hover { color: rgba(168,201,181,0.85); background: rgba(255,255,255,0.04); }
 
 /* Brand */
 .asb__brand {

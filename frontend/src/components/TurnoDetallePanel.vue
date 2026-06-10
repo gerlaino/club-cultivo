@@ -1,13 +1,20 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { updateMedicoTurno } from '../lib/api.js'
+import { updateMedicoTurno, updateAdminTurno } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { X, CheckCircle2, XCircle, AlertCircle, Pencil } from 'lucide-vue-next'
 
-const props = defineProps({ turno: { type: Object, required: true } })
+const props = defineProps({
+  turno:     { type: Object,  required: true },
+  adminMode: { type: Boolean, default: false },
+})
 const emit  = defineEmits(['close', 'updated'])
+
+const apiUpdate = (id, payload) => props.adminMode
+  ? updateAdminTurno(id, payload)
+  : updateMedicoTurno(id, payload)
 
 const router = useRouter()
 const toast  = useToast()
@@ -40,7 +47,7 @@ watch(() => props.turno, t => {
 
 async function cambiarEstado(estado) {
   try {
-    const { data } = await updateMedicoTurno(props.turno.id, { estado })
+    const { data } = await apiUpdate(props.turno.id, { estado })
     emit('updated', data)
     toast.success(ESTADO_CFG[estado]?.label)
   } catch { toast.error('No se pudo actualizar') }
@@ -48,7 +55,7 @@ async function cambiarEstado(estado) {
 
 async function guardarNotas() {
   try {
-    const { data } = await updateMedicoTurno(props.turno.id, { notas_post: notasForm.value })
+    const { data } = await apiUpdate(props.turno.id, { notas_post: notasForm.value })
     emit('updated', data)
     editingNotas.value = false
     toast.success('Notas guardadas')
@@ -70,7 +77,7 @@ async function guardarReprogramacion() {
   reprogramSaving.value = true
   try {
     const fecha_hora = new Date(`${reprogramForm.value.fecha}T${reprogramForm.value.hora}:00`).toISOString()
-    const { data } = await updateMedicoTurno(props.turno.id, {
+    const { data } = await apiUpdate(props.turno.id, {
       fecha_hora,
       duracion_minutos: Number(reprogramForm.value.duracion_minutos),
     })
@@ -97,7 +104,11 @@ function fmtHoraFin(fh, mins) {
 
 function irFicha() {
   emit('close')
-  router.push(`/medico/pacientes/${props.turno.paciente_id}/ficha`)
+  if (props.adminMode) {
+    router.push(`/socios/${props.turno.paciente_id}`)
+  } else {
+    router.push(`/medico/pacientes/${props.turno.paciente_id}/ficha`)
+  }
 }
 </script>
 

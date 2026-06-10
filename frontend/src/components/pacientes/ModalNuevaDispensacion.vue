@@ -11,9 +11,6 @@ const props = defineProps({
   pacienteNombre: { type: String,  default: '' },
   saldoCc:        { type: Number,  default: null },
   limiteCc:       { type: Number,  default: null },
-  saldoCcG:            { type: Number,  default: null },
-  limiteCcG:           { type: Number,  default: null },
-  ccGramosActivo:      { type: Boolean, default: false },
   descuentoPorcentaje: { type: Number,  default: 0 },
 })
 
@@ -58,13 +55,6 @@ const estadoCc = computed(() => {
   if (ccInsuficiente.value)  return 'insuficiente'
   if (ccMargen.value < (props.limiteCc ?? 0) * 0.2) return 'critico'
   return 'ok'
-})
-
-// ── Crédito en gramos ──────────────────────────────────────────────────────────
-const tieneCcG        = computed(() => props.ccGramosActivo && props.limiteCcG > 0)
-const ccGInsuficiente = computed(() => {
-  if (!tieneCcG.value || !form.value.cantidad) return false
-  return Number(form.value.cantidad) > (props.saldoCcG ?? 0)
 })
 
 const excederiaStock = computed(() => {
@@ -154,14 +144,15 @@ async function handleSubmit() {
     formError.value = `Stock insuficiente: solo hay ${stockSeleccionado.value.cantidad}${stockSeleccionado.value.unidad || 'g'} disponibles`
     saving.value = false; return
   }
+  if (form.value.medio_pago === 'cuenta_corriente' && !(Number(form.value.aporte_socio_ars) > 0)) {
+    formError.value = 'El aporte del socio debe ser mayor a $0 para cobrar por cuenta corriente'
+    saving.value = false; return
+  }
   if (ccInsuficiente.value && form.value.medio_pago === 'cuenta_corriente') {
     formError.value = `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
     saving.value = false; return
   }
-  if (ccGInsuficiente.value && form.value.medio_pago === 'credito_gramos') {
-    formError.value = `Gramos insuficientes. Disponible: ${(props.saldoCcG ?? 0).toFixed(1)}g — requerido: ${Number(form.value.cantidad).toFixed(1)}g`
-    saving.value = false; return
-  }
+
 
   if (form.value.con_envio) {
     if (!form.value.delivery_id) { formError.value = 'Seleccioná un delivery para asignar el envío'; saving.value = false; return }
@@ -207,7 +198,7 @@ async function handleSubmit() {
 
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="mnd__overlay" @click.self="cerrar">
+    <div v-if="modelValue" class="mnd__overlay">
       <div class="mnd__modal">
 
         <div class="mnd__modal-header">
@@ -312,24 +303,6 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <!-- CC gramos -->
-          <div v-if="tieneCcG && form.medio_pago === 'credito_gramos'"
-               class="mnd__cc-panel" :class="ccGInsuficiente ? 'mnd__cc-panel--insuficiente' : 'mnd__cc-panel--ok'">
-            <div class="mnd__cc-row">
-              <span class="mnd__cc-label"><i class="bi bi-flower1"></i> Gramos disponibles</span>
-              <span class="mnd__cc-saldo" :class="{ 'mnd__cc-saldo--bajo': (props.saldoCcG ?? 0) <= 0 }">
-                {{ (props.saldoCcG ?? 0).toFixed(1) }}g
-              </span>
-            </div>
-            <div v-if="form.cantidad > 0 && !ccGInsuficiente" class="mnd__cc-tras">
-              Luego de esta dispensación: <strong>{{ ((props.saldoCcG ?? 0) - Number(form.cantidad)).toFixed(1) }}g</strong>
-            </div>
-            <div v-if="ccGInsuficiente" class="mnd__cc-warn">
-              <i class="bi bi-exclamation-triangle-fill"></i>
-              Gramos insuficientes (disponible: {{ (props.saldoCcG ?? 0).toFixed(1) }}g)
-            </div>
-          </div>
-
           <!-- CC ARS — siempre visible como info; advertencias solo cuando medio_pago=cuenta_corriente -->
           <div v-if="tieneCc" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
             <div class="mnd__cc-row">
@@ -359,7 +332,6 @@ async function handleSubmit() {
                 <option value="debito">Débito</option>
                 <option value="credito">Crédito</option>
                 <option value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite configurado)' : '' }}</option>
-                <option value="credito_gramos" :disabled="!tieneCcG">Crédito en gramos{{ !tieneCcG ? ' (no activado)' : ` — ${(props.saldoCcG ?? 0).toFixed(1)}g disponibles` }}</option>
                 <option value="otro">Otro</option>
               </select>
             </div>

@@ -158,6 +158,9 @@ class StocksController < ApplicationController
     # Lote origen
     lote = s.lote
 
+    # Genética — directo en stock o heredada del lote
+    genetica = s.genetica || lote&.genetica
+
     # Pesada origen
     pesada = s.pesada
 
@@ -172,22 +175,35 @@ class StocksController < ApplicationController
     # Dispensaciones
     dispensaciones = s.dispensaciones.includes(:paciente).order(created_at: :desc).limit(100).map do |d|
       {
-        id:                d.id,
-        fecha:             d.fecha_dispensacion,
-        cantidad_g:        d.cantidad&.to_f,
+        id:                 d.id,
+        fecha:              d.fecha_dispensacion,
+        cantidad_g:         d.cantidad&.to_f,
         paciente_iniciales: "#{d.paciente&.nombre&.[](0)}.#{d.paciente&.apellido&.[](0)}.",
         paciente_dni_last4: d.paciente&.dni_normalizado.to_s.last(4),
       }
     end
+
+    gramos_dispensados  = dispensaciones.sum { |d| d[:cantidad_g].to_f }.round(2)
+    cantidad_disponible = s.cantidad.to_f.round(2)
+    cantidad_inicial    = (cantidad_disponible + gramos_dispensados).round(2)
 
     render json: {
       stock: {
         id:                   s.id,
         numero_lote_producto: s.numero_lote_producto,
         forma_producto:       s.forma_producto,
-        cantidad_g:           s.cantidad&.to_f,
+        cantidad_inicial_g:   cantidad_inicial,
+        cantidad_disponible_g: cantidad_disponible,
         fecha_elaboracion:    s.fecha_elaboracion,
         codigo_qr:            s.codigo_qr,
+        genetica: genetica ? {
+          id:                    genetica.id,
+          nombre:                genetica.nombre,
+          numero_registro_inase: genetica.numero_registro_inase,
+          tipo:                  genetica.tipo,
+          thc:                   genetica.thc,
+          cbd:                   genetica.cbd,
+        } : nil,
       },
       lote: lote ? {
         id:      lote.id,
@@ -207,7 +223,8 @@ class StocksController < ApplicationController
       totales: {
         plantas_origen:       plantas.size,
         dispensaciones_count: dispensaciones.size,
-        gramos_dispensados:   dispensaciones.sum { |d| d[:cantidad_g].to_f }.round(2),
+        gramos_dispensados:   gramos_dispensados,
+        cantidad_disponible_g: cantidad_disponible,
       },
     }
   end

@@ -185,10 +185,7 @@
                   <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'cuenta_corriente' }" :disabled="!tieneCc" :title="!tieneCc ? 'El paciente no tiene cuenta corriente configurada' : ''" @click="medioPago = 'cuenta_corriente'">
                     Cta. corriente
                   </button>
-                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'credito_gramos' }" :disabled="!tieneCcG" :title="!tieneCcG ? 'El paciente no tiene crédito en gramos' : ''" @click="medioPago = 'credito_gramos'">
-                    Crédito g
-                  </button>
-                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'no_abona' }" :disabled="!puedeNoAbonar" :title="!puedeNoAbonar ? 'El paciente no tiene crédito configurado' : ''" @click="medioPago = 'no_abona'">
+                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'no_abona' }" :disabled="!tieneCc" :title="!tieneCc ? 'El paciente no tiene crédito configurado' : ''" @click="medioPago = 'no_abona'">
                     No abona
                   </button>
                 </div>
@@ -200,11 +197,7 @@
                 <strong>{{ formatARS(ccBalance) }}</strong>
                 <span v-if="ccExcedido" class="dv__balance-error">— saldo insuficiente</span>
               </div>
-              <div v-else-if="medioPago === 'credito_gramos' && ccGBalance !== null" class="dv__balance-info" :class="{ 'dv__balance-info--alerta': gramosExcedido }">
-                <span>Crédito en gramos:</span>
-                <strong>{{ formatG(ccGBalance) }}</strong>
-                <span v-if="gramosExcedido" class="dv__balance-error">— saldo insuficiente</span>
-              </div>
+
 
               <!-- Envío a domicilio -->
               <div class="dv__modal-field">
@@ -391,18 +384,12 @@ const stocksDisponibles = computed(() =>
 const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.total, 0))
 
 const tieneCc       = computed(() => (pacienteDetalle.value?.limite_cc ?? 0) > 0)
-const tieneCcG      = computed(() => pacienteDetalle.value?.cc_gramos_activo && (pacienteDetalle.value?.saldo_cc_g ?? 0) > 0)
-const puedeNoAbonar = computed(() => tieneCc.value || tieneCcG.value)
 
 const ccBalance      = computed(() => pacienteDetalle.value?.saldo_cc  ?? null)
-const ccGBalance     = computed(() => pacienteDetalle.value?.saldo_cc_g ?? null)
 const ccExcedido     = computed(() =>
   medioPago.value === 'cuenta_corriente' && ccBalance.value !== null && cartTotal.value > ccBalance.value
 )
-const gramosExcedido = computed(() =>
-  medioPago.value === 'credito_gramos' && ccGBalance.value !== null && cartTotalG.value > ccGBalance.value
-)
-const pagoExcedido   = computed(() => ccExcedido.value || gramosExcedido.value)
+const pagoExcedido   = computed(() => ccExcedido.value)
 
 const cartTotalG = computed(() => cart.value.filter(i => i.stock.unidad === 'g').reduce((s, i) => s + i.cantidad, 0))
 

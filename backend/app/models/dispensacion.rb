@@ -2,7 +2,7 @@ class Dispensacion < ApplicationRecord
   self.table_name = 'dispensaciones'
 
   ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido].freeze
-  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente credito_gramos no_abona].freeze
+  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona].freeze
 
   belongs_to :paciente
   belongs_to :user
@@ -26,7 +26,7 @@ class Dispensacion < ApplicationRecord
   validate  :stock_disponible,           on: :create
   validate  :limite_mensual_no_superado, on: :create
   validate  :credito_suficiente,        on: :create, if: -> { medio_pago == 'cuenta_corriente' }
-  validate  :gramos_suficientes,        on: :create, if: -> { medio_pago == 'credito_gramos' }
+  validate  :credito_no_abona,          on: :create, if: -> { medio_pago == 'no_abona' }
   validate  :delivery_fields_presentes, if: :con_envio?
 
   scope :del_mes,        ->(fecha = Date.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
@@ -88,7 +88,11 @@ class Dispensacion < ApplicationRecord
   end
 
   def credito_suficiente
-    return unless paciente_id && aporte_socio_ars.to_d > 0
+    return unless paciente_id
+    if aporte_socio_ars.to_d <= 0
+      errors.add(:aporte_socio_ars, 'debe ser mayor a $0 cuando el medio de pago es cuenta corriente')
+      return
+    end
     cc = paciente.cuenta_corriente
     return unless cc
     margen = cc.saldo_disponible + cc.limite_credito
@@ -97,13 +101,17 @@ class Dispensacion < ApplicationRecord
     end
   end
 
-  def gramos_suficientes
-    return unless paciente_id && cantidad.to_d > 0
-    saldo = paciente.saldo_cc_g.to_d
-    if saldo <= 0
-      errors.add(:base, 'El paciente no tiene crédito en gramos disponible.')
-    elsif cantidad.to_d > saldo
-      errors.add(:cantidad, "supera el crédito en gramos disponible (#{saldo.round(2)}g disponibles)")
+  def credito_no_abona
+    return unless paciente_id
+    cc    = paciente.cuenta_corriente
+    monto = aporte_socio_ars.to_d
+
+    if cc.nil? || cc.limite_credito.to_d <= 0
+      errors.add(:base, 'El paciente no tiene crédito configurado. Consultá con el administrador.')
+    elsif monto <= 0
+      errors.add(:base, 'No se puede determinar el valor del producto. Configurá el precio del stock.')
+    elsif (cc.saldo_disponible + cc.limite_credito) < monto
+      errors.add(:base, 'Crédito insuficiente para realizar la dispensa.')
     end
   end
 

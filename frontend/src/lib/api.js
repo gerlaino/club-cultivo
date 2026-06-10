@@ -180,9 +180,6 @@ export const getCuentaCorriente  = (pacienteId)         => api.get(`/pacientes/$
 export const cargarCreditoCC     = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/cargar`, payload)
 export const ajustarCC           = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/ajuste`, payload)
 export const setLimiteCC         = (pacienteId, limite)  => api.patch(`/pacientes/${pacienteId}/cuenta_corriente/set_limite`, { limite_credito: limite })
-export const toggleGramosCC      = (pacienteId)          => api.patch(`/pacientes/${pacienteId}/cuenta_corriente/toggle_gramos`)
-export const setLimiteGCC        = (pacienteId, g)       => api.patch(`/pacientes/${pacienteId}/cuenta_corriente/set_limite_g`, { limite_credito_g: g })
-export const cargarGCC           = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/cargar_g`, payload)
 
 export const exportPacientesCSV  = (params = {}) => api.get('/pacientes/export_csv', { params, responseType: 'blob' })
 export const listDispensaciones = (pacienteId) => api.get(`/pacientes/${pacienteId}/dispensaciones`);

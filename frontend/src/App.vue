@@ -746,6 +746,10 @@ onMounted(async () => {
 }
 .admin-main {
   flex: 1;
+  min-width: 0;
+}
+.admin-main :deep(> *) {
+  box-sizing: border-box;
 }
 @media (max-width: 767px) {
   .admin-main { padding-bottom: 72px; }
