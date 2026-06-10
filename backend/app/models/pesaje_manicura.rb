@@ -1,4 +1,6 @@
 class PesajeManicura < ApplicationRecord
+  self.table_name = 'pesajes_manicura'
+
   ESTADOS = %w[borrador enviado confirmado].freeze
 
   belongs_to :lote
