@@ -97,11 +97,17 @@ class Stock < ApplicationRecord
     return if numero_lote_producto.present?
     return unless club_id
     year = Date.today.strftime("%y")
-    result = ActiveRecord::Base.connection.execute(
-      "UPDATE clubs SET lote_numero_seq = COALESCE(lote_numero_seq, 0) + 1 WHERE id = #{club_id.to_i} RETURNING lote_numero_seq"
-    )
-    seq = result.first['lote_numero_seq']
-    self.numero_lote_producto = "ST-#{year}-#{seq.to_s.rjust(4, '0')}"
+    loop do
+      result = ActiveRecord::Base.connection.execute(
+        "UPDATE clubs SET lote_numero_seq = COALESCE(lote_numero_seq, 0) + 1 WHERE id = #{club_id.to_i} RETURNING lote_numero_seq"
+      )
+      seq = result.first['lote_numero_seq']
+      candidate = "ST-#{year}-#{seq.to_s.rjust(4, '0')}"
+      unless Stock.where(club_id: club_id).exists?(numero_lote_producto: candidate)
+        self.numero_lote_producto = candidate
+        break
+      end
+    end
   end
 
   def generar_codigo_qr
