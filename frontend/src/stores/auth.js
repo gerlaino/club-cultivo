@@ -61,6 +61,11 @@ export const useAuthStore = defineStore("auth", {
         await signIn(email, password);
         await this.fetchMe();
 
+        if (!this.user) {
+          this.error = "No se pudo obtener el usuario. Intentá de nuevo.";
+          return;
+        }
+
         const { default: router } = await import("../router");
         const ROLE_HOME = {
           super_admin: '/super-admin',
