@@ -5,7 +5,7 @@ import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
-import { getRegistrosAmbientales, getLoteEventos, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio } from "../lib/api"
+import { getRegistrosAmbientales, getLoteEventos, listTareas, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio } from "../lib/api"
 import { useQRCode } from '../composables/useQRCode.js'
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
@@ -122,10 +122,18 @@ const loadingEventos = ref(false)
 async function loadEventos() {
   loadingEventos.value = true
   try {
-    const [evRes, regRes] = await Promise.all([getLoteEventos(id), getRegistrosAmbientales(id)])
-    const evs  = (evRes.data  || []).map(e => ({ ...e, _tipo: 'evento' }))
-    const regs = (regRes.data || []).map(r => ({ ...r, _tipo: 'registro' }))
-    eventos.value = [...evs, ...regs].sort((a, b) => new Date(b.registrado_en) - new Date(a.registrado_en))
+    const [evRes, regRes, tareasRes] = await Promise.all([
+      getLoteEventos(id),
+      getRegistrosAmbientales(id),
+      listTareas({ lote_id: id, estado: 'completada' }),
+    ])
+    const evs    = (evRes.data      || []).map(e => ({ ...e, _tipo: 'evento' }))
+    const regs   = (regRes.data     || []).map(r => ({ ...r, _tipo: 'registro' }))
+    const tareas = (tareasRes.data  || []).map(t => ({
+      ...t, _tipo: 'tarea', registrado_en: t.fecha_completada || t.updated_at
+    }))
+    eventos.value = [...evs, ...regs, ...tareas]
+      .sort((a, b) => new Date(b.registrado_en) - new Date(a.registrado_en))
   } catch { eventos.value = [] }
   finally { loadingEventos.value = false }
 }

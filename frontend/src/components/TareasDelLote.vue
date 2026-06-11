@@ -1,9 +1,18 @@
 <template>
   <div class="tl">
 
-    <!-- Header con acción aplicar plan -->
-    <div v-if="canAdmin" class="tl__header">
-      <button class="tl__btn-plan" @click="showAplicarPlan = true">
+    <!-- Header: nav semanal + aplicar plan -->
+    <div class="tl__header">
+      <div class="tl__week-nav">
+        <button class="tl__nav-btn" @click="prevSemana" :disabled="!puedePrev" title="Semana anterior">
+          <i class="bi bi-chevron-left"></i>
+        </button>
+        <span class="tl__nav-label">{{ labelSemana }}</span>
+        <button class="tl__nav-btn" @click="nextSemana" :disabled="!puedeNext" title="Semana siguiente">
+          <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+      <button v-if="canAdmin" class="tl__btn-plan" @click="showAplicarPlan = true">
         <i class="bi bi-calendar2-check"></i> Aplicar plan
       </button>
     </div>
@@ -12,45 +21,70 @@
       <DsSpinner :size="40" />
     </div>
 
-    <div v-else-if="tareasPendientes.length === 0" class="tl__empty">
-      <span>🎉</span>
-      <p>Sin tareas pendientes para este lote</p>
-    </div>
-
-    <div v-else class="tl__lista">
-      <div
-        v-for="t in tareasPendientes"
-        :key="t.id"
-        class="tl__tarea"
-        :class="`tl__tarea--${t.prioridad}`"
-      >
-        <div class="tl__tarea-left">
-          <div class="tl__tarea-titulo">{{ t.titulo }}</div>
-          <div class="tl__tarea-meta">
-            {{ TIPO_LABELS[t.tipo] || t.tipo }}
-            <span v-if="t.fecha_programada"> · {{ t.fecha_programada }}</span>
-            <span v-if="t.asignada_a"> · {{ t.asignada_a.nombre }}</span>
+    <div v-else>
+      <!-- Grid semanal -->
+      <div class="tl__week-grid">
+        <div
+          v-for="dia in diasSemana"
+          :key="dia.iso"
+          class="tl__dia"
+          :class="{ 'tl__dia--hoy': dia.esHoy }"
+        >
+          <div class="tl__dia-head">
+            <span class="tl__dia-nombre">{{ dia.nombre }}</span>
+            <span class="tl__dia-num" :class="{ 'tl__dia-num--hoy': dia.esHoy }">{{ dia.numMes }}</span>
+          </div>
+          <div class="tl__dia-body">
+            <div
+              v-for="t in dia.tareas"
+              :key="t.id"
+              class="tl__chip"
+              :class="[`tl__chip--${t.prioridad}`, { 'tl__chip--done': t.estado === 'completada', 'tl__chip--prog': t.estado === 'en_progreso' }]"
+              @click="abrirTarea(t)"
+              :title="t.titulo"
+            >
+              <span class="tl__chip-dot"></span>
+              <span class="tl__chip-titulo">{{ t.titulo }}</span>
+              <i v-if="t.estado === 'completada'" class="bi bi-check-circle-fill tl__chip-ico tl__chip-ico--done"></i>
+              <i v-else-if="t.estado === 'en_progreso'" class="bi bi-play-circle-fill tl__chip-ico tl__chip-ico--prog"></i>
+            </div>
+            <div v-if="dia.tareas.length === 0" class="tl__dia-empty"></div>
           </div>
         </div>
-        <div class="tl__tarea-right">
-          <span class="tl__prioridad" :class="`tl__prioridad--${t.prioridad}`">{{ t.prioridad }}</span>
-          <button
-            v-if="t.estado === 'pendiente'"
-            class="tl__btn-iniciar"
-            @click="iniciar(t)"
-            :disabled="procesando === t.id"
-          >
-            <i class="bi bi-play-fill"></i>
-          </button>
-          <button
-            v-else-if="t.estado === 'en_progreso'"
-            class="tl__btn-completar"
-            @click="completar(t)"
-            :disabled="procesando === t.id"
-          >
-            <i class="bi bi-check-lg"></i>
-          </button>
+      </div>
+
+      <!-- Sin fecha: solo pendientes/en_progreso -->
+      <div v-if="tareasSinFecha.length" class="tl__sin-fecha">
+        <div class="tl__sin-fecha-label"><i class="bi bi-clock"></i> Sin fecha programada</div>
+        <div
+          v-for="t in tareasSinFecha"
+          :key="t.id"
+          class="tl__tarea"
+          :class="`tl__tarea--${t.prioridad}`"
+        >
+          <div class="tl__tarea-left">
+            <div class="tl__tarea-titulo">{{ t.titulo }}</div>
+            <div class="tl__tarea-meta">
+              {{ TIPO_LABELS[t.tipo] || t.tipo }}
+              <span v-if="t.asignada_a"> · {{ t.asignada_a.nombre }}</span>
+            </div>
+          </div>
+          <div class="tl__tarea-right">
+            <span class="tl__prioridad" :class="`tl__prioridad--${t.prioridad}`">{{ t.prioridad }}</span>
+            <button v-if="t.estado === 'pendiente'" class="tl__btn-iniciar" @click="iniciar(t)" :disabled="procesando === t.id">
+              <i class="bi bi-play-fill"></i>
+            </button>
+            <button v-else-if="t.estado === 'en_progreso'" class="tl__btn-completar" @click="completar(t)" :disabled="procesando === t.id">
+              <i class="bi bi-check-lg"></i>
+            </button>
+          </div>
         </div>
+      </div>
+
+      <!-- Empty total -->
+      <div v-if="tareas.length === 0" class="tl__empty">
+        <span>📅</span>
+        <p>Sin tareas para este lote</p>
       </div>
     </div>
 
@@ -100,8 +134,6 @@
           </div>
           <div class="tl__modal-body">
             <div v-if="registroError" class="tl__alert">{{ registroError }}</div>
-
-            <!-- Estado y plagas -->
             <div class="tl__section-title">Estado general</div>
             <div class="tl__grid">
               <div class="tl__field tl__field--full">
@@ -129,40 +161,18 @@
                 </div>
               </div>
             </div>
-
             <div class="tl__section-title">Ambiente</div>
             <div class="tl__grid">
-              <div class="tl__field">
-                <label class="tl__label">Temperatura aire (°C)</label>
-                <input type="number" step="0.1" class="tl__input" v-model.number="registroForm.temperatura" placeholder="24.5" />
-              </div>
-              <div class="tl__field">
-                <label class="tl__label">Temperatura sustrato (°C)</label>
-                <input type="number" step="0.1" class="tl__input" v-model.number="registroForm.temperatura_sustrato" placeholder="22.0" />
-              </div>
-              <div class="tl__field">
-                <label class="tl__label">Humedad (%)</label>
-                <input type="number" step="0.1" class="tl__input" v-model.number="registroForm.humedad" placeholder="60" />
-              </div>
-              <div class="tl__field">
-                <label class="tl__label">CO₂ (ppm)</label>
-                <input type="number" step="1" class="tl__input" v-model.number="registroForm.co2" placeholder="1200" />
-              </div>
+              <div class="tl__field"><label class="tl__label">Temperatura aire (°C)</label><input type="number" step="0.1" class="tl__input" v-model.number="registroForm.temperatura" placeholder="24.5" /></div>
+              <div class="tl__field"><label class="tl__label">Temperatura sustrato (°C)</label><input type="number" step="0.1" class="tl__input" v-model.number="registroForm.temperatura_sustrato" placeholder="22.0" /></div>
+              <div class="tl__field"><label class="tl__label">Humedad (%)</label><input type="number" step="0.1" class="tl__input" v-model.number="registroForm.humedad" placeholder="60" /></div>
+              <div class="tl__field"><label class="tl__label">CO₂ (ppm)</label><input type="number" step="1" class="tl__input" v-model.number="registroForm.co2" placeholder="1200" /></div>
             </div>
-
             <div class="tl__section-title">Agua</div>
             <div class="tl__grid">
-              <div class="tl__field">
-                <label class="tl__label">pH entrada</label>
-                <input type="number" step="0.1" class="tl__input" v-model.number="registroForm.ph" placeholder="6.2" />
-              </div>
-              <div class="tl__field">
-                <label class="tl__label">EC (mS/cm)</label>
-                <input type="number" step="0.1" class="tl__input" v-model.number="registroForm.ec" placeholder="1.8" />
-              </div>
+              <div class="tl__field"><label class="tl__label">pH entrada</label><input type="number" step="0.1" class="tl__input" v-model.number="registroForm.ph" placeholder="6.2" /></div>
+              <div class="tl__field"><label class="tl__label">EC (mS/cm)</label><input type="number" step="0.1" class="tl__input" v-model.number="registroForm.ec" placeholder="1.8" /></div>
             </div>
-
-            <!-- Fertilización -->
             <div class="tl__section-title">Fertilización</div>
             <div class="tl__field tl__field--full">
               <label class="tl__toggle">
@@ -170,34 +180,16 @@
                 <div class="tl__toggle-track"><div class="tl__toggle-thumb"></div></div>
                 <span class="tl__toggle-label">Se realizó fertilización</span>
               </label>
-              <textarea v-if="registroForm.fertilizacion" class="tl__input tl__textarea"
-                        style="margin-top:.6rem" rows="2"
-                        v-model.trim="registroForm.notas_fertilizacion"
-                        placeholder="Ej: Base A 10ml/L + Base B 10ml/L"></textarea>
+              <textarea v-if="registroForm.fertilizacion" class="tl__input tl__textarea" style="margin-top:.6rem" rows="2" v-model.trim="registroForm.notas_fertilizacion" placeholder="Ej: Base A 10ml/L + Base B 10ml/L"></textarea>
             </div>
-
-            <!-- Avanzar ciclo -->
             <div class="tl__section-title">Ciclo <span class="tl__optional">opcional</span></div>
             <div class="tl__field tl__field--full">
               <label class="tl__label">¿Avanzar a la siguiente etapa?</label>
               <div class="tl__selector">
-                <button type="button" class="tl__sel-btn"
-                        :class="{ 'tl__sel-btn--active': registroForm.nuevo_estado === '' }"
-                        :style="registroForm.nuevo_estado==='' ? {borderColor:'#64748b',background:'#f1f5f9',color:'#64748b'} : {}"
-                        @click="registroForm.nuevo_estado = ''">
-                  Sin cambio
-                </button>
-                <button v-for="etapa in estadosSiguientes" :key="etapa" type="button"
-                        class="tl__sel-btn"
-                        :class="{ 'tl__sel-btn--active': registroForm.nuevo_estado === etapa }"
-                        :style="registroForm.nuevo_estado===etapa ? {borderColor:em(etapa).color,background:em(etapa).bg,color:em(etapa).color} : {}"
-                        @click="registroForm.nuevo_estado = etapa">
-                  {{ em(etapa).emoji }} {{ em(etapa).label }}
-                </button>
+                <button type="button" class="tl__sel-btn" :class="{ 'tl__sel-btn--active': registroForm.nuevo_estado === '' }" :style="registroForm.nuevo_estado==='' ? {borderColor:'#64748b',background:'#f1f5f9',color:'#64748b'} : {}" @click="registroForm.nuevo_estado = ''">Sin cambio</button>
+                <button v-for="etapa in estadosSiguientes" :key="etapa" type="button" class="tl__sel-btn" :class="{ 'tl__sel-btn--active': registroForm.nuevo_estado === etapa }" :style="registroForm.nuevo_estado===etapa ? {borderColor:em(etapa).color,background:em(etapa).bg,color:em(etapa).color} : {}" @click="registroForm.nuevo_estado = etapa">{{ em(etapa).emoji }} {{ em(etapa).label }}</button>
               </div>
             </div>
-
-            <!-- Observaciones -->
             <div class="tl__field tl__field--full" style="margin-top:.75rem">
               <label class="tl__label">Observaciones <span class="tl__optional">opcional</span></label>
               <textarea class="tl__input tl__textarea" rows="2" v-model.trim="registroForm.observaciones" placeholder="Cualquier observación relevante…"></textarea>
@@ -238,79 +230,32 @@ const props = defineProps({
 })
 const emit = defineEmits(['tarea-completada', 'horas-aplicadas'])
 
+// ── Plan ──────────────────────────────────────────────────
 const showAplicarPlan = ref(false)
-
 function onPlanAplicado() {
   showAplicarPlan.value = false
   cargarTareas()
 }
 
-const tareasStore = useTareasStore()
-const tareas      = ref([])
-const loading     = ref(false)
-const procesando  = ref(null)
-const guardando   = ref(false)
-
-// Modal completar normal
+// ── Tareas ────────────────────────────────────────────────
+const tareasStore     = useTareasStore()
+const tareas          = ref([])
+const loading         = ref(false)
+const procesando      = ref(null)
+const guardando       = ref(false)
 const tareaCompletando = ref(null)
 const horasForm        = ref(null)
 const notasForm        = ref('')
-
-// Modal registro lote
-const registroError = ref(null)
-const registroForm  = ref(emptyRegistroForm())
+const registroError    = ref(null)
+const registroForm     = ref(emptyRegistroForm())
 
 function emptyRegistroForm() {
   return {
-    temperatura:null, humedad:null, temperatura_sustrato:null, co2:null,
-    ph:null, ec:null, fertilizacion:false, notas_fertilizacion:'',
-    plagas_observadas:'ninguna', estado_general:'bueno',
-    observaciones:'', nuevo_estado:''
+    temperatura: null, humedad: null, temperatura_sustrato: null, co2: null,
+    ph: null, ec: null, fertilizacion: false, notas_fertilizacion: '',
+    plagas_observadas: 'ninguna', estado_general: 'bueno',
+    observaciones: '', nuevo_estado: ''
   }
-}
-
-const TIPO_LABELS = {
-  riego:'💧 Riego', poda:'✂️ Poda', medicion:'📏 Medición',
-  limpieza:'🧹 Limpieza', cosecha:'🌿 Cosecha', transplante:'🪴 Trasplante',
-  inspeccion:'🔍 Inspección', registrar_lote:'📋 Registrar lote',
-  registrar_planta:'🌱 Registrar planta', otro:'📋 Otro'
-}
-
-const ESTADO_SALUD_META = {
-  excelente:{color:"#16a34a",emoji:"🟢"}, bueno:{color:"#65a30d",emoji:"🟡"},
-  regular:{color:"#d97706",emoji:"🟠"},   malo:{color:"#dc2626",emoji:"🔴"},
-  critico:{color:"#991b1b",emoji:"🚨"},
-}
-const PLAGAS_META = {
-  ninguna:{color:"#16a34a",emoji:"✅"}, leve:{color:"#d97706",emoji:"⚠️"},
-  moderada:{color:"#ea580c",emoji:"🐛"}, severa:{color:"#dc2626",emoji:"🚨"},
-}
-const CICLO = ["semilla","vegetativo","floracion","cosecha","curado","finalizado"]
-const ESTADO_META = {
-  semilla:    {label:"Semilla",    color:"#64748b",bg:"#f1f5f9", emoji:"🌱"},
-  vegetativo: {label:"Vegetativo", color:"#16a34a",bg:"#dcfce7", emoji:"🍃"},
-  floracion:  {label:"Floración",  color:"#d97706",bg:"#fef3c7", emoji:"🌸"},
-  cosecha:    {label:"Cosecha",    color:"#92400e",bg:"#fff7ed", emoji:"✂️"},
-  curado:     {label:"Curado",     color:"#2563eb",bg:"#dbeafe", emoji:"🫙"},
-  finalizado: {label:"Finalizado", color:"#1b5e20",bg:"#dcfce7", emoji:"✅"},
-}
-function em(e) { return ESTADO_META[e] || {label:e,color:"#64748b",bg:"#f1f5f9",emoji:"•"} }
-
-const estadosSiguientes = computed(() => {
-  const idx = CICLO.indexOf(props.lote?.estado)
-  return CICLO.filter((_,i) => i > idx)
-})
-
-const tareasPendientes = computed(() =>
-  tareas.value.filter(t => ['pendiente','en_progreso'].includes(t.estado))
-    .sort((a,b) => {
-      const orden = {urgente:0,alta:1,normal:2,baja:3}
-      return (orden[a.prioridad]||2) - (orden[b.prioridad]||2)
-    })
-)
-
-function esRegistroLote(t) {
-  return t.tipo === 'registrar_lote' || t.titulo?.toLowerCase().includes('registrar lote') || t.titulo?.toLowerCase().includes('registro lote')
 }
 
 onMounted(() => cargarTareas())
@@ -324,6 +269,104 @@ async function cargarTareas() {
   finally { loading.value = false }
 }
 
+// ── Calendario semanal ────────────────────────────────────
+const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+function getMondayOf(date) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  const day = d.getDay()
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+  return d
+}
+
+function toISO(date) {
+  return date.toISOString().slice(0, 10)
+}
+
+const hoyISO       = toISO(new Date())
+const semanaInicio = ref(getMondayOf(new Date()))
+
+const tareasPorFecha = computed(() => {
+  const map = {}
+  tareas.value.forEach(t => {
+    if (t.fecha_programada) {
+      if (!map[t.fecha_programada]) map[t.fecha_programada] = []
+      map[t.fecha_programada].push(t)
+    }
+  })
+  return map
+})
+
+const tareasSinFecha = computed(() =>
+  tareas.value.filter(t => !t.fecha_programada && ['pendiente', 'en_progreso'].includes(t.estado))
+)
+
+const diasSemana = computed(() =>
+  DIAS.map((nombre, i) => {
+    const d = new Date(semanaInicio.value)
+    d.setDate(d.getDate() + i)
+    const iso = toISO(d)
+    return {
+      nombre,
+      numMes: d.getDate(),
+      iso,
+      esHoy: iso === hoyISO,
+      tareas: (tareasPorFecha.value[iso] || []).slice().sort((a, b) => {
+        const ord = { urgente: 0, alta: 1, normal: 2, baja: 3 }
+        return (ord[a.prioridad] ?? 2) - (ord[b.prioridad] ?? 2)
+      }),
+    }
+  })
+)
+
+const fechasConTareas = computed(() =>
+  tareas.value.filter(t => t.fecha_programada).map(t => t.fecha_programada).sort()
+)
+
+const puedePrev = computed(() => {
+  if (!fechasConTareas.value.length) return false
+  const minLunes = getMondayOf(new Date(fechasConTareas.value[0] + 'T12:00:00'))
+  return semanaInicio.value > minLunes
+})
+
+const puedeNext = computed(() => {
+  if (!fechasConTareas.value.length) return false
+  const maxLunes = getMondayOf(new Date(fechasConTareas.value[fechasConTareas.value.length - 1] + 'T12:00:00'))
+  return semanaInicio.value < maxLunes
+})
+
+const labelSemana = computed(() => {
+  const ini = semanaInicio.value
+  const fin = new Date(ini)
+  fin.setDate(fin.getDate() + 6)
+  const mIni = ini.toLocaleDateString('es-AR', { month: 'short' })
+  const mFin = fin.toLocaleDateString('es-AR', { month: 'short' })
+  const año  = fin.getFullYear()
+  return mIni === mFin
+    ? `${ini.getDate()} – ${fin.getDate()} ${mFin} ${año}`
+    : `${ini.getDate()} ${mIni} – ${fin.getDate()} ${mFin} ${año}`
+})
+
+function prevSemana() {
+  const d = new Date(semanaInicio.value)
+  d.setDate(d.getDate() - 7)
+  semanaInicio.value = d
+}
+
+function nextSemana() {
+  const d = new Date(semanaInicio.value)
+  d.setDate(d.getDate() + 7)
+  semanaInicio.value = d
+}
+
+function abrirTarea(t) {
+  if (t.estado === 'completada') return
+  if (t.estado === 'pendiente') iniciar(t)
+  else if (t.estado === 'en_progreso') completar(t)
+}
+
+// ── Acciones ──────────────────────────────────────────────
 async function iniciar(t) {
   procesando.value = t.id
   try {
@@ -347,7 +390,8 @@ async function confirmarCompletar() {
   guardando.value = true
   try {
     await tareasStore.completar(tareaCompletando.value.id, horasForm.value, notasForm.value)
-    tareas.value = tareas.value.filter(t => t.id !== tareaCompletando.value.id)
+    const found = tareas.value.find(x => x.id === tareaCompletando.value.id)
+    if (found) found.estado = 'completada'
     emit('tarea-completada', tareaCompletando.value)
     tareaCompletando.value = null
   } catch {}
@@ -358,25 +402,20 @@ async function confirmarRegistroLote() {
   if (!tareaCompletando.value) return
   guardando.value = true; registroError.value = null
   try {
-    // 1. Crear registro ambiental
     const payload = { ...registroForm.value }
     delete payload.nuevo_estado
     await createRegistroAmbiental(props.lote.id, payload)
-
-    // 2. Avanzar ciclo si corresponde
     if (registroForm.value.nuevo_estado) {
       await createLoteEvento(props.lote.id, {
         tipo: 'cambio_estado',
         estado_nuevo: registroForm.value.nuevo_estado,
         descripcion: `Cambio desde registro del lote`
       })
-      // Actualizar estado local
       props.lote.estado = registroForm.value.nuevo_estado
     }
-
-    // 3. Completar la tarea
     await tareasStore.completar(tareaCompletando.value.id, horasForm.value, registroForm.value.observaciones)
-    tareas.value = tareas.value.filter(t => t.id !== tareaCompletando.value.id)
+    const found = tareas.value.find(x => x.id === tareaCompletando.value.id)
+    if (found) found.estado = 'completada'
     emit('tarea-completada', tareaCompletando.value)
     tareaCompletando.value = null
   } catch(e) {
@@ -384,22 +423,98 @@ async function confirmarRegistroLote() {
   }
   finally { guardando.value = false }
 }
+
+function esRegistroLote(t) {
+  return t.tipo === 'registrar_lote' || t.titulo?.toLowerCase().includes('registrar lote') || t.titulo?.toLowerCase().includes('registro lote')
+}
+
+// ── Constantes dominio ────────────────────────────────────
+const TIPO_LABELS = {
+  riego:'💧 Riego', poda:'✂️ Poda', medicion:'📏 Medición',
+  limpieza:'🧹 Limpieza', cosecha:'🌿 Cosecha', transplante:'🪴 Trasplante',
+  inspeccion:'🔍 Inspección', registrar_lote:'📋 Registrar lote',
+  registrar_planta:'🌱 Registrar planta', otro:'📋 Otro'
+}
+const ESTADO_SALUD_META = {
+  excelente:{color:"#16a34a",emoji:"🟢"}, bueno:{color:"#65a30d",emoji:"🟡"},
+  regular:{color:"#d97706",emoji:"🟠"}, malo:{color:"#dc2626",emoji:"🔴"}, critico:{color:"#991b1b",emoji:"🚨"},
+}
+const PLAGAS_META = {
+  ninguna:{color:"#16a34a",emoji:"✅"}, leve:{color:"#d97706",emoji:"⚠️"},
+  moderada:{color:"#ea580c",emoji:"🐛"}, severa:{color:"#dc2626",emoji:"🚨"},
+}
+const CICLO = ["semilla","vegetativo","floracion","cosecha","curado","finalizado"]
+const ESTADO_META = {
+  semilla:    {label:"Semilla",    color:"#64748b",bg:"#f1f5f9",emoji:"🌱"},
+  vegetativo: {label:"Vegetativo", color:"#16a34a",bg:"#dcfce7",emoji:"🍃"},
+  floracion:  {label:"Floración",  color:"#d97706",bg:"#fef3c7",emoji:"🌸"},
+  cosecha:    {label:"Cosecha",    color:"#92400e",bg:"#fff7ed",emoji:"✂️"},
+  curado:     {label:"Curado",     color:"#2563eb",bg:"#dbeafe",emoji:"🫙"},
+  finalizado: {label:"Finalizado", color:"#1b5e20",bg:"#dcfce7",emoji:"✅"},
+}
+function em(e) { return ESTADO_META[e] || {label:e,color:"#64748b",bg:"#f1f5f9",emoji:"•"} }
+const estadosSiguientes = computed(() => {
+  const idx = CICLO.indexOf(props.lote?.estado)
+  return CICLO.filter((_,i) => i > idx)
+})
 </script>
 
 <style scoped>
 .tl { font-family: system-ui, -apple-system, sans-serif; }
+
+/* Header */
+.tl__header { display: flex; align-items: center; justify-content: space-between; padding: .6rem 1rem .4rem; gap: .75rem; flex-wrap: wrap; }
+.tl__week-nav { display: flex; align-items: center; gap: .5rem; }
+.tl__nav-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid #d4e6d4; background: #f4f8f4; color: #1b5e20; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .8rem; transition: all .15s; }
+.tl__nav-btn:hover:not(:disabled) { background: #e8f5e9; border-color: #1b5e20; }
+.tl__nav-btn:disabled { opacity: .35; cursor: not-allowed; }
+.tl__nav-label { font-size: .78rem; font-weight: 700; color: #1a1a1a; min-width: 140px; text-align: center; }
+.tl__btn-plan { display: inline-flex; align-items: center; gap: .35rem; background: none; border: 1px solid #d4e6d4; color: #15803d; font-size: .75rem; font-weight: 600; padding: .3rem .7rem; border-radius: 6px; cursor: pointer; transition: all .15s; }
+.tl__btn-plan:hover { background: #f0fdf4; border-color: #15803d; }
+
+/* Loading / Empty */
 .tl__loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .tl__empty { display: flex; align-items: center; gap: .75rem; padding: 1.5rem 1.1rem; color: #60725d; font-size: .875rem; }
-.tl__lista { display: flex; flex-direction: column; }
-.tl__tarea { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .85rem 1.1rem; border-bottom: 1px solid #f0fdf4; border-left: 3px solid #d4e6d4; transition: background .15s; }
+
+/* Week grid */
+.tl__week-grid { display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid #e8f0e9; }
+.tl__dia { border-right: 1px solid #e8f0e9; min-height: 80px; }
+.tl__dia:last-child { border-right: none; }
+.tl__dia--hoy { background: #f0fdf4; }
+.tl__dia-head { display: flex; flex-direction: column; align-items: center; gap: .1rem; padding: .4rem .2rem .3rem; border-bottom: 1px solid #e8f0e9; }
+.tl__dia-nombre { font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; }
+.tl__dia-num { font-size: .82rem; font-weight: 600; color: #374151; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.tl__dia-num--hoy { background: #1b5e20; color: #fff; }
+.tl__dia-body { padding: .35rem .25rem; display: flex; flex-direction: column; gap: .25rem; }
+.tl__dia-empty { min-height: 20px; }
+
+/* Task chips in calendar */
+.tl__chip { display: flex; align-items: flex-start; gap: .25rem; padding: .25rem .3rem; border-radius: 5px; background: #f0fdf4; border-left: 2.5px solid #d4e6d4; cursor: pointer; transition: all .12s; font-size: .67rem; line-height: 1.3; }
+.tl__chip:hover:not(.tl__chip--done) { background: #e8f5e9; }
+.tl__chip--done { background: #f8fafc; border-left-color: #cbd5e1; cursor: default; opacity: .7; }
+.tl__chip--prog { border-left-color: #f59e0b; background: #fffbeb; }
+.tl__chip--urgente { border-left-color: #dc2626; }
+.tl__chip--alta    { border-left-color: #ea580c; }
+.tl__chip--normal  { border-left-color: #2563eb; }
+.tl__chip--baja    { border-left-color: #94a3b8; }
+.tl__chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; margin-top: .28rem; flex-shrink: 0; opacity: .5; }
+.tl__chip-titulo { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: #1a1a1a; }
+.tl__chip--done .tl__chip-titulo { color: #94a3b8; }
+.tl__chip-ico { font-size: .62rem; margin-top: .15rem; flex-shrink: 0; }
+.tl__chip-ico--done { color: #16a34a; }
+.tl__chip-ico--prog { color: #f59e0b; }
+
+/* Sin fecha */
+.tl__sin-fecha { border-top: 1px solid #e8f0e9; padding: .5rem 1rem; }
+.tl__sin-fecha-label { font-size: .68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .5rem; display: flex; align-items: center; gap: .3rem; }
+.tl__tarea { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .7rem .5rem; border-bottom: 1px solid #f0fdf4; border-left: 3px solid #d4e6d4; }
 .tl__tarea:last-child { border-bottom: none; }
-.tl__tarea:hover { background: #f9fdf9; }
 .tl__tarea--urgente { border-left-color: #dc2626; }
 .tl__tarea--alta    { border-left-color: #ea580c; }
 .tl__tarea--normal  { border-left-color: #2563eb; }
 .tl__tarea--baja    { border-left-color: #94a3b8; }
 .tl__tarea-left { flex: 1; min-width: 0; }
-.tl__tarea-titulo { font-size: .875rem; font-weight: 600; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl__tarea-titulo { font-size: .875rem; font-weight: 600; color: #1a1a1a; }
 .tl__tarea-meta { font-size: .72rem; color: #94a3b8; margin-top: .1rem; }
 .tl__tarea-right { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
 .tl__prioridad { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: .2em .55em; border-radius: 6px; }
@@ -413,7 +528,8 @@ async function confirmarRegistroLote() {
 .tl__btn-completar { background: #fef3c7; color: #b45309; }
 .tl__btn-completar:hover { background: #16a34a; color: #fff; }
 .tl__btn-iniciar:disabled, .tl__btn-completar:disabled { opacity: .5; cursor: not-allowed; }
-/* Modal */
+
+/* Modales — igual que antes */
 .tl__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(3px); }
 .tl__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(27,94,32,.15); display: flex; flex-direction: column; }
 .tl__modal--wide { max-width: 580px; }
@@ -455,12 +571,4 @@ async function confirmarRegistroLote() {
 .tl__btn-success { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .tl__btn-success:hover { background: #104417; }
 .tl__btn-success:disabled { opacity: .6; cursor: not-allowed; }
-.tl__header { display: flex; justify-content: flex-end; padding: .5rem 1rem .2rem; }
-.tl__btn-plan {
-  display: inline-flex; align-items: center; gap: .35rem;
-  background: none; border: 1px solid #d4e6d4; color: #15803d;
-  font-size: .75rem; font-weight: 600; padding: .3rem .7rem;
-  border-radius: 6px; cursor: pointer; transition: all .15s;
-}
-.tl__btn-plan:hover { background: #f0fdf4; border-color: #15803d; }
 </style>
