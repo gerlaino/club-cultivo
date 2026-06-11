@@ -178,7 +178,7 @@ class AplicacionPlanesController < ApplicationController
         fecha_programada: t.fecha_programada,
         asignada_a:       t.asignada_a ? { id: t.asignada_a.id, nombre: t.asignada_a.nombre_completo } : nil,
         sala:             t.sala ? { id: t.sala.id, nombre: t.sala.nombre } : nil,
-        lote:             t.lote ? { id: t.lote.id, nombre: t.lote.nombre_o_codigo } : nil,
+        lote:             t.lote ? { id: t.lote.id, nombre: t.lote.codigo } : nil,
       }
     end
     data
