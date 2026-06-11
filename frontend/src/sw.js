@@ -17,9 +17,12 @@ const API_ORIGIN = import.meta.env.VITE_API_URL
   : null
 
 registerRoute(
-  ({ url }) => API_ORIGIN
-    ? url.origin === API_ORIGIN
-    : url.pathname.startsWith('/api/'),
+  ({ url, request }) => {
+    if (request.method !== 'GET') return false
+    return API_ORIGIN
+      ? url.origin === API_ORIGIN
+      : url.pathname.startsWith('/api/')
+  },
   new NetworkFirst({
     cacheName: 'api-cache',
     plugins: [
