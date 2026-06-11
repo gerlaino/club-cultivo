@@ -31,8 +31,9 @@
             </div>
             <p v-if="loadingPlanes" class="apm__hint">Cargando planes…</p>
             <p v-else-if="planes.length === 0" class="apm__hint apm__hint--warn">
-              No hay planes publicados disponibles.
-              <a href="/plan-trabajo" class="apm__link">Crear un plan</a>
+              Sin plantillas creadas. Andá a
+              <a href="/plan-trabajo" class="apm__link">Planes de trabajo</a>
+              y creá una plantilla con tareas.
             </p>
           </div>
 
@@ -134,8 +135,8 @@ const TIPO_LABELS = {
 onMounted(async () => {
   loadingPlanes.value = true
   try {
-    const { data } = await listPlanTrabajos({ estado: 'publicado', per_page: 50 })
-    planes.value = data
+    const { data } = await listPlanTrabajos({ plantilla: 'true', per_page: 50 })
+    planes.value = Array.isArray(data) ? data : (data.planes ?? data.data ?? [])
   } catch {
     error.value = 'No se pudieron cargar los planes.'
   } finally {

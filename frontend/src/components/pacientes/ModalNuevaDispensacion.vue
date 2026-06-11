@@ -44,9 +44,11 @@ const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
 const ccMargen = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
 
 const ccInsuficiente = computed(() => {
-  if (!tieneCc.value || form.value.medio_pago !== 'cuenta_corriente') return false
-  if (form.value.aporte_socio_ars == null) return false
-  return Number(form.value.aporte_socio_ars) > ccMargen.value
+  const esCc = form.value.medio_pago === 'cuenta_corriente' || form.value.medio_pago === 'no_abona'
+  if (!tieneCc.value || !esCc) return false
+  const aporte = Number(form.value.aporte_socio_ars)
+  if (!aporte || aporte <= 0) return false
+  return aporte > ccMargen.value
 })
 
 const estadoCc = computed(() => {
@@ -148,7 +150,7 @@ async function handleSubmit() {
     formError.value = 'El aporte del socio debe ser mayor a $0 para cobrar por cuenta corriente'
     saving.value = false; return
   }
-  if (ccInsuficiente.value && form.value.medio_pago === 'cuenta_corriente') {
+  if (ccInsuficiente.value) {
     formError.value = `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
     saving.value = false; return
   }
@@ -303,18 +305,18 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <!-- CC ARS — siempre visible como info; advertencias solo cuando medio_pago=cuenta_corriente -->
-          <div v-if="tieneCc" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
+          <!-- CC ARS — visible solo cuando es relevante al medio de pago -->
+          <div v-if="tieneCc && (form.medio_pago === 'cuenta_corriente' || form.medio_pago === 'no_abona')" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
             <div class="mnd__cc-row">
               <span class="mnd__cc-label"><i class="bi bi-wallet2"></i> Crédito disponible</span>
               <span class="mnd__cc-saldo" :class="{ 'mnd__cc-saldo--bajo': ccMargen <= 0 }">{{ fmt(ccMargen) }}</span>
             </div>
-            <div v-if="form.medio_pago === 'cuenta_corriente' && form.aporte_socio_ars > 0 && !ccInsuficiente" class="mnd__cc-tras">
+            <div v-if="form.aporte_socio_ars > 0 && !ccInsuficiente" class="mnd__cc-tras">
               Luego de esta dispensación: <strong>{{ fmt(ccMargen - Number(form.aporte_socio_ars)) }}</strong>
             </div>
             <div v-if="ccInsuficiente" class="mnd__cc-warn">
               <i class="bi bi-exclamation-triangle-fill"></i>
-              Crédito insuficiente para cargar en cuenta (disponible: {{ fmt(ccMargen) }})
+              Crédito insuficiente — disponible: {{ fmt(ccMargen) }}, requerido: {{ fmt(form.aporte_socio_ars) }}
             </div>
           </div>
 
@@ -401,7 +403,7 @@ async function handleSubmit() {
 
         <div class="mnd__modal-footer">
           <button class="mnd__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
-          <button class="mnd__btn-primary" :disabled="saving || !form.stock_id" @click="handleSubmit">
+          <button class="mnd__btn-primary" :disabled="saving || !form.stock_id || ccInsuficiente" @click="handleSubmit">
             <DsSpinner v-if="saving" :size="14" />
             <i v-else class="bi bi-check-lg"></i>
             Registrar dispensación

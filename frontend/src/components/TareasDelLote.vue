@@ -362,8 +362,7 @@ function nextSemana() {
 
 function abrirTarea(t) {
   if (t.estado === 'completada') return
-  if (t.estado === 'pendiente') iniciar(t)
-  else if (t.estado === 'en_progreso') completar(t)
+  completar(t)
 }
 
 // ── Acciones ──────────────────────────────────────────────
@@ -389,6 +388,9 @@ async function confirmarCompletar() {
   if (!tareaCompletando.value) return
   guardando.value = true
   try {
+    if (tareaCompletando.value.estado === 'pendiente') {
+      await tareasStore.iniciar(tareaCompletando.value.id)
+    }
     await tareasStore.completar(tareaCompletando.value.id, horasForm.value, notasForm.value)
     const found = tareas.value.find(x => x.id === tareaCompletando.value.id)
     if (found) found.estado = 'completada'

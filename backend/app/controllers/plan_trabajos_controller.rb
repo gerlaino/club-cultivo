@@ -2,7 +2,7 @@ class PlanTrabajosController < ApplicationController
   before_action :authenticate_user!
   before_action :authorize_admin_or_supervisor!
   before_action :set_club
-  before_action :set_plan, only: [:show, :update, :destroy, :publicar, :archivar]
+  before_action :set_plan, only: [:show, :update, :destroy, :publicar, :archivar, :export_csv]
 
   DIAS_A_WDAY = { 'lun' => 1, 'mar' => 2, 'mie' => 3, 'jue' => 4, 'vie' => 5, 'sab' => 6, 'dom' => 0 }.freeze
 
