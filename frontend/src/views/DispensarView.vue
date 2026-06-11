@@ -191,11 +191,11 @@
                 </div>
               </div>
 
-              <!-- Saldo según medio de pago -->
-              <div v-if="(medioPago === 'cuenta_corriente' || medioPago === 'no_abona') && ccBalance !== null" class="dv__balance-info" :class="{ 'dv__balance-info--alerta': ccExcedido }">
+              <!-- Saldo CC — siempre visible cuando el paciente tiene crédito configurado -->
+              <div v-if="tieneCc && ccBalance !== null" class="dv__balance-info" :class="{ 'dv__balance-info--alerta': ccBalance < cartTotal }">
                 <span>Crédito disponible:</span>
                 <strong>{{ formatARS(ccBalance) }}</strong>
-                <span v-if="ccExcedido" class="dv__balance-error">— crédito insuficiente</span>
+                <span v-if="ccBalance < cartTotal" class="dv__balance-error">— crédito insuficiente</span>
               </div>
 
 

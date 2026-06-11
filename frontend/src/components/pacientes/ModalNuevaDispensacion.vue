@@ -193,7 +193,9 @@ async function handleSubmit() {
     toast.success('Dispensación registrada')
     emit('saved')
   } catch (e) {
-    formError.value = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al guardar'
+    const msg = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al guardar'
+    formError.value = msg
+    toast.error(msg)
   } finally { saving.value = false }
 }
 </script>

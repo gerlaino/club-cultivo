@@ -52,7 +52,10 @@ const canAgendar = computed(() => isAdmin.value || isMedico.value)
 const toast   = useToast()
 
 const ccRefreshKey = ref(0)
-function onDispensacionCreada() { ccRefreshKey.value++ }
+function onDispensacionCreada() {
+  ccRefreshKey.value++
+  store.fetchOne(socioId)
+}
 
 // ── Timeline ──────────────────────────────────────────────────────────────────
 const timeline        = ref([])
