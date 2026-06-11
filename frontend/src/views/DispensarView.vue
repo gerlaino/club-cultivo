@@ -192,10 +192,10 @@
               </div>
 
               <!-- Saldo según medio de pago -->
-              <div v-if="medioPago === 'cuenta_corriente' && ccBalance !== null" class="dv__balance-info" :class="{ 'dv__balance-info--alerta': ccExcedido }">
-                <span>Saldo disponible:</span>
+              <div v-if="(medioPago === 'cuenta_corriente' || medioPago === 'no_abona') && ccBalance !== null" class="dv__balance-info" :class="{ 'dv__balance-info--alerta': ccExcedido }">
+                <span>Crédito disponible:</span>
                 <strong>{{ formatARS(ccBalance) }}</strong>
-                <span v-if="ccExcedido" class="dv__balance-error">— saldo insuficiente</span>
+                <span v-if="ccExcedido" class="dv__balance-error">— crédito insuficiente</span>
               </div>
 
 
@@ -385,9 +385,15 @@ const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.total, 0))
 
 const tieneCc       = computed(() => (pacienteDetalle.value?.limite_cc ?? 0) > 0)
 
-const ccBalance      = computed(() => pacienteDetalle.value?.saldo_cc  ?? null)
+const ccBalance      = computed(() => {
+  const saldo  = pacienteDetalle.value?.saldo_cc   ?? null
+  const limite = pacienteDetalle.value?.limite_cc  ?? 0
+  if (saldo === null) return null
+  return saldo + limite
+})
 const ccExcedido     = computed(() =>
-  medioPago.value === 'cuenta_corriente' && ccBalance.value !== null && cartTotal.value > ccBalance.value
+  (medioPago.value === 'cuenta_corriente' || medioPago.value === 'no_abona') &&
+  tieneCc.value && ccBalance.value !== null && cartTotal.value > ccBalance.value
 )
 const pagoExcedido   = computed(() => ccExcedido.value)
 
