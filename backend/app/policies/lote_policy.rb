@@ -48,9 +48,7 @@ class LotePolicy < ApplicationPolicy
 
   def puede_avanzar_fase_actual?
     case record.estado
-    when 'vegetativo', 'floracion'
-      admin? || cultivador?
-    when 'cosecha', 'secado'
+    when 'semilla', 'esqueje', 'vegetativo', 'floracion', 'cosecha', 'secado'
       admin? || cultivador?
     else
       admin?

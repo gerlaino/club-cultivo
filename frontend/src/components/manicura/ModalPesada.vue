@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="mp-fade">
-      <div v-if="modelValue" class="mp-overlay" @click.self="$emit('update:modelValue', false)">
+      <div v-if="modelValue" class="mp-overlay">
         <div class="mp-modal" role="dialog" aria-modal="true">
 
           <div class="mp-header">
@@ -71,7 +71,7 @@
                 Cancelar
               </button>
               <button type="submit" class="mp-btn-submit" :disabled="saving">
-                <div v-if="saving" class="mp-spinner"></div>
+                <DsSpinner v-if="saving" :size="14" />
                 <Scale v-else :size="15" :stroke-width="2" />
                 Guardar pesada
               </button>
@@ -89,6 +89,7 @@ import { ref, computed, watch } from 'vue'
 import { Scale, X, AlertCircle } from 'lucide-vue-next'
 import { createPesada } from '../../lib/api.js'
 import { useModalEscape } from '../../composables/useModalEscape.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -272,15 +273,6 @@ async function submit() {
 }
 .mp-btn-submit:hover:not(:disabled) { opacity: 0.88; }
 .mp-btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-.mp-spinner {
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: mp-spin .6s linear infinite;
-}
-@keyframes mp-spin { to { transform: rotate(360deg); } }
-
 .mp-fade-enter-active, .mp-fade-leave-active { transition: opacity .2s; }
 .mp-fade-enter-from, .mp-fade-leave-to { opacity: 0; }
 </style>

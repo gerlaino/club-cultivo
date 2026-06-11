@@ -3,6 +3,7 @@ class PacientesController < ApplicationController
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados]
   before_action :require_export_role!, only: [:export_csv]
+  before_action :require_criticos_role!, only: [:criticos]
   before_action :normalize_paciente_params, only: [:create, :update]
   before_action :warn_deprecated_route
 
@@ -48,6 +49,14 @@ class PacientesController < ApplicationController
     )
     json['notas_clinicas'] = @paciente.notas_clinicas if policy(@paciente).ver_notas_clinicas?
     json['reprocann_documento_url'] = url_for(@paciente.reprocann_documento) if @paciente.reprocann_documento.attached?
+
+    ultima = @paciente.dispensaciones.includes(:stock).recientes.first
+    json['ultima_dispensacion'] = ultima ? {
+      fecha:          ultima.fecha_dispensacion,
+      cantidad:       ultima.cantidad,
+      forma_producto: ultima.stock&.forma_producto,
+    } : nil
+
     render json: { data: json }
   end
 
@@ -94,6 +103,22 @@ class PacientesController < ApplicationController
         fecha: i.created_at,
         descripcion: "Indicación médica registrada",
         id: i.id
+      }
+    end
+
+    @paciente.turnos.includes(:medico).order(fecha_hora: :desc).each do |t|
+      tipo_label = { 'primera_vez' => 'Primera vez', 'seguimiento' => 'Seguimiento', 'revision' => 'Revisión', 'urgencia' => 'Urgencia' }
+      estado_label = { 'programado' => 'Programado', 'confirmado' => 'Confirmado', 'realizado' => 'Realizado', 'cancelado' => 'Cancelado', 'ausente' => 'Ausente' }
+      desc = "Turno #{tipo_label[t.tipo] || t.tipo}"
+      desc += " con #{t.medico&.nombre_completo}" if t.medico
+      desc += " — #{estado_label[t.estado] || t.estado}"
+      desc += " — #{t.motivo.truncate(60)}" if t.motivo.present?
+      eventos << {
+        tipo:        'turno',
+        fecha:       t.fecha_hora,
+        descripcion: desc,
+        estado:      t.estado,
+        id:          t.id
       }
     end
 
@@ -163,6 +188,46 @@ class PacientesController < ApplicationController
     @paciente.update!(deleted_by_id: current_user.id)
     @paciente.destroy
     head :no_content
+  end
+
+  # GET /pacientes/criticos
+  def criticos
+    hoy   = Date.today
+    club  = current_user.club
+
+    reprocann_vencidos = club.pacientes
+      .where.not(reprocann_vencimiento: nil)
+      .where('reprocann_vencimiento < ?', hoy)
+      .where(reprocann_estado: %w[activo pendiente])
+      .select(:id, :nombre, :apellido, :reprocann_vencimiento, :reprocann_estado)
+      .map { |p| { id: p.id, nombre: p.nombre_completo, reprocann_vencimiento: p.reprocann_vencimiento, dias_vencido: (hoy - p.reprocann_vencimiento).to_i } }
+
+    reprocann_por_vencer = club.pacientes
+      .where('reprocann_vencimiento > ? AND reprocann_vencimiento <= ?', hoy, 30.days.from_now)
+      .where(reprocann_estado: %w[activo pendiente])
+      .select(:id, :nombre, :apellido, :reprocann_vencimiento, :reprocann_estado)
+      .map { |p| { id: p.id, nombre: p.nombre_completo, reprocann_vencimiento: p.reprocann_vencimiento, dias_restantes: (p.reprocann_vencimiento - hoy).to_i } }
+
+    sin_dispensacion_ids = Dispensacion
+      .joins(:paciente)
+      .where(pacientes: { club_id: club.id })
+      .where('dispensaciones.fecha_dispensacion >= ?', 60.days.ago)
+      .pluck(:paciente_id).uniq
+
+    sin_dispensacion_reciente = club.pacientes
+      .where(reprocann_estado: 'activo')
+      .where.not(id: sin_dispensacion_ids)
+      .select(:id, :nombre, :apellido, :created_at)
+      .order(created_at: :asc)
+      .limit(20)
+      .map { |p| { id: p.id, nombre: p.nombre_completo } }
+
+    render json: {
+      reprocann_vencidos:,
+      reprocann_por_vencer:,
+      sin_dispensacion_reciente:,
+      total: reprocann_vencidos.size + reprocann_por_vencer.size + sin_dispensacion_reciente.size,
+    }
   end
 
   # GET /pacientes/export_csv
@@ -306,7 +371,10 @@ class PacientesController < ApplicationController
   end
 
   def paciente_params
-    allowed = %i[nombre apellido dni fecha_nacimiento es_paciente email telefono reprocann_numero reprocann_vencimiento reprocann_estado limite_dispensacion_mensual_g]
+    allowed = %i[nombre apellido dni fecha_nacimiento es_paciente email telefono reprocann_numero reprocann_vencimiento reprocann_estado]
+    if current_user&.admin? || current_user&.super_admin?
+      allowed += %i[limite_dispensacion_mensual_g descuento_porcentaje]
+    end
     allowed << :notas_clinicas          if can_edit_notas_clinicas?
     allowed << :con_seguimiento_medico  if current_user&.admin? || current_user&.medico?
     if can_edit_notas_clinicas?
@@ -335,6 +403,12 @@ class PacientesController < ApplicationController
 
   def require_export_role!
     unless %w[admin medico super_admin].include?(current_user&.role)
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
+  end
+
+  def require_criticos_role!
+    unless %w[admin supervisor super_admin].include?(current_user&.role)
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end

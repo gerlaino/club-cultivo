@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="npm__overlay" @click.self="$emit('close')">
+    <div class="npm__overlay">
       <div class="npm__panel">
 
         <!-- Header -->
@@ -108,7 +108,7 @@
                   <p class="npm__drop-formats">.xlsx &nbsp;.xls &nbsp;.csv &nbsp;.docx &nbsp;.pdf</p>
                 </template>
                 <template v-else>
-                  <div class="npm__drop-spinner"></div>
+                  <DsSpinner :size="28" />
                   <p class="npm__drop-main">{{ archivoNombre }}</p>
                   <p class="npm__drop-sub">Interpretando…</p>
                 </template>
@@ -259,7 +259,7 @@
                     :disabled="copiandoPlan === p.id"
                     @click="copiarPlan(p)"
                   >
-                    <span v-if="copiandoPlan === p.id" class="npm__spinner npm__spinner--xs"></span>
+                    <DsSpinner v-if="copiandoPlan === p.id" :size="10" />
                     {{ copiandoPlan === p.id ? '…' : 'Copiar' }}
                   </button>
                 </div>
@@ -323,7 +323,7 @@
               Siguiente →
             </button>
             <button v-else class="npm__btn-primary" :disabled="saving" @click="guardar">
-              <span v-if="saving" class="npm__spinner"></span>
+              <DsSpinner v-if="saving" :size="14" />
               {{ saving ? 'Creando…' : (publicarAlCrear ? 'Crear y publicar' : 'Guardar borrador') }}
             </button>
           </div>
@@ -339,6 +339,7 @@ import {
   createPlanTrabajo, createPlanTarea, publicarPlanTrabajo,
   interpretarArchivoPlan, listPlanTrabajos, listPlanTareas,
 } from '../../lib/api.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   usuarios: { type: Array, default: () => [] },
@@ -678,7 +679,6 @@ async function guardar() {
 .npm__drop-main { font-size: .9rem; font-weight: 700; color: #0f2611; margin: 0; }
 .npm__drop-sub  { font-size: .8rem; color: #60725d; margin: 0; }
 .npm__drop-formats { font-size: .72rem; color: #94a3b8; background: #f1f5f9; padding: .2em .75em; border-radius: 5px; margin: .25rem 0 0; letter-spacing: .03em; }
-.npm__drop-spinner { width: 28px; height: 28px; border: 3px solid #c8e6c9; border-top-color: #1b5e20; border-radius: 50%; animation: npm-spin .7s linear infinite; }
 
 /* ── Preview ── */
 .npm__preview { display: flex; flex-direction: column; gap: .75rem; }
@@ -751,9 +751,6 @@ async function guardar() {
 .npm__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; }
 .npm__btn-primary:hover:not(:disabled) { background: #144a18; }
 .npm__btn-primary:disabled { opacity: .55; cursor: not-allowed; }
-.npm__spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: npm-spin .6s linear infinite; display: inline-block; }
-.npm__spinner--xs { width: 10px; height: 10px; border-width: 1.5px; }
-@keyframes npm-spin { to { transform: rotate(360deg); } }
 
 /* Responsable autocomplete */
 .npm__resp-wrap { position: relative; flex: 1; }

@@ -4,5 +4,6 @@ FactoryBot.define do
     association :created_by, factory: :user
     sequence(:nombre) { |n| "Sala #{n}" }
     state             { 'activa' }
+    kind              { 'vegetativo' }
   end
 end

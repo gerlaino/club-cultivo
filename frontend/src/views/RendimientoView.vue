@@ -2,14 +2,26 @@
   <div class="rnd">
     <div class="rnd__header">
       <h1 class="rnd__title"><TrendingUp :size="22" :stroke-width="1.75" /> Rendimiento</h1>
-      <button class="rnd__refresh" @click="cargar" :disabled="loading">
-        <RefreshCw :size="15" :stroke-width="1.75" :class="{ 'rnd__spin': loading }" />
-      </button>
+      <div class="rnd__header-right">
+        <button v-if="tab === 'financiero'" class="rnd__btn-csv" @click="exportarCSV" title="Exportar P&L a CSV">
+          <Download :size="14" :stroke-width="2" /> CSV
+        </button>
+        <button class="rnd__refresh" @click="cargar" :disabled="loading">
+          <RefreshCw :size="15" :stroke-width="1.75" :class="{ 'rnd__spin': loading }" />
+        </button>
+      </div>
     </div>
 
-    <div v-if="loading && !data" class="rnd__loading">Cargando analytics…</div>
+    <!-- Tabs -->
+    <div class="rnd__tabs">
+      <button class="rnd__tab" :class="{ 'rnd__tab--active': tab === 'produccion' }" @click="tab = 'produccion'">Producción</button>
+      <button class="rnd__tab" :class="{ 'rnd__tab--active': tab === 'financiero' }" @click="switchFinanciero">Financiero</button>
+    </div>
 
-    <template v-if="data">
+    <div v-if="loading" class="rnd__loading">Cargando…</div>
+
+    <!-- TAB PRODUCCIÓN -->
+    <template v-if="tab === 'produccion' && data">
       <!-- KPIs globales -->
       <div class="rnd__kpis">
         <div class="rnd__kpi">
@@ -33,11 +45,9 @@
       <!-- Por genética -->
       <div class="rnd__section">
         <h2 class="rnd__section-title">Por genética</h2>
-
         <div v-if="!data.por_genetica.length" class="rnd__empty">
           Sin datos suficientes. Los lotes necesitan tener rendimiento real registrado.
         </div>
-
         <table v-else class="rnd__table">
           <thead>
             <tr>
@@ -113,16 +123,110 @@
         </table>
       </div>
     </template>
+
+    <!-- TAB FINANCIERO -->
+    <template v-if="tab === 'financiero'">
+      <div v-if="loadingPL" class="rnd__loading">Cargando P&L…</div>
+
+      <template v-else-if="plLotes.length">
+        <!-- KPIs financieros -->
+        <div class="rnd__kpis">
+          <div class="rnd__kpi">
+            <span class="rnd__kpi-val">{{ formatARS(plResumen.ingresos_total) }}</span>
+            <span class="rnd__kpi-lbl">Ingresos totales</span>
+          </div>
+          <div class="rnd__kpi">
+            <span class="rnd__kpi-val">{{ formatARS(plResumen.costos_total) }}</span>
+            <span class="rnd__kpi-lbl">Costos totales</span>
+          </div>
+          <div class="rnd__kpi" :class="plResumen.margen_total >= 0 ? 'rnd__kpi--ok' : 'rnd__kpi--err'">
+            <span class="rnd__kpi-val">{{ formatARS(plResumen.margen_total) }}</span>
+            <span class="rnd__kpi-lbl">Margen bruto total</span>
+          </div>
+          <div class="rnd__kpi">
+            <span class="rnd__kpi-val">{{ plResumen.margen_pct !== null ? `${plResumen.margen_pct}%` : '—' }}</span>
+            <span class="rnd__kpi-lbl">Margen promedio</span>
+          </div>
+        </div>
+
+        <div class="rnd__section">
+          <h2 class="rnd__section-title">P&L por lote</h2>
+          <div class="rnd__table-wrap">
+            <table class="rnd__table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Genética</th>
+                  <th>Estado</th>
+                  <th class="rnd__th-num">Costos</th>
+                  <th class="rnd__th-num">Ingresos</th>
+                  <th class="rnd__th-num">Margen</th>
+                  <th class="rnd__th-num">Margen %</th>
+                  <th class="rnd__th-num">Costo/g</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="l in plLotes" :key="l.id">
+                  <td>
+                    <RouterLink :to="`/lotes/${l.id}`" class="rnd__link">{{ l.codigo }}</RouterLink>
+                  </td>
+                  <td class="rnd__td-gen">{{ l.genetica || '—' }}</td>
+                  <td><span class="rnd__badge" :class="`rnd__badge--${l.estado}`">{{ l.estado }}</span></td>
+                  <td class="rnd__td-num">
+                    <span v-if="l.tiene_costos">{{ formatARS(l.costo_total) }}</span>
+                    <span v-else class="rnd__nd">—</span>
+                  </td>
+                  <td class="rnd__td-num">
+                    <span v-if="l.tiene_ingresos">{{ formatARS(l.ingresos) }}</span>
+                    <span v-else class="rnd__nd">—</span>
+                  </td>
+                  <td class="rnd__td-num">
+                    <span v-if="l.tiene_costos || l.tiene_ingresos" class="rnd__desv" :class="l.margen >= 0 ? 'rnd__desv--pos' : 'rnd__desv--neg'">
+                      {{ formatARS(l.margen) }}
+                    </span>
+                    <span v-else class="rnd__nd">—</span>
+                  </td>
+                  <td class="rnd__td-num">
+                    <span v-if="l.margen_pct !== null" class="rnd__desv" :class="l.margen_pct >= 0 ? 'rnd__desv--pos' : 'rnd__desv--neg'">
+                      {{ l.margen_pct >= 0 ? '+' : '' }}{{ l.margen_pct }}%
+                    </span>
+                    <span v-else class="rnd__nd">—</span>
+                  </td>
+                  <td class="rnd__td-num">{{ l.costo_por_gramo ? formatARS(l.costo_por_gramo) : '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+
+      <div v-else class="rnd__empty">Sin lotes con datos financieros. Cargá costos en algún lote para ver el P&L.</div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { TrendingUp, RefreshCw } from 'lucide-vue-next'
-import { getAnalyticsRendimiento } from '../lib/api.js'
+import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
+import { TrendingUp, RefreshCw, Download } from 'lucide-vue-next'
+import { getAnalyticsRendimiento, getAnalyticsPL } from '../lib/api.js'
+import { formatARS } from '../lib/formatters.js'
 
-const loading = ref(false)
-const data    = ref(null)
+const loading   = ref(false)
+const loadingPL = ref(false)
+const data      = ref(null)
+const plLotes   = ref([])
+const tab       = ref('produccion')
+
+const plResumen = computed(() => {
+  const rows = plLotes.value
+  const costos  = rows.reduce((s, r) => s + (r.costo_total  || 0), 0)
+  const ingresos = rows.reduce((s, r) => s + (r.ingresos     || 0), 0)
+  const margen   = ingresos - costos
+  const conPct   = rows.filter(r => r.margen_pct !== null)
+  const pct      = conPct.length ? (conPct.reduce((s, r) => s + r.margen_pct, 0) / conPct.length).toFixed(1) : null
+  return { costos_total: costos, ingresos_total: ingresos, margen_total: margen, margen_pct: pct }
+})
 
 async function cargar() {
   loading.value = true
@@ -134,6 +238,46 @@ async function cargar() {
   } finally {
     loading.value = false
   }
+}
+
+async function cargarPL() {
+  if (plLotes.value.length) return
+  loadingPL.value = true
+  try {
+    const { data: d } = await getAnalyticsPL()
+    plLotes.value = d.lotes ?? []
+  } catch {
+    plLotes.value = []
+  } finally {
+    loadingPL.value = false
+  }
+}
+
+function switchFinanciero() {
+  tab.value = 'financiero'
+  cargarPL()
+}
+
+function exportarCSV() {
+  const headers = ['Código', 'Genética', 'Estado', 'Costos (ARS)', 'Ingresos (ARS)', 'Margen (ARS)', 'Margen %', 'Costo/g (ARS)']
+  const rows = plLotes.value.map(l => [
+    l.codigo,
+    l.genetica || '',
+    l.estado,
+    l.costo_total ?? '',
+    l.ingresos ?? '',
+    l.margen ?? '',
+    l.margen_pct ?? '',
+    l.costo_por_gramo ?? '',
+  ])
+  const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `pl_lotes_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 onMounted(cargar)
@@ -188,4 +332,30 @@ onMounted(cargar)
 .rnd__badge--cosecha, .rnd__badge--secado, .rnd__badge--curado { background: rgba(91,100,115,.1); color: #5B6473; }
 .rnd__badge--finalizado { background: var(--c-ink-100); color: var(--c-ink-400); }
 .rnd__empty { color: var(--c-ink-500); font-size: var(--fs-14); background: var(--c-ink-50); padding: var(--sp-5); border-radius: var(--r-lg); text-align: center; }
+
+/* Header right */
+.rnd__header-right { display: flex; align-items: center; gap: var(--sp-2); }
+.rnd__btn-csv {
+  display: flex; align-items: center; gap: .35rem;
+  background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d;
+  font-size: var(--fs-12); font-weight: 700; padding: .4rem .75rem;
+  border-radius: var(--r-md); cursor: pointer; transition: background .15s;
+}
+.rnd__btn-csv:hover { background: #dcfce7; }
+
+/* Tabs */
+.rnd__tabs { display: flex; gap: .25rem; margin-bottom: var(--sp-5); border-bottom: 2px solid var(--c-ink-100); padding-bottom: 0; }
+.rnd__tab {
+  background: none; border: none; padding: .6rem 1.1rem; font-size: var(--fs-14); font-weight: 600;
+  color: var(--c-ink-500); cursor: pointer; border-bottom: 2px solid transparent;
+  margin-bottom: -2px; transition: color .15s, border-color .15s;
+}
+.rnd__tab--active { color: var(--c-role-cultivador, #1b5e20); border-bottom-color: var(--c-role-cultivador, #1b5e20); }
+.rnd__tab:hover:not(.rnd__tab--active) { color: var(--c-ink-800); }
+
+/* KPI de error (margen negativo) */
+.rnd__kpi--err .rnd__kpi-val { color: #dc2626; }
+
+/* Table wrap */
+.rnd__table-wrap { overflow-x: auto; }
 </style>

@@ -5,6 +5,7 @@ import { useAuthStore }         from "../stores/auth"
 import { listSedes, listLotes, listPacientes } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
@@ -328,7 +329,7 @@ onMounted(async () => {
     <div v-if="vistaActiva === 'dashboard'">
 
       <div v-if="store.loadingDashboard" class="cv__loading">
-        <div class="cv__ring"></div><span>Cargando…</span>
+        <DsSpinner />
       </div>
 
       <template v-else-if="store.dashboard">
@@ -611,7 +612,7 @@ onMounted(async () => {
       </div>
 
       <div class="cv__card">
-        <div v-if="store.loading" class="cv__loading"><div class="cv__ring"></div><span>Cargando…</span></div>
+        <div v-if="store.loading" class="cv__loading"><DsSpinner :size="60" /></div>
         <div v-else-if="!itemsFiltrados.length" class="cv__empty">
           <div class="cv__empty-icon"><i class="bi bi-journal-text"></i></div>
           <div class="cv__empty-title">Sin movimientos</div>
@@ -691,7 +692,7 @@ onMounted(async () => {
 
     <!-- ══════════════ P&L POR LOTE ══════════════ -->
     <div v-if="vistaActiva === 'pl'" ref="plContainerRef">
-      <div v-if="loadingLotes" class="cv__loading"><div class="cv__ring"></div><span>Cargando lotes…</span></div>
+      <div v-if="loadingLotes" class="cv__loading"><DsSpinner /></div>
       <template v-else>
 
         <!-- Sub-tabs + PDF export -->
@@ -703,7 +704,7 @@ onMounted(async () => {
             Por cepa
           </button>
           <button class="cv__btn-ghost cv__pl-pdf" :disabled="generandoPDF" @click="exportarPDF">
-            <div v-if="generandoPDF" class="cv__spin cv__spin--sm"></div>
+            <DsSpinner v-if="generandoPDF" :size="11" />
             <i v-else class="bi bi-file-earmark-pdf"></i>
             {{ generandoPDF ? 'Generando…' : 'Exportar PDF' }}
           </button>
@@ -954,12 +955,8 @@ onMounted(async () => {
 .cv__btn-link { background: none; border: none; color: #1b5e20; font-size: .8rem; font-weight: 600; cursor: pointer; padding: 0; white-space: nowrap; }
 .cv__btn-link:hover { text-decoration: underline; }
 
-.cv__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 4rem; color: #94a3b8; }
-.cv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: cv-spin .7s linear infinite; }
-@keyframes cv-spin { to { transform: rotate(360deg); } }
+.cv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
-.cv__spin { width: 14px; height: 14px; border: 2px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: cv-spin .6s linear infinite; }
-.cv__spin--sm { width: 11px; height: 11px; }
 
 /* ══ Selector de sede en dashboard ══════════════════════ */
 .cv__sede-selector {

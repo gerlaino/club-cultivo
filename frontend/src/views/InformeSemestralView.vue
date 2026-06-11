@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, nextTick } from "vue"
 import { useAuthStore } from "../stores/auth"
 import { getInformeSemestral } from "../lib/api"
+import DsSpinner from '../design-system/components/Spinner.vue'
 import { semestreActual as getSemestreActual, formatFechaLarga, formatFechaCorta, formatFechaSemestre } from '../utils/dates.js'
 
 const auth    = useAuthStore()
@@ -108,12 +109,12 @@ onMounted(() => cargar())
           <option v-for="y in anios" :key="y" :value="y">{{ y }}</option>
         </select>
         <button class="ir__btn-primary" :disabled="loading" @click="cargar">
-          <div v-if="loading" class="ir__spin"></div>
+          <DsSpinner v-if="loading" :size="14" />
           <i v-else class="bi bi-arrow-clockwise"></i>
           Generar
         </button>
         <button v-if="informe" class="ir__btn-download" :disabled="generandoPDF" @click="descargarPDF">
-          <div v-if="generandoPDF" class="ir__spin"></div>
+          <DsSpinner v-if="generandoPDF" :size="14" />
           <i v-else class="bi bi-file-earmark-pdf"></i>
           {{ generandoPDF ? 'Generando PDF...' : 'Descargar PDF' }}
         </button>
@@ -122,8 +123,7 @@ onMounted(() => cargar())
 
     <!-- ── Loading ── -->
     <div v-if="loading" class="ir__loading">
-      <div class="ir__ring"></div>
-      <span>Generando informe…</span>
+      <DsSpinner />
     </div>
     <div v-else-if="error" class="ir__error">{{ error }}</div>
 
@@ -507,12 +507,10 @@ onMounted(() => cargar())
 .ir__btn-ghost { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #475569; border: 1.5px solid #e2e8f0; padding: .6rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 500; cursor: pointer; transition: all .15s; white-space: nowrap; }
 .ir__btn-ghost:hover { background: #f8fafc; color: #0f172a; }
 
-.ir__spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: ir-spin .7s linear infinite; }
-@keyframes ir-spin { to { transform: rotate(360deg); } }
+
 
 /* Loading / Error */
-.ir__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
-.ir__ring { width: 24px; height: 24px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: ir-spin .7s linear infinite; }
+.ir__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .ir__error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem 1.25rem; border-radius: 10px; }
 
 /* Portada */

@@ -1,7 +1,10 @@
 <template>
   <div class="sdv">
     <div class="sdv__toolbar">
-      <h1 class="sdv__title">Stock</h1>
+      <div class="sdv__toolbar-left">
+        <h1 class="sdv__title">Stock</h1>
+        <div v-if="liveConectado" class="sdv__live-dot" title="Actualización en tiempo real activa">● en vivo</div>
+      </div>
       <div class="sdv__filters">
         <select v-model="filtroForma" class="sdv__select">
           <option value="">Todos los productos</option>
@@ -21,24 +24,39 @@
         <thead>
           <tr>
             <th>Producto</th>
+            <th>Cepa</th>
             <th>Lote</th>
             <th>Sede</th>
             <th class="sdv__th-num">Disponible</th>
+            <th class="sdv__th-num">Comprometido</th>
             <th class="sdv__th-num">P. sugerido</th>
-            <th>Origen</th>
+            <th>Vencimiento</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="s in stocksFiltrados" :key="s.id">
+          <tr v-for="s in stocksFiltrados" :key="s.id" :class="{ 'sdv__tr--flash': flashIds.has(s.id) }">
             <td class="sdv__td-forma">{{ formaLabel(s.forma_producto) }}</td>
+            <td class="sdv__td-cepa">{{ s.genetica?.nombre ?? s.lote?.genetica?.nombre ?? '—' }}</td>
             <td class="sdv__td-mono">{{ s.lote_codigo ?? s.lote?.codigo ?? '—' }}</td>
             <td>{{ s.sede?.nombre ?? '—' }}</td>
-            <td class="sdv__td-num" :class="{ 'sdv__td-bajo': s.cantidad < 5 }">
-              {{ s.cantidad }}{{ s.unidad }}
+            <td class="sdv__td-num" :class="{ 'sdv__td-bajo': s.cantidad_disponible_real < 5 }">
+              {{ s.cantidad_disponible_real?.toFixed(1) ?? s.cantidad }}{{ s.unidad }}
+            </td>
+            <td class="sdv__td-num">
+              <span v-if="s.gramos_reservados > 0" class="sdv__badge-reservado" :title="`${s.gramos_reservados}g comprometidos en delivery`">
+                −{{ s.gramos_reservados?.toFixed(1) }}g
+              </span>
+              <span v-else class="sdv__none">—</span>
             </td>
             <td class="sdv__td-num">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad }}</td>
-            <td>{{ s.origen ?? '—' }}</td>
+            <td>
+              <span v-if="s.estado_vencimiento && s.estado_vencimiento !== 'ok'" class="sdv__badge-venc" :class="`sdv__badge-venc--${s.estado_vencimiento}`">
+                {{ badgeVencimiento(s) }}
+              </span>
+              <span v-else-if="s.fecha_vencimiento_est" class="sdv__none">{{ fmtFecha(s.fecha_vencimiento_est) }}</span>
+              <span v-else class="sdv__none">—</span>
+            </td>
             <td class="sdv__td-etiqueta">
               <RouterLink :to="{ name: 'stock-etiqueta', params: { id: s.id } }" class="sdv__etiqueta-link" title="Ver etiqueta">🏷️</RouterLink>
             </td>
@@ -53,27 +71,61 @@
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { listStocks } from '../lib/api.js'
+import { formaLabel, formatARS } from '../lib/formatters.js'
+import { useStockChannel } from '../composables/useStockChannel.js'
 
 const FORMAS = [
-  { value: 'flor_seca', label: 'Flor seca' },
-  { value: 'aceite',    label: 'Aceite' },
-  { value: 'tintura',   label: 'Tintura' },
-  { value: 'crema',     label: 'Crema' },
-  { value: 'capsulas',  label: 'Cápsulas' },
-  { value: 'otro',      label: 'Otro' },
+  { value: 'flor_seca',  label: 'Flor seca' },
+  { value: 'hash',       label: 'Hash' },
+  { value: 'aceite',     label: 'Aceite' },
+  { value: 'tintura',    label: 'Tintura' },
+  { value: 'crema',      label: 'Crema' },
+  { value: 'capsula',    label: 'Cápsula' },
+  { value: 'comestible', label: 'Comestible' },
+  { value: 'prensado',   label: 'Prensado' },
+  { value: 'externo',    label: 'Externo' },
+  { value: 'otro',       label: 'Otro' },
 ]
 
-const loading     = ref(true)
-const stocks      = ref([])
-const filtroForma = ref('')
+const loading      = ref(true)
+const stocks       = ref([])
+const filtroForma  = ref('')
+const liveConectado = ref(false)
+const flashIds     = ref(new Set())
 
 const stocksFiltrados = computed(() => {
-  let s = stocks.value.filter(x => x.cantidad > 0)
+  let s = stocks.value.filter(x => x.cantidad > 0 && x.estado !== 'pendiente_asignacion')
   if (filtroForma.value) s = s.filter(x => x.forma_producto === filtroForma.value)
   return s
 })
 
+function onStockActualizado(data) {
+  liveConectado.value = true
+  const idx = stocks.value.findIndex(s => s.id === data.stock_id)
+  if (idx === -1) return
+
+  stocks.value[idx] = {
+    ...stocks.value[idx],
+    cantidad:                 data.cantidad,
+    gramos_reservados:        data.gramos_reservados,
+    cantidad_disponible_real: data.cantidad_disponible_real,
+  }
+
+  // flash visual
+  const newSet = new Set(flashIds.value)
+  newSet.add(data.stock_id)
+  flashIds.value = newSet
+  setTimeout(() => {
+    const s = new Set(flashIds.value)
+    s.delete(data.stock_id)
+    flashIds.value = s
+  }, 1200)
+}
+
+useStockChannel(onStockActualizado)
+
 onMounted(async () => {
+  liveConectado.value = true
   try {
     const { data } = await listStocks()
     stocks.value = data.stocks ?? data ?? []
@@ -84,15 +136,17 @@ onMounted(async () => {
   }
 })
 
-function formaLabel(f) {
-  const L = { flor_seca: 'Flor seca', aceite: 'Aceite', tintura: 'Tintura', crema: 'Crema', capsulas: 'Cápsulas', otro: 'Otro' }
-  return L[f] || f || '—'
+function badgeVencimiento(s) {
+  if (!s.dias_para_vencimiento === null) return ''
+  const dias = s.dias_para_vencimiento
+  if (dias < 0)  return `Vencido hace ${Math.abs(dias)}d`
+  if (dias === 0) return 'Vence hoy'
+  return `Vence en ${dias}d`
 }
 
-function formatARS(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
-}
+const fmtFecha = (d) => d
+  ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  : '—'
 </script>
 
 <style scoped>
@@ -106,7 +160,9 @@ function formatARS(n) {
   margin-bottom: var(--sp-5);
   flex-wrap: wrap;
 }
+.sdv__toolbar-left { display: flex; align-items: center; gap: var(--sp-3); }
 .sdv__title { font-family: var(--font-display); font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); margin: 0; }
+.sdv__live-dot { font-size: .68rem; font-weight: 700; color: #15803d; background: #dcfce7; padding: .15rem .5rem; border-radius: 99px; }
 
 .sdv__select {
   padding: .5rem var(--sp-3);
@@ -140,13 +196,35 @@ function formatARS(n) {
   background: var(--c-ink-100);
   border-bottom: 2px solid var(--c-ink-300);
 }
-.sdv__table td { padding: var(--sp-3); border-bottom: 1px solid var(--c-ink-100); color: var(--c-ink-900); }
+.sdv__table td { padding: var(--sp-3); border-bottom: 1px solid var(--c-ink-100); color: var(--c-ink-900); vertical-align: middle; }
 .sdv__table tr:last-child td { border-bottom: none; }
 .sdv__table tr:hover td { background: var(--c-leaf-50); }
 .sdv__th-num, .sdv__td-num { text-align: right; }
 .sdv__td-forma { font-weight: 600; }
+.sdv__td-cepa  { font-size: var(--fs-13); color: var(--c-ink-600); font-style: italic; }
 .sdv__td-mono  { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--c-ink-700); }
 .sdv__td-bajo  { color: var(--c-rust-600); font-weight: 700; }
+.sdv__none     { color: var(--c-ink-300); font-size: var(--fs-13); }
+
+/* Badges */
+.sdv__badge-reservado {
+  font-size: .7rem; font-weight: 700; color: #d97706;
+  background: #fef3c7; padding: .15rem .45rem; border-radius: 99px;
+  white-space: nowrap;
+}
+.sdv__badge-venc {
+  font-size: .7rem; font-weight: 700; padding: .15rem .45rem; border-radius: 99px; white-space: nowrap;
+}
+.sdv__badge-venc--vencido  { background: #fee2e2; color: #dc2626; }
+.sdv__badge-venc--critico  { background: #ffedd5; color: #ea580c; }
+.sdv__badge-venc--proximo  { background: #fef9c3; color: #a16207; }
+
+/* Live flash */
+.sdv__tr--flash td { animation: stockFlash .6s ease-out; }
+@keyframes stockFlash {
+  0%  { background: #dcfce7; }
+  100% { background: transparent; }
+}
 
 .sdv__empty { font-size: var(--fs-14); color: var(--c-ink-500); padding: var(--sp-4) 0; }
 

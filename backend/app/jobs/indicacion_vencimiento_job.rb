@@ -10,7 +10,9 @@ class IndicacionVencimientoJob < ApplicationJob
   private
 
   def procesar_club(club)
-    hoy = Date.today
+    hoy      = Date.today
+    vencidas = []
+    por_vencer = {}
 
     # Indicaciones vencidas y aún activas — alerta diaria
     IndicacionMedica
@@ -33,6 +35,7 @@ class IndicacionVencimientoJob < ApplicationJob
         mensaje = "Indicación vencida: #{ind.paciente.nombre_completo} — #{ind.patologia} (venció hace #{dias_vencida} día#{dias_vencida == 1 ? '' : 's'})"
 
         crear_alertas(club, 'indicacion_vencida', mensaje, 'error', contexto)
+        vencidas << ind
       end
 
     # Indicaciones por vencer en 30, 15 o 7 días
@@ -57,7 +60,17 @@ class IndicacionVencimientoJob < ApplicationJob
           severidad = dias <= 7 ? 'warning' : 'info'
 
           crear_alertas(club, 'indicacion_por_vencer', mensaje, severidad, contexto)
+          por_vencer[dias] ||= []
+          por_vencer[dias] << ind
         end
+    end
+
+    if vencidas.any? || por_vencer.values.any?(&:any?)
+      NotificacionesMailer.resumen_indicaciones(
+        club:       club,
+        vencidas:   vencidas,
+        por_vencer: por_vencer
+      ).deliver_later
     end
   end
 

@@ -2,8 +2,7 @@
   <div class="usm">
 
     <div v-if="loading" class="usm__loading">
-      <div class="usm__ring"></div>
-      <span>Cargando salas…</span>
+      <DsSpinner />
     </div>
 
     <template v-else-if="salasParaRol.length === 0">
@@ -37,7 +36,7 @@
             @click="toggle(sala)"
           >
             <div class="usm__sala-ico">
-              <div v-if="toggling === sala.id" class="usm__mini-ring"></div>
+              <DsSpinner v-if="toggling === sala.id" :size="12" />
               <i v-else-if="isAsignada(sala)" class="bi bi-check-lg"></i>
               <i v-else class="bi bi-plus-lg"></i>
             </div>
@@ -67,6 +66,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { getUserSalasAsignadas, asignarSalaAUsuario, desasignarSalaAUsuario, listSalas } from '../lib/api.js'
@@ -150,15 +150,8 @@ onMounted(async () => {
 
 /* Loading */
 .usm__loading {
-  display: flex; align-items: center; gap: .65rem;
-  padding: 1rem 0; color: #94a3b8; font-size: .82rem;
+  display: flex; align-items: center; justify-content: center; padding: 2rem;
 }
-.usm__ring {
-  width: 16px; height: 16px; flex-shrink: 0;
-  border: 2px solid #e2e8f0; border-top-color: #1b5e20;
-  border-radius: 50%; animation: usm-spin .7s linear infinite;
-}
-@keyframes usm-spin { to { transform: rotate(360deg); } }
 
 /* Empty */
 .usm__empty {
@@ -207,11 +200,6 @@ onMounted(async () => {
   width: 16px; height: 16px; display: flex;
   align-items: center; justify-content: center;
   font-size: .75rem; flex-shrink: 0;
-}
-.usm__mini-ring {
-  width: 12px; height: 12px;
-  border: 2px solid currentColor; border-top-color: transparent;
-  border-radius: 50%; animation: usm-spin .6s linear infinite; opacity: .6;
 }
 
 /* Footer chips */

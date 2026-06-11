@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Prescripción — <%= indicacion.id %></title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #1a1a1a; padding: 32px; max-width: 740px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1b5e20; padding-bottom: 16px; margin-bottom: 20px; }
+    .club-name { font-size: 20px; font-weight: 800; color: #1b5e20; }
+    .club-sub { font-size: 11px; color: #60725d; margin-top: 3px; }
+    .doc-info { text-align: right; }
+    .doc-title { font-size: 15px; font-weight: 700; color: #1b5e20; text-transform: uppercase; letter-spacing: .05em; }
+    .doc-num { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+    .section { margin-bottom: 18px; }
+    .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #60725d; border-bottom: 1px solid #e8f0e9; padding-bottom: 4px; margin-bottom: 10px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
+    .field { margin-bottom: 6px; }
+    .field-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: .05em; }
+    .field-val { font-size: 12px; color: #1a1a1a; margin-top: 2px; }
+    .dosificacion-box { background: #f0fdf4; border: 1.5px solid #d4e6d4; border-radius: 8px; padding: 12px 16px; margin-top: 6px; font-size: 13px; line-height: 1.6; color: #1a1a1a; white-space: pre-wrap; }
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 10px; font-weight: 700; }
+    .badge-active { background: #dcfce7; color: #15803d; }
+    .badge-inactive { background: #fee2e2; color: #dc2626; }
+    .badge-warning { background: #fef9c3; color: #b45309; }
+    .footer { margin-top: 40px; border-top: 1px solid #e8f0e9; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .firma-block { text-align: center; }
+    .firma-line { width: 200px; border-bottom: 1px solid #1a1a1a; margin: 0 auto 6px; height: 40px; }
+    .firma-label { font-size: 10px; color: #60725d; }
+    .obs-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #92400e; line-height: 1.5; white-space: pre-wrap; }
+    @media print {
+      body { padding: 16px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="club-name"><%= club.name %></div>
+      <div class="club-sub">Cannabis Medicinal — Uso Terapéutico</div>
+    </div>
+    <div class="doc-info">
+      <div class="doc-title">Prescripción médica</div>
+      <div class="doc-num">Nº <%= indicacion.id.to_s.rjust(6, '0') %></div>
+    </div>
+  </div>
+
+  <!-- Paciente -->
+  <div class="section">
+    <div class="section-title">Datos del paciente</div>
+    <div class="grid-2">
+      <div class="field">
+        <div class="field-label">Nombre completo</div>
+        <div class="field-val"><strong><%= paciente.nombre_completo %></strong></div>
+      </div>
+      <div class="field">
+        <div class="field-label">DNI / Documento</div>
+        <div class="field-val"><%= paciente.dni.presence || '—' %></div>
+      </div>
+      <% if paciente.respond_to?(:fecha_nacimiento) && paciente.fecha_nacimiento.present? %>
+      <div class="field">
+        <div class="field-label">Fecha de nacimiento</div>
+        <div class="field-val"><%= paciente.fecha_nacimiento.strftime('%d/%m/%Y') %></div>
+      </div>
+      <% end %>
+      <div class="field">
+        <div class="field-label">N.º de socio</div>
+        <div class="field-val"><%= paciente.numero_socio.presence || '—' %></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Indicación -->
+  <div class="section">
+    <div class="section-title">Indicación terapéutica</div>
+    <div class="grid-2">
+      <div class="field">
+        <div class="field-label">Patología / Diagnóstico</div>
+        <div class="field-val"><strong><%= indicacion.patologia %></strong></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Vía de administración</div>
+        <div class="field-val"><%= indicacion.via_administracion %></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Fecha de emisión</div>
+        <div class="field-val"><%= indicacion.fecha_emision.strftime('%d/%m/%Y') %></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Fecha de vencimiento</div>
+        <div class="field-val">
+          <% if indicacion.fecha_vencimiento.present? %>
+            <%= indicacion.fecha_vencimiento.strftime('%d/%m/%Y') %>
+            <% if indicacion.fecha_vencimiento < Date.today %>
+              <span class="badge badge-inactive">Vencida</span>
+            <% elsif indicacion.fecha_vencimiento <= Date.today + 30 %>
+              <span class="badge badge-warning">Por vencer</span>
+            <% end %>
+          <% else %>
+            —
+          <% end %>
+        </div>
+      </div>
+      <% if indicacion.duracion_dias.present? %>
+      <div class="field">
+        <div class="field-label">Duración del tratamiento</div>
+        <div class="field-val"><%= indicacion.duracion_dias %> días</div>
+      </div>
+      <% end %>
+      <div class="field">
+        <div class="field-label">Estado</div>
+        <div class="field-val">
+          <span class="badge <%= indicacion.activa ? 'badge-active' : 'badge-inactive' %>">
+            <%= indicacion.activa ? 'Activa' : 'Inactiva' %>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:12px">
+      <div class="field-label">Dosificación y pauta terapéutica</div>
+      <div class="dosificacion-box"><%= indicacion.dosificacion %></div>
+    </div>
+
+    <% if indicacion.observaciones.present? %>
+    <div class="field" style="margin-top:12px">
+      <div class="field-label">Observaciones</div>
+      <div class="obs-box"><%= indicacion.observaciones %></div>
+    </div>
+    <% end %>
+  </div>
+
+  <!-- Footer con firma -->
+  <div class="footer">
+    <div style="font-size:10px; color:#94a3b8; max-width:300px; line-height:1.5;">
+      Documento emitido en el marco de la Ley 27.350 y normativa vigente de uso medicinal de cannabis.<br>
+      Uso exclusivamente terapéutico. No válido como receta farmacéutica.
+    </div>
+    <div class="firma-block">
+      <div class="firma-line"></div>
+      <div class="firma-label">
+        <strong>Dr/a. <%= medico.nombre_completo rescue "#{medico.first_name} #{medico.last_name}".strip %></strong><br>
+        Médico responsable — <%= club.name %>
+      </div>
+    </div>
+  </div>
+
+  <div class="no-print" style="text-align:center; margin-top:24px;">
+    <button onclick="window.print()" style="background:#1b5e20; color:#fff; border:none; padding:10px 24px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">
+      Imprimir / Guardar PDF
+    </button>
+  </div>
+
+</body>
+</html>

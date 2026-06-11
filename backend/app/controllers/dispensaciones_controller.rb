@@ -33,6 +33,7 @@ class DispensacionesController < ApplicationController
         .joins(stock: :sede)
         .where(sedes: { club_id: current_user.club_id })
         .includes(:user, :paciente, :sede, stock: :lote)
+      scope = apply_dispensacion_filters(scope)
       if params[:desde].present? || params[:hasta].present?
         desde = params[:desde].present? ? Date.parse(params[:desde]) : nil
         hasta = params[:hasta].present? ? Date.parse(params[:hasta]) : Date.today
@@ -61,8 +62,12 @@ class DispensacionesController < ApplicationController
     @dispensacion.user = current_user
     @dispensacion.sede_id ||= @dispensacion.stock&.sede_id
 
-    if @dispensacion.stock && @dispensacion.aporte_socio_ars.nil?
-      precio = @dispensacion.stock.precio_sugerido_ars.to_d
+    needs_autocalc = @dispensacion.aporte_socio_ars.nil? ||
+                     (@dispensacion.aporte_socio_ars.to_d <= 0 && @dispensacion.medio_pago == 'no_abona')
+    if @dispensacion.stock && needs_autocalc
+      precio_base = @dispensacion.stock.precio_sugerido_ars.to_d
+      descuento   = @paciente.descuento_porcentaje.to_d.clamp(0, 100) / 100
+      precio      = precio_base * (1 - descuento)
       @dispensacion.aporte_socio_ars    = (precio * @dispensacion.cantidad.to_d).round(2)
       @dispensacion.precio_unitario_ars ||= precio
     end
@@ -71,21 +76,23 @@ class DispensacionesController < ApplicationController
     when 'cuenta_corriente'
       cc    = @paciente.cuenta_corriente
       monto = @dispensacion.aporte_socio_ars.to_d
-      unless cc&.limite_credito.to_f > 0
-        return render json: { error: 'El socio no tiene cuenta corriente configurada' }, status: :unprocessable_entity
+      if monto <= 0
+        return render json: { error: 'El aporte del socio debe ser mayor a $0 para cobrar por cuenta corriente.' }, status: :unprocessable_entity
+      end
+      unless cc&.limite_credito.to_f > 0 && cc.puede_dispensar?(monto)
+        return render json: { error: 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.' }, status: :unprocessable_entity
+      end
+    when 'no_abona'
+      cc    = @paciente.cuenta_corriente
+      monto = @dispensacion.aporte_socio_ars.to_d
+      if cc.nil? || cc.limite_credito.to_f <= 0
+        return render json: { error: 'El paciente no tiene crédito configurado. Consultá con el administrador.' }, status: :unprocessable_entity
+      end
+      if monto <= 0
+        return render json: { error: 'No se puede determinar el valor del producto. Configurá el precio del stock.' }, status: :unprocessable_entity
       end
       unless cc.puede_dispensar?(monto)
-        margen = (cc.saldo_disponible + cc.limite_credito).round(2)
-        return render json: { error: "Saldo insuficiente en cuenta corriente (margen disponible: #{margen} ARS)" }, status: :unprocessable_entity
-      end
-    when 'credito_gramos'
-      cc     = @paciente.cuenta_corriente
-      gramos = @dispensacion.cantidad.to_d
-      unless cc&.credito_gramos_activo?
-        return render json: { error: 'El socio no tiene crédito en gramos activado' }, status: :unprocessable_entity
-      end
-      unless cc.puede_dispensar_g?(gramos)
-        return render json: { error: "Gramos insuficientes en crédito (disponible: #{cc.saldo_disponible_g.round(3)}g)" }, status: :unprocessable_entity
+        return render json: { error: 'Crédito insuficiente para realizar la dispensa.' }, status: :unprocessable_entity
       end
     end
 
@@ -93,8 +100,10 @@ class DispensacionesController < ApplicationController
       @dispensacion.save!
       crear_movimiento_contable(@dispensacion)
       case @dispensacion.medio_pago
-      when 'cuenta_corriente' then debitar_cuenta_corriente(@dispensacion)
-      when 'credito_gramos'   then debitar_gramos(@dispensacion)
+      when 'cuenta_corriente'
+        debitar_cuenta_corriente(@dispensacion)
+      when 'no_abona'
+        debitar_cuenta_corriente(@dispensacion)
       end
     end
 
@@ -119,6 +128,8 @@ class DispensacionesController < ApplicationController
   def mis_paquetes
     @dispensaciones = Dispensacion
       .del_delivery(current_user.id)
+      .joins(stock: :sede)
+      .where(sedes: { club_id: current_user.club_id })
       .includes(:paciente, :sede, stock: :lote)
       .order(created_at: :asc)
     render json: { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion_delivery(d) } }
@@ -127,9 +138,13 @@ class DispensacionesController < ApplicationController
   # PATCH /dispensaciones/iniciar_viaje  { ids: [1,2,3] }
   def iniciar_viaje
     ids = params[:ids].to_a.map(&:to_i)
-    dispensaciones = Dispensacion.del_delivery(current_user.id)
-                                 .where(id: ids, estado_envio: 'pendiente')
+    dispensaciones = Dispensacion
+      .del_delivery(current_user.id)
+      .joins(stock: :sede)
+      .where(sedes: { club_id: current_user.club_id })
+      .where(id: ids, estado_envio: 'pendiente')
     updated = dispensaciones.update_all(estado_envio: 'en_viaje')
+    dispensaciones.each { |d| NotificacionDeliveryService.new(d).notificar_despacho }
     render json: { updated: updated }
   end
 
@@ -142,10 +157,12 @@ class DispensacionesController < ApplicationController
       return render json: { error: 'La dispensación no está en un estado válido para entregar' }, status: :unprocessable_entity
     end
     @dispensacion.update!(
-      estado_envio:  'entregado',
-      notas_entrega: params[:notas_entrega],
-      entregado_at:  Time.current
+      estado_envio:       'entregado',
+      notas_entrega:      params[:notas_entrega],
+      firma_entrega_data: params[:firma_entrega_data],
+      entregado_at:       Time.current
     )
+    NotificacionDeliveryService.new(@dispensacion).notificar_entrega
     render json: serialize_dispensacion_delivery(@dispensacion)
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
@@ -194,6 +211,8 @@ class DispensacionesController < ApplicationController
       .includes(:paciente, :user, :sede, stock: :lote)
       .order(fecha_dispensacion: :desc, created_at: :desc)
 
+    scope = apply_dispensacion_filters(scope)
+
     if params[:desde].present?
       desde = Date.parse(params[:desde]) rescue nil
       scope = scope.where("fecha_dispensacion >= ?", desde) if desde
@@ -201,9 +220,6 @@ class DispensacionesController < ApplicationController
     if params[:hasta].present?
       hasta = Date.parse(params[:hasta]) rescue nil
       scope = scope.where("fecha_dispensacion <= ?", hasta) if hasta
-    end
-    if params[:sede_id].present?
-      scope = scope.where(sedes: { id: params[:sede_id] })
     end
 
     require "csv"
@@ -243,8 +259,8 @@ class DispensacionesController < ApplicationController
   def destroy
     ActiveRecord::Base.transaction do
       case @dispensacion.medio_pago
-      when 'cuenta_corriente' then revertir_cuenta_corriente(@dispensacion)
-      when 'credito_gramos'   then revertir_gramos(@dispensacion)
+      when 'cuenta_corriente', 'no_abona'
+        revertir_cuenta_corriente(@dispensacion)
       end
       # Nullify FK references before destroy (prevents FK constraint violation)
       CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)
@@ -254,6 +270,14 @@ class DispensacionesController < ApplicationController
   end
 
   private
+
+  def apply_dispensacion_filters(scope)
+    scope = scope.where(paciente_id: params[:paciente_id])          if params[:paciente_id].present?
+    scope = scope.where(medio_pago: params[:medio_pago])            if params[:medio_pago].present?
+    scope = scope.where(stocks: { forma_producto: params[:forma_producto] }) if params[:forma_producto].present?
+    scope = scope.where(sedes: { id: params[:sede_id] })            if params[:sede_id].present?
+    scope
+  end
 
   def set_paciente
     @paciente = current_user.club.pacientes.find(params[:paciente_id])
@@ -269,8 +293,11 @@ class DispensacionesController < ApplicationController
   end
 
   def set_dispensacion
-    @dispensacion = Dispensacion.joins(:stock).where(stocks: { sede_id: current_user.club.sede_ids })
-                                .find(params[:id])
+    club_sede_ids = current_user.club.sede_ids
+    @dispensacion = Dispensacion
+      .joins(:stock)
+      .where("stocks.sede_id IN (?) OR stocks.club_id = ?", club_sede_ids, current_user.club_id)
+      .find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Dispensación no encontrada' }, status: :not_found
   end
@@ -281,7 +308,8 @@ class DispensacionesController < ApplicationController
       :cantidad, :precio_unitario_ars, :aporte_socio_ars,
       :observaciones, :fecha_dispensacion, :medio_pago,
       :con_envio, :delivery_id, :direccion_envio,
-      :contacto_nombre, :contacto_telefono, :notas_envio
+      :contacto_nombre, :contacto_telefono, :notas_envio,
+      :firma_entrega_data
     )
   end
 
@@ -327,6 +355,7 @@ class DispensacionesController < ApplicationController
     cc.update!(saldo_disponible: nuevo)
     cc.movimientos.create!(
       tipo:           'debito',
+      unidad:         'ars',
       monto:          -monto,
       saldo_anterior: anterior,
       saldo_nuevo:    nuevo,
@@ -370,6 +399,7 @@ class DispensacionesController < ApplicationController
     cc.update!(saldo_disponible_g: nuevo)
     cc.movimientos.create!(
       tipo:           'debito',
+      unidad:         'gramos',
       monto:          -gramos,
       saldo_anterior: anterior,
       saldo_nuevo:    nuevo,
@@ -383,15 +413,18 @@ class DispensacionesController < ApplicationController
     cc = dispensacion.paciente.cuenta_corriente
     return unless cc
 
-    gramos = dispensacion.cantidad.to_d
-    return if gramos <= 0
+    # Busca por unidad='gramos' (nuevos registros) o por descripción como fallback (registros anteriores a la migración)
+    total_g = cc.movimientos.where(dispensacion: dispensacion, tipo: 'debito')
+                .where("unidad = 'gramos' OR descripcion ILIKE ?", '%(crédito gramos)%')
+                .sum(:monto).abs
+    return if total_g <= 0
 
     anterior = cc.saldo_disponible_g.to_d
-    nuevo    = anterior + gramos
+    nuevo    = anterior + total_g
     cc.update!(saldo_disponible_g: nuevo)
     cc.movimientos.create!(
       tipo:           'ajuste',
-      monto:          gramos,
+      monto:          total_g,
       saldo_anterior: anterior,
       saldo_nuevo:    nuevo,
       descripcion:    "Reversa dispensación ##{dispensacion.id} (gramos)",

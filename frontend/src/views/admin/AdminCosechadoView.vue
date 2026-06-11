@@ -13,8 +13,7 @@
     </div>
 
     <div v-if="loading" class="acs__loading">
-      <div class="acs__ring"></div>
-      <span>Cargando cosechas…</span>
+      <DsSpinner />
     </div>
 
     <div v-else-if="!lotes.length" class="acs__empty">
@@ -36,7 +35,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="lote in lotes" :key="lote.id" class="acs__row">
+        <tr v-for="lote in paginados" :key="lote.id" class="acs__row">
           <td>
             <RouterLink :to="`/lotes/${lote.id}`" class="acs__lote-link">
               {{ lote.codigo }}
@@ -69,6 +68,12 @@
       </tbody>
     </table>
 
+    <div v-if="totalPages > 1" class="acs__pager">
+      <button class="acs__pager-btn" :disabled="page <= 1" @click="page--">«</button>
+      <span class="acs__pager-info">{{ page }} / {{ totalPages }}</span>
+      <button class="acs__pager-btn" :disabled="page >= totalPages" @click="page++">»</button>
+    </div>
+
     <!-- Modal asignación -->
     <Teleport to="body">
       <Transition name="acs-fade">
@@ -86,7 +91,7 @@
 
             <div class="acs-modal__body">
               <div v-if="loadingManicuradores" class="acs-modal__loading">
-                <div class="acs-modal__ring"></div> Cargando manicuradores…
+                <DsSpinner :size="14" /> Cargando manicuradores…
               </div>
               <div v-else-if="!manicuradores.length" class="acs-modal__empty">
                 No hay usuarios con rol de manicura en el club.
@@ -121,7 +126,7 @@
                 :disabled="!seleccionado || saving"
                 @click="confirmar"
               >
-                <div v-if="saving" class="acs-modal__spinner"></div>
+                <DsSpinner v-if="saving" :size="12" />
                 <UserCheck v-else :size="14" :stroke-width="2" />
                 Asignar
               </button>
@@ -136,7 +141,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { RefreshCw, Scissors, UserCheck, Scale, Dna, X, AlertCircle } from 'lucide-vue-next'
 import { listLotes, listUsers, asignarManicurador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -146,6 +152,12 @@ const toast = useToast()
 const lotes             = ref([])
 const loading           = ref(true)
 const manicuradores     = ref([])
+
+const PER_PAGE   = 10
+const page       = ref(1)
+const paginados  = computed(() => lotes.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
+const totalPages = computed(() => Math.max(1, Math.ceil(lotes.value.length / PER_PAGE)))
+watch(lotes, () => { page.value = 1 })
 const loadingManicuradores = ref(false)
 
 const modalLote   = ref(null)
@@ -259,18 +271,8 @@ onMounted(cargar)
 .acs__loading {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
   justify-content: center;
-  padding: var(--sp-12);
-  color: var(--c-ink-400);
-  font-size: var(--fs-14);
-}
-.acs__ring {
-  width: 18px; height: 18px;
-  border: 2px solid var(--c-ink-100);
-  border-top-color: var(--c-ink-500);
-  border-radius: 50%;
-  animation: acs-spin .7s linear infinite;
+  min-height: calc(100vh - 56px);
 }
 .acs__empty {
   text-align: center;
@@ -305,6 +307,11 @@ onMounted(cargar)
   background: var(--c-ink-50, #f8fafc);
   border-bottom: 1.5px solid var(--c-ink-100);
 }
+.acs__pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 1.25rem 0 .5rem; }
+.acs__pager-btn { background: #fff; border: 1.5px solid var(--c-ink-200); color: var(--c-ink-700); padding: .35rem .75rem; border-radius: 7px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.acs__pager-btn:hover:not(:disabled) { border-color: #7c3aed; color: #7c3aed; }
+.acs__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.acs__pager-info { font-size: .82rem; color: var(--c-ink-500); font-weight: 600; min-width: 50px; text-align: center; }
 .acs__row {
   border-bottom: 1px solid var(--c-ink-100);
   transition: background .1s;
@@ -426,13 +433,6 @@ onMounted(cargar)
   color: var(--c-ink-400);
   font-size: var(--fs-13);
 }
-.acs-modal__ring {
-  width: 14px; height: 14px;
-  border: 2px solid var(--c-ink-100);
-  border-top-color: var(--c-ink-400);
-  border-radius: 50%;
-  animation: acs-spin .7s linear infinite;
-}
 .acs-modal__empty { font-size: var(--fs-13); color: var(--c-ink-400); }
 .acs-label { font-size: 12px; font-weight: 600; color: var(--c-ink-600); text-transform: uppercase; letter-spacing: .04em; }
 .acs-req { color: #ef4444; }
@@ -488,13 +488,6 @@ onMounted(cargar)
 }
 .acs-modal__btn-confirm:hover:not(:disabled) { background: var(--c-leaf-800); }
 .acs-modal__btn-confirm:disabled { opacity: .5; cursor: not-allowed; }
-.acs-modal__spinner {
-  width: 12px; height: 12px;
-  border: 2px solid rgba(255,255,255,.35);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: acs-spin .6s linear infinite;
-}
 
 .acs-fade-enter-active, .acs-fade-leave-active { transition: opacity .15s; }
 .acs-fade-enter-from, .acs-fade-leave-to { opacity: 0; }

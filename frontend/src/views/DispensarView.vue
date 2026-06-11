@@ -30,7 +30,8 @@
           <div class="dv__paciente-name">{{ p.nombre }} {{ p.apellido }}</div>
           <div class="dv__paciente-meta">
             <span class="dv__paciente-dni">{{ p.dni ?? p.numero_documento ?? '—' }}</span>
-            <span class="dv__reprocann-badge" :class="reprocannClass(p)">{{ reprocannLabel(p) }}</span>
+            <span v-if="!p.es_paciente" class="dv__badge--inactivo">Dado de baja</span>
+            <span v-else class="dv__reprocann-badge" :class="reprocannClass(p)">{{ reprocannLabel(p) }}</span>
           </div>
         </li>
       </ul>
@@ -52,16 +53,13 @@
             <span class="dv__paciente-bar-name">{{ selectedPaciente.nombre }} {{ selectedPaciente.apellido }}</span>
             <span class="dv__reprocann-badge" :class="reprocannClass(selectedPaciente)">{{ reprocannLabel(selectedPaciente) }}</span>
           </div>
-          <div v-if="pacienteDetalle" class="dv__cc-chips">
-            <span v-if="tieneCc" class="dv__cc-chip" :class="{ 'dv__cc-chip--warn': ccInsuficiente }">
-              CC: {{ formatARS(ccMargen) }}
-            </span>
-            <span v-if="tieneCcG" class="dv__cc-chip" :class="{ 'dv__cc-chip--warn': gInsuficiente }">
-              Gramos: {{ formatG(pacienteDetalle.saldo_cc_g) }}
-            </span>
-            <span v-if="!tieneCc && !tieneCcG" class="dv__cc-chip dv__cc-chip--neutral">
-              Solo efectivo
-            </span>
+          <div v-if="pacienteDetalle" class="dv__ultima-dispensa">
+            <template v-if="pacienteDetalle.ultima_dispensacion">
+              Última dispensa:
+              <strong>{{ pacienteDetalle.ultima_dispensacion.cantidad }}g de {{ formaLabel(pacienteDetalle.ultima_dispensacion.forma_producto) }}</strong>
+              — {{ formatFecha(pacienteDetalle.ultima_dispensacion.fecha) }}
+            </template>
+            <template v-else>Sin dispensaciones previas</template>
           </div>
           <div v-else-if="loadingDetalle" class="dv__limite-loading">Cargando…</div>
         </div>
@@ -82,8 +80,16 @@
             <div v-for="s in stocksDisponibles" :key="s.id" class="dv__stock-card">
               <div class="dv__stock-header">{{ formaLabel(s.forma_producto) }}</div>
               <div class="dv__stock-lote">{{ s.lote?.codigo ?? '—' }}<span v-if="s.sede?.nombre" class="dv__stock-sede"> · {{ s.sede.nombre }}</span></div>
+              <div v-if="s.genetica?.nombre ?? s.lote?.genetica?.nombre" class="dv__stock-cepa">{{ s.genetica?.nombre ?? s.lote?.genetica?.nombre }}</div>
               <div class="dv__stock-disponible">{{ s.cantidad }}{{ s.unidad }} disponibles</div>
-              <div class="dv__stock-precio">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad }}</div>
+              <div class="dv__stock-precio">
+                <template v-if="descuentoPaciente > 0 && s.precio_sugerido_ars">
+                  <span class="dv__precio-original">{{ formatARS(s.precio_sugerido_ars) }}</span>
+                  {{ formatARS(precioConDescuento(s.precio_sugerido_ars)) }}/{{ s.unidad }}
+                  <span class="dv__descuento-badge">-{{ descuentoPaciente }}%</span>
+                </template>
+                <template v-else>{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad }}</template>
+              </div>
               <div class="dv__stock-add">
                 <input
                   v-model.number="cantidades[s.id]"
@@ -148,8 +154,13 @@
                 <span class="dv__reprocann-badge" :class="reprocannClass(selectedPaciente)">{{ reprocannLabel(selectedPaciente) }}</span>
               </div>
 
+              <!-- Bloqueo: paciente dado de baja -->
+              <div v-if="!pacienteActivo" class="dv__modal-aviso dv__modal-aviso--error">
+                <strong>Socio dado de baja.</strong> No se puede realizar una dispensación. Reactivá el socio desde la sección Socios antes de continuar.
+              </div>
+
               <!-- Aviso REPROCANN -->
-              <div v-if="!reprocannVigente" class="dv__modal-aviso dv__modal-aviso--warn">
+              <div v-if="reprocannVigente === false && pacienteActivo" class="dv__modal-aviso dv__modal-aviso--warn">
                 <strong>Atención:</strong> el paciente {{ reprocannStatus(selectedPaciente) === 'vencido' ? 'tiene el REPROCANN vencido' : 'no tiene REPROCANN registrado' }}. Verificar habilitación antes de continuar.
               </div>
 
@@ -164,54 +175,29 @@
               <!-- Medio de pago -->
               <div class="dv__modal-field">
                 <label class="dv__label">Medio de pago</label>
-                <select v-model="medioPago" class="dv__select">
-                  <option value="efectivo">Efectivo</option>
-                  <option value="cuenta_corriente" :disabled="!tieneCc">
-                    Cuenta corriente{{ tieneCc ? ` — ${formatARS(ccMargen)} disponibles` : ' (sin crédito configurado)' }}
-                  </option>
-                  <option value="credito_gramos" :disabled="!tieneCcG">
-                    Crédito en gramos{{ tieneCcG ? ` — ${formatG(pacienteDetalle?.saldo_cc_g)} disponibles` : ' (no activado)' }}
-                  </option>
-                </select>
+                <div class="dv__medio-pago">
+                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'efectivo' }" @click="medioPago = 'efectivo'">
+                    Efectivo
+                  </button>
+                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'transferencia' }" @click="medioPago = 'transferencia'">
+                    Transferencia
+                  </button>
+                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'cuenta_corriente' }" :disabled="!tieneCc" :title="!tieneCc ? 'El paciente no tiene cuenta corriente configurada' : ''" @click="medioPago = 'cuenta_corriente'">
+                    Cta. corriente
+                  </button>
+                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'no_abona' }" :disabled="!tieneCc" :title="!tieneCc ? 'El paciente no tiene crédito configurado' : ''" @click="medioPago = 'no_abona'">
+                    No abona
+                  </button>
+                </div>
               </div>
 
-              <!-- Panel CC -->
-              <div v-if="medioPago === 'cuenta_corriente' && tieneCc"
-                   class="dv__cc-panel"
-                   :class="ccInsuficiente ? 'dv__cc-panel--error' : 'dv__cc-panel--ok'">
-                <div class="dv__cc-panel-row">
-                  <span>Disponible</span>
-                  <strong>{{ formatARS(ccMargen) }}</strong>
-                </div>
-                <div class="dv__cc-panel-row">
-                  <span>Esta dispensación</span>
-                  <strong>{{ formatARS(cartTotal) }}</strong>
-                </div>
-                <div class="dv__cc-panel-row dv__cc-panel-row--result">
-                  <span>Saldo restante</span>
-                  <strong :class="ccInsuficiente ? 'dv__cc-negativo' : ''">{{ formatARS(ccMargen - cartTotal) }}</strong>
-                </div>
-                <div v-if="ccInsuficiente" class="dv__cc-alerta">Crédito insuficiente para esta dispensación</div>
+              <!-- Saldo según medio de pago -->
+              <div v-if="medioPago === 'cuenta_corriente' && ccBalance !== null" class="dv__balance-info" :class="{ 'dv__balance-info--alerta': ccExcedido }">
+                <span>Saldo disponible:</span>
+                <strong>{{ formatARS(ccBalance) }}</strong>
+                <span v-if="ccExcedido" class="dv__balance-error">— saldo insuficiente</span>
               </div>
 
-              <!-- Panel Gramos -->
-              <div v-if="medioPago === 'credito_gramos' && tieneCcG"
-                   class="dv__cc-panel"
-                   :class="gInsuficiente ? 'dv__cc-panel--error' : 'dv__cc-panel--ok'">
-                <div class="dv__cc-panel-row">
-                  <span>Gramos disponibles</span>
-                  <strong>{{ formatG(pacienteDetalle?.saldo_cc_g) }}</strong>
-                </div>
-                <div class="dv__cc-panel-row">
-                  <span>Esta dispensación</span>
-                  <strong>{{ formatG(cartGramos) }}</strong>
-                </div>
-                <div class="dv__cc-panel-row dv__cc-panel-row--result">
-                  <span>Saldo restante</span>
-                  <strong :class="gInsuficiente ? 'dv__cc-negativo' : ''">{{ formatG((pacienteDetalle?.saldo_cc_g ?? 0) - cartGramos) }}</strong>
-                </div>
-                <div v-if="gInsuficiente" class="dv__cc-alerta">Gramos insuficientes para esta dispensación</div>
-              </div>
 
               <!-- Envío a domicilio -->
               <div class="dv__modal-field">
@@ -219,6 +205,16 @@
                   <input type="checkbox" v-model="conEnvio" class="dv__checkbox" />
                   Envío a domicilio
                 </label>
+              </div>
+
+              <div v-if="sinEntregadores" class="dv__aviso-delivery">
+                <AlertTriangle :size="15" :stroke-width="2" class="dv__aviso-delivery-ico" />
+                <div>
+                  <strong>Sin repartidores configurados.</strong>
+                  El paquete quedará pendiente de asignación. Podés crear un repartidor
+                  desde <strong>Configuración → Equipo</strong> y asignarlo después en
+                  <strong>Operaciones → Despachos</strong>.
+                </div>
               </div>
 
               <template v-if="conEnvio">
@@ -253,8 +249,8 @@
               <button class="dv__modal-cancel" @click="confirmOpen = false" :disabled="submitting">
                 Cancelar
               </button>
-              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || ccInsuficiente || gInsuficiente">
-                <div v-if="submitting" class="dv__spinner" />
+              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || pagoExcedido || !pacienteActivo">
+                <DsSpinner v-if="submitting" :size="16" />
                 <template v-else>Confirmar</template>
               </button>
             </div>
@@ -266,10 +262,16 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { listPacientes, getPaciente, listStocks, createDispensacion } from '../lib/api.js'
+import { ref, computed, watch, onMounted } from 'vue'
+import { listPacientes, getPaciente, listStocks, listEntregadores } from '../lib/api.js'
+import { dispensarOffline, cacheStock, getCachedStock, cacheSocios, getCachedSocios } from '../lib/offlineApi.js'
+import { useNetwork } from '../composables/useNetwork.js'
+import { formaLabel, formatARS, formatG, formatFecha } from '../lib/formatters.js'
 import { useToast } from '../composables/useToast.js'
-import { Search, Users, Plus, X } from 'lucide-vue-next'
+import { Search, Users, Plus, X, AlertTriangle } from 'lucide-vue-next'
+import DsSpinner from '../design-system/components/Spinner.vue'
+
+const { isOnline } = useNetwork()
 
 const toast = useToast()
 
@@ -292,23 +294,55 @@ const direccionEnvio = ref('')
 const contactoNombre = ref('')
 const contactoTel    = ref('')
 const observaciones  = ref('')
-const submitting  = ref(false)
+const submitting      = ref(false)
+const entregadores    = ref([])
+
+const sinEntregadores = computed(() => conEnvio.value && entregadores.value.length === 0)
+
+onMounted(async () => {
+  try {
+    const [entRes, pacRes] = await Promise.all([
+      listEntregadores(),
+      listPacientes({ limite: 50 }),
+    ])
+    entregadores.value = entRes.data.data ?? []
+    pacientes.value    = pacRes.data.data ?? []
+    cacheSocios(pacientes.value)
+  } catch {}
+})
 
 let searchTimeout = null
 
 watch(query, (val) => {
   clearTimeout(searchTimeout)
-  if (!val.trim()) { pacientes.value = []; return }
+  if (!val.trim()) {
+    // sin query → volver a mostrar lista inicial
+    searchTimeout = setTimeout(() => buscarPacientes(''), 150)
+    return
+  }
   searchTimeout = setTimeout(() => buscarPacientes(val.trim()), 300)
 })
 
 async function buscarPacientes(q) {
   loadingPacientes.value = true
   try {
-    const { data } = await listPacientes({ query: q, limite: 20 })
+    const params = q ? { query: q, limite: 20 } : { limite: 50 }
+    const { data } = await listPacientes(params)
     pacientes.value = data.data ?? []
+    cacheSocios(pacientes.value)
   } catch {
-    pacientes.value = []
+    // Offline: usar caché
+    const cached = getCachedSocios()
+    if (cached) {
+      const qLow = q.toLowerCase()
+      pacientes.value = cached.filter(p =>
+        p.nombre?.toLowerCase().includes(qLow) ||
+        p.apellido?.toLowerCase().includes(qLow) ||
+        p.dni?.includes(q)
+      )
+    } else {
+      pacientes.value = []
+    }
   } finally {
     loadingPacientes.value = false
   }
@@ -329,43 +363,72 @@ async function selectPaciente(p) {
       listStocks(),
     ])
     pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
-    stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
+    const stockData = stockRes.data.stocks ?? stockRes.data ?? []
+    stocks.value = stockData
+    cacheStock(stockData)
   } catch {
-    stocks.value = []
+    // Offline: servir desde caché
+    const cached = getCachedStock()
+    stocks.value = cached ?? []
+    if (cached) toast.warning('Sin conexión — mostrando stock guardado localmente')
   } finally {
     loadingDetalle.value = false
     loadingStocks.value  = false
   }
 }
 
-const stocksDisponibles = computed(() => stocks.value.filter(s => s.cantidad > 0))
+const stocksDisponibles = computed(() =>
+  stocks.value.filter(s => s.cantidad > 0 && s.estado !== 'pendiente_asignacion')
+)
 
 const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.total, 0))
 
-const cartGramos = computed(() =>
-  cart.value.filter(i => i.stock.unidad === 'g').reduce((s, i) => s + i.cantidad, 0)
-)
+const tieneCc       = computed(() => (pacienteDetalle.value?.limite_cc ?? 0) > 0)
 
-const tieneCc  = computed(() => (pacienteDetalle.value?.limite_cc ?? 0) > 0)
-const tieneCcG = computed(() => pacienteDetalle.value?.cc_gramos_activo && (pacienteDetalle.value?.limite_cc_g ?? 0) > 0)
-const ccMargen = computed(() => (pacienteDetalle.value?.saldo_cc ?? 0) + (pacienteDetalle.value?.limite_cc ?? 0))
+const ccBalance      = computed(() => pacienteDetalle.value?.saldo_cc  ?? null)
+const ccExcedido     = computed(() =>
+  medioPago.value === 'cuenta_corriente' && ccBalance.value !== null && cartTotal.value > ccBalance.value
+)
+const pagoExcedido   = computed(() => ccExcedido.value)
 
-const ccInsuficiente = computed(() =>
-  medioPago.value === 'cuenta_corriente' && cartTotal.value > ccMargen.value
-)
-const gInsuficiente = computed(() =>
-  medioPago.value === 'credito_gramos' && cartGramos.value > (pacienteDetalle.value?.saldo_cc_g ?? 0)
-)
+const cartTotalG = computed(() => cart.value.filter(i => i.stock.unidad === 'g').reduce((s, i) => s + i.cantidad, 0))
+
+// Estado del paciente
+const pacienteActivo  = computed(() => pacienteDetalle.value?.es_paciente !== false)
 
 // REPROCANN
 const reprocannVigente = computed(() => reprocannStatus(selectedPaciente.value) === 'vigente')
 
+const descuentoPaciente = computed(() => {
+  const d = pacienteDetalle.value?.descuento_porcentaje
+  return d != null && d > 0 ? Number(d) : 0
+})
+
+function precioConDescuento(precioBase) {
+  if (!descuentoPaciente.value) return precioBase
+  return precioBase * (1 - descuentoPaciente.value / 100)
+}
+
 function addToCart(s) {
   const qty = cantidades.value[s.id]
   if (!qty || qty <= 0) { toast.warning('Ingresá una cantidad'); return }
-  if (qty > s.cantidad) { toast.warning(`Máximo disponible: ${s.cantidad}${s.unidad}`); return }
-  const precio = s.precio_sugerido_ars ?? 0
-  cart.value.push({ stock: s, cantidad: qty, total: qty * precio })
+
+  const existente   = cart.value.find(i => i.stock.id === s.id)
+  const yaEnCarrito = existente?.cantidad ?? 0
+
+  if (qty + yaEnCarrito > s.cantidad) {
+    const disponible = s.cantidad - yaEnCarrito
+    toast.warning(`Stock insuficiente: ${disponible}${s.unidad} disponibles`)
+    return
+  }
+
+  const precio = precioConDescuento(s.precio_sugerido_ars ?? 0)
+  if (existente) {
+    existente.cantidad += qty
+    existente.total = existente.cantidad * precio
+  } else {
+    cart.value.push({ stock: s, cantidad: qty, total: qty * precio })
+  }
   cantidades.value[s.id] = null
 }
 
@@ -373,19 +436,31 @@ function removeFromCart(i) {
   cart.value.splice(i, 1)
 }
 
+function resetModal() {
+  medioPago.value      = 'efectivo'
+  conEnvio.value       = false
+  direccionEnvio.value = ''
+  contactoNombre.value = ''
+  contactoTel.value    = ''
+  observaciones.value  = ''
+}
+
 async function submitDispensacion() {
   if (!selectedPaciente.value || !cart.value.length) return
-  if (ccInsuficiente.value) { toast.error(`Crédito insuficiente (disponible: ${formatARS(ccMargen.value)})`); return }
-  if (gInsuficiente.value)  { toast.error(`Gramos insuficientes (disponible: ${formatG(pacienteDetalle.value?.saldo_cc_g ?? 0)})`); return }
+  if (conEnvio.value) {
+    if (!direccionEnvio.value.trim()) { toast.warning('Ingresá la dirección de entrega'); return }
+    if (!contactoNombre.value.trim()) { toast.warning('Ingresá el nombre de contacto'); return }
+  }
   submitting.value = true
-  try {
-    const today = new Date().toISOString().slice(0, 10)
-    // Procesar secuencialmente para evitar race condition en stock compartido
-    for (const item of cart.value) {
-      await createDispensacion(selectedPaciente.value.id, {
+
+  const today  = new Date().toISOString().slice(0, 10)
+  const items  = [...cart.value]
+  const results = await Promise.allSettled(
+    items.map(item =>
+      dispensarOffline(selectedPaciente.value.id, {
         stock_id:            item.stock.id,
         cantidad:            item.cantidad,
-        precio_unitario_ars: item.stock.precio_sugerido_ars,
+        precio_unitario_ars: precioConDescuento(item.stock.precio_sugerido_ars ?? 0),
         aporte_socio_ars:    item.total,
         fecha_dispensacion:  today,
         medio_pago:          medioPago.value,
@@ -397,24 +472,55 @@ async function submitDispensacion() {
         } : {}),
         ...(observaciones.value.trim() ? { observaciones: observaciones.value.trim() } : {}),
       })
+        .then(res => ({ ok: true, item, _queued: res?.queued === true }))
+        .catch(e => ({
+          ok:  false,
+          item,
+          msg: e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar',
+        }))
+    )
+  )
+
+  submitting.value = false
+
+  const ok     = results.map(r => r.value).filter(v => v.ok).map(v => v.item)
+  const errors = results.map(r => r.value).filter(v => !v.ok)
+
+  if (ok.length > 0) {
+    cart.value = cart.value.filter(i => !ok.includes(i))
+    Promise.all([getPaciente(selectedPaciente.value.id), listStocks()])
+      .then(([detRes, stockRes]) => {
+        pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
+        stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
+      }).catch(() => {})
+  }
+
+  // Detectar items que fueron encolados (offline)
+  const queued   = ok.filter(i => i._queued)
+  const enviados = ok.filter(i => !i._queued)
+
+  // Actualizar stock local inmediatamente para los items encolados
+  if (queued.length) {
+    queued.forEach(({ item }) => {
+      const s = stocks.value.find(x => x.id === item.stock.id)
+      if (s) s.cantidad = Math.max(0, (s.cantidad || 0) - item.cantidad)
+    })
+  }
+
+  if (errors.length === 0) {
+    if (queued.length > 0 && enviados.length === 0) {
+      toast.warning(`Dispensación guardada localmente. Se enviará cuando haya conexión.`)
+    } else if (queued.length > 0) {
+      toast.warning(`${enviados.length} enviados, ${queued.length} guardados offline — se sincronizarán al reconectarse.`)
+    } else {
+      toast.success(`Dispensación registrada para ${selectedPaciente.value.nombre}`)
     }
-    toast.success(`Dispensación registrada para ${selectedPaciente.value.nombre}`)
-    cart.value        = []
     confirmOpen.value = false
-    conEnvio.value    = false
-    direccionEnvio.value = ''
-    contactoNombre.value = ''
-    contactoTel.value    = ''
-    observaciones.value  = ''
-    // Refrescar detalle del paciente para actualizar la barra de crédito
-    getPaciente(selectedPaciente.value.id)
-      .then(r => { pacienteDetalle.value = r.data?.data ?? r.data ?? null })
-      .catch(() => {})
-  } catch (e) {
-    const msg = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar'
-    toast.error(msg)
-  } finally {
-    submitting.value = false
+    resetModal()
+  } else if (ok.length === 0) {
+    toast.error(errors[0].msg)
+  } else {
+    toast.warning(`${ok.length} de ${items.length} ítems registrados. ${errors[0].msg}`)
   }
 }
 
@@ -435,18 +541,6 @@ function reprocannLabel(p) {
   return 'Sin REPROCANN'
 }
 
-function formaLabel(f) {
-  const LABELS = { flor_seca: 'Flor seca', aceite: 'Aceite', tintura: 'Tintura', crema: 'Crema', capsulas: 'Cápsulas', otro: 'Otro' }
-  return LABELS[f] || f || '—'
-}
-function formatARS(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
-}
-function formatG(g) {
-  if (g == null) return '—'
-  return `${Number(g).toLocaleString('es-AR', { maximumFractionDigits: 1 })} g`
-}
 </script>
 
 <style scoped>
@@ -540,6 +634,11 @@ function formatG(g) {
 .dv__reprocann-badge--green { background: #d1fae5; color: #065f46; }
 .dv__reprocann-badge--amber { background: var(--c-amber-100); color: var(--c-amber-500); }
 .dv__reprocann-badge--gray  { background: var(--c-ink-100); color: var(--c-ink-500); }
+.dv__badge--inactivo {
+  font-size: 10px; font-weight: 700; padding: 1px 6px;
+  border-radius: var(--r-pill); text-transform: uppercase; letter-spacing: .03em;
+  background: #fef2f2; color: #b91c1c;
+}
 
 /* Patient info bar */
 .dv__paciente-bar {
@@ -562,31 +661,39 @@ function formatG(g) {
   font-weight: 700;
   color: var(--c-ink-900);
 }
-/* CC chips (patient bar) */
-.dv__cc-chips { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
-.dv__cc-chip {
-  font-size: var(--fs-12); font-weight: 600;
-  padding: .2rem .6rem;
-  border-radius: var(--r-pill);
-  background: #e0f2fe; color: #0369a1;
-}
-.dv__cc-chip--warn    { background: #fee2e2; color: #b91c1c; }
-.dv__cc-chip--neutral { background: var(--c-ink-100); color: var(--c-ink-500); }
-
-/* CC / gramos panel (modal) */
-.dv__cc-panel {
-  border-radius: var(--r-md);
-  padding: var(--sp-3) var(--sp-4);
-  display: flex; flex-direction: column; gap: var(--sp-2);
+/* Última dispensación (patient bar) */
+.dv__ultima-dispensa {
   font-size: var(--fs-13);
+  color: var(--c-ink-500);
+  line-height: 1.4;
 }
-.dv__cc-panel--ok    { background: #f0fdf4; border: 1px solid #bbf7d0; }
-.dv__cc-panel--error { background: #fef2f2; border: 1px solid #fecaca; }
-.dv__cc-panel-row { display: flex; justify-content: space-between; color: var(--c-ink-700); }
-.dv__cc-panel-row--result { border-top: 1px dashed currentColor; padding-top: var(--sp-2); font-weight: 700; }
-.dv__cc-negativo { color: #b91c1c; }
-.dv__cc-alerta { font-size: var(--fs-12); font-weight: 600; color: #b91c1c; }
+.dv__ultima-dispensa strong { color: var(--c-ink-800); }
 .dv__limite-loading { font-size: var(--fs-12); color: var(--c-ink-400); }
+
+/* Medio de pago buttons */
+.dv__medio-pago { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.dv__mp-btn {
+  flex: 1;
+  min-width: 90px;
+  padding: .55rem .875rem;
+  border: 1.5px solid var(--c-ink-300);
+  border-radius: var(--r-md);
+  background: #fff;
+  font-size: var(--fs-14);
+  font-weight: 500;
+  color: var(--c-ink-700);
+  cursor: pointer;
+  transition: all .15s;
+  text-align: center;
+}
+.dv__mp-btn:hover:not(:disabled) { border-color: var(--c-role-dispensador); color: var(--c-role-dispensador); }
+.dv__mp-btn--active {
+  background: var(--c-role-dispensador);
+  border-color: var(--c-role-dispensador);
+  color: #fff;
+  font-weight: 700;
+}
+.dv__mp-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* Placeholder */
 .dv__placeholder {
@@ -620,7 +727,9 @@ function formatG(g) {
 .dv__stock-header { font-weight: 700; font-size: var(--fs-14); color: var(--c-ink-900); }
 .dv__stock-lote   { font-family: var(--font-mono); font-size: var(--fs-12); color: var(--c-ink-500); }
 .dv__stock-disponible { font-size: var(--fs-13); color: var(--c-leaf-600); }
-.dv__stock-precio     { font-size: var(--fs-13); color: var(--c-role-dispensador); font-weight: 600; }
+.dv__stock-precio     { font-size: var(--fs-13); color: var(--c-role-dispensador); font-weight: 600; display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.dv__precio-original  { text-decoration: line-through; color: #94a3b8; font-weight: 400; }
+.dv__descuento-badge  { font-size: .65rem; font-weight: 800; background: #dcfce7; color: #15803d; padding: .1em .45em; border-radius: 5px; }
 .dv__stock-add { display: flex; gap: var(--sp-2); align-items: center; margin-top: var(--sp-1); }
 .dv__qty-input {
   width: 70px;
@@ -732,6 +841,57 @@ function formatG(g) {
   border-top: 1px solid var(--c-ink-100);
   padding-top: var(--sp-3);
 }
+
+/* Límite mensual */
+.dv__limite-mensual {
+  background: var(--c-ink-50);
+  border: 1px solid var(--c-ink-200);
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.dv__limite-mensual--alerta {
+  background: #fff5f5;
+  border-color: #fca5a5;
+}
+.dv__limite-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dv__limite-label {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--c-ink-500);
+}
+.dv__limite-nums {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--c-ink-700);
+  font-family: var(--font-mono);
+}
+.dv__limite-bar-track {
+  height: 6px;
+  background: var(--c-ink-200);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.dv__limite-bar-fill {
+  height: 100%;
+  background: #16a34a;
+  border-radius: 99px;
+  transition: width .3s ease;
+}
+.dv__limite-mensual--alerta .dv__limite-bar-fill { background: #dc2626; }
+.dv__limite-error {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #dc2626;
+}
 .dv__modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .dv__modal-field { display: flex; flex-direction: column; gap: var(--sp-1); }
 .dv__label { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700); }
@@ -794,16 +954,6 @@ function formatG(g) {
 .dv__modal-submit:hover:not(:disabled) { opacity: .88; }
 .dv__modal-submit:disabled { opacity: .6; cursor: not-allowed; }
 
-/* Spinner */
-.dv__spinner {
-  width: 16px; height: 16px;
-  border: 2px solid rgba(255,255,255,.4);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
 /* Skeletons */
 .dv__skel-list { display: flex; flex-direction: column; gap: var(--sp-2); }
 .dv__skel { height: 52px; background: var(--c-ink-100); border-radius: var(--r-md); animation: pulse 1.4s ease-in-out infinite; }
@@ -815,6 +965,19 @@ function formatG(g) {
 
 /* Sede label en stock card */
 .dv__stock-sede { color: var(--c-ink-400); font-size: var(--fs-11); }
+.dv__stock-cepa { font-size: var(--fs-12); color: var(--c-ink-600); font-style: italic; }
+
+/* CC / gramos balance info */
+.dv__balance-info {
+  display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-ink-50);
+  border: 1px solid var(--c-ink-200);
+  border-radius: var(--r-md);
+  font-size: var(--fs-13); color: var(--c-ink-700);
+}
+.dv__balance-info--alerta { background: #fff5f5; border-color: #fca5a5; color: #991b1b; }
+.dv__balance-error { font-weight: 700; color: #dc2626; }
 
 /* Avisos en modal */
 .dv__modal-aviso {
@@ -825,6 +988,20 @@ function formatG(g) {
 }
 .dv__modal-aviso--warn  { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
 .dv__modal-aviso--error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+
+.dv__aviso-delivery {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-13);
+  line-height: 1.5;
+}
+.dv__aviso-delivery-ico { flex-shrink: 0; margin-top: 1px; }
 
 /* Modal transition */
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity .2s; }

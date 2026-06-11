@@ -2,11 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listSedes, createSede, updateSede, deleteSede,
-  getSedeStocks } from '../lib/api.js'
+  getSedeStocks, listStocks } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import { usePermissions } from '../composables/usePermissions.js'
 import { usePlan } from '../composables/usePlan.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const router   = useRouter()
 const auth     = useAuthStore()
@@ -28,6 +29,26 @@ const editingId      = ref(null)
 const sedeActiva     = ref(null)
 const inventarioData = ref([])
 const loadingInv     = ref(false)
+
+// Stock por sede (para mostrar en las cards)
+const stocksPorSede  = ref({}) // { sede_id: { totalG, productos } }
+
+async function cargarResumenStocks() {
+  try {
+    const { data } = await listStocks()
+    const agrupado = {}
+    for (const s of (data || [])) {
+      const sid = s.sede_id
+      if (!sid) continue
+      if (!agrupado[sid]) agrupado[sid] = { totalG: 0, productos: 0 }
+      agrupado[sid].totalG   += Number(s.cantidad || 0)
+      agrupado[sid].productos += 1
+    }
+    stocksPorSede.value = agrupado
+  } catch { /* no crítico */ }
+}
+
+function stockResumen(sedeId) { return stocksPorSede.value[sedeId] || null }
 
 const CICLO_META = {
   semilla:    { label: 'Semilla',    color: '#a16207', bg: 'rgba(161,98,7,.12)',    dot: '#ca8a04' },
@@ -74,6 +95,7 @@ onMounted(async () => {
     await fetchPlan()
     const { data } = await listSedes()
     sedes.value = data
+    cargarResumenStocks()
   } finally { loading.value = false }
 })
 
@@ -179,8 +201,7 @@ function tieneActividad(sede) {
 
       <!-- Loading -->
       <div v-if="loading" class="agri-loading">
-        <div class="agri-loading__ring"></div>
-        <span>Cargando datos operativos…</span>
+        <DsSpinner />
       </div>
 
       <!-- Empty -->
@@ -392,8 +413,7 @@ function tieneActividad(sede) {
 
       <!-- Loading -->
       <div v-if="loading" class="loading-state">
-        <div class="spinner"></div>
-        <span>Cargando sedes…</span>
+        <DsSpinner />
       </div>
 
       <!-- Empty -->
@@ -438,6 +458,19 @@ function tieneActividad(sede) {
                 <span class="sede-card__stat-value">{{ sede.salas_count || 0 }}</span>
                 <span class="sede-card__stat-label">salas</span>
               </div>
+              <template v-if="stockResumen(sede.id)">
+                <div class="sede-card__stat-sep"></div>
+                <div class="sede-card__stat sede-card__stat--stock">
+                  <span class="sede-card__stat-value" style="color:#15803d">
+                    {{ stockResumen(sede.id).totalG.toFixed(1) }}g
+                  </span>
+                  <span class="sede-card__stat-label">en stock</span>
+                </div>
+                <div class="sede-card__stat">
+                  <span class="sede-card__stat-value">{{ stockResumen(sede.id).productos }}</span>
+                  <span class="sede-card__stat-label">productos</span>
+                </div>
+              </template>
             </div>
             <div class="sede-card__actions" @click.stop>
               <button
@@ -521,7 +554,7 @@ function tieneActividad(sede) {
           <div class="modal-panel__footer">
             <button class="btn-ghost" :disabled="saving" @click="showModal=false">Cancelar</button>
             <button class="btn-primary-action" :disabled="saving" @click="handleSubmit">
-              <span v-if="saving" class="spinner spinner--sm"></span>
+              <DsSpinner v-if="saving" :size="14" />
               {{ editingId ? 'Guardar cambios' : 'Crear sede' }}
             </button>
           </div>
@@ -545,7 +578,7 @@ function tieneActividad(sede) {
             </div>
           </div>
           <div class="modal-panel__body">
-            <div v-if="loadingInv" class="loading-state"><div class="spinner"></div></div>
+            <div v-if="loadingInv" class="loading-state"><DsSpinner :size="40" /></div>
             <div v-else-if="!inventarioData.length" class="empty-state empty-state--sm">
               <div class="empty-state__icon">📦</div>
               <p class="empty-state__desc">Sin stock en esta sede</p>
@@ -679,18 +712,7 @@ function tieneActividad(sede) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: .75rem;
-  padding: 5rem;
-  color: #94a3b8;
-  font-size: .875rem;
-}
-.agri-loading__ring {
-  width: 24px;
-  height: 24px;
-  border: 2px solid #e2e8f0;
-  border-top-color: var(--brand-primary, #1b5e20);
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
+  min-height: calc(100vh - 56px);
 }
 
 /* Empty */
@@ -1071,16 +1093,13 @@ function tieneActividad(sede) {
 .kpi-card__value { font-size: 1.75rem; font-weight: 700; color: #0f172a; line-height: 1; letter-spacing: -.03em; }
 .kpi-card__label { font-size: .75rem; color: #94a3b8; margin-top: .2rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
 
-.loading-state { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 4rem; color: #94a3b8; font-size: .875rem; }
+.loading-state { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .empty-state { text-align: center; padding: 5rem 1rem; }
 .empty-state--sm { padding: 2rem 1rem; }
 .empty-state__icon { font-size: 3rem; margin-bottom: 1rem; }
 .empty-state__title { font-size: 1.25rem; font-weight: 600; color: #0f172a; margin-bottom: .5rem; }
 .empty-state__desc { color: #64748b; font-size: .875rem; margin-bottom: 1.5rem; }
 
-.spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; flex-shrink: 0; }
-.spinner--sm { width: 14px; height: 14px; }
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .sedes-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.25rem; }
 @media (max-width: 1024px) { .sedes-grid { grid-template-columns: repeat(2,1fr); } }
@@ -1101,6 +1120,7 @@ function tieneActividad(sede) {
 .sede-card__stat { display: flex; align-items: baseline; gap: .3rem; }
 .sede-card__stat-value { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
 .sede-card__stat-label { font-size: .72rem; color: #94a3b8; font-weight: 500; }
+.sede-card__stat-sep { width: 1px; background: #e2e8f0; align-self: stretch; margin: 0 .25rem; }
 .sede-card__actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: auto; }
 .sede-card__btn { display: inline-flex; align-items: center; gap: .35rem; padding: .45rem .8rem; border-radius: 7px; font-size: .78rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; text-decoration: none; white-space: nowrap; }
 .sede-card__btn--primary { background: var(--brand-primary, #1b5e20); color: #fff; margin-left: auto; }

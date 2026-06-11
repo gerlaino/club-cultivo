@@ -1,9 +1,10 @@
 class StocksController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_lectura_stock!,   only: [:index, :show]
-  before_action :require_auditor_lectura!, only: [:trazabilidad]
-  before_action :require_escritura_stock!, only: [:create, :update, :asignar]
-  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update]
+  before_action :require_lectura_stock!,        only: [:index, :show, :movimientos]
+  before_action :require_auditor_lectura!,      only: [:trazabilidad]
+  before_action :require_escritura_stock!,      only: [:create, :update, :asignar, :ajuste, :descartar]
+  before_action :require_admin_o_supervisor!,   only: [:show_by_qr]
+  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :movimientos]
 
   # GET /stocks?sede_id=&canal=regulatorio|social&incluir_pendientes=true
   # GET /sedes/:sede_id/stocks
@@ -47,6 +48,44 @@ class StocksController < ApplicationController
     render json: { data: serialize_stock(@stock) }
   end
 
+  # GET /stocks/qr/:codigo_qr — para admin/supervisor al escanear un QR
+  def show_by_qr
+    stock = Stock.joins(:club)
+                 .where(codigo_qr: params[:codigo_qr], club_id: current_user.club_id)
+                 .includes(:lote, :sede, lote: :genetica)
+                 .first
+
+    return render json: { error: 'Producto no encontrado' }, status: :not_found unless stock
+
+    en_delivery = stock.gramos_reservados
+
+    render json: {
+      id:                       stock.id,
+      numero_lote_producto:     stock.numero_lote_producto,
+      codigo_qr:                stock.codigo_qr,
+      forma_producto:           stock.forma_producto,
+      unidad:                   stock.unidad,
+      cantidad_total:           stock.cantidad.to_f,
+      cantidad_disponible_real: stock.cantidad_disponible_real,
+      en_delivery_g:            en_delivery,
+      fecha_elaboracion:       stock.fecha_elaboracion,
+      fecha_vencimiento_est:   stock.fecha_vencimiento_est,
+      estado:                  stock.estado,
+      lote: stock.lote ? {
+        codigo:   stock.lote.codigo,
+        genetica: stock.lote.genetica ? {
+          nombre:                stock.lote.genetica.nombre,
+          numero_registro_inase: stock.lote.genetica.numero_registro_inase,
+        } : nil,
+      } : nil,
+      club: {
+        nombre: current_user.club.name,
+        logo:   current_user.club.logo.attached? ? url_for(current_user.club.logo) : nil,
+      },
+      sede: stock.sede ? { nombre: stock.sede.nombre } : nil,
+    }
+  end
+
   # POST /stocks
   def create
     @stock = Stock.new(stock_params)
@@ -62,11 +101,93 @@ class StocksController < ApplicationController
 
   # PATCH /stocks/:id
   def update
+    cantidad_anterior = @stock.cantidad.to_f
     if @stock.update(stock_update_params)
+      nueva_cantidad = @stock.cantidad.to_f
+      if nueva_cantidad != cantidad_anterior
+        delta = nueva_cantidad - cantidad_anterior
+        @stock.stock_movimientos.create!(
+          tipo:    'ajuste',
+          gramos:  delta,
+          usuario: current_user,
+          notas:   "Edición manual: #{cantidad_anterior}g → #{nueva_cantidad}g",
+        )
+      end
       render json: serialize_stock(@stock.reload)
     else
       render json: { errors: @stock.errors.full_messages }, status: :unprocessable_entity
     end
+  end
+
+  # POST /stocks/:id/ajuste
+  # Body: { tipo: merma|reconteo|perdida, gramos: float, motivo: string }
+  def ajuste
+    tipo_ajuste = params[:tipo].presence
+    gramos      = params[:gramos].to_f
+    motivo      = params[:motivo].to_s.strip
+
+    return render json: { error: 'Tipo de ajuste inválido' }, status: :unprocessable_entity unless %w[merma reconteo perdida].include?(tipo_ajuste)
+    return render json: { error: 'Los gramos deben ser distinto de 0' }, status: :unprocessable_entity if gramos.zero?
+    return render json: { error: 'El motivo es obligatorio' }, status: :unprocessable_entity if motivo.blank?
+
+    nueva_cantidad = @stock.cantidad.to_f + gramos
+    return render json: { error: "La cantidad resultante sería negativa (#{nueva_cantidad.round(2)}g)" }, status: :unprocessable_entity if nueva_cantidad < 0
+
+    ActiveRecord::Base.transaction do
+      @stock.update!(cantidad: nueva_cantidad)
+      @stock.stock_movimientos.create!(
+        tipo:    'ajuste',
+        gramos:  gramos,
+        usuario: current_user,
+        notas:   "[#{tipo_ajuste.upcase}] #{motivo}",
+      )
+      @stock.update!(estado: 'agotado') if nueva_cantidad == 0
+    end
+    render json: serialize_stock(@stock.reload)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /stocks/:id/descartar
+  # Body: { motivo: string }
+  def descartar
+    motivo = params[:motivo].to_s.strip
+    return render json: { error: 'El motivo es obligatorio para descartar stock' }, status: :unprocessable_entity if motivo.blank?
+    return render json: { error: 'El stock ya está agotado' }, status: :unprocessable_entity if @stock.agotado?
+
+    gramos_descartados = @stock.cantidad.to_f
+    ActiveRecord::Base.transaction do
+      @stock.stock_movimientos.create!(
+        tipo:    'merma',
+        gramos:  -gramos_descartados,
+        usuario: current_user,
+        notas:   "[DESCARTE] #{motivo}",
+      )
+      @stock.update!(cantidad: 0, estado: 'agotado')
+    end
+    render json: serialize_stock(@stock.reload)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # GET /stocks/:id/movimientos
+  def movimientos
+    movs = @stock.stock_movimientos
+                 .includes(:usuario, :sede_origen, :sede_destino)
+                 .order(created_at: :desc)
+                 .limit(200)
+    render json: movs.map { |m|
+      {
+        id:              m.id,
+        tipo:            m.tipo,
+        gramos:          m.gramos.to_f,
+        notas:           m.notas,
+        usuario:         m.usuario ? { id: m.usuario.id, nombre: m.usuario.nombre_completo } : nil,
+        sede_origen:     m.sede_origen  ? { id: m.sede_origen.id,  nombre: m.sede_origen.nombre  } : nil,
+        sede_destino:    m.sede_destino ? { id: m.sede_destino.id, nombre: m.sede_destino.nombre } : nil,
+        created_at:      m.created_at,
+      }
+    }
   end
 
   # GET /stocks/:id/trazabilidad
@@ -75,6 +196,9 @@ class StocksController < ApplicationController
 
     # Lote origen
     lote = s.lote
+
+    # Genética — directo en stock o heredada del lote
+    genetica = s.genetica || lote&.genetica
 
     # Pesada origen
     pesada = s.pesada
@@ -90,22 +214,35 @@ class StocksController < ApplicationController
     # Dispensaciones
     dispensaciones = s.dispensaciones.includes(:paciente).order(created_at: :desc).limit(100).map do |d|
       {
-        id:                d.id,
-        fecha:             d.fecha_dispensacion,
-        cantidad_g:        d.cantidad&.to_f,
+        id:                 d.id,
+        fecha:              d.fecha_dispensacion,
+        cantidad_g:         d.cantidad&.to_f,
         paciente_iniciales: "#{d.paciente&.nombre&.[](0)}.#{d.paciente&.apellido&.[](0)}.",
         paciente_dni_last4: d.paciente&.dni_normalizado.to_s.last(4),
       }
     end
+
+    gramos_dispensados  = dispensaciones.sum { |d| d[:cantidad_g].to_f }.round(2)
+    cantidad_disponible = s.cantidad.to_f.round(2)
+    cantidad_inicial    = (cantidad_disponible + gramos_dispensados).round(2)
 
     render json: {
       stock: {
         id:                   s.id,
         numero_lote_producto: s.numero_lote_producto,
         forma_producto:       s.forma_producto,
-        cantidad_g:           s.cantidad&.to_f,
+        cantidad_inicial_g:   cantidad_inicial,
+        cantidad_disponible_g: cantidad_disponible,
         fecha_elaboracion:    s.fecha_elaboracion,
         codigo_qr:            s.codigo_qr,
+        genetica: genetica ? {
+          id:                    genetica.id,
+          nombre:                genetica.nombre,
+          numero_registro_inase: genetica.numero_registro_inase,
+          tipo:                  genetica.tipo,
+          thc:                   genetica.thc,
+          cbd:                   genetica.cbd,
+        } : nil,
       },
       lote: lote ? {
         id:      lote.id,
@@ -125,7 +262,8 @@ class StocksController < ApplicationController
       totales: {
         plantas_origen:       plantas.size,
         dispensaciones_count: dispensaciones.size,
-        gramos_dispensados:   dispensaciones.sum { |d| d[:cantidad_g].to_f }.round(2),
+        gramos_dispensados:   gramos_dispensados,
+        cantidad_disponible_g: cantidad_disponible,
       },
     }
   end
@@ -257,7 +395,11 @@ class StocksController < ApplicationController
       sede:  s.sede  ? { id: s.sede.id, nombre: s.sede.nombre } : nil,
       club:  s.club  ? { id: s.club.id, nombre: s.club.name,
                          logo_url: s.club.logo.attached? ? url_for(s.club.logo) : nil } : nil,
-      created_at:              s.created_at,
+      gramos_reservados:        s.gramos_reservados,
+      cantidad_disponible_real: s.cantidad_disponible_real,
+      dias_para_vencimiento:    s.dias_para_vencimiento,
+      estado_vencimiento:       s.estado_vencimiento,
+      created_at:               s.created_at,
     }
   end
 
@@ -275,5 +417,9 @@ class StocksController < ApplicationController
 
   def require_auditor_lectura!
     render json: { error: 'No autorizado' }, status: :forbidden unless ROLES_AUDITOR_LECTURA.include?(current_user&.role)
+  end
+
+  def require_admin_o_supervisor!
+    render json: { error: 'No autorizado' }, status: :forbidden unless %w[admin supervisor].include?(current_user&.role)
   end
 end

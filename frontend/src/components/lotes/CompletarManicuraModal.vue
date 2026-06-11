@@ -81,7 +81,7 @@
         <div class="cmm__footer">
           <button class="cmm__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
           <button class="cmm__btn-primary" :disabled="saving || !canSubmit" @click="confirmar">
-            <span v-if="saving" class="cmm__spinner" />
+            <DsSpinner v-if="saving" :size="14" />
             <CheckCheck v-else :size="14" :stroke-width="2" />
             Completar y finalizar
           </button>
@@ -96,6 +96,7 @@
 import { ref, computed, watch } from 'vue'
 import { CheckCheck, X } from 'lucide-vue-next'
 import { completarManicura, listSedes } from '../../lib/api.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -276,12 +277,4 @@ function cerrar() {
 .cmm__btn-primary:hover:not(:disabled) { opacity: .88; }
 .cmm__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 
-.cmm__spinner {
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.35);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: cmm-spin .6s linear infinite;
-}
-@keyframes cmm-spin { to { transform: rotate(360deg); } }
 </style>

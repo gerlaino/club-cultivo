@@ -11,6 +11,7 @@ class PlanTarea < ApplicationRecord
   validates :tipo,      inclusion: { in: TIPOS }
   validates :prioridad, inclusion: { in: PRIORIDADES }
   validate  :dias_semana_validos
+  validates :dia_relativo, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
 
   before_create :assign_recurrencia_id, if: :es_recurrente?
 

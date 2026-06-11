@@ -13,7 +13,9 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   def create
     club = Club.new(club_params)
     if club.save
-      usuarios = club.crear_usuarios_default!
+      roles    = Array(params[:roles_a_crear]).map(&:to_s).presence || Club::ROLES_DEFAULT
+      password = params[:password_inicial].presence || Club::PASSWORD_DEFAULT
+      usuarios = club.crear_usuarios_default!(roles: roles, password: password)
       club.crear_geneticas_default!
       render json: {
         club:     serialize_club_detail(club),
@@ -110,7 +112,8 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       :plan, :plan_activo_hasta, :plan_trial, :web_activa,
       :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
       :smtp_from, :smtp_from_name,
-      :ia_habilitada, :ia_tier, :ia_limite_hora
+      :ia_tier, :ia_limite_hora,
+      features: {}
     )
   end
 
@@ -142,14 +145,14 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       address:        c.address,
       timezone:       c.timezone,
       usuarios:       c.users.map { |u| { id: u.id, email: u.email, role: u.role, nombre: u.nombre_completo } },
-      web_activa:     c.web_activa,
+      web_activa:      c.web_activa,
       smtp_configured: c.smtp_configured?,
       smtp_host:       c.smtp_host,
       smtp_port:       c.smtp_port || 587,
       smtp_user:       c.smtp_user,
       smtp_from:       c.smtp_from,
       smtp_from_name:  c.smtp_from_name,
-      ia_habilitada:   c.ia_habilitada,
+      features:        c.features,
       ia_tier:         c.ia_tier,
       ia_limite_hora:  c.ia_limite_hora,
     )

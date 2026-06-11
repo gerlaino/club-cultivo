@@ -35,8 +35,7 @@
               <th class="cv__th cv__th--genetica">Genética</th>
               <th class="cv__th cv__th--sala">Sala</th>
               <th class="cv__th cv__th--plantas">Plantas</th>
-              <th class="cv__th cv__th--veg">Días veg.</th>
-              <th class="cv__th cv__th--flor">Días flor.</th>
+              <th class="cv__th cv__th--estado">Estado</th>
               <th class="cv__th cv__th--cosecha">Fecha cosechado</th>
               <th class="cv__th cv__th--arrow"></th>
             </tr>
@@ -46,7 +45,7 @@
               v-for="lote in paginados"
               :key="lote.id"
               class="cv__tr"
-              @click="$router.push({ name: 'lote-detail', params: { id: lote.id } })"
+              @click="$router.push({ name: 'cosechado-detalle', params: { id: lote.id } })"
             >
               <td class="cv__td cv__td--lote">
                 <div class="cv__lote-av">
@@ -63,13 +62,8 @@
               <td class="cv__td cv__td--plantas">
                 <span class="cv__pill-plantas">{{ lote.plants_count ?? '—' }}</span>
               </td>
-              <td class="cv__td cv__td--veg">
-                <span v-if="lote.dias_vegetacion != null" class="cv__dias">{{ lote.dias_vegetacion }}d</span>
-                <span v-else class="cv__dias cv__dias--none">—</span>
-              </td>
-              <td class="cv__td cv__td--flor">
-                <span v-if="lote.dias_floracion != null" class="cv__dias">{{ lote.dias_floracion }}d</span>
-                <span v-else class="cv__dias cv__dias--none">—</span>
+              <td class="cv__td cv__td--estado">
+                <span class="cv__estado-pill" :class="`cv__estado-pill--${lote.estado}`">{{ ESTADO_LABEL[lote.estado] || lote.estado }}</span>
               </td>
               <td class="cv__td cv__td--cosecha">
                 <span v-if="lote.fecha_cosechado" class="cv__fecha">{{ formatFecha(lote.fecha_cosechado) }}</span>
@@ -113,15 +107,26 @@ import { ref, computed, onMounted } from 'vue'
 import { listLotes } from '../lib/api.js'
 import { ChevronRight, ChevronLeft, Leaf } from 'lucide-vue-next'
 
-const PER_PAGE = 15
+const PER_PAGE = 10
 
 const loading = ref(true)
 const lotes   = ref([])
 const pagina  = ref(1)
 
+const POST_HARVEST = ['cosecha', 'secado', 'manicura_pendiente', 'en_manicura', 'curado', 'finalizado']
+const ESTADO_LABEL = {
+  floracion:         'Cosecha parcial',
+  cosecha:           'Cosecha',
+  secado:            'Secado',
+  manicura_pendiente:'Manicura pend.',
+  en_manicura:       'En manicura',
+  curado:            'Curado',
+  finalizado:        'Finalizado',
+}
+
 const lotesCosechados = computed(() =>
   lotes.value
-    .filter(l => l.estado === 'cosecha')
+    .filter(l => POST_HARVEST.includes(l.estado) || (l.estado === 'floracion' && (l.plantas_cosechadas_count ?? 0) > 0))
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 )
 
@@ -151,7 +156,7 @@ function formatFecha(d) {
 
 onMounted(async () => {
   try {
-    const { data } = await listLotes()
+    const { data } = await listLotes({ cosechados: true })
     lotes.value = data || []
   } finally {
     loading.value = false
@@ -192,8 +197,7 @@ onMounted(async () => {
 .cv__th { padding: .75rem 1rem; background: #f6faf6; font-weight: 600; color: #0f2611; text-align: left; border-bottom: 1px solid #e8f0e9; font-size: .78rem; white-space: nowrap; }
 .cv__th--arrow   { width: 32px; }
 .cv__th--plantas { width: 80px; text-align: center; }
-.cv__th--veg     { width: 80px; text-align: center; }
-.cv__th--flor    { width: 80px; text-align: center; }
+.cv__th--estado  { width: 120px; }
 .cv__th--cosecha { width: 120px; }
 
 .cv__tr { cursor: pointer; border-bottom: 1px solid #f0f4f0; transition: background .12s; }
@@ -213,8 +217,15 @@ onMounted(async () => {
 .cv__td--plantas { text-align: center; }
 .cv__pill-plantas { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 22px; background: #f0fdf4; border: 1px solid #c8e6c9; color: #1b5e20; font-size: .78rem; font-weight: 700; border-radius: 999px; padding: 0 .4rem; }
 .cv__td--veg, .cv__td--flor { text-align: center; }
-.cv__dias      { font-weight: 600; color: #0f2611; font-variant-numeric: tabular-nums; }
-.cv__dias--none { color: #c8e6c9; font-weight: 400; }
+.cv__td--estado { vertical-align: middle; }
+.cv__estado-pill { display: inline-flex; align-items: center; font-size: .72rem; font-weight: 600; padding: .2em .6em; border-radius: 999px; white-space: nowrap; }
+.cv__estado-pill--floracion         { background: #fef3c7; color: #92400e; border: 1px dashed #fcd34d; }
+.cv__estado-pill--cosecha           { background: #fef9c3; color: #854d0e; }
+.cv__estado-pill--secado            { background: #e0f2fe; color: #0369a1; }
+.cv__estado-pill--manicura_pendiente{ background: #fce7f3; color: #9d174d; }
+.cv__estado-pill--en_manicura       { background: #ede9fe; color: #5b21b6; }
+.cv__estado-pill--curado            { background: #dcfce7; color: #14532d; }
+.cv__estado-pill--finalizado        { background: #f1f5f9; color: #475569; }
 .cv__fecha     { color: #60725d; }
 .cv__fecha--none { color: #c8e6c9; }
 .cv__td--arrow { text-align: center; padding-right: .5rem; }
@@ -235,9 +246,8 @@ onMounted(async () => {
 
 /* Responsive */
 @media (max-width: 640px) {
-  .cv__th--sala,    .cv__td--sala,
-  .cv__th--veg,     .cv__td--veg,
-  .cv__th--flor,    .cv__td--flor,
-  .cv__th--cosecha, .cv__td--cosecha { display: none; }
+  .cv__th--sala,   .cv__td--sala,
+  .cv__th--estado, .cv__td--estado,
+  .cv__th--cosecha,.cv__td--cosecha { display: none; }
 }
 </style>

@@ -3,8 +3,8 @@
 
     <!-- Brand -->
     <div class="csb__brand">
-      <LeafSeal :size="24" class="csb__brand-leaf" />
-      <span class="csb__brand-name">cultivoespacial</span>
+      <img src="/logo-ce-icono.png" class="csb__brand-logo" alt="Cultivo Espacial" />
+      <span class="csb__brand-name">Cultivo Espacial</span>
     </div>
 
     <!-- Nav links -->
@@ -21,38 +21,21 @@
       </RouterLink>
     </nav>
 
-    <!-- User card -->
-    <div class="csb__user">
-      <DsAvatar :name="auth.displayName" tone="role-cultivador" size="sm" />
-      <div class="csb__user-info">
-        <div class="csb__user-name">{{ auth.displayName }}</div>
-        <div class="csb__user-role">Cultivador · {{ club.name }}</div>
-      </div>
-      <button class="csb__logout" @click="handleLogout" title="Cerrar sesión">
-        <LogOut :size="16" :stroke-width="1.75" />
-      </button>
-    </div>
-
   </aside>
 
 </template>
 
 <script setup>
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../../stores/auth.js'
-import { useClubStore } from '../../stores/club.js'
-import LeafSeal from '../../design-system/icons/LeafSeal.vue'
-import DsAvatar from '../../design-system/components/Avatar.vue'
-import { Home, LayoutGrid, PackageCheck, History, LogOut } from 'lucide-vue-next'
+import { useRoute } from 'vue-router'
+import { Home, LayoutGrid, PackageCheck, History, Layers, Leaf } from 'lucide-vue-next'
 
-const route  = useRoute()
-const router = useRouter()
-const auth   = useAuthStore()
-const club   = useClubStore()
+const route = useRoute()
 
 const NAV_LINKS = [
   { to: '/',                     icon: Home,         label: 'Inicio' },
   { to: '/salas',                icon: LayoutGrid,   label: 'Mis salas' },
+  { to: '/lotes',                icon: Layers,       label: 'Lotes' },
+  { to: '/plantas',              icon: Leaf,         label: 'Plantas' },
   { to: '/cosechado',            icon: PackageCheck, label: 'Cosechado' },
   { to: '/historial-cultivador', icon: History,      label: 'Historial' },
 ]
@@ -63,11 +46,7 @@ function isActive(to) {
   return route.path === to || route.path.startsWith(to + '/')
 }
 
-async function handleLogout() {
-  await auth.logOut()
-  club.$reset()
-  router.replace('/login')
-}
+
 </script>
 
 <style scoped>
@@ -92,7 +71,7 @@ async function handleLogout() {
   padding: var(--sp-5) var(--sp-5) var(--sp-4);
   border-bottom: 1px solid rgba(168, 201, 181, 0.15);
 }
-.csb__brand-leaf { color: var(--c-leaf-300); flex-shrink: 0; }
+.csb__brand-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .csb__brand-name {
   font-family: var(--font-display);
   font-size: var(--fs-16);
@@ -141,45 +120,6 @@ async function handleLogout() {
   border-left-color: var(--c-role-cultivador);
 }
 .csb__link-ico { flex-shrink: 0; display: flex; }
-
-/* User card */
-.csb__user {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-5);
-  border-top: 1px solid rgba(168, 201, 181, 0.15);
-  flex-shrink: 0;
-}
-.csb__user-info { flex: 1; min-width: 0; }
-.csb__user-name {
-  font-size: var(--fs-13);
-  font-weight: 600;
-  color: var(--c-paper);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.csb__user-role {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--c-leaf-300);
-  margin-top: 1px;
-}
-.csb__logout {
-  background: none;
-  border: none;
-  color: var(--c-leaf-300);
-  cursor: pointer;
-  padding: var(--sp-1);
-  border-radius: var(--r-sm);
-  transition: color var(--t-fast), background var(--t-fast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.csb__logout:hover { color: var(--c-paper); background: rgba(255, 255, 255, 0.08); }
 
 /* Hidden on mobile */
 @media (max-width: 1023px) { .csb { display: none; } }

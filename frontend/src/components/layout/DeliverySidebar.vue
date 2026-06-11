@@ -1,7 +1,7 @@
 <template>
   <aside class="dlv-sidebar">
     <div class="dlv-logo">
-      <Truck :size="22" :stroke-width="1.75" />
+      <img src="/logo-ce-icono.png" class="dlv-logo-img" alt="Cultivo Espacial" />
       <span>Delivery</span>
     </div>
 
@@ -43,6 +43,7 @@ const canSeeDespachos = computed(() => ['admin', 'supervisor'].includes(auth.use
   padding: var(--sp-3) var(--sp-5) var(--sp-5);
   color: rgba(255,255,255,.65); font-weight: 700; font-size: var(--fs-16);
 }
+.dlv-logo-img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .dlv-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 0 var(--sp-3); }
 .dlv-link {
   display: flex; align-items: center; gap: var(--sp-3);

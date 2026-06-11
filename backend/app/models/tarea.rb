@@ -8,8 +8,9 @@ class Tarea < ApplicationRecord
   belongs_to :plant, optional: true
   belongs_to :parent_tarea, class_name: 'Tarea', optional: true
   has_many   :tareas_hijas, class_name: 'Tarea', foreign_key: :parent_tarea_id, dependent: :nullify
-  belongs_to :origen_plan,  class_name: 'PlanTrabajo', optional: true
-  belongs_to :plan_tarea,   class_name: 'PlanTarea',   optional: true
+  belongs_to :origen_plan,    class_name: 'PlanTrabajo',   optional: true
+  belongs_to :plan_tarea,     class_name: 'PlanTarea',     optional: true
+  belongs_to :aplicacion_plan, class_name: 'AplicacionPlan', optional: true
 
   # ── Enums ──────────────────────────────────────────────────────
   TIPOS       = %w[riego poda medicion limpieza cosecha transplante inspeccion otro
@@ -40,6 +41,8 @@ class Tarea < ApplicationRecord
 
   # Al completar, registrar fecha
   before_save :set_fecha_completada, if: :completando?
+
+  after_create_commit :push_asignacion_nueva, if: -> { asignada_a.present? }
 
   # ── Scopes ────────────────────────────────────────────────────
   scope :del_club,         ->(club_id) { where(club_id: club_id) }
@@ -164,6 +167,15 @@ class Tarea < ApplicationRecord
   end
 
   private
+
+  def push_asignacion_nueva
+    PushNotificationService.notify_user_async(
+      asignada_a,
+      title: "Nueva tarea asignada",
+      body:  titulo,
+      url:   '/m/cultivador/tareas'
+    )
+  end
 
   def completando?
     estado_changed? && estado == 'completada' && fecha_completada.nil?

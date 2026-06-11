@@ -58,6 +58,15 @@ class ReprocannVencimientoJob < ApplicationJob
         )
         por_vencer[dias] ||= []
         por_vencer[dias] << paciente
+
+        # Aviso directo al socio en umbrales 15 y 7 días
+        if dias <= 15 && paciente.email.present? && club.smtp_configured?
+          NotificacionesMailer.aviso_reprocann_paciente(
+            paciente:       paciente,
+            dias_restantes: dias,
+            club:           club
+          ).deliver_later
+        end
       end
     end
 

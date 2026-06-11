@@ -1,7 +1,7 @@
 <template>
   <div>
     <div v-if="loading" class="text-center py-2">
-      <div class="spinner-border spinner-border-sm" style="color:#0f766e"></div>
+      <DsSpinner :size="18" />
     </div>
     <div v-else-if="sedesAsignadas.length === 0" class="text-muted small py-1">
       <i class="bi bi-building-dash me-1"></i>Sin sedes asignadas
@@ -43,7 +43,7 @@
         <div class="d-flex gap-2">
           <button class="btn btn-sm btn-success" @click="asignar" :disabled="!sedeSeleccionada || asignando"
                   style="background:#0f766e;border-color:#0f766e">
-            <span v-if="asignando" class="spinner-border spinner-border-sm me-1"></span>
+            <DsSpinner v-if="asignando" :size="14" />
             <i v-else class="bi bi-check-lg me-1"></i>Confirmar
           </button>
           <button class="btn btn-sm btn-outline-secondary" @click="cerrarForm">Cancelar</button>
@@ -59,6 +59,7 @@ import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { getUserSedesAsignadas, asignarSedeAUsuario, desasignarSedeAUsuario, listSedes } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const { confirm } = useConfirm()
 

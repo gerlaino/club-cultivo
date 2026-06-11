@@ -22,7 +22,7 @@
         <i class="bi bi-stop-fill"></i>
       </span>
       <span v-else-if="estado === 'procesando'" class="d-flex align-items-center gap-2">
-        <span class="spinner-border spinner-border-sm"></span>
+        <DsSpinner :size="14" />
         <span class="small">Procesando...</span>
       </span>
       <span v-else-if="estado === 'error'">
@@ -54,6 +54,7 @@
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
 import { logger } from '../utils/logger.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const props = defineProps({
   // Contexto que se le pasa a Claude para entender qué campos llenar

@@ -22,6 +22,11 @@ class Club < ApplicationRecord
   has_many :alertas_internas, class_name: 'AlertaInterna', dependent: :destroy
   has_many :ariccame_registros, class_name: 'AriccameRegistro', dependent: :destroy
   has_many :plan_trabajos,      dependent: :destroy
+  has_many :aplicacion_planes,  class_name: 'AplicacionPlan', dependent: :destroy
+  has_many :pesajes_manicura,   class_name: 'PesajeManicura', dependent: :destroy
+  has_many :webhooks,           dependent: :destroy
+  has_many :turnos,             dependent: :destroy
+  has_many :check_ins,          dependent: :destroy
 
   has_one_attached :logo
 
@@ -35,8 +40,9 @@ class Club < ApplicationRecord
   before_validation :generar_slug, on: :create
   after_create :crear_geneticas_default!
 
-  ROLES_DEFAULT    = %w[admin medico cultivador abogado].freeze
-  PASSWORD_DEFAULT = '123456Aa'.freeze
+  ROLES_DEFAULT    = %w[admin].freeze
+  ROLES_VALIDOS_CLUB = %w[admin medico cultivador supervisor abogado auditor dispensador manicura delivery].freeze
+  PASSWORD_DEFAULT = ENV.fetch('CLUB_DEFAULT_PASSWORD', '123456Aa').freeze
 
   GENETICAS_INASE = [
     {
@@ -105,18 +111,18 @@ class Club < ApplicationRecord
     },
   ].freeze
 
-  def crear_usuarios_default!
-    ROLES_DEFAULT.map do |rol|
-      email = "#{rol}@#{slug}.clubcultivo.app"
+  def crear_usuarios_default!(roles: ROLES_DEFAULT, password: PASSWORD_DEFAULT)
+    roles.select { |r| ROLES_VALIDOS_CLUB.include?(r) }.map do |rol|
+      email = "#{rol}@#{slug}.com"
       next if User.exists?(email: email)
       User.create!(
         club:       self,
         role:       rol,
         email:      email,
-        password:   PASSWORD_DEFAULT,
+        password:   password,
         first_name: rol.capitalize,
         last_name:  name,
-        )
+      )
     end.compact
   end
 
@@ -128,6 +134,23 @@ class Club < ApplicationRecord
   end
 
   def eliminado? = deleted_at.present?
+
+  AVAILABLE_FEATURES = %w[
+    ia_analisis
+    ia_voz
+    web_publica
+    mailer
+    iot
+    alertas
+    ariccame
+    cuenta_corriente
+    analytics
+    multi_sede
+  ].freeze
+
+  def feature?(key)
+    features[key.to_s] == true
+  end
 
   IA_TIERS = {
     'basico'     => { label: 'Básico',     limite_hora: 20,  color: '#64748b' },
@@ -156,6 +179,21 @@ class Club < ApplicationRecord
       authentication:       :plain,
       enable_starttls_auto: true,
     }
+  end
+
+  def twilio_configurado?
+    twilio_account_sid.present? && twilio_auth_token_enc.present? && twilio_whatsapp_from.present?
+  end
+
+  def twilio_auth_token
+    return nil unless twilio_auth_token_enc.present?
+    Rails.application.message_verifier(:twilio).verify(twilio_auth_token_enc)
+  rescue ActiveSupport::MessageVerifier::InvalidSignature
+    nil
+  end
+
+  def twilio_auth_token=(raw_token)
+    self.twilio_auth_token_enc = raw_token.present? ? Rails.application.message_verifier(:twilio).generate(raw_token) : nil
   end
 
   def soft_delete!

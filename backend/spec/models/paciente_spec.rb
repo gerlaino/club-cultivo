@@ -148,4 +148,103 @@ RSpec.describe Paciente, type: :model do
       expect(paciente.dispensado_mes_actual_g).to eq(25.0)
     end
   end
+
+  # ── porcentaje_limite_mensual ─────────────────────────────────────────────
+
+  describe '#porcentaje_limite_mensual' do
+    let(:sede)     { create(:sede, club: club, created_by: admin) }
+    let(:lote)     { create(:lote, club: club, sala: create(:sala, club: club, sede: sede, created_by: admin)) }
+    let!(:stock)   { Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 200) }
+    let(:paciente) { create_paciente(limite_dispensacion_mensual_g: 40) }
+
+    it 'devuelve 0.0 cuando no hay dispensaciones en el mes' do
+      expect(paciente.porcentaje_limite_mensual).to eq(0.0)
+    end
+
+    it 'calcula el porcentaje correcto cuando hay dispensaciones' do
+      Dispensacion.create!(paciente: paciente, user: admin, stock: stock,
+        cantidad: 20, fecha_dispensacion: Date.today, medio_pago: 'efectivo')
+      expect(paciente.porcentaje_limite_mensual).to eq(50.0)
+    end
+
+    it 'topa en 100 aunque se exceda el límite' do
+      Dispensacion.create!(paciente: paciente, user: admin, stock: stock,
+        cantidad: 40, fecha_dispensacion: Date.today, medio_pago: 'efectivo')
+      # simular 50g ignorando la validación
+      Dispensacion.where(paciente: paciente).last.update_column(:cantidad, 50)
+      expect(paciente.porcentaje_limite_mensual).to eq(100.0)
+    end
+
+    it 'devuelve nil si no hay límite configurado' do
+      p = create_paciente(limite_dispensacion_mensual_g: nil)
+      expect(p.porcentaje_limite_mensual).to be_nil
+    end
+
+    it 'devuelve nil si el límite es 0' do
+      p = create_paciente(limite_dispensacion_mensual_g: 0)
+      expect(p.porcentaje_limite_mensual).to be_nil
+    end
+  end
+
+  # ── saldo_cc / limite_cc ──────────────────────────────────────────────────
+
+  describe '#saldo_cc y #limite_cc' do
+    context 'paciente con CuentaCorriente' do
+      before do
+        CuentaCorriente.create!(
+          paciente: paciente, club: club,
+          saldo_disponible: 300, limite_credito: 500
+        )
+      end
+
+      let(:paciente) { create_paciente }
+
+      it '#saldo_cc devuelve el saldo disponible en ARS' do
+        expect(paciente.saldo_cc).to eq(300.0)
+      end
+
+      it '#limite_cc devuelve el límite de crédito en ARS' do
+        expect(paciente.limite_cc).to eq(500.0)
+      end
+    end
+
+    context 'paciente sin CuentaCorriente' do
+      let(:paciente) { create_paciente }
+
+      it '#saldo_cc devuelve nil' do
+        expect(paciente.saldo_cc).to be_nil
+      end
+
+      it '#limite_cc devuelve nil' do
+        expect(paciente.limite_cc).to be_nil
+      end
+    end
+  end
+
+  # ── acts_as_paranoid: soft delete ─────────────────────────────────────────
+
+  describe 'soft delete (acts_as_paranoid)' do
+    let(:paciente) { create_paciente }
+
+    it 'setea deleted_at al hacer destroy' do
+      paciente.destroy
+      expect(Paciente.with_deleted.find(paciente.id).deleted_at).not_to be_nil
+    end
+
+    it 'excluye al paciente del default scope tras destroy' do
+      paciente.destroy
+      expect(Paciente.where(id: paciente.id)).to be_empty
+    end
+
+    it 'puede recuperar el registro eliminado con with_deleted' do
+      paciente.destroy
+      expect(Paciente.with_deleted.where(id: paciente.id)).not_to be_empty
+    end
+
+    it 'restore! reactiva el paciente eliminado' do
+      paciente.destroy
+      paciente.restore!
+      expect(Paciente.where(id: paciente.id)).not_to be_empty
+    end
+  end
 end

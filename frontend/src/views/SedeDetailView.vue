@@ -3,11 +3,13 @@ import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
 import { getSede, listSalas, getSedeStocks, updateStock, deleteSede } from "../lib/api"
-import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
-import Breadcrumb from '../components/ui/Breadcrumb.vue'
-import EmptyState from '../components/ui/EmptyState.vue'
-import { useToast } from '../composables/useToast.js'
+import ModalCrearSala    from '../components/salas/ModalCrearSala.vue'
+import Breadcrumb         from '../components/ui/Breadcrumb.vue'
+import EmptyState         from '../components/ui/EmptyState.vue'
+import ActionsDropdown    from '../components/ui/ActionsDropdown.vue'
+import { useToast }   from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -146,6 +148,18 @@ function onSalaCreada() {
   recargarSalas()
 }
 
+const sedeAcciones = computed(() => {
+  const items = []
+  if (tieneInv.value) {
+    items.push({ emoji: '📊', label: 'Gestionar stock', onClick: () => router.push('/admin/stock') })
+  }
+  if (isAdmin.value) {
+    items.push({ divider: true })
+    items.push({ emoji: '🗑️', label: 'Eliminar sede', danger: true, onClick: eliminarSede, disabled: deleting.value })
+  }
+  return items
+})
+
 function escapeHandler(e) {
   if (e.key !== 'Escape') return
   if (showEditarStockModal.value) showEditarStockModal.value = false
@@ -170,8 +184,7 @@ onMounted(async () => {
   <div class="sdv">
 
     <div v-if="loading" class="sdv__loading">
-      <div class="sdv__ring"></div>
-      <span>Cargando sede…</span>
+      <DsSpinner />
     </div>
 
     <div v-else-if="error" class="sdv__error">
@@ -204,17 +217,9 @@ onMounted(async () => {
         </div>
         <div class="sdv__header-actions">
           <button v-if="puedeCrearSala && tieneSalas" class="sdv__btn-primary" @click="showCrearSala = true">
-            <i class="bi bi-plus-lg"></i> Nueva sala aquí
+            <i class="bi bi-plus-lg"></i> Nueva sala
           </button>
-          <RouterLink v-if="tieneInv && isAdmin" to="/admin/stock" class="sdv__btn-inv">
-            <i class="bi bi-boxes"></i> Gestionar stock
-          </RouterLink>
-          <button v-if="isAdmin" class="sdv__btn-danger" :disabled="deleting" @click="eliminarSede">
-            <i class="bi bi-trash3"></i> Eliminar sede
-          </button>
-          <button class="sdv__btn-ghost" @click="router.back()">
-            <i class="bi bi-arrow-left"></i> Volver
-          </button>
+          <ActionsDropdown v-if="isAdmin && sedeAcciones.length" :items="sedeAcciones" />
         </div>
       </div>
 
@@ -244,7 +249,7 @@ onMounted(async () => {
               </div>
               <RouterLink v-if="isAdmin" to="/admin/stock" class="sdv__card-btn">Gestionar →</RouterLink>
             </div>
-            <div v-if="loadingTienda" class="sdv__tienda-loading"><div class="sdv__ring sdv__ring--sm"></div> Cargando…</div>
+            <div v-if="loadingTienda" class="sdv__tienda-loading"><DsSpinner :size="40" /></div>
             <EmptyState v-else-if="!tiendaStocks.length" icon="bi-shop" title="Sin stock asignado" message="Esta sede no tiene stock. Asigná desde el gestor de stock." compact>
               <template #actions>
                 <RouterLink v-if="isAdmin" to="/admin/stock" class="sdv__btn-sm-green"><i class="bi bi-boxes"></i> Ir al stock</RouterLink>
@@ -399,7 +404,7 @@ onMounted(async () => {
           <div class="sdv__modal-footer">
             <button class="sdv__btn-ghost" :disabled="savingEditarStock" @click="showEditarStockModal = false">Cancelar</button>
             <button class="sdv__btn-primary" :disabled="savingEditarStock || !editarStockForm.cantidad" @click="confirmarEditarStock">
-              <span v-if="savingEditarStock" class="sdv__ring sdv__ring--sm sdv__ring--white"></span>
+              <DsSpinner v-if="savingEditarStock" :size="14" />
               <i v-else class="bi bi-check-lg"></i>
               Guardar cambios
             </button>
@@ -415,11 +420,7 @@ onMounted(async () => {
 /* ══ ORIGINALES ══════════════════════════════════════════════════ */
 .sdv { padding: 1.75rem 1.75rem 3rem; max-width: 1200px; margin: 0 auto; }
 @media (max-width: 768px) { .sdv { padding: 1.25rem 1rem 2rem; } }
-.sdv__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
-.sdv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: sdv-spin .7s linear infinite; }
-.sdv__ring--sm { width: 14px; height: 14px; border-width: 1.5px; }
-.sdv__ring--white { border-color: rgba(255,255,255,.3); border-top-color: white; }
-@keyframes sdv-spin { to { transform: rotate(360deg); } }
+.sdv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .sdv__error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 10px; display: flex; gap: .5rem; align-items: center; }
 .sdv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
 .sdv__header-left { display: flex; align-items: flex-start; gap: 1rem; }

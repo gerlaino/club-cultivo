@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { getInventarioPendiente, aprobarMovimiento, rechazarMovimiento } from '../lib/api.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const toast = useToast()
 
@@ -79,7 +80,7 @@ onMounted(cargar)
 
     <!-- Loading -->
     <div v-if="loading" class="mv__loading">
-      <div class="mv__ring"></div><span>Cargando movimientos…</span>
+      <DsSpinner />
     </div>
 
     <template v-else>
@@ -116,7 +117,7 @@ onMounted(cargar)
             </div>
             <div class="mv__card-actions">
               <button class="mv__btn-aprobar" :disabled="procesando === m.id" @click="aprobar(m)">
-                <div v-if="procesando === m.id" class="mv__spinner mv__spinner--white"></div>
+                <DsSpinner v-if="procesando === m.id" :size="13" />
                 <i v-else class="bi bi-check-lg"></i>
                 Aprobar
               </button>
@@ -198,7 +199,7 @@ onMounted(cargar)
           <div class="mv__modal-actions">
             <button class="mv__btn-ghost" :disabled="rechazando" @click="showRechazo=false">Cancelar</button>
             <button class="mv__btn-rechazar" :disabled="rechazando" @click="confirmarRechazo">
-              <div v-if="rechazando" class="mv__spinner mv__spinner--white"></div>
+              <DsSpinner v-if="rechazando" :size="13" />
               <i v-else class="bi bi-x-lg"></i>
               Confirmar rechazo
             </button>
@@ -221,9 +222,7 @@ onMounted(cargar)
 .mv__title { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; letter-spacing: -.04em; }
 .mv__sub { font-size: .84rem; color: #64748b; margin: 0; }
 
-.mv__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; justify-content: center; color: #94a3b8; }
-.mv__ring { width: 20px; height: 20px; border: 2px solid #e2e8f0; border-top-color: #b45309; border-radius: 50%; animation: mv-spin .7s linear infinite; }
-@keyframes mv-spin { to { transform: rotate(360deg); } }
+.mv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 .mv__section { }
 .mv__section--mt { margin-top: 2.5rem; }
@@ -267,7 +266,7 @@ onMounted(cargar)
 .mv__btn-ghost { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .6rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 500; cursor: pointer; }
 .mv__btn-ghost:hover { background: #f8fafc; }
 
-.mv__spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: mv-spin .6s linear infinite; }
+
 
 .mv__table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow-x: auto; }
 .mv__table { width: 100%; border-collapse: collapse; font-size: .8rem; }

@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send } from 'lucide-vue-next'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
+import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send, Route, PenLine, Trash2 } from 'lucide-vue-next'
 import { getMisPaquetes, iniciarViaje, entregarPaquete, reportarFallo } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
@@ -17,6 +18,63 @@ const modalFallo    = ref(null)  // dispensacion object
 const notasEntrega  = ref('')
 const motivoFallo   = ref('')
 const saving        = ref(false)
+
+// firma digital
+const canvasRef      = ref(null)
+const firmaActiva    = ref(false)
+const firmaData      = ref(null)
+let   ctx            = null
+let   dibujando      = false
+
+watch(modalEntregar, async (val) => {
+  if (val) {
+    firmaActiva.value = false
+    firmaData.value   = null
+    await nextTick()
+  }
+})
+
+function iniciarCanvas() {
+  firmaActiva.value = true
+  nextTick(() => {
+    const canvas = canvasRef.value
+    if (!canvas) return
+    ctx = canvas.getContext('2d')
+    ctx.strokeStyle = '#111827'
+    ctx.lineWidth   = 2
+    ctx.lineCap     = 'round'
+    ctx.lineJoin    = 'round'
+    canvas.addEventListener('mousedown',  startDraw)
+    canvas.addEventListener('mousemove',  draw)
+    canvas.addEventListener('mouseup',    endDraw)
+    canvas.addEventListener('mouseleave', endDraw)
+    canvas.addEventListener('touchstart', startDrawT, { passive: false })
+    canvas.addEventListener('touchmove',  drawT,      { passive: false })
+    canvas.addEventListener('touchend',   endDraw)
+  })
+}
+
+function startDraw(e)  { dibujando = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY) }
+function draw(e)       { if (!dibujando) return; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke() }
+function endDraw()     { dibujando = false; firmaData.value = canvasRef.value?.toDataURL('image/png') }
+
+function startDrawT(e) { e.preventDefault(); const t = e.touches[0]; const r = canvasRef.value.getBoundingClientRect(); startDraw({ offsetX: t.clientX - r.left, offsetY: t.clientY - r.top }) }
+function drawT(e)      { e.preventDefault(); const t = e.touches[0]; const r = canvasRef.value.getBoundingClientRect(); draw({ offsetX: t.clientX - r.left, offsetY: t.clientY - r.top }) }
+
+function borrarFirma() {
+  if (!ctx) return
+  ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
+  firmaData.value = null
+}
+
+// Google Maps route — abre Maps con todas las direcciones en viaje como waypoints
+function verRutaEnMaps() {
+  const dirs = enViaje.value.map(p => p.direccion_envio).filter(Boolean)
+  if (!dirs.length) return
+  const base     = 'https://www.google.com/maps/dir/'
+  const waypoints = dirs.map(d => encodeURIComponent(d)).join('/')
+  window.open(base + waypoints, '_blank', 'noopener')
+}
 
 const pendientes = computed(() => paquetes.value.filter(p => p.estado_envio === 'pendiente'))
 const enViaje    = computed(() => paquetes.value.filter(p => p.estado_envio === 'en_viaje'))
@@ -75,8 +133,10 @@ function abrirFallo(p) {
 async function confirmarEntrega() {
   saving.value = true
   try {
-    await entregarPaquete(modalEntregar.value.id, notasEntrega.value)
+    await entregarPaquete(modalEntregar.value.id, notasEntrega.value, firmaData.value)
     modalEntregar.value = null
+    firmaData.value     = null
+    firmaActiva.value   = false
     await load()
     toast.success('Entrega registrada')
   } catch { toast.error('Error al registrar entrega') }
@@ -117,11 +177,14 @@ onMounted(load)
           <div class="dlv__sub">{{ activos.length }} activos</div>
         </div>
       </div>
+      <button v-if="enViaje.length" class="dlv__btn-ruta" @click="verRutaEnMaps">
+        <Route :size="15" :stroke-width="2" /> Ver ruta en Maps ({{ enViaje.length }})
+      </button>
     </div>
 
     <!-- Loading -->
     <div v-if="loading" class="dlv__loading">
-      <div class="dlv__ring"></div> Cargando…
+      <DsSpinner />
     </div>
 
     <template v-else>
@@ -280,18 +343,44 @@ onMounted(load)
           </div>
           <div class="dlv__modal-body">
             <div class="dlv__modal-pkg">{{ modalEntregar.codigo_paquete }} — {{ modalEntregar.paciente?.nombre }}</div>
+
+            <!-- Firma digital -->
+            <div class="dlv__firma-section">
+              <div class="dlv__firma-label">
+                <PenLine :size="13" :stroke-width="2" />
+                Firma del receptor
+                <span class="dlv__opt">opcional</span>
+              </div>
+              <div v-if="!firmaActiva" class="dlv__firma-placeholder" @click="iniciarCanvas">
+                <PenLine :size="20" :stroke-width="1.5" style="color:#9ca3af" />
+                <span>Tocar para capturar firma</span>
+              </div>
+              <div v-else class="dlv__firma-canvas-wrap">
+                <canvas
+                  ref="canvasRef"
+                  class="dlv__firma-canvas"
+                  width="400"
+                  height="120"
+                ></canvas>
+                <button class="dlv__firma-borrar" @click="borrarFirma" title="Borrar firma">
+                  <Trash2 :size="13" :stroke-width="2" /> Borrar
+                </button>
+              </div>
+              <p v-if="firmaData" class="dlv__firma-ok">✓ Firma capturada</p>
+            </div>
+
             <label class="dlv__modal-label">Notas de entrega <span class="dlv__opt">opcional</span></label>
             <textarea
               v-model.trim="notasEntrega"
               class="dlv__modal-input"
-              rows="3"
+              rows="2"
               placeholder="Firmó el receptor, dejé con vecino…"
             ></textarea>
           </div>
           <div class="dlv__modal-footer">
             <button class="dlv__btn-ghost" :disabled="saving" @click="modalEntregar = null">Cancelar</button>
             <button class="dlv__btn-confirm" :disabled="saving" @click="confirmarEntrega">
-              <div v-if="saving" class="dlv__spinner"></div>
+              <DsSpinner v-if="saving" :size="13" />
               <CheckCircle2 v-else :size="14" :stroke-width="2" />
               Confirmar entrega
             </button>
@@ -322,7 +411,7 @@ onMounted(load)
           <div class="dlv__modal-footer">
             <button class="dlv__btn-ghost" :disabled="saving" @click="modalFallo = null">Cancelar</button>
             <button class="dlv__btn-danger" :disabled="saving || !motivoFallo.trim()" @click="confirmarFallo">
-              <div v-if="saving" class="dlv__spinner"></div>
+              <DsSpinner v-if="saving" :size="13" />
               <XCircle v-else :size="14" :stroke-width="2" />
               Reportar
             </button>
@@ -344,9 +433,7 @@ onMounted(load)
 .dlv__sub { font-size: var(--fs-13); color: var(--c-ink-400); }
 
 /* Loading */
-.dlv__loading { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-8); color: var(--c-ink-400); justify-content: center; }
-.dlv__ring { width: 18px; height: 18px; border: 2px solid var(--c-ink-100); border-top-color: var(--c-ink-500); border-radius: 50%; animation: dlv-spin .7s linear infinite; }
-@keyframes dlv-spin { to { transform: rotate(360deg); } }
+.dlv__loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
 
 /* Stats */
 .dlv__stats { display: flex; gap: var(--sp-3); margin-bottom: var(--sp-5); }
@@ -425,8 +512,42 @@ onMounted(load)
 .dlv__btn-confirm:disabled { opacity: .5; cursor: not-allowed; }
 .dlv__btn-danger { display: inline-flex; align-items: center; gap: var(--sp-1); background: var(--c-rust-600); color: #fff; border: none; padding: .5rem 1.1rem; border-radius: var(--r-md); font-size: var(--fs-14); font-weight: 600; cursor: pointer; }
 .dlv__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
-.dlv__spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: dlv-spin .6s linear infinite; }
 .dlv__opt { font-size: var(--fs-11); font-weight: 400; color: var(--c-ink-400); text-transform: none; letter-spacing: 0; }
+
+/* Botón Ver ruta */
+.dlv__btn-ruta {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  background: #fff; color: #1d4ed8; border: 1.5px solid #bfdbfe;
+  padding: .45rem .9rem; border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; cursor: pointer;
+}
+.dlv__btn-ruta:hover { background: #eff6ff; }
+
+/* Firma digital */
+.dlv__firma-section { display: flex; flex-direction: column; gap: .35rem; }
+.dlv__firma-label {
+  display: flex; align-items: center; gap: .3rem;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--c-ink-600);
+}
+.dlv__firma-placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .4rem;
+  border: 2px dashed #d1d5db; border-radius: var(--r-md); padding: 1.25rem;
+  cursor: pointer; color: #9ca3af; font-size: var(--fs-13);
+  transition: border-color .15s, background .15s;
+}
+.dlv__firma-placeholder:hover { border-color: #9ca3af; background: #f9fafb; }
+.dlv__firma-canvas-wrap { position: relative; }
+.dlv__firma-canvas {
+  display: block; width: 100%; height: 120px; border: 1.5px solid #d1d5db; border-radius: var(--r-md);
+  background: #fff; touch-action: none; cursor: crosshair;
+}
+.dlv__firma-borrar {
+  position: absolute; top: .4rem; right: .4rem;
+  display: inline-flex; align-items: center; gap: .25rem;
+  background: rgba(255,255,255,.9); border: 1px solid #e5e7eb; border-radius: 6px;
+  padding: .2rem .5rem; font-size: .72rem; color: #6b7280; cursor: pointer;
+}
+.dlv__firma-borrar:hover { color: #dc2626; border-color: #fca5a5; }
+.dlv__firma-ok { font-size: .72rem; color: #15803d; margin: 0; }
 
 /* ── Mobile ──────────────────────────────────────────────────────── */
 @media (max-width: 1023px) {

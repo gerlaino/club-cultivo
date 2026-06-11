@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="mt-overlay" @click.self="$emit('cerrar')">
+    <div v-if="show" class="mt-overlay">
       <div class="mt-panel">
 
         <!-- Header -->
@@ -152,7 +152,7 @@
                 </label>
                 <div v-if="form.asignada_a_id && !cargandoSalas && salasDisponibles.length === 0"
                      class="mt-hint-warn">
-                  Este usuario no tiene salas asignadas. Asignale una sala primero desde el perfil del usuario.
+                  Este usuario no tiene salas disponibles en su sede asignada.
                 </div>
                 <select v-else v-model="form.sala_id" class="mt-input" @change="form.lote_id = ''"
                         :disabled="cargandoSalas">
@@ -262,7 +262,7 @@
             Siguiente →
           </button>
           <button v-else class="mt-btn-primary" @click="guardar" :disabled="guardando">
-            <span v-if="guardando" class="mt-spinner"></span>
+            <DsSpinner v-if="guardando" :size="14" />
             <i v-else class="bi bi-check-lg"></i>
             {{ editando ? 'Guardar cambios' : conRepeticion ? `Crear ${fechasGeneradas.length || 1} tareas` : 'Crear tarea' }}
           </button>
@@ -281,6 +281,7 @@ import { useTareasStore } from '../stores/tareas'
 import { formatFechaCorta, formatFechaLarga } from '../utils/fecha.js'
 import { getUserSalasAsignadas } from '../lib/api.js'
 import AppDatePicker from './ui/AppDatePicker.vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const props = defineProps({
   show:         { type: Boolean, default: false },
@@ -779,9 +780,4 @@ async function guardar() {
 }
 .mt-btn-primary:hover:not(:disabled) { background: #104417; }
 .mt-btn-primary:disabled { opacity: .6; cursor: not-allowed; }
-.mt-spinner {
-  width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3);
-  border-top-color: #fff; border-radius: 50%; animation: mt-spin .6s linear infinite;
-}
-@keyframes mt-spin { to { transform: rotate(360deg); } }
 </style>

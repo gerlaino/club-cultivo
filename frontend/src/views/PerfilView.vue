@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref, computed } from 'vue'
 import { getProfile, updateProfile, updateMyPassword, uploadAvatar } from '../lib/api'
 import { useAuthStore } from '../stores/auth'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const auth = useAuthStore()
 
@@ -177,7 +178,7 @@ onMounted(fetchProfile)
 
     <!-- Loading -->
     <div v-if="loading" class="pfl__loading">
-      <div class="pfl__spinner"></div>
+      <DsSpinner />
     </div>
 
     <template v-else>
@@ -206,7 +207,7 @@ onMounted(fetchProfile)
               <div v-else class="pfl__avatar-placeholder">{{ initials(form.first_name, form.last_name) }}</div>
               <div class="pfl__avatar-overlay"><i class="bi bi-camera-fill"></i></div>
               <div v-if="avatarSaving" class="pfl__avatar-loading">
-                <div class="pfl__spinner pfl__spinner--sm pfl__spinner--white"></div>
+                <DsSpinner :size="16" />
               </div>
             </div>
 
@@ -246,7 +247,7 @@ onMounted(fetchProfile)
                 <div class="pfl__card-desc">Tu nombre, DNI y datos de contacto</div>
               </div>
               <button class="pfl__btn-primary" :disabled="saving" @click="onSave">
-                <div v-if="saving" class="pfl__spinner pfl__spinner--sm pfl__spinner--white"></div>
+                <DsSpinner v-if="saving" :size="16" />
                 <i v-else class="bi bi-check2"></i>
                 {{ saving ? 'Guardando...' : 'Guardar' }}
               </button>
@@ -381,7 +382,7 @@ onMounted(fetchProfile)
 
             <div class="pfl__form-actions">
               <button class="pfl__btn-primary" :disabled="passSaving" @click="onChangePassword">
-                <div v-if="passSaving" class="pfl__spinner pfl__spinner--sm pfl__spinner--white"></div>
+                <DsSpinner v-if="passSaving" :size="16" />
                 <i v-else class="bi bi-shield-lock"></i>
                 {{ passSaving ? 'Actualizando...' : 'Actualizar contraseña' }}
               </button>
@@ -406,13 +407,9 @@ onMounted(fetchProfile)
 .pfl__sub    { font-size: .82rem; color: #64748b; margin: 0; }
 
 /* Loading */
-.pfl__loading { display: flex; justify-content: center; padding: 3rem; }
+.pfl__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 /* Spinner */
-.pfl__spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #1a3d2e; border-radius: 50%; animation: pfl-spin .8s linear infinite; display: inline-block; }
-.pfl__spinner--sm { width: 16px; height: 16px; border-width: 2px; }
-.pfl__spinner--white { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
-@keyframes pfl-spin { to { transform: rotate(360deg); } }
 
 /* Alerts */
 .pfl__alert { display: flex; align-items: center; gap: .65rem; padding: .75rem 1rem; border-radius: 10px; margin-bottom: 1rem; font-size: .875rem; }

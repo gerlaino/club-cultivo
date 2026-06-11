@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { getBenchmark, updatePreferences } from '../lib/api'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const data    = ref(null)
 const loading = ref(true)
@@ -142,7 +143,7 @@ const metricas = computed(() => {
     </Transition>
 
     <div v-if="loading" class="bv__loading">
-      <div class="bv__spinner"></div>
+      <DsSpinner :size="22" />
       <span>Cargando datos…</span>
     </div>
 
@@ -320,12 +321,6 @@ const metricas = computed(() => {
   display: flex; align-items: center; gap: .75rem;
   padding: 3rem 1rem; color: var(--text-secondary);
 }
-.bv__spinner {
-  width: 22px; height: 22px; border-radius: 50%;
-  border: 3px solid #e2e8f0; border-top-color: #1b5e20;
-  animation: bv-spin .8s linear infinite;
-}
-@keyframes bv-spin { to { transform: rotate(360deg); } }
 .bv__error {
   padding: 2rem 1rem;
   color: #991b1b;

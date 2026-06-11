@@ -1,14 +1,12 @@
 <template>
   <span class="ds-spinner" :style="{ width: size + 'px', height: size + 'px' }" aria-hidden="true">
-    <LeafSeal :size="size" class="ds-spinner__leaf" />
+    <img src="/logo-ce-icono.png" class="ds-spinner__logo" alt="" />
   </span>
 </template>
 
 <script setup>
-import LeafSeal from '../icons/LeafSeal.vue'
-
 defineProps({
-  size: { type: [Number, String], default: 20 },
+  size: { type: [Number, String], default: 144 },
 })
 </script>
 
@@ -17,23 +15,22 @@ defineProps({
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: currentColor;
 }
 
-.ds-spinner__leaf {
-  animation: ds-spin 1s linear infinite, ds-pulse 1s ease-in-out infinite alternate;
-}
-
-@keyframes ds-spin {
-  to { transform: rotate(360deg); }
+.ds-spinner__logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  animation: ds-pulse 1.2s ease-in-out infinite alternate;
 }
 
 @keyframes ds-pulse {
-  from { opacity: 0.5; }
-  to   { opacity: 1; }
+  from { opacity: 0.45; transform: scale(0.88); }
+  to   { opacity: 1;    transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ds-spinner__leaf { animation: none; opacity: 0.7; }
+  .ds-spinner__logo { animation: none; opacity: 0.8; }
 }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="ept__overlay" @click.self="$emit('close')">
+    <div class="ept__overlay">
       <div class="ept__panel">
         <div class="ept__header">
           <div class="ept__header-ico"><i class="bi bi-pencil-square"></i></div>
@@ -103,7 +103,7 @@
           <div class="ept__footer-right">
             <button class="ept__btn-ghost" @click="$emit('close')">Cancelar</button>
             <button class="ept__btn-primary" :disabled="saving" @click="guardar">
-              <span v-if="saving" class="ept__spinner"></span>
+              <DsSpinner v-if="saving" :size="14" />
               {{ saving ? 'Guardando…' : 'Guardar' }}
             </button>
           </div>
@@ -116,6 +116,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { updatePlanTarea, deletePlanTarea } from '../../lib/api.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   planTarea:    { type: Object, default: null },
@@ -240,6 +241,4 @@ async function eliminar() {
 .ept__btn-primary:hover:not(:disabled) { background: #144a18; }
 .ept__btn-primary:disabled { opacity: .55; cursor: not-allowed; }
 .ept__btn-ghost  { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; padding: .6rem 1rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; }
-.ept__spinner    { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: ept-spin .6s linear infinite; }
-@keyframes ept-spin { to { transform: rotate(360deg); } }
 </style>

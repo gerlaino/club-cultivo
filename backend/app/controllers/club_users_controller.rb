@@ -15,12 +15,15 @@ class ClubUsersController < ApplicationController
       )
     end
 
-    rel = rel.where(role: params[:role]) if params[:role].present?
+    if params[:roles].present?
+      rel = rel.where(role: Array(params[:roles]))
+    elsif params[:role].present?
+      rel = rel.where(role: params[:role])
+    end
 
-    users = rel.includes(:sala_cultivadores).order("created_at DESC")
+    users = rel.order("created_at DESC")
     render json: { data: users.map { |u|
       u.as_json(only: [:id, :email, :first_name, :last_name, :role, :created_at, :updated_at])
-       .merge(sala_ids: u.sala_cultivadores.map(&:sala_id))
     } }
   end
 

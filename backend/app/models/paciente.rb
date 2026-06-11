@@ -12,14 +12,20 @@ class Paciente < ApplicationRecord
   has_one  :cuenta_corriente, dependent: :destroy
   has_many :reprocann_renovaciones, class_name: 'ReprocannRenovacion', dependent: :destroy
   has_many :mails_enviados, class_name: 'MailEnviado', dependent: :destroy
+  has_many :check_ins, dependent: :destroy
+  has_many :turnos, dependent: :destroy
 
   has_one_attached :reprocann_documento
 
   before_validation :normalize_dni!
   before_create     :assign_carnet_token
+  after_create_commit :dispatch_webhook
 
   validates :nombre, :apellido, :dni, :dni_normalizado, :fecha_nacimiento, presence: true
-  validates :dni_normalizado, uniqueness: true, format: { with: /\A\d{7,9}\z/, message: "debe tener 7 a 9 dígitos" }
+  # Unicidad global (no por club) — requisito REPROCANN: un DNI no puede estar en dos clubes a la vez.
+  validates :dni_normalizado,
+    uniqueness: { message: "ya está registrado en el sistema. Bajo REPROCANN, un DNI no puede pertenecer a dos clubes simultáneamente." },
+    format:     { with: /\A\d{7,9}\z/, message: "debe tener 7 a 9 dígitos" }
   validate :fecha_nacimiento_pasada
 
   scope :for_club,          ->(club_id) { where(club_id: club_id) }
@@ -66,6 +72,16 @@ class Paciente < ApplicationRecord
   end
 
   private
+
+  def dispatch_webhook
+    WebhookDispatcher.dispatch(club, 'paciente.creado', {
+      id:       id,
+      nombre:   nombre_completo,
+      dni:      dni,
+      email:    email,
+      telefono: telefono,
+    })
+  end
 
   def normalize_dni!
     return if dni.blank?

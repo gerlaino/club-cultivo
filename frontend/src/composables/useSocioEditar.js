@@ -33,6 +33,7 @@ export function useSocioEditar(socioId) {
       reprocann_estado:               s?.reprocann_estado     || 'sin_registro',
       es_paciente:                    s?.es_paciente          ?? true,
       limite_dispensacion_mensual_g:  s?.limite_dispensacion_mensual_g ?? '',
+      descuento_porcentaje:           s?.descuento_porcentaje ?? 0,
     }
     editError.value = null
     editOpen.value  = true

@@ -13,6 +13,10 @@ class PreferencesController < ApplicationController
       @club.logo.purge if @club.logo.attached?
     end
 
+    if (ac = params.dig(:club, :alertas_config))
+      @club.alertas_config = ac.is_a?(ActionController::Parameters) ? ac.to_unsafe_h : ac
+    end
+
     if @club.update(club_params)
       render json: serialize(@club)
     else
@@ -33,6 +37,66 @@ class PreferencesController < ApplicationController
     else
       render json: { errors: ["No se pudo adjuntar el logo"] }, status: :unprocessable_entity
     end
+  end
+
+  # PATCH /preferences/twilio
+  def update_twilio
+    unless current_user.admin? || current_user.super_admin?
+      return render json: { error: 'Sin permiso' }, status: :forbidden
+    end
+
+    raw_token = params[:twilio_auth_token]
+    @club.twilio_account_sid    = params[:twilio_account_sid]   if params[:twilio_account_sid].present?
+    @club.twilio_auth_token     = raw_token                      if raw_token.present?
+    @club.twilio_whatsapp_from  = params[:twilio_whatsapp_from] if params[:twilio_whatsapp_from].present?
+
+    if @club.save
+      render json: {
+        twilio_configurado:    @club.twilio_configurado?,
+        twilio_account_sid:    @club.twilio_account_sid,
+        twilio_whatsapp_from:  @club.twilio_whatsapp_from,
+      }
+    else
+      render json: { errors: @club.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  # DELETE /preferences/twilio
+  def destroy_twilio
+    unless current_user.admin? || current_user.super_admin?
+      return render json: { error: 'Sin permiso' }, status: :forbidden
+    end
+
+    @club.update!(twilio_account_sid: nil, twilio_auth_token_enc: nil, twilio_whatsapp_from: nil)
+    render json: { twilio_configurado: false }
+  end
+
+  # POST /preferences/test_twilio
+  def test_twilio
+    unless @club.twilio_configurado?
+      return render json: { error: 'WhatsApp no configurado' }, status: :unprocessable_entity
+    end
+
+    telefono_destino = current_user.phone.presence
+    unless telefono_destino
+      return render json: { error: 'Tu perfil no tiene número de teléfono configurado. Agregá uno en tu perfil para probar.' }, status: :unprocessable_entity
+    end
+
+    client = Twilio::REST::Client.new(@club.twilio_account_sid, @club.twilio_auth_token)
+    limpio  = telefono_destino.gsub(/[^0-9+]/, '')
+    numero  = limpio.start_with?('+') ? limpio : (limpio.start_with?('0') ? "+54#{limpio[1..]}" : "+54#{limpio}")
+
+    client.messages.create(
+      from: @club.twilio_whatsapp_from,
+      to:   "whatsapp:#{numero}",
+      body: "✅ Prueba exitosa de WhatsApp para #{@club.name}. Las notificaciones de delivery están listas."
+    )
+
+    render json: { ok: true, enviado_a: numero }
+  rescue Twilio::REST::RestError => e
+    render json: { error: "Error Twilio: #{e.message}" }, status: :unprocessable_entity
+  rescue => e
+    render json: { error: "Error de conexión: #{e.message}" }, status: :unprocessable_entity
   end
 
   def test_smtp
@@ -74,7 +138,8 @@ class PreferencesController < ApplicationController
       :facebook_url, :horarios_atencion, :web_activa,
       :benchmark_opt_in,
       :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
-      :smtp_from, :smtp_from_name
+      :smtp_from, :smtp_from_name,
+      :umbral_stock_g
     )
   end
 
@@ -104,13 +169,19 @@ class PreferencesController < ApplicationController
       horarios_atencion:            club.horarios_atencion,
       web_activa:                   club.web_activa,
       benchmark_opt_in:             club.benchmark_opt_in,
+      features:                     club.features,
       smtp_configured:              club.smtp_configured?,
       smtp_host:                    club.smtp_host,
       smtp_port:                    club.smtp_port || 587,
       smtp_user:                    club.smtp_user,
       smtp_from:                    club.smtp_from,
       smtp_from_name:               club.smtp_from_name,
-      # smtp_pass nunca se serializa
+      # smtp_pass / twilio_auth_token_enc nunca se serializan
+      twilio_configurado:           club.twilio_configurado?,
+      twilio_account_sid:           club.twilio_account_sid,
+      twilio_whatsapp_from:         club.twilio_whatsapp_from,
+      umbral_stock_g:               club.umbral_stock_g,
+      alertas_config:               club.alertas_config || {},
     }
   end
 end

@@ -5,14 +5,10 @@ Rails.application.routes.draw do
   get  "/up", to: "health#show"
 
   # QR público — sin prefijo /api para que los links de QR funcionen siempre
-  get "/p/:codigo_qr", to: "public/plantas#show_qr",   defaults: { format: :json }
-  get "/s/:codigo_qr", to: "public/stocks#show_qr",    defaults: { format: :json }
-  get "/c/:token",     to: "public/carnets#show",      defaults: { format: :json }
-
-  # API pública para investigación — sin auth, datos anonimizados agregados
-  scope '/api/public', defaults: { format: :json } do
-    get 'benchmark', to: 'public/benchmark#show'
-  end
+  get "/p/:codigo_qr",   to: "public/plantas#show_qr",   defaults: { format: :json }
+  get "/s/:codigo_qr",   to: "public/stocks#show_qr",    defaults: { format: :json }
+  get "/c/:token",       to: "public/carnets#show",      defaults: { format: :json }
+  get "/cos/:codigo_qr", to: "public/cosechas#show_qr",  defaults: { format: :json }
 
   # Web pública del club (accedida desde el sitio web externo del club)
   namespace :public, defaults: { format: :json } do
@@ -46,9 +42,17 @@ Rails.application.routes.draw do
       get :rendimiento_genetica
       get :dispensador
       get :produccion
+      get :correlacion_ambiental
+      get :pl_lotes
+      get :ejecutivo
+      get :comparativa_salas
+      get :contabilidad
     end
 
-    resource :benchmark, only: [:show], controller: :benchmark
+    resource :benchmark, only: [:show], controller: :benchmark  # solo super_admin, uso interno de plataforma
+    namespace :public do
+      resource :benchmark, only: [:show], controller: :benchmark  # público, datos anonimizados y agregados
+    end
 
     post '/asistente/parsear',       to: 'asistente#parsear'
     post '/asistente/ejecutar',      to: 'asistente#ejecutar'
@@ -56,16 +60,24 @@ Rails.application.routes.draw do
     post '/asistente/analizar_lote',      to: 'asistente#analizar_lote'
     get  '/asistente/historial_analisis', to: 'asistente#historial_analisis'
 
+    resources :push_subscriptions, only: [:create, :destroy]
+    resources :webhooks do
+      resources :webhook_deliveries, only: [:index], shallow: true
+    end
+
     resources :salas do
       resources :lotes, only: [:index, :create]
       resources :cultivadores, controller: 'sala_cultivadores', only: [:index, :create, :destroy]
       resources :notas, only: [:index, :create]
       resources :lecturas_ambientales, only: [:index, :create, :destroy]
       get  :ambiente,    to: 'lecturas_ambientales#ambiente'
+      get  :historico,   to: 'lecturas_ambientales#historico'
       post :ai_import,   to: 'lecturas_ambientales/ai_imports#create'
       resources :alertas, only: [:index]
       member do
         post :cargar_lote
+        post :cambiar_fase
+        post :registrar_sala
       end
     end
 
@@ -73,6 +85,7 @@ Rails.application.routes.draw do
       collection do
         get :export_csv
         get :proximo_codigo
+        get 'por_qr/:codigo_qr', action: :por_qr
       end
       resource :costo, controller: :costo_lotes, only: [:show, :create, :update]
       resources :registros_ambientales, only: [:index, :create, :destroy]
@@ -80,24 +93,41 @@ Rails.application.routes.draw do
       resources :fotos, only: [:index, :create, :destroy], controller: 'fotos_lote'
       resources :notas, only: [:index, :create]
       resources :pesadas, only: [:index, :create, :destroy]
+      resources :analisis_laboratorio, only: [:index, :create, :update, :destroy]
+      resources :pesajes_manicura, only: [:index, :show, :create] do
+        member do
+          post :enviar
+          post :confirmar
+        end
+      end
       member do
-        post :transiciones
-        post :cerrar_curado
-        post :avanzar_fase
-        post :cosechar_plantas
-        post :aprobar_manicura
-        post :rechazar_manicura
-        post :asignar_manicurador
-        post :completar_manicura
-        post :finalizar_pesaje_manicura
-        get  :timeline
+        post  :transiciones
+        post  :cerrar_curado
+        post  :avanzar_fase
+        post  :cosechar_plantas
+        post  :aprobar_manicura
+        post  :rechazar_manicura
+        post  :asignar_manicurador
+        post  :completar_manicura
+        post  :finalizar_pesaje_manicura
+        patch :completar_datos
+        get   :timeline
+        get   :preview_plan
+        post  :aplicar_plan
+        get   :pl
       end
     end
 
+    get '/pesajes_manicura', to: 'pesajes_manicura#index_admin'
+
+    get '/stocks/qr/:codigo_qr', to: 'stocks#show_by_qr'
     resources :stocks, only: [:index, :show, :create, :update] do
       member do
         post :asignar
         get  :trazabilidad
+        post :ajuste
+        post :descartar
+        get  :movimientos
       end
     end
 
@@ -116,11 +146,13 @@ Rails.application.routes.draw do
     resources :pacientes do
       collection do
         get :export_csv
+        get :criticos
       end
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
       resources :dispensaciones, only: [:index, :create]
       resources :reprocann_renovaciones, only: [:index, :create, :update, :destroy]
+      resources :turnos, controller: "paciente_turnos", only: [:index]
       resources :documents, controller: 'patient_documents' do
         member do
           post  :firmar
@@ -162,7 +194,30 @@ Rails.application.routes.draw do
     resources :socio_notas, controller: 'paciente_notas', only: [:destroy], as: :socio_notas_legacy
 
     get '/indicaciones_medicas', to: 'indicacion_medica#index_medico'
-    resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy]
+
+    # Médico — ficha clínica + turnos
+    namespace :medico do
+      resources :pacientes, only: [:index] do
+        member { get :ficha }
+      end
+      resources :turnos, only: [:index, :create, :update, :destroy]
+      resources :check_ins, only: [:create]
+      resource  :disponibilidad, only: [:index, :update], controller: 'disponibilidad'
+    end
+
+    namespace :admin do
+      resources :medicos, only: [:index] do
+        member do
+          get  :disponibilidad
+          get  :turnos
+          post :crear_turno
+        end
+      end
+      resources :turnos, only: [:update, :destroy]
+    end
+    resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy] do
+      member { get :prescripcion_pdf }
+    end
     resources :dispensaciones, only: [:index, :show, :update, :destroy] do
       collection do
         get  :mis_paquetes
@@ -190,8 +245,11 @@ Rails.application.routes.draw do
     end
 
     resource :preferences, only: [:show, :update], controller: "preferences" do
-      post :upload_logo,  on: :collection
-      post :test_smtp,    on: :collection
+      post   :upload_logo,    on: :collection
+      post   :test_smtp,      on: :collection
+      patch  :update_twilio,  on: :collection
+      delete :destroy_twilio, on: :collection
+      post   :test_twilio,    on: :collection
     end
 
     resources :usuarios, controller: :club_users do
@@ -260,6 +318,7 @@ Rails.application.routes.draw do
       member do
         post :publicar
         post :archivar
+        get  :export_csv
       end
     end
     scope '/plan_trabajos/:id', controller: :plan_trabajos do
@@ -267,6 +326,11 @@ Rails.application.routes.draw do
       post   'plan_tareas',       action: :plan_tareas_create
       patch  'plan_tareas/:tid',  action: :plan_tareas_update
       delete 'plan_tareas/:tid',  action: :plan_tareas_destroy
+    end
+
+    # Aplicación de plantillas de plan
+    resources :aplicacion_planes, only: [:index, :create, :show, :destroy] do
+      member { post :cancelar }
     end
 
     resources :tareas do

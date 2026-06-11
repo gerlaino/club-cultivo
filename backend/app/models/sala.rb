@@ -11,15 +11,21 @@ class Sala < ApplicationRecord
   has_many :notas, as: :noteable, dependent: :destroy
 
   ESTADOS = %w[activa mantenimiento cerrada].freeze
-  KINDS   = %w[vegetativo floracion manicura cosechado cosecha mixta madre clon secado].freeze
+  KINDS   = %w[vegetativo floracion manicura cosecha mixta madre clon secado].freeze
   TIPOS   = %w[cultivo vegetativo floracion cosecha secado curado madre clones].freeze
 
-  validates :nombre, presence: true, uniqueness: { scope: :club_id }
+  before_validation :set_default_state, on: :create
+
+  validates :nombre, presence: true, uniqueness: { scope: :club_id, conditions: -> { where(deleted_at: nil) } }
   validates :state,  inclusion: { in: ESTADOS }, allow_blank: false
   validates :tipo,   inclusion: { in: TIPOS }, allow_blank: true
   validate  :manicura_requiere_sede_produccion
 
   private
+
+  def set_default_state
+    self.state ||= 'activa'
+  end
 
   def manicura_requiere_sede_produccion
     return unless kind == 'manicura'
@@ -48,7 +54,7 @@ class Sala < ApplicationRecord
   NOMBRES_TIPO = {
     'germinacion' => 'Germinación', 'vegetativo' => 'Vegetativo',
     'floracion'   => 'Floración',   'cosecha'    => 'Cosecha',
-    'cosechado'   => 'Cosechado',   'secado'     => 'Secado',
+    'secado'      => 'Secado',
     'curado'      => 'Curado',      'manicura'   => 'Manicura',
   }.freeze
 

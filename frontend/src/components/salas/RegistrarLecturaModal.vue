@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="rlm-fade">
-      <div v-if="modelValue" class="rlm__overlay" @click.self="close">
+      <div v-if="modelValue" class="rlm__overlay">
         <div class="rlm__modal" role="dialog" aria-modal="true">
 
           <div class="rlm__header">
@@ -110,7 +110,7 @@
           <div class="rlm__footer">
             <button class="rlm__btn-ghost" :disabled="saving" @click="close">Cancelar</button>
             <button class="rlm__btn-primary" :disabled="saving || !canSubmit" @click="submit">
-              <div v-if="saving" class="rlm__spinner" />
+              <DsSpinner v-if="saving" :size="16" />
               <span v-else>Registrar</span>
             </button>
           </div>
@@ -124,8 +124,9 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Gauge, X, Leaf } from 'lucide-vue-next'
-import { createLecturaAmbiental, createRegistroAmbiental } from '../../lib/api.js'
+import { registrarLecturaOffline } from '../../lib/offlineApi.js'
 import { useToast } from '../../composables/useToast.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -209,32 +210,33 @@ async function submit() {
   errorMsg.value = null
 
   try {
+    let queued = false
+
     if (loteId.value) {
-      // Registro completo asociado al lote (propaga automáticamente a LecturaAmbiental via callback)
       const payload = {}
       const campos = ['temperatura','humedad','co2','ph','ec','ph_runoff','ec_runoff','ppfd','horas_luz','temperatura_sustrato']
       campos.forEach(c => { const v = form.value[c]; if (v != null && !Number.isNaN(v)) payload[c] = v })
       if (form.value.observaciones) payload.observaciones = form.value.observaciones
       payload.fuente = 'manual'
-      await createRegistroAmbiental(loteId.value, payload)
+      const res = await registrarLecturaOffline({ loteId: loteId.value, payload })
+      if (res?.queued) queued = true
     } else {
-      // Sin lote activo: lecturas individuales por sala
-      const promises = []
       const UNIDADES = { temperatura:'°C', humedad:'%', co2:'ppm', ph:'pH', ec:'mS/cm', ppfd:'µmol/m²s' }
-      Object.entries(UNIDADES).forEach(([tipo, unidad]) => {
+      const medido_at = new Date(form.value.medido_at).toISOString()
+      const promises = Object.entries(UNIDADES).map(([tipo, unidad]) => {
         const valor = form.value[tipo]
-        if (valor != null && !Number.isNaN(valor)) {
-          // Convert local datetime-local string back to UTC for storage
-          const medido_at = new Date(form.value.medido_at).toISOString()
-          promises.push(createLecturaAmbiental(props.salaId, {
-            tipo, valor, unidad, medido_at, fuente: 'manual',
-          }))
-        }
-      })
-      await Promise.all(promises)
+        if (valor == null || Number.isNaN(valor)) return null
+        return registrarLecturaOffline({ salaId: props.salaId, tipo, valor, unidad, medido_at })
+      }).filter(Boolean)
+      const results = await Promise.all(promises)
+      if (results.some(r => r?.queued)) queued = true
     }
 
-    toast.success('Lectura registrada')
+    if (queued) {
+      toast.warning('Sin conexión — lectura guardada localmente, se enviará al reconectarse')
+    } else {
+      toast.success('Lectura registrada')
+    }
     emit('registrada')
     emit('update:modelValue', false)
   } catch (e) {
@@ -357,11 +359,6 @@ async function submit() {
 }
 .rlm__btn-primary:hover:not(:disabled) { opacity: .88; }
 .rlm__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-.rlm__spinner {
-  width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.4);
-  border-top-color: #fff; border-radius: 50%; animation: rlm-spin .7s linear infinite;
-}
-@keyframes rlm-spin { to { transform: rotate(360deg); } }
 .rlm-fade-enter-active { animation: rlm-appear .2s ease; }
 .rlm-fade-leave-active { animation: rlm-appear .15s ease reverse; }
 @keyframes rlm-appear {

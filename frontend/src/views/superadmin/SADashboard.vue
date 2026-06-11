@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { logger } from '../../utils/logger.js'
 import { useRouter } from 'vue-router'
 import { getSuperAdminStats } from '../../lib/api.js'
@@ -48,8 +49,7 @@ onMounted(async () => {
 
     <!-- Loading -->
     <div v-if="loading" class="sad__loading">
-      <div class="sad__ring"></div>
-      <span>Cargando datos globales…</span>
+      <DsSpinner />
     </div>
 
     <template v-else-if="stats">
@@ -136,7 +136,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.sad { padding: 2rem 2.5rem 3rem; max-width: 1100px; margin: 0 auto; }
+.sad { padding: 2rem 2.5rem 3rem; }
 
 /* Header */
 .sad__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
@@ -144,9 +144,7 @@ onMounted(async () => {
 .sad__title { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; letter-spacing: -.04em; line-height: 1; }
 .sad__sub { font-size: .83rem; color: #94a3b8; margin: 0; }
 
-.sad__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
-.sad__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: var(--c-role-superadmin, #1b5e20); border-radius: 50%; animation: sad-spin .7s linear infinite; }
-@keyframes sad-spin { to { transform: rotate(360deg); } }
+.sad__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 /* KPIs — fila horizontal compacta */
 .sad__kpis {

@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useSalasStore } from '../../stores/salas'
 import { listSedes } from '../../lib/api'
 import { useModalEscape } from '../../composables/useModalEscape.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   sedeIdFija: { type: Number, default: null }, // Si viene de SedeDetailView, la sede está fija
@@ -18,17 +19,18 @@ const error  = ref(null)
 
 const KINDS = [
   { value: 'vegetativo', label: 'Vegetativo' },
-  { value: 'floracion',  label: 'Floración' },
-  { value: 'manicura',   label: 'Manicura' },
-  { value: 'cosechado',  label: 'Cosechado' },
+  { value: 'floracion',  label: 'Floración'  },
+  { value: 'cosecha',    label: 'Cosecha'    },
+  { value: 'manicura',   label: 'Manicura'   },
 ]
 
 const form = ref({
-  nombre:  '',
-  state:   'activa',
-  kind:    'vegetativo',
-  sede_id: props.sedeIdFija || null,
-  notes:   '',
+  nombre:     '',
+  state:      'activa',
+  kind:       'vegetativo',
+  sede_id:    props.sedeIdFija || null,
+  pots_count: null,
+  notes:      '',
 })
 
 const errors = ref({})
@@ -41,6 +43,7 @@ const sedeSeleccionada = computed(() =>
 function validate() {
   const e = {}
   if (!form.value.nombre.trim()) e.nombre = 'El nombre es obligatorio'
+  if (!props.sedeIdFija && !form.value.sede_id) e.sede_id = 'La sede es obligatoria'
   errors.value = e
   return !Object.keys(e).length
 }
@@ -69,7 +72,7 @@ onMounted(async () => {
 
 <template>
   <Teleport to="body">
-    <div class="mcr__overlay" @click.self="$emit('close')">
+    <div class="mcr__overlay" >
       <div class="mcr__panel">
 
         <!-- Header -->
@@ -124,25 +127,38 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Estado -->
-          <div class="mcr__field">
-            <label class="mcr__label">Estado inicial</label>
-            <select class="mcr__input" v-model="form.state">
-              <option value="activa">Activa</option>
-              <option value="mantenimiento">En mantenimiento</option>
-              <option value="cerrada">Cerrada</option>
-            </select>
+          <!-- Estado + Pots en grilla -->
+          <div class="mcr__grid">
+            <div class="mcr__field">
+              <label class="mcr__label">Estado inicial</label>
+              <select class="mcr__input" v-model="form.state">
+                <option value="activa">Activa</option>
+                <option value="mantenimiento">En mantenimiento</option>
+                <option value="cerrada">Cerrada</option>
+              </select>
+            </div>
+            <div class="mcr__field">
+              <label class="mcr__label">Slots para lotes</label>
+              <input
+                type="number" min="0" step="1"
+                class="mcr__input"
+                v-model.number="form.pots_count"
+                placeholder="Ej: 6"
+              />
+              <span class="mcr__hint">Capacidad de lotes simultáneos</span>
+            </div>
           </div>
 
           <!-- Sede (solo si no está fija) -->
           <div v-if="!sedeIdFija" class="mcr__field mcr__field--full">
-            <label class="mcr__label">Sede</label>
-            <select class="mcr__input" v-model="form.sede_id">
-              <option :value="null">Sin sede asignada</option>
+            <label class="mcr__label">Sede <span class="mcr__req">*</span></label>
+            <select class="mcr__input" :class="{ 'mcr__input--err': errors.sede_id }" v-model="form.sede_id">
+              <option :value="null" disabled>Seleccioná una sede</option>
               <option v-for="s in sedes.filter(s => ['produccion','mixta'].includes(s.tipo))" :key="s.id" :value="s.id">
-                {{ s.nombre }} — {{ s.tipo_label }}
+                {{ s.nombre }}
               </option>
             </select>
+            <span v-if="errors.sede_id" class="mcr__err">{{ errors.sede_id }}</span>
           </div>
 
           <!-- Nota manicura -->
@@ -169,7 +185,7 @@ onMounted(async () => {
             Cancelar
           </button>
           <button class="mcr__btn-primary" :disabled="saving" @click="handleSubmit">
-            <span v-if="saving" class="mcr__spinner"></span>
+            <DsSpinner v-if="saving" :size="14" />
             <i v-else class="bi bi-plus-lg"></i>
             {{ saving ? 'Creando…' : 'Crear sala' }}
           </button>
@@ -249,6 +265,7 @@ onMounted(async () => {
 .mcr__textarea { resize: vertical; min-height: 68px; }
 .mcr__err  { font-size: .72rem; color: #dc2626; font-weight: 600; }
 .mcr__hint { font-size: .72rem; color: #94a3b8; }
+.mcr__hint { font-size: .72rem; color: #94a3b8; }
 
 /* Kinds selector */
 .mcr__kinds { display: flex; flex-wrap: wrap; gap: .4rem; }
@@ -295,10 +312,4 @@ onMounted(async () => {
   cursor: pointer; transition: all .15s;
 }
 .mcr__btn-ghost:hover:not(:disabled) { background: #f8fafc; }
-.mcr__spinner {
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: mcr-spin .6s linear infinite;
-}
-@keyframes mcr-spin { to { transform: rotate(360deg); } }
 </style>

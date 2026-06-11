@@ -2,6 +2,7 @@
   <div class="aud-home">
     <h1 class="aud-home__title">Panel de Auditoría</h1>
     <p class="aud-home__sub">Acceso de solo lectura a los informes del club.</p>
+
     <div class="aud-home__cards">
       <RouterLink to="/auditor/reprocann" class="aud-card">
         <FileCheck :size="28" :stroke-width="1.5" />

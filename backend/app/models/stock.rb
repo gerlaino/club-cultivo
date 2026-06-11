@@ -2,7 +2,7 @@ class Stock < ApplicationRecord
   belongs_to :sede,     optional: true
   belongs_to :lote,     optional: true
   belongs_to :pesada,   optional: true
-  belongs_to :club,     optional: true
+  belongs_to :club
   belongs_to :genetica, optional: true
 
   has_many :stock_movimientos, dependent: :destroy
@@ -26,7 +26,7 @@ class Stock < ApplicationRecord
 
   validate :validar_segun_origen
 
-  before_create :set_club_id
+  before_validation :set_club_id, on: :create
   before_create :generar_numero_lote_producto
   before_create :generar_codigo_qr
   before_create :descontar_lote_origen_si_corresponde, unless: -> { es_split }
@@ -42,6 +42,29 @@ class Stock < ApplicationRecord
   def asignado?             = estado == 'asignado'
   def agotado?              = estado == 'agotado'
   def del_club?             = sede_id.nil?
+
+  def gramos_reservados
+    dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
+  end
+
+  def cantidad_disponible_real
+    [cantidad.to_f - gramos_reservados, 0].max
+  end
+
+  def dias_para_vencimiento
+    return nil unless fecha_vencimiento_est
+    (fecha_vencimiento_est - Date.today).to_i
+  end
+
+  def estado_vencimiento
+    return nil unless fecha_vencimiento_est
+    dias = dias_para_vencimiento
+    if    dias < 0  then 'vencido'
+    elsif dias <= 7 then 'critico'
+    elsif dias <= 30 then 'proximo'
+    else 'ok'
+    end
+  end
 
   def asignar!(sede:, usuario:, notas: nil)
     ActiveRecord::Base.transaction do
@@ -74,13 +97,17 @@ class Stock < ApplicationRecord
     return if numero_lote_producto.present?
     return unless club_id
     year = Date.today.strftime("%y")
-    n    = Stock.where(club_id: club_id).count + 1
-    candidate = "ST-#{year}-#{n.to_s.rjust(4, '0')}"
-    while Stock.exists?(numero_lote_producto: candidate)
-      n += 1
-      candidate = "ST-#{year}-#{n.to_s.rjust(4, '0')}"
+    loop do
+      result = ActiveRecord::Base.connection.execute(
+        "UPDATE clubs SET lote_numero_seq = COALESCE(lote_numero_seq, 0) + 1 WHERE id = #{club_id.to_i} RETURNING lote_numero_seq"
+      )
+      seq = result.first['lote_numero_seq']
+      candidate = "ST-#{year}-#{seq.to_s.rjust(4, '0')}"
+      unless Stock.where(club_id: club_id).exists?(numero_lote_producto: candidate)
+        self.numero_lote_producto = candidate
+        break
+      end
     end
-    self.numero_lote_producto = candidate
   end
 
   def generar_codigo_qr
@@ -100,6 +127,9 @@ class Stock < ApplicationRecord
       errors.add(:lote_id, 'es obligatorio para derivados')           if lote_id.blank?
       errors.add(:lote_origen_consumido_g, 'debe ser mayor a 0')     if lote_origen_consumido_g.to_d <= 0
       errors.add(:forma_producto, 'no puede ser flor_seca para derivados') if forma_producto == 'flor_seca'
+      if cantidad.to_d > lote_origen_consumido_g.to_d
+        errors.add(:cantidad, "no puede superar los gramos consumidos (#{lote_origen_consumido_g}g consumidos → #{cantidad}g resultado)")
+      end
     when 'compra_externa'
       errors.add(:proveedor, 'es obligatorio para compra externa') if proveedor.blank?
       errors.add(:lote_id,   'debe ser nulo para compra externa')  if lote_id.present?

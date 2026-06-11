@@ -36,7 +36,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="miv__loading">
-      <div class="miv__ring"></div> Cargando indicaciones…
+      <DsSpinner :size="20" /> Cargando indicaciones…
     </div>
 
     <!-- Empty -->
@@ -79,6 +79,9 @@
               <span class="miv__estado-badge" :class="estadoClass(ind)">{{ estadoLabel(ind) }}</span>
             </td>
             <td class="miv__td-actions">
+              <a class="miv__action-btn" :href="`${apiBase}/indicaciones/${ind.id}/prescripcion_pdf`" target="_blank" title="Ver prescripción PDF">
+                <FileText :size="14" />
+              </a>
               <button class="miv__action-btn" @click="openEdit(ind)" title="Editar">
                 <Pencil :size="14" />
               </button>
@@ -177,10 +180,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Search, Plus, Pencil, Trash2, X, FileHeart } from 'lucide-vue-next'
+import { Search, Plus, Pencil, Trash2, X, FileHeart, FileText } from 'lucide-vue-next'
+
+const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 import { createIndicacion, updateIndicacion, deleteIndicacion } from '../../lib/api.js'
 import { usePacientesStore } from '../../stores/pacientes.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useToast } from '../../composables/useToast.js'
 import api from '../../lib/api.js'
 
@@ -422,12 +428,6 @@ onMounted(async () => {
   display: flex; align-items: center; gap: var(--sp-3);
   color: var(--c-ink-500); padding: var(--sp-8); font-size: var(--fs-14);
 }
-.miv__ring {
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 2px solid var(--c-ink-200); border-top-color: #2D8A6B;
-  animation: spin .7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 .miv__empty {
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-3);
   padding: var(--sp-12) var(--sp-6); color: var(--c-ink-300); text-align: center;
@@ -481,53 +481,72 @@ onMounted(async () => {
 
 /* Modal */
 .miv__overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1000;
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1000;
   display: flex; align-items: center; justify-content: center; padding: var(--sp-4);
 }
 .miv__modal {
-  background: var(--c-paper); border-radius: var(--r-xl); width: 100%; max-width: 580px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.2); display: flex; flex-direction: column; max-height: 90vh;
+  background: #fff; border-radius: 16px; width: 100%; max-width: 600px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.22); display: flex; flex-direction: column; max-height: 90vh;
 }
 .miv__modal-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: var(--sp-5) var(--sp-6); border-bottom: 1px solid var(--c-ink-100);
+  padding: 1.25rem 1.5rem; border-bottom: 1px solid #e2e8f0;
 }
-.miv__modal-title { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); margin: 0; }
+.miv__modal-title { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0; }
 .miv__modal-close {
-  background: none; border: none; color: var(--c-ink-400); cursor: pointer;
-  display: flex; align-items: center; padding: var(--sp-1); border-radius: var(--r-sm);
+  background: none; border: none; color: #94a3b8; cursor: pointer;
+  display: flex; align-items: center; padding: .3rem; border-radius: 6px; transition: all .12s;
 }
-.miv__modal-close:hover { background: var(--c-ink-50); color: var(--c-ink-700); }
-.miv__modal-body { padding: var(--sp-5) var(--sp-6); overflow-y: auto; flex: 1; }
+.miv__modal-close:hover { background: #f1f5f9; color: #475569; }
+.miv__modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; background: #f8fafc; }
 .miv__modal-footer {
-  display: flex; justify-content: flex-end; gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-6); border-top: 1px solid var(--c-ink-100);
+  display: flex; justify-content: flex-end; gap: .75rem;
+  padding: 1rem 1.5rem; border-top: 1px solid #e2e8f0; background: #fff; border-radius: 0 0 16px 16px;
 }
 
 /* Formulario */
 .miv__form-error {
-  background: rgba(220,38,38,.08); border: 1px solid rgba(220,38,38,.2);
-  color: #dc2626; border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
-  font-size: var(--fs-13); margin-bottom: var(--sp-4);
+  background: #fef2f2; border: 1px solid #fecaca;
+  color: #dc2626; border-radius: 8px; padding: .75rem 1rem;
+  font-size: var(--fs-13); margin-bottom: 1rem;
 }
-.miv__form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
-.miv__form-field { display: flex; flex-direction: column; gap: var(--sp-1); }
+.miv__form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
+.miv__form-field { display: flex; flex-direction: column; gap: .3rem; }
 .miv__form-field--full { grid-column: 1 / -1; }
-.miv__form-field label { font-size: var(--fs-12); font-weight: 600; color: var(--c-ink-600); }
+.miv__form-field label {
+  font-size: .72rem; font-weight: 700; color: #475569;
+  text-transform: uppercase; letter-spacing: .04em;
+}
 .miv__req { color: #dc2626; }
 .miv__form-field input,
 .miv__form-field select,
 .miv__form-field textarea {
-  padding: var(--sp-2) var(--sp-3); background: var(--c-bg);
-  border: 1px solid var(--c-ink-200); border-radius: var(--r-md);
-  font-size: var(--fs-14); color: var(--c-ink-800); outline: none;
-  transition: border-color .15s; font-family: inherit;
+  padding: .55rem .8rem;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: .875rem;
+  color: #0f172a;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
 }
+.miv__form-field input::placeholder,
+.miv__form-field textarea::placeholder { color: #94a3b8; }
+.miv__form-field select { appearance: auto; cursor: pointer; }
 .miv__form-field input:focus,
 .miv__form-field select:focus,
-.miv__form-field textarea:focus { border-color: #2D8A6B; }
+.miv__form-field textarea:focus {
+  border-color: #2D8A6B;
+  box-shadow: 0 0 0 3px rgba(45,138,107,.12);
+}
 .miv__form-field--error input,
-.miv__form-field--error select { border-color: #dc2626; }
-.miv__field-err { font-size: var(--fs-11); color: #dc2626; }
-.miv__form-field textarea { resize: vertical; }
+.miv__form-field--error select,
+.miv__form-field--error textarea {
+  border-color: #f87171;
+  box-shadow: 0 0 0 3px rgba(220,38,38,.08);
+}
+.miv__field-err { font-size: .72rem; color: #dc2626; font-weight: 500; }
+.miv__form-field textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
 </style>

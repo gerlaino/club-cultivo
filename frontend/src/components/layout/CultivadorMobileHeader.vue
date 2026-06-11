@@ -3,8 +3,8 @@
     <div class="cmh__inner">
       <!-- Brand -->
       <RouterLink to="/" class="cmh__brand">
-        <LeafSeal :size="20" class="cmh__brand-leaf" />
-        <span class="cmh__brand-name">cultivoespacial</span>
+        <img src="/logo-ce-icono.png" class="cmh__brand-logo" alt="Cultivo Espacial" />
+        <span class="cmh__brand-name">Cultivo Espacial</span>
       </RouterLink>
 
       <!-- Bell -->
@@ -49,7 +49,6 @@
 import { ref, computed } from 'vue'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
-import LeafSeal   from '../../design-system/icons/LeafSeal.vue'
 import DsEmpty    from '../../design-system/components/EmptyState.vue'
 import SheetBottom from '../cultivador/SheetBottom.vue'
 import { Bell } from 'lucide-vue-next'
@@ -103,7 +102,7 @@ function formatTime(ts) {
   gap: var(--sp-2);
   text-decoration: none;
 }
-.cmh__brand-leaf { color: var(--c-leaf-700); flex-shrink: 0; }
+.cmh__brand-logo { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .cmh__brand-name {
   font-family: var(--font-display);
   font-size: var(--fs-14);

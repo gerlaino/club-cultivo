@@ -9,8 +9,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="mne__loading">
-      <div class="mne__spinner"></div>
-      <span>Cargando lotes…</span>
+      <DsSpinner />
     </div>
 
     <!-- Empty -->
@@ -23,7 +22,7 @@
     <!-- List -->
     <div v-else class="mne__list">
       <RouterLink
-        v-for="lote in lotes"
+        v-for="lote in paginados"
         :key="lote.id"
         :to="`/mnc/lotes/${lote.id}`"
         class="mne__row"
@@ -51,16 +50,29 @@
       </RouterLink>
     </div>
 
+    <div v-if="totalPages > 1" class="mne__pager">
+      <button class="mne__pager-btn" :disabled="page <= 1" @click="page--">«</button>
+      <span class="mne__pager-info">{{ page }} / {{ totalPages }}</span>
+      <button class="mne__pager-btn" :disabled="page >= totalPages" @click="page++">»</button>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Clock, Scale, ChevronRight } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
 
 const lotes   = ref([])
 const loading = ref(true)
+
+const PER_PAGE   = 10
+const page       = ref(1)
+const paginados  = computed(() => lotes.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
+const totalPages = computed(() => Math.max(1, Math.ceil(lotes.value.length / PER_PAGE)))
+watch(lotes, () => { page.value = 1 })
 
 async function cargar() {
   loading.value = true
@@ -85,16 +97,8 @@ onMounted(cargar)
 .mne__sub    { font-size: var(--fs-14); color: var(--c-ink-500); margin: 0; }
 
 .mne__loading {
-  display: flex; align-items: center; gap: var(--sp-3);
-  padding: var(--sp-12) 0; justify-content: center; color: var(--c-ink-400);
-  font-size: var(--fs-14);
+  display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px);
 }
-.mne__spinner {
-  width: 18px; height: 18px;
-  border: 2px solid var(--c-ink-200); border-top-color: #7c3aed;
-  border-radius: 50%; animation: mne-spin .7s linear infinite;
-}
-@keyframes mne-spin { to { transform: rotate(360deg); } }
 
 .mne__empty {
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
@@ -143,4 +147,10 @@ onMounted(cargar)
   text-transform: uppercase; letter-spacing: .04em;
 }
 .mne__row-arrow { color: var(--c-ink-300); }
+
+.mne__pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 1.25rem 0 .5rem; }
+.mne__pager-btn { background: #fff; border: 1.5px solid var(--c-ink-200); color: var(--c-ink-700); padding: .35rem .75rem; border-radius: 7px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.mne__pager-btn:hover:not(:disabled) { border-color: #7c3aed; color: #7c3aed; }
+.mne__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.mne__pager-info { font-size: .82rem; color: var(--c-ink-500); font-weight: 600; min-width: 50px; text-align: center; }
 </style>

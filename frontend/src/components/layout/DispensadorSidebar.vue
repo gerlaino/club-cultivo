@@ -3,8 +3,8 @@
 
     <!-- Brand -->
     <div class="dsb__brand">
-      <LeafSeal :size="24" class="dsb__brand-leaf" />
-      <span class="dsb__brand-name">cultivoespacial</span>
+      <img src="/logo-ce-icono.png" class="dsb__brand-logo" alt="Cultivo Espacial" />
+      <span class="dsb__brand-name">Cultivo Espacial</span>
     </div>
 
     <!-- Nav links -->
@@ -40,7 +40,6 @@
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
-import LeafSeal from '../../design-system/icons/LeafSeal.vue'
 import DsAvatar from '../../design-system/components/Avatar.vue'
 import { Home, PackagePlus, Users, History, Boxes, LogOut } from 'lucide-vue-next'
 
@@ -53,7 +52,7 @@ const NAV_LINKS = [
   { to: '/',          icon: Home,        label: 'Inicio' },
   { to: '/dispensar', icon: PackagePlus, label: 'Dispensar' },
   { to: '/pacientes', icon: Users,       label: 'Pacientes' },
-  { to: '/historial', icon: History,     label: 'Historial' },
+  { to: '/historial', icon: History,     label: 'Dispensaciones' },
   { to: '/stock',     icon: Boxes,       label: 'Stock' },
 ]
 
@@ -91,7 +90,7 @@ async function handleLogout() {
   padding: var(--sp-5) var(--sp-5) var(--sp-4);
   border-bottom: 1px solid rgba(168, 201, 181, 0.15);
 }
-.dsb__brand-leaf { color: var(--c-leaf-300); flex-shrink: 0; }
+.dsb__brand-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .dsb__brand-name {
   font-family: var(--font-display);
   font-size: var(--fs-16);

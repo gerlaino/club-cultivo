@@ -32,7 +32,6 @@ export function usePermissions() {
       plant_activities: ['index', 'create', 'destroy'],
       lotes: ['index', 'show', 'create', 'update', 'destroy'],
       salas: ['index', 'show', 'create', 'update', 'destroy'],
-      sedes: ['index', 'show'],
       geneticas: ['index', 'show'],
       plan_trabajo: ['index', 'show', 'create', 'update'],
       tareas: ['index', 'show', 'create', 'update', 'destroy'],
@@ -121,7 +120,8 @@ export function usePermissions() {
     return resourcePermissions.includes(action)
   }
 
-  const isAdmin       = computed(() => userRole.value === 'admin' || userRole.value === 'super_admin')
+  const isAdmin       = computed(() => userRole.value === 'admin')
+  const isSuperAdmin  = computed(() => userRole.value === 'super_admin')
   const isMedico      = computed(() => userRole.value === 'medico')
   const isCultivador  = computed(() => userRole.value === 'cultivador')
   const isSupervisor  = computed(() => userRole.value === 'supervisor')
@@ -136,6 +136,7 @@ export function usePermissions() {
   return {
     can,
     isAdmin,
+    isSuperAdmin,
     isMedico,
     isCultivador,
     isSupervisor,

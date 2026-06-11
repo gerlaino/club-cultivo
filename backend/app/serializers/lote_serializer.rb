@@ -24,6 +24,7 @@ class LoteSerializer
       club_id:              lote.club_id,
       sala_id:              lote.sala_id,
       codigo:               lote.codigo,
+      codigo_qr:            lote.codigo_qr,
       origen:               lote.origen,
       planta_madre:         lote.planta_madre ? { id: lote.planta_madre.id, nombre: lote.planta_madre.nombre, codigo_qr: lote.planta_madre.codigo_qr } : nil,
       estado:               lote.estado,
@@ -38,11 +39,18 @@ class LoteSerializer
       plantas_cosechadas_count: lote.estado == 'floracion' ? lote.plants.where(state: 'cosechado').count : nil,
       strain:             lote.strain,
       notes:              lote.notes,
-      grow_type:          lote.grow_type,
-      light_type:         lote.light_type,
-      semanas_floracion:  lote.semanas_floracion,
-      tamanio_maceta:     lote.tamanio_maceta,
-      fotoperiodo:        lote.fotoperiodo,
+      grow_type:                 lote.grow_type,
+      light_type:                lote.light_type,
+      semanas_floracion:         lote.semanas_floracion,
+      tamanio_maceta:            lote.tamanio_maceta,
+      tamanio_maceta_inicial:    lote.tamanio_maceta_inicial,
+      fecha_trasplante:          lote.fecha_trasplante,
+      fotoperiodo:               lote.fotoperiodo,
+      fotoperiodo_vegetativo:    lote.fotoperiodo_vegetativo,
+      ph_riego:                  lote.ph_riego&.to_f,
+      fertilizacion_descripcion: lote.fertilizacion_descripcion,
+      sistema_hidro:             lote.sistema_hidro,
+      sustrato_especifico:       lote.sustrato_especifico,
       genetica_id:        lote.genetica_id,
       genetica:           lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, registrada_inase: lote.genetica.registrada_inase } : nil,
       dias_desde_inicio:  lote.dias_desde_inicio,
@@ -61,12 +69,12 @@ class LoteSerializer
       plants_count_cosechadas: lote.plants_count_cosechadas,
       manicurador_id: lote.manicurador_id,
       manicurador:    lote.manicurador ? { id: lote.manicurador.id, nombre: lote.manicurador.first_name || lote.manicurador.email } : nil,
-      sala: {
+      sala: lote.sala ? {
         id:     lote.sala.id,
         nombre: lote.sala.nombre,
         tipo:   lote.sala.tipo,
         sede:   lote.sala.sede ? { id: lote.sala.sede_id, nombre: lote.sala.sede.nombre } : nil,
-      },
+      } : nil,
       created_at: lote.created_at,
       updated_at: lote.updated_at,
     }
@@ -74,14 +82,22 @@ class LoteSerializer
     pm = lote.pesadas.loaded? \
       ? lote.pesadas.select(&:manicurado).max_by { |p| p.registrado_at } \
       : lote.pesadas.where(manicurado: true).order(registrado_at: :desc).first
-    result[:ultima_pesada_manicura] = pm ? {
-      peso_seco_g:         pm.peso_seco_g&.to_f,
-      plantas_manicuradas: pm.plantas_manicuradas,
-      notas:               pm.notas,
-      registrado_at:       pm.registrado_at,
-      registrado_por:      pm.registrado_por&.first_name,
-      aprobada_at:         pm.aprobada_at,
-    } : nil
+    if pm
+      # QR flow may leave peso_seco_g nil — fall back to sum of pesadas_plantas
+      pm_peso = pm.peso_seco_g&.to_f
+      pm_peso = pm.pesadas_plantas.sum(:peso_seco_g).to_f.round(2) if pm_peso.nil? || pm_peso == 0
+      pm_peso = nil if pm_peso == 0.0
+      result[:ultima_pesada_manicura] = {
+        peso_seco_g:         pm_peso,
+        plantas_manicuradas: pm.plantas_manicuradas || pm.pesadas_plantas.count,
+        notas:               pm.notas,
+        registrado_at:       pm.registrado_at,
+        registrado_por:      pm.registrado_por&.first_name,
+        aprobada_at:         pm.aprobada_at,
+      }
+    else
+      result[:ultima_pesada_manicura] = nil
+    end
 
     ultima_p = lote.pesadas.loaded? \
       ? lote.pesadas.max_by { |p| p.registrado_at } \
@@ -110,13 +126,24 @@ class LoteSerializer
         []
       end
 
-      result[:salas_destino] = lote.club.salas.activas
-                                    .includes(:responsable)
+      salas_base = lote.club.salas.activas
+      salas_base = case proxima_fase
+        when 'cosecha'    then salas_base.where('tipo = ? OR kind = ?', 'cosecha', 'cosecha')
+        when 'vegetativo' then salas_base.where('tipo = ? OR kind = ?', 'vegetativo', 'vegetativo')
+        when 'floracion'  then salas_base.where('tipo = ? OR kind = ?', 'floracion',  'floracion')
+        when 'secado'     then salas_base.where('tipo = ? OR kind IN (?)', 'secado', %w[secado manicura])
+        when 'curado'     then salas_base.where('tipo = ?', 'curado')
+        else salas_base
+      end
+      result[:salas_destino] = salas_base
+                                    .includes(:responsable, :sede)
                                     .order(:nombre)
                                     .map { |s| {
                                       id:                 s.id,
                                       nombre:             s.nombre,
                                       kind:               s.kind,
+                                      sede_id:            s.sede_id,
+                                      sede:               s.sede ? { id: s.sede_id, nombre: s.sede.nombre } : nil,
                                       actual:             s.id == lote.sala_id,
                                       responsable_id:     s.responsable_id,
                                       responsable_nombre: s.responsable&.nombre_completo,

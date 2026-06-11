@@ -15,8 +15,7 @@
     </div>
 
     <div v-if="loading" class="mnd__loading">
-      <div class="mnd__spinner"></div>
-      <span>Cargando…</span>
+      <DsSpinner />
     </div>
 
     <template v-else>
@@ -88,7 +87,7 @@
                     :disabled="!form.cantidad || form.cantidad <= 0 || enviando"
                     @click="enviar"
                   >
-                    <span v-if="enviando" class="mnd__spinner mnd__spinner--sm"></span>
+                    <DsSpinner v-if="enviando" :size="14" />
                     <i v-else class="bi bi-send-fill"></i>
                     Enviar para aprobación
                   </button>
@@ -128,7 +127,7 @@
             </div>
 
             <div v-if="loadingMovs" class="mnd__loading mnd__loading--sm">
-              <div class="mnd__spinner"></div>
+              <DsSpinner />
             </div>
             <div v-else-if="movimientos.length === 0" class="mnd__empty-movs">
               Sin registros todavía.
@@ -164,6 +163,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { listLotes, listSalas, agregarStock, getMisMovimientos } from '../../lib/api'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const auth = useAuthStore()
 
@@ -289,11 +289,8 @@ onMounted(async () => {
 .mnd__sala-sede { color: #a78bfa; font-weight: 400; }
 
 /* Loading */
-.mnd__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; }
-.mnd__loading--sm { padding: 1.5rem; }
-.mnd__spinner { width: 22px; height: 22px; border: 2.5px solid #e2e8f0; border-top-color: #7c3aed; border-radius: 50%; animation: mnd-spin .6s linear infinite; flex-shrink: 0; }
-.mnd__spinner--sm { width: 14px; height: 14px; border-width: 2px; border-top-color: #fff; border-color: rgba(255,255,255,.3); }
-@keyframes mnd-spin { to { transform: rotate(360deg); } }
+.mnd__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
+.mnd__loading--sm { min-height: unset; padding: 2rem; }
 
 /* Empty states */
 .mnd__empty-sala { text-align: center; padding: 5rem 1rem; }

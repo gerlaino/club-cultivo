@@ -2,7 +2,7 @@
   <div class="mnl">
 
     <div v-if="loading" class="mnl__loading">
-      <div class="mnl__spinner"></div>
+      <DsSpinner />
     </div>
 
     <template v-else-if="lote">
@@ -132,7 +132,7 @@
           {{ pesadasKpi }}/{{ plantas.length }} plantas · {{ totalGramosKpi }}g total
         </p>
         <button class="mnl__btn-submit" :disabled="submitting" @click="enviarAprobacion">
-          <div v-if="submitting" class="mnl__spinner mnl__spinner--sm"></div>
+          <DsSpinner v-if="submitting" :size="14" />
           <Send v-else :size="14" :stroke-width="2" />
           Enviar para aprobación
         </button>
@@ -183,7 +183,7 @@
               <div class="mnl-actions">
                 <button type="button" class="mnl-btn-cancel" @click="cerrarModal">Cancelar</button>
                 <button type="submit" class="mnl-btn-ok" :disabled="savingBatch || !batchForm.plantas_manicuradas || !batchForm.peso_seco_g">
-                  <div v-if="savingBatch" class="mnl__spinner mnl__spinner--sm mnl__spinner--white"></div>
+                  <DsSpinner v-if="savingBatch" :size="14" />
                   <Send v-else :size="13" />
                   Enviar a aprobación
                 </button>
@@ -200,6 +200,7 @@
 <script setup>
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { ChevronLeft, Scissors, Leaf, CheckCircle, Scale, Send, X, Lock, RefreshCw } from 'lucide-vue-next'
 import { getLote, listPlants, transicionarLote, finalizarPesajeManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -468,15 +469,7 @@ onActivated(cargar)
 .mnl__btn-submit:disabled { opacity: .45; cursor: not-allowed; }
 
 /* Loading */
-.mnl__loading { display: flex; align-items: center; justify-content: center; padding: 4rem 0; }
-.mnl__spinner {
-  width: 20px; height: 20px;
-  border: 2px solid #e2e8f0; border-top-color: #5C7A4A;
-  border-radius: 50%; animation: mnl-spin .7s linear infinite;
-}
-.mnl__spinner--sm    { width: 14px; height: 14px; }
-.mnl__spinner--white { border-top-color: #fff; border-color: rgba(255,255,255,.3); }
-@keyframes mnl-spin { to { transform: rotate(360deg); } }
+.mnl__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 /* Modal */
 .mnl-overlay {

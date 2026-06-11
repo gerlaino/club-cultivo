@@ -11,8 +11,7 @@
     </div>
 
     <div v-if="loading" class="av__loading">
-      <div class="av__ring"></div>
-      <span>Cargando lotes…</span>
+      <DsSpinner />
     </div>
 
     <div v-else-if="!lotes.length" class="av__empty">
@@ -22,7 +21,7 @@
     </div>
 
     <div v-else class="av__cards">
-      <div v-for="lote in lotes" :key="lote.id" class="av__card">
+      <div v-for="lote in paginados" :key="lote.id" class="av__card">
         <div class="av__card-stripe"></div>
         <div class="av__card-body">
           <div class="av__card-head">
@@ -67,12 +66,18 @@
           </button>
           <!-- Legacy: aprobación directa → curado -->
           <button v-else class="av__btn-success" :disabled="aprobando === lote.id" @click="aprobarLegacy(lote)">
-            <div v-if="aprobando === lote.id" class="av__spinner"></div>
+            <DsSpinner v-if="aprobando === lote.id" :size="13" />
             <CheckCircle v-else :size="14" :stroke-width="2" />
             Aprobar
           </button>
         </div>
       </div>
+    </div>
+
+    <div v-if="totalPages > 1" class="av__pager">
+      <button class="av__pager-btn" :disabled="page <= 1" @click="page--">«</button>
+      <span class="av__pager-info">{{ page }} / {{ totalPages }}</span>
+      <button class="av__pager-btn" :disabled="page >= totalPages" @click="page++">»</button>
     </div>
 
     <!-- Modal rechazo -->
@@ -115,7 +120,7 @@
               <div class="av-actions">
                 <button type="button" class="av-btn-cancel" @click="cerrarRechazo">Cancelar</button>
                 <button type="submit" class="av-btn-danger-solid" :disabled="rechazando">
-                  <div v-if="rechazando" class="av-spinner"></div>
+                  <DsSpinner v-if="rechazando" :size="13" />
                   <XCircle v-else :size="15" :stroke-width="2" />
                   Confirmar rechazo
                 </button>
@@ -146,11 +151,6 @@
 
             <form class="av-modal__body" @submit.prevent="confirmarAprobacion">
 
-              <div class="av-info-box">
-                <span class="av-info-ico">📦</span>
-                <span>El stock se creará como <strong>flor seca pendiente de asignación</strong>. Desde la sección Stock podrás distribuirlo entre sedes y procesar derivados.</span>
-              </div>
-
               <div class="av-field">
                 <label class="av-label">Peso seco confirmado (g) <span class="av-req">*</span></label>
                 <input
@@ -165,6 +165,28 @@
                 <span class="av-hint">Registrado por manicura: {{ loteAprobacion?.ultima_pesada_manicura?.peso_seco_g }}g. Editá si no coincide.</span>
               </div>
 
+              <div class="av-field">
+                <label class="av-label">Precio sugerido (ARS/g)</label>
+                <input
+                  v-model.number="aprobForm.precio_sugerido_ars"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="av-input"
+                  placeholder="0.00"
+                />
+                <span class="av-hint">Opcional — se usará al crear dispensaciones</span>
+              </div>
+
+              <div v-if="sedes.length" class="av-field">
+                <label class="av-label">Asignar a sede</label>
+                <select v-model="aprobForm.sede_id" class="av-select">
+                  <option :value="null">— Sin asignar (pendiente) —</option>
+                  <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                </select>
+                <span class="av-hint">Solo sedes sociales o mixtas. Si asignás, el estado cambia a "disponible".</span>
+              </div>
+
               <div v-if="aprobError" class="av-error">
                 <AlertCircle :size="15" :stroke-width="2" /> {{ aprobError }}
               </div>
@@ -172,7 +194,7 @@
               <div class="av-actions">
                 <button type="button" class="av-btn-cancel" @click="cerrarAprobacion">Cancelar</button>
                 <button type="submit" class="av-btn-success-solid" :disabled="aprobando !== null">
-                  <div v-if="aprobando" class="av-spinner"></div>
+                  <DsSpinner v-if="aprobando" :size="13" />
                   <PackageCheck v-else :size="15" :stroke-width="2" />
                   Confirmar y generar stock
                 </button>
@@ -189,15 +211,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { ClipboardCheck, Clock, Leaf, MapPin, Package, Scale, Eye, CheckCircle, XCircle, X, AlertCircle, Scissors, PackageCheck } from 'lucide-vue-next'
-import { listLotes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
+import { listLotes, listSedes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast = useToast()
 const lotes   = ref([])
+const sedes   = ref([])
 const loading = ref(true)
 const aprobando = ref(null)
+
+const PER_PAGE   = 10
+const page       = ref(1)
+const paginados  = computed(() => lotes.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
+const totalPages = computed(() => Math.max(1, Math.ceil(lotes.value.length / PER_PAGE)))
+watch(lotes, () => { page.value = 1 })
 
 // Modal rechazo
 const modalRechazo  = ref(false)
@@ -209,7 +239,7 @@ const rechazoError  = ref('')
 // Modal aprobación (nuevo flujo)
 const modalAprobacion = ref(false)
 const loteAprobacion  = ref(null)
-const aprobForm = ref({ peso_seco_g: null })
+const aprobForm = ref({ peso_seco_g: null, precio_sugerido_ars: null, sede_id: null })
 const aprobError = ref('')
 
 function fmtDate(d) {
@@ -220,19 +250,27 @@ function fmtDate(d) {
 async function cargar() {
   loading.value = true
   try {
-    const lotesRes = await listLotes({ estado: 'manicura_pendiente' })
-    lotes.value = lotesRes.data || []
-  } catch {
-    lotes.value = []
+    const [lotesRes, sedesRes] = await Promise.allSettled([
+      listLotes({ estado: 'manicura_pendiente' }),
+      listSedes(),
+    ])
+    lotes.value = lotesRes.status === 'fulfilled' ? (lotesRes.value.data || []) : []
+    sedes.value = sedesRes.status === 'fulfilled'
+      ? (sedesRes.value.data || []).filter(s => ['social', 'mixta'].includes(s.tipo))
+      : []
   } finally {
     loading.value = false
   }
 }
 
-// Nuevo flujo: abre modal con sede + peso
+// Nuevo flujo: abre modal con sede + peso + precio
 function abrirAprobacion(lote) {
   loteAprobacion.value  = lote
-  aprobForm.value       = { peso_seco_g: lote.ultima_pesada_manicura?.peso_seco_g ?? null }
+  aprobForm.value       = {
+    peso_seco_g:         lote.ultima_pesada_manicura?.peso_seco_g ?? null,
+    precio_sugerido_ars: null,
+    sede_id:             null,
+  }
   aprobError.value      = ''
   modalAprobacion.value = true
 }
@@ -249,8 +287,14 @@ async function confirmarAprobacion() {
   aprobando.value  = loteAprobacion.value.id
   aprobError.value = ''
   try {
-    await aprobarManicura(loteAprobacion.value.id, { peso_seco_g: aprobForm.value.peso_seco_g })
-    toast.success(`Lote ${loteAprobacion.value.codigo} finalizado — stock pendiente de asignación`)
+    const payload = { peso_seco_g: aprobForm.value.peso_seco_g }
+    if (aprobForm.value.sede_id) payload.sede_id = aprobForm.value.sede_id
+    if (aprobForm.value.precio_sugerido_ars) payload.precio_sugerido_ars = aprobForm.value.precio_sugerido_ars
+    await aprobarManicura(loteAprobacion.value.id, payload)
+    const dest = aprobForm.value.sede_id
+      ? `asignado a ${sedes.value.find(s => s.id === aprobForm.value.sede_id)?.nombre}`
+      : 'pendiente de asignación'
+    toast.success(`Lote ${loteAprobacion.value.codigo} finalizado — ${dest}`)
     cerrarAprobacion()
     cargar()
   } catch (e) {
@@ -319,13 +363,7 @@ onMounted(cargar)
 .av__title { font-size: 1.75rem; font-weight: 800; color: var(--c-ink-900); margin: 0 0 .2rem; letter-spacing: -.03em; }
 .av__sub { font-size: var(--fs-14); color: var(--c-ink-500); margin: 0; }
 
-.av__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; justify-content: center; color: var(--c-ink-500); }
-.av__ring {
-  width: 20px; height: 20px;
-  border: 2px solid var(--c-ink-200); border-top-color: var(--c-role-admin);
-  border-radius: 50%; animation: av-spin .7s linear infinite;
-}
-@keyframes av-spin { to { transform: rotate(360deg); } }
+.av__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 .av__empty { text-align: center; padding: 4rem 2rem; }
 .av__empty-ico { color: var(--c-ink-300); margin-bottom: 1rem; display: flex; justify-content: center; }
@@ -333,6 +371,11 @@ onMounted(cargar)
 .av__empty-sub { font-size: var(--fs-14); color: var(--c-ink-500); margin: 0; }
 
 .av__cards { display: flex; flex-direction: column; gap: .75rem; }
+.av__pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 1.25rem 0 .5rem; }
+.av__pager-btn { background: #fff; border: 1.5px solid var(--c-ink-200); color: var(--c-ink-700); padding: .35rem .75rem; border-radius: 7px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.av__pager-btn:hover:not(:disabled) { border-color: #15803d; color: #15803d; }
+.av__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.av__pager-info { font-size: .82rem; color: var(--c-ink-500); font-weight: 600; min-width: 50px; text-align: center; }
 .av__card {
   display: flex; align-items: stretch;
   background: var(--c-paper); border: 1px solid var(--c-ink-200);
@@ -399,11 +442,6 @@ onMounted(cargar)
 }
 .av__btn-success:hover:not(:disabled) { opacity: .88; }
 .av__btn-success:disabled { opacity: .5; cursor: not-allowed; }
-.av__spinner {
-  width: 13px; height: 13px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: av-spin .6s linear infinite;
-}
 
 /* Modal */
 .av-overlay {

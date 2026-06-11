@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth'
 import { useConfirm } from '../composables/useConfirm.js'
 import { exportPacientesCSV } from '../lib/api.js'
 import EmptyState from '../components/ui/EmptyState.vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const store  = usePacientesStore()
 const auth   = useAuthStore()
@@ -278,8 +279,7 @@ async function exportarCSV() {
 
     <!-- Loading -->
     <div v-if="store.loading" class="sv__loading">
-      <div class="sv__ring"></div>
-      <span>Cargando pacientes…</span>
+      <DsSpinner />
     </div>
 
     <!-- Empty -->
@@ -454,7 +454,7 @@ async function exportarCSV() {
           <div class="sp-modal__footer">
             <button class="sp-btn-ghost" :disabled="store.saving" @click="showModal=false">Cancelar</button>
             <button class="sp-btn-primary" :disabled="store.saving" @click="save">
-              <span v-if="store.saving" class="sp-spinner"></span>
+              <DsSpinner v-if="store.saving" :size="15" />
               <i v-else class="bi bi-check-lg"></i>
               Guardar cambios
             </button>
@@ -508,9 +508,7 @@ async function exportarCSV() {
 .sv__search:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); }
 .sv__search-count { position: absolute; right: .875rem; font-size: .72rem; font-weight: 600; color: #94a3b8; }
 
-.sv__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 4rem; color: #94a3b8; font-size: .875rem; }
-.sv__ring { width: 22px; height: 22px; border: 2px solid #e2e8f0; border-top-color: #1b5e20; border-radius: 50%; animation: sv-spin .7s linear infinite; }
-@keyframes sv-spin { to { transform: rotate(360deg); } }
+.sv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 
 /* ── Tabla ───────────────────────────────────────── */

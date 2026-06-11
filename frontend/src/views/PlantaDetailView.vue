@@ -4,29 +4,26 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
+import { useClubStore }   from '../stores/club'
 import { getPlantActivities, createPlantActivity, updatePlant, addPlantFoto, removePlantFoto } from '../lib/api'
-import AsistenteVoz from '../components/AsistenteVoz.vue'
-import Breadcrumb from '../components/ui/Breadcrumb.vue'
-import EmptyState from '../components/ui/EmptyState.vue'
-import Lightbox from '../components/ui/Lightbox.vue'
+import Breadcrumb            from '../components/ui/Breadcrumb.vue'
+import EmptyState            from '../components/ui/EmptyState.vue'
+import Lightbox              from '../components/ui/Lightbox.vue'
+import ActionsDropdown       from '../components/ui/ActionsDropdown.vue'
+import RegistroPlantaModal   from '../components/plants/RegistroPlantaModal.vue'
 import { useToast }      from '../composables/useToast.js'
+import { useConfirm }   from '../composables/useConfirm.js'
 import { useBluelabBLE } from '../composables/useBluelabBLE.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
-const contextoAsistente = computed(() => planta.value ? {
-  tipo:          'planta',
-  planta_id:     planta.value.id,
-  planta_nombre: planta.value.nombre || planta.value.codigo_qr,
-  lote_id:       planta.value.lote?.id,
-  lote_codigo:   planta.value.lote?.codigo,
-} : null)
-
-function onRegistradoPorVoz() { loadActivities() }
 
 const route  = useRoute()
 const router = useRouter()
 const plants = usePlantsStore()
 const auth   = useAuthStore()
-const toast  = useToast()
+const club   = useClubStore()
+const toast   = useToast()
+const { confirm } = useConfirm()
 
 const id           = Number(route.params.id)
 const error        = ref(null)
@@ -89,14 +86,20 @@ function emptyForm() {
 const form = ref(emptyForm())
 
 // ── Constantes visuales ───────────────────────────────────
-const CICLO_PLANTA = ['semilla', 'vegetativo', 'floracion', 'cosecha', 'finalizado']
 const ESTADO_META = {
-  semilla:    { label:'Semilla',    color:'#64748b', bg:'#f1f5f9', emoji:'🌰' },
-  vegetativo: { label:'Vegetativo', color:'#16a34a', bg:'#dcfce7', emoji:'🍃' },
-  floracion:  { label:'Floración',  color:'#d97706', bg:'#fef3c7', emoji:'🌸' },
-  cosecha:    { label:'Cosecha',    color:'#92400e', bg:'#fff7ed', emoji:'✂️'  },
-  finalizado: { label:'Finalizado', color:'#1b5e20', bg:'#dcfce7', emoji:'✅' },
+  germinacion: { label:'Germinación', color:'#64748b', bg:'#f1f5f9', emoji:'🌱' },
+  esqueje:     { label:'Esqueje',     color:'#0891b2', bg:'#e0f2fe', emoji:'🪴' },
+  vegetativo:  { label:'Vegetativo',  color:'#16a34a', bg:'#dcfce7', emoji:'🍃' },
+  floracion:   { label:'Floración',   color:'#d97706', bg:'#fef3c7', emoji:'🌸' },
+  cosechado:   { label:'Cosechada',   color:'#92400e', bg:'#fff7ed', emoji:'✂️'  },
+  secado:      { label:'Secado',      color:'#7c3aed', bg:'#ede9fe', emoji:'🌬️' },
+  descartada:  { label:'Descartada',  color:'#dc2626', bg:'#fef2f2', emoji:'🗑️' },
 }
+const CICLO_PLANTA = computed(() => {
+  const origen = planta.value?.origen
+  if (origen === 'esqueje') return ['esqueje', 'vegetativo', 'floracion', 'cosechado']
+  return ['germinacion', 'vegetativo', 'floracion', 'cosechado']
+})
 const SALUD_META = {
   excelente: { color:'#16a34a', emoji:'🟢', label:'Excelente' },
   bueno:     { color:'#65a30d', emoji:'🟡', label:'Bueno'     },
@@ -148,7 +151,7 @@ function formatDateTime(d) {
 // ── Datos computados ──────────────────────────────────────
 const cicloIndex = computed(() => {
   if (!planta.value) return -1
-  return CICLO_PLANTA.indexOf(planta.value.state)
+  return CICLO_PLANTA.value.indexOf(planta.value.state)
 })
 
 const diasEnCiclo = computed(() => {
@@ -267,9 +270,16 @@ function cancelarSubidaFoto() {
 }
 
 async function handleFotoDelete(blobId) {
+  const ok = await confirm({
+    title: 'Eliminar foto',
+    message: '¿Seguro que querés eliminar esta foto? No se puede deshacer.',
+    confirmText: 'Eliminar',
+  })
+  if (!ok) return
   try {
     await removePlantFoto(planta.value.id, blobId)
     fotos.value = fotos.value.filter(f => f.id !== blobId)
+    toast.success('Foto eliminada')
   } catch {
     toast.error('Error al eliminar la foto')
   }
@@ -388,6 +398,63 @@ const canManicura = computed(() =>
   ['secado', 'manicura_pendiente'].includes(planta.value?.lote?.estado)
 )
 
+// ── Nuevo modal registro planta ───────────────────────────
+const showRegistroPlanta = ref(false)
+
+// ── Editar planta ──────────────────────────────────────────
+const showEditarPlanta = ref(false)
+const editForm = ref({ nombre: '', state: '' })
+const savingEditar = ref(false)
+
+function abrirEditarPlanta() {
+  editForm.value = { nombre: planta.value?.nombre || '', state: planta.value?.state || '' }
+  showEditarPlanta.value = true
+}
+
+async function guardarEdicion() {
+  savingEditar.value = true
+  try {
+    await updatePlant(id, { nombre: editForm.value.nombre, state: editForm.value.state })
+    await plants.fetchOne(id)
+    showEditarPlanta.value = false
+    toast.success('Planta actualizada')
+  } catch { toast.error('Error al guardar') } finally { savingEditar.value = false }
+}
+
+// ── Descartar planta ───────────────────────────────────────
+async function descartarPlanta() {
+  const ok = await confirm({
+    title: 'Descartar planta',
+    message: `¿Seguro que querés descartar "${planta.value?.nombre}"? Quedará marcada como descartada.`,
+    confirmText: 'Descartar',
+  })
+  if (!ok) return
+  try {
+    await updatePlant(id, { state: 'descartada' })
+    await plants.fetchOne(id)
+    toast.success('Planta descartada')
+  } catch { toast.error('Error al descartar') }
+}
+
+const registrosHoyPlanta = computed(() =>
+  activities.value
+    .filter(a => {
+      const d = new Date(a.created_at)
+      const hoy = new Date()
+      return d.toDateString() === hoy.toDateString()
+    })
+    .map(a => a.activity_type)
+)
+
+const plantaAcciones = computed(() => {
+  const items = []
+  items.push({ emoji: '📋', label: 'Registrar planta', onClick: () => { showRegistroPlanta.value = true } })
+  items.push({ emoji: '✏️', label: 'Editar planta',    onClick: abrirEditarPlanta })
+  items.push({ divider: true })
+  items.push({ emoji: '🗑️', label: 'Descartar planta', danger: true, onClick: descartarPlanta })
+  return items
+})
+
 onMounted(async () => {
   try {
     await plants.fetchOne(id)
@@ -413,8 +480,7 @@ onMounted(async () => {
   <div class="pd">
 
     <div v-if="loading" class="pd__loading">
-      <div class="pd__spinner"></div>
-      <span>Cargando planta…</span>
+      <DsSpinner />
     </div>
     <div v-else-if="error" class="pd__error">{{ error }}</div>
     <div v-else-if="!planta" class="pd__error">Planta no encontrada.</div>
@@ -451,20 +517,7 @@ onMounted(async () => {
           </div>
         </div>
         <div v-if="auth.user?.role !== 'manicura'" class="pd__hero-actions">
-          <AsistenteVoz
-            v-if="contextoAsistente"
-            :contexto="contextoAsistente"
-            @registrado="onRegistradoPorVoz"
-          />
-          <button class="pd__btn-sensor" @click="abrirMedicion" title="Registrar EC / pH / temperatura del sustrato">
-            <i class="bi bi-droplet-half"></i>EC / pH
-          </button>
-          <button class="pd__btn-trasplante" @click="abrirTrasplante" title="Registrar trasplante de maceta">
-            <i class="bi bi-arrow-up-circle"></i>Trasplantar
-          </button>
-          <button class="pd__btn-primary" @click="abrirModal">
-            <i class="bi bi-clipboard2-pulse"></i>Registrar planta
-          </button>
+          <ActionsDropdown :items="plantaAcciones" />
         </div>
       </div>
 
@@ -479,38 +532,6 @@ onMounted(async () => {
             <div class="pd__ciclo-label">{{ em(etapa).label }}</div>
             <div v-if="i < CICLO_PLANTA.length - 1" class="pd__ciclo-line"
                  :class="{ 'pd__ciclo-line--done': i < cicloIndex }"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- KPIs rápidos -->
-      <div class="pd__kpis">
-        <div class="pd__kpi" :class="{ 'pd__kpi--ok': alturaActual }">
-          <div class="pd__kpi-icon">📏</div>
-          <div class="pd__kpi-body">
-            <div class="pd__kpi-value">{{ alturaActual ? alturaActual + ' cm' : '—' }}</div>
-            <div class="pd__kpi-label">Altura actual</div>
-          </div>
-        </div>
-        <div class="pd__kpi">
-          <div class="pd__kpi-icon">🌿</div>
-          <div class="pd__kpi-body">
-            <div class="pd__kpi-value">{{ planta.num_colas || ultimoRegistro?.metadata?.num_colas || '—' }}</div>
-            <div class="pd__kpi-label">Copas</div>
-          </div>
-        </div>
-        <div class="pd__kpi">
-          <div class="pd__kpi-icon">📋</div>
-          <div class="pd__kpi-body">
-            <div class="pd__kpi-value">{{ activities.filter(a => a.activity_type === 'registro_planta').length }}</div>
-            <div class="pd__kpi-label">Registros</div>
-          </div>
-        </div>
-        <div class="pd__kpi">
-          <div class="pd__kpi-icon">📅</div>
-          <div class="pd__kpi-body">
-            <div class="pd__kpi-value">{{ diasEnCiclo }}</div>
-            <div class="pd__kpi-label">Días</div>
           </div>
         </div>
       </div>
@@ -533,7 +554,7 @@ onMounted(async () => {
           />
           <span class="pd__mnc-unit">g</span>
           <button class="pd__mnc-btn" :disabled="savingManicura || !pesoManicura" @click="saveManicura">
-            <div v-if="savingManicura" class="pd__mnc-spinner"></div>
+            <DsSpinner v-if="savingManicura" :size="12" />
             <i v-else class="bi bi-check-lg"></i>
             Guardar
           </button>
@@ -670,7 +691,7 @@ onMounted(async () => {
               </div>
               <div class="pd__str">
                 <button v-if="auth.user?.role !== 'manicura'" class="pd__btn-sm" @click.stop="fotoInput?.click()" :disabled="uploadingFoto">
-                  <span v-if="uploadingFoto" class="pd__spinner" style="width:12px;height:12px;border-width:1.5px"></span>
+                  <DsSpinner v-if="uploadingFoto" :size="12" />
                   <i v-else class="bi bi-camera-fill"></i>
                 </button>
                 <i class="bi pd__chevron" :class="fotosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -708,13 +729,12 @@ onMounted(async () => {
           <div class="pd__card">
             <div class="pd__card-header"><span class="pd__card-title">⚙️ Datos técnicos</span></div>
             <dl class="pd__dl">
-              <dt>Código</dt><dd class="pd__mono">{{ planta.codigo_qr || '—' }}</dd>
-              <dt>Origen</dt><dd>{{ origenLabel(planta.origen) }}</dd>
+              <dt>Fecha creación</dt><dd>{{ formatDate(planta.created_at) }}</dd>
               <dt>Genética</dt><dd>{{ planta.genetica?.nombre || '—' }}</dd>
+              <dt>Origen</dt><dd>{{ origenLabel(planta.origen) }}</dd>
               <dt>Tipo cultivo</dt><dd>{{ growLabel(planta.lote?.grow_type) }}</dd>
               <dt>Maceta</dt><dd>{{ macetaActual ? macetaActual + 'L' : '—' }}</dd>
               <dt>Sustrato</dt><dd>{{ planta.lote?.sustrato_especifico || '—' }}</dd>
-              <dt>Ingreso lote</dt><dd>{{ formatDate(planta.created_at) }}</dd>
             </dl>
           </div>
 
@@ -786,7 +806,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Registro de Planta ══ -->
     <Teleport to="body">
-      <div v-if="showModal" class="pd__overlay" @click.self="showModal = false">
+      <div v-if="showModal" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
@@ -875,7 +895,7 @@ onMounted(async () => {
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" @click="showModal = false">Cancelar</button>
             <button class="pd__btn-primary" @click="guardarRegistro" :disabled="guardando">
-              <span v-if="guardando" class="pd__spinner pd__spinner--sm"></span>
+              <DsSpinner v-if="guardando" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Guardar registro
             </button>
           </div>
@@ -885,7 +905,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Medición Sensor ══ -->
     <Teleport to="body">
-      <div v-if="showMedicionModal" class="pd__overlay" @click.self="showMedicionModal = false">
+      <div v-if="showMedicionModal" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
@@ -918,7 +938,7 @@ onMounted(async () => {
                           class="pd__ble-btn"
                           :disabled="ble.conectando.value"
                           @click="ble.conectar()">
-                    <span v-if="ble.conectando.value" class="pd__spinner pd__spinner--sm" style="border-top-color:#1b5e20;border-color:rgba(27,94,32,.2)"></span>
+                    <DsSpinner v-if="ble.conectando.value" :size="13" />
                     <i v-else class="bi bi-bluetooth"></i>
                     {{ ble.conectando.value ? 'Buscando…' : 'Conectar' }}
                   </button>
@@ -988,7 +1008,7 @@ onMounted(async () => {
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" @click="showMedicionModal = false; ble.desconectar()">Cancelar</button>
             <button class="pd__btn-primary" @click="guardarMedicion" :disabled="savingMedicion">
-              <span v-if="savingMedicion" class="pd__spinner pd__spinner--sm"></span>
+              <DsSpinner v-if="savingMedicion" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Guardar medición
             </button>
           </div>
@@ -998,7 +1018,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Trasplante ══ -->
     <Teleport to="body">
-      <div v-if="showTrasplanteModal" class="pd__overlay" @click.self="showTrasplanteModal = false">
+      <div v-if="showTrasplanteModal" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
@@ -1048,7 +1068,7 @@ onMounted(async () => {
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" @click="showTrasplanteModal = false">Cancelar</button>
             <button class="pd__btn-primary" @click="guardarTrasplante" :disabled="savingTrasplante">
-              <span v-if="savingTrasplante" class="pd__spinner pd__spinner--sm"></span>
+              <DsSpinner v-if="savingTrasplante" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Guardar trasplante
             </button>
           </div>
@@ -1058,7 +1078,7 @@ onMounted(async () => {
 
     <!-- ══ Modal subir foto ══ -->
     <Teleport to="body">
-      <div v-if="showFotoUploadModal" class="pd__overlay" @click.self="cancelarSubidaFoto">
+      <div v-if="showFotoUploadModal" class="pd__overlay">
         <div class="pd__modal pd__modal--foto">
           <div class="pd__modal-header">
             <div>
@@ -1088,7 +1108,7 @@ onMounted(async () => {
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" @click="cancelarSubidaFoto">Cancelar</button>
             <button class="pd__btn-primary" @click="confirmarSubidaFoto" :disabled="uploadingFoto">
-              <span v-if="uploadingFoto" class="pd__spinner pd__spinner--sm"></span>
+              <DsSpinner v-if="uploadingFoto" :size="13" />
               <i v-else class="bi bi-cloud-upload"></i>Subir foto
             </button>
           </div>
@@ -1104,6 +1124,67 @@ onMounted(async () => {
       @update:index="lightboxIndex = $event"
     />
 
+    <!-- ══ Modal Registro de Planta (nuevo) ══ -->
+    <RegistroPlantaModal
+      v-model="showRegistroPlanta"
+      :planta="planta"
+      :registros-hoy="registrosHoyPlanta"
+      @saved="loadActivities"
+    />
+
+    <!-- ══ Modal Editar Planta ══ -->
+    <Teleport to="body">
+      <div v-if="showEditarPlanta" class="pd__overlay">
+        <div class="pd__modal" style="max-width:440px">
+          <div class="pd__modal-header">
+            <div>
+              <h3 class="pd__modal-title">✏️ Editar planta</h3>
+              <p class="pd__modal-sub">{{ planta?.nombre || planta?.codigo_qr }}</p>
+            </div>
+            <button class="pd__modal-close" @click="showEditarPlanta = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="pd__modal-body">
+            <div class="pd__msection">Nombre</div>
+            <div class="pd__field pd__field--full">
+              <input
+                type="text"
+                class="pd__input"
+                v-model.trim="editForm.nombre"
+                placeholder="Nombre de la planta"
+                autofocus
+                @keydown.enter.prevent="guardarEdicion"
+                @keydown.esc.prevent="showEditarPlanta = false"
+              />
+            </div>
+
+            <div class="pd__msection" style="margin-top:1rem">Estado</div>
+            <div class="pd__field pd__field--full">
+              <div class="pd__selector">
+                <button
+                  v-for="(meta, key) in ESTADO_META"
+                  :key="key"
+                  type="button"
+                  class="pd__sel-btn"
+                  :class="{ 'pd__sel-btn--active': editForm.state === key }"
+                  :style="editForm.state === key ? { borderColor: meta.color, background: meta.bg, color: meta.color } : {}"
+                  @click="editForm.state = key"
+                >
+                  {{ meta.emoji }} {{ meta.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="pd__modal-footer">
+            <button class="pd__btn-ghost" @click="showEditarPlanta = false">Cancelar</button>
+            <button class="pd__btn-primary" @click="guardarEdicion" :disabled="savingEditar">
+              <DsSpinner v-if="savingEditar" :size="13" />
+              <i v-else class="bi bi-check-lg"></i>Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
@@ -1112,11 +1193,8 @@ onMounted(async () => {
 @media (max-width: 640px) { .pd { padding: 1rem; } }
 
 /* Loading / Error */
-.pd__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
+.pd__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .pd__error   { padding: 1rem 1.25rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 10px; font-size: .875rem; }
-.pd__spinner { width: 20px; height: 20px; border: 2.5px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: pd-spin .6s linear infinite; flex-shrink: 0; }
-.pd__spinner--sm { width: 13px; height: 13px; border-color: rgba(255,255,255,.3); border-top-color: #fff; }
-@keyframes pd-spin { to { transform: rotate(360deg); } }
 
 /* Breadcrumb */
 
@@ -1143,17 +1221,6 @@ onMounted(async () => {
 .pd__ciclo-step--pending { opacity: .4; }
 .pd__ciclo-line { position: absolute; top: 16px; left: 50%; width: 100%; height: 2px; background: #d4e6d4; }
 .pd__ciclo-line--done { background: #16a34a; }
-
-/* KPIs */
-.pd__kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.75rem; }
-@media (max-width: 640px) { .pd__kpis { grid-template-columns: repeat(2,1fr); } }
-.pd__kpi { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; padding: 1rem; display: flex; align-items: center; gap: .75rem; transition: box-shadow .15s; }
-.pd__kpi:hover { box-shadow: 0 4px 16px rgba(27,94,32,.1); }
-.pd__kpi--ok { border-color: #a7d7a9; background: #f0fdf4; }
-.pd__kpi-icon { font-size: 1.4rem; flex-shrink: 0; }
-.pd__kpi-body { flex: 1; min-width: 0; }
-.pd__kpi-value { font-size: 1.4rem; font-weight: 800; color: #1a1a1a; line-height: 1; letter-spacing: -.03em; }
-.pd__kpi-label { font-size: .68rem; color: #60725d; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: .2rem; }
 
 /* Layout */
 /* Manicura weight section */
@@ -1188,12 +1255,6 @@ onMounted(async () => {
 }
 .pd__mnc-btn:hover:not(:disabled) { background: #15803d; }
 .pd__mnc-btn:disabled { opacity: .45; cursor: not-allowed; }
-.pd__mnc-spinner {
-  width: 12px; height: 12px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: pd-mnc-spin .6s linear infinite;
-}
-@keyframes pd-mnc-spin { to { transform: rotate(360deg); } }
 .pd__mnc-saved {
   font-size: .75rem; color: #15803d; font-weight: 600;
   display: flex; align-items: center; gap: .3rem;
@@ -1324,25 +1385,6 @@ onMounted(async () => {
 .pd__hero-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 
 /* Botón sensor */
-.pd__btn-sensor {
-  display: inline-flex; align-items: center; gap: .4rem;
-  background: #f0fdf4; color: #15803d;
-  border: 1.5px solid #86efac;
-  padding: .55rem 1rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer;
-  transition: all .15s;
-}
-.pd__btn-sensor:hover { background: #dcfce7; border-color: #4ade80; }
-
-/* Botón trasplante */
-.pd__btn-trasplante {
-  display: inline-flex; align-items: center; gap: .4rem;
-  background: #fffbeb; color: #92400e;
-  border: 1.5px solid #fde68a;
-  padding: .55rem 1rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer;
-  transition: all .15s;
-}
-.pd__btn-trasplante:hover { background: #fef3c7; border-color: #fcd34d; }
-
 /* Medición en historial */
 .pd__metrica--sensor { background: #f0fdf4; border-color: #86efac; color: #15803d; }
 .pd__metrica--trasplante { background: #fffbeb; border-color: #fde68a; color: #92400e; display: flex; align-items: center; gap: .35rem; }

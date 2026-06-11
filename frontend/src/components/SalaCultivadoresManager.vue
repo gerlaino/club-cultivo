@@ -15,7 +15,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="text-center py-2">
-      <div class="spinner-border spinner-border-sm text-success"></div>
+      <DsSpinner :size="18" />
     </div>
 
     <!-- Sin cultivadores -->
@@ -81,7 +81,7 @@
               @click="asignar"
               :disabled="!userSeleccionado || asignando"
             >
-              <span v-if="asignando" class="spinner-border spinner-border-sm me-1"></span>
+              <DsSpinner v-if="asignando" :size="14" />
               Asignar
             </button>
           </div>
@@ -98,6 +98,7 @@ import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { getSalaCultivadores, asignarCultivador, desasignarCultivador, listUsers } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 const { confirm } = useConfirm()
 
 const props = defineProps({

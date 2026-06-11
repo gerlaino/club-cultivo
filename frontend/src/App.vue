@@ -14,6 +14,8 @@ import BrandLogo from "./components/BrandLogo.vue";
 import PlanBadge from "./components/PlanBadge.vue";
 import ToastProvider from "./components/ui/ToastProvider.vue";
 import ConfirmDialog from "./components/ui/ConfirmDialog.vue";
+import OfflineIndicator from "./components/ui/OfflineIndicator.vue";
+import { useOfflineSync } from "./composables/useOfflineSync.js";
 import NotificationBell from "./components/ui/NotificationBell.vue";
 import AuditorBanner from "./components/AuditorBanner.vue";
 import AdminSidebar          from "./components/layout/AdminSidebar.vue";
@@ -45,22 +47,29 @@ const plants = usePlantsStore();
 const router = useRouter();
 const route  = useRoute();
 
-const routeLoading = ref(false)
+const routeLoading  = ref(false)
 router.beforeEach(() => { routeLoading.value = true })
 router.afterEach(() => { routeLoading.value = false })
-const { can, isAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
+const { can, isAdmin, isSuperAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
+const isMobileRoute = computed(() => route.path.startsWith('/m/'))
 
 const adminDrawerOpen = ref(false);
-const svrDrawerOpen = ref(false);
-const dpvDrawerOpen = ref(false);
-const mncDrawerOpen = ref(false);
-const audDrawerOpen = ref(false);
-const medDrawerOpen = ref(false);
-const abgDrawerOpen = ref(false);
-const dlvDrawerOpen = ref(false);
+const cvdDrawerOpen  = ref(false);
+const svrDrawerOpen  = ref(false);
+const dpvDrawerOpen  = ref(false);
+const mncDrawerOpen  = ref(false);
+const audDrawerOpen  = ref(false);
+const medDrawerOpen  = ref(false);
+const abgDrawerOpen  = ref(false);
+const dlvDrawerOpen  = ref(false);
 
-watch(() => route.path, () => { adminDrawerOpen.value = false; svrDrawerOpen.value = false });
+watch(() => route.path, () => {
+  adminDrawerOpen.value = false; cvdDrawerOpen.value = false; svrDrawerOpen.value = false;
+  dpvDrawerOpen.value = false; mncDrawerOpen.value = false; audDrawerOpen.value = false;
+  medDrawerOpen.value = false; abgDrawerOpen.value = false; dlvDrawerOpen.value = false;
+});
 const { fetchPlan, planData } = usePlan();
+useOfflineSync(); // inicia el watcher de red y auto-sync
 
 async function doLogout() {
   await auth.logOut();
@@ -173,11 +182,22 @@ onMounted(async () => {
 <template>
   <ToastProvider />
   <ConfirmDialog />
+  <OfflineIndicator />
   <div v-if="routeLoading" class="route-loading-bar"></div>
   <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isSupervisor && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor && !isDelivery }">
 
+    <!-- ── MOBILE SHELL (rutas /m/*) — sin sidebar ni topbar ── -->
+    <template v-if="isMobileRoute">
+      <router-view />
+    </template>
+
+    <!-- ── SUPER ADMIN LAYOUT (manejado enteramente por SuperAdminLayout) ── -->
+    <template v-else-if="isSuperAdmin && auth.isAuthenticated">
+      <router-view />
+    </template>
+
     <!-- ── ADMIN LAYOUT (sidebar + topbar, desktop ≥1024px) ── -->
-    <template v-if="isAdmin && auth.isAuthenticated && !$route.meta.fullscreen">
+    <template v-else-if="isAdmin && auth.isAuthenticated && !$route.meta.fullscreen">
       <div class="admin-shell">
         <AdminSidebar />
         <div class="admin-body">
@@ -205,7 +225,7 @@ onMounted(async () => {
       <div class="cvd-shell">
         <CultivadorSidebar />
         <div class="cvd-body">
-          <CultivadorTopBar />
+          <CultivadorTopBar @open-drawer="cvdDrawerOpen = true" />
           <CultivadorMobileHeader />
           <div class="cvd-accent-bar"></div>
           <main class="cvd-main">
@@ -214,6 +234,16 @@ onMounted(async () => {
         </div>
       </div>
       <BottomNavCultivador />
+      <!-- Drawer overlay tablet (768-1023px) -->
+      <Teleport to="body">
+        <Transition name="cvd-drawer">
+          <div v-if="cvdDrawerOpen" class="cvd-drawer-overlay" @click.self="cvdDrawerOpen = false">
+            <div class="cvd-drawer">
+              <CultivadorSidebar />
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
     </template>
 
     <!-- ── SUPERVISOR LAYOUT (sidebar + topbar desktop, sin mobile bottom-nav) ── -->
@@ -659,6 +689,31 @@ onMounted(async () => {
   display: flex;
   min-height: 100vh;
 }
+
+/* Drawer overlay cultivador (tablet 768-1023px) */
+.cvd-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 500;
+  display: flex;
+}
+.cvd-drawer {
+  width: 240px;
+  height: 100%;
+  overflow: hidden;
+}
+.cvd-drawer :deep(.csb) {
+  display: flex !important;
+  height: 100%;
+  position: static;
+}
+.cvd-drawer-enter-active,
+.cvd-drawer-leave-active { transition: opacity .2s, transform .2s; }
+.cvd-drawer-enter-from,
+.cvd-drawer-leave-to { opacity: 0; pointer-events: none; }
+.cvd-drawer-enter-from .cvd-drawer,
+.cvd-drawer-leave-to  .cvd-drawer { transform: translateX(-100%); }
 .cvd-body {
   flex: 1;
   min-width: 0;
@@ -691,6 +746,10 @@ onMounted(async () => {
 }
 .admin-main {
   flex: 1;
+  min-width: 0;
+}
+.admin-main :deep(> *) {
+  box-sizing: border-box;
 }
 @media (max-width: 767px) {
   .admin-main { padding-bottom: 72px; }
@@ -925,7 +984,8 @@ onMounted(async () => {
 .med-shell { display: flex; min-height: 100vh; }
 .med-body { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--c-paper); }
 .med-accent-bar { height: 4px; background: #2D8A6B; flex-shrink: 0; }
-.med-main { flex: 1; }
+.med-main { flex: 1; overflow-y: auto; }
+.med-main > * { max-width: 1200px; margin: 0 auto; }
 .med-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
 .med-drawer { width: 240px; height: 100%; overflow: hidden; }
 .med-drawer-enter-active, .med-drawer-leave-active { transition: opacity .2s, transform .2s; }
@@ -961,6 +1021,7 @@ onMounted(async () => {
 .dlv-main { flex: 1; }
 .dlv-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
 .dlv-drawer { width: 200px; height: 100%; overflow: hidden; }
+.dlv-drawer :deep(.dlv-sidebar) { display: flex !important; height: 100%; position: static; }
 .dlv-drawer-enter-active, .dlv-drawer-leave-active { transition: opacity .2s, transform .2s; }
 .dlv-drawer-enter-from, .dlv-drawer-leave-to { opacity: 0; pointer-events: none; }
 .dlv-drawer-enter-from .dlv-drawer, .dlv-drawer-leave-to .dlv-drawer { transform: translateX(-100%); }

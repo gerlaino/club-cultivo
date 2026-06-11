@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { useToast } from './useToast.js'
-import { getCostoLote, createCostoLote, updateCostoLote } from '../lib/api'
+import { getCostoLote, createCostoLote, updateCostoLote, getPesadas } from '../lib/api'
 
 export function useLoteCostos(loteId) {
   const toast = useToast()
@@ -8,30 +8,55 @@ export function useLoteCostos(loteId) {
   const costoLote     = ref(null)
   const showCostoForm = ref(false)
   const savingCosto   = ref(false)
-  const costoForm     = ref({ costo_insumos: 0, costo_energia: 0, costo_mano_obra: 0, costo_prorrateado: 0, gramos_producidos: null, notas: '' })
+  const pesadasLote   = ref([])
+  // gramos_producidos se excluye del form — siempre viene de pesadas aprobadas
+  const costoForm     = ref({ costo_insumos: 0, costo_energia: 0, costo_mano_obra: 0, costo_prorrateado: 0, notas: '' })
 
   const costoTotal = computed(() => {
     const f = costoForm.value
     return (Number(f.costo_insumos) || 0) + (Number(f.costo_energia) || 0) + (Number(f.costo_mano_obra) || 0) + (Number(f.costo_prorrateado) || 0)
   })
 
+  // Pesadas aprobadas por admin (aprobada_at presente)
+  const pesadasAprobadas = computed(() => pesadasLote.value.filter(p => p.aprobada_at))
+
+  // Pesadas registradas pero aún no aprobadas ni rechazadas
+  const pesadasPendientes = computed(() => pesadasLote.value.filter(p => !p.aprobada_at && !p.rechazada_at))
+
+  // Suma de gramos de pesadas aprobadas. Usa peso_curado_g si existe, sino peso_seco_g.
+  const gramosAprobados = computed(() => {
+    if (!pesadasAprobadas.value.length) return null
+    const suma = pesadasAprobadas.value.reduce((acc, p) => acc + (p.peso_curado_g || p.peso_seco_g || 0), 0)
+    return suma > 0 ? Math.round(suma * 10) / 10 : null
+  })
+
+  // Suma parcial de pesadas pendientes (aún sin aprobar), para mostrar como referencia
+  const gramosPendientes = computed(() => {
+    if (!pesadasPendientes.value.length) return null
+    const suma = pesadasPendientes.value.reduce((acc, p) => acc + (p.peso_curado_g || p.peso_seco_g || 0), 0)
+    return suma > 0 ? Math.round(suma * 10) / 10 : null
+  })
+
+  // Estado del campo gramos para el template
+  // 'aprobado' | 'pendiente' | 'sin_datos'
+  const estadoGramos = computed(() => {
+    if (gramosAprobados.value) return 'aprobado'
+    if (gramosPendientes.value) return 'pendiente'
+    return 'sin_datos'
+  })
+
   const costoPorGramo = computed(() => {
-    const g = Number(costoForm.value.gramos_producidos)
+    const g = gramosAprobados.value
     return g > 0 ? costoTotal.value / g : null
   })
 
   function openCostoForm() {
-    if (costoLote.value) {
-      costoForm.value = {
-        costo_insumos:     costoLote.value.costo_insumos     || 0,
-        costo_energia:     costoLote.value.costo_energia      || 0,
-        costo_mano_obra:   costoLote.value.costo_mano_obra    || 0,
-        costo_prorrateado: costoLote.value.costo_prorrateado  || 0,
-        gramos_producidos: costoLote.value.gramos_producidos  || null,
-        notas:             costoLote.value.notas              || '',
-      }
-    } else {
-      costoForm.value = { costo_insumos: 0, costo_energia: 0, costo_mano_obra: 0, costo_prorrateado: 0, gramos_producidos: null, notas: '' }
+    costoForm.value = {
+      costo_insumos:     costoLote.value?.costo_insumos     || 0,
+      costo_energia:     costoLote.value?.costo_energia      || 0,
+      costo_mano_obra:   costoLote.value?.costo_mano_obra    || 0,
+      costo_prorrateado: costoLote.value?.costo_prorrateado  || 0,
+      notas:             costoLote.value?.notas              || '',
     }
     showCostoForm.value = true
   }
@@ -44,8 +69,8 @@ export function useLoteCostos(loteId) {
         costo_energia:     Number(costoForm.value.costo_energia)      || 0,
         costo_mano_obra:   Number(costoForm.value.costo_mano_obra)    || 0,
         costo_prorrateado: Number(costoForm.value.costo_prorrateado)  || 0,
-        gramos_producidos: costoForm.value.gramos_producidos ? Number(costoForm.value.gramos_producidos) : null,
-        notas: costoForm.value.notas,
+        gramos_producidos: gramosAprobados.value,  // siempre desde pesadas aprobadas
+        notas:             costoForm.value.notas,
       }
       const fn = costoLote.value ? updateCostoLote : createCostoLote
       const { data } = await fn(loteId, payload)
@@ -61,14 +86,20 @@ export function useLoteCostos(loteId) {
 
   async function cargarCostos() {
     try {
-      const { data } = await getCostoLote(loteId)
-      costoLote.value = data?.costo || data || null
+      const [costoRes, pesadasRes] = await Promise.all([
+        getCostoLote(loteId),
+        getPesadas(loteId),
+      ])
+      costoLote.value   = costoRes.data?.costo || costoRes.data || null
+      pesadasLote.value = pesadasRes.data || []
     } catch {}
   }
 
   return {
     costoLote, showCostoForm, savingCosto, costoForm,
     costoTotal, costoPorGramo,
+    gramosAprobados, gramosPendientes, estadoGramos,
+    pesadasAprobadas, pesadasPendientes,
     openCostoForm, saveCosto, cargarCostos,
   }
 }

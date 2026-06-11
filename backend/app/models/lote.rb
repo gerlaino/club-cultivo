@@ -1,6 +1,7 @@
 class Lote < ApplicationRecord
   belongs_to :club
-  belongs_to :sala
+  belongs_to :sala, optional: true
+  validates :sala_id, presence: true, unless: -> { estado == 'finalizado' }
   belongs_to :genetica,    optional: true
   belongs_to :manicurador,   class_name: 'User',  optional: true
   belongs_to :planta_madre,  class_name: 'Plant', optional: true
@@ -11,6 +12,7 @@ class Lote < ApplicationRecord
   has_many :lote_eventos,          dependent: :destroy
   has_many :pesadas,               -> { order(registrado_at: :asc) }, dependent: :destroy
   has_many :stocks,                dependent: :nullify
+  has_many :pesajes_manicura,      dependent: :destroy
   has_many_attached :fotos
   has_many :notas,      as: :noteable,              dependent: :destroy
   has_many :analisis_ia, class_name: 'AnalisisIa', dependent: :destroy
@@ -36,6 +38,9 @@ class Lote < ApplicationRecord
   validates :start_date,        presence: true
 
   before_create :generar_codigo
+  before_create :generar_codigo_qr
+  after_commit  :push_manicura_pendiente, on: [:create, :update]
+  after_commit  :dispatch_webhook_avance,  on: [:create, :update]
 
   default_scope { where(deleted_at: nil) }
 
@@ -250,14 +255,19 @@ class Lote < ApplicationRecord
   end
 
   # Aprueba pesada del manicurador, genera stock y finaliza el lote en un solo paso.
-  def aprobar_y_finalizar!(aprobado_por:, peso_seco_g: nil)
+  def aprobar_y_finalizar!(aprobado_por:, peso_seco_g: nil, sede_id: nil, precio_sugerido_ars: nil)
     raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
 
     ultima_pesada = pesadas.where(fase_origen: 'en_manicura', manicurado: true).reorder(id: :desc).first
+    ultima_pesada ||= pesadas.where(manicurado: true).reorder(id: :desc).first
     raise "No hay pesada de manicura para aprobar" unless ultima_pesada
 
-    peso = peso_seco_g.present? ? peso_seco_g.to_d : ultima_pesada.peso_seco_g.to_d
+    peso_base = ultima_pesada.peso_seco_g.to_d
+    peso_base = ultima_pesada.pesadas_plantas.sum(:peso_seco_g).to_d if peso_base == 0
+    peso = peso_seco_g.present? ? peso_seco_g.to_d : peso_base
     raise ArgumentError, "El peso debe ser mayor a 0" unless peso > 0
+
+    sede = sede_id.present? ? club.sedes.where(tipo: %w[social mixta]).find(sede_id) : nil
 
     ActiveRecord::Base.transaction do
       ultima_pesada.update!(
@@ -270,15 +280,16 @@ class Lote < ApplicationRecord
       )
 
       stock = Stock.create!(
-        club:           club,
-        sede:           nil,
-        lote:           self,
-        genetica:       genetica,
-        origen:         'lote',
-        estado:         'pendiente_asignacion',
-        forma_producto: 'flor_seca',
-        cantidad:       peso,
-        unidad:         'g',
+        club:                club,
+        sede:                sede,
+        lote:                self,
+        genetica:            genetica,
+        origen:              'lote',
+        estado:              sede ? 'disponible' : 'pendiente_asignacion',
+        forma_producto:      'flor_seca',
+        cantidad:            peso,
+        unidad:              'g',
+        precio_sugerido_ars: precio_sugerido_ars.present? ? precio_sugerido_ars.to_d : nil,
       )
       stock.stock_movimientos.create!(
         tipo:    'produccion',
@@ -290,6 +301,7 @@ class Lote < ApplicationRecord
         estado:             'finalizado',
         rendimiento_real_g: peso,
         manicurador:        nil,
+        sala_id:            nil,
       )
 
       lote_eventos.create!(
@@ -359,6 +371,7 @@ class Lote < ApplicationRecord
         estado:             'finalizado',
         rendimiento_real_g: peso,
         manicurador:        nil,
+        sala_id:            nil,
       )
 
       lote_eventos.create!(
@@ -433,12 +446,61 @@ class Lote < ApplicationRecord
         precio_sugerido_ars: precio_sugerido_ars,
       )
 
-      update!(estado: 'finalizado')
+      update!(estado: 'finalizado', sala_id: nil)
       stock
     end
   end
 
+  # Llamado tras cada confirmación de PesajeManicura.
+  # Finaliza el lote automáticamente cuando todas las plantas del lote
+  # tienen registro en pesajes confirmados.
+  def check_and_finalize_manicura!(finalizador: nil)
+    return unless estado == 'en_manicura'
+
+    total_plantas = plants.count
+    return if total_plantas == 0
+
+    plantas_confirmadas = PesadaPlanta
+      .joins(:pesaje_manicura)
+      .where(pesajes_manicura: { lote_id: id, estado: 'confirmado' })
+      .select(:plant_id)
+      .distinct
+      .count
+
+    # Batch registrations without individual plant records
+    batch_count = pesajes_manicura
+      .where(estado: 'confirmado')
+      .where.not(plantas_count: nil)
+      .sum(:plantas_count) - plantas_confirmadas
+
+    total_procesadas = plantas_confirmadas + [batch_count, 0].max
+    return unless total_procesadas >= total_plantas
+
+    peso_total = pesajes_manicura.where(estado: 'confirmado').sum(:peso_confirmado_g).to_d
+
+    update!(
+      estado:             'finalizado',
+      rendimiento_real_g: peso_total,
+      manicurador:        nil,
+      sala_id:            nil,
+    )
+
+    lote_eventos.create!(
+      tipo:            'cambio_estado',
+      estado_anterior: 'en_manicura',
+      estado_nuevo:    'finalizado',
+      descripcion:     "Manicura completada — #{total_plantas} plantas · #{peso_total.round(1)}g acumulados en #{pesajes_manicura.confirmados.count} pesajes",
+      user:            finalizador,
+      club:            club,
+      registrado_en:   Time.current,
+    )
+  end
+
   private
+
+  def generar_codigo_qr
+    self.codigo_qr = "L-#{club_id}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"
+  end
 
   def generar_codigo
     return if codigo.present?
@@ -450,5 +512,34 @@ class Lote < ApplicationRecord
       count += 1
       self.codigo = "#{base}-#{anio}-#{count.to_s.rjust(3, '0')}"
     end
+  end
+
+  def push_manicura_pendiente
+    return unless saved_change_to_estado? && estado == 'manicura_pendiente'
+
+    PushNotificationService.notify_admins_async(
+      club,
+      title: "Aprobación requerida",
+      body:  "Lote #{codigo} esperando tu aprobación",
+      url:   '/aprobaciones'
+    )
+  end
+
+  def dispatch_webhook_avance
+    return unless saved_change_to_estado?
+
+    estado_anterior, estado_nuevo = saved_change_to_estado
+
+    event = estado_nuevo == 'finalizado' ? 'cosecha.completada' : 'lote.avanzado'
+
+    WebhookDispatcher.dispatch(club, event, {
+      id:              id,
+      codigo:          codigo,
+      estado_anterior: estado_anterior,
+      estado_nuevo:    estado_nuevo,
+      genetica:        genetica&.nombre,
+      sala:            sala&.nombre,
+      plants_count:    plants_count,
+    })
   end
 end

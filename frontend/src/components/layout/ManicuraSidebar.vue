@@ -3,8 +3,8 @@
 
     <!-- Brand -->
     <div class="msb__brand">
-      <Scissors :size="22" :stroke-width="1.5" class="msb__brand-icon" />
-      <span class="msb__brand-name">cultivoespacial</span>
+      <img src="/logo-ce-icono.png" class="msb__brand-logo" alt="Cultivo Espacial" />
+      <span class="msb__brand-name">Cultivo Espacial</span>
     </div>
 
     <!-- Nav links -->
@@ -42,7 +42,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import DsAvatar from '../../design-system/components/Avatar.vue'
-import { Scissors, Clock, LogOut } from 'lucide-vue-next'
+import { Scissors, Clock, Scale, LogOut } from 'lucide-vue-next'
 
 const route  = useRoute()
 const router = useRouter()
@@ -51,6 +51,7 @@ const club   = useClubStore()
 
 const NAV_LINKS = [
   { to: '/mnc/pendientes', icon: Scissors, label: 'Pendientes' },
+  { to: '/mnc/pesajes',    icon: Scale,    label: 'Mis pesajes' },
   { to: '/mnc/espera',     icon: Clock,    label: 'En espera' },
 ]
 
@@ -87,7 +88,7 @@ async function handleLogout() {
   padding: var(--sp-5) var(--sp-5) var(--sp-4);
   border-bottom: 1px solid rgba(122, 155, 110, 0.25);
 }
-.msb__brand-icon { color: var(--c-role-manicura); flex-shrink: 0; }
+.msb__brand-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .msb__brand-name {
   font-family: var(--font-display);
   font-size: var(--fs-16);

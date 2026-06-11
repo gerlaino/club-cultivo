@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_10_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -96,6 +96,43 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.index ["user_id"], name: "index_analisis_ia_on_user_id"
   end
 
+  create_table "analisis_laboratorio", force: :cascade do |t|
+    t.bigint "lote_id", null: false
+    t.bigint "genetica_id"
+    t.bigint "club_id", null: false
+    t.bigint "user_id", null: false
+    t.date "fecha_analisis"
+    t.string "laboratorio"
+    t.decimal "thc_pct", precision: 5, scale: 2
+    t.decimal "cbd_pct", precision: 5, scale: 2
+    t.decimal "cbg_pct", precision: 5, scale: 2
+    t.string "terpenos_principales"
+    t.text "notas"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_analisis_laboratorio_on_club_id"
+    t.index ["genetica_id"], name: "index_analisis_laboratorio_on_genetica_id"
+    t.index ["lote_id"], name: "index_analisis_laboratorio_on_lote_id"
+  end
+
+  create_table "aplicacion_planes", force: :cascade do |t|
+    t.bigint "plan_trabajo_id", null: false
+    t.bigint "club_id", null: false
+    t.bigint "aplicado_por_id", null: false
+    t.string "objetivo_tipo"
+    t.integer "objetivo_id"
+    t.date "fecha_inicio", null: false
+    t.string "estado", default: "activo", null: false
+    t.integer "tareas_creadas", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["aplicado_por_id"], name: "index_aplicacion_planes_on_aplicado_por_id"
+    t.index ["club_id", "estado"], name: "index_aplicacion_planes_on_club_id_and_estado"
+    t.index ["club_id"], name: "index_aplicacion_planes_on_club_id"
+    t.index ["objetivo_tipo", "objetivo_id"], name: "index_aplicacion_planes_on_objetivo_tipo_and_objetivo_id"
+    t.index ["plan_trabajo_id"], name: "index_aplicacion_planes_on_plan_trabajo_id"
+  end
+
   create_table "ariccame_registros", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.string "tipo", null: false
@@ -118,6 +155,22 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.index ["dispensacion_id"], name: "index_ariccame_registros_on_dispensacion_id"
     t.index ["estado"], name: "index_ariccame_registros_on_estado"
     t.index ["stock_id"], name: "index_ariccame_registros_on_stock_id"
+  end
+
+  create_table "check_ins", force: :cascade do |t|
+    t.bigint "paciente_id", null: false
+    t.bigint "dispensacion_id"
+    t.bigint "club_id", null: false
+    t.integer "escala_bienestar"
+    t.jsonb "sintomas", default: {}, null: false
+    t.text "notas"
+    t.string "via_registro", default: "dispensacion", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_check_ins_on_club_id"
+    t.index ["dispensacion_id"], name: "index_check_ins_on_dispensacion_id", unique: true
+    t.index ["paciente_id", "created_at"], name: "index_check_ins_on_paciente_id_and_created_at"
+    t.index ["paciente_id"], name: "index_check_ins_on_paciente_id"
   end
 
   create_table "clubs", force: :cascade do |t|
@@ -159,11 +212,18 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.string "smtp_pass"
     t.string "smtp_from"
     t.string "smtp_from_name"
-    t.boolean "ia_habilitada", default: true, null: false
     t.string "ia_tier", default: "basico", null: false
     t.integer "ia_limite_hora", default: 20, null: false
+    t.jsonb "features", default: {}, null: false
+    t.string "twilio_account_sid"
+    t.string "twilio_auth_token_enc"
+    t.string "twilio_whatsapp_from"
+    t.integer "umbral_stock_g", default: 50, null: false
+    t.jsonb "alertas_config", default: {}, null: false
+    t.integer "lote_numero_seq", default: 0, null: false
     t.index ["benchmark_opt_in"], name: "index_clubs_on_benchmark_opt_in"
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
+    t.index ["features"], name: "index_clubs_on_features", using: :gin
     t.index ["plan"], name: "index_clubs_on_plan"
     t.index ["slug"], name: "index_clubs_on_slug", unique: true
   end
@@ -210,6 +270,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.string "descripcion"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "unidad", default: "ars", null: false
     t.index ["created_by_id"], name: "index_cuenta_corriente_movimientos_on_created_by_id"
     t.index ["cuenta_corriente_id"], name: "index_cuenta_corriente_movimientos_on_cuenta_corriente_id"
     t.index ["dispensacion_id"], name: "index_cuenta_corriente_movimientos_on_dispensacion_id"
@@ -231,13 +292,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
   end
 
   create_table "dispensaciones", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
     t.bigint "paciente_id", null: false
     t.bigint "user_id", null: false
     t.bigint "indicacion_medica_id"
     t.text "observaciones"
     t.date "fecha_dispensacion", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
     t.bigint "sede_id"
     t.decimal "aporte_socio_ars", precision: 10, scale: 2
     t.string "medio_pago", default: "efectivo", null: false
@@ -256,6 +317,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.text "motivo_fallo"
     t.datetime "entregado_at"
     t.boolean "ariccame_reportada", default: false, null: false
+    t.text "firma_entrega_data"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["delivery_id"], name: "index_dispensaciones_on_delivery_id"
@@ -268,6 +330,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.index ["sede_id"], name: "index_dispensaciones_on_sede_id"
     t.index ["stock_id"], name: "index_dispensaciones_on_stock_id"
     t.index ["user_id"], name: "index_dispensaciones_on_user_id"
+  end
+
+  create_table "disponibilidad_medicos", force: :cascade do |t|
+    t.bigint "medico_id", null: false
+    t.bigint "club_id", null: false
+    t.integer "dia_semana", null: false
+    t.integer "hora_inicio", null: false
+    t.integer "hora_fin", null: false
+    t.boolean "activa", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "medico_id"], name: "index_disponibilidad_medicos_on_club_id_and_medico_id"
+    t.index ["club_id"], name: "index_disponibilidad_medicos_on_club_id"
+    t.index ["medico_id", "dia_semana"], name: "index_disponibilidad_medicos_on_medico_id_and_dia_semana"
+    t.index ["medico_id"], name: "index_disponibilidad_medicos_on_medico_id"
   end
 
   create_table "dispositivos", force: :cascade do |t|
@@ -372,9 +449,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.string "categoria_inase"
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
+    t.index ["club_id", "slug"], name: "index_geneticas_on_club_id_and_slug", unique: true
     t.index ["club_id"], name: "index_geneticas_on_club_id"
     t.index ["numero_registro_inase"], name: "idx_geneticas_numero_inase", unique: true, where: "(numero_registro_inase IS NOT NULL)"
-    t.index ["slug"], name: "index_geneticas_on_slug", unique: true
   end
 
   create_table "indicacion_medicas", force: :cascade do |t|
@@ -473,11 +550,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.integer "plants_count"
     t.string "strain"
     t.text "notes"
-    t.bigint "sala_id", null: false
+    t.bigint "sala_id"
     t.bigint "club_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "grow_type"
+    t.string "grow_type", default: "sustrato", null: false
     t.string "light_type"
     t.string "estado"
     t.integer "tamanio_maceta"
@@ -494,8 +571,18 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.bigint "manicurador_id"
     t.string "origen", default: "semilla", null: false
     t.bigint "planta_madre_id"
+    t.string "fotoperiodo_vegetativo"
+    t.integer "tamanio_maceta_inicial"
+    t.date "fecha_trasplante"
+    t.decimal "ph_riego", precision: 4, scale: 1
+    t.text "fertilizacion_descripcion"
+    t.string "sistema_hidro"
+    t.string "codigo_qr_cosecha"
+    t.string "codigo_qr"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
+    t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"
+    t.index ["codigo_qr_cosecha"], name: "index_lotes_on_codigo_qr_cosecha", unique: true
     t.index ["deleted_at"], name: "index_lotes_on_deleted_at"
     t.index ["estado"], name: "index_lotes_on_estado"
     t.index ["genetica_id"], name: "index_lotes_on_genetica_id"
@@ -629,6 +716,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.text "alergias"
     t.text "medicacion_habitual"
     t.string "grupo_sanguineo", limit: 5
+    t.decimal "descuento_porcentaje", precision: 5, scale: 2, default: "0.0", null: false
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["carnet_token"], name: "index_pacientes_on_carnet_token", unique: true
@@ -705,8 +793,36 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.decimal "peso_seco_g", precision: 8, scale: 2
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "pesaje_manicura_id"
     t.index ["pesada_id"], name: "index_pesadas_plantas_on_pesada_id"
+    t.index ["pesaje_manicura_id"], name: "index_pesadas_plantas_on_pesaje_manicura_id"
     t.index ["plant_id"], name: "index_pesadas_plantas_on_plant_id"
+  end
+
+  create_table "pesajes_manicura", force: :cascade do |t|
+    t.bigint "lote_id", null: false
+    t.bigint "manicurador_id", null: false
+    t.bigint "club_id", null: false
+    t.bigint "stock_id"
+    t.bigint "confirmado_por_id"
+    t.date "fecha_pesaje", null: false
+    t.string "estado", default: "borrador", null: false
+    t.decimal "peso_total_g", precision: 10, scale: 2
+    t.decimal "peso_confirmado_g", precision: 10, scale: 2
+    t.integer "plantas_count"
+    t.text "notas"
+    t.datetime "enviado_at"
+    t.datetime "confirmado_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "estado"], name: "index_pesajes_manicura_on_club_id_and_estado"
+    t.index ["club_id"], name: "index_pesajes_manicura_on_club_id"
+    t.index ["confirmado_por_id"], name: "index_pesajes_manicura_on_confirmado_por_id"
+    t.index ["fecha_pesaje"], name: "index_pesajes_manicura_on_fecha_pesaje"
+    t.index ["lote_id", "estado"], name: "index_pesajes_manicura_on_lote_id_and_estado"
+    t.index ["lote_id"], name: "index_pesajes_manicura_on_lote_id"
+    t.index ["manicurador_id"], name: "index_pesajes_manicura_on_manicurador_id"
+    t.index ["stock_id"], name: "index_pesajes_manicura_on_stock_id"
   end
 
   create_table "plan_tareas", force: :cascade do |t|
@@ -727,6 +843,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.boolean "confirmada", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "dia_relativo"
+    t.string "rol_sugerido"
     t.index ["plan_trabajo_id", "es_recurrente"], name: "index_plan_tareas_on_plan_trabajo_id_and_es_recurrente"
     t.index ["plan_trabajo_id"], name: "index_plan_tareas_on_plan_trabajo_id"
     t.index ["recurrencia_id"], name: "index_plan_tareas_on_recurrencia_id"
@@ -740,15 +858,16 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.bigint "creado_por_id", null: false
     t.bigint "sede_id"
     t.string "titulo", null: false
-    t.integer "periodo_tipo", default: 0, null: false
-    t.date "fecha_inicio", null: false
-    t.date "fecha_fin", null: false
+    t.integer "periodo_tipo", default: 0
+    t.date "fecha_inicio"
+    t.date "fecha_fin"
     t.integer "estado", default: 0, null: false
     t.boolean "repetir_automaticamente", default: false, null: false
     t.text "notas"
     t.datetime "publicado_en"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "es_plantilla", default: false, null: false
     t.index ["club_id", "estado"], name: "index_plan_trabajos_on_club_id_and_estado"
     t.index ["club_id", "fecha_inicio"], name: "index_plan_trabajos_on_club_id_and_fecha_inicio"
     t.index ["club_id"], name: "index_plan_trabajos_on_club_id"
@@ -803,6 +922,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.index ["lote_id"], name: "index_plants_on_lote_id"
     t.index ["origen"], name: "index_plants_on_origen"
     t.index ["planta_madre_id"], name: "index_plants_on_planta_madre_id"
+  end
+
+  create_table "push_subscriptions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "club_id", null: false
+    t.string "endpoint", null: false
+    t.string "p256dh_key", null: false
+    t.string "auth_key", null: false
+    t.string "device_name"
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_push_subscriptions_on_club_id"
+    t.index ["endpoint"], name: "index_push_subscriptions_on_endpoint", unique: true
+    t.index ["user_id"], name: "index_push_subscriptions_on_user_id"
   end
 
   create_table "registros_ambientales", force: :cascade do |t|
@@ -900,8 +1034,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.bigint "club_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "kind"
-    t.bigint "created_by_id", null: false
+    t.string "kind", default: "indoor", null: false
+    t.bigint "created_by_id"
     t.string "camera_stream_url"
     t.string "camera_snapshot_url"
     t.bigint "sede_id"
@@ -992,7 +1126,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.datetime "updated_at", null: false
     t.string "estado", default: "asignado", null: false
     t.bigint "pesada_id"
-    t.bigint "club_id"
+    t.bigint "club_id", null: false
     t.string "numero_lote_producto"
     t.date "fecha_elaboracion"
     t.date "fecha_vencimiento_est"
@@ -1039,6 +1173,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.integer "parent_tarea_id"
     t.bigint "origen_plan_id"
     t.bigint "plan_tarea_id"
+    t.bigint "aplicacion_plan_id"
+    t.string "origen_plan_titulo"
+    t.index ["aplicacion_plan_id"], name: "index_tareas_on_aplicacion_plan_id"
     t.index ["asignada_a_id", "estado"], name: "index_tareas_on_asignada_a_id_and_estado"
     t.index ["asignada_a_id"], name: "index_tareas_on_asignada_a_id"
     t.index ["club_id", "estado"], name: "index_tareas_on_club_id_and_estado"
@@ -1052,6 +1189,26 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.index ["plan_tarea_id"], name: "index_tareas_on_plan_tarea_id"
     t.index ["plant_id"], name: "index_tareas_on_plant_id"
     t.index ["sala_id"], name: "index_tareas_on_sala_id"
+  end
+
+  create_table "turnos", force: :cascade do |t|
+    t.bigint "paciente_id", null: false
+    t.bigint "medico_id", null: false
+    t.bigint "club_id", null: false
+    t.datetime "fecha_hora", null: false
+    t.integer "duracion_minutos", default: 30, null: false
+    t.string "tipo", default: "seguimiento", null: false
+    t.string "estado", default: "programado", null: false
+    t.text "motivo"
+    t.text "notas_post"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "fecha_hora"], name: "index_turnos_on_club_id_and_fecha_hora"
+    t.index ["club_id"], name: "index_turnos_on_club_id"
+    t.index ["medico_id", "fecha_hora"], name: "index_turnos_on_medico_id_and_fecha_hora"
+    t.index ["medico_id"], name: "index_turnos_on_medico_id"
+    t.index ["paciente_id", "fecha_hora"], name: "index_turnos_on_paciente_id_and_fecha_hora"
+    t.index ["paciente_id"], name: "index_turnos_on_paciente_id"
   end
 
   create_table "user_sedes", force: :cascade do |t|
@@ -1090,6 +1247,37 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
     t.index ["role"], name: "index_users_on_role"
   end
 
+  create_table "webhook_deliveries", force: :cascade do |t|
+    t.bigint "webhook_id", null: false
+    t.string "event", null: false
+    t.text "payload_json"
+    t.string "status", default: "pending", null: false
+    t.integer "http_code"
+    t.integer "duration_ms"
+    t.text "error_message"
+    t.integer "attempts", default: 0, null: false
+    t.datetime "last_attempted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["status"], name: "index_webhook_deliveries_on_status"
+    t.index ["webhook_id", "created_at"], name: "index_webhook_deliveries_on_webhook_id_and_created_at"
+    t.index ["webhook_id"], name: "index_webhook_deliveries_on_webhook_id"
+  end
+
+  create_table "webhooks", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "created_by_id", null: false
+    t.string "nombre", null: false
+    t.string "url", null: false
+    t.string "secret", null: false
+    t.string "events", default: "[]", null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_webhooks_on_club_id"
+    t.index ["created_by_id"], name: "index_webhooks_on_created_by_id"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "alertas", "lecturas_ambientales", column: "lectura_id"
@@ -1103,9 +1291,17 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
   add_foreign_key "analisis_ia", "clubs"
   add_foreign_key "analisis_ia", "lotes"
   add_foreign_key "analisis_ia", "users"
+  add_foreign_key "analisis_laboratorio", "geneticas"
+  add_foreign_key "analisis_laboratorio", "lotes"
+  add_foreign_key "aplicacion_planes", "clubs"
+  add_foreign_key "aplicacion_planes", "plan_trabajos"
+  add_foreign_key "aplicacion_planes", "users", column: "aplicado_por_id"
   add_foreign_key "ariccame_registros", "clubs"
   add_foreign_key "ariccame_registros", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "ariccame_registros", "stocks"
+  add_foreign_key "check_ins", "clubs"
+  add_foreign_key "check_ins", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "check_ins", "pacientes"
   add_foreign_key "conversaciones_asistente", "clubs"
   add_foreign_key "conversaciones_asistente", "users"
   add_foreign_key "costo_lotes", "clubs"
@@ -1122,6 +1318,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
   add_foreign_key "dispensaciones", "stocks", on_delete: :nullify
   add_foreign_key "dispensaciones", "users"
   add_foreign_key "dispensaciones", "users", column: "delivery_id"
+  add_foreign_key "disponibilidad_medicos", "clubs"
+  add_foreign_key "disponibilidad_medicos", "users", column: "medico_id"
   add_foreign_key "dispositivos", "clubs"
   add_foreign_key "dispositivos", "salas"
   add_foreign_key "document_templates", "clubs"
@@ -1177,7 +1375,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
   add_foreign_key "pesadas", "users", column: "rechazada_por_id"
   add_foreign_key "pesadas", "users", column: "registrado_por_id"
   add_foreign_key "pesadas_plantas", "pesadas"
+  add_foreign_key "pesadas_plantas", "pesajes_manicura", column: "pesaje_manicura_id"
   add_foreign_key "pesadas_plantas", "plants"
+  add_foreign_key "pesajes_manicura", "clubs"
+  add_foreign_key "pesajes_manicura", "lotes"
+  add_foreign_key "pesajes_manicura", "stocks"
+  add_foreign_key "pesajes_manicura", "users", column: "confirmado_por_id"
+  add_foreign_key "pesajes_manicura", "users", column: "manicurador_id"
   add_foreign_key "plan_tareas", "plan_trabajos"
   add_foreign_key "plan_tareas", "salas"
   add_foreign_key "plan_tareas", "tareas", column: "tarea_generada_id"
@@ -1189,6 +1393,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
   add_foreign_key "plant_activities", "users"
   add_foreign_key "plants", "clubs"
   add_foreign_key "plants", "lotes"
+  add_foreign_key "push_subscriptions", "clubs"
+  add_foreign_key "push_subscriptions", "users"
   add_foreign_key "registros_ambientales", "clubs"
   add_foreign_key "registros_ambientales", "lotes"
   add_foreign_key "registros_ambientales", "users"
@@ -1214,15 +1420,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_20_000003) do
   add_foreign_key "stocks", "lotes"
   add_foreign_key "stocks", "pesadas"
   add_foreign_key "stocks", "sedes"
+  add_foreign_key "tareas", "aplicacion_planes", column: "aplicacion_plan_id"
   add_foreign_key "tareas", "clubs"
   add_foreign_key "tareas", "lotes"
   add_foreign_key "tareas", "plan_tareas"
   add_foreign_key "tareas", "plan_trabajos", column: "origen_plan_id"
-  add_foreign_key "tareas", "plants"
   add_foreign_key "tareas", "salas"
   add_foreign_key "tareas", "users", column: "asignada_a_id"
   add_foreign_key "tareas", "users", column: "creada_por_id"
+  add_foreign_key "turnos", "clubs"
+  add_foreign_key "turnos", "pacientes"
+  add_foreign_key "turnos", "users", column: "medico_id"
   add_foreign_key "user_sedes", "sedes"
   add_foreign_key "user_sedes", "users"
   add_foreign_key "users", "clubs"
+  add_foreign_key "webhook_deliveries", "webhooks"
+  add_foreign_key "webhooks", "clubs"
+  add_foreign_key "webhooks", "users", column: "created_by_id"
 end

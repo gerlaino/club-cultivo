@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
-import { signIn, signOut, me } from "../lib/api";
-import api from "../lib/api";
+import { signIn, signOut, me, clearAuthToken } from "../lib/api";
 import { useClubStore } from "../stores/club.js";
 import { usePlan } from '../composables/usePlan.js'
 
@@ -62,8 +61,7 @@ export const useAuthStore = defineStore("auth", {
         await this.fetchMe();
 
         if (!this.user) {
-          this.error = "No se pudo obtener el usuario. Intentá de nuevo.";
-          return;
+          throw Object.assign(new Error("No se pudo verificar la sesión"), { response: { status: 500 } });
         }
 
         const { default: router } = await import("../router");
@@ -103,8 +101,7 @@ export const useAuthStore = defineStore("auth", {
       } finally {
         this.user = null;
         this.bootstrapped = true;
-        localStorage.removeItem('jwt_token');
-        delete api.defaults.headers.common['Authorization'];
+        clearAuthToken();
         const { planData } = usePlan();
         planData.value = null;
         // Hard reload limpia todos los stores de Pinia, evitando filtraciones entre clubs

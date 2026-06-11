@@ -7,8 +7,11 @@ class AlertaInterna < ApplicationRecord
 
   TIPOS_OPERATIVOS = %w[
     paciente_creado_por_dispensador documento_vencido reprocann_vencido reprocann_por_vencer
+    indicacion_vencida indicacion_por_vencer
     manicura_asignada manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada
-    stock_bajo saldo_cc_bajo saldo_gramos_bajo otro
+    stock_bajo stock_vencimiento saldo_cc_bajo saldo_gramos_bajo
+    delivery_entregado delivery_fallido
+    otro
   ].freeze
 
   TIPOS_CULTIVO = %w[

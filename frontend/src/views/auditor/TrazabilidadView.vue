@@ -23,7 +23,7 @@
             @blur="onBlur"
           />
           <button class="trz__search-btn" :disabled="!query.trim() || loading" @click="buscarDesdeInput">
-            <span v-if="loading" class="trz__spin"></span>
+            <DsSpinner v-if="loading" :size="14" />
             <i v-else class="bi bi-arrow-right"></i>
           </button>
 
@@ -60,14 +60,14 @@
 
     <!-- Loading cadena -->
     <div v-if="loading" class="trz__loader">
-      <div class="trz__ring"></div>
+      <DsSpinner />
       Cargando cadena de trazabilidad…
     </div>
 
     <!-- ESTADO: listado de stocks (default) -->
     <template v-else-if="!data">
       <div v-if="loadingList" class="trz__loader">
-        <div class="trz__ring"></div> Cargando stocks…
+        <DsSpinner /> Cargando stocks…
       </div>
       <div v-else-if="!stocksList.length" class="trz__empty-plain">
         <i class="bi bi-inbox"></i> Sin stocks registrados aún.
@@ -134,7 +134,7 @@
         </div>
         <div class="trz__kpi trz__kpi--amber">
           <span class="trz__kpi-ico">🏷️</span>
-          <span class="trz__kpi-val">{{ data.stock.cantidad_g }} g</span>
+          <span class="trz__kpi-val">{{ data.stock.cantidad_inicial_g }} g</span>
           <span class="trz__kpi-lbl">Stock generado</span>
         </div>
         <div class="trz__kpi trz__kpi--blue">
@@ -246,9 +246,35 @@
                 <span class="trz__field-lbl">Forma</span>
                 <span class="trz__field-val">{{ FORMA_LABELS[data.stock.forma_producto] || data.stock.forma_producto }}</span>
               </div>
+              <div v-if="data.stock.genetica" class="trz__field">
+                <span class="trz__field-lbl">Genética</span>
+                <span class="trz__field-val trz__field-gen">{{ data.stock.genetica.nombre }}</span>
+              </div>
+              <div v-if="data.stock.genetica?.tipo" class="trz__field">
+                <span class="trz__field-lbl">Tipo</span>
+                <span class="trz__field-val">{{ data.stock.genetica.tipo }}</span>
+              </div>
+              <div v-if="data.stock.genetica?.thc || data.stock.genetica?.cbd" class="trz__field">
+                <span class="trz__field-lbl">Perfil</span>
+                <span class="trz__field-val trz__field-perfil">
+                  <span v-if="data.stock.genetica.thc">THC {{ data.stock.genetica.thc }}%</span>
+                  <span v-if="data.stock.genetica.cbd">CBD {{ data.stock.genetica.cbd }}%</span>
+                </span>
+              </div>
+              <div v-if="data.stock.genetica?.numero_registro_inase" class="trz__field">
+                <span class="trz__field-lbl">Reg. INASE</span>
+                <span class="trz__field-val trz__field-inase">
+                  <i class="bi bi-patch-check-fill"></i>
+                  {{ data.stock.genetica.numero_registro_inase }}
+                </span>
+              </div>
               <div class="trz__field">
-                <span class="trz__field-lbl">Cantidad</span>
-                <span class="trz__field-val trz__field-g">{{ data.stock.cantidad_g }} g</span>
+                <span class="trz__field-lbl">Cantidad generada</span>
+                <span class="trz__field-val trz__field-g">{{ data.stock.cantidad_inicial_g }} g</span>
+              </div>
+              <div class="trz__field">
+                <span class="trz__field-lbl">Disponible actual</span>
+                <span class="trz__field-val trz__field-g">{{ data.stock.cantidad_disponible_g }} g</span>
               </div>
               <div class="trz__field">
                 <span class="trz__field-lbl">Elaborado</span>
@@ -311,7 +337,7 @@
       </div>
 
       <div class="trz__footer-legal">
-        Informe generado por Club Cultivo · {{ hoy }} · Uso exclusivo para auditoría REPROCANN / ARICCAME
+        Informe generado por Cultivo Espacial · {{ hoy }} · Uso exclusivo para auditoría REPROCANN / ARICCAME
       </div>
     </div>
 
@@ -320,6 +346,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { getStockTrazabilidad, listStocks } from '../../lib/api.js'
 
 const FORMA_LABELS = {
@@ -497,11 +524,6 @@ const formatDate = d => d
 }
 .trz__search-btn:hover:not(:disabled) { background: #144a18; }
 .trz__search-btn:disabled { opacity: .4; cursor: not-allowed; }
-.trz__spin {
-  width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3);
-  border-top-color: #fff; border-radius: 50%; animation: trz-spin .6s linear infinite;
-}
-@keyframes trz-spin { to { transform: rotate(360deg); } }
 
 .trz__autocomplete {
   position: absolute; top: calc(100% + 2px); left: 0; right: 0;
@@ -539,12 +561,7 @@ const formatDate = d => d
 
 /* Loader */
 .trz__loader {
-  display: flex; align-items: center; gap: .6rem;
-  color: #64748b; font-size: .875rem; padding: 3rem 0;
-}
-.trz__ring {
-  width: 20px; height: 20px; border: 2.5px solid #e2e8f0;
-  border-top-color: #1b5e20; border-radius: 50%; animation: trz-spin .7s linear infinite; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; padding: 2rem;
 }
 
 /* Empty plain */
@@ -661,6 +678,8 @@ const formatDate = d => d
 .trz__field-val { font-size: .875rem; color: #0f172a; font-weight: 500; }
 .trz__field-inase { display: inline-flex; align-items: center; gap: .3rem; color: #15803d; }
 .trz__field-g { color: #d97706; font-weight: 700; }
+.trz__field-gen { color: #7c3aed; font-weight: 700; }
+.trz__field-perfil { display: inline-flex; gap: .5rem; color: #64748b; font-size: .8rem; }
 .trz__estado-pill {
   display: inline-block; background: #f1f5f9; color: #475569;
   font-size: .72rem; font-weight: 700; text-transform: capitalize;

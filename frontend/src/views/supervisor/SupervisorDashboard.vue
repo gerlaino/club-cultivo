@@ -11,7 +11,7 @@
 
     <!-- ── LOADING ─────────────────────────────────────────────── -->
     <div v-if="loading" class="svd__loading">
-      <div class="svd__spinner"></div>
+      <DsSpinner :size="20" />
       <span>Cargando datos…</span>
     </div>
 
@@ -25,7 +25,13 @@
       <!-- ── SEDES GRID ───────────────────────────────────────── -->
       <section class="svd__section">
         <h2 class="svd__section-title">Mis sedes</h2>
-        <div v-if="!sedes.length" class="svd__empty">No tenés sedes asignadas.</div>
+        <div v-if="!sedes.length" class="svd__empty svd__empty--warn">
+          <i class="bi bi-exclamation-triangle-fill svd__warn-icon"></i>
+          <div>
+            <strong>No tenés sedes asignadas.</strong>
+            <span> Contactá al administrador del club para que te asigne una sede.</span>
+          </div>
+        </div>
         <div v-else class="svd__sedes-grid">
           <div
             v-for="sede in sedes"
@@ -84,6 +90,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
 import api from '../../lib/api.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const auth = useAuthStore()
 
@@ -162,16 +169,6 @@ onMounted(async () => {
   font-size: var(--fs-14);
   padding: var(--sp-8) 0;
 }
-.svd__spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--c-ink-200);
-  border-top-color: #0f766e;
-  border-radius: 50%;
-  animation: svd-spin 0.7s linear infinite;
-}
-@keyframes svd-spin { to { transform: rotate(360deg); } }
-
 /* Error */
 .svd__error {
   padding: var(--sp-4) var(--sp-5);
@@ -193,6 +190,22 @@ onMounted(async () => {
   font-size: var(--fs-14);
   color: var(--c-ink-400);
   padding: var(--sp-4) 0;
+}
+.svd__empty--warn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--r-md);
+  padding: var(--sp-4) var(--sp-5);
+  color: #92400e;
+}
+.svd__warn-icon {
+  font-size: var(--fs-16);
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #d97706;
 }
 
 /* Sedes grid */

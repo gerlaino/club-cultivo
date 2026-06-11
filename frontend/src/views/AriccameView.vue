@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { listAriccameRegistros } from '../lib/api.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const registros  = ref([])
 const meta       = ref({ total: 0, pagina: 1, limite: 30, pendientes: 0, con_error: 0 })
@@ -203,7 +204,7 @@ const hayFiltros = computed(() => filtros.value.estado || filtros.value.tipo)
 
     <!-- Loading -->
     <div v-if="loading" class="ar__loading">
-      <div class="ar__spinner"></div>
+      <DsSpinner :size="22" />
       <span>Cargando registros ARICCAME…</span>
     </div>
 
@@ -504,13 +505,6 @@ const hayFiltros = computed(() => filtros.value.estado || filtros.value.tipo)
   display: flex; align-items: center; gap: .75rem;
   padding: 3.5rem 1rem; color: #94a3b8; font-size: .875rem;
 }
-.ar__spinner {
-  width: 22px; height: 22px; border-radius: 50%;
-  border: 3px solid #e2e8f0; border-top-color: #1b5e20;
-  animation: ar-spin .8s linear infinite; flex-shrink: 0;
-}
-@keyframes ar-spin { to { transform: rotate(360deg); } }
-
 /* Empty state */
 .ar__empty {
   display: flex; flex-direction: column; align-items: center; text-align: center;

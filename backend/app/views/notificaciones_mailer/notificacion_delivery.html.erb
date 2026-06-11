@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, sans-serif; background: #f8fafc; margin: 0; padding: 2rem; color: #1a2e1a; }
+    .card { background: #fff; border-radius: 12px; max-width: 480px; margin: 0 auto; padding: 2rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    .logo { font-size: 1.1rem; font-weight: 800; color: #15803d; margin-bottom: 1.5rem; }
+    .mensaje { font-size: 1rem; line-height: 1.6; color: #374151; }
+    .footer { margin-top: 2rem; font-size: .8rem; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo"><%= @club&.name || 'Club Cultivo' %></div>
+    <div class="mensaje"><%= @mensaje %></div>
+    <div class="footer">Este mensaje fue enviado automáticamente. No respondas a este correo.</div>
+  </div>
+</body>
+</html>

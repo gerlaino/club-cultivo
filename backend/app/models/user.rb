@@ -7,6 +7,9 @@ class User < ApplicationRecord
   has_many :salas_asignadas,   through: :sala_cultivadores, source: :sala
   has_many :user_sedes,        class_name: 'UserSede', foreign_key: 'user_id', dependent: :destroy
   has_many :sedes_asignadas,   through: :user_sedes, source: :sede
+  has_many :push_subscriptions, dependent: :destroy
+  has_many :disponibilidad_medicos, foreign_key: :medico_id, dependent: :destroy
+  has_many :turnos_como_medico, class_name: 'Turno', foreign_key: :medico_id, dependent: :destroy
 
   devise :database_authenticatable, :recoverable, :rememberable, :validatable,
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
@@ -34,8 +37,20 @@ class User < ApplicationRecord
     "#{first_name} #{last_name}".strip
   end
 
+  KINDS_CULTIVADOR = %w[vegetativo floracion mixta madre clon].freeze
+  KINDS_MANICURA   = %w[manicura].freeze
+
   def salas_ids_asignadas
-    salas_asignadas.pluck(:id)
+    if cultivador?
+      sedes = sedes_ids_asignadas
+      return [] if sedes.empty?
+      scope = Sala.where(club_id: club_id).where(kind: KINDS_CULTIVADOR)
+      scope.where(sede_id: sedes).pluck(:id)
+    elsif manicura?
+      Sala.where(club_id: club_id).where(kind: KINDS_MANICURA).pluck(:id)
+    else
+      salas_asignadas.pluck(:id)
+    end
   end
 
   def sedes_ids_asignadas
@@ -43,7 +58,10 @@ class User < ApplicationRecord
   end
 
   def salas_ids_en_sedes_asignadas
-    Sala.where(sede_id: sedes_ids_asignadas, club_id: club_id).pluck(:id)
+    sedes = sedes_ids_asignadas
+    scope = Sala.where(club_id: club_id)
+    # Sin sedes asignadas = acceso a todas las salas del club
+    sedes.empty? ? scope.pluck(:id) : scope.where(sede_id: sedes).pluck(:id)
   end
 
   def observando_club

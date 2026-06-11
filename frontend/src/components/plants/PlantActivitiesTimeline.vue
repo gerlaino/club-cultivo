@@ -32,7 +32,7 @@
                 class="btn btn-success btn-sm w-100"
                 :disabled="saving"
               >
-                <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+                <DsSpinner v-if="saving" :size="14" />
                 <i v-else class="bi bi-plus-circle me-1"></i>
                 Agregar
               </button>
@@ -59,7 +59,7 @@
 
     <!-- Timeline -->
     <div v-if="loading" class="text-center py-4">
-      <div class="spinner-border spinner-border-sm text-success"></div>
+      <DsSpinner :size="18" />
     </div>
 
     <div v-else-if="activities.length === 0" class="text-center py-4 text-muted">
@@ -111,6 +111,7 @@ import { logger } from '../../utils/logger.js'
 import { listPlantActivities, createPlantActivity, deletePlantActivity } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 const { confirm } = useConfirm()
 const toast = useToast()
 

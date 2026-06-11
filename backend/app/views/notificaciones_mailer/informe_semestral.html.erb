@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 0; color: #0f172a; }
+    .wrapper { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    .header { background: #1b5e20; padding: 28px 32px; }
+    .header-title { color: #fff; font-size: 20px; font-weight: 700; margin: 0; }
+    .header-sub { color: #a5d6a7; font-size: 13px; margin: 4px 0 0; }
+    .banner-rec { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 14px 20px; margin: 0; font-size: 14px; color: #78350f; }
+    .body { padding: 28px 32px; }
+    .kpi-row { display: flex; gap: 16px; margin-bottom: 24px; }
+    .kpi { flex: 1; background: #f8fafc; border-radius: 8px; padding: 14px 16px; text-align: center; }
+    .kpi-num { font-size: 28px; font-weight: 700; color: #0f172a; line-height: 1; }
+    .kpi-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin: 20px 0 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+    th { text-align: left; font-size: 11px; font-weight: 700; color: #64748b; border-bottom: 2px solid #e2e8f0; padding: 6px 8px; }
+    td { padding: 7px 8px; border-bottom: 1px solid #f1f5f9; }
+    .cta { text-align: center; margin: 28px 0 0; }
+    .btn { display: inline-block; background: #1b5e20; color: #fff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; }
+    .footer { background: #f8fafc; padding: 16px 32px; text-align: center; font-size: 12px; color: #94a3b8; }
+    .divider { height: 1px; background: #e2e8f0; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <p class="header-title">🌿 Club Cultivo — Informe semestral</p>
+      <p class="header-sub"><%= @club.name %> · <%= @semestre %>° semestre <%= @anio %></p>
+    </div>
+
+    <% if @modo == :recordatorio %>
+    <div class="banner-rec">
+      ⏰ <strong>Recordatorio:</strong> el plazo para presentar el informe semestral ante REPROCANN vence en 30 días.
+      Revisá los datos a continuación y completá la presentación.
+    </div>
+    <% end %>
+
+    <div class="body">
+
+      <% pac = @datos[:pacientes] %>
+      <% dis = @datos[:dispensaciones] %>
+
+      <p class="section-title">Resumen del período</p>
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-num"><%= pac[:total] %></div>
+          <div class="kpi-label">Socios activos</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-num"><%= dis[:total] %></div>
+          <div class="kpi-label">Dispensaciones</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-num"><%= dis[:total_gramos].round(0) %>g</div>
+          <div class="kpi-label">Gramos entregados</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-num"><%= pac[:con_reprocann] %></div>
+          <div class="kpi-label">Con REPROCANN</div>
+        </div>
+      </div>
+
+      <% if pac[:vencidos] > 0 || pac[:por_vencer] > 0 %>
+      <div class="divider"></div>
+      <p class="section-title">⚠️ Alertas REPROCANN</p>
+      <table>
+        <tr><th>Estado</th><th>Cantidad</th></tr>
+        <% if pac[:vencidos] > 0 %>
+        <tr><td style="color:#dc2626;font-weight:600">REPROCANN vencido</td><td style="color:#dc2626;font-weight:600"><%= pac[:vencidos] %></td></tr>
+        <% end %>
+        <% if pac[:por_vencer] > 0 %>
+        <tr><td style="color:#d97706">Por vencer (30 días)</td><td style="color:#d97706"><%= pac[:por_vencer] %></td></tr>
+        <% end %>
+      </table>
+      <% end %>
+
+      <% prod = @datos[:produccion] %>
+      <% if prod[:lotes_periodo].any? %>
+      <div class="divider"></div>
+      <p class="section-title">Producción — Lotes del período</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Genética</th>
+            <th>Sala</th>
+            <th>Estado</th>
+            <th>Gramos</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% prod[:lotes_periodo].first(10).each do |l| %>
+          <tr>
+            <td><%= l[:codigo] %></td>
+            <td><%= l[:strain] || '—' %></td>
+            <td><%= l[:sala] || '—' %></td>
+            <td><%= l[:estado] %></td>
+            <td><%= l[:gramos_producidos]&.round(1) || '—' %></td>
+          </tr>
+          <% end %>
+          <% if prod[:lotes_periodo].size > 10 %>
+          <tr><td colspan="5" style="color:#64748b;font-style:italic">... y <%= prod[:lotes_periodo].size - 10 %> más. Ver informe completo en el sistema.</td></tr>
+          <% end %>
+        </tbody>
+      </table>
+      <% end %>
+
+      <div class="divider"></div>
+      <div class="cta">
+        <a class="btn" href="<%= ENV.fetch('APP_HOST', 'https://app.clubcultivo.app') %>/informes/semestral">
+          Ver informe completo →
+        </a>
+      </div>
+
+    </div>
+
+    <div class="footer">
+      Club Cultivo · Plataforma de gestión de clubes cannábicos<br/>
+      Este es un aviso automático generado por el sistema.
+    </div>
+  </div>
+</body>
+</html>

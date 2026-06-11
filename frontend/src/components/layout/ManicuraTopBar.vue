@@ -22,6 +22,12 @@
 
       <!-- Right -->
       <div class="mtb__right">
+        <!-- Help -->
+        <button class="mtb__icon-btn" @click="openHelp" aria-label="Ayuda" title="Ayuda">
+          <HelpCircle :size="20" :stroke-width="1.75" />
+          <span v-if="helpDot" class="mtb__help-dot" />
+        </button>
+
         <DsDropdown v-model="avatarOpen" align="right">
           <template #anchor>
             <button class="mtb__avatar-btn" @click="avatarOpen = !avatarOpen" aria-label="Menú de usuario">
@@ -52,16 +58,19 @@
       </div>
     </div>
   </header>
+
+  <HelpDrawer v-model="helpOpen" />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import DsDropdown from '../../design-system/components/Dropdown.vue'
 import DsAvatar   from '../../design-system/components/Avatar.vue'
-import { User, LogOut, Menu } from 'lucide-vue-next'
+import { User, LogOut, Menu, HelpCircle } from 'lucide-vue-next'
+import HelpDrawer from '../HelpDrawer.vue'
 
 const emit = defineEmits(['open-drawer'])
 
@@ -71,6 +80,18 @@ const auth   = useAuthStore()
 const club   = useClubStore()
 
 const avatarOpen = ref(false)
+const helpOpen   = ref(false)
+const helpDot    = ref(false)
+onMounted(() => {
+  helpDot.value = !localStorage.getItem(`help_seen_${auth.user?.id || 'u'}`)
+})
+function openHelp() {
+  helpOpen.value = true
+  if (helpDot.value) {
+    helpDot.value = false
+    localStorage.setItem(`help_seen_${auth.user?.id || 'u'}`, '1')
+  }
+}
 
 const SEGMENT_LABELS = {
   mnc:     'Manicura',
@@ -146,6 +167,27 @@ async function handleLogout() {
 
 /* Right */
 .mtb__right { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; }
+
+.mtb__icon-btn {
+  position: relative;
+  width: 36px; height: 36px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--c-ink-300);
+  background: transparent;
+  color: var(--c-ink-500);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.mtb__icon-btn:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
+.mtb__help-dot {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 7px; height: 7px;
+  background: #3b82f6;
+  border-radius: 50%;
+  border: 1.5px solid var(--c-paper);
+}
 
 /* Avatar */
 .mtb__avatar-btn { background: none; border: none; padding: 0; cursor: pointer; border-radius: 50%; display: flex; }

@@ -5,23 +5,27 @@ import { useRoute, useRouter } from "vue-router"
 import { useSalasStore } from "../stores/salas"
 import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
-import SalaCultivadoresManager from '../components/SalaCultivadoresManager.vue'
-import ModalCargarLote from '../components/salas/ModalCargarLote.vue'
-import RegistrarLecturaModal from '../components/salas/RegistrarLecturaModal.vue'
-import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado } from '../lib/api.js'
+import { useClubStore } from "../stores/club"
+import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
+import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vue'
+import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
+import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
+import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
-import AsistenteVoz from '../components/AsistenteVoz.vue'
 import { Gauge } from 'lucide-vue-next'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import SemaforoAmbiente from '../components/ambiente/SemaforoAmbiente.vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
+import SalaLayoutGrid from '../components/salas/SalaLayoutGrid.vue'
 
 const route  = useRoute()
 const router = useRouter()
 const salas  = useSalasStore()
 const lotes  = useLotesStore()
 const auth   = useAuthStore()
+const club   = useClubStore()
 const toast  = useToast()
 const { confirm } = useConfirm()
 
@@ -54,6 +58,10 @@ const canEdit        = computed(() => ['admin', 'supervisor'].includes(auth.role
 const isCultivador   = computed(() => auth.role === "cultivador")
 const isManicurador  = computed(() => auth.role === "manicura")
 const isAgricultor   = computed(() => auth.role === "cultivador")
+const canCambiarFase = computed(() =>
+  ['admin', 'supervisor', 'cultivador'].includes(auth.role) &&
+  ['vegetativo', 'floracion'].includes(sala.value?.kind)
+)
 
 const lecturaOpen   = ref(false)
 const lotesExpanded = ref(true)
@@ -65,15 +73,18 @@ const DIAS_CICLO   = { semilla:7, esqueje:7, vegetativo:45, floracion:65, cosech
 const geneticas = ref([])
 
 // ── Cámara ─────────────────────────────────────────────────
-const showCameraForm = ref(false)
-const savingCamera   = ref(false)
-const cameraError    = ref(false)
-const snapshotKey    = ref(0)
-const snapshotTs     = ref('')
-const cameraForm     = ref({ camera_stream_url: '', camera_snapshot_url: '' })
+const showCameraForm  = ref(false)
+const savingCamera    = ref(false)
+const cameraError     = ref(false)
+const snapshotKey     = ref(0)
+const snapshotTs      = ref('')
+const cameraInputUrl  = ref('')
+const cameraTestSrc   = ref('')
+const cameraTestOk    = ref(false)
+const cameraTestError = ref(false)
 
 const snapshotSrc = computed(() => {
-  const url = sala.value?.camera_snapshot_url || sala.value?.camera_stream_url
+  const url = sala.value?.camera_stream_url || sala.value?.camera_snapshot_url
   if (!url) return ''
   return url + (url.includes('?') ? '&' : '?') + '_t=' + snapshotKey.value
 })
@@ -84,14 +95,49 @@ function refreshSnapshot() {
   snapshotTs.value  = new Date().toLocaleTimeString('es-AR')
 }
 
+function normalizarUrl(input) {
+  const s = input.trim()
+  if (!s) return ''
+  return /^https?:\/\//i.test(s) ? s : 'http://' + s
+}
+
+function abrirFormCamera() {
+  cameraInputUrl.value  = sala.value?.camera_stream_url || sala.value?.camera_snapshot_url || ''
+  cameraTestSrc.value   = ''
+  cameraTestOk.value    = false
+  cameraTestError.value = false
+  showCameraForm.value  = true
+}
+
+function probarCamara() {
+  const url = normalizarUrl(cameraInputUrl.value)
+  if (!url) return
+  cameraTestOk.value    = false
+  cameraTestError.value = false
+  cameraTestSrc.value   = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now()
+}
+
 async function saveCamera() {
+  const url = normalizarUrl(cameraInputUrl.value)
   savingCamera.value = true
   try {
-    await updateSala(salaId, cameraForm.value)
+    await updateSala(salaId, { camera_stream_url: url, camera_snapshot_url: '' })
     await salas.fetchOne(salaId)
     showCameraForm.value = false
-    toast.success('Cámara configurada')
+    toast.success('Cámara guardada')
+    refreshSnapshot()
   } catch { toast.error('Error al guardar la cámara') }
+  finally { savingCamera.value = false }
+}
+
+async function eliminarCamara() {
+  savingCamera.value = true
+  try {
+    await updateSala(salaId, { camera_stream_url: '', camera_snapshot_url: '' })
+    await salas.fetchOne(salaId)
+    cameraError.value = false
+    toast.success('Cámara eliminada')
+  } catch { toast.error('Error') }
   finally { savingCamera.value = false }
 }
 
@@ -104,17 +150,17 @@ const savingEditSala = ref(false)
 const SALA_KINDS = [
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración'  },
-  { value: 'mixta',      label: 'Mixta'      },
-  { value: 'madre',      label: 'Madres'     },
-  { value: 'clon',       label: 'Clones'     },
-  { value: 'secado',     label: 'Secado'     },
+  { value: 'cosecha',    label: 'Cosecha'    },
+  { value: 'manicura',   label: 'Manicura'   },
 ]
 
 function openEditSala() {
   editSalaForm.value = {
-    nombre: sala.value.nombre || '',
-    kind:   sala.value.kind   || '',
-    notes:  sala.value.notes  || '',
+    nombre:     sala.value.nombre     || '',
+    kind:       sala.value.kind       || '',
+    state:      sala.value.state      || 'activa',
+    pots_count: sala.value.pots_count ?? '',
+    notes:      sala.value.notes      || '',
   }
   editSalaError.value = null
   showEditSala.value  = true
@@ -136,9 +182,32 @@ async function saveEditSala() {
   }
 }
 
+const salaAcciones = computed(() => {
+  const items = []
+  if (canEdit.value || isCultivador.value) {
+    items.push({ emoji: '🌿', label: 'Registrar sala', onClick: () => { lecturaOpen.value = true } })
+  }
+  if (puedeCargarLote.value) {
+    const lbl = esSalaSecado.value ? 'Cargar lote de floración' : esSalaManicura.value ? 'Cargar lote de cosecha' : 'Cargar lote de secado'
+    items.push({ emoji: '📦', label: lbl, onClick: () => { showCargarLote.value = true } })
+  }
+  if (canCambiarFase.value) {
+    const hacia = sala.value?.kind === 'vegetativo' ? 'Floración' : 'Vegetativo'
+    items.push({ emoji: '🔄', label: `Pasar sala a ${hacia}`, onClick: () => { showCambiarFaseModal.value = true; cambiarFaseError.value = null } })
+  }
+  if (canEdit.value) {
+    items.push({ emoji: '✏️', label: 'Editar sala', onClick: openEditSala })
+    items.push({ divider: true })
+    items.push({ emoji: '🗑️', label: 'Eliminar sala', danger: true, onClick: eliminarSala, disabled: deleting.value })
+  }
+  return items
+})
+
 function salaEscapeHandler(e) {
   if (e.key !== 'Escape') return
   if (showEditSala.value)    { showEditSala.value = false; return }
+  if (showCambiarFaseModal.value)   { showCambiarFaseModal.value = false; return }
+  if (showCrearLoteCosecha.value) { showCrearLoteCosecha.value = false; return }
   if (showCreate.value)      { closeCreate(); return }
   if (showCargarLote.value)  { showCargarLote.value = false; return }
   if (showUpgrade.value)     { showUpgrade.value = false; return }
@@ -154,7 +223,7 @@ onMounted(async () => {
   finally  { loading.value = false }
 
   try {
-    const res = await listGeneticas({ activa: true, disponible: true })
+    const res = await listGeneticas({ solo_club: 'true' })
     geneticas.value = res.data || []
   } catch { /* genéticas no críticas */ }
 
@@ -166,30 +235,31 @@ onUnmounted(() => {
 })
 
 const sala  = computed(() => salas.currentSala)
-const items = computed(() => lotes.bySala(salaId))
+const ESTADOS_ACTIVOS_CULTIVADOR = ['semilla', 'esqueje', 'vegetativo', 'floracion']
+const items = computed(() => {
+  const todos = lotes.bySala(salaId)
+  return isCultivador.value
+    ? todos.filter(l => ESTADOS_ACTIVOS_CULTIVADOR.includes(l.estado))
+    : todos
+})
 
 watch(() => sala.value?.camera_stream_url, (url) => {
-  if (url) {
-    cameraForm.value.camera_stream_url   = url
-    cameraForm.value.camera_snapshot_url = sala.value?.camera_snapshot_url || ''
-    refreshSnapshot()
-  }
+  if (url) refreshSnapshot()
 }, { immediate: true })
 
-const contextoAsistente = computed(() => sala.value ? {
-  tipo:        'sala',
-  sala_id:     sala.value.id,
-  sala_nombre: sala.value.nombre,
-} : null)
-
 // ── Cambiar estado de sala ──────────────────────────────────
-const cambiandoEstado = ref(false)
+const cambiandoEstado  = ref(false)
+const showEstadoMenu   = ref(false)
+
+function toggleEstadoMenu() { showEstadoMenu.value = !showEstadoMenu.value }
+function cerrarEstadoMenu()  { showEstadoMenu.value = false }
 const ESTADOS_SALA = [
   { value: 'activa',        label: 'Activa',          style: 'background:#dcfce7;color:#15803d' },
   { value: 'mantenimiento', label: 'En mantenimiento', style: 'background:#fef3c7;color:#b45309' },
   { value: 'cerrada',       label: 'Cerrada',          style: 'background:#f1f5f9;color:#64748b' },
 ]
 async function cambiarEstado(nuevoEstado) {
+  cerrarEstadoMenu()
   if (!sala.value || sala.value.state === nuevoEstado) return
   cambiandoEstado.value = true
   try {
@@ -253,6 +323,12 @@ const itemsSorted = computed(() => {
   return [...items.value].sort((a,b) => order.indexOf(a.estado) - order.indexOf(b.estado))
 })
 
+const SD_PER_PAGE    = 10
+const sdPage         = ref(1)
+const itemsPaginados = computed(() => itemsSorted.value.slice((sdPage.value - 1) * SD_PER_PAGE, sdPage.value * SD_PER_PAGE))
+const sdTotalPages   = computed(() => Math.max(1, Math.ceil(itemsSorted.value.length / SD_PER_PAGE)))
+watch(itemsSorted, () => { sdPage.value = 1 })
+
 const breadcrumbs = computed(() => {
   if (isCultivador.value) return []
   const crumbs = [{ label:"Sedes", to:{ name:"sedes" } }]
@@ -263,8 +339,42 @@ const breadcrumbs = computed(() => {
 // ── Cargar lote (secado / manicura) ────────────────────────
 const showCargarLote = ref(false)
 
+// ── Cambiar fase (vege ↔ flora) ────────────────────────────
+const showCambiarFaseModal = ref(false)
+const cambiarFaseLoading   = ref(false)
+const cambiarFaseError     = ref(null)
+
+const faseSiguiente = computed(() =>
+  sala.value?.kind === 'vegetativo' ? 'floracion' : 'vegetativo'
+)
+const faseLabel = (f) => ({ vegetativo: 'Vegetativo', floracion: 'Floración' }[f] || f)
+
+const lotesAfectados = computed(() =>
+  lotes.bySala(salaId).filter(l => l.estado === sala.value?.kind)
+)
+const plantasAfectadas = computed(() =>
+  lotesAfectados.value.reduce((sum, l) => sum + (l.plants_count || 0), 0)
+)
+
+async function ejecutarCambioFase() {
+  cambiarFaseLoading.value = true
+  cambiarFaseError.value   = null
+  try {
+    const { data } = await cambiarFaseSala(salaId)
+    await salas.fetchSala(salaId)
+    await lotes.fetchBySala(salaId)
+    showCambiarFaseModal.value = false
+    toast.success(`Sala cambiada a ${faseLabel(data.nueva_fase)} — ${data.lotes_afectados} lotes, ${data.plantas_afectadas} plantas`)
+  } catch (e) {
+    cambiarFaseError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al cambiar la fase'
+  } finally {
+    cambiarFaseLoading.value = false
+  }
+}
+
 const esSalaSecado   = computed(() => sala.value?.kind === 'secado')
 const esSalaManicura = computed(() => sala.value?.kind === 'manicura')
+const esSalaCosecha  = computed(() => sala.value?.kind === 'cosecha')
 const puedeCargarLote = computed(() =>
   (esSalaSecado.value   && (canEdit.value || isAgricultor.value)) ||
   (esSalaManicura.value && (canEdit.value || isAgricultor.value || isManicurador.value))
@@ -286,7 +396,15 @@ const ESTADOS_HEREDADO = [
   { value: 'cosecha',    label: 'Cosecha' },
 ]
 
-const showCreate     = ref(false)
+const estadosHeredadoPermitidos = computed(() => {
+  const kind = sala.value?.kind
+  if (kind === 'floracion') return ESTADOS_HEREDADO.filter(e => e.value === 'floracion')
+  if (kind === 'cosecha') return ESTADOS_HEREDADO.filter(e => e.value === 'cosecha')
+  return ESTADOS_HEREDADO.filter(e => ['semilla', 'vegetativo'].includes(e.value))
+})
+
+const showCreate            = ref(false)
+const showCrearLoteCosecha  = ref(false)
 const loteForm       = ref(emptyLoteForm())
 const loteErrors     = ref({})
 const loteApiError   = ref(null)
@@ -370,7 +488,7 @@ async function setOrigen(valor) {
   if (valor === 'esqueje') {
     loadingMadres.value = true
     try {
-      const { data } = await listPlants({})
+      const { data } = await listPlants({ lote_estado: 'vegetativo' })
       plantasMadre.value = data || []
     } catch { plantasMadre.value = [] }
     finally { loadingMadres.value = false }
@@ -456,11 +574,12 @@ async function createLote() {
   }
 }
 async function openCreate() {
+  if (esSalaCosecha.value) { showCrearLoteCosecha.value = true; return }
   loteForm.value       = emptyLoteForm()
   loteErrors.value     = {}
   loteApiError.value   = null
   tipoCreacion.value   = 'nuevo'
-  heredadoEstado.value = 'semilla'
+  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'semilla'
   heredadoDias.value   = { semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 }
   proximoCodigo.value  = ''
   showCreate.value     = true
@@ -470,6 +589,12 @@ async function openCreate() {
     proximoCodigo.value = data.codigo
   } catch { /* no crítico */ }
   finally { loadingCodigo.value = false }
+}
+
+async function onLoteCosechaCreado() {
+  await lotes.fetchBySala(salaId)
+  await salas.fetchSala(salaId)
+  lotesExpanded.value = true
 }
 function closeCreate() {
   showCreate.value     = false
@@ -502,6 +627,15 @@ async function cargarAmbienteMini() {
 const canSeeAmbiente = computed(() =>
   auth.role === 'admin' || auth.role === 'cultivador'
 )
+
+// ── Tabs (Layout / Historial) ──────────────────────────────
+const tabActiva = ref('lotes')
+
+const lotesActivos = computed(() =>
+  (sala.value?.lotes_historial || []).filter(l => !['finalizado', 'curado'].includes(l.estado))
+)
+const historialLotes = computed(() => sala.value?.lotes_historial || [])
+const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 </script>
 
 <template>
@@ -512,7 +646,7 @@ const canSeeAmbiente = computed(() =>
       :items="[...breadcrumbs, { label: sala?.nombre || '…' }]"
     />
 
-    <div v-if="loading" class="sd__loading"><div class="sd__spinner"></div><span>Cargando sala…</span></div>
+    <div v-if="loading" class="sd__loading"><DsSpinner /></div>
     <div v-else-if="error" class="sd__error">{{ error }}</div>
     <div v-else-if="!sala" class="sd__error">Sala no encontrada.</div>
 
@@ -524,12 +658,13 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__hero-title-row">
             <h1 class="sd__title">{{ sala.nombre }}</h1>
             <!-- Estado con dropdown para cambiar -->
-            <div class="sd__estado-wrap" v-if="canEdit">
+            <div class="sd__estado-wrap" v-if="canEdit" v-click-outside="cerrarEstadoMenu">
               <div class="sd__estado-dropdown">
-                <span class="sd__estado-pill" :style="{ background: salaEstadoStyle(sala.state).bg, color: salaEstadoStyle(sala.state).color }">
-                  {{ sala.state }} <i class="bi bi-chevron-down" style="font-size:.6rem"></i>
+                <span class="sd__estado-pill" :style="{ background: salaEstadoStyle(sala.state).bg, color: salaEstadoStyle(sala.state).color }"
+                      @click.stop="toggleEstadoMenu">
+                  {{ sala.state }} <i class="bi" :class="showEstadoMenu ? 'bi-chevron-up' : 'bi-chevron-down'" style="font-size:.6rem"></i>
                 </span>
-                <div class="sd__estado-menu">
+                <div v-if="showEstadoMenu" class="sd__estado-menu">
                   <button
                     v-for="est in ESTADOS_SALA"
                     :key="est.value"
@@ -555,35 +690,10 @@ const canSeeAmbiente = computed(() =>
           </p>
         </div>
         <div class="sd__hero-actions">
-          <button
-            v-if="canEdit || isCultivador"
-            class="sd__btn-lectura"
-            @click="lecturaOpen = true"
-          >
-            <Gauge :size="16" :stroke-width="1.75" />
-            Registrar lectura
-          </button>
-          <AsistenteVoz
-            v-if="contextoAsistente"
-            :contexto="contextoAsistente"
-          />
-          <button
-            v-if="puedeCargarLote"
-            class="sd__btn-secondary"
-            @click="showCargarLote = true"
-          >
-            <i class="bi bi-box-arrow-in-down"></i>
-            {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
-          </button>
-          <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
+          <button v-if="(canEdit || isCultivador) && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
-          <button v-if="canEdit" class="sd__btn-edit" @click="openEditSala" title="Editar sala">
-            <i class="bi bi-pencil"></i>
-          </button>
-          <button v-if="canEdit" class="sd__btn-danger" :disabled="deleting" @click="eliminarSala">
-            <i class="bi bi-trash3"></i>
-          </button>
+          <ActionsDropdown v-if="(canEdit || isCultivador) && salaAcciones.length" :items="salaAcciones" />
         </div>
       </div>
 
@@ -614,11 +724,18 @@ const canSeeAmbiente = computed(() =>
         </div>
       </div>
 
+      <!-- Tabs -->
+      <div class="sd__tabs">
+        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'lotes' }" @click="tabActiva = 'lotes'">🌿 Lotes</button>
+        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'layout' }" @click="tabActiva = 'layout'">🗺 Layout</button>
+        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'historial' }" @click="tabActiva = 'historial'">📋 Historial</button>
+      </div>
+
       <div class="sd__layout">
         <div class="sd__main">
 
           <!-- Lotes -->
-          <div class="sd__section">
+          <div v-show="tabActiva === 'lotes'" class="sd__section">
             <button class="sd__section-toggle" @click="lotesExpanded = !lotesExpanded">
               <div class="sd__section-toggle-left">
                 <span class="sd__section-emoji">🌿</span>
@@ -631,15 +748,15 @@ const canSeeAmbiente = computed(() =>
               <div v-if="lotes.loading" class="sd__placeholder">Cargando lotes…</div>
               <EmptyState v-else-if="!items.length" icon="📦" title="Sin lotes todavía" message="Esta sala no tiene lotes asignados." compact>
                 <template #actions>
-                  <button v-if="canEdit && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="openCreate">Crear primer lote</button>
+                  <button v-if="(canEdit || isCultivador) && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="openCreate">Crear primer lote</button>
                   <button v-else-if="puedeCargarLote" class="sd__btn-outline" style="color:#b45309;border-color:#fde68a" @click="showCargarLote=true">
                     <i class="bi bi-box-arrow-in-down"></i>
-                    {{ esSalaSecado ? 'Cargar lote de floración' : 'Cargar lote de secado' }}
+                    {{ esSalaSecado ? 'Cargar lote de floración' : esSalaManicura ? 'Cargar lote de cosecha' : 'Cargar lote de secado' }}
                   </button>
                 </template>
               </EmptyState>
               <div v-else class="sd__lotes">
-                <RouterLink v-for="l in itemsSorted" :key="l.id" :to="{ name:'lote-detail', params:{ id:l.id } }" class="sd__lote">
+                <RouterLink v-for="l in itemsPaginados" :key="l.id" :to="{ name:'lote-detail', params:{ id:l.id } }" class="sd__lote">
                   <div class="sd__lote-stripe" :style="{ background: estadoMeta(l.estado).color }"></div>
                   <div class="sd__lote-content">
                     <div class="sd__lote-head">
@@ -654,9 +771,10 @@ const canSeeAmbiente = computed(() =>
                       <span v-if="l.plants_count">🪴 {{ l.plants_count }} plantas</span>
                       <span v-if="l.estado === 'floracion' && l.plantas_cosechadas_count > 0"
                             class="sd__cosecha-parcial">
-                        ✅ {{ l.plantas_cosechadas_count }}/{{ l.plants_count || '?' }} cosechadas
+                        🌸 {{ (l.plants_count || 0) - l.plantas_cosechadas_count }} en floración · ✅ {{ l.plantas_cosechadas_count }} cosechadas
                       </span>
-                      <span v-if="l.strain">🌿 {{ l.strain }}</span>
+                      <span v-if="l.genetica?.nombre" class="sd__lote-gen">🌿 {{ l.genetica.nombre }}</span>
+                      <span v-else-if="l.strain" class="sd__lote-strain">🌿 {{ l.strain }}</span>
                       <span v-if="l.grow_type">⚗️ {{ growLabel(l.grow_type) }}</span>
                       <span v-if="l.start_date">📅 {{ l.start_date }}</span>
                     </div>
@@ -669,8 +787,76 @@ const canSeeAmbiente = computed(() =>
                   </div>
                   <i class="bi bi-chevron-right sd__lote-arrow"></i>
                 </RouterLink>
+                <div v-if="sdTotalPages > 1" class="sd__lotes-pager">
+                  <button class="sd__pager-btn" :disabled="sdPage <= 1" @click="sdPage--">«</button>
+                  <span class="sd__pager-info">{{ sdPage }} / {{ sdTotalPages }}</span>
+                  <button class="sd__pager-btn" :disabled="sdPage >= sdTotalPages" @click="sdPage++">»</button>
+                </div>
               </div>
             </div>
+          </div>
+
+          <!-- Tab: Layout -->
+          <div v-show="tabActiva === 'layout'" class="sd__tab-panel">
+            <SalaLayoutGrid :sala="sala" :lotes-activos="lotesActivos" />
+          </div>
+
+          <!-- Tab: Historial -->
+          <div v-show="tabActiva === 'historial'" class="sd__tab-panel">
+            <div v-if="historialKpis" class="sd__hist-kpis">
+              <div class="sd__hist-kpi">
+                <div class="sd__hist-kpi-val">{{ historialKpis.total_ciclos }}</div>
+                <div class="sd__hist-kpi-lbl">Total ciclos</div>
+              </div>
+              <div class="sd__hist-kpi">
+                <div class="sd__hist-kpi-val">{{ historialKpis.ciclos_finalizados }}</div>
+                <div class="sd__hist-kpi-lbl">Finalizados</div>
+              </div>
+              <div class="sd__hist-kpi">
+                <div class="sd__hist-kpi-val">
+                  {{ historialKpis.duracion_promedio_dias ?? '—' }}<small v-if="historialKpis.duracion_promedio_dias">d</small>
+                </div>
+                <div class="sd__hist-kpi-lbl">Duración prom.</div>
+              </div>
+              <div class="sd__hist-kpi">
+                <div class="sd__hist-kpi-val">
+                  {{ historialKpis.rendimiento_promedio_g != null ? historialKpis.rendimiento_promedio_g + ' g' : '—' }}
+                </div>
+                <div class="sd__hist-kpi-lbl">Rend. prom.</div>
+              </div>
+            </div>
+
+            <div v-if="historialLotes.length" class="sd__hist-wrap">
+              <table class="sd__hist-table">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Genética</th>
+                    <th>Inicio</th>
+                    <th>Días</th>
+                    <th>Rendimiento</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="l in historialLotes" :key="l.id">
+                    <td>
+                      <RouterLink :to="{ name: 'lote-detail', params: { id: l.id } }" class="sd__hist-link">{{ l.codigo }}</RouterLink>
+                    </td>
+                    <td>{{ l.genetica_nombre || '—' }}</td>
+                    <td>{{ l.start_date || '—' }}</td>
+                    <td>{{ l.duracion_dias ?? '—' }}</td>
+                    <td>{{ l.rendimiento_real_g != null ? l.rendimiento_real_g + ' g' : '—' }}</td>
+                    <td>
+                      <span class="sd__lote-badge" :style="{ background: estadoMeta(l.estado).color + '18', color: estadoMeta(l.estado).color }">
+                        {{ estadoMeta(l.estado).label }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="sd__hist-empty">Sin historial disponible para esta sala.</div>
           </div>
 
         </div>
@@ -712,20 +898,12 @@ const canSeeAmbiente = computed(() =>
               </dd>
               <dt>Tipo</dt><dd>{{ kindLabel(sala.kind) }}</dd>
               <dt>Sede</dt><dd>{{ sala.sede?.nombre || "—" }}</dd>
-              <dt>A cargo</dt><dd>{{ sala.cultivadores?.map(c => c.nombre).join(', ') || "—" }}</dd>
               <dt>Creado por</dt><dd>{{ sala.created_by_name || "—" }}</dd>
               <dt>Creado</dt><dd>{{ formatDate(sala.created_at) }}</dd>
               <dt>Actualizado</dt><dd>{{ formatDate(sala.updated_at) }}</dd>
             </dl>
           </div>
 
-          <!-- Cultivadores -->
-          <div v-if="!isCultivador" class="sd__card sd__card--mt">
-            <div class="sd__card-header"><span class="sd__card-title">👨‍🌾 Cultivadores</span></div>
-            <div class="sd__card-body">
-              <SalaCultivadoresManager :sala-id="sala.id" :sala-nombre="sala.nombre" />
-            </div>
-          </div>
 
           <!-- Notas -->
           <div v-if="sala.notes" class="sd__card sd__card--mt">
@@ -737,32 +915,75 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__card sd__card--mt">
             <div class="sd__card-header">
               <span class="sd__card-title">📷 Cámara</span>
-              <button v-if="canEdit" class="sd__link-small" @click="showCameraForm = !showCameraForm">
+              <button v-if="canEdit && !showCameraForm" class="sd__link-small" @click="abrirFormCamera">
                 <i :class="sala.camera_stream_url ? 'bi bi-pencil' : 'bi bi-plus-lg'"></i>
-                {{ sala.camera_stream_url ? 'Editar' : 'Configurar' }}
+                {{ sala.camera_stream_url ? 'Editar' : 'Conectar cámara' }}
               </button>
             </div>
 
+            <!-- Formulario de configuración -->
             <div v-if="showCameraForm" class="sd__cam-form">
+              <p class="sd__cam-help">
+                Ingresá la dirección IP de tu cámara. La encontrás en la configuración de la cámara o en tu router.<br>
+                <strong>Ejemplo:</strong> <code>192.168.1.50</code> o <code>http://192.168.1.50/snapshot.jpg</code>
+              </p>
               <div class="sd__cam-row">
-                <label>URL de stream (MJPEG / HLS)</label>
-                <input v-model="cameraForm.camera_stream_url" type="url" placeholder="http://cam.local/stream" class="sd__cam-input" />
+                <label class="sd__cam-label">Dirección de la cámara</label>
+                <div class="sd__cam-input-wrap">
+                  <input
+                    v-model="cameraInputUrl"
+                    type="text"
+                    placeholder="192.168.1.50  o  http://192.168.1.50/video"
+                    class="sd__cam-input"
+                    @keydown.enter="probarCamara"
+                  />
+                  <button class="sd__cam-btn-probar" :disabled="!cameraInputUrl.trim()" @click="probarCamara">
+                    Probar
+                  </button>
+                </div>
               </div>
-              <div class="sd__cam-row">
-                <label>URL de snapshot (imagen estática)</label>
-                <input v-model="cameraForm.camera_snapshot_url" type="url" placeholder="http://cam.local/snapshot.jpg" class="sd__cam-input" />
+
+              <!-- Preview de prueba -->
+              <div v-if="cameraTestSrc" class="sd__cam-test">
+                <div class="sd__cam-stream">
+                  <img
+                    :src="cameraTestSrc"
+                    class="sd__cam-img"
+                    alt="Prueba de cámara"
+                    @load="cameraTestOk = true; cameraTestError = false"
+                    @error="cameraTestError = true; cameraTestOk = false"
+                  />
+                </div>
+                <div v-if="cameraTestOk" class="sd__cam-test-ok">
+                  <i class="bi bi-check-circle-fill"></i> La cámara responde correctamente
+                </div>
+                <div v-if="cameraTestError" class="sd__cam-test-err">
+                  <i class="bi bi-exclamation-triangle"></i>
+                  No se pudo conectar. Verificá que la cámara esté encendida y en la misma red.
+                </div>
               </div>
+
               <div class="sd__cam-actions">
                 <button class="sd__btn-ghost-sm" @click="showCameraForm = false">Cancelar</button>
-                <button class="sd__btn-primary-sm" :disabled="savingCamera" @click="saveCamera">
+                <button
+                  v-if="sala.camera_stream_url"
+                  class="sd__btn-ghost-sm sd__btn-ghost-sm--danger"
+                  :disabled="savingCamera"
+                  @click="eliminarCamara"
+                >Quitar cámara</button>
+                <button
+                  class="sd__btn-primary-sm"
+                  :disabled="savingCamera || !cameraInputUrl.trim()"
+                  @click="saveCamera"
+                >
                   {{ savingCamera ? 'Guardando…' : 'Guardar' }}
                 </button>
               </div>
             </div>
 
+            <!-- Vista de cámara guardada -->
             <template v-else-if="sala.camera_stream_url || sala.camera_snapshot_url">
-              <!-- Stream en vivo -->
-              <div v-if="sala.camera_stream_url" class="sd__cam-stream">
+              <div class="sd__cam-stream">
                 <img
                   :src="snapshotSrc"
                   :key="snapshotKey"
@@ -771,8 +992,7 @@ const canSeeAmbiente = computed(() =>
                   @error="cameraError = true"
                 />
                 <div v-if="cameraError" class="sd__cam-error">
-                  <span>📷 Sin señal</span>
-                  <a :href="sala.camera_stream_url" target="_blank" rel="noopener" class="sd__cam-link">Abrir stream externo</a>
+                  <span>📷 Sin señal — verificá que la cámara esté encendida</span>
                 </div>
                 <div class="sd__cam-controls">
                   <button class="sd__cam-btn" @click="refreshSnapshot" title="Actualizar imagen">
@@ -780,10 +1000,6 @@ const canSeeAmbiente = computed(() =>
                   </button>
                   <span class="sd__cam-ts">{{ snapshotTs }}</span>
                 </div>
-              </div>
-              <!-- Solo snapshot -->
-              <div v-else-if="sala.camera_snapshot_url" class="sd__cam-stream">
-                <img :src="sala.camera_snapshot_url" class="sd__cam-img" alt="Snapshot sala" @error="cameraError = true" />
               </div>
             </template>
 
@@ -798,7 +1014,7 @@ const canSeeAmbiente = computed(() =>
 
     <!-- Modal Crear Lote -->
     <Teleport to="body">
-      <div v-if="showCreate" class="sd__overlay" @click.self="closeCreate">
+      <div v-if="showCreate" class="sd__overlay">
         <div class="sd__modal">
           <div class="sd__modal-header">
             <div>
@@ -866,7 +1082,7 @@ const canSeeAmbiente = computed(() =>
                 <div class="sd__field sd__field--full">
                   <label class="sd__label">Estado actual del lote</label>
                   <select class="sd__input" v-model="heredadoEstado">
-                    <option v-for="e in ESTADOS_HEREDADO" :key="e.value" :value="e.value">{{ e.label }}</option>
+                    <option v-for="e in estadosHeredadoPermitidos" :key="e.value" :value="e.value">{{ e.label }}</option>
                   </select>
                 </div>
 
@@ -1073,13 +1289,80 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__modal-footer">
             <button class="sd__btn-ghost" :disabled="lotes.creating || creandoLote" @click="closeCreate">Cancelar</button>
             <button class="sd__btn-primary" :disabled="lotes.creating || creandoLote" @click="createLote">
-              <div v-if="lotes.creating || creandoLote" class="sd__spinner sd__spinner--sm"></div>
+              <DsSpinner v-if="lotes.creating || creandoLote" :size="14" />
               <i v-else class="bi bi-plus-lg"></i>Crear lote
             </button>
           </div>
         </div>
       </div>
     </Teleport>
+
+    <!-- Modal cambiar fase (vege ↔ flora) -->
+    <Teleport to="body">
+      <div v-if="showCambiarFaseModal" class="sd__overlay">
+        <div class="sd__modal" style="max-width:420px">
+          <div class="sd__modal-header">
+            <div>
+              <h3 class="sd__modal-title">🔄 Cambiar fase de la sala</h3>
+              <p class="sd__modal-sub">{{ sala?.nombre }}</p>
+            </div>
+            <button class="sd__modal-close" @click="showCambiarFaseModal = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="sd__modal-body">
+            <div v-if="cambiarFaseError" class="sd__alert">{{ cambiarFaseError }}</div>
+
+            <!-- Flecha de transición -->
+            <div class="sd__fase-arrow">
+              <div class="sd__fase-chip sd__fase-chip--origen">
+                <i class="bi" :class="sala?.kind === 'vegetativo' ? 'bi-flower1' : 'bi-flower2'"></i>
+                {{ faseLabel(sala?.kind) }}
+              </div>
+              <i class="bi bi-arrow-right sd__fase-ico"></i>
+              <div class="sd__fase-chip sd__fase-chip--destino">
+                <i class="bi" :class="faseSiguiente === 'vegetativo' ? 'bi-flower1' : 'bi-flower2'"></i>
+                {{ faseLabel(faseSiguiente) }}
+              </div>
+            </div>
+
+            <!-- Impacto -->
+            <div v-if="lotesAfectados.length" class="sd__fase-impacto">
+              <div class="sd__fase-impacto-row">
+                <span>Lotes que cambian de estado</span>
+                <strong>{{ lotesAfectados.length }}</strong>
+              </div>
+              <div class="sd__fase-impacto-row">
+                <span>Plantas afectadas</span>
+                <strong>{{ plantasAfectadas }}</strong>
+              </div>
+            </div>
+            <div v-else class="sd__fase-warning">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              No hay lotes en estado <strong>{{ faseLabel(sala?.kind) }}</strong> en esta sala. No habrá cambios en lotes ni plantas, solo cambia el tipo de sala.
+            </div>
+
+            <p class="sd__fase-desc">
+              Esta acción cambia el estado de todos los lotes y sus plantas. Se registra un evento en cada lote para trazabilidad.
+            </p>
+          </div>
+          <div class="sd__modal-footer">
+            <button class="sd__btn-ghost" :disabled="cambiarFaseLoading" @click="showCambiarFaseModal = false">Cancelar</button>
+            <button class="sd__btn-primary" :disabled="cambiarFaseLoading" @click="ejecutarCambioFase">
+              <DsSpinner v-if="cambiarFaseLoading" :size="14" />
+              <i v-else class="bi bi-arrow-right-circle"></i>
+              Pasar a {{ faseLabel(faseSiguiente) }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Wizard crear lote cosecha -->
+    <ModalCrearLoteCosecha
+      v-if="showCrearLoteCosecha && sala"
+      :sala="sala"
+      @created="onLoteCosechaCreado"
+      @close="showCrearLoteCosecha = false"
+    />
 
     <!-- Modal cargar lote (usa Teleport internamente) -->
     <ModalCargarLote
@@ -1089,16 +1372,15 @@ const canSeeAmbiente = computed(() =>
       @close="showCargarLote = false"
     />
 
-    <RegistrarLecturaModal
+    <RegistroSalaModal
       v-model="lecturaOpen"
-      :sala-id="salaId"
-      :lotes="items"
-      @registrada="cargarAmbienteMini"
+      :sala="sala"
+      @saved="cargarAmbienteMini"
     />
 
     <!-- Modal Editar Sala -->
     <Teleport to="body">
-      <div v-if="showEditSala" class="sd__overlay" @click.self="showEditSala = false">
+      <div v-if="showEditSala" class="sd__overlay">
         <div class="sd__modal">
           <div class="sd__modal-header">
             <div>
@@ -1117,9 +1399,31 @@ const canSeeAmbiente = computed(() =>
               <div class="sd__field">
                 <label class="sd__label">Tipo de sala</label>
                 <select class="sd__input" v-model="editSalaForm.kind">
-                  <option value="">Sin especificar</option>
-                  <option v-for="k in SALA_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
+                  <option v-if="!['vegetativo','floracion'].includes(sala?.kind)" value="">Sin especificar</option>
+                  <option
+                    v-for="k in (['vegetativo','floracion'].includes(sala?.kind) ? SALA_KINDS.filter(k => ['vegetativo','floracion'].includes(k.value)) : SALA_KINDS)"
+                    :key="k.value"
+                    :value="k.value"
+                  >{{ k.label }}</option>
                 </select>
+              </div>
+              <div class="sd__field">
+                <label class="sd__label">Estado</label>
+                <select class="sd__input" v-model="editSalaForm.state">
+                  <option value="activa">Activa</option>
+                  <option value="mantenimiento">En mantenimiento</option>
+                  <option value="cerrada">Cerrada</option>
+                </select>
+              </div>
+              <div class="sd__field">
+                <label class="sd__label">Slots para lotes</label>
+                <input
+                  type="number" min="0" step="1"
+                  class="sd__input"
+                  v-model.number="editSalaForm.pots_count"
+                  placeholder="Ej: 6"
+                />
+                <span class="sd__hint">Cantidad de lotes que pueden estar simultáneamente en esta sala. Define el layout visual.</span>
               </div>
               <div class="sd__field sd__field--full">
                 <label class="sd__label">Notas</label>
@@ -1130,7 +1434,7 @@ const canSeeAmbiente = computed(() =>
           <div class="sd__modal-footer">
             <button class="sd__btn-ghost" :disabled="savingEditSala" @click="showEditSala = false">Cancelar</button>
             <button class="sd__btn-primary" :disabled="savingEditSala" @click="saveEditSala">
-              <div v-if="savingEditSala" class="sd__spinner sd__spinner--sm"></div>
+              <DsSpinner v-if="savingEditSala" :size="14" />
               <i v-else class="bi bi-check-lg"></i>Guardar cambios
             </button>
           </div>
@@ -1140,7 +1444,7 @@ const canSeeAmbiente = computed(() =>
 
     <!-- Modal upgrade plan -->
     <Teleport to="body">
-      <div v-if="showUpgrade" class="sd__overlay" @click.self="showUpgrade=false">
+      <div v-if="showUpgrade" class="sd__overlay">
         <div class="sd__modal" style="max-width:380px;text-align:center;padding:2rem">
           <div style="font-size:3rem;margin-bottom:.75rem">🚀</div>
           <h3 class="sd__modal-title" style="margin-bottom:.5rem">Límite del plan alcanzado</h3>
@@ -1159,11 +1463,8 @@ const canSeeAmbiente = computed(() =>
 @media (max-width: 640px) { .sd { padding: 1rem; } }
 
 
-.sd__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
+.sd__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .sd__error { padding: 1rem 1.25rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 10px; font-size: .875rem; }
-.sd__spinner { width: 20px; height: 20px; border: 2.5px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: sd-spin .6s linear infinite; flex-shrink: 0; }
-.sd__spinner--sm { width: 14px; height: 14px; border-top-color: #fff; border-color: rgba(255,255,255,.3); }
-@keyframes sd-spin { to { transform: rotate(360deg); } }
 
 .sd__hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
 .sd__hero-title-row { display: flex; align-items: center; gap: .65rem; margin-bottom: .3rem; flex-wrap: wrap; }
@@ -1175,14 +1476,13 @@ const canSeeAmbiente = computed(() =>
 /* Estado dropdown */
 .sd__estado-wrap { position: relative; }
 .sd__estado-dropdown { position: relative; }
-.sd__estado-dropdown:hover .sd__estado-menu { display: flex; }
 .sd__estado-pill {
   font-size: .68rem; font-weight: 800; text-transform: uppercase;
   letter-spacing: .08em; padding: .28em .75em; border-radius: 999px;
   cursor: pointer; user-select: none; display: inline-flex; align-items: center; gap: .3rem;
 }
 .sd__estado-menu {
-  display: none; flex-direction: column; position: absolute;
+  display: flex; flex-direction: column; position: absolute;
   top: calc(100% + 4px); left: 0; z-index: 100;
   background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,.12); overflow: hidden; min-width: 160px;
@@ -1237,12 +1537,19 @@ const canSeeAmbiente = computed(() =>
 .sd__lote-badge { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .2em .6em; border-radius: 6px; }
 .sd__lote-dias { font-size: .72rem; font-weight: 700; color: #60725d; background: #e8f5e9; padding: .2em .6em; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
 .sd__lote-meta { display: flex; gap: .6rem; flex-wrap: wrap; font-size: .73rem; color: #94a3b8; margin-bottom: .5rem; }
+.sd__lote-gen    { color: #3F6452; font-weight: 600; }
+.sd__lote-strain { color: #94a3b8; font-style: italic; }
 .sd__cosecha-parcial { color: #15803d; font-weight: 600; }
 .sd__lote-progress-wrap { display: flex; align-items: center; gap: .6rem; }
 .sd__lote-progress-track { flex: 1; height: 3px; background: #e8f5e9; border-radius: 999px; overflow: hidden; }
 .sd__lote-progress-fill { height: 100%; border-radius: 999px; transition: width .5s ease; }
 .sd__lote-progress-pct { font-size: .65rem; color: #94a3b8; font-weight: 600; flex-shrink: 0; }
 .sd__lote-arrow { color: #a7d7a9; font-size: .75rem; align-self: center; padding-right: 1rem; flex-shrink: 0; }
+.sd__lotes-pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: .75rem 1rem; border-top: 1px solid #e8f5e9; }
+.sd__pager-btn { background: #fff; border: 1.5px solid #d4e6d4; color: #2d6a4f; padding: .3rem .7rem; border-radius: 7px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.sd__pager-btn:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }
+.sd__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.sd__pager-info { font-size: .82rem; color: #64748b; font-weight: 600; min-width: 50px; text-align: center; }
 
 .sd__card { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
 .sd__card--mt { margin-top: 1rem; }
@@ -1317,6 +1624,7 @@ const canSeeAmbiente = computed(() =>
 .sd__checkbox-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; flex-shrink: 0; }
 .sd__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; }
 .sd__input--disabled { color: #94a3b8; cursor: default; }
+.sd__hint { font-size: .72rem; color: #94a3b8; line-height: 1.3; }
 
 /* Madre picker */
 .sd__madre-picker { position: relative; display: flex; flex-direction: column; gap: .4rem; }
@@ -1388,14 +1696,77 @@ const canSeeAmbiente = computed(() =>
 /* Código readonly */
 .sd__codigo-hint { font-size: .72rem; color: #94a3b8; }
 
-/* Cámara */
-.sd__cam-form { display: flex; flex-direction: column; gap: .75rem; }
 .sd__btn-ghost-sm { background: transparent; border: 1px solid #d4e6d4; color: #60725d; padding: .4rem .8rem; border-radius: 6px; font-size: .78rem; font-weight: 500; cursor: pointer; transition: all .15s; }
 .sd__btn-ghost-sm:hover { background: #f0fdf4; color: #1b5e20; }
+
+/* Cambiar fase modal */
+.sd__fase-arrow { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 1.25rem 0; }
+.sd__fase-chip { display: flex; align-items: center; gap: .4rem; padding: .5rem 1rem; border-radius: 9px; font-size: .9rem; font-weight: 700; }
+.sd__fase-chip--origen { background: #f1f5f9; color: #475569; }
+.sd__fase-chip--destino { background: #f0fdf4; color: #15803d; border: 1.5px solid #86efac; }
+.sd__fase-ico { color: #94a3b8; font-size: 1.1rem; }
+.sd__fase-impacto { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: .75rem 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .4rem; }
+.sd__fase-impacto-row { display: flex; justify-content: space-between; align-items: center; font-size: .85rem; color: #334155; }
+.sd__fase-impacto-row strong { color: #0f172a; font-size: .95rem; }
+.sd__fase-warning { background: #fffbeb; border: 1.5px solid #fde68a; color: #92400e; border-radius: 10px; padding: .75rem 1rem; font-size: .82rem; margin-bottom: 1rem; display: flex; align-items: flex-start; gap: .5rem; }
+.sd__fase-desc { font-size: .78rem; color: #94a3b8; margin: 0; }
 .sd__btn-primary-sm { background: #1b5e20; color: #fff; border: none; padding: .4rem .9rem; border-radius: 6px; font-size: .78rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .sd__btn-primary-sm:hover { background: #155016; }
-.sd__cam-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .25rem; }
-.sd__cam-stream { margin-top: .5rem; border-radius: 8px; overflow: hidden; border: 1px solid #d4e6d4; background: #000; }
+.sd__cam-form { display: flex; flex-direction: column; gap: .75rem; padding-top: .25rem; }
+.sd__cam-help { font-size: .78rem; color: #64748b; line-height: 1.5; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .6rem .8rem; margin: 0; }
+.sd__cam-help code { background: #e2e8f0; border-radius: 4px; padding: .1em .35em; font-size: .85em; }
+.sd__cam-row { display: flex; flex-direction: column; gap: .3rem; }
+.sd__cam-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
+.sd__cam-input-wrap { display: flex; gap: .4rem; }
+.sd__cam-input { flex: 1; background: #f4f8f4; border: 1.5px solid #d4e6d4; border-radius: 8px; padding: .55rem .8rem; font-size: .875rem; color: #1a1a1a; outline: none; transition: border-color .15s; font-family: monospace; }
+.sd__cam-input:focus { border-color: #1b5e20; }
+.sd__cam-btn-probar { background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; border-radius: 8px; padding: .55rem 1rem; font-size: .82rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all .15s; }
+.sd__cam-btn-probar:hover:not(:disabled) { background: #dcfce7; }
+.sd__cam-btn-probar:disabled { opacity: .4; cursor: not-allowed; }
+.sd__cam-test { display: flex; flex-direction: column; gap: .4rem; }
+.sd__cam-test-ok  { display: flex; align-items: center; gap: .4rem; font-size: .78rem; font-weight: 700; color: #16a34a; }
+.sd__cam-test-err { display: flex; align-items: center; gap: .4rem; font-size: .78rem; color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; border-radius: 7px; padding: .5rem .7rem; }
+.sd__cam-actions { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
+.sd__btn-ghost-sm--danger { color: #dc2626; border-color: #fecaca; }
+.sd__btn-ghost-sm--danger:hover { background: #fef2f2; }
+.sd__cam-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .25rem; align-items: center; }
+.sd__cam-stream { margin-top: .25rem; border-radius: 8px; overflow: hidden; border: 1px solid #d4e6d4; background: #000; }
 .sd__cam-img { width: 100%; display: block; max-height: 220px; object-fit: cover; }
+.sd__cam-error { padding: .5rem .75rem; font-size: .78rem; color: #94a3b8; text-align: center; background: #111; }
+.sd__cam-btn { background: rgba(255,255,255,.15); border: none; color: #fff; border-radius: 5px; padding: .25rem .5rem; cursor: pointer; font-size: .78rem; }
+.sd__cam-ts { font-size: .7rem; color: rgba(255,255,255,.5); }
 .sd__cam-empty { color: #94a3b8; font-size: .8rem; font-style: italic; text-align: center; padding: .5rem 0; }
+
+/* ── Tabs ─────────────────────────────────────────────────── */
+.sd__tabs { display: flex; gap: .4rem; margin-bottom: 1rem; }
+.sd__tab {
+  padding: .45rem 1rem; background: #f4f8f4; border: 1.5px solid #d4e6d4;
+  border-radius: 8px; font-size: .82rem; font-weight: 600; color: #475569;
+  cursor: pointer; transition: all .14s; white-space: nowrap;
+}
+.sd__tab:hover { border-color: #1b5e20; color: #1b5e20; background: #f0fdf4; }
+.sd__tab--active { background: #f0fdf4; border-color: #1b5e20; color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.08); }
+
+.sd__tab-panel { padding: 1rem 0; }
+
+/* ── Historial ────────────────────────────────────────────── */
+.sd__hist-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; margin-bottom: 1.25rem; }
+.sd__hist-kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: .75rem 1rem; text-align: center; }
+.sd__hist-kpi-val { font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1; }
+.sd__hist-kpi-val small { font-size: .7rem; font-weight: 600; color: #64748b; margin-left: .1rem; }
+.sd__hist-kpi-lbl { font-size: .7rem; color: #64748b; margin-top: .25rem; font-weight: 500; }
+
+.sd__hist-wrap { overflow-x: auto; }
+.sd__hist-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.sd__hist-table th { padding: .45rem .75rem; text-align: left; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; background: #f8fafc; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+.sd__hist-table td { padding: .5rem .75rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; white-space: nowrap; }
+.sd__hist-table tbody tr:hover { background: #f8fafc; }
+.sd__hist-link { color: #1b5e20; font-weight: 700; text-decoration: none; }
+.sd__hist-link:hover { text-decoration: underline; }
+.sd__hist-empty { font-size: .82rem; color: #94a3b8; text-align: center; padding: 1.5rem 0; }
+
+@media (max-width: 600px) {
+  .sd__hist-kpis { grid-template-columns: repeat(2, 1fr); }
+  .sd__tabs { flex-wrap: wrap; }
+}
 </style>

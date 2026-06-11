@@ -1,5 +1,4 @@
-class AsistenteController < ApplicationController
-  before_action :authenticate_user!
+class AsistenteController < BaseController
   require 'net/http'
   require 'json'
 
@@ -96,14 +95,14 @@ class AsistenteController < ApplicationController
     color_hojas:   verde_oscuro | verde_claro | amarillo | marron
     plagas:        ninguna | leve | moderada | severa
     prioridad:     baja | normal | media | alta | urgente
-    estado_nuevo:  semilla | vegetativo | floracion | cosecha | curado | finalizado
+    estado_nuevo:  semilla | esqueje | vegetativo | floracion | cosecha | secado | curado | finalizado
   PROMPT
 
   LIMITE_LLAMADAS_POR_HORA = 20
 
   # POST /asistente/parsear
   def parsear
-    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+    return render json: { error: 'El registro por voz no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_voz)
 
     texto    = params[:texto].to_s.strip
     contexto = params[:contexto]
@@ -129,7 +128,7 @@ class AsistenteController < ApplicationController
 
   # POST /asistente/consultar
   def consultar
-    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+    return render json: { error: 'El registro por voz no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_voz)
 
     texto    = params[:texto].to_s.strip
     contexto = params[:contexto]
@@ -151,7 +150,8 @@ class AsistenteController < ApplicationController
 
   # POST /asistente/analizar_lote
   def analizar_lote
-    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+    return render json: { error: 'No tenés permiso para usar análisis IA.' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
+    return render json: { error: 'El análisis de IA no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_analisis)
     return render json: { error: 'Límite de uso alcanzado. Volvé en unos minutos.' }, status: :too_many_requests if rate_limited?
 
     lote = current_user.club.lotes.find_by(id: params[:lote_id])
@@ -180,6 +180,7 @@ class AsistenteController < ApplicationController
 
   # GET /asistente/historial_analisis?lote_id=X
   def historial_analisis
+    return render json: { error: 'No tenés permiso para usar análisis IA.' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
     lote = current_user.club.lotes.find_by(id: params[:lote_id])
     return render json: { error: 'Lote no encontrado' }, status: :not_found unless lote
 
@@ -194,9 +195,10 @@ class AsistenteController < ApplicationController
 
   # POST /asistente/ejecutar
   def ejecutar
-    return render json: { error: 'El asistente de IA no está disponible en tu plan actual.' }, status: :forbidden unless current_user.club.ia_habilitada?
+    return render json: { error: 'El registro por voz no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_voz)
 
     acciones = params[:acciones] || []
+    return render json: { error: 'Demasiadas acciones en una sola llamada (máx: 15)' }, status: :unprocessable_entity if acciones.size > 15
     contexto = params[:contexto]
     club     = current_user.club
 
@@ -264,7 +266,7 @@ class AsistenteController < ApplicationController
 
   def rate_limited?
     limite = current_user.club.ia_limite_efectivo
-    key    = "asistente:club:#{current_user.club_id}:#{Time.current.strftime('%Y%m%d%H')}"
+    key    = "asistente:user:#{current_user.id}:#{Time.current.strftime('%Y%m%d%H')}"
     redis  = Redis.new(url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'))
     count  = redis.incr(key)
     redis.expire(key, 3600) if count == 1
@@ -290,7 +292,8 @@ class AsistenteController < ApplicationController
     if es_cultivador
       "\nROL: Este usuario es CULTIVADOR.\n" \
       "- NO generar acciones de tipo 'tarea'.\n" \
-      "- Si menciona avanzar ciclo → nota_lote con 'Sugerencia: [lo que dijo]', no avance_ciclo.\n"
+      "- PUEDE generar avance_ciclo cuando lo mencione. Estados válidos para avanzar DESDE: semilla, esqueje, vegetativo, floracion, cosecha, secado.\n" \
+      "- NO puede avanzar el ciclo desde 'curado' o 'finalizado' (eso lo hace el manicuro/admin).\n"
     else
       "\nROL: Este usuario es ADMIN/SUPERVISOR con permisos completos.\n" \
       "- Puede generar avance_ciclo cuando el cultivador lo mencione explícitamente.\n"
@@ -758,6 +761,13 @@ class AsistenteController < ApplicationController
     estado_nuevo = datos['estado_nuevo']
     return { ok: false, error: 'Estado nuevo no especificado' } if estado_nuevo.blank?
     return { ok: false, error: "Estado inválido: #{estado_nuevo}" } unless Lote::ESTADOS.include?(estado_nuevo)
+
+    if current_user.cultivador?
+      estados_permitidos = %w[semilla esqueje vegetativo floracion cosecha secado]
+      unless estados_permitidos.include?(lote.estado)
+        return { ok: false, error: "No tenés permiso para avanzar el lote desde '#{lote.estado}'" }
+      end
+    end
 
     estado_anterior = lote.estado
     if lote.update(estado: estado_nuevo)

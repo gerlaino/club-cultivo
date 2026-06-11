@@ -1,9 +1,15 @@
 <template>
   <div class="tl">
 
+    <!-- Header con acción aplicar plan -->
+    <div v-if="canAdmin" class="tl__header">
+      <button class="tl__btn-plan" @click="showAplicarPlan = true">
+        <i class="bi bi-calendar2-check"></i> Aplicar plan
+      </button>
+    </div>
+
     <div v-if="loading" class="tl__loading">
-      <div class="tl__spinner"></div>
-      <span>Cargando tareas…</span>
+      <DsSpinner :size="40" />
     </div>
 
     <div v-else-if="tareasPendientes.length === 0" class="tl__empty">
@@ -50,7 +56,7 @@
 
     <!-- Modal completar tarea normal -->
     <Teleport to="body">
-      <div v-if="tareaCompletando && !esRegistroLote(tareaCompletando)" class="tl__overlay" @click.self="tareaCompletando = null">
+      <div v-if="tareaCompletando && !esRegistroLote(tareaCompletando)" class="tl__overlay">
         <div class="tl__modal">
           <div class="tl__modal-header">
             <h3 class="tl__modal-title">Completar tarea</h3>
@@ -73,7 +79,7 @@
           <div class="tl__modal-footer">
             <button class="tl__btn-ghost" @click="tareaCompletando = null">Cancelar</button>
             <button class="tl__btn-success" @click="confirmarCompletar" :disabled="guardando">
-              <span v-if="guardando" class="tl__spinner tl__spinner--sm"></span>
+              <DsSpinner v-if="guardando" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Completar
             </button>
           </div>
@@ -83,7 +89,7 @@
 
     <!-- Modal completar tarea de tipo registro_lote -->
     <Teleport to="body">
-      <div v-if="tareaCompletando && esRegistroLote(tareaCompletando)" class="tl__overlay" @click.self="tareaCompletando = null">
+      <div v-if="tareaCompletando && esRegistroLote(tareaCompletando)" class="tl__overlay">
         <div class="tl__modal tl__modal--wide">
           <div class="tl__modal-header">
             <div>
@@ -200,13 +206,21 @@
           <div class="tl__modal-footer">
             <button class="tl__btn-ghost" @click="tareaCompletando = null">Cancelar</button>
             <button class="tl__btn-success" @click="confirmarRegistroLote" :disabled="guardando">
-              <span v-if="guardando" class="tl__spinner tl__spinner--sm"></span>
+              <DsSpinner v-if="guardando" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Guardar y completar tarea
             </button>
           </div>
         </div>
       </div>
     </Teleport>
+
+    <!-- Modal aplicar plan -->
+    <LoteAplicarPlanModal
+      v-if="showAplicarPlan"
+      :lote="lote"
+      @close="showAplicarPlan = false"
+      @applied="onPlanAplicado"
+    />
 
   </div>
 </template>
@@ -215,11 +229,21 @@
 import { ref, computed, onMounted } from 'vue'
 import { listTareas, updateTarea, createRegistroAmbiental, createLoteEvento } from '../lib/api.js'
 import { useTareasStore } from '../stores/tareas'
+import DsSpinner from '../design-system/components/Spinner.vue'
+import LoteAplicarPlanModal from './lotes/LoteAplicarPlanModal.vue'
 
 const props = defineProps({
-  lote: { type: Object, required: true }
+  lote:     { type: Object,  required: true },
+  canAdmin: { type: Boolean, default: false },
 })
 const emit = defineEmits(['tarea-completada', 'horas-aplicadas'])
+
+const showAplicarPlan = ref(false)
+
+function onPlanAplicado() {
+  showAplicarPlan.value = false
+  cargarTareas()
+}
 
 const tareasStore = useTareasStore()
 const tareas      = ref([])
@@ -364,10 +388,7 @@ async function confirmarRegistroLote() {
 
 <style scoped>
 .tl { font-family: system-ui, -apple-system, sans-serif; }
-.tl__loading { display: flex; align-items: center; gap: .5rem; padding: 1.5rem; color: #94a3b8; font-size: .875rem; }
-.tl__spinner { width: 16px; height: 16px; border: 2px solid #d4e6d4; border-top-color: #1b5e20; border-radius: 50%; animation: tl-spin .6s linear infinite; }
-.tl__spinner--sm { width: 13px; height: 13px; border-color: rgba(255,255,255,.3); border-top-color: #fff; }
-@keyframes tl-spin { to { transform: rotate(360deg); } }
+.tl__loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .tl__empty { display: flex; align-items: center; gap: .75rem; padding: 1.5rem 1.1rem; color: #60725d; font-size: .875rem; }
 .tl__lista { display: flex; flex-direction: column; }
 .tl__tarea { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .85rem 1.1rem; border-bottom: 1px solid #f0fdf4; border-left: 3px solid #d4e6d4; transition: background .15s; }
@@ -434,4 +455,12 @@ async function confirmarRegistroLote() {
 .tl__btn-success { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .tl__btn-success:hover { background: #104417; }
 .tl__btn-success:disabled { opacity: .6; cursor: not-allowed; }
+.tl__header { display: flex; justify-content: flex-end; padding: .5rem 1rem .2rem; }
+.tl__btn-plan {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: none; border: 1px solid #d4e6d4; color: #15803d;
+  font-size: .75rem; font-weight: 600; padding: .3rem .7rem;
+  border-radius: 6px; cursor: pointer; transition: all .15s;
+}
+.tl__btn-plan:hover { background: #f0fdf4; border-color: #15803d; }
 </style>

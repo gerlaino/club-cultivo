@@ -1,8 +1,14 @@
 <script setup>
 import { ref } from 'vue'
-import { createSede } from '../lib/api.js'
+import { createSede, createSala } from '../lib/api.js'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import DsSpinner from '../design-system/components/Spinner.vue'
+import BrandLogo from './BrandLogo.vue'
+
+const props = defineProps({
+  checking: { type: Boolean, default: false },
+})
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -42,7 +48,20 @@ const TIPOS = [
   },
 ]
 
-const nombreInvalido = ref(false)
+const nombreInvalido    = ref(false)
+const salaNombreInvalido = ref(false)
+const savingSala        = ref(false)
+const salaError         = ref(null)
+let   sedeIdCreada      = null
+
+const sala = ref({ nombre: '', tipo: 'vegetativo' })
+
+const TIPOS_SALA = [
+  { key: 'vegetativo', emoji: '🌿', label: 'Vegetativo' },
+  { key: 'floracion',  emoji: '🌸', label: 'Floración'  },
+  { key: 'cosecha',    emoji: '✂️', label: 'Cosecha'    },
+  { key: 'mixta',      emoji: '🏠', label: 'Mixta'      },
+]
 
 async function avanzar() {
   if (!sede.value.nombre.trim()) {
@@ -57,18 +76,35 @@ async function crearSede() {
   saving.value = true
   error.value  = null
   try {
-    await createSede(sede.value)
-    paso.value = 3
-    setTimeout(() => {
-      emit('completado')
-      router.push({ name: 'sedes' })
-    }, 2200)
+    const res    = await createSede(sede.value)
+    sedeIdCreada = res.data?.id
+    paso.value   = 3
   } catch (e) {
     error.value = e.response?.data?.errors?.join(', ') || 'Error al crear la sede. Intentá de nuevo.'
     paso.value = 1
   } finally {
     saving.value = false
   }
+}
+
+async function crearSala() {
+  if (!sala.value.nombre.trim()) { salaNombreInvalido.value = true; return }
+  savingSala.value = true
+  salaError.value  = null
+  try {
+    await createSala({ ...sala.value, sede_id: sedeIdCreada })
+    paso.value = 4
+    setTimeout(() => { emit('completado'); router.push('/') }, 2200)
+  } catch (e) {
+    salaError.value = e.response?.data?.errors?.join(', ') || 'Error al crear la sala. Intentá de nuevo.'
+  } finally {
+    savingSala.value = false
+  }
+}
+
+function saltarSala() {
+  emit('completado')
+  router.push('/')
 }
 
 function tipoSeleccionado(key) {
@@ -91,17 +127,16 @@ const nombreUsuario = auth.user?.first_name || ''
 
     <!-- Logo superior -->
     <div class="ob__logo">
-      <div class="ob__logo-mark">
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M11 2C11 2 5 7 5 12a6 6 0 0012 0c0-5-6-10-6-10z" fill="white" opacity="0.9"/>
-          <path d="M11 22v-8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <span class="ob__logo-text">Cultivo Espacial</span>
+      <BrandLogo class="ob__brand-logo" />
+    </div>
+
+    <!-- Estado: verificando setup -->
+    <div v-if="checking" class="ob__checking">
+      <DsSpinner :size="32" color="rgba(255,255,255,0.5)" />
     </div>
 
     <!-- Contenido central -->
-    <div class="ob__center">
+    <div v-else class="ob__center">
 
       <!-- ── PASO 1 ── Bienvenida + Datos de sede -->
       <Transition name="ob-fade" mode="out-in">
@@ -267,7 +302,7 @@ const nombreUsuario = auth.user?.first_name || ''
                 Volver
               </button>
               <button class="ob__btn-primary ob__btn-primary--wide" @click="crearSede" :disabled="saving">
-                <div v-if="saving" class="ob__spinner"></div>
+                <DsSpinner v-if="saving" :size="18" />
                 <template v-else>
                   Crear sede y empezar
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -280,8 +315,84 @@ const nombreUsuario = auth.user?.first_name || ''
 
         </div>
 
-        <!-- ── PASO 3 ── Éxito -->
-        <div v-else-if="paso === 3" class="ob__panel ob__panel--success" key="paso3">
+        <!-- ── PASO 3 ── Primera sala -->
+        <div v-else-if="paso === 3" class="ob__panel" key="paso3">
+
+          <div class="ob__welcome ob__welcome--sm">
+            <div class="ob__step-check">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <circle cx="14" cy="14" r="13" stroke="#4caf50" stroke-width="1.5" opacity="0.5"/>
+                <path d="M8 14l5 5 7-8" stroke="#4caf50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <h1 class="ob__title">{{ sede.nombre }} creada</h1>
+            <p class="ob__subtitle">Ahora agregá tu primera sala de cultivo para poder crear lotes y registrar plantas.</p>
+          </div>
+
+          <div class="ob__card">
+            <div class="ob__card-eyebrow">Primera sala</div>
+            <h2 class="ob__card-title">¿Cómo se llama tu primer espacio?</h2>
+
+            <div v-if="salaError" class="ob__alert">{{ salaError }}</div>
+
+            <div class="ob__field">
+              <label class="ob__label">Nombre de la sala <span class="ob__req">*</span></label>
+              <input
+                v-model.trim="sala.nombre"
+                class="ob__input"
+                :class="{ 'ob__input--err': salaNombreInvalido }"
+                placeholder="Ej: Sala Vegetativo 1, Flower Room A..."
+                @input="salaNombreInvalido = false"
+                @keyup.enter="crearSala"
+                autofocus
+              />
+              <span v-if="salaNombreInvalido" class="ob__err">El nombre es obligatorio</span>
+            </div>
+
+            <div class="ob__field">
+              <label class="ob__label">Tipo de sala</label>
+              <div class="ob__tipos ob__tipos--compact">
+                <button
+                  v-for="t in TIPOS_SALA"
+                  :key="t.key"
+                  class="ob__tipo ob__tipo--sm"
+                  :class="{ 'ob__tipo--selected': sala.tipo === t.key }"
+                  @click="sala.tipo = t.key"
+                  type="button"
+                >
+                  <span class="ob__tipo-emoji">{{ t.emoji }}</span>
+                  <div class="ob__tipo-body">
+                    <div class="ob__tipo-label">{{ t.label }}</div>
+                  </div>
+                  <div class="ob__tipo-check">
+                    <svg v-if="sala.tipo === t.key" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div class="ob__actions">
+              <button class="ob__btn-ghost" @click="saltarSala" :disabled="savingSala">
+                Ir al panel sin sala
+              </button>
+              <button class="ob__btn-primary ob__btn-primary--wide" @click="crearSala" :disabled="savingSala">
+                <DsSpinner v-if="savingSala" :size="18" />
+                <template v-else>
+                  Crear sala
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </template>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── PASO 4 ── Éxito final -->
+        <div v-else-if="paso === 4" class="ob__panel ob__panel--success" key="paso4">
           <div class="ob__success">
             <div class="ob__success-ring">
               <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
@@ -291,7 +402,7 @@ const nombreUsuario = auth.user?.first_name || ''
             </div>
             <h1 class="ob__title ob__title--light">Todo listo</h1>
             <p class="ob__subtitle ob__subtitle--light">
-              {{ sede.nombre }} fue creada.<br>
+              {{ sede.nombre }} y {{ sala.nombre || 'tu primera sala' }} están listos.<br>
               Te llevamos al panel ahora mismo.
             </p>
             <div class="ob__dots">
@@ -306,7 +417,7 @@ const nombreUsuario = auth.user?.first_name || ''
     </div>
 
     <!-- Progreso -->
-    <div class="ob__progress" v-if="paso < 3">
+    <div class="ob__progress" v-if="!checking && paso < 4">
       <div class="ob__progress-step" :class="{ 'ob__progress-step--done': paso > 1, 'ob__progress-step--active': paso === 1 }">
         <div class="ob__progress-dot">
           <svg v-if="paso > 1" width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -316,9 +427,18 @@ const nombreUsuario = auth.user?.first_name || ''
         <span>Datos</span>
       </div>
       <div class="ob__progress-line" :class="{ 'ob__progress-line--done': paso > 1 }"></div>
-      <div class="ob__progress-step" :class="{ 'ob__progress-step--active': paso === 2 }">
-        <div class="ob__progress-dot"></div>
+      <div class="ob__progress-step" :class="{ 'ob__progress-step--done': paso > 2, 'ob__progress-step--active': paso === 2 }">
+        <div class="ob__progress-dot">
+          <svg v-if="paso > 2" width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1 5l3 3 5-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <span>Confirmar</span>
+      </div>
+      <div class="ob__progress-line" :class="{ 'ob__progress-line--done': paso > 2 }"></div>
+      <div class="ob__progress-step" :class="{ 'ob__progress-step--active': paso === 3 }">
+        <div class="ob__progress-dot"></div>
+        <span>Primera sala</span>
       </div>
     </div>
 
@@ -384,18 +504,21 @@ const nombreUsuario = auth.user?.first_name || ''
   z-index: 1;
   align-self: flex-start;
 }
-.ob__logo-mark {
-  width: 36px; height: 36px;
-  background: rgba(255,255,255,0.12);
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  border: 1px solid rgba(255,255,255,0.15);
-}
-.ob__logo-text {
+/* BrandLogo en contexto oscuro */
+.ob__brand-logo :deep(.brand-name) {
+  color: rgba(255,255,255,0.75);
   font-size: .875rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.7);
   letter-spacing: .02em;
+}
+
+/* ── Checking (loader inicial) ─────────────── */
+.ob__checking {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
 }
 
 /* ── Centro ────────────────────────────────── */
@@ -795,17 +918,6 @@ const nombreUsuario = auth.user?.first_name || ''
   font-size: .83rem;
 }
 
-/* ── Spinner ───────────────────────────────── */
-.ob__spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: ob-spin .6s linear infinite;
-}
-@keyframes ob-spin { to { transform: rotate(360deg); } }
-
 /* ── Éxito ─────────────────────────────────── */
 .ob__success {
   display: flex;
@@ -902,4 +1014,22 @@ const nombreUsuario = auth.user?.first_name || ''
 .ob-fade-leave-active { transition: opacity .25s ease, transform .25s ease; }
 .ob-fade-enter-from   { opacity: 0; transform: translateY(12px); }
 .ob-fade-leave-to     { opacity: 0; transform: translateY(-8px); }
+
+/* ── Paso 3 extras ─────────────────────────── */
+.ob__step-check {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: rgba(76,175,80,0.12);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto .75rem;
+}
+.ob__tipos--compact { gap: .35rem; }
+.ob__tipo--sm {
+  padding: .625rem .875rem;
+}
+.ob__tipo--sm .ob__tipo-label { font-size: .8rem; }
+.ob__tipo-emoji {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
 </style>

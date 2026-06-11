@@ -8,17 +8,22 @@ class PlanTrabajo < ApplicationRecord
   enum :periodo_tipo, { semanal: 0, mensual: 1, trimestral: 2 }
   enum :estado,       { borrador: 0, publicado: 1, archivado: 2 }
 
-  validates :titulo,       presence: true, length: { maximum: 200 }
-  validates :fecha_inicio, presence: true
-  validates :fecha_fin,    presence: true
-  validate  :fecha_fin_posterior
+  has_many :aplicaciones, class_name: 'AplicacionPlan', dependent: :destroy
 
-  scope :del_club,    ->(club_id) { where(club_id: club_id) }
-  scope :publicados,  -> { where(estado: :publicado) }
-  scope :vigentes,    -> { publicados.where('fecha_fin >= ?', Date.today) }
-  scope :recientes,   -> { order(created_at: :desc) }
+  validates :titulo,       presence: true, length: { maximum: 200 }
+  validates :fecha_inicio, presence: true, unless: :es_plantilla?
+  validates :fecha_fin,    presence: true, unless: :es_plantilla?
+  validate  :fecha_fin_posterior, unless: :es_plantilla?
+
+  scope :del_club,     ->(club_id) { where(club_id: club_id) }
+  scope :publicados,   -> { where(estado: :publicado) }
+  scope :vigentes,     -> { publicados.where('fecha_fin >= ?', Date.today) }
+  scope :recientes,    -> { order(created_at: :desc) }
+  scope :plantillas,   -> { where(es_plantilla: true) }
+  scope :no_plantillas,-> { where(es_plantilla: false) }
 
   def duracion_dias
+    return nil if es_plantilla? || fecha_inicio.nil? || fecha_fin.nil?
     (fecha_fin - fecha_inicio).to_i + 1
   end
 

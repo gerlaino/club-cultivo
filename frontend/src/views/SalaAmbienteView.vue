@@ -6,12 +6,14 @@ import { useAmbiente } from '../composables/useAmbiente.js'
 import { useSetpoints } from '../composables/useSetpoints.js'
 import { useAuthStore } from '../stores/auth.js'
 import { formatValor } from '../composables/useLecturaFormat.js'
+import { useAmbienteChannel } from '../composables/useAmbienteChannel.js'
 import SemaforoAmbiente from '../components/ambiente/SemaforoAmbiente.vue'
 import AmbienteChart from '../components/ambiente/AmbienteChart.vue'
 import LecturaManualForm from '../components/ambiente/LecturaManualForm.vue'
 import AlertaBadge from '../components/ambiente/AlertaBadge.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
-import { getSala, listLotes } from '../lib/api.js'
+import { getSala, listLotes, getSalaAmbienteHistorico } from '../lib/api.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
 const auth   = useAuthStore()
@@ -30,7 +32,23 @@ const desde     = ref(new Date(Date.now() - 7 * 24 * 3600_000).toISOString().sli
 const hasta     = ref(new Date().toISOString().slice(0, 16))
 
 // Activa sección
-const seccionActiva = ref('semaforo') // 'semaforo' | 'chart' | 'manual' | 'alertas'
+const seccionActiva = ref('semaforo') // 'semaforo' | 'chart' | 'tendencia' | 'manual' | 'alertas'
+
+// Live updates
+const liveConectado = ref(false)
+
+// Histórico (tendencia)
+const tipoHistorico  = ref('temperatura')
+const semanasHistorico = ref(4)
+const histData       = ref([])
+const loadingHist    = ref(false)
+
+const TIPOS_HISTORICO = [
+  { value: 'temperatura', label: 'Temperatura' },
+  { value: 'humedad',     label: 'Humedad' },
+  { value: 'vpd',         label: 'VPD' },
+  { value: 'co2',         label: 'CO₂' },
+]
 
 const isCultivador = computed(() => auth.user?.role === 'cultivador')
 
@@ -125,6 +143,54 @@ watch([desde, hasta, bucket], async () => {
   })
 })
 
+// ActionCable — live readings
+function onLecturaEnVivo(data) {
+  liveConectado.value = true
+  // Agregar al store si cae dentro del rango visible
+  const ts = new Date(data.medido_at)
+  const desdeTs = new Date(desde.value)
+  const hastaTs = new Date(hasta.value)
+  if (ts >= desdeTs && ts <= hastaTs) {
+    store.lecturas.push({ ...data, valor: data.valor })
+  } else {
+    // Actualizar ultima lectura aunque no esté en rango (semáforo)
+    store.lecturas.push({ ...data, valor: data.valor })
+  }
+}
+
+useAmbienteChannel(salaId, onLecturaEnVivo)
+
+// Histórico
+async function cargarHistorico() {
+  loadingHist.value = true
+  try {
+    const { data } = await getSalaAmbienteHistorico(salaId, {
+      tipo:    tipoHistorico.value,
+      semanas: semanasHistorico.value,
+    })
+    // Convertir a formato que AmbienteChart entiende
+    histData.value = (data.historico || []).map(d => ({
+      tipo:      d.tipo,
+      valor:     d.valor,
+      unidad:    '',
+      medido_at: d.fecha + 'T12:00:00Z',
+      n:         d.n,
+    }))
+  } catch {
+    histData.value = []
+  } finally {
+    loadingHist.value = false
+  }
+}
+
+watch([tipoHistorico, semanasHistorico], () => {
+  if (seccionActiva.value === 'tendencia') cargarHistorico()
+})
+
+watch(seccionActiva, (val) => {
+  if (val === 'tendencia' && !histData.value.length) cargarHistorico()
+})
+
 </script>
 
 <template>
@@ -135,16 +201,17 @@ watch([desde, hasta, bucket], async () => {
     />
 
     <div v-if="loading" class="sav__loading">
-      <div class="sav__spinner"></div> Cargando…
+      <DsSpinner />
     </div>
 
     <template v-else>
       <!-- Header -->
       <div class="sav__hero">
         <div class="sav__hero-left">
-          <h1 class="sav__title">
-            🌿 {{ sala?.nombre || 'Sala' }} — Ambiente
-          </h1>
+          <div class="sav__title-row">
+            <h1 class="sav__title">🌿 {{ sala?.nombre || 'Sala' }} — Ambiente</h1>
+            <span v-if="liveConectado" class="sav__live-dot" title="Actualizaciones en tiempo real activas">● en vivo</span>
+          </div>
           <p class="sav__subtitle" v-if="loteActivo">
             Lote activo: <strong>{{ loteActivo.codigo }}</strong>
             <span v-if="loteActivo.estado"> · {{ estadoLabel(loteActivo.estado) }}</span>
@@ -162,20 +229,13 @@ watch([desde, hasta, bucket], async () => {
 
       <!-- Tabs -->
       <div class="sav__tabs">
-        <button
-          v-for="tab in ['semaforo','chart','manual','alertas']"
-          :key="tab"
-          class="sav__tab"
-          :class="{ 'sav__tab--active': seccionActiva === tab }"
-          @click="seccionActiva = tab"
-        >
-          <span v-if="tab === 'semaforo'">🚦 Estado</span>
-          <span v-if="tab === 'chart'">📈 Histórico</span>
-          <span v-if="tab === 'manual'">✏️ Registrar</span>
-          <span v-if="tab === 'alertas'">
-            🔔 Alertas
-            <span v-if="store.alertasCount > 0" class="sav__tab-badge">{{ store.alertasCount }}</span>
-          </span>
+        <button class="sav__tab" :class="{ 'sav__tab--active': seccionActiva === 'semaforo' }" @click="seccionActiva = 'semaforo'">🚦 Estado</button>
+        <button class="sav__tab" :class="{ 'sav__tab--active': seccionActiva === 'chart' }" @click="seccionActiva = 'chart'">📈 Gráfico</button>
+        <button class="sav__tab" :class="{ 'sav__tab--active': seccionActiva === 'tendencia' }" @click="seccionActiva = 'tendencia'">📊 Tendencia</button>
+        <button class="sav__tab" :class="{ 'sav__tab--active': seccionActiva === 'manual' }" @click="seccionActiva = 'manual'">✏️ Registrar</button>
+        <button class="sav__tab" :class="{ 'sav__tab--active': seccionActiva === 'alertas' }" @click="seccionActiva = 'alertas'">
+          🔔 Alertas
+          <span v-if="store.alertasCount > 0" class="sav__tab-badge">{{ store.alertasCount }}</span>
         </button>
       </div>
 
@@ -243,6 +303,48 @@ watch([desde, hasta, bucket], async () => {
         </div>
       </div>
 
+      <!-- Tendencia histórica -->
+      <div v-if="seccionActiva === 'tendencia'" class="sav__section">
+        <div class="sav__chart-controls">
+          <div class="sav__field">
+            <label class="sav__label">Parámetro</label>
+            <select class="sav__input" v-model="tipoHistorico">
+              <option v-for="t in TIPOS_HISTORICO" :key="t.value" :value="t.value">{{ t.label }}</option>
+            </select>
+          </div>
+          <div class="sav__field">
+            <label class="sav__label">Período</label>
+            <select class="sav__input" v-model.number="semanasHistorico">
+              <option :value="1">Última semana</option>
+              <option :value="2">Últimas 2 semanas</option>
+              <option :value="4">Últimas 4 semanas</option>
+              <option :value="8">Últimas 8 semanas</option>
+              <option :value="12">Últimas 12 semanas</option>
+            </select>
+          </div>
+        </div>
+
+        <div v-if="loadingHist" class="sav__hist-loading">Cargando histórico…</div>
+        <div v-else-if="!histData.length" class="sav__empty sav__empty--center">
+          Sin datos históricos para {{ tipoHistorico }} en este período.
+        </div>
+        <template v-else>
+          <div class="sav__chart-wrap">
+            <AmbienteChart
+              :lecturas="histData"
+              :tipo="tipoHistorico"
+              bucket="daily"
+              :setpoint="setpointChart"
+              :height="320"
+            />
+          </div>
+          <div class="sav__hist-info">
+            Promedio diario — {{ histData.length }} día{{ histData.length !== 1 ? 's' : '' }} con datos
+            · {{ histData.reduce((s, d) => s + d.n, 0) }} lecturas totales
+          </div>
+        </template>
+      </div>
+
       <!-- Registro manual -->
       <div v-if="seccionActiva === 'manual'" class="sav__section">
         <div v-if="!loteActivo" class="sav__info-msg">
@@ -280,9 +382,7 @@ watch([desde, hasta, bucket], async () => {
 .sav { padding: 1.75rem 1.5rem; max-width: 1100px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; }
 @media (max-width: 640px) { .sav { padding: 1rem; } }
 
-.sav__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; color: #94a3b8; justify-content: center; }
-.sav__spinner { width: 20px; height: 20px; border: 2.5px solid rgba(27,94,32,.2); border-top-color: #1b5e20; border-radius: 50%; animation: sav-spin .6s linear infinite; }
-@keyframes sav-spin { to { transform: rotate(360deg); } }
+.sav__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .sav__spin { animation: sav-spin .6s linear infinite; }
 
 .sav__hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
@@ -359,4 +459,16 @@ watch([desde, hasta, bucket], async () => {
 
 .sav__alertas-list { display: flex; flex-direction: column; gap: .6rem; }
 .sav__empty { color: #94a3b8; font-size: .82rem; grid-column: 1/-1; }
+.sav__empty--center { text-align: center; padding: 2rem 1rem; background: #f8fafc; border-radius: 10px; grid-column: unset; }
+
+/* Live dot */
+.sav__title-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.sav__live-dot {
+  font-size: .68rem; font-weight: 700; color: #15803d; background: #dcfce7;
+  padding: .15rem .5rem; border-radius: 99px;
+}
+
+/* Tendencia */
+.sav__hist-loading { color: #94a3b8; font-size: .82rem; padding: 2rem; text-align: center; }
+.sav__hist-info { font-size: .72rem; color: #94a3b8; margin-top: .6rem; text-align: center; }
 </style>

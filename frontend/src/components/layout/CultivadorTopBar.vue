@@ -2,6 +2,11 @@
   <header class="ctb">
     <div class="ctb__inner">
 
+      <!-- Hamburger (tablet 768-1023px) -->
+      <button class="ctb__hamburger" @click="emit('open-drawer')" aria-label="Abrir menú">
+        <Menu :size="20" :stroke-width="1.75" />
+      </button>
+
       <!-- Breadcrumb -->
       <nav class="ctb__bc" aria-label="breadcrumb">
         <template v-for="(crumb, i) in breadcrumbs" :key="i">
@@ -13,6 +18,12 @@
 
       <!-- Right -->
       <div class="ctb__right">
+
+        <!-- Help -->
+        <button class="ctb__icon-btn" @click="openHelp" aria-label="Ayuda" title="Ayuda">
+          <HelpCircle :size="20" :stroke-width="1.75" />
+          <span v-if="helpDot" class="ctb__help-dot" />
+        </button>
 
         <!-- Bell con notificaciones del cultivador -->
         <DsDropdown v-model="bellOpen" align="right">
@@ -92,10 +103,12 @@
       </div>
     </div>
   </header>
+
+  <HelpDrawer v-model="helpOpen" />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
@@ -104,7 +117,10 @@ import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import DsDropdown from '../../design-system/components/Dropdown.vue'
 import DsAvatar   from '../../design-system/components/Avatar.vue'
 import DsEmpty    from '../../design-system/components/EmptyState.vue'
-import { Bell, User, LogOut } from 'lucide-vue-next'
+import { Bell, User, LogOut, Menu, HelpCircle } from 'lucide-vue-next'
+import HelpDrawer from '../HelpDrawer.vue'
+
+const emit = defineEmits(['open-drawer'])
 
 const route    = useRoute()
 const router   = useRouter()
@@ -116,6 +132,18 @@ useAlertasBell()
 
 const bellOpen   = ref(false)
 const avatarOpen = ref(false)
+const helpOpen   = ref(false)
+const helpDot    = ref(false)
+onMounted(() => {
+  helpDot.value = !localStorage.getItem(`help_seen_${auth.user?.id || 'u'}`)
+})
+function openHelp() {
+  helpOpen.value = true
+  if (helpDot.value) {
+    helpDot.value = false
+    localStorage.setItem(`help_seen_${auth.user?.id || 'u'}`, '1')
+  }
+}
 
 const notifCount   = computed(() => ambStore.alertasCount)
 const alertasSlice = computed(() => ambStore.alertasActivas.slice(0, 6))
@@ -140,9 +168,17 @@ function formatTime(ts) {
 }
 
 const SEGMENT_LABELS = {
-  salas: 'Mis salas', lotes: 'Mis lotes', tareas: 'Tareas',
-  perfil: 'Mi perfil', 'sala-ambiente': 'Ambiente',
-  ambiente: 'Ambiente',
+  salas:               'Mis salas',
+  lotes:               'Mis lotes',
+  plantas:             'Mis plantas',
+  tareas:              'Tareas',
+  geneticas:           'Genéticas',
+  cosechado:           'Cosechado',
+  perfil:              'Mi perfil',
+  ambiente:            'Ambiente',
+  'sala-ambiente':     'Ambiente',
+  'plan-trabajo':      'Plan de trabajo',
+  'historial-cultivador': 'Historial',
 }
 
 const breadcrumbs = computed(() => {
@@ -215,6 +251,15 @@ async function handleLogout() {
 .ctb__icon-btn:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
 .ctb__icon-btn--alerta { border-color: #fca5a5; background: var(--c-rust-100); color: var(--c-rust-600); }
 
+.ctb__help-dot {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 7px; height: 7px;
+  background: #3b82f6;
+  border-radius: 50%;
+  border: 1.5px solid var(--c-paper);
+}
+
 .ctb__badge {
   position: absolute;
   top: -4px; right: -4px;
@@ -281,6 +326,24 @@ async function handleLogout() {
 .ctb__user-item--danger { color: var(--c-rust-600); }
 .ctb__user-item--danger:hover { background: var(--c-rust-100); color: var(--c-rust-600); }
 .ctb__divider { height: 1px; background: var(--c-ink-100); margin: var(--sp-1) 0; }
+
+/* Hamburger: solo visible en tablet (768-1023px) */
+.ctb__hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--c-ink-300);
+  background: transparent;
+  color: var(--c-ink-600);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--t-fast);
+}
+.ctb__hamburger:hover { background: var(--c-ink-100); }
+@media (max-width: 1023px) { .ctb__hamburger { display: flex; } }
 
 /* Hidden on mobile */
 @media (max-width: 767px) { .ctb { display: none; } }

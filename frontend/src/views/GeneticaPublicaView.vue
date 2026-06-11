@@ -7,7 +7,7 @@
         <span class="gp__brand-dot"></span>
         <span class="gp__brand-name">{{ clubNombre }}</span>
       </div>
-      <div class="gp__spinner"></div>
+      <DsSpinner :size="36" />
     </div>
 
     <!-- No encontrada / no publicada -->
@@ -141,6 +141,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../lib/api'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route = useRoute()
 const slug  = route.params.slug
@@ -204,15 +205,6 @@ onMounted(async () => {
   justify-content: center;
   gap: 2rem;
 }
-.gp__spinner {
-  width: 36px; height: 36px;
-  border: 3px solid rgba(27,94,32,.15);
-  border-top-color: #1b5e20;
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
 /* Brand */
 .gp__brand, .gp__brand--top {
   display: flex; align-items: center; gap: .5rem;

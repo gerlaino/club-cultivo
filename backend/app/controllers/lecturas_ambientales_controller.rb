@@ -72,6 +72,33 @@ class LecturasAmbientalesController < ApplicationController
     end
   end
 
+  # GET /salas/:sala_id/ambiente/historico?tipo=temperatura&semanas=4
+  def historico
+    tipo    = params[:tipo].presence || 'temperatura'
+    semanas = params[:semanas].to_i.clamp(1, 12)
+    desde   = semanas.weeks.ago.beginning_of_day
+
+    unless AmbienteTipos::TIPOS.include?(tipo)
+      return render json: { error: 'tipo inválido' }, status: :bad_request
+    end
+
+    filas = LecturaAmbiental
+      .de_sala(@sala.id)
+      .del_tipo(tipo)
+      .where('medido_at >= ?', desde)
+      .no_backfill
+      .group(Arel.sql("DATE(medido_at AT TIME ZONE 'UTC')"))
+      .order(Arel.sql("DATE(medido_at AT TIME ZONE 'UTC') ASC"))
+      .pluck(
+        Arel.sql("DATE(medido_at AT TIME ZONE 'UTC')"),
+        Arel.sql("AVG(valor::numeric)"),
+        Arel.sql("COUNT(*)")
+      )
+      .map { |fecha, avg, n| { fecha: fecha.to_s, tipo: tipo, valor: avg.to_f.round(3), n: n.to_i } }
+
+    render json: { historico: filas, tipo: tipo, semanas: semanas }
+  end
+
   def destroy
     return render json: { error: 'Forbidden' }, status: :forbidden unless write_access?
 

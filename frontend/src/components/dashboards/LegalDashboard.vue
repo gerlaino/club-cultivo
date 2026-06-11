@@ -4,6 +4,7 @@ import { logger } from '../../utils/logger.js'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { getContableDashboard, listPacientes, getInformeSemestral } from '../../lib/api.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -124,8 +125,7 @@ onMounted(async () => {
 
     <!-- Loading -->
     <div v-if="loading" class="ld__loading">
-      <div class="ld__ring"></div>
-      <span>Cargando datos…</span>
+      <DsSpinner />
     </div>
 
     <template v-else>
@@ -511,9 +511,7 @@ onMounted(async () => {
 .ld__action:hover .ld__action-arrow { color: #0f172a; transform: translateX(2px); }
 
 /* Loading */
-.ld__loading { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 5rem; color: #94a3b8; font-size: .875rem; }
-.ld__ring { width: 24px; height: 24px; border: 2px solid #e2e8f0; border-top-color: #7c3aed; border-radius: 50%; animation: ld-spin .7s linear infinite; }
-@keyframes ld-spin { to { transform: rotate(360deg); } }
+.ld__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 /* Buttons */
 .ld__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: var(--brand-primary, #1b5e20); color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: background .15s; white-space: nowrap; }

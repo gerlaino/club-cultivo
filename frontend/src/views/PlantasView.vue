@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { listPlants, listLotes } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import EmptyState from '../components/ui/EmptyState.vue'
+import DsSpinner from '../design-system/components/Spinner.vue'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -18,11 +19,13 @@ const filters = ref({ state: '', lote_id: '', search: '' })
 const sortBy  = ref('created_at_desc')
 
 const STATE_META = {
-  germinacion: { label: 'Germinación', icon: '🌰', bg: '#E0F2FE', color: '#0369a1', bar: '#0284C7' },
-  vegetativo:  { label: 'Vegetativo',  icon: '🌱', bg: '#E8F0EB', color: '#1A3D2E', bar: '#1b5e20' },
-  floracion:   { label: 'Floración',   icon: '🌸', bg: '#FEF3C7', color: '#92400e', bar: '#D97706' },
-  secado:      { label: 'Manicura',    icon: '✂️',  bg: '#F3F4F6', color: '#374151', bar: '#6B7280' },
-  cosechado:   { label: 'Cosechado',   icon: '✂️',  bg: '#F4F8F5', color: '#1A3D2E', bar: '#3F6452' },
+  semilla:    { label: 'Germinación', icon: '🌰', bg: '#E0F2FE', color: '#0369a1', bar: '#0284C7', kpiIcon: '🌰', kpiBg: 'rgba(3,105,161,.1)' },
+  esqueje:    { label: 'Esqueje',     icon: '✂️',  bg: '#F3E8FF', color: '#7c3aed', bar: '#8b5cf6', kpiIcon: '✂️',  kpiBg: 'rgba(124,58,237,.1)' },
+  vegetativo: { label: 'Vegetativo',  icon: '🌱', bg: '#E8F0EB', color: '#1A3D2E', bar: '#1b5e20', kpiIcon: '🌱', kpiBg: 'rgba(27,94,32,.1)'   },
+  floracion:  { label: 'Floración',   icon: '🌸', bg: '#FEF3C7', color: '#92400e', bar: '#D97706', kpiIcon: '🌸', kpiBg: 'rgba(217,119,6,.12)'  },
+  maduracion: { label: 'Maduración',  icon: '🍂', bg: '#FFF7ED', color: '#c2410c', bar: '#ea580c', kpiIcon: '🍂', kpiBg: 'rgba(194,65,12,.1)'   },
+  cosechado:  { label: 'Cosechada',   icon: '🌿', bg: '#F4F8F5', color: '#1A3D2E', bar: '#3F6452', kpiIcon: '🌿', kpiBg: 'rgba(63,100,82,.1)'   },
+  descartada: { label: 'Descartada',  icon: '🗑️', bg: '#FEF2F2', color: '#b91c1c', bar: '#ef4444', kpiIcon: '🗑️', kpiBg: 'rgba(185,28,28,.1)'   },
 }
 
 function sm(s) { return STATE_META[s] || { label: s || '—', icon: '•', bg: '#f3f4f6', color: '#374151', bar: '#94a3b8' } }
@@ -31,12 +34,20 @@ function stateIcon(s)       { return sm(s).icon }
 function stateBadgeStyle(s) { const m = sm(s); return { background: m.bg, color: m.color } }
 function stateBarStyle(s)   { return { background: sm(s).bar } }
 
-const kpis = computed(() => ({
-  total:      plants.value.length,
-  vegetativo: plants.value.filter(p => p.state === 'vegetativo').length,
-  floracion:  plants.value.filter(p => p.state === 'floracion').length,
-  cosechado:  plants.value.filter(p => p.state === 'cosechado').length,
-}))
+const KPI_STATES = ['semilla', 'esqueje', 'vegetativo', 'floracion', 'maduracion', 'cosechado', 'descartada']
+
+const kpis = computed(() => {
+  const counts = {}
+  for (const s of KPI_STATES) {
+    counts[s] = plants.value.filter(p => p.state === s).length
+  }
+  return {
+    total: plants.value.length,
+    byState: KPI_STATES
+      .filter(s => counts[s] > 0)
+      .map(s => ({ state: s, count: counts[s], ...STATE_META[s] })),
+  }
+})
 
 const filtered = computed(() => {
   let list = [...plants.value]
@@ -58,12 +69,19 @@ const filtered = computed(() => {
     case 'lote_desc':     list.sort((a,b) => (b.lote?.codigo||'').localeCompare(a.lote?.codigo||'')); break
     case 'genetica_asc':  list.sort((a,b) => (a.genetica?.nombre||'').localeCompare(b.genetica?.nombre||'')); break
     case 'genetica_desc': list.sort((a,b) => (b.genetica?.nombre||'').localeCompare(a.genetica?.nombre||'')); break
-    case 'dias_asc':      list.sort((a,b) => (a.dias_desde_germinacion||0) - (b.dias_desde_germinacion||0)); break
-    case 'dias_desc':     list.sort((a,b) => (b.dias_desde_germinacion||0) - (a.dias_desde_germinacion||0)); break
+    case 'dias_asc':      list.sort((a,b) => (a.dias_en_fase||0) - (b.dias_en_fase||0)); break
+    case 'dias_desc':     list.sort((a,b) => (b.dias_en_fase||0) - (a.dias_en_fase||0)); break
+    case 'fecha_asc':     list.sort((a,b) => new Date(a.created_at) - new Date(b.created_at)); break
+    case 'fecha_desc':    list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at)); break
     default:              list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
   }
   return list
 })
+
+function formatFecha(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+}
 
 function clearFilters() {
   filters.value = { state: '', lote_id: '', search: '' }
@@ -76,7 +94,7 @@ const hasFilters = computed(() =>
 
 // Paginación
 const page    = ref(1)
-const perPage = 50
+const perPage = 10
 
 const paginated  = computed(() => filtered.value.slice((page.value - 1) * perPage, page.value * perPage))
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / perPage)))
@@ -135,25 +153,15 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 
     <!-- KPIs -->
     <div class="ptv__kpis">
-      <div class="ptv__kpi">
+      <div class="ptv__kpi ptv__kpi--total">
         <div class="ptv__kpi-icon" style="background:rgba(27,94,32,.1)">🌿</div>
         <div class="ptv__kpi-value">{{ kpis.total }}</div>
         <div class="ptv__kpi-label">Total plantas</div>
       </div>
-      <div class="ptv__kpi">
-        <div class="ptv__kpi-icon" style="background:rgba(27,94,32,.1)">🌱</div>
-        <div class="ptv__kpi-value">{{ kpis.vegetativo }}</div>
-        <div class="ptv__kpi-label">Vegetativo</div>
-      </div>
-      <div class="ptv__kpi">
-        <div class="ptv__kpi-icon" style="background:rgba(217,119,6,.12)">🌸</div>
-        <div class="ptv__kpi-value">{{ kpis.floracion }}</div>
-        <div class="ptv__kpi-label">Floración</div>
-      </div>
-      <div class="ptv__kpi">
-        <div class="ptv__kpi-icon" style="background:rgba(107,114,128,.1)">✂️</div>
-        <div class="ptv__kpi-value">{{ kpis.cosechado }}</div>
-        <div class="ptv__kpi-label">Cosechadas</div>
+      <div v-for="k in kpis.byState" :key="k.state" class="ptv__kpi">
+        <div class="ptv__kpi-icon" :style="{ background: k.kpiBg }">{{ k.kpiIcon }}</div>
+        <div class="ptv__kpi-value">{{ k.count }}</div>
+        <div class="ptv__kpi-label">{{ k.label }}</div>
       </div>
     </div>
 
@@ -186,20 +194,21 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
       >
         Todos {{ plants.length }}
       </button>
-      <button
-        v-for="(meta, key) in STATE_META"
-        :key="key"
-        class="ptv__pill"
-        :class="{ 'ptv__pill--active': filters.state === key }"
-        @click="filters.state = filters.state === key ? '' : key"
-      >
-        {{ meta.icon }} {{ meta.label }} {{ plants.filter(p => p.state === key).length }}
-      </button>
+      <template v-for="(meta, key) in STATE_META" :key="key">
+        <button
+          v-if="plants.filter(p => p.state === key).length > 0"
+          class="ptv__pill"
+          :class="{ 'ptv__pill--active': filters.state === key }"
+          @click="filters.state = filters.state === key ? '' : key"
+        >
+          {{ meta.icon }} {{ meta.label }} {{ plants.filter(p => p.state === key).length }}
+        </button>
+      </template>
     </div>
 
     <!-- Loading -->
     <div v-if="loading" class="ptv__loading">
-      <div class="ptv__spinner"></div>
+      <DsSpinner />
     </div>
 
     <!-- Error -->
@@ -227,15 +236,17 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
             <th class="pt-table__sortable" @click="onSort('nombre')">
               Nombre <span class="pt-sort-icon">{{ sortIcon('nombre') }}</span>
             </th>
-            <th>QR</th>
             <th class="pt-table__sortable" @click="onSort('lote')">
               Lote <span class="pt-sort-icon">{{ sortIcon('lote') }}</span>
             </th>
-            <th class="pt-table__sortable" @click="onSort('genetica')">
+            <th class="pt-table__sortable pt-col-genetica" @click="onSort('genetica')">
               Genética <span class="pt-sort-icon">{{ sortIcon('genetica') }}</span>
             </th>
-            <th class="pt-table__sortable" @click="onSort('dias')">
-              Días <span class="pt-sort-icon">{{ sortIcon('dias') }}</span>
+            <th class="pt-table__sortable pt-col-fecha" @click="onSort('fecha')">
+              Creación <span class="pt-sort-icon">{{ sortIcon('fecha') }}</span>
+            </th>
+            <th class="pt-table__sortable pt-col-dias" @click="onSort('dias')">
+              Días en fase <span class="pt-sort-icon">{{ sortIcon('dias') }}</span>
             </th>
             <th></th>
           </tr>
@@ -256,16 +267,19 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
               <span class="pt-nombre">{{ plant.nombre || `Planta #${plant.id}` }}</span>
             </td>
             <td>
-              <span class="pt-qr">{{ plant.codigo_qr || '—' }}</span>
-            </td>
-            <td>
               <span class="pt-lote">{{ plant.lote?.codigo || '—' }}</span>
             </td>
-            <td>
+            <td class="pt-col-genetica">
               <span class="pt-genetica">{{ plant.genetica?.nombre || '—' }}</span>
             </td>
-            <td>
-              <span class="pt-dias">{{ plant.dias_desde_germinacion || '—' }}</span>
+            <td class="pt-col-fecha">
+              <span class="pt-fecha">{{ formatFecha(plant.created_at) }}</span>
+            </td>
+            <td class="pt-col-dias">
+              <span v-if="plant.dias_en_fase != null" class="pt-dias-badge" :style="stateBadgeStyle(plant.state)">
+                {{ plant.dias_en_fase }}d
+              </span>
+              <span v-else class="pt-dias-empty">—</span>
             </td>
             <td>
               <span class="pt-arrow">→</span>
@@ -304,8 +318,9 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 .ptv__btn-ghost:hover { background: #f8fafc; }
 
 /* KPIs */
-.ptv__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
-@media (max-width: 640px) { .ptv__kpis { grid-template-columns: repeat(2, 1fr); } }
+.ptv__kpis { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+.ptv__kpi  { flex: 1 1 140px; min-width: 130px; max-width: 220px; }
+.ptv__kpi--total { flex: 1 1 160px; }
 .ptv__kpi { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 1.25rem; }
 .ptv__kpi-icon  { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: .6rem; }
 .ptv__kpi-value { font-size: 1.8rem; font-weight: 800; color: #0f172a; line-height: 1; }
@@ -333,9 +348,7 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 .ptv__pill--active { background: #1a3d2e; border-color: #1a3d2e; color: #fff; }
 
 /* Loading / Error */
-.ptv__loading { display: flex; justify-content: center; padding: 3rem; }
-.ptv__spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #1a3d2e; border-radius: 50%; animation: ptv-spin .8s linear infinite; }
-@keyframes ptv-spin { to { transform: rotate(360deg); } }
+.ptv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .ptv__error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: .875rem 1rem; border-radius: 10px; margin-bottom: 1rem; }
 
 /* Table wrap */
@@ -357,13 +370,14 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 .pt-table td { padding: 10px 12px; vertical-align: middle; }
 
 /* Cell styles */
-.pt-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .6rem; border-radius: 99px; font-size: .72rem; font-weight: 600; white-space: nowrap; }
-.pt-nombre { font-weight: 600; color: #1e293b; }
-.pt-qr { font-family: monospace; font-size: .75rem; color: #94a3b8; }
-.pt-lote { font-size: .82rem; color: #374151; }
-.pt-genetica { font-size: .82rem; color: #374151; }
-.pt-dias { font-size: .82rem; color: #374151; }
-.pt-arrow { color: #cbd5e1; opacity: 0; transition: opacity .15s; font-size: .9rem; }
+.pt-badge      { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .6rem; border-radius: 99px; font-size: .72rem; font-weight: 600; white-space: nowrap; }
+.pt-nombre     { font-weight: 600; color: #1e293b; }
+.pt-lote       { font-size: .82rem; color: #374151; font-weight: 500; }
+.pt-genetica   { font-size: .82rem; color: #374151; }
+.pt-fecha      { font-size: .8rem; color: #64748b; font-variant-numeric: tabular-nums; }
+.pt-dias-badge { display: inline-flex; align-items: center; padding: .15rem .5rem; border-radius: 99px; font-size: .72rem; font-weight: 700; }
+.pt-dias-empty { font-size: .82rem; color: #cbd5e1; }
+.pt-arrow      { color: #cbd5e1; opacity: 0; transition: opacity .15s; font-size: .9rem; }
 .pt-table__row:hover .pt-arrow { opacity: 1; color: #64748b; }
 
 /* Pagination */
@@ -378,10 +392,7 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
 
 /* Responsive */
 @media (max-width: 640px) {
-  .pt-table thead th:nth-child(3),
-  .pt-table thead th:nth-child(5),
-  .pt-table td:nth-child(3),
-  .pt-table td:nth-child(5) { display: none; }
+  .pt-col-genetica, .pt-col-fecha { display: none; }
   .pt-arrow { opacity: 1; }
 }
 </style>

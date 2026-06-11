@@ -1,7 +1,17 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { useAuthStore } from "../stores/auth";
+import { useAuthStore }   from "../stores/auth";
 import { usePermissions } from "../composables/usePermissions";
-import { useToast } from "../composables/useToast";
+import { useToast }       from "../composables/useToast";
+import { usePWA }         from "../composables/usePWA";
+
+const MOBILE_ROLES = ['admin', 'supervisor', 'cultivador', 'manicura', 'delivery']
+const MOBILE_HOME  = {
+  admin:      '/m/admin/sedes',
+  supervisor: '/m/admin/sedes',
+  cultivador: '/m/cultivador/sedes',
+  manicura:   '/m/manicura/pesar',
+  delivery:   '/m/delivery/despachos',
+}
 
 const requiresPermission = (resource, action) => {
   return (to, from, next) => {
@@ -135,6 +145,20 @@ const routes = [
     beforeEnter: requiresPermission("lotes", "index"),
   },
   {
+    path: "/cosechado/:id",
+    name: "cosechado-detalle",
+    component: () => import("../views/LoteCosechadoDetalleView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("lotes", "index"),
+  },
+  {
+    path: "/cosechado/:loteId/planta/:id",
+    name: "planta-cosechada-detalle",
+    component: () => import("../views/PlantaCosechadaDetalleView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("lotes", "index"),
+  },
+  {
     path: "/historial-cultivador",
     name: "historial-cultivador",
     component: () => import("../views/HistorialCultivadorView.vue"),
@@ -216,6 +240,17 @@ const routes = [
     beforeEnter: requiresPermission("socios", "index"),
   },
   {
+    path: "/socios/criticos",
+    name: "socios-criticos",
+    component: () => import("../views/SociosCriticosView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (['admin', 'supervisor'].includes(auth.user?.role)) next();
+      else next('/');
+    },
+  },
+  {
     path: "/pacientes/nuevo",
     alias: ["/socios/nuevo"],
     name: "paciente-nuevo",
@@ -227,7 +262,7 @@ const routes = [
     alias: ["/socios/:id"],
     name: "paciente-detail",
     component: () => import("../views/SocioDetailView.vue"),
-    props: true,
+    props: route => ({ backPath: '/pacientes' }),
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
       const role = auth.user?.role
@@ -272,25 +307,51 @@ const routes = [
       else next("/");
     },
   },
+  {
+    path: "/alertas-configuracion",
+    name: "alertas-configuracion",
+    component: () => import("../views/SetpointsConfigView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (auth.user?.role === "admin") next();
+      else next("/");
+    },
+  },
+  {
+    path: "/configuracion",
+    component: () => import("../views/ConfiguracionView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (auth.user?.role === "admin") next();
+      else next("/");
+    },
+    children: [
+      { path: '',           redirect: '/configuracion/club' },
+      { path: 'club',       name: 'config-club',        component: () => import("../views/PreferenciasView.vue") },
+      { path: 'sedes',      name: 'config-sedes',       component: () => import("../views/SedesView.vue") },
+      { path: 'equipo',     name: 'config-equipo',      component: () => import("../views/UsuariosView.vue") },
+      { path: 'suscripcion',name: 'config-suscripcion', component: () => import("../views/SuscripcionTabView.vue") },
+    ],
+  },
+  {
+    path: "/integraciones",
+    name: "integraciones",
+    component: () => import("../views/IntegracionesView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (auth.user?.role === "admin") next();
+      else next("/");
+    },
+  },
 
   // ARICCAME
   {
     path: "/ariccame",
     name: "ariccame",
     component: () => import("../views/AriccameView.vue"),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore();
-      if (["admin", "super_admin"].includes(auth.user?.role)) next();
-      else next("/");
-    },
-  },
-
-  // Benchmark
-  {
-    path: "/benchmark",
-    name: "benchmark",
-    component: () => import("../views/BenchmarkView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore();
@@ -397,6 +458,29 @@ const routes = [
       next()
     },
   },
+  {
+    path: '/admin/stock/:id',
+    name: 'admin-stock-detail',
+    component: () => import('../views/admin/AdminStockDetailView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role !== 'admin') return next('/')
+      next()
+    },
+  },
+
+  {
+    path: '/admin/pesajes-manicura',
+    name: 'admin-pesajes-manicura',
+    component: () => import('../views/admin/AdminPesajesManicuraView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'supervisor'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+  },
 
   // Manicura role routes
   {
@@ -443,6 +527,17 @@ const routes = [
       next()
     },
   },
+  {
+    path: '/mnc/pesajes',
+    name: 'mnc-pesajes',
+    component: () => import('../views/manicura/MncPesajesView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'manicura'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+  },
 
   {
     path: '/super-admin',
@@ -478,13 +573,25 @@ const routes = [
     path: '/s/:codigo_qr',
     name: 'stock-qr',
     component: () => import('../views/StockQrView.vue'),
-    meta: { fullscreen: true },
+    meta: { requiresAuth: true },
   },
   {
     path: '/c/:token',
     name: 'carnet-publico',
     component: () => import('../views/CarnetPublicoView.vue'),
     meta: { fullscreen: true },
+  },
+  {
+    path: '/cos/:codigo_qr',
+    name: 'cosecha-qr',
+    component: () => import('../views/CosechaQrView.vue'),
+    meta: { fullscreen: true },
+  },
+  {
+    path: '/l/:codigo_qr',
+    name: 'lote-qr',
+    component: () => import('../views/LoteQrView.vue'),
+    meta: { requiresAuth: true },
   },
   {
     path: '/stocks/:id/etiqueta',
@@ -541,6 +648,9 @@ const routes = [
       { path: '', name: 'medico-dashboard', component: () => import('../views/medico/MedicoDashboard.vue') },
       { path: 'pacientes', name: 'medico-pacientes', component: () => import('../views/medico/MedicoPacientesView.vue') },
       { path: 'pacientes/:id', name: 'medico-paciente-detail', component: () => import('../views/SocioDetailView.vue'), props: () => ({ backPath: '/medico/pacientes' }) },
+      { path: 'pacientes/:id/ficha', name: 'medico-ficha-paciente', component: () => import('../views/medico/MedicoFichaPacienteView.vue') },
+      { path: 'turnos', name: 'medico-turnos', component: () => import('../views/medico/MedicoTurnosView.vue') },
+      { path: 'disponibilidad', name: 'medico-disponibilidad', component: () => import('../views/medico/MedicoDisponibilidadView.vue') },
       { path: 'indicaciones', name: 'medico-indicaciones', component: () => import('../views/medico/MedicoIndicacionesView.vue') },
       { path: 'documentos', name: 'medico-documentos', component: () => import('../views/medico/MedicoDocumentosView.vue') },
     ],
@@ -605,6 +715,54 @@ const routes = [
     ],
   },
 
+  // ── Mobile PWA shell ─────────────────────────────────────────────────
+  {
+    path: '/m',
+    component: () => import('../components/layout/MobileShell.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      // Redirect /m → primera tab del rol.
+      // Roles sin shell mobile (dispensador, medico, etc.) van a su home desktop.
+      { path: '', redirect: () => {
+          const role = useAuthStore().user?.role
+          const homes = {
+            admin:      '/m/admin/sedes',
+            supervisor: '/m/admin/sedes', // supervisor comparte rutas mobile de admin
+            cultivador: '/m/cultivador/sedes',
+            manicura:   '/m/manicura/pesar',
+            delivery:   '/m/delivery/despachos',
+          }
+          return homes[role] || '/'
+        }
+      },
+
+      // ── Cultivador ──
+      { path: 'cultivador/sedes',  component: () => import('../views/mobile/MSedesView.vue') },
+      { path: 'cultivador/tareas', component: () => import('../views/mobile/MTareasView.vue') },
+
+      // ── Admin / Supervisor ──
+      { path: 'admin/sedes',   component: () => import('../views/mobile/MSedesView.vue') },
+      { path: 'admin/tareas',  component: () => import('../views/mobile/MTareasView.vue') },
+      { path: 'admin/aprobar', component: () => import('../views/mobile/MAdminAprobacionView.vue') },
+
+      // ── Detalle mobile propio ──
+      { path: 'sede/:id',   component: () => import('../views/mobile/MSedeMobileDetail.vue') },
+      { path: 'sala-m/:id', component: () => import('../views/mobile/MSalaMobileDetail.vue') },
+      { path: 'lote-m/:id', component: () => import('../views/mobile/MLoteMobileDetail.vue') },
+      { path: 'planta/:id', component: () => import('../views/mobile/MPlantaDetailView.vue') },
+
+      // ── Manicura ──
+      { path: 'manicura/pesar',     component: () => import('../views/mobile/MCosechasPorPesarView.vue') },
+      { path: 'manicura/pesajes',   component: () => import('../views/manicura/MncPesajesView.vue') },
+      { path: 'manicura/aprobacion',component: () => import('../views/mobile/MPendientesAprobacionView.vue') },
+      { path: 'mnc/lotes/:id',      component: () => import('../views/manicura/MncLoteDetailView.vue') },
+
+      // ── Delivery ──
+      { path: 'delivery/despachos', component: () => import('../views/delivery/DespachoListView.vue') },
+      { path: 'delivery/historial', component: () => import('../views/delivery/DespachoListView.vue') },
+    ],
+  },
+
   { path: "/:pathMatch(.*)*", redirect: "/" },
 
 ];
@@ -647,6 +805,36 @@ router.beforeEach(async (to) => {
   }
 
   const role = auth.user?.role
+  const { isPWA } = usePWA()
+
+  // En modo PWA instalada, mantener dentro del shell mobile
+  if (
+    auth.isAuthenticated &&
+    isPWA() &&
+    MOBILE_ROLES.includes(role) &&
+    !to.path.startsWith('/m') &&
+    !to.path.startsWith('/p/') &&
+    !to.path.startsWith('/s/') &&
+    !to.path.startsWith('/g/') &&
+    !to.path.startsWith('/c/') &&
+    !to.path.startsWith('/cos/') &&
+    !to.path.startsWith('/l/') &&
+    !to.path.startsWith('/login')
+  ) {
+    // Si es una página de detalle conocida, redirigir a su equivalente /m/
+    // para que quede dentro del MobileShell con bottom nav
+    const detalleMatch = to.path.match(/^\/(salas|lotes|plantas)\/(\d+)/)
+    if (detalleMatch) {
+      const map = { salas: 'sala-m', lotes: 'lote-m', plantas: 'planta' }
+      return `/m/${map[detalleMatch[1]]}/${detalleMatch[2]}`
+    }
+    // Ruta de manicura → equivalente mobile
+    const mncMatch = to.path.match(/^\/mnc\/lotes\/(\d+)/)
+    if (mncMatch) return `/m/mnc/lotes/${mncMatch[1]}`
+
+    return MOBILE_HOME[role]
+  }
+
   if (auth.isAuthenticated && ROLE_ALLOWED_PREFIX[role]) {
     const allowed = ROLE_ALLOWED_PREFIX[role].some(p => to.path === p || to.path.startsWith(p + '/'))
     if (!allowed) {

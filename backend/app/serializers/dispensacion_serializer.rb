@@ -23,8 +23,12 @@ class DispensacionSerializer
       direccion_envio:   d.direccion_envio,
       contacto_nombre:   d.contacto_nombre,
       contacto_telefono: d.contacto_telefono,
-      notas_envio:       d.notas_envio,
-      created_at:        d.created_at,
+      notas_envio:        d.notas_envio,
+      notas_entrega:      d.notas_entrega,
+      firma_entrega_data: d.firma_entrega_data,
+      entregado_at:       d.entregado_at,
+      motivo_fallo:       d.motivo_fallo,
+      created_at:         d.created_at,
     }
   end
 
@@ -35,6 +39,7 @@ class DispensacionSerializer
       estado_envio:       d.estado_envio,
       entregado_at:       d.entregado_at,
       notas_entrega:      d.notas_entrega,
+      firma_entrega_data: d.firma_entrega_data,
       motivo_fallo:       d.motivo_fallo,
       fecha_dispensacion: d.fecha_dispensacion,
       cantidad:           d.cantidad.to_f,

@@ -3,8 +3,8 @@
 
     <!-- Brand -->
     <div class="csb__brand">
-      <LeafSeal :size="24" class="csb__brand-leaf" />
-      <span class="csb__brand-name">cultivoespacial</span>
+      <img src="/logo-ce-icono.png" class="csb__brand-logo" alt="Cultivo Espacial" />
+      <span class="csb__brand-name">Cultivo Espacial</span>
     </div>
 
     <!-- Nav links -->
@@ -40,10 +40,9 @@
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
-import LeafSeal from '../../design-system/icons/LeafSeal.vue'
 import DsAvatar from '../../design-system/components/Avatar.vue'
 import {
-  Home, Building2, LayoutGrid, Sprout, CheckSquare, Dna, LogOut,
+  Home, Building2, LayoutGrid, Sprout, CheckSquare, Dna, TrendingUp, LogOut,
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -58,6 +57,7 @@ const NAV_LINKS = [
   { to: '/lotes',     icon: Sprout,      label: 'Lotes' },
   { to: '/tareas',    icon: CheckSquare, label: 'Tareas' },
   { to: '/geneticas', icon: Dna,         label: 'Genéticas' },
+  { to: '/analitica', icon: TrendingUp,  label: 'Analítica' },
 ]
 
 function isActive(to) {
@@ -95,7 +95,7 @@ async function handleLogout() {
   padding: var(--sp-5) var(--sp-5) var(--sp-4);
   border-bottom: 1px solid rgba(168, 201, 181, 0.15);
 }
-.csb__brand-leaf { color: var(--c-leaf-300); flex-shrink: 0; }
+.csb__brand-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .csb__brand-name {
   font-family: var(--font-display);
   font-size: var(--fs-16);

@@ -1,10 +1,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   PackageCheck, Truck, CheckCircle2, XCircle, User, MapPin,
   Phone, FileText, RefreshCw, ChevronDown, ChevronUp, AlertCircle
 } from 'lucide-vue-next'
-import { listDespachos, listDeliveryUsers, reasignarDelivery, reprogramarPaquete } from '../../lib/api.js'
+import { listDespachos, listEntregadores, reasignarDelivery, reprogramarPaquete } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast = useToast()
@@ -73,10 +74,12 @@ async function load() {
   finally { loading.value = false }
 }
 
+const ROLE_LABEL = { delivery: 'Repartidor', admin: 'Admin', supervisor: 'Supervisor' }
+
 async function loadDeliveryUsers() {
   try {
-    const { data } = await listDeliveryUsers()
-    deliveryUsers.value = data.users || []
+    const { data } = await listEntregadores()
+    deliveryUsers.value = data.data || []
   } catch {}
 }
 
@@ -109,7 +112,13 @@ async function confirmarReasignacion(id) {
 function deliveryNombre(d) {
   if (d.delivery_nombre) return d.delivery_nombre
   const u = deliveryUsers.value.find(u => u.id === d.delivery_id)
-  return u ? (u.first_name || u.email) : '—'
+  return u ? entregadorLabel(u) : '—'
+}
+
+function entregadorLabel(u) {
+  const nombre = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
+  if (u.role !== 'delivery') return `${nombre} (${ROLE_LABEL[u.role] || u.role})`
+  return nombre
 }
 
 async function reprogramar(id) {
@@ -183,9 +192,9 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
         <option value="fallido">Fallido</option>
       </select>
       <select v-model="filtroDelivery" class="dsp__select" @change="load">
-        <option value="">Todos los repartidores</option>
+        <option value="">Todos los asignados</option>
         <option v-for="u in deliveryUsers" :key="u.id" :value="String(u.id)">
-          {{ u.first_name || u.email }}
+          {{ entregadorLabel(u) }}
         </option>
       </select>
       <input v-model="filtroDesde" class="dsp__input-date" type="date" title="Desde" @change="load" />
@@ -201,8 +210,7 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
 
     <!-- Loading -->
     <div v-if="loading" class="dsp__loading">
-      <div class="dsp__ring"></div>
-      Cargando despachos…
+      <DsSpinner />
     </div>
 
     <!-- Empty -->
@@ -307,6 +315,13 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
                   <CheckCircle2 :size="13" :stroke-width="2" /> {{ d.notas_entrega }}
                 </div>
               </template>
+
+              <template v-if="d.estado_envio === 'entregado' && d.firma_entrega_data">
+                <div class="dsp__detail-label dsp__detail-label--green">Firma del receptor</div>
+                <div class="dsp__firma-preview">
+                  <img :src="d.firma_entrega_data" alt="Firma" class="dsp__firma-img" />
+                </div>
+              </template>
             </div>
 
           </div>
@@ -314,15 +329,22 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
           <!-- Reasignación -->
           <div class="dsp__reasign-bar">
             <template v-if="reasignandoId === d.id">
-              <span class="dsp__reasign-label">Reasignar a:</span>
+              <span class="dsp__reasign-label">Asignar a:</span>
               <select v-model="nuevoDelivery" class="dsp__reasign-select">
-                <option value="">Sin asignar</option>
-                <option v-for="u in deliveryUsers" :key="u.id" :value="String(u.id)">
-                  {{ u.first_name || u.email }}
-                </option>
+                <option value="">— Sin asignar —</option>
+                <optgroup v-if="deliveryUsers.filter(u => u.role === 'delivery').length" label="Repartidores">
+                  <option v-for="u in deliveryUsers.filter(u => u.role === 'delivery')" :key="u.id" :value="String(u.id)">
+                    {{ [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email }}
+                  </option>
+                </optgroup>
+                <optgroup v-if="deliveryUsers.filter(u => u.role !== 'delivery').length" label="Admin / Supervisor">
+                  <option v-for="u in deliveryUsers.filter(u => u.role !== 'delivery')" :key="u.id" :value="String(u.id)">
+                    {{ [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email }}
+                  </option>
+                </optgroup>
               </select>
               <button class="dsp__btn-confirm" :disabled="saving" @click="confirmarReasignacion(d.id)">
-                <div v-if="saving" class="dsp__spinner"></div>
+                <DsSpinner v-if="saving" :size="12" />
                 Guardar
               </button>
               <button class="dsp__btn-ghost" :disabled="saving" @click="cancelarReasignacion">
@@ -340,7 +362,7 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
                 :disabled="reprogramando"
                 @click.stop="reprogramar(d.id)"
               >
-                <div v-if="reprogramando" class="dsp__spinner"></div>
+                <DsSpinner v-if="reprogramando" :size="12" />
                 <RefreshCw v-else :size="13" :stroke-width="2" />
                 Reprogramar
               </button>
@@ -502,19 +524,8 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
 .dsp__loading {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
   justify-content: center;
-  padding: var(--sp-10);
-  color: var(--c-ink-400);
-  font-size: var(--fs-14);
-}
-.dsp__ring {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--c-ink-100);
-  border-top-color: var(--c-ink-500);
-  border-radius: 50%;
-  animation: dsp-spin .7s linear infinite;
+  min-height: calc(100vh - 56px);
 }
 .dsp__empty {
   text-align: center;
@@ -663,6 +674,8 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
 .dsp__detail-val--italic { font-style: italic; color: var(--c-ink-500); }
 .dsp__detail-val--red    { color: #dc2626; }
 .dsp__detail-val--green  { color: var(--c-leaf-700); }
+.dsp__firma-preview { border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; padding: .4rem; display: inline-block; }
+.dsp__firma-img { display: block; max-width: 240px; height: auto; }
 .dsp__code-sm {
   font-family: monospace;
   font-size: var(--fs-13);
@@ -767,14 +780,6 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
 .dsp__btn-reprogramar:hover:not(:disabled) { background: #ffedd5; border-color: #fb923c; }
 .dsp__btn-reprogramar:disabled { opacity: .5; cursor: not-allowed; }
 
-.dsp__spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(255,255,255,.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: dsp-spin .6s linear infinite;
-}
 
 @media (max-width: 768px) {
   .dsp { padding: var(--sp-4); }

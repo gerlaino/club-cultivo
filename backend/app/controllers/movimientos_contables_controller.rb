@@ -103,6 +103,7 @@ class MovimientosContablesController < ApplicationController
         egresos:        mes_actual.egresos.sum(:monto_ars).to_f,
         balance:        (mes_actual.ingresos.sum(:monto_ars) - mes_actual.egresos.sum(:monto_ars)).to_f,
         por_categoria:  resumen_por_categoria(mes_actual),
+        por_semana:     semanas_del_mes(scope, hoy),
       },
       mes_anterior: {
         ingresos: mes_ant.ingresos.sum(:monto_ars).to_f,
@@ -240,6 +241,26 @@ class MovimientosContablesController < ApplicationController
          .sum(:monto_ars)
          .map { |(cat, tipo), total| { categoria: cat, tipo: tipo, total: total.to_f } }
          .sort_by { |r| -r[:total] }
+  end
+
+  def semanas_del_mes(scope, hoy)
+    inicio = hoy.beginning_of_month
+    fin    = hoy
+    result = []
+    semana_num = 1
+    d = inicio
+    while d <= fin
+      d_fin = [d.end_of_week, fin].min
+      s = scope.del_periodo(d, d_fin)
+      result << {
+        label:    "Sem #{semana_num}",
+        ingresos: s.ingresos.sum(:monto_ars).to_f,
+        egresos:  s.egresos.sum(:monto_ars).to_f,
+      }
+      d = d_fin + 1.day
+      semana_num += 1
+    end
+    result
   end
 
   def resumen_por_mes(scope, hoy)

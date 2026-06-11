@@ -27,7 +27,7 @@
     </div>
 
     <div v-if="loading" class="sv__loading">
-      <div class="sv__ring"></div><span>Cargando stocks…</span>
+      <DsSpinner />
     </div>
 
     <div v-else-if="!stocksFiltrados.length" class="sv__empty">
@@ -75,6 +75,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 import { PackagePlus } from 'lucide-vue-next'
 import { listStocks, listSedes } from '../../lib/api.js'
 
@@ -147,9 +148,7 @@ onMounted(cargar)
 }
 .sv__select:focus { outline: none; border-color: #6B4FBE; }
 
-.sv__loading { display: flex; align-items: center; gap: .75rem; padding: 4rem; justify-content: center; color: var(--c-ink-400); }
-.sv__ring { width: 20px; height: 20px; border: 2px solid var(--c-ink-200); border-top-color: #6B4FBE; border-radius: 50%; animation: sv-spin .7s linear infinite; }
-@keyframes sv-spin { to { transform: rotate(360deg); } }
+.sv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 .sv__empty { text-align: center; padding: 4rem 2rem; }
 .sv__empty-ico { color: var(--c-ink-300); margin-bottom: 1rem; display: flex; justify-content: center; }

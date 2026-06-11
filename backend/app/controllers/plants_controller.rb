@@ -5,17 +5,24 @@ class PlantsController < ApplicationController
   # GET /plants
   def index
     plants = Plant.joins(:lote).where(lotes: { club_id: current_user.club_id })
-    if current_user.cultivador?
-      salas_ids = current_user.salas_ids_asignadas
-      return render json: [] if salas_ids.empty?
-      plants = plants.where(lotes: { sala_id: salas_ids })
-    elsif current_user.supervisor?
-      salas_ids = current_user.salas_ids_en_sedes_asignadas
-      return render json: [] if salas_ids.empty?
-      plants = plants.where(lotes: { sala_id: salas_ids })
+
+    if params[:lote_id].present?
+      # Con lote_id explícito la unidad de acceso es el lote (ya scoped al club).
+      # No aplicamos el filtro de sala asignada: el cultivador puede ver las plantas
+      # del lote al que navega, independientemente de si está en sala_cultivadores.
+      return render json: [] unless current_user.club.lotes.exists?(id: params[:lote_id])
+      plants = plants.where(lote_id: params[:lote_id])
+    else
+      if current_user.cultivador?
+        salas_ids = current_user.salas_ids_asignadas
+        plants = plants.where(lotes: { sala_id: salas_ids })
+      elsif current_user.supervisor?
+        salas_ids = current_user.salas_ids_en_sedes_asignadas
+        plants = plants.where(lotes: { sala_id: salas_ids })
+      end
     end
-    plants = plants.where(lote_id: params[:lote_id]) if params[:lote_id].present?
-    plants = plants.where(state: params[:state])    if params[:state].present?
+    plants = plants.where(state: params[:state])                if params[:state].present?
+    plants = plants.where(lotes: { estado: params[:lote_estado] }) if params[:lote_estado].present?
     plants = plants.includes(lote: [:genetica, { sala: :sede }]).order(created_at: :desc)
     render json: plants.map { |p| serialize_plant(p) }
   end
@@ -123,48 +130,65 @@ class PlantsController < ApplicationController
                  (current_user.manicura? && lote.manicurador_id.nil?)
     return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless authorized
 
+    pesaje_manicura_id = params[:pesaje_manicura_id]
+
     ActiveRecord::Base.transaction do
       plant_attrs = { peso_seco: peso_seco }
       plant_attrs[:peso_humedo] = peso_humedo if peso_humedo&.positive?
       @plant.update!(plant_attrs)
 
-      pesada = lote.pesadas.find_or_initialize_by(
-        borrador:     true,
-        fase_origen:  lote.estado,
-        fase_destino: 'finalizado',
-        manicurado:   true,
-      )
-      unless pesada.persisted?
-        pesada.registrado_por = current_user
-        pesada.registrado_at  = Time.current
-        pesada.save!
-      end
+      if pesaje_manicura_id.present?
+        # New flow: register against a PesajeManicura
+        pesaje = lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id)
+                                       .find(pesaje_manicura_id)
 
-      pp = pesada.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
-      pp.peso_seco_g   = peso_seco
-      pp.peso_humedo_g = peso_humedo if peso_humedo&.positive?
-      pp.save!
+        pp = pesaje.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
+        pp.pesaje_manicura = pesaje
+        pp.pesada          = nil
+        pp.peso_seco_g     = peso_seco
+        pp.peso_humedo_g   = peso_humedo if peso_humedo&.positive?
+        pp.save!
 
-      total_peso = pesada.pesadas_plantas.sum(:peso_seco_g)
-      count      = pesada.pesadas_plantas.count
-      pesada.update!(peso_seco_g: total_peso, plantas_manicuradas: count)
+        total_peso = pesaje.pesadas_plantas.sum(:peso_seco_g)
+        count      = pesaje.pesadas_plantas.count
 
-      total_plantas = lote.plants.count
-      render json: {
-        planta: {
-          id:          @plant.id,
-          nombre:      @plant.nombre,
-          codigo_qr:   @plant.codigo_qr,
-          peso_seco:   @plant.peso_seco.to_f,
-          peso_humedo: @plant.peso_humedo&.to_f,
-        },
-        progreso: {
-          pesadas:       count,
-          total:         total_plantas,
-          peso_total_g:  total_peso.to_f,
-          completado:    count >= total_plantas,
+        render json: {
+          planta:    { id: @plant.id, nombre: @plant.nombre, codigo_qr: @plant.codigo_qr,
+                       peso_seco: @plant.peso_seco.to_f, peso_humedo: @plant.peso_humedo&.to_f },
+          pesaje:    { id: pesaje.id, peso_total_g: total_peso.to_f, plantas_count: count },
+          progreso:  { pesadas: count, total: lote.plants.count,
+                       peso_total_g: total_peso.to_f, completado: count >= lote.plants.count },
         }
-      }
+      else
+        # Legacy flow: group under a borrador Pesada
+        pesada = lote.pesadas.find_or_initialize_by(
+          borrador:     true,
+          fase_origen:  lote.estado,
+          fase_destino: 'finalizado',
+          manicurado:   true,
+        )
+        unless pesada.persisted?
+          pesada.registrado_por = current_user
+          pesada.registrado_at  = Time.current
+          pesada.save!
+        end
+
+        pp = pesada.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
+        pp.peso_seco_g   = peso_seco
+        pp.peso_humedo_g = peso_humedo if peso_humedo&.positive?
+        pp.save!
+
+        total_peso = pesada.pesadas_plantas.sum(:peso_seco_g)
+        count      = pesada.pesadas_plantas.count
+        pesada.update!(peso_seco_g: total_peso, plantas_manicuradas: count)
+
+        render json: {
+          planta:   { id: @plant.id, nombre: @plant.nombre, codigo_qr: @plant.codigo_qr,
+                      peso_seco: @plant.peso_seco.to_f, peso_humedo: @plant.peso_humedo&.to_f },
+          progreso: { pesadas: count, total: lote.plants.count,
+                      peso_total_g: total_peso.to_f, completado: count >= lote.plants.count },
+        }
+      end
     end
   end
 
@@ -209,6 +233,18 @@ class PlantsController < ApplicationController
     nil
   end
 
+  def dias_en_fase(plant)
+    ref = case plant.state
+          when 'semilla'    then plant.fecha_germinacion || plant.created_at.to_date
+          when 'esqueje'    then plant.created_at.to_date
+          when 'vegetativo' then plant.fecha_vegetativo || plant.created_at.to_date
+          when 'floracion'  then plant.fecha_floracion
+          when 'maduracion' then plant.fecha_floracion
+          when 'cosechado'  then plant.fecha_cosecha
+          end
+    ref ? (Date.today - ref.to_date).to_i : nil
+  end
+
   def serialize_plant(plant)
     g = plant.lote.genetica
     {
@@ -228,10 +264,9 @@ class PlantsController < ApplicationController
         estado: plant.lote.estado,
         sala:   plant.lote.sala ? { id: plant.lote.sala.id, nombre: plant.lote.sala.nombre } : nil,
       },
-      genetica: g ? { id: g.id, nombre: g.nombre, tipo: g.tipo } : nil,
-      fecha_germinacion:      plant.fecha_germinacion,
-      dias_desde_germinacion: plant.fecha_germinacion ? (Date.today - plant.fecha_germinacion).to_i : nil,
-      created_at: plant.created_at,
+      genetica:      g ? { id: g.id, nombre: g.nombre, tipo: g.tipo } : nil,
+      created_at:    plant.created_at,
+      dias_en_fase:  dias_en_fase(plant),
     }
   end
 

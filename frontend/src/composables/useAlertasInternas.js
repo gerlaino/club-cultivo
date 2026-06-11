@@ -6,9 +6,9 @@ import { useAuthStore } from '../stores/auth.js'
 // Fallback poll interval — WebSocket handles real-time; poll catches missed events
 const POLL_MS = 5 * 60_000
 
-// Singleton shared state
-const alertas  = ref([])
-const noLeidas = computed(() => alertas.value.filter(a => !a.leida))
+// Singleton shared state — null means "not yet loaded"
+const alertas  = ref(null)
+const noLeidas = computed(() => (alertas.value ?? []).filter(a => !a.leida))
 const count    = computed(() => noLeidas.value.length)
 
 let instanceCount = 0
@@ -16,11 +16,10 @@ let intervalId    = null
 let consumer      = null
 
 function cableUrl() {
-  const base  = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
-  const root  = base.replace(/\/api$/, '')
-  const ws    = root.replace(/^http/, 'ws')
-  const token = localStorage.getItem('jwt_token') || ''
-  return `${ws}/cable?token=${encodeURIComponent(token)}`
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+  const root = base.replace(/\/api$/, '')
+  const ws   = root.replace(/^http/, 'ws')
+  return `${ws}/cable` // httpOnly cookie se envía automáticamente en el upgrade WS
 }
 
 async function refresh() {
@@ -28,7 +27,10 @@ async function refresh() {
   try {
     const res = await getAlertasInternas({ solo_no_leidas: 1, limite: 20 })
     alertas.value = res.data.data ?? []
-  } catch { /* silently ignore during auth transitions */ }
+  } catch {
+    // Silently ignore during auth transitions; default to empty so UI isn't stuck on skeletons
+    if (alertas.value === null) alertas.value = []
+  }
 }
 
 function onVisibility() {
@@ -41,9 +43,9 @@ function conectarWS() {
     consumer = createConsumer(cableUrl())
     consumer.subscriptions.create('AlertasInternasChannel', {
       received(data) {
-        // Push nueva alerta al frente evitando duplicados
-        if (!alertas.value.find(a => a.id === data.id)) {
-          alertas.value = [{ ...data, leida: false }, ...alertas.value].slice(0, 50)
+        const current = alertas.value ?? []
+        if (!current.find(a => a.id === data.id)) {
+          alertas.value = [{ ...data, leida: false }, ...current].slice(0, 50)
         }
       },
     })
@@ -87,6 +89,7 @@ export function useAlertasInternas() {
     if (instanceCount === 0) {
       stopPolling()
       desconectarWS()
+      alertas.value = null
     }
   })
 

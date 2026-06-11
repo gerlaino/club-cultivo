@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { listLotes, cargarLoteEnSala } from '../../lib/api.js'
 import { useModalEscape } from '../../composables/useModalEscape.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   sala: { type: Object, required: true },
@@ -53,7 +54,7 @@ async function confirmar() {
 
 <template>
   <Teleport to="body">
-    <div class="mcl__overlay" @click.self="$emit('close')">
+    <div class="mcl__overlay">
       <div class="mcl__panel">
 
         <!-- Header -->
@@ -78,7 +79,7 @@ async function confirmar() {
           </div>
 
           <div v-else-if="loading" class="mcl__loading">
-            <div class="mcl__ring"></div> Buscando lotes en {{ cfg.label }}…
+            <DsSpinner :size="16" /> Buscando lotes en {{ cfg.label }}…
           </div>
 
           <template v-else>
@@ -143,7 +144,7 @@ async function confirmar() {
             :disabled="!selected || saving"
             @click="confirmar"
           >
-            <span v-if="saving" class="mcl__spinner"></span>
+            <DsSpinner v-if="saving" :size="14" />
             <i v-else class="bi bi-box-arrow-in-down"></i>
             {{ saving ? 'Cargando…' : `Cargar "${selected?.codigo || '…'}"` }}
           </button>
@@ -193,8 +194,6 @@ async function confirmar() {
 .mcl__body { flex: 1; overflow-y: auto; padding: 1.1rem 1.4rem; }
 
 .mcl__loading { display: flex; align-items: center; gap: .65rem; color: #94a3b8; font-size: .875rem; padding: 2rem 0; }
-.mcl__ring { width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: #b45309; border-radius: 50%; animation: mcl-spin .7s linear infinite; flex-shrink: 0; }
-@keyframes mcl-spin { to { transform: rotate(360deg); } }
 
 .mcl__error {
   display: flex; align-items: center; gap: .45rem;
@@ -244,9 +243,4 @@ async function confirmar() {
   border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer;
 }
 .mcl__btn-ghost:hover:not(:disabled) { background: #f8fafc; }
-.mcl__spinner {
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: mcl-spin .6s linear infinite;
-}
 </style>

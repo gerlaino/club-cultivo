@@ -12,7 +12,8 @@ class PlanTrabajosController < ApplicationController
       .includes(:creado_por, :sede, :plan_tareas)
       .order(created_at: :desc)
 
-    planes = planes.where(estado: params[:estado]) if params[:estado].present?
+    planes = planes.where(estado:       params[:estado])      if params[:estado].present?
+    planes = planes.where(es_plantilla: params[:plantilla] == 'true') if params[:plantilla].present?
 
     render json: planes.map { |p| serialize_plan(p) }
   end
@@ -66,10 +67,20 @@ class PlanTrabajosController < ApplicationController
   # DELETE /api/plan_trabajos/:id
   def destroy
     if @plan.publicado?
-      return render json: { error: 'No se puede eliminar un plan publicado' }, status: :unprocessable_entity
+      return render json: { error: 'No se puede eliminar un plan publicado. Archivalo primero.' }, status: :unprocessable_entity
     end
+
+    tareas_eliminadas = @plan.tareas_generadas
+                             .where(estado: %w[pendiente en_progreso])
+                             .destroy_all
+                             .size
+
+    # Nullify plan_tarea_id en las tareas restantes (completadas/canceladas)
+    # antes de que dependent: :destroy borre los plan_tareas y viole la FK
+    @plan.tareas_generadas.update_all(plan_tarea_id: nil)
+
     @plan.destroy
-    head :no_content
+    render json: { tareas_eliminadas: tareas_eliminadas }
   end
 
   # POST /api/plan_trabajos/:id/publicar
@@ -116,6 +127,26 @@ class PlanTrabajosController < ApplicationController
   def archivar
     @plan.update!(estado: :archivado)
     render json: serialize_plan(@plan)
+  end
+
+  # GET /api/plan_trabajos/:id/export_csv?modo=plantilla|calendario&fecha_inicio=YYYY-MM-DD
+  def export_csv
+    modo     = params[:modo].presence || 'plantilla'
+    filename = "#{@plan.titulo.parameterize}-#{modo}.csv"
+
+    csv_data = if modo == 'calendario'
+      fecha = Date.parse(params[:fecha_inicio].to_s)
+      generar_csv_calendario(@plan, fecha)
+    else
+      generar_csv_plantilla(@plan)
+    end
+
+    send_data "\xEF\xBB\xBF#{csv_data}",
+      type:        'text/csv; charset=utf-8',
+      disposition: "attachment; filename=\"#{filename}\"",
+      status:      :ok
+  rescue Date::Error, ArgumentError
+    render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
   end
 
   # POST /api/plan_trabajos/interpretar_archivo
@@ -173,6 +204,40 @@ class PlanTrabajosController < ApplicationController
 
   private
 
+  DIAS_ES = %w[Domingo Lunes Martes Miércoles Jueves Viernes Sábado].freeze
+
+  def generar_csv_plantilla(plan)
+    require 'csv'
+    CSV.generate(encoding: 'UTF-8') do |csv|
+      csv << %w[dia tipo titulo descripcion rol_sugerido prioridad]
+      plan.plan_tareas.order(:dia_relativo).each do |pt|
+        csv << [pt.dia_relativo.to_i, pt.tipo, pt.titulo, pt.descripcion, pt.rol_sugerido, pt.prioridad]
+      end
+    end
+  end
+
+  def generar_csv_calendario(plan, fecha_inicio)
+    require 'csv'
+    CSV.generate(encoding: 'UTF-8') do |csv|
+      csv << %w[semana fecha dia_semana tipo tarea descripcion rol prioridad]
+      plan.plan_tareas.order(:dia_relativo).each do |pt|
+        dia    = pt.dia_relativo.to_i
+        fecha  = fecha_inicio + dia.days
+        semana = (dia / 7) + 1
+        csv << [
+          semana,
+          fecha.strftime('%d/%m/%Y'),
+          DIAS_ES[fecha.wday],
+          pt.tipo,
+          pt.titulo.presence || pt.tipo,
+          pt.descripcion,
+          pt.rol_sugerido,
+          pt.prioridad,
+        ]
+      end
+    end
+  end
+
   def set_club
     @club = current_user.club
   end
@@ -192,7 +257,7 @@ class PlanTrabajosController < ApplicationController
   def plan_params
     params.require(:plan_trabajo).permit(
       :titulo, :periodo_tipo, :fecha_inicio, :fecha_fin,
-      :sede_id, :estado, :repetir_automaticamente, :notas
+      :sede_id, :estado, :repetir_automaticamente, :notas, :es_plantilla
     )
   end
 
@@ -200,7 +265,7 @@ class PlanTrabajosController < ApplicationController
     params.require(:plan_tarea).permit(
       :titulo, :tipo, :responsable_id, :prioridad, :sala_id,
       :descripcion, :dias_semana, :hora, :es_recurrente,
-      :fecha_especifica, :origen_ia, :confirmada
+      :fecha_especifica, :origen_ia, :confirmada, :dia_relativo, :rol_sugerido
     )
   end
 
@@ -208,10 +273,10 @@ class PlanTrabajosController < ApplicationController
     raw.permit(
       :titulo, :tipo, :responsable_id, :prioridad, :sala_id,
       :descripcion, :dias_semana, :hora, :es_recurrente,
-      :fecha_especifica, :origen_ia, :confirmada
+      :fecha_especifica, :origen_ia, :confirmada, :dia_relativo, :rol_sugerido
     )
   rescue
-    raw.slice(*%w[titulo tipo responsable_id prioridad sala_id descripcion dias_semana hora es_recurrente fecha_especifica origen_ia confirmada])
+    raw.slice(*%w[titulo tipo responsable_id prioridad sala_id descripcion dias_semana hora es_recurrente fecha_especifica origen_ia confirmada dia_relativo rol_sugerido])
   end
 
   def calcular_fechas(plan_tarea)
@@ -229,18 +294,19 @@ class PlanTrabajosController < ApplicationController
 
   def crear_tarea!(plan_tarea, fecha)
     @club.tareas.create!(
-      titulo:          plan_tarea.titulo.presence || plan_tarea.tipo,
-      descripcion:     plan_tarea.descripcion,
-      tipo:            plan_tarea.tipo,
-      estado:          'pendiente',
-      prioridad:       plan_tarea.prioridad,
-      asignada_a_id:   plan_tarea.responsable_id,
-      sala_id:         plan_tarea.sala_id,
-      fecha_programada: fecha,
-      recurrente:      plan_tarea.es_recurrente,
-      creada_por:      current_user,
-      origen_plan_id:  @plan.id,
-      plan_tarea_id:   plan_tarea.id
+      titulo:             plan_tarea.titulo.presence || plan_tarea.tipo,
+      descripcion:        plan_tarea.descripcion,
+      tipo:               plan_tarea.tipo,
+      estado:             'pendiente',
+      prioridad:          plan_tarea.prioridad,
+      asignada_a_id:      plan_tarea.responsable_id,
+      sala_id:            plan_tarea.sala_id,
+      fecha_programada:   fecha,
+      recurrente:         plan_tarea.es_recurrente,
+      creada_por:         current_user,
+      origen_plan_id:     @plan.id,
+      origen_plan_titulo: @plan.titulo,
+      plan_tarea_id:      plan_tarea.id
     )
   end
 
@@ -264,6 +330,7 @@ class PlanTrabajosController < ApplicationController
     {
       id:                      plan.id,
       titulo:                  plan.titulo,
+      es_plantilla:            plan.es_plantilla,
       periodo_tipo:            plan.periodo_tipo,
       fecha_inicio:            plan.fecha_inicio,
       fecha_fin:               plan.fecha_fin,
@@ -289,6 +356,8 @@ class PlanTrabajosController < ApplicationController
       tipo:             pt.tipo,
       prioridad:        pt.prioridad,
       descripcion:      pt.descripcion,
+      dia_relativo:     pt.dia_relativo,
+      rol_sugerido:     pt.rol_sugerido,
       dias_semana:      pt.dias_semana,
       dias_array:       pt.dias_array,
       hora:             pt.hora,

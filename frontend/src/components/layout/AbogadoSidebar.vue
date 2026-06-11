@@ -1,7 +1,7 @@
 <template>
   <aside class="abg-sidebar">
     <div class="abg-logo">
-      <Scale :size="22" :stroke-width="1.75" />
+      <img src="/logo-ce-icono.png" class="abg-logo-img" alt="Cultivo Espacial" />
       <span>Legal</span>
     </div>
 
@@ -39,6 +39,7 @@ defineEmits(['logout'])
   padding: var(--sp-3) var(--sp-5) var(--sp-5);
   color: #8fa3b1; font-weight: 700; font-size: var(--fs-16);
 }
+.abg-logo-img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .abg-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 0 var(--sp-3); }
 .abg-link {
   display: flex; align-items: center; gap: var(--sp-3);

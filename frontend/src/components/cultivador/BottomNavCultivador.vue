@@ -13,10 +13,10 @@
       <span class="bnc__lbl">Salas</span>
     </RouterLink>
 
-    <!-- FAB Registrar (central elevado) -->
+    <!-- FAB Asistente de voz (central elevado) -->
     <div class="bnc__fab-wrap">
-      <button class="bnc__fab" @click="lecturaOpen = true" aria-label="Registrar lectura">
-        <Plus :size="26" :stroke-width="1.75" />
+      <button class="bnc__fab" @click="abrirAsistente" aria-label="Asistente de voz">
+        <Mic :size="26" :stroke-width="1.75" />
       </button>
     </div>
 
@@ -40,9 +40,9 @@
   <!-- Sheet: Más opciones -->
   <SheetBottom v-model="masOpen" title="Más opciones">
     <div class="bnc__mas">
-      <button class="bnc__mas-item" @click="abrirAsistente">
-        <span class="bnc__mas-ico"><Mic :size="20" :stroke-width="1.75" /></span>
-        <span class="bnc__mas-lbl">Asistente de voz</span>
+      <button class="bnc__mas-item" @click="abrirLectura">
+        <span class="bnc__mas-ico"><Plus :size="20" :stroke-width="1.75" /></span>
+        <span class="bnc__mas-lbl">Registrar lectura</span>
         <ChevronRight :size="16" :stroke-width="1.75" class="bnc__mas-arr" />
       </button>
       <RouterLink to="/lotes" class="bnc__mas-item" @click="masOpen = false">
@@ -55,31 +55,21 @@
         <span class="bnc__mas-lbl">Mi perfil</span>
         <ChevronRight :size="16" :stroke-width="1.75" class="bnc__mas-arr" />
       </RouterLink>
-      <div class="bnc__mas-sep"></div>
-      <button class="bnc__mas-item bnc__mas-item--danger" @click="handleLogout">
-        <span class="bnc__mas-ico"><LogOut :size="20" :stroke-width="1.75" /></span>
-        <span class="bnc__mas-lbl">Cerrar sesión</span>
-      </button>
     </div>
   </SheetBottom>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../../stores/auth.js'
-import { useClubStore } from '../../stores/club.js'
+import { useRoute } from 'vue-router'
 import SheetBottom          from './SheetBottom.vue'
 import RegistrarLecturaSheet from './RegistrarLecturaSheet.vue'
 import {
-  Home, LayoutGrid, Plus, MoreHorizontal, PackageCheck,
-  Sprout, User, LogOut, ChevronRight, Mic,
+  Home, LayoutGrid, Plus, Mic, MoreHorizontal, PackageCheck,
+  Sprout, User, ChevronRight,
 } from 'lucide-vue-next'
 
 const route   = useRoute()
-const router  = useRouter()
-const auth    = useAuthStore()
-const club    = useClubStore()
 
 const lecturaOpen = ref(false)
 const masOpen     = ref(false)
@@ -89,16 +79,14 @@ function abrirAsistente() {
   window.dispatchEvent(new CustomEvent('abrir-asistente-voz'))
 }
 
+function abrirLectura() {
+  masOpen.value = false
+  lecturaOpen.value = true
+}
+
 function isActive(to) {
   if (to === '/') return route.path === '/'
   return route.path === to || route.path.startsWith(to + '/')
-}
-
-async function handleLogout() {
-  masOpen.value = false
-  await auth.logOut()
-  club.$reset()
-  router.replace('/login')
 }
 </script>
 
@@ -206,13 +194,9 @@ async function handleLogout() {
   text-align: left;
 }
 .bnc__mas-item:hover { background: var(--c-leaf-50); }
-.bnc__mas-item--danger { color: var(--c-rust-600); }
-.bnc__mas-item--danger:hover { background: var(--c-rust-100); }
 .bnc__mas-ico { display: flex; flex-shrink: 0; color: var(--c-ink-500); }
-.bnc__mas-item--danger .bnc__mas-ico { color: var(--c-rust-600); }
 .bnc__mas-lbl { flex: 1; }
 .bnc__mas-arr { color: var(--c-ink-300); }
-.bnc__mas-sep { height: 1px; background: var(--c-ink-100); margin: var(--sp-1) 0; }
 
 /* Only visible on mobile */
 @media (min-width: 768px) { .bnc { display: none; } }

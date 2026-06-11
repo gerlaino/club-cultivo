@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { getGenetica, updateGenetica } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
@@ -12,6 +12,8 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import Paginator  from '../components/ui/Paginator.vue'
 import Lightbox   from '../components/ui/Lightbox.vue'
 import api from '../lib/api.js'
+import DsSpinner from '../design-system/components/Spinner.vue'
+import Chart from 'chart.js/auto'
 
 const props = defineProps({ id: { type: Number, required: true } })
 
@@ -60,16 +62,91 @@ const lotesPaginados = computed(() => {
   return lotesTotales.value.slice(start, start + lotesPerPage.value)
 })
 
-// Rendimiento promedio calculado desde lotes históricos
+// Rendimiento promedio — usa rendimiento_real_g (oficial) cuando existe, si no g/planta
 const rendimientoStats = computed(() => {
-  const lotes = (gen.value?.lotes_historicos || []).filter(l => l.rendimiento_gramos_planta != null && l.rendimiento_gramos_planta > 0)
-  if (!lotes.length) return { avg: null, max: null, min: null, n: 0 }
-  const vals = lotes.map(l => Number(l.rendimiento_gramos_planta))
-  const avg  = vals.reduce((a, b) => a + b, 0) / vals.length
-  const max  = Math.max(...vals)
-  const min  = Math.min(...vals)
-  return { avg: avg.toFixed(1), max: max.toFixed(1), min: min.toFixed(1), n: lotes.length }
+  const conReal = (gen.value?.lotes_historicos || []).filter(l => l.rendimiento_real_g != null && l.rendimiento_real_g > 0)
+  if (conReal.length) {
+    const vals = conReal.map(l => Number(l.rendimiento_real_g))
+    return {
+      avg:  (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1),
+      max:  Math.max(...vals).toFixed(1),
+      min:  Math.min(...vals).toFixed(1),
+      n:    conReal.length,
+      unit: 'g/lote',
+    }
+  }
+  const fallback = (gen.value?.lotes_historicos || []).filter(l => l.rendimiento_gramos_planta != null && l.rendimiento_gramos_planta > 0)
+  if (!fallback.length) return { avg: null, max: null, min: null, n: 0, unit: 'g/planta' }
+  const vals = fallback.map(l => Number(l.rendimiento_gramos_planta))
+  return {
+    avg:  (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1),
+    max:  Math.max(...vals).toFixed(1),
+    min:  Math.min(...vals).toFixed(1),
+    n:    fallback.length,
+    unit: 'g/planta',
+  }
 })
+
+// P&L resumen de la genética
+const plResumen = computed(() => gen.value?.pl_resumen ?? null)
+
+// Sparkline — rendimiento en el tiempo (lotes con rendimiento_real_g, orden cronológico)
+const sparklineCanvas = ref(null)
+let   sparklineChart  = null
+
+const sparklineData = computed(() => {
+  return (gen.value?.lotes_historicos || [])
+    .filter(l => l.rendimiento_real_g != null && l.start_date)
+    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+    .map(l => ({ label: l.codigo, x: l.start_date?.slice(0, 7), y: l.rendimiento_real_g }))
+})
+
+function initSparkline() {
+  if (!sparklineCanvas.value) return
+  if (sparklineChart) { sparklineChart.destroy(); sparklineChart = null }
+  if (sparklineData.value.length < 2) return
+
+  sparklineChart = new Chart(sparklineCanvas.value, {
+    type: 'line',
+    data: {
+      labels:   sparklineData.value.map(p => p.x),
+      datasets: [{
+        data:            sparklineData.value.map(p => p.y),
+        borderColor:     '#1b5e20',
+        backgroundColor: 'rgba(27,94,32,.08)',
+        borderWidth:     2,
+        pointRadius:     4,
+        pointHoverRadius: 6,
+        fill:            true,
+        tension:         0.3,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => sparklineData.value[items[0].dataIndex]?.label ?? '',
+            label: (ctx)  => `${ctx.raw} g`,
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#f1f5f9' }, beginAtZero: false },
+      },
+    },
+  })
+}
+
+watch(() => gen.value, async () => {
+  await nextTick()
+  initSparkline()
+})
+
+onUnmounted(() => { if (sparklineChart) sparklineChart.destroy() })
 
 // Galería lightbox (Lightbox component)
 const fotoActiva   = ref(0)
@@ -144,7 +221,7 @@ onMounted(async () => {
 
     <!-- Loading -->
     <div v-if="loading" class="gdv__loading">
-      <div class="gdv__spinner"></div>
+      <DsSpinner />
     </div>
 
     <!-- Error -->
@@ -301,22 +378,55 @@ onMounted(async () => {
             <div v-if="rendimientoStats.n > 0" class="rend-stats">
               <div class="rend-stat">
                 <div class="rend-stat__label">Promedio</div>
-                <div class="rend-stat__value rend-stat__value--main">{{ rendimientoStats.avg }}<span class="rend-stat__unit">g/planta</span></div>
+                <div class="rend-stat__value rend-stat__value--main">{{ rendimientoStats.avg }}<span class="rend-stat__unit">{{ rendimientoStats.unit }}</span></div>
               </div>
               <div class="rend-stat">
                 <div class="rend-stat__label">Máximo</div>
-                <div class="rend-stat__value" style="color:#1b5e20">{{ rendimientoStats.max }}<span class="rend-stat__unit">g/planta</span></div>
+                <div class="rend-stat__value" style="color:#1b5e20">{{ rendimientoStats.max }}<span class="rend-stat__unit">{{ rendimientoStats.unit }}</span></div>
               </div>
               <div class="rend-stat">
                 <div class="rend-stat__label">Mínimo</div>
-                <div class="rend-stat__value" style="color:#dc2626">{{ rendimientoStats.min }}<span class="rend-stat__unit">g/planta</span></div>
+                <div class="rend-stat__value" style="color:#dc2626">{{ rendimientoStats.min }}<span class="rend-stat__unit">{{ rendimientoStats.unit }}</span></div>
               </div>
               <div v-if="gen.rendimiento" class="rend-stat">
                 <div class="rend-stat__label">Est. genética</div>
                 <div class="rend-stat__value" style="color:#64748b">{{ gen.rendimiento }}<span class="rend-stat__unit">g/m²</span></div>
               </div>
             </div>
-            <p v-else class="gdv__empty-note">Marcá plantas con ⭐ para acumular datos de rendimiento real.</p>
+            <p v-else class="gdv__empty-note">Sin rendimiento real registrado aún.</p>
+
+            <!-- Sparkline evolución temporal -->
+            <div v-if="sparklineData.length >= 2" class="gdv__sparkline-wrap">
+              <canvas ref="sparklineCanvas" />
+            </div>
+          </div>
+
+          <!-- P&L por genética -->
+          <div v-if="plResumen && plResumen.lotes_con_datos > 0" class="gdv__card gdv__card--mb">
+            <h6 class="section-title">💰 Rentabilidad ({{ plResumen.lotes_con_datos }} lotes)</h6>
+            <div class="rend-stats">
+              <div class="rend-stat">
+                <div class="rend-stat__label">Ingresos prom.</div>
+                <div class="rend-stat__value" style="color:#16a34a">
+                  {{ plResumen.ingresos_promedio != null ? '$' + Number(plResumen.ingresos_promedio).toLocaleString('es-AR') : '—' }}
+                </div>
+              </div>
+              <div class="rend-stat">
+                <div class="rend-stat__label">Costo prom.</div>
+                <div class="rend-stat__value" style="color:#64748b">
+                  {{ plResumen.costo_promedio != null ? '$' + Number(plResumen.costo_promedio).toLocaleString('es-AR') : '—' }}
+                </div>
+              </div>
+              <div class="rend-stat">
+                <div class="rend-stat__label">Margen prom.</div>
+                <div class="rend-stat__value" :style="{ color: (plResumen.margen_promedio ?? 0) >= 0 ? '#1b5e20' : '#dc2626' }">
+                  {{ plResumen.margen_promedio != null ? '$' + Number(plResumen.margen_promedio).toLocaleString('es-AR') : '—' }}
+                  <span v-if="plResumen.margen_pct_promedio != null" class="rend-stat__unit">
+                    ({{ plResumen.margen_pct_promedio }}%)
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Lotes históricos -->
@@ -334,12 +444,13 @@ onMounted(async () => {
                   <thead>
                     <tr>
                       <th>Código</th>
-                      <th>Sala</th>
+                      <th class="gdv__col-md">Sala</th>
                       <th class="gdv__col-md">Inicio</th>
-                      <th class="gdv__col-md">Cosecha</th>
                       <th class="gdv__text-right">Plantas</th>
-                      <th class="gdv__text-right">Peso seco</th>
-                      <th class="gdv__text-right gdv__col-md">g/planta</th>
+                      <th class="gdv__text-right">Rend. real</th>
+                      <th class="gdv__text-right gdv__col-md">Desvío</th>
+                      <th class="gdv__text-right gdv__col-md">Ingresos</th>
+                      <th class="gdv__text-right gdv__col-md">Margen</th>
                       <th>Estado</th>
                     </tr>
                   </thead>
@@ -350,15 +461,30 @@ onMounted(async () => {
                           {{ lote.codigo }}
                         </a>
                       </td>
-                      <td class="gdv__cell-muted">{{ lote.sala || '—' }}</td>
+                      <td class="gdv__cell-muted gdv__col-md">{{ lote.sala || '—' }}</td>
                       <td class="gdv__cell-muted gdv__col-md">{{ formatDate(lote.start_date) }}</td>
-                      <td class="gdv__cell-muted gdv__col-md">{{ formatDate(lote.fecha_cosecha) }}</td>
                       <td class="gdv__text-right gdv__cell-sm">{{ lote.plants_count || '—' }}</td>
                       <td class="gdv__text-right gdv__cell-bold">
-                        {{ lote.peso_seco_total != null ? lote.peso_seco_total + 'g' : '—' }}
+                        {{ lote.rendimiento_real_g != null ? lote.rendimiento_real_g + ' g' : (lote.peso_seco_total != null ? lote.peso_seco_total + ' g' : '—') }}
                       </td>
-                      <td class="gdv__text-right gdv__cell-muted gdv__col-md">
-                        {{ lote.rendimiento_gramos_planta != null ? lote.rendimiento_gramos_planta + 'g' : '—' }}
+                      <td class="gdv__text-right gdv__col-md">
+                        <span v-if="lote.desv_pct != null"
+                              class="gdv__desv"
+                              :class="lote.desv_pct >= 0 ? 'gdv__desv--pos' : 'gdv__desv--neg'">
+                          {{ lote.desv_pct >= 0 ? '+' : '' }}{{ lote.desv_pct }}%
+                        </span>
+                        <span v-else class="gdv__cell-muted">—</span>
+                      </td>
+                      <td class="gdv__text-right gdv__col-md" style="color:#16a34a;font-size:.8rem">
+                        {{ lote.ingresos != null ? '$' + Number(lote.ingresos).toLocaleString('es-AR') : '—' }}
+                      </td>
+                      <td class="gdv__text-right gdv__col-md">
+                        <span v-if="lote.margen != null"
+                              :style="{ color: lote.margen >= 0 ? '#16a34a' : '#dc2626', fontSize: '.8rem', fontWeight: '600' }">
+                          ${{ Number(lote.margen).toLocaleString('es-AR') }}
+                          <small v-if="lote.margen_pct != null" style="opacity:.7">({{ lote.margen_pct }}%)</small>
+                        </span>
+                        <span v-else class="gdv__cell-muted">—</span>
                       </td>
                       <td>
                         <span class="gdv__estado-badge" :style="estadoLote(lote.estado).style">
@@ -487,9 +613,7 @@ onMounted(async () => {
 @media (max-width: 768px) { .gdv { padding: 1.25rem 1rem 2rem; } }
 
 /* Loading / Error */
-.gdv__loading { display: flex; justify-content: center; padding: 3rem; }
-.gdv__spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #1a3d2e; border-radius: 50%; animation: gdv-spin .8s linear infinite; }
-@keyframes gdv-spin { to { transform: rotate(360deg); } }
+.gdv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 .gdv__error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: .875rem 1rem; border-radius: 10px; margin-bottom: 1rem; }
 
 /* Hero */
@@ -618,4 +742,12 @@ onMounted(async () => {
 .gdv__toggle-sm--on  { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
 .gdv__toggle-sm--off { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
 .gdv__toggle-sm:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Sparkline */
+.gdv__sparkline-wrap { height: 120px; margin-top: 1rem; border-top: 1px solid #f1f5f9; padding-top: .75rem; }
+
+/* Desvío en tabla */
+.gdv__desv { font-size: .76rem; font-weight: 700; }
+.gdv__desv--pos { color: #15803d; }
+.gdv__desv--neg { color: #dc2626; }
 </style>

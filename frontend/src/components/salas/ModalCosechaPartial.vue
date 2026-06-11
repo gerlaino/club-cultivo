@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="mcp-overlay" @click.self="$emit('cerrar')">
+    <div class="mcp-overlay">
       <div class="mcp-panel">
 
         <div class="mcp-header">
@@ -118,7 +118,7 @@
             :disabled="!seleccionadas.size || guardando"
             @click="guardar"
           >
-            <span v-if="guardando" class="mcp-spinner"></span>
+            <DsSpinner v-if="guardando" :size="14" />
             <span v-else>🌿 Cosechar {{ seleccionadas.size > 0 ? seleccionadas.size : '' }} plantas</span>
           </button>
         </div>
@@ -131,6 +131,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { cosecharPlantas } from '../../lib/api.js'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   lote:          { type: Object, required: true },
@@ -310,12 +311,6 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
   padding: 10px 14px; background: #fef2f2; border: 1px solid #fecaca;
   border-radius: 10px; font-size: .82rem; color: #dc2626;
 }
-.mcp-spinner {
-  display: inline-block; width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
-  border-radius: 50%; animation: mcp-spin .6s linear infinite;
-}
-@keyframes mcp-spin { to { transform: rotate(360deg); } }
 
 .mcp-footer {
   display: flex; gap: 10px; padding: 16px 24px;
