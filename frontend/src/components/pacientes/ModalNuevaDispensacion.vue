@@ -44,8 +44,7 @@ const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
 const ccMargen = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
 
 const ccInsuficiente = computed(() => {
-  const esCc = form.value.medio_pago === 'cuenta_corriente' || form.value.medio_pago === 'no_abona'
-  if (!tieneCc.value || !esCc) return false
+  if (!tieneCc.value) return false
   const aporte = Number(form.value.aporte_socio_ars)
   if (!aporte || aporte <= 0) return false
   return aporte > ccMargen.value
@@ -307,8 +306,8 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <!-- CC ARS — visible solo cuando es relevante al medio de pago -->
-          <div v-if="tieneCc && (form.medio_pago === 'cuenta_corriente' || form.medio_pago === 'no_abona')" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
+          <!-- CC ARS — visible siempre que el paciente tenga crédito configurado -->
+          <div v-if="tieneCc" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
             <div class="mnd__cc-row">
               <span class="mnd__cc-label"><i class="bi bi-wallet2"></i> Crédito disponible</span>
               <span class="mnd__cc-saldo" :class="{ 'mnd__cc-saldo--bajo': ccMargen <= 0 }">{{ fmt(ccMargen) }}</span>

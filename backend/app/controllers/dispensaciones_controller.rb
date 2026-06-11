@@ -72,39 +72,38 @@ class DispensacionesController < ApplicationController
       @dispensacion.precio_unitario_ars ||= precio
     end
 
+    cc    = @paciente.cuenta_corriente
+    monto = @dispensacion.aporte_socio_ars.to_d
+
+    # Validaciones específicas por medio de pago
     case @dispensacion.medio_pago
     when 'cuenta_corriente'
-      cc    = @paciente.cuenta_corriente
-      monto = @dispensacion.aporte_socio_ars.to_d
       if monto <= 0
         return render json: { error: 'El aporte del socio debe ser mayor a $0 para cobrar por cuenta corriente.' }, status: :unprocessable_entity
       end
-      unless cc&.limite_credito.to_f > 0 && cc.puede_dispensar?(monto)
+      unless cc&.limite_credito.to_f > 0
         return render json: { error: 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.' }, status: :unprocessable_entity
       end
     when 'no_abona'
-      cc    = @paciente.cuenta_corriente
-      monto = @dispensacion.aporte_socio_ars.to_d
       if cc.nil? || cc.limite_credito.to_f <= 0
         return render json: { error: 'El paciente no tiene crédito configurado. Consultá con el administrador.' }, status: :unprocessable_entity
       end
       if monto <= 0
         return render json: { error: 'No se puede determinar el valor del producto. Configurá el precio del stock.' }, status: :unprocessable_entity
       end
-      unless cc.puede_dispensar?(monto)
-        return render json: { error: 'Crédito insuficiente para realizar la dispensa.' }, status: :unprocessable_entity
-      end
+    end
+
+    # Verificación universal de crédito: si el paciente tiene límite configurado,
+    # ninguna dispensación (sea cual sea el medio de pago) puede superar el disponible.
+    if cc&.limite_credito.to_f > 0 && monto > 0 && !cc.puede_dispensar?(monto)
+      return render json: { error: 'Crédito insuficiente para realizar la dispensa.' }, status: :unprocessable_entity
     end
 
     ActiveRecord::Base.transaction do
       @dispensacion.save!
       crear_movimiento_contable(@dispensacion)
-      case @dispensacion.medio_pago
-      when 'cuenta_corriente'
-        debitar_cuenta_corriente(@dispensacion)
-      when 'no_abona'
-        debitar_cuenta_corriente(@dispensacion)
-      end
+      # Debitar crédito para todos los medios de pago cuando el paciente tiene límite
+      debitar_cuenta_corriente(@dispensacion) if cc&.limite_credito.to_f > 0
     end
 
     render json: serialize_dispensacion(@dispensacion), status: :created
@@ -258,10 +257,7 @@ class DispensacionesController < ApplicationController
   # DELETE /dispensaciones/:id
   def destroy
     ActiveRecord::Base.transaction do
-      case @dispensacion.medio_pago
-      when 'cuenta_corriente', 'no_abona'
-        revertir_cuenta_corriente(@dispensacion)
-      end
+      revertir_cuenta_corriente(@dispensacion)
       # Nullify FK references before destroy (prevents FK constraint violation)
       CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)
       @dispensacion.destroy

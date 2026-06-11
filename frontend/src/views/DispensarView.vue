@@ -392,7 +392,6 @@ const ccBalance      = computed(() => {
   return saldo + limite
 })
 const ccExcedido     = computed(() =>
-  (medioPago.value === 'cuenta_corriente' || medioPago.value === 'no_abona') &&
   tieneCc.value && ccBalance.value !== null && cartTotal.value > ccBalance.value
 )
 const pagoExcedido   = computed(() => ccExcedido.value)
