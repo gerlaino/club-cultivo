@@ -452,6 +452,14 @@ function resetModal() {
 
 async function submitDispensacion() {
   if (!selectedPaciente.value || !cart.value.length) return
+
+  // Bloquear si algún item del carrito tiene total = 0 (stock sin precio configurado)
+  const sinPrecio = cart.value.filter(i => !(i.total > 0))
+  if (sinPrecio.length) {
+    toast.error(`Hay ítems sin precio configurado: ${sinPrecio.map(i => i.stock.nombre || i.stock.id).join(', ')}. Configurá el precio antes de dispensar.`)
+    return
+  }
+
   if (conEnvio.value) {
     if (!direccionEnvio.value.trim()) { toast.warning('Ingresá la dirección de entrega'); return }
     if (!contactoNombre.value.trim()) { toast.warning('Ingresá el nombre de contacto'); return }

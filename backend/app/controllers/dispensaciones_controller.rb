@@ -75,27 +75,27 @@ class DispensacionesController < ApplicationController
     cc    = @paciente.cuenta_corriente
     monto = @dispensacion.aporte_socio_ars.to_d
 
+    # Regla universal: aporte obligatorio para todo medio de pago que no sea no_abona.
+    # no_abona tiene autocalc arriba; si sigue en 0 hay un problema de precio.
+    if monto <= 0
+      return render json: { error: 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.' }, status: :unprocessable_entity
+    end
+
     # Validaciones específicas por medio de pago
     case @dispensacion.medio_pago
     when 'cuenta_corriente'
-      if monto <= 0
-        return render json: { error: 'El aporte del socio debe ser mayor a $0 para cobrar por cuenta corriente.' }, status: :unprocessable_entity
-      end
       unless cc&.limite_credito.to_f > 0
-        return render json: { error: 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.' }, status: :unprocessable_entity
+        return render json: { error: 'El paciente no tiene crédito configurado para cobrar por cuenta corriente.' }, status: :unprocessable_entity
       end
     when 'no_abona'
       if cc.nil? || cc.limite_credito.to_f <= 0
         return render json: { error: 'El paciente no tiene crédito configurado. Consultá con el administrador.' }, status: :unprocessable_entity
       end
-      if monto <= 0
-        return render json: { error: 'No se puede determinar el valor del producto. Configurá el precio del stock.' }, status: :unprocessable_entity
-      end
     end
 
     # Verificación universal de crédito: si el paciente tiene límite configurado,
-    # ninguna dispensación (sea cual sea el medio de pago) puede superar el disponible.
-    if cc&.limite_credito.to_f > 0 && monto > 0 && !cc.puede_dispensar?(monto)
+    # ninguna dispensación puede superar el disponible, sin importar el medio de pago.
+    if cc&.limite_credito.to_f > 0 && !cc.puede_dispensar?(monto)
       return render json: { error: 'Crédito insuficiente para realizar la dispensa.' }, status: :unprocessable_entity
     end
 

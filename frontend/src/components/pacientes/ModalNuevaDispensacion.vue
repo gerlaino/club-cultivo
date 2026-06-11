@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
+import { useAuthStore } from '../../stores/auth.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { createDispensacion, listStocks, listEntregadores } from '../../lib/api.js'
 
@@ -18,6 +19,11 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 
 const { confirm }     = useConfirm()
 const toast           = useToast()
+const auth            = useAuthStore()
+
+const puedeVerCredito = computed(() =>
+  ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role)
+)
 
 const stocks          = ref([])
 const loadingStocks   = ref(false)
@@ -145,12 +151,20 @@ async function handleSubmit() {
     formError.value = `Stock insuficiente: solo hay ${stockSeleccionado.value.cantidad}${stockSeleccionado.value.unidad || 'g'} disponibles`
     saving.value = false; return
   }
-  if (form.value.medio_pago === 'cuenta_corriente' && !(Number(form.value.aporte_socio_ars) > 0)) {
-    formError.value = 'El aporte del socio debe ser mayor a $0 para cobrar por cuenta corriente'
+  // Aporte obligatorio para todos los medios de pago
+  if (!(Number(form.value.aporte_socio_ars) > 0)) {
+    formError.value = 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.'
+    saving.value = false; return
+  }
+  if (form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
+    formError.value = 'El paciente no tiene crédito configurado para cobrar por cuenta corriente'
     saving.value = false; return
   }
   if (ccInsuficiente.value) {
-    formError.value = `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
+    const msg = puedeVerCredito.value
+      ? `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
+      : 'Crédito insuficiente. Consultá con un administrador.'
+    formError.value = msg
     saving.value = false; return
   }
 
@@ -306,8 +320,8 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <!-- CC ARS — visible siempre que el paciente tenga crédito configurado -->
-          <div v-if="tieneCc" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
+          <!-- CC ARS — solo admin/supervisor ven el saldo del paciente -->
+          <div v-if="tieneCc && puedeVerCredito" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
             <div class="mnd__cc-row">
               <span class="mnd__cc-label"><i class="bi bi-wallet2"></i> Crédito disponible</span>
               <span class="mnd__cc-saldo" :class="{ 'mnd__cc-saldo--bajo': ccMargen <= 0 }">{{ fmt(ccMargen) }}</span>
