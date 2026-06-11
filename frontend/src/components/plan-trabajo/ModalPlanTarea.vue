@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { listUsers } from '../../lib/api.js'
 
 const props = defineProps({
   tarea: { type: Object, default: null },
@@ -101,12 +102,22 @@ function serializarDescripcion(tipo, extras) {
   return lineas.join('\n')
 }
 
+// ── Usuarios del club ────────────────────────────────────────────
+const usuarios = ref([])
+onMounted(async () => {
+  try {
+    const { data } = await listUsers({ per_page: 200 })
+    usuarios.value = Array.isArray(data) ? data : (data.usuarios ?? data.data ?? [])
+  } catch {}
+})
+
 // ── Form compartido ──────────────────────────────────────────────
 const form = ref({
-  tipo:      props.tarea?.tipo      ?? 'riego',
-  titulo:    props.tarea?.titulo    ?? '',
-  prioridad: props.tarea?.prioridad ?? 'normal',
-  extras:    parseExtras(props.tarea?.descripcion ?? ''),
+  tipo:           props.tarea?.tipo            ?? 'riego',
+  titulo:         props.tarea?.titulo          ?? '',
+  prioridad:      props.tarea?.prioridad       ?? 'normal',
+  responsable_id: props.tarea?.responsable?.id ?? props.tarea?.responsable_id ?? null,
+  extras:         parseExtras(props.tarea?.descripcion ?? ''),
 })
 const rolesSeleccionados = ref(
   props.tarea?.rol_sugerido
@@ -160,9 +171,10 @@ function quitarDia(dia) {
 const canSave = computed(() => isEdit.value || diasSeleccionados.value.length > 0)
 
 function guardar() {
-  const descripcion  = serializarDescripcion(form.value.tipo, form.value.extras)
-  const rol_sugerido = rolesSeleccionados.value.join(',') || null
-  const base = { tipo: form.value.tipo, titulo: form.value.titulo, descripcion, prioridad: form.value.prioridad, rol_sugerido }
+  const descripcion    = serializarDescripcion(form.value.tipo, form.value.extras)
+  const rol_sugerido   = rolesSeleccionados.value.join(',') || null
+  const responsable_id = form.value.responsable_id || null
+  const base = { tipo: form.value.tipo, titulo: form.value.titulo, descripcion, prioridad: form.value.prioridad, rol_sugerido, responsable_id }
 
   if (isEdit.value) {
     emit('saved', { ...props.tarea, ...base, dia_relativo: diaRelativoEdit.value })
@@ -337,7 +349,7 @@ function guardar() {
           <div class="mpt__field">
             <label class="mpt__label">
               Roles que ejecutan esta tarea
-              <span class="mpt__opt">al aplicar se asigna a todos los usuarios del rol</span>
+              <span class="mpt__opt">referencia informativa</span>
             </label>
             <div class="mpt__roles">
               <button
@@ -351,10 +363,15 @@ function guardar() {
                 <i v-if="rolesSeleccionados.includes(r.value)" class="bi bi-check-lg mpt__rol-check"></i>
               </button>
             </div>
-            <p v-if="!rolesSeleccionados.length" class="mpt__roles-hint">Sin rol → la tarea se crea sin asignar</p>
-            <p v-else class="mpt__roles-hint mpt__roles-hint--ok">
-              Al aplicar: una tarea por cada {{ rolesSeleccionados.map(r => ROLES.find(x => x.value === r)?.label).join(' + ') }} del club
-            </p>
+          </div>
+
+          <!-- ── Responsable ── -->
+          <div class="mpt__field">
+            <label class="mpt__label">Responsable <span class="mpt__opt">usuario específico — opcional</span></label>
+            <select class="mpt__input" v-model="form.responsable_id">
+              <option :value="null">— Sin asignar —</option>
+              <option v-for="u in usuarios" :key="u.id" :value="u.id">{{ u.nombre_completo || u.email }}</option>
+            </select>
           </div>
 
         </div>

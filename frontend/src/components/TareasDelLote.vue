@@ -41,10 +41,11 @@
               class="tl__chip"
               :class="[`tl__chip--${t.prioridad}`, { 'tl__chip--done': t.estado === 'completada', 'tl__chip--prog': t.estado === 'en_progreso' }]"
               @click="abrirTarea(t)"
-              :title="t.titulo"
+              :title="t.titulo + (t.asignada_a ? ' · ' + t.asignada_a.nombre : '')"
             >
               <span class="tl__chip-dot"></span>
               <span class="tl__chip-titulo">{{ t.titulo }}</span>
+              <span v-if="t.asignada_a" class="tl__chip-user" :title="t.asignada_a.nombre">{{ initials(t.asignada_a.nombre) }}</span>
               <i v-if="t.estado === 'completada'" class="bi bi-check-circle-fill tl__chip-ico tl__chip-ico--done"></i>
               <i v-else-if="t.estado === 'en_progreso'" class="bi bi-play-circle-fill tl__chip-ico tl__chip-ico--prog"></i>
             </div>
@@ -365,6 +366,11 @@ function abrirTarea(t) {
   completar(t)
 }
 
+function initials(nombre) {
+  if (!nombre) return ''
+  return nombre.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase()
+}
+
 // ── Acciones ──────────────────────────────────────────────
 async function iniciar(t) {
   procesando.value = t.id
@@ -505,6 +511,12 @@ const estadosSiguientes = computed(() => {
 .tl__chip-ico { font-size: .62rem; margin-top: .15rem; flex-shrink: 0; }
 .tl__chip-ico--done { color: #16a34a; }
 .tl__chip-ico--prog { color: #f59e0b; }
+.tl__chip-user {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: #2563eb; color: #fff; font-size: .55rem; font-weight: 700;
+  line-height: 1; letter-spacing: -.02em;
+}
 
 /* Sin fecha */
 .tl__sin-fecha { border-top: 1px solid #e8f0e9; padding: .5rem 1rem; }

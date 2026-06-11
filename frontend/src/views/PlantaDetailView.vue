@@ -430,9 +430,11 @@ async function descartarPlanta() {
   })
   if (!ok) return
   try {
+    const loteId = planta.value?.lote?.id
     await updatePlant(id, { state: 'descartada' })
-    await plants.fetchOne(id)
     toast.success('Planta descartada')
+    if (loteId) router.push({ name: 'lote-detail', params: { id: loteId } })
+    else await plants.fetchOne(id)
   } catch { toast.error('Error al descartar') }
 }
 

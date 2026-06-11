@@ -59,6 +59,13 @@ class PlantsController < ApplicationController
     if plant.save
       attach_foto(plant) if params[:foto].present?
       lote.increment!(:plants_count)
+      lote.lote_eventos.create!(
+        tipo:          'nota',
+        descripcion:   "Planta #{plant.nombre} añadida al lote",
+        user:          current_user,
+        club:          current_user.club,
+        registrado_en: Time.current,
+      )
       render json: serialize_plant(plant), status: :created
     else
       render json: { errors: plant.errors.full_messages }, status: :unprocessable_entity
@@ -79,6 +86,15 @@ class PlantsController < ApplicationController
           description:   "Estado cambiado de #{old_state} a #{@plant.state}",
           occurred_at:   Time.current
         )
+        if @plant.state == 'descartada'
+          @plant.lote.lote_eventos.create!(
+            tipo:          'nota',
+            descripcion:   "Planta #{@plant.nombre} descartada (estaba en #{old_state})",
+            user:          current_user,
+            club:          current_user.club,
+            registrado_en: Time.current,
+          )
+        end
       end
       render json: serialize_plant_detail(@plant)
     else

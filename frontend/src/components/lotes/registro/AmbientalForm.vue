@@ -39,7 +39,10 @@
 <script setup>
 import { ref, computed } from 'vue'
 
-const props = defineProps({ modelValue: { type: Object, default: () => ({}) } })
+const props = defineProps({
+  modelValue:  { type: Object, default: () => ({}) },
+  estadoLote:  { type: String, default: null },
+})
 const emit  = defineEmits(['update:modelValue'])
 const f = computed({
   get: () => props.modelValue,
@@ -66,9 +69,32 @@ const vpdStatus = computed(() => {
   const v = parseFloat(vpd.value)
   if (!v) return ''
   if (v < 0.4) return '⚠️ Muy bajo'
-  if (v < 0.8) return '✅ Ideal vege'
-  if (v < 1.2) return '✅ Ideal flora'
-  if (v < 1.6) return '⚠️ Estrés leve'
+
+  const estado = props.estadoLote
+  // Rango óptimo según estadío
+  if (['semilla', 'esqueje', 'germinacion'].includes(estado)) {
+    if (v < 0.8) return '✅ Ideal para clones/semillas'
+    if (v < 1.2) return '⚠️ Algo alto para esta etapa'
+    return '🚨 Muy alto para esta etapa'
+  }
+  if (estado === 'vegetativo') {
+    if (v < 0.8) return '⚠️ Bajo para vegetativo'
+    if (v < 1.2) return '✅ Ideal para vegetativo'
+    if (v < 1.6) return '⚠️ Estrés leve'
+    return '🚨 Muy alto'
+  }
+  if (['floracion', 'cosecha'].includes(estado)) {
+    if (v < 0.8) return '⚠️ Bajo para floración'
+    if (v < 1.0) return '⚠️ Ideal vegetativo, algo bajo para floración'
+    if (v < 1.6) return '✅ Ideal para floración'
+    if (v < 2.0) return '⚠️ Estrés leve'
+    return '🚨 Muy alto'
+  }
+  // Fallback sin estadío
+  if (v < 0.8) return '✅ Rango clones/vege temprano'
+  if (v < 1.2) return '✅ Rango vegetativo'
+  if (v < 1.6) return '✅ Rango floración'
+  if (v < 2.0) return '⚠️ Estrés leve'
   return '🚨 Muy alto'
 })
 </script>

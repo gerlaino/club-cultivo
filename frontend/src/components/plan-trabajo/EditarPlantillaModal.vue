@@ -59,15 +59,17 @@ const showModalTarea = ref(false)
 
 function makeTarea(pt = null) {
   return {
-    _tmpId:      nextTmp++,
-    id:          pt?.id           ?? null,
-    tipo:        pt?.tipo         ?? 'riego',
-    titulo:      pt?.titulo       ?? '',
-    descripcion: pt?.descripcion  ?? '',
-    dia_relativo: pt?.dia_relativo ?? 0,
-    prioridad:   pt?.prioridad    ?? 'normal',
-    rol_sugerido: pt?.rol_sugerido ?? '',
-    _deleted:    false,
+    _tmpId:         nextTmp++,
+    id:             pt?.id             ?? null,
+    tipo:           pt?.tipo           ?? 'riego',
+    titulo:         pt?.titulo         ?? '',
+    descripcion:    pt?.descripcion    ?? '',
+    dia_relativo:   pt?.dia_relativo   ?? 0,
+    prioridad:      pt?.prioridad      ?? 'normal',
+    rol_sugerido:   pt?.rol_sugerido   ?? '',
+    responsable_id: pt?.responsable?.id ?? pt?.responsable_id ?? null,
+    responsable:    pt?.responsable    ?? null,
+    _deleted:       false,
   }
 }
 
@@ -140,12 +142,13 @@ async function guardar() {
 
     for (const t of tareas.value) {
       const payload = {
-        tipo:         t.tipo,
-        titulo:       t.titulo,
-        descripcion:  t.descripcion,
-        dia_relativo: t.dia_relativo ?? 0,
-        prioridad:    t.prioridad,
-        rol_sugerido: t.rol_sugerido || null,
+        tipo:           t.tipo,
+        titulo:         t.titulo,
+        descripcion:    t.descripcion,
+        dia_relativo:   t.dia_relativo ?? 0,
+        prioridad:      t.prioridad,
+        rol_sugerido:   t.rol_sugerido   || null,
+        responsable_id: t.responsable_id || null,
       }
       if (t._deleted && t.id) {
         await deletePlanTarea(planId, t.id)

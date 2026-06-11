@@ -153,7 +153,10 @@ async function handleSubmit() {
   }
   // Aporte obligatorio para todos los medios de pago
   if (!(Number(form.value.aporte_socio_ars) > 0)) {
-    formError.value = 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.'
+    const sinPrecio = stockSeleccionado.value && !(stockSeleccionado.value.precio_sugerido_ars > 0)
+    formError.value = sinPrecio
+      ? 'El stock no tiene precio configurado. Pedile al administrador que lo configure.'
+      : 'El aporte del socio debe ser mayor a $0.'
     saving.value = false; return
   }
   if (form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {

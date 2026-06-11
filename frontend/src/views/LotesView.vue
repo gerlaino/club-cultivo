@@ -6,7 +6,7 @@ import { useAuthStore }  from "../stores/auth";
 import Paginator from '../components/ui/Paginator.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import { useConfirm } from '../composables/useConfirm.js';
-import { exportLotesCSV, getLoteProximoCodigo } from '../lib/api.js';
+import { exportLotesCSV, getLoteProximoCodigo, listGeneticas } from '../lib/api.js';
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const store = useLotesStore();
@@ -116,7 +116,7 @@ function emptyForm() {
   return {
     estado: "vegetativo", plants_count: 0,
     start_date: new Date().toISOString().slice(0,10),
-    strain: "", grow_type: "sustrato", light_type: "", notes: "",
+    genetica_id: null, strain: "", grow_type: "sustrato", light_type: "", notes: "",
     sala_id: salas.items[0]?.id ?? "",
     tamanio_maceta: null,
   };
@@ -126,6 +126,7 @@ const showCreate      = ref(false);
 const createForm      = ref(emptyForm());
 const createErrors    = ref({});
 const proximoCodigo   = ref('…');
+const geneticasActivas = ref([]);
 
 async function openCreate() {
   createForm.value   = emptyForm();
@@ -133,8 +134,12 @@ async function openCreate() {
   proximoCodigo.value = '…';
   showCreate.value   = true;
   try {
-    const res = await getLoteProximoCodigo();
-    proximoCodigo.value = res.data.codigo;
+    const [codigoRes, genRes] = await Promise.all([
+      getLoteProximoCodigo(),
+      listGeneticas({ activa: true, per_page: 200 }),
+    ]);
+    proximoCodigo.value = codigoRes.data.codigo;
+    geneticasActivas.value = Array.isArray(genRes.data) ? genRes.data : (genRes.data.geneticas ?? genRes.data.data ?? []);
   } catch {
     proximoCodigo.value = 'Auto';
   }
@@ -457,8 +462,13 @@ async function exportarCSV() {
                 <input type="date" class="lm-input" v-model="createForm.start_date" />
               </div>
               <div class="lm-field">
-                <label class="lm-label">Variedad / Strain</label>
-                <input class="lm-input" v-model.trim="createForm.strain" placeholder="Ej: OG Kush" />
+                <label class="lm-label">Genética</label>
+                <select class="lm-input" v-model="createForm.genetica_id" @change="createForm.strain = ''">
+                  <option :value="null">— Sin especificar —</option>
+                  <option v-for="g in geneticasActivas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
+                </select>
+                <input v-if="!createForm.genetica_id" class="lm-input" style="margin-top:.4rem"
+                       v-model.trim="createForm.strain" placeholder="O escribí el nombre si no está en la lista" />
               </div>
               <div class="lm-field">
                 <label class="lm-label">Sistema de cultivo</label>

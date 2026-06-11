@@ -87,7 +87,7 @@
                   <RiegoForm      v-if="accionId === 'riego'"     v-model="formData.riego" />
                   <PodaForm       v-if="accionId === 'poda'"      v-model="formData.poda" :total-plantas="lote?.plants_count" />
                   <PlagasForm     v-if="accionId === 'plagas'"    v-model="formData.plagas" />
-                  <AmbientalForm  v-if="accionId === 'ambiental'" v-model="formData.ambiental" />
+                  <AmbientalForm  v-if="accionId === 'ambiental'" v-model="formData.ambiental" :estado-lote="lote?.estado" />
                   <LuzForm        v-if="accionId === 'luz'"       v-model="formData.luz" />
                   <LimpiezaForm   v-if="accionId === 'limpieza'"  v-model="formData.limpieza" />
                   <TrasplanteForm v-if="accionId === 'trasplante'" v-model="formData.trasplante" :total-plantas="lote?.plants_count" :plants="plants" />

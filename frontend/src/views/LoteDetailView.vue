@@ -1012,8 +1012,8 @@ onUnmounted(() => {
 .ld__ciclo-connector--done { background: #16a34a; }
 .ld__ciclo-progress { height: 4px; background: #e8f5e9; border-radius: 999px; overflow: hidden; margin-top: .75rem; }
 .ld__ciclo-progress-fill { height: 100%; background: linear-gradient(90deg, #16a34a, #1b5e20); border-radius: 999px; transition: width .5s ease; }
-.ld__layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.25rem; align-items: start; }
-@media (max-width: 900px) { .ld__layout { grid-template-columns: 1fr; } }
+.ld__layout { display: flex; flex-direction: column; gap: 1.25rem; }
+.ld__aside { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: start; }
 .ld__section { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
 .ld__section--mt { margin-top: 1.25rem; }
 .ld__section-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: .9rem 1.1rem; background: transparent; border: none; cursor: pointer; transition: background .15s; text-align: left; }
@@ -1051,7 +1051,7 @@ onUnmounted(() => {
 .ld__csv-upload i { font-size: 1.2rem; }
 .ld__modal-section-title { font-size: .72rem; font-weight: 800; color: #60725d; text-transform: uppercase; letter-spacing: .06em; margin: 1.1rem 0 .6rem; padding-bottom: .4rem; border-bottom: 1px solid #e8f0e9; }
 .ld__card { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
-.ld__card--mt { margin-top: 1rem; }
+.ld__card--mt { margin-top: 0; }
 .ld__card-header { display: flex; align-items: center; justify-content: space-between; padding: .8rem 1rem; border-bottom: 1px solid #e8f0e9; }
 .ld__card-title { font-size: .85rem; font-weight: 700; color: #1a1a1a; }
 .ld__card-notes { padding: .9rem 1rem; font-size: .82rem; color: #475569; line-height: 1.6; }
