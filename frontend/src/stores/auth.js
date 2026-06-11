@@ -61,7 +61,8 @@ export const useAuthStore = defineStore("auth", {
         await this.fetchMe();
 
         if (!this.user) {
-          throw Object.assign(new Error("No se pudo verificar la sesión"), { response: { status: 500 } });
+          this.error = "No se pudo obtener el usuario. Intentá de nuevo.";
+          return;
         }
 
         const { default: router } = await import("../router");
