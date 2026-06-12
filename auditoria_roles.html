@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Auditoría Club Cultivo — Estado actual por rol</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      color: #1a1a1a;
+      line-height: 1.6;
+      padding: 40px 50px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    /* ── Portada ── */
+    .cover {
+      min-height: 200px;
+      border-bottom: 3px solid #1b5e20;
+      margin-bottom: 36px;
+      padding-bottom: 24px;
+    }
+    .cover-brand { font-size: 11px; font-weight: 700; color: #60725d; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 12px; }
+    .cover-title { font-size: 28px; font-weight: 800; color: #1b5e20; line-height: 1.2; margin-bottom: 8px; }
+    .cover-sub { font-size: 15px; color: #444; margin-bottom: 20px; }
+    .cover-meta { font-size: 11px; color: #888; }
+
+    /* ── Headings ── */
+    h1 { font-size: 20px; font-weight: 800; color: #1b5e20; border-bottom: 2px solid #d4e6d4; padding-bottom: 6px; margin: 32px 0 14px; page-break-after: avoid; }
+    h2 { font-size: 14px; font-weight: 700; color: #2d4a2d; margin: 22px 0 8px; page-break-after: avoid; }
+    h3 { font-size: 12px; font-weight: 700; color: #444; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .04em; page-break-after: avoid; }
+
+    /* ── Párrafos ── */
+    p { margin-bottom: 10px; }
+
+    /* ── Rol header ── */
+    .rol-header {
+      background: #f0fdf4;
+      border-left: 4px solid #1b5e20;
+      border-radius: 0 6px 6px 0;
+      padding: 12px 16px;
+      margin: 28px 0 14px;
+      page-break-after: avoid;
+    }
+    .rol-header .rol-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #60725d; margin-bottom: 2px; }
+    .rol-header .rol-name  { font-size: 18px; font-weight: 800; color: #1b5e20; }
+
+    /* ── Tablas ── */
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 11px; }
+    th { background: #1b5e20; color: #fff; font-weight: 700; padding: 7px 10px; text-align: left; }
+    td { padding: 6px 10px; border-bottom: 1px solid #e8f0e9; vertical-align: top; }
+    tr:nth-child(even) td { background: #f7fbf7; }
+
+    /* ── Badges de estado ── */
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .badge-ok      { background: #dcfce7; color: #15803d; }
+    .badge-warn    { background: #fef9c3; color: #b45309; }
+    .badge-bad     { background: #fee2e2; color: #dc2626; }
+    .badge-neutral { background: #f1f5f9; color: #475569; }
+
+    /* ── Cajas de problema ── */
+    .issue {
+      background: #fff8f0;
+      border: 1px solid #fde68a;
+      border-left: 4px solid #f59e0b;
+      border-radius: 0 6px 6px 0;
+      padding: 10px 14px;
+      margin: 10px 0;
+    }
+    .issue.critical {
+      background: #fff1f2;
+      border-color: #fecaca;
+      border-left-color: #dc2626;
+    }
+    .issue.medium {
+      background: #fffbeb;
+      border-color: #fde68a;
+      border-left-color: #f59e0b;
+    }
+    .issue.low {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+      border-left-color: #94a3b8;
+    }
+    .issue-title { font-weight: 700; font-size: 11.5px; margin-bottom: 4px; }
+    .issue.critical .issue-title { color: #dc2626; }
+    .issue.medium   .issue-title { color: #b45309; }
+    .issue.low      .issue-title { color: #475569; }
+
+    /* ── Listas ── */
+    ul { padding-left: 18px; margin: 8px 0 12px; }
+    li { margin-bottom: 5px; }
+
+    /* ── Tabla de prioridades ── */
+    .prio-table td:first-child { font-weight: 700; width: 32px; text-align: center; }
+    .prio-table .prio-high  td:first-child { color: #dc2626; }
+    .prio-table .prio-mid   td:first-child { color: #b45309; }
+    .prio-table .prio-low   td:first-child { color: #475569; }
+
+    /* ── Resumen ejecutivo ── */
+    .summary-box {
+      background: #f0fdf4;
+      border: 1.5px solid #d4e6d4;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-top: 16px;
+    }
+
+    /* ── Page breaks ── */
+    .page-break { page-break-before: always; }
+    .no-break   { page-break-inside: avoid; }
+
+    /* ── Metodología ── */
+    .method-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 24px;
+      font-size: 11px;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PORTADA -->
+  <div class="cover">
+    <div class="cover-brand">Club Cultivo — Plataforma SaaS</div>
+    <div class="cover-title">Auditoría de estado por rol</div>
+    <div class="cover-sub">Análisis exhaustivo del codebase — qué funciona, qué no, qué pulir</div>
+    <div class="cover-meta">Fecha: junio 2026 &nbsp;|&nbsp; Versión: master (post-bloques 1–20) &nbsp;|&nbsp; Generado por Claude Code</div>
+  </div>
+
+  <!-- METODOLOGÍA -->
+  <div class="method-box">
+    <strong>Metodología:</strong> Análisis estático completo de router/index.js (todas las rutas y guards de rol), 56+ vistas Vue, 10+ controllers Rails, stores Pinia, dashboards por rol, y los 20 bloques implementados en la sesión actual. Cada área se clasifica en: <span class="badge badge-ok">Funciona bien</span> <span class="badge badge-warn">Incompleto</span> <span class="badge badge-bad">Roto</span> <span class="badge badge-neutral">Riesgo latente</span>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ROL: ADMIN -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="rol-header">
+    <div class="rol-label">Rol</div>
+    <div class="rol-name">Admin</div>
+  </div>
+
+  <p>El rol más completo de la app. Tiene acceso irrestricto a todas las rutas y vistas.</p>
+
+  <h3>Qué puede hacer</h3>
+  <table>
+    <tr><th>Área</th><th>Vista principal</th><th>Estado</th></tr>
+    <tr><td>Dashboard principal</td><td>AdminDashboard (1150L)</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Socios / pacientes</td><td>SociosView + SocioDetailView (9 tabs)</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Lotes</td><td>LotesView + LoteDetailView + análisis lab</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Salas</td><td>SalasView + SalaDetailView + sensores + comparativa</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Genéticas</td><td>GeneticasView + GeneticaDetalleView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Analítica</td><td>AnaliticaView (5 tabs: genéticas/ciclos/pérdidas/comparativa/contabilidad)</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Contabilidad P&amp;L</td><td>ContabilidadView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Tareas</td><td>TareasView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Usuarios</td><td>UsuariosView + UsuarioDetail</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Configuración</td><td>PreferenciasView + SetpointsConfigView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Socios críticos REPROCANN</td><td>SociosCriticosView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Aprobaciones manicura</td><td>AdminAprobacionesView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Supervisión curado</td><td>AdminCuradoView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Cosecha admin</td><td>AdminCosechadoView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Pesajes</td><td>AdminPesajesManicuraView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Stocks pendientes</td><td>AdminStocksPendientesView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Sedes</td><td>SedesView + SedeDetailView</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+    <tr><td>Correo a socios</td><td>Tab "Correo" en SocioDetail</td><td><span class="badge badge-ok">Funciona bien</span></td></tr>
+  </table>
+
+  <h3>Problemas concretos</h3>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">AdminDashboard hace 6+ llamadas paralelas al cargar</div>
+    <p>Si el backend tarda o un endpoint falla, el dashboard queda parcialmente vacío sin indicarle al usuario qué falló. Los errores se acumulan en <code>erroresCarga</code> pero no hay feedback visible en pantalla.</p>
+  </div>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">Alertas IoT configuradas pero no disparadas</div>
+    <p><code>SetpointsConfigView</code> guarda thresholds en <code>alertas_config jsonb</code> del club. No existe ningún worker ni job que evalúe esas condiciones contra las lecturas de sensores. El campo existe, la UI existe, pero la alerta real no se dispara. Un admin que configure esto va a esperar notificaciones que nunca llegan.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">SocioDetailView tiene 9 tabs — demasiado para móvil</div>
+    <p>En pantalla chica se rompe la navegación por tabs. No hay scroll horizontal ni menú desplegable para los que no entran.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">Sin búsqueda global</div>
+    <p>El admin no puede buscar un socio, un lote y una dispensación desde un solo lugar. Tiene que ir vista por vista.</p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ROL: SUPERVISOR -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="rol-header page-break">
+    <div class="rol-label">Rol</div>
+    <div class="rol-name">Supervisor</div>
+  </div>
+
+  <p>Acceso a casi todo lo que tiene el admin: socios, lotes, salas, analítica, tareas, aprobaciones manicura, socios críticos, pesajes. Puede enviar correos a socios. No tiene configuración del club ni gestión de usuarios.</p>
+
+  <h3>Problemas concretos</h3>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">SupervisorDashboard: contenido no confirmado</div>
+    <p>El archivo <code>SupervisorDashboard.vue</code> existe pero no se pudo confirmar su contenido en el análisis. Si hereda del <code>DefaultDashboard</code> genérico (64 líneas), el supervisor vería una pantalla casi vacía al entrar — en contraste con el AdminDashboard robusto.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">Rol ambiguo sin documentación</div>
+    <p>El supervisor tiene casi las mismas capacidades que el admin pero no está claro en qué casos un club usaría supervisor vs admin. Sin distinción de UX clara, la diferencia es confusa para el operador.</p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ROL: CULTIVADOR -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="rol-header page-break">
+    <div class="rol-label">Rol</div>
+    <div class="rol-name">Cultivador</div>
+  </div>
+
+  <h3>Qué puede hacer</h3>
+  <ul>
+    <li>Dashboard: tareas del día organizadas por sede + próximas cosechas</li>
+    <li>Ver y gestionar lotes asignados</li>
+    <li>Avanzar fases: <strong>vegetativo → floración</strong> y <strong>floración → cosecha</strong> (solo estas dos transiciones)</li>
+    <li>Ver salas asignadas con datos ambientales (SalaAmbienteView)</li>
+    <li>Plantas individuales (PlantaDetailView)</li>
+    <li>Tareas: crear, completar, ver</li>
+    <li>Plan de trabajo (PlanTrabajoView)</li>
+    <li>Historial cultivador</li>
+    <li>Genéticas (solo lectura)</li>
+  </ul>
+
+  <h3>Problemas concretos</h3>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">El flujo de avance de fases es incompleto por diseño pero no está comunicado</div>
+    <p>El cultivador puede pasar de floración a cosecha pero NO puede marcar un lote como "en_secado". Esa transición la hace el admin/manicura. Si el admin no procesa, el lote queda en estado "cosecha" indefinidamente sin ninguna alerta visible para el cultivador.</p>
+  </div>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">TareasAutoService falla silenciosamente</div>
+    <p>Cuando un lote avanza de fase, el service genera tareas sugeridas envuelto en un <code>rescue</code> global. Si falla, no hay log específico ni feedback al cultivador. Puede esperar tareas que nunca aparecen.</p>
+  </div>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">CultivadorDashboard no muestra el estado global de lotes</div>
+    <p>Muestra tareas + próximas cosechas, pero no un resumen del estado de cada lote (cuántos en vegetativo, floración, alertas ambientales). Comparado con el AdminDashboard es notablemente menos informativo para el mismo trabajo.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">Sin acceso a análisis de laboratorio de sus propios lotes</div>
+    <p>El cultivador no puede ver los resultados de THC/CBD de lo que produjo — solo el admin y roles superiores los ven en LoteDetailView. Es quien más necesita esa información y está bloqueado.</p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ROL: MANICURA -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="rol-header page-break">
+    <div class="rol-label">Rol</div>
+    <div class="rol-name">Manicura</div>
+  </div>
+
+  <p>El flujo más completo y cohesivo de la app después del admin.</p>
+
+  <h3>Qué puede hacer</h3>
+  <ul>
+    <li>Dashboard: ver lotes activos + agregar movimientos de stock (quick-add)</li>
+    <li>MncPendientesView: lotes en estado <code>en_manicura</code> con filtros</li>
+    <li>MncLoteDetailView: detalle del lote en proceso</li>
+    <li>MncPesajesView: registro de pesadas durante el manicure</li>
+    <li>MncEsperaView: lotes en espera</li>
+    <li>LotesEnCosechaView / LotesEnSecadoView / LotesEnCuradoView: seguimiento del pipeline</li>
+    <li>StocksManicuraView: stock disponible post-manicura</li>
+  </ul>
+
+  <h3>Problemas concretos</h3>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">Quick-add de stock en el dashboard puede bypassear validaciones del wizard</div>
+    <p>El dashboard tiene un formulario simple (<code>lote_id + cantidad → agregarStock</code>). El wizard <code>cerrar_curado</code> tiene validación de peso curado, formas de producto, stocks. Si el manicurador agrega stock desde el dashboard, puede crear registros que no pasaron por esa validación, generando inconsistencias en los totales.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">Sin indicador de tiempo en secado</div>
+    <p>El manicurador ve lotes en secado pero no hay un contador de días transcurridos ni alerta de "este lote lleva X días en secado". El tiempo de secado es crítico en cannabis y no está visible.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">Sin vista de rendimiento histórico propio</div>
+    <p>El manicurador no puede ver su merma promedio (gramos finales vs cosechados). Eso está en la analítica del admin, pero no en su rol.</p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ROL: DISPENSADOR -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="rol-header page-break">
+    <div class="rol-label">Rol</div>
+    <div class="rol-name">Dispensador</div>
+  </div>
+
+  <h3>Qué puede hacer</h3>
+  <ul>
+    <li>Dashboard: analytics básicos + alerta REPROCANN + dispensaciones de hoy</li>
+    <li>DispensarView: flujo completo de dispensación (1056L) — búsqueda de socio, stock, monto, notas, firma, modalidad domicilio/presencial</li>
+    <li>HistorialDispensacionesView: filtros, búsqueda, exportación</li>
+    <li>StockView: ver stock disponible</li>
+    <li>SociosView: lista de socios únicamente, sin acceso al detalle</li>
+    <li>Crear socios nuevos (sin seguimiento médico, con alerta interna al admin)</li>
+  </ul>
+
+  <h3>Problemas concretos</h3>
+
+  <div class="issue critical no-break">
+    <div class="issue-title">El dispensador NO puede ver el detalle de un socio — riesgo operativo real</div>
+    <p>El <code>ROLE_ALLOWED_PREFIX</code> bloquea <code>/socios/:id</code> para dispensador. Cuando está dispensando puede buscar al socio por nombre/DNI, pero no puede ver si tiene REPROCANN vigente, historial clínico, indicación médica activa. Puede dispensar a un socio con REPROCANN vencido sin saberlo.</p>
+  </div>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">Dashboard muy thin (232L vs AdminDashboard 1150L)</div>
+    <p>No hay resumen de stock disponible, no hay alertas de socios con cupo agotado, no hay indicador de dispensaciones restantes del día.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">Sin feedback de alerta al crear socio</div>
+    <p>Cuando el dispensador crea un socio, se genera una alerta interna para el admin pero el dispensador no recibe confirmación de que fue generada ni sabe si el admin la revisó.</p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ROL: MÉDICO -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="rol-header page-break">
+    <div class="rol-label">Rol</div>
+    <div class="rol-name">Médico</div>
+  </div>
+
+  <h3>Qué puede hacer</h3>
+  <ul>
+    <li>MedicoDashboard: KPIs de socios + indicaciones (activas, vencidas, por vencer)</li>
+    <li>Lista de socios con alertas REPROCANN</li>
+    <li>Ver, crear y editar indicaciones médicas</li>
+    <li>Exportar prescripción en PDF (via browser print)</li>
+    <li>Acceso al detalle de socios con tabs: historia clínica, notas, documentos, timeline</li>
+  </ul>
+
+  <h3>Problemas concretos</h3>
+
+  <div class="issue critical no-break">
+    <div class="issue-title">BUG POTENCIAL — routing puede bloquear /socios/:id para el médico</div>
+    <p>El <code>ROLE_ALLOWED_PREFIX</code> en el router global restringe al médico a rutas que empiecen con <code>/medico</code> o <code>/perfil</code>. Si eso es correcto, cuando el MedicoDashboard intenta navegar a <code>/socios/123</code> se va a redirigir o rechazar. Los tabs de "historia clínica", "notas" y "documentos" están configurados en <code>SocioDetailView</code> para el rol médico — pero si el médico no puede acceder a la ruta, esos tabs son código muerto. <strong>Requiere testing manual urgente.</strong></p>
+  </div>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">MedicoDashboard carga hasta 200 socios client-side para KPIs</div>
+    <p>Llama a <code>listPacientes({ limite: 200 })</code> y filtra en JavaScript para contar vencidos, por vencer, etc. Con 300+ socios el endpoint devuelve solo 200 y los KPIs son incorrectos silenciosamente. Con 500+ socios el dashboard da datos erróneos sin ningún aviso.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">Prescripción PDF depende del navegador</div>
+    <p>La vista <code>/indicaciones/:id/prescripcion_pdf</code> es un HTML que el browser imprime. No hay generación de PDF real (wicked_pdf, Prawn). Si el usuario no tiene impresora virtual instalada, no puede guardar el PDF.</p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ROL: ABOGADO -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="rol-header page-break">
+    <div class="rol-label">Rol</div>
+    <div class="rol-name">Abogado</div>
+  </div>
+
+  <h3>Qué puede hacer</h3>
+  <ul>
+    <li>LegalDashboard (compartido con auditor): KPIs contables, socios activos, informe semestral</li>
+    <li>Acceso limitado a <code>/abogado</code> y <code>/perfil</code></li>
+  </ul>
+
+  <h3>Problemas concretos</h3>
+
+  <div class="issue critical no-break">
+    <div class="issue-title">Rol prácticamente sin funcionalidad propia</div>
+    <p>El <code>LegalDashboard</code> está compartido entre abogado y auditor con un <code>isAbogado</code> computed. El abogado ve: balance del mes, movimientos recientes, socios activos, informe semestral. No hay ninguna funcionalidad específica del rol — no puede gestionar documentos legales, ver contratos, ni exportar ningún informe. Es el rol menos implementado de la app.</p>
+  </div>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">Acceso a datos financieros sin justificación clara</div>
+    <p>Un abogado externo que ingrese ve el balance del mes y movimientos contables del club. No está claro si eso es lo que se quiere exponer. Si se le da acceso a un abogado real, puede ver información financiera sensible sin una intención definida en el diseño del rol.</p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ROL: AUDITOR -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="rol-header page-break">
+    <div class="rol-label">Rol</div>
+    <div class="rol-name">Auditor</div>
+  </div>
+
+  <h3>Qué puede hacer</h3>
+  <ul>
+    <li>AuditorDashboard: índice de informes (5 tarjetas de navegación)</li>
+    <li>InformeReprocannView: estado habilitaciones médicas</li>
+    <li>InformeProduccionView: lotes, plantas, rendimiento</li>
+    <li>InformeDispensacionesView: entregas a pacientes</li>
+    <li>InformeCumplimientoView: alertas y tasas regulatorias</li>
+    <li>InformeSedesView: instalaciones y stock</li>
+    <li>InformePlanVsRealView: plan vs real productivo</li>
+    <li>TrazabilidadView: trazabilidad completa planta → dispensación</li>
+  </ul>
+
+  <h3>Problemas concretos</h3>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">AuditorDashboard es solo una grilla de navegación — sin datos propios</div>
+    <p>Entra y ve 5 botones. No hay resumen ejecutivo, no hay alertas de cumplimiento en el dashboard, no hay un "estado general del club" que justifique abrir el dashboard todos los días.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">Sin exportación visible desde el dashboard</div>
+    <p>El auditor no tiene botón de exportación CSV o PDF visible desde su panel principal, aunque existen endpoints <code>export_csv</code> en algunos controllers.</p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ROL: DELIVERY -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="rol-header page-break">
+    <div class="rol-label">Rol</div>
+    <div class="rol-name">Delivery</div>
+  </div>
+
+  <h3>Qué puede hacer</h3>
+  <ul>
+    <li>Ver sus paquetes asignados (pendientes, en_viaje, entregados, fallidos)</li>
+    <li>Iniciar viaje en bulk (seleccionar múltiples paquetes)</li>
+    <li>Registrar entrega con firma digital (canvas táctil)</li>
+    <li>Reportar fallo con motivo</li>
+    <li>Ver ruta en Google Maps (abre en nueva pestaña con waypoints)</li>
+  </ul>
+
+  <h3>Problemas concretos</h3>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">Firma digital guardada como base64 sin compresión ni límite</div>
+    <p>Un canvas de 300×150px genera 50–100KB de base64 por entrega. Con 20 entregas por día son ~2MB de base64 en la base de datos solo en firmas. No hay compresión, ni validación de tamaño máximo en el backend.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">Sin historial de entregas propias</div>
+    <p>El delivery solo ve los paquetes pendientes/del día. No hay un "mis entregas históricas" para confirmar o disputar una entrega pasada.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">Ruta en Maps falla silenciosamente sin dirección_envio</div>
+    <p>Si la dispensación no tiene dirección, la ruta abre Maps vacío. No hay validación previa que advierta cuántos paquetes carecen de dirección.</p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- PROBLEMAS TRANSVERSALES -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h1 class="page-break">Problemas transversales</h1>
+  <p>Estos problemas afectan a múltiples roles y son independientes de una vista específica.</p>
+
+  <div class="issue critical no-break">
+    <div class="issue-title">CRÍTICO — Bug de routing: médico probablemente bloqueado en /socios/:id</div>
+    <p>El <code>ROLE_ALLOWED_PREFIX</code> en el router global puede bloquear al médico de acceder a <code>/socios/:id</code>. Si es así, todo el flujo de "médico ve historia clínica del paciente" está roto en producción. Requiere testing manual inmediato.</p>
+  </div>
+
+  <div class="issue critical no-break">
+    <div class="issue-title">CRÍTICO — Alertas IoT configuradas pero nunca disparadas</div>
+    <p><code>SetpointsConfigView</code> permite configurar thresholds de temperatura, humedad, VPD, CO₂. No existe ningún worker ni job en background que evalúe esas condiciones. La feature completa es un placeholder funcional en UI pero sin lógica en backend.</p>
+  </div>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">MEDIO — MedicoDashboard no escala más allá de 200 socios</div>
+    <p><code>listPacientes({ limite: 200 })</code> con filtrado client-side. Los KPIs son incorrectos silenciosamente con clubes grandes.</p>
+  </div>
+
+  <div class="issue medium no-break">
+    <div class="issue-title">MEDIO — Sin feedback visible de errores parciales en AdminDashboard</div>
+    <p>6+ promises paralelas. Si una falla, el KPI queda en null sin mensaje visible al usuario.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">BAJO — UX en móvil sin verificar para admin</div>
+    <p><code>SocioDetailView</code> con 9 tabs y <code>LoteDetailView</code> con 1208L no fueron verificados en pantalla de 375px.</p>
+  </div>
+
+  <div class="issue low no-break">
+    <div class="issue-title">BAJO — Sin búsqueda global en la app</div>
+    <p>El admin que busca "García" tiene que saber si es socio, usuario o lote antes de buscar. No hay un campo de búsqueda cross-módulo.</p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- PRIORIDADES DE PULIDO -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h1 class="page-break">Prioridades de pulido recomendadas</h1>
+  <p>Ordenadas por impacto real en usuarios. Ninguna de estas agrega features nuevas — todas mejoran lo que ya existe.</p>
+
+  <table class="prio-table">
+    <tr><th>#</th><th>Qué pulir</th><th>Rol afectado</th><th>Severidad</th></tr>
+    <tr class="prio-high">
+      <td>1</td>
+      <td>Verificar y corregir routing del médico a <code>/socios/:id</code></td>
+      <td>Médico</td>
+      <td><span class="badge badge-bad">Crítico</span></td>
+    </tr>
+    <tr class="prio-high">
+      <td>2</td>
+      <td>Dispensador: mostrar REPROCANN vigente y último historial inline en DispensarView</td>
+      <td>Dispensador</td>
+      <td><span class="badge badge-bad">Alto</span></td>
+    </tr>
+    <tr class="prio-high">
+      <td>3</td>
+      <td>AdminDashboard: mostrar KPIs en gris con "No disponible" cuando un endpoint falla</td>
+      <td>Admin</td>
+      <td><span class="badge badge-warn">Medio</span></td>
+    </tr>
+    <tr class="prio-mid">
+      <td>4</td>
+      <td>MedicoDashboard: mover KPIs al backend (endpoint <code>GET /pacientes/kpis</code>)</td>
+      <td>Médico</td>
+      <td><span class="badge badge-warn">Medio</span></td>
+    </tr>
+    <tr class="prio-mid">
+      <td>5</td>
+      <td>Cultivador: acceso de lectura a análisis de laboratorio de sus propios lotes</td>
+      <td>Cultivador</td>
+      <td><span class="badge badge-warn">Medio</span></td>
+    </tr>
+    <tr class="prio-mid">
+      <td>6</td>
+      <td>SocioDetailView: tabs colapsables en mobile (menú "más" o scroll horizontal)</td>
+      <td>Admin / Médico</td>
+      <td><span class="badge badge-warn">Medio</span></td>
+    </tr>
+    <tr class="prio-mid">
+      <td>7</td>
+      <td>Alertas IoT: deshabilitar el toggle en UI o aclarar "próximamente" hasta implementar el worker</td>
+      <td>Admin</td>
+      <td><span class="badge badge-warn">Medio</span></td>
+    </tr>
+    <tr class="prio-low">
+      <td>8</td>
+      <td>ManicuradorDashboard: eliminar quick-add de stock o conectarlo al wizard</td>
+      <td>Manicura</td>
+      <td><span class="badge badge-neutral">Bajo</span></td>
+    </tr>
+    <tr class="prio-low">
+      <td>9</td>
+      <td>Firma delivery: comprimir a JPEG 70% + validar tamaño máximo en backend</td>
+      <td>Delivery</td>
+      <td><span class="badge badge-neutral">Bajo</span></td>
+    </tr>
+    <tr class="prio-low">
+      <td>10</td>
+      <td>Abogado: definir qué hace diferente al auditor o consolidar los dos roles</td>
+      <td>Abogado</td>
+      <td><span class="badge badge-neutral">Bajo</span></td>
+    </tr>
+  </table>
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- RESUMEN EJECUTIVO -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h1>Resumen ejecutivo</h1>
+
+  <div class="summary-box">
+    <p>La app está en un estado sorprendentemente sólido para la cantidad de funcionalidad implementada. El flujo de cultivo (cultivador → manicura → admin) es el más cohesivo. El flujo de dispensación es completo. El módulo de analítica es rico y cubre todos los ángulos financieros y productivos.</p>
+    <br>
+    <p>Los problemas más graves son de integración y escala, no de features faltantes: el bug de routing del médico, los KPIs client-side que no escalan, y las alertas IoT que están configurables pero no activas. Todo eso se puede resolver sin agregar nada nuevo.</p>
+    <br>
+    <p>El foco de pulido debería ser: <strong>datos correctos para cada rol en su dashboard</strong>, <strong>sin rutas rotas</strong>, y <strong>feedback visible cuando algo falla</strong>. Con eso, la app pasa de "funciona" a "funciona bien".</p>
+  </div>
+
+</body>
+</html>
