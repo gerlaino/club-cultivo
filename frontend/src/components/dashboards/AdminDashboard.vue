@@ -12,6 +12,7 @@ import { useClubStore }  from '../../stores/club.js'
 import { useStatsStore } from '../../stores/stats.js'
 import { useTareasStore } from '../../stores/tareas.js'
 import OnboardingWizard  from '../OnboardingWizard.vue'
+import DsSpinner         from '../../design-system/components/Spinner.vue'
 
 const router      = useRouter()
 const auth        = useAuthStore()
@@ -37,7 +38,9 @@ const chartCanvas   = ref(null)
 let   chartInstance = null
 
 const stats = computed(() => statsStore.data ?? {})
-const mostrarOnboarding = computed(() => loading.value || sedes.value.length === 0)
+// Solo después de cargar: durante la carga se muestra el spinner estándar,
+// no el wizard (su modo "checking" pintaba la pantalla verde en cada visita)
+const mostrarOnboarding = computed(() => !loading.value && sedes.value.length === 0)
 
 // ── Greeting ───────────────────────────────────────────────────────────────
 
@@ -381,9 +384,11 @@ async function onOnboardingCompletado() {
 
 <template>
   <div class="ad">
-    <OnboardingWizard v-if="mostrarOnboarding" :checking="loading" @completado="onOnboardingCompletado" />
+    <div v-if="loading" class="ad__loading"><DsSpinner /></div>
 
-    <template v-if="!mostrarOnboarding">
+    <OnboardingWizard v-else-if="mostrarOnboarding" @completado="onOnboardingCompletado" />
+
+    <template v-if="!loading && !mostrarOnboarding">
 
       <!-- ── ERRORES DE CARGA ───────────────────────────────────────────── -->
       <div v-if="erroresCarga.length" class="ad__error-banner">
@@ -728,6 +733,8 @@ async function onOnboardingCompletado() {
 </template>
 
 <style scoped>
+.ad__loading { display: flex; justify-content: center; align-items: center; padding: 6rem 0; }
+
 .ad {
   padding: 2rem;
   max-width: 1280px;
