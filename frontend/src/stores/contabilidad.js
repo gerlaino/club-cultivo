@@ -115,13 +115,30 @@ export const useContabilidadStore = defineStore("contabilidad", {
       this.removeError = null;
       try {
         await deleteMovimiento(id);
-        this.items = this.items.filter(m => m.id !== id);
-        this.totales.count--;
+        this._quitarDeListas(id);
       } catch (e) {
+        // 404 = ya no existía en el servidor (borrado previo / lista desactualizada):
+        // sincronizamos las listas locales en lugar de fallar
+        if (e?.response?.status === 404) {
+          this._quitarDeListas(id);
+          return;
+        }
         this.removeError = e?.response?.data?.error || "No se pudo eliminar";
         throw e;
       } finally {
         this.removing = false;
+      }
+    },
+
+    // Saca el movimiento de TODAS las listas locales (libro + últimos del dashboard).
+    // Antes solo se filtraba items: la fila seguía visible en el dashboard y un
+    // segundo click producía un 404.
+    _quitarDeListas(id) {
+      this.items = this.items.filter(m => m.id !== id);
+      this.totales.count--;
+      if (this.dashboard?.ultimos_movimientos) {
+        this.dashboard.ultimos_movimientos =
+          this.dashboard.ultimos_movimientos.filter(m => m.id !== id);
       }
     },
 

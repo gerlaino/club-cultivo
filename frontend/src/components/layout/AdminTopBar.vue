@@ -10,7 +10,7 @@
       <!-- Identidad del club (tenant) -->
       <div class="atb__club" :title="club.name">
         <img v-if="club.logoUrl" :src="club.logoUrl" class="atb__club-logo" :alt="club.name" />
-        <DsAvatar v-else :name="club.name" tone="role-admin" size="sm" />
+        <DsAvatar v-else :name="club.name" tone="role-admin" size="md" />
         <span class="atb__club-name">{{ club.name }}</span>
       </div>
       <span class="atb__club-sep" aria-hidden="true"></span>
@@ -222,7 +222,7 @@ async function handleLogout() {
   flex-shrink: 0;
 }
 .atb__inner {
-  height: 56px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -256,26 +256,30 @@ async function handleLogout() {
   min-width: 0;
 }
 .atb__club-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--r-sm);
-  object-fit: cover;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  /* contain: muestra el logo completo sin recortarlo (cover recortaba logos no cuadrados) */
+  object-fit: contain;
+  padding: 2px;
   border: 1px solid var(--c-ink-100);
   background: #fff;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 .atb__club-name {
-  font-size: var(--fs-13);
+  font-size: var(--fs-14);
   font-weight: 700;
   color: var(--c-ink-900);
   white-space: nowrap;
-  max-width: 200px;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -.01em;
 }
 .atb__club-sep {
   width: 1px;
-  height: 20px;
+  height: 26px;
   background: var(--c-ink-300);
   flex-shrink: 0;
 }

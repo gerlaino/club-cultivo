@@ -4,6 +4,7 @@ import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
 import { listSedes, listLotes, listPacientes } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
+import { useToast }             from "../composables/useToast.js"
 import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
 import DsSpinner from '../design-system/components/Spinner.vue'
 
@@ -17,6 +18,7 @@ const canEdit = computed(() => ["admin","super_admin"].includes(auth.role))
 // se corrigen desde la dispensación para que libro, stock y CC queden consistentes
 const esAutomatico = (m) => !!m.dispensacion_id
 const { confirm } = useConfirm()
+const toast = useToast()
 
 const vistaActiva    = ref("dashboard")
 const dashboardSede  = ref(null)
@@ -269,7 +271,15 @@ async function confirmDelete(m) {
     variant: 'danger',
   })
   if (!ok) return
-  await store.remove(m.id)
+  try {
+    await store.remove(m.id)
+    toast.success('Movimiento eliminado')
+  } catch {
+    toast.error(store.removeError || 'No se pudo eliminar el movimiento')
+  }
+  // Refrescar totales/KPIs y listas: el borrado afecta ingresos, balance y por_cobrar
+  if (vistaActiva.value === 'dashboard') await store.fetchDashboard(dashboardSede.value)
+  else await store.fetch()
 }
 
 async function goToPage(p) {
