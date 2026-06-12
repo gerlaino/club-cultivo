@@ -2,7 +2,7 @@ class Dispensacion < ApplicationRecord
   self.table_name = 'dispensaciones'
 
   ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido].freeze
-  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona].freeze
+  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos].freeze
 
   belongs_to :paciente
   belongs_to :user
@@ -11,7 +11,15 @@ class Dispensacion < ApplicationRecord
   belongs_to :sede,          optional: true
   belongs_to :delivery_user, class_name: 'User', foreign_key: :delivery_id, optional: true
 
-  has_one :movimiento_contable, dependent: :nullify
+  # El asiento contable de la dispensación vive y muere con ella:
+  # si quedara huérfano, el libro mostraría un ingreso de una entrega que no existió.
+  has_one :movimiento_contable, dependent: :destroy
+
+  MEDIOS_A_CREDITO = %w[cuenta_corriente no_abona].freeze
+
+  def a_credito?
+    MEDIOS_A_CREDITO.include?(medio_pago)
+  end
 
   before_validation { self.fecha_dispensacion ||= Date.current }
   before_create     :generar_codigo_paquete, if: :con_envio?
@@ -27,6 +35,7 @@ class Dispensacion < ApplicationRecord
   validate  :limite_mensual_no_superado, on: :create
   validate  :credito_suficiente,        on: :create, if: -> { medio_pago == 'cuenta_corriente' }
   validate  :credito_no_abona,          on: :create, if: -> { medio_pago == 'no_abona' }
+  validate  :gramos_suficientes,        on: :create, if: -> { medio_pago == 'credito_gramos' }
   validate  :delivery_fields_presentes, if: :con_envio?
 
   scope :del_mes,        ->(fecha = Date.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
@@ -115,6 +124,23 @@ class Dispensacion < ApplicationRecord
     end
   end
 
+  def gramos_suficientes
+    return unless paciente_id
+    cc = paciente.cuenta_corriente
+
+    unless cc&.credito_gramos_activo?
+      errors.add(:base, 'El paciente no tiene crédito en gramos activo')
+      return
+    end
+
+    saldo = cc.saldo_disponible_g.to_d
+    if saldo <= 0
+      errors.add(:base, 'Sin saldo de gramos disponible')
+    elsif cantidad.to_d > saldo
+      errors.add(:cantidad, "supera el saldo en gramos disponible (#{saldo.to_f}g)")
+    end
+  end
+
   def decrementar_stock
     return unless stock
     ActiveRecord::Base.transaction do
@@ -129,7 +155,14 @@ class Dispensacion < ApplicationRecord
   end
 
   def incrementar_stock
-    stock&.increment!(:cantidad, cantidad)
+    return unless stock
+    ActiveRecord::Base.transaction do
+      stock.increment!(:cantidad, cantidad)
+      stock.stock_movimientos
+           .where(tipo: 'dispensacion')
+           .where("notas LIKE ?", "Dispensación ##{id} —%")
+           .destroy_all
+    end
   end
 
   def generar_codigo_paquete

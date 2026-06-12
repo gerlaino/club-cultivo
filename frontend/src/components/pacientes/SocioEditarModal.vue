@@ -55,29 +55,6 @@
               </div>
               <div v-if="isAdmin" class="sem__field sem__field--full">
                 <label class="sem__label" style="margin-bottom:.4rem">
-                  Límite de dispensación mensual
-                  <span class="sem__opt">opcional — en gramos</span>
-                </label>
-                <div class="sem__limit-wrap">
-                  <input
-                    v-model.number="editForm.limite_dispensacion_mensual_g"
-                    class="sem__input sem__input--limit"
-                    type="number" step="0.5" min="0" max="9999"
-                    placeholder="Sin límite"
-                  />
-                  <span class="sem__limit-unit">g / mes</span>
-                  <button
-                    v-if="editForm.limite_dispensacion_mensual_g"
-                    type="button"
-                    class="sem__limit-clear"
-                    @click="editForm.limite_dispensacion_mensual_g = ''"
-                    title="Quitar límite"
-                  ><X :size="13" /></button>
-                </div>
-                <span class="sem__hint">Dejá vacío para no aplicar ningún límite.</span>
-              </div>
-              <div v-if="isAdmin" class="sem__field sem__field--full">
-                <label class="sem__label" style="margin-bottom:.4rem">
                   Descuento por defecto
                   <span class="sem__opt">en dispensaciones — opcional</span>
                 </label>
@@ -165,8 +142,6 @@ async function doSave() {
 .sem__limit-wrap { display: flex; align-items: center; gap: .4rem; }
 .sem__input--limit { max-width: 140px; }
 .sem__limit-unit { font-size: .8rem; font-weight: 600; color: #64748b; white-space: nowrap; }
-.sem__limit-clear { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 2px; display: flex; align-items: center; border-radius: 4px; transition: color .15s; }
-.sem__limit-clear:hover { color: #dc2626; }
 .sem__hint { font-size: .72rem; color: #94a3b8; margin-top: .2rem; display: block; }
 .sem__error { margin-top: .875rem; padding: .75rem 1rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: .8rem; color: #dc2626; }
 .sem__footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1.25rem 1.5rem; border-top: 1px solid #f1f5f9; position: sticky; bottom: 0; background: #fff; }

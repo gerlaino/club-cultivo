@@ -6,13 +6,18 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import AplicarPlanModal       from '../components/plan-trabajo/AplicarPlanModal.vue'
 import EditarPlantillaModal   from '../components/plan-trabajo/EditarPlantillaModal.vue'
 import ExportarCalendarioModal from '../components/plan-trabajo/ExportarCalendarioModal.vue'
-import { listPlanTrabajos, deletePlanTrabajo, getPlanTrabajo, exportPlanCSV } from '../lib/api.js'
+import { listPlanTrabajos, deletePlanTrabajo, getPlanTrabajo, exportPlanCSV, listAplicaciones, cancelarAplicacion } from '../lib/api.js'
 
 const toast   = useToast()
 const confirm = useConfirm()
 
 const loading    = ref(true)
 const plantillas = ref([])
+
+const aplicaciones        = ref([])
+const loadingAplicaciones = ref(false)
+const verHistorialApl     = ref(false)
+const quitandoId          = ref(null)
 
 const showEditar    = ref(false)
 const showAplicar   = ref(false)
@@ -99,10 +104,54 @@ async function eliminar(plan) {
   }
 }
 
+async function cargarAplicaciones() {
+  loadingAplicaciones.value = true
+  try {
+    const params = verHistorialApl.value ? {} : { estado: 'activo' }
+    const { data } = await listAplicaciones(params)
+    aplicaciones.value = data
+  } catch { toast.error('Error al cargar planes aplicados') }
+  finally { loadingAplicaciones.value = false }
+}
+
+function toggleHistorialApl() {
+  verHistorialApl.value = !verHistorialApl.value
+  cargarAplicaciones()
+}
+
+const OBJETIVO_LABEL = { Lote: 'Lote', Sala: 'Sala' }
+
+function describirObjetivo(a) {
+  if (!a.objetivo_tipo) return 'Todo el club'
+  const tipo = OBJETIVO_LABEL[a.objetivo_tipo] || a.objetivo_tipo
+  return a.objetivo_nombre ? `${tipo} · ${a.objetivo_nombre}` : tipo
+}
+
+async function quitarPlan(a) {
+  const ok = await confirm.confirm({
+    title:       'Quitar plan aplicado',
+    message:     `¿Quitás "${a.plan_trabajo?.titulo}" de ${describirObjetivo(a)}?\n\nLas tareas pendientes y en progreso generadas por esta aplicación se cancelan. Las completadas se conservan.`,
+    confirmText: 'Sí, quitar plan',
+    variant:     'danger',
+  })
+  if (!ok) return
+  quitandoId.value = a.id
+  try {
+    await cancelarAplicacion(a.id)
+    toast.success('Plan quitado — las tareas pendientes fueron canceladas')
+    await cargarAplicaciones()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'Error al quitar el plan')
+  } finally {
+    quitandoId.value = null
+  }
+}
+
 function onSaved() { showEditar.value = false; cargar() }
 function onAplicado() {
   showAplicar.value = false
   toast.success('Plan aplicado — las tareas fueron creadas en el calendario')
+  cargarAplicaciones()
 }
 function toggleExportDropdown(plan) {
   exportDropdownPlan.value = exportDropdownPlan.value?.id === plan.id ? null : plan
@@ -114,6 +163,7 @@ function onDocClick(e) {
 }
 onMounted(() => {
   cargar()
+  cargarAplicaciones()
   document.addEventListener('click', onDocClick)
 })
 </script>
@@ -215,6 +265,59 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- ── Planes aplicados ─────────────────────────────────── -->
+    <div class="ptv__apl">
+      <div class="ptv__apl-hdr">
+        <div>
+          <h2 class="ptv__apl-title">Planes aplicados</h2>
+          <p class="ptv__subtitle">Aplicaciones de plantillas sobre lotes, salas o el club</p>
+        </div>
+        <button class="ptv__btn-secondary" @click="toggleHistorialApl">
+          {{ verHistorialApl ? 'Ver solo activos' : 'Ver historial' }}
+        </button>
+      </div>
+
+      <div v-if="loadingAplicaciones" class="ptv__loading"><DsSpinner /></div>
+
+      <div v-else-if="!aplicaciones.length" class="ptv__apl-empty">
+        {{ verHistorialApl ? 'Todavía no se aplicó ninguna plantilla.' : 'No hay planes activos. Aplicá una plantilla con el botón "Aplicar".' }}
+      </div>
+
+      <div v-else class="ptv__apl-list">
+        <div v-for="a in aplicaciones" :key="a.id" class="ptv__apl-row">
+          <div class="ptv__apl-info">
+            <div class="ptv__apl-plan">
+              {{ a.plan_trabajo?.titulo }}
+              <span class="ptv__apl-estado" :class="`ptv__apl-estado--${a.estado}`">{{ a.estado }}</span>
+            </div>
+            <div class="ptv__apl-meta">
+              <span><i class="bi bi-geo-alt"></i> {{ describirObjetivo(a) }}</span>
+              <span><i class="bi bi-calendar3"></i> {{ new Date(a.fecha_inicio).toLocaleDateString('es-AR') }}</span>
+              <span><i class="bi bi-list-task"></i> {{ a.tareas_creadas }} tareas</span>
+              <span v-if="a.aplicado_por"><i class="bi bi-person"></i> {{ a.aplicado_por.nombre }}</span>
+            </div>
+          </div>
+          <div class="ptv__apl-right">
+            <div class="ptv__apl-progreso" :title="`${a.porcentaje_completado}% completado`">
+              <div class="ptv__apl-progreso-bar">
+                <div class="ptv__apl-progreso-fill" :style="{ width: a.porcentaje_completado + '%' }"></div>
+              </div>
+              <span class="ptv__apl-progreso-pct">{{ a.porcentaje_completado }}%</span>
+            </div>
+            <button
+              v-if="a.estado === 'activo'"
+              class="ptv__btn-danger-sm ptv__apl-quitar"
+              :disabled="quitandoId === a.id"
+              @click="quitarPlan(a)"
+              title="Quitar plan (cancela tareas pendientes)"
+            >
+              <i class="bi bi-x-lg"></i> Quitar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Modales -->
     <EditarPlantillaModal
       v-if="showEditar"
@@ -296,6 +399,29 @@ onMounted(() => {
 .ptv__card-footer { display: flex; align-items: center; justify-content: space-between; padding: .75rem 1.1rem; border-top: 1px solid #f1f5f9; background: #fafbfc; margin-top: auto; border-radius: 0 0 14px 14px; }
 .ptv__card-meta { font-size: .72rem; color: #94a3b8; }
 .ptv__card-actions { display: flex; align-items: center; gap: .4rem; }
+
+/* Planes aplicados */
+.ptv__apl { margin-top: 2.5rem; }
+.ptv__apl-hdr { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.ptv__apl-title { font-size: 1.15rem; font-weight: 800; margin: 0 0 .25rem; letter-spacing: -.03em; }
+.ptv__apl-empty { font-size: .85rem; color: #94a3b8; background: #f8fafc; border: 1.5px dashed #e2e8f0; border-radius: 12px; padding: 1.5rem; text-align: center; }
+.ptv__apl-list { display: flex; flex-direction: column; gap: .6rem; }
+.ptv__apl-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: .85rem 1.1rem; flex-wrap: wrap; }
+.ptv__apl-info { flex: 1; min-width: 220px; }
+.ptv__apl-plan { font-size: .9rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.ptv__apl-estado { font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: .15em .55em; border-radius: 999px; }
+.ptv__apl-estado--activo     { background: #dcfce7; color: #15803d; }
+.ptv__apl-estado--completado { background: #e0f2fe; color: #0369a1; }
+.ptv__apl-estado--cancelado  { background: #f1f5f9; color: #94a3b8; }
+.ptv__apl-meta { display: flex; flex-wrap: wrap; gap: .85rem; font-size: .75rem; color: #64748b; margin-top: .3rem; }
+.ptv__apl-meta i { margin-right: .25rem; color: #94a3b8; }
+.ptv__apl-right { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
+.ptv__apl-progreso { display: flex; align-items: center; gap: .5rem; }
+.ptv__apl-progreso-bar { width: 90px; height: 6px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.ptv__apl-progreso-fill { height: 100%; background: #1b5e20; border-radius: 999px; transition: width .3s; }
+.ptv__apl-progreso-pct { font-size: .72rem; font-weight: 700; color: #475569; min-width: 32px; }
+.ptv__apl-quitar { width: auto; padding: 0 .7rem; gap: .35rem; font-size: .75rem; font-weight: 700; }
+.ptv__apl-quitar:disabled { opacity: .5; cursor: wait; }
 
 /* Export dropdown */
 .ptv__export-wrap { position: relative; }

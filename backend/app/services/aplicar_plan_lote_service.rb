@@ -15,6 +15,18 @@ class AplicarPlanLoteService
     propuestas = calcular_propuestas
     creadas    = []
     ActiveRecord::Base.transaction do
+      # Registrar la aplicación para que sea visible y reversible
+      # (mismo modelo que usa AplicacionPlanesController)
+      aplicacion = @lote.club.aplicacion_planes.create!(
+        plan_trabajo:   @plan,
+        aplicado_por:   @ejecutado_por,
+        fecha_inicio:   @lote.start_date,
+        objetivo_tipo:  'Lote',
+        objetivo_id:    @lote.id,
+        estado:         'activo',
+        tareas_creadas: 0
+      )
+
       propuestas.each do |td|
         creadas << @lote.club.tareas.create!(
           titulo:           td[:titulo],
@@ -29,8 +41,11 @@ class AplicarPlanLoteService
           creada_por:       @ejecutado_por,
           origen_plan_id:   @plan.id,
           plan_tarea_id:    td[:plan_tarea_id],
+          aplicacion_plan_id: aplicacion.id,
         )
       end
+
+      aplicacion.update!(tareas_creadas: creadas.size)
     end
     creadas
   end

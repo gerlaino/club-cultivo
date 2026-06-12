@@ -17,8 +17,9 @@ class JwtCookieMiddleware
     request = Rack::Request.new(env)
 
     unless request.get_header('HTTP_X_MOBILE_CLIENT') == 'true'
-      # Web SPA: setea cookie httpOnly Y mantiene el Authorization header
-      # para que el frontend pueda leerlo y almacenarlo (cross-origin safe).
+      # Web SPA: el JWT viaja SOLO en cookie httpOnly (inaccesible desde JS).
+      # Exponerlo además en el header lo dejaba al alcance de cualquier XSS.
+      # El SPA se sirve same-origin (spa_fallback), así que la cookie siempre llega.
       Rack::Utils.set_cookie_header!(headers, 'jwt_token', {
         value:     jwt,
         path:      '/',
@@ -27,8 +28,10 @@ class JwtCookieMiddleware
         secure:    ENV.fetch('RAILS_ENV', 'development') == 'production',
         same_site: ENV.fetch('RAILS_ENV', 'development') == 'production' ? 'None' : 'Lax',
       })
+      headers.delete('Authorization')
+      headers.delete('authorization')
     end
-    # Authorization header se mantiene en todos los casos (mobile + web)
+    # Mobile (X-Mobile-Client): el Authorization header se mantiene intacto
 
     [status, headers, body]
   end

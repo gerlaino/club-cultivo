@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_10_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_10_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1132,13 +1132,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_10_000001) do
     t.date "fecha_vencimiento_est"
     t.string "codigo_qr"
     t.bigint "genetica_id"
+    t.index ["club_id", "numero_lote_producto"], name: "index_stocks_on_club_id_and_numero_lote_producto", unique: true, where: "(numero_lote_producto IS NOT NULL)"
     t.index ["club_id"], name: "index_stocks_on_club_id"
     t.index ["codigo_qr"], name: "index_stocks_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"
     t.index ["estado"], name: "index_stocks_on_estado"
     t.index ["genetica_id"], name: "index_stocks_on_genetica_id"
     t.index ["lote_id", "forma_producto"], name: "index_stocks_on_lote_id_and_forma_producto"
     t.index ["lote_id"], name: "index_stocks_on_lote_id"
-    t.index ["numero_lote_producto"], name: "index_stocks_on_numero_lote_producto", unique: true, where: "(numero_lote_producto IS NOT NULL)"
     t.index ["origen"], name: "index_stocks_on_origen"
     t.index ["pesada_id"], name: "index_stocks_on_pesada_id"
     t.index ["sede_id", "origen"], name: "index_stocks_on_sede_id_and_origen"

@@ -4,17 +4,17 @@ import { useToast } from "../composables/useToast.js";
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
   withCredentials: true,  // envía httpOnly cookie automáticamente en cada request
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   }
 });
 
-// Restaurar token guardado (fallback cross-origin para cuando la cookie no se transmite)
-const _savedToken = localStorage.getItem('jwt_token');
-if (_savedToken) {
-  api.defaults.headers.common['Authorization'] = `Bearer ${_savedToken}`;
-}
+// La autenticación web viaja únicamente en la cookie httpOnly (withCredentials).
+// El token nunca se guarda en localStorage: si fuera legible desde JS, cualquier
+// XSS podría robarlo. La línea siguiente limpia restos de la versión anterior.
+localStorage.removeItem('jwt_token');
 
 export function clearAuthToken() {
   localStorage.removeItem('jwt_token');
@@ -23,16 +23,7 @@ export function clearAuthToken() {
 
 // RESPONSE INTERCEPTOR: manejar errores de autenticación y servidor
 api.interceptors.response.use(
-  (response) => {
-    // Guardar JWT del header Authorization (sign_in lo expone vía CORS)
-    const authHeader = response.headers['authorization'];
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      localStorage.setItem('jwt_token', token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const status = error?.response?.status;
     const url = error?.config?.url || "";

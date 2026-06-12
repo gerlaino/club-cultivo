@@ -8,6 +8,7 @@
       </div>
       <h1 class="av__title">Aprobaciones de manicura</h1>
       <p class="av__sub">Lotes procesados por manicura. Confirmá el peso, elegí la sede y generá el stock.</p>
+      <p class="av__sub av__sub--deprecated">⚠ Flujo anterior: los lotes nuevos se confirman por pesajes diarios en <RouterLink to="/admin/pesajes-manicura">Manicura</RouterLink>. Esta vista existe solo para terminar los lotes que ya estaban en aprobación.</p>
     </div>
 
     <div v-if="loading" class="av__loading">
@@ -362,6 +363,8 @@ onMounted(cargar)
 }
 .av__title { font-size: 1.75rem; font-weight: 800; color: var(--c-ink-900); margin: 0 0 .2rem; letter-spacing: -.03em; }
 .av__sub { font-size: var(--fs-14); color: var(--c-ink-500); margin: 0; }
+.av__sub--deprecated { font-size: .78rem; color: #92400e; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: .45rem .75rem; margin-top: .6rem; }
+.av__sub--deprecated a { color: #92400e; font-weight: 700; }
 
 .av__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 

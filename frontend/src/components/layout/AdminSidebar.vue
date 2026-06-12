@@ -73,7 +73,7 @@ import {
   ClipboardList, Package, Settings, ClipboardCheck, Scale, Webhook, BellRing,
   PanelLeftClose, PanelLeftOpen,
 } from 'lucide-vue-next'
-import { listLotes } from '../../lib/api.js'
+import { listLotes, listPesajesManicuraAdmin } from '../../lib/api.js'
 
 const collapsed = ref(localStorage.getItem('asb-collapsed') === '1')
 
@@ -84,10 +84,15 @@ function toggleCollapse() {
 
 const aprobacionesPendientes = ref(0)
 
+// Badge de Manicura: pesajes esperando confirmación + lotes del flujo
+// anterior esperando aprobación
 async function fetchAprobaciones() {
   try {
-    const { data } = await listLotes({ estado: 'manicura_pendiente' })
-    aprobacionesPendientes.value = (data || []).length
+    const [lotes, pesajes] = await Promise.all([
+      listLotes({ estado: 'manicura_pendiente' }),
+      listPesajesManicuraAdmin().catch(() => ({ data: [] })),
+    ])
+    aprobacionesPendientes.value = (lotes.data || []).length + (pesajes.data || []).length
   } catch {}
 }
 
@@ -122,8 +127,9 @@ const GRUPOS = [
     items: [
       { to: '/admin/stock',                 icon: Boxes,          label: 'Stock' },
       { to: '/admin/cosechado',             icon: Scissors,       label: 'Post-cosecha' },
-      { to: '/aprobaciones',                icon: ClipboardCheck, label: 'Aprobaciones', badge: aprobacionesPendientes },
-      { to: '/admin/pesajes-manicura',      icon: Scale,          label: 'Pesajes manicura' },
+      // Aprobaciones (flujo viejo de manicura) ya no tiene entrada propia:
+      // se accede desde el banner en Manicura solo si hay lotes pendientes
+      { to: '/admin/pesajes-manicura',      icon: Scale,          label: 'Manicura', badge: aprobacionesPendientes },
       { to: '/delivery/despachos', icon: Truck,          label: 'Despachos' },
       { to: '/contabilidad',       icon: Wallet,         label: 'Contabilidad' },
     ],
@@ -208,7 +214,8 @@ onMounted(() => {
 
 watch(() => route.path, (path, prev) => {
   sincronizarGrupos()
-  if (prev === '/aprobaciones' || path === '/aprobaciones') fetchAprobaciones()
+  const rutasManicura = ['/aprobaciones', '/admin/pesajes-manicura']
+  if (rutasManicura.includes(prev) || rutasManicura.includes(path)) fetchAprobaciones()
 })
 </script>
 

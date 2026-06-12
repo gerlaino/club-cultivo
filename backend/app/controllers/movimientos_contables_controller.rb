@@ -117,6 +117,10 @@ class MovimientosContablesController < ApplicationController
         por_mes:  resumen_por_mes(anio_actual, hoy),
       },
       por_sede:            por_sede,
+      # Deuda real de socios = saldos negativos de cuentas corrientes (caja con deuda visible)
+      por_cobrar:          CuentaCorriente.where(club_id: club.id)
+                                          .where('saldo_disponible < 0')
+                                          .sum('-saldo_disponible').to_f,
       ultimos_movimientos: scope.recientes.limit(10).map { |m| serialize(m) },
     }
   end
@@ -140,6 +144,22 @@ class MovimientosContablesController < ApplicationController
 
   # PATCH /movimientos_contables/:id
   def update
+    if @movimiento.dispensacion_id.present?
+      return render json: { error: 'Este movimiento fue generado por una dispensación. Para corregirlo, editá o eliminá la dispensación.' }, status: :unprocessable_entity
+    end
+
+    # Un aporte de socio ya acreditó su cuenta corriente: cambiarle el monto o el
+    # paciente desincronizaría libro y crédito. Se elimina (revierte el crédito) y se recarga.
+    if @movimiento.categoria == 'aporte_socio' && @movimiento.paciente_id.present?
+      nuevo_monto    = movimiento_params[:monto_ars]
+      nuevo_paciente = movimiento_params[:paciente_id]
+      monto_cambia    = nuevo_monto.present?    && nuevo_monto.to_d != @movimiento.monto_ars.to_d
+      paciente_cambia = nuevo_paciente.present? && nuevo_paciente.to_i != @movimiento.paciente_id
+      if monto_cambia || paciente_cambia
+        return render json: { error: 'Este aporte ya acreditó la cuenta corriente del socio. Eliminalo (se revierte el crédito) y cargalo de nuevo con los datos correctos.' }, status: :unprocessable_entity
+      end
+    end
+
     if @movimiento.update(movimiento_params)
       render json: serialize(@movimiento)
     else
@@ -149,6 +169,9 @@ class MovimientosContablesController < ApplicationController
 
   # DELETE /movimientos_contables/:id
   def destroy
+    if @movimiento.dispensacion_id.present?
+      return render json: { error: 'Este movimiento fue generado por una dispensación. Eliminá la dispensación para que el libro y el stock queden consistentes.' }, status: :unprocessable_entity
+    end
     @movimiento.destroy
     head :no_content
   end
@@ -229,10 +252,11 @@ class MovimientosContablesController < ApplicationController
 
   def calcular_totales(scope)
     {
-      ingresos: scope.ingresos.sum(:monto_ars).to_f,
-      egresos:  scope.egresos.sum(:monto_ars).to_f,
-      balance:  (scope.ingresos.sum(:monto_ars) - scope.egresos.sum(:monto_ars)).to_f,
-      count:    scope.count,
+      ingresos:  scope.ingresos.sum(:monto_ars).to_f,
+      egresos:   scope.egresos.sum(:monto_ars).to_f,
+      balance:   (scope.ingresos.sum(:monto_ars) - scope.egresos.sum(:monto_ars)).to_f,
+      a_credito: scope.a_credito.sum(:monto_ars).to_f,
+      count:     scope.count,
     }
   end
 

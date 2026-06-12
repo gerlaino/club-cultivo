@@ -6,9 +6,16 @@
         <Scale :size="14" :stroke-width="2" />
         Administración
       </div>
-      <h1 class="apm__title">Pesajes de manicura</h1>
+      <h1 class="apm__title">Manicura</h1>
       <p class="apm__sub">Pesajes diarios enviados por manicura. Confirmá el peso y asigná el contenedor de stock.</p>
     </div>
+
+    <!-- Lotes del flujo anterior pendientes de aprobación -->
+    <RouterLink v-if="lotesFlujoViejo > 0" to="/aprobaciones" class="apm__legacy-banner">
+      <Clock :size="15" :stroke-width="2" />
+      <span><strong>{{ lotesFlujoViejo }}</strong> lote{{ lotesFlujoViejo === 1 ? '' : 's' }} del flujo anterior esperando aprobación</span>
+      <span class="apm__legacy-cta">Ir a aprobar →</span>
+    </RouterLink>
 
     <div v-if="loading" class="apm__loading">
       <DsSpinner />
@@ -164,13 +171,16 @@
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, MessageCircle, List } from 'lucide-vue-next'
-import { listPesajesManicuraAdmin, confirmarPesajeManicura, listStocks } from '../../lib/api.js'
+import { listPesajesManicuraAdmin, confirmarPesajeManicura, listStocks, listLotes } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast = useToast()
 
 const loading      = ref(true)
 const pesajes      = ref([])
+// Lotes del flujo anterior (manicura_pendiente) que aún esperan aprobación.
+// Cuando este contador llegue a 0 de forma permanente, /aprobaciones puede eliminarse.
+const lotesFlujoViejo = ref(0)
 const modalOpen    = ref(false)
 const pesajeActivo = ref(null)
 const loadingStocks = ref(false)
@@ -206,6 +216,10 @@ async function cargar() {
   } finally {
     loading.value = false
   }
+  try {
+    const { data } = await listLotes({ estado: 'manicura_pendiente' })
+    lotesFlujoViejo.value = (data || []).length
+  } catch { lotesFlujoViejo.value = 0 }
 }
 
 async function abrirConfirmacion(p) {
@@ -268,7 +282,10 @@ onMounted(cargar)
 </script>
 
 <style scoped>
-.apm { padding: var(--sp-6); max-width: 900px; }
+.apm { padding: var(--sp-6); max-width: 900px; margin: 0 auto; }
+.apm__legacy-banner { display: flex; align-items: center; gap: var(--sp-2); background: #fffbeb; border: 1.5px solid #fcd34d; color: #92400e; border-radius: 10px; padding: .65rem 1rem; font-size: .82rem; text-decoration: none; margin-bottom: var(--sp-4); transition: background .15s; }
+.apm__legacy-banner:hover { background: #fef3c7; }
+.apm__legacy-cta { margin-left: auto; font-weight: 700; white-space: nowrap; }
 
 /* Header */
 .apm__header    { margin-bottom: var(--sp-6); }

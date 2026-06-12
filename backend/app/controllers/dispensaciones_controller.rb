@@ -76,8 +76,8 @@ class DispensacionesController < ApplicationController
     monto = @dispensacion.aporte_socio_ars.to_d
 
     # Regla universal: aporte obligatorio para todo medio de pago que no sea no_abona.
-    # no_abona tiene autocalc arriba; si sigue en 0 hay un problema de precio.
-    if monto <= 0
+    # Excepción: credito_gramos consume gramos prepagos, no pesos — el aporte es 0.
+    if monto <= 0 && @dispensacion.medio_pago != 'credito_gramos'
       return render json: { error: 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.' }, status: :unprocessable_entity
     end
 
@@ -91,19 +91,26 @@ class DispensacionesController < ApplicationController
       if cc.nil? || cc.limite_credito.to_f <= 0
         return render json: { error: 'El paciente no tiene crédito configurado. Consultá con el administrador.' }, status: :unprocessable_entity
       end
+    when 'credito_gramos'
+      unless cc&.credito_gramos_activo?
+        return render json: { error: 'El paciente no tiene crédito en gramos activo.' }, status: :unprocessable_entity
+      end
+      if cc.saldo_disponible_g.to_d < @dispensacion.cantidad.to_d
+        return render json: { error: "Gramos insuficientes: dispone de #{cc.saldo_disponible_g.to_f}g" }, status: :unprocessable_entity
+      end
     end
 
-    # Verificación universal de crédito: si el paciente tiene límite configurado,
-    # ninguna dispensación puede superar el disponible, sin importar el medio de pago.
-    if cc&.limite_credito.to_f > 0 && !cc.puede_dispensar?(monto)
+    # Verificación de crédito: solo aplica cuando el medio de pago consume crédito.
+    # Pagos reales (efectivo/transferencia) no generan deuda ni se topean por el límite.
+    if @dispensacion.a_credito? && cc && !cc.puede_dispensar?(monto)
       return render json: { error: 'Crédito insuficiente para realizar la dispensa.' }, status: :unprocessable_entity
     end
 
     ActiveRecord::Base.transaction do
       @dispensacion.save!
       crear_movimiento_contable(@dispensacion)
-      # Debitar crédito para todos los medios de pago cuando el paciente tiene límite
-      debitar_cuenta_corriente(@dispensacion) if cc&.limite_credito.to_f > 0
+      debitar_cuenta_corriente(@dispensacion) if @dispensacion.a_credito? && cc
+      debitar_gramos(@dispensacion)           if @dispensacion.medio_pago == 'credito_gramos'
     end
 
     render json: serialize_dispensacion(@dispensacion), status: :created
@@ -257,6 +264,7 @@ class DispensacionesController < ApplicationController
   # DELETE /dispensaciones/:id
   def destroy
     ActiveRecord::Base.transaction do
+      revertir_gramos(@dispensacion)
       revertir_cuenta_corriente(@dispensacion)
       # Nullify FK references before destroy (prevents FK constraint violation)
       CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)
@@ -365,8 +373,11 @@ class DispensacionesController < ApplicationController
     cc = dispensacion.paciente.cuenta_corriente
     return unless cc
 
-    # Usar la suma real de débitos (más robusto ante el bug de doble POST)
-    total = cc.movimientos.where(dispensacion: dispensacion, tipo: 'debito').sum(:monto).abs
+    # Usar la suma real de débitos (más robusto ante el bug de doble POST).
+    # Solo débitos en pesos: los de gramos los maneja revertir_gramos.
+    total = cc.movimientos.where(dispensacion: dispensacion, tipo: 'debito')
+              .where("unidad IS NULL OR unidad = 'ars'")
+              .sum(:monto).abs
     return if total <= 0
 
     anterior = cc.saldo_disponible
@@ -446,7 +457,9 @@ class DispensacionesController < ApplicationController
       descripcion:      descripcion,
       monto_ars:        monto,
       fecha:            dispensacion.fecha_dispensacion,
-      pagado:           true,
+      # Contabilidad de caja: a crédito no entra plata real, queda como deuda visible.
+      # El ingreso real se registra cuando el socio paga (aporte_socio).
+      pagado:           !dispensacion.a_credito?,
       medio_pago:       dispensacion.medio_pago || 'efectivo',
       comprobante_tipo: 'sin_comprobante',
     )

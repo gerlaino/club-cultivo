@@ -21,6 +21,11 @@ import {useClubStore} from "./stores/club.js";
 import { registerSW } from 'virtual:pwa-register'
 registerSW({ immediate: true })
 
+// Cuando el nuevo Service Worker toma control, recargar para servir assets frescos
+navigator.serviceWorker?.addEventListener('controllerchange', () => {
+  window.location.reload()
+})
+
 const app = createApp(App);
 
 app.use(createPinia());

@@ -145,8 +145,12 @@ const {
 } = useSocioCuentaCorriente(props.socioId)
 
 // ── Draft state ────────────────────────────────────────────
+// El on/off es estado explícito (ref), no se deriva del valor: si fuera
+// derivado, encender el toggle con valor 0 no tendría ningún efecto visible.
 const draftLimite    = ref(0)
 const draftDescuento = ref(0)
+const creditoOn      = ref(false)
+const descuentoOn    = ref(false)
 const saving         = ref(false)
 
 // Inicializar draft cuando carga cc
@@ -154,34 +158,38 @@ watch(cc, (val) => {
   if (val) {
     draftLimite.value    = val.limite_credito ?? 0
     draftDescuento.value = store.current?.descuento_porcentaje ?? 0
+    creditoOn.value      = (val.limite_credito ?? 0) > 0
+    descuentoOn.value    = (store.current?.descuento_porcentaje ?? 0) > 0
   }
 }, { immediate: true })
 
 watch(descuentoPorcentaje, (val) => {
-  if (!hasChanges.value) draftDescuento.value = val
+  if (!hasChanges.value) {
+    draftDescuento.value = val
+    descuentoOn.value    = (val ?? 0) > 0
+  }
 })
 
-const creditoOn   = computed(() => (draftLimite.value ?? 0) > 0)
-const descuentoOn = computed(() => (draftDescuento.value ?? 0) > 0)
+// Valor efectivo que se guardaría: toggle apagado = 0
+const limiteEfectivo    = computed(() => creditoOn.value   ? (draftLimite.value    || 0) : 0)
+const descuentoEfectivo = computed(() => descuentoOn.value ? (draftDescuento.value || 0) : 0)
 
 const hasChanges = computed(() =>
-  (draftLimite.value ?? 0) !== (cc.value?.limite_credito ?? 0) ||
-  (draftDescuento.value ?? 0) !== (descuentoPorcentaje.value ?? 0)
+  limiteEfectivo.value    !== (cc.value?.limite_credito ?? 0) ||
+  descuentoEfectivo.value !== (descuentoPorcentaje.value ?? 0)
 )
 
 function toggleCredito() {
+  creditoOn.value = !creditoOn.value
   if (creditoOn.value) {
-    draftLimite.value = 0
-  } else {
-    // Restaurar valor previo o poner un valor base
+    // Restaurar valor previo si existía; si no, dejar el input vacío para tipear
     draftLimite.value = (cc.value?.limite_credito ?? 0) > 0 ? cc.value.limite_credito : null
   }
 }
 
 function toggleDescuento() {
+  descuentoOn.value = !descuentoOn.value
   if (descuentoOn.value) {
-    draftDescuento.value = 0
-  } else {
     draftDescuento.value = (descuentoPorcentaje.value ?? 0) > 0 ? descuentoPorcentaje.value : null
   }
 }
@@ -189,17 +197,19 @@ function toggleDescuento() {
 function resetDraft() {
   draftLimite.value    = cc.value?.limite_credito ?? 0
   draftDescuento.value = descuentoPorcentaje.value ?? 0
+  creditoOn.value      = (cc.value?.limite_credito ?? 0) > 0
+  descuentoOn.value    = (descuentoPorcentaje.value ?? 0) > 0
 }
 
 async function guardarCambios() {
   saving.value = true
   try {
-    const limiteChanged    = (draftLimite.value ?? 0) !== (cc.value?.limite_credito ?? 0)
-    const descuentoChanged = (draftDescuento.value ?? 0) !== (descuentoPorcentaje.value ?? 0)
+    const limiteChanged    = limiteEfectivo.value    !== (cc.value?.limite_credito ?? 0)
+    const descuentoChanged = descuentoEfectivo.value !== (descuentoPorcentaje.value ?? 0)
 
     const promises = []
-    if (limiteChanged)    promises.push(setLimiteCC(props.socioId, draftLimite.value ?? 0))
-    if (descuentoChanged) promises.push(updatePaciente(props.socioId, { descuento_porcentaje: draftDescuento.value ?? 0 }))
+    if (limiteChanged)    promises.push(setLimiteCC(props.socioId, limiteEfectivo.value))
+    if (descuentoChanged) promises.push(updatePaciente(props.socioId, { descuento_porcentaje: descuentoEfectivo.value }))
 
     const results = await Promise.all(promises)
 

@@ -7,6 +7,14 @@
         <Menu :size="20" :stroke-width="1.75" />
       </button>
 
+      <!-- Identidad del club (tenant) -->
+      <div class="atb__club" :title="club.name">
+        <img v-if="club.logoUrl" :src="club.logoUrl" class="atb__club-logo" :alt="club.name" />
+        <DsAvatar v-else :name="club.name" tone="role-admin" size="sm" />
+        <span class="atb__club-name">{{ club.name }}</span>
+      </div>
+      <span class="atb__club-sep" aria-hidden="true"></span>
+
       <!-- Breadcrumb -->
       <nav class="atb__bc" aria-label="breadcrumb">
         <template v-for="(crumb, i) in breadcrumbs" :key="i">
@@ -174,7 +182,7 @@ const SEGMENT_LABELS = {
   stock:                  'Stock',
   'informe-semestral':    'REPROCANN',
   'plan-trabajo':         'Plan de trabajo',
-  'pesajes-manicura':     'Pesajes de manicura',
+  'pesajes-manicura':     'Manicura',
   'socios-criticos':      'Socios críticos',
   'alertas-configuracion':'Alertas',
   'admin':                'Administración',
@@ -238,6 +246,42 @@ async function handleLogout() {
 }
 .atb__hamburger:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
 @media (max-width: 1023px) { .atb__hamburger { display: flex; } }
+
+/* Identidad del club */
+.atb__club {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.atb__club-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  border: 1px solid var(--c-ink-100);
+  background: #fff;
+  flex-shrink: 0;
+}
+.atb__club-name {
+  font-size: var(--fs-13);
+  font-weight: 700;
+  color: var(--c-ink-900);
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atb__club-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--c-ink-300);
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .atb__club-name, .atb__club-sep { display: none; }
+}
 
 /* Breadcrumb */
 .atb__bc {

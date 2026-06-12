@@ -12,7 +12,8 @@ class Lote < ApplicationRecord
   has_many :lote_eventos,          dependent: :destroy
   has_many :pesadas,               -> { order(registrado_at: :asc) }, dependent: :destroy
   has_many :stocks,                dependent: :nullify
-  has_many :pesajes_manicura,      dependent: :destroy
+  # class_name explícito: Rails inferiría "PesajesManicura" (clase inexistente)
+  has_many :pesajes_manicura,      class_name: 'PesajeManicura', dependent: :destroy
   has_many_attached :fotos
   has_many :notas,      as: :noteable,              dependent: :destroy
   has_many :analisis_ia, class_name: 'AnalisisIa', dependent: :destroy
@@ -257,6 +258,12 @@ class Lote < ApplicationRecord
   # Aprueba pesada del manicurador, genera stock y finaliza el lote en un solo paso.
   def aprobar_y_finalizar!(aprobado_por:, peso_seco_g: nil, sede_id: nil, precio_sugerido_ars: nil)
     raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
+
+    # Guard anti doble stock: si el lote ya generó stock por el flujo de pesajes
+    # diarios (PesajeManicura confirmados), aprobarlo de nuevo duplicaría los gramos.
+    if pesajes_manicura.where(estado: 'confirmado').exists?
+      raise "Este lote ya generó stock a través de pesajes de manicura confirmados — no se puede aprobar de nuevo"
+    end
 
     ultima_pesada = pesadas.where(fase_origen: 'en_manicura', manicurado: true).reorder(id: :desc).first
     ultima_pesada ||= pesadas.where(manicurado: true).reorder(id: :desc).first

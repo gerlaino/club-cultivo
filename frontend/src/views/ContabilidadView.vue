@@ -10,7 +10,12 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
 const sedes   = ref([])
-const canEdit = computed(() => ["admin","abogado"].includes(auth.role))
+// Solo admin: el backend rechaza escritura de cualquier otro rol (abogado incluido)
+const canEdit = computed(() => ["admin","super_admin"].includes(auth.role))
+
+// Los movimientos generados por dispensaciones no se editan ni borran a mano:
+// se corrigen desde la dispensación para que libro, stock y CC queden consistentes
+const esAutomatico = (m) => !!m.dispensacion_id
 const { confirm } = useConfirm()
 
 const vistaActiva    = ref("dashboard")
@@ -384,6 +389,11 @@ onMounted(async () => {
             </div>
             <div class="cv__kpi-bar" :style="{ background: balanceColor(store.dashboard.mes_actual.balance) }"></div>
           </div>
+          <div v-if="store.dashboard.por_cobrar > 0" class="cv__kpi">
+            <div class="cv__kpi-label">Por cobrar (deuda de socios)</div>
+            <div class="cv__kpi-val cv__kpi-val--amber">{{ fmt(store.dashboard.por_cobrar) }}</div>
+            <div class="cv__kpi-bar cv__kpi-bar--amber"></div>
+          </div>
           <div class="cv__kpi cv__kpi--highlight">
             <div class="cv__kpi-label">Balance del año</div>
             <div class="cv__kpi-val" :style="{ color: balanceColor(store.dashboard.anio_actual.balance) }">
@@ -552,9 +562,15 @@ onMounted(async () => {
               <div class="cv__mov-cat">{{ catLabel(m.categoria) }}</div>
               <div class="cv__mov-monto" :style="{ color: tipoMeta(m.tipo).color }">{{ fmt(m.monto_ars) }}</div>
               <div class="cv__mov-actions">
-                <button v-if="canEdit" class="cv__icon-btn" @click="openEdit(m)" title="Editar">
-                  <i class="bi bi-pencil"></i>
-                </button>
+                <template v-if="canEdit && !esAutomatico(m)">
+                  <button class="cv__icon-btn" @click="openEdit(m)" title="Editar">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="cv__icon-btn cv__icon-btn--danger" @click="confirmDelete(m)" title="Eliminar">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </template>
+                <i v-else-if="esAutomatico(m)" class="bi bi-link-45deg cv__auto-icon" title="Generado por una dispensación — se corrige desde la dispensación"></i>
               </div>
             </div>
           </div>
@@ -650,13 +666,16 @@ onMounted(async () => {
               <td class="cv__td-right cv__td-bold" :style="{ color: tipoMeta(m.tipo).color }">{{ fmt(m.monto_ars) }}</td>
               <td>
                   <span class="cv__pagado-pill" :class="m.pagado ? 'cv__pagado-pill--ok' : 'cv__pagado-pill--pend'">
-                    {{ m.pagado ? '✓ Pagado' : 'Pendiente' }}
+                    {{ m.pagado ? '✓ Pagado' : (['ingreso','recupero_costo'].includes(m.tipo) ? 'A crédito' : 'Pendiente') }}
                   </span>
               </td>
               <td v-if="canEdit">
                 <div class="cv__row-actions">
-                  <button class="cv__icon-btn" @click="openEdit(m)"><i class="bi bi-pencil"></i></button>
-                  <button class="cv__icon-btn cv__icon-btn--danger" @click="confirmDelete(m)"><i class="bi bi-trash"></i></button>
+                  <template v-if="!esAutomatico(m)">
+                    <button class="cv__icon-btn" @click="openEdit(m)"><i class="bi bi-pencil"></i></button>
+                    <button class="cv__icon-btn cv__icon-btn--danger" @click="confirmDelete(m)"><i class="bi bi-trash"></i></button>
+                  </template>
+                  <i v-else class="bi bi-link-45deg cv__auto-icon" title="Generado por una dispensación — se corrige desde la dispensación"></i>
                 </div>
               </td>
             </tr>
@@ -832,9 +851,12 @@ onMounted(async () => {
 .cv__kpi-label { font-size: .72rem; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .5rem; }
 .cv__kpi-val { font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em; }
 .cv__kpi-val--green { color: #15803d; }
+.cv__kpi-val--amber { color: #b45309; }
 .cv__kpi-val--red   { color: #dc2626; }
 .cv__kpi-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; }
 .cv__kpi-bar--green   { background: #15803d; }
+.cv__kpi-bar--amber   { background: #f59e0b; }
+.cv__auto-icon { color: #94a3b8; font-size: 1rem; cursor: help; }
 .cv__kpi-bar--red     { background: #dc2626; }
 .cv__kpi-bar--neutral { background: #e2e8f0; }
 

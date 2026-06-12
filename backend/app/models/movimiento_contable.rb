@@ -9,7 +9,8 @@ class MovimientoContable < ApplicationRecord
   belongs_to :paciente,     optional: true
   belongs_to :created_by,   class_name: "User"
 
-  after_create :acreditar_cuenta_corriente
+  after_create   :acreditar_cuenta_corriente
+  before_destroy :revertir_credito_cuenta_corriente
 
   TIPOS = %w[egreso ingreso recupero_costo ajuste].freeze
 
@@ -35,7 +36,8 @@ class MovimientoContable < ApplicationRecord
   }.freeze
 
   TIPOS_COMPROBANTE = %w[factura_a factura_b recibo ticket sin_comprobante].freeze
-  MEDIOS_PAGO       = %w[efectivo transferencia mercado_pago cheque].freeze
+  # cuenta_corriente y no_abona llegan desde dispensaciones a crédito (pagado: false)
+  MEDIOS_PAGO       = %w[efectivo transferencia mercado_pago cheque cuenta_corriente no_abona].freeze
 
   # Categorías que típicamente son egresos
   CATEGORIAS_EGRESO = %w[
@@ -52,10 +54,14 @@ class MovimientoContable < ApplicationRecord
   validates :monto_ars,   presence: true,
             numericality: { greater_than: 0 }
   validates :fecha,       presence: true
+  validates :medio_pago,  inclusion: { in: MEDIOS_PAGO }, allow_blank: true
   validate  :fecha_no_futura
 
   scope :egresos,          -> { where(tipo: %w[egreso]) }
-  scope :ingresos,         -> { where(tipo: %w[ingreso recupero_costo]) }
+  # Contabilidad de caja: solo cuenta como ingreso la plata que entró de verdad.
+  # Las dispensaciones a crédito (pagado: false) son deuda visible, no ingreso.
+  scope :ingresos,         -> { where(tipo: %w[ingreso recupero_costo]).where.not(pagado: false) }
+  scope :a_credito,        -> { where(tipo: %w[ingreso recupero_costo], pagado: false) }
   scope :del_periodo,      ->(desde, hasta) { where(fecha: desde..hasta) }
   scope :del_mes,          ->(fecha = Time.zone.today) {
     where(fecha: fecha.beginning_of_month..fecha.end_of_month)
@@ -111,6 +117,36 @@ class MovimientoContable < ApplicationRecord
     end
   rescue => e
     Rails.logger.error "[MovimientoContable] Error al acreditar CC paciente #{paciente_id}: #{e.message}"
+    raise
+  end
+
+  # Espejo de acreditar_cuenta_corriente: si se elimina un aporte que acreditó
+  # la CC del socio, el crédito debe revertirse — si no, el socio conserva
+  # crédito por un pago que ya no figura en el libro.
+  def revertir_credito_cuenta_corriente
+    return unless categoria == 'aporte_socio' && paciente_id.present? && monto_ars.to_d > 0
+
+    cc = paciente&.cuenta_corriente
+    return unless cc
+    return unless cc.movimientos.where(tipo: 'pago')
+                    .where(descripcion: "Pago registrado — Mov. contable ##{id}").exists?
+
+    anterior = cc.saldo_disponible
+    nuevo    = anterior - monto_ars.to_d
+
+    ActiveRecord::Base.transaction do
+      cc.update!(saldo_disponible: nuevo)
+      cc.movimientos.create!(
+        tipo:           'ajuste',
+        monto:          -monto_ars.to_d,
+        saldo_anterior: anterior,
+        saldo_nuevo:    nuevo,
+        descripcion:    "Reversa por eliminación de pago — Mov. contable ##{id}",
+        created_by:     created_by
+      )
+    end
+  rescue => e
+    Rails.logger.error "[MovimientoContable] Error al revertir CC paciente #{paciente_id}: #{e.message}"
     raise
   end
 end
