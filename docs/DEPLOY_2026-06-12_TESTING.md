@@ -129,3 +129,52 @@ Para cada caso, anotá el saldo de CC del paciente ANTES (pestaña Cuenta Corrie
 ---
 
 *Si algo de T3/T4 no da como se describe acá, no deployes y avisame: es el corazón financiero.*
+
+---
+
+# Anexo — Lote 2026-06-13 (4 pendientes grandes)
+
+**Estado:** Backend 582/582 ✅ · Frontend 58/58 ✅ · Build ✅
+**Migraciones nuevas:** `clubs.contabilidad_cerrada_hasta` y tabla `auditorias`. Correr `rails db:migrate`.
+
+## Qué cambió
+
+**1. Service worker — toast en vez de reload automático.** Al haber nueva versión aparece un banner abajo ("Hay una nueva versión — Actualizar"); recién al tocar el botón se actualiza y recarga. Nunca recarga solo en medio de un formulario.
+
+**2. Manicura: flujo viejo eliminado.** Cuando el manicurista pesa un lote (en cualquier estado: en_manicura o secado), ahora **siempre** se crea un pesaje en la cola única de "Manicura" para confirmar. El estado `manicura_pendiente` ya no se genera. Lotes en "secado" pasan automáticamente a "en_manicura" al pesarlos. La vista "Aprobaciones" queda solo para lotes viejos que ya estaban en ese estado.
+
+**3. Costos del lote derivados del libro contable.** Cargar un egreso en Contabilidad con un lote asignado actualiza automáticamente el CostoLote de ese lote (insumos / energía / mano de obra según categoría). En la card de costos del lote hay un botón **"Desde libro"** para recalcular a demanda. El P&L por lote ya no requiere doble carga.
+
+**4. Cierre de período + auditoría.** En el dashboard de Contabilidad (admin) hay una barra para **cerrar el período** hasta fin del mes anterior: los movimientos de fechas cerradas quedan inmutables (no se crean, editan ni borran). Botón **Reabrir** para levantarlo (queda auditado). Cada create/update/delete de movimiento se registra en la tabla de auditoría con usuario y cambios.
+
+## Testing — bloques nuevos
+
+### T10. Service worker (requiere 2 deploys o build nuevo)
+1. Con la app abierta, deployá una versión nueva. ✅ Aparece banner abajo, **sin recargar solo**.
+2. Empezá a cargar un formulario largo, esperá el banner. ✅ El form no se pierde hasta que vos toques "Actualizar".
+3. Tocá "Actualizar" → ✅ recarga con la versión nueva.
+
+### T11. Manicura — flujo único (15 min)
+1. Como manicurista, pesá un lote en **en_manicura**. ✅ No finaliza solo: queda un pesaje "enviado". Como admin, andá a **Manicura** → ✅ está el pesaje para confirmar → confirmá → ✅ genera/acumula stock.
+2. Como manicurista, pesá un lote en **secado**. ✅ El lote pasa a "en_manicura" y se crea el pesaje en la misma cola (antes iba a "Aprobaciones"). Confirmalo desde Manicura.
+3. Completá todas las plantas de un lote vía pesajes confirmados. ✅ Al confirmar el último, el lote pasa a "finalizado" solo.
+4. ✅ Pesar sin peso (0g) → error claro.
+5. Si tenés algún lote viejo en "manicura_pendiente": ✅ el banner ámbar en Manicura te lleva a Aprobaciones para terminarlo. Si no hay ninguno, no aparece banner.
+
+### T12. Costos desde el libro (8 min)
+1. Contabilidad → cargá un egreso categoría **Insumo** con un lote asignado, $5.000. Repetí con **Electricidad** $3.000 al mismo lote.
+2. Andá al detalle del lote → card de Costos. ✅ Insumos $5.000, Energía $3.000, Total $8.000 (sin haberlos tipeado en el lote).
+3. Editá los costos a mano y guardá → ✅ se respeta lo manual. Tocá **"Desde libro"** → ✅ vuelve a los valores del libro.
+4. Borrá el egreso de Insumo en Contabilidad → volvé al lote → ✅ Insumos bajó a $0.
+
+### T13. Cierre de período (10 min)
+1. Contabilidad → dashboard (como admin). ✅ Barra "Sin cierre de período" con botón "Cerrar hasta [fin mes anterior]".
+2. Cargá un movimiento con fecha del mes pasado. Cerrá el período → ✅ confirma y la barra pasa a "Libro cerrado hasta…".
+3. Intentá editar/borrar ese movimiento del mes pasado → ✅ no hay botones (candado 🔒); por API daría 422.
+4. Cargá un movimiento con fecha **de hoy** → ✅ funciona (posterior al cierre).
+5. Intentá cargar uno con fecha **dentro del período cerrado** → ✅ error "período cerrado".
+6. Tocá **Reabrir** → ✅ los movimientos vuelven a ser editables.
+7. Intentá eliminar una **dispensación** cuyo asiento cae en período cerrado → ✅ error claro (no se puede).
+8. (Opcional, rol no-admin) Un cultivador no ve la barra de cierre y el endpoint le da 403.
+
+*Como antes: si T11/T12/T13 tocan algo financiero o de stock y no da como se describe, frená y avisame.*

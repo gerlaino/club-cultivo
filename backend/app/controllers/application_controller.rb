@@ -5,6 +5,7 @@ class ApplicationController < ActionController::API
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
 
   before_action :inject_jwt_from_cookie
+  before_action :set_current_user
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
 
@@ -34,6 +35,13 @@ class ApplicationController < ActionController::API
     unless current_user&.admin? || current_user&.super_admin?
       render json: { error: "No autorizado" }, status: :forbidden
     end
+  end
+
+  # Expone el usuario del request a la capa de modelos (concern Auditable)
+  def set_current_user
+    Current.user = current_user if respond_to?(:current_user, true)
+  rescue StandardError
+    Current.user = nil
   end
 
   def inject_jwt_from_cookie

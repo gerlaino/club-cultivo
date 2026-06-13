@@ -42,6 +42,17 @@ class Paciente < ApplicationRecord
     "#{nombre} #{apellido}"
   end
 
+  # Estado REPROCANN cruzado con la fecha: el campo manual puede quedar en
+  # "activo" después de vencer — para mostrar, la fecha manda sobre el campo.
+  def reprocann_estado_efectivo
+    if reprocann_vencimiento.present? && reprocann_vencimiento < Date.today &&
+       %w[activo pendiente].include?(reprocann_estado.to_s)
+      'vencido'
+    else
+      reprocann_estado
+    end
+  end
+
   def saldo_cc
     cuenta_corriente&.saldo_disponible&.to_f
   end

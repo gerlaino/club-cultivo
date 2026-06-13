@@ -19,10 +19,38 @@ import {useAuthStore} from "./stores/auth.js";
 import {useClubStore} from "./stores/club.js";
 
 import { registerSW } from 'virtual:pwa-register'
-registerSW({ immediate: true })
 
-// Cuando el nuevo Service Worker toma control, recargar para servir assets frescos
+// Nueva versión disponible → banner no intrusivo. Nunca recargar solos:
+// un operador puede estar a mitad de una dispensación o un alta.
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    mostrarBannerActualizacion()
+  },
+})
+
+function mostrarBannerActualizacion() {
+  if (document.getElementById('sw-update-banner')) return
+  const banner = document.createElement('div')
+  banner.id = 'sw-update-banner'
+  banner.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9999;' +
+    'display:flex;align-items:center;gap:12px;background:#0f172a;color:#fff;padding:10px 16px;' +
+    'border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font:600 13px system-ui,sans-serif;'
+  banner.innerHTML = '<span>Hay una nueva versión de la app</span>'
+  const btn = document.createElement('button')
+  btn.textContent = 'Actualizar'
+  btn.style.cssText = 'background:#4ade80;color:#0f172a;border:none;border-radius:8px;' +
+    'padding:6px 14px;font:700 13px system-ui,sans-serif;cursor:pointer;'
+  btn.onclick = () => { btn.textContent = 'Actualizando…'; updateSW(true) }
+  banner.appendChild(btn)
+  document.body.appendChild(banner)
+}
+
+// Cuando el SW nuevo toma control (tras aceptar el banner), recargar para servir assets frescos
+let swRecargando = false
 navigator.serviceWorker?.addEventListener('controllerchange', () => {
+  if (swRecargando) return
+  swRecargando = true
   window.location.reload()
 })
 

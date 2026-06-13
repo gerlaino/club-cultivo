@@ -42,6 +42,15 @@ class CostoLotesController < ApplicationController
     end
   end
 
+  # POST /lotes/:lote_id/costo/recalcular
+  # Deriva insumos/energía/mano de obra desde los egresos del libro con este lote
+  def recalcular
+    costo = CostoDesdeLibroService.new(lote: @lote, actualizado_por: current_user).call
+    render json: serialize(costo)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
   private
 
   def set_lote

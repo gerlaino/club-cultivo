@@ -1,5 +1,7 @@
 # backend/app/models/movimiento_contable.rb
 class MovimientoContable < ApplicationRecord
+  include Auditable
+
   self.table_name = "movimientos_contables"
 
   belongs_to :club
@@ -11,6 +13,9 @@ class MovimientoContable < ApplicationRecord
 
   after_create   :acreditar_cuenta_corriente
   before_destroy :revertir_credito_cuenta_corriente
+  # El libro es la fuente de verdad de los costos por lote: cualquier cambio
+  # en un egreso con lote recalcula su CostoLote (P&L siempre consistente)
+  after_commit   :sincronizar_costo_lote, on: [:create, :update, :destroy]
 
   TIPOS = %w[egreso ingreso recupero_costo ajuste].freeze
 
@@ -56,6 +61,8 @@ class MovimientoContable < ApplicationRecord
   validates :fecha,       presence: true
   validates :medio_pago,  inclusion: { in: MEDIOS_PAGO }, allow_blank: true
   validate  :fecha_no_futura
+  validate  :periodo_no_cerrado, on: [:create, :update]
+  before_destroy :verificar_periodo_no_cerrado, prepend: true
 
   scope :egresos,          -> { where(tipo: %w[egreso]) }
   # Contabilidad de caja: solo cuenta como ingreso la plata que entró de verdad.
@@ -87,10 +94,38 @@ class MovimientoContable < ApplicationRecord
     %w[ingreso recupero_costo].include?(tipo)
   end
 
+  # Pertenece a un período contable cerrado por el club (inmutable)
+  def cerrado?
+    cierre = club&.contabilidad_cerrada_hasta
+    cierre.present? && fecha.present? && fecha <= cierre
+  end
+
   private
 
   def fecha_no_futura
     errors.add(:fecha, "no puede ser futura") if fecha.present? && fecha > Date.today
+  end
+
+  # Cierre de período: una vez cerrado un mes, sus movimientos son inmutables.
+  # Correcciones sobre períodos cerrados = contra-asiento con fecha actual,
+  # o reabrir el período (acción de admin, auditada).
+  def periodo_no_cerrado
+    cierre = club&.contabilidad_cerrada_hasta
+    return if cierre.blank?
+
+    if fecha.present? && fecha <= cierre
+      errors.add(:fecha, "pertenece a un período cerrado (hasta el #{cierre.strftime('%d/%m/%Y')})")
+    end
+
+    if persisted? && will_save_change_to_fecha? && fecha_was.present? && fecha_was <= cierre
+      errors.add(:base, 'No se puede modificar un movimiento de un período cerrado')
+    end
+  end
+
+  def verificar_periodo_no_cerrado
+    return unless cerrado?
+    errors.add(:base, 'No se puede eliminar un movimiento de un período cerrado')
+    throw :abort
   end
 
   # Cuando se registra un pago de socio (aporte_socio) vinculado a un paciente,
@@ -148,5 +183,18 @@ class MovimientoContable < ApplicationRecord
   rescue => e
     Rails.logger.error "[MovimientoContable] Error al revertir CC paciente #{paciente_id}: #{e.message}"
     raise
+  end
+
+  def sincronizar_costo_lote
+    lote_ids = [lote_id, previous_changes['lote_id']&.first].compact.uniq
+    return if lote_ids.empty?
+
+    lote_ids.each do |id|
+      l = Lote.find_by(id: id)
+      CostoDesdeLibroService.new(lote: l).call if l
+    end
+  rescue => e
+    # No bloquear la operación contable: el costo se puede recalcular a mano
+    Rails.logger.error "[MovimientoContable] Error al sincronizar costo de lote: #{e.message}"
   end
 end

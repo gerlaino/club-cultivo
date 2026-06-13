@@ -270,59 +270,52 @@ class LotesController < ApplicationController
       return render json: LoteSerializer.serialize(@lote.reload, include_plants: true), status: :created
     end
 
-    # Manicura pesa un lote en en_manicura (nuevo flujo) → manicura_pendiente
-    if manicurado && @lote.estado == 'en_manicura' && current_user.manicura?
-      ActiveRecord::Base.transaction do
-        @lote.pesadas.create!(
-          fase_origen:          'en_manicura',
-          fase_destino:         'manicura_pendiente',
-          manicurado:           true,
-          registrado_por:       current_user,
-          registrado_at:        Time.current,
-          notas:                pesada_attrs[:notas],
-          peso_seco_g:          pesada_attrs[:peso_seco_g],
-          peso_humedo_g:        pesada_attrs[:peso_humedo_g],
-          plantas_manicuradas:  pesada_attrs[:plantas_manicuradas],
-        )
-        @lote.update!(estado: 'manicura_pendiente')
-        AlertaInterna.create!(
-          club:             current_user.club,
-          tipo:             'manicura_aprobacion_pendiente',
-          mensaje:          "Manicura #{current_user.first_name} completó lote #{@lote.codigo} — #{pesada_attrs[:plantas_manicuradas]} plantas · #{pesada_attrs[:peso_seco_g]}g — pendiente aprobación",
-          severidad:        'info',
-          creada_por:       current_user,
-          destinada_a_role: 'admin',
-          contexto:         { lote_id: @lote.id, lote_codigo: @lote.codigo,
-                              peso_seco_g: pesada_attrs[:peso_seco_g], manicura_id: current_user.id }
-        )
+    # Manicura pesa un lote (en_manicura o secado) → crea un PesajeManicura
+    # "enviado" que cae en la cola única de confirmación del admin (Manicura).
+    # El lote NO pasa más por manicura_pendiente: al confirmar el pesaje se
+    # genera el stock y, cubiertas todas las plantas, el lote se finaliza solo.
+    if manicurado && %w[en_manicura secado].include?(@lote.estado) && current_user.manicura?
+      peso = pesada_attrs[:peso_seco_g].to_d
+      if peso <= 0
+        return render json: { error: 'El peso seco debe ser mayor a 0' }, status: :unprocessable_entity
       end
-      return render json: LoteSerializer.serialize(@lote.reload), status: :created
-    end
 
-    # Manicura pesa un lote en secado → va a manicura_pendiente (flujo legacy)
-    if manicurado && @lote.estado == 'secado' && current_user.manicura?
       ActiveRecord::Base.transaction do
-        pesada = @lote.pesadas.create!(
-          fase_origen:          'secado',
-          fase_destino:         'manicura_pendiente',
-          manicurado:           true,
-          registrado_por:       current_user,
-          registrado_at:        Time.current,
-          notas:                pesada_attrs[:notas],
-          peso_seco_g:          pesada_attrs[:peso_seco_g],
-          peso_humedo_g:        pesada_attrs[:peso_humedo_g],
-          plantas_manicuradas:  pesada_attrs[:plantas_manicuradas],
+        # Lotes que venían del camino viejo (secado, sin manicurador asignado)
+        # entran al flujo nuevo acá mismo
+        if @lote.estado == 'secado'
+          @lote.update!(estado: 'en_manicura', manicurador_id: @lote.manicurador_id || current_user.id)
+          @lote.lote_eventos.create!(
+            tipo:            'cambio_estado',
+            estado_anterior: 'secado',
+            estado_nuevo:    'en_manicura',
+            descripcion:     'Inicio de manicura (pesaje directo desde secado)',
+            user:            current_user,
+            club:            current_user.club,
+            registrado_en:   Time.current,
+          )
+        end
+
+        @lote.pesajes_manicura.create!(
+          club:          current_user.club,
+          manicurador:   current_user,
+          fecha_pesaje:  Date.today,
+          estado:        'enviado',
+          enviado_at:    Time.current,
+          peso_total_g:  peso,
+          plantas_count: pesada_attrs[:plantas_manicuradas],
+          notas:         pesada_attrs[:notas],
         )
-        @lote.update!(estado: 'manicura_pendiente')
+
         AlertaInterna.create!(
           club:             current_user.club,
           tipo:             'manicura_aprobacion_pendiente',
-          mensaje:          "Manicura #{current_user.first_name} completó cosecha #{@lote.codigo} — #{pesada_attrs[:plantas_manicuradas]} plantas · #{pesada_attrs[:peso_seco_g]}g — pendiente aprobación",
+          mensaje:          "Manicura #{current_user.first_name} envió pesaje del lote #{@lote.codigo} — #{pesada_attrs[:plantas_manicuradas]} plantas · #{peso}g — pendiente de confirmación",
           severidad:        'info',
           creada_por:       current_user,
           destinada_a_role: 'admin',
           contexto:         { lote_id: @lote.id, lote_codigo: @lote.codigo,
-                              peso_seco_g: pesada_attrs[:peso_seco_g], manicura_id: current_user.id }
+                              peso_seco_g: peso, manicura_id: current_user.id }
         )
       end
       return render json: LoteSerializer.serialize(@lote.reload), status: :created
@@ -434,45 +427,54 @@ class LotesController < ApplicationController
                  (current_user.manicura? && @lote.manicurador_id.nil?)
     return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless authorized
 
+    # Flujo unificado: el cierre del pesaje crea un PesajeManicura "enviado"
+    # que cae en la cola de confirmación del admin. El lote no pasa más por
+    # manicura_pendiente: el stock y la finalización ocurren al confirmar.
+    pesaje = nil
     ActiveRecord::Base.transaction do
-      pesada = @lote.pesadas.find_by(borrador: true, manicurado: true)
+      pesada_borrador = @lote.pesadas.find_by(borrador: true, manicurado: true)
 
-      if pesada
-        # QR flow: peso_seco_g is stored in pesadas_plantas, aggregate it
-        total_qr = pesada.pesadas_plantas.sum(:peso_seco_g).to_d
-        count_qr = pesada.pesadas_plantas.count
-        pesada.update!(
-          borrador:            false,
-          peso_seco_g:         total_qr > 0 ? total_qr : pesada.peso_seco_g,
-          plantas_manicuradas: count_qr  > 0 ? count_qr  : pesada.plantas_manicuradas,
-        )
+      if pesada_borrador
+        # QR flow: peso_seco_g vive en pesadas_plantas, se agrega
+        total = pesada_borrador.pesadas_plantas.sum(:peso_seco_g).to_d
+        count = pesada_borrador.pesadas_plantas.count
+        total = pesada_borrador.peso_seco_g.to_d        if total <= 0
+        count = pesada_borrador.plantas_manicuradas.to_i if count.zero?
       else
-        # Batch flow: compute totals from per-plant peso_seco
-        plantas_pesadas  = @lote.plants.where('peso_seco > 0')
-        total_peso       = plantas_pesadas.sum(:peso_seco)
-        count            = plantas_pesadas.count
-        return render json: { error: 'No hay plantas con peso registrado en este lote' }, status: :unprocessable_entity if count == 0
-
-        pesada = @lote.pesadas.create!(
-          borrador:            false,
-          manicurado:          true,
-          fase_origen:         @lote.estado,
-          fase_destino:        'finalizado',
-          peso_seco_g:         total_peso,
-          plantas_manicuradas: count,
-          registrado_por:      current_user,
-          registrado_at:       Time.current,
-        )
+        # Batch flow: totales desde el peso_seco por planta
+        plantas_pesadas = @lote.plants.where('peso_seco > 0')
+        total = plantas_pesadas.sum(:peso_seco).to_d
+        count = plantas_pesadas.count
       end
 
-      estado_anterior = @lote.estado
-      @lote.update!(estado: 'manicura_pendiente')
+      if total <= 0 || count.zero?
+        return render json: { error: 'No hay plantas con peso registrado en este lote' }, status: :unprocessable_entity
+      end
+
+      if @lote.estado == 'secado'
+        @lote.update!(estado: 'en_manicura', manicurador_id: @lote.manicurador_id || current_user.id)
+      end
+
+      pesaje = @lote.pesajes_manicura.create!(
+        club:          current_user.club,
+        manicurador:   current_user,
+        fecha_pesaje:  Date.today,
+        estado:        'enviado',
+        enviado_at:    Time.current,
+        peso_total_g:  total,
+        plantas_count: count,
+      )
+
+      if pesada_borrador
+        # Vincular las plantas pesadas al pesaje para que la finalización
+        # automática del lote cuente por planta, y cerrar el borrador legacy
+        pesada_borrador.pesadas_plantas.update_all(pesaje_manicura_id: pesaje.id)
+        pesada_borrador.update!(borrador: false)
+      end
 
       @lote.lote_eventos.create!(
-        tipo:            'cambio_estado',
-        estado_anterior: estado_anterior,
-        estado_nuevo:    'manicura_pendiente',
-        descripcion:     "Pesaje completado: #{pesada.plantas_manicuradas} plantas · #{pesada.peso_seco_g&.round(1)}g — enviado a aprobación",
+        tipo:            'nota',
+        descripcion:     "Pesaje completado: #{count} plantas · #{total.round(1)}g — enviado para confirmación",
         user:            current_user,
         club:            current_user.club,
         registrado_en:   Time.current,
@@ -481,12 +483,13 @@ class LotesController < ApplicationController
       AlertaInterna.create!(
         club:             current_user.club,
         tipo:             'manicura_aprobacion_pendiente',
-        mensaje:          "Manicura #{current_user.first_name} completó #{@lote.codigo} — #{pesada.plantas_manicuradas} plantas · #{pesada.peso_seco_g&.round(1)}g — pendiente aprobación",
+        mensaje:          "Manicura #{current_user.first_name} completó #{@lote.codigo} — #{count} plantas · #{total.round(1)}g — pendiente de confirmación",
         severidad:        'info',
         creada_por:       current_user,
         destinada_a_role: 'admin',
         contexto:         { lote_id: @lote.id, lote_codigo: @lote.codigo,
-                            peso_seco_g: pesada.peso_seco_g, manicura_id: current_user.id },
+                            peso_seco_g: total, manicura_id: current_user.id,
+                            pesaje_manicura_id: pesaje.id },
       )
     end
 

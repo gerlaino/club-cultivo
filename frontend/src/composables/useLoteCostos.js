@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { useToast } from './useToast.js'
-import { getCostoLote, createCostoLote, updateCostoLote, getPesadas } from '../lib/api'
+import { getCostoLote, createCostoLote, updateCostoLote, recalcularCostoLote, getPesadas } from '../lib/api'
 
 export function useLoteCostos(loteId) {
   const toast = useToast()
@@ -95,11 +95,28 @@ export function useLoteCostos(loteId) {
     } catch {}
   }
 
+  // Deriva insumos/energía/mano de obra desde los egresos del libro contable
+  // vinculados al lote (el libro es la fuente de verdad de costos)
+  const recalculando = ref(false)
+  async function recalcularDesdeLibro() {
+    recalculando.value = true
+    try {
+      const { data } = await recalcularCostoLote(loteId)
+      costoLote.value = data
+      toast.success('Costos recalculados desde el libro contable')
+    } catch {
+      toast.error('Error al recalcular costos')
+    } finally {
+      recalculando.value = false
+    }
+  }
+
   return {
     costoLote, showCostoForm, savingCosto, costoForm,
     costoTotal, costoPorGramo,
     gramosAprobados, gramosPendientes, estadoGramos,
     pesadasAprobadas, pesadasPendientes,
     openCostoForm, saveCosto, cargarCostos,
+    recalculando, recalcularDesdeLibro,
   }
 }

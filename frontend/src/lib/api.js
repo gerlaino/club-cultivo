@@ -261,12 +261,15 @@ export const createMovimiento       = (payload)      => api.post('/movimientos_c
 export const updateMovimiento       = (id, payload)  => api.put(`/movimientos_contables/${id}`, { movimiento_contable: payload })
 export const deleteMovimiento       = (id)           => api.delete(`/movimientos_contables/${id}`)
 export const exportMovimientosCSV   = (params = {})  => api.get('/movimientos_contables/export_csv', { params, responseType: 'blob' })
+export const cerrarPeriodoContable  = (hasta)        => api.post('/movimientos_contables/cerrar_periodo', { hasta })
+export const reabrirPeriodoContable = (hasta = null) => api.post('/movimientos_contables/reabrir_periodo', { hasta })
 export const exportLotesCSV         = (params = {})  => api.get('/lotes/export_csv', { params, responseType: 'blob' })
 
 // ── Costo por lote ────────────────────────────────────────────────────────────
 export const getCostoLote    = (loteId)           => api.get(`/lotes/${loteId}/costo`)
 export const createCostoLote = (loteId, payload)  => api.post(`/lotes/${loteId}/costo`, { costo_lote: payload })
 export const updateCostoLote = (loteId, payload)  => api.put(`/lotes/${loteId}/costo`, { costo_lote: payload })
+export const recalcularCostoLote = (loteId)       => api.post(`/lotes/${loteId}/costo/recalcular`)
 
 // ── Informe semestral REPROCANN ───────────────────────────────────────────────
 export const getInformeSemestral = (params = {}) => api.get('/informe_semestral', { params })

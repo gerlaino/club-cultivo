@@ -40,9 +40,13 @@ const canEdit    = computed(() => ['admin', 'medico', 'super_admin'].includes(au
 const s          = computed(() => store.current)
 const edadSocio  = computed(() => s.value ? edad(s.value.fecha_nacimiento) : null)
 
-const reprocannEstadoMeta = computed(() =>
-  REPROCANN_ESTADOS.find(e => e.value === (s.value?.reprocann_estado || 'sin_registro'))
-)
+const reprocannEstadoMeta = computed(() => {
+  // estado_efectivo viene del backend cruzado con la fecha de vencimiento;
+  // si está vencido pisa al campo manual (que puede haber quedado en "activo")
+  const estado = s.value?.reprocann_estado_efectivo || s.value?.reprocann_estado || 'sin_registro'
+  if (estado === 'vencido') return { value: 'vencido', label: 'Vencido', color: '#dc2626', bg: '#fef2f2' }
+  return REPROCANN_ESTADOS.find(e => e.value === estado)
+})
 
 const editarOpen     = ref(false)
 const agendarTurnoOpen = ref(false)

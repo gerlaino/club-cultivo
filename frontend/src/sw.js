@@ -5,7 +5,13 @@ import { NetworkFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 
-self.skipWaiting()
+// Modo "prompt": el SW nuevo queda en waiting hasta que el usuario acepte
+// actualizar desde el banner (main.js le manda SKIP_WAITING). Si activara
+// solo (skipWaiting incondicional), la página se recargaría en medio de
+// un formulario.
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
+})
 clientsClaim()
 
 precacheAndRoute(self.__WB_MANIFEST)

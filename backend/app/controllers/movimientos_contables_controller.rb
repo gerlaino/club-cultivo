@@ -2,7 +2,7 @@
 class MovimientosContablesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_lectura,   only: [:index, :show, :dashboard, :export_csv]
-  before_action :require_escritura, only: [:create, :update, :destroy]
+  before_action :require_escritura, only: [:create, :update, :destroy, :cerrar_periodo, :reabrir_periodo]
   before_action :set_movimiento,    only: [:show, :update, :destroy]
 
   # GET /movimientos_contables
@@ -121,6 +121,7 @@ class MovimientosContablesController < ApplicationController
       por_cobrar:          CuentaCorriente.where(club_id: club.id)
                                           .where('saldo_disponible < 0')
                                           .sum('-saldo_disponible').to_f,
+      contabilidad_cerrada_hasta: club.contabilidad_cerrada_hasta,
       ultimos_movimientos: scope.recientes.limit(10).map { |m| serialize(m) },
     }
   end
@@ -172,8 +173,48 @@ class MovimientosContablesController < ApplicationController
     if @movimiento.dispensacion_id.present?
       return render json: { error: 'Este movimiento fue generado por una dispensación. Eliminá la dispensación para que el libro y el stock queden consistentes.' }, status: :unprocessable_entity
     end
-    @movimiento.destroy
-    head :no_content
+    if @movimiento.destroy
+      head :no_content
+    else
+      render json: { error: @movimiento.errors.full_messages.join(', ') }, status: :unprocessable_entity
+    end
+  end
+
+  # POST /movimientos_contables/cerrar_periodo  { hasta: 'YYYY-MM-DD' }
+  # Congela el libro hasta esa fecha inclusive: nada anterior se puede
+  # crear, editar ni borrar. Correcciones = contra-asiento o reapertura.
+  def cerrar_periodo
+    hasta = Date.parse(params.require(:hasta).to_s)
+    return render json: { error: 'La fecha de cierre no puede ser futura' }, status: :unprocessable_entity if hasta > Date.today
+
+    club   = current_user.club
+    previo = club.contabilidad_cerrada_hasta
+    if previo.present? && hasta < previo
+      return render json: { error: "El período ya está cerrado hasta el #{previo.strftime('%d/%m/%Y')}. Usá reabrir para retroceder." }, status: :unprocessable_entity
+    end
+
+    club.update!(contabilidad_cerrada_hasta: hasta)
+    Auditoria.create!(auditable: club, club: club, user: current_user, accion: 'actualizar',
+                      cambios: { 'contabilidad_cerrada_hasta' => [previo&.to_s, hasta.to_s], 'evento' => 'cierre_periodo' })
+
+    render json: { contabilidad_cerrada_hasta: hasta }
+  rescue Date::Error, ActionController::ParameterMissing
+    render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
+  end
+
+  # POST /movimientos_contables/reabrir_periodo  { hasta: 'YYYY-MM-DD' | null }
+  def reabrir_periodo
+    club   = current_user.club
+    previo = club.contabilidad_cerrada_hasta
+    nueva  = params[:hasta].present? ? Date.parse(params[:hasta].to_s) : nil
+
+    club.update!(contabilidad_cerrada_hasta: nueva)
+    Auditoria.create!(auditable: club, club: club, user: current_user, accion: 'actualizar',
+                      cambios: { 'contabilidad_cerrada_hasta' => [previo&.to_s, nueva&.to_s], 'evento' => 'reapertura_periodo' })
+
+    render json: { contabilidad_cerrada_hasta: nueva }
+  rescue Date::Error
+    render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
   end
 
   # GET /movimientos_contables/export_csv
@@ -247,6 +288,7 @@ class MovimientosContablesController < ApplicationController
       created_by:           m.created_by&.first_name || m.created_by&.email,
       created_at:           m.created_at,
       updated_at:           m.updated_at,
+      cerrado:              m.cerrado?,
     }
   end
 

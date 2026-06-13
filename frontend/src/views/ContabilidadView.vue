@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, nextTick } from "vue"
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import { listSedes, listLotes, listPacientes } from "../lib/api"
+import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
 import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
@@ -17,6 +17,62 @@ const canEdit = computed(() => ["admin","super_admin"].includes(auth.role))
 // Los movimientos generados por dispensaciones no se editan ni borran a mano:
 // se corrigen desde la dispensación para que libro, stock y CC queden consistentes
 const esAutomatico = (m) => !!m.dispensacion_id
+// Movimientos de períodos cerrados: inmutables (corrección = contra-asiento)
+const esCerrado    = (m) => !!m.cerrado
+
+// ── Cierre de período ──────────────────────────────────────────
+const cerrandoPeriodo = ref(false)
+const cierreActual    = computed(() => store.dashboard?.contabilidad_cerrada_hasta || null)
+const finMesAnterior  = computed(() => {
+  const d = new Date()
+  return new Date(d.getFullYear(), d.getMonth(), 0)  // último día del mes pasado
+})
+const puedeCerrarMesAnterior = computed(() => {
+  if (!cierreActual.value) return true
+  return new Date(cierreActual.value) < finMesAnterior.value
+})
+
+function fmtFechaCorta(d) {
+  return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+}
+
+async function cerrarMesAnterior() {
+  const hasta = finMesAnterior.value.toISOString().slice(0, 10)
+  const ok = await confirm({
+    title:       'Cerrar período contable',
+    message:     `Se congela el libro hasta el ${fmtFechaCorta(hasta)} inclusive: ningún movimiento anterior a esa fecha se podrá crear, editar ni eliminar. Las correcciones futuras serán por contra-asiento o reapertura.`,
+    confirmText: 'Cerrar período',
+    variant:     'danger',
+  })
+  if (!ok) return
+  cerrandoPeriodo.value = true
+  try {
+    await cerrarPeriodoContable(hasta)
+    toast.success(`Período cerrado hasta el ${fmtFechaCorta(hasta)}`)
+    await store.fetchDashboard(dashboardSede.value)
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo cerrar el período')
+  } finally {
+    cerrandoPeriodo.value = false
+  }
+}
+
+async function reabrirPeriodo() {
+  const ok = await confirm({
+    title:       'Reabrir período contable',
+    message:     'Se levanta el cierre: los movimientos vuelven a ser editables. La reapertura queda registrada en la auditoría con tu usuario.',
+    confirmText: 'Reabrir',
+    variant:     'danger',
+  })
+  if (!ok) return
+  try {
+    await reabrirPeriodoContable(null)
+    toast.success('Período reabierto')
+    await store.fetchDashboard(dashboardSede.value)
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo reabrir')
+  }
+}
 const { confirm } = useConfirm()
 const toast = useToast()
 
@@ -380,6 +436,23 @@ onMounted(async () => {
           </button>
         </div>
 
+        <!-- Cierre de período -->
+        <div v-if="canEdit" class="cv__cierre">
+          <div class="cv__cierre-info">
+            <i class="bi" :class="cierreActual ? 'bi-lock-fill' : 'bi-unlock'"></i>
+            <span v-if="cierreActual">Libro cerrado hasta el <strong>{{ fmtFechaCorta(cierreActual) }}</strong> — los movimientos anteriores son inmutables.</span>
+            <span v-else>Sin cierre de período: todos los movimientos son editables.</span>
+          </div>
+          <div class="cv__cierre-actions">
+            <button v-if="puedeCerrarMesAnterior" class="cv__cierre-btn" :disabled="cerrandoPeriodo" @click="cerrarMesAnterior">
+              <i class="bi bi-lock"></i> Cerrar hasta {{ fmtFechaCorta(finMesAnterior) }}
+            </button>
+            <button v-if="cierreActual" class="cv__cierre-btn cv__cierre-btn--ghost" @click="reabrirPeriodo">
+              Reabrir
+            </button>
+          </div>
+        </div>
+
         <!-- KPIs -->
         <div class="cv__kpis">
           <div class="cv__kpi">
@@ -572,7 +645,7 @@ onMounted(async () => {
               <div class="cv__mov-cat">{{ catLabel(m.categoria) }}</div>
               <div class="cv__mov-monto" :style="{ color: tipoMeta(m.tipo).color }">{{ fmt(m.monto_ars) }}</div>
               <div class="cv__mov-actions">
-                <template v-if="canEdit && !esAutomatico(m)">
+                <template v-if="canEdit && !esAutomatico(m) && !esCerrado(m)">
                   <button class="cv__icon-btn" @click="openEdit(m)" title="Editar">
                     <i class="bi bi-pencil"></i>
                   </button>
@@ -580,6 +653,7 @@ onMounted(async () => {
                     <i class="bi bi-trash"></i>
                   </button>
                 </template>
+                <i v-else-if="esCerrado(m)" class="bi bi-lock-fill cv__auto-icon" title="Período cerrado — movimiento inmutable"></i>
                 <i v-else-if="esAutomatico(m)" class="bi bi-link-45deg cv__auto-icon" title="Generado por una dispensación — se corrige desde la dispensación"></i>
               </div>
             </div>
@@ -681,10 +755,11 @@ onMounted(async () => {
               </td>
               <td v-if="canEdit">
                 <div class="cv__row-actions">
-                  <template v-if="!esAutomatico(m)">
+                  <template v-if="!esAutomatico(m) && !esCerrado(m)">
                     <button class="cv__icon-btn" @click="openEdit(m)"><i class="bi bi-pencil"></i></button>
                     <button class="cv__icon-btn cv__icon-btn--danger" @click="confirmDelete(m)"><i class="bi bi-trash"></i></button>
                   </template>
+                  <i v-else-if="esCerrado(m)" class="bi bi-lock-fill cv__auto-icon" title="Período cerrado — movimiento inmutable"></i>
                   <i v-else class="bi bi-link-45deg cv__auto-icon" title="Generado por una dispensación — se corrige desde la dispensación"></i>
                 </div>
               </td>
@@ -867,6 +942,17 @@ onMounted(async () => {
 .cv__kpi-bar--green   { background: #15803d; }
 .cv__kpi-bar--amber   { background: #f59e0b; }
 .cv__auto-icon { color: #94a3b8; font-size: 1rem; cursor: help; }
+
+/* Cierre de período */
+.cv__cierre { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: .7rem 1rem; margin-bottom: 1rem; }
+.cv__cierre-info { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: #475569; }
+.cv__cierre-info i { color: #64748b; }
+.cv__cierre-actions { display: flex; gap: .5rem; }
+.cv__cierre-btn { display: inline-flex; align-items: center; gap: .35rem; background: #0f172a; color: #fff; border: none; border-radius: 8px; padding: .45rem .85rem; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.cv__cierre-btn:hover { opacity: .9; }
+.cv__cierre-btn:disabled { opacity: .5; cursor: wait; }
+.cv__cierre-btn--ghost { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; }
+.cv__cierre-btn--ghost:hover { color: #0f172a; border-color: #94a3b8; opacity: 1; }
 .cv__kpi-bar--red     { background: #dc2626; }
 .cv__kpi-bar--neutral { background: #e2e8f0; }
 

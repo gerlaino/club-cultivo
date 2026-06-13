@@ -2,10 +2,16 @@
   <div class="lcc__card">
     <div class="lcc__header">
       <span class="lcc__title">💰 Costos de producción</span>
-      <button class="lcc__action" @click="openCostoForm">
-        <i :class="costoLote ? 'bi bi-pencil' : 'bi bi-plus-lg'"></i>
-        {{ costoLote ? 'Editar' : 'Cargar' }}
-      </button>
+      <div class="lcc__header-actions">
+        <button class="lcc__action" :disabled="recalculando" @click="recalcularDesdeLibro" title="Suma los egresos del libro contable vinculados a este lote (insumos, energía, mano de obra)">
+          <i class="bi bi-arrow-repeat"></i>
+          {{ recalculando ? 'Calculando…' : 'Desde libro' }}
+        </button>
+        <button class="lcc__action" @click="openCostoForm">
+          <i :class="costoLote ? 'bi bi-pencil' : 'bi bi-plus-lg'"></i>
+          {{ costoLote ? 'Editar' : 'Cargar' }}
+        </button>
+      </div>
     </div>
 
     <div v-if="showCostoForm" class="lcc__form">
@@ -125,6 +131,7 @@ const {
   gramosAprobados, gramosPendientes, estadoGramos,
   pesadasAprobadas, pesadasPendientes,
   openCostoForm, saveCosto, cargarCostos,
+  recalculando, recalcularDesdeLibro,
 } = useLoteCostos(props.loteId)
 
 onMounted(() => cargarCostos())
@@ -133,6 +140,7 @@ onMounted(() => cargarCostos())
 <style scoped>
 .lcc__card { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
 .lcc__header { display: flex; align-items: center; justify-content: space-between; padding: .8rem 1rem; border-bottom: 1px solid #e8f0e9; }
+.lcc__header-actions { display: flex; align-items: center; gap: .4rem; }
 .lcc__title { font-size: .85rem; font-weight: 700; color: #1a1a1a; }
 .lcc__action { background: none; border: 1px solid #d4e6d4; color: #15803d; font-size: .75rem; font-weight: 600; padding: .25rem .65rem; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: .3rem; transition: background .15s; }
 .lcc__action:hover { background: #f0fdf4; }

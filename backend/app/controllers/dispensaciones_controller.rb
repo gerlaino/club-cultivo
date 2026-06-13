@@ -263,6 +263,12 @@ class DispensacionesController < ApplicationController
 
   # DELETE /dispensaciones/:id
   def destroy
+    # Una dispensación cuyo asiento cae en un período contable cerrado es
+    # inmutable: borrarla dejaría el libro congelado inconsistente con el stock
+    if @dispensacion.movimiento_contable&.cerrado?
+      return render json: { error: 'La dispensación pertenece a un período contable cerrado y no puede eliminarse.' }, status: :unprocessable_entity
+    end
+
     ActiveRecord::Base.transaction do
       revertir_gramos(@dispensacion)
       revertir_cuenta_corriente(@dispensacion)

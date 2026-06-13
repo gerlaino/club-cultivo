@@ -35,11 +35,13 @@ RSpec.describe 'DS-FIX-7 — Flujo aprobación manicura', type: :request do
     end
   end
 
-  # ── Transicion manicurado → manicura_pendiente ───────────────
+  # ── Pesaje manicurado → cola única de confirmación (flujo unificado) ──
+  # El lote ya no pasa por manicura_pendiente: el pesaje cae como
+  # PesajeManicura "enviado" y el admin lo confirma en Manicura.
   describe 'POST /lotes/:id/transiciones — manicura pesa lote en secado' do
     before { sign_in_as(manicura) }
 
-    it 'transiciona a manicura_pendiente y crea alerta admin' do
+    it 'crea un PesajeManicura enviado, pasa el lote a en_manicura y alerta al admin' do
       params = {
         nueva_fase:  'manicura_pendiente',
         pesada:      { peso_seco_g: 450, manicurado: true }
@@ -47,14 +49,27 @@ RSpec.describe 'DS-FIX-7 — Flujo aprobación manicura', type: :request do
       expect {
         post "/lotes/#{lote_secado.id}/transiciones", params: params, headers: auth_headers
       }.to change(AlertaInterna, :count).by(1)
+       .and change(PesajeManicura, :count).by(1)
 
       expect(response).to have_http_status(:created)
       body = JSON.parse(response.body)
-      expect(body['estado']).to eq('manicura_pendiente')
+      expect(body['estado']).to eq('en_manicura')
+
+      pesaje = PesajeManicura.last
+      expect(pesaje.estado).to eq('enviado')
+      expect(pesaje.peso_total_g.to_f).to eq(450.0)
+      expect(pesaje.lote_id).to eq(lote_secado.id)
 
       alerta = AlertaInterna.last
       expect(alerta.tipo).to eq('manicura_aprobacion_pendiente')
       expect(alerta.destinada_a_role).to eq('admin')
+    end
+
+    it 'rechaza pesaje sin peso' do
+      post "/lotes/#{lote_secado.id}/transiciones",
+           params: { nueva_fase: 'manicura_pendiente', pesada: { peso_seco_g: 0, manicurado: true } },
+           headers: auth_headers
+      expect(response).to have_http_status(:unprocessable_entity)
     end
   end
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_10_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_13_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -157,6 +157,20 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_10_000002) do
     t.index ["stock_id"], name: "index_ariccame_registros_on_stock_id"
   end
 
+  create_table "auditorias", force: :cascade do |t|
+    t.string "auditable_type", null: false
+    t.bigint "auditable_id", null: false
+    t.bigint "club_id", null: false
+    t.bigint "user_id"
+    t.string "accion", null: false
+    t.jsonb "cambios", default: {}
+    t.datetime "created_at", null: false
+    t.index ["auditable_type", "auditable_id"], name: "index_auditorias_on_auditable"
+    t.index ["club_id", "created_at"], name: "index_auditorias_on_club_id_and_created_at"
+    t.index ["club_id"], name: "index_auditorias_on_club_id"
+    t.index ["user_id"], name: "index_auditorias_on_user_id"
+  end
+
   create_table "check_ins", force: :cascade do |t|
     t.bigint "paciente_id", null: false
     t.bigint "dispensacion_id"
@@ -221,6 +235,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_10_000002) do
     t.integer "umbral_stock_g", default: 50, null: false
     t.jsonb "alertas_config", default: {}, null: false
     t.integer "lote_numero_seq", default: 0, null: false
+    t.date "contabilidad_cerrada_hasta"
     t.index ["benchmark_opt_in"], name: "index_clubs_on_benchmark_opt_in"
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["features"], name: "index_clubs_on_features", using: :gin
@@ -1299,6 +1314,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_10_000002) do
   add_foreign_key "ariccame_registros", "clubs"
   add_foreign_key "ariccame_registros", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "ariccame_registros", "stocks"
+  add_foreign_key "auditorias", "clubs"
+  add_foreign_key "auditorias", "users"
   add_foreign_key "check_ins", "clubs"
   add_foreign_key "check_ins", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "check_ins", "pacientes"

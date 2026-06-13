@@ -87,7 +87,9 @@ Rails.application.routes.draw do
         get :proximo_codigo
         get 'por_qr/:codigo_qr', action: :por_qr
       end
-      resource :costo, controller: :costo_lotes, only: [:show, :create, :update]
+      resource :costo, controller: :costo_lotes, only: [:show, :create, :update] do
+        post :recalcular   # recalcula insumos/energía/mano de obra desde el libro contable
+      end
       resources :registros_ambientales, only: [:index, :create, :destroy]
       resources :lote_eventos,          only: [:index, :create]
       resources :fotos, only: [:index, :create, :destroy], controller: 'fotos_lote'
@@ -302,6 +304,8 @@ Rails.application.routes.draw do
       collection do
         get :dashboard
         get :export_csv
+        post :cerrar_periodo    # congela movimientos hasta una fecha (solo admin)
+        post :reabrir_periodo   # retrocede/levanta el cierre (solo admin, auditado)
       end
     end
 
