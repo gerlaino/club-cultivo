@@ -13,8 +13,9 @@ import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTu
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
-  CalendarDays, UserCheck, RotateCcw, X
+  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check
 } from 'lucide-vue-next'
+import DsDropdown from '../design-system/components/Dropdown.vue'
 import { REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner               from '../design-system/components/Spinner.vue'
@@ -62,8 +63,10 @@ function onDispensacionCreada() {
 }
 
 // ── Cambio rápido de estado REPROCANN (sin abrir el modal de edición) ──
-const cambiandoEstado = ref(false)
+const cambiandoEstado    = ref(false)
+const estadoDropdownOpen = ref(false)
 async function cambiarEstadoReprocann(nuevo) {
+  estadoDropdownOpen.value = false
   if (s.value?.reprocann_estado === nuevo) return
   cambiandoEstado.value = true
   try {
@@ -385,21 +388,40 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             <div class="sd__info-item">
               <div class="sd__info-label">Estado REPROCANN</div>
               <div class="sd__info-val">
-                <span class="sd__inline-badge"
+                <!-- Editable: el badge es un menú discreto. Limpio por defecto. -->
+                <DsDropdown v-if="canEdit" v-model="estadoDropdownOpen" align="left">
+                  <template #anchor>
+                    <button
+                      type="button"
+                      class="sd__estado-trigger"
+                      :disabled="cambiandoEstado"
+                      :style="{ background: reprocannEstadoMeta?.bg, color: reprocannEstadoMeta?.color, borderColor: reprocannEstadoMeta?.color }"
+                      @click="estadoDropdownOpen = !estadoDropdownOpen"
+                    >
+                      {{ reprocannEstadoMeta?.label || 'Sin estado' }}
+                      <ChevronDown :size="13" :stroke-width="2.5" />
+                    </button>
+                  </template>
+                  <template #panel>
+                    <div class="sd__estado-menu">
+                      <button
+                        v-for="opt in REPROCANN_ESTADOS" :key="opt.value"
+                        type="button"
+                        class="sd__estado-opt"
+                        @click="cambiarEstadoReprocann(opt.value)"
+                      >
+                        <span class="sd__estado-dot" :style="{ background: opt.color }"></span>
+                        <span class="sd__estado-opt-label">{{ opt.label }}</span>
+                        <Check v-if="s.reprocann_estado === opt.value" :size="14" class="sd__estado-check" />
+                      </button>
+                    </div>
+                  </template>
+                </DsDropdown>
+                <!-- Solo lectura -->
+                <span v-else class="sd__inline-badge"
                       :style="{ background: reprocannEstadoMeta?.bg, color: reprocannEstadoMeta?.color, borderColor: reprocannEstadoMeta?.color }">
                   {{ reprocannEstadoMeta?.label || '—' }}
                 </span>
-              </div>
-              <!-- Cambio rápido de estado (sin abrir el modal de edición) -->
-              <div v-if="canEdit" class="sd__rep-estados">
-                <button
-                  v-for="opt in REPROCANN_ESTADOS" :key="opt.value"
-                  type="button"
-                  class="sd__rep-estado-btn"
-                  :disabled="cambiandoEstado"
-                  :style="s.reprocann_estado === opt.value ? { background: opt.bg, borderColor: opt.color, color: opt.color } : {}"
-                  @click="cambiarEstadoReprocann(opt.value)"
-                >{{ opt.label }}</button>
               </div>
             </div>
             <div class="sd__info-item">
@@ -697,10 +719,16 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__info-val--mono { font-family: monospace; }
 .sd__val-empty { color: #94a3b8; font-weight: 400; }
 .sd__inline-badge { display: inline-flex; align-items: center; font-size: .68rem; font-weight: 700; padding: .18em .6em; border-radius: 6px; margin-left: .4rem; }
-.sd__rep-estados { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
-.sd__rep-estado-btn { padding: .3rem .65rem; border-radius: 6px; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: .7rem; font-weight: 700; cursor: pointer; transition: all .15s; }
-.sd__rep-estado-btn:hover:not(:disabled) { border-color: #94a3b8; }
-.sd__rep-estado-btn:disabled { opacity: .5; cursor: wait; }
+/* Badge-trigger: se ve como un chip de estado, pero al hacer clic abre el menú */
+.sd__estado-trigger { display: inline-flex; align-items: center; gap: .3rem; font-size: .68rem; font-weight: 700; padding: .22em .55em .22em .7em; border-radius: 6px; border: 1px solid; cursor: pointer; transition: filter .15s; }
+.sd__estado-trigger:hover:not(:disabled) { filter: brightness(.96); }
+.sd__estado-trigger:disabled { opacity: .6; cursor: wait; }
+.sd__estado-menu { display: flex; flex-direction: column; padding: .3rem; min-width: 190px; }
+.sd__estado-opt { display: flex; align-items: center; gap: .55rem; width: 100%; padding: .5rem .6rem; border: none; background: none; border-radius: 7px; font-size: .8rem; font-weight: 600; color: #334155; cursor: pointer; text-align: left; transition: background .12s; }
+.sd__estado-opt:hover { background: #f1f5f9; }
+.sd__estado-opt-label { flex: 1; }
+.sd__estado-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.sd__estado-check { color: #15803d; }
 
 /* Sys info */
 .sd__sys-info { display: flex; gap: 2rem; flex-wrap: wrap; padding: .875rem 1.25rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; font-size: .78rem; color: #64748b; }
