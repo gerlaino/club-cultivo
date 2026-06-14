@@ -26,7 +26,10 @@ class JwtCookieMiddleware
         expires:   Time.now + 12 * 3600,
         httponly:  true,
         secure:    ENV.fetch('RAILS_ENV', 'development') == 'production',
-        same_site: ENV.fetch('RAILS_ENV', 'development') == 'production' ? 'None' : 'Lax',
+        # Lax: la SPA se sirve del mismo origen que la API (Rails sirve el index.html),
+        # así que la cookie es first-party. 'None' era innecesario y lo bloquea el
+        # modo incógnito (que filtra cookies third-party). Lax funciona en incógnito.
+        same_site: 'Lax',
       })
       headers.delete('Authorization')
       headers.delete('authorization')

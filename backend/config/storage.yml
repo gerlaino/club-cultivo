@@ -20,6 +20,10 @@ amazon:
   secret_access_key: <%= ENV["S3_SECRET_ACCESS_KEY"] || ENV["AWS_SECRET_ACCESS_KEY"] %>
   region:            <%= ENV["S3_REGION"] || ENV["AWS_REGION"] || "us-east-1" %>
   bucket:            <%= ENV["S3_BUCKET"] || ENV["AWS_BUCKET"] || ENV["AWS_S3_BUCKET"] %>
+  # aws-sdk-s3 ≥ 2025 activó checksums por defecto que rompen la firma con
+  # "AuthorizationHeaderMalformed". Los volvemos a "when_required" (comportamiento previo).
+  request_checksum_calculation: when_required
+  response_checksum_validation: when_required
   <% if ENV["S3_ENDPOINT"].present? %>
   endpoint:          <%= ENV["S3_ENDPOINT"] %>
   force_path_style:  true
