@@ -65,16 +65,35 @@ function onDispensacionCreada() {
 // ── Cambio rápido de estado REPROCANN (sin abrir el modal de edición) ──
 const cambiandoEstado    = ref(false)
 const estadoDropdownOpen = ref(false)
+const activarModalOpen   = ref(false)
+const nuevaVencimiento   = ref('')
+
 async function cambiarEstadoReprocann(nuevo) {
   estadoDropdownOpen.value = false
+  // Activar exige (re)cargar la fecha de vencimiento → mini-modal
+  if (nuevo === 'activo') {
+    nuevaVencimiento.value = (s.value?.reprocann_vencimiento || '').toString().slice(0, 10)
+    activarModalOpen.value = true
+    return
+  }
   if (s.value?.reprocann_estado === nuevo) return
+  await guardarEstadoReprocann({ reprocann_estado: nuevo })
+}
+
+async function confirmarActivacion() {
+  if (!nuevaVencimiento.value) { toast.error('Ingresá la fecha de vencimiento'); return }
+  await guardarEstadoReprocann({ reprocann_estado: 'activo', reprocann_vencimiento: nuevaVencimiento.value })
+  activarModalOpen.value = false
+}
+
+async function guardarEstadoReprocann(payload) {
   cambiandoEstado.value = true
   try {
-    await updatePaciente(socioId, { reprocann_estado: nuevo })
+    await updatePaciente(socioId, payload)
     await store.fetchOne(socioId)
-    toast.success('Estado REPROCANN actualizado')
+    toast.success('REPROCANN actualizado')
   } catch (e) {
-    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo actualizar el estado')
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo actualizar')
   } finally {
     cambiandoEstado.value = false
   }
@@ -644,6 +663,24 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
   <SocioEditarModal v-model:open="editarOpen" :socio-id="socioId" @saved="store.fetchOne(socioId)" />
 
+  <!-- Mini-modal: activar REPROCANN con nueva fecha de vencimiento -->
+  <Teleport to="body">
+    <div v-if="activarModalOpen" class="sd__rep-modal-overlay" @click.self="activarModalOpen = false">
+      <div class="sd__rep-modal">
+        <h3 class="sd__rep-modal-title">Activar REPROCANN</h3>
+        <p class="sd__rep-modal-sub">Ingresá la fecha de vencimiento del certificado aprobado.</p>
+        <label class="sd__rep-modal-label">Vencimiento</label>
+        <input type="date" v-model="nuevaVencimiento" class="sd__rep-modal-input" />
+        <div class="sd__rep-modal-actions">
+          <button class="sd__rep-modal-cancel" :disabled="cambiandoEstado" @click="activarModalOpen = false">Cancelar</button>
+          <button class="sd__rep-modal-ok" :disabled="cambiandoEstado || !nuevaVencimiento" @click="confirmarActivacion">
+            {{ cambiandoEstado ? 'Guardando…' : 'Activar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <ModalAgendarTurnoMedico
     v-if="agendarTurnoOpen && s"
     :paciente-id="socioId"
@@ -729,6 +766,20 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__estado-opt-label { flex: 1; }
 .sd__estado-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .sd__estado-check { color: #15803d; }
+/* Mini-modal activar REPROCANN */
+.sd__rep-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 900; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.sd__rep-modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 100%; max-width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+.sd__rep-modal-title { font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0 0 .4rem; }
+.sd__rep-modal-sub { font-size: .8rem; color: #64748b; margin: 0 0 1rem; }
+.sd__rep-modal-label { display: block; font-size: .72rem; font-weight: 700; color: #64748b; margin-bottom: .3rem; }
+.sd__rep-modal-input { width: 100%; box-sizing: border-box; padding: .55rem .75rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .9rem; color: #0f172a; }
+.sd__rep-modal-input:focus { outline: none; border-color: #15803d; }
+.sd__rep-modal-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.25rem; }
+.sd__rep-modal-cancel { background: none; color: #64748b; border: 1px solid #cbd5e1; border-radius: 8px; padding: .45rem .9rem; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.sd__rep-modal-cancel:hover:not(:disabled) { background: #f1f5f9; }
+.sd__rep-modal-ok { background: #15803d; color: #fff; border: none; border-radius: 8px; padding: .45rem 1.1rem; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.sd__rep-modal-ok:hover:not(:disabled) { background: #166534; }
+.sd__rep-modal-ok:disabled, .sd__rep-modal-cancel:disabled { opacity: .55; cursor: not-allowed; }
 
 /* Sys info */
 .sd__sys-info { display: flex; gap: 2rem; flex-wrap: wrap; padding: .875rem 1.25rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; font-size: .78rem; color: #64748b; }

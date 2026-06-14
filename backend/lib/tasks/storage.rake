@@ -40,9 +40,31 @@ namespace :storage do
     rescue => e
       puts "FALLÓ"
       puts "\n✗ ERROR: #{e.class}: #{e.message}"
+
+      # Auto-detectar la región real del bucket (get_bucket_location funciona
+      # firmando desde us-east-1 sin importar dónde esté el bucket)
+      begin
+        require "aws-sdk-s3"
+        probe = Aws::S3::Client.new(
+          region: "us-east-1",
+          access_key_id: cfg[:access_key_id],
+          secret_access_key: cfg[:secret_access_key],
+        )
+        loc  = probe.get_bucket_location(bucket: cfg[:bucket]).location_constraint.to_s
+        real = loc.empty? ? "us-east-1" : loc
+        puts "\n🔎 Región real del bucket '#{cfg[:bucket]}': #{real}"
+        if real != cfg[:region]
+          puts "   ⚠️  Tenés configurada AWS_REGION=#{cfg[:region]} pero el bucket está en #{real}."
+          puts "   → Cambiá AWS_REGION=#{real} en Render y volvé a probar."
+        end
+      rescue => probe_err
+        puts "\n(No se pudo detectar la región automáticamente: #{probe_err.message})"
+      end
+
       puts "\nPistas según el error:"
+      puts "  • AuthorizationHeaderMalformed → región equivocada (ver detección de arriba)"
       puts "  • AccessDenied            → el token no tiene permiso de escritura sobre el bucket"
-      puts "  • NoSuchBucket            → el nombre del bucket está mal o no existe en esa región"
+      puts "  • NoSuchBucket            → el nombre del bucket está mal o no existe"
       puts "  • InvalidAccessKeyId      → la access key es incorrecta o fue revocada"
       puts "  • SignatureDoesNotMatch   → la secret key es incorrecta"
       puts "  • cuenta suspendida/billing → la cuenta AWS no está activa: resolver el pago primero"
