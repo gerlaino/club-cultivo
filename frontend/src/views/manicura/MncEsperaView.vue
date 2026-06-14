@@ -90,7 +90,7 @@ onMounted(cargar)
 </script>
 
 <style scoped>
-.mne { padding: var(--sp-6); max-width: 900px; }
+.mne { padding: var(--sp-6); max-width: 900px; margin: 0 auto; }
 
 .mne__header { margin-bottom: var(--sp-5); }
 .mne__title  { font-size: var(--fs-24); font-weight: 800; color: var(--c-ink-900); margin: 0 0 var(--sp-1); }

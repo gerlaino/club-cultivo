@@ -44,9 +44,13 @@ class Paciente < ApplicationRecord
 
   # Estado REPROCANN cruzado con la fecha: el campo manual puede quedar en
   # "activo" después de vencer — para mostrar, la fecha manda sobre el campo.
+  # Estado a mostrar, cruzado con la fecha:
+  # - 'activo' cuya fecha ya pasó → 'vencido' (rojo): cert aprobado que caducó.
+  # - 'pendiente' NO se pisa aunque la fecha esté vencida: significa que hay un
+  #   trámite de renovación en curso (se muestra ámbar, no rojo).
   def reprocann_estado_efectivo
-    if reprocann_vencimiento.present? && reprocann_vencimiento < Date.today &&
-       %w[activo pendiente].include?(reprocann_estado.to_s)
+    if reprocann_estado.to_s == 'activo' &&
+       reprocann_vencimiento.present? && reprocann_vencimiento < Date.today
       'vencido'
     else
       reprocann_estado

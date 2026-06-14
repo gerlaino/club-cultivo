@@ -264,7 +264,7 @@ onMounted(cargarLotes)
 </script>
 
 <style scoped>
-.mpv { padding: var(--sp-6); max-width: 700px; }
+.mpv { padding: var(--sp-6); max-width: 700px; margin: 0 auto; }
 
 /* Header */
 .mpv__eyebrow {

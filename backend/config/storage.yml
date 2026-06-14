@@ -4,7 +4,41 @@ test:
 
 local:
   service: Disk
-  root: <%= Rails.root.join("storage") %>
+  root: <%= Rails.root.join("storage").to_s %>
+
+# Object storage S3-compatible. Sirve para Cloudflare R2 (recomendado, sin egress)
+# y para AWS S3 — la diferencia es solo el endpoint/region en las env vars.
+#   R2:  S3_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com  S3_REGION=auto
+#   AWS: (sin S3_ENDPOINT)  S3_REGION=sa-east-1   (San Pablo, lo más cerca de Argentina)
+# Privado por defecto: los archivos se sirven con URLs firmadas que expiran
+# (obligatorio para documentos clínicos / datos de pacientes).
+amazon:
+  service: S3
+  # Acepta tanto nombres S3_* (R2) como AWS_* (convención estándar de AWS),
+  # así funciona con credenciales ya existentes sin renombrar nada.
+  access_key_id:     <%= ENV["S3_ACCESS_KEY_ID"]     || ENV["AWS_ACCESS_KEY_ID"] %>
+  secret_access_key: <%= ENV["S3_SECRET_ACCESS_KEY"] || ENV["AWS_SECRET_ACCESS_KEY"] %>
+  region:            <%= ENV["S3_REGION"] || ENV["AWS_REGION"] || "us-east-1" %>
+  bucket:            <%= ENV["S3_BUCKET"] || ENV["AWS_BUCKET"] || ENV["AWS_S3_BUCKET"] %>
+  <% if ENV["S3_ENDPOINT"].present? %>
+  endpoint:          <%= ENV["S3_ENDPOINT"] %>
+  force_path_style:  true
+  <% end %>
+
+# Variante pública para assets no sensibles (logos, web pública del club):
+# se sirven directo desde el CDN sin firmar, más rápido y cacheable.
+# Requiere un segundo bucket con acceso público (o el mismo con prefijo público).
+amazon_public:
+  service: S3
+  access_key_id:     <%= ENV["S3_ACCESS_KEY_ID"] %>
+  secret_access_key: <%= ENV["S3_SECRET_ACCESS_KEY"] %>
+  region:            <%= ENV.fetch("S3_REGION", "auto") %>
+  bucket:            <%= ENV.fetch("S3_PUBLIC_BUCKET") { ENV["S3_BUCKET"].to_s } %>
+  public:            true
+  <% if ENV["S3_PUBLIC_ENDPOINT"].present? || ENV["S3_ENDPOINT"].present? %>
+  endpoint:          <%= ENV.fetch("S3_PUBLIC_ENDPOINT") { ENV["S3_ENDPOINT"] } %>
+  force_path_style:  true
+  <% end %>
 
 # Use bin/rails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
 # amazon:

@@ -313,7 +313,7 @@ onActivated(cargar)
 </script>
 
 <style scoped>
-.mnl { padding: 1.5rem 1.75rem 3rem; }
+.mnl { padding: 1.5rem 1.75rem 3rem; max-width: 1000px; margin: 0 auto; }
 @media (max-width: 768px) { .mnl { padding: 1rem 1rem 2rem; } }
 
 /* Back */

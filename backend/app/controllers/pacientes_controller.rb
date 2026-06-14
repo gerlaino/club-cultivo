@@ -37,7 +37,7 @@ class PacientesController < ApplicationController
                      .limit(limit)
 
     render json: {
-      data: pacientes.as_json(methods: :nombre_completo),
+      data: pacientes.as_json(methods: [:nombre_completo, :reprocann_estado_efectivo]),
       meta: { pagina: page, limite: limit, total: total }
     }
   end

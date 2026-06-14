@@ -130,7 +130,12 @@ function reprocannDias(s) {
 function reprocannStatus(s) {
   const days = reprocannDias(s)
   if (days === null) return null
-  if (days < 0)   return { label: 'Vencido',   level: 'danger',  days }
+  const estado = s.reprocann_estado_efectivo || s.reprocann_estado
+  if (days < 0) {
+    // Vencido con trámite de renovación en curso → ámbar, no rojo (igual que en la ficha)
+    if (estado === 'pendiente') return { label: 'En trámite', level: 'caution', days }
+    return { label: 'Vencido', level: 'danger', days }
+  }
   if (days <= 30) return { label: `${days}d`,   level: 'warning', days }
   if (days <= 90) return { label: `${days}d`,   level: 'caution', days }
   return { label: 'Vigente', level: 'ok', days }

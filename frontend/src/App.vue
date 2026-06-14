@@ -847,6 +847,13 @@ onMounted(async () => {
 }
 .mnc-main {
   flex: 1;
+  min-width: 0;
+}
+/* Centrado a nivel layout (mismo patrón que .med-main): centra todas las vistas
+   del rol manicura sin depender del CSS propio de cada una */
+.mnc-main > * {
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
 /* Drawer overlay (mobile <1024px) */

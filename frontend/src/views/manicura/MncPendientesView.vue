@@ -124,7 +124,7 @@ onMounted(cargar)
 </script>
 
 <style scoped>
-.mnp { padding: var(--sp-6); max-width: 900px; }
+.mnp { padding: var(--sp-6); max-width: 900px; margin: 0 auto; }
 
 /* Header */
 .mnp__header { margin-bottom: var(--sp-5); }

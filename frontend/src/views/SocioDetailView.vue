@@ -9,7 +9,7 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTurno } from '../lib/api.js'
+import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTurno, updatePaciente } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
@@ -59,6 +59,22 @@ const ccRefreshKey = ref(0)
 function onDispensacionCreada() {
   ccRefreshKey.value++
   store.fetchOne(socioId)
+}
+
+// ── Cambio rápido de estado REPROCANN (sin abrir el modal de edición) ──
+const cambiandoEstado = ref(false)
+async function cambiarEstadoReprocann(nuevo) {
+  if (s.value?.reprocann_estado === nuevo) return
+  cambiandoEstado.value = true
+  try {
+    await updatePaciente(socioId, { reprocann_estado: nuevo })
+    await store.fetchOne(socioId)
+    toast.success('Estado REPROCANN actualizado')
+  } catch (e) {
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo actualizar el estado')
+  } finally {
+    cambiandoEstado.value = false
+  }
 }
 
 // ── Timeline ──────────────────────────────────────────────────────────────────
@@ -183,8 +199,13 @@ function edad(fn) {
 
 const reprocannStatus = computed(() => {
   if (!s.value?.reprocann_vencimiento) return null
+  const estado = s.value?.reprocann_estado_efectivo || s.value?.reprocann_estado
   const days = Math.floor((safeDate(s.value.reprocann_vencimiento) - new Date()) / 86400000)
-  if (days < 0)   return { label: 'Vencido',                        color: '#dc2626', bg: 'rgba(220,38,38,.1)',   key: 'danger'  }
+  if (days < 0) {
+    // Vencido pero con trámite de renovación en curso → ámbar, no rojo
+    if (estado === 'pendiente') return { label: 'Vencido — trámite pendiente', color: '#b45309', bg: 'rgba(180,83,9,.12)', key: 'pendiente' }
+    return { label: 'Vencido', color: '#dc2626', bg: 'rgba(220,38,38,.1)', key: 'danger' }
+  }
   if (days <= 30) return { label: `Vence en ${days} días`,           color: '#d97706', bg: 'rgba(217,119,6,.1)',  key: 'warning' }
   return               { label: `Vigente — ${days} días restantes`, color: '#15803d', bg: 'rgba(21,128,61,.1)',  key: 'success' }
 })
@@ -287,6 +308,10 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         <AlertTriangle :size="16" />
         <div><strong>REPROCANN vencido</strong> — El certificado venció el {{ formatDate(s.reprocann_vencimiento) }}.</div>
       </div>
+      <div v-else-if="reprocannStatus?.key === 'pendiente'" class="sd__alerta sd__alerta--warning">
+        <AlertTriangle :size="16" />
+        <div><strong>REPROCANN vencido — trámite pendiente</strong> — El certificado venció el {{ formatDate(s.reprocann_vencimiento) }}, con renovación en trámite.</div>
+      </div>
       <div v-else-if="reprocannStatus?.key === 'warning'" class="sd__alerta sd__alerta--warning">
         <AlertTriangle :size="16" />
         <div><strong>REPROCANN por vencer</strong> — El certificado vence el {{ formatDate(s.reprocann_vencimiento) }}.</div>
@@ -364,6 +389,17 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
                       :style="{ background: reprocannEstadoMeta?.bg, color: reprocannEstadoMeta?.color, borderColor: reprocannEstadoMeta?.color }">
                   {{ reprocannEstadoMeta?.label || '—' }}
                 </span>
+              </div>
+              <!-- Cambio rápido de estado (sin abrir el modal de edición) -->
+              <div v-if="canEdit" class="sd__rep-estados">
+                <button
+                  v-for="opt in REPROCANN_ESTADOS" :key="opt.value"
+                  type="button"
+                  class="sd__rep-estado-btn"
+                  :disabled="cambiandoEstado"
+                  :style="s.reprocann_estado === opt.value ? { background: opt.bg, borderColor: opt.color, color: opt.color } : {}"
+                  @click="cambiarEstadoReprocann(opt.value)"
+                >{{ opt.label }}</button>
               </div>
             </div>
             <div class="sd__info-item">
@@ -661,6 +697,10 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__info-val--mono { font-family: monospace; }
 .sd__val-empty { color: #94a3b8; font-weight: 400; }
 .sd__inline-badge { display: inline-flex; align-items: center; font-size: .68rem; font-weight: 700; padding: .18em .6em; border-radius: 6px; margin-left: .4rem; }
+.sd__rep-estados { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
+.sd__rep-estado-btn { padding: .3rem .65rem; border-radius: 6px; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: .7rem; font-weight: 700; cursor: pointer; transition: all .15s; }
+.sd__rep-estado-btn:hover:not(:disabled) { border-color: #94a3b8; }
+.sd__rep-estado-btn:disabled { opacity: .5; cursor: wait; }
 
 /* Sys info */
 .sd__sys-info { display: flex; gap: 2rem; flex-wrap: wrap; padding: .875rem 1.25rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; font-size: .78rem; color: #64748b; }
