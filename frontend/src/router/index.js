@@ -755,6 +755,7 @@ const routes = [
       { path: 'manicura/pesar',     component: () => import('../views/mobile/MCosechasPorPesarView.vue') },
       { path: 'manicura/pesajes',   component: () => import('../views/manicura/MncPesajesView.vue') },
       { path: 'manicura/aprobacion',component: () => import('../views/mobile/MPendientesAprobacionView.vue') },
+      { path: 'manicura/tareas',    component: () => import('../views/mobile/MTareasView.vue') },
       { path: 'mnc/lotes/:id',      component: () => import('../views/manicura/MncLoteDetailView.vue') },
 
       // ── Delivery ──

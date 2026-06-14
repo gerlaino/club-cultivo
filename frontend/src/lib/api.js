@@ -170,6 +170,7 @@ export const deleteIndicacion = (id) => api.delete(`/indicaciones/${id}`);
 export const getCuentaCorriente  = (pacienteId)         => api.get(`/pacientes/${pacienteId}/cuenta_corriente`)
 export const cargarCreditoCC     = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/cargar`, payload)
 export const ajustarCC           = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/ajuste`, payload)
+export const registrarPagoCC     = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/registrar_pago`, payload)
 export const setLimiteCC         = (pacienteId, limite)  => api.patch(`/pacientes/${pacienteId}/cuenta_corriente/set_limite`, { limite_credito: limite })
 
 export const exportPacientesCSV  = (params = {}) => api.get('/pacientes/export_csv', { params, responseType: 'blob' })

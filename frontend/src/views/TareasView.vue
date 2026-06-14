@@ -424,10 +424,12 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
 async function cargarContexto() {
   try {
-    const [resSalas, resLotes, resSedes] = await Promise.all([listSalas(), listLotes(), listSedes()])
-    salas.value = resSalas.data || []
-    lotes.value = resLotes.data || []
-    sedes.value = resSedes.data || []
+    // allSettled: roles como manicura no pueden listar salas (403) — que eso
+    // no impida cargar lotes/sedes ni la lista de tareas
+    const [resSalas, resLotes, resSedes] = await Promise.allSettled([listSalas(), listLotes(), listSedes()])
+    salas.value = resSalas.status === 'fulfilled' ? (resSalas.value.data || []) : []
+    lotes.value = resLotes.status === 'fulfilled' ? (resLotes.value.data || []) : []
+    sedes.value = resSedes.status === 'fulfilled' ? (resSedes.value.data || []) : []
     if (esAdmin.value) {
       const resU = await listUsers()
       usuarios.value = (resU.data?.data || resU.data || []).map(u => ({

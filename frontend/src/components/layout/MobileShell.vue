@@ -85,6 +85,7 @@ const NAV = {
     { to: '/m/manicura/pesar',     icon: 'bi-scissors',       label: 'Por pesar'  },
     { to: '/m/manicura/pesajes',   icon: 'bi-journal-check',  label: 'Pesajes'    },
     { to: '/m/manicura/aprobacion',icon: 'bi-hourglass-split', label: 'Aprobación' },
+    { to: '/m/manicura/tareas',    icon: 'bi-list-check',     label: 'Tareas'     },
   ],
   delivery: [
     { to: '/m/delivery/despachos', icon: 'bi-truck',         label: 'Despachos' },

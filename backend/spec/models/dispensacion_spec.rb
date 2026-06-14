@@ -41,7 +41,8 @@ RSpec.describe Dispensacion, type: :model do
     it 'asigna fecha_dispensacion automáticamente si es nil (before_validation)' do
       d = nueva_dispensacion(fecha_dispensacion: nil)
       d.valid?
-      expect(d.fecha_dispensacion).to eq(Date.today)
+      # Date.current (no Date.today) para coincidir con la zona horaria del modelo
+      expect(d.fecha_dispensacion).to eq(Date.current)
     end
 
     it 'no permite fecha futura' do

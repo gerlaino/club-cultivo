@@ -96,6 +96,11 @@
           </div>
           <span class="scc__progreso-pct">{{ ccPorcentaje }}% del crédito utilizado</span>
         </div>
+
+        <!-- Registrar pago — disponible para admin y dispensador -->
+        <button v-if="puedeCobrar" class="scc__pago-btn" @click="abrirPago">
+          <i class="bi bi-cash-coin"></i> Registrar pago
+        </button>
       </div>
 
       <!-- ── Historial ──────────────────────────────────────── -->
@@ -117,6 +122,38 @@
 
     </template>
     <div v-else class="scc__empty">No se pudo cargar la cuenta corriente.</div>
+
+    <!-- Modal registrar pago -->
+    <Teleport to="body">
+      <div v-if="pagoOpen" class="scc__modal-overlay" @click.self="pagoOpen = false">
+        <div class="scc__modal">
+          <h3 class="scc__modal-title">Registrar pago</h3>
+          <p v-if="ccDeudaActual > 0" class="scc__modal-deuda">
+            Deuda actual: <strong>{{ fmtARS(ccDeudaActual) }}</strong>
+          </p>
+          <label class="scc__modal-label">Monto recibido</label>
+          <div class="scc__draft-input">
+            <input type="number" min="0" step="100" v-model.number="pagoMonto" class="scc__input" placeholder="0" autofocus />
+            <span class="scc__input-unit">ARS</span>
+          </div>
+          <label class="scc__modal-label">Medio de pago</label>
+          <select v-model="pagoMedio" class="scc__input">
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="mercado_pago">Mercado Pago</option>
+          </select>
+          <p v-if="pagoMonto > ccDeudaActual && ccDeudaActual >= 0" class="scc__modal-hint">
+            Quedará <strong>{{ fmtARS(pagoMonto - ccDeudaActual) }}</strong> a favor del socio.
+          </p>
+          <div class="scc__modal-actions">
+            <button class="scc__discard-btn" :disabled="pagando" @click="pagoOpen = false">Cancelar</button>
+            <button class="scc__save-btn" :disabled="pagando || !(pagoMonto > 0)" @click="confirmarPago">
+              {{ pagando ? 'Registrando…' : 'Registrar pago' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -125,8 +162,9 @@ import { ref, computed, watch, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useSocioCuentaCorriente } from '../../composables/useSocioCuentaCorriente.js'
 import { useToast } from '../../composables/useToast.js'
-import { setLimiteCC, updatePaciente } from '../../lib/api.js'
+import { setLimiteCC, updatePaciente, registrarPagoCC } from '../../lib/api.js'
 import { usePacientesStore } from '../../stores/pacientes'
+import { useAuthStore } from '../../stores/auth.js'
 
 const props = defineProps({
   socioId:    { type: Number,  required: true },
@@ -136,6 +174,7 @@ const props = defineProps({
 
 const { success: toastOk, error: toastErr } = useToast()
 const store = usePacientesStore()
+const auth  = useAuthStore()
 
 const {
   cc, loadingCC,
@@ -143,6 +182,35 @@ const {
   fmtARS, ccDeudaActual, ccMargen, ccPorcentaje,
   loadCC,
 } = useSocioCuentaCorriente(props.socioId)
+
+// ── Registrar pago (admin + dispensador) ───────────────────
+const puedeCobrar = computed(() => ['admin', 'super_admin', 'dispensador', 'supervisor'].includes(auth.user?.role))
+const pagoOpen    = ref(false)
+const pagoMonto   = ref(null)
+const pagoMedio   = ref('efectivo')
+const pagando     = ref(false)
+
+function abrirPago() {
+  pagoMonto.value = ccDeudaActual.value > 0 ? ccDeudaActual.value : null
+  pagoMedio.value = 'efectivo'
+  pagoOpen.value  = true
+}
+
+async function confirmarPago() {
+  if (!(pagoMonto.value > 0)) return
+  pagando.value = true
+  try {
+    const { data } = await registrarPagoCC(props.socioId, { monto: pagoMonto.value, medio_pago: pagoMedio.value })
+    cc.value = data
+    pagoOpen.value = false
+    await store.fetchOne(props.socioId)
+    toastOk('Pago registrado')
+  } catch (e) {
+    toastErr(e?.response?.data?.error || 'No se pudo registrar el pago')
+  } finally {
+    pagando.value = false
+  }
+}
 
 // ── Draft state ────────────────────────────────────────────
 // El on/off es estado explícito (ref), no se deriva del valor: si fuera
@@ -293,6 +361,24 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 }
 .scc__discard-btn:hover:not(:disabled) { background: #f1f5f9; color: #334155; }
 .scc__discard-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Registrar pago */
+.scc__pago-btn {
+  margin-top: 1rem; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  background: #15803d; color: #fff; border: none; border-radius: 9px;
+  padding: .6rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; transition: background .15s;
+}
+.scc__pago-btn:hover { background: #166534; }
+.scc__modal-overlay {
+  position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 900;
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.scc__modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+.scc__modal-title { font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0 0 .5rem; }
+.scc__modal-deuda { font-size: .82rem; color: #b45309; margin: 0 0 1rem; }
+.scc__modal-label { display: block; font-size: .75rem; font-weight: 700; color: #64748b; margin: .75rem 0 .3rem; }
+.scc__modal-hint { font-size: .78rem; color: #15803d; margin: .6rem 0 0; }
+.scc__modal-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.25rem; }
 
 /* Save transition */
 .scc-save-enter-active, .scc-save-leave-active { transition: all .25s ease; }

@@ -1,6 +1,9 @@
 class CuentaCorrientesController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_admin!
+  # Mostrar saldo y registrar pagos: roles de mostrador (incluye dispensador).
+  # Configurar crédito/límites/ajustes: solo admin/supervisor.
+  before_action :require_cobro_access!, only: [:show, :registrar_pago]
+  before_action :require_admin!,        except: [:show, :registrar_pago]
   before_action :set_paciente
 
   # GET /pacientes/:paciente_id/cuenta_corriente
@@ -121,6 +124,45 @@ class CuentaCorrientesController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  # POST /pacientes/:paciente_id/cuenta_corriente/registrar_pago
+  # Registra un pago real del socio: crea el asiento de ingreso (aporte_socio)
+  # —que aparece en el libro contable y acredita la cuenta corriente, saldando
+  # la deuda y dejando saldo a favor si paga de más—. Disponible para mostrador.
+  def registrar_pago
+    cc    = find_or_create_cc
+    monto = params[:monto].to_d
+    return render json: { error: "El monto debe ser mayor a 0" }, status: :unprocessable_entity unless monto > 0
+
+    sede_id = params[:sede_id].presence ||
+              current_user.sedes_ids_asignadas.first ||
+              current_user.club.sedes.activas.first&.id
+    return render json: { error: "No hay una sede para asignar el pago" }, status: :unprocessable_entity unless sede_id
+
+    medio = params[:medio_pago].presence || 'efectivo'
+    unless MovimientoContable::MEDIOS_PAGO.include?(medio)
+      return render json: { error: "Medio de pago inválido" }, status: :unprocessable_entity
+    end
+
+    # El after_create del movimiento acredita la cuenta corriente del paciente
+    MovimientoContable.create!(
+      club:        current_user.club,
+      sede_id:     sede_id,
+      paciente:    @paciente,
+      created_by:  current_user,
+      tipo:        'ingreso',
+      categoria:   'aporte_socio',
+      descripcion: "Pago de #{@paciente.nombre_completo}",
+      monto_ars:   monto,
+      fecha:       Date.current,
+      pagado:      true,
+      medio_pago:  medio,
+    )
+
+    render json: serialize(cc.reload), status: :created
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   private
 
   def set_paciente
@@ -131,6 +173,12 @@ class CuentaCorrientesController < ApplicationController
 
   def require_admin!
     render json: { error: "No autorizado" }, status: :forbidden unless current_user.admin? || current_user.supervisor?
+  end
+
+  # Mostrador: admin, supervisor y dispensador pueden ver saldo y registrar pagos
+  def require_cobro_access!
+    return if current_user.admin? || current_user.supervisor? || current_user.dispensador?
+    render json: { error: "No autorizado" }, status: :forbidden
   end
 
   def find_or_create_cc

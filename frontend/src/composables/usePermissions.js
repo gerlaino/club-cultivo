@@ -79,6 +79,7 @@ export function usePermissions() {
       plantas: ['index', 'show', 'update'],
       geneticas: ['index', 'show'],
       sedes: ['index', 'show'],
+      tareas: ['index', 'show'],
       manicura: ['access'],
     },
 

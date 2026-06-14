@@ -105,7 +105,8 @@ RSpec.describe Paciente, type: :model do
       end
 
       it 'excluye pacientes con vencimiento más allá de 30 días' do
-        p = create_paciente(reprocann_vencimiento: 31.days.from_now)
+        # 45 días: bien lejos del borde de los 30 días (evita flake por TZ/hora)
+        p = create_paciente(reprocann_vencimiento: 45.days.from_now)
         expect(Paciente.reprocann_por_vencer).not_to include(p)
       end
 

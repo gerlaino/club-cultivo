@@ -129,7 +129,9 @@ class PreferencesController < ApplicationController
   end
 
   def club_params
-    params.require(:club).permit(
+    # fetch (no require): hay requests legítimos sin clave :club (ej. purge_logo
+    # suelto), que con require devolvían 400 ParameterMissing.
+    params.fetch(:club, {}).permit(
       :name, :legal_name, :email, :phone, :website,
       :address, :city, :state, :timezone, :theme_primary,
       :cuit, :numero_igj, :numero_resolucion_reprocann,
