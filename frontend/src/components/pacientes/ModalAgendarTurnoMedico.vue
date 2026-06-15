@@ -66,6 +66,10 @@ const slotSel     = ref(null)       // { dia: Date, hora: string, fecha: string 
 const editTurnoId = ref(null)
 const form        = ref({ duracion_minutos: 30, tipo: 'seguimiento', motivo: '', estado: 'programado' })
 
+// Un turno ya realizado no se puede reprogramar ni cancelar (solo se muestra)
+const turnoEditando = computed(() => turnosExist.value.find(t => t.id === editTurnoId.value) || null)
+const esRealizado   = computed(() => turnoEditando.value?.estado === 'realizado')
+
 function resetPanel() {
   mode.value        = MODE_NONE
   slotSel.value     = null
@@ -447,7 +451,7 @@ onMounted(async () => {
               <div class="atm__panel-fields">
                 <div class="atm__pf-field">
                   <label class="atm__pf-lbl">Duración</label>
-                  <select v-model.number="form.duracion_minutos" class="atm__pf-input">
+                  <select v-model.number="form.duracion_minutos" class="atm__pf-input" :disabled="esRealizado">
                     <option :value="15">15 min</option>
                     <option :value="30">30 min</option>
                     <option :value="45">45 min</option>
@@ -457,7 +461,7 @@ onMounted(async () => {
                 </div>
                 <div class="atm__pf-field">
                   <label class="atm__pf-lbl">Tipo de consulta</label>
-                  <select v-model="form.tipo" class="atm__pf-input">
+                  <select v-model="form.tipo" class="atm__pf-input" :disabled="esRealizado">
                     <option value="primera_vez">Primera vez</option>
                     <option value="seguimiento">Seguimiento</option>
                     <option value="revision">Revisión</option>
@@ -466,7 +470,7 @@ onMounted(async () => {
                 </div>
                 <div class="atm__pf-field">
                   <label class="atm__pf-lbl">Motivo (opcional)</label>
-                  <textarea v-model="form.motivo" class="atm__pf-input atm__pf-textarea" rows="2" placeholder="Motivo de la consulta…" />
+                  <textarea v-model="form.motivo" class="atm__pf-input atm__pf-textarea" rows="2" placeholder="Motivo de la consulta…" :disabled="esRealizado" />
                 </div>
               </div>
 
@@ -500,16 +504,20 @@ onMounted(async () => {
                 </div>
               </div>
 
+              <div v-if="esRealizado" class="atm__realizado-nota">
+                <CheckCircle2 :size="14" /> Este turno ya fue realizado: no puede reprogramarse ni cancelarse.
+              </div>
+
               <div class="atm__panel-fields">
                 <div class="atm__pf-field">
                   <label class="atm__pf-lbl">Estado</label>
-                  <select v-model="form.estado" class="atm__pf-input">
+                  <select v-model="form.estado" class="atm__pf-input" :disabled="esRealizado">
                     <option v-for="o in ESTADO_OPTS" :key="o.value" :value="o.value">{{ o.label }}</option>
                   </select>
                 </div>
                 <div class="atm__pf-field">
                   <label class="atm__pf-lbl">Duración</label>
-                  <select v-model.number="form.duracion_minutos" class="atm__pf-input">
+                  <select v-model.number="form.duracion_minutos" class="atm__pf-input" :disabled="esRealizado">
                     <option :value="15">15 min</option>
                     <option :value="30">30 min</option>
                     <option :value="45">45 min</option>
@@ -519,7 +527,7 @@ onMounted(async () => {
                 </div>
                 <div class="atm__pf-field">
                   <label class="atm__pf-lbl">Tipo de consulta</label>
-                  <select v-model="form.tipo" class="atm__pf-input">
+                  <select v-model="form.tipo" class="atm__pf-input" :disabled="esRealizado">
                     <option value="primera_vez">Primera vez</option>
                     <option value="seguimiento">Seguimiento</option>
                     <option value="revision">Revisión</option>
@@ -528,19 +536,22 @@ onMounted(async () => {
                 </div>
                 <div class="atm__pf-field">
                   <label class="atm__pf-lbl">Motivo (opcional)</label>
-                  <textarea v-model="form.motivo" class="atm__pf-input atm__pf-textarea" rows="2" placeholder="Motivo de la consulta…" />
+                  <textarea v-model="form.motivo" class="atm__pf-input atm__pf-textarea" rows="2" placeholder="Motivo de la consulta…" :disabled="esRealizado" />
                 </div>
               </div>
 
               <div class="atm__panel-actions atm__panel-actions--edit">
-                <button class="atm__btn-danger-ghost" :disabled="saving" @click="cancelar" title="Cancelar turno">
-                  <Trash2 :size="13" />
-                </button>
-                <button class="atm__btn-ghost" @click="resetPanel">Descartar</button>
-                <button class="atm__btn-primary" :disabled="saving" @click="actualizar">
-                  <DsSpinner v-if="saving" :size="13" />
-                  <template v-else><CheckCircle2 :size="13" /> Guardar</template>
-                </button>
+                <template v-if="!esRealizado">
+                  <button class="atm__btn-danger-ghost" :disabled="saving" @click="cancelar" title="Cancelar turno">
+                    <Trash2 :size="13" />
+                  </button>
+                  <button class="atm__btn-ghost" @click="resetPanel">Descartar</button>
+                  <button class="atm__btn-primary" :disabled="saving" @click="actualizar">
+                    <DsSpinner v-if="saving" :size="13" />
+                    <template v-else><CheckCircle2 :size="13" /> Guardar</template>
+                  </button>
+                </template>
+                <button v-else class="atm__btn-ghost" @click="resetPanel">Cerrar</button>
               </div>
             </template>
 
@@ -750,6 +761,7 @@ onMounted(async () => {
 .atm__pi-val--strong { font-weight: 700; color: #0f172a; }
 
 /* Fields */
+.atm__realizado-nota { display: flex; align-items: center; gap: .4rem; margin: 0 1rem .5rem; padding: .5rem .7rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; border-radius: 8px; font-size: .76rem; font-weight: 600; }
 .atm__panel-fields { padding: 0 1rem; display: flex; flex-direction: column; gap: .4rem; flex: 1; overflow-y: auto; }
 .atm__pf-field { display: flex; flex-direction: column; gap: .2rem; }
 .atm__pf-lbl { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; }

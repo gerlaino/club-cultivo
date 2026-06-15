@@ -16,6 +16,9 @@ module Admin
     # DELETE /api/admin/turnos/:id
     def destroy
       turno = club.turnos.find(params[:id])
+      if turno.realizado?
+        return render json: { error: 'No se puede eliminar un turno ya realizado' }, status: :unprocessable_entity
+      end
       turno.update!(estado: 'cancelado')
       head :no_content
     end
