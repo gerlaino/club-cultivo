@@ -24,6 +24,11 @@ gem 'roo',        '~> 2.10', require: false   # Excel (.xlsx, .xls)
 gem 'pdf-reader', '~> 2.12', require: false   # PDF
 gem 'docx',       '~> 0.8',  require: false   # Word (.docx)
 
+# Generación de informes profesionales
+gem 'prawn',       '~> 2.5'                    # PDF con membrete del club
+gem 'prawn-table', '~> 0.2'                    # tablas en PDF
+gem 'caxlsx',      '~> 4.1'                    # Excel (.xlsx) con formato
+
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 

@@ -2,12 +2,20 @@
   <div class="inf">
     <div class="inf__header">
       <h1 class="inf__title"><FileCheck :size="20" :stroke-width="1.75" /> Informe REPROCANN</h1>
-      <select v-model="periodo" class="inf__periodo" @change="cargar">
-        <option value="mes_actual">Mes actual</option>
-        <option value="mes_anterior">Mes anterior</option>
-        <option value="trimestre">Trimestre</option>
-        <option value="anio">Año</option>
-      </select>
+      <div class="inf__acciones">
+        <select v-model="periodo" class="inf__periodo" @change="cargar">
+          <option value="mes_actual">Mes actual</option>
+          <option value="mes_anterior">Mes anterior</option>
+          <option value="trimestre">Trimestre</option>
+          <option value="anio">Año</option>
+        </select>
+        <button class="inf__btn" :disabled="descargando" @click="descargar('pdf')">
+          <FileDown :size="15" :stroke-width="2" /> PDF
+        </button>
+        <button class="inf__btn" :disabled="descargando" @click="descargar('xlsx')">
+          <Sheet :size="15" :stroke-width="2" /> Excel
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="inf__loading">Cargando…</div>
@@ -56,12 +64,32 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { FileCheck } from 'lucide-vue-next'
+import { FileCheck, FileDown, Sheet } from 'lucide-vue-next'
 import api from '../../lib/api.js'
+import { useToast } from '../../composables/useToast.js'
 
+const toast = useToast()
 const periodo = ref('mes_actual')
 const loading = ref(false)
 const data    = ref(null)
+const descargando = ref(false)
+
+async function descargar(formato) {
+  descargando.value = true
+  try {
+    const res = await api.get(`/informes/reprocann.${formato}`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `informe_reprocann_${new Date().toISOString().slice(0, 10)}.${formato}`
+    document.body.appendChild(a); a.click(); a.remove()
+    window.URL.revokeObjectURL(url)
+  } catch {
+    toast.error('No se pudo descargar el informe')
+  } finally {
+    descargando.value = false
+  }
+}
 
 async function cargar() {
   loading.value = true
@@ -83,8 +111,12 @@ onMounted(cargar)
 </script>
 
 <style scoped>
-.inf { padding: var(--sp-6); max-width: 900px; }
+.inf { padding: var(--sp-6); max-width: 900px; margin: 0 auto; }
 .inf__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-6); gap: var(--sp-4); flex-wrap: wrap; }
+.inf__acciones { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.inf__btn { display: inline-flex; align-items: center; gap: 5px; background: #15803d; color: #fff; border: none; border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-13); font-weight: 600; cursor: pointer; transition: background .15s; }
+.inf__btn:hover:not(:disabled) { background: #166534; }
+.inf__btn:disabled { opacity: .55; cursor: wait; }
 .inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
 .inf__periodo { background: var(--c-ink-50); border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: 6px 12px; font-size: var(--fs-14); color: var(--c-ink-900); }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }

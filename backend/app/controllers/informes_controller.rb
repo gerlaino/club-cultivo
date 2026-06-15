@@ -10,44 +10,24 @@ class InformesController < ApplicationController
   }.freeze
 
   def reprocann
-    club = current_user.club
-    pacientes = Paciente.for_club(club.id)
-    total = pacientes.count
+    data = reprocann_data(current_user.club)
 
-    con_vigente  = pacientes.where('reprocann_vencimiento >= ?', Date.today).count
-    vencen_30d   = pacientes.where('reprocann_vencimiento > ? AND reprocann_vencimiento <= ?',
-                                    Date.today, 30.days.from_now).count
-    vencidos     = pacientes.where('reprocann_vencimiento < ?', Date.today).count
-    sin_reprocann = pacientes.where(reprocann_numero: nil).count
-
-    lista = pacientes.limit(200).map do |p|
-      estado = if p.reprocann_numero.blank?
-        'sin_reprocann'
-      elsif p.reprocann_vencimiento.nil?
-        'vigente_sin_vencimiento'
-      elsif p.reprocann_vencimiento < Date.today
-        'vencido'
-      elsif p.reprocann_vencimiento <= 30.days.from_now
-        'por_vencer'
-      else
-        'vigente'
+    respond_to do |format|
+      format.json { render json: data }
+      format.pdf do
+        pdf = ReprocannDocument.new(club: current_user.club, usuario: current_user, data: data).render
+        send_data pdf,
+                  filename:    "informe_reprocann_#{Date.today.strftime('%Y%m%d')}.pdf",
+                  type:        "application/pdf",
+                  disposition: "attachment"
       end
-      {
-        iniciales:             "#{p.nombre[0]}.#{p.apellido[0]}.",
-        dni_ultimos_4:         p.dni_normalizado.to_s.last(4),
-        reprocann_estado:      estado,
-        reprocann_vencimiento: p.reprocann_vencimiento,
-      }
+      format.xlsx do
+        send_data reprocann_xlsx(current_user.club, data),
+                  filename:    "informe_reprocann_#{Date.today.strftime('%Y%m%d')}.xlsx",
+                  type:        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  disposition: "attachment"
+      end
     end
-
-    render json: {
-      total_pacientes:        total,
-      con_reprocann_vigente:  con_vigente,
-      vencen_30d:             vencen_30d,
-      vencidos:               vencidos,
-      sin_reprocann:          sin_reprocann,
-      lista_anonimizada:      lista,
-    }
   end
 
   def produccion
@@ -238,6 +218,74 @@ class InformesController < ApplicationController
   end
 
   private
+
+  # Datos del informe REPROCANN — compartidos por la respuesta JSON y el PDF
+  def reprocann_data(club)
+    pacientes = Paciente.for_club(club.id)
+    total = pacientes.count
+
+    con_vigente   = pacientes.where('reprocann_vencimiento >= ?', Date.today).count
+    vencen_30d    = pacientes.where('reprocann_vencimiento > ? AND reprocann_vencimiento <= ?',
+                                    Date.today, 30.days.from_now).count
+    vencidos      = pacientes.where('reprocann_vencimiento < ?', Date.today).count
+    sin_reprocann = pacientes.where(reprocann_numero: nil).count
+
+    lista = pacientes.limit(200).map do |p|
+      estado = if p.reprocann_numero.blank?
+        'sin_reprocann'
+      elsif p.reprocann_vencimiento.nil?
+        'vigente_sin_vencimiento'
+      elsif p.reprocann_vencimiento < Date.today
+        'vencido'
+      elsif p.reprocann_vencimiento <= 30.days.from_now
+        'por_vencer'
+      else
+        'vigente'
+      end
+      {
+        iniciales:             "#{p.nombre[0]}.#{p.apellido[0]}.",
+        dni_ultimos_4:         p.dni_normalizado.to_s.last(4),
+        reprocann_estado:      estado,
+        reprocann_vencimiento: p.reprocann_vencimiento,
+      }
+    end
+
+    {
+      total_pacientes:        total,
+      con_reprocann_vigente:  con_vigente,
+      vencen_30d:             vencen_30d,
+      vencidos:               vencidos,
+      sin_reprocann:          sin_reprocann,
+      lista_anonimizada:      lista,
+    }
+  end
+
+  ESTADO_REPROCANN_LABEL = {
+    'vigente'                 => 'Vigente',
+    'por_vencer'              => 'Por vencer (hasta 30 días)',
+    'vencido'                 => 'Vencido',
+    'vigente_sin_vencimiento' => 'Sin vencimiento',
+    'sin_reprocann'           => 'Sin REPROCANN',
+  }.freeze
+
+  def reprocann_xlsx(club, data)
+    rows = (data[:lista_anonimizada] || []).map do |p|
+      venc = p[:reprocann_vencimiento].present? ? Date.parse(p[:reprocann_vencimiento].to_s).strftime('%d/%m/%Y') : '—'
+      [
+        p[:iniciales].to_s,
+        p[:dni_ultimos_4].present? ? "**** #{p[:dni_ultimos_4]}" : '—',
+        ESTADO_REPROCANN_LABEL[p[:reprocann_estado].to_s] || p[:reprocann_estado].to_s,
+        venc,
+      ]
+    end
+    XlsxExport.new(
+      club:    club,
+      titulo:  'Informe REPROCANN',
+      headers: ['Iniciales', 'DNI (últ. 4)', 'Estado', 'Vencimiento'],
+      rows:    rows,
+      anchos:  [14, 16, 28, 16],
+    ).render
+  end
 
   def periodo_rango
     periodo = params[:periodo].presence_in(PERIODO_RANGOS.keys) || 'mes_actual'
