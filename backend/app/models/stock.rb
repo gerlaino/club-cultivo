@@ -7,6 +7,7 @@ class Stock < ApplicationRecord
 
   has_many :stock_movimientos, dependent: :destroy
   has_many :dispensaciones, class_name: 'Dispensacion', dependent: :nullify
+  has_many :reservas, dependent: :nullify
 
   ORIGENES         = %w[lote derivado_lote compra_externa].freeze
   FORMAS_PRODUCTO  = %w[flor_seca hash aceite tintura crema capsula comestible prensado otro externo].freeze
@@ -43,8 +44,14 @@ class Stock < ApplicationRecord
   def agotado?              = estado == 'agotado'
   def del_club?             = sede_id.nil?
 
+  # Stock comprometido pero todavía no descontado: envíos de dispensaciones en curso
+  # MÁS reservas pendientes de entrega. Al entregar una reserva se crea la Dispensacion
+  # (que descuenta el real) y la reserva pasa a 'entregada', dejando de contar acá — sin
+  # doble conteo.
   def gramos_reservados
-    dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
+    envios   = dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
+    apartado = reservas.pendientes.sum(:cantidad).to_f
+    envios + apartado
   end
 
   def cantidad_disponible_real

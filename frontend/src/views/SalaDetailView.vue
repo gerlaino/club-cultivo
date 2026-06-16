@@ -8,6 +8,7 @@ import { useAuthStore } from "../stores/auth"
 import { useClubStore } from "../stores/club"
 import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
 import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vue'
+import NuevoLoteModal         from '../components/lotes/NuevoLoteModal.vue'
 import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
 import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala } from '../lib/api.js'
@@ -573,22 +574,17 @@ async function createLote() {
     creandoLote.value = false
   }
 }
-async function openCreate() {
+function openCreate() {
+  // Sala de cosecha (legacy) usa su propio modal; el resto, el NuevoLoteModal compartido
   if (esSalaCosecha.value) { showCrearLoteCosecha.value = true; return }
-  loteForm.value       = emptyLoteForm()
-  loteErrors.value     = {}
-  loteApiError.value   = null
-  tipoCreacion.value   = 'nuevo'
-  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'semilla'
-  heredadoDias.value   = { semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 }
-  proximoCodigo.value  = ''
-  showCreate.value     = true
-  loadingCodigo.value  = true
-  try {
-    const { data } = await getLoteProximoCodigo()
-    proximoCodigo.value = data.codigo
-  } catch { /* no crítico */ }
-  finally { loadingCodigo.value = false }
+  showCreate.value = true
+}
+
+// Lote creado desde el NuevoLoteModal compartido
+async function onNuevoLoteCreado() {
+  await lotes.fetchBySala(salaId)
+  await salas.fetchSala(salaId)
+  lotesExpanded.value = true
 }
 
 async function onLoteCosechaCreado() {
@@ -1011,291 +1007,8 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
         </div>
       </div>
     </template>
-
-    <!-- Modal Crear Lote -->
-    <Teleport to="body">
-      <div v-if="showCreate" class="sd__overlay">
-        <div class="sd__modal">
-          <div class="sd__modal-header">
-            <div>
-              <h3 class="sd__modal-title">Nuevo lote</h3>
-              <p class="sd__modal-sub">{{ sala?.nombre }}</p>
-            </div>
-            <button class="sd__modal-close" @click="closeCreate"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="sd__modal-body">
-            <div v-if="loteApiError" class="sd__alert">{{ loteApiError }}</div>
-            <div v-else-if="lotes.createError" class="sd__alert">{{ lotes.createError }}</div>
-
-            <!-- Bifurcación tipo creación -->
-            <div class="sd__tipo-tabs">
-              <button
-                type="button"
-                class="sd__tipo-tab"
-                :class="{ 'sd__tipo-tab--active': tipoCreacion === 'nuevo' }"
-                @click="tipoCreacion = 'nuevo'"
-              >
-                <i class="bi bi-plus-circle"></i>
-                Lote nuevo
-              </button>
-              <button
-                type="button"
-                class="sd__tipo-tab"
-                :class="{ 'sd__tipo-tab--active': tipoCreacion === 'existente' }"
-                @click="tipoCreacion = 'existente'"
-              >
-                <i class="bi bi-clock-history"></i>
-                Cargar lote existente
-              </button>
-            </div>
-
-            <!-- Código (siempre visible, readonly) -->
-            <div class="sd__field">
-              <label class="sd__label">Código</label>
-              <input
-                type="text"
-                class="sd__input"
-                :value="loadingCodigo ? 'Calculando…' : (proximoCodigo || '—')"
-                readonly
-                style="opacity:.75;cursor:default"
-              />
-              <span class="sd__codigo-hint">Asignado automáticamente al guardar</span>
-            </div>
-
-            <div class="sd__grid">
-
-              <!-- ── LOTE EXISTENTE (heredado) ── -->
-              <template v-if="tipoCreacion === 'existente'">
-
-                <div class="sd__field sd__field--full">
-                  <label class="sd__label">¿Cómo inició este lote?</label>
-                  <div class="sd__origen-pills">
-                    <button type="button" class="sd__origen-pill"
-                      :class="{ 'sd__origen-pill--active': loteForm.origen === 'semilla' }"
-                      @click="setOrigen('semilla')">🌱 Semilla</button>
-                    <button type="button" class="sd__origen-pill"
-                      :class="{ 'sd__origen-pill--active': loteForm.origen === 'esqueje' }"
-                      @click="setOrigen('esqueje')">🪴 Esqueje</button>
-                  </div>
-                </div>
-
-                <div class="sd__field sd__field--full">
-                  <label class="sd__label">Estado actual del lote</label>
-                  <select class="sd__input" v-model="heredadoEstado">
-                    <option v-for="e in estadosHeredadoPermitidos" :key="e.value" :value="e.value">{{ e.label }}</option>
-                  </select>
-                </div>
-
-                <div class="sd__field">
-                  <label class="sd__label">
-                    Días en {{ loteForm.origen === 'esqueje' ? 'esqueje' : 'semilla' }}
-                    <span v-if="['vegetativo','floracion','cosecha'].includes(heredadoEstado)" class="sd__label-opt">(completados)</span>
-                  </label>
-                  <input type="number" min="0" max="999" step="1" class="sd__input" v-model.number="heredadoDias.semilla_esqueje" />
-                </div>
-
-                <div v-if="['vegetativo','floracion','cosecha'].includes(heredadoEstado)" class="sd__field">
-                  <label class="sd__label">
-                    Días en vegetativo
-                    <span v-if="['floracion','cosecha'].includes(heredadoEstado)" class="sd__label-opt">(completados)</span>
-                  </label>
-                  <input type="number" min="0" max="999" step="1" class="sd__input" v-model.number="heredadoDias.vegetativo" />
-                </div>
-
-                <div v-if="['floracion','cosecha'].includes(heredadoEstado)" class="sd__field">
-                  <label class="sd__label">
-                    Días en floración
-                    <span v-if="heredadoEstado === 'cosecha'" class="sd__label-opt">(completados)</span>
-                  </label>
-                  <input type="number" min="0" max="999" step="1" class="sd__input" v-model.number="heredadoDias.floracion" />
-                </div>
-
-                <div v-if="heredadoEstado === 'cosecha'" class="sd__field">
-                  <label class="sd__label">Días en cosecha <span class="sd__label-opt">(actual)</span></label>
-                  <input type="number" min="0" max="999" step="1" class="sd__input" v-model.number="heredadoDias.cosecha" />
-                </div>
-
-                <div v-if="heredadoStartDatePreview" class="sd__field sd__field--full">
-                  <label class="sd__label">Fecha de inicio estimada</label>
-                  <input type="text" class="sd__input" :value="heredadoStartDatePreview" readonly style="opacity:.75;cursor:default" />
-                  <span class="sd__codigo-hint">Calculada a partir de los días ingresados</span>
-                </div>
-
-              </template>
-
-              <!-- ── LOTE NUEVO ── -->
-              <template v-else>
-                <div v-if="mostrarOrigenSelector" class="sd__field sd__field--full">
-                  <label class="sd__label">¿Cómo inicia este lote?</label>
-                  <div class="sd__origen-pills">
-                    <button type="button" class="sd__origen-pill"
-                      :class="{ 'sd__origen-pill--active': loteForm.origen === 'semilla' }"
-                      @click="setOrigen('semilla')">🌱 Semilla</button>
-                    <button type="button" class="sd__origen-pill"
-                      :class="{ 'sd__origen-pill--active': loteForm.origen === 'esqueje' }"
-                      @click="setOrigen('esqueje')">🪴 Esqueje</button>
-                  </div>
-                </div>
-                <div class="sd__field">
-                  <label class="sd__label">Fecha de inicio</label>
-                  <input type="date" class="sd__input" v-model="loteForm.start_date" />
-                </div>
-              </template>
-
-              <!-- Planta madre (solo esqueje) -->
-              <div v-if="loteForm.origen === 'esqueje'" class="sd__field sd__field--full">
-                <label class="sd__label">Planta madre <span class="sd__label-opt">(opcional)</span></label>
-                <div v-if="loadingMadres" class="sd__input sd__input--disabled">Cargando plantas…</div>
-                <div v-else class="sd__madre-picker">
-                  <div v-if="plantaMadreSeleccionada" class="sd__madre-chip">
-                    <i class="bi bi-check-circle-fill"></i>
-                    <strong>{{ plantaMadreSeleccionada.nombre }}</strong>
-                    <span v-if="plantaMadreSeleccionada.lote?.codigo" class="sd__madre-chip-lote">{{ plantaMadreSeleccionada.lote.codigo }}</span>
-                    <span v-if="plantaMadreSeleccionada.genetica" class="sd__madre-chip-gen">· {{ plantaMadreSeleccionada.genetica.nombre }}</span>
-                    <button type="button" class="sd__madre-clear" @click="clearMadre" title="Quitar">×</button>
-                  </div>
-                  <input
-                    v-model="madreQuery"
-                    type="text"
-                    class="sd__input"
-                    :placeholder="plantaMadreSeleccionada ? 'Cambiar planta madre…' : 'Buscar por nombre, sala, lote o genética…'"
-                    @focus="madreFocused = true"
-                    @blur="onMadreBlur"
-                    autocomplete="off"
-                  />
-                  <div v-if="madreFocused" class="sd__madre-dropdown">
-                    <template v-if="madreQuery.trim()">
-                      <div v-if="!madreDropdown.length" class="sd__madre-empty">Sin resultados para "{{ madreQuery }}"</div>
-                      <div
-                        v-for="p in madreDropdown"
-                        :key="p.id"
-                        class="sd__madre-opt"
-                        :class="{ 'sd__madre-opt--sel': loteForm.planta_madre_id === p.id }"
-                        @mousedown.prevent="selectMadre(p)"
-                      >
-                        <span class="sd__madre-opt-nombre">{{ p.nombre }}</span>
-                        <span class="sd__madre-opt-meta">
-                          <span class="sd__madre-opt-sala">{{ p.lote?.sala?.nombre }}</span>
-                          · {{ p.lote?.codigo }}
-                          <span v-if="p.genetica">· {{ p.genetica.nombre }}</span>
-                        </span>
-                      </div>
-                    </template>
-                    <template v-else>
-                      <div v-if="!madreAgrupado.length" class="sd__madre-empty">No hay plantas disponibles</div>
-                      <template v-for="sala in madreAgrupado" :key="sala.sala_id">
-                        <div class="sd__madre-sala-hd">
-                          <span><i class="bi bi-geo-alt-fill"></i> {{ sala.sala_nombre }}</span>
-                          <span class="sd__madre-sala-cnt">{{ sala.lotes.reduce((t, l) => t + l.plants.length, 0) }} plantas</span>
-                        </div>
-                        <template v-for="lote in sala.lotes" :key="lote.lote_id">
-                          <div class="sd__madre-lote-hd">
-                            <i class="bi bi-box-seam"></i>
-                            <span>{{ lote.lote_codigo }}</span>
-                            <span v-if="lote.genetica" class="sd__madre-lote-gen">{{ lote.genetica }}</span>
-                          </div>
-                          <div
-                            v-for="p in lote.plants"
-                            :key="p.id"
-                            class="sd__madre-opt sd__madre-opt--plant"
-                            :class="{ 'sd__madre-opt--sel': loteForm.planta_madre_id === p.id }"
-                            @mousedown.prevent="selectMadre(p)"
-                          >
-                            <span class="sd__madre-opt-nombre">🌿 {{ p.nombre }}</span>
-                            <span class="sd__madre-opt-meta">{{ p.state }}</span>
-                          </div>
-                        </template>
-                      </template>
-                    </template>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Cantidad de plantas -->
-              <div class="sd__field">
-                <label class="sd__label">Cantidad de plantas</label>
-                <input type="number" min="0" max="5000" step="1" class="sd__input"
-                       :class="{ 'sd__input--err': loteErrors.plants_count }"
-                       v-model.number="loteForm.plants_count" />
-                <span v-if="loteErrors.plants_count" class="sd__err-msg">{{ loteErrors.plants_count }}</span>
-              </div>
-
-              <!-- Genética -->
-              <div class="sd__field">
-                <label class="sd__label">
-                  Genética / Variedad
-                  <span v-if="loteForm.origen === 'esqueje' && loteForm.planta_madre_id" class="sd__label-heredada">Heredada de madre</span>
-                </label>
-                <select class="sd__input" v-model="loteForm.genetica_id" :disabled="!geneticas.length">
-                  <option value="">{{ geneticas.length ? 'Sin especificar' : 'Sin genéticas disponibles para cultivo' }}</option>
-                  <option v-for="g in geneticas" :key="g.id" :value="g.id">
-                    {{ g.nombre }}{{ g.registrada_inase ? ' 🏛️' : '' }} — {{ g.tipo }}
-                  </option>
-                </select>
-                <p v-if="!geneticas.length" class="sd__genetica-hint">
-                  <i class="bi bi-info-circle"></i>
-                  Antes de crear un lote, <a href="/geneticas" class="sd__genetica-link">registrá una genética</a>.
-                </p>
-              </div>
-
-              <!-- Tipo de cultivo -->
-              <div class="sd__field">
-                <label class="sd__label">Tipo de cultivo</label>
-                <select class="sd__input" v-model="loteForm.grow_type">
-                  <option value="sustrato">Sustrato</option>
-                  <option value="hidroponia">Hidroponia</option>
-                  <option value="aeroponia">Aeroponia</option>
-                </select>
-              </div>
-
-              <!-- Tamaño de maceta -->
-              <div class="sd__field">
-                <label class="sd__label">Tamaño de maceta</label>
-                <select class="sd__input" v-model="loteForm.tamanio_maceta">
-                  <option value="">Sin especificar</option>
-                  <option value="0.5">Vaso (0.5L)</option>
-                  <option value="1">1 litro</option>
-                  <option value="3">3 litros</option>
-                  <option value="5">5 litros</option>
-                  <option value="7">7 litros</option>
-                  <option value="10">10 litros</option>
-                  <option value="12">12 litros</option>
-                  <option value="15">15 litros</option>
-                  <option value="otro">Otro</option>
-                </select>
-              </div>
-
-              <!-- Tipo de luz -->
-              <div class="sd__field">
-                <label class="sd__label">Tipo de luz</label>
-                <select class="sd__input" v-model="loteForm.light_type">
-                  <option value="">Sin especificar</option>
-                  <option value="led">LED</option>
-                  <option value="hps">HPS</option>
-                  <option value="cmh">CMH</option>
-                  <option value="natural">Natural</option>
-                  <option value="mixta">Mixta</option>
-                </select>
-              </div>
-
-              <!-- Notas -->
-              <div class="sd__field sd__field--full">
-                <label class="sd__label">Notas</label>
-                <textarea class="sd__input sd__textarea" rows="2" v-model.trim="loteForm.notes" placeholder="Observaciones…"></textarea>
-              </div>
-
-            </div>
-          </div>
-          <div class="sd__modal-footer">
-            <button class="sd__btn-ghost" :disabled="lotes.creating || creandoLote" @click="closeCreate">Cancelar</button>
-            <button class="sd__btn-primary" :disabled="lotes.creating || creandoLote" @click="createLote">
-              <DsSpinner v-if="lotes.creating || creandoLote" :size="14" />
-              <i v-else class="bi bi-plus-lg"></i>Crear lote
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- Modal Crear Lote (componente compartido NuevoLoteModal) -->
+    <NuevoLoteModal :show="showCreate" :sala="sala" @close="showCreate = false" @created="onNuevoLoteCreado" />
 
     <!-- Modal cambiar fase (vege ↔ flora) -->
     <Teleport to="body">

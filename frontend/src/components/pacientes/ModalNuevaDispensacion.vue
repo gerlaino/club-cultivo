@@ -4,7 +4,7 @@ import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { createDispensacion, listStocks, listEntregadores } from '../../lib/api.js'
+import { createDispensacion, createReserva, listStocks, listEntregadores } from '../../lib/api.js'
 
 const props = defineProps({
   modelValue:     { type: Boolean, required: true },
@@ -97,6 +97,8 @@ function emptyForm() {
     fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo',
     con_envio: false, delivery_id: null, direccion_envio: '',
     contacto_nombre: '', contacto_telefono: '', notas_envio: '',
+    // Reserva: si es_reserva, no se entrega ahora — se aparta stock para una fecha futura.
+    es_reserva: false, fecha_entrega_estimada: '', sena_ars: null,
   }
 }
 
@@ -150,6 +152,42 @@ async function handleSubmit() {
   if (excederiaStock.value) {
     formError.value = `Stock insuficiente: solo hay ${stockSeleccionado.value.cantidad}${stockSeleccionado.value.unidad || 'g'} disponibles`
     saving.value = false; return
+  }
+
+  // ── Rama RESERVA: aparta stock para una fecha futura, no se entrega ahora ──
+  if (form.value.es_reserva) {
+    if (!form.value.fecha_entrega_estimada) {
+      formError.value = 'Indicá la fecha de entrega estimada'; saving.value = false; return
+    }
+    if (Number(form.value.sena_ars) > Number(form.value.aporte_socio_ars || 0)) {
+      formError.value = 'La seña no puede superar el total estimado'; saving.value = false; return
+    }
+    try {
+      const payload = {
+        stock_id: form.value.stock_id,
+        cantidad: form.value.cantidad,
+        fecha_entrega_estimada: form.value.fecha_entrega_estimada,
+        medio_pago: form.value.medio_pago,
+        con_envio: form.value.con_envio,
+        notas: form.value.observaciones || undefined,
+      }
+      if (form.value.aporte_socio_ars) payload.aporte_estimado_ars = Number(form.value.aporte_socio_ars).toFixed(2)
+      if (form.value.sena_ars)         payload.sena_ars = Number(form.value.sena_ars).toFixed(2)
+      if (form.value.con_envio) {
+        payload.direccion_envio   = form.value.direccion_envio || undefined
+        payload.contacto_nombre   = form.value.contacto_nombre || undefined
+        payload.contacto_telefono = form.value.contacto_telefono || undefined
+      }
+      await createReserva(props.socioId, payload)
+      cerrar()
+      toast.success('Reserva creada')
+      emit('saved')
+    } catch (e) {
+      const msg = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al crear la reserva'
+      formError.value = msg
+      toast.error(msg)
+    } finally { saving.value = false }
+    return
   }
   // Aporte obligatorio para todos los medios de pago
   if (!(Number(form.value.aporte_socio_ars) > 0)) {
@@ -230,6 +268,16 @@ async function handleSubmit() {
 
         <div class="mnd__modal-body">
           <div v-if="formError" class="mnd__error"><i class="bi bi-exclamation-triangle-fill"></i> {{ formError }}</div>
+
+          <!-- Tipo: entrega inmediata o reserva -->
+          <div class="mnd__segmented">
+            <button type="button" class="mnd__seg-btn" :class="{ 'mnd__seg-btn--active': !form.es_reserva }" @click="form.es_reserva = false">
+              <i class="bi bi-bag-check"></i> Entrega inmediata
+            </button>
+            <button type="button" class="mnd__seg-btn" :class="{ 'mnd__seg-btn--active': form.es_reserva }" @click="form.es_reserva = true">
+              <i class="bi bi-bookmark-star"></i> Reserva
+            </button>
+          </div>
 
           <!-- Stock -->
           <div class="mnd__section-label">Stock a dispensar <span class="mnd__req">*</span></div>
@@ -341,11 +389,13 @@ async function handleSubmit() {
           <!-- Fecha + pago -->
           <div class="mnd__form-row">
             <div class="mnd__field">
-              <label class="mnd__label">Fecha</label>
-              <input v-model="form.fecha_dispensacion" type="date" class="mnd__input" :max="today" />
+              <label class="mnd__label" v-if="form.es_reserva">Fecha de entrega estimada <span class="mnd__req">*</span></label>
+              <label class="mnd__label" v-else>Fecha</label>
+              <input v-if="form.es_reserva" v-model="form.fecha_entrega_estimada" type="date" class="mnd__input" :min="today" />
+              <input v-else v-model="form.fecha_dispensacion" type="date" class="mnd__input" :max="today" />
             </div>
             <div class="mnd__field">
-              <label class="mnd__label">Medio de pago</label>
+              <label class="mnd__label">Medio de pago <span v-if="form.es_reserva" class="mnd__opt">previsto</span></label>
               <select v-model="form.medio_pago" class="mnd__input">
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
@@ -355,6 +405,19 @@ async function handleSubmit() {
                 <option value="otro">Otro</option>
               </select>
             </div>
+          </div>
+
+          <!-- Seña (solo reserva) -->
+          <div v-if="form.es_reserva" class="mnd__field">
+            <label class="mnd__label">Seña <span class="mnd__opt">opcional — se cobra ahora, el resto al entregar</span></label>
+            <div class="mnd__input-suffix-wrap">
+              <span class="mnd__input-prefix">$</span>
+              <input v-model.number="form.sena_ars" type="number" min="0" step="1"
+                     class="mnd__input mnd__input--with-prefix" placeholder="0" />
+            </div>
+            <span v-if="form.sena_ars > 0 && form.aporte_socio_ars" class="mnd__field-hint">
+              Resto a cobrar al entregar: {{ fmt(Math.max(0, Number(form.aporte_socio_ars) - Number(form.sena_ars))) }}
+            </span>
           </div>
 
           <!-- Observaciones -->
@@ -381,7 +444,7 @@ async function handleSubmit() {
           </div>
 
           <div v-if="form.con_envio" class="mnd__delivery-section">
-            <div class="mnd__field">
+            <div v-if="!form.es_reserva" class="mnd__field">
               <label class="mnd__label">Delivery asignado <span class="mnd__req">*</span></label>
               <div v-if="loadingDelivery" class="mnd__loading-inline"><DsSpinner :size="13" /> Cargando…</div>
               <div v-else-if="!deliveryUsers.length" class="mnd__warn-box">
@@ -393,6 +456,9 @@ async function handleSubmit() {
                   {{ u.first_name || u.nombre || u.email }}
                 </option>
               </select>
+            </div>
+            <div v-else class="mnd__field-hint" style="margin-bottom:.5rem">
+              El delivery se asigna al entregar la reserva.
             </div>
             <div class="mnd__field">
               <label class="mnd__label">Dirección de entrega <span class="mnd__req">*</span></label>
@@ -421,10 +487,10 @@ async function handleSubmit() {
 
         <div class="mnd__modal-footer">
           <button class="mnd__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
-          <button class="mnd__btn-primary" :disabled="saving || !form.stock_id || ccInsuficiente" @click="handleSubmit">
+          <button class="mnd__btn-primary" :disabled="saving || !form.stock_id || (!form.es_reserva && ccInsuficiente)" @click="handleSubmit">
             <DsSpinner v-if="saving" :size="14" />
-            <i v-else class="bi bi-check-lg"></i>
-            Registrar dispensación
+            <i v-else class="bi" :class="form.es_reserva ? 'bi-bookmark-star' : 'bi-check-lg'"></i>
+            {{ form.es_reserva ? 'Crear reserva' : 'Registrar dispensación' }}
           </button>
         </div>
 
@@ -444,6 +510,11 @@ async function handleSubmit() {
 .mnd__modal-close:hover { background: #e2e8f0; }
 
 .mnd__modal-body { padding: 1.1rem 1.25rem; flex: 1; display: flex; flex-direction: column; gap: .9rem; }
+
+/* Segmented entrega / reserva */
+.mnd__segmented { display: flex; gap: .35rem; background: #f1f5f9; padding: .25rem; border-radius: 10px; }
+.mnd__seg-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: none; background: transparent; color: #64748b; font-size: .82rem; font-weight: 700; padding: .5rem .75rem; border-radius: 8px; cursor: pointer; transition: all .15s; }
+.mnd__seg-btn--active { background: #fff; color: #15803d; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .mnd__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: .875rem 1.25rem; border-top: 1px solid #f1f5f9; position: sticky; bottom: 0; background: #fff; }
 
 .mnd__error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 9px; padding: .6rem .875rem; font-size: .82rem; display: flex; align-items: center; gap: .4rem; }

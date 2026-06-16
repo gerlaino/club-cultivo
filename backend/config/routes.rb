@@ -153,6 +153,7 @@ Rails.application.routes.draw do
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
       resources :dispensaciones, only: [:index, :create]
+      resources :reservas, only: [:index, :create]
       resources :reprocann_renovaciones, only: [:index, :create, :update, :destroy]
       resources :turnos, controller: "paciente_turnos", only: [:index]
       resources :documents, controller: 'patient_documents' do
@@ -231,6 +232,13 @@ Rails.application.routes.draw do
         patch :entregar
         patch :reportar_fallo
         patch :reprogramar
+      end
+    end
+
+    resources :reservas, only: [:index, :show] do
+      member do
+        patch :entregar
+        patch :cancelar
       end
     end
 

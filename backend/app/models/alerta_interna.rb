@@ -11,6 +11,7 @@ class AlertaInterna < ApplicationRecord
     manicura_asignada manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada
     stock_bajo stock_vencimiento saldo_cc_bajo saldo_gramos_bajo
     delivery_entregado delivery_fallido
+    reserva_por_entregar reserva_vencida
     otro
   ].freeze
 

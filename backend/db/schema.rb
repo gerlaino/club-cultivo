@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_13_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_16_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1031,6 +1031,38 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_13_000002) do
     t.index ["paciente_id"], name: "index_reprocann_renovaciones_on_paciente_id"
   end
 
+  create_table "reservas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "paciente_id", null: false
+    t.bigint "stock_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "dispensacion_id"
+    t.decimal "cantidad", precision: 10, scale: 3, null: false
+    t.string "estado", default: "pendiente", null: false
+    t.date "fecha_entrega_estimada", null: false
+    t.decimal "sena_ars", precision: 10, scale: 2, default: "0.0", null: false
+    t.decimal "aporte_estimado_ars", precision: 10, scale: 2
+    t.string "medio_pago"
+    t.boolean "con_envio", default: false, null: false
+    t.string "direccion_envio"
+    t.string "contacto_nombre"
+    t.string "contacto_telefono"
+    t.text "notas"
+    t.datetime "entregada_at"
+    t.datetime "cancelada_at"
+    t.datetime "vencida_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "estado"], name: "index_reservas_on_club_id_and_estado"
+    t.index ["club_id"], name: "index_reservas_on_club_id"
+    t.index ["dispensacion_id"], name: "index_reservas_on_dispensacion_id"
+    t.index ["fecha_entrega_estimada"], name: "index_reservas_on_fecha_entrega_estimada"
+    t.index ["paciente_id"], name: "index_reservas_on_paciente_id"
+    t.index ["stock_id", "estado"], name: "index_reservas_on_stock_id_and_estado"
+    t.index ["stock_id"], name: "index_reservas_on_stock_id"
+    t.index ["user_id"], name: "index_reservas_on_user_id"
+  end
+
   create_table "sala_cultivadores", force: :cascade do |t|
     t.bigint "sala_id", null: false
     t.bigint "user_id", null: false
@@ -1419,6 +1451,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_13_000002) do
   add_foreign_key "reprocann_renovaciones", "clubs"
   add_foreign_key "reprocann_renovaciones", "pacientes"
   add_foreign_key "reprocann_renovaciones", "users", column: "iniciada_por_id"
+  add_foreign_key "reservas", "clubs"
+  add_foreign_key "reservas", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "reservas", "pacientes"
+  add_foreign_key "reservas", "stocks"
+  add_foreign_key "reservas", "users"
   add_foreign_key "sala_cultivadores", "salas"
   add_foreign_key "sala_cultivadores", "users"
   add_foreign_key "salas", "clubs"

@@ -115,10 +115,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
   async function handleAvanzarFase() {
     const lote = lotes.current
     if (lote?.proxima_fase_posible === 'cosecha') {
-      if (!lote.salas_destino?.length) {
-        toast.error('No hay salas disponibles para cosechar, por favor crear una nueva.')
-        return
-      }
+      // La cosecha ya no requiere una sala de cosecha: es un evento → post-cosecha.
       if (!plants.itemsByLote[String(loteId)]) {
         try { await plants.fetchByLote(loteId) } catch {}
       }
@@ -200,7 +197,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     try {
       const { data } = await transicionarLote(lotes.current.id, {
         nueva_fase: 'cosecha',
-        sala_id: cosechaSalaId.value || undefined,
+        // La cosecha es un evento → post-cosecha, no se elige sala.
         pesada: {
           plantas_cosechadas: cosechaForm.value.plantas_cosechadas,
           notas: cosechaForm.value.notas || undefined,

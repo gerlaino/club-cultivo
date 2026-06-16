@@ -17,10 +17,11 @@ const sedes = ref([])
 const saving = ref(false)
 const error  = ref(null)
 
+// 'cosecha' se retiró del alta de salas (la cosecha es un evento → post-cosecha).
+// El kind 'cosecha' sigue siendo válido en el backend para salas existentes y uso futuro.
 const KINDS = [
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración'  },
-  { value: 'cosecha',    label: 'Cosecha'    },
   { value: 'manicura',   label: 'Manicura'   },
 ]
 

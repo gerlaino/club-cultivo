@@ -128,6 +128,10 @@ class Lote < ApplicationRecord
     raise ArgumentError, "registrado_por es obligatorio" unless registrado_por
 
     ActiveRecord::Base.transaction do
+      # La cosecha NO usa una sala de cultivo: el lote sale de floración (liberando su
+      # slot) hacia una sala de proceso "Cosecha · sede" (auto-gestionada, igual que
+      # Secado y Curado). Así queda en post-cosecha conservando la sede para el flujo
+      # de manicura, y se ve en /cosechado por estado.
       sala_destino = if sala_id.present?
         club.salas.activas.find_by(id: sala_id) ||
           Sala.find_or_create_proceso!(sede: sala.sede, tipo: nueva_fase, created_by: registrado_por)

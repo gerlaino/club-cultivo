@@ -111,6 +111,49 @@
           </div>
         </fieldset>
 
+        <fieldset class="spc__fieldset">
+          <legend class="spc__legend">Post-cosecha → manicura</legend>
+          <p class="spc__field-desc">
+            Qué hacer con un lote cosechado que sigue esperando manicura. A los días indicados,
+            el sistema avisa al admin o asigna la manicura automáticamente.
+          </p>
+          <div class="spc__field-grid">
+            <div class="spc__field">
+              <label class="spc__label">Días de gracia</label>
+              <div class="spc__input-wrap">
+                <input
+                  v-model.number="configForm.postcosecha_dias"
+                  type="number"
+                  min="0"
+                  max="60"
+                  class="spc__input spc__input--sm"
+                />
+                <span class="spc__input-suffix">días cosechado (0 = desactivado)</span>
+              </div>
+            </div>
+            <div class="spc__field">
+              <label class="spc__label">Acción al cumplirse</label>
+              <select v-model="configForm.postcosecha_modo" class="spc__select">
+                <option value="avisar">Sólo avisar al admin</option>
+                <option value="asignar_automatico">Asignar a manicura automáticamente</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="configForm.postcosecha_modo === 'asignar_automatico' && manicuras.length > 1" class="spc__field">
+            <label class="spc__label">Manicura por defecto</label>
+            <select v-model="configForm.postcosecha_manicura_default_id" class="spc__select">
+              <option :value="null">Sin definir (pedir elección al admin)</option>
+              <option v-for="m in manicuras" :key="m.id" :value="m.id">
+                {{ m.first_name || m.nombre || m.email }}
+              </option>
+            </select>
+            <p class="spc__field-desc">
+              Hay varios manicuras. Si no elegís uno, cada lote quedará pendiente de asignación manual.
+            </p>
+          </div>
+        </fieldset>
+
         <div class="spc__form-footer">
           <button type="submit" class="spc__btn-primary" :disabled="guardandoAlertas">
             {{ guardandoAlertas ? 'Guardando…' : 'Guardar configuración' }}
@@ -176,7 +219,7 @@ import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import {
   listSetpointsFase, createSetpointFase, updateSetpointFase, deleteSetpointFase,
-  getPreferences, updatePreferences,
+  getPreferences, updatePreferences, listUsers,
 } from '../lib/api.js'
 
 const toast   = useToast()
@@ -337,7 +380,21 @@ const guardandoAlertas = ref(false)
 const configForm = ref({
   dias_sin_registro: { vegetativo: 3, floracion: 2, cosecha: 1 },
   cosecha_pendiente_umbral_dias: 0,
+  postcosecha_dias: 0,
+  postcosecha_modo: 'avisar',
+  postcosecha_manicura_default_id: null,
 })
+
+// Manicuras del club — para elegir un default cuando hay varios (modo asignar_automatico).
+const manicuras = ref([])
+async function cargarManicuras() {
+  try {
+    const { data } = await listUsers({ role: 'manicura' })
+    manicuras.value = Array.isArray(data) ? data : (data.items || data.users || [])
+  } catch {
+    manicuras.value = []
+  }
+}
 
 async function cargarPreferences() {
   loadingPrefs.value = true
@@ -354,6 +411,11 @@ async function cargarPreferences() {
     if (ac.cosecha_pendiente_umbral_dias !== undefined) {
       configForm.value.cosecha_pendiente_umbral_dias = ac.cosecha_pendiente_umbral_dias
     }
+    if (ac.postcosecha_dias !== undefined) configForm.value.postcosecha_dias = ac.postcosecha_dias
+    if (ac.postcosecha_modo) configForm.value.postcosecha_modo = ac.postcosecha_modo
+    if (ac.postcosecha_manicura_default_id !== undefined) {
+      configForm.value.postcosecha_manicura_default_id = ac.postcosecha_manicura_default_id
+    }
   } finally {
     loadingPrefs.value = false
   }
@@ -366,6 +428,9 @@ async function guardarAlertas() {
       alertas_config: {
         dias_sin_registro: configForm.value.dias_sin_registro,
         cosecha_pendiente_umbral_dias: configForm.value.cosecha_pendiente_umbral_dias,
+        postcosecha_dias: configForm.value.postcosecha_dias,
+        postcosecha_modo: configForm.value.postcosecha_modo,
+        postcosecha_manicura_default_id: configForm.value.postcosecha_manicura_default_id || null,
       },
     })
     toast.success('Configuración guardada')
@@ -379,6 +444,7 @@ async function guardarAlertas() {
 onMounted(() => {
   cargarSetpoints()
   cargarPreferences()
+  cargarManicuras()
 })
 </script>
 

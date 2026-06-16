@@ -6,8 +6,9 @@ import { useAuthStore }  from "../stores/auth";
 import Paginator from '../components/ui/Paginator.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import { useConfirm } from '../composables/useConfirm.js';
-import { exportLotesCSV, getLoteProximoCodigo, listGeneticas } from '../lib/api.js';
+import { exportLotesCSV } from '../lib/api.js';
 import DsSpinner from '../design-system/components/Spinner.vue'
+import NuevoLoteModal from '../components/lotes/NuevoLoteModal.vue'
 
 const store = useLotesStore();
 const salas = useSalasStore();
@@ -122,27 +123,12 @@ function emptyForm() {
   };
 }
 
-const showCreate      = ref(false);
-const createForm      = ref(emptyForm());
-const createErrors    = ref({});
-const proximoCodigo   = ref('…');
-const geneticasActivas = ref([]);
+const showCreate = ref(false);
 
-async function openCreate() {
-  createForm.value   = emptyForm();
-  createErrors.value = {};
-  proximoCodigo.value = '…';
-  showCreate.value   = true;
-  try {
-    const [codigoRes, genRes] = await Promise.all([
-      getLoteProximoCodigo(),
-      listGeneticas({ activa: true, per_page: 200 }),
-    ]);
-    proximoCodigo.value = codigoRes.data.codigo;
-    geneticasActivas.value = Array.isArray(genRes.data) ? genRes.data : (genRes.data.geneticas ?? genRes.data.data ?? []);
-  } catch {
-    proximoCodigo.value = 'Auto';
-  }
+function openCreate() { showCreate.value = true; }
+async function onLoteCreado() {
+  await store.fetch();
+  showCreate.value = false;
 }
 
 const showEdit   = ref(false);
@@ -156,18 +142,6 @@ function validateForm(form) {
   if (!Number.isInteger(n) || n < 0 || n > 5000) e.plants_count = "Debe ser 0–5000";
   if (!form.sala_id) e.sala_id = "Seleccioná una sala";
   return e;
-}
-
-async function submitCreate() {
-  const e = validateForm(createForm.value);
-  createErrors.value = e;
-  if (Object.keys(e).length) return;
-  try {
-    const { sala_id, ...rest } = createForm.value;
-    await store.createInSala(sala_id, rest);
-    await store.fetch();
-    showCreate.value = false;
-  } catch {}
 }
 
 function startEdit(l) {
@@ -418,93 +392,8 @@ async function exportarCSV() {
       </div>
     </div>
 
-    <!-- MODAL Crear -->
-    <Teleport to="body">
-      <div v-if="showCreate" class="lm-overlay" @click.self="showCreate = false">
-        <div class="lm-modal">
-          <div class="lm-modal__header">
-            <div>
-              <h2 class="lm-modal__title">Nuevo lote</h2>
-              <p class="lm-modal__sub">Registrá un nuevo ciclo productivo</p>
-            </div>
-            <button class="lm-modal__close" @click="showCreate = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="lm-modal__body">
-            <div v-if="store.createError" class="lm-alert">{{ store.createError }}</div>
-            <div class="lm-grid">
-              <div class="lm-field">
-                <label class="lm-label">Código</label>
-                <input class="lm-input" :value="proximoCodigo" disabled
-                       style="opacity:.7;cursor:not-allowed;background:#f8fafc;font-family:monospace;font-size:.85rem" />
-              </div>
-              <div class="lm-field">
-                <label class="lm-label">Sala <span class="lm-req">*</span></label>
-                <select class="lm-input" :class="{ 'lm-input--err': createErrors.sala_id }" v-model="createForm.sala_id">
-                  <option value="" disabled>Seleccioná una sala…</option>
-                  <option v-for="s in salas.items" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-                </select>
-                <span v-if="createErrors.sala_id" class="lm-err">{{ createErrors.sala_id }}</span>
-              </div>
-              <div class="lm-field">
-                <label class="lm-label">Estado</label>
-                <select class="lm-input" v-model="createForm.estado">
-                  <option v-for="e in ESTADOS" :key="e" :value="e">{{ estadoLabel(e) }}</option>
-                </select>
-              </div>
-              <div class="lm-field">
-                <label class="lm-label">Cantidad de plantas</label>
-                <input type="number" min="0" max="5000" class="lm-input" :class="{ 'lm-input--err': createErrors.plants_count }"
-                       v-model.number="createForm.plants_count" />
-                <span v-if="createErrors.plants_count" class="lm-err">{{ createErrors.plants_count }}</span>
-              </div>
-              <div class="lm-field">
-                <label class="lm-label">Fecha de inicio</label>
-                <input type="date" class="lm-input" v-model="createForm.start_date" />
-              </div>
-              <div class="lm-field">
-                <label class="lm-label">Genética</label>
-                <select class="lm-input" v-model="createForm.genetica_id" @change="createForm.strain = ''">
-                  <option :value="null">— Sin especificar —</option>
-                  <option v-for="g in geneticasActivas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
-                </select>
-                <input v-if="!createForm.genetica_id" class="lm-input" style="margin-top:.4rem"
-                       v-model.trim="createForm.strain" placeholder="O escribí el nombre si no está en la lista" />
-              </div>
-              <div class="lm-field">
-                <label class="lm-label">Sistema de cultivo</label>
-                <select class="lm-input" v-model="createForm.grow_type">
-                  <option value="sustrato">Sustrato</option>
-                  <option value="hidroponia">Hidroponia</option>
-                  <option value="aeroponia">Aeroponia</option>
-                </select>
-              </div>
-              <div class="lm-field">
-                <label class="lm-label">Tipo de luz</label>
-                <select class="lm-input" v-model="createForm.light_type">
-                  <option value="">Sin especificar</option>
-                  <option value="led">LED</option>
-                  <option value="hps">HPS</option>
-                  <option value="cmh">CMH</option>
-                  <option value="natural">Natural</option>
-                  <option value="mixta">Mixta</option>
-                </select>
-              </div>
-              <div class="lm-field lm-field--full">
-                <label class="lm-label">Notas</label>
-                <textarea class="lm-input lm-textarea" rows="2" v-model.trim="createForm.notes"></textarea>
-              </div>
-            </div>
-          </div>
-          <div class="lm-modal__footer">
-            <button class="lm-btn-ghost" @click="showCreate = false">Cancelar</button>
-            <button class="lm-btn-primary" :disabled="store.creating" @click="submitCreate">
-              <DsSpinner v-if="store.creating" :size="14" />
-              Crear lote
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- MODAL Crear (componente compartido con SalaDetail) -->
+    <NuevoLoteModal :show="showCreate" :salas="salas.items" @close="showCreate = false" @created="onLoteCreado" />
 
     <!-- MODAL Editar -->
     <Teleport to="body">

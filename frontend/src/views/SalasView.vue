@@ -494,7 +494,6 @@ async function confirmDelete(s) {
                     <option value="">Sin especificar</option>
                     <option value="vegetativo">Vegetativo</option>
                     <option value="floracion">Floración</option>
-                    <option value="cosecha">Cosecha</option>
                     <option value="secado">Secado</option>
                     <option value="curado">Curado</option>
                     <option value="mixta">Mixta</option>

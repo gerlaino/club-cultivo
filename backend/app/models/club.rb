@@ -3,6 +3,7 @@ class Club < ApplicationRecord
   has_many :salas,                dependent: :destroy
   has_many :lotes,                dependent: :destroy
   has_many :pacientes,            class_name: 'Paciente', dependent: :destroy
+  has_many :reservas,             dependent: :destroy
   has_many :geneticas,            dependent: :destroy
   has_many :noticias,             dependent: :destroy
   has_many :eventos,              dependent: :destroy

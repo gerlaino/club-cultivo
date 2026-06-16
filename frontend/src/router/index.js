@@ -624,6 +624,17 @@ const routes = [
     },
   },
   {
+    path: '/reservas',
+    name: 'reservas',
+    component: () => import('../views/ReservasView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (['dispensador', 'admin', 'supervisor'].includes(auth.user?.role)) next()
+      else next('/')
+    },
+  },
+  {
     path: '/stock',
     name: 'stock-dispensador',
     component: () => import('../views/StockDispensadorView.vue'),

@@ -43,6 +43,7 @@
             :to="link.to"
             class="asb__sub"
             :class="{ 'asb__sub--active': isActive(link.to) }"
+            :title="link.hint || undefined"
           >
             <component :is="link.icon" :size="15" :stroke-width="1.75" class="asb__sub-ico" />
             <span class="asb__label">{{ link.label }}</span>
@@ -71,7 +72,7 @@ import {
   ShieldCheck, Truck, TrendingUp, History,
   GitBranch, Layers, ChevronDown, Dna, Archive, Leaf, Boxes, Scissors,
   ClipboardList, Package, Settings, ClipboardCheck, Scale, Webhook, BellRing,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, BookmarkCheck,
 } from 'lucide-vue-next'
 import { listLotes, listPesajesManicuraAdmin } from '../../lib/api.js'
 
@@ -126,10 +127,11 @@ const GRUPOS = [
     defaultOpen: true,
     items: [
       { to: '/admin/stock',                 icon: Boxes,          label: 'Stock' },
-      { to: '/admin/cosechado',             icon: Scissors,       label: 'Post-cosecha' },
+      { to: '/admin/cosechado',             icon: Scissors,       label: 'Cosecha', hint: 'Lotes cosechados, esperando manicura' },
       // Aprobaciones (flujo viejo de manicura) ya no tiene entrada propia:
       // se accede desde el banner en Manicura solo si hay lotes pendientes
       { to: '/admin/pesajes-manicura',      icon: Scale,          label: 'Manicura', badge: aprobacionesPendientes },
+      { to: '/reservas',           icon: BookmarkCheck,  label: 'Reservas' },
       { to: '/delivery/despachos', icon: Truck,          label: 'Despachos' },
       { to: '/contabilidad',       icon: Wallet,         label: 'Contabilidad' },
     ],

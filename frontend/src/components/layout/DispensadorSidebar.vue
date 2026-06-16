@@ -41,7 +41,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import DsAvatar from '../../design-system/components/Avatar.vue'
-import { Home, PackagePlus, Users, History, Boxes, LogOut } from 'lucide-vue-next'
+import { Home, PackagePlus, Users, History, Boxes, LogOut, BookmarkCheck } from 'lucide-vue-next'
 
 const route  = useRoute()
 const router = useRouter()
@@ -53,6 +53,7 @@ const NAV_LINKS = [
   { to: '/dispensar', icon: PackagePlus, label: 'Dispensar' },
   { to: '/pacientes', icon: Users,       label: 'Pacientes' },
   { to: '/historial', icon: History,     label: 'Dispensaciones' },
+  { to: '/reservas',  icon: BookmarkCheck, label: 'Reservas' },
   { to: '/stock',     icon: Boxes,       label: 'Stock' },
 ]
 

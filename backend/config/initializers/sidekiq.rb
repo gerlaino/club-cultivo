@@ -34,6 +34,16 @@ Sidekiq.configure_server do |config|
         'class' => 'DetectarAlertasJob',
         'description' => 'Detecta anomalías de cultivo: registros vencidos, pH/EC fuera de rango, cosecha pendiente, tareas vencidas'
       },
+      'asignacion_postcosecha' => {
+        'cron'  => '10 8 * * *',
+        'class' => 'AsignacionPostcosechaJob',
+        'description' => 'Avisa o asigna a manicura los lotes cosechados que superan los días de gracia post-cosecha (config por club)'
+      },
+      'vencimiento_reservas' => {
+        'cron'  => '15 8 * * *',
+        'class' => 'VencimientoReservasJob',
+        'description' => 'Vence reservas de dispensa pasadas de fecha (libera stock) y avisa las que se entregan hoy'
+      },
       'tareas_diarias_push' => {
         'cron'  => '0 8 * * *',
         'class' => 'TareasDiariasPushJob',

@@ -181,6 +181,13 @@ export const createDispensacion = (pacienteId, payload) => api.post(`/pacientes/
 export const updateDispensacion = (id, payload) => api.put(`/dispensaciones/${id}`, { dispensacion: payload });
 export const deleteDispensacion = (id) => api.delete(`/dispensaciones/${id}`);
 
+// ── Reservas de dispensa ────────────────────────────────────────────────────
+export const createReserva   = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/reservas`, { reserva: payload });
+export const listReservas    = (params = {})         => api.get('/reservas', { params });
+export const listReservasPaciente = (pacienteId)     => api.get(`/pacientes/${pacienteId}/reservas`);
+export const entregarReserva = (id, payload = {})    => api.patch(`/reservas/${id}/entregar`, payload);
+export const cancelarReserva = (id, motivo = null)   => api.patch(`/reservas/${id}/cancelar`, { motivo });
+
 // ── Delivery ──────────────────────────────────────────────────────────────────
 export const exportDispensacionesCSV = (params = {}) => api.get('/dispensaciones/export_csv', { params, responseType: 'blob' })
 export const getMisPaquetes   = ()                  => api.get('/dispensaciones/mis_paquetes')
