@@ -35,7 +35,8 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="lote in paginados" :key="lote.id" class="acs__row">
+        <tr v-for="lote in paginados" :key="lote.id" class="acs__row"
+            @click="$router.push(`/lotes/${lote.id}`)">
           <td>
             <RouterLink :to="`/lotes/${lote.id}`" class="acs__lote-link">
               {{ lote.codigo }}
@@ -58,7 +59,7 @@
             <span v-else class="acs__nd">—</span>
           </td>
           <td class="acs__fecha">{{ fmtFecha(lote.updated_at) }}</td>
-          <td class="acs__actions">
+          <td class="acs__actions" @click.stop>
             <button class="acs__btn-asignar" @click="abrirModal(lote)">
               <UserCheck :size="14" :stroke-width="2" />
               Asignar manicurador
@@ -315,6 +316,7 @@ onMounted(cargar)
 .acs__row {
   border-bottom: 1px solid var(--c-ink-100);
   transition: background .1s;
+  cursor: pointer;
 }
 .acs__row:last-child { border-bottom: none; }
 .acs__row:hover { background: var(--c-ink-50, #f8fafc); }

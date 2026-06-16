@@ -17,10 +17,14 @@ clientsClaim()
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
-// Network-first para la API
-const API_ORIGIN = import.meta.env.VITE_API_URL
-  ? new URL(import.meta.env.VITE_API_URL).origin
-  : null
+// Network-first para la API.
+// VITE_API_URL puede ser absoluta (https://api…) o relativa (/api, mismo origen).
+// Si es relativa, new URL() tiraría error → API_ORIGIN null y matcheamos por pathname.
+const API_ORIGIN = (() => {
+  const v = import.meta.env.VITE_API_URL
+  if (!v) return null
+  try { return new URL(v).origin } catch { return null }
+})()
 
 registerRoute(
   ({ url, request }) => {

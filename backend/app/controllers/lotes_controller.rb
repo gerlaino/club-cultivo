@@ -38,7 +38,16 @@ class LotesController < ApplicationController
       )).or(lotes.where(
         lotes: { estado: %w[secado manicura_pendiente], manicurador_id: nil }
       ))
-      lotes = lotes.where(estado: params[:estado]) if params[:estado].present?
+      # Flujo nuevo: "en espera de aprobación" = lotes con un pesaje ya enviado por
+      # este manicura (el lote sigue en_manicura, lo que espera es el PesajeManicura).
+      if ActiveModel::Type::Boolean.new.cast(params[:pesaje_enviado])
+        lote_ids = current_user.club.pesajes_manicura
+                               .enviados.where(manicurador_id: current_user.id)
+                               .select(:lote_id)
+        lotes = lotes.where(id: lote_ids)
+      elsif params[:estado].present?
+        lotes = lotes.where(estado: params[:estado])
+      end
     elsif params[:manicura].present?
       lotes = lotes.where(estado: %w[cosecha secado curado])
     else

@@ -1,7 +1,9 @@
 class PesajeManicuraSerializer
   def self.serialize(pesaje, include_plantas: false)
+    # nil-safe: con includes, pesadas_plantas viene loaded y la suma corre en Ruby;
+    # si alguna planta tiene peso_seco_g nil, sum(&:peso_seco_g) explotaría (0 + nil).
     peso_calculado = pesaje.pesadas_plantas.loaded? \
-      ? pesaje.pesadas_plantas.sum(&:peso_seco_g).to_d.round(2) \
+      ? pesaje.pesadas_plantas.sum { |pp| pp.peso_seco_g.to_d }.round(2) \
       : pesaje.pesadas_plantas.sum(:peso_seco_g).to_d.round(2)
 
     plantas_count_real = pesaje.pesadas_plantas.loaded? \

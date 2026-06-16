@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_16_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_16_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -802,7 +802,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_16_000001) do
   end
 
   create_table "pesadas_plantas", force: :cascade do |t|
-    t.bigint "pesada_id", null: false
+    t.bigint "pesada_id"
     t.bigint "plant_id", null: false
     t.decimal "peso_humedo_g", precision: 8, scale: 2
     t.decimal "peso_seco_g", precision: 8, scale: 2

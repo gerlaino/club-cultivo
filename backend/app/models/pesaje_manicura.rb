@@ -8,7 +8,9 @@ class PesajeManicura < ApplicationRecord
   belongs_to :club
   belongs_to :stock,           optional: true
   belongs_to :confirmado_por,  class_name: 'User', optional: true, foreign_key: :confirmado_por_id
-  has_many   :pesadas_plantas,  dependent: :nullify
+  # class_name explícito: el nombre de la asociación inferiría 'PesadasPlanta' (con 's'),
+  # pero el modelo real es PesadaPlanta. Sin esto, cualquier acceso a pesadas_plantas rompe.
+  has_many   :pesadas_plantas,  class_name: 'PesadaPlanta', dependent: :nullify
 
   validates :estado,       inclusion: { in: ESTADOS }
   validates :fecha_pesaje, presence: true

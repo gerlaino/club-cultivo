@@ -77,7 +77,7 @@ watch(lotes, () => { page.value = 1 })
 async function cargar() {
   loading.value = true
   try {
-    const { data } = await listLotes({ estado: 'manicura_pendiente' })
+    const { data } = await listLotes({ pesaje_enviado: true })
     lotes.value = Array.isArray(data) ? data : (data?.data || [])
   } catch {
     lotes.value = []
