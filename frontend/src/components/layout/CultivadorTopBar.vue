@@ -7,6 +7,9 @@
         <Menu :size="20" :stroke-width="1.75" />
       </button>
 
+      <!-- Identidad del club (tenant) -->
+      <ClubBrand tone="role-cultivador" />
+
       <!-- Breadcrumb -->
       <nav class="ctb__bc" aria-label="breadcrumb">
         <template v-for="(crumb, i) in breadcrumbs" :key="i">
@@ -118,6 +121,7 @@ import DsDropdown from '../../design-system/components/Dropdown.vue'
 import DsAvatar   from '../../design-system/components/Avatar.vue'
 import DsEmpty    from '../../design-system/components/EmptyState.vue'
 import { Bell, User, LogOut, Menu, HelpCircle } from 'lucide-vue-next'
+import ClubBrand from './ClubBrand.vue'
 import HelpDrawer from '../HelpDrawer.vue'
 
 const emit = defineEmits(['open-drawer'])

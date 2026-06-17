@@ -84,6 +84,6 @@ onMounted(async () => {
 .mcp__badge--secado { background: #e0f2fe; color: #0369a1; }
 .mcp__card-meta { font-size: .72rem; color: #64748b; display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
 .mcp__dot { color: #d1d5db; }
-.mcp__hint { font-size: .68rem; color: #7c3aed; font-weight: 600; margin-top: .2rem; }
+.mcp__hint { font-size: .68rem; color: var(--c-leaf-700); font-weight: 600; margin-top: .2rem; }
 .mcp__chevron { color: #d1d5db; font-size: .8rem; flex-shrink: 0; }
 </style>

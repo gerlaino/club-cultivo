@@ -1,10 +1,10 @@
 <template>
   <aside class="sbg" :class="{ 'sbg--collapsed': collapsed }" :style="{ background: bgColor }">
 
-    <!-- Header: logo + nombre del club -->
+    <!-- Header: marca de plataforma (el club va en el topbar) -->
     <div class="sbg__brand">
-      <img :src="logoSrc" class="sbg__brand-logo" :alt="club.name" />
-      <span class="sbg__brand-name">{{ club.name }}</span>
+      <img src="/logo-ce-icono.png" class="sbg__brand-logo" alt="Cultivo Espacial" />
+      <span class="sbg__brand-name">Cultivo Espacial</span>
     </div>
 
     <nav class="sbg__nav">
@@ -60,7 +60,6 @@
 <script setup>
 import { reactive, ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useClubStore } from '../../stores/club.js'
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
 
 // Sidebar agrupado (estilo admin) reutilizable: header con club, grupos colapsables,
@@ -72,10 +71,8 @@ const props = defineProps({
 })
 
 const route = useRoute()
-const club  = useClubStore()
 
 const bgColor = computed(() => `var(--c-role-${props.role})`)
-const logoSrc = computed(() => club.logoUrl || '/logo-ce-icono.png')
 
 const collapsed = ref(localStorage.getItem('sb-collapsed') === '1')
 function toggleCollapse() {

@@ -3,6 +3,7 @@
     <button class="abg-hamburger" @click="$emit('open-drawer')" aria-label="Menú">
       <Menu :size="20" :stroke-width="2" />
     </button>
+    <ClubBrand tone="role-abogado" />
     <span class="abg-breadcrumb">{{ pageTitle }}</span>
     <div class="abg-right">
       <button class="abg-icon-btn" @click="openHelp" aria-label="Ayuda" title="Ayuda">
@@ -21,6 +22,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { Menu, HelpCircle } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth.js'
+import ClubBrand from './ClubBrand.vue'
 import HelpDrawer from '../HelpDrawer.vue'
 
 defineEmits(['open-drawer'])

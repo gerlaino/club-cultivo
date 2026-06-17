@@ -115,11 +115,11 @@ onMounted(cargar)
   text-decoration: none; color: inherit;
   transition: border-color .15s, box-shadow .15s;
 }
-.mne__row:hover { border-color: #7c3aed; box-shadow: 0 1px 6px rgba(124,58,237,.08); }
+.mne__row:hover { border-color: var(--c-leaf-700); box-shadow: 0 1px 6px rgba(26,61,46,.08); }
 
 .mne__row-av {
   width: 32px; height: 32px; border-radius: var(--r-sm);
-  background: #ede9fe; color: #7c3aed;
+  background: var(--c-leaf-100); color: var(--c-leaf-700);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .mne__row-info {
@@ -143,14 +143,14 @@ onMounted(cargar)
 }
 .mne__badge {
   font-size: 12px; font-weight: 600; padding: .2em .65em;
-  border-radius: 999px; background: #ede9fe; color: #7c3aed;
+  border-radius: 999px; background: var(--c-leaf-100); color: var(--c-leaf-700);
   text-transform: uppercase; letter-spacing: .04em;
 }
 .mne__row-arrow { color: var(--c-ink-300); }
 
 .mne__pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 1.25rem 0 .5rem; }
 .mne__pager-btn { background: #fff; border: 1.5px solid var(--c-ink-200); color: var(--c-ink-700); padding: .35rem .75rem; border-radius: 7px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
-.mne__pager-btn:hover:not(:disabled) { border-color: #7c3aed; color: #7c3aed; }
+.mne__pager-btn:hover:not(:disabled) { border-color: var(--c-leaf-700); color: var(--c-leaf-700); }
 .mne__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
 .mne__pager-info { font-size: .82rem; color: var(--c-ink-500); font-weight: 600; min-width: 50px; text-align: center; }
 </style>

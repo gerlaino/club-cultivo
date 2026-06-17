@@ -343,7 +343,7 @@ onActivated(cargar)
   border-radius: 999px; text-transform: uppercase; letter-spacing: .05em;
 }
 .mnl__estado-badge--asignado  { background: #fffbeb; color: #b45309; }
-.mnl__estado-badge--pendiente { background: #ede9fe; color: #7c3aed; }
+.mnl__estado-badge--pendiente { background: var(--c-leaf-100); color: var(--c-leaf-700); }
 
 .mnl__btn-icon {
   width: 32px; height: 32px; border-radius: 6px;
@@ -364,11 +364,11 @@ onActivated(cargar)
 /* Waiting banner */
 .mnl__waiting {
   display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
-  background: #ede9fe; border: 1px solid #c4b5fd; border-radius: 10px;
+  background: var(--c-leaf-100); border: 1px solid var(--c-leaf-300); border-radius: 10px;
   padding: .75rem 1rem; margin-bottom: 1.5rem;
-  font-size: .82rem; color: #7c3aed;
+  font-size: .82rem; color: var(--c-leaf-700);
 }
-.mnl__waiting-note { margin-left: auto; font-size: .75rem; color: #6d28d9; }
+.mnl__waiting-note { margin-left: auto; font-size: .75rem; color: var(--c-leaf-800); }
 
 /* KPIs — mismo patrón que SalaDetailView */
 .mnl__kpis {
@@ -406,7 +406,7 @@ onActivated(cargar)
 }
 .mnl__locked-tag {
   display: inline-flex; align-items: center; gap: .25rem;
-  font-size: .72rem; color: #7c3aed; font-weight: 600;
+  font-size: .72rem; color: var(--c-leaf-700); font-weight: 600;
 }
 
 /* Table */

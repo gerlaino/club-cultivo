@@ -94,7 +94,7 @@
                 </div>
 
                 <div v-if="loteActivo" class="mnd__preview">
-                  <i class="bi bi-info-circle" style="color:#7c3aed"></i>
+                  <i class="bi bi-info-circle" style="color:var(--c-leaf-700)"></i>
                   Se registrará <strong>{{ form.cantidad || 0 }}g</strong> de
                   <strong>{{ loteActivo.genetica?.nombre || loteActivo.codigo }}</strong>
                   — quedará pendiente hasta que el admin lo apruebe.
@@ -185,7 +185,7 @@ const hoy    = (() => { const s = new Date().toLocaleDateString('es-AR', { weekd
 const ESTADOS = {
   semilla:    { label: 'Semilla',    color: '#92400e', bg: 'rgba(146,64,14,.12)'  },
   vegetativo: { label: 'Vegetativo', color: '#15803d', bg: 'rgba(21,128,61,.12)'  },
-  floracion:  { label: 'Floración',  color: '#7c3aed', bg: 'rgba(124,58,237,.12)' },
+  floracion:  { label: 'Floración',  color: 'var(--c-leaf-700)', bg: 'rgba(26,61,46,.12)' },
   cosecha:    { label: 'Cosecha',    color: '#b45309', bg: 'rgba(180,83,9,.12)'   },
   curado:     { label: 'Curado',     color: '#0369a1', bg: 'rgba(3,105,161,.12)'  },
   finalizado: { label: 'Finalizado', color: '#475569', bg: 'rgba(71,85,105,.12)'  },
@@ -282,11 +282,11 @@ onMounted(async () => {
 .mnd__date { font-size: .82rem; color: #64748b; margin: 0; }
 .mnd__sala-badge {
   display: flex; align-items: center; gap: .4rem;
-  background: rgba(124,58,237,.08); border: 1px solid rgba(124,58,237,.2);
-  color: #7c3aed; padding: .55rem 1rem; border-radius: 10px;
+  background: rgba(26,61,46,.08); border: 1px solid rgba(26,61,46,.2);
+  color: var(--c-leaf-700); padding: .55rem 1rem; border-radius: 10px;
   font-size: .85rem; font-weight: 600;
 }
-.mnd__sala-sede { color: #a78bfa; font-weight: 400; }
+.mnd__sala-sede { color: var(--c-leaf-500); font-weight: 400; }
 
 /* Loading */
 .mnd__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
@@ -309,7 +309,7 @@ onMounted(async () => {
   background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
   padding: 1.5rem; margin-bottom: 1.25rem;
 }
-.mnd__card--accent { border-color: rgba(124,58,237,.2); }
+.mnd__card--accent { border-color: rgba(26,61,46,.2); }
 .mnd__card:last-child { margin-bottom: 0; }
 .mnd__col-aside .mnd__card { margin-bottom: 0; }
 
@@ -321,15 +321,15 @@ onMounted(async () => {
   display: flex; align-items: center; justify-content: center;
   background: #f8fafc; color: #64748b; font-size: 1rem;
 }
-.mnd__card-icon--purple { background: rgba(124,58,237,.1); color: #7c3aed; }
+.mnd__card-icon--purple { background: rgba(26,61,46,.1); color: var(--c-leaf-700); }
 .mnd__card-title { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0; flex: 1; }
 .mnd__refresh { background: none; border: none; color: #94a3b8; cursor: pointer; padding: .25rem; border-radius: 6px; transition: color .15s; }
-.mnd__refresh:hover { color: #7c3aed; }
+.mnd__refresh:hover { color: var(--c-leaf-700); }
 
 /* Steps */
 .mnd__step { margin-bottom: 1.25rem; }
 .mnd__step-label { display: flex; align-items: center; gap: .5rem; font-size: .82rem; font-weight: 600; color: #475569; margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .05em; }
-.mnd__step-num { width: 20px; height: 20px; border-radius: 50%; background: #7c3aed; color: #fff; font-size: .65rem; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.mnd__step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--c-leaf-700); color: #fff; font-size: .65rem; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 
 /* Lotes grid */
 .mnd__lotes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .75rem; }
@@ -338,8 +338,8 @@ onMounted(async () => {
   padding: .875rem 1rem; text-align: left; cursor: pointer;
   transition: all .15s;
 }
-.mnd__lote-card:hover { border-color: #a78bfa; background: rgba(124,58,237,.03); }
-.mnd__lote-card--active { border-color: #7c3aed; background: rgba(124,58,237,.06); box-shadow: 0 0 0 3px rgba(124,58,237,.12); }
+.mnd__lote-card:hover { border-color: var(--c-leaf-500); background: rgba(26,61,46,.03); }
+.mnd__lote-card--active { border-color: var(--c-leaf-700); background: rgba(26,61,46,.06); box-shadow: 0 0 0 3px rgba(26,61,46,.12); }
 .mnd__lote-top { display: flex; align-items: center; justify-content: space-between; gap: .4rem; margin-bottom: .35rem; }
 .mnd__lote-codigo { font-size: .875rem; font-weight: 700; color: #0f172a; }
 .mnd__lote-estado { font-size: .65rem; font-weight: 700; padding: .2em .55em; border-radius: 999px; white-space: nowrap; }
@@ -355,27 +355,27 @@ onMounted(async () => {
   font-size: 1.1rem; font-weight: 700; color: #0f172a;
   outline: none; transition: border .15s;
 }
-.mnd__cant-input:focus { border-color: #7c3aed; background: #fff; }
+.mnd__cant-input:focus { border-color: var(--c-leaf-700); background: #fff; }
 .mnd__cant-suffix {
-  background: #ede9fe; border: 1.5px solid #e2e8f0; border-left: none;
+  background: var(--c-leaf-100); border: 1.5px solid #e2e8f0; border-left: none;
   border-radius: 0 10px 10px 0; padding: .65rem .875rem;
-  font-size: .875rem; font-weight: 700; color: #7c3aed;
+  font-size: .875rem; font-weight: 700; color: var(--c-leaf-700);
 }
 
 .mnd__btn-primary {
   display: inline-flex; align-items: center; gap: .4rem;
-  background: #7c3aed; color: #fff; border: none;
+  background: var(--c-leaf-700); color: #fff; border: none;
   padding: .65rem 1.25rem; border-radius: 10px;
   font-size: .875rem; font-weight: 600; cursor: pointer;
   transition: background .15s; white-space: nowrap;
 }
-.mnd__btn-primary:hover:not(:disabled) { background: #6d28d9; }
+.mnd__btn-primary:hover:not(:disabled) { background: var(--c-leaf-800); }
 .mnd__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 
 .mnd__preview {
   display: flex; align-items: flex-start; gap: .5rem;
   margin-top: .75rem; padding: .75rem 1rem;
-  background: rgba(124,58,237,.05); border: 1px solid rgba(124,58,237,.15);
+  background: rgba(26,61,46,.05); border: 1px solid rgba(26,61,46,.15);
   border-radius: 10px; font-size: .82rem; color: #475569;
   line-height: 1.5;
 }

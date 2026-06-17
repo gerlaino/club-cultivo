@@ -182,7 +182,7 @@ onMounted(cargar)
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .mnp__av--secado    { background: #fffbeb; color: #b45309; }
-.mnp__av--pendiente { background: #ede9fe; color: #7c3aed; }
+.mnp__av--pendiente { background: var(--c-leaf-100); color: var(--c-leaf-700); }
 
 .mnp__row-info {
   flex: 1; min-width: 0;
@@ -208,7 +208,7 @@ onMounted(cargar)
   border-radius: 999px; text-transform: uppercase; letter-spacing: .04em;
 }
 .mnp__badge--secado    { background: #fffbeb; color: #b45309; }
-.mnp__badge--pendiente { background: #ede9fe; color: #7c3aed; }
+.mnp__badge--pendiente { background: var(--c-leaf-100); color: var(--c-leaf-700); }
 
 .mnp__row-arrow { color: var(--c-ink-300); }
 

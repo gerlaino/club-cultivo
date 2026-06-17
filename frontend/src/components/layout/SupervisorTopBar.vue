@@ -2,6 +2,9 @@
   <header class="ctb">
     <div class="ctb__inner">
 
+      <!-- Identidad del club (tenant) -->
+      <ClubBrand tone="role-supervisor" />
+
       <!-- Breadcrumb -->
       <nav class="ctb__bc" aria-label="breadcrumb">
         <template v-for="(crumb, i) in breadcrumbs" :key="i">
@@ -69,6 +72,7 @@ import { useClubStore } from '../../stores/club.js'
 import DsDropdown from '../../design-system/components/Dropdown.vue'
 import DsAvatar   from '../../design-system/components/Avatar.vue'
 import { User, LogOut, Menu, HelpCircle } from 'lucide-vue-next'
+import ClubBrand from './ClubBrand.vue'
 import HelpDrawer from '../HelpDrawer.vue'
 
 const route  = useRoute()

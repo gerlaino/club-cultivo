@@ -4,6 +4,8 @@
       <Menu :size="20" :stroke-width="2" />
     </button>
 
+    <ClubBrand tone="role-medico" />
+
     <div class="mdc-breadcrumb">
       <span class="mdc-page-title">{{ pageTitle }}</span>
     </div>
@@ -66,6 +68,7 @@ import { Menu, Bell, ChevronDown, UserCircle, LogOut } from 'lucide-vue-next'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { clearAuthToken } from '../../lib/api.js'
+import ClubBrand from './ClubBrand.vue'
 import HelpDrawer from '../HelpDrawer.vue'
 
 defineEmits(['open-drawer'])
