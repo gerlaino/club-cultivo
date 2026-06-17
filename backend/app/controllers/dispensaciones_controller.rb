@@ -64,6 +64,22 @@ class DispensacionesController < ApplicationController
     @dispensacion.user = current_user
     @dispensacion.sede_id ||= @dispensacion.stock&.sede_id
 
+    # Dirección de entrega: si se pidió usar el domicilio del paciente (o no se cargó
+    # ninguna calle), tomamos el domicilio registrado del paciente como snapshot.
+    if @dispensacion.con_envio
+      usar_domicilio = ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :usar_domicilio_paciente))
+      if usar_domicilio || @dispensacion.envio_calle.blank?
+        @dispensacion.envio_calle  = @paciente.domicilio_calle
+        @dispensacion.envio_altura = @paciente.domicilio_altura
+        @dispensacion.envio_piso   = @paciente.domicilio_piso
+        @dispensacion.envio_depto  = @paciente.domicilio_depto
+        @dispensacion.envio_barrio = @paciente.domicilio_barrio
+        @dispensacion.envio_ciudad = @paciente.domicilio_ciudad
+      end
+      @dispensacion.contacto_nombre   ||= @paciente.nombre_completo
+      @dispensacion.contacto_telefono ||= @paciente.telefono
+    end
+
     needs_autocalc = @dispensacion.aporte_socio_ars.nil? ||
                      (@dispensacion.aporte_socio_ars.to_d <= 0 && @dispensacion.medio_pago == 'no_abona')
     if @dispensacion.stock && needs_autocalc
@@ -321,7 +337,8 @@ class DispensacionesController < ApplicationController
       :observaciones, :fecha_dispensacion, :medio_pago,
       :con_envio, :delivery_id, :direccion_envio,
       :contacto_nombre, :contacto_telefono, :notas_envio,
-      :firma_entrega_data
+      :firma_entrega_data,
+      :envio_calle, :envio_altura, :envio_piso, :envio_depto, :envio_barrio, :envio_ciudad
     )
   end
 

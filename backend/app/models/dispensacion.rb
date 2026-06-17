@@ -21,7 +21,15 @@ class Dispensacion < ApplicationRecord
     MEDIOS_A_CREDITO.include?(medio_pago)
   end
 
+  # Dirección limpia para Google Maps (sin piso/depto, que confunden el geocoding).
+  def direccion_envio_maps
+    limpia = [[envio_calle, envio_altura].reject(&:blank?).join(' ').presence,
+              envio_barrio.presence, envio_ciudad.presence].compact.join(', ')
+    limpia.presence || direccion_envio
+  end
+
   before_validation { self.fecha_dispensacion ||= Date.current }
+  before_validation :componer_direccion_envio, if: :con_envio?
   before_create     :generar_codigo_paquete, if: :con_envio?
 
   validates :cantidad,           presence: true, numericality: { greater_than: 0 }
@@ -168,6 +176,16 @@ class Dispensacion < ApplicationRecord
   def generar_codigo_paquete
     self.codigo_paquete = "PKG-#{Date.today.strftime('%Y%m%d')}-#{SecureRandom.hex(3).upcase}"
     self.estado_envio   = 'pendiente'
+  end
+
+  # Compone direccion_envio (texto para mostrar) a partir de los campos estructurados.
+  def componer_direccion_envio
+    return if envio_calle.blank?
+    linea1    = [envio_calle, envio_altura].reject(&:blank?).join(' ')
+    pisodepto = [("Piso #{envio_piso}" if envio_piso.present?),
+                 ("Depto #{envio_depto}" if envio_depto.present?)].compact.join(' ')
+    partes = [linea1, pisodepto.presence, envio_barrio.presence, envio_ciudad.presence].compact
+    self.direccion_envio = partes.join(', ') if partes.any?
   end
 
   def delivery_fields_presentes

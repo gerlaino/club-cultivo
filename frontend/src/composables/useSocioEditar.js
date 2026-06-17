@@ -33,6 +33,12 @@ export function useSocioEditar(socioId) {
       reprocann_estado:               s?.reprocann_estado     || 'sin_registro',
       es_paciente:                    s?.es_paciente          ?? true,
       descuento_porcentaje:           s?.descuento_porcentaje ?? 0,
+      domicilio_calle:                s?.domicilio_calle      || '',
+      domicilio_altura:               s?.domicilio_altura     || '',
+      domicilio_piso:                 s?.domicilio_piso       || '',
+      domicilio_depto:                s?.domicilio_depto      || '',
+      domicilio_barrio:               s?.domicilio_barrio     || '',
+      domicilio_ciudad:               s?.domicilio_ciudad     || '',
     }
     editError.value = null
     editOpen.value  = true

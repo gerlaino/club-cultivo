@@ -97,6 +97,9 @@ function emptyForm() {
     fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo',
     con_envio: false, delivery_id: null, direccion_envio: '',
     contacto_nombre: '', contacto_telefono: '', notas_envio: '',
+    // Dirección de entrega estructurada (o usar el domicilio registrado del paciente)
+    usar_domicilio_paciente: true,
+    envio_calle: '', envio_altura: '', envio_piso: '', envio_depto: '', envio_barrio: '', envio_ciudad: '',
     // Reserva: si es_reserva, no se entrega ahora — se aparta stock para una fecha futura.
     es_reserva: false, fecha_entrega_estimada: '', sena_ars: null,
   }
@@ -142,6 +145,18 @@ watch(() => props.modelValue, (open) => {
 
 function cerrar() { emit('update:modelValue', false) }
 
+// Compone la dirección de entrega a partir de los campos estructurados (para reservas,
+// que guardan texto). Si se usa el domicilio del paciente, lo resuelve el backend.
+function composeDireccion() {
+  if (form.value.usar_domicilio_paciente) return undefined
+  const l1 = [form.value.envio_calle, form.value.envio_altura].filter(Boolean).join(' ')
+  const pd = [
+    form.value.envio_piso  && `Piso ${form.value.envio_piso}`,
+    form.value.envio_depto && `Depto ${form.value.envio_depto}`,
+  ].filter(Boolean).join(' ')
+  return [l1, pd, form.value.envio_barrio, form.value.envio_ciudad].filter(Boolean).join(', ') || undefined
+}
+
 async function handleSubmit() {
   if (saving.value) return
   saving.value = true
@@ -174,7 +189,7 @@ async function handleSubmit() {
       if (form.value.aporte_socio_ars) payload.aporte_estimado_ars = Number(form.value.aporte_socio_ars).toFixed(2)
       if (form.value.sena_ars)         payload.sena_ars = Number(form.value.sena_ars).toFixed(2)
       if (form.value.con_envio) {
-        payload.direccion_envio   = form.value.direccion_envio || undefined
+        payload.direccion_envio   = composeDireccion()
         payload.contacto_nombre   = form.value.contacto_nombre || undefined
         payload.contacto_telefono = form.value.contacto_telefono || undefined
       }
@@ -212,8 +227,11 @@ async function handleSubmit() {
 
   if (form.value.con_envio) {
     if (!form.value.delivery_id) { formError.value = 'Seleccioná un delivery para asignar el envío'; saving.value = false; return }
-    if (!form.value.direccion_envio?.trim()) { formError.value = 'La dirección de envío es requerida'; saving.value = false; return }
-    if (!form.value.contacto_nombre?.trim()) { formError.value = 'El nombre de contacto es requerido'; saving.value = false; return }
+    if (!form.value.usar_domicilio_paciente) {
+      if (!form.value.envio_calle?.trim() || !form.value.envio_altura?.trim() || !form.value.envio_ciudad?.trim()) {
+        formError.value = 'Completá calle, altura y ciudad de la dirección de entrega'; saving.value = false; return
+      }
+    }
   }
 
   try {
@@ -237,8 +255,14 @@ async function handleSubmit() {
     }
     if (form.value.con_envio) {
       payload.delivery_id       = form.value.delivery_id
-      payload.direccion_envio   = form.value.direccion_envio
-      payload.contacto_nombre   = form.value.contacto_nombre
+      payload.usar_domicilio_paciente = form.value.usar_domicilio_paciente
+      payload.envio_calle       = form.value.envio_calle || undefined
+      payload.envio_altura      = form.value.envio_altura || undefined
+      payload.envio_piso        = form.value.envio_piso || undefined
+      payload.envio_depto       = form.value.envio_depto || undefined
+      payload.envio_barrio      = form.value.envio_barrio || undefined
+      payload.envio_ciudad      = form.value.envio_ciudad || undefined
+      payload.contacto_nombre   = form.value.contacto_nombre || undefined
       payload.contacto_telefono = form.value.contacto_telefono || undefined
       payload.notas_envio       = form.value.notas_envio || undefined
     }
@@ -460,11 +484,55 @@ async function handleSubmit() {
             <div v-else class="mnd__field-hint" style="margin-bottom:.5rem">
               El delivery se asigna al entregar la reserva.
             </div>
+            <!-- Dirección de entrega: domicilio del paciente u otra -->
             <div class="mnd__field">
-              <label class="mnd__label">Dirección de entrega <span class="mnd__req">*</span></label>
-              <input v-model.trim="form.direccion_envio" type="text" class="mnd__input"
-                     placeholder="Calle, número, piso, depto…" />
+              <label class="mnd__label">Dirección de entrega</label>
+              <div class="mnd__segmented mnd__segmented--sm">
+                <button type="button" class="mnd__seg-btn" :class="{ 'mnd__seg-btn--active': form.usar_domicilio_paciente }" @click="form.usar_domicilio_paciente = true">
+                  <i class="bi bi-house"></i> Domicilio del paciente
+                </button>
+                <button type="button" class="mnd__seg-btn" :class="{ 'mnd__seg-btn--active': !form.usar_domicilio_paciente }" @click="form.usar_domicilio_paciente = false">
+                  <i class="bi bi-geo-alt"></i> Otra dirección
+                </button>
+              </div>
             </div>
+
+            <div v-if="form.usar_domicilio_paciente" class="mnd__field-hint">
+              Se enviará al domicilio registrado del paciente. Si no tiene uno cargado, elegí "Otra dirección".
+            </div>
+
+            <template v-else>
+              <div class="mnd__form-row">
+                <div class="mnd__field" style="flex:2">
+                  <label class="mnd__label">Calle <span class="mnd__req">*</span></label>
+                  <input v-model.trim="form.envio_calle" type="text" class="mnd__input" placeholder="Av. Siempreviva" />
+                </div>
+                <div class="mnd__field">
+                  <label class="mnd__label">Altura <span class="mnd__req">*</span></label>
+                  <input v-model.trim="form.envio_altura" type="text" class="mnd__input" placeholder="742" />
+                </div>
+              </div>
+              <div class="mnd__form-row">
+                <div class="mnd__field">
+                  <label class="mnd__label">Piso <span class="mnd__opt">opc.</span></label>
+                  <input v-model.trim="form.envio_piso" type="text" class="mnd__input" placeholder="3" />
+                </div>
+                <div class="mnd__field">
+                  <label class="mnd__label">Depto <span class="mnd__opt">opc.</span></label>
+                  <input v-model.trim="form.envio_depto" type="text" class="mnd__input" placeholder="B" />
+                </div>
+              </div>
+              <div class="mnd__form-row">
+                <div class="mnd__field">
+                  <label class="mnd__label">Barrio <span class="mnd__opt">opc.</span></label>
+                  <input v-model.trim="form.envio_barrio" type="text" class="mnd__input" placeholder="Palermo" />
+                </div>
+                <div class="mnd__field">
+                  <label class="mnd__label">Ciudad <span class="mnd__req">*</span></label>
+                  <input v-model.trim="form.envio_ciudad" type="text" class="mnd__input" placeholder="CABA" />
+                </div>
+              </div>
+            </template>
             <div class="mnd__form-row">
               <div class="mnd__field">
                 <label class="mnd__label">Contacto <span class="mnd__req">*</span></label>
@@ -515,6 +583,7 @@ async function handleSubmit() {
 .mnd__segmented { display: flex; gap: .35rem; background: #f1f5f9; padding: .25rem; border-radius: 10px; }
 .mnd__seg-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: none; background: transparent; color: #64748b; font-size: .82rem; font-weight: 700; padding: .5rem .75rem; border-radius: 8px; cursor: pointer; transition: all .15s; }
 .mnd__seg-btn--active { background: #fff; color: #15803d; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.mnd__segmented--sm .mnd__seg-btn { font-size: .78rem; padding: .4rem .5rem; }
 .mnd__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: .875rem 1.25rem; border-top: 1px solid #f1f5f9; position: sticky; bottom: 0; background: #fff; }
 
 .mnd__error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 9px; padding: .6rem .875rem; font-size: .82rem; display: flex; align-items: center; gap: .4rem; }

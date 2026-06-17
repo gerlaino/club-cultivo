@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_16_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_17_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -333,6 +333,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_16_000002) do
     t.datetime "entregado_at"
     t.boolean "ariccame_reportada", default: false, null: false
     t.text "firma_entrega_data"
+    t.string "envio_calle"
+    t.string "envio_altura"
+    t.string "envio_piso"
+    t.string "envio_depto"
+    t.string "envio_barrio"
+    t.string "envio_ciudad"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["delivery_id"], name: "index_dispensaciones_on_delivery_id"
@@ -732,6 +738,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_16_000002) do
     t.text "medicacion_habitual"
     t.string "grupo_sanguineo", limit: 5
     t.decimal "descuento_porcentaje", precision: 5, scale: 2, default: "0.0", null: false
+    t.string "domicilio_calle"
+    t.string "domicilio_altura"
+    t.string "domicilio_piso"
+    t.string "domicilio_depto"
+    t.string "domicilio_barrio"
+    t.string "domicilio_ciudad"
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["carnet_token"], name: "index_pacientes_on_carnet_token", unique: true

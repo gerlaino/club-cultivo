@@ -70,6 +70,19 @@
                 <span class="sem__hint">Se aplica automáticamente al calcular el precio en cada dispensación. 0 = sin descuento.</span>
               </div>
               <div class="sem__field sem__field--full">
+                <label class="sem__label" style="margin-bottom:.4rem">
+                  Domicilio <span class="sem__opt">para entregas a domicilio — opcional</span>
+                </label>
+                <div class="sem__domicilio-grid">
+                  <input v-model.trim="editForm.domicilio_calle"  class="sem__input" type="text" placeholder="Calle" style="grid-column: span 2" />
+                  <input v-model.trim="editForm.domicilio_altura" class="sem__input" type="text" placeholder="Altura" />
+                  <input v-model.trim="editForm.domicilio_piso"   class="sem__input" type="text" placeholder="Piso" />
+                  <input v-model.trim="editForm.domicilio_depto"  class="sem__input" type="text" placeholder="Depto" />
+                  <input v-model.trim="editForm.domicilio_barrio" class="sem__input" type="text" placeholder="Barrio" />
+                  <input v-model.trim="editForm.domicilio_ciudad" class="sem__input" type="text" placeholder="Ciudad" style="grid-column: span 2" />
+                </div>
+              </div>
+              <div class="sem__field sem__field--full">
                 <label class="sem__label">
                   <input v-model="editForm.es_paciente" type="checkbox" class="sem__check" />
                   En tratamiento activo
@@ -131,6 +144,8 @@ async function doSave() {
 @media (max-width: 480px) { .sem__grid { grid-template-columns: 1fr; } }
 .sem__field { display: flex; flex-direction: column; gap: .4rem; }
 .sem__field--full { grid-column: 1 / -1; }
+.sem__domicilio-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; }
+@media (max-width: 480px) { .sem__domicilio-grid { grid-template-columns: 1fr 1fr; } }
 .sem__label { font-size: .75rem; font-weight: 600; color: #64748b; display: flex; align-items: center; gap: .4rem; }
 .sem__input { padding: .55rem .75rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; color: #0f172a; outline: none; transition: border-color .15s; width: 100%; box-sizing: border-box; }
 .sem__input:focus { border-color: #1b5e20; }

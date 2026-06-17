@@ -14,7 +14,7 @@
         :key="link.to"
         :to="link.to"
         class="sb__link"
-        :class="{ 'sb__link--active': isActive(link.to) }"
+        :class="{ 'sb__link--active': isActive(link) }"
         :title="collapsed ? link.label : (link.hint || undefined)"
       >
         <component :is="link.icon" :size="18" :stroke-width="1.75" class="sb__link-ico" />
@@ -60,8 +60,9 @@ function toggleCollapse() {
   localStorage.setItem('sb-collapsed', collapsed.value ? '1' : '0')
 }
 
-function isActive(to) {
-  if (to === '/') return route.path === '/'
+function isActive(link) {
+  const to = link.to
+  if (link.exact || to === '/') return route.path === to
   return route.path === to || route.path.startsWith(to + '/')
 }
 
