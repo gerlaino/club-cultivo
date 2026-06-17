@@ -1,7 +1,7 @@
 class PesajesManicuraController < ApplicationController
   before_action :authenticate_user!
   before_action :set_lote, except: [:index_admin]
-  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy]
+  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir]
 
   # GET /lotes/:lote_id/pesajes_manicura
   # Manicurador ve sus pesajes activos del lote; admin ve todos.
@@ -67,6 +67,19 @@ class PesajesManicuraController < ApplicationController
     @pesaje.pesadas_plantas.destroy_all
     @pesaje.destroy
     head :no_content
+  end
+
+  # POST /lotes/:lote_id/pesajes_manicura/:id/reabrir
+  # Vuelve un pesaje enviado a borrador para corregirlo.
+  def reabrir
+    unless @pesaje.manicurador_id == current_user.id || current_user.admin? || current_user.supervisor?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    unless @pesaje.enviado?
+      return render json: { error: 'Solo se puede reabrir un pesaje enviado' }, status: :unprocessable_entity
+    end
+    @pesaje.update!(estado: 'borrador', enviado_at: nil)
+    render json: PesajeManicuraSerializer.serialize(@pesaje)
   end
 
   # POST /lotes/:lote_id/pesajes_manicura/:id/enviar

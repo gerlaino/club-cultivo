@@ -123,6 +123,15 @@
                 {{ (p.peso_confirmado_g || 0).toFixed(1) }}g confirmados
               </div>
               <button
+                v-if="p.estado === 'enviado'"
+                class="mpv__hist-act"
+                :disabled="reabriendo === p.id"
+                title="Reabrir para corregir"
+                @click="reabrirPesaje(p)"
+              >
+                <Undo2 :size="14" :stroke-width="2" />
+              </button>
+              <button
                 v-if="p.estado !== 'confirmado'"
                 class="mpv__hist-del"
                 :disabled="borrando === p.id"
@@ -151,13 +160,14 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { Scale, Wind, Plus, Send, List, CheckCircle, CalendarPlus, Trash2 } from 'lucide-vue-next'
+import { Scale, Wind, Plus, Send, List, CheckCircle, CalendarPlus, Trash2, Undo2 } from 'lucide-vue-next'
 import {
   listLotes,
   listPesajesManicura,
   createPesajeManicura,
   enviarPesajeManicura,
   deletePesajeManicura,
+  reabrirPesajeManicura,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -251,6 +261,21 @@ async function cerrarDia() {
     toast.error(e.response?.data?.error || 'Error al enviar el pesaje')
   } finally {
     enviando.value = false
+  }
+}
+
+const reabriendo = ref(null)
+async function reabrirPesaje(p) {
+  if (p.estado !== 'enviado') return
+  reabriendo.value = p.id
+  try {
+    await reabrirPesajeManicura(loteSeleccionado.value.id, p.id)
+    toast.success('Jornada reabierta — podés corregirla y volver a enviar')
+    await cargarPesajes()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo reabrir')
+  } finally {
+    reabriendo.value = null
   }
 }
 
@@ -356,7 +381,7 @@ onMounted(cargarLotes)
 
 /* Active pesaje card */
 .mpv__active-card {
-  background: #f5f3ff; border: 1.5px solid #c4b5fd;
+  background: #f6faf4; border: 1.5px solid #cfe3c8;
   border-radius: var(--r-lg); padding: var(--sp-5);
   margin-bottom: var(--sp-4);
 }
@@ -366,11 +391,11 @@ onMounted(cargarLotes)
 }
 .mpv__active-ico {
   width: 36px; height: 36px; border-radius: var(--r-sm);
-  background: #ede9fe; color: #7c3aed;
+  background: #dcfce7; color: #5C7A4A;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.mpv__active-title { font-size: var(--fs-14); font-weight: 700; color: #4c1d95; margin: 0 0 1px; }
-.mpv__active-date  { font-size: var(--fs-12); color: #7c3aed; margin: 0; }
+.mpv__active-title { font-size: var(--fs-14); font-weight: 700; color: #14532d; margin: 0 0 1px; }
+.mpv__active-date  { font-size: var(--fs-12); color: #5C7A4A; margin: 0; }
 
 .mpv__active-kpis {
   display: flex; gap: var(--sp-6); margin-bottom: var(--sp-4);
@@ -378,40 +403,40 @@ onMounted(cargarLotes)
 }
 .mpv__akpi { display: flex; flex-direction: column; gap: 2px; }
 .mpv__akpi-val {
-  font-size: var(--fs-22); font-weight: 800; color: #4c1d95; line-height: 1;
+  font-size: var(--fs-22); font-weight: 800; color: #14532d; line-height: 1;
 }
-.mpv__akpi-unit { font-size: var(--fs-13); font-weight: 500; color: #7c3aed; }
-.mpv__akpi-lbl  { font-size: var(--fs-11); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #7c3aed; }
+.mpv__akpi-unit { font-size: var(--fs-13); font-weight: 500; color: #5C7A4A; }
+.mpv__akpi-lbl  { font-size: var(--fs-11); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #5C7A4A; }
 
 .mpv__active-notas { margin-bottom: var(--sp-4); }
 .mpv__active-notas-lbl {
   display: block; font-size: var(--fs-11); font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: #6d28d9; margin-bottom: var(--sp-1);
+  letter-spacing: .06em; color: #4a6239; margin-bottom: var(--sp-1);
 }
 .mpv__textarea {
   width: 100%; box-sizing: border-box;
-  background: rgba(255,255,255,.7); border: 1.5px solid #c4b5fd;
+  background: rgba(255,255,255,.7); border: 1.5px solid #cfe3c8;
   border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3);
   font-size: var(--fs-13); color: #1e1b4b; outline: none;
   resize: vertical; min-height: 56px; font-family: inherit;
   transition: border-color .15s;
 }
-.mpv__textarea:focus { border-color: #7c3aed; background: #fff; }
+.mpv__textarea:focus { border-color: #5C7A4A; background: #fff; }
 
 .mpv__active-actions { display: flex; justify-content: flex-end; }
 .mpv__btn-enviar {
   display: inline-flex; align-items: center; gap: var(--sp-2);
-  background: #7c3aed; color: #fff; border: none;
+  background: #5C7A4A; color: #fff; border: none;
   padding: .6rem 1.25rem; border-radius: var(--r-sm);
   font-size: var(--fs-13); font-weight: 700; cursor: pointer;
   transition: background .15s;
 }
-.mpv__btn-enviar:hover:not(:disabled) { background: #6d28d9; }
+.mpv__btn-enviar:hover:not(:disabled) { background: #4a6239; }
 .mpv__btn-enviar:disabled { opacity: .5; cursor: not-allowed; }
 
 .mpv__hint { font-size: var(--fs-12); color: var(--c-ink-400); margin-top: var(--sp-3); }
 .mpv__hint--warn { color: #b45309; }
-.mpv__opt { font-size: var(--fs-11); font-weight: 400; color: #8b5cf6; text-transform: none; letter-spacing: 0; }
+.mpv__opt { font-size: var(--fs-11); font-weight: 400; color: var(--c-ink-400); text-transform: none; letter-spacing: 0; }
 
 /* Historial */
 .mpv__section-title {
@@ -420,14 +445,15 @@ onMounted(cargarLotes)
   color: var(--c-ink-500); margin: 0 0 var(--sp-3);
 }
 .mpv__hist-list {
-  display: flex; flex-direction: column; gap: 2px;
-  border: 1px solid var(--c-ink-100); border-radius: var(--r-md); overflow: hidden;
+  display: flex; flex-direction: column;
+  border: 1px solid #e2e8f0; border-radius: var(--r-md); overflow: hidden;
 }
 .mpv__hist-row {
   display: flex; align-items: center; gap: var(--sp-4);
-  background: var(--c-paper); border-bottom: 1px solid var(--c-ink-50, #f8fafc);
+  background: var(--c-paper); border-bottom: 1px solid #e2e8f0;
   padding: var(--sp-3) var(--sp-4);
 }
+.mpv__hist-row:nth-child(even) { background: #fafcf9; }
 .mpv__hist-row:last-child { border-bottom: none; }
 .mpv__hist-date { font-size: var(--fs-12); color: var(--c-ink-600); font-weight: 600; min-width: 90px; }
 .mpv__hist-info {
@@ -439,14 +465,15 @@ onMounted(cargarLotes)
   display: inline-flex; align-items: center; gap: 4px;
   font-size: var(--fs-12); color: #16a34a; font-weight: 600;
 }
-.mpv__hist-del {
+.mpv__hist-del, .mpv__hist-act {
   display: inline-flex; align-items: center; justify-content: center;
   background: transparent; border: none; cursor: pointer;
   color: var(--c-ink-300, #cbd5e1); padding: 4px; border-radius: 6px;
   transition: all .15s;
 }
 .mpv__hist-del:hover:not(:disabled) { background: #fef2f2; color: #dc2626; }
-.mpv__hist-del:disabled { opacity: .4; cursor: not-allowed; }
+.mpv__hist-act:hover:not(:disabled) { background: #eef5ea; color: #5C7A4A; }
+.mpv__hist-del:disabled, .mpv__hist-act:disabled { opacity: .4; cursor: not-allowed; }
 
 /* Badges */
 .mpv__badge {
@@ -454,7 +481,7 @@ onMounted(cargarLotes)
   border-radius: 999px; text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0;
 }
 .mpv__badge--borrador   { background: #fffbeb; color: #b45309; }
-.mpv__badge--enviado    { background: #ede9fe; color: #7c3aed; }
+.mpv__badge--enviado    { background: #e0f2fe; color: #0369a1; }
 .mpv__badge--confirmado { background: #dcfce7; color: #15803d; }
 
 /* Empty */

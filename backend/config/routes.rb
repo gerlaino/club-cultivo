@@ -103,6 +103,7 @@ Rails.application.routes.draw do
         member do
           post :enviar
           post :confirmar
+          post :reabrir
         end
       end
       member do

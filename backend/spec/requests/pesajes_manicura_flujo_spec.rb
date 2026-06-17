@@ -70,6 +70,20 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(PesadaPlanta.where(pesaje_manicura_id: pesaje.id)).to be_empty
   end
 
+  it 'reabrir devuelve un pesaje enviado a borrador' do
+    pesaje = lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current, estado: 'enviado', enviado_at: Time.current)
+    post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje.id}/reabrir", headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    expect(pesaje.reload.estado).to eq('borrador')
+    expect(pesaje.enviado_at).to be_nil
+  end
+
+  it 'no permite reabrir un pesaje confirmado' do
+    pesaje = lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current, estado: 'confirmado')
+    post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje.id}/reabrir", headers: auth_headers
+    expect(response).to have_http_status(:unprocessable_entity)
+  end
+
   it 'no permite borrar un pesaje confirmado' do
     pesaje = lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current, estado: 'confirmado')
     delete "/lotes/#{lote.id}/pesajes_manicura/#{pesaje.id}", headers: auth_headers
