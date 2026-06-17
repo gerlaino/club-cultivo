@@ -99,7 +99,7 @@ Rails.application.routes.draw do
       resources :notas, only: [:index, :create]
       resources :pesadas, only: [:index, :create, :destroy]
       resources :analisis_laboratorio, only: [:index, :create, :update, :destroy]
-      resources :pesajes_manicura, only: [:index, :show, :create] do
+      resources :pesajes_manicura, only: [:index, :show, :create, :destroy] do
         member do
           post :enviar
           post :confirmar

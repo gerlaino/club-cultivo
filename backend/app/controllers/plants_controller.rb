@@ -153,11 +153,19 @@ class PlantsController < ApplicationController
       plant_attrs[:peso_humedo] = peso_humedo if peso_humedo&.positive?
       @plant.update!(plant_attrs)
 
-      if pesaje_manicura_id.present?
-        # New flow: register against a PesajeManicura
-        pesaje = lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id)
-                                       .find(pesaje_manicura_id)
+      # Resolvemos la jornada (PesajeManicura): por id explícito, o —si el lote está en
+      # manicura— el borrador abierto del manicura para este lote. Si no hay ninguno, se
+      # crea. Así escanear el QR de la planta alimenta SIEMPRE la jornada (antes el peso
+      # caía en el flujo viejo y la jornada quedaba en 0).
+      pesaje = if pesaje_manicura_id.present?
+        lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id).find(pesaje_manicura_id)
+      elsif lote.estado == 'en_manicura'
+        lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id).order(created_at: :desc).first ||
+          lote.pesajes_manicura.create!(manicurador: current_user, club: lote.club, fecha_pesaje: Date.current)
+      end
 
+      if pesaje
+        # Flujo nuevo: registra contra el PesajeManicura (la jornada)
         pp = pesaje.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
         pp.pesaje_manicura = pesaje
         pp.pesada          = nil

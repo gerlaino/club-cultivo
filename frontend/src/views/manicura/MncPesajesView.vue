@@ -122,6 +122,15 @@
                 <CheckCircle :size="12" :stroke-width="2" />
                 {{ (p.peso_confirmado_g || 0).toFixed(1) }}g confirmados
               </div>
+              <button
+                v-if="p.estado !== 'confirmado'"
+                class="mpv__hist-del"
+                :disabled="borrando === p.id"
+                title="Borrar jornada"
+                @click="borrarPesaje(p)"
+              >
+                <Trash2 :size="14" :stroke-width="2" />
+              </button>
             </div>
           </div>
         </div>
@@ -142,17 +151,20 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { Scale, Wind, Plus, Send, List, CheckCircle, CalendarPlus } from 'lucide-vue-next'
+import { Scale, Wind, Plus, Send, List, CheckCircle, CalendarPlus, Trash2 } from 'lucide-vue-next'
 import {
   listLotes,
   listPesajesManicura,
   createPesajeManicura,
   enviarPesajeManicura,
+  deletePesajeManicura,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useConfirm } from '../../composables/useConfirm.js'
 import { useAuthStore } from '../../stores/auth.js'
 
 const toast = useToast()
+const { confirm } = useConfirm()
 const auth  = useAuthStore()
 
 const loadingLotes  = ref(true)
@@ -239,6 +251,27 @@ async function cerrarDia() {
     toast.error(e.response?.data?.error || 'Error al enviar el pesaje')
   } finally {
     enviando.value = false
+  }
+}
+
+const borrando = ref(null)
+async function borrarPesaje(p) {
+  if (p.estado === 'confirmado') return
+  const ok = await confirm({
+    title: 'Borrar jornada',
+    message: `¿Borrar esta jornada del ${fmtDate(p.fecha_pesaje)}? Esta acción no se puede deshacer.`,
+    confirmText: 'Borrar', danger: true,
+  })
+  if (!ok) return
+  borrando.value = p.id
+  try {
+    await deletePesajeManicura(loteSeleccionado.value.id, p.id)
+    toast.success('Jornada borrada')
+    await cargarPesajes()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo borrar')
+  } finally {
+    borrando.value = null
   }
 }
 
@@ -406,6 +439,14 @@ onMounted(cargarLotes)
   display: inline-flex; align-items: center; gap: 4px;
   font-size: var(--fs-12); color: #16a34a; font-weight: 600;
 }
+.mpv__hist-del {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--c-ink-300, #cbd5e1); padding: 4px; border-radius: 6px;
+  transition: all .15s;
+}
+.mpv__hist-del:hover:not(:disabled) { background: #fef2f2; color: #dc2626; }
+.mpv__hist-del:disabled { opacity: .4; cursor: not-allowed; }
 
 /* Badges */
 .mpv__badge {

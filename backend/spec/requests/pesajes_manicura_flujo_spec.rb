@@ -39,6 +39,44 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(body.first['peso_calculado_g']).to eq(12.5)
   end
 
+  it 'registrar peso SIN pesaje_manicura_id (scan QR) alimenta la jornada abierta y refleja KPIs' do
+    pesaje = lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current)
+
+    post "/plants/#{planta.id}/registrar_peso", params: { peso_seco_g: 8 }, headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    expect(pesaje.reload.pesadas_plantas.count).to eq(1)
+
+    get "/lotes/#{lote.id}/pesajes_manicura", headers: auth_headers
+    body = JSON.parse(response.body).find { |p| p['id'] == pesaje.id }
+    expect(body['peso_calculado_g']).to eq(8.0)
+    expect(body['plantas_registradas']).to eq(1)
+  end
+
+  it 'registrar peso sin jornada abierta en lote en_manicura crea una automáticamente' do
+    expect {
+      post "/plants/#{planta.id}/registrar_peso", params: { peso_seco_g: 5 }, headers: auth_headers
+    }.to change { lote.pesajes_manicura.where(estado: 'borrador').count }.by(1)
+    expect(response).to have_http_status(:ok)
+  end
+
+  it 'el manicura puede borrar una jornada propia no confirmada (y sus pesadas)' do
+    pesaje = lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current)
+    pesaje.pesadas_plantas.create!(plant: planta, peso_seco_g: 3)
+
+    expect {
+      delete "/lotes/#{lote.id}/pesajes_manicura/#{pesaje.id}", headers: auth_headers
+    }.to change(PesajeManicura, :count).by(-1)
+    expect(response).to have_http_status(:no_content)
+    expect(PesadaPlanta.where(pesaje_manicura_id: pesaje.id)).to be_empty
+  end
+
+  it 'no permite borrar un pesaje confirmado' do
+    pesaje = lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current, estado: 'confirmado')
+    delete "/lotes/#{lote.id}/pesajes_manicura/#{pesaje.id}", headers: auth_headers
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(PesajeManicura.exists?(pesaje.id)).to be true
+  end
+
   it 'lista sin romper aunque una pesada_planta tenga peso_seco_g nil' do
     pesaje = lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current)
     pesaje.pesadas_plantas.create!(plant: planta, peso_humedo_g: 5, peso_seco_g: nil)

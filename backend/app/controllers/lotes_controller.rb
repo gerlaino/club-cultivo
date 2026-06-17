@@ -21,7 +21,10 @@ class LotesController < ApplicationController
         ).select(:lote_id)
         lotes = lotes.where(sala_id: salas_ids).or(lotes.where(id: mis_lotes_cosechados))
       else
+        # El cultivador ve solo lotes EN CULTIVO. Aunque por datos viejos un lote en
+        # manicura conserve una sala de veg/flor, se filtra por estado para no colarse.
         lotes = lotes.where(sala_id: salas_ids)
+                     .where(estado: %w[semilla esqueje vegetativo floracion])
       end
     elsif current_user.supervisor?
       salas_ids = current_user.salas_ids_en_sedes_asignadas

@@ -1,7 +1,7 @@
 class PesajesManicuraController < ApplicationController
   before_action :authenticate_user!
   before_action :set_lote, except: [:index_admin]
-  before_action :set_pesaje, only: [:show, :enviar, :confirmar]
+  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy]
 
   # GET /lotes/:lote_id/pesajes_manicura
   # Manicurador ve sus pesajes activos del lote; admin ve todos.
@@ -53,6 +53,20 @@ class PesajesManicuraController < ApplicationController
     else
       render json: { errors: pesaje.errors.full_messages }, status: :unprocessable_entity
     end
+  end
+
+  # DELETE /lotes/:lote_id/pesajes_manicura/:id
+  # Borra un pesaje propio que todavía no se confirmó (limpiar jornadas erróneas/duplicadas).
+  def destroy
+    unless @pesaje.manicurador_id == current_user.id || current_user.admin? || current_user.supervisor?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    if @pesaje.confirmado?
+      return render json: { error: 'No se puede borrar un pesaje ya confirmado' }, status: :unprocessable_entity
+    end
+    @pesaje.pesadas_plantas.destroy_all
+    @pesaje.destroy
+    head :no_content
   end
 
   # POST /lotes/:lote_id/pesajes_manicura/:id/enviar
