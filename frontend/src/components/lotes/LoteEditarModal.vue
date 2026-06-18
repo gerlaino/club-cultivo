@@ -18,7 +18,7 @@
             </div>
             <div class="lem__field">
               <label class="lem__label">Fecha de inicio</label>
-              <input type="date" class="lem__input" v-model="editLoteForm.start_date" />
+              <AppDatePicker v-model="editLoteForm.start_date" />
             </div>
             <div class="lem__field">
               <label class="lem__label">Genética / Variedad</label>
@@ -63,6 +63,7 @@
               <label class="lem__label">Tamaño de maceta (L)</label>
               <select class="lem__input" v-model="editLoteForm.tamanio_maceta">
                 <option value="">Sin especificar</option>
+                <option value="0.5">Vaso (0.5L)</option>
                 <option value="1">1 litro</option>
                 <option value="3">3 litros</option>
                 <option value="5">5 litros</option>
@@ -95,6 +96,7 @@
 import { watch } from 'vue'
 import { useLoteEditar } from '../../composables/useLoteEditar.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 
 const props = defineProps({
   open:   { type: Boolean, default: false },

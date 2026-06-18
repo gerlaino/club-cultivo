@@ -5,7 +5,7 @@ class ReservasController < ApplicationController
   before_action :require_reservas_role!
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
-  before_action :set_reserva,      only: [:show, :entregar, :cancelar]
+  before_action :set_reserva,      only: [:show, :update, :destroy, :entregar, :cancelar]
 
   # GET /pacientes/:paciente_id/reservas  OR  GET /reservas[?estado=pendiente]
   def index
@@ -16,7 +16,7 @@ class ReservasController < ApplicationController
              .where("stocks.sede_id IN (?) OR stocks.club_id = ?", club_sede_ids, current_user.club_id)
     end
     scope = scope.where(estado: params[:estado]) if params[:estado].present?
-    scope = scope.includes(:paciente, :user, stock: :lote).recientes
+    scope = scope.includes(:user, stock: :lote, paciente: :cuenta_corriente).recientes
     render json: { reservas: scope.map { |r| serialize_reserva(r) } }
   end
 
@@ -53,31 +53,106 @@ class ReservasController < ApplicationController
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
+  # PATCH /reservas/:id  — editar una reserva pendiente
+  def update
+    unless @reserva.pendiente?
+      return render json: { error: 'Solo se pueden editar reservas pendientes.' }, status: :unprocessable_entity
+    end
+    attrs = reserva_update_params
+    # Si cambia la cantidad, re-validar disponibilidad (devolviendo el bloqueo propio actual).
+    if attrs[:cantidad].present?
+      nueva       = attrs[:cantidad].to_d
+      disponible  = @reserva.stock.cantidad_disponible_real.to_d + @reserva.cantidad.to_d
+      if nueva <= 0 || nueva > disponible
+        return render json: { errors: ["Cantidad inválida. Disponible: #{disponible.to_f}#{@reserva.stock.unidad}"] }, status: :unprocessable_entity
+      end
+    end
+    if @reserva.update(attrs)
+      render json: serialize_reserva(@reserva)
+    else
+      render json: { errors: @reserva.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  # DELETE /reservas/:id  — eliminar (solo si nunca se concretó ni tiene seña)
+  def destroy
+    if @reserva.estado == 'entregada'
+      return render json: { error: 'No se puede eliminar una reserva ya entregada.' }, status: :unprocessable_entity
+    end
+    if @reserva.sena_ars.to_d > 0
+      return render json: { error: 'La reserva tiene una seña registrada. Usá "Cancelar" en lugar de eliminar.' }, status: :unprocessable_entity
+    end
+    @reserva.destroy!
+    head :no_content
+  end
+
   # PATCH /reservas/:id/entregar
-  # Convierte la reserva en una Dispensacion real: re-valida REPROCANN/crédito/stock
-  # (vía las validaciones de Dispensacion) y cobra el RESTO (total − seña).
+  # Convierte la reserva en una Dispensacion real. Acá se definen los datos de
+  # despacho (delivery/dirección) — no en el alta de la reserva. Re-valida stock/
+  # crédito/REPROCANN vía Dispensacion y cobra el RESTO (total − seña).
   def entregar
     unless @reserva.pendiente?
       return render json: { error: "La reserva no está pendiente (#{@reserva.estado})" }, status: :unprocessable_entity
     end
 
+    paciente   = @reserva.paciente
     medio_pago = params[:medio_pago].presence || @reserva.medio_pago.presence || 'efectivo'
-    aporte     = @reserva.aporte_restante_ars
+    # Se puede ajustar al entregar: cantidad real entregada y monto a cobrar.
+    cantidad   = params[:cantidad].presence ? params[:cantidad].to_d : @reserva.cantidad
+    aporte     = params[:aporte_socio_ars].presence ? params[:aporte_socio_ars].to_d : @reserva.aporte_restante_ars
+    con_envio  = ActiveModel::Type::Boolean.new.cast(params[:con_envio]) == true
 
-    dispensacion = @reserva.paciente.dispensaciones.build(
-      stock:             @reserva.stock,
-      sede_id:           @reserva.stock&.sede_id,
-      cantidad:          @reserva.cantidad,
-      medio_pago:        medio_pago,
-      aporte_socio_ars:  aporte,
-      fecha_dispensacion: Date.current,
-      con_envio:          @reserva.con_envio,
-      direccion_envio:    @reserva.direccion_envio,
-      contacto_nombre:    @reserva.contacto_nombre,
-      contacto_telefono:  @reserva.contacto_telefono,
-      observaciones:      "Entrega de reserva ##{@reserva.id}",
+    dispensacion = paciente.dispensaciones.build(
+      stock:                  @reserva.stock,
+      sede_id:                @reserva.stock&.sede_id,
+      cantidad:               cantidad,
+      medio_pago:             medio_pago,
+      aporte_socio_ars:       aporte,
+      descuento_paciente_pct: paciente.descuento_porcentaje.to_d.clamp(0, 100),
+      fecha_dispensacion:     Date.current,
+      con_envio:              con_envio,
+      observaciones:          "Entrega de reserva ##{@reserva.id}",
     )
     dispensacion.user = current_user
+
+    if con_envio
+      dispensacion.delivery_id = params[:delivery_id]
+      usar_domicilio = ActiveModel::Type::Boolean.new.cast(params[:usar_domicilio_paciente])
+      if usar_domicilio || params[:envio_calle].blank?
+        dispensacion.envio_calle  = paciente.domicilio_calle
+        dispensacion.envio_altura = paciente.domicilio_altura
+        dispensacion.envio_piso   = paciente.domicilio_piso
+        dispensacion.envio_depto  = paciente.domicilio_depto
+        dispensacion.envio_barrio = paciente.domicilio_barrio
+        dispensacion.envio_ciudad = paciente.domicilio_ciudad
+      else
+        dispensacion.envio_calle  = params[:envio_calle]
+        dispensacion.envio_altura = params[:envio_altura]
+        dispensacion.envio_piso   = params[:envio_piso]
+        dispensacion.envio_depto  = params[:envio_depto]
+        dispensacion.envio_barrio = params[:envio_barrio]
+        dispensacion.envio_ciudad = params[:envio_ciudad]
+      end
+      dispensacion.contacto_nombre   = params[:contacto_nombre].presence   || paciente.nombre_completo
+      dispensacion.contacto_telefono = params[:contacto_telefono].presence || paciente.telefono
+    end
+
+    # Split de crédito (misma lógica que dispensaciones#create).
+    cc = paciente.cuenta_corriente
+    if dispensacion.a_credito?
+      unless cc&.limite_credito.to_f > 0
+        return render json: { errors: ['El paciente no tiene crédito configurado.'] }, status: :unprocessable_entity
+      end
+      credito_disp = [cc.saldo_disponible.to_d + cc.limite_credito.to_d, 0].max
+      if medio_pago == 'no_abona'
+        unless cc.puede_dispensar?(aporte.to_d)
+          return render json: { errors: ['Crédito insuficiente para realizar la entrega.'] }, status: :unprocessable_entity
+        end
+        dispensacion.monto_credito_ars = aporte
+      else
+        dispensacion.monto_credito_ars = [aporte.to_d, credito_disp].min
+      end
+    end
 
     ActiveRecord::Base.transaction do
       # Liberamos primero el bloqueo de esta reserva para que la dispensación no choque
@@ -85,7 +160,7 @@ class ReservasController < ApplicationController
       @reserva.update!(estado: 'entregada', entregada_at: Time.current)
       dispensacion.save! # corre validaciones on:create (stock/crédito/REPROCANN) + callbacks
       crear_movimiento_contable(dispensacion)
-      debitar_cuenta_corriente(dispensacion) if dispensacion.a_credito?
+      debitar_cuenta_corriente(dispensacion) if dispensacion.a_credito? && cc
       debitar_gramos(dispensacion)           if dispensacion.medio_pago == 'credito_gramos'
       @reserva.update!(dispensacion: dispensacion)
     end
@@ -136,6 +211,12 @@ class ReservasController < ApplicationController
       :aporte_estimado_ars, :medio_pago, :notas,
       :con_envio, :direccion_envio, :contacto_nombre, :contacto_telefono
     )
+  end
+
+  # Edición de reserva pendiente: campos sin impacto financiero complejo. La seña
+  # no se edita (ya quedó asentada); para cambiarla, cancelar y rehacer.
+  def reserva_update_params
+    params.require(:reserva).permit(:cantidad, :fecha_entrega_estimada, :medio_pago, :notas)
   end
 
   # Reservan: dispensador, admin, supervisor.
@@ -191,9 +272,12 @@ class ReservasController < ApplicationController
       cancelada_at:           r.cancelada_at,
       vencida_at:             r.vencida_at,
       paciente: r.paciente && {
-        id:     r.paciente.id,
-        nombre: r.paciente.nombre_completo,
-        dni:    r.paciente.dni,
+        id:             r.paciente.id,
+        nombre:         r.paciente.nombre_completo,
+        dni:            r.paciente.dni,
+        saldo_cc:       r.paciente.cuenta_corriente&.saldo_disponible&.to_f,
+        limite_cc:      r.paciente.cuenta_corriente&.limite_credito&.to_f,
+        tiene_domicilio: r.paciente.domicilio_calle.present?,
       },
       stock: r.stock && {
         id:             r.stock.id,

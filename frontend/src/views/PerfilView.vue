@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue'
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { getProfile, updateProfile, updateMyPassword, uploadAvatar } from '../lib/api'
 import { useAuthStore } from '../stores/auth'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -267,7 +268,7 @@ onMounted(fetchProfile)
               </div>
               <div class="pfl__field">
                 <label class="pfl__label">Fecha de nacimiento</label>
-                <input v-model="form.birth_date" type="date" class="pfl__input" />
+                <AppDatePicker v-model="form.birth_date" />
               </div>
               <div class="pfl__field">
                 <label class="pfl__label">Teléfono</label>

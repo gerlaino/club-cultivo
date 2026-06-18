@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   PackageCheck, Truck, CheckCircle2, XCircle, User, MapPin,
@@ -8,7 +9,7 @@ import {
 } from 'lucide-vue-next'
 import {
   listDespachos, listEntregadores, reasignarDelivery, reprogramarPaquete,
-  listReservas, entregarReserva,
+  listReservas, entregarReserva, entregarPaquete, reportarFallo, cancelarEntregaDispensacion,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -60,6 +61,15 @@ const ESTADO_META = {
   en_viaje:  { label: 'En camino', bg: '#fef3c7', color: '#d97706' },
   entregado: { label: 'Entregado', bg: '#dcfce7', color: '#15803d' },
   fallido:   { label: 'Fallido',   bg: '#fee2e2', color: '#dc2626' },
+  cancelada: { label: 'Cancelada', bg: '#f1f5f9', color: '#64748b' },
+}
+
+const EVENTO_META = {
+  despachado:  { label: 'Despachado',  color: '#d97706' },
+  entregado:   { label: 'Entregado',   color: '#15803d' },
+  fallido:     { label: 'Fallo de entrega', color: '#dc2626' },
+  reprogramado:{ label: 'Reprogramado', color: '#1d4ed8' },
+  cancelado:   { label: 'Cancelado',   color: '#64748b' },
 }
 
 function estadoBadgeStyle(estado) {
@@ -69,6 +79,9 @@ function estadoBadgeStyle(estado) {
 
 const fmtFecha = (d) => d
   ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+  : '—'
+const fmtFechaHora = (iso) => iso
+  ? new Date(iso).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   : '—'
 
 const fmtMoneda = (n) => (n == null ? null : new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n))
@@ -180,6 +193,55 @@ function entregadorLabel(u) {
   const nombre = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
   if (u.role !== 'delivery') return `${nombre} (${ROLE_LABEL[u.role] || u.role})`
   return nombre
+}
+
+// ── Completar entrega (admin cierra el círculo) ──
+const entregaModal = ref({ open: false, id: null, codigo: '', paciente: '', notas: '' })
+function abrirEntrega(d) {
+  entregaModal.value = { open: true, id: d.id, codigo: d.codigo_paquete || `#${d.id}`, paciente: d.paciente?.nombre || '', notas: '' }
+}
+async function confirmarEntrega() {
+  saving.value = true
+  try {
+    await entregarPaquete(entregaModal.value.id, entregaModal.value.notas || null, null)
+    toast.success('Entrega completada')
+    entregaModal.value.open = false
+    await load()
+  } catch (e) { toast.error(e.response?.data?.error || 'No se pudo completar la entrega') }
+  finally { saving.value = false }
+}
+
+// ── Reportar fallo ──
+const falloModal = ref({ open: false, id: null, codigo: '', paciente: '', motivo: '' })
+function abrirFallo(d) {
+  falloModal.value = { open: true, id: d.id, codigo: d.codigo_paquete || `#${d.id}`, paciente: d.paciente?.nombre || '', motivo: '' }
+}
+async function confirmarFallo() {
+  if (!falloModal.value.motivo) return
+  saving.value = true
+  try {
+    await reportarFallo(falloModal.value.id, falloModal.value.motivo)
+    toast.success('Fallo reportado')
+    falloModal.value.open = false
+    await load()
+  } catch (e) { toast.error(e.response?.data?.error || 'No se pudo reportar el fallo') }
+  finally { saving.value = false }
+}
+
+// ── Cancelar entrega (revierte + queda registrada como cancelada) ──
+const cancelarModal = ref({ open: false, id: null, codigo: '', paciente: '', motivo: '' })
+function abrirCancelar(d) {
+  cancelarModal.value = { open: true, id: d.id, codigo: d.codigo_paquete || `#${d.id}`, paciente: d.paciente?.nombre || '', motivo: '' }
+}
+async function confirmarCancelar() {
+  saving.value = true
+  try {
+    await cancelarEntregaDispensacion(cancelarModal.value.id, cancelarModal.value.motivo || null)
+    toast.success('Entrega cancelada — producto devuelto al stock')
+    cancelarModal.value.open = false
+    await load()
+  } catch (e) { toast.error(e.response?.data?.errors?.[0] || e.response?.data?.error || 'No se pudo cancelar') }
+  finally { saving.value = false }
 }
 
 async function reprogramar(id) {
@@ -303,8 +365,8 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
           {{ entregadorLabel(u) }}
         </option>
       </select>
-      <input v-model="filtroDesde" class="dsp__input-date" type="date" title="Desde" @change="load" />
-      <input v-model="filtroHasta" class="dsp__input-date" type="date" title="Hasta" @change="load" />
+      <AppDatePicker v-model="filtroDesde" @update:model-value="load" />
+      <AppDatePicker v-model="filtroHasta" @update:model-value="load" />
       <button
         v-if="filtroEstado || filtroDelivery || filtroDesde || filtroHasta || filtroBusca"
         class="dsp__btn-clear"
@@ -432,6 +494,18 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
 
           </div>
 
+          <!-- Historial de la entrega -->
+          <div v-if="d.historial_envio?.length" class="dsp__historial">
+            <div class="dsp__detail-label">Historial</div>
+            <div v-for="(ev, i) in d.historial_envio" :key="i" class="dsp__hist-row">
+              <span class="dsp__hist-dot" :style="{ background: EVENTO_META[ev.evento]?.color || '#94a3b8' }"></span>
+              <span class="dsp__hist-evento">{{ EVENTO_META[ev.evento]?.label || ev.evento }}</span>
+              <span class="dsp__hist-fecha">{{ fmtFechaHora(ev.fecha) }}</span>
+              <span v-if="ev.usuario_nombre" class="dsp__hist-user">· {{ ev.usuario_nombre }}</span>
+              <span v-if="ev.motivo" class="dsp__hist-motivo">— {{ ev.motivo }}</span>
+            </div>
+          </div>
+
           <!-- Reasignación -->
           <div class="dsp__reasign-bar">
             <template v-if="reasignandoId === d.id">
@@ -463,6 +537,20 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
                 Repartidor: <strong>{{ d.delivery_nombre || deliveryNombre(d) || 'Sin asignar' }}</strong>
               </span>
               <button
+                v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)"
+                class="dsp__btn-confirm"
+                @click.stop="abrirEntrega(d)"
+              >
+                <CheckCircle2 :size="13" :stroke-width="2" /> Completar entrega
+              </button>
+              <button
+                v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)"
+                class="dsp__btn-fallo"
+                @click.stop="abrirFallo(d)"
+              >
+                <AlertCircle :size="13" :stroke-width="2" /> Reportar fallo
+              </button>
+              <button
                 v-if="d.estado_envio === 'fallido'"
                 class="dsp__btn-reprogramar"
                 :disabled="reprogramando"
@@ -473,11 +561,19 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
                 Reprogramar
               </button>
               <button
-                v-if="d.estado_envio !== 'entregado'"
+                v-if="!['entregado', 'cancelada'].includes(d.estado_envio)"
                 class="dsp__btn-outline"
                 @click.stop="iniciarReasignacion(d)"
               >
                 Reasignar
+              </button>
+              <button
+                v-if="!['entregado', 'cancelada'].includes(d.estado_envio)"
+                class="dsp__btn-fallo"
+                @click.stop="abrirCancelar(d)"
+                title="Cancela y devuelve el producto al stock"
+              >
+                <XCircle :size="13" :stroke-width="2" /> Cancelar
               </button>
             </template>
           </div>
@@ -485,6 +581,64 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
         </div>
       </div>
     </div>
+
+    <!-- Modal completar entrega (admin) -->
+    <Teleport to="body">
+      <div v-if="entregaModal.open" class="dsp__overlay" @click.self="entregaModal.open = false">
+        <div class="dsp__modal">
+          <h3 class="dsp__modal-title">Completar entrega</h3>
+          <p class="dsp__modal-sub">{{ entregaModal.codigo }} · {{ entregaModal.paciente }}</p>
+          <label class="dsp__modal-label">Notas de entrega <span class="dsp__opt">opcional</span></label>
+          <textarea v-model.trim="entregaModal.notas" class="dsp__modal-input" rows="2" placeholder="Quién recibió, observaciones…"></textarea>
+          <div class="dsp__modal-foot">
+            <button class="dsp__btn-ghost" @click="entregaModal.open = false">Cancelar</button>
+            <button class="dsp__btn-confirm" :disabled="saving" @click="confirmarEntrega">
+              <DsSpinner v-if="saving" :size="12" /> Marcar entregado
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Modal cancelar entrega (admin) -->
+    <Teleport to="body">
+      <div v-if="cancelarModal.open" class="dsp__overlay" @click.self="cancelarModal.open = false">
+        <div class="dsp__modal">
+          <h3 class="dsp__modal-title">Cancelar entrega</h3>
+          <p class="dsp__modal-sub">{{ cancelarModal.codigo }} · {{ cancelarModal.paciente }}</p>
+          <div class="dsp__modal-warn">
+            <AlertCircle :size="14" :stroke-width="2" />
+            Se devuelve el producto al stock y se revierte el cobro. La dispensación queda registrada como <strong>cancelada</strong>.
+          </div>
+          <label class="dsp__modal-label">Motivo <span class="dsp__opt">opcional</span></label>
+          <textarea v-model.trim="cancelarModal.motivo" class="dsp__modal-input" rows="2" placeholder="Ej: el socio canceló el pedido…"></textarea>
+          <div class="dsp__modal-foot">
+            <button class="dsp__btn-ghost" @click="cancelarModal.open = false">Volver</button>
+            <button class="dsp__btn-fallo" :disabled="saving" @click="confirmarCancelar">
+              <DsSpinner v-if="saving" :size="12" /> Cancelar entrega
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Modal reportar fallo (admin) -->
+    <Teleport to="body">
+      <div v-if="falloModal.open" class="dsp__overlay" @click.self="falloModal.open = false">
+        <div class="dsp__modal">
+          <h3 class="dsp__modal-title">Reportar fallo de entrega</h3>
+          <p class="dsp__modal-sub">{{ falloModal.codigo }} · {{ falloModal.paciente }}</p>
+          <label class="dsp__modal-label">Motivo <span class="dsp__req">*</span></label>
+          <textarea v-model.trim="falloModal.motivo" class="dsp__modal-input" rows="2" placeholder="Ej: dirección incorrecta, nadie atendió…"></textarea>
+          <div class="dsp__modal-foot">
+            <button class="dsp__btn-ghost" @click="falloModal.open = false">Cancelar</button>
+            <button class="dsp__btn-fallo" :disabled="saving || !falloModal.motivo" @click="confirmarFallo">
+              <DsSpinner v-if="saving" :size="12" /> Reportar fallo
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
   </div>
 </template>
@@ -844,6 +998,35 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
 }
 .dsp__btn-confirm:hover:not(:disabled) { background: var(--c-leaf-800); }
 .dsp__btn-confirm:disabled { opacity: .5; cursor: not-allowed; }
+.dsp__btn-fallo {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  background: #fff; color: #dc2626; border: 1.5px solid #fecaca;
+  padding: .42rem .9rem; border-radius: var(--r-md); font-size: var(--fs-13);
+  font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.dsp__btn-fallo:hover:not(:disabled) { background: #fef2f2; }
+.dsp__btn-fallo:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Modales completar entrega / fallo */
+.dsp__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(3px); }
+.dsp__modal { background: #fff; border-radius: 14px; width: 100%; max-width: 420px; padding: 1.25rem; box-shadow: 0 24px 64px rgba(0,0,0,.18); }
+.dsp__modal-title { font-size: 1rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; }
+.dsp__modal-sub { font-size: .8rem; color: #64748b; margin: 0 0 .9rem; }
+.dsp__modal-label { display: block; font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
+.dsp__opt { font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+.dsp__req { color: #dc2626; }
+.dsp__modal-input { width: 100%; box-sizing: border-box; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .55rem .8rem; font-size: .85rem; color: #0f172a; outline: none; resize: vertical; }
+.dsp__modal-warn { display: flex; align-items: flex-start; gap: .4rem; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 9px; padding: .55rem .7rem; font-size: .78rem; margin-bottom: .75rem; }
+
+/* Historial de la entrega */
+.dsp__historial { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--c-ink-100, #f1f5f9); }
+.dsp__hist-row { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; font-size: .78rem; color: #475569; padding: .2rem 0; }
+.dsp__hist-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dsp__hist-evento { font-weight: 700; color: #0f172a; }
+.dsp__hist-fecha { color: #94a3b8; }
+.dsp__hist-user { color: #64748b; }
+.dsp__hist-motivo { color: #64748b; font-style: italic; }
+.dsp__modal-foot { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
 .dsp__btn-ghost {
   background: var(--c-paper);
   color: var(--c-ink-500);

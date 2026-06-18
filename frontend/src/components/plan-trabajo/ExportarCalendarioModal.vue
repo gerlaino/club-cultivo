@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { exportPlanCSV } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -80,7 +81,7 @@ async function descargar() {
           <!-- Fecha de inicio -->
           <div class="ecm__field">
             <label class="ecm__label">Fecha de inicio del plan</label>
-            <input class="ecm__input" type="date" v-model="fechaInicio" />
+            <AppDatePicker v-model="fechaInicio" />
           </div>
 
           <!-- Info resumen -->

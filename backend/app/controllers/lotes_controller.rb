@@ -93,8 +93,30 @@ class LotesController < ApplicationController
       return render json: PlanEnforcer.error_limite('lotes', info[:limites][:lotes]), status: :payment_required
     end
 
+    # Lote cosechado sin sala de cultivo: viene con sede_id y lo ubicamos en la
+    # sala de proceso "Cosecha · sede" (igual que al avanzar floración → cosecha),
+    # así conserva la sede para el flujo de manicura y se ve en /cosechado.
+    if @sala.nil? && params[:sede_id].present?
+      sede = current_user.club.sedes.find_by(id: params[:sede_id])
+      return render json: { errors: ['Sede no encontrada'] }, status: :unprocessable_entity unless sede
+      @sala = Sala.find_or_create_proceso!(sede: sede, tipo: 'cosecha', created_by: current_user)
+    end
+    return render json: { errors: ['Falta la sala o la sede'] }, status: :unprocessable_entity if @sala.nil?
+
     @lote = @sala.lotes.build(lote_params)
     @lote.club = current_user.club
+
+    # Estados creables: ciclo previo a stock + cosechado. secado/curado/finalizado
+    # y los de manicura son post-stock o de proceso y no se cargan a mano.
+    estados_no_creables = %w[secado curado en_manicura manicura_pendiente finalizado]
+    if estados_no_creables.include?(@lote.estado.to_s)
+      return render json: { errors: ["No se puede crear un lote en estado '#{@lote.estado}'"] }, status: :unprocessable_entity
+    end
+
+    # Un lote es un batch de plantas: exigimos al menos 1 al crear.
+    if lote_params[:plants_count].to_i < 1
+      return render json: { errors: ['La cantidad de plantas debe ser al menos 1'] }, status: :unprocessable_entity
+    end
 
     # En el path heredado el frontend no envía start_date (lo calcula crear_lote_heredado).
     # Calculamos aquí también para que la validación de presencia no rechace el save!.
@@ -728,7 +750,7 @@ class LotesController < ApplicationController
 
   def calcular_pl(lote)
     stock_ids = lote.stocks.map(&:id)
-    disps     = Dispensacion.where(stock_id: stock_ids)
+    disps     = Dispensacion.no_canceladas.where(stock_id: stock_ids)
 
     ingresos           = disps.sum('cantidad * COALESCE(precio_unitario_ars, 0)').to_f.round(2)
     gramos_dispensados = disps.sum(:cantidad).to_f.round(3)

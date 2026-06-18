@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub } from '../../lib/api.js'
@@ -587,7 +588,7 @@ onMounted(cargar)
               </div>
               <div class="scd__field" style="margin-top:1rem">
                 <label class="scd__lbl">Vigente hasta</label>
-                <input v-model="planForm.plan_activo_hasta" type="date" class="scd__input" />
+                <AppDatePicker v-model="planForm.plan_activo_hasta" />
                 <span class="scd__hint">Vacío = sin vencimiento</span>
               </div>
               <label class="scd__toggle-row" style="margin-top:.875rem">

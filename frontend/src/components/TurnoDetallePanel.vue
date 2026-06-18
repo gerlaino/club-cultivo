@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue'
+import AppDatePicker from './ui/AppDatePicker.vue'
 import { useRouter } from 'vue-router'
 import { updateMedicoTurno, updateAdminTurno } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
@@ -192,8 +193,7 @@ function irFicha() {
           <div class="tdp__reprog-fields">
             <div class="tdp__reprog-field">
               <label class="tdp__lbl">Fecha</label>
-              <input v-model="reprogramForm.fecha" type="date" class="tdp__input"
-                :min="new Date().toISOString().split('T')[0]" />
+              <AppDatePicker v-model="reprogramForm.fecha" :min="new Date().toISOString().split('T')[0]" />
             </div>
             <div class="tdp__reprog-field">
               <label class="tdp__lbl">Hora</label>

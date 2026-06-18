@@ -131,7 +131,7 @@
         </div>
         <div class="mta__field">
           <label class="mta__label">Fecha programada</label>
-          <input v-model="form.fecha_programada" type="date" class="mta__input" />
+          <AppDatePicker v-model="form.fecha_programada" />
         </div>
         <div v-if="createError" class="mta__error">{{ createError }}</div>
         <button class="mta__btn-primary mta__btn-full" :disabled="saving" @click="crearTarea">
@@ -144,6 +144,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useTareasStore } from '../../stores/tareas'
 import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 

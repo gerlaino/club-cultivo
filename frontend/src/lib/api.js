@@ -78,6 +78,9 @@ export const deleteLote = (id) => api.delete(`/lotes/${id}`);
 export const getLoteProximoCodigo = () => api.get('/lotes/proximo_codigo')
 export const createLoteHeredado = (salaId, lotePayload, diasParams) =>
   api.post(`/salas/${salaId}/lotes`, { lote: lotePayload, heredado: true, ...diasParams })
+// Lote cosechado sin sala de cultivo: el backend resuelve la sala de proceso "Cosecha" por sede.
+export const createLoteCosechadoEnSede = (sedeId, lotePayload, diasParams) =>
+  api.post('/lotes', { lote: lotePayload, heredado: true, sede_id: sedeId, ...diasParams })
 export const cargarLoteEnSala = (salaId, loteId) => api.post(`/salas/${salaId}/cargar_lote`, { lote_id: loteId });
 
 // -------- PLANTAS --------
@@ -187,6 +190,8 @@ export const listReservas    = (params = {})         => api.get('/reservas', { p
 export const listReservasPaciente = (pacienteId)     => api.get(`/pacientes/${pacienteId}/reservas`);
 export const entregarReserva = (id, payload = {})    => api.patch(`/reservas/${id}/entregar`, payload);
 export const cancelarReserva = (id, motivo = null)   => api.patch(`/reservas/${id}/cancelar`, { motivo });
+export const updateReserva   = (id, payload)         => api.patch(`/reservas/${id}`, { reserva: payload });
+export const deleteReserva   = (id)                  => api.delete(`/reservas/${id}`);
 
 // ── Delivery ──────────────────────────────────────────────────────────────────
 export const exportDispensacionesCSV = (params = {}) => api.get('/dispensaciones/export_csv', { params, responseType: 'blob' })
@@ -195,6 +200,7 @@ export const iniciarViaje     = (ids)               => api.patch('/dispensacione
 export const entregarPaquete  = (id, notasEntrega, firmaData) => api.patch(`/dispensaciones/${id}/entregar`, { notas_entrega: notasEntrega, firma_entrega_data: firmaData || null })
 export const reportarFallo    = (id, motivoFallo)   => api.patch(`/dispensaciones/${id}/reportar_fallo`, { motivo_fallo: motivoFallo })
 export const reprogramarPaquete = (id)             => api.patch(`/dispensaciones/${id}/reprogramar`)
+export const cancelarEntregaDispensacion = (id, motivo) => api.patch(`/dispensaciones/${id}/cancelar_entrega`, { motivo })
 export const listDeliveryUsers  = ()                => api.get('/usuarios', { params: { role: 'delivery' } })
 export const listEntregadores   = ()                => api.get('/usuarios', { params: { roles: ['delivery', 'admin', 'supervisor'] } })
 export const listDespachos     = (params = {})      => api.get('/dispensaciones', { params: { con_envio: 'true', ...params } })

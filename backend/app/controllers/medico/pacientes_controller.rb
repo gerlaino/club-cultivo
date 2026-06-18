@@ -50,7 +50,7 @@ module Medico
       end
 
       # Resumen consumo últimos 90 días
-      disp_90d = @paciente.dispensaciones
+      disp_90d = @paciente.dispensaciones.no_canceladas
                           .where('fecha_dispensacion >= ?', 90.days.ago)
       total_90d  = disp_90d.sum(:cantidad).to_f
       prom_mens  = (total_90d / 3.0).round(1)
@@ -60,7 +60,7 @@ module Medico
         indicacion_activa:  indicacion ? serialize_indicacion(indicacion) : nil,
         proximo_turno:      proximo_turno ? serialize_turno(proximo_turno) : nil,
         dispensaciones:     disp_serialized,
-        total_dispensaciones: @paciente.dispensaciones.count,
+        total_dispensaciones: @paciente.dispensaciones.no_canceladas.count,
         resumen_consumo: {
           total_g_90d:          total_90d,
           promedio_mensual_g:   prom_mens,

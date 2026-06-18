@@ -4,6 +4,7 @@ import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import { createDispensacion, createReserva, listStocks, listEntregadores } from '../../lib/api.js'
 
 const props = defineProps({
@@ -21,9 +22,14 @@ const { confirm }     = useConfirm()
 const toast           = useToast()
 const auth            = useAuthStore()
 
-const puedeVerCredito = computed(() =>
+// admin/supervisor: ven el descuento del paciente, el desglose de precio,
+// pueden pisar el aporte a mano y ven siempre el crédito.
+const esAdminoSup = computed(() =>
   ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role)
 )
+const puedeVerCredito       = esAdminoSup
+const puedeEditarAporte     = esAdminoSup
+const puedeVerDescPaciente  = esAdminoSup
 
 const stocks          = ref([])
 const loadingStocks   = ref(false)
@@ -49,18 +55,36 @@ const stocksDisponibles = computed(() => stocks.value.filter(s => s.cantidad > 0
 const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
 const ccMargen = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
 
+// El crédito solo aplica cuando el medio de pago consume crédito.
+const esMedioCredito = computed(() => ['cuenta_corriente', 'no_abona'].includes(form.value.medio_pago))
+const esCuentaCorriente = computed(() => form.value.medio_pago === 'cuenta_corriente')
+const esNoAbona         = computed(() => form.value.medio_pago === 'no_abona')
+// Panel de crédito: visible a quien dispensa cuando elige cuenta corriente; admin/sup siempre.
+const mostrarPanelCredito = computed(() => tieneCc.value && (esMedioCredito.value || puedeVerCredito.value))
+
+const margenPos = computed(() => Math.max(0, ccMargen.value))
+// Cuenta corriente: el crédito cubre lo que puede; la diferencia se cobra ahora.
+const montoACredito = computed(() => {
+  if (!esMedioCredito.value) return 0
+  return Math.min(Number(form.value.aporte_socio_ars) || 0, margenPos.value)
+})
+const restoACobrar = computed(() => {
+  if (!esCuentaCorriente.value) return 0
+  return Math.max(0, (Number(form.value.aporte_socio_ars) || 0) - margenPos.value)
+})
+
+// Solo "no abona" se bloquea por crédito (no paga nada ahora → tiene que entrar entero).
 const ccInsuficiente = computed(() => {
-  if (!tieneCc.value) return false
+  if (!tieneCc.value || !esNoAbona.value) return false
   const aporte = Number(form.value.aporte_socio_ars)
-  if (!aporte || aporte <= 0) return false
-  return aporte > ccMargen.value
+  return aporte > 0 && aporte > ccMargen.value
 })
 
 const estadoCc = computed(() => {
   if (!tieneCc.value) return null
-  if (ccMargen.value <= 0)   return 'agotado'
   if (ccInsuficiente.value)  return 'insuficiente'
-  if (ccMargen.value < (props.limiteCc ?? 0) * 0.2) return 'critico'
+  if (restoACobrar.value > 0) return 'critico'
+  if (ccMargen.value <= 0)   return 'agotado'
   return 'ok'
 })
 
@@ -71,6 +95,12 @@ const excederiaStock = computed(() => {
 
 const fmt = n => n == null ? '—' :
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(n)
+
+const fmtFecha = (d) => {
+  if (!d) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d))
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null
+}
 
 async function cargarStocks() {
   loadingStocks.value = true
@@ -93,7 +123,7 @@ async function cargarDeliveryUsers() {
 
 function emptyForm() {
   return {
-    stock_id: null, cantidad: null, descuento_pct: props.descuentoPorcentaje ?? 0, aporte_socio_ars: null,
+    stock_id: null, cantidad: null, descuento_pct: 0, aporte_socio_ars: null,
     fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo',
     con_envio: false, delivery_id: null, direccion_envio: '',
     contacto_nombre: '', contacto_telefono: '', notas_envio: '',
@@ -125,10 +155,15 @@ const precioBase = computed(() => {
   return ppu * cnt
 })
 
+// Descuento del paciente (de la ficha, privado) + descuento de la dispensa (puntual del modal),
+// aditivos con tope 100%. El dispensador no ve el del paciente, pero igual se refleja en el total.
+const descPacientePct = computed(() => Math.max(0, Math.min(100, Number(props.descuentoPorcentaje) || 0)))
+const descDispensaPct = computed(() => Math.max(0, Math.min(100, Number(form.value.descuento_pct) || 0)))
+const descTotalPct    = computed(() => Math.min(100, descPacientePct.value + descDispensaPct.value))
+
 const precioFinal = computed(() => {
   if (precioBase.value == null) return null
-  const desc = Math.max(0, Math.min(100, Number(form.value.descuento_pct) || 0))
-  return precioBase.value * (1 - desc / 100)
+  return precioBase.value * (1 - descTotalPct.value / 100)
 })
 
 watch(precioFinal, (val) => { if (val != null) form.value.aporte_socio_ars = Math.round(val) })
@@ -178,21 +213,16 @@ async function handleSubmit() {
       formError.value = 'La seña no puede superar el total estimado'; saving.value = false; return
     }
     try {
+      // El envío (delivery/dirección) NO se define al reservar — se define al entregar.
       const payload = {
         stock_id: form.value.stock_id,
         cantidad: form.value.cantidad,
         fecha_entrega_estimada: form.value.fecha_entrega_estimada,
         medio_pago: form.value.medio_pago,
-        con_envio: form.value.con_envio,
         notas: form.value.observaciones || undefined,
       }
       if (form.value.aporte_socio_ars) payload.aporte_estimado_ars = Number(form.value.aporte_socio_ars).toFixed(2)
       if (form.value.sena_ars)         payload.sena_ars = Number(form.value.sena_ars).toFixed(2)
-      if (form.value.con_envio) {
-        payload.direccion_envio   = composeDireccion()
-        payload.contacto_nombre   = form.value.contacto_nombre || undefined
-        payload.contacto_telefono = form.value.contacto_telefono || undefined
-      }
       await createReserva(props.socioId, payload)
       cerrar()
       toast.success('Reserva creada')
@@ -240,18 +270,16 @@ async function handleSubmit() {
       fecha_dispensacion: form.value.fecha_dispensacion,
       observaciones: form.value.observaciones || undefined,
       medio_pago: form.value.medio_pago, con_envio: form.value.con_envio,
+      // Descuento de la dispensa (puntual). El del paciente lo aplica el server desde la ficha.
+      descuento_dispensa_pct: descDispensaPct.value,
     }
-    if (form.value.aporte_socio_ars != null && form.value.aporte_socio_ars !== '')
+    // El total lo calcula el server (descuento paciente + dispensa). Solo admin/supervisor
+    // pueden pisar el aporte a mano; el dispensador no manda aporte.
+    if (puedeEditarAporte.value && form.value.aporte_socio_ars != null && form.value.aporte_socio_ars !== '')
       payload.aporte_socio_ars = Number(form.value.aporte_socio_ars).toFixed(2)
-    const s = stockSeleccionado.value
-    if (s) {
-      const ppu = s.precio_sugerido_ars
-        ? parseFloat(s.precio_sugerido_ars)
-        : (parseFloat(precioUnitarioManual.value) || 0)
-      if (ppu > 0) {
-        const desc = Math.max(0, Math.min(100, Number(form.value.descuento_pct) || 0))
-        payload.precio_unitario_ars = (ppu * (1 - desc / 100)).toFixed(2)
-      }
+    // Stock sin precio configurado: si admin cargó precio manual, lo mandamos como override.
+    if (puedeEditarAporte.value && necesitaPrecioManual.value && precioUnitarioManual.value > 0) {
+      payload.precio_unitario_ars = (parseFloat(precioUnitarioManual.value) * (1 - descTotalPct.value / 100)).toFixed(2)
     }
     if (form.value.con_envio) {
       payload.delivery_id       = form.value.delivery_id
@@ -320,7 +348,10 @@ async function handleSubmit() {
               <span class="mnd__stock-emoji">{{ FORMA_EMOJI[s.forma_producto] || '📦' }}</span>
               <span class="mnd__stock-info">
                 <span class="mnd__stock-nombre">{{ FORMA_LABEL[s.forma_producto] || s.forma_producto }}</span>
-                <span v-if="s.lote?.genetica?.nombre" class="mnd__stock-gen">{{ s.lote.genetica.nombre }}</span>
+                <span v-if="s.genetica?.nombre || s.lote?.genetica?.nombre" class="mnd__stock-gen">{{ s.genetica?.nombre || s.lote.genetica.nombre }}</span>
+                <span v-if="fmtFecha(s.fecha_elaboracion || s.created_at)" class="mnd__stock-fecha">
+                  {{ fmtFecha(s.fecha_elaboracion || s.created_at) }}
+                </span>
               </span>
               <span class="mnd__stock-right">
                 <span class="mnd__stock-disp">{{ s.cantidad }}{{ s.unidad }}</span>
@@ -366,7 +397,7 @@ async function handleSubmit() {
               </span>
             </div>
             <div class="mnd__field">
-              <label class="mnd__label">Descuento</label>
+              <label class="mnd__label">Descuento <span class="mnd__opt">esta dispensa</span></label>
               <div class="mnd__input-suffix-wrap">
                 <input v-model.number="form.descuento_pct" type="number" step="1" min="0" max="100"
                        class="mnd__input mnd__input--with-suffix" placeholder="0" />
@@ -377,15 +408,25 @@ async function handleSubmit() {
 
           <!-- Precio + aporte -->
           <div class="mnd__aporte-wrap">
-            <div v-if="precioBase != null" class="mnd__precio-box">
-              <div class="mnd__precio-row"><span>Precio base</span><span>{{ fmt(precioBase) }}</span></div>
-              <div v-if="form.descuento_pct > 0" class="mnd__precio-row mnd__precio-row--desc">
-                <span>Descuento {{ form.descuento_pct }}%</span>
-                <span>- {{ fmt(precioBase - precioFinal) }}</span>
-              </div>
-              <div class="mnd__precio-row mnd__precio-row--total"><span>Total sugerido</span><span>{{ fmt(precioFinal) }}</span></div>
+            <div v-if="precioFinal != null" class="mnd__precio-box">
+              <!-- Desglose completo: solo admin/supervisor -->
+              <template v-if="puedeVerDescPaciente">
+                <div class="mnd__precio-row"><span>Precio base</span><span>{{ fmt(precioBase) }}</span></div>
+                <div v-if="descPacientePct > 0" class="mnd__precio-row mnd__precio-row--desc">
+                  <span>Descuento socio {{ descPacientePct }}%</span>
+                  <span>- {{ fmt(precioBase * descPacientePct / 100) }}</span>
+                </div>
+                <div v-if="descDispensaPct > 0" class="mnd__precio-row mnd__precio-row--desc">
+                  <span>Descuento esta dispensa {{ descDispensaPct }}%</span>
+                  <span>- {{ fmt(precioBase * descDispensaPct / 100) }}</span>
+                </div>
+                <div class="mnd__precio-row mnd__precio-row--total"><span>Total</span><span>{{ fmt(precioFinal) }}</span></div>
+              </template>
+              <!-- Dispensador: solo el total final (sin desglose ni descuento del paciente) -->
+              <div v-else class="mnd__precio-row mnd__precio-row--total"><span>Total a cobrar</span><span>{{ fmt(precioFinal) }}</span></div>
             </div>
-            <div class="mnd__field">
+            <!-- Override del aporte: solo admin/supervisor -->
+            <div v-if="puedeEditarAporte" class="mnd__field">
               <label class="mnd__label">Aporte del socio <span class="mnd__opt">ARS — editable</span></label>
               <div class="mnd__input-suffix-wrap">
                 <span class="mnd__input-prefix">$</span>
@@ -395,15 +436,22 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <!-- CC ARS — solo admin/supervisor ven el saldo del paciente -->
-          <div v-if="tieneCc && puedeVerCredito" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
+          <!-- Crédito: visible a quien dispensa al elegir cuenta corriente; admin/sup siempre -->
+          <div v-if="mostrarPanelCredito" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
             <div class="mnd__cc-row">
               <span class="mnd__cc-label"><i class="bi bi-wallet2"></i> Crédito disponible</span>
               <span class="mnd__cc-saldo" :class="{ 'mnd__cc-saldo--bajo': ccMargen <= 0 }">{{ fmt(ccMargen) }}</span>
             </div>
-            <div v-if="form.aporte_socio_ars > 0 && !ccInsuficiente" class="mnd__cc-tras">
-              Luego de esta dispensación: <strong>{{ fmt(ccMargen - Number(form.aporte_socio_ars)) }}</strong>
-            </div>
+            <!-- Cuenta corriente: cuánto cae al crédito y cuánto se cobra ahora -->
+            <template v-if="esCuentaCorriente && Number(form.aporte_socio_ars) > 0">
+              <div class="mnd__cc-tras">Se carga al crédito: <strong>{{ fmt(montoACredito) }}</strong></div>
+              <div v-if="restoACobrar > 0" class="mnd__cc-warn">
+                <i class="bi bi-cash-coin"></i>
+                El crédito no alcanza — a cobrar ahora: <strong>{{ fmt(restoACobrar) }}</strong>
+              </div>
+              <div v-else class="mnd__cc-tras">Crédito restante luego: <strong>{{ fmt(ccMargen - montoACredito) }}</strong></div>
+            </template>
+            <!-- No abona: tiene que entrar entero en el crédito -->
             <div v-if="ccInsuficiente" class="mnd__cc-warn">
               <i class="bi bi-exclamation-triangle-fill"></i>
               Crédito insuficiente — disponible: {{ fmt(ccMargen) }}, requerido: {{ fmt(form.aporte_socio_ars) }}
@@ -415,8 +463,8 @@ async function handleSubmit() {
             <div class="mnd__field">
               <label class="mnd__label" v-if="form.es_reserva">Fecha de entrega estimada <span class="mnd__req">*</span></label>
               <label class="mnd__label" v-else>Fecha</label>
-              <input v-if="form.es_reserva" v-model="form.fecha_entrega_estimada" type="date" class="mnd__input" :min="today" />
-              <input v-else v-model="form.fecha_dispensacion" type="date" class="mnd__input" :max="today" />
+              <AppDatePicker v-if="form.es_reserva" v-model="form.fecha_entrega_estimada" :min="today" />
+              <AppDatePicker v-else v-model="form.fecha_dispensacion" :max="today" />
             </div>
             <div class="mnd__field">
               <label class="mnd__label">Medio de pago <span v-if="form.es_reserva" class="mnd__opt">previsto</span></label>
@@ -453,8 +501,13 @@ async function handleSubmit() {
 
           <div class="mnd__divider"></div>
 
-          <!-- Delivery -->
-          <div class="mnd__delivery-toggle" @click="form.con_envio = !form.con_envio">
+          <!-- Reserva: el envío se define al entregar, no al reservar -->
+          <div v-if="form.es_reserva" class="mnd__warn-box" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
+            <i class="bi bi-info-circle"></i> El delivery y la dirección se definen al momento de entregar la reserva.
+          </div>
+
+          <!-- Delivery (solo entrega inmediata) -->
+          <div v-if="!form.es_reserva" class="mnd__delivery-toggle" @click="form.con_envio = !form.con_envio">
             <div class="mnd__delivery-toggle-left">
               <i class="bi bi-bicycle" style="font-size:1rem;color:#1b5e20"></i>
               <div>
@@ -599,6 +652,7 @@ async function handleSubmit() {
 .mnd__stock-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
 .mnd__stock-nombre { font-size: .82rem; font-weight: 700; color: #0f172a; }
 .mnd__stock-gen { font-size: .72rem; color: #64748b; font-style: italic; }
+.mnd__stock-fecha { font-size: .68rem; color: #94a3b8; display: flex; align-items: center; gap: .25rem; }
 .mnd__stock-right { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; flex-shrink: 0; }
 .mnd__stock-disp  { font-size: .8rem; font-weight: 700; color: #1b5e20; font-family: monospace; }
 .mnd__stock-precio { font-size: .7rem; color: #64748b; font-family: monospace; white-space: nowrap; }

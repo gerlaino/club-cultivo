@@ -7,7 +7,7 @@
         Administración
       </div>
       <h1 class="apm__title">Manicura</h1>
-      <p class="apm__sub">Pesajes diarios enviados por manicura. Confirmá el peso y asigná el contenedor de stock.</p>
+      <p class="apm__sub">Pesá las cosechas asignadas a vos y confirmá los pesajes que envía manicura. Todo termina en stock.</p>
     </div>
 
     <!-- Lotes del flujo anterior pendientes de aprobación -->
@@ -21,13 +21,43 @@
       <DsSpinner />
     </div>
 
-    <div v-else-if="!pesajes.length" class="apm__empty">
+    <template v-else>
+
+    <!-- Para pesar: cosechas asignadas al admin/supervisor (las pesa él mismo) -->
+    <section v-if="misCosechas.length" class="apm__group">
+      <h2 class="apm__group-title"><Scissors :size="15" :stroke-width="2" /> Para pesar — asignadas a vos</h2>
+      <div class="apm__cards">
+        <div v-for="l in misCosechas" :key="l.id" class="apm__card">
+          <div class="apm__card-stripe apm__card-stripe--amber"></div>
+          <div class="apm__card-body">
+            <div class="apm__card-head">
+              <span class="apm__card-codigo">{{ l.codigo }}</span>
+              <span class="apm__badge apm__badge--amber"><Scale :size="11" :stroke-width="2.5" /> Pendiente de pesar</span>
+            </div>
+            <div class="apm__card-meta">
+              <span v-if="l.genetica"><Leaf :size="13" :stroke-width="2" /> {{ l.genetica.nombre }}</span>
+              <span><Package :size="13" :stroke-width="2" /> {{ l.plants_count_cosechadas || l.plants_count }} plantas</span>
+              <span v-if="l.dias_en_estado != null"><Clock :size="13" :stroke-width="2" /> hace {{ l.dias_en_estado }} día{{ l.dias_en_estado === 1 ? '' : 's' }}</span>
+            </div>
+          </div>
+          <div class="apm__card-actions">
+            <RouterLink :to="`/lotes/${l.id}`" class="apm__btn-eliminar" style="text-decoration:none">Ver lote</RouterLink>
+            <button class="apm__btn-confirmar" @click="abrirPesar(l)">
+              <Scale :size="14" :stroke-width="2" /> Registrar peso
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div v-if="!pesajes.length && !misCosechas.length" class="apm__empty">
       <div class="apm__empty-ico"><Scale :size="40" :stroke-width="1.25" /></div>
       <p class="apm__empty-title">Sin pesajes pendientes</p>
       <p class="apm__empty-sub">Cuando manicura cierre un día de trabajo aparecerá aquí para tu confirmación.</p>
     </div>
 
-    <div v-else class="apm__cards">
+    <h2 v-if="pesajes.length" class="apm__group-title"><Clock :size="15" :stroke-width="2" /> Para confirmar — enviadas por manicura</h2>
+    <div v-if="pesajes.length" class="apm__cards">
       <div v-for="p in pesajes" :key="p.id" class="apm__card">
         <div class="apm__card-stripe"></div>
         <div class="apm__card-body">
@@ -96,6 +126,11 @@
         </div>
       </div>
     </div>
+
+    </template>
+
+    <!-- Modal registrar peso (admin/supervisor pesa su cosecha → stock) -->
+    <CompletarManicuraModal v-model="showPesar" :lote="lotePesar" @completado="onPesado" />
 
     <!-- Modal confirmar -->
     <Teleport to="body">
@@ -188,9 +223,19 @@ import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, Messag
 import { listPesajesManicuraAdmin, confirmarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura, listStocks, listLotes } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import { useAuthStore } from '../../stores/auth'
+import CompletarManicuraModal from '../../components/lotes/CompletarManicuraModal.vue'
 
 const toast = useToast()
 const { confirm } = useConfirm()
+const auth = useAuthStore()
+
+// Cosechas en manicura asignadas a este admin/supervisor: las pesa él mismo.
+const misCosechas = ref([])
+const showPesar   = ref(false)
+const lotePesar   = ref(null)
+function abrirPesar(l) { lotePesar.value = l; showPesar.value = true }
+function onPesado() { showPesar.value = false; cargar() }
 
 const loading      = ref(true)
 const pesajes      = ref([])
@@ -236,6 +281,14 @@ async function cargar() {
     const { data } = await listLotes({ estado: 'manicura_pendiente' })
     lotesFlujoViejo.value = (data || []).length
   } catch { lotesFlujoViejo.value = 0 }
+  // Cosechas en manicura asignadas a mí, todavía sin un pesaje enviado.
+  try {
+    const { data } = await listLotes({ estado: 'en_manicura' })
+    const enviadosLoteIds = new Set(pesajes.value.map(p => p.lote_id))
+    misCosechas.value = (data || []).filter(l =>
+      l.manicurador_id === auth.user?.id && !enviadosLoteIds.has(l.id)
+    )
+  } catch { misCosechas.value = [] }
 }
 
 async function abrirConfirmacion(p) {
@@ -366,8 +419,14 @@ onMounted(cargar)
 .apm__empty-title { font-size: var(--fs-15); font-weight: 700; color: var(--c-ink-600); margin: 0; }
 .apm__empty-sub   { font-size: var(--fs-13); color: var(--c-ink-400); margin: 0; max-width: 360px; }
 
+/* Grupos */
+.apm__group { margin-bottom: var(--sp-6); }
+.apm__group-title { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-14); font-weight: 800; color: var(--c-ink-700); margin: 0 0 var(--sp-3); }
+
 /* Cards */
 .apm__cards { display: flex; flex-direction: column; gap: var(--sp-3); }
+.apm__card-stripe--amber { background: linear-gradient(90deg, #b45309, #f59e0b); }
+.apm__badge--amber { background: #fef3c7; color: #b45309; }
 .apm__card {
   background: var(--c-paper); border: 1px solid var(--c-ink-100);
   border-radius: var(--r-lg); overflow: hidden;

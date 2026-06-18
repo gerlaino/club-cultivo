@@ -9,8 +9,15 @@ class SalasController < ApplicationController
     'manicura' => { desde: 'cosecha',   hacia: 'curado',   label_desde: 'cosecha',    label_hacia: 'curado'   },
   }.freeze
 
+  # Salas de proceso (cosecha/secado/curado): se autocrean para conservar la sede del
+  # lote post-cosecha, pero NO son salas que el usuario gestione. No se listan en el ABM
+  # (los lotes cosechados/en proceso se ven desde Cosecha / Manicura, no como salas).
+  KINDS_PROCESO = %w[cosecha secado curado].freeze
+
   def index
     salas = current_user.club.salas
+                        .where.not(kind: KINDS_PROCESO)
+                        .where.not(tipo: KINDS_PROCESO)
                         .includes(:sede, :lotes, :created_by)
                         .order(:nombre)
 

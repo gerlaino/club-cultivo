@@ -23,8 +23,19 @@
             </button>
           </div>
 
-          <!-- Selector de sala (solo cuando no viene fija) -->
-          <div v-if="!sala" class="nlm__field">
+          <!-- Lote cosechado: no va a una sala de cultivo, se ubica por sede y se ve en Cosecha -->
+          <div v-if="esCosechado" class="nlm__field">
+            <label class="nlm__label">Sede <span class="nlm__req">*</span></label>
+            <select class="nlm__input" :class="{ 'nlm__input--err': errors.sede_id }" v-model="sedeId">
+              <option value="" disabled>Seleccioná una sede…</option>
+              <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+            </select>
+            <span v-if="errors.sede_id" class="nlm__err">{{ errors.sede_id }}</span>
+            <span class="nlm__hint">El lote cosechado se verá en la sección Cosecha, pendiente de manicura.</span>
+          </div>
+
+          <!-- Selector de sala (solo cuando no viene fija y no es cosechado) -->
+          <div v-else-if="!sala" class="nlm__field">
             <label class="nlm__label">Sala <span class="nlm__req">*</span></label>
             <select class="nlm__input" :class="{ 'nlm__input--err': errors.sala_id }" v-model="salaId">
               <option value="" disabled>Seleccioná una sala…</option>
@@ -95,7 +106,7 @@
               </div>
               <div class="nlm__field">
                 <label class="nlm__label">Fecha de inicio</label>
-                <input type="date" class="nlm__input" v-model="form.start_date" />
+                <AppDatePicker v-model="form.start_date" />
               </div>
             </template>
 
@@ -127,12 +138,19 @@
                     <template v-for="grp in madreAgrupado" :key="grp.sala_id">
                       <div class="nlm__madre-sala-hd"><i class="bi bi-geo-alt-fill"></i> {{ grp.sala_nombre }}</div>
                       <template v-for="lote in grp.lotes" :key="lote.lote_id">
-                        <div class="nlm__madre-lote-hd"><i class="bi bi-box-seam"></i> {{ lote.lote_codigo }}<span v-if="lote.genetica" class="nlm__madre-lote-gen">{{ lote.genetica }}</span></div>
-                        <div v-for="p in lote.plants" :key="p.id" class="nlm__madre-opt nlm__madre-opt--plant"
-                             :class="{ 'nlm__madre-opt--sel': form.planta_madre_id === p.id }" @mousedown.prevent="selectMadre(p)">
-                          <span class="nlm__madre-opt-nombre">🌿 {{ p.nombre }}</span>
-                          <span class="nlm__madre-opt-meta">{{ p.state }}</span>
-                        </div>
+                        <button type="button" class="nlm__madre-lote-hd nlm__madre-lote-hd--btn" @mousedown.prevent="toggleLoteColapso(lote.lote_id)">
+                          <i class="bi" :class="madreColapsados.has(lote.lote_id) ? 'bi-chevron-right' : 'bi-chevron-down'"></i>
+                          <i class="bi bi-box-seam"></i> {{ lote.lote_codigo }}
+                          <span v-if="lote.genetica" class="nlm__madre-lote-gen">{{ lote.genetica }}</span>
+                          <span class="nlm__madre-lote-count">{{ lote.plants.length }}</span>
+                        </button>
+                        <template v-if="!madreColapsados.has(lote.lote_id)">
+                          <div v-for="p in lote.plants" :key="p.id" class="nlm__madre-opt nlm__madre-opt--plant"
+                               :class="{ 'nlm__madre-opt--sel': form.planta_madre_id === p.id }" @mousedown.prevent="selectMadre(p)">
+                            <span class="nlm__madre-opt-nombre">🌿 {{ p.nombre }}</span>
+                            <span class="nlm__madre-opt-meta">{{ p.state }}</span>
+                          </div>
+                        </template>
                       </template>
                     </template>
                   </template>
@@ -141,20 +159,21 @@
             </div>
 
             <div class="nlm__field">
-              <label class="nlm__label">Cantidad de plantas</label>
-              <input type="number" min="0" max="5000" step="1" class="nlm__input" :class="{ 'nlm__input--err': errors.plants_count }" v-model.number="form.plants_count" />
+              <label class="nlm__label">Cantidad de plantas <span class="nlm__req">*</span></label>
+              <input type="number" min="1" max="5000" step="1" class="nlm__input" :class="{ 'nlm__input--err': errors.plants_count }" v-model.number="form.plants_count" />
               <span v-if="errors.plants_count" class="nlm__err">{{ errors.plants_count }}</span>
             </div>
 
             <div class="nlm__field">
               <label class="nlm__label">Genética / Variedad
-                <span v-if="form.origen === 'esqueje' && form.planta_madre_id" class="nlm__label-heredada">Heredada de madre</span>
+                <span v-if="form.planta_madre_id" class="nlm__label-heredada">Heredada de madre</span>
               </label>
-              <select class="nlm__input" v-model="form.genetica_id" :disabled="!geneticas.length">
+              <select class="nlm__input" v-model="form.genetica_id" :disabled="!geneticas.length || !!form.planta_madre_id">
                 <option value="">{{ geneticas.length ? 'Sin especificar' : 'Sin genéticas disponibles' }}</option>
                 <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}{{ g.registrada_inase ? ' 🏛️' : '' }} — {{ g.tipo }}</option>
               </select>
-              <p v-if="!geneticas.length" class="nlm__hint"><i class="bi bi-info-circle"></i> Antes de crear un lote, <a href="/geneticas" class="nlm__link">registrá una genética</a>.</p>
+              <p v-if="form.planta_madre_id" class="nlm__hint"><i class="bi bi-link-45deg"></i> La genética se hereda de la planta madre.</p>
+              <p v-else-if="!geneticas.length" class="nlm__hint"><i class="bi bi-info-circle"></i> No tenés genéticas marcadas como disponibles. <a href="/geneticas" class="nlm__link">Activá o registrá una</a> para asignarla.</p>
             </div>
 
             <div class="nlm__field">
@@ -173,7 +192,7 @@
                 <option value="1">1 litro</option><option value="3">3 litros</option>
                 <option value="5">5 litros</option><option value="7">7 litros</option>
                 <option value="10">10 litros</option><option value="12">12 litros</option>
-                <option value="15">15 litros</option><option value="otro">Otro</option>
+                <option value="15">15 litros</option>
               </select>
             </div>
             <div class="nlm__field">
@@ -206,8 +225,18 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useLotesStore } from '../../stores/lotes'
-import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado } from '../../lib/api.js'
+import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado, createLoteCosechadoEnSede, listSedes } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
+
+// Fecha local en ISO (yyyy-mm-dd) SIN pasar por UTC — toISOString() convierte a
+// UTC y de tarde/noche en Argentina (UTC-3) devolvía el día siguiente.
+function localISO(date = new Date()) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
 
 const props = defineProps({
   show:  { type: Boolean, default: false },
@@ -225,11 +254,15 @@ const ESTADOS_HEREDADO = [
   { value: 'semilla',    label: 'Germinación / Plántula' },
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración' },
-  { value: 'cosecha',    label: 'Cosecha' },
+  { value: 'cosecha',    label: 'Cosechado' },
 ]
 
 const salaId = ref('')
+const sedeId = ref('')
+const sedes  = ref([])
 const effectiveSala = computed(() => props.sala || (props.salas || []).find(s => s.id === salaId.value) || null)
+// Lote cosechado heredado: no va a sala de cultivo, se ubica por sede.
+const esCosechado = computed(() => tipoCreacion.value === 'existente' && heredadoEstado.value === 'cosecha')
 
 const form          = ref(emptyForm())
 const errors        = ref({})
@@ -245,13 +278,24 @@ const plantasMadre   = ref([])
 const loadingMadres  = ref(false)
 const madreQuery     = ref('')
 const madreFocused   = ref(false)
+const madreColapsados = ref(new Set())   // lote_id colapsados en el dropdown de planta madre
 
-const estadosHeredadoPermitidos = computed(() => {
-  const kind = effectiveSala.value?.kind
-  if (kind === 'floracion') return ESTADOS_HEREDADO.filter(e => e.value === 'floracion')
-  if (kind === 'cosecha')   return ESTADOS_HEREDADO.filter(e => e.value === 'cosecha')
-  return ESTADOS_HEREDADO.filter(e => ['semilla','vegetativo'].includes(e.value))
-})
+function toggleLoteColapso(loteId) {
+  const s = new Set(madreColapsados.value)
+  s.has(loteId) ? s.delete(loteId) : s.add(loteId)
+  madreColapsados.value = s
+}
+
+// Los estados creables son los del ciclo previo a stock: germinación/plántula
+// (o esqueje según el origen), vegetativo, floración y cosechado (un lote ya
+// cosechado se carga y queda pendiente de manicura). Nunca secado/finalizado.
+const estadosHeredadoPermitidos = computed(() =>
+  ESTADOS_HEREDADO.map(e =>
+    e.value === 'semilla'
+      ? { ...e, label: form.value.origen === 'esqueje' ? 'Esqueje' : 'Germinación / Plántula' }
+      : e
+  )
+)
 const mostrarOrigenSelector = computed(() => {
   const k = effectiveSala.value?.kind
   return !k || KINDS_CON_ORIGEN.includes(k)
@@ -284,7 +328,7 @@ const heredadoStartDatePreview = computed(() => {
   if (e === 'cosecha')                                  total += d.cosecha
   if (total <= 0) return null
   const date = new Date(); date.setDate(date.getDate() - total)
-  return date.toISOString().slice(0, 10)
+  return localISO(date)
 })
 
 function emptyForm() {
@@ -293,8 +337,8 @@ function emptyForm() {
   return {
     estado: conOrigen ? 'semilla' : (KIND_TO_ESTADO[kind] || 'vegetativo'),
     origen: conOrigen ? 'semilla' : null,
-    planta_madre_id: null, plants_count: 0,
-    start_date: new Date().toISOString().slice(0, 10),
+    planta_madre_id: null, plants_count: 1,
+    start_date: localISO(),
     genetica_id: '', grow_type: 'sustrato', light_type: '', tamanio_maceta: '', notes: '',
   }
 }
@@ -322,10 +366,14 @@ function clearMadre() { form.value.planta_madre_id = null; madreQuery.value = ''
 
 function validate() {
   const e = {}
-  if (!props.sala && !salaId.value) e.sala_id = 'Seleccioná una sala'
+  if (esCosechado.value) {
+    if (!sedeId.value) e.sede_id = 'Seleccioná una sede'
+  } else if (!props.sala && !salaId.value) {
+    e.sala_id = 'Seleccioná una sala'
+  }
   if (!ESTADOS_LOTE.includes(form.value.estado)) e.estado = 'Estado inválido'
   const n = Number(form.value.plants_count)
-  if (!Number.isInteger(n) || n < 0 || n > 5000) e.plants_count = 'Debe ser 0–5000'
+  if (!Number.isInteger(n) || n < 1 || n > 5000) e.plants_count = 'Debe ser 1–5000'
   return e
 }
 
@@ -338,29 +386,37 @@ async function crear() {
   if (Object.keys(e).length) return
 
   const targetSala = effectiveSala.value
-  if (!targetSala) { errors.value.sala_id = 'Seleccioná una sala'; return }
+  if (!esCosechado.value && !targetSala) { errors.value.sala_id = 'Seleccioná una sala'; return }
 
   saving.value = true
   try {
     const payload = { ...form.value }
     if (!payload.genetica_id)     delete payload.genetica_id
     if (!payload.light_type)      delete payload.light_type
+    if (!payload.tamanio_maceta)  delete payload.tamanio_maceta
     if (!payload.planta_madre_id) delete payload.planta_madre_id
 
-    if (tipoCreacion.value === 'existente') {
+    const dias = {
+      dias_semilla_esqueje: heredadoDias.value.semilla_esqueje || 0,
+      dias_vegetativo:      heredadoDias.value.vegetativo      || 0,
+      dias_floracion:       heredadoDias.value.floracion       || 0,
+      dias_cosecha:         heredadoDias.value.cosecha          || 0,
+    }
+
+    if (esCosechado.value) {
+      // Sin sala de cultivo: el backend ubica el lote en la sala de proceso "Cosecha · sede".
       delete payload.start_date
       if (!payload.origen) payload.origen = 'semilla'
-      await createLoteHeredado(targetSala.id, payload, {
-        dias_semilla_esqueje: heredadoDias.value.semilla_esqueje || 0,
-        dias_vegetativo:      heredadoDias.value.vegetativo      || 0,
-        dias_floracion:       heredadoDias.value.floracion       || 0,
-        dias_cosecha:         heredadoDias.value.cosecha          || 0,
-      })
+      await createLoteCosechadoEnSede(sedeId.value, payload, dias)
+    } else if (tipoCreacion.value === 'existente') {
+      delete payload.start_date
+      if (!payload.origen) payload.origen = 'semilla'
+      await createLoteHeredado(targetSala.id, payload, dias)
     } else {
       if (!payload.origen) delete payload.origen
       await lotes.createInSala(targetSala.id, payload)
     }
-    emit('created', targetSala.id)
+    emit('created', targetSala?.id)
     emit('close')
   } catch (err) {
     apiError.value = err.response?.data?.errors?.[0] || err.response?.data?.error || 'Error al crear el lote'
@@ -373,17 +429,22 @@ async function crear() {
 watch(() => props.show, async (open) => {
   if (!open) return
   salaId.value        = props.sala ? props.sala.id : ''
+  sedeId.value        = ''
   form.value          = emptyForm()
   errors.value        = {}
   apiError.value      = null
   tipoCreacion.value  = 'nuevo'
+  listSedes().then(({ data }) => {
+    sedes.value = (data || []).filter(s => ['produccion', 'mixta'].includes(s.tipo))
+    if (sedes.value.length === 1) sedeId.value = sedes.value[0].id
+  }).catch(() => { sedes.value = [] })
   heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'semilla'
   heredadoDias.value  = { semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 }
   plantasMadre.value  = []
   proximoCodigo.value = ''
   loadingCodigo.value = true
   try {
-    const [cod, gen] = await Promise.all([getLoteProximoCodigo(), listGeneticas({ activa: true, per_page: 200 })])
+    const [cod, gen] = await Promise.all([getLoteProximoCodigo(), listGeneticas({ activa: true, disponible: true, per_page: 200 })])
     proximoCodigo.value = cod.data.codigo
     geneticas.value = Array.isArray(gen.data) ? gen.data : (gen.data.geneticas ?? gen.data.data ?? [])
   } catch { proximoCodigo.value = 'Auto' } finally { loadingCodigo.value = false }
@@ -438,7 +499,10 @@ watch(salaId, () => {
 .nlm__madre-empty { padding: .6rem .8rem; font-size: .8rem; color: #94a3b8; }
 .nlm__madre-sala-hd { padding: .4rem .7rem; background: #f1f5f9; font-size: .72rem; font-weight: 700; color: #475569; }
 .nlm__madre-lote-hd { padding: .3rem .7rem .3rem 1rem; font-size: .72rem; font-weight: 600; color: #64748b; display: flex; gap: .35rem; align-items: center; }
+.nlm__madre-lote-hd--btn { width: 100%; background: none; border: none; cursor: pointer; text-align: left; }
+.nlm__madre-lote-hd--btn:hover { background: #f8fafc; }
 .nlm__madre-lote-gen { color: #94a3b8; }
+.nlm__madre-lote-count { margin-left: auto; background: #e2e8f0; color: #64748b; border-radius: 999px; padding: .05rem .4rem; font-size: .65rem; }
 .nlm__madre-opt { display: flex; justify-content: space-between; align-items: center; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
 .nlm__madre-opt--plant { padding-left: 1.3rem; }
 .nlm__madre-opt:hover { background: #f0fdf4; }

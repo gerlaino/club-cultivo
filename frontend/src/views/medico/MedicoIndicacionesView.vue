@@ -150,12 +150,12 @@
 
               <div class="miv__form-field">
                 <label>Fecha de emisión</label>
-                <input v-model="form.fecha_emision" type="date" />
+                <AppDatePicker v-model="form.fecha_emision" />
               </div>
 
               <div class="miv__form-field">
                 <label>Fecha de vencimiento</label>
-                <input v-model="form.fecha_vencimiento" type="date" />
+                <AppDatePicker v-model="form.fecha_vencimiento" />
               </div>
 
               <div class="miv__form-field miv__form-field--full">
@@ -180,6 +180,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { Search, Plus, Pencil, Trash2, X, FileHeart, FileText } from 'lucide-vue-next'
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'

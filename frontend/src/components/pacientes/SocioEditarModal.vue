@@ -23,7 +23,7 @@
               </div>
               <div class="sem__field">
                 <label class="sem__label">Fecha de nacimiento</label>
-                <input v-model="editForm.fecha_nacimiento" class="sem__input" type="date" />
+                <AppDatePicker v-model="editForm.fecha_nacimiento" />
               </div>
               <div class="sem__field">
                 <label class="sem__label">Email</label>
@@ -39,7 +39,7 @@
               </div>
               <div class="sem__field">
                 <label class="sem__label">Vencimiento REPROCANN</label>
-                <input v-model="editForm.reprocann_vencimiento" class="sem__input" type="date" />
+                <AppDatePicker v-model="editForm.reprocann_vencimiento" />
               </div>
               <div class="sem__field sem__field--full">
                 <label class="sem__label" style="margin-bottom:.4rem">Estado REPROCANN</label>
@@ -106,6 +106,7 @@
 
 <script setup>
 import { watch, computed } from 'vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import { X, Save } from 'lucide-vue-next'
 import { useSocioEditar, REPROCANN_ESTADOS } from '../../composables/useSocioEditar.js'
 import { useAuthStore } from '../../stores/auth.js'

@@ -10,13 +10,27 @@ module DispensacionesFinancieras
   private
 
   def crear_movimiento_contable(dispensacion)
-    monto = dispensacion.aporte_socio_ars.to_d
-    return if monto <= 0
+    total = dispensacion.aporte_socio_ars.to_d
+    return if total <= 0
 
-    descripcion = "Dispensación #{dispensacion.cantidad}#{dispensacion.stock&.unidad} " \
+    base_desc = "Dispensación #{dispensacion.cantidad}#{dispensacion.stock&.unidad} " \
       "#{dispensacion.stock&.forma_producto} — " \
       "#{dispensacion.paciente.nombre} #{dispensacion.paciente.apellido}"
 
+    if dispensacion.a_credito?
+      credito  = dispensacion.monto_credito_ars.to_d
+      efectivo = total - credito
+      # Parte a crédito: deuda visible (no entra plata, pagado: false).
+      asiento_contable(dispensacion, credito,  "#{base_desc} (crédito)",  pagado: false, medio: dispensacion.medio_pago) if credito > 0
+      # Diferencia cobrada ahora: ingreso real en efectivo.
+      asiento_contable(dispensacion, efectivo, "#{base_desc} (efectivo)", pagado: true,  medio: 'efectivo')             if efectivo > 0
+    else
+      asiento_contable(dispensacion, total, base_desc, pagado: true, medio: dispensacion.medio_pago || 'efectivo')
+    end
+  end
+
+  def asiento_contable(dispensacion, monto, descripcion, pagado:, medio:)
+    return if monto.to_d <= 0
     MovimientoContable.create!(
       club:             current_user.club,
       sede_id:          dispensacion.sede_id,
@@ -27,16 +41,15 @@ module DispensacionesFinancieras
       descripcion:      descripcion,
       monto_ars:        monto,
       fecha:            dispensacion.fecha_dispensacion,
-      # Contabilidad de caja: a crédito no entra plata real, queda como deuda visible.
-      # El ingreso real se registra cuando el socio paga (aporte_socio).
-      pagado:           !dispensacion.a_credito?,
-      medio_pago:       dispensacion.medio_pago || 'efectivo',
+      pagado:           pagado,
+      medio_pago:       medio || 'efectivo',
       comprobante_tipo: 'sin_comprobante',
     )
   end
 
   def debitar_cuenta_corriente(dispensacion)
-    monto = dispensacion.aporte_socio_ars.to_d
+    # Solo se debita al crédito la parte que cae sobre la cuenta corriente.
+    monto = dispensacion.monto_credito_ars.to_d
     return if monto <= 0
 
     cc = dispensacion.paciente.cuenta_corriente

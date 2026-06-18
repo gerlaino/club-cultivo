@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from "vue"
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
 import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable } from "../lib/api"
@@ -687,9 +688,9 @@ onMounted(async () => {
           <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
         <div class="cv__filtro-fechas">
-          <input type="date" class="cv__filtro-input cv__filtro-input--date" v-model="filtroDesde" @change="aplicarFiltros" />
+          <AppDatePicker v-model="filtroDesde" @update:model-value="aplicarFiltros" />
           <span class="cv__filtro-sep">—</span>
-          <input type="date" class="cv__filtro-input cv__filtro-input--date" v-model="filtroHasta" @change="aplicarFiltros" />
+          <AppDatePicker v-model="filtroHasta" @update:model-value="aplicarFiltros" />
         </div>
         <button v-if="hayFiltros" class="cv__btn-clear" @click="limpiarFiltros">
           <i class="bi bi-x-circle"></i> Limpiar

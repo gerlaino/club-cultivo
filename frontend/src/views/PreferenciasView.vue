@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref, watch } from 'vue'
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useClubStore } from '../stores/club'
 import Avatar from '../components/Avatar.vue'
 import { useConfirm } from '../composables/useConfirm.js'
@@ -355,7 +356,7 @@ async function runTestSmtp() {
               </div>
               <div class="pv__field">
                 <label class="pv__label">Fecha de resolución</label>
-                <input type="date" class="pv__input" v-model="form.fecha_resolucion_reprocann" @change="onChange" />
+                <AppDatePicker v-model="form.fecha_resolucion_reprocann" @update:model-value="onChange" />
               </div>
             </div>
           </div>

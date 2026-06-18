@@ -19,6 +19,12 @@ class LoteSerializer
     dias_vegetacion = (lote.start_date && fecha_inicio_floracion) ? (fecha_inicio_floracion - lote.start_date).to_i : nil
     dias_floracion  = (fecha_inicio_floracion && fecha_cosechado)  ? (fecha_cosechado - fecha_inicio_floracion).to_i   : nil
 
+    # Días en el estado actual: desde el último cambio a este estado (o desde el
+    # inicio del lote si nunca cambió de estado, ej. creado en vegetativo/semilla).
+    ev_estado_actual = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == lote.estado }.max_by(&:registrado_en)
+    fecha_estado_actual = ev_estado_actual&.registrado_en&.to_date || lote.start_date
+    dias_en_estado   = fecha_estado_actual ? (Date.current - fecha_estado_actual).to_i : nil
+
     result = {
       id:                   lote.id,
       club_id:              lote.club_id,
@@ -54,6 +60,7 @@ class LoteSerializer
       genetica_id:        lote.genetica_id,
       genetica:           lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, registrada_inase: lote.genetica.registrada_inase } : nil,
       dias_desde_inicio:  lote.dias_desde_inicio,
+      dias_en_estado:     dias_en_estado,
       progreso_ciclo:     lote.progreso_ciclo,
       costo_por_gramo:    lote.costo_lote&.costo_por_gramo&.to_f,
       costo_total:        lote.costo_lote&.costo_total&.to_f,

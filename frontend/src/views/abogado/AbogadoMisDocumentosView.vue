@@ -46,7 +46,7 @@
         </div>
         <div class="abd__form-group">
           <label class="abd__label">Vencimiento (opcional)</label>
-          <input v-model="form.fecha_vencimiento" type="date" class="abd__input" />
+          <AppDatePicker v-model="form.fecha_vencimiento" />
         </div>
         <div class="abd__form-group">
           <label class="abd__label">Archivo</label>
@@ -65,6 +65,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { Files, Upload, Download } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 

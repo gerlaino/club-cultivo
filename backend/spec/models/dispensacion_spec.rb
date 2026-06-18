@@ -85,10 +85,11 @@ RSpec.describe Dispensacion, type: :model do
       expect(d).to be_valid
     end
 
-    it 'rechaza si el aporte supera el margen total (saldo + límite)' do
+    it 'ya NO rechaza por exceder el crédito: la diferencia se cobra ahora (split)' do
+      # El reparto crédito/efectivo lo resuelve el controller (monto_credito_ars);
+      # el modelo solo exige aporte > 0 para cuenta corriente.
       d = nueva_dispensacion(medio_pago: 'cuenta_corriente', aporte_socio_ars: 500)
-      expect(d).not_to be_valid
-      expect(d.errors[:base]).to be_present
+      expect(d).to be_valid
     end
 
     it 'no valida crédito si medio_pago es efectivo' do

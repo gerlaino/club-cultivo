@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref, computed, watch } from "vue"
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from "vue-router"
 import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
@@ -15,7 +16,7 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { ArrowRight, ChevronRight } from 'lucide-vue-next'
-import { em, sm, pgm, growLabel, lightLabel, macetaLabel, formatDate, formatDateTime,
+import { em, sm, pgm, growLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate, formatDateTime,
   capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS } from '../lib/loteHelpers.js'
 import LoteHistorialSection from '../components/lotes/LoteHistorialSection.vue'
 import LotePlantasSection   from '../components/lotes/LotePlantasSection.vue'
@@ -317,6 +318,7 @@ onUnmounted(() => {
             <h1 class="ld__title">{{ lote.codigo }}</h1>
             <span class="ld__estado-pill" :style="{ background: em(lote.estado).bg, color: em(lote.estado).color }">
               {{ em(lote.estado).label }}
+              <span v-if="lote.dias_en_estado != null" class="ld__estado-dias">· día {{ lote.dias_en_estado }}</span>
             </span>
           </div>
           <p class="ld__subtitle">
@@ -325,7 +327,7 @@ onUnmounted(() => {
             <span v-if="lote.sala" class="ld__subtitle-sep">·</span>
             <span v-if="lote.sala">📍 {{ lote.sala.nombre }}</span>
             <span v-if="lote.start_date" class="ld__subtitle-sep">·</span>
-            <span v-if="lote.start_date">📅 inicio {{ lote.start_date }}</span>
+            <span v-if="lote.start_date">📅 inicio {{ formatDate(lote.start_date) }}</span>
             <span v-if="lote.dias_desde_inicio != null" class="ld__subtitle-sep">·</span>
             <span v-if="lote.dias_desde_inicio != null" class="ld__dias-badge">Día {{ lote.dias_desde_inicio }}</span>
           </p>
@@ -496,7 +498,7 @@ onUnmounted(() => {
                     <div class="ld__lab-form-row">
                       <div class="ld__lab-field">
                         <label class="ld__lab-label">Fecha</label>
-                        <input v-model="labForm.fecha_analisis" type="date" class="ld__lab-input" />
+                        <AppDatePicker v-model="labForm.fecha_analisis" />
                       </div>
                       <div class="ld__lab-field">
                         <label class="ld__lab-label">Laboratorio</label>
@@ -549,10 +551,11 @@ onUnmounted(() => {
               <dt>Tipo cultivo</dt><dd>{{ growLabel(lote.grow_type) }}</dd>
               <dt>Luminaria</dt><dd>{{ lightLabel(lote.light_type) }}</dd>
               <dt>Genética</dt><dd>{{ lote.genetica?.nombre || lote.strain || '—' }}</dd>
-              <dt>Fotoperiodo</dt><dd>{{ lote.fotoperiodo || '—' }}</dd>
-              <dt>Semanas flor.</dt><dd>{{ lote.semanas_floracion ? lote.semanas_floracion + ' sem.' : '—' }}</dd>
-              <dt>Inicio</dt><dd>{{ lote.start_date || '—' }}</dd>
-              <dt>Días ciclo</dt><dd>{{ lote.dias_desde_inicio ?? '—' }}</dd>
+              <dt>Fotoperiodo</dt><dd>{{ fotoperiodoLabel(lote.estado, lote.fotoperiodo) }}</dd>
+              <dt>Floración estimada</dt><dd>{{ lote.semanas_floracion ? lote.semanas_floracion + ' sem.' : '—' }}</dd>
+              <dt>Inicio</dt><dd>{{ formatDate(lote.start_date) }}</dd>
+              <dt>Día del ciclo</dt><dd>{{ lote.dias_desde_inicio != null ? 'día ' + lote.dias_desde_inicio : '—' }}</dd>
+              <dt>Día en {{ em(lote.estado).label.toLowerCase() }}</dt><dd>{{ lote.dias_en_estado != null ? 'día ' + lote.dias_en_estado : '—' }}</dd>
             </dl>
           </div>
 
@@ -876,7 +879,6 @@ onUnmounted(() => {
       :plantas="plantList"
       :pasadas-usadas="pasadasUsadas"
       :pasada-inicial="siguientePasada"
-      :salas-destino="lote.salas_destino || []"
       @cosechado="onCosechadoParcial"
       @cerrar="showCosechaPartialModal = false"
     />
@@ -992,6 +994,7 @@ onUnmounted(() => {
 .ld__hero-emoji { font-size: 1.8rem; }
 .ld__title { font-size: 1.8rem; font-weight: 800; margin: 0; letter-spacing: -.04em; }
 .ld__estado-pill { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; padding: .28em .75em; border-radius: 999px; }
+.ld__estado-dias { font-weight: 700; opacity: .75; margin-left: .15em; }
 .ld__subtitle { font-size: .85rem; color: #60725d; margin: 0; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
 .ld__subtitle-sep { color: #cbd5e1; }
 .ld__strain-fallback { font-style: italic; color: #94a3b8; }

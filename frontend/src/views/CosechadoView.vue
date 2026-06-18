@@ -33,7 +33,7 @@
             <tr>
               <th class="cv__th cv__th--lote">Lote</th>
               <th class="cv__th cv__th--genetica">Genética</th>
-              <th class="cv__th cv__th--sala">Sala</th>
+              <th class="cv__th cv__th--sala">Días cosechado</th>
               <th class="cv__th cv__th--plantas">Plantas</th>
               <th class="cv__th cv__th--estado">Estado</th>
               <th class="cv__th cv__th--cosecha">Fecha cosechado</th>
@@ -57,7 +57,7 @@
                 <span class="cv__genetica">{{ lote.genetica?.nombre || '—' }}</span>
               </td>
               <td class="cv__td cv__td--sala">
-                <span class="cv__sala">{{ lote.sala?.nombre || '—' }}</span>
+                <span class="cv__sala">{{ diasCosechado(lote) }}</span>
               </td>
               <td class="cv__td cv__td--plantas">
                 <span class="cv__pill-plantas">{{ lote.plants_count ?? '—' }}</span>
@@ -152,6 +152,15 @@ const paginas = computed(() => {
 function formatFecha(d) {
   if (!d) return '—'
   return new Date(d + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+// Días desde la cosecha (robusto ante el estado actual: usa la fecha de cosechado).
+function diasCosechado(lote) {
+  if (!lote.fecha_cosechado) return lote.dias_en_estado != null ? `${lote.dias_en_estado} días` : '—'
+  const cosecha = new Date(lote.fecha_cosechado + 'T00:00:00')
+  const dias = Math.floor((Date.now() - cosecha.getTime()) / 86400000)
+  if (dias <= 0) return 'Hoy'
+  return `${dias} día${dias === 1 ? '' : 's'}`
 }
 
 onMounted(async () => {

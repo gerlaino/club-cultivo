@@ -114,11 +114,11 @@
               </div>
               <div class="im__form-field">
                 <label>FECHA DE EMISIÓN <span class="im__req">*</span></label>
-                <input v-model="form.fecha_emision" type="date" />
+                <AppDatePicker v-model="form.fecha_emision" />
               </div>
               <div class="im__form-field">
                 <label>FECHA DE VENCIMIENTO</label>
-                <input v-model="form.fecha_vencimiento" type="date" />
+                <AppDatePicker v-model="form.fecha_vencimiento" />
                 <span class="im__hint">Dejar vacío si no vence</span>
               </div>
               <div class="im__form-field im__form-field--full">
@@ -173,6 +173,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import { logger } from '../../utils/logger.js'
 import { useAuthStore } from '../../stores/auth'
 import { listIndicaciones, createIndicacion, updateIndicacion, deleteIndicacion } from '../../lib/api.js'

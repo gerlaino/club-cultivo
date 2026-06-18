@@ -5,6 +5,7 @@ import { usePacientesStore } from '../stores/pacientes'
 import { useClubStore } from '../stores/club'
 import { enviarMailPaciente } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 
 const router = useRouter()
 const store  = usePacientesStore()
@@ -13,6 +14,7 @@ const club   = useClubStore()
 const sendWelcomeMail = ref(false)
 const formError       = ref(null)
 const formErrors      = ref({})
+const todayISO        = new Date().toLocaleDateString('en-CA') // yyyy-mm-dd local
 
 const form = ref({
   nombre:               '',
@@ -21,6 +23,12 @@ const form = ref({
   fecha_nacimiento:     '',
   telefono:             '',
   email:                '',
+  domicilio_calle:      '',
+  domicilio_altura:     '',
+  domicilio_piso:       '',
+  domicilio_depto:      '',
+  domicilio_barrio:     '',
+  domicilio_ciudad:     '',
   reprocann_numero:     '',
   reprocann_vencimiento:'',
   reprocann_estado:     'sin_registro',
@@ -139,8 +147,7 @@ async function handleSubmit() {
           </div>
           <div class="snv__field">
             <label class="snv__label">Fecha de nacimiento <span class="snv__req">*</span></label>
-            <input v-model="form.fecha_nacimiento" type="date" class="snv__input"
-              :class="{ 'snv__input--err': formErrors.fecha_nacimiento }" />
+            <AppDatePicker v-model="form.fecha_nacimiento" :max="todayISO" />
             <span v-if="formErrors.fecha_nacimiento" class="snv__err">{{ formErrors.fecha_nacimiento }}</span>
           </div>
           <div class="snv__field">
@@ -152,6 +159,46 @@ async function handleSubmit() {
             <input v-model.trim="form.email" type="email" class="snv__input"
               :class="{ 'snv__input--err': formErrors.email }" placeholder="paciente@email.com" />
             <span v-if="formErrors.email" class="snv__err">{{ formErrors.email }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Domicilio ── -->
+      <div class="snv__section">
+        <div class="snv__section-header">
+          <div class="snv__section-icon" style="background:rgba(180,83,9,.1);color:#b45309">
+            <i class="bi bi-geo-alt"></i>
+          </div>
+          <div>
+            <div class="snv__section-title">Domicilio</div>
+            <div class="snv__section-sub">Se reutiliza como dirección de entrega por defecto</div>
+          </div>
+        </div>
+
+        <div class="snv__grid snv__grid--2">
+          <div class="snv__field">
+            <label class="snv__label">Calle</label>
+            <input v-model.trim="form.domicilio_calle" class="snv__input" placeholder="Ej: Av. Corrientes" />
+          </div>
+          <div class="snv__field">
+            <label class="snv__label">Altura</label>
+            <input v-model.trim="form.domicilio_altura" class="snv__input" placeholder="Ej: 1234" />
+          </div>
+          <div class="snv__field">
+            <label class="snv__label">Piso</label>
+            <input v-model.trim="form.domicilio_piso" class="snv__input" placeholder="Ej: 3" />
+          </div>
+          <div class="snv__field">
+            <label class="snv__label">Depto</label>
+            <input v-model.trim="form.domicilio_depto" class="snv__input" placeholder="Ej: B" />
+          </div>
+          <div class="snv__field">
+            <label class="snv__label">Barrio</label>
+            <input v-model.trim="form.domicilio_barrio" class="snv__input" placeholder="Ej: Almagro" />
+          </div>
+          <div class="snv__field">
+            <label class="snv__label">Ciudad</label>
+            <input v-model.trim="form.domicilio_ciudad" class="snv__input" placeholder="Ej: CABA" />
           </div>
         </div>
       </div>
@@ -191,7 +238,7 @@ async function handleSubmit() {
           </div>
           <div class="snv__field">
             <label class="snv__label">Fecha de vencimiento</label>
-            <input v-model="form.reprocann_vencimiento" type="date" class="snv__input" />
+            <AppDatePicker v-model="form.reprocann_vencimiento" />
             <span class="snv__hint">El sistema alertará a 90, 60 y 30 días</span>
           </div>
         </div>

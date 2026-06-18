@@ -40,6 +40,14 @@ class ClubUsersController < ApplicationController
       return render json: PlanEnforcer.error_limite('usuarios', info[:limites][:usuarios]), status: :payment_required
     end
 
+    # No se pueden dar de alta usuarios operativos hasta que el club tenga al
+    # menos una sede: esos roles se asignan a sedes/salas y, sin sede, loguearían
+    # a una app vacía (inconsistencia de onboarding). El admin sí puede crearse.
+    nuevo_rol = params.dig(:user, :role).to_s
+    unless nuevo_rol == 'admin' || current_user.club.sedes.exists?
+      return render json: { errors: ['Creá al menos una sede antes de dar de alta usuarios operativos.'] }, status: :unprocessable_entity
+    end
+
     user = User.new(user_params)
     user.club_id = current_user.club_id
 

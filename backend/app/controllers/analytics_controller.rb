@@ -111,7 +111,7 @@ class AnalyticsController < ApplicationController
     inicio_mes    = hoy.beginning_of_month
 
     # Scope dispensaciones del club
-    base_disps = Dispensacion.joins(stock: :sede)
+    base_disps = Dispensacion.no_canceladas.joins(stock: :sede)
                              .where(sedes: { club_id: club.id })
 
     disps_hoy     = base_disps.where(fecha_dispensacion: hoy..hoy)
@@ -492,7 +492,7 @@ class AnalyticsController < ApplicationController
                                  .sum(:rendimiento_real_g).to_f.round(2)
     ciclos_cerrados   = lotes_año.where(estado: 'finalizado').count
 
-    base_disps = Dispensacion.joins(:stock)
+    base_disps = Dispensacion.no_canceladas.joins(:stock)
                              .where(stocks: { club_id: club.id })
                              .where(fecha_dispensacion: inicio..fin)
 
@@ -568,14 +568,14 @@ class AnalyticsController < ApplicationController
   def calcular_pl_lotes(club)
     lotes = club.lotes.includes(:genetica, :costo_lote).order(created_at: :desc)
 
-    ingresos_por_lote = Dispensacion
+    ingresos_por_lote = Dispensacion.no_canceladas
       .joins(:stock)
       .where(stocks: { club_id: club.id })
       .where.not(stocks: { lote_id: nil })
       .group('stocks.lote_id')
       .sum('dispensaciones.cantidad * COALESCE(dispensaciones.precio_unitario_ars, 0)')
 
-    gramos_disp_por_lote = Dispensacion
+    gramos_disp_por_lote = Dispensacion.no_canceladas
       .joins(:stock)
       .where(stocks: { club_id: club.id })
       .where.not(stocks: { lote_id: nil })
@@ -719,7 +719,7 @@ class AnalyticsController < ApplicationController
       mes_fin = mes_ini.end_of_month
       label   = mes_ini.strftime('%b %Y')
 
-      ingresos = Dispensacion.joins(:stock)
+      ingresos = Dispensacion.no_canceladas.joins(:stock)
                              .where(stocks: { club_id: club.id })
                              .where(fecha_dispensacion: mes_ini..mes_fin)
                              .sum('dispensaciones.cantidad * COALESCE(dispensaciones.precio_unitario_ars, 0)').to_f.round(2)

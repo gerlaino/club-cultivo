@@ -79,7 +79,7 @@ class Paciente < ApplicationRecord
   end
 
   def dispensado_mes_actual_g
-    dispensaciones.del_mes.sum(:cantidad).to_f
+    dispensaciones.no_canceladas.del_mes.sum(:cantidad).to_f
   end
 
   def porcentaje_limite_mensual

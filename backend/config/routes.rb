@@ -84,7 +84,7 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :lotes, only: [:index, :show, :update, :destroy] do
+    resources :lotes, only: [:index, :show, :update, :destroy, :create] do
       collection do
         get :export_csv
         get :proximo_codigo
@@ -236,10 +236,11 @@ Rails.application.routes.draw do
         patch :entregar
         patch :reportar_fallo
         patch :reprogramar
+        patch :cancelar_entrega
       end
     end
 
-    resources :reservas, only: [:index, :show] do
+    resources :reservas, only: [:index, :show, :update, :destroy] do
       member do
         patch :entregar
         patch :cancelar

@@ -54,13 +54,12 @@ const savingSala        = ref(false)
 const salaError         = ref(null)
 let   sedeIdCreada      = null
 
-const sala = ref({ nombre: '', tipo: 'vegetativo' })
+const sala = ref({ nombre: '', kind: 'vegetativo' })
 
 const TIPOS_SALA = [
   { key: 'vegetativo', emoji: '🌿', label: 'Vegetativo' },
   { key: 'floracion',  emoji: '🌸', label: 'Floración'  },
-  { key: 'cosecha',    emoji: '✂️', label: 'Cosecha'    },
-  { key: 'mixta',      emoji: '🏠', label: 'Mixta'      },
+  { key: 'manicura',   emoji: '✂️', label: 'Manicura'   },
 ]
 
 async function avanzar() {
@@ -356,8 +355,8 @@ const nombreUsuario = auth.user?.first_name || ''
                   v-for="t in TIPOS_SALA"
                   :key="t.key"
                   class="ob__tipo ob__tipo--sm"
-                  :class="{ 'ob__tipo--selected': sala.tipo === t.key }"
-                  @click="sala.tipo = t.key"
+                  :class="{ 'ob__tipo--selected': sala.kind === t.key }"
+                  @click="sala.kind = t.key"
                   type="button"
                 >
                   <span class="ob__tipo-emoji">{{ t.emoji }}</span>
@@ -365,7 +364,7 @@ const nombreUsuario = auth.user?.first_name || ''
                     <div class="ob__tipo-label">{{ t.label }}</div>
                   </div>
                   <div class="ob__tipo-check">
-                    <svg v-if="sala.tipo === t.key" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <svg v-if="sala.kind === t.key" width="12" height="12" viewBox="0 0 12 12" fill="none">
                       <path d="M2 6l3 3 5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                   </div>

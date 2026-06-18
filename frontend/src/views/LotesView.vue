@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useLotesStore } from "../stores/lotes";
 import { useSalasStore } from "../stores/salas";
 import { useAuthStore }  from "../stores/auth";
@@ -433,7 +434,7 @@ async function exportarCSV() {
               </div>
               <div class="lm-field">
                 <label class="lm-label">Fecha de inicio</label>
-                <input type="date" class="lm-input" v-model="editForm.start_date" />
+                <AppDatePicker v-model="editForm.start_date" />
               </div>
               <div class="lm-field">
                 <label class="lm-label">Variedad / Strain</label>

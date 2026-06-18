@@ -18,7 +18,7 @@
       </div>
       <div class="pvr__row">
         <label class="pvr__label">Fecha cosecha estimada</label>
-        <input type="date" class="pvr__input" v-model="form.fecha_cosecha_estimada" />
+        <AppDatePicker v-model="form.fecha_cosecha_estimada" />
       </div>
       <div v-if="lote.estado === 'finalizado'" class="pvr__row pvr__row--sep">
         <label class="pvr__label">Rendimiento real (g)</label>
@@ -69,6 +69,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import { updateLote } from '../../lib/api'
 import { useToast } from '../../composables/useToast.js'
 

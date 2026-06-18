@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, deleteDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink } from 'vue-router'
@@ -211,10 +212,22 @@ function medioPagoClass(m) {
   return C[m] || 'hd__pago--gris'
 }
 function descuentoPct(d) {
+  // Usa los descuentos explícitos (paciente + dispensa). Fallback: derivado del precio (registros viejos).
+  const dp = Number(d.descuento_paciente_pct) || 0
+  const dd = Number(d.descuento_dispensa_pct) || 0
+  if (dp + dd > 0) return Math.min(100, Math.round(dp + dd))
   const pu = d.precio_unitario_ars
   const ps = d.stock?.precio_sugerido_ars
   if (!pu || !ps || pu >= ps) return null
   return Math.round((1 - pu / ps) * 100)
+}
+function descuentoTitle(d) {
+  const dp = Number(d.descuento_paciente_pct) || 0
+  const dd = Number(d.descuento_dispensa_pct) || 0
+  const parts = []
+  if (dp > 0) parts.push(`Socio: ${dp}%`)
+  if (dd > 0) parts.push(`Esta dispensa: ${dd}%${d.descuento_otorgado_por ? ` (otorgó ${d.descuento_otorgado_por})` : ''}`)
+  return parts.join(' · ')
 }
 
 const MEDIOS_PAGO = [
@@ -329,12 +342,12 @@ const FORMAS = [
         <div class="hd__dates">
           <div class="hd__date-group">
             <label class="hd__date-label">Desde</label>
-            <input v-model="desde" type="date" class="hd__date-input" :max="hasta || hoy" />
+            <AppDatePicker v-model="desde" :max="hasta || hoy" />
           </div>
           <span class="hd__date-sep">→</span>
           <div class="hd__date-group">
             <label class="hd__date-label">Hasta</label>
-            <input v-model="hasta" type="date" class="hd__date-input" :max="hoy" :min="desde" />
+            <AppDatePicker v-model="hasta" :min="desde" :max="hoy" />
           </div>
         </div>
       </div>
@@ -451,7 +464,7 @@ const FORMAS = [
                 <span v-else class="hd__dash">—</span>
               </td>
               <td class="hd__td-num">
-                <span v-if="descuentoPct(d)" class="hd__desc-badge">-{{ descuentoPct(d) }}%</span>
+                <span v-if="descuentoPct(d)" class="hd__desc-badge" :title="descuentoTitle(d)">-{{ descuentoPct(d) }}%</span>
                 <span v-else class="hd__dash">—</span>
               </td>
               <td class="hd__td-num hd__td-monto">{{ formatARS(d.aporte_socio_ars) }}</td>

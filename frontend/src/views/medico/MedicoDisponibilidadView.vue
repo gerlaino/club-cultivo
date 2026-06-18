@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { getMedicoDisponibilidad, saveMedicoDisponibilidad } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
@@ -281,11 +282,11 @@ onMounted(async () => {
           <div class="mdv__vac-fields">
             <div class="mdv__vac-field">
               <label>Desde</label>
-              <input v-model="vacForm.fecha_inicio" type="date" class="mdv__vac-input" />
+              <AppDatePicker v-model="vacForm.fecha_inicio" />
             </div>
             <div class="mdv__vac-field">
               <label>Hasta</label>
-              <input v-model="vacForm.fecha_fin" type="date" class="mdv__vac-input" />
+              <AppDatePicker v-model="vacForm.fecha_fin" />
             </div>
             <div class="mdv__vac-field mdv__vac-field--wide">
               <label>Motivo (opcional)</label>

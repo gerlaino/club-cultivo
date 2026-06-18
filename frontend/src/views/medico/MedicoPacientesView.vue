@@ -160,7 +160,7 @@
               </div>
               <div class="mpv__form-field" :class="{ 'mpv__form-field--error': formErrors.fecha_nacimiento }">
                 <label>Fecha de nacimiento <span class="mpv__req">*</span></label>
-                <input v-model="form.fecha_nacimiento" type="date" />
+                <AppDatePicker v-model="form.fecha_nacimiento" />
                 <span v-if="formErrors.fecha_nacimiento" class="mpv__field-err">{{ formErrors.fecha_nacimiento }}</span>
               </div>
               <div class="mpv__form-field">
@@ -177,7 +177,7 @@
               </div>
               <div class="mpv__form-field">
                 <label>Vencimiento REPROCANN</label>
-                <input v-model="form.reprocann_vencimiento" type="date" />
+                <AppDatePicker v-model="form.reprocann_vencimiento" />
               </div>
               <div class="mpv__form-field mpv__form-field--full">
                 <label>Estado REPROCANN</label>
@@ -205,6 +205,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRouter } from 'vue-router'
 import { Search, UserPlus, Users, Trash2, X, FileText } from 'lucide-vue-next'
 import { usePacientesStore } from '../../stores/pacientes.js'

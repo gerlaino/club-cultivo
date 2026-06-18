@@ -1,7 +1,7 @@
 class Dispensacion < ApplicationRecord
   self.table_name = 'dispensaciones'
 
-  ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido].freeze
+  ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido cancelada].freeze
   MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos].freeze
 
   belongs_to :paciente
@@ -11,9 +11,9 @@ class Dispensacion < ApplicationRecord
   belongs_to :sede,          optional: true
   belongs_to :delivery_user, class_name: 'User', foreign_key: :delivery_id, optional: true
 
-  # El asiento contable de la dispensación vive y muere con ella:
-  # si quedara huérfano, el libro mostraría un ingreso de una entrega que no existió.
-  has_one :movimiento_contable, dependent: :destroy
+  # Los asientos contables de la dispensación viven y mueren con ella. Puede haber
+  # más de uno cuando se paga parte con crédito (deuda) y parte en efectivo (ingreso).
+  has_many :movimientos_contables, class_name: 'MovimientoContable', dependent: :destroy
 
   MEDIOS_A_CREDITO = %w[cuenta_corriente no_abona].freeze
 
@@ -45,6 +45,13 @@ class Dispensacion < ApplicationRecord
   validate  :credito_no_abona,          on: :create, if: -> { medio_pago == 'no_abona' }
   validate  :gramos_suficientes,        on: :create, if: -> { medio_pago == 'credito_gramos' }
   validate  :delivery_fields_presentes, if: :con_envio?
+
+  # Una dispensación cancelada conserva su registro e historia, pero NO cuenta como
+  # dispensada (se revirtió stock y plata). Excluila de todo agregado de cantidad/conteo.
+  # OJO: estado_envio es NULL en dispensaciones sin envío (la mayoría). where.not las
+  # excluiría, así que incluimos explícitamente los NULL.
+  scope :no_canceladas,  ->                     { where("dispensaciones.estado_envio IS NULL OR dispensaciones.estado_envio != 'cancelada'") }
+  def cancelada? = estado_envio == 'cancelada'
 
   scope :del_mes,        ->(fecha = Date.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
   scope :del_paciente,   ->(paciente_id)        { where(paciente_id: paciente_id) }
@@ -112,10 +119,9 @@ class Dispensacion < ApplicationRecord
     end
     cc = paciente.cuenta_corriente
     return unless cc
-    margen = cc.saldo_disponible + cc.limite_credito
-    if margen < aporte_socio_ars.to_d
-      errors.add(:base, 'No se puede realizar la dispensa. Sin crédito disponible. Consultá con el administrador.')
-    end
+    # Ya no se bloquea cuando excede el crédito: el crédito cubre lo que puede
+    # (monto_credito_ars) y la diferencia se cobra ahora. La validación de tener
+    # crédito CONFIGURADO vive en el controller.
   end
 
   def credito_no_abona

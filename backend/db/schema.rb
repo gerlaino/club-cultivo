@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_17_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_18_000005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -339,6 +339,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_17_000001) do
     t.string "envio_depto"
     t.string "envio_barrio"
     t.string "envio_ciudad"
+    t.decimal "descuento_paciente_pct", precision: 5, scale: 2, default: "0.0", null: false
+    t.decimal "descuento_dispensa_pct", precision: 5, scale: 2, default: "0.0", null: false
+    t.decimal "monto_credito_ars", precision: 12, scale: 2, default: "0.0", null: false
+    t.jsonb "historial_envio", default: [], null: false
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["delivery_id"], name: "index_dispensaciones_on_delivery_id"
@@ -578,7 +582,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_17_000001) do
     t.string "grow_type", default: "sustrato", null: false
     t.string "light_type"
     t.string "estado"
-    t.integer "tamanio_maceta"
+    t.decimal "tamanio_maceta", precision: 4, scale: 1
     t.string "sustrato_especifico"
     t.string "fotoperiodo"
     t.integer "semanas_floracion"
@@ -593,7 +597,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_17_000001) do
     t.string "origen", default: "semilla", null: false
     t.bigint "planta_madre_id"
     t.string "fotoperiodo_vegetativo"
-    t.integer "tamanio_maceta_inicial"
+    t.decimal "tamanio_maceta_inicial", precision: 4, scale: 1
     t.date "fecha_trasplante"
     t.decimal "ph_riego", precision: 4, scale: 1
     t.text "fertilizacion_descripcion"
@@ -1093,7 +1097,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_17_000001) do
     t.bigint "club_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "kind", default: "indoor", null: false
+    t.string "kind", default: "vegetativo", null: false
     t.bigint "created_by_id"
     t.string "camera_stream_url"
     t.string "camera_snapshot_url"

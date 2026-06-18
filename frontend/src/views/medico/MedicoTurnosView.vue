@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRouter } from 'vue-router'
 import { getMedicoTurnos, getMedicoPacientes, createMedicoTurno, updateMedicoTurno, getMedicoDisponibilidad } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -495,7 +496,7 @@ onUnmounted(() => clearInterval(tickInterval))
               <div class="tv__row-2">
                 <div class="tv__field">
                   <label class="tv__label">Fecha <span class="tv__req">*</span></label>
-                  <input v-model="form.fecha" type="date" class="tv__input" :min="ahora.toISOString().split('T')[0]" />
+                  <AppDatePicker v-model="form.fecha" :min="ahora.toISOString().split('T')[0]" />
                 </div>
                 <div class="tv__field">
                   <label class="tv__label">Hora</label>

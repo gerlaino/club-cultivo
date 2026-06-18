@@ -5,9 +5,11 @@ import { useAuthStore } from '../../stores/auth'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { listDispensaciones, deleteDispensacion } from '../../lib/api.js'
+import { listDispensaciones, deleteDispensacion, listReservasPaciente, deleteReserva, cancelarReserva } from '../../lib/api.js'
 import ModalNuevaDispensacion from './ModalNuevaDispensacion.vue'
 import ModalEditarDispensacion from './ModalEditarDispensacion.vue'
+import ModalEntregarReserva from './ModalEntregarReserva.vue'
+import ModalEditarReserva from './ModalEditarReserva.vue'
 
 const props = defineProps({
   socioId:          { type: Number,  required: true },
@@ -85,11 +87,48 @@ async function loadDispensaciones() {
 
 const totalCantidad = computed(() => dispensaciones.value.reduce((s, d) => s + (parseFloat(d.cantidad) || 0), 0))
 
+// ── Reservas pendientes del socio ──
+const reservasPend  = ref([])
+const showEntrega   = ref(false)
+const reservaSel    = ref(null)
+const hoyISO        = new Date().toISOString().split('T')[0]
+
+async function loadReservas() {
+  try {
+    const { data } = await listReservasPaciente(props.socioId)
+    reservasPend.value = (data.reservas || []).filter(r => r.estado === 'pendiente')
+  } catch { reservasPend.value = [] }
+}
+function abrirEntregaReserva(r) { reservaSel.value = r; showEntrega.value = true }
+const showEditarReserva = ref(false)
+function abrirEditarReserva(r) { reservaSel.value = r; showEditarReserva.value = true }
+async function onReservaEntregada() { await Promise.all([loadReservas(), loadDispensaciones()]) }
+async function eliminarReserva(r) {
+  const accion = r.sena_ars > 0 ? 'cancelar' : 'eliminar'
+  const ok = await confirm({
+    title: r.sena_ars > 0 ? 'Cancelar reserva' : 'Eliminar reserva',
+    message: `Se libera el stock apartado de ${r.cantidad}${r.stock?.unidad || 'g'}.` + (r.sena_ars > 0 ? ' La seña no se reintegra.' : ''),
+    confirmText: r.sena_ars > 0 ? 'Cancelar reserva' : 'Eliminar', variant: 'danger',
+  })
+  if (!ok) return
+  try {
+    r.sena_ars > 0 ? await cancelarReserva(r.id) : await deleteReserva(r.id)
+    await loadReservas()
+    toast.success(r.sena_ars > 0 ? 'Reserva cancelada' : 'Reserva eliminada')
+  } catch (e) { toast.error(e.response?.data?.error || 'Error') }
+}
+
 function dvEscapeHandler(e) {
   if (e.key === 'Escape' && showModal.value) { showModal.value = false }
 }
+async function onDispensacionGuardadaConReservas() {
+  await onDispensacionGuardada()
+  await loadReservas()
+}
+
 onMounted(() => {
   loadDispensaciones()
+  loadReservas()
   document.addEventListener('keydown', dvEscapeHandler, true)
 })
 onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true))
@@ -110,6 +149,27 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       <button v-if="canCreate" class="dv__btn-primary" @click="openCreate">
         <i class="bi bi-plus-lg"></i> Nueva
       </button>
+    </div>
+
+    <!-- Reservas pendientes -->
+    <div v-if="reservasPend.length" class="dv__reservas">
+      <div class="dv__reservas-title"><i class="bi bi-bookmark-star"></i> Reservas pendientes</div>
+      <div v-for="r in reservasPend" :key="r.id" class="dv__reserva"
+           :class="{ 'dv__reserva--vencida': r.fecha_entrega_estimada < hoyISO }">
+        <div class="dv__reserva-info">
+          <span class="dv__reserva-prod">{{ FORMA_LABEL[r.stock?.forma_producto] || r.stock?.forma_producto }} · {{ r.cantidad }}{{ r.stock?.unidad || 'g' }}</span>
+          <span class="dv__reserva-meta">
+            entrega {{ fmtDate(r.fecha_entrega_estimada) }}
+            <template v-if="r.sena_ars > 0"> · seña {{ fmt(r.sena_ars) }}</template>
+            <template v-if="r.aporte_restante_ars != null"> · resta {{ fmt(r.aporte_restante_ars) }}</template>
+          </span>
+        </div>
+        <div v-if="canCreate" class="dv__reserva-acts">
+          <button class="dv__reserva-btn dv__reserva-btn--primary" @click="abrirEntregaReserva(r)">Entregar</button>
+          <button class="dv__reserva-btn" @click="abrirEditarReserva(r)">Editar</button>
+          <button class="dv__reserva-btn" @click="eliminarReserva(r)">{{ r.sena_ars > 0 ? 'Cancelar' : 'Eliminar' }}</button>
+        </div>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -135,6 +195,13 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
             </span>
             <span v-if="d.stock?.lote?.codigo" class="dv__lote-ref">
               <i class="bi bi-box-seam"></i> {{ d.stock.lote.codigo }}
+            </span>
+          </div>
+          <div v-if="Number(d.descuento_dispensa_pct) > 0 || Number(d.descuento_paciente_pct) > 0" class="dv__item-desc-info">
+            <i class="bi bi-tag"></i>
+            <span v-if="Number(d.descuento_paciente_pct) > 0">socio {{ Number(d.descuento_paciente_pct) }}%</span>
+            <span v-if="Number(d.descuento_dispensa_pct) > 0">
+              · dispensa {{ Number(d.descuento_dispensa_pct) }}%<template v-if="d.descuento_otorgado_por"> (otorgó {{ d.descuento_otorgado_por }})</template>
             </span>
           </div>
           <div v-if="d.observaciones" class="dv__item-obs">{{ d.observaciones }}</div>
@@ -177,8 +244,14 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       :saldo-cc="props.saldoCc"
       :limite-cc="props.limiteCc"
       :descuento-porcentaje="props.descuentoPorcentaje"
-      @saved="onDispensacionGuardada"
+      @saved="onDispensacionGuardadaConReservas"
     />
+
+    <!-- Modal entregar reserva -->
+    <ModalEntregarReserva v-model="showEntrega" :reserva="reservaSel" @entregada="onReservaEntregada" />
+
+    <!-- Modal editar reserva -->
+    <ModalEditarReserva v-model="showEditarReserva" :reserva="reservaSel" @saved="loadReservas" />
   </div>
 </template>
 
@@ -204,6 +277,18 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__stock-pill { font-size: .7rem; font-weight: 700; background: rgba(21,128,61,.1); color: #15803d; padding: .2em .65em; border-radius: 6px; }
 .dv__lote-ref { font-size: .7rem; color: #64748b; display: flex; align-items: center; gap: .25rem; }
 .dv__item-obs { font-size: .73rem; color: #94a3b8; font-style: italic; }
+.dv__item-desc-info { font-size: .72rem; color: #b45309; display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+/* Reservas pendientes */
+.dv__reservas { margin: .9rem 1.25rem; border: 1px solid #fde68a; background: #fffbeb; border-radius: 10px; padding: .6rem .8rem; }
+.dv__reservas-title { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: #92400e; margin-bottom: .5rem; display: flex; align-items: center; gap: .35rem; }
+.dv__reserva { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .5rem 0; border-top: 1px solid #fde68a; }
+.dv__reserva:first-of-type { border-top: none; }
+.dv__reserva--vencida { color: #b91c1c; }
+.dv__reserva-prod { font-size: .82rem; font-weight: 700; color: #0f172a; display: block; }
+.dv__reserva-meta { font-size: .72rem; color: #92400e; }
+.dv__reserva-acts { display: flex; gap: .35rem; flex-shrink: 0; }
+.dv__reserva-btn { border: 1.5px solid #e2e8f0; background: #fff; border-radius: 7px; padding: .3rem .6rem; font-size: .75rem; font-weight: 700; cursor: pointer; color: #475569; }
+.dv__reserva-btn--primary { background: #15803d; color: #fff; border-color: #15803d; }
 .dv__item-envio-badge { display: inline-flex; align-items: center; gap: .25rem; margin-top: .2rem; font-size: 12px; font-weight: 600; padding: .15em .55em; border-radius: 5px; }
 .dv__item-envio-badge--pendiente { background: var(--c-sky-100);   color: var(--c-sky-600); }
 .dv__item-envio-badge--en_viaje  { background: var(--c-amber-100); color: var(--c-amber-500); }

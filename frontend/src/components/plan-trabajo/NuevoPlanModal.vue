@@ -45,11 +45,11 @@
             <div class="npm__row">
               <div class="npm__field">
                 <label class="npm__label">Desde</label>
-                <input class="npm__input" type="date" v-model="form.fecha_inicio" @change="ajustarFechaFin" />
+                <AppDatePicker v-model="form.fecha_inicio" @update:model-value="ajustarFechaFin" />
               </div>
               <div class="npm__field">
                 <label class="npm__label">Hasta</label>
-                <input class="npm__input" type="date" v-model="form.fecha_fin" :min="form.fecha_inicio" />
+                <AppDatePicker v-model="form.fecha_fin" :min="form.fecha_inicio" />
               </div>
             </div>
 
@@ -158,7 +158,7 @@
                           </div>
                         </template>
                         <template v-else>
-                          <input class="npm__input npm__input--sm" type="date" v-model="t.fecha_especifica" :min="form.fecha_inicio" :max="form.fecha_fin" />
+                          <AppDatePicker v-model="t.fecha_especifica" :min="form.fecha_inicio" :max="form.fecha_fin" />
                         </template>
                         <input class="npm__input npm__input--xs" type="time" v-model="t.hora" />
                         <div class="npm__prio-row">
@@ -236,7 +236,7 @@
                       </div>
                     </template>
                     <template v-else>
-                      <input class="npm__input npm__input--sm" type="date" v-model="t.fecha_especifica" :min="form.fecha_inicio" :max="form.fecha_fin" />
+                      <AppDatePicker v-model="t.fecha_especifica" :min="form.fecha_inicio" :max="form.fecha_fin" />
                     </template>
                     <input class="npm__input npm__input--xs" type="time" v-model="t.hora" placeholder="Hora" />
                     <div class="npm__prio-row">
@@ -335,6 +335,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import {
   createPlanTrabajo, createPlanTarea, publicarPlanTrabajo,
   interpretarArchivoPlan, listPlanTrabajos, listPlanTareas,

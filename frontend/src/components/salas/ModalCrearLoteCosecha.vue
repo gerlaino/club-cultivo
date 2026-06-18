@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { createLoteHeredado, listGeneticas, listPlants, getLoteProximoCodigo } from '../../lib/api.js'
 import { useModalEscape } from '../../composables/useModalEscape.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 
 const props = defineProps({
   sala: { type: Object, required: true },
@@ -545,7 +546,7 @@ async function crear() {
                       Fecha de trasplante
                       <span class="clc__label-opt">(opc.) — hubo cambio de maceta {{ form.tamanio_maceta_inicial }}L → {{ form.tamanio_maceta }}L</span>
                     </label>
-                    <input type="date" class="clc__input" v-model="form.fecha_trasplante" />
+                    <AppDatePicker v-model="form.fecha_trasplante" />
                   </div>
                 </Transition>
 

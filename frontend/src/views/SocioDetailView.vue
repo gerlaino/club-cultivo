@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useRoute } from 'vue-router'
 
 const props = defineProps({ backPath: { type: String, default: '/pacientes' } })
@@ -577,8 +578,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               <div class="sd__edit-body">
                 <div class="sd__edit-row">
                   <label class="sd__edit-lbl">Fecha</label>
-                  <input v-model="editForm.fecha" type="date" class="sd__edit-input"
-                    :min="new Date().toISOString().split('T')[0]" />
+                  <AppDatePicker v-model="editForm.fecha" :min="new Date().toISOString().split('T')[0]" />
                 </div>
                 <div class="sd__edit-row">
                   <label class="sd__edit-lbl">Hora</label>
@@ -670,7 +670,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         <h3 class="sd__rep-modal-title">Activar REPROCANN</h3>
         <p class="sd__rep-modal-sub">Ingresá la fecha de vencimiento del certificado aprobado.</p>
         <label class="sd__rep-modal-label">Vencimiento</label>
-        <input type="date" v-model="nuevaVencimiento" class="sd__rep-modal-input" />
+        <AppDatePicker v-model="nuevaVencimiento" />
         <div class="sd__rep-modal-actions">
           <button class="sd__rep-modal-cancel" :disabled="cambiandoEstado" @click="activarModalOpen = false">Cancelar</button>
           <button class="sd__rep-modal-ok" :disabled="cambiandoEstado || !nuevaVencimiento" @click="confirmarActivacion">

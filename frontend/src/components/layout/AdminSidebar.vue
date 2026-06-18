@@ -14,20 +14,26 @@ import {
   ClipboardList, Package, Settings, Scale, Webhook, BellRing, BookmarkCheck,
 } from 'lucide-vue-next'
 import { listLotes, listPesajesManicuraAdmin } from '../../lib/api.js'
+import { useAuthStore } from '../../stores/auth'
 
 const route = useRoute()
+const auth  = useAuthStore()
 
 const HOME = { to: '/', icon: LayoutDashboard, label: 'Dashboard' }
 
-// Badge de Manicura: pesajes esperando confirmación + lotes del flujo anterior.
+// Badge de Manicura: pesajes esperando confirmación + lotes del flujo anterior +
+// cosechas en manicura asignadas a mí (que tengo que pesar).
 const aprobacionesPendientes = ref(0)
 async function fetchAprobaciones() {
   try {
-    const [lotes, pesajes] = await Promise.all([
+    const [lotes, pesajes, enManicura] = await Promise.all([
       listLotes({ estado: 'manicura_pendiente' }),
       listPesajesManicuraAdmin().catch(() => ({ data: [] })),
+      listLotes({ estado: 'en_manicura' }).catch(() => ({ data: [] })),
     ])
-    aprobacionesPendientes.value = (lotes.data || []).length + (pesajes.data || []).length
+    const enviadosLoteIds = new Set((pesajes.data || []).map(p => p.lote_id))
+    const misCosechas = (enManicura.data || []).filter(l => l.manicurador_id === auth.user?.id && !enviadosLoteIds.has(l.id))
+    aprobacionesPendientes.value = (lotes.data || []).length + (pesajes.data || []).length + misCosechas.length
   } catch {}
 }
 

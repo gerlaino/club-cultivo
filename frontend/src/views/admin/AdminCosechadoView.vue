@@ -26,8 +26,8 @@
       <thead>
         <tr>
           <th>Lote</th>
-          <th>Cepa</th>
-          <th>Sala</th>
+          <th>Genética</th>
+          <th>Días cosechado</th>
           <th>Plantas</th>
           <th>Peso húmedo</th>
           <th>Fecha cosecha</th>
@@ -48,7 +48,9 @@
             </span>
             <span v-else class="acs__nd">—</span>
           </td>
-          <td>{{ lote.sala?.nombre || '—' }}</td>
+          <td>
+            <span class="acs__pill acs__pill--amber">{{ diasCosechado(lote) }}</span>
+          </td>
           <td>
             <span class="acs__pill acs__pill--blue">{{ lote.plants_count_cosechadas || lote.plants_count }} plantas</span>
           </td>
@@ -169,6 +171,14 @@ const errorModal  = ref('')
 const fmtFecha = (d) => d
   ? new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
   : '—'
+
+// Días que lleva cosechado el lote (desde que entró al estado cosecha).
+const diasCosechado = (lote) => {
+  const d = lote.dias_en_estado
+  if (d == null) return '—'
+  if (d === 0) return 'Hoy'
+  return `${d} día${d === 1 ? '' : 's'}`
+}
 
 async function cargar() {
   loading.value = true
@@ -346,6 +356,7 @@ onMounted(cargar)
   font-weight: 600;
 }
 .acs__pill--blue { background: #dbeafe; color: #1d4ed8; }
+.acs__pill--amber { background: #fef3c7; color: #b45309; }
 .acs__peso {
   display: inline-flex;
   align-items: center;

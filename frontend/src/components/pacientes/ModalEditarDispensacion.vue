@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { updateDispensacion } from '../../lib/api.js'
@@ -53,10 +54,23 @@ const form = ref({})
 function buildForm(d) {
   if (!d) return {}
   return {
+    cantidad:           d.cantidad ?? null,
     fecha_dispensacion: d.fecha_dispensacion || '',
     medio_pago:         d.medio_pago || 'efectivo',
     aporte_socio_ars:   d.aporte_socio_ars ?? null,
     observaciones:      d.observaciones || '',
+  }
+}
+
+// Precio unitario original (para re-sugerir el aporte al cambiar la cantidad).
+const precioUnitOrig = computed(() => {
+  const a = Number(props.dispensacion?.aporte_socio_ars) || 0
+  const c = Number(props.dispensacion?.cantidad) || 0
+  return c > 0 ? a / c : 0
+})
+function onCantidadChange() {
+  if (precioUnitOrig.value > 0 && Number(form.value.cantidad) > 0) {
+    form.value.aporte_socio_ars = Math.round(precioUnitOrig.value * Number(form.value.cantidad))
   }
 }
 
@@ -85,6 +99,7 @@ async function handleSubmit() {
 
   try {
     await updateDispensacion(props.dispensacion.id, {
+      cantidad:           form.value.cantidad,
       fecha_dispensacion: form.value.fecha_dispensacion,
       medio_pago:         form.value.medio_pago,
       aporte_socio_ars:   form.value.aporte_socio_ars,
@@ -126,8 +141,10 @@ const stk = computed(() => props.dispensacion?.stock)
               <span v-if="stk?.lote?.genetica?.nombre" class="med__stock-gen">{{ stk.lote.genetica.nombre }}</span>
             </div>
             <div class="med__stock-cantidad">
-              <span class="med__stock-qty">{{ dispensacion.cantidad }}{{ stk?.unidad || 'g' }}</span>
-              <span class="med__stock-readonly-badge">no editable</span>
+              <div class="med__qty-edit">
+                <input v-model.number="form.cantidad" type="number" min="0.01" step="0.01" class="med__qty-input" @input="onCantidadChange" />
+                <span class="med__qty-unit">{{ stk?.unidad || 'g' }}</span>
+              </div>
             </div>
           </div>
 
@@ -159,7 +176,7 @@ const stk = computed(() => props.dispensacion?.stock)
           <div class="med__form-row">
             <div class="med__field">
               <label class="med__label">Fecha</label>
-              <input v-model="form.fecha_dispensacion" type="date" class="med__input" />
+              <AppDatePicker v-model="form.fecha_dispensacion" />
             </div>
             <div class="med__field">
               <label class="med__label">Medio de pago</label>
@@ -223,6 +240,9 @@ const stk = computed(() => props.dispensacion?.stock)
 .med__stock-cantidad { display: flex; flex-direction: column; align-items: flex-end; gap: .2rem; flex-shrink: 0; }
 .med__stock-qty { font-size: .95rem; font-weight: 800; color: #1b5e20; font-family: monospace; }
 .med__stock-readonly-badge { font-size: .62rem; color: #94a3b8; background: #f1f5f9; border-radius: 4px; padding: .1em .4em; }
+.med__qty-edit { display: flex; align-items: center; gap: .3rem; }
+.med__qty-input { width: 72px; text-align: right; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 7px; padding: .35rem .5rem; font-size: .85rem; font-weight: 700; color: #0f172a; outline: none; }
+.med__qty-unit { font-size: .78rem; color: #64748b; font-weight: 600; }
 
 /* Form */
 .med__divider { height: 1px; background: #e2e8f0; }

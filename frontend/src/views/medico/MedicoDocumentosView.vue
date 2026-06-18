@@ -139,12 +139,12 @@
 
               <div class="mdv__form-field">
                 <label>Fecha del documento</label>
-                <input v-model="uploadForm.fecha_documento" type="date" />
+                <AppDatePicker v-model="uploadForm.fecha_documento" />
               </div>
 
               <div class="mdv__form-field">
                 <label>Fecha de vencimiento</label>
-                <input v-model="uploadForm.fecha_vencimiento" type="date" />
+                <AppDatePicker v-model="uploadForm.fecha_vencimiento" />
               </div>
 
               <div class="mdv__form-field">
@@ -179,6 +179,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import {
   Search, Upload, Download, Trash2, X, FolderOpen,
   FileText, File, Stethoscope, Scale,

@@ -120,6 +120,75 @@ RSpec.describe 'Reservas', type: :request do
     end
   end
 
+  describe 'PATCH /reservas/:id (editar)' do
+    before { sign_in_as(dispensador) }
+    let(:reserva) { Reserva.create!(club: club, paciente: paciente, user: dispensador, stock: stock, cantidad: 20, fecha_entrega_estimada: 3.days.from_now.to_date, aporte_estimado_ars: 2000) }
+
+    it 'edita cantidad y fecha de una reserva pendiente' do
+      patch "/reservas/#{reserva.id}", params: { reserva: { cantidad: 15 } }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(reserva.reload.cantidad.to_f).to eq(15.0)
+    end
+
+    it 'rechaza cantidad mayor al disponible' do
+      patch "/reservas/#{reserva.id}", params: { reserva: { cantidad: 999 } }, headers: auth_headers
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'no edita una reserva entregada' do
+      reserva.update!(estado: 'entregada')
+      patch "/reservas/#{reserva.id}", params: { reserva: { cantidad: 5 } }, headers: auth_headers
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
+
+  describe 'DELETE /reservas/:id (eliminar)' do
+    before { sign_in_as(dispensador) }
+
+    it 'elimina una reserva pendiente sin seña y libera el stock' do
+      reserva = Reserva.create!(club: club, paciente: paciente, user: dispensador, stock: stock, cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date)
+      expect(stock.reload.gramos_reservados).to eq(10.0)
+      delete "/reservas/#{reserva.id}", headers: auth_headers
+      expect(response).to have_http_status(:no_content)
+      expect(Reserva.exists?(reserva.id)).to be(false)
+      expect(stock.reload.gramos_reservados).to eq(0.0)
+    end
+
+    it 'NO elimina si tiene seña (debe cancelarse)' do
+      reserva = Reserva.create!(club: club, paciente: paciente, user: dispensador, stock: stock, cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date, sena_ars: 300, aporte_estimado_ars: 1000)
+      delete "/reservas/#{reserva.id}", headers: auth_headers
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(Reserva.exists?(reserva.id)).to be(true)
+    end
+  end
+
+  describe 'entrega con envío y crédito' do
+    before { sign_in_as(dispensador) }
+    let(:delivery)  { create(:user, club: club, role: 'delivery') }
+    let(:paciente2) { create(:paciente, club: club, created_by: admin, domicilio_calle: 'Corrientes', domicilio_altura: '1234', domicilio_ciudad: 'CABA') }
+    let(:reserva)   { Reserva.create!(club: club, paciente: paciente2, user: dispensador, stock: stock, cantidad: 10, fecha_entrega_estimada: Date.current, aporte_estimado_ars: 1000) }
+
+    it 'asigna delivery y toma el domicilio del paciente al entregar' do
+      patch "/reservas/#{reserva.id}/entregar",
+            params: { con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true },
+            headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      disp = reserva.reload.dispensacion
+      expect(disp.con_envio).to be(true)
+      expect(disp.delivery_id).to eq(delivery.id)
+      expect(disp.envio_calle).to eq('Corrientes')
+    end
+
+    it 'reparte crédito/efectivo al entregar por cuenta corriente' do
+      CuentaCorriente.create!(paciente: paciente2, club: club, saldo_disponible: 0, limite_credito: 600)
+      patch "/reservas/#{reserva.id}/entregar", params: { medio_pago: 'cuenta_corriente' }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      disp = reserva.reload.dispensacion
+      expect(disp.aporte_socio_ars.to_f).to eq(1000.0)
+      expect(disp.monto_credito_ars.to_f).to eq(600.0) # crédito disp; resto 400 a efectivo
+    end
+  end
+
   describe 'aislamiento por tenant' do
     let(:otro_club)        { create(:club) }
     let(:otro_admin)       { create(:user, :admin, club: otro_club) }

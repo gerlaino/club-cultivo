@@ -55,10 +55,11 @@ const mesLabel = new Date().toLocaleDateString('es-AR', { month: 'long', year: '
 
 function fmtCompacto(n) {
   if (n == null) return '—'
-  const abs = Math.abs(n)
-  if (abs >= 1_000_000) return (n < 0 ? '-' : '') + '$' + (abs / 1_000_000).toFixed(1) + 'M'
-  if (abs >= 1_000)     return (n < 0 ? '-' : '') + '$' + (abs / 1_000).toFixed(0) + 'k'
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(n)
+  // Es plata: mostramos el monto exacto, sin abreviar (abreviar redondeaba 18.5k → 19k).
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency', currency: 'ARS',
+    minimumFractionDigits: 0, maximumFractionDigits: 2,
+  }).format(n)
 }
 
 function timeAgo(ts) {

@@ -71,7 +71,7 @@
 
           <div v-else class="ept__field">
             <label class="ept__label">Fecha</label>
-            <input class="ept__input" type="date" v-model="form.fecha_especifica" />
+            <AppDatePicker v-model="form.fecha_especifica" />
           </div>
 
           <!-- Hora -->
@@ -115,6 +115,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import { updatePlanTarea, deletePlanTarea } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 

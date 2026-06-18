@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { createAplicacion, listLotes, listSalas } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -140,7 +141,7 @@ async function aplicar() {
           <!-- Fecha de inicio -->
           <div class="apm__field">
             <label class="apm__label">Fecha de inicio del plan</label>
-            <input class="apm__input" type="date" v-model="fechaInicio" />
+            <AppDatePicker v-model="fechaInicio" />
             <p class="apm__field-hint">El día 0 del plan corresponde a esta fecha. Cada tarea se programa desde ahí.</p>
           </div>
 

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
@@ -418,7 +419,7 @@ async function exportarCSV() {
               </div>
               <div class="sp-field">
                 <label class="sp-label">Fecha de nacimiento <span class="sp-req">*</span></label>
-                <input v-model="form.fecha_nacimiento" type="date" class="sp-input" :class="{ 'sp-input--err': formErrors.fecha_nacimiento }" />
+                <AppDatePicker v-model="form.fecha_nacimiento" />
                 <span v-if="formErrors.fecha_nacimiento" class="sp-err">{{ formErrors.fecha_nacimiento }}</span>
               </div>
               <div class="sp-field">
@@ -441,7 +442,7 @@ async function exportarCSV() {
               </div>
               <div class="sp-field">
                 <label class="sp-label">Fecha de vencimiento</label>
-                <input v-model="form.reprocann_vencimiento" type="date" class="sp-input" />
+                <AppDatePicker v-model="form.reprocann_vencimiento" />
               </div>
             </div>
             <div class="sp-section-title sp-section-title--mt">

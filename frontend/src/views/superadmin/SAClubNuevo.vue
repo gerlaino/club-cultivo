@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useRouter } from 'vue-router'
 import { Building2, MapPin, Zap, Users, ChevronRight, ChevronLeft, Check, ArrowLeft } from 'lucide-vue-next'
@@ -269,7 +270,7 @@ async function handleSubmit() {
           <div class="cnv__row-2" style="margin-top:1rem">
             <div class="cnv__field">
               <label class="cnv__label">Vigente hasta</label>
-              <input v-model="form.plan_activo_hasta" type="date" class="cnv__input" />
+              <AppDatePicker v-model="form.plan_activo_hasta" />
               <span class="cnv__hint">Dejá vacío para sin vencimiento</span>
             </div>
             <label class="cnv__toggle">

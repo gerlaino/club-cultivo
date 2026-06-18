@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { listLotes } from '../lib/api.js'
 import api from '../lib/api.js'
@@ -248,7 +249,7 @@ onMounted(async () => {
 
             <div class="pnv__field">
               <label class="pnv__label">🌰 Germinación / inicio</label>
-              <input v-model="form.fecha_germinacion" type="date" class="pnv__input" :max="today" />
+              <AppDatePicker v-model="form.fecha_germinacion" :max="today" />
               <div v-if="diasDesdeGerminacion !== null" class="pnv__hint pnv__hint--ok">
                 {{ diasDesdeGerminacion }} días desde el inicio
               </div>
@@ -256,17 +257,17 @@ onMounted(async () => {
 
             <div class="pnv__field" v-if="!['esqueje','germinacion'].includes(form.state)">
               <label class="pnv__label">🌱 Inicio vegetativo</label>
-              <input v-model="form.fecha_vegetativo" type="date" class="pnv__input" :max="today" />
+              <AppDatePicker v-model="form.fecha_vegetativo" :max="today" />
             </div>
 
             <div class="pnv__field" v-if="['floracion','secado','cosechado'].includes(form.state)">
               <label class="pnv__label">🌸 Inicio floración</label>
-              <input v-model="form.fecha_floracion" type="date" class="pnv__input" :max="today" />
+              <AppDatePicker v-model="form.fecha_floracion" :max="today" />
             </div>
 
             <div class="pnv__field" v-if="form.state === 'cosechado'">
               <label class="pnv__label">✂️ Fecha cosecha</label>
-              <input v-model="form.fecha_cosecha" type="date" class="pnv__input" :max="today" />
+              <AppDatePicker v-model="form.fecha_cosecha" :max="today" />
             </div>
 
             <div class="pnv__field" v-if="form.state === 'cosechado'">

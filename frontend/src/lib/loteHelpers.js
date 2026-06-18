@@ -76,7 +76,20 @@ export function pgm(p) { return PLAGAS_META[p]       || { color: '#94a3b8', emoj
 
 export function growLabel(g)  { return { sustrato: 'Sustrato', hidroponia: 'Hidroponia', aeroponia: 'Aeroponia' }[g] || g || '—' }
 export function lightLabel(l) { return { led: 'LED', hps: 'HPS', cmh: 'CMH', natural: 'Natural', mixta: 'Mixta' }[l] || l || '—' }
-export function macetaLabel(m) { return MACETA_LABELS[String(m)] || (m ? m + 'L' : '—') }
+export function macetaLabel(m) {
+  if (m == null || m === '') return '—'
+  const key = String(parseFloat(m))   // "15.0" -> "15", "0.5" -> "0.5"
+  return MACETA_LABELS[key] || `${m}L`
+}
+
+// Fotoperíodo (horas luz/oscuridad). Usa el valor cargado si existe; si no, lo
+// deriva del estado: vegetativo/germinación/esqueje = 18/6, floración = 12/12.
+export function fotoperiodoLabel(estado, stored) {
+  if (stored) return stored
+  if (['semilla', 'esqueje', 'vegetativo'].includes(estado)) return '18/6'
+  if (estado === 'floracion') return '12/12'
+  return '—'
+}
 
 export function parseDate(d) {
   if (!d) return null

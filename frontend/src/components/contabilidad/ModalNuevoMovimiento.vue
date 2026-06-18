@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useModalEscape } from '../../composables/useModalEscape.js'
 
 const props = defineProps({
@@ -446,8 +447,7 @@ async function submit() {
               <!-- Fecha -->
               <div class="nm-field">
                 <label class="nm-label">Fecha <span class="nm-req">*</span></label>
-                <input type="date" class="nm-input nm-input--date"
-                       :class="{ 'nm-input--err': errors.fecha }" v-model="form.fecha" />
+                <AppDatePicker v-model="form.fecha" />
                 <span v-if="errors.fecha" class="nm-err">{{ errors.fecha }}</span>
               </div>
 

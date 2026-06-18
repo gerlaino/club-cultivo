@@ -491,14 +491,8 @@ async function confirmDelete(s) {
                 <div class="slv__field">
                   <label class="slv__label">Tipo</label>
                   <select class="slv__input" v-model="editForm.kind">
-                    <option value="">Sin especificar</option>
                     <option value="vegetativo">Vegetativo</option>
                     <option value="floracion">Floración</option>
-                    <option value="secado">Secado</option>
-                    <option value="curado">Curado</option>
-                    <option value="mixta">Mixta</option>
-                    <option value="madre">Madres</option>
-                    <option value="clon">Clones</option>
                     <option value="manicura">Manicura</option>
                   </select>
                 </div>

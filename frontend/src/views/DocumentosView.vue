@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useAuthStore } from '../stores/auth'
 import { getDocumentos, createDocumento, deleteDocumento } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
@@ -296,7 +297,7 @@ onMounted(async () => {
 
             <div class="dv__field">
               <label class="dv__label">Fecha de vencimiento <span class="dv__optional">si aplica</span></label>
-              <input type="date" class="dv__input" v-model="docForm.fecha_vencimiento" />
+              <AppDatePicker v-model="docForm.fecha_vencimiento" />
             </div>
 
             <div class="dv__field">

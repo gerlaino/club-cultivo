@@ -3,10 +3,10 @@ class DispensacionesController < ApplicationController
 
   before_action :authenticate_user!
   before_action :require_dispensaciones_role!
-  before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :mis_paquetes, :export_csv]
+  before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :export_csv]
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
-  before_action :set_dispensacion, only: [:show, :update, :destroy, :entregar, :reportar_fallo, :reprogramar]
+  before_action :set_dispensacion, only: [:show, :update, :destroy, :entregar, :reportar_fallo, :reprogramar, :cancelar_entrega]
 
   # GET /pacientes/:paciente_id/dispensaciones  OR  GET /dispensaciones?fecha=YYYY-MM-DD
   # GET /dispensaciones?con_envio=true[&estado_envio=pendiente][&delivery_id=N][&desde=YYYY-MM-DD][&hasta=YYYY-MM-DD]
@@ -80,48 +80,32 @@ class DispensacionesController < ApplicationController
       @dispensacion.contacto_telefono ||= @paciente.telefono
     end
 
-    needs_autocalc = @dispensacion.aporte_socio_ars.nil? ||
-                     (@dispensacion.aporte_socio_ars.to_d <= 0 && @dispensacion.medio_pago == 'no_abona')
-    if @dispensacion.stock && needs_autocalc
-      precio_base = @dispensacion.stock.precio_sugerido_ars.to_d
-      descuento   = @paciente.descuento_porcentaje.to_d.clamp(0, 100) / 100
-      precio      = precio_base * (1 - descuento)
-      @dispensacion.aporte_socio_ars    = (precio * @dispensacion.cantidad.to_d).round(2)
-      @dispensacion.precio_unitario_ars ||= precio
+    # ── Descuentos: dos distintos, aditivos con tope 100% ──
+    #   descuento_paciente_pct: de la ficha del socio (autoritativo desde el server, privado).
+    #   descuento_dispensa_pct: puntual que otorga quien dispensa (lo manda el modal).
+    desc_paciente = @paciente.descuento_porcentaje.to_d.clamp(0, 100)
+    desc_dispensa = params.dig(:dispensacion, :descuento_dispensa_pct).to_d.clamp(0, 100)
+    desc_total    = [desc_paciente + desc_dispensa, 100].min
+    @dispensacion.descuento_paciente_pct = desc_paciente
+    @dispensacion.descuento_dispensa_pct = desc_dispensa
+
+    # El total lo calcula el server. Solo admin/supervisor pueden pisarlo a mano (override).
+    override_admin = (current_user.admin? || current_user.supervisor?) && @dispensacion.aporte_socio_ars.to_d > 0
+    cantidad       = @dispensacion.cantidad.to_d
+    precio_unit_base = @dispensacion.stock&.precio_sugerido_ars.to_d
+
+    if precio_unit_base > 0
+      precio_unit_desc = (precio_unit_base * (1 - desc_total / 100)).round(2)
+      @dispensacion.precio_unitario_ars = precio_unit_desc
+      @dispensacion.aporte_socio_ars    = override_admin ? @dispensacion.aporte_socio_ars : (precio_unit_desc * cantidad).round(2)
+    elsif override_admin && cantidad > 0
+      # Stock sin precio configurado: admin fija el total a mano.
+      @dispensacion.precio_unitario_ars ||= (@dispensacion.aporte_socio_ars.to_d / cantidad).round(2)
     end
 
-    cc    = @paciente.cuenta_corriente
-    monto = @dispensacion.aporte_socio_ars.to_d
-
-    # Regla universal: aporte obligatorio para todo medio de pago que no sea no_abona.
-    # Excepción: credito_gramos consume gramos prepagos, no pesos — el aporte es 0.
-    if monto <= 0 && @dispensacion.medio_pago != 'credito_gramos'
-      return render json: { error: 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.' }, status: :unprocessable_entity
-    end
-
-    # Validaciones específicas por medio de pago
-    case @dispensacion.medio_pago
-    when 'cuenta_corriente'
-      unless cc&.limite_credito.to_f > 0
-        return render json: { error: 'El paciente no tiene crédito configurado para cobrar por cuenta corriente.' }, status: :unprocessable_entity
-      end
-    when 'no_abona'
-      if cc.nil? || cc.limite_credito.to_f <= 0
-        return render json: { error: 'El paciente no tiene crédito configurado. Consultá con el administrador.' }, status: :unprocessable_entity
-      end
-    when 'credito_gramos'
-      unless cc&.credito_gramos_activo?
-        return render json: { error: 'El paciente no tiene crédito en gramos activo.' }, status: :unprocessable_entity
-      end
-      if cc.saldo_disponible_g.to_d < @dispensacion.cantidad.to_d
-        return render json: { error: "Gramos insuficientes: dispone de #{cc.saldo_disponible_g.to_f}g" }, status: :unprocessable_entity
-      end
-    end
-
-    # Verificación de crédito: solo aplica cuando el medio de pago consume crédito.
-    # Pagos reales (efectivo/transferencia) no generan deuda ni se topean por el límite.
-    if @dispensacion.a_credito? && cc && !cc.puede_dispensar?(monto)
-      return render json: { error: 'Crédito insuficiente para realizar la dispensa.' }, status: :unprocessable_entity
+    cc = @paciente.cuenta_corriente
+    if (err = validar_y_calcular_credito(@dispensacion, cc))
+      return render json: { error: err }, status: :unprocessable_entity
     end
 
     ActiveRecord::Base.transaction do
@@ -141,10 +125,60 @@ class DispensacionesController < ApplicationController
 
   # PATCH/PUT /dispensaciones/:id
   def update
-    if @dispensacion.update(dispensacion_params_update)
+    attrs = dispensacion_params_update
+    # Cambios sin impacto financiero (fecha, observaciones, sede, delivery…): update directo.
+    financiero = (attrs.keys.map(&:to_s) & %w[cantidad stock_id aporte_socio_ars medio_pago]).any?
+    unless financiero
+      if @dispensacion.update(attrs)
+        return render json: serialize_dispensacion(@dispensacion)
+      else
+        return render json: { errors: @dispensacion.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+
+    # Cambio financiero (incl. cantidad): se revierten los efectos actuales (stock,
+    # cuenta corriente, gramos, asientos) y se re-aplican con los valores nuevos, todo
+    # en una transacción, para no dejar la contabilidad/stock inconsistentes.
+    if @dispensacion.movimientos_contables.any?(&:cerrado?)
+      return render json: { error: 'La dispensación pertenece a un período contable cerrado y no puede editarse.' }, status: :unprocessable_entity
+    end
+
+    cc = @dispensacion.paciente.cuenta_corriente
+    begin
+      ActiveRecord::Base.transaction do
+        # 1) revertir efectos actuales
+        revertir_gramos(@dispensacion)
+        revertir_cuenta_corriente(@dispensacion)
+        CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)
+        @dispensacion.movimientos_contables.destroy_all
+        @dispensacion.send(:incrementar_stock)   # devuelve al stock la cantidad vieja
+        @dispensacion.stock.reload
+        cc&.reload
+
+        # 2) aplicar cambios nuevos
+        @dispensacion.assign_attributes(attrs)
+
+        # 3) validar stock disponible con la cantidad nueva
+        disp_real = @dispensacion.stock.cantidad_disponible_real.to_d
+        if @dispensacion.cantidad.to_d > disp_real
+          raise "Stock insuficiente: hay #{disp_real.round(2)}#{@dispensacion.stock.unidad || 'g'} disponibles"
+        end
+
+        if (err = validar_y_calcular_credito(@dispensacion, cc))
+          raise err
+        end
+
+        @dispensacion.save!
+        @dispensacion.send(:decrementar_stock)   # descuenta la cantidad nueva
+        crear_movimiento_contable(@dispensacion)
+        debitar_cuenta_corriente(@dispensacion) if @dispensacion.a_credito? && cc
+        debitar_gramos(@dispensacion)           if @dispensacion.medio_pago == 'credito_gramos'
+      end
       render json: serialize_dispensacion(@dispensacion)
-    else
-      render json: { errors: @dispensacion.errors.full_messages }, status: :unprocessable_entity
+    rescue ActiveRecord::RecordInvalid => e
+      render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+    rescue => e
+      render json: { errors: [e.message] }, status: :unprocessable_entity
     end
   end
 
@@ -180,11 +214,13 @@ class DispensacionesController < ApplicationController
     unless %w[pendiente en_viaje].include?(@dispensacion.estado_envio)
       return render json: { error: 'La dispensación no está en un estado válido para entregar' }, status: :unprocessable_entity
     end
+    registrar_evento_envio(@dispensacion, 'entregado', motivo: params[:notas_entrega])
     @dispensacion.update!(
       estado_envio:       'entregado',
       notas_entrega:      params[:notas_entrega],
       firma_entrega_data: params[:firma_entrega_data],
-      entregado_at:       Time.current
+      entregado_at:       Time.current,
+      historial_envio:    @dispensacion.historial_envio,
     )
     NotificacionDeliveryService.new(@dispensacion).notificar_entrega
     render json: serialize_dispensacion_delivery(@dispensacion)
@@ -202,7 +238,8 @@ class DispensacionesController < ApplicationController
     end
     motivo = params[:motivo_fallo].presence
     return render json: { error: 'El motivo es requerido' }, status: :unprocessable_entity unless motivo
-    @dispensacion.update!(estado_envio: 'fallido', motivo_fallo: motivo)
+    registrar_evento_envio(@dispensacion, 'fallido', motivo: motivo)
+    @dispensacion.update!(estado_envio: 'fallido', motivo_fallo: motivo, historial_envio: @dispensacion.historial_envio)
     render json: serialize_dispensacion_delivery(@dispensacion)
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
@@ -217,10 +254,40 @@ class DispensacionesController < ApplicationController
     unless @dispensacion.estado_envio == 'fallido'
       return render json: { error: 'Solo se pueden reprogramar paquetes fallidos' }, status: :unprocessable_entity
     end
-    @dispensacion.update!(estado_envio: 'pendiente', motivo_fallo: nil)
+    registrar_evento_envio(@dispensacion, 'reprogramado', motivo: params[:motivo])
+    @dispensacion.update!(estado_envio: 'pendiente', motivo_fallo: nil, historial_envio: @dispensacion.historial_envio)
     render json: serialize_dispensacion_delivery(@dispensacion)
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # PATCH /dispensaciones/:id/cancelar_entrega
+  # Cancela la dispensación CONSERVANDO el registro (estado 'cancelada'): revierte
+  # stock, cuenta corriente y asientos contables, y deja el evento en el historial.
+  def cancelar_entrega
+    unless current_user.admin? || current_user.supervisor?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    if @dispensacion.cancelada?
+      return render json: { error: 'La dispensación ya está cancelada' }, status: :unprocessable_entity
+    end
+    if @dispensacion.movimientos_contables.any?(&:cerrado?)
+      return render json: { error: 'Pertenece a un período contable cerrado y no puede cancelarse.' }, status: :unprocessable_entity
+    end
+    motivo = params[:motivo].presence
+    cc = @dispensacion.paciente.cuenta_corriente
+    ActiveRecord::Base.transaction do
+      revertir_gramos(@dispensacion)
+      revertir_cuenta_corriente(@dispensacion)
+      CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)
+      @dispensacion.movimientos_contables.destroy_all
+      @dispensacion.send(:incrementar_stock)   # el producto vuelve al stock
+      registrar_evento_envio(@dispensacion, 'cancelado', motivo: motivo)
+      @dispensacion.update!(estado_envio: 'cancelada', historial_envio: @dispensacion.historial_envio)
+    end
+    render json: serialize_dispensacion_delivery(@dispensacion)
+  rescue => e
+    render json: { errors: [e.message] }, status: :unprocessable_entity
   end
 
   # GET /dispensaciones/export_csv
@@ -283,7 +350,7 @@ class DispensacionesController < ApplicationController
   def destroy
     # Una dispensación cuyo asiento cae en un período contable cerrado es
     # inmutable: borrarla dejaría el libro congelado inconsistente con el stock
-    if @dispensacion.movimiento_contable&.cerrado?
+    if @dispensacion.movimientos_contables.any?(&:cerrado?)
       return render json: { error: 'La dispensación pertenece a un período contable cerrado y no puede eliminarse.' }, status: :unprocessable_entity
     end
 
@@ -334,6 +401,7 @@ class DispensacionesController < ApplicationController
     params.require(:dispensacion).permit(
       :indicacion_medica_id, :stock_id, :sede_id,
       :cantidad, :precio_unitario_ars, :aporte_socio_ars,
+      :descuento_dispensa_pct,
       :observaciones, :fecha_dispensacion, :medio_pago,
       :con_envio, :delivery_id, :direccion_envio,
       :contacto_nombre, :contacto_telefono, :notas_envio,
@@ -345,9 +413,44 @@ class DispensacionesController < ApplicationController
   def dispensacion_params_update
     params.require(:dispensacion).permit(
       :indicacion_medica_id, :stock_id, :sede_id,
-      :aporte_socio_ars, :observaciones, :fecha_dispensacion, :medio_pago,
+      :cantidad, :aporte_socio_ars, :observaciones, :fecha_dispensacion, :medio_pago,
       :delivery_id
     )
+  end
+
+  # Agrega un evento a la bitácora de entrega (no guarda: el caller hace update!).
+  def registrar_evento_envio(disp, evento, motivo: nil)
+    disp.historial_envio = (disp.historial_envio || []) + [{
+      'evento'         => evento,
+      'fecha'          => Time.current.iso8601,
+      'motivo'         => motivo.presence,
+      'usuario_id'     => current_user.id,
+      'usuario_nombre' => current_user.first_name || current_user.email,
+    }]
+  end
+
+  # Valida el medio de pago y calcula cuánto cae al crédito (monto_credito_ars).
+  # Devuelve un string de error o nil. Compartido entre create y update.
+  def validar_y_calcular_credito(dispensacion, cc)
+    monto = dispensacion.aporte_socio_ars.to_d
+    if monto <= 0 && dispensacion.medio_pago != 'credito_gramos'
+      return 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.'
+    end
+    credito_disp = cc ? [cc.saldo_disponible.to_d + cc.limite_credito.to_d, 0].max : 0
+    dispensacion.monto_credito_ars = 0
+    case dispensacion.medio_pago
+    when 'cuenta_corriente'
+      return 'El paciente no tiene crédito configurado para cobrar por cuenta corriente.' unless cc&.limite_credito.to_f > 0
+      dispensacion.monto_credito_ars = [monto, credito_disp].min
+    when 'no_abona'
+      return 'El paciente no tiene crédito configurado. Consultá con el administrador.' if cc.nil? || cc.limite_credito.to_f <= 0
+      return 'Crédito insuficiente para realizar la dispensa.' unless cc.puede_dispensar?(monto)
+      dispensacion.monto_credito_ars = monto
+    when 'credito_gramos'
+      return 'El paciente no tiene crédito en gramos activo.' unless cc&.credito_gramos_activo?
+      return "Gramos insuficientes: dispone de #{cc.saldo_disponible_g.to_f}g" if cc.saldo_disponible_g.to_d < dispensacion.cantidad.to_d
+    end
+    nil
   end
 
   def require_dispensaciones_role!

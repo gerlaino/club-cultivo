@@ -69,7 +69,7 @@ class InformesController < ApplicationController
     club  = current_user.club
     desde, hasta = periodo_rango
 
-    disps = Dispensacion.joins(stock: :sede)
+    disps = Dispensacion.no_canceladas.joins(stock: :sede)
                         .where(sedes: { club_id: club.id })
                         .where(fecha_dispensacion: desde..hasta)
 

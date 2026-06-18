@@ -28,7 +28,7 @@ class BenchmarkController < ApplicationController
       (lotes_finalizados.sum { |l| l.rendimiento_real_g.to_f } / lotes_finalizados.size).round(1) : nil
 
     hoy = Date.today
-    disps_mes = Dispensacion.joins(stock: :sede)
+    disps_mes = Dispensacion.no_canceladas.joins(stock: :sede)
                             .where(sedes: { club_id: club.id })
                             .where(fecha_dispensacion: hoy.beginning_of_month..hoy)
     gramos_mes = disps_mes.sum(:cantidad).to_f.round(2)
@@ -68,7 +68,7 @@ class BenchmarkController < ApplicationController
     avg_rendimiento = rendimientos.any? ? (rendimientos.sum / rendimientos.size).round(1) : nil
 
     gramos_mes_list = opted_clubs.map do |c|
-      Dispensacion.joins(stock: :sede)
+      Dispensacion.no_canceladas.joins(stock: :sede)
                   .where(sedes: { club_id: c.id })
                   .where(fecha_dispensacion: inicio_mes..hoy)
                   .sum(:cantidad).to_f
@@ -78,7 +78,7 @@ class BenchmarkController < ApplicationController
     dispens_por_pac_list = opted_clubs.filter_map do |c|
       pac = c.pacientes.where(deleted_at: nil).count
       next if pac == 0
-      disps = Dispensacion.joins(stock: :sede)
+      disps = Dispensacion.no_canceladas.joins(stock: :sede)
                           .where(sedes: { club_id: c.id })
                           .where(fecha_dispensacion: inicio_mes..hoy)
                           .count
