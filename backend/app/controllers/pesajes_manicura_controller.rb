@@ -64,8 +64,29 @@ class PesajesManicuraController < ApplicationController
     if @pesaje.confirmado?
       return render json: { error: 'No se puede borrar un pesaje ya confirmado' }, status: :unprocessable_entity
     end
+
+    # Si lo borra un admin/supervisor (no el propio manicurista), avisarle al manicurista
+    # que su pesaje se descartó para que lo vuelva a cargar.
+    notificar = @pesaje.manicurador_id != current_user.id
+    lote_id     = @pesaje.lote_id
+    lote_codigo = @pesaje.lote.codigo
+    peso_decl   = @pesaje.peso_total_g || @pesaje.peso_calculado_g
+
     @pesaje.pesadas_plantas.destroy_all
     @pesaje.destroy
+
+    if notificar
+      AlertaInterna.create!(
+        club:             current_user.club,
+        tipo:             'manicura_eliminada',
+        mensaje:          "Se eliminó el pesaje del lote #{lote_codigo} (#{peso_decl.to_f.round(1)}g) — volvé a registrarlo",
+        severidad:        'warning',
+        creada_por:       current_user,
+        destinada_a_role: 'manicura',
+        contexto:         { lote_id: lote_id, lote_codigo: lote_codigo },
+      )
+    end
+
     head :no_content
   end
 
@@ -79,6 +100,21 @@ class PesajesManicuraController < ApplicationController
       return render json: { error: 'Solo se puede reabrir un pesaje enviado' }, status: :unprocessable_entity
     end
     @pesaje.update!(estado: 'borrador', enviado_at: nil)
+
+    # Si lo reabre un admin/supervisor (no el propio manicurista), avisarle que su pesaje
+    # volvió a borrador para que lo corrija y lo vuelva a enviar. Los datos se conservan.
+    if @pesaje.manicurador_id != current_user.id
+      AlertaInterna.create!(
+        club:             current_user.club,
+        tipo:             'manicura_reabierta',
+        mensaje:          "El pesaje del lote #{@pesaje.lote.codigo} se reabrió para corrección — revisalo y volvé a enviarlo",
+        severidad:        'warning',
+        creada_por:       current_user,
+        destinada_a_role: 'manicura',
+        contexto:         { lote_id: @pesaje.lote_id, lote_codigo: @pesaje.lote.codigo, pesaje_manicura_id: @pesaje.id },
+      )
+    end
+
     render json: PesajeManicuraSerializer.serialize(@pesaje)
   end
 

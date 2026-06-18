@@ -16,6 +16,8 @@ export function resolverRutaAlerta(tipo, contexto = {}) {
     case 'manicura_aprobacion_pendiente':
     case 'manicura_aprobada':
     case 'manicura_rechazada':
+    case 'manicura_eliminada':
+    case 'manicura_reabierta':
       return c.lote_id ? `/lotes/${c.lote_id}` : null
 
     case 'sin_registro_ambiental':

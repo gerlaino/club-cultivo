@@ -23,6 +23,7 @@ const INTERNA_ICON  = {
   sin_registro_ambiental: '📋', cosecha_pendiente: '🌿', tarea_vencida_cultivo: '📌',
   saldo_cc_bajo: '💳', saldo_gramos_bajo: '⚖️', documento_vencido: '📄',
   reprocann_vencido: '📄', reprocann_por_vencer: '⏰', manicura_aprobacion_pendiente: '✂️',
+  manicura_aprobada: '✅', manicura_rechazada: '↩️', manicura_eliminada: '🗑️', manicura_reabierta: '✏️',
   stock_bajo: '📦',
 }
 const SEV_CLASS = { error: 'nb__dot--error', warning: 'nb__dot--warning', info: 'nb__dot--info' }

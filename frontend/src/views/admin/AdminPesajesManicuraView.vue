@@ -76,6 +76,20 @@
         </div>
 
         <div class="apm__card-actions">
+          <button
+            class="apm__btn-eliminar"
+            :disabled="eliminandoId === p.id"
+            @click="eliminar(p)"
+          >
+            <Trash2 :size="14" :stroke-width="2" /> Eliminar
+          </button>
+          <button
+            class="apm__btn-reabrir"
+            :disabled="reabriendoId === p.id"
+            @click="reabrir(p)"
+          >
+            <RotateCcw :size="14" :stroke-width="2" /> Reabrir
+          </button>
           <button class="apm__btn-confirmar" @click="abrirConfirmacion(p)">
             <CheckCircle :size="14" :stroke-width="2" /> Confirmar
           </button>
@@ -170,11 +184,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, MessageCircle, List } from 'lucide-vue-next'
-import { listPesajesManicuraAdmin, confirmarPesajeManicura, listStocks, listLotes } from '../../lib/api.js'
+import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, MessageCircle, List, Trash2, RotateCcw } from 'lucide-vue-next'
+import { listPesajesManicuraAdmin, confirmarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura, listStocks, listLotes } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useConfirm } from '../../composables/useConfirm.js'
 
 const toast = useToast()
+const { confirm } = useConfirm()
 
 const loading      = ref(true)
 const pesajes      = ref([])
@@ -244,6 +260,52 @@ async function abrirConfirmacion(p) {
 function cerrarModal() {
   modalOpen.value    = false
   pesajeActivo.value = null
+}
+
+// Devuelve el pesaje a borrador para que el manicurista lo corrija y lo reenvíe.
+// NO pierde los pesajes individuales: es el camino recomendado para correcciones.
+const reabriendoId = ref(null)
+async function reabrir(p) {
+  const ok = await confirm({
+    title:       'Reabrir para corrección',
+    message:     `El pesaje del lote ${p.lote_codigo} volverá a ${p.manicurador_nombre} como borrador para que lo corrija y lo reenvíe. No se pierde ninguna planta cargada.`,
+    confirmText: 'Reabrir',
+    variant:     'primary',
+  })
+  if (!ok) return
+  reabriendoId.value = p.id
+  try {
+    await reabrirPesajeManicura(p.lote_id, p.id)
+    toast.success(`Pesaje de ${p.lote_codigo} reabierto — se avisó a ${p.manicurador_nombre}`)
+    cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || e.response?.data?.errors?.[0] || 'No se pudo reabrir el pesaje')
+  } finally {
+    reabriendoId.value = null
+  }
+}
+
+// Descarta un pesaje declarado por manicura (no confirmado). Útil para limpiar
+// jornadas erróneas/duplicadas o destrabar un pesaje que no se puede confirmar.
+const eliminandoId = ref(null)
+async function eliminar(p) {
+  const ok = await confirm({
+    title:       'Eliminar peso declarado',
+    message:     `Se descartará el pesaje del lote ${p.lote_codigo} (${(p.peso_total_g || p.peso_calculado_g || 0).toFixed(1)}g declarados por ${p.manicurador_nombre}). Esta acción no se puede deshacer.`,
+    confirmText: 'Eliminar',
+    variant:     'danger',
+  })
+  if (!ok) return
+  eliminandoId.value = p.id
+  try {
+    await deletePesajeManicura(p.lote_id, p.id)
+    toast.success(`Pesaje de ${p.lote_codigo} eliminado`)
+    cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || e.response?.data?.errors?.[0] || 'No se pudo eliminar el pesaje')
+  } finally {
+    eliminandoId.value = null
+  }
 }
 
 async function confirmar() {
@@ -398,6 +460,24 @@ onMounted(cargar)
   transition: background .15s;
 }
 .apm__btn-confirmar:hover { background: var(--c-leaf-800); }
+.apm__btn-eliminar {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  background: transparent; color: var(--c-ink-500); border: 1px solid var(--c-ink-200);
+  padding: .5rem 1rem; border-radius: var(--r-sm);
+  font-size: var(--fs-13); font-weight: 600; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.apm__btn-eliminar:hover:not(:disabled) { background: var(--c-rust-100, #fef2f2); color: #dc2626; border-color: #fecaca; }
+.apm__btn-eliminar:disabled { opacity: .5; cursor: not-allowed; }
+.apm__btn-reabrir {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  background: transparent; color: var(--c-leaf-700); border: 1px solid var(--c-leaf-300);
+  padding: .5rem 1rem; border-radius: var(--r-sm);
+  font-size: var(--fs-13); font-weight: 600; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.apm__btn-reabrir:hover:not(:disabled) { background: var(--c-leaf-50); color: var(--c-leaf-800); border-color: var(--c-leaf-500); }
+.apm__btn-reabrir:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Modal */
 .apm-overlay {

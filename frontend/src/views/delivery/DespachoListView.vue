@@ -3,12 +3,18 @@ import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   PackageCheck, Truck, CheckCircle2, XCircle, User, MapPin,
-  Phone, FileText, RefreshCw, ChevronDown, ChevronUp, AlertCircle
+  Phone, FileText, RefreshCw, ChevronDown, ChevronUp, AlertCircle,
+  CalendarClock, ArrowRight, BookmarkCheck
 } from 'lucide-vue-next'
-import { listDespachos, listEntregadores, reasignarDelivery, reprogramarPaquete } from '../../lib/api.js'
+import {
+  listDespachos, listEntregadores, reasignarDelivery, reprogramarPaquete,
+  listReservas, entregarReserva,
+} from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useConfirm } from '../../composables/useConfirm.js'
 
 const toast = useToast()
+const { confirm } = useConfirm()
 
 const despachos      = ref([])
 const deliveryUsers  = ref([])
@@ -25,6 +31,11 @@ const filtroBusca    = ref('')
 const expandedId     = ref(null)
 const reasignandoId  = ref(null)
 const nuevoDelivery  = ref('')
+
+// Reservas con envío pendientes: entregas futuras que todavía no son un despacho real.
+// Al "preparar entrega" se convierten en Dispensacion con envío y bajan a la lista.
+const reservas          = ref([])
+const entregandoReservaId = ref(null)
 
 const kpis = computed(() => ({
   pendientes: despachos.value.filter(d => d.estado_envio === 'pendiente').length,
@@ -60,6 +71,26 @@ const fmtFecha = (d) => d
   ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
   : '—'
 
+const fmtMoneda = (n) => (n == null ? null : new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n))
+
+const HOY = new Date().toISOString().slice(0, 10)
+
+// Reservas con envío pendientes, ordenadas por urgencia (las más próximas/vencidas primero).
+const reservasEnvio = computed(() =>
+  reservas.value
+    .filter(r => r.con_envio && r.estado === 'pendiente')
+    .sort((a, b) => (a.fecha_entrega_estimada || '').localeCompare(b.fecha_entrega_estimada || ''))
+)
+
+// 'vencida' (fecha pasada), 'hoy', o 'proxima'. Define color y etiqueta.
+function urgenciaReserva(r) {
+  if (!r.fecha_entrega_estimada) return 'proxima'
+  if (r.fecha_entrega_estimada < HOY)  return 'vencida'
+  if (r.fecha_entrega_estimada === HOY) return 'hoy'
+  return 'proxima'
+}
+const URGENCIA_LABEL = { vencida: 'Vencida', hoy: 'Hoy', proxima: 'Próxima' }
+
 async function load() {
   loading.value = true
   try {
@@ -72,6 +103,36 @@ async function load() {
     despachos.value = data.dispensaciones || []
   } catch { toast.error('Error al cargar despachos') }
   finally { loading.value = false }
+}
+
+async function loadReservas() {
+  try {
+    const { data } = await listReservas({ estado: 'pendiente' })
+    reservas.value = (data.reservas || [])
+  } catch { reservas.value = [] }
+}
+
+// Convierte la reserva en una dispensación con envío (corre validaciones de crédito/stock
+// en el backend). Al confirmarse, aparece como despacho 'pendiente' en la lista de abajo.
+async function prepararEntrega(r) {
+  const restante = r.aporte_restante_ars > 0 ? ` Se cobrará ${fmtMoneda(r.aporte_restante_ars)}.` : ''
+  const ok = await confirm({
+    title:       'Preparar entrega',
+    message:     `Se generará el despacho con envío de ${r.cantidad}${r.stock?.unidad || 'g'} para ${r.paciente?.nombre}.${restante} Después podés asignarle un repartidor en la lista de despachos.`,
+    confirmText: 'Generar despacho',
+    variant:     'primary',
+  })
+  if (!ok) return
+  entregandoReservaId.value = r.id
+  try {
+    await entregarReserva(r.id)
+    toast.success(`Despacho generado para ${r.paciente?.nombre}`)
+    await Promise.all([loadReservas(), load()])
+  } catch (e) {
+    toast.error(e.response?.data?.errors?.[0] || e.response?.data?.error || 'No se pudo generar el despacho')
+  } finally {
+    entregandoReservaId.value = null
+  }
 }
 
 const ROLE_LABEL = { delivery: 'Repartidor', admin: 'Admin', supervisor: 'Supervisor' }
@@ -132,7 +193,7 @@ async function reprogramar(id) {
   finally { reprogramando.value = false }
 }
 
-onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
+onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
 </script>
 
 <template>
@@ -175,6 +236,51 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
         <span class="dsp__kpi-l">Fallidos</span>
       </div>
     </div>
+
+    <!-- Próximas entregas: reservas con envío pendientes -->
+    <section v-if="reservasEnvio.length" class="dsp__resv">
+      <div class="dsp__resv-head">
+        <BookmarkCheck :size="16" :stroke-width="2" />
+        <span class="dsp__resv-title">Próximas entregas</span>
+        <span class="dsp__resv-count">{{ reservasEnvio.length }}</span>
+        <span class="dsp__resv-hint">reservas con envío pendientes de despachar</span>
+      </div>
+
+      <div class="dsp__resv-list">
+        <div
+          v-for="r in reservasEnvio"
+          :key="r.id"
+          class="dsp__resv-card"
+          :class="`dsp__resv-card--${urgenciaReserva(r)}`"
+        >
+          <div class="dsp__resv-when">
+            <CalendarClock :size="13" :stroke-width="2" />
+            <span class="dsp__resv-urg" :class="`dsp__resv-urg--${urgenciaReserva(r)}`">
+              {{ URGENCIA_LABEL[urgenciaReserva(r)] }}
+            </span>
+            <span class="dsp__resv-date">{{ fmtFecha(r.fecha_entrega_estimada) }}</span>
+          </div>
+
+          <div class="dsp__resv-body">
+            <div class="dsp__resv-nombre"><User :size="12" :stroke-width="2" /> {{ r.paciente?.nombre }}</div>
+            <div class="dsp__resv-meta">
+              <span><PackageCheck :size="12" :stroke-width="2" /> {{ r.cantidad }}{{ r.stock?.unidad || 'g' }}<template v-if="r.stock?.lote"> · {{ r.stock.lote }}</template></span>
+              <span><MapPin :size="12" :stroke-width="2" /> {{ r.direccion_envio || '(sin dirección)' }}</span>
+              <span v-if="r.contacto_telefono"><Phone :size="12" :stroke-width="2" /> {{ r.contacto_telefono }}</span>
+              <span v-if="r.aporte_restante_ars > 0" class="dsp__resv-cobrar">A cobrar {{ fmtMoneda(r.aporte_restante_ars) }}</span>
+            </div>
+          </div>
+
+          <button
+            class="dsp__resv-btn"
+            :disabled="entregandoReservaId === r.id"
+            @click="prepararEntrega(r)"
+          >
+            Generar despacho <ArrowRight :size="14" :stroke-width="2" />
+          </button>
+        </div>
+      </div>
+    </section>
 
     <!-- Filtros -->
     <div class="dsp__filters">
@@ -781,6 +887,62 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
 .dsp__btn-reprogramar:disabled { opacity: .5; cursor: not-allowed; }
 
 
+/* Próximas entregas (reservas con envío) */
+.dsp__resv {
+  background: var(--c-leaf-50);
+  border: 1px solid var(--c-leaf-100);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+.dsp__resv-head {
+  display: flex; align-items: center; gap: var(--sp-2);
+  color: var(--c-leaf-800); margin-bottom: var(--sp-3);
+}
+.dsp__resv-title { font-size: var(--fs-14); font-weight: 700; }
+.dsp__resv-count {
+  background: var(--c-leaf-700); color: #fff; font-size: var(--fs-11); font-weight: 700;
+  min-width: 18px; text-align: center; padding: 1px 6px; border-radius: 10px;
+}
+.dsp__resv-hint { font-size: var(--fs-12); color: var(--c-ink-500); font-weight: 500; }
+
+.dsp__resv-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+.dsp__resv-card {
+  display: flex; align-items: center; gap: var(--sp-4);
+  background: var(--c-paper); border: 1px solid var(--c-ink-100);
+  border-left: 3px solid var(--c-leaf-500);
+  border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
+}
+.dsp__resv-card--vencida { border-left-color: #dc2626; }
+.dsp__resv-card--hoy     { border-left-color: #d97706; }
+.dsp__resv-card--proxima { border-left-color: var(--c-leaf-500); }
+
+.dsp__resv-when { display: flex; align-items: center; gap: 6px; min-width: 150px; color: var(--c-ink-500); }
+.dsp__resv-urg { font-size: var(--fs-11); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.dsp__resv-urg--vencida { color: #dc2626; }
+.dsp__resv-urg--hoy     { color: #d97706; }
+.dsp__resv-urg--proxima { color: var(--c-leaf-700); }
+.dsp__resv-date { font-size: var(--fs-12); color: var(--c-ink-500); }
+
+.dsp__resv-body { flex: 1; min-width: 0; }
+.dsp__resv-nombre { display: flex; align-items: center; gap: 5px; font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
+.dsp__resv-meta {
+  display: flex; flex-wrap: wrap; gap: 4px var(--sp-3); margin-top: 2px;
+  font-size: var(--fs-12); color: var(--c-ink-500);
+}
+.dsp__resv-meta span { display: inline-flex; align-items: center; gap: 4px; }
+.dsp__resv-cobrar { color: #d97706; font-weight: 700; }
+
+.dsp__resv-btn {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  background: var(--c-leaf-700); color: #fff; border: none;
+  padding: .5rem .9rem; border-radius: var(--r-sm);
+  font-size: var(--fs-13); font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.dsp__resv-btn:hover:not(:disabled) { background: var(--c-leaf-800); }
+.dsp__resv-btn:disabled { opacity: .5; cursor: not-allowed; }
+
 @media (max-width: 768px) {
   .dsp { padding: var(--sp-4); }
   .dsp__kpis { grid-template-columns: repeat(2, 1fr); }
@@ -788,5 +950,7 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers()]))
   .dsp__row-left { min-width: unset; }
   .dsp__row-right { align-items: flex-start; }
   .dsp__detail-grid { grid-template-columns: 1fr; }
+  .dsp__resv-card { flex-wrap: wrap; }
+  .dsp__resv-btn { width: 100%; justify-content: center; }
 }
 </style>
