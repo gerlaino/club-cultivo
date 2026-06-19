@@ -86,7 +86,8 @@ class Sala < ApplicationRecord
   end
 
   def plantas_totales
-    lotes.sum(:plants_count)
+    # Conteo vivo: plantas no descartadas (el default scope de Plant excluye las eliminadas).
+    Plant.where(lote_id: lotes.select(:id)).where.not(state: 'descartada').count
   end
 
   def porcentaje_ocupacion

@@ -86,7 +86,7 @@ class PlantsController < ApplicationController
           description:   "Estado cambiado de #{old_state} a #{@plant.state}",
           occurred_at:   Time.current
         )
-        if @plant.state == 'descartada'
+        if @plant.state == 'descartada' && old_state != 'descartada'
           @plant.lote.lote_eventos.create!(
             tipo:          'nota',
             descripcion:   "Planta #{@plant.nombre} descartada (estaba en #{old_state})",
@@ -94,6 +94,10 @@ class PlantsController < ApplicationController
             club:          current_user.club,
             registrado_en: Time.current,
           )
+          # Una planta descartada deja de contar como planta viva del lote.
+          @plant.lote.decrement!(:plants_count) if @plant.lote.plants_count.to_i > 0
+        elsif old_state == 'descartada' && @plant.state != 'descartada'
+          @plant.lote.increment!(:plants_count) # se revierte el descarte
         end
       end
       render json: serialize_plant_detail(@plant)

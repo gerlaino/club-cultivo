@@ -318,6 +318,11 @@ class SalasController < ApplicationController
     lotes_all = s.lotes.includes(:genetica).order(start_date: :desc, created_at: :desc)
     lote_ids  = lotes_all.map(&:id)
 
+    # Conteo VIVO de plantas por lote (excluye descartadas; el default scope ya excluye
+    # las eliminadas). Es la verdad, no el campo plants_count denormalizado que puede driftear.
+    plantas_vivas_por_lote = Plant.where(lote_id: lote_ids).where.not(state: 'descartada').group(:lote_id).count
+    plantas_vivas = ->(id) { plantas_vivas_por_lote[id] || 0 }
+
     fecha_cosecha_por_lote =
       lote_ids.any? ?
         Plant.where(lote_id: lote_ids)
@@ -334,7 +339,7 @@ class SalasController < ApplicationController
         codigo:             l.codigo,
         estado:             l.estado,
         start_date:         l.start_date,
-        plants_count:       l.plants_count,
+        plants_count:       plantas_vivas.(l.id),
         genetica_nombre:    l.genetica&.nombre,
         rendimiento_real_g: l.rendimiento_real_g&.to_f,
         fecha_cosecha:      fecha_cosecha,
@@ -355,7 +360,7 @@ class SalasController < ApplicationController
 
     serialize_sala(s).merge(
       lotes: lotes_all.map { |l|
-        { id: l.id, codigo: l.codigo, estado: l.estado, plants_count: l.plants_count }
+        { id: l.id, codigo: l.codigo, estado: l.estado, plants_count: plantas_vivas.(l.id) }
       },
       lotes_historial:,
       historial_kpis:,
