@@ -292,13 +292,13 @@ export const getInformeSemestral = (params = {}) => api.get('/informe_semestral'
 
 export const listTareas        = (params = {}) => api.get('/tareas', { params })
 export const getTareasDashboard = ()            => api.get('/tareas/dashboard')
-export const getTareasKanban   = (params = {}) => api.get('/tareas/kanban', { params })
 export const getTarea          = (id)           => api.get(`/tareas/${id}`)
 export const createTarea       = (payload)      => api.post('/tareas', { tarea: payload })
 export const updateTarea       = (id, payload)  => api.patch(`/tareas/${id}`, { tarea: payload })
 export const deleteTarea       = (id)           => api.delete(`/tareas/${id}`)
 export const iniciarTarea      = (id)           => api.post(`/tareas/${id}/iniciar`)
 export const completarTarea    = (id, data)     => api.post(`/tareas/${id}/completar`, data)
+export const completarTareasMasivo = (ids)      => api.post('/tareas/completar_masivo', { ids })
 export const cancelarTarea     = (id)           => api.post(`/tareas/${id}/cancelar`)
 export const getTareasSemana    = (desde)        => api.get('/tareas/semana', { params: { desde } })
 export const cancelarSerieTarea = (id)           => api.delete(`/tareas/${id}/cancelar_serie`)
@@ -370,6 +370,7 @@ export const deleteSetpointFase  = (id)          => api.delete(`/setpoints_fase/
 
 export const getLoteEventos    = (loteId)          => api.get(`/lotes/${loteId}/lote_eventos`)
 export const createLoteEvento  = (loteId, payload)  => api.post(`/lotes/${loteId}/lote_eventos`, { lote_evento: payload })
+export const deleteLoteEvento  = (loteId, eventoId) => api.delete(`/lotes/${loteId}/lote_eventos/${eventoId}`)
 export const cosecharPlantas   = (loteId, payload)  => api.post(`/lotes/${loteId}/cosechar_plantas`, payload)
 
 export const getLoteFotos    = (loteId)          => api.get(`/lotes/${loteId}/fotos`)
@@ -425,8 +426,8 @@ export const transicionarLote  = (loteId, payload) => api.post(`/lotes/${loteId}
 export const avanzarFaseLote   = (loteId, payload = {}) => api.post(`/lotes/${loteId}/avanzar_fase`, payload)
 export const cerrarCurado      = (loteId, payload) => api.post(`/lotes/${loteId}/cerrar_curado`, payload)
 export const getLoteTimeline  = (loteId)          => api.get(`/lotes/${loteId}/timeline`)
-export const previewLotePlan  = (loteId, planId)  => api.get(`/lotes/${loteId}/preview_plan`, { params: { plan_trabajo_id: planId } })
-export const aplicarLotePlan  = (loteId, planId)  => api.post(`/lotes/${loteId}/aplicar_plan`, { plan_trabajo_id: planId })
+export const previewLotePlan  = (loteId, planId, fechaInicio)  => api.get(`/lotes/${loteId}/preview_plan`, { params: { plan_trabajo_id: planId, fecha_inicio: fechaInicio || undefined } })
+export const aplicarLotePlan  = (loteId, planId, fechaInicio)  => api.post(`/lotes/${loteId}/aplicar_plan`, { plan_trabajo_id: planId, fecha_inicio: fechaInicio || undefined })
 
 // ── Pesadas ───────────────────────────────────────────────────────────────────
 export const getPesadas     = (loteId)          => api.get(`/lotes/${loteId}/pesadas`)

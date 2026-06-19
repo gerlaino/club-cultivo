@@ -27,9 +27,14 @@ class RegistrosAmbientalesController < ApplicationController
   end
 
   def destroy
+    unless current_user.admin?
+      return render json: { error: 'Solo un administrador puede borrar registros' }, status: :forbidden
+    end
     registro = @lote.registros_ambientales.find(params[:id])
     registro.destroy
     head :no_content
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Registro no encontrado' }, status: :not_found
   end
 
   private

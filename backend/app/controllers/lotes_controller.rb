@@ -105,6 +105,8 @@ class LotesController < ApplicationController
 
     @lote = @sala.lotes.build(lote_params)
     @lote.club = current_user.club
+    # Legacy: planta_madre_id (single) = la primera del array de madres, para compatibilidad.
+    @lote.planta_madre_id ||= @lote.planta_madre_ids&.first
 
     # Estados creables: ciclo previo a stock + cosechado. secado/curado/finalizado
     # y los de manicura son post-stock o de proceso y no se cargan a mano.
@@ -603,7 +605,7 @@ class LotesController < ApplicationController
       return render json: { error: 'Sin permiso' }, status: :forbidden
     end
     plan = current_user.club.plan_trabajos.publicados.find(params[:plan_trabajo_id])
-    tareas = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user).preview
+    tareas = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user, fecha_inicio: params[:fecha_inicio]).preview
     render json: {
       plan:   { id: plan.id, titulo: plan.titulo, duracion_dias: plan.duracion_dias },
       tareas: tareas,
@@ -611,6 +613,8 @@ class LotesController < ApplicationController
     }
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Plan no encontrado' }, status: :not_found
+  rescue Date::Error, ArgumentError
+    render json: { error: 'Fecha de inicio inválida' }, status: :unprocessable_entity
   end
 
   # POST /lotes/:id/aplicar_plan
@@ -619,10 +623,12 @@ class LotesController < ApplicationController
       return render json: { error: 'Sin permiso' }, status: :forbidden
     end
     plan = current_user.club.plan_trabajos.publicados.find(params[:plan_trabajo_id])
-    creadas = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user).aplicar!
+    creadas = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user, fecha_inicio: params[:fecha_inicio]).aplicar!
     render json: { tareas_creadas: creadas.size }
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Plan no encontrado' }, status: :not_found
+  rescue Date::Error
+    render json: { error: 'Fecha de inicio inválida' }, status: :unprocessable_entity
   rescue => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
@@ -860,7 +866,8 @@ class LotesController < ApplicationController
       :rendimiento_real_g, :plants_count_cosechadas,
       :fotoperiodo, :fotoperiodo_vegetativo,
       :tamanio_maceta_inicial, :fecha_trasplante,
-      :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico
+      :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico,
+      planta_madre_ids: []
     )
   end
 
@@ -872,7 +879,8 @@ class LotesController < ApplicationController
       :rendimiento_real_g, :plants_count_cosechadas,
       :fotoperiodo, :fotoperiodo_vegetativo,
       :tamanio_maceta_inicial, :fecha_trasplante,
-      :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico
+      :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico,
+      planta_madre_ids: []
     )
   end
 

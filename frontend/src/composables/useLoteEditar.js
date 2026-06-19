@@ -35,7 +35,8 @@ export function useLoteEditar(loteId) {
       light_type:        l.light_type        || '',
       tiene_semanas:     !!l.semanas_floracion,
       semanas_floracion: l.semanas_floracion ?? '',
-      tamanio_maceta:    l.tamanio_maceta    ?? '',
+      // El backend serializa decimal(4,1) como "5.0"; el <select> usa "5". Normalizar para que matchee.
+      tamanio_maceta:    l.tamanio_maceta != null && l.tamanio_maceta !== '' ? String(parseFloat(l.tamanio_maceta)) : '',
       notes:             l.notes             || '',
     }
     editLoteError.value = null

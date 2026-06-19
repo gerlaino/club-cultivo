@@ -3,7 +3,7 @@
  * El `collapsed` ref es module-level: ambos componentes comparten la misma instancia.
  */
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { listLotes, getTareasKanban } from '../lib/api.js'
+import { listLotes, getTareasDashboard } from '../lib/api.js'
 
 // ── Singleton state ───────────────────────────────────────────────────────────
 const collapsed = ref(
@@ -50,15 +50,16 @@ export function useNavContext() {
 
   async function refreshBadges() {
     try {
-      const [lotesRes, kanbanRes] = await Promise.allSettled([
+      const [lotesRes, dashRes] = await Promise.allSettled([
         listLotes({ estado: 'manicura_pendiente' }),
-        getTareasKanban(),
+        getTareasDashboard(),
       ])
       if (lotesRes.status === 'fulfilled') {
         aprobPendientes.value = (lotesRes.value.data || []).length
       }
-      if (kanbanRes.status === 'fulfilled') {
-        tareasPendientes.value = (kanbanRes.value.data?.pendiente || []).length
+      if (dashRes.status === 'fulfilled') {
+        // Pendientes reales del día (vencidas + hoy), no futuras.
+        tareasPendientes.value = dashRes.value.data?.stats?.pendientes || 0
       }
     } catch {}
   }

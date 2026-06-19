@@ -35,6 +35,7 @@ class LoteSerializer
       codigo_qr:            lote.codigo_qr,
       origen:               lote.origen,
       planta_madre:         lote.planta_madre ? { id: lote.planta_madre.id, nombre: lote.planta_madre.nombre, codigo_qr: lote.planta_madre.codigo_qr } : nil,
+      planta_madre_ids:     lote.planta_madre_ids || [],
       estado:               lote.estado,
       fase:                 lote.estado,
       proxima_fase_posible: proxima_fase,

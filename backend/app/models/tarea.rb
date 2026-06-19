@@ -53,6 +53,8 @@ class Tarea < ApplicationRecord
   scope :activas,          -> { where(estado: %w[pendiente en_progreso]) }
   scope :de_hoy,           -> { where(fecha_programada: Time.zone.today) }
   scope :vencidas,         -> { where('fecha_programada < ? AND estado NOT IN (?)', Time.zone.today, %w[completada cancelada]) }
+  # Pendientes reales "del día": vencidas + las de hoy (y sin fecha). NO incluye futuras.
+  scope :pendientes_al_dia, -> { activas.where('fecha_programada <= ? OR fecha_programada IS NULL', Time.zone.today) }
   scope :proximas,         -> { where(fecha_programada: Time.zone.today..7.days.from_now) }
   scope :con_lote,         -> { where.not(lote_id: nil) }
   scope :horas_pendientes, -> { con_lote.completadas.where(horas_aplicadas_al_lote: false).where.not(horas_reales: nil) }

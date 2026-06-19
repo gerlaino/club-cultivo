@@ -112,23 +112,25 @@
 
             <!-- Planta madre (solo esqueje) -->
             <div v-if="form.origen === 'esqueje'" class="nlm__field nlm__field--full">
-              <label class="nlm__label">Planta madre <span class="nlm__label-opt">(opcional)</span></label>
+              <label class="nlm__label">Plantas madre <span class="nlm__label-opt">(opcional · podés elegir varias)</span></label>
               <div v-if="loadingMadres" class="nlm__input nlm__input--ro">Cargando plantas…</div>
               <div v-else class="nlm__madre">
-                <div v-if="plantaMadreSeleccionada" class="nlm__madre-chip">
-                  <i class="bi bi-check-circle-fill"></i>
-                  <strong>{{ plantaMadreSeleccionada.nombre }}</strong>
-                  <span v-if="plantaMadreSeleccionada.lote?.codigo">{{ plantaMadreSeleccionada.lote.codigo }}</span>
-                  <button type="button" class="nlm__madre-clear" @click="clearMadre" title="Quitar">×</button>
+                <div v-if="plantasMadreSeleccionadas.length" class="nlm__madre-chips">
+                  <div v-for="m in plantasMadreSeleccionadas" :key="m.id" class="nlm__madre-chip">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <strong>{{ m.nombre }}</strong>
+                    <span v-if="m.lote?.codigo">{{ m.lote.codigo }}</span>
+                    <button type="button" class="nlm__madre-clear" @click="quitarMadre(m.id)" title="Quitar">×</button>
+                  </div>
                 </div>
                 <input v-model="madreQuery" type="text" class="nlm__input"
-                       :placeholder="plantaMadreSeleccionada ? 'Cambiar planta madre…' : 'Buscar por nombre, sala, lote o genética…'"
+                       :placeholder="plantasMadreSeleccionadas.length ? 'Agregar otra planta madre…' : 'Buscar por nombre, sala, lote o genética…'"
                        @focus="madreFocused = true" @blur="onMadreBlur" autocomplete="off" />
                 <div v-if="madreFocused" class="nlm__madre-drop">
                   <template v-if="madreQuery.trim()">
                     <div v-if="!madreDropdown.length" class="nlm__madre-empty">Sin resultados para "{{ madreQuery }}"</div>
                     <div v-for="p in madreDropdown" :key="p.id" class="nlm__madre-opt"
-                         :class="{ 'nlm__madre-opt--sel': form.planta_madre_id === p.id }" @mousedown.prevent="selectMadre(p)">
+                         :class="{ 'nlm__madre-opt--sel': form.planta_madre_ids.includes(p.id) }" @mousedown.prevent="selectMadre(p)">
                       <span class="nlm__madre-opt-nombre">{{ p.nombre }}</span>
                       <span class="nlm__madre-opt-meta">{{ p.lote?.sala?.nombre }} · {{ p.lote?.codigo }}<span v-if="p.genetica"> · {{ p.genetica.nombre }}</span></span>
                     </div>
@@ -146,7 +148,7 @@
                         </button>
                         <template v-if="!madreColapsados.has(lote.lote_id)">
                           <div v-for="p in lote.plants" :key="p.id" class="nlm__madre-opt nlm__madre-opt--plant"
-                               :class="{ 'nlm__madre-opt--sel': form.planta_madre_id === p.id }" @mousedown.prevent="selectMadre(p)">
+                               :class="{ 'nlm__madre-opt--sel': form.planta_madre_ids.includes(p.id) }" @mousedown.prevent="selectMadre(p)">
                             <span class="nlm__madre-opt-nombre">🌿 {{ p.nombre }}</span>
                             <span class="nlm__madre-opt-meta">{{ p.state }}</span>
                           </div>
@@ -166,13 +168,13 @@
 
             <div class="nlm__field">
               <label class="nlm__label">Genética / Variedad
-                <span v-if="form.planta_madre_id" class="nlm__label-heredada">Heredada de madre</span>
+                <span v-if="form.planta_madre_ids.length" class="nlm__label-heredada">Heredada de madre</span>
               </label>
-              <select class="nlm__input" v-model="form.genetica_id" :disabled="!geneticas.length || !!form.planta_madre_id">
+              <select class="nlm__input" v-model="form.genetica_id" :disabled="!geneticas.length || !!form.planta_madre_ids.length">
                 <option value="">{{ geneticas.length ? 'Sin especificar' : 'Sin genéticas disponibles' }}</option>
                 <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}{{ g.registrada_inase ? ' 🏛️' : '' }} — {{ g.tipo }}</option>
               </select>
-              <p v-if="form.planta_madre_id" class="nlm__hint"><i class="bi bi-link-45deg"></i> La genética se hereda de la planta madre.</p>
+              <p v-if="form.planta_madre_ids.length" class="nlm__hint"><i class="bi bi-link-45deg"></i> La genética se hereda de la planta madre.</p>
               <p v-else-if="!geneticas.length" class="nlm__hint"><i class="bi bi-info-circle"></i> No tenés genéticas marcadas como disponibles. <a href="/geneticas" class="nlm__link">Activá o registrá una</a> para asignarla.</p>
             </div>
 
@@ -300,7 +302,7 @@ const mostrarOrigenSelector = computed(() => {
   const k = effectiveSala.value?.kind
   return !k || KINDS_CON_ORIGEN.includes(k)
 })
-const plantaMadreSeleccionada = computed(() => plantasMadre.value.find(p => p.id === form.value.planta_madre_id))
+const plantasMadreSeleccionadas = computed(() => plantasMadre.value.filter(p => form.value.planta_madre_ids.includes(p.id)))
 const madreDropdown = computed(() => {
   const q = madreQuery.value.trim().toLowerCase()
   if (!q) return []
@@ -337,7 +339,7 @@ function emptyForm() {
   return {
     estado: conOrigen ? 'semilla' : (KIND_TO_ESTADO[kind] || 'vegetativo'),
     origen: conOrigen ? 'semilla' : null,
-    planta_madre_id: null, plants_count: 1,
+    planta_madre_ids: [], plants_count: 1,
     start_date: localISO(),
     genetica_id: '', grow_type: 'sustrato', light_type: '', tamanio_maceta: '', notes: '',
   }
@@ -346,7 +348,7 @@ function emptyForm() {
 async function setOrigen(valor) {
   form.value.origen = valor
   form.value.estado = valor
-  form.value.planta_madre_id = null
+  form.value.planta_madre_ids = []
   madreQuery.value = ''
   if (valor === 'esqueje') {
     loadingMadres.value = true
@@ -358,11 +360,22 @@ let _madreTimer = null
 function onMadreBlur() { _madreTimer = setTimeout(() => { madreFocused.value = false }, 180) }
 function selectMadre(p) {
   clearTimeout(_madreTimer)
-  form.value.planta_madre_id = p.id
-  madreQuery.value = ''; madreFocused.value = false
-  if (p.genetica?.id) form.value.genetica_id = p.genetica.id
+  // Toggle: si ya está, la saca; si no, la agrega. Se pueden elegir varias.
+  if (form.value.planta_madre_ids.includes(p.id)) {
+    form.value.planta_madre_ids = form.value.planta_madre_ids.filter(id => id !== p.id)
+  } else {
+    form.value.planta_madre_ids = [...form.value.planta_madre_ids, p.id]
+  }
+  madreQuery.value = ''
+  // La genética se hereda de la primera madre seleccionada.
+  const primera = plantasMadre.value.find(x => x.id === form.value.planta_madre_ids[0])
+  if (primera?.genetica?.id) form.value.genetica_id = primera.genetica.id
 }
-function clearMadre() { form.value.planta_madre_id = null; madreQuery.value = '' }
+function quitarMadre(id) {
+  form.value.planta_madre_ids = form.value.planta_madre_ids.filter(x => x !== id)
+  const primera = plantasMadre.value.find(x => x.id === form.value.planta_madre_ids[0])
+  if (primera?.genetica?.id) form.value.genetica_id = primera.genetica.id
+}
 
 function validate() {
   const e = {}
@@ -394,7 +407,7 @@ async function crear() {
     if (!payload.genetica_id)     delete payload.genetica_id
     if (!payload.light_type)      delete payload.light_type
     if (!payload.tamanio_maceta)  delete payload.tamanio_maceta
-    if (!payload.planta_madre_id) delete payload.planta_madre_id
+    if (!payload.planta_madre_ids?.length) delete payload.planta_madre_ids
 
     const dias = {
       dias_semilla_esqueje: heredadoDias.value.semilla_esqueje || 0,
@@ -452,7 +465,7 @@ watch(() => props.show, async (open) => {
 
 // Si cambia la sala elegida, recomputar estado inicial del form nuevo
 watch(salaId, () => {
-  if (tipoCreacion.value === 'nuevo' && !form.value.planta_madre_id) {
+  if (tipoCreacion.value === 'nuevo' && !form.value.planta_madre_ids.length) {
     const f = emptyForm()
     form.value.estado = f.estado
     form.value.origen = f.origen
@@ -493,7 +506,8 @@ watch(salaId, () => {
 .nlm__pill { flex: 1; padding: .5rem; border: 1.5px solid #e2e8f0; background: #f8fafc; border-radius: 9px; font-size: .82rem; font-weight: 700; color: #475569; cursor: pointer; transition: all .15s; }
 .nlm__pill--active { border-color: #15803d; background: #f0fdf4; color: #15803d; }
 .nlm__madre { position: relative; }
-.nlm__madre-chip { display: inline-flex; align-items: center; gap: .35rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; border-radius: 7px; padding: .25rem .55rem; font-size: .78rem; margin-bottom: .35rem; }
+.nlm__madre-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .35rem; }
+.nlm__madre-chip { display: inline-flex; align-items: center; gap: .35rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; border-radius: 7px; padding: .25rem .55rem; font-size: .78rem; }
 .nlm__madre-clear { background: none; border: none; color: #15803d; cursor: pointer; font-size: 1rem; line-height: 1; }
 .nlm__madre-drop { position: absolute; z-index: 10; top: 100%; left: 0; right: 0; max-height: 240px; overflow-y: auto; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; box-shadow: 0 8px 24px rgba(0,0,0,.12); margin-top: 3px; }
 .nlm__madre-empty { padding: .6rem .8rem; font-size: .8rem; color: #94a3b8; }

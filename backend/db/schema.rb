@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_19_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_19_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -606,6 +606,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_19_000002) do
     t.string "sistema_hidro"
     t.string "codigo_qr_cosecha"
     t.string "codigo_qr"
+    t.integer "planta_madre_ids", default: [], null: false, array: true
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"

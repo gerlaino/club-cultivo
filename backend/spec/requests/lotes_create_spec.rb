@@ -69,6 +69,21 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
     end
   end
 
+  context 'lote de esquejes con varias plantas madre' do
+    let(:madre_sala) { create(:sala, club: club, sede: sede, kind: 'vegetativo') }
+    let(:madre_lote) { create(:lote, club: club, sala: madre_sala, estado: 'vegetativo') }
+    let(:madres)     { 3.times.map { |i| Plant.create!(lote: madre_lote, club: club, nombre: "M#{i}", state: 'vegetativo') } }
+
+    it 'guarda el array de madres y deja planta_madre_id = la primera' do
+      ids = madres.map(&:id)
+      crear(estado: 'esqueje', origen: 'esqueje', plants_count: 8, start_date: Date.today, planta_madre_ids: ids)
+      expect(response).to have_http_status(:created)
+      lote = Lote.last
+      expect(lote.planta_madre_ids).to eq(ids)
+      expect(lote.planta_madre_id).to eq(ids.first)
+    end
+  end
+
   context 'tamaño de maceta decimal' do
     it 'guarda 0.5L (vaso) sin truncar' do
       crear(estado: 'vegetativo', plants_count: 2, start_date: Date.today, tamanio_maceta: '0.5')

@@ -232,7 +232,7 @@ class SedesController < ApplicationController
       club_id: current_user.club_id,
       sala_id: salas.map(&:id),
       estado:  %w[pendiente en_progreso]
-    ).count
+    ).where('fecha_programada <= ? OR fecha_programada IS NULL', Time.zone.today).count
 
     tareas_urgentes = Tarea.where(
       club_id:  current_user.club_id,

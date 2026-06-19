@@ -278,6 +278,9 @@ const ESTADO_LABELS = {
 function estadoPlantaLabel(e) { return ESTADO_LABELS[e] || e || '—' }
 
 onMounted(async () => {
+  // Watchdog: pase lo que pase, nunca quedar en "cargando" para siempre.
+  const watchdog = setTimeout(() => { if (estado.value === 'cargando') estado.value = 'no_encontrada' }, 14000)
+  try {
   await auth.ensureBootstrapped()
   const base = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/api\/?$/, '')
   try {
@@ -296,6 +299,9 @@ onMounted(async () => {
   }
 
   await resolverEstado()
+  } finally {
+    clearTimeout(watchdog)
+  }
 })
 
 async function resolverEstado() {

@@ -38,6 +38,29 @@ class LoteEventosController < ApplicationController
     end
   end
 
+  # DELETE /api/lotes/:lote_id/lote_eventos/:id
+  # Solo admin. Los eventos cambio_estado definen la historia de fases del lote
+  # (de ahí salen los días de vege/floración en analítica): no se borran desde acá,
+  # para corregir una fase se usa Editar lote (estado + fechas de fase).
+  def destroy
+    unless current_user.admin?
+      return render json: { error: 'Solo un administrador puede borrar eventos' }, status: :forbidden
+    end
+
+    evento = @lote.lote_eventos.find(params[:id])
+
+    if evento.tipo == 'cambio_estado'
+      return render json: {
+        error: 'Este evento define la fase del lote. Para corregir una fase, usá Editar lote (estado y fechas).'
+      }, status: :unprocessable_entity
+    end
+
+    evento.destroy
+    head :no_content
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Evento no encontrado' }, status: :not_found
+  end
+
   private
 
   def set_lote

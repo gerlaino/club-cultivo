@@ -12,9 +12,40 @@
           <i class="bi bi-chevron-right"></i>
         </button>
       </div>
-      <button v-if="canAdmin" class="tl__btn-plan" @click="showAplicarPlan = true">
-        <i class="bi bi-calendar2-check"></i> Aplicar plan
-      </button>
+      <div class="tl__header-actions">
+        <button v-if="canAdmin && !modoSeleccion" class="tl__btn-plan" @click="entrarSeleccion" title="Marcar varias tareas como realizadas">
+          <i class="bi bi-check2-square"></i> Marcar realizadas
+        </button>
+        <button v-if="canAdmin && !modoSeleccion" class="tl__btn-plan" @click="showAplicarPlan = true">
+          <i class="bi bi-calendar2-check"></i> Aplicar plan
+        </button>
+      </div>
+    </div>
+
+    <!-- Planes aplicados al lote -->
+    <div v-if="canAdmin && planesAplicados.length" class="tl__planes">
+      <i class="bi bi-calendar2-check tl__planes-ico"></i>
+      <span class="tl__planes-label">Plan{{ planesAplicados.length > 1 ? 'es' : '' }} aplicado{{ planesAplicados.length > 1 ? 's' : '' }}:</span>
+      <span v-for="a in planesAplicados" :key="a.id" class="tl__plan-chip">
+        {{ a.plan_trabajo?.titulo || 'Plan' }}
+        <button class="tl__plan-quitar" @click="quitarPlan(a)" :disabled="quitandoId === a.id" title="Quitar plan aplicado">
+          <DsSpinner v-if="quitandoId === a.id" :size="11" />
+          <i v-else class="bi bi-x-lg"></i>
+        </button>
+      </span>
+    </div>
+
+    <!-- Barra de selección -->
+    <div v-if="modoSeleccion" class="tl__selbar">
+      <span class="tl__selbar-count">{{ seleccion.length }} seleccionada{{ seleccion.length !== 1 ? 's' : '' }}</span>
+      <div class="tl__selbar-actions">
+        <button class="tl__selbar-link" @click="seleccionarTodasPendientes">Seleccionar pendientes hasta hoy</button>
+        <button class="tl__btn-ghost" @click="salirSeleccion" :disabled="aplicandoBulk">Cancelar</button>
+        <button class="tl__btn-success" @click="marcarRealizadas" :disabled="!seleccion.length || aplicandoBulk">
+          <DsSpinner v-if="aplicandoBulk" :size="13" />
+          <i v-else class="bi bi-check-lg"></i>Marcar realizadas
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="tl__loading">
@@ -39,11 +70,12 @@
               v-for="t in dia.tareas"
               :key="t.id"
               class="tl__chip"
-              :class="[`tl__chip--${t.prioridad}`, { 'tl__chip--done': t.estado === 'completada', 'tl__chip--prog': t.estado === 'en_progreso' }]"
-              @click="abrirTarea(t)"
+              :class="[`tl__chip--${t.prioridad}`, { 'tl__chip--done': t.estado === 'completada', 'tl__chip--prog': t.estado === 'en_progreso', 'tl__chip--sel': isSel(t.id), 'tl__chip--selectable': modoSeleccion && esSeleccionable(t) }]"
+              @click="onTareaClick(t)"
               :title="t.titulo + (t.asignada_a ? ' · ' + t.asignada_a.nombre : '')"
             >
-              <span class="tl__chip-dot"></span>
+              <i v-if="modoSeleccion && esSeleccionable(t)" class="bi tl__chip-check" :class="isSel(t.id) ? 'bi-check-square-fill' : 'bi-square'"></i>
+              <span v-else class="tl__chip-dot"></span>
               <span class="tl__chip-titulo">{{ t.titulo }}</span>
               <span v-if="t.asignada_a" class="tl__chip-user" :title="t.asignada_a.nombre">{{ initials(t.asignada_a.nombre) }}</span>
               <i v-if="t.estado === 'completada'" class="bi bi-check-circle-fill tl__chip-ico tl__chip-ico--done"></i>
@@ -61,16 +93,20 @@
           v-for="t in tareasSinFecha"
           :key="t.id"
           class="tl__tarea"
-          :class="`tl__tarea--${t.prioridad}`"
+          :class="[`tl__tarea--${t.prioridad}`, { 'tl__tarea--sel': isSel(t.id), 'tl__tarea--selectable': modoSeleccion }]"
+          @click="modoSeleccion && onTareaClick(t)"
         >
           <div class="tl__tarea-left">
-            <div class="tl__tarea-titulo">{{ t.titulo }}</div>
+            <div class="tl__tarea-titulo">
+              <i v-if="modoSeleccion" class="bi tl__tarea-check" :class="isSel(t.id) ? 'bi-check-square-fill' : 'bi-square'"></i>
+              {{ t.titulo }}
+            </div>
             <div class="tl__tarea-meta">
               {{ TIPO_LABELS[t.tipo] || t.tipo }}
               <span v-if="t.asignada_a"> · {{ t.asignada_a.nombre }}</span>
             </div>
           </div>
-          <div class="tl__tarea-right">
+          <div v-if="!modoSeleccion" class="tl__tarea-right">
             <span class="tl__prioridad" :class="`tl__prioridad--${t.prioridad}`">{{ t.prioridad }}</span>
             <button v-if="t.estado === 'pendiente'" class="tl__btn-iniciar" @click="iniciar(t)" :disabled="procesando === t.id">
               <i class="bi bi-play-fill"></i>
@@ -220,8 +256,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { listTareas, updateTarea, createRegistroAmbiental, createLoteEvento } from '../lib/api.js'
+import { listTareas, updateTarea, createRegistroAmbiental, createLoteEvento, completarTareasMasivo, listAplicaciones, cancelarAplicacion } from '../lib/api.js'
 import { useTareasStore } from '../stores/tareas'
+import { useToast } from '../composables/useToast.js'
+import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import LoteAplicarPlanModal from './lotes/LoteAplicarPlanModal.vue'
 
@@ -230,12 +268,101 @@ const props = defineProps({
   canAdmin: { type: Boolean, default: false },
 })
 const emit = defineEmits(['tarea-completada', 'horas-aplicadas'])
+const toast = useToast()
+const confirm = useConfirm()
 
 // ── Plan ──────────────────────────────────────────────────
 const showAplicarPlan = ref(false)
 function onPlanAplicado() {
   showAplicarPlan.value = false
   cargarTareas()
+  cargarPlanesAplicados()
+}
+
+// ── Planes aplicados al lote (quitar) ─────────────────────
+const planesAplicados = ref([])
+const quitandoId       = ref(null)
+
+async function cargarPlanesAplicados() {
+  if (!props.canAdmin) return
+  try {
+    const { data } = await listAplicaciones({ estado: 'activo', objetivo_tipo: 'Lote', objetivo_id: props.lote.id })
+    planesAplicados.value = Array.isArray(data) ? data : []
+  } catch { planesAplicados.value = [] }
+}
+
+async function quitarPlan(a) {
+  const ok = await confirm.confirm({
+    title:       'Quitar plan aplicado',
+    message:     `¿Quitás "${a.plan_trabajo?.titulo}" de este lote?\n\nLas tareas pendientes y en progreso que generó se cancelan. Las completadas se conservan.`,
+    confirmText: 'Sí, quitar plan',
+    variant:     'danger',
+  })
+  if (!ok) return
+  quitandoId.value = a.id
+  try {
+    await cancelarAplicacion(a.id)
+    toast.success('Plan quitado — las tareas pendientes fueron canceladas')
+    await cargarTareas()
+    await cargarPlanesAplicados()
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al quitar el plan')
+  } finally {
+    quitandoId.value = null
+  }
+}
+
+// ── Selección múltiple / marcar realizadas ────────────────
+const modoSeleccion = ref(false)
+const seleccion     = ref([])          // ids de tareas seleccionadas
+const aplicandoBulk = ref(false)
+
+function esSeleccionable(t) {
+  return ['pendiente', 'en_progreso'].includes(t.estado)
+}
+function isSel(id) {
+  return seleccion.value.includes(id)
+}
+function toggleSel(id) {
+  seleccion.value = isSel(id) ? seleccion.value.filter(x => x !== id) : [...seleccion.value, id]
+}
+function onTareaClick(t) {
+  if (modoSeleccion.value) {
+    if (esSeleccionable(t)) toggleSel(t.id)
+  } else {
+    abrirTarea(t)
+  }
+}
+function entrarSeleccion() {
+  modoSeleccion.value = true
+  seleccion.value = []
+}
+function salirSeleccion() {
+  modoSeleccion.value = false
+  seleccion.value = []
+}
+function seleccionarTodasPendientes() {
+  // Registro retroactivo: solo tareas hasta HOY (o sin fecha). Las futuras NO se
+  // autoseleccionan — si querés marcar una futura, la tocás a mano.
+  const hoy = hoyISO
+  seleccion.value = tareas.value
+    .filter(t => esSeleccionable(t) && (!t.fecha_programada || t.fecha_programada <= hoy))
+    .map(t => t.id)
+}
+async function marcarRealizadas() {
+  if (!seleccion.value.length) return
+  aplicandoBulk.value = true
+  try {
+    const { data } = await completarTareasMasivo(seleccion.value)
+    toast.success(`${data.completadas} tarea${data.completadas !== 1 ? 's' : ''} marcada${data.completadas !== 1 ? 's' : ''} como realizada${data.completadas !== 1 ? 's' : ''}`)
+    salirSeleccion()
+    await cargarTareas()
+    emit('tarea-completada')
+  } catch {
+    toast.error('No se pudieron marcar las tareas')
+  } finally {
+    aplicandoBulk.value = false
+  }
 }
 
 // ── Tareas ────────────────────────────────────────────────
@@ -259,7 +386,7 @@ function emptyRegistroForm() {
   }
 }
 
-onMounted(() => cargarTareas())
+onMounted(() => { cargarTareas(); cargarPlanesAplicados() })
 
 async function cargarTareas() {
   loading.value = true
@@ -479,6 +606,33 @@ const estadosSiguientes = computed(() => {
 .tl__nav-label { font-size: .78rem; font-weight: 700; color: #1a1a1a; min-width: 140px; text-align: center; }
 .tl__btn-plan { display: inline-flex; align-items: center; gap: .35rem; background: none; border: 1px solid #d4e6d4; color: #15803d; font-size: .75rem; font-weight: 600; padding: .3rem .7rem; border-radius: 6px; cursor: pointer; transition: all .15s; }
 .tl__btn-plan:hover { background: #f0fdf4; border-color: #15803d; }
+.tl__header-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+/* Planes aplicados */
+.tl__planes { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; padding: .5rem 1rem; background: #f4f8f4; border-top: 1px solid #e8f0e9; }
+.tl__planes-ico { color: #15803d; font-size: .85rem; }
+.tl__planes-label { font-size: .72rem; font-weight: 700; color: #60725d; text-transform: uppercase; letter-spacing: .04em; }
+.tl__plan-chip { display: inline-flex; align-items: center; gap: .4rem; background: #fff; border: 1px solid #d4e6d4; color: #15803d; font-size: .76rem; font-weight: 600; padding: .25rem .35rem .25rem .65rem; border-radius: 999px; }
+.tl__plan-quitar { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: none; background: #fee2e2; color: #dc2626; cursor: pointer; font-size: .62rem; transition: all .15s; }
+.tl__plan-quitar:hover:not(:disabled) { background: #dc2626; color: #fff; }
+.tl__plan-quitar:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Barra de selección */
+.tl__selbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; padding: .55rem 1rem; background: #f0fdf4; border-top: 1px solid #d4e6d4; border-bottom: 1px solid #d4e6d4; }
+.tl__selbar-count { font-size: .8rem; font-weight: 700; color: #15803d; }
+.tl__selbar-actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.tl__selbar-link { background: none; border: none; color: #15803d; font-size: .75rem; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 0; }
+.tl__selbar-link:hover { color: #104417; }
+
+/* Selección en chips */
+.tl__chip-check { font-size: .72rem; margin-top: .12rem; flex-shrink: 0; color: #15803d; }
+.tl__chip--selectable { cursor: pointer; }
+.tl__chip--sel { background: #dcfce7 !important; border-left-color: #15803d !important; box-shadow: inset 0 0 0 1px #86efac; }
+
+/* Selección en filas sin fecha */
+.tl__tarea--selectable { cursor: pointer; }
+.tl__tarea--sel { background: #dcfce7; }
+.tl__tarea-check { color: #15803d; margin-right: .35rem; }
 
 /* Loading / Empty */
 .tl__loading { display: flex; align-items: center; justify-content: center; padding: 2rem; }
@@ -497,7 +651,7 @@ const estadosSiguientes = computed(() => {
 .tl__dia-empty { min-height: 20px; }
 
 /* Task chips in calendar */
-.tl__chip { display: flex; align-items: flex-start; gap: .25rem; padding: .25rem .3rem; border-radius: 5px; background: #f0fdf4; border-left: 2.5px solid #d4e6d4; cursor: pointer; transition: all .12s; font-size: .67rem; line-height: 1.3; }
+.tl__chip { display: flex; align-items: flex-start; gap: .3rem; padding: .35rem .4rem; border-radius: 5px; background: #f0fdf4; border-left: 2.5px solid #d4e6d4; cursor: pointer; transition: all .12s; font-size: .72rem; line-height: 1.3; }
 .tl__chip:hover:not(.tl__chip--done) { background: #e8f5e9; }
 .tl__chip--done { background: #f8fafc; border-left-color: #cbd5e1; cursor: default; opacity: .7; }
 .tl__chip--prog { border-left-color: #f59e0b; background: #fffbeb; }
@@ -506,7 +660,7 @@ const estadosSiguientes = computed(() => {
 .tl__chip--normal  { border-left-color: #2563eb; }
 .tl__chip--baja    { border-left-color: #94a3b8; }
 .tl__chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; margin-top: .28rem; flex-shrink: 0; opacity: .5; }
-.tl__chip-titulo { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: #1a1a1a; }
+.tl__chip-titulo { flex: 1; min-width: 0; color: #1a1a1a; overflow-wrap: anywhere; word-break: break-word; }
 .tl__chip--done .tl__chip-titulo { color: #94a3b8; }
 .tl__chip-ico { font-size: .62rem; margin-top: .15rem; flex-shrink: 0; }
 .tl__chip-ico--done { color: #16a34a; }

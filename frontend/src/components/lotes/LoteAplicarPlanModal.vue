@@ -37,6 +37,17 @@
             </p>
           </div>
 
+          <!-- Fecha de inicio del plan -->
+          <div class="apm__section">
+            <label class="apm__label">Fecha de inicio del plan</label>
+            <AppDatePicker v-model="fechaInicio" @update:modelValue="onFechaChange" />
+            <p class="apm__hint">
+              Las tareas se calculan desde esta fecha. Si el lote ya venía empezado, ponela
+              en el pasado y se generan las tareas pasadas para un registro fiel
+              (después las marcás como realizadas).
+            </p>
+          </div>
+
           <!-- Loading preview -->
           <div v-if="loadingPreview" class="apm__preview-loading">
             <DsSpinner :size="28" />
@@ -47,7 +58,7 @@
           <template v-else-if="preview">
             <div class="apm__preview-meta">
               <span class="apm__badge">{{ preview.total }} tarea{{ preview.total !== 1 ? 's' : '' }}</span>
-              <span class="apm__hint">Fechas calculadas desde el {{ lote.start_date }}</span>
+              <span class="apm__hint">Fechas calculadas desde el {{ formatDate(fechaInicio) }}</span>
             </div>
 
             <div class="apm__table-wrap">
@@ -108,6 +119,7 @@
 import { ref, onMounted } from 'vue'
 import { listPlanTrabajos, previewLotePlan, aplicarLotePlan } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
@@ -119,6 +131,7 @@ const toast = useToast()
 
 const planes        = ref([])
 const planId        = ref('')
+const fechaInicio   = ref((props.lote.start_date || '').slice(0, 10) || new Date().toISOString().slice(0, 10))
 const preview       = ref(null)
 const loadingPlanes = ref(false)
 const loadingPreview = ref(false)
@@ -150,11 +163,16 @@ function onPlanChange() {
   if (planId.value) cargarPreview()
 }
 
+function onFechaChange() {
+  if (planId.value) cargarPreview()
+}
+
 async function cargarPreview() {
+  if (!fechaInicio.value) { error.value = 'Elegí una fecha de inicio.'; return }
   loadingPreview.value = true
   error.value = null
   try {
-    const { data } = await previewLotePlan(props.lote.id, planId.value)
+    const { data } = await previewLotePlan(props.lote.id, planId.value, fechaInicio.value)
     preview.value = data
   } catch (e) {
     error.value = e.response?.data?.error || 'Error al calcular el preview.'
@@ -169,7 +187,7 @@ async function confirmarAplicar() {
   applying.value = true
   error.value = null
   try {
-    const { data } = await aplicarLotePlan(props.lote.id, planId.value)
+    const { data } = await aplicarLotePlan(props.lote.id, planId.value, fechaInicio.value)
     toast.success(`${data.tareas_creadas} tarea${data.tareas_creadas !== 1 ? 's' : ''} creadas correctamente`)
     emit('applied', data.tareas_creadas)
   } catch (e) {

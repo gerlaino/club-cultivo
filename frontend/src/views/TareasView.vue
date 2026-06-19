@@ -9,14 +9,6 @@
         <p class="tv__sub">{{ fechaHoy }} · {{ saludo }}</p>
       </div>
       <div class="tv__header-right">
-        <div class="tv__tabs">
-          <button class="tv__tab" :class="{ 'tv__tab--active': vistaActiva === 'semana' }" @click="vistaActiva = 'semana'">
-            <i class="bi bi-calendar-week"></i> Semana
-          </button>
-          <button class="tv__tab" :class="{ 'tv__tab--active': vistaActiva === 'kanban' }" @click="cambiarAKanban">
-            <i class="bi bi-kanban"></i> Kanban
-          </button>
-        </div>
         <button v-if="puedeCrear" class="tv__btn-primary" @click="abrirModalNueva">
           <i class="bi bi-plus-lg"></i> Nueva tarea
         </button>
@@ -54,48 +46,8 @@
 
     <template v-else>
 
-      <!-- ══ KANBAN COMPLETO ══ -->
-      <div v-if="vistaActiva === 'kanban'">
-
-        <!-- Filtros -->
-        <div class="tv__filtros">
-          <select v-if="esAdmin" v-model="filtros.asignada_a_id" class="tv__filtro-select" @change="cargarKanban">
-            <option value="">Todos los usuarios</option>
-            <option v-for="u in usuarios" :key="u.id" :value="u.id">{{ u.nombre_completo }}</option>
-          </select>
-          <select v-model="filtros.sala_id" class="tv__filtro-select" @change="onFiltroSala">
-            <option value="">Todas las salas</option>
-            <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-          </select>
-          <select v-model="filtros.lote_id" class="tv__filtro-select" @change="cargarKanban">
-            <option value="">Todos los lotes</option>
-            <option v-for="l in lotesFiltrados" :key="l.id" :value="l.id">{{ l.codigo }}</option>
-          </select>
-          <button v-if="filtros.asignada_a_id || filtros.sala_id || filtros.lote_id" class="tv__btn-clear" @click="limpiarFiltros">
-            <i class="bi bi-x-circle"></i> Limpiar
-          </button>
-        </div>
-
-        <div class="tv__kanban-cols">
-          <div v-for="col in columnas" :key="col.key" class="tv__col">
-            <div class="tv__col-header" :class="`tv__col-header--${col.clase}`">
-              <span>{{ col.label }}</span>
-              <span class="tv__col-count">{{ kanban[col.key]?.length || 0 }}</span>
-            </div>
-            <div class="tv__col-body">
-              <TareaCard v-for="t in kanban[col.key]" :key="t.id" :tarea="t"
-                         @click="abrirDetalle(t)"
-                         @completar="abrirModalCompletar(t)" @editar="abrirModalEditar(t)"
-                         @cancelar="confirmarCancelar(t)" @cancelar-serie="confirmarCancelarSerie(t)" />
-              <EmptyState v-if="!kanban[col.key]?.length" icon="bi-inbox" title="Sin tareas" compact />
-            </div>
-          </div>
-        </div>
-
-      </div>
-
       <!-- Vista Semana -->
-      <div v-if="vistaActiva === 'semana'" class="tv__semana">
+      <div class="tv__semana">
         <div class="sem__nav">
           <button class="sem__nav-btn" @click="semAnterior">
             <i class="bi bi-chevron-left"></i>
@@ -260,7 +212,6 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { useTareasStore } from '../stores/tareas'
-import TareaCard from '../components/TareaCard.vue'
 import ModalTarea from '../components/ModalTarea.vue'
 import ModalCompletarTarea from '../components/ModalCompletarTarea.vue'
 import { listSalas, listLotes, listUsers, listSedes, getTareasSemana } from '../lib/api'
@@ -274,7 +225,6 @@ import { formatFechaLarga } from '../utils/fecha.js'
 const authStore   = useAuthStore()
 const tareasStore = useTareasStore()
 
-const vistaActiva       = ref('semana')
 const showModalTarea    = ref(false)
 const showModalCompletar = ref(false)
 const tareaEditando     = ref(null)
@@ -284,11 +234,10 @@ const salas             = ref([])
 const sedes             = ref([])
 const lotes             = ref([])
 const usuarios          = ref([])
-const filtros           = ref({ asignada_a_id: '', sala_id: '', lote_id: '' })
 const toast             = useToast()
 const { confirm }       = useConfirm()
 
-const { loading, dashboard, kanban, stats, hayVencidas, hoyPendientes, hoyEnProgreso, hoyCompletadas } = storeToRefs(tareasStore)
+const { loading, dashboard, stats, hayVencidas, hoyPendientes, hoyEnProgreso, hoyCompletadas } = storeToRefs(tareasStore)
 
 const esAdmin    = computed(() => authStore.user?.role === 'admin')
 const puedeCrear = computed(() => authStore.user?.role === 'admin')
@@ -304,17 +253,6 @@ const saludo = computed(() => {
   if (h < 19) return `Buenas tardes, ${n}`
   return `Buenas noches, ${n}`
 })
-
-const lotesFiltrados = computed(() => {
-  if (!filtros.value.sala_id) return lotes.value
-  return lotes.value.filter(l => String(l.sala_id) === String(filtros.value.sala_id))
-})
-
-const columnas = [
-  { key: 'pendiente',   label: 'Pendiente',  clase: 'pending'  },
-  { key: 'en_progreso', label: 'En progreso', clase: 'progress' },
-  { key: 'completada',  label: 'Completadas', clase: 'done'     },
-]
 
 const TIPO_META = {
   riego:       { label: 'Riego',      emoji: '💧' },
@@ -406,10 +344,6 @@ function abrirTarea(tarea) {
   abrirDetalle(tarea)
 }
 
-watch(vistaActiva, (v) => {
-  if (v === 'semana' && !semana.value.dias.length) cargarSemana()
-})
-
 function escapeHandler(e) {
   if (e.key !== 'Escape') return
   if (tareaDetalle.value) { tareaDetalle.value = null }
@@ -439,47 +373,11 @@ async function cargarContexto() {
   } catch (e) { logger.error('Error cargando contexto:', e) }
 }
 
-async function cambiarAKanban() { vistaActiva.value = 'kanban'; await cargarKanban() }
-async function cargarKanban() {
-  const params = {}
-  if (filtros.value.asignada_a_id) params.asignada_a_id = filtros.value.asignada_a_id
-  if (filtros.value.sala_id)       params.sala_id       = filtros.value.sala_id
-  if (filtros.value.lote_id)       params.lote_id       = filtros.value.lote_id
-  await tareasStore.fetchKanban(params)
-}
-function onFiltroSala() { filtros.value.lote_id = ''; cargarKanban() }
-function limpiarFiltros() { filtros.value = { asignada_a_id: '', sala_id: '', lote_id: '' }; cargarKanban() }
-
 function abrirModalNueva() { tareaEditando.value = null; showModalTarea.value = true }
 function abrirModalEditar(t) { tareaEditando.value = t; tareaDetalle.value = null; showModalTarea.value = true }
 function abrirModalCompletar(t) { tareaCompletando.value = t; tareaDetalle.value = null; showModalCompletar.value = true }
 function abrirDetalle(t) { tareaDetalle.value = t }
 
-async function confirmarCancelar(t) {
-  const ok = await confirm({ title: `¿Cancelar la tarea "${t.titulo}"?`, variant: 'warning', confirmText: 'Cancelar tarea', cancelText: 'Volver' })
-  if (!ok) return
-  try { await tareasStore.cancelar(t.id); tareaDetalle.value = null; toast.warning('Tarea cancelada') }
-  catch (e) { toast.error(e.response?.data?.error || 'Error') }
-}
-
-async function confirmarCancelarSerie(t) {
-  const ok = await confirm({
-    title: '¿Cancelar toda la serie?',
-    message: `Se cancelarán todas las tareas pendientes de la serie "${t.titulo}".`,
-    variant: 'warning',
-    confirmText: 'Cancelar serie',
-    cancelText: 'Volver',
-  })
-  if (!ok) return
-  try {
-    const res = await tareasStore.cancelarSerie(t.id)
-    tareaDetalle.value = null
-    toast.warning(`${res?.canceladas ?? 'N'} tareas canceladas`)
-    tareasStore.fetchDashboard()
-    if (vistaActiva.value === 'kanban') cargarKanban()
-    if (vistaActiva.value === 'semana') cargarSemana()
-  } catch (e) { toast.error(e.response?.data?.error || 'Error al cancelar serie') }
-}
 function onTareaGuardada() {
   showModalTarea.value = false
   tareaEditando.value = null
@@ -493,8 +391,7 @@ function onTareaCompletada() {
   tareaDetalle.value = null
   toast.success('Tarea completada ✓')
   tareasStore.fetchDashboard()
-  if (vistaActiva.value === 'kanban') cargarKanban()
-  if (vistaActiva.value === 'semana') cargarSemana()
+  cargarSemana()
 }
 
 function puedeEditarTarea(t) {

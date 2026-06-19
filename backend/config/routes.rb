@@ -93,7 +93,7 @@ Rails.application.routes.draw do
         post :recalcular   # recalcula insumos/energía/mano de obra desde el libro contable
       end
       resources :registros_ambientales, only: [:index, :create, :destroy]
-      resources :lote_eventos,          only: [:index, :create]
+      resources :lote_eventos,          only: [:index, :create, :destroy]
       resources :fotos, only: [:index, :create, :destroy], controller: 'fotos_lote'
       resources :notas, only: [:index, :create]
       resources :pesadas, only: [:index, :create, :destroy]
@@ -352,9 +352,9 @@ Rails.application.routes.draw do
 
     resources :tareas do
       collection do
-        get :dashboard
-        get :kanban
-        get :semana
+        get  :dashboard
+        get  :semana
+        post :completar_masivo
       end
       member do
         post   :iniciar

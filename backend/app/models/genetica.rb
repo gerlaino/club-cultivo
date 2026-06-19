@@ -17,10 +17,12 @@ class Genetica < ApplicationRecord
   scope :disponibles,  -> { where(disponible: true) }
   scope :visibles_web, -> { activas.where(visible_web: true) }
 
+  # Rendimiento real de la cepa: promedio de TODAS las plantas cosechadas con peso seco
+  # (no solo "selección" — eso daba info incompleta y vacío si nadie marcaba ninguna).
   def rendimiento_promedio_seco
     PesadaPlanta
       .joins(plant: { lote: :genetica }, pesada: {})
-      .where(plants: { es_seleccion: true }, lotes: { genetica_id: id })
+      .where(lotes: { genetica_id: id })
       .where.not(pesadas_plantas: { peso_seco_g: nil })
       .average('pesadas_plantas.peso_seco_g')
       &.round(2)
@@ -29,7 +31,7 @@ class Genetica < ApplicationRecord
   def rendimiento_min_max_seco
     scope = PesadaPlanta
       .joins(plant: { lote: :genetica }, pesada: {})
-      .where(plants: { es_seleccion: true }, lotes: { genetica_id: id })
+      .where(lotes: { genetica_id: id })
       .where.not(pesadas_plantas: { peso_seco_g: nil })
 
     {

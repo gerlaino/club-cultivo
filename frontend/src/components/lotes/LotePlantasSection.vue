@@ -135,8 +135,6 @@
               </div>
             </div>
 
-            <!-- Star si es selección -->
-            <div v-if="p.es_seleccion" class="lps__pcard-star" title="Planta selección">⭐</div>
           </RouterLink>
         </div>
 
@@ -167,11 +165,6 @@
             <span class="lps__planta-estado" :style="{ background: pm(p.state).color + '18', color: pm(p.state).color }">
               {{ pm(p.state).emoji }} {{ pm(p.state).label }}
             </span>
-            <button v-if="canEdit" class="lps__planta-sel" :class="{ 'lps__planta-sel--on': p.es_seleccion }"
-                    :title="p.es_seleccion ? 'Quitar de selección' : 'Marcar como selección'"
-                    @click.prevent.stop="toggleEsSeleccion(p)">
-              <i class="bi" :class="p.es_seleccion ? 'bi-star-fill' : 'bi-star'"></i>
-            </button>
             <i class="bi bi-chevron-right lps__planta-arrow"></i>
           </RouterLink>
         </div>
@@ -266,7 +259,7 @@ import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { usePlantsStore } from '../../stores/plants'
 import { useClubStore }   from '../../stores/club'
-import { createPlant, updatePlant } from '../../lib/api'
+import { createPlant } from '../../lib/api'
 import { useQRCode } from '../../composables/useQRCode.js'
 import { useToast } from '../../composables/useToast.js'
 import { pm, STATE_MAP } from '../../lib/loteHelpers.js'
@@ -369,13 +362,6 @@ async function guardarPlanta() {
   } finally {
     savingPlanta.value = false
   }
-}
-
-async function toggleEsSeleccion(plant) {
-  const original = plant.es_seleccion
-  plant.es_seleccion = !original
-  try { await updatePlant(plant.id, { es_seleccion: !original }) }
-  catch { plant.es_seleccion = original; toast.error('Error al actualizar selección') }
 }
 
 const printingLabels    = ref(false)

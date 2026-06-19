@@ -16,7 +16,15 @@
                 {{ em(e.estado_nuevo).emoji }} {{ em(e.estado_nuevo).label }}
               </span>
               <span v-else class="lhs__evento-titulo">{{ e.descripcion }}</span>
-              <span class="lhs__evento-fecha">{{ formatDateTime(e.registrado_en) }}</span>
+              <div class="lhs__evento-head-right">
+                <span class="lhs__evento-fecha">{{ formatDateTime(e.registrado_en) }}</span>
+                <button
+                  v-if="canAdmin && e.tipo !== 'cambio_estado'"
+                  class="lhs__del-btn"
+                  title="Borrar evento"
+                  @click="$emit('delete', e)"
+                ><i class="bi bi-trash"></i></button>
+              </div>
             </div>
             <div class="lhs__evento-meta">{{ e.usuario }}</div>
             <div v-if="e.sala_origen && e.sala_destino" class="lhs__evento-sala-move">
@@ -40,7 +48,15 @@
                 <span v-if="e.fertilizacion" style="color:#1b5e20"> · 🌿 fertilización</span>
                 <span v-if="e.plagas_observadas && e.plagas_observadas !== 'ninguna'" :style="{ color: pgm(e.plagas_observadas).color }"> · {{ pgm(e.plagas_observadas).emoji }} {{ e.plagas_observadas }}</span>
               </span>
-              <span class="lhs__evento-fecha">{{ formatDateTime(e.registrado_en) }}</span>
+              <div class="lhs__evento-head-right">
+                <span class="lhs__evento-fecha">{{ formatDateTime(e.registrado_en) }}</span>
+                <button
+                  v-if="canAdmin"
+                  class="lhs__del-btn"
+                  title="Borrar del historial"
+                  @click="$emit('delete', e)"
+                ><i class="bi bi-trash"></i></button>
+              </div>
             </div>
             <div class="lhs__evento-meta">{{ e.usuario }}</div>
             <div v-if="e.tareas_realizadas?.length" class="lhs__tareas-chips">
@@ -69,7 +85,15 @@
                 ✅ {{ e.titulo }}
                 <span class="lhs__tarea-tipo-tag">{{ TIPO_LABELS[e.tipo] || e.tipo }}</span>
               </span>
-              <span class="lhs__evento-fecha">{{ formatDateTime(e.registrado_en) }}</span>
+              <div class="lhs__evento-head-right">
+                <span class="lhs__evento-fecha">{{ formatDateTime(e.registrado_en) }}</span>
+                <button
+                  v-if="canAdmin"
+                  class="lhs__del-btn"
+                  title="Borrar del historial"
+                  @click="$emit('delete', e)"
+                ><i class="bi bi-trash"></i></button>
+              </div>
             </div>
             <div class="lhs__evento-meta">
               <span v-if="e.asignada_a">{{ e.asignada_a.nombre }}</span>
@@ -110,7 +134,9 @@ import EmptyState from '../ui/EmptyState.vue'
 const props = defineProps({
   eventos:        { type: Array,   required: true },
   loadingEventos: { type: Boolean, default: false },
+  canAdmin:       { type: Boolean, default: false },
 })
+defineEmits(['delete'])
 
 const PER_PAGE = 10
 const pagina   = ref(1)
@@ -140,6 +166,9 @@ const TIPO_LABELS = {
 .lhs__evento-titulo { font-size: .82rem; font-weight: 600; color: #1a1a1a; }
 .lhs__evento-arrow  { color: #94a3b8; margin: 0 .2rem; }
 .lhs__evento-fecha  { font-size: .7rem; color: #94a3b8; white-space: nowrap; flex-shrink: 0; }
+.lhs__evento-head-right { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
+.lhs__del-btn { background: none; border: none; color: #cbd5e1; cursor: pointer; padding: .1rem .25rem; font-size: .78rem; line-height: 1; border-radius: 5px; transition: all .15s; }
+.lhs__del-btn:hover { color: #dc2626; background: #fef2f2; }
 .lhs__evento-meta   { font-size: .72rem; color: #64748b; margin-bottom: .2rem; }
 .lhs__evento-sala-move { display: flex; align-items: center; gap: .35rem; font-size: .75rem; color: #475569; margin: .2rem 0; }
 .lhs__evento-desc   { font-size: .78rem; color: #475569; margin-top: .25rem; line-height: 1.5; }

@@ -6,7 +6,7 @@ import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
-import { getRegistrosAmbientales, getLoteEventos, listTareas, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio } from "../lib/api"
+import { getRegistrosAmbientales, getLoteEventos, listTareas, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
 import { useQRCode } from '../composables/useQRCode.js'
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
@@ -53,6 +53,7 @@ const canEdit  = computed(() =>
   lote.value?.estado !== 'finalizado'
 )
 const canAdmin = computed(() => ['admin', 'supervisor'].includes(auth.role))
+const esAdmin  = computed(() => auth.role === 'admin')
 const isCultivador = computed(() => auth.role === 'cultivador')
 
 const { downloadPNG, generatePNG } = useQRCode()
@@ -169,6 +170,26 @@ async function loadEventos() {
   finally { loadingEventos.value = false }
 }
 
+async function onDeleteEvento(e) {
+  const LABEL = { evento: 'evento', registro: 'registro', tarea: 'tarea completada' }
+  const ok = await confirm({
+    title:       `Borrar ${LABEL[e._tipo] || 'ítem'} del historial`,
+    message:     `¿Borrás este ${LABEL[e._tipo] || 'ítem'} del historial?\n\n"${e.descripcion || e.titulo || e.observaciones || 'Sin descripción'}"\n\nEsta acción no se puede deshacer.`,
+    confirmText: 'Sí, borrar',
+    variant:     'danger',
+  })
+  if (!ok) return
+  try {
+    if (e._tipo === 'registro')   await deleteRegistroAmbiental(id, e.id)
+    else if (e._tipo === 'tarea') await deleteTarea(e.id)
+    else                          await deleteLoteEvento(id, e.id)
+    toast.success('Borrado del historial')
+    await loadEventos()
+  } catch (err) {
+    toast.error(err?.response?.data?.error || 'No se pudo borrar')
+  }
+}
+
 // ── Section toggles ────────────────────────────────────────
 const tareasExpanded    = ref(true)
 // Lab
@@ -182,7 +203,7 @@ const labForm       = ref({ fecha_analisis: '', laboratorio: '', thc_pct: '', cb
 async function cargarAnalisisLab() {
   loadingLab.value = true
   try {
-    const { data } = await listAnalisisLaboratorio(id.value)
+    const { data } = await listAnalisisLaboratorio(id)
     analisisLab.value = data || []
   } finally { loadingLab.value = false }
 }
@@ -190,7 +211,7 @@ async function cargarAnalisisLab() {
 async function guardarAnalisis() {
   guardandoLab.value = true
   try {
-    const { data } = await createAnalisisLaboratorio(id.value, labForm.value)
+    const { data } = await createAnalisisLaboratorio(id, labForm.value)
     analisisLab.value.unshift(data)
     labFormOpen.value = false
     labForm.value = { fecha_analisis: '', laboratorio: '', thc_pct: '', cbd_pct: '', cbg_pct: '', terpenos_principales: '' }
@@ -198,7 +219,7 @@ async function guardarAnalisis() {
 }
 
 async function eliminarAnalisis(a) {
-  await deleteAnalisisLaboratorio(id.value, a.id)
+  await deleteAnalisisLaboratorio(id, a.id)
   analisisLab.value = analisisLab.value.filter(x => x.id !== a.id)
 }
 
@@ -465,7 +486,7 @@ onUnmounted(() => {
               <i class="bi ld__chevron" :class="historialExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </button>
             <div v-show="historialExpanded" class="ld__section-body ld__section-body--flush">
-              <LoteHistorialSection :eventos="eventos" :loading-eventos="loadingEventos" />
+              <LoteHistorialSection :eventos="eventos" :loading-eventos="loadingEventos" :can-admin="esAdmin" @delete="onDeleteEvento" />
             </div>
           </div>
 

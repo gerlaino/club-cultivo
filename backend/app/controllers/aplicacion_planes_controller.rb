@@ -10,7 +10,9 @@ class AplicacionPlanesController < ApplicationController
       .includes(:plan_trabajo, :aplicado_por)
       .recientes
 
-    aplicaciones = aplicaciones.where(estado: params[:estado]) if params[:estado].present?
+    aplicaciones = aplicaciones.where(estado: params[:estado])               if params[:estado].present?
+    aplicaciones = aplicaciones.where(objetivo_tipo: params[:objetivo_tipo]) if params[:objetivo_tipo].present?
+    aplicaciones = aplicaciones.where(objetivo_id: params[:objetivo_id])     if params[:objetivo_id].present?
 
     render json: aplicaciones.map { |a| serialize(a) }
   end

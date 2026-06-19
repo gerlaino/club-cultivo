@@ -4,7 +4,6 @@ import { ref, computed } from 'vue'
 import {
   listTareas,
   getTareasDashboard,
-  getTareasKanban,
   getTarea,
   createTarea,
   updateTarea,
@@ -20,7 +19,6 @@ export const useTareasStore = defineStore('tareas', () => {
   // ── State ──────────────────────────────────────────────────────
   const tareas      = ref([])
   const dashboard   = ref({ hoy: [], vencidas: [], proximas: [], stats: {} })
-  const kanban      = ref({ pendiente: [], en_progreso: [], completada: [] })
   const semana      = ref({ desde: null, hasta: null, dias: [] })
   const loading     = ref(false)
   const error       = ref(null)
@@ -50,19 +48,6 @@ export const useTareasStore = defineStore('tareas', () => {
     }
   }
 
-  async function fetchKanban(params = {}) {
-    loading.value = true
-    error.value   = null
-    try {
-      const res    = await getTareasKanban(params)
-      kanban.value = res.data
-    } catch (e) {
-      error.value = e.response?.data?.error || 'Error al cargar el kanban'
-    } finally {
-      loading.value = false
-    }
-  }
-
   async function fetchTareas(params = {}) {
     loading.value = true
     error.value   = null
@@ -79,8 +64,6 @@ export const useTareasStore = defineStore('tareas', () => {
   async function create(data) {
     const res    = await createTarea(data)
     const nueva  = res.data
-    // Insertar en la columna correcta del kanban
-    kanban.value[nueva.estado]?.unshift(nueva)
     // Refrescar dashboard si es de hoy
     if (nueva.fecha_programada === new Date().toISOString().split('T')[0]) {
       dashboard.value.hoy.unshift(nueva)
@@ -91,21 +74,18 @@ export const useTareasStore = defineStore('tareas', () => {
   async function update(id, data) {
     const res        = await updateTarea(id, data)
     const actualizada = res.data
-    _reemplazarEnKanban(id, actualizada)
     _reemplazarEnDashboard(id, actualizada)
     return actualizada
   }
 
   async function remove(id) {
     await deleteTarea(id)
-    _eliminarDeKanban(id)
     _eliminarDeDashboard(id)
   }
 
   async function iniciar(id) {
     const res        = await iniciarTarea(id)
     const actualizada = res.data
-    _moverEnKanban(id, 'pendiente', actualizada)
     _reemplazarEnDashboard(id, actualizada)
     return actualizada
   }
@@ -113,7 +93,6 @@ export const useTareasStore = defineStore('tareas', () => {
   async function completar(id, horas_reales, notas_completado = '') {
     const res  = await completarTarea(id, { horas_reales, notas_completado })
     const { tarea: actualizada, tiene_horas_para_lote } = res.data
-    _moverEnKanban(id, 'en_progreso', actualizada)
     _reemplazarEnDashboard(id, actualizada)
     // Actualizar stats
     if (dashboard.value.stats.en_progreso > 0) dashboard.value.stats.en_progreso--
@@ -124,7 +103,6 @@ export const useTareasStore = defineStore('tareas', () => {
   async function cancelar(id) {
     const res        = await cancelarTarea(id)
     const actualizada = res.data
-    _eliminarDeKanban(id)
     _eliminarDeDashboard(id)
     return actualizada
   }
@@ -149,34 +127,6 @@ export const useTareasStore = defineStore('tareas', () => {
 
   // ── Helpers internos ───────────────────────────────────────────
 
-  function _reemplazarEnKanban(id, tarea) {
-    for (const col of Object.keys(kanban.value)) {
-      const idx = kanban.value[col].findIndex(t => t.id === id)
-      if (idx !== -1) {
-        kanban.value[col][idx] = tarea
-        return
-      }
-    }
-  }
-
-  function _moverEnKanban(id, estadoAnterior, tarea) {
-    // Quitar del estado anterior
-    const col = kanban.value[estadoAnterior]
-    if (col) {
-      const idx = col.findIndex(t => t.id === id)
-      if (idx !== -1) col.splice(idx, 1)
-    }
-    // Agregar al nuevo estado
-    kanban.value[tarea.estado]?.unshift(tarea)
-  }
-
-  function _eliminarDeKanban(id) {
-    for (const col of Object.keys(kanban.value)) {
-      const idx = kanban.value[col].findIndex(t => t.id === id)
-      if (idx !== -1) { kanban.value[col].splice(idx, 1); return }
-    }
-  }
-
   function _reemplazarEnDashboard(id, tarea) {
     for (const key of ['hoy', 'vencidas', 'proximas']) {
       const idx = dashboard.value[key].findIndex(t => t.id === id)
@@ -192,10 +142,10 @@ export const useTareasStore = defineStore('tareas', () => {
   }
 
   return {
-    tareas, dashboard, kanban, semana, loading, error,
+    tareas, dashboard, semana, loading, error,
     tareasDeHoy, stats, hayVencidas,
     hoyPendientes, hoyEnProgreso, hoyCompletadas,
-    fetchDashboard, fetchKanban, fetchTareas,
+    fetchDashboard, fetchTareas,
     create, update, remove, iniciar, completar, cancelar,
     fetchSemana, cancelarSerie
   }

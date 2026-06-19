@@ -1,10 +1,14 @@
 class AplicarPlanLoteService
   DIAS_A_WDAY = { 'lun' => 1, 'mar' => 2, 'mie' => 3, 'jue' => 4, 'vie' => 5, 'sab' => 6, 'dom' => 0 }.freeze
 
-  def initialize(lote:, plan:, ejecutado_por:)
+  def initialize(lote:, plan:, ejecutado_por:, fecha_inicio: nil)
     @lote          = lote
     @plan          = plan
     @ejecutado_por = ejecutado_por
+    # Fecha de anclaje del plan. Por defecto el inicio del lote, pero se puede
+    # elegir otra (p. ej. un lote heredado que empezó hace 2 semanas → las tareas
+    # se generan desde esa fecha, incluso en el pasado, para un registro fiel).
+    @fecha_inicio  = fecha_inicio.presence ? Date.parse(fecha_inicio.to_s) : @lote.start_date
   end
 
   def preview
@@ -20,7 +24,7 @@ class AplicarPlanLoteService
       aplicacion = @lote.club.aplicacion_planes.create!(
         plan_trabajo:   @plan,
         aplicado_por:   @ejecutado_por,
-        fecha_inicio:   @lote.start_date,
+        fecha_inicio:   @fecha_inicio,
         objetivo_tipo:  'Lote',
         objetivo_id:    @lote.id,
         estado:         'activo',
@@ -53,7 +57,7 @@ class AplicarPlanLoteService
   private
 
   def calcular_propuestas
-    base     = @lote.start_date
+    base     = @fecha_inicio
     offset   = (base - @plan.fecha_inicio).to_i
     fin_date = @plan.fecha_fin + offset.days
 
