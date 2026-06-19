@@ -205,7 +205,8 @@ async function cargarAnalisisLab() {
   try {
     const { data } = await listAnalisisLaboratorio(id)
     analisisLab.value = data || []
-  } finally { loadingLab.value = false }
+  } catch { analisisLab.value = [] }
+  finally { loadingLab.value = false }
 }
 
 async function guardarAnalisis() {
