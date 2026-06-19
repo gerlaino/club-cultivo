@@ -9,6 +9,17 @@ class ApplicationController < ActionController::API
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
 
+  # SPA fallback — sirve index.html para el root y las rutas del front (get '*path').
+  # DEBE ser pública: una action privada no es ruteable → Rails tira ActionNotFound.
+  def spa_fallback
+    index_html = Rails.root.join('public', 'index.html')
+    if index_html.exist?
+      render file: index_html, layout: false
+    else
+      render json: { error: 'Not found' }, status: :not_found
+    end
+  end
+
   private
 
   def user_not_authorized
@@ -50,12 +61,4 @@ class ApplicationController < ActionController::API
     request.headers['Authorization'] = "Bearer #{token}" if token.present?
   end
 
-  def spa_fallback
-    index_html = Rails.root.join('public', 'index.html')
-    if index_html.exist?
-      render file: index_html, layout: false
-    else
-      render json: { error: 'Not found' }, status: :not_found
-    end
-  end
 end
