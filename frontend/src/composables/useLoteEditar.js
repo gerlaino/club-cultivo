@@ -24,6 +24,7 @@ export function useLoteEditar(loteId) {
     const l = lotes.current
     editLoteForm.value = {
       codigo:            l.codigo            || '',
+      plants_count:      l.plants_count      ?? null,
       start_date:        l.start_date        || '',
       genetica_id:       l.genetica?.id      || '',
       grow_type:         l.grow_type         || '',

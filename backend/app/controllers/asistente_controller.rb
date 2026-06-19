@@ -199,6 +199,11 @@ class AsistenteController < BaseController
 
     acciones = params[:acciones] || []
     return render json: { error: 'Demasiadas acciones en una sola llamada (máx: 15)' }, status: :unprocessable_entity if acciones.size > 15
+
+    # El reconocimiento de voz a veces finaliza la misma frase más de una vez y el
+    # parseo devuelve acciones idénticas → se creaban eventos duplicados. Deduplicamos
+    # acciones byte-idénticas (mismo tipo + datos + lote) dentro de la misma llamada.
+    acciones = acciones.uniq { |a| (a.respond_to?(:to_unsafe_h) ? a.to_unsafe_h : a).to_json }
     contexto = params[:contexto]
     club     = current_user.club
 

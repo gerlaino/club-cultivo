@@ -567,7 +567,7 @@ const routes = [
     path: '/p/:codigo_qr',
     name: 'planta-qr',
     component: () => import('../views/PlantaQrView.vue'),
-    meta: { fullscreen: true },
+    meta: { fullscreen: true, requiresAuth: true },
   },
   {
     path: '/s/:codigo_qr',
@@ -585,7 +585,7 @@ const routes = [
     path: '/cos/:codigo_qr',
     name: 'cosecha-qr',
     component: () => import('../views/CosechaQrView.vue'),
-    meta: { fullscreen: true },
+    meta: { fullscreen: true, requiresAuth: true },
   },
   {
     path: '/l/:codigo_qr',

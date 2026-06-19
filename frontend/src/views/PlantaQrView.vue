@@ -281,7 +281,7 @@ onMounted(async () => {
   await auth.ensureBootstrapped()
   const base = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/api\/?$/, '')
   try {
-    const { data } = await axios.get(`${base}/p/${codigoQr}`)
+    const { data } = await axios.get(`${base}/p/${codigoQr}`, { timeout: 12000 })
     plantaInfo.value = data
     clubNombre.value = data.club_nombre || ''
     clubLogo.value   = data.club_logo   || ''
