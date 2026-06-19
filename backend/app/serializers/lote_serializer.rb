@@ -9,12 +9,14 @@ class LoteSerializer
     puede_transicion = %w[semilla esqueje].include?(lote.estado) ||
                        (idx_ciclo.present? && idx_ciclo < Lote::CICLO_FASES.length - 1)
 
-    eventos      = lote.lote_eventos.loaded? ? lote.lote_eventos : lote.lote_eventos.to_a
-    ev_floracion = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'floracion' }.min_by(&:registrado_en)
-    ev_cosecha   = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'cosecha'   }.min_by(&:registrado_en)
+    eventos       = lote.lote_eventos.loaded? ? lote.lote_eventos : lote.lote_eventos.to_a
+    ev_vegetativo = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'vegetativo' }.min_by(&:registrado_en)
+    ev_floracion  = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'floracion' }.min_by(&:registrado_en)
+    ev_cosecha    = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'cosecha'   }.min_by(&:registrado_en)
 
-    fecha_inicio_floracion = ev_floracion&.registrado_en&.to_date
-    fecha_cosechado        = ev_cosecha&.registrado_en&.to_date
+    fecha_inicio_vegetativo = ev_vegetativo&.registrado_en&.to_date
+    fecha_inicio_floracion  = ev_floracion&.registrado_en&.to_date
+    fecha_cosechado         = ev_cosecha&.registrado_en&.to_date
 
     dias_vegetacion = (lote.start_date && fecha_inicio_floracion) ? (fecha_inicio_floracion - lote.start_date).to_i : nil
     dias_floracion  = (fecha_inicio_floracion && fecha_cosechado)  ? (fecha_cosechado - fecha_inicio_floracion).to_i   : nil
@@ -69,6 +71,8 @@ class LoteSerializer
       plants_count_objetivo:  lote.plants_count_objetivo,
       rendimiento_objetivo_g: lote.rendimiento_objetivo_g&.to_f,
       fecha_cosecha_estimada: lote.fecha_cosecha_estimada,
+      fecha_inicio_vegetativo: fecha_inicio_vegetativo,
+      fecha_inicio_floracion:  fecha_inicio_floracion,
       fecha_cosechado:        fecha_cosechado,
       dias_vegetacion:        dias_vegetacion,
       dias_floracion:         dias_floracion,

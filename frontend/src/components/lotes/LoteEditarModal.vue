@@ -22,8 +22,15 @@
 
           <div class="lem__grid">
             <div class="lem__field">
-              <label class="lem__label">Fecha de inicio</label>
-              <AppDatePicker v-model="editLoteForm.start_date" />
+              <label class="lem__label">Estado</label>
+              <select class="lem__input" v-model="editLoteForm.estado">
+                <option value="semilla">Germinación / Plántula</option>
+                <option value="esqueje">Esqueje</option>
+                <option value="vegetativo">Vegetativo</option>
+                <option value="floracion">Floración</option>
+                <option value="cosecha">Cosechado</option>
+                <option v-for="e in ESTADOS_EXTRA" :key="e.v" :value="e.v">{{ e.l }}</option>
+              </select>
             </div>
 
             <div class="lem__field">
@@ -97,6 +104,31 @@
                         placeholder="Observaciones internas…"></textarea>
             </div>
           </div>
+
+          <!-- Estado e historia: fechas de inicio de cada fase -->
+          <div class="lem__seccion-titulo">📅 Fechas de inicio por fase</div>
+          <div class="lem__grid">
+            <div class="lem__field">
+              <label class="lem__label">Inicio <span class="lem__opt">germinación / esqueje</span></label>
+              <AppDatePicker v-model="editLoteForm.start_date" />
+            </div>
+            <div class="lem__field">
+              <label class="lem__label">Inicio vegetativo</label>
+              <AppDatePicker v-model="editLoteForm.fecha_vegetativo" />
+            </div>
+            <div class="lem__field">
+              <label class="lem__label">Inicio floración</label>
+              <AppDatePicker v-model="editLoteForm.fecha_floracion" />
+            </div>
+            <div class="lem__field">
+              <label class="lem__label">Cosechado</label>
+              <AppDatePicker v-model="editLoteForm.fecha_cosecha" />
+            </div>
+          </div>
+          <div class="lem__nota">
+            <i class="bi bi-info-circle"></i>
+            Corrección del registro: ajusta el estado y las fechas históricas del lote (alimentan los días por fase de la analítica). No mueve plantas entre salas ni genera dispensaciones.
+          </div>
         </div>
 
         <div class="lem__footer">
@@ -134,6 +166,15 @@ const cantidadCambiada = computed(() =>
   Number(editLoteForm.value.plants_count) !== Number(props.lote?.plants_count)
 )
 
+// Si el lote ya está en un estado post-cosecha, lo mostramos para no perderlo
+// (pero las opciones editables son las fases de cultivo).
+const ESTADOS_EXTRA = computed(() => {
+  const base = ['semilla', 'esqueje', 'vegetativo', 'floracion', 'cosecha']
+  const cur = editLoteForm.value.estado
+  const labels = { en_manicura: 'En manicura', secado: 'Secado / Manicura', manicura_pendiente: 'Manicura pendiente', curado: 'Curado', finalizado: 'Finalizado' }
+  return (cur && !base.includes(cur)) ? [{ v: cur, l: labels[cur] || cur }] : []
+})
+
 watch(() => props.open, async (v) => {
   if (v) { await cargarGeneticas(); openEditLote() }
 })
@@ -169,6 +210,9 @@ async function doSave() {
 .lem__hint { font-size: .72rem; color: #94a3b8; }
 .lem__warn { display: flex; gap: .5rem; align-items: flex-start; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 9px; padding: .6rem .8rem; font-size: .78rem; line-height: 1.4; margin: .85rem 0; }
 .lem__warn i { margin-top: 1px; flex-shrink: 0; }
+.lem__seccion-titulo { font-size: .8rem; font-weight: 800; color: #0f172a; margin: 1.1rem 0 .6rem; padding-top: .9rem; border-top: 1px solid #f1f5f9; }
+.lem__nota { display: flex; gap: .5rem; align-items: flex-start; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 9px; padding: .55rem .8rem; font-size: .74rem; line-height: 1.4; margin-top: .7rem; }
+.lem__nota i { margin-top: 1px; flex-shrink: 0; }
 .lem__footer { display: flex; justify-content: flex-end; gap: .6rem; padding: 1rem 1.4rem; border-top: 1px solid #f1f5f9; }
 .lem__btn-ghost { background: none; border: 1.5px solid #cbd5e1; color: #64748b; border-radius: 9px; padding: .5rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; }
 .lem__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #15803d; color: #fff; border: none; border-radius: 9px; padding: .5rem 1.2rem; font-size: .85rem; font-weight: 700; cursor: pointer; }

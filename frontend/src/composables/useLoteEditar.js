@@ -24,8 +24,12 @@ export function useLoteEditar(loteId) {
     const l = lotes.current
     editLoteForm.value = {
       codigo:            l.codigo            || '',
+      estado:            l.estado            || '',
       plants_count:      l.plants_count      ?? null,
       start_date:        l.start_date        || '',
+      fecha_vegetativo:  l.fecha_inicio_vegetativo || '',
+      fecha_floracion:   l.fecha_inicio_floracion  || '',
+      fecha_cosecha:     l.fecha_cosechado          || '',
       genetica_id:       l.genetica?.id      || '',
       grow_type:         l.grow_type         || '',
       light_type:        l.light_type        || '',
@@ -42,7 +46,8 @@ export function useLoteEditar(loteId) {
     savingEditLote.value = true
     editLoteError.value  = null
     try {
-      const { tiene_semanas, codigo, ...rest } = editLoteForm.value
+      // Las fechas de fase NO son columnas del lote: van aparte y el backend reconcilia los eventos.
+      const { tiene_semanas, codigo, fecha_vegetativo, fecha_floracion, fecha_cosecha, ...rest } = editLoteForm.value
       const payload = {
         ...rest,
         semanas_floracion: tiene_semanas ? (Number(rest.semanas_floracion) || null) : null,
@@ -50,7 +55,11 @@ export function useLoteEditar(loteId) {
       }
       if (!payload.genetica_id) delete payload.genetica_id
       if (!payload.light_type)  delete payload.light_type
-      await updateLote(loteId, payload)
+      const fechas_fase = {}
+      if (fecha_vegetativo) fechas_fase.vegetativo = fecha_vegetativo
+      if (fecha_floracion)  fechas_fase.floracion  = fecha_floracion
+      if (fecha_cosecha)    fechas_fase.cosecha     = fecha_cosecha
+      await updateLote(loteId, payload, Object.keys(fechas_fase).length ? { fechas_fase } : {})
       await lotes.fetchOne(loteId)
       showEditLote.value = false
       toast.success('Lote actualizado')

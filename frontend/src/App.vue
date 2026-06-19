@@ -670,7 +670,7 @@ onMounted(async () => {
   height: 100%;
   overflow: hidden;
 }
-.admin-drawer :deep(.asb) {
+.admin-drawer :deep(.sbg) {
   display: flex !important;
   height: 100%;
   position: static;
@@ -703,7 +703,7 @@ onMounted(async () => {
   height: 100%;
   overflow: hidden;
 }
-.cvd-drawer :deep(.csb) {
+.cvd-drawer :deep(.sb) {
   display: flex !important;
   height: 100%;
   position: static;
@@ -790,7 +790,7 @@ onMounted(async () => {
   height: 100%;
   overflow: hidden;
 }
-.svr-drawer :deep(.csb) {
+.svr-drawer :deep(.sbg) {
   display: flex !important;
   height: 100%;
   position: static;
@@ -814,7 +814,7 @@ onMounted(async () => {
   height: 100%;
   overflow: hidden;
 }
-.dpv-drawer :deep(.dsb) {
+.dpv-drawer :deep(.sb) {
   display: flex !important;
   height: 100%;
   position: static;
@@ -869,7 +869,7 @@ onMounted(async () => {
   height: 100%;
   overflow: hidden;
 }
-.mnc-drawer :deep(.msb) {
+.mnc-drawer :deep(.sb) {
   display: flex !important;
   height: 100%;
   position: static;
@@ -995,6 +995,7 @@ onMounted(async () => {
 .med-main > * { max-width: 1200px; margin: 0 auto; }
 .med-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; }
 .med-drawer { width: 240px; height: 100%; overflow: hidden; }
+.med-drawer :deep(.sb) { display: flex !important; height: 100%; position: static; }
 .med-drawer-enter-active, .med-drawer-leave-active { transition: opacity .2s, transform .2s; }
 .med-drawer-enter-from, .med-drawer-leave-to { opacity: 0; pointer-events: none; }
 .med-drawer-enter-from .med-drawer, .med-drawer-leave-to .med-drawer { transform: translateX(-100%); }

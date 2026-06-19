@@ -177,15 +177,34 @@ class LotesController < ApplicationController
       return render json: { error: 'Los lotes finalizados son inmutables. Para correcciones de datos contactá al soporte.' }, status: :forbidden
     end
 
-    if lote_params[:plants_count].present?
-      nuevas   = lote_params[:plants_count].to_i
-      actuales = @lote.plants_count.to_i
-      delta    = nuevas - actuales
-    end
     if @lote.update(lote_update_params)
-      render json: LoteSerializer.serialize(@lote)
+      # Corrección de historia: reconciliar las fechas de inicio de cada fase con sus
+      # eventos de cambio de estado (fuente de verdad de la analítica de días por fase).
+      reconciliar_fechas_fase(@lote, params[:fechas_fase]) if params[:fechas_fase].present?
+      render json: LoteSerializer.serialize(@lote.reload)
     else
       render json: { errors: @lote.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  # Ajusta el registrado_en del evento 'cambio_estado' de cada fase (o lo crea si falta),
+  # para reflejar las fechas reales de un lote cargado/corregido a mano.
+  def reconciliar_fechas_fase(lote, fechas)
+    %w[vegetativo floracion cosecha].each do |fase|
+      valor = fechas[fase].presence
+      next unless valor
+      ts = Date.parse(valor).in_time_zone.change(hour: 12) rescue nil
+      next unless ts
+      ev = lote.lote_eventos.where(tipo: 'cambio_estado', estado_nuevo: fase).order(:registrado_en).first
+      if ev
+        ev.update!(registrado_en: ts)
+      else
+        lote.lote_eventos.create!(
+          tipo: 'cambio_estado', estado_nuevo: fase, estado_anterior: nil,
+          descripcion: "Corrección de fecha: inicio #{fase}", registrado_en: ts,
+          user: current_user, club: lote.club,
+        )
+      end
     end
   end
 
@@ -847,7 +866,7 @@ class LotesController < ApplicationController
 
   def lote_update_params
     params.require(:lote).permit(
-      :start_date, :origen, :planta_madre_id, :plants_count, :strain, :notes,
+      :estado, :start_date, :origen, :planta_madre_id, :plants_count, :strain, :notes,
       :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
       :rendimiento_real_g, :plants_count_cosechadas,

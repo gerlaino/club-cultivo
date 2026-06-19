@@ -72,7 +72,7 @@ export const listLotes = (params = null) => {
 export const getLote      = (id)         => api.get(`/lotes/${id}`)
 export const getLotePorQR = (codigoQr)   => api.get(`/lotes/por_qr/${codigoQr}`)
 export const createLote = (salaId, payload) => api.post(`/salas/${salaId}/lotes`, { lote: payload });
-export const updateLote         = (id, payload) => api.put(`/lotes/${id}`, { lote: payload });
+export const updateLote         = (id, payload, extra = {}) => api.put(`/lotes/${id}`, { lote: payload, ...extra });
 export const completarDatosLote = (id, payload) => api.patch(`/lotes/${id}/completar_datos`, { lote: payload });
 export const deleteLote = (id) => api.delete(`/lotes/${id}`);
 export const getLoteProximoCodigo = () => api.get('/lotes/proximo_codigo')
