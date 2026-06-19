@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_18_000005) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_19_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -343,6 +343,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_18_000005) do
     t.decimal "descuento_dispensa_pct", precision: 5, scale: 2, default: "0.0", null: false
     t.decimal "monto_credito_ars", precision: 12, scale: 2, default: "0.0", null: false
     t.jsonb "historial_envio", default: [], null: false
+    t.string "lote_codigo"
+    t.string "genetica_nombre"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["delivery_id"], name: "index_dispensaciones_on_delivery_id"

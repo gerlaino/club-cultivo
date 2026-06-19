@@ -27,12 +27,10 @@
           <span class="et__club-nombre">{{ stock.club?.nombre }}</span>
         </div>
 
-        <!-- QR code placeholder -->
+        <!-- QR code real -->
         <div class="et__qr-area">
-          <div class="et__qr-placeholder">
-            <span class="et__qr-icon">▦</span>
-            <span class="et__qr-text">{{ stock.codigo_qr }}</span>
-          </div>
+          <img v-if="qrDataUrl" :src="qrDataUrl" alt="QR" class="et__qr-img" />
+          <div v-else class="et__qr-placeholder"><span class="et__qr-text">{{ stock.codigo_qr }}</span></div>
           <div class="et__lote-numero">{{ stock.numero_lote_producto }}</div>
         </div>
 
@@ -60,12 +58,15 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../lib/api'
+import { useQRCode } from '../composables/useQRCode.js'
 
 const route   = useRoute()
 const stockId = Number(route.params.id)
 const loading = ref(true)
 const stock   = ref(null)
 const tamano  = ref('60x40')
+const qrDataUrl = ref(null)
+const { generatePNG } = useQRCode()
 
 const FORMA_LABELS = {
   flor_seca:   'Flor seca',
@@ -86,6 +87,9 @@ onMounted(async () => {
   try {
     const { data } = await api.get(`/stocks/${stockId}`)
     stock.value = data.data || data
+    if (stock.value?.codigo_qr) {
+      qrDataUrl.value = await generatePNG(`${window.location.origin}/s/${stock.value.codigo_qr}`, { width: 200, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' } })
+    }
   } catch { stock.value = null }
   finally { loading.value = false }
 })
@@ -136,6 +140,7 @@ onMounted(async () => {
 .et__club-nombre { font-weight: 800; color: #1b5e20; font-size: 1.1em; line-height: 1; }
 
 .et__qr-area { display: flex; align-items: center; gap: 2.5mm; margin-bottom: 1.5mm; }
+.et__qr-img { width: 16mm; height: 16mm; display: block; flex-shrink: 0; }
 .et__qr-placeholder { display: flex; flex-direction: column; align-items: center; gap: .5mm; padding: 1.5mm; border: 1pt solid #e2e8f0; border-radius: 2px; }
 .et__qr-icon { font-size: 2em; line-height: 1; color: #1b5e20; }
 .et__qr-text { font-family: monospace; font-size: .75em; color: #64748b; word-break: break-all; text-align: center; }

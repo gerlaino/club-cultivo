@@ -31,6 +31,7 @@ class Dispensacion < ApplicationRecord
   before_validation { self.fecha_dispensacion ||= Date.current }
   before_validation :componer_direccion_envio, if: :con_envio?
   before_create     :generar_codigo_paquete, if: :con_envio?
+  before_create     :capturar_snapshot_trazabilidad
 
   validates :cantidad,           presence: true, numericality: { greater_than: 0 }
   validates :fecha_dispensacion, presence: true
@@ -182,6 +183,13 @@ class Dispensacion < ApplicationRecord
   def generar_codigo_paquete
     self.codigo_paquete = "PKG-#{Date.today.strftime('%Y%m%d')}-#{SecureRandom.hex(3).upcase}"
     self.estado_envio   = 'pendiente'
+  end
+
+  # Snapshot inmutable de trazabilidad: copia código de lote y genética del stock al
+  # crear. Sobrevive aunque el stock se elimine después (dependent: :nullify).
+  def capturar_snapshot_trazabilidad
+    self.lote_codigo     ||= stock&.lote&.codigo || stock&.lote_codigo
+    self.genetica_nombre ||= (stock&.genetica || stock&.lote&.genetica)&.nombre
   end
 
   # Compone direccion_envio (texto para mostrar) a partir de los campos estructurados.

@@ -582,12 +582,6 @@ const routes = [
     meta: { fullscreen: true },
   },
   {
-    path: '/cos/:codigo_qr',
-    name: 'cosecha-qr',
-    component: () => import('../views/CosechaQrView.vue'),
-    meta: { fullscreen: true, requiresAuth: true },
-  },
-  {
     path: '/l/:codigo_qr',
     name: 'lote-qr',
     component: () => import('../views/LoteQrView.vue'),
@@ -829,7 +823,6 @@ router.beforeEach(async (to) => {
     !to.path.startsWith('/s/') &&
     !to.path.startsWith('/g/') &&
     !to.path.startsWith('/c/') &&
-    !to.path.startsWith('/cos/') &&
     !to.path.startsWith('/l/') &&
     !to.path.startsWith('/login')
   ) {

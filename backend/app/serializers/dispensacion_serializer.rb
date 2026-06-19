@@ -14,6 +14,8 @@ class DispensacionSerializer
       descuento_paciente_pct: d.descuento_paciente_pct&.to_f,
       descuento_dispensa_pct: d.descuento_dispensa_pct&.to_f,
       descuento_otorgado_por: (d.descuento_dispensa_pct.to_f > 0 && d.user) ? (d.user.first_name || d.user.email) : nil,
+      lote_codigo:         d.lote_codigo     || d.stock&.lote&.codigo,
+      genetica_nombre:     d.genetica_nombre || d.stock&.genetica&.nombre || d.stock&.lote&.genetica&.nombre,
       observaciones:       d.observaciones,
       fecha_dispensacion:  d.fecha_dispensacion,
       medio_pago:          d.medio_pago,

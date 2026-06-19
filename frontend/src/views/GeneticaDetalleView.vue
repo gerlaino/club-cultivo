@@ -20,7 +20,7 @@ const props = defineProps({ id: { type: Number, required: true } })
 const router  = useRouter()
 const auth    = useAuthStore()
 const { can } = usePermissions()
-const { downloadPNG, downloadSVG } = useQRCode()
+const { downloadPNG, downloadSVG, generatePNG } = useQRCode()
 const toast   = useToast()
 const { confirm } = useConfirm()
 
@@ -162,6 +162,40 @@ function qrFilename(ext)  { return `qr-genetica-${gen.value?.slug}.${ext}` }
 async function descargarQRpng() { await downloadPNG(qrUrl(), qrFilename('png')) }
 async function descargarQRsvg() { await downloadSVG(qrUrl(), qrFilename('svg')) }
 
+function _escG(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
+async function imprimirEtiquetaGenetica() {
+  const g = gen.value
+  if (!g?.slug) return
+  const dataUrl = await generatePNG(qrUrl(), { width: 260, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' } })
+  const inase = g.registrada_inase ? `INASE${g.numero_registro_inase ? ' ' + g.numero_registro_inase : ''}` : ''
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Etiqueta ${_escG(g.nombre)}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0} @page{size:80mm 50mm;margin:0}
+  body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .et{display:flex;align-items:center;gap:5mm;border:0.4px solid #bbb;border-radius:3mm;padding:5mm}
+  .et img{width:30mm;height:30mm;display:block}
+  .et-d{display:flex;flex-direction:column;gap:1mm}
+  .et-name{font-size:14pt;font-weight:800;color:#0f172a}
+  .et-tipo{font-size:9pt;color:#475569;text-transform:capitalize}
+  .et-can{font-size:10pt;font-weight:700;color:#15803d}
+  .et-inase{font-size:8pt;color:#b45309;font-weight:700;margin-top:1mm}
+</style></head><body>
+  <div class="et">
+    <img src="${dataUrl}" alt="${_escG(g.nombre)}" />
+    <div class="et-d">
+      <div class="et-name">${_escG(g.nombre)}</div>
+      <div class="et-tipo">${_escG(g.tipo || '')}</div>
+      <div class="et-can">THC ${g.thc != null ? g.thc + '%' : '—'} · CBD ${g.cbd != null ? g.cbd + '%' : '—'}</div>
+      ${inase ? `<div class="et-inase">🏛️ ${_escG(inase)}</div>` : ''}
+    </div>
+  </div>
+</body></html>`
+  const win = window.open('', '_blank', 'width=700,height=500')
+  if (!win) { await downloadPNG(qrUrl(), qrFilename('png')); return }
+  win.document.write(html); win.document.close()
+  setTimeout(() => win.print(), 500)
+}
+
 async function toggleVisibleWeb() {
   if (!canUpdate.value || toggling.value) return
   toggling.value = true
@@ -270,6 +304,9 @@ onMounted(async () => {
                   </button>
                   <button class="gdv__dropdown-item" @click="descargarQRpng(); qrDropdownOpen=false">
                     <i class="bi bi-file-earmark-image"></i> Descargar PNG
+                  </button>
+                  <button class="gdv__dropdown-item" @click="imprimirEtiquetaGenetica(); qrDropdownOpen=false">
+                    <i class="bi bi-printer"></i> Imprimir etiqueta
                   </button>
                   <div class="gdv__dropdown-sep"></div>
                   <a :href="`/g/${gen.slug}`" target="_blank" class="gdv__dropdown-item">

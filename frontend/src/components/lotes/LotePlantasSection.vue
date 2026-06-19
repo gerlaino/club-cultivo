@@ -381,10 +381,19 @@ async function toggleEsSeleccion(plant) {
 const printingLabels    = ref(false)
 const downloadingLabels = ref(false)
 
+function _esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
+function _fechaCorta(d) {
+  if (!d) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d))
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null
+}
+
 async function generarHTMLEtiquetas() {
   const origen   = window.location.origin
   const clubName = clubStore.data?.name || ''
   const loteCode = props.lote?.codigo || 'lote'
+  const genetica = props.lote?.genetica?.nombre || props.lote?.strain || '—'
+  const inicio   = _fechaCorta(props.lote?.start_date)
 
   const labels = await Promise.all(
     plantList.value
@@ -402,30 +411,36 @@ async function generarHTMLEtiquetas() {
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Etiquetas QR — ${loteCode}</title>
+<title>Etiquetas QR — ${_esc(loteCode)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   @page { size: A4; margin: 8mm; }
   body { font-family: -apple-system, sans-serif; background: #fff; }
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; }
   .label {
-    width: 100%;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    border: 0.4px solid #ccc; border-radius: 2mm; padding: 3mm 2mm;
-    page-break-inside: avoid; break-inside: avoid; gap: 2mm;
+    width: 100%; display: flex; align-items: center; gap: 2.5mm;
+    border: 0.4px solid #bbb; border-radius: 2mm; padding: 2.5mm;
+    page-break-inside: avoid; break-inside: avoid;
   }
-  .label img { width: 62%; height: auto; display: block; }
-  .label-club { font-size: 9pt; color: #444; text-align: center; line-height: 1.2; }
-  .label-code { font-size: 11pt; font-weight: 700; font-family: monospace; color: #000; text-align: center; line-height: 1.2; }
+  .label img { width: 22mm; height: 22mm; flex-shrink: 0; display: block; }
+  .label-data { display: flex; flex-direction: column; gap: .6mm; min-width: 0; }
+  .label-code { font-size: 10pt; font-weight: 700; font-family: monospace; color: #0f172a; line-height: 1.1; }
+  .label-gen  { font-size: 8.5pt; font-weight: 600; color: #15803d; line-height: 1.15; }
+  .label-meta { font-size: 7.5pt; color: #475569; line-height: 1.2; }
+  .label-club { font-size: 6.5pt; color: #94a3b8; line-height: 1.2; }
 </style>
 </head>
 <body>
 <div class="grid">
 ${labels.map(l => `
   <div class="label">
-    <img src="${l.dataUrl}" alt="${l.nombre}" />
-    <div class="label-club">${clubName}</div>
-    <div class="label-code">${l.nombre}</div>
+    <img src="${l.dataUrl}" alt="${_esc(l.nombre)}" />
+    <div class="label-data">
+      <div class="label-code">${_esc(l.nombre)}</div>
+      <div class="label-gen">🌿 ${_esc(genetica)}</div>
+      <div class="label-meta">Lote ${_esc(loteCode)}${inicio ? ` · inicio ${inicio}` : ''}</div>
+      <div class="label-club">${_esc(clubName)}</div>
+    </div>
   </div>`).join('')}
 </div>
 </body>

@@ -193,8 +193,9 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
             <span class="dv__stock-pill">
               {{ FORMA_EMOJI[d.stock?.forma_producto] }} {{ FORMA_LABEL[d.stock?.forma_producto] || d.stock?.forma_producto || '—' }}
             </span>
-            <span v-if="d.stock?.lote?.codigo" class="dv__lote-ref">
-              <i class="bi bi-box-seam"></i> {{ d.stock.lote.codigo }}
+            <span v-if="d.stock?.lote?.codigo || d.lote_codigo" class="dv__lote-ref">
+              <i class="bi bi-box-seam"></i> {{ d.stock?.lote?.codigo || d.lote_codigo }}
+              <span v-if="!d.stock" class="dv__lote-snap" title="Stock eliminado — dato preservado">(histórico)</span>
             </span>
           </div>
           <div v-if="Number(d.descuento_dispensa_pct) > 0 || Number(d.descuento_paciente_pct) > 0" class="dv__item-desc-info">
@@ -276,6 +277,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__item-desc { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .15rem; }
 .dv__stock-pill { font-size: .7rem; font-weight: 700; background: rgba(21,128,61,.1); color: #15803d; padding: .2em .65em; border-radius: 6px; }
 .dv__lote-ref { font-size: .7rem; color: #64748b; display: flex; align-items: center; gap: .25rem; }
+.dv__lote-snap { color: #94a3b8; font-style: italic; }
 .dv__item-obs { font-size: .73rem; color: #94a3b8; font-style: italic; }
 .dv__item-desc-info { font-size: .72rem; color: #b45309; display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
 /* Reservas pendientes */
