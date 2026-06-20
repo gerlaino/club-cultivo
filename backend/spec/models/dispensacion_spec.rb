@@ -27,6 +27,20 @@ RSpec.describe Dispensacion, type: :model do
     }.merge(attrs))
   end
 
+  describe 'movimiento de stock vinculado' do
+    it 'crea el movimiento con dispensacion_id y lo borra al eliminar la dispensación' do
+      d = nueva_dispensacion(cantidad: 10)
+      d.save!
+      mov = stock.stock_movimientos.where(tipo: 'dispensacion', dispensacion_id: d.id)
+      expect(mov.count).to eq(1)
+      expect(stock.reload.cantidad).to eq(90)
+
+      d.destroy
+      expect(stock.stock_movimientos.where(dispensacion_id: d.id)).to be_empty
+      expect(stock.reload.cantidad).to eq(100)
+    end
+  end
+
   # ── validaciones ──────────────────────────────────────────────────────────
 
   describe 'validaciones' do

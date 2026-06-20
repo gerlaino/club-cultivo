@@ -126,7 +126,7 @@ Rails.application.routes.draw do
     get '/pesajes_manicura', to: 'pesajes_manicura#index_admin'
 
     get '/stocks/qr/:codigo_qr', to: 'stocks#show_by_qr'
-    resources :stocks, only: [:index, :show, :create, :update] do
+    resources :stocks, only: [:index, :show, :create, :update, :destroy] do
       member do
         post :asignar
         get  :trazabilidad

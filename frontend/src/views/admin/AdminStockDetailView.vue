@@ -208,6 +208,13 @@
                   <div class="sd__action-sub">Marcar como agotado con merma</div>
                 </div>
               </button>
+              <button class="sd__action sd__action--danger" @click="eliminarStock" :disabled="eliminando">
+                <span class="sd__action-ico sd__action-ico--red"><i class="bi bi-x-octagon"></i></span>
+                <div class="sd__action-txt">
+                  <div class="sd__action-lbl">Eliminar stock</div>
+                  <div class="sd__action-sub">Borra el stock y revierte reservas/dispensas pendientes</div>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -493,15 +500,38 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
-  getStock, updateStock, asignarStock, ajustarStock, descartarStock,
+  getStock, updateStock, asignarStock, ajustarStock, descartarStock, deleteStock,
   getStockMovimientos, listSedes, createStock,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useConfirm } from '../../composables/useConfirm.js'
 import { useQRCode } from '../../composables/useQRCode.js'
 
 const route  = useRoute()
 const router = useRouter()
 const toast  = useToast()
+const { confirm } = useConfirm()
+const eliminando = ref(false)
+
+async function eliminarStock() {
+  const ok = await confirm({
+    title:       'Eliminar stock',
+    message:     'Se borra este stock y se revierten las reservas y dispensaciones PENDIENTES (vuelve el producto, se ajusta la cuenta corriente y la contabilidad). Si hay despachos entregados o asientos en un período cerrado, no se podrá borrar.',
+    confirmText: 'Sí, eliminar',
+    variant:     'danger',
+  })
+  if (!ok) return
+  eliminando.value = true
+  try {
+    await deleteStock(route.params.id)
+    toast.success('Stock eliminado')
+    router.push('/admin/stock')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo eliminar el stock')
+  } finally {
+    eliminando.value = false
+  }
+}
 const { generatePNG, generateSVG, downloadPNG, downloadSVG } = useQRCode()
 
 // ── Data ───────────────────────────────────────────────────────────────────────

@@ -3,8 +3,8 @@ class StocksController < ApplicationController
   before_action :require_lectura_stock!,        only: [:index, :show, :movimientos]
   before_action :require_auditor_lectura!,      only: [:trazabilidad]
   before_action :require_escritura_stock!,      only: [:create, :update, :asignar, :ajuste, :descartar]
-  before_action :require_admin_o_supervisor!,   only: [:show_by_qr]
-  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :movimientos]
+  before_action :require_admin_o_supervisor!,   only: [:show_by_qr, :destroy]
+  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :movimientos, :destroy]
 
   # GET /stocks?sede_id=&canal=regulatorio|social&incluir_pendientes=true
   # GET /sedes/:sede_id/stocks
@@ -168,6 +168,18 @@ class StocksController < ApplicationController
     render json: serialize_stock(@stock.reload)
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # DELETE /stocks/:id
+  # Borra el stock arrastrando lo reversible (reservas/dispensaciones pendientes con
+  # su rollback). Bloquea si hay entregadas o período contable cerrado.
+  def destroy
+    EliminarStockService.new(stock: @stock, usuario: current_user).eliminar!
+    head :no_content
+  rescue EliminarStockService::Bloqueado => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   # GET /stocks/:id/movimientos

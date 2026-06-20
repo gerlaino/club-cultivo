@@ -1,5 +1,6 @@
 class StockMovimiento < ApplicationRecord
   belongs_to :stock
+  belongs_to :dispensacion, optional: true
   belongs_to :usuario, class_name: 'User'
   belongs_to :sede_origen,  class_name: 'Sede', optional: true
   belongs_to :sede_destino, class_name: 'Sede', optional: true

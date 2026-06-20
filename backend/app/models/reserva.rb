@@ -10,7 +10,9 @@ class Reserva < ApplicationRecord
 
   belongs_to :club
   belongs_to :paciente
-  belongs_to :stock
+  # optional: si se borra el stock, la reserva puede quedar huérfana y aún así
+  # poder cancelarse/eliminarse sin romper por la FK requerida.
+  belongs_to :stock, optional: true
   belongs_to :user
   belongs_to :dispensacion, optional: true
 

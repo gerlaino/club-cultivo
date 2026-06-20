@@ -161,10 +161,11 @@ class Dispensacion < ApplicationRecord
     ActiveRecord::Base.transaction do
       stock.decrement!(:cantidad, cantidad)
       stock.stock_movimientos.create!(
-        tipo:    'dispensacion',
-        gramos:  -cantidad,
-        usuario: user,
-        notas:   "Dispensación ##{id} — #{paciente&.nombre_completo}",
+        tipo:           'dispensacion',
+        gramos:         -cantidad,
+        usuario:        user,
+        dispensacion_id: id,
+        notas:          "Dispensación ##{id} — #{paciente&.nombre_completo}",
       )
     end
   end
@@ -173,10 +174,10 @@ class Dispensacion < ApplicationRecord
     return unless stock
     ActiveRecord::Base.transaction do
       stock.increment!(:cantidad, cantidad)
-      stock.stock_movimientos
-           .where(tipo: 'dispensacion')
-           .where("notas LIKE ?", "Dispensación ##{id} —%")
-           .destroy_all
+      # Borra el movimiento por FK exacta; fallback por texto para registros viejos.
+      movs    = stock.stock_movimientos.where(tipo: 'dispensacion')
+      borrados = movs.where(dispensacion_id: id).destroy_all
+      movs.where("notas LIKE ?", "Dispensación ##{id} —%").destroy_all if borrados.empty?
     end
   end
 

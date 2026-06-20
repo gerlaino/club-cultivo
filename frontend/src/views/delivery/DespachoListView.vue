@@ -365,8 +365,14 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
           {{ entregadorLabel(u) }}
         </option>
       </select>
-      <AppDatePicker v-model="filtroDesde" @update:model-value="load" />
-      <AppDatePicker v-model="filtroHasta" @update:model-value="load" />
+      <label class="dsp__date-field">
+        <span class="dsp__date-label">Dispensadas desde</span>
+        <AppDatePicker v-model="filtroDesde" @update:model-value="load" />
+      </label>
+      <label class="dsp__date-field">
+        <span class="dsp__date-label">hasta</span>
+        <AppDatePicker v-model="filtroHasta" @update:model-value="load" />
+      </label>
       <button
         v-if="filtroEstado || filtroDelivery || filtroDesde || filtroHasta || filtroBusca"
         class="dsp__btn-clear"
@@ -743,8 +749,10 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
   flex-wrap: wrap;
   gap: var(--sp-2);
   margin-bottom: var(--sp-5);
-  align-items: center;
+  align-items: flex-end;
 }
+.dsp__date-field { display: flex; flex-direction: column; gap: 2px; }
+.dsp__date-label { font-size: 11px; font-weight: 600; color: var(--c-text-soft, #64748b); text-transform: uppercase; letter-spacing: .03em; }
 .dsp__search {
   flex: 1;
   min-width: 220px;

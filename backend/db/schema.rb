@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_19_000003) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_20_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1168,6 +1168,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_19_000003) do
     t.text "notas"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "dispensacion_id"
+    t.index ["dispensacion_id"], name: "index_stock_movimientos_on_dispensacion_id"
     t.index ["sede_destino_id"], name: "index_stock_movimientos_on_sede_destino_id"
     t.index ["sede_origen_id"], name: "index_stock_movimientos_on_sede_origen_id"
     t.index ["stock_id"], name: "index_stock_movimientos_on_stock_id"
