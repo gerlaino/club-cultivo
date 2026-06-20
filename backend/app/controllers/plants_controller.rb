@@ -255,8 +255,13 @@ class PlantsController < ApplicationController
   end
 
   def foto_url(plant)
-    return nil unless plant.respond_to?(:foto) && plant.foto.attached?
-    url_for(plant.foto)
+    # Las fotos de planta se suben a `fotos` (has_many). Mantenemos compat con `foto`
+    # (has_one) por si alguna quedó así. Devolvemos la más reciente.
+    if plant.respond_to?(:foto) && plant.foto.attached?
+      url_for(plant.foto)
+    elsif plant.respond_to?(:fotos) && plant.fotos.attached?
+      url_for(plant.fotos.blobs.order(created_at: :desc).first)
+    end
   rescue
     nil
   end
