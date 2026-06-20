@@ -36,7 +36,9 @@ module Medico
       if turno.realizado?
         return render json: { error: 'No se puede eliminar un turno ya realizado' }, status: :unprocessable_entity
       end
-      turno.update!(estado: 'cancelado')
+      # Cancelar = flip de estado; no re-validamos el turno entero (un médico/paciente
+      # con referencia colgada no debe impedir cancelar). El guard de realizado? ya está.
+      turno.update_columns(estado: 'cancelado', updated_at: Time.current)
       head :no_content
     end
 
