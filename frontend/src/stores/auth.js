@@ -105,6 +105,11 @@ export const useAuthStore = defineStore("auth", {
         clearAuthToken();
         const { planData } = usePlan();
         planData.value = null;
+        // Borra el caché de API del service worker: evita que tras el logout se
+        // sirva un /me viejo (la causa de "no cierra sesión" en mobile/PWA).
+        if (typeof caches !== 'undefined') {
+          try { await caches.delete('api-cache'); } catch (_) {}
+        }
         // Hard reload limpia todos los stores de Pinia, evitando filtraciones entre clubs
         window.location.href = '/login';
       }

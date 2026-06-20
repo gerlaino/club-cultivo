@@ -731,8 +731,8 @@ const routes = [
       { path: '', redirect: () => {
           const role = useAuthStore().user?.role
           const homes = {
-            admin:      '/m/admin/sedes',
-            supervisor: '/m/admin/sedes', // supervisor comparte rutas mobile de admin
+            admin:      '/m/admin/home',
+            supervisor: '/m/admin/home', // supervisor comparte rutas mobile de admin
             cultivador: '/m/cultivador/sedes',
             manicura:   '/m/manicura/pesar',
             delivery:   '/m/delivery/despachos',
@@ -745,7 +745,11 @@ const routes = [
       { path: 'cultivador/sedes',  component: () => import('../views/mobile/MSedesView.vue') },
       { path: 'cultivador/tareas', component: () => import('../views/mobile/MTareasView.vue') },
 
+      // ── Escaneo QR (cualquier rol con shell mobile) ──
+      { path: 'scan', component: () => import('../views/mobile/MScanView.vue') },
+
       // ── Admin / Supervisor ──
+      { path: 'admin/home',    component: () => import('../views/mobile/MAdminHomeView.vue') },
       { path: 'admin/sedes',   component: () => import('../views/mobile/MSedesView.vue') },
       { path: 'admin/tareas',  component: () => import('../views/mobile/MTareasView.vue') },
       { path: 'admin/aprobar', component: () => import('../views/mobile/MAdminAprobacionView.vue') },

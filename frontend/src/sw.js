@@ -26,12 +26,19 @@ const API_ORIGIN = (() => {
   try { return new URL(v).origin } catch { return null }
 })()
 
+// Endpoints sensibles a la sesión: NUNCA se cachean. Si /me se sirviera del
+// caché, tras un logout el SW devolvería el usuario viejo y parecería que la
+// sesión sigue abierta (pasaba en mobile/PWA, donde la red lenta hace que
+// NetworkFirst caiga al caché). Estos van siempre a la red.
+const AUTH_BYPASS = ['/me', '/users/sign_in', '/users/sign_out', '/users/sign_up']
+
 registerRoute(
   ({ url, request }) => {
     if (request.method !== 'GET') return false
-    return API_ORIGIN
-      ? url.origin === API_ORIGIN
-      : url.pathname.startsWith('/api/')
+    const isApi = API_ORIGIN ? url.origin === API_ORIGIN : url.pathname.startsWith('/api/')
+    if (!isApi) return false
+    if (AUTH_BYPASS.some(p => url.pathname.endsWith(p))) return false
+    return true
   },
   new NetworkFirst({
     cacheName: 'api-cache',
