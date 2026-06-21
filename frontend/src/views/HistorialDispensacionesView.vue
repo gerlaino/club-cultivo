@@ -4,7 +4,8 @@ import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, deleteDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink } from 'vue-router'
-import { Download, RefreshCw, Truck, Search, Plus, X, Filter, Pencil, Trash2 } from 'lucide-vue-next'
+import { Download, RefreshCw, Truck, Search, Plus, X, Filter, Pencil, Trash2, QrCode } from 'lucide-vue-next'
+import { useEtiquetaDispensa } from '../composables/useEtiquetaDispensa.js'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
 import ModalEditarDispensacion from '../components/pacientes/ModalEditarDispensacion.vue'
 import { useAuthStore } from '../stores/auth'
@@ -14,6 +15,7 @@ import { useToast } from '../composables/useToast.js'
 const auth    = useAuthStore()
 const { confirm } = useConfirm()
 const toast   = useToast()
+const { imprimirEtiqueta } = useEtiquetaDispensa()
 
 const canEdit   = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 const canDelete = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
@@ -440,7 +442,7 @@ const FORMAS = [
               <th>Pago</th>
               <th>Dispensador</th>
               <th></th>
-              <th v-if="canEdit || canDelete"></th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -478,6 +480,9 @@ const FORMAS = [
                 </span>
               </td>
               <td class="hd__td-actions">
+                <button v-if="d.token" class="hd__action-btn" @click="imprimirEtiqueta(d)" title="Imprimir etiqueta">
+                  <QrCode :size="13" :stroke-width="2" />
+                </button>
                 <button v-if="canEdit" class="hd__action-btn" @click="openEdit(d)" title="Editar">
                   <Pencil :size="13" :stroke-width="2" />
                 </button>
