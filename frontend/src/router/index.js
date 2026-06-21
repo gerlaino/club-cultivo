@@ -582,6 +582,12 @@ const routes = [
     meta: { fullscreen: true },
   },
   {
+    path: '/d/:token',
+    name: 'dispensa-publica',
+    component: () => import('../views/DispensaQrView.vue'),
+    meta: { fullscreen: true },
+  },
+  {
     path: '/l/:codigo_qr',
     name: 'lote-qr',
     component: () => import('../views/LoteQrView.vue'),

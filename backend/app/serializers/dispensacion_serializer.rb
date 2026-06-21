@@ -2,6 +2,7 @@ class DispensacionSerializer
   def self.serialize(d)
     {
       id:              d.id,
+      token:           d.token,
       club_id:         d.sede&.club_id,
       paciente_id:     d.paciente_id,
       paciente_nombre: "#{d.paciente.nombre} #{d.paciente.apellido}",

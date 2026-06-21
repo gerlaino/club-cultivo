@@ -32,6 +32,8 @@ class Dispensacion < ApplicationRecord
   before_validation :componer_direccion_envio, if: :con_envio?
   before_create     :generar_codigo_paquete, if: :con_envio?
   before_create     :capturar_snapshot_trazabilidad
+  before_create     :generar_token
+  before_create     :capturar_snapshot_producto
 
   validates :cantidad,           presence: true, numericality: { greater_than: 0 }
   validates :fecha_dispensacion, presence: true
@@ -191,6 +193,38 @@ class Dispensacion < ApplicationRecord
   def capturar_snapshot_trazabilidad
     self.lote_codigo     ||= stock&.lote&.codigo || stock&.lote_codigo
     self.genetica_nombre ||= (stock&.genetica || stock&.lote&.genetica)&.nombre
+  end
+
+  # Token público (no adivinable) para la URL /d/:token del pasaporte.
+  def generar_token
+    return if token.present?
+    self.token = loop do
+      t = SecureRandom.urlsafe_base64(12)
+      break t unless self.class.exists?(token: t)
+    end
+  end
+
+  # Foto inmutable del producto al dispensar: datos que muestra la etiqueta/pasaporte.
+  # Se lee de acá (no en vivo) para que sobreviva a ediciones de genética o borrado de stock.
+  def capturar_snapshot_producto
+    return if producto_snapshot.present? && producto_snapshot != {}
+    g = stock&.genetica || stock&.lote&.genetica
+    self.producto_snapshot = {
+      forma_producto: stock&.forma_producto,
+      cantidad:       cantidad&.to_f,
+      unidad:         stock&.unidad,
+      lote_codigo:    lote_codigo || stock&.lote&.codigo,
+      fecha:          (fecha_dispensacion || Date.current).to_s,
+      genetica: g && {
+        nombre:    g.nombre,
+        tipo:      g.tipo,
+        thc_pct:   g.thc&.to_f,
+        cbd_pct:   g.cbd&.to_f,
+        terpenos:  g.terpenos,
+        registrada_inase:      g.registrada_inase,
+        numero_registro_inase: g.numero_registro_inase,
+      },
+    }.compact
   end
 
   # Compone direccion_envio (texto para mostrar) a partir de los campos estructurados.

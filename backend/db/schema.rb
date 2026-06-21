@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_20_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_21_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -345,6 +345,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_20_000001) do
     t.jsonb "historial_envio", default: [], null: false
     t.string "lote_codigo"
     t.string "genetica_nombre"
+    t.string "token"
+    t.jsonb "producto_snapshot", default: {}, null: false
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["delivery_id"], name: "index_dispensaciones_on_delivery_id"
@@ -356,6 +358,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_20_000001) do
     t.index ["paciente_id"], name: "index_dispensaciones_on_paciente_id"
     t.index ["sede_id"], name: "index_dispensaciones_on_sede_id"
     t.index ["stock_id"], name: "index_dispensaciones_on_stock_id"
+    t.index ["token"], name: "index_dispensaciones_on_token", unique: true
     t.index ["user_id"], name: "index_dispensaciones_on_user_id"
   end
 

@@ -11,6 +11,8 @@ Rails.application.routes.draw do
   get "/p/:codigo_qr",   to: "public/plantas#show_qr",   defaults: { format: :json }
   get "/s/:codigo_qr",   to: "public/stocks#show_qr",    defaults: { format: :json }
   get "/c/:token",       to: "public/carnets#show",      defaults: { format: :json }
+  get  "/d/:token",      to: "public/dispensas#preview", defaults: { format: :json }
+  post "/d/:token/ver",  to: "public/dispensas#ver",     defaults: { format: :json }
 
   # Web pública del club (accedida desde el sitio web externo del club)
   namespace :public, defaults: { format: :json } do
