@@ -88,7 +88,8 @@ import axios from 'axios'
 const route = useRoute()
 const token = route.params.token
 
-const base = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/api\/?$/, '')
+// Base CON /api: los datos del pasaporte viven bajo /api (la página /d/:token es la SPA).
+const base = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 const estado      = ref('cargando') // cargando | gate | ok | no_encontrada
 const club        = ref(null)

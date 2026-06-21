@@ -14,7 +14,7 @@ unless Rails.env.test?
 
     # Gate por DNI del pasaporte de dispensa: evita probar DNIs a lo bruto.
     throttle('dispensa_ver/ip', limit: 10, period: 1.minute) do |req|
-      req.ip if req.path.match?(%r{\A/d/[^/]+/ver\z}) && req.post?
+      req.ip if req.path.match?(%r{\A/api/d/[^/]+/ver\z}) && req.post?
     end
 
     # Asistente IA: 30 req/min por IP (complementa el rate limit interno por tier)

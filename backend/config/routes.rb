@@ -11,8 +11,9 @@ Rails.application.routes.draw do
   get "/p/:codigo_qr",   to: "public/plantas#show_qr",   defaults: { format: :json }
   get "/s/:codigo_qr",   to: "public/stocks#show_qr",    defaults: { format: :json }
   get "/c/:token",       to: "public/carnets#show",      defaults: { format: :json }
-  get  "/d/:token",      to: "public/dispensas#preview", defaults: { format: :json }
-  post "/d/:token/ver",  to: "public/dispensas#ver",     defaults: { format: :json }
+  # OJO: los datos del pasaporte de dispensa van bajo /api (ver scope abajo), NO a
+  # nivel root. A nivel root colisionarían con la navegación del browser a la página
+  # /d/:token de la SPA (mismo origen → el backend interceptaría el HTML).
 
   # Web pública del club (accedida desde el sitio web externo del club)
   namespace :public, defaults: { format: :json } do
@@ -33,6 +34,11 @@ Rails.application.routes.draw do
   # API — todo bajo /api para evitar colisión con Vue Router
   # ══════════════════════════════════════════════════════════════
   scope '/api', defaults: { format: :json } do
+    # Pasaporte público de dispensa (datos). La página vive en la SPA en /d/:token y
+    # consume estos endpoints. Bajo /api para no chocar con la navegación de la SPA.
+    get  'd/:token',     to: 'public/dispensas#preview'
+    post 'd/:token/ver', to: 'public/dispensas#ver'
+
     devise_for :users,
                path: '',
                path_names: { sign_in: 'users/sign_in', sign_out: 'users/sign_out' },
