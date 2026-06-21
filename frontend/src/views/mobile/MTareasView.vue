@@ -36,7 +36,7 @@
         v-for="t in tareasDelDia"
         :key="t.id"
         class="mta__card"
-        :class="`mta__card--${t.prioridad}`"
+        :class="[`mta__card--${t.prioridad}`, { 'mta__card--futura': esFutura(t) && t.estado !== 'completada' }]"
         @click="abrirCompletarSheet(t)"
       >
         <div class="mta__card-left">
@@ -47,19 +47,21 @@
           <div class="mta__card-meta">
             <span v-if="t.sala?.nombre" class="mta__sala">{{ t.sala.nombre }}</span>
             <span v-if="t.estado === 'completada'" class="mta__completada-badge">✓ Completada</span>
+            <span v-else-if="esFutura(t)" class="mta__prog-badge"><i class="bi bi-clock"></i> Programada</span>
             <span v-else class="mta__prioridad" :class="`mta__prioridad--${t.prioridad}`">
               {{ PRIORIDAD_LABEL[t.prioridad] || t.prioridad }}
             </span>
           </div>
         </div>
         <button
-          v-if="t.estado !== 'completada'"
+          v-if="t.estado !== 'completada' && !esFutura(t)"
           class="mta__check"
           @click.stop="abrirCompletarSheet(t)"
         >
           <i class="bi bi-check2"></i>
         </button>
-        <i v-else class="bi bi-check2-all mta__done-icon"></i>
+        <i v-else-if="t.estado === 'completada'" class="bi bi-check2-all mta__done-icon"></i>
+        <i v-else class="bi bi-lock mta__lock-icon"></i>
       </div>
     </div>
 
@@ -183,6 +185,9 @@ const dias = computed(() => {
 })
 
 const diaSeleccionado = ref(toISO(hoy))
+const hoyISO = toISO(hoy)
+// Una tarea programada a futuro no se puede completar todavía (mismo criterio que el desktop).
+const esFutura = (t) => !!t.fecha_programada && t.fecha_programada > hoyISO
 
 const tareasDelDia = computed(() => {
   const diaData = tareasStore.semana.dias?.find(x => x.fecha === diaSeleccionado.value)
@@ -205,6 +210,7 @@ const completarForm  = ref({ horas_reales: null, notas_completado: '' })
 
 function abrirCompletarSheet(t) {
   if (t.estado === 'completada') return
+  if (esFutura(t)) return   // no se completan tareas futuras
   tareaActiva.value    = t
   completarForm.value  = { horas_reales: null, notas_completado: '' }
   completarError.value = null
@@ -283,15 +289,17 @@ onMounted(async () => {
 
 .mta__topbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 1rem 1rem .75rem;
+  padding: 1.2rem 1.1rem .8rem;
 }
-.mta__title { font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0; }
+.mta__title { font-family: var(--font-display, sans-serif); font-size: 1.45rem; font-weight: 700; color: var(--c-ink-900, #1a1d1f); margin: 0; }
 .mta__fab {
-  width: 38px; height: 38px; border-radius: 12px;
-  background: #1b5e20; color: #fff; border: none;
+  width: 40px; height: 40px; border-radius: 12px;
+  background: var(--c-leaf-800, #1a3d2e); color: #fff; border: none;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem; cursor: pointer;
+  font-size: 1.1rem; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s;
 }
+.mta__fab:active { transform: scale(.92); }
 
 /* ── Strip 7 días ── */
 .mta__strip {
@@ -370,6 +378,9 @@ onMounted(async () => {
 }
 .mta__check:hover { color: #16a34a; }
 .mta__done-icon { color: #16a34a; padding: .75rem; font-size: 1rem; flex-shrink: 0; }
+.mta__lock-icon { color: #cbd5e1; padding: .75rem; font-size: .95rem; flex-shrink: 0; }
+.mta__card--futura { opacity: .62; }
+.mta__prog-badge { color: #94a3b8; font-weight: 600; display: inline-flex; align-items: center; gap: .25rem; }
 
 /* ── Sheets ── */
 .mta__sheet-completar,

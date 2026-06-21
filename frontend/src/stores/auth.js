@@ -105,13 +105,19 @@ export const useAuthStore = defineStore("auth", {
         clearAuthToken();
         const { planData } = usePlan();
         planData.value = null;
-        // Borra el caché de API del service worker: evita que tras el logout se
-        // sirva un /me viejo (la causa de "no cierra sesión" en mobile/PWA).
+        // Borra TODOS los cachés del service worker (incl. el SW viejo aún instalado
+        // en la PWA): evita que tras el logout se sirva un /me viejo cacheado, que es
+        // la causa de "no cierra sesión" en mobile/PWA.
         if (typeof caches !== 'undefined') {
-          try { await caches.delete('api-cache'); } catch (_) {}
+          try {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((k) => caches.delete(k)));
+          } catch (_) {}
         }
-        // Hard reload limpia todos los stores de Pinia, evitando filtraciones entre clubs
-        window.location.href = '/login';
+        try { localStorage.clear(); sessionStorage.clear(); } catch (_) {}
+        // Hard reload (con replace) limpia todos los stores de Pinia y evita volver
+        // atrás a una pantalla autenticada. Cache-bust para saltear cualquier SW.
+        window.location.replace('/login?loggedout=' + Date.now());
       }
     },
 

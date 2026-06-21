@@ -46,11 +46,6 @@
       </div>
     </section>
 
-    <!-- Accesos -->
-    <section class="mah__section">
-      <h2 class="mah__section-title">Accesos</h2>
-      <MobileActionGrid :actions="accesos" />
-    </section>
   </div>
 </template>
 
@@ -59,7 +54,6 @@ import { computed, ref, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { useStatsStore } from '../../stores/stats.js'
 import { getTareasDashboard, listLotes, listStocksPendientes } from '../../lib/api.js'
-import MobileActionGrid from '../../components/mobile/MobileActionGrid.vue'
 
 const auth  = useAuthStore()
 const stats = useStatsStore()
@@ -99,13 +93,6 @@ onMounted(async () => {
   aprobaciones.value = manicura + stockP
   loading.value = false
 })
-
-const accesos = [
-  { key: 'cultivo',  label: 'Cultivo',     icon: 'bi-diagram-3',     to: '/m/admin/sedes',   tint: 'var(--c-leaf-100)', color: 'var(--c-leaf-700)' },
-  { key: 'scan',     label: 'Escanear QR', icon: 'bi-qr-code-scan',  to: '/m/scan',          tint: '#ede9fe',           color: '#7c3aed' },
-  { key: 'tareas',   label: 'Tareas',      icon: 'bi-check2-square',  to: '/m/admin/tareas',  tint: '#e0f2fe',           color: 'var(--c-sky-600)' },
-  { key: 'aprobar',  label: 'Aprobar',     icon: 'bi-patch-check',    to: '/m/admin/aprobar', tint: '#fef3c7',           color: 'var(--c-amber-500)' },
-]
 </script>
 
 <style scoped>
