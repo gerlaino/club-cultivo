@@ -218,8 +218,8 @@ onMounted(cargar)
 </script>
 
 <style scoped>
-.mh { padding: 1.2rem 1rem 2.5rem; display: flex; justify-content: center; }
-.mh__wrap { width: 100%; max-width: 460px; }
+.mh { padding: 1.5rem 1rem 2.5rem; display: flex; justify-content: center; }
+.mh__wrap { width: 100%; max-width: 620px; }
 
 .mh__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .mh__title { font-family: var(--font-display, sans-serif); font-size: 1.4rem; font-weight: 700; color: var(--c-ink-900, #1a1d1f); margin: 0; }
@@ -229,7 +229,7 @@ onMounted(cargar)
 .mh__total-lbl { display: block; font-size: .6rem; color: rgba(255,255,255,.7); margin-top: .1rem; }
 
 /* Card del calendario */
-.mh__cal-card { background: #fff; border: 1px solid var(--c-leaf-100, #e8f0eb); border-radius: 18px; padding: 1rem; box-shadow: var(--sh-1); }
+.mh__cal-card { background: #fff; border: 1px solid var(--c-leaf-100, #e8f0eb); border-radius: 18px; padding: 1.25rem; box-shadow: var(--sh-1); }
 .mh__monthbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: .8rem; }
 .mh__nav { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--c-leaf-100, #e8f0eb); background: var(--c-leaf-50, #f4f8f5); color: var(--c-leaf-700, #2d4a3e); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s; }
 .mh__nav:hover:not(:disabled) { background: var(--c-leaf-100, #e8f0eb); }
@@ -237,12 +237,12 @@ onMounted(cargar)
 .mh__month { font-family: var(--font-display, sans-serif); font-weight: 700; color: var(--c-ink-900, #1a1d1f); font-size: 1rem; }
 
 .mh__dows { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: .35rem; }
-.mh__dow { text-align: center; font-size: .62rem; font-weight: 700; color: var(--c-ink-300, #b8c0b8); text-transform: uppercase; letter-spacing: .03em; }
+.mh__dow { text-align: center; font-size: .68rem; font-weight: 700; color: var(--c-ink-300, #b8c0b8); text-transform: uppercase; letter-spacing: .03em; padding-bottom: .15rem; }
 
-.mh__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.mh__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .mh__cell {
-  aspect-ratio: 1; max-height: 46px;
-  border-radius: 10px; position: relative;
+  aspect-ratio: 1; max-height: 70px;
+  border-radius: 12px; position: relative;
   display: flex; align-items: center; justify-content: center;
   background: var(--c-leaf-50, #f4f8f5);
   cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -254,9 +254,9 @@ onMounted(cargar)
 .mh__cell--fut { opacity: .35; cursor: not-allowed; }
 .mh__cell--hoy { box-shadow: inset 0 0 0 1.5px var(--c-leaf-500, #5a8a72); }
 .mh__cell--con { background: var(--c-leaf-800, #1a3d2e); }
-.mh__num { font-size: .85rem; font-weight: 600; color: var(--c-ink-700, #3a3f44); }
+.mh__num { font-size: .95rem; font-weight: 600; color: var(--c-ink-700, #3a3f44); }
 .mh__cell--con .mh__num { color: #fff; }
-.mh__dot { position: absolute; bottom: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--c-leaf-300, #a8c9b5); }
+.mh__dot { position: absolute; bottom: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--c-leaf-300, #a8c9b5); }
 
 .mh__loading { display: flex; justify-content: center; padding: .8rem 0 0; }
 .mh__spin { font-size: 1.2rem; color: var(--c-leaf-300, #a8c9b5); animation: spin .8s linear infinite; }
