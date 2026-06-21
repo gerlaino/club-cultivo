@@ -292,6 +292,12 @@ export const getInformeSemestral = (params = {}) => api.get('/informe_semestral'
 
 export const listTareas        = (params = {}) => api.get('/tareas', { params })
 export const getTareasDashboard = ()            => api.get('/tareas/dashboard')
+
+// ── Jornadas laborales (planilla de horas) ──
+export const listJornadas   = (params = {})      => api.get('/jornadas', { params })
+export const createJornada  = (jornada)          => api.post('/jornadas', { jornada })
+export const updateJornada  = (id, jornada)      => api.patch(`/jornadas/${id}`, { jornada })
+export const deleteJornada  = (id)               => api.delete(`/jornadas/${id}`)
 export const getTarea          = (id)           => api.get(`/tareas/${id}`)
 export const createTarea       = (payload)      => api.post('/tareas', { tarea: payload })
 export const updateTarea       = (id, payload)  => api.patch(`/tareas/${id}`, { tarea: payload })

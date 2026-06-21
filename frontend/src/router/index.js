@@ -588,6 +588,12 @@ const routes = [
     meta: { fullscreen: true },
   },
   {
+    path: '/mis-horas',
+    name: 'mis-horas',
+    component: () => import('../views/MisHorasView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/l/:codigo_qr',
     name: 'lote-qr',
     component: () => import('../views/LoteQrView.vue'),
@@ -746,6 +752,9 @@ const routes = [
           return homes[role] || '/'
         }
       },
+
+      // ── Horas (manicura / cultivador) ──
+      { path: 'horas', component: () => import('../views/MisHorasView.vue') },
 
       // ── Cultivador ──
       { path: 'cultivador/sedes',  component: () => import('../views/mobile/MSedesView.vue') },

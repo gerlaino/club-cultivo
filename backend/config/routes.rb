@@ -358,6 +358,8 @@ Rails.application.routes.draw do
       member { post :cancelar }
     end
 
+    resources :jornadas, only: [:index, :create, :update, :destroy]
+
     resources :tareas do
       collection do
         get  :dashboard

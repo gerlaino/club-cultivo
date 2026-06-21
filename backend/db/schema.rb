@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_21_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_21_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -501,6 +501,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_21_000001) do
     t.index ["fecha_vencimiento"], name: "index_indicacion_medicas_on_fecha_vencimiento"
     t.index ["paciente_id"], name: "index_indicacion_medicas_on_paciente_id"
     t.index ["user_id"], name: "index_indicacion_medicas_on_user_id"
+  end
+
+  create_table "jornadas_laborales", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "club_id", null: false
+    t.date "fecha", null: false
+    t.string "hora_entrada", null: false
+    t.string "hora_salida", null: false
+    t.text "nota"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "fecha"], name: "index_jornadas_laborales_on_club_id_and_fecha"
+    t.index ["club_id"], name: "index_jornadas_laborales_on_club_id"
+    t.index ["user_id", "fecha"], name: "index_jornadas_laborales_on_user_id_and_fecha", unique: true
+    t.index ["user_id"], name: "index_jornadas_laborales_on_user_id"
   end
 
   create_table "jwt_denylists", force: :cascade do |t|
@@ -1405,6 +1420,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_21_000001) do
   add_foreign_key "geneticas", "clubs"
   add_foreign_key "indicacion_medicas", "pacientes"
   add_foreign_key "indicacion_medicas", "users"
+  add_foreign_key "jornadas_laborales", "clubs"
+  add_foreign_key "jornadas_laborales", "users"
   add_foreign_key "lecturas_ambientales", "dispositivos"
   add_foreign_key "lecturas_ambientales", "lotes"
   add_foreign_key "lecturas_ambientales", "salas"

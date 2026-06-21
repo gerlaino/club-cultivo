@@ -117,6 +117,7 @@ const NAV = {
   cultivador: { items: [
     { to: '/m/cultivador/sedes',  icon: 'bi-diagram-3',  label: 'Cultivo' },
     { to: '/m/cultivador/tareas', icon: 'bi-check2-square', label: 'Tareas' },
+    { to: '/m/horas',             icon: 'bi-clock-history', label: 'Mis horas' },
   ] },
   admin: { fab: true, items: [
     { to: '/m/admin/home',    icon: 'bi-grid-1x2',     label: 'Inicio'  },
@@ -128,6 +129,7 @@ const NAV = {
     { to: '/m/manicura/pesar',      icon: 'bi-scissors',        label: 'Por pesar'  },
     { to: '/m/manicura/pesajes',    icon: 'bi-journal-check',   label: 'Pesajes'    },
     { to: '/m/manicura/aprobacion', icon: 'bi-hourglass-split', label: 'Aprobación' },
+    { to: '/m/horas',               icon: 'bi-clock-history',   label: 'Horas'      },
     { to: '/m/manicura/tareas',     icon: 'bi-check2-square',   label: 'Tareas'     },
   ] },
   delivery: { items: [
