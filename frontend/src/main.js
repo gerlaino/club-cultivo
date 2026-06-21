@@ -70,17 +70,16 @@ app.directive('click-outside', {
   },
 });
 
+// Montamos YA. NO bloquear el render esperando /api/me: si el backend está
+// despertando (free tier) o /me tarda, bloquear acá dejaba la pantalla en negro
+// (la app nunca montaba). El router (ensureBootstrapped) maneja la sesión por ruta.
+app.mount("#app");
+
+// Bootstrap en segundo plano (sesión + preferencias del club).
 const auth = useAuthStore()
 const club = useClubStore()
-
-// Primero intentamos recuperar sesión
-await auth.fetchMe?.()
-
-// Si hay sesión, traemos preferencias del club (logo_url, nombre, etc.)
-if (auth.user) {
-  await club.fetch()
-}
-
-app.mount("#app");
+auth.fetchMe?.()
+  .then(() => { if (auth.user) club.fetch() })
+  .catch(() => {})
 
 

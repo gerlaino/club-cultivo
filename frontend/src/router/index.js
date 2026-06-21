@@ -819,7 +819,14 @@ const ROLE_ALLOWED_PREFIX = {
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
-  await auth.ensureBootstrapped();
+  // Las rutas que necesitan saber si hay sesión esperan el bootstrap; las públicas
+  // (QR, carnet, login, dispensa) NO se bloquean — así renderizan al instante aunque
+  // el backend esté despertando (free tier) y no quede la pantalla en negro.
+  if (to.meta.requiresAuth || to.meta.guestOnly) {
+    await auth.ensureBootstrapped();
+  } else {
+    auth.ensureBootstrapped();
+  }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: "login", query: { redirect: to.fullPath } };
