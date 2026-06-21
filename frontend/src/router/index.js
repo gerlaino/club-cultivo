@@ -833,6 +833,7 @@ router.beforeEach(async (to) => {
     !to.path.startsWith('/s/') &&
     !to.path.startsWith('/g/') &&
     !to.path.startsWith('/c/') &&
+    !to.path.startsWith('/d/') &&
     !to.path.startsWith('/l/') &&
     !to.path.startsWith('/login')
   ) {
