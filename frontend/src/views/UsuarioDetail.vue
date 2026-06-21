@@ -10,6 +10,7 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { getUsuarioStats } from '../lib/api.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -124,10 +125,40 @@ async function doDelete() {
   } catch { toast.error(store.error || 'No se pudo eliminar el usuario.') }
 }
 
+// ── Estadísticas ──────────────────────────────────────────────
+const hoy = new Date()
+const statsAnio = ref(hoy.getFullYear())
+const statsMes  = ref(hoy.getMonth() + 1)
+const stats     = ref(null)
+const loadingStats = ref(false)
+const puedeVerStats = computed(() => ['admin', 'supervisor'].includes(auth.role))
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const statsLabelMes = computed(() => `${MESES[statsMes.value-1]} ${statsAnio.value}`)
+const statsEsMesActual = computed(() => statsAnio.value === hoy.getFullYear() && statsMes.value === hoy.getMonth()+1)
+
+async function cargarStats() {
+  if (!puedeVerStats.value) return
+  loadingStats.value = true
+  try {
+    const { data } = await getUsuarioStats(userId, { anio: statsAnio.value, mes: statsMes.value })
+    stats.value = data
+  } catch { stats.value = null } finally { loadingStats.value = false }
+}
+function cambiarMesStats(delta) {
+  let m = statsMes.value + delta, a = statsAnio.value
+  if (m < 1) { m = 12; a-- } else if (m > 12) { m = 1; a++ }
+  if (a > hoy.getFullYear() || (a === hoy.getFullYear() && m > hoy.getMonth()+1)) return
+  statsMes.value = m; statsAnio.value = a
+  cargarStats()
+}
+const MEDIO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente', no_abona: 'No abona', credito_gramos: 'Crédito gramos' }
+
 onMounted(async () => {
   try { await store.fetchOne(userId) }
   catch { error.value = 'No se pudo cargar el usuario.' }
   finally { loading.value = false }
+  cargarStats()
 })
 </script>
 
@@ -233,6 +264,56 @@ onMounted(async () => {
 
         <!-- ── Columna main ── -->
         <div class="ud__main">
+
+          <!-- Estadísticas del usuario -->
+          <div v-if="puedeVerStats" class="ud__card">
+            <div class="ud__card-hdr">
+              <div class="ud__card-ico" style="background:rgba(26,61,46,.1);color:#1a3d2e">
+                <i class="bi bi-bar-chart-line"></i>
+              </div>
+              <span class="ud__card-title">Estadísticas</span>
+              <div class="uds__monthnav">
+                <button class="uds__nav" @click="cambiarMesStats(-1)"><i class="bi bi-chevron-left"></i></button>
+                <span class="uds__month">{{ statsLabelMes }}</span>
+                <button class="uds__nav" :disabled="statsEsMesActual" @click="cambiarMesStats(1)"><i class="bi bi-chevron-right"></i></button>
+              </div>
+            </div>
+            <div class="ud__card-body">
+              <div v-if="loadingStats" class="uds__loading"><DsSpinner :size="22" /></div>
+              <div v-else-if="stats" class="uds__grid">
+                <div class="uds__stat">
+                  <span class="uds__val">{{ stats.horas.total }}<small>hs</small></span>
+                  <span class="uds__lbl">Horas trabajadas</span>
+                  <span class="uds__sub">{{ stats.horas.dias }} día{{ stats.horas.dias !== 1 ? 's' : '' }}</span>
+                </div>
+                <div v-if="u.role === 'manicura'" class="uds__stat">
+                  <span class="uds__val">{{ stats.produccion.gramos }}<small>g</small></span>
+                  <span class="uds__lbl">Producción</span>
+                  <span class="uds__sub">{{ stats.produccion.pesajes }} pesaje{{ stats.produccion.pesajes !== 1 ? 's' : '' }}</span>
+                </div>
+                <div v-if="stats.despachos.total > 0" class="uds__stat">
+                  <span class="uds__val">{{ stats.despachos.total }}</span>
+                  <span class="uds__lbl">Despachos</span>
+                  <span class="uds__sub">{{ stats.despachos.entregados }} entreg. · {{ stats.despachos.fallidos }} fall.</span>
+                </div>
+                <div v-if="stats.dispensaciones.total > 0" class="uds__stat">
+                  <span class="uds__val">{{ stats.dispensaciones.total }}</span>
+                  <span class="uds__lbl">Dispensaciones</span>
+                  <span class="uds__sub">{{ stats.dispensaciones.gramos }}g entregados</span>
+                </div>
+                <!-- Desglose por medio de pago -->
+                <div v-if="stats.dispensaciones.total > 0" class="uds__medios">
+                  <span class="uds__medios-title">Por medio de pago</span>
+                  <div class="uds__medios-list">
+                    <span v-for="(n, medio) in stats.dispensaciones.por_medio" :key="medio" class="uds__medio">
+                      {{ MEDIO_LABEL[medio] || medio }}: <strong>{{ n }}</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="uds__empty">Sin datos para este período.</p>
+            </div>
+          </div>
 
           <!-- Módulo: Médico → Agenda semanal -->
           <div v-if="u.role === 'medico'" class="ud__card">
@@ -621,4 +702,22 @@ onMounted(async () => {
   padding: .5rem .875rem; border-radius: 9px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; backdrop-filter: blur(4px);
 }
 .ud__btn-danger-outline:hover { background: #fef2f2; border-color: #dc2626; }
+
+/* Estadísticas */
+.uds__monthnav { margin-left: auto; display: flex; align-items: center; gap: .5rem; }
+.uds__nav { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; color: #475569; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.uds__nav:disabled { opacity: .4; cursor: not-allowed; }
+.uds__month { font-size: .82rem; font-weight: 700; color: #1a2e1a; min-width: 110px; text-align: center; }
+.uds__loading { display: flex; justify-content: center; padding: 1rem; }
+.uds__empty { color: #94a3b8; font-size: .85rem; text-align: center; padding: 1rem 0; margin: 0; }
+.uds__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem; }
+.uds__stat { background: #f8fafc; border: 1px solid #eef2f6; border-radius: 12px; padding: .9rem; display: flex; flex-direction: column; gap: .15rem; }
+.uds__val { font-family: var(--font-display, sans-serif); font-size: 1.6rem; font-weight: 700; color: #1a2e1a; line-height: 1; }
+.uds__val small { font-size: .9rem; font-weight: 600; color: #64748b; margin-left: .1rem; }
+.uds__lbl { font-size: .78rem; font-weight: 600; color: #334155; }
+.uds__sub { font-size: .7rem; color: #94a3b8; }
+.uds__medios { grid-column: 1 / -1; background: #f8fafc; border: 1px solid #eef2f6; border-radius: 12px; padding: .8rem .9rem; }
+.uds__medios-title { font-size: .7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+.uds__medios-list { display: flex; flex-wrap: wrap; gap: .4rem .9rem; margin-top: .4rem; }
+.uds__medio { font-size: .8rem; color: #475569; }
 </style>

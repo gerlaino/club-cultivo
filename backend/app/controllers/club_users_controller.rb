@@ -1,7 +1,7 @@
 class ClubUsersController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!
-  before_action :set_user, only: [:show, :update, :destroy, :reset_password, :salas_asignadas, :asignar_sala, :desasignar_sala, :sedes_asignadas, :asignar_sede, :desasignar_sede]
+  before_action :set_user, only: [:show, :update, :destroy, :reset_password, :salas_asignadas, :asignar_sala, :desasignar_sala, :sedes_asignadas, :asignar_sede, :desasignar_sede, :stats]
 
   # GET /usuarios
   def index
@@ -140,6 +140,58 @@ class ClubUsersController < ApplicationController
     render json: { message: "Sede desasignada correctamente" }
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Sede no encontrada' }, status: :not_found
+  end
+
+  # GET /usuarios/:id/stats?anio=&mes=
+  # Estadísticas del usuario en el mes: horas trabajadas + métricas según su rol
+  # (producción de manicura, despachos de delivery, dispensaciones por medio de pago).
+  def stats
+    anio = (params[:anio] || Date.current.year).to_i
+    mes  = (params[:mes]  || Date.current.month).to_i
+    ini  = Date.new(anio, mes, 1)
+    rango_fecha = ini..ini.end_of_month
+    rango_ts    = ini.beginning_of_day..ini.end_of_month.end_of_day
+    club = current_user.club
+
+    # Horas (planilla)
+    jornadas = club.jornadas_laborales.where(user_id: @user.id, fecha: rango_fecha)
+    horas = {
+      total: jornadas.sum(&:horas).round(2),
+      dias:  jornadas.count,
+    }
+
+    # Producción de manicura
+    pesajes = PesajeManicura.where(club_id: club.id, manicurador_id: @user.id, created_at: rango_ts)
+    produccion = {
+      pesajes: pesajes.count,
+      gramos:  pesajes.sum(:peso_total_g).to_f.round(2),
+    }
+
+    # Despachos (delivery). @user ya está scopeado al club (set_user), así que
+    # filtrar por delivery_id/user_id es tenant-safe aunque dispensaciones no tenga club_id.
+    despachos_scope = Dispensacion.where(delivery_id: @user.id, fecha_dispensacion: rango_fecha)
+    despachos = {
+      total:      despachos_scope.count,
+      entregados: despachos_scope.where(estado_envio: 'entregado').count,
+      fallidos:   despachos_scope.where(estado_envio: 'fallido').count,
+    }
+
+    # Dispensaciones realizadas por el usuario, por medio de pago
+    disp_scope = Dispensacion.no_canceladas.where(user_id: @user.id, fecha_dispensacion: rango_fecha)
+    dispensaciones = {
+      total:        disp_scope.count,
+      por_medio:    disp_scope.group(:medio_pago).count,
+      gramos:       disp_scope.sum(:cantidad).to_f.round(2),
+    }
+
+    render json: {
+      anio: anio, mes: mes,
+      usuario: { id: @user.id, nombre: @user.nombre_completo, rol: @user.role },
+      horas: horas,
+      produccion: produccion,
+      despachos: despachos,
+      dispensaciones: dispensaciones,
+    }
   end
 
   private

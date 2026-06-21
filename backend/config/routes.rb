@@ -284,6 +284,7 @@ Rails.application.routes.draw do
         get    :sedes_asignadas
         post   :asignar_sede
         delete :desasignar_sede
+        get    :stats
       end
     end
 
