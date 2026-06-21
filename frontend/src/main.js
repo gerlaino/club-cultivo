@@ -20,12 +20,13 @@ import {useClubStore} from "./stores/club.js";
 
 import { registerSW } from 'virtual:pwa-register'
 
-// Nueva versión disponible → banner no intrusivo. Nunca recargar solos:
-// un operador puede estar a mitad de una dispensación o un alta.
+// Nueva versión disponible → aplicar la actualización automáticamente.
+// (Antes mostraba un banner "Actualizar" que en mobile casi nadie tocaba, y los
+//  dispositivos quedaban con la versión vieja. Ahora se actualiza solo.)
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    mostrarBannerActualizacion()
+    updateSW(true)   // skipWaiting → controllerchange → reload (abajo)
   },
 })
 
