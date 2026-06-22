@@ -2,9 +2,9 @@
 
 ## Etiqueta de despacho con QR + dos direcciones del paciente (2026-06-22)
 
-### Etiqueta de despacho (QR descargable/imprimible)
-- Vista nueva `EtiquetaDespachoView` en `/despachos/:id/etiqueta`: logo+nombre del club, código de paquete, paciente, dirección, contacto y un **QR** que lleva (con login) a `/delivery/despachos?paquete=<codigo>`. Descargable (PNG/SVG) + imprimible — espeja `EtiquetaStockView`.
-- `DespachoListView`: botón "Etiqueta" por despacho (abre en pestaña nueva) + auto-foco del despacho cuando se entra con `?paquete=`.
+### Etiqueta de despacho (sin QR — decisión de seguridad)
+- Vista nueva `EtiquetaDespachoView` en `/despachos/:id/etiqueta`: logo+nombre del club, **destinatario**, dirección de entrega, teléfono y **código de paquete**. **Sin QR**: un QR a la app interna en cada paquete que va a la calle era superficie de ataque innecesaria (exponía el login). Imprimible + **descargable como PDF** (`html2pdf.js`, igual que el carnet).
+- `DespachoListView`: botón "Etiqueta" por despacho (abre en pestaña nueva).
 - Redise UI: bordes de KPIs/inputs más visibles; "Dispensadas desde" y "Hasta" agrupadas en una fila alineada.
 
 ### Dos direcciones del paciente
