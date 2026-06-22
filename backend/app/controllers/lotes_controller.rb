@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :aprobar_manicura, :rechazar_manicura, :asignar_manicurador, :completar_manicura, :finalizar_pesaje_manicura]
+  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :asignar_manicurador]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -325,55 +325,11 @@ class LotesController < ApplicationController
       return render json: LoteSerializer.serialize(@lote.reload, include_plants: true), status: :created
     end
 
-    # Manicura pesa un lote (en_manicura o secado) → crea un PesajeManicura
-    # "enviado" que cae en la cola única de confirmación del admin (Manicura).
-    # El lote NO pasa más por manicura_pendiente: al confirmar el pesaje se
-    # genera el stock y, cubiertas todas las plantas, el lote se finaliza solo.
-    if manicurado && %w[en_manicura secado].include?(@lote.estado) && current_user.manicura?
-      peso = pesada_attrs[:peso_seco_g].to_d
-      if peso <= 0
-        return render json: { error: 'El peso seco debe ser mayor a 0' }, status: :unprocessable_entity
-      end
-
-      ActiveRecord::Base.transaction do
-        # Lotes que venían del camino viejo (secado, sin manicurador asignado)
-        # entran al flujo nuevo acá mismo
-        if @lote.estado == 'secado'
-          @lote.update!(estado: 'en_manicura', manicurador_id: @lote.manicurador_id || current_user.id)
-          @lote.lote_eventos.create!(
-            tipo:            'cambio_estado',
-            estado_anterior: 'secado',
-            estado_nuevo:    'en_manicura',
-            descripcion:     'Inicio de manicura (pesaje directo desde secado)',
-            user:            current_user,
-            club:            current_user.club,
-            registrado_en:   Time.current,
-          )
-        end
-
-        @lote.pesajes_manicura.create!(
-          club:          current_user.club,
-          manicurador:   current_user,
-          fecha_pesaje:  Date.today,
-          estado:        'enviado',
-          enviado_at:    Time.current,
-          peso_total_g:  peso,
-          plantas_count: pesada_attrs[:plantas_manicuradas],
-          notas:         pesada_attrs[:notas],
-        )
-
-        AlertaInterna.create!(
-          club:             current_user.club,
-          tipo:             'manicura_aprobacion_pendiente',
-          mensaje:          "Manicura #{current_user.first_name} envió pesaje del lote #{@lote.codigo} — #{pesada_attrs[:plantas_manicuradas]} plantas · #{peso}g — pendiente de confirmación",
-          severidad:        'info',
-          creada_por:       current_user,
-          destinada_a_role: 'admin',
-          contexto:         { lote_id: @lote.id, lote_codigo: @lote.codigo,
-                              peso_seco_g: peso, manicura_id: current_user.id }
-        )
-      end
-      return render json: LoteSerializer.serialize(@lote.reload), status: :created
+    # La carga de manicura (por QR o manual) ya no pasa por acá: vive en su flujo único
+    # (pesajes_manicura#create / plants#registrar_peso). transiciones queda solo para el
+    # ciclo de cultivo (vegetativo → floración → cosecha → secado → curado).
+    if manicurado
+      return render json: { error: 'La manicura se carga desde el flujo de pesajes, no por transiciones' }, status: :unprocessable_entity
     end
 
     estado_anterior  = @lote.estado
@@ -411,30 +367,6 @@ class LotesController < ApplicationController
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
-  # POST /lotes/:id/aprobar_manicura
-  def aprobar_manicura
-    authorize @lote, :aprobar_manicura?
-    if @lote.manicurador_id.present?
-      # Nuevo flujo: aprobar + generar stock pendiente_asignacion + finalizar
-      @lote.aprobar_y_finalizar!(
-        aprobado_por:        current_user,
-        peso_seco_g:         params[:peso_seco_g],
-        sede_id:             params[:sede_id],
-        precio_sugerido_ars: params[:precio_sugerido_ars],
-      )
-    else
-      # Flujo legacy: aprobar → curado
-      @lote.aprobar_manicura!(aprobado_por: current_user, observaciones: params[:observaciones])
-    end
-    render json: LoteSerializer.serialize(@lote.reload)
-  rescue ActionController::ParameterMissing => e
-    render json: { error: "Falta parámetro requerido: #{e.param}" }, status: :unprocessable_entity
-  rescue ArgumentError, RuntimeError => e
-    render json: { error: e.message }, status: :unprocessable_entity
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-  end
-
   # POST /lotes/:id/asignar_manicurador
   def asignar_manicurador
     authorize @lote, :asignar_manicurador?
@@ -449,120 +381,6 @@ class LotesController < ApplicationController
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
-  # POST /lotes/:id/completar_manicura
-  def completar_manicura
-    authorize @lote, :completar_manicura?
-    @lote.completar_manicura_directa!(
-      registrado_por: current_user,
-      peso_seco_g:    params.require(:peso_seco_g),
-      sede_id:        params.require(:sede_id),
-      notas:          params[:notas],
-      forma_producto: params[:forma_producto].presence || 'flor_seca',
-    )
-    render json: LoteSerializer.serialize(@lote.reload)
-  rescue ActionController::ParameterMissing => e
-    render json: { error: "Falta parámetro requerido: #{e.param}" }, status: :unprocessable_entity
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Sede no encontrada' }, status: :not_found
-  rescue ArgumentError, RuntimeError => e
-    render json: { error: e.message }, status: :unprocessable_entity
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-  end
-
-  # POST /lotes/:id/finalizar_pesaje_manicura
-  # Funciona con QR flow (borrador pesada existente) y con batch flow (compute from plant.peso_seco)
-  def finalizar_pesaje_manicura
-    unless %w[en_manicura secado].include?(@lote.estado)
-      return render json: { error: 'Estado inválido para finalizar pesaje' }, status: :unprocessable_entity
-    end
-
-    authorized = current_user.admin? || current_user.supervisor? ||
-                 (current_user.manicura? && @lote.manicurador_id == current_user.id) ||
-                 (current_user.manicura? && @lote.manicurador_id.nil?)
-    return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless authorized
-
-    # Flujo unificado: el cierre del pesaje crea un PesajeManicura "enviado"
-    # que cae en la cola de confirmación del admin. El lote no pasa más por
-    # manicura_pendiente: el stock y la finalización ocurren al confirmar.
-    pesaje = nil
-    ActiveRecord::Base.transaction do
-      pesada_borrador = @lote.pesadas.find_by(borrador: true, manicurado: true)
-
-      if pesada_borrador
-        # QR flow: peso_seco_g vive en pesadas_plantas, se agrega
-        total = pesada_borrador.pesadas_plantas.sum(:peso_seco_g).to_d
-        count = pesada_borrador.pesadas_plantas.count
-        total = pesada_borrador.peso_seco_g.to_d        if total <= 0
-        count = pesada_borrador.plantas_manicuradas.to_i if count.zero?
-      else
-        # Batch flow: totales desde el peso_seco por planta
-        plantas_pesadas = @lote.plants.where('peso_seco > 0')
-        total = plantas_pesadas.sum(:peso_seco).to_d
-        count = plantas_pesadas.count
-      end
-
-      if total <= 0 || count.zero?
-        return render json: { error: 'No hay plantas con peso registrado en este lote' }, status: :unprocessable_entity
-      end
-
-      if @lote.estado == 'secado'
-        @lote.update!(estado: 'en_manicura', manicurador_id: @lote.manicurador_id || current_user.id)
-      end
-
-      pesaje = @lote.pesajes_manicura.create!(
-        club:          current_user.club,
-        manicurador:   current_user,
-        fecha_pesaje:  Date.today,
-        estado:        'enviado',
-        enviado_at:    Time.current,
-        peso_total_g:  total,
-        plantas_count: count,
-      )
-
-      if pesada_borrador
-        # Vincular las plantas pesadas al pesaje para que la finalización
-        # automática del lote cuente por planta, y cerrar el borrador legacy
-        pesada_borrador.pesadas_plantas.update_all(pesaje_manicura_id: pesaje.id)
-        pesada_borrador.update!(borrador: false)
-      end
-
-      @lote.lote_eventos.create!(
-        tipo:            'nota',
-        descripcion:     "Pesaje completado: #{count} plantas · #{total.round(1)}g — enviado para confirmación",
-        user:            current_user,
-        club:            current_user.club,
-        registrado_en:   Time.current,
-      )
-
-      AlertaInterna.create!(
-        club:             current_user.club,
-        tipo:             'manicura_aprobacion_pendiente',
-        mensaje:          "Manicura #{current_user.first_name} completó #{@lote.codigo} — #{count} plantas · #{total.round(1)}g — pendiente de confirmación",
-        severidad:        'info',
-        creada_por:       current_user,
-        destinada_a_role: 'admin',
-        contexto:         { lote_id: @lote.id, lote_codigo: @lote.codigo,
-                            peso_seco_g: total, manicura_id: current_user.id,
-                            pesaje_manicura_id: pesaje.id },
-      )
-    end
-
-    render json: { ok: true, lote: LoteSerializer.serialize(@lote.reload) }
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-  end
-
-  # POST /lotes/:id/rechazar_manicura
-  def rechazar_manicura
-    authorize @lote, :rechazar_manicura?
-    @lote.rechazar_manicura!(rechazado_por: current_user, motivo: params.require(:motivo))
-    render json: LoteSerializer.serialize(@lote.reload)
-  rescue ArgumentError, RuntimeError => e
-    render json: { error: e.message }, status: :unprocessable_entity
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-  end
 
   # PATCH /lotes/:id/completar_datos
   # Exclusivamente para completar campos críticos en lotes ya finalizados.

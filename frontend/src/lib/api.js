@@ -259,11 +259,8 @@ export const getStockDisponible     = ()              => api.get('/inventario/di
 export const aprobarMovimiento      = (id)            => api.post(`/inventario/aprobar/${id}`)
 export const rechazarMovimiento     = (id, motivo)    => api.post(`/inventario/rechazar/${id}`, { motivo })
 
-// ── Aprobación manicura ───────────────────────────────────────────────────────
-export const aprobarManicura    = (loteId, payload = {}) => api.post(`/lotes/${loteId}/aprobar_manicura`, payload)
-export const rechazarManicura   = (loteId, motivo)       => api.post(`/lotes/${loteId}/rechazar_manicura`, { motivo })
+// ── Manicura ──────────────────────────────────────────────────────────────────
 export const asignarManicurador  = (loteId, manicuradorId, params = {}) => api.post(`/lotes/${loteId}/asignar_manicurador`, { manicurador_id: manicuradorId, ...params })
-export const completarManicura   = (loteId, payload = {})               => api.post(`/lotes/${loteId}/completar_manicura`, payload)
 
 // -------- PLAN --------
 export const getPlan = () => api.get('/plan')
@@ -424,7 +421,6 @@ export const deleteNota     = (id)       => api.delete(`/notas/${id}`)
 export const addPlantFoto       = (plantId, formData) => api.post(`/plants/${plantId}/add_foto`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const removePlantFoto    = (plantId, blobId)   => api.delete(`/plants/${plantId}/fotos/${blobId}`)
 export const registrarPesoPlanta      = (plantId, payload) => api.post(`/plants/${plantId}/registrar_peso`, payload)
-export const finalizarPesajeManicura  = (loteId)           => api.post(`/lotes/${loteId}/finalizar_pesaje_manicura`)
 
 export const getPlantaByQR = (codigoQr) => api.get(`/p/${codigoQr}`)
 

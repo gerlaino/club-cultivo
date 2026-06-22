@@ -33,14 +33,28 @@ class PesajesManicuraController < ApplicationController
   end
 
   # POST /lotes/:lote_id/pesajes_manicura
-  # Manicurador crea un nuevo pesaje del día (borrador).
+  # Crea un pesaje (borrador) para cargar plantas por QR. Si se pasan plantas_count +
+  # peso_total_g es una CARGA MANUAL sin QR; con enviar=true se manda a confirmar en el acto.
   def create
     unless current_user.manicura? || current_user.admin? || current_user.supervisor?
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
-    unless @lote.estado == 'en_manicura'
+    unless %w[en_manicura secado].include?(@lote.estado)
       return render json: { error: 'El lote no está en manicura activa' }, status: :unprocessable_entity
     end
+
+    # Lotes legacy en 'secado' (sin manicura asignada) entran a manicura activa acá.
+    if @lote.estado == 'secado'
+      @lote.update!(estado: 'en_manicura', manicurador_id: @lote.manicurador_id || current_user.id)
+      @lote.lote_eventos.create!(
+        tipo: 'cambio_estado', estado_anterior: 'secado', estado_nuevo: 'en_manicura',
+        descripcion: 'Inicio de manicura (carga de pesaje desde secado)',
+        user: current_user, club: current_user.club, registrado_en: Time.current,
+      )
+    end
+
+    carga_manual = params[:peso_total_g].present?
+    enviar_ya    = ActiveModel::Type::Boolean.new.cast(params[:enviar])
 
     pesaje = @lote.pesajes_manicura.build(
       manicurador: current_user,
@@ -48,11 +62,20 @@ class PesajesManicuraController < ApplicationController
       fecha_pesaje: Date.today,
       notas:        params[:notas],
     )
+
+    if carga_manual
+      pesaje.peso_total_g  = params[:peso_total_g].to_d
+      pesaje.plantas_count = params[:plantas_count]
+    end
+
     if pesaje.save
-      render json: PesajeManicuraSerializer.serialize(pesaje), status: :created
+      pesaje.enviar! if enviar_ya && carga_manual
+      render json: PesajeManicuraSerializer.serialize(pesaje.reload, include_plantas: true), status: :created
     else
       render json: { errors: pesaje.errors.full_messages }, status: :unprocessable_entity
     end
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   # DELETE /lotes/:lote_id/pesajes_manicura/:id

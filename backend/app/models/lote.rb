@@ -42,7 +42,6 @@ class Lote < ApplicationRecord
 
   before_create :generar_codigo
   before_create :generar_codigo_qr
-  after_commit  :push_manicura_pendiente, on: [:create, :update]
   after_commit  :dispatch_webhook_avance,  on: [:create, :update]
 
   default_scope { where(deleted_at: nil) }
@@ -167,64 +166,6 @@ class Lote < ApplicationRecord
     end
   end
 
-  # Aprueba la pesada de manicura, transiciona de manicura_pendiente a curado.
-  def aprobar_manicura!(aprobado_por:, observaciones: nil)
-    raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
-
-    ultima_pesada = pesadas.where(fase_origen: 'secado', manicurado: true).reorder(id: :desc).first
-    raise "No hay pesada de manicura para aprobar" unless ultima_pesada
-
-    ActiveRecord::Base.transaction do
-      ultima_pesada.update!(aprobada_at: Time.current, aprobada_por_id: aprobado_por.id,
-                            rechazada_at: nil, rechazada_por_id: nil, motivo_rechazo: nil)
-
-      sala_curado = Sala.find_or_create_proceso!(sede: sala.sede, tipo: 'curado', created_by: aprobado_por)
-      update!(estado: 'curado', sala: sala_curado)
-
-      AlertaInterna.create!(
-        club:             club,
-        tipo:             'manicura_aprobada',
-        mensaje:          "Manicura aprobada para lote #{codigo}",
-        severidad:        'info',
-        creada_por:       aprobado_por,
-        destinada_a_role: 'manicura',
-        contexto:         { lote_id: id, lote_codigo: codigo, aprobado_por_id: aprobado_por.id }
-      )
-    end
-  end
-
-  # Rechaza la pesada de manicura.
-  # Nuevo flujo: vuelve a cosecha (admin reasigna). Legacy: vuelve a secado.
-  def rechazar_manicura!(rechazado_por:, motivo:)
-    raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
-    raise ArgumentError, "El motivo es obligatorio" if motivo.blank?
-
-    fase_origen_pesada = manicurador_id.present? ? 'en_manicura' : 'secado'
-    ultima_pesada = pesadas.where(fase_origen: fase_origen_pesada, manicurado: true).reorder(id: :desc).first
-
-    ActiveRecord::Base.transaction do
-      ultima_pesada&.update!(rechazada_at: Time.current, rechazada_por_id: rechazado_por.id,
-                             motivo_rechazo: motivo, aprobada_at: nil, aprobada_por_id: nil)
-
-      if manicurador_id.present?
-        update!(estado: 'cosecha', manicurador: nil)
-      else
-        sala_secado = Sala.find_or_create_proceso!(sede: sala.sede, tipo: 'secado', created_by: rechazado_por)
-        update!(estado: 'secado', sala: sala_secado)
-      end
-
-      AlertaInterna.create!(
-        club:             club,
-        tipo:             'manicura_rechazada',
-        mensaje:          "Manicura rechazada para lote #{codigo}: #{motivo}",
-        severidad:        'warning',
-        creada_por:       rechazado_por,
-        destinada_a_role: 'manicura',
-        contexto:         { lote_id: id, lote_codigo: codigo, motivo: motivo }
-      )
-    end
-  end
-
   # Admin asigna un manicurador → cosecha → en_manicura (nuevo flujo).
   ROLES_MANICURA = %w[manicura admin supervisor].freeze
 
@@ -257,144 +198,6 @@ class Lote < ApplicationRecord
         creada_por:       asignado_por,
         destinada_a_role: manicurador.role,
         contexto:         { lote_id: id, lote_codigo: codigo, manicurador_id: manicurador.id }
-      )
-    end
-  end
-
-  # Aprueba pesada del manicurador, genera stock y finaliza el lote en un solo paso.
-  def aprobar_y_finalizar!(aprobado_por:, peso_seco_g: nil, sede_id: nil, precio_sugerido_ars: nil)
-    raise "El lote no está en manicura_pendiente" unless estado == 'manicura_pendiente'
-
-    # Guard anti doble stock: si el lote ya generó stock por el flujo de pesajes
-    # diarios (PesajeManicura confirmados), aprobarlo de nuevo duplicaría los gramos.
-    if pesajes_manicura.where(estado: 'confirmado').exists?
-      raise "Este lote ya generó stock a través de pesajes de manicura confirmados — no se puede aprobar de nuevo"
-    end
-
-    ultima_pesada = pesadas.where(fase_origen: 'en_manicura', manicurado: true).reorder(id: :desc).first
-    ultima_pesada ||= pesadas.where(manicurado: true).reorder(id: :desc).first
-    raise "No hay pesada de manicura para aprobar" unless ultima_pesada
-
-    peso_base = ultima_pesada.peso_seco_g.to_d
-    peso_base = ultima_pesada.pesadas_plantas.sum(:peso_seco_g).to_d if peso_base == 0
-    peso = peso_seco_g.present? ? peso_seco_g.to_d : peso_base
-    raise ArgumentError, "El peso debe ser mayor a 0" unless peso > 0
-
-    sede = sede_id.present? ? club.sedes.where(tipo: %w[social mixta]).find(sede_id) : nil
-
-    ActiveRecord::Base.transaction do
-      ultima_pesada.update!(
-        aprobada_at:      Time.current,
-        aprobada_por_id:  aprobado_por.id,
-        peso_seco_g:      peso,
-        rechazada_at:     nil,
-        rechazada_por_id: nil,
-        motivo_rechazo:   nil,
-      )
-
-      stock = Stock.create!(
-        club:                club,
-        sede:                sede,
-        lote:                self,
-        genetica:            genetica,
-        origen:              'lote',
-        estado:              sede ? 'disponible' : 'pendiente_asignacion',
-        forma_producto:      'flor_seca',
-        cantidad:            peso,
-        unidad:              'g',
-        precio_sugerido_ars: precio_sugerido_ars.present? ? precio_sugerido_ars.to_d : nil,
-      )
-      stock.stock_movimientos.create!(
-        tipo:    'produccion',
-        gramos:  peso,
-        usuario: aprobado_por,
-      )
-
-      update!(
-        estado:             'finalizado',
-        rendimiento_real_g: peso,
-        manicurador:        nil,
-        sala_id:            nil,
-      )
-
-      lote_eventos.create!(
-        tipo:            'cambio_estado',
-        estado_anterior: 'manicura_pendiente',
-        estado_nuevo:    'finalizado',
-        descripcion:     "Aprobado — #{peso}g pendiente de asignación",
-        user:            aprobado_por,
-        club:            club,
-        registrado_en:   Time.current,
-      )
-
-      AlertaInterna.create!(
-        club:             club,
-        tipo:             'manicura_aprobada',
-        mensaje:          "Lote #{codigo} finalizado: #{peso}g pendiente de asignación a sede",
-        severidad:        'info',
-        creada_por:       aprobado_por,
-        destinada_a_role: 'manicura',
-        contexto:         { lote_id: id, lote_codigo: codigo, peso_seco_g: peso, stock_id: stock.id }
-      )
-    end
-  end
-
-  # Admin/supervisor completa la manicura directamente desde en_manicura o secado
-  # sin pasar por manicura_pendiente. Crea pesada, stock y finaliza en un paso.
-  def completar_manicura_directa!(registrado_por:, peso_seco_g:, sede_id:, notas: nil, forma_producto: 'flor_seca')
-    raise "El lote no está en una fase de manicura activa" unless %w[en_manicura secado].include?(estado)
-
-    peso = peso_seco_g.to_d
-    raise ArgumentError, "El peso debe ser mayor a 0" unless peso > 0
-
-    sede       = club.sedes.find(sede_id)
-    fase_origen = estado
-
-    ActiveRecord::Base.transaction do
-      pesadas.create!(
-        fase_origen:     fase_origen,
-        fase_destino:    'finalizado',
-        manicurado:      true,
-        registrado_por:  registrado_por,
-        registrado_at:   Time.current,
-        notas:           notas,
-        peso_seco_g:     peso,
-        aprobada_at:     Time.current,
-        aprobada_por_id: registrado_por.id,
-      )
-
-      stock = Stock.create!(
-        club:           club,
-        sede:           sede,
-        lote:           self,
-        genetica:       genetica,
-        origen:         'lote',
-        estado:         'asignado',
-        forma_producto: forma_producto,
-        cantidad:       peso,
-        unidad:         'g',
-      )
-      stock.stock_movimientos.create!(
-        tipo:    'produccion',
-        gramos:  peso,
-        usuario: registrado_por,
-      )
-
-      update!(
-        estado:             'finalizado',
-        rendimiento_real_g: peso,
-        manicurador:        nil,
-        sala_id:            nil,
-      )
-
-      lote_eventos.create!(
-        tipo:            'cambio_estado',
-        estado_anterior: fase_origen,
-        estado_nuevo:    'finalizado',
-        descripcion:     "Manicura completada — #{peso}g → #{sede.nombre} (#{forma_producto})",
-        user:            registrado_por,
-        club:            club,
-        registrado_en:   Time.current,
       )
     end
   end
@@ -525,17 +328,6 @@ class Lote < ApplicationRecord
       count += 1
       self.codigo = "#{base}-#{anio}-#{count.to_s.rjust(3, '0')}"
     end
-  end
-
-  def push_manicura_pendiente
-    return unless saved_change_to_estado? && estado == 'manicura_pendiente'
-
-    PushNotificationService.notify_admins_async(
-      club,
-      title: "Aprobación requerida",
-      body:  "Lote #{codigo} esperando tu aprobación",
-      url:   '/aprobaciones'
-    )
   end
 
   def dispatch_webhook_avance

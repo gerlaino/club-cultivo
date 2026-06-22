@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Chart from 'chart.js/auto'
 import {
-  listSedes, getContableDashboard, listLotes,
+  listSedes, getContableDashboard, listLotes, listPesajesManicuraAdmin,
   getAnalyticsDispensador, listStocksPendientes,
   listDispensacionesFecha, getAnalyticsEjecutivo,
 } from '../../lib/api.js'
@@ -24,7 +24,7 @@ const tareasStore = useTareasStore()
 
 const sedes                  = ref([])
 const contable               = ref(null)
-const lotesManicuraPendiente = ref([])
+const pesajesPorConfirmar    = ref([])
 const stocksPendientes       = ref([])
 const analyticsDisp          = ref(null)
 const lotesEnFloracion       = ref([])
@@ -130,13 +130,13 @@ const tareasVencidas = computed(() =>
 const alertas = computed(() => {
   const list = []
 
-  if (lotesManicuraPendiente.value.length > 0) {
+  if (pesajesPorConfirmar.value.length > 0) {
     list.push({
       key:     'aprobaciones',
       icono:   '⏳',
-      texto:   `${lotesManicuraPendiente.value.length} lote${lotesManicuraPendiente.value.length > 1 ? 's' : ''} esperando aprobación`,
-      cta:     'Ir a aprobaciones',
-      ruta:    '/aprobaciones',
+      texto:   `${pesajesPorConfirmar.value.length} pesaje${pesajesPorConfirmar.value.length > 1 ? 's' : ''} de manicura esperando confirmación`,
+      cta:     'Ir a confirmar',
+      ruta:    '/admin/pesajes-manicura',
       nivel:   'amber',
     })
   }
@@ -347,7 +347,7 @@ onMounted(async () => {
       await Promise.allSettled([
         listSedes(),
         getContableDashboard(),
-        listLotes({ estado: 'manicura_pendiente' }),
+        listPesajesManicuraAdmin(),
         getAnalyticsDispensador(),
         listStocksPendientes(),
         listLotes({ estado: 'floracion', limit: 20 }),
@@ -359,7 +359,7 @@ onMounted(async () => {
 
     if (sedesRes.status      === 'fulfilled') sedes.value                  = sedesRes.value.data    || []
     if (contableRes.status   === 'fulfilled') contable.value               = contableRes.value.data
-    if (manicuraRes.status   === 'fulfilled') lotesManicuraPendiente.value = manicuraRes.value.data  || []
+    if (manicuraRes.status   === 'fulfilled') pesajesPorConfirmar.value     = manicuraRes.value.data  || []
     if (dispRes.status       === 'fulfilled') analyticsDisp.value          = dispRes.value.data
     if (stocksRes.status     === 'fulfilled') stocksPendientes.value       = stocksRes.value.data   || []
     if (floracionRes.status  === 'fulfilled') lotesEnFloracion.value       = floracionRes.value.data || []

@@ -26,6 +26,7 @@ class Club < ApplicationRecord
   has_many :plan_trabajos,      dependent: :destroy
   has_many :aplicacion_planes,  class_name: 'AplicacionPlan', dependent: :destroy
   has_many :pesajes_manicura,   class_name: 'PesajeManicura', dependent: :destroy
+  has_many :stocks,             dependent: :destroy
   has_many :webhooks,           dependent: :destroy
   has_many :turnos,             dependent: :destroy
   has_many :check_ins,          dependent: :destroy

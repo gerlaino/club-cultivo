@@ -131,152 +131,89 @@ RSpec.describe Lote, type: :model do
     end
   end
 
-  # ── aprobar_manicura! ─────────────────────────────────────────────────────
+  # ── Flujo unificado de manicura (PesajeManicura → confirmar → finaliza) ──────
 
-  describe '#aprobar_manicura!' do
+  describe 'flujo unificado de manicura' do
     let(:manicurador) { create(:user, club: club, role: 'manicura') }
 
-    let!(:lote_pendiente) do
-      lote = lote_en('manicura_pendiente')
-      lote.update_column(:manicurador_id, nil)
-      lote.pesadas.create!(
-        fase_origen:    'secado',
-        fase_destino:   'manicura_pendiente',
-        manicurado:     true,
-        registrado_por: admin,
-        registrado_at:  Time.current,
-        peso_seco_g:    500,
-      )
-      lote
-    end
-
-    it 'transiciona a curado' do
-      lote_pendiente.aprobar_manicura!(aprobado_por: admin)
-      expect(lote_pendiente.reload.estado).to eq('curado')
-    end
-
-    it 'registra aprobada_at en la pesada' do
-      lote_pendiente.aprobar_manicura!(aprobado_por: admin)
-      pesada = lote_pendiente.pesadas.where(manicurado: true).last
-      expect(pesada.aprobada_at).to be_present
-    end
-
-    it 'lanza error si el lote no está en manicura_pendiente' do
-      lote = lote_en('secado')
-      expect {
-        lote.aprobar_manicura!(aprobado_por: admin)
-      }.to raise_error(RuntimeError, /manicura_pendiente/)
-    end
-  end
-
-  # ── rechazar_manicura! ────────────────────────────────────────────────────
-
-  describe '#rechazar_manicura!' do
-    let!(:lote_pendiente) do
-      lote = lote_en('manicura_pendiente')
-      lote.update_column(:manicurador_id, nil)
-      lote.pesadas.create!(
-        fase_origen:    'secado',
-        fase_destino:   'manicura_pendiente',
-        manicurado:     true,
-        registrado_por: admin,
-        registrado_at:  Time.current,
-        peso_seco_g:    500,
-      )
-      lote
-    end
-
-    it 'vuelve a secado cuando no hay manicurador asignado (flujo legacy)' do
-      lote_pendiente.rechazar_manicura!(rechazado_por: admin, motivo: 'Peso incorrecto')
-      expect(lote_pendiente.reload.estado).to eq('secado')
-    end
-
-    it 'registra rechazada_at y el motivo en la pesada' do
-      lote_pendiente.rechazar_manicura!(rechazado_por: admin, motivo: 'Peso incorrecto')
-      pesada = lote_pendiente.pesadas.where(manicurado: true).last
-      expect(pesada.rechazada_at).to be_present
-      expect(pesada.motivo_rechazo).to eq('Peso incorrecto')
-    end
-
-    it 'lanza error si el motivo está vacío' do
-      expect {
-        lote_pendiente.rechazar_manicura!(rechazado_por: admin, motivo: '')
-      }.to raise_error(ArgumentError, /motivo/)
-    end
-  end
-
-  # ── aprobar_y_finalizar! ──────────────────────────────────────────────────
-
-  describe '#aprobar_y_finalizar!' do
-    let!(:lote_pendiente) do
-      lote = lote_en('manicura_pendiente')
-      manicurador = create(:user, club: club, role: 'manicura')
+    def lote_con_plantas(n)
+      lote = lote_en('en_manicura')
       lote.update_column(:manicurador_id, manicurador.id)
-      lote.pesadas.create!(
-        fase_origen:    'en_manicura',
-        fase_destino:   'manicura_pendiente',
-        manicurado:     true,
-        registrado_por: admin,
-        registrado_at:  Time.current,
-        peso_seco_g:    400,
-      )
+      create_list(:plant, n, lote: lote, club: club)
       lote
     end
 
-    it 'finaliza el lote y crea un Stock' do
-      expect {
-        lote_pendiente.aprobar_y_finalizar!(aprobado_por: admin)
-      }.to change(Stock, :count).by(1)
-
-      expect(lote_pendiente.reload.estado).to eq('finalizado')
+    def pesaje_por_qr(lote, plantas, peso_c_u)
+      pesaje = lote.pesajes_manicura.create!(club: club, manicurador: manicurador, fecha_pesaje: Date.current)
+      plantas.each { |pl| pesaje.pesadas_plantas.create!(plant: pl, peso_seco_g: peso_c_u) }
+      pesaje
     end
 
-    it 'el stock creado tiene el peso correcto' do
-      lote_pendiente.aprobar_y_finalizar!(aprobado_por: admin)
+    it 'confirmar un pesaje genera stock pendiente_asignacion (sin sede)' do
+      lote = lote_con_plantas(2)
+      pesaje = pesaje_por_qr(lote, lote.plants.to_a, 100)
+      pesaje.enviar!
+      expect {
+        pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      }.to change(Stock, :count).by(1)
       stock = Stock.last
-      expect(stock.cantidad.to_f).to eq(400.0)
+      expect(stock.estado).to eq('pendiente_asignacion')
+      expect(stock.sede_id).to be_nil
+      expect(stock.cantidad.to_f).to eq(200.0)
+      expect(stock.cantidad_inicial.to_f).to eq(200.0)
       expect(stock.forma_producto).to eq('flor_seca')
     end
 
-    it 'lanza error si el lote no está en manicura_pendiente' do
-      lote = lote_en('en_manicura')
-      expect {
-        lote.aprobar_y_finalizar!(aprobado_por: admin)
-      }.to raise_error(RuntimeError)
-    end
-  end
-
-  # ── completar_manicura_directa! ───────────────────────────────────────────
-
-  describe '#completar_manicura_directa!' do
-    let!(:lote_en_manicura) do
-      manicurador = create(:user, club: club, role: 'manicura')
-      lote = lote_en('en_manicura')
-      lote.update_column(:manicurador_id, manicurador.id)
-      lote
+    it 'al cubrir TODAS las plantas el lote se finaliza solo' do
+      lote = lote_con_plantas(2)
+      pesaje = pesaje_por_qr(lote, lote.plants.to_a, 100)
+      pesaje.enviar!
+      pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      expect(lote.reload.estado).to eq('finalizado')
     end
 
-    it 'finaliza el lote, crea pesada y stock en un solo paso' do
+    it 'un pesaje PARCIAL deja el lote en en_manicura' do
+      lote = lote_con_plantas(4)
+      pesaje = pesaje_por_qr(lote, lote.plants.first(2), 100)
+      pesaje.enviar!
+      pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      expect(lote.reload.estado).to eq('en_manicura')
+    end
+
+    it 'dos pesajes parciales que cubren todo finalizan el lote' do
+      lote = lote_con_plantas(4)
+      p1 = pesaje_por_qr(lote, lote.plants.first(2), 100); p1.enviar!
+      p1.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      expect(lote.reload.estado).to eq('en_manicura')
+
+      p2 = pesaje_por_qr(lote, lote.plants.last(2), 100); p2.enviar!
+      p2.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      expect(lote.reload.estado).to eq('finalizado')
+    end
+
+    it 'carga manual (sin QR) suma al stock y finaliza vía plantas_count' do
+      lote = lote_con_plantas(3)
+      pesaje = lote.pesajes_manicura.create!(club: club, manicurador: manicurador, fecha_pesaje: Date.current)
+      pesaje.cargar_manual!(plantas: 3, peso: 300)
+      pesaje.enviar!
+      expect(pesaje.reload.estado).to eq('enviado')
+      expect(pesaje.peso_total_g.to_f).to eq(300.0)
       expect {
-        lote_en_manicura.completar_manicura_directa!(
-          registrado_por: admin,
-          peso_seco_g:    350,
-          sede_id:        sede.id,
-        )
+        pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 300)
       }.to change(Stock, :count).by(1)
-        .and change(Pesada, :count).by(1)
-
-      expect(lote_en_manicura.reload.estado).to eq('finalizado')
+      expect(lote.reload.estado).to eq('finalizado')
     end
 
-    it 'lanza error si el peso es 0' do
-      expect {
-        lote_en_manicura.completar_manicura_directa!(
-          registrado_por: admin,
-          peso_seco_g:    0,
-          sede_id:        sede.id,
-        )
-      }.to raise_error(ArgumentError, /peso/)
+    it 'enviar! sin plantas ni carga lanza error' do
+      lote = lote_con_plantas(2)
+      pesaje = lote.pesajes_manicura.create!(club: club, manicurador: manicurador, fecha_pesaje: Date.current)
+      expect { pesaje.enviar! }.to raise_error(ArgumentError, /carga/)
+    end
+
+    it 'cargar_manual! sobre un pesaje con plantas por QR lanza error' do
+      lote = lote_con_plantas(2)
+      pesaje = pesaje_por_qr(lote, lote.plants.first(1), 100)
+      expect { pesaje.cargar_manual!(plantas: 2, peso: 200) }.to raise_error(RuntimeError, /QR/)
     end
   end
 

@@ -21,12 +21,28 @@ class PesajeManicura < ApplicationRecord
   scope :pendientes,  -> { where(estado: %w[borrador enviado]) }
   scope :recientes,   -> { order(fecha_pesaje: :desc, created_at: :desc) }
 
+  # Peso del pesaje: si hay registros por planta (flujo QR) los suma; si no, usa el
+  # peso declarado en carga manual (peso_total_g). Un pesaje es QR o manual, nunca ambos.
   def peso_calculado_g
-    pesadas_plantas.sum(:peso_seco_g).to_d.round(2)
+    if pesadas_plantas.exists?
+      pesadas_plantas.sum(:peso_seco_g).to_d.round(2)
+    else
+      peso_total_g.to_d.round(2)
+    end
   end
 
   def plantas_registradas_count
-    pesadas_plantas.count
+    pesadas_plantas.exists? ? pesadas_plantas.count : (plantas_count || 0)
+  end
+
+  # Carga manual sin QR: el manicura declara cantidad de plantas y peso total sobre el
+  # borrador. Mismo modelo que el flujo QR, sin registros por planta.
+  def cargar_manual!(plantas:, peso:, notas: nil)
+    raise "Solo se puede cargar sobre un borrador" unless borrador?
+    raise ArgumentError, "El peso debe ser mayor a 0" unless peso.to_d > 0
+    raise "Este pesaje ya tiene plantas registradas por QR — no mezclar con carga manual" if pesadas_plantas.exists?
+
+    update!(peso_total_g: peso.to_d, plantas_count: plantas.to_i, notas: notas.presence || self.notas)
   end
 
   def borrador?   = estado == 'borrador'
@@ -37,14 +53,14 @@ class PesajeManicura < ApplicationRecord
     raise "Solo un borrador puede enviarse a aprobación" unless borrador?
 
     peso = peso_calculado_g
-    raise ArgumentError, "Registrá al menos una planta antes de enviar" if peso == 0
+    raise ArgumentError, "Registrá al menos una planta o una carga antes de enviar" if peso == 0
 
     ActiveRecord::Base.transaction do
       update!(
         estado:        'enviado',
         enviado_at:    Time.current,
         peso_total_g:  peso,
-        plantas_count: pesadas_plantas.count,
+        plantas_count: plantas_registradas_count,
       )
 
       AlertaInterna.create!(
@@ -63,6 +79,8 @@ class PesajeManicura < ApplicationRecord
         },
       )
     end
+
+    notificar_admins_pendiente(peso)
   end
 
   # Admin/supervisor confirms: edits peso if needed, picks or creates a stock container.
@@ -96,6 +114,7 @@ class PesajeManicura < ApplicationRecord
         usuario: confirmado_por,
       )
       stock_destino.increment!(:cantidad, peso)
+      stock_destino.increment!(:cantidad_inicial, peso)
 
       update!(
         estado:            'confirmado',
@@ -123,5 +142,20 @@ class PesajeManicura < ApplicationRecord
 
       lote.check_and_finalize_manicura!(finalizador: confirmado_por)
     end
+  end
+
+  private
+
+  # Aviso push al admin: hay un pesaje esperando confirmación (reemplaza al push viejo
+  # de manicura_pendiente, que apuntaba a la pantalla deprecada /aprobaciones).
+  def notificar_admins_pendiente(peso)
+    PushNotificationService.notify_admins_async(
+      club,
+      title: "Pesaje para confirmar",
+      body:  "#{manicurador.first_name} envió #{plantas_count} plantas · #{peso}g del lote #{lote.codigo}",
+      url:   '/admin/pesajes-manicura',
+    )
+  rescue => e
+    Rails.logger.warn("[PesajeManicura#enviar!] push falló: #{e.message}")
   end
 end

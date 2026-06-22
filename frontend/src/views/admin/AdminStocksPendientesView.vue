@@ -176,15 +176,18 @@
                 <div class="stk__inv-main">
                   <span class="stk__inv-forma">{{ formaLabel(s.forma_producto) }}</span>
                   <div class="stk__inv-chips">
+                    <span v-if="s.numero_lote_producto" class="stk__chip stk__chip--np">{{ s.numero_lote_producto }}</span>
                     <span v-if="s.lote" class="stk__chip stk__chip--lote">{{ s.lote.codigo }}</span>
                     <span v-if="s.lote?.genetica" class="stk__chip stk__chip--gen">{{ s.lote.genetica.nombre }}</span>
                     <span v-else-if="s.genetica" class="stk__chip stk__chip--gen">{{ s.genetica.nombre }}</span>
                     <span v-if="s.origen === 'compra_externa'" class="stk__chip stk__chip--ext">Externo</span>
                     <span v-if="s.proveedor" class="stk__chip">{{ s.proveedor }}</span>
+                    <span v-if="s.created_at" class="stk__chip stk__chip--muted">Ingresó {{ timeAgo(s.created_at) }}</span>
                   </div>
                 </div>
                 <div class="stk__inv-right">
                   <span class="stk__inv-g" :class="{ 'stk__inv-g--flash': flashIds.has(s.id) }">{{ s.cantidad_disponible_real?.toFixed(1) ?? s.cantidad }}g</span>
+                  <span v-if="mostrarInicial(s)" class="stk__inv-inicial">de {{ s.cantidad_inicial?.toFixed(1) }}g</span>
                   <span v-if="s.gramos_reservados > 0" class="stk__badge-reservado" :title="`${s.gramos_reservados}g en delivery pendiente`">
                     −{{ s.gramos_reservados?.toFixed(1) }}g
                   </span>
@@ -1238,6 +1241,13 @@ function timeAgo(dateStr) {
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 }
+// Muestra "de Xg" solo si ya se consumió algo del stock (inicial > disponible real).
+function mostrarInicial(s) {
+  const ini = s.cantidad_inicial
+  if (ini == null) return false
+  const disp = s.cantidad_disponible_real ?? s.cantidad ?? 0
+  return ini - disp > 0.05
+}
 </script>
 
 <style scoped>
@@ -1366,6 +1376,8 @@ function formatDate(dateStr) {
 .stk__chip--gen  { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
 .stk__chip--ext  { background: #fef3c7; color: #92400e; border-color: #fde68a; }
 .stk__chip--muted { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
+.stk__chip--np { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; font-family: var(--font-mono, monospace); }
+.stk__inv-inicial { display: block; font-size: .68rem; color: #94a3b8; font-weight: 500; text-align: right; }
 
 /* ── Filters ────────────────────────────────────────────────────────────────── */
 .stk__filters { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1rem; }

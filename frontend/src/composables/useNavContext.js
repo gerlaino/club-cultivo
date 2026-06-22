@@ -20,7 +20,7 @@ const TAB_ROUTES = {
   pacientes:   ['/pacientes', '/historial', '/informe-semestral', '/socios'],
   operaciones: [
     '/admin/stock', '/admin/cosechado', '/admin/curado', '/admin/pesajes-manicura',
-    '/aprobaciones', '/delivery/despachos', '/contabilidad',
+    '/delivery/despachos', '/contabilidad',
   ],
   tareas: ['/tareas', '/plan-trabajo'],
 }

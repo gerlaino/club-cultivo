@@ -28,6 +28,7 @@ class Stock < ApplicationRecord
   validate :validar_segun_origen
 
   before_validation :set_club_id, on: :create
+  before_create :set_cantidad_inicial
   before_create :generar_numero_lote_producto
   before_create :generar_codigo_qr
   before_create :descontar_lote_origen_si_corresponde, unless: -> { es_split }
@@ -98,6 +99,12 @@ class Stock < ApplicationRecord
 
   def set_club_id
     self.club_id ||= sede&.club_id || lote&.club_id
+  end
+
+  # "Cantidad inicial" = lo que entró originalmente. Para stock externo/derivado nace con
+  # su cantidad; el de manicura nace en 0 y se acumula vía produccion en PesajeManicura#confirmar!.
+  def set_cantidad_inicial
+    self.cantidad_inicial ||= cantidad
   end
 
   def generar_numero_lote_producto

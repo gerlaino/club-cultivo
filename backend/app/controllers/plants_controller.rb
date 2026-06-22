@@ -157,66 +157,44 @@ class PlantsController < ApplicationController
       plant_attrs[:peso_humedo] = peso_humedo if peso_humedo&.positive?
       @plant.update!(plant_attrs)
 
-      # Resolvemos la jornada (PesajeManicura): por id explícito, o —si el lote está en
-      # manicura— el borrador abierto del manicura para este lote. Si no hay ninguno, se
-      # crea. Así escanear el QR de la planta alimenta SIEMPRE la jornada (antes el peso
-      # caía en el flujo viejo y la jornada quedaba en 0).
+      # Si el lote venía de 'secado' (camino viejo, sin manicura asignada), entra a
+      # manicura activa al primer pesaje por QR. Mismo criterio que la carga por lote.
+      if lote.estado == 'secado'
+        lote.update!(estado: 'en_manicura', manicurador_id: lote.manicurador_id || current_user.id)
+        lote.lote_eventos.create!(
+          tipo: 'cambio_estado', estado_anterior: 'secado', estado_nuevo: 'en_manicura',
+          descripcion: 'Inicio de manicura (pesaje por QR desde secado)',
+          user: current_user, club: lote.club, registrado_en: Time.current,
+        )
+      end
+
+      # Resolvemos la jornada (PesajeManicura): por id explícito, o el borrador abierto del
+      # manicura para este lote. Si no hay ninguno, se crea. Flujo único: el peso siempre
+      # alimenta un PesajeManicura.
       pesaje = if pesaje_manicura_id.present?
         lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id).find(pesaje_manicura_id)
-      elsif lote.estado == 'en_manicura'
+      else
         lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id).order(created_at: :desc).first ||
           lote.pesajes_manicura.create!(manicurador: current_user, club: lote.club, fecha_pesaje: Date.current)
       end
 
-      if pesaje
-        # Flujo nuevo: registra contra el PesajeManicura (la jornada)
-        pp = pesaje.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
-        pp.pesaje_manicura = pesaje
-        pp.pesada          = nil
-        pp.peso_seco_g     = peso_seco
-        pp.peso_humedo_g   = peso_humedo if peso_humedo&.positive?
-        pp.save!
+      pp = pesaje.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
+      pp.pesaje_manicura = pesaje
+      pp.pesada          = nil
+      pp.peso_seco_g     = peso_seco
+      pp.peso_humedo_g   = peso_humedo if peso_humedo&.positive?
+      pp.save!
 
-        total_peso = pesaje.pesadas_plantas.sum(:peso_seco_g)
-        count      = pesaje.pesadas_plantas.count
+      total_peso = pesaje.pesadas_plantas.sum(:peso_seco_g)
+      count      = pesaje.pesadas_plantas.count
 
-        render json: {
-          planta:    { id: @plant.id, nombre: @plant.nombre, codigo_qr: @plant.codigo_qr,
-                       peso_seco: @plant.peso_seco.to_f, peso_humedo: @plant.peso_humedo&.to_f },
-          pesaje:    { id: pesaje.id, peso_total_g: total_peso.to_f, plantas_count: count },
-          progreso:  { pesadas: count, total: lote.plants.count,
-                       peso_total_g: total_peso.to_f, completado: count >= lote.plants.count },
-        }
-      else
-        # Legacy flow: group under a borrador Pesada
-        pesada = lote.pesadas.find_or_initialize_by(
-          borrador:     true,
-          fase_origen:  lote.estado,
-          fase_destino: 'finalizado',
-          manicurado:   true,
-        )
-        unless pesada.persisted?
-          pesada.registrado_por = current_user
-          pesada.registrado_at  = Time.current
-          pesada.save!
-        end
-
-        pp = pesada.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
-        pp.peso_seco_g   = peso_seco
-        pp.peso_humedo_g = peso_humedo if peso_humedo&.positive?
-        pp.save!
-
-        total_peso = pesada.pesadas_plantas.sum(:peso_seco_g)
-        count      = pesada.pesadas_plantas.count
-        pesada.update!(peso_seco_g: total_peso, plantas_manicuradas: count)
-
-        render json: {
-          planta:   { id: @plant.id, nombre: @plant.nombre, codigo_qr: @plant.codigo_qr,
-                      peso_seco: @plant.peso_seco.to_f, peso_humedo: @plant.peso_humedo&.to_f },
-          progreso: { pesadas: count, total: lote.plants.count,
-                      peso_total_g: total_peso.to_f, completado: count >= lote.plants.count },
-        }
-      end
+      render json: {
+        planta:    { id: @plant.id, nombre: @plant.nombre, codigo_qr: @plant.codigo_qr,
+                     peso_seco: @plant.peso_seco.to_f, peso_humedo: @plant.peso_humedo&.to_f },
+        pesaje:    { id: pesaje.id, peso_total_g: total_peso.to_f, plantas_count: count },
+        progreso:  { pesadas: count, total: lote.plants.count,
+                     peso_total_g: total_peso.to_f, completado: count >= lote.plants.count },
+      }
     end
   end
 

@@ -44,8 +44,9 @@ const loading    = ref(false)
 onMounted(async () => {
   loading.value = true
   try {
-    const { data } = await listLotes()
-    pendientes.value = (data || []).filter(l => l.estado === 'manicura_pendiente')
+    // Lotes con un pesaje enviado, esperando confirmación del admin.
+    const { data } = await listLotes({ pesaje_enviado: true })
+    pendientes.value = data || []
   } catch {} finally { loading.value = false }
 })
 </script>

@@ -406,21 +406,15 @@ const routes = [
     meta: { requiresAuth: true }
   },
 
+  // Flujo de manicura unificado: la aprobación vive en /admin/pesajes-manicura.
+  // Rutas viejas redirigen para no romper bookmarks.
   {
     path: '/manicura',
-    redirect: '/aprobaciones',
+    redirect: '/admin/pesajes-manicura',
   },
-
   {
     path: '/aprobaciones',
-    name: 'aprobaciones',
-    component: () => import('../views/admin/AdminAprobacionesView.vue'),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore()
-      if (auth.user?.role !== 'admin') return next('/')
-      next()
-    },
+    redirect: '/admin/pesajes-manicura',
   },
 
   {

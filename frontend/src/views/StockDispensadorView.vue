@@ -27,6 +27,7 @@
             <th>Cepa</th>
             <th>Lote</th>
             <th>Sede</th>
+            <th class="sdv__th-ing">Ingresó</th>
             <th class="sdv__th-num">Disponible</th>
             <th class="sdv__th-num">Comprometido</th>
             <th class="sdv__th-num">P. sugerido</th>
@@ -36,12 +37,22 @@
         </thead>
         <tbody>
           <tr v-for="s in stocksFiltrados" :key="s.id" :class="{ 'sdv__tr--flash': flashIds.has(s.id) }">
-            <td class="sdv__td-forma">{{ formaLabel(s.forma_producto) }}</td>
+            <td class="sdv__td-forma">
+              <div class="sdv__forma-main">
+                {{ formaLabel(s.forma_producto) }}
+                <span class="sdv__chip" :class="s.regulatorio ? 'sdv__chip--propio' : 'sdv__chip--externo'">
+                  {{ s.regulatorio ? 'Propio' : 'Externo' }}
+                </span>
+              </div>
+              <span v-if="s.numero_lote_producto" class="sdv__forma-sub">{{ s.numero_lote_producto }}</span>
+            </td>
             <td class="sdv__td-cepa">{{ s.genetica?.nombre ?? s.lote?.genetica?.nombre ?? '—' }}</td>
             <td class="sdv__td-mono">{{ s.lote_codigo ?? s.lote?.codigo ?? '—' }}</td>
             <td>{{ s.sede?.nombre ?? '—' }}</td>
+            <td class="sdv__td-ing">{{ fmtIngreso(s.created_at) }}</td>
             <td class="sdv__td-num" :class="{ 'sdv__td-bajo': s.cantidad_disponible_real < 5 }">
-              {{ s.cantidad_disponible_real?.toFixed(1) ?? s.cantidad }}{{ s.unidad }}
+              <div>{{ s.cantidad_disponible_real?.toFixed(1) ?? s.cantidad }}{{ s.unidad }}</div>
+              <span v-if="mostrarInicial(s)" class="sdv__td-inicial">de {{ s.cantidad_inicial?.toFixed(1) }}{{ s.unidad }}</span>
             </td>
             <td class="sdv__td-num">
               <span v-if="s.gramos_reservados > 0" class="sdv__badge-reservado" :title="`${s.gramos_reservados}g comprometidos en delivery`">
@@ -147,6 +158,19 @@ function badgeVencimiento(s) {
 const fmtFecha = (d) => d
   ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
   : '—'
+
+// Fecha de ingreso del stock (created_at = cuándo se aprobó/generó). Es timestamp ISO.
+const fmtIngreso = (d) => d
+  ? new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  : '—'
+
+// Mostramos "de Xg" solo si ya se consumió algo (inicial > disponible real).
+function mostrarInicial(s) {
+  const ini = s.cantidad_inicial
+  if (ini == null) return false
+  const disp = s.cantidad_disponible_real ?? s.cantidad ?? 0
+  return ini - disp > 0.05
+}
 </script>
 
 <style scoped>
@@ -201,6 +225,13 @@ const fmtFecha = (d) => d
 .sdv__table tr:hover td { background: var(--c-leaf-50); }
 .sdv__th-num, .sdv__td-num { text-align: right; }
 .sdv__td-forma { font-weight: 600; }
+.sdv__forma-main { display: flex; align-items: center; gap: var(--sp-2); }
+.sdv__forma-sub { font-family: var(--font-mono); font-size: var(--fs-11); font-weight: 400; color: var(--c-ink-400); }
+.sdv__chip { font-size: .62rem; font-weight: 700; padding: .1rem .4rem; border-radius: 99px; text-transform: uppercase; letter-spacing: .03em; }
+.sdv__chip--propio  { background: #dcfce7; color: #15803d; }
+.sdv__chip--externo { background: #e0e7ff; color: #4338ca; }
+.sdv__th-ing, .sdv__td-ing { font-size: var(--fs-13); color: var(--c-ink-500); white-space: nowrap; }
+.sdv__td-inicial { display: block; font-size: var(--fs-11); color: var(--c-ink-400); font-weight: 400; }
 .sdv__td-cepa  { font-size: var(--fs-13); color: var(--c-ink-600); font-style: italic; }
 .sdv__td-mono  { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--c-ink-700); }
 .sdv__td-bajo  { color: var(--c-rust-600); font-weight: 700; }
@@ -232,7 +263,12 @@ const fmtFecha = (d) => d
 .sdv__skel { height: 44px; background: var(--c-ink-100); border-radius: var(--r-md); animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 
-@media (max-width: 767px) { .sdv { padding: var(--sp-4); } }
+@media (max-width: 767px) {
+  .sdv { padding: var(--sp-4); }
+  /* En mobile, info secundaria oculta para no saturar */
+  .sdv__th-ing, .sdv__td-ing { display: none; }
+  .sdv__forma-sub { display: none; }
+}
 .sdv__td-etiqueta { width: 36px; text-align: center; }
 .sdv__etiqueta-link { font-size: 1rem; text-decoration: none; cursor: pointer; }
 </style>

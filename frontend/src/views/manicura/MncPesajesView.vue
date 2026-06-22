@@ -5,7 +5,7 @@
     <div class="mpv__header">
       <p class="mpv__eyebrow"><Scale :size="13" :stroke-width="2" /> Manicura</p>
       <h1 class="mpv__title">Mis pesajes</h1>
-      <p class="mpv__sub">Registrá el peso diario de manicura. Cada jornada es un pesaje independiente.</p>
+      <p class="mpv__sub">Registrá el peso de manicura. Cerrás un pesaje, lo mandás a confirmar, y seguís con otro lote.</p>
     </div>
 
     <!-- Lote activo selector -->
@@ -40,8 +40,8 @@
         <div class="mpv__cta" v-if="!pesajeBorrador">
           <div class="mpv__cta-ico"><CalendarPlus :size="22" :stroke-width="1.5" /></div>
           <div class="mpv__cta-body">
-            <p class="mpv__cta-title">Iniciar jornada de hoy</p>
-            <p class="mpv__cta-sub">Creá un pesaje para registrar las plantas que manicurés hoy.</p>
+            <p class="mpv__cta-title">Nuevo pesaje</p>
+            <p class="mpv__cta-sub">Creá un pesaje y registrá las plantas escaneando su QR. ¿Sin QR? Cargá por lote desde el detalle.</p>
           </div>
           <button class="mpv__btn-new" :disabled="creando" @click="crearPesaje">
             <DsSpinner v-if="creando" :size="14" />
@@ -55,7 +55,7 @@
           <div class="mpv__active-head">
             <div class="mpv__active-ico"><Scale :size="16" :stroke-width="1.75" /></div>
             <div>
-              <p class="mpv__active-title">Jornada de hoy</p>
+              <p class="mpv__active-title">Pesaje en curso</p>
               <p class="mpv__active-date">{{ fmtDate(pesajeBorrador.fecha_pesaje) }}</p>
             </div>
             <span class="mpv__badge mpv__badge--borrador">En progreso</span>
@@ -78,7 +78,7 @@
 
           <!-- Notas -->
           <div class="mpv__active-notas">
-            <label class="mpv__active-notas-lbl">Notas del día <span class="mpv__opt">opcional</span></label>
+            <label class="mpv__active-notas-lbl">Notas del pesaje <span class="mpv__opt">opcional</span></label>
             <textarea
               v-model="notasBorrador"
               class="mpv__textarea"
@@ -95,19 +95,19 @@
             >
               <DsSpinner v-if="enviando" :size="14" />
               <Send v-else :size="14" :stroke-width="2" />
-              Cerrar día y enviar
+              Cerrar pesaje y mandar a confirmar
             </button>
           </div>
 
           <p v-if="(pesajeBorrador.plantas_registradas || 0) === 0" class="mpv__hint mpv__hint--warn">
-            ⚠️ Registrá al menos una planta antes de cerrar el día.
+            ⚠️ Registrá al menos una planta antes de cerrar el pesaje.
             Usá el QR de cada planta para registrar el peso individual.
           </p>
         </div>
 
         <!-- Historial de pesajes enviados/confirmados -->
         <div v-if="pesajesHistorial.length" class="mpv__historial">
-          <h2 class="mpv__section-title"><List :size="12" :stroke-width="2" /> Historial de jornadas</h2>
+          <h2 class="mpv__section-title"><List :size="12" :stroke-width="2" /> Pesajes anteriores</h2>
           <div class="mpv__hist-list">
             <div v-for="p in pesajesHistorial" :key="p.id" class="mpv__hist-row">
               <div class="mpv__hist-date">{{ fmtDate(p.fecha_pesaje) }}</div>
@@ -148,7 +148,7 @@
         <div v-else-if="!pesajeBorrador" class="mpv__empty">
           <Scale :size="28" :stroke-width="1.25" />
           <p>Todavía no hay pesajes para este lote.</p>
-          <span>Iniciá la primera jornada para comenzar a registrar.</span>
+          <span>Creá el primer pesaje para comenzar a registrar.</span>
         </div>
 
       </template>
@@ -241,7 +241,7 @@ async function crearPesaje() {
   try {
     const { data } = await createPesajeManicura(loteSeleccionado.value.id)
     pesajes.value.unshift(data)
-    toast.success('Jornada iniciada — podés empezar a pesar plantas con el QR')
+    toast.success('Pesaje iniciado — escaneá el QR de cada planta para cargar su peso')
   } catch (e) {
     toast.error(e.response?.data?.error || 'Error al crear el pesaje')
   } finally {
@@ -255,7 +255,7 @@ async function cerrarDia() {
   enviando.value = true
   try {
     await enviarPesajeManicura(loteSeleccionado.value.id, p.id)
-    toast.success('Jornada enviada para aprobación del admin')
+    toast.success('Pesaje cerrado y enviado a confirmar')
     await cargarPesajes()
   } catch (e) {
     toast.error(e.response?.data?.error || 'Error al enviar el pesaje')
@@ -270,7 +270,7 @@ async function reabrirPesaje(p) {
   reabriendo.value = p.id
   try {
     await reabrirPesajeManicura(loteSeleccionado.value.id, p.id)
-    toast.success('Jornada reabierta — podés corregirla y volver a enviar')
+    toast.success('Pesaje reabierto — corregilo y volvé a enviar')
     await cargarPesajes()
   } catch (e) {
     toast.error(e.response?.data?.error || 'No se pudo reabrir')
@@ -283,15 +283,15 @@ const borrando = ref(null)
 async function borrarPesaje(p) {
   if (p.estado === 'confirmado') return
   const ok = await confirm({
-    title: 'Borrar jornada',
-    message: `¿Borrar esta jornada del ${fmtDate(p.fecha_pesaje)}? Esta acción no se puede deshacer.`,
+    title: 'Borrar pesaje',
+    message: `¿Borrar este pesaje del ${fmtDate(p.fecha_pesaje)}? Esta acción no se puede deshacer.`,
     confirmText: 'Borrar', danger: true,
   })
   if (!ok) return
   borrando.value = p.id
   try {
     await deletePesajeManicura(loteSeleccionado.value.id, p.id)
-    toast.success('Jornada borrada')
+    toast.success('Pesaje borrado')
     await cargarPesajes()
   } catch (e) {
     toast.error(e.response?.data?.error || 'No se pudo borrar')

@@ -21,19 +21,18 @@ const auth  = useAuthStore()
 
 const HOME = { to: '/', icon: LayoutDashboard, label: 'Dashboard' }
 
-// Badge de Manicura: pesajes esperando confirmación + lotes del flujo anterior +
-// cosechas en manicura asignadas a mí (que tengo que pesar).
+// Badge de Manicura: pesajes esperando confirmación + cosechas en manicura asignadas
+// a mí (que todavía tengo que pesar).
 const aprobacionesPendientes = ref(0)
 async function fetchAprobaciones() {
   try {
-    const [lotes, pesajes, enManicura] = await Promise.all([
-      listLotes({ estado: 'manicura_pendiente' }),
+    const [pesajes, enManicura] = await Promise.all([
       listPesajesManicuraAdmin().catch(() => ({ data: [] })),
       listLotes({ estado: 'en_manicura' }).catch(() => ({ data: [] })),
     ])
     const enviadosLoteIds = new Set((pesajes.data || []).map(p => p.lote_id))
     const misCosechas = (enManicura.data || []).filter(l => l.manicurador_id === auth.user?.id && !enviadosLoteIds.has(l.id))
-    aprobacionesPendientes.value = (lotes.data || []).length + (pesajes.data || []).length + misCosechas.length
+    aprobacionesPendientes.value = (pesajes.data || []).length + misCosechas.length
   } catch {}
 }
 
@@ -60,7 +59,7 @@ const GRUPOS = computed(() => [
     items: [
       { to: '/admin/stock',            icon: Boxes,         label: 'Stock' },
       { to: '/admin/cosechado',        icon: Scissors,      label: 'Cosecha', hint: 'Lotes cosechados, esperando manicura' },
-      { to: '/admin/pesajes-manicura', icon: Scale,         label: 'Manicura', badge: aprobacionesPendientes.value },
+      { to: '/admin/pesajes-manicura', icon: Scale,         label: 'Manicura', badge: aprobacionesPendientes.value, hint: 'Pesajes y aprobaciones de cosecha' },
       { to: '/reservas',               icon: BookmarkCheck, label: 'Reservas' },
       { to: '/delivery/despachos',     icon: Truck,         label: 'Despachos' },
       { to: '/contabilidad',           icon: Wallet,        label: 'Contabilidad' },
@@ -109,7 +108,7 @@ const GRUPOS = computed(() => [
 onMounted(fetchAprobaciones)
 
 watch(() => route.path, (path, prev) => {
-  const rutasManicura = ['/aprobaciones', '/admin/pesajes-manicura']
+  const rutasManicura = ['/admin/pesajes-manicura']
   if (rutasManicura.includes(prev) || rutasManicura.includes(path)) fetchAprobaciones()
 })
 </script>

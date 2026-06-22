@@ -53,7 +53,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { useStatsStore } from '../../stores/stats.js'
-import { getTareasDashboard, listLotes, listStocksPendientes } from '../../lib/api.js'
+import { getTareasDashboard, listPesajesManicuraAdmin, listStocksPendientes } from '../../lib/api.js'
 
 const auth  = useAuthStore()
 const stats = useStatsStore()
@@ -84,7 +84,7 @@ onMounted(async () => {
   if (!stats.data) stats.fetchAll()
   const [tareasRes, manicuraRes, stockRes] = await Promise.allSettled([
     getTareasDashboard(),
-    listLotes({ estado: 'manicura_pendiente' }),
+    listPesajesManicuraAdmin(),
     listStocksPendientes(),
   ])
   if (tareasRes.status === 'fulfilled') tareasHoy.value = tareasRes.value.data?.stats?.pendientes || 0

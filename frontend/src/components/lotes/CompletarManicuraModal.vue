@@ -7,7 +7,7 @@
           <div class="cmm__header-left">
             <div class="cmm__icon-wrap"><CheckCheck :size="18" :stroke-width="2" /></div>
             <div>
-              <div class="cmm__title">Completar Manicura</div>
+              <div class="cmm__title">Registrar pesaje</div>
               <div class="cmm__sub">Lote {{ lote?.codigo }}</div>
             </div>
           </div>
@@ -16,6 +16,22 @@
 
         <div class="cmm__body">
           <div v-if="error" class="cmm__alert">{{ error }}</div>
+
+          <!-- Plantas -->
+          <div class="cmm__field">
+            <label class="cmm__label">
+              Plantas manicuradas
+              <span class="cmm__required">requerido</span>
+            </label>
+            <div class="cmm__input-row">
+              <input
+                type="number" step="1" min="1"
+                class="cmm__input" v-model.number="form.plantas_count"
+                :max="lote?.plants_count" placeholder="0" autofocus
+              />
+              <span class="cmm__unit">de {{ lote?.plants_count ?? '—' }}</span>
+            </div>
+          </div>
 
           <!-- Peso seco -->
           <div class="cmm__field">
@@ -28,36 +44,9 @@
                 type="number" step="0.1" min="0.1"
                 class="cmm__input" v-model.number="form.peso_seco_g"
                 placeholder="ej: 350.0"
-                autofocus
               />
               <span class="cmm__unit">g</span>
             </div>
-          </div>
-
-          <!-- Sede destino -->
-          <div class="cmm__field">
-            <label class="cmm__label">
-              Sede destino
-              <span class="cmm__required">requerido</span>
-            </label>
-            <select v-model="form.sede_id" class="cmm__select" :disabled="loadingSedes">
-              <option :value="null">— Seleccioná una sede —</option>
-              <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-            </select>
-          </div>
-
-          <!-- Forma producto -->
-          <div class="cmm__field">
-            <label class="cmm__label">
-              Forma de producto
-              <span class="cmm__optional">opcional</span>
-            </label>
-            <select v-model="form.forma_producto" class="cmm__select">
-              <option value="flor_seca">Flor seca</option>
-              <option value="resina">Resina</option>
-              <option value="extracto">Extracto</option>
-              <option value="otro">Otro</option>
-            </select>
           </div>
 
           <!-- Notas -->
@@ -74,7 +63,7 @@
           </div>
 
           <div class="cmm__info">
-            El stock se generará automáticamente en la sede seleccionada. El lote quedará finalizado.
+            Se crea un pesaje y se manda a confirmar. La sede del stock se asigna después en Stock.
           </div>
         </div>
 
@@ -83,7 +72,7 @@
           <button class="cmm__btn-primary" :disabled="saving || !canSubmit" @click="confirmar">
             <DsSpinner v-if="saving" :size="14" />
             <CheckCheck v-else :size="14" :stroke-width="2" />
-            Completar y finalizar
+            Enviar a confirmar
           </button>
         </div>
 
@@ -95,7 +84,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { CheckCheck, X } from 'lucide-vue-next'
-import { completarManicura, listSedes } from '../../lib/api.js'
+import { createPesajeManicura } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
@@ -104,36 +93,19 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue', 'completado'])
 
-const form = ref({ peso_seco_g: null, sede_id: null, forma_producto: 'flor_seca', notas: '' })
-const error       = ref(null)
-const saving      = ref(false)
-const sedes       = ref([])
-const loadingSedes = ref(false)
+const form = ref({ plantas_count: null, peso_seco_g: null, notas: '' })
+const error  = ref(null)
+const saving = ref(false)
 
-const canSubmit = computed(() => form.value.peso_seco_g > 0 && form.value.sede_id)
+const canSubmit = computed(() => form.value.peso_seco_g > 0 && form.value.plantas_count > 0)
 
-watch(() => props.modelValue, async (visible) => {
-  if (!visible) return
-  resetForm()
-  await cargarSedes()
+watch(() => props.modelValue, (visible) => {
+  if (visible) resetForm()
 })
 
 function resetForm() {
-  form.value = { peso_seco_g: null, sede_id: null, forma_producto: 'flor_seca', notas: '' }
+  form.value = { plantas_count: props.lote?.plants_count || null, peso_seco_g: null, notas: '' }
   error.value = null
-}
-
-async function cargarSedes() {
-  loadingSedes.value = true
-  try {
-    const { data } = await listSedes()
-    sedes.value = data || []
-    if (sedes.value.length === 1) form.value.sede_id = sedes.value[0].id
-  } catch {
-    sedes.value = []
-  } finally {
-    loadingSedes.value = false
-  }
 }
 
 async function confirmar() {
@@ -141,18 +113,18 @@ async function confirmar() {
   saving.value = true
   error.value  = null
   try {
-    const { data } = await completarManicura(props.lote.id, {
-      peso_seco_g:    form.value.peso_seco_g,
-      sede_id:        form.value.sede_id,
-      forma_producto: form.value.forma_producto,
-      notas:          form.value.notas || undefined,
+    const { data } = await createPesajeManicura(props.lote.id, {
+      plantas_count: form.value.plantas_count,
+      peso_total_g:  form.value.peso_seco_g,
+      notas:         form.value.notas || undefined,
+      enviar:        true,
     })
     emit('completado', data)
     cerrar()
   } catch (e) {
     error.value = e?.response?.data?.error
       || e?.response?.data?.errors?.join(', ')
-      || 'Error al completar manicura'
+      || 'Error al registrar el pesaje'
   } finally {
     saving.value = false
   }

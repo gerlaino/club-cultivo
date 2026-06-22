@@ -3,8 +3,8 @@
 
     <!-- Header -->
     <div class="maa__header">
-      <h1 class="maa__title">Aprobaciones</h1>
-      <span v-if="lotes.length" class="maa__count">{{ lotes.length }}</span>
+      <h1 class="maa__title">Confirmar pesajes</h1>
+      <span v-if="pesajes.length" class="maa__count">{{ pesajes.length }}</span>
     </div>
 
     <!-- Loading -->
@@ -13,144 +13,78 @@
     </div>
 
     <!-- Vacío -->
-    <div v-else-if="!lotes.length" class="maa__empty">
+    <div v-else-if="!pesajes.length" class="maa__empty">
       <i class="bi bi-check2-circle maa__empty-icon"></i>
-      <p class="maa__empty-title">Sin aprobaciones pendientes</p>
-      <p class="maa__empty-sub">Cuando manicura complete un lote aparecerá aquí.</p>
+      <p class="maa__empty-title">Sin pesajes para confirmar</p>
+      <p class="maa__empty-sub">Cuando manicura cierre un pesaje aparecerá acá.</p>
     </div>
 
     <!-- Lista -->
     <div v-else class="maa__list">
-      <div v-for="lote in lotes" :key="lote.id" class="maa__card">
+      <div v-for="p in pesajes" :key="p.id" class="maa__card">
 
         <div class="maa__card-top">
-          <span class="maa__codigo">{{ lote.codigo }}</span>
-          <span class="maa__badge">⏳ Pendiente</span>
+          <span class="maa__codigo">{{ p.lote_codigo }}</span>
+          <span class="maa__badge">⏳ Enviado</span>
         </div>
 
         <div class="maa__card-meta">
-          <span v-if="lote.genetica?.nombre">🌿 {{ lote.genetica.nombre }}</span>
-          <span v-if="lote.sala?.nombre">📍 {{ lote.sala.nombre }}</span>
-          <span>🪴 {{ lote.plants_count }} plantas</span>
+          <span v-if="p.lote_genetica">🌿 {{ p.lote_genetica }}</span>
+          <span>🪴 {{ p.plantas_count }} plantas</span>
         </div>
 
-        <div v-if="lote.ultima_pesada_manicura" class="maa__pesada">
+        <div class="maa__pesada">
           <i class="bi bi-bar-chart-fill"></i>
-          <strong>{{ lote.ultima_pesada_manicura.peso_seco_g }}g</strong>
-          <span v-if="lote.ultima_pesada_manicura.registrado_por">
-            · {{ lote.ultima_pesada_manicura.registrado_por }}
-          </span>
-        </div>
-
-        <div v-if="lote.manicurador" class="maa__manicurador">
-          ✂️ {{ lote.manicurador.nombre }}
+          <strong>{{ (p.peso_total_g || p.peso_calculado_g || 0).toFixed(1) }}g</strong>
+          <span v-if="p.manicurador_nombre">· ✂️ {{ p.manicurador_nombre }}</span>
         </div>
 
         <div class="maa__card-actions">
-          <button class="maa__btn-rechazar" @click="abrirRechazo(lote)">
-            <i class="bi bi-x-circle"></i> Rechazar
+          <button class="maa__btn-rechazar" :disabled="reabriendo === p.id" @click="reabrir(p)">
+            <i class="bi bi-arrow-counterclockwise"></i> Reabrir
           </button>
-          <button class="maa__btn-aprobar" @click="abrirAprobacion(lote)">
-            <i class="bi bi-check-circle"></i>
-            {{ lote.manicurador_id ? 'Aprobar y finalizar' : 'Aprobar' }}
+          <button class="maa__btn-aprobar" @click="abrirConfirmacion(p)">
+            <i class="bi bi-check-circle"></i> Confirmar
           </button>
         </div>
 
       </div>
     </div>
 
-    <!-- Sheet: Rechazar -->
+    <!-- Sheet: Confirmar -->
     <Transition name="maa-sheet">
-      <div v-if="sheetRechazo" class="maa__overlay" @click.self="cerrarRechazo">
+      <div v-if="sheetConfirmar" class="maa__overlay" @click.self="cerrarConfirmacion">
         <div class="maa__sheet">
           <div class="maa__sheet-handle"></div>
           <div class="maa__sheet-header">
-            <h3 class="maa__sheet-title">Rechazar manicura</h3>
-            <button class="maa__sheet-close" @click="cerrarRechazo">
+            <h3 class="maa__sheet-title">Confirmar y generar stock</h3>
+            <button class="maa__sheet-close" @click="cerrarConfirmacion">
               <i class="bi bi-x-lg"></i>
             </button>
           </div>
           <div class="maa__sheet-body">
-            <p class="maa__sheet-lote">Lote <strong>{{ loteActivo?.codigo }}</strong></p>
+            <p class="maa__sheet-lote">Lote <strong>{{ pesajeActivo?.lote_codigo }}</strong></p>
             <div class="maa__field">
-              <label class="maa__label">Motivo del rechazo <span class="maa__req">*</span></label>
-              <textarea
-                v-model="motivoRechazo"
-                class="maa__textarea"
-                rows="3"
-                placeholder="Explicá por qué se rechaza la manicura…"
-                autofocus
-              ></textarea>
-            </div>
-            <div v-if="errorMsg" class="maa__error">{{ errorMsg }}</div>
-            <button
-              class="maa__btn-confirmar maa__btn-confirmar--danger"
-              :disabled="rechazando || !motivoRechazo.trim()"
-              @click="confirmarRechazo"
-            >
-              <i v-if="!rechazando" class="bi bi-x-circle-fill"></i>
-              <i v-else class="bi bi-arrow-repeat maa__spin"></i>
-              Confirmar rechazo
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- Sheet: Aprobar -->
-    <Transition name="maa-sheet">
-      <div v-if="sheetAprobacion" class="maa__overlay" @click.self="cerrarAprobacion">
-        <div class="maa__sheet">
-          <div class="maa__sheet-handle"></div>
-          <div class="maa__sheet-header">
-            <h3 class="maa__sheet-title">Aprobar y generar stock</h3>
-            <button class="maa__sheet-close" @click="cerrarAprobacion">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </div>
-          <div class="maa__sheet-body">
-            <p class="maa__sheet-lote">Lote <strong>{{ loteActivo?.codigo }}</strong></p>
-            <div class="maa__field">
-              <label class="maa__label">Peso seco confirmado (g) <span class="maa__req">*</span></label>
+              <label class="maa__label">Peso confirmado (g) <span class="maa__req">*</span></label>
               <input
-                v-model.number="pesoAprobacion"
+                v-model.number="pesoConfirmado"
                 type="number" min="0.1" step="0.1"
                 class="maa__input"
-                :class="{ 'maa__input--warn': !pesoAprobacion || pesoAprobacion <= 0 }"
+                :class="{ 'maa__input--warn': !pesoConfirmado || pesoConfirmado <= 0 }"
                 placeholder="Ingresá el peso en gramos"
               />
-              <span v-if="loteActivo?.ultima_pesada_manicura?.peso_seco_g" class="maa__hint">
-                Pre-completado desde pesada de manicura
-              </span>
-              <span v-else-if="!pesoAprobacion || pesoAprobacion <= 0" class="maa__hint maa__hint--warn">
-                ⚠️ La pesada no tiene peso registrado — ingresalo para poder aprobar
-              </span>
+              <span class="maa__hint">Pre-completado desde el pesaje. Ajustalo si hace falta.</span>
             </div>
-            <div v-if="loteActivo?.manicurador_id" class="maa__field">
-              <label class="maa__label">Precio sugerido (ARS/g)</label>
-              <input
-                v-model.number="precioAprobacion"
-                type="number" min="0" step="0.01"
-                class="maa__input"
-                placeholder="0.00"
-              />
-              <span class="maa__hint">Opcional — se usará al crear dispensaciones</span>
-            </div>
-            <div v-if="loteActivo?.manicurador_id && sedes.length" class="maa__field">
-              <label class="maa__label">Asignar a sede</label>
-              <select v-model="sedeAprobacion" class="maa__input maa__select">
-                <option :value="null">— Sin asignar (pendiente) —</option>
-                <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-              </select>
-              <span class="maa__hint">Solo sedes sociales o mixtas</span>
+            <div class="maa__info-box">
+              El stock se crea sin sede (pendiente de asignación). La sede se asigna después en Stock.
             </div>
             <div v-if="errorMsg" class="maa__error">{{ errorMsg }}</div>
             <button
               class="maa__btn-confirmar maa__btn-confirmar--green"
-              :disabled="aprobando || !pesoAprobacion || pesoAprobacion <= 0"
-              @click="confirmarAprobacion"
+              :disabled="confirmando || !pesoConfirmado || pesoConfirmado <= 0"
+              @click="confirmar"
             >
-              <i v-if="!aprobando" class="bi bi-check-circle-fill"></i>
+              <i v-if="!confirmando" class="bi bi-check-circle-fill"></i>
               <i v-else class="bi bi-arrow-repeat maa__spin"></i>
               Confirmar y generar stock
             </button>
@@ -164,105 +98,69 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { listLotes, listSedes, aprobarManicura, rechazarManicura } from '../../lib/api.js'
+import { listPesajesManicuraAdmin, confirmarPesajeManicura, reabrirPesajeManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast   = useToast()
-const lotes   = ref([])
-const sedes   = ref([])
+const pesajes = ref([])
 const loading = ref(true)
 
-const sheetRechazo    = ref(false)
-const sheetAprobacion = ref(false)
-const loteActivo      = ref(null)
-const motivoRechazo   = ref('')
-const pesoAprobacion  = ref(null)
-const sedeAprobacion  = ref(null)
-const precioAprobacion = ref(null)
-const rechazando      = ref(false)
-const aprobando       = ref(false)
-const errorMsg        = ref('')
+const sheetConfirmar = ref(false)
+const pesajeActivo   = ref(null)
+const pesoConfirmado = ref(null)
+const confirmando    = ref(false)
+const reabriendo     = ref(null)
+const errorMsg       = ref('')
 
 async function cargar() {
   loading.value = true
   try {
-    const [lotesRes, sedesRes] = await Promise.allSettled([
-      listLotes({ estado: 'manicura_pendiente' }),
-      listSedes(),
-    ])
-    lotes.value = lotesRes.status === 'fulfilled' ? (lotesRes.value.data || []) : []
-    sedes.value = sedesRes.status === 'fulfilled'
-      ? (sedesRes.value.data || []).filter(s => ['social', 'mixta'].includes(s.tipo))
-      : []
+    const { data } = await listPesajesManicuraAdmin()
+    pesajes.value = data || []
+  } catch {
+    pesajes.value = []
   } finally { loading.value = false }
 }
 
-function abrirRechazo(lote) {
-  loteActivo.value   = lote
-  motivoRechazo.value = ''
-  errorMsg.value      = ''
-  sheetRechazo.value  = true
+function abrirConfirmacion(p) {
+  pesajeActivo.value   = p
+  pesoConfirmado.value = p.peso_total_g || p.peso_calculado_g || null
+  errorMsg.value       = ''
+  sheetConfirmar.value = true
 }
 
-function cerrarRechazo() {
-  sheetRechazo.value = false
-  loteActivo.value   = null
+function cerrarConfirmacion() {
+  sheetConfirmar.value = false
+  pesajeActivo.value   = null
 }
 
-function abrirAprobacion(lote) {
-  loteActivo.value      = lote
-  pesoAprobacion.value  = lote.ultima_pesada_manicura?.peso_seco_g ?? null
-  sedeAprobacion.value  = null
-  precioAprobacion.value = null
-  errorMsg.value        = ''
-  sheetAprobacion.value = true
-}
-
-function cerrarAprobacion() {
-  sheetAprobacion.value = false
-  loteActivo.value      = null
-}
-
-async function confirmarRechazo() {
-  if (!loteActivo.value || !motivoRechazo.value.trim()) return
-  rechazando.value = true
-  errorMsg.value   = ''
-  try {
-    await rechazarManicura(loteActivo.value.id, motivoRechazo.value.trim())
-    const destino = loteActivo.value.manicurador_id ? 'vuelve a cosecha' : 'vuelve a secado'
-    toast.success(`Lote ${loteActivo.value.codigo} rechazado — ${destino}`)
-    cerrarRechazo()
-    cargar()
-  } catch (e) {
-    errorMsg.value = e.response?.data?.error || 'Error al rechazar'
-  } finally { rechazando.value = false }
-}
-
-async function confirmarAprobacion() {
-  if (!pesoAprobacion.value || pesoAprobacion.value <= 0) {
+async function confirmar() {
+  if (!pesajeActivo.value || !pesoConfirmado.value || pesoConfirmado.value <= 0) {
     errorMsg.value = 'El peso debe ser mayor a 0'; return
   }
-  aprobando.value = true
-  errorMsg.value  = ''
+  confirmando.value = true
+  errorMsg.value    = ''
   try {
-    if (loteActivo.value.manicurador_id) {
-      const payload = { peso_seco_g: pesoAprobacion.value }
-      if (sedeAprobacion.value) payload.sede_id = sedeAprobacion.value
-      if (precioAprobacion.value) payload.precio_sugerido_ars = precioAprobacion.value
-      await aprobarManicura(loteActivo.value.id, payload)
-      const dest = sedeAprobacion.value
-        ? `asignado a ${sedes.value.find(s => s.id === sedeAprobacion.value)?.nombre}`
-        : 'pendiente de asignación'
-      toast.success(`Lote ${loteActivo.value.codigo} finalizado — ${dest}`)
-    } else {
-      await aprobarManicura(loteActivo.value.id)
-      toast.success(`Lote ${loteActivo.value.codigo} aprobado — pasa a curado`)
-    }
-    cerrarAprobacion()
+    await confirmarPesajeManicura(pesajeActivo.value.lote_id, pesajeActivo.value.id, {
+      peso_confirmado_g: pesoConfirmado.value,
+    })
+    toast.success(`Pesaje de ${pesajeActivo.value.lote_codigo} confirmado — ${pesoConfirmado.value}g`)
+    cerrarConfirmacion()
     cargar()
   } catch (e) {
-    errorMsg.value = e.response?.data?.error || 'Error al aprobar'
-  } finally { aprobando.value = false }
+    errorMsg.value = e.response?.data?.error || e.response?.data?.errors?.[0] || 'Error al confirmar'
+  } finally { confirmando.value = false }
+}
+
+async function reabrir(p) {
+  reabriendo.value = p.id
+  try {
+    await reabrirPesajeManicura(p.lote_id, p.id)
+    toast.success(`Pesaje de ${p.lote_codigo} reabierto — vuelve a manicura para corregir`)
+    cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo reabrir')
+  } finally { reabriendo.value = null }
 }
 
 onMounted(cargar)
@@ -319,16 +217,15 @@ onMounted(cargar)
   align-self: flex-start;
 }
 
-.maa__manicurador { font-size: .72rem; color: #15803d; font-weight: 600; }
-
 .maa__card-actions { display: flex; gap: .5rem; margin-top: .25rem; }
 .maa__btn-rechazar {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: .35rem;
-  background: #fff; color: #dc2626; border: 1.5px solid #fca5a5;
+  background: #fff; color: #b45309; border: 1.5px solid #fcd34d;
   padding: .65rem; border-radius: 10px; font-size: .82rem; font-weight: 600;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
-.maa__btn-rechazar:active { background: #fef2f2; }
+.maa__btn-rechazar:active { background: #fffbeb; }
+.maa__btn-rechazar:disabled { opacity: .5; }
 .maa__btn-aprobar {
   flex: 2; display: flex; align-items: center; justify-content: center; gap: .35rem;
   background: #15803d; color: #fff; border: none;
@@ -379,16 +276,7 @@ onMounted(cargar)
   width: 100%; box-sizing: border-box; outline: none;
 }
 .maa__input:focus { border-color: #15803d; background: #fff; }
-.maa__select { appearance: none; -webkit-appearance: none; cursor: pointer; }
-.maa__textarea {
-  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px;
-  padding: .7rem .875rem; font-size: .875rem; color: #0f172a;
-  width: 100%; box-sizing: border-box; outline: none;
-  resize: none; font-family: inherit; min-height: 90px;
-}
-.maa__textarea:focus { border-color: #dc2626; background: #fff; }
 .maa__hint { font-size: .7rem; color: #94a3b8; }
-.maa__hint--warn { color: #b45309; }
 .maa__input--warn { border-color: #f59e0b; background: #fffbeb; }
 
 .maa__error {
@@ -403,7 +291,6 @@ onMounted(cargar)
   -webkit-tap-highlight-color: transparent;
 }
 .maa__btn-confirmar:disabled { opacity: .5; cursor: not-allowed; }
-.maa__btn-confirmar--danger { background: #dc2626; color: #fff; }
 .maa__btn-confirmar--green  { background: #15803d; color: #fff; }
 
 /* Sheet transition */

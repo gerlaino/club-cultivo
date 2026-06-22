@@ -10,13 +10,6 @@
       <p class="apm__sub">Pesá las cosechas asignadas a vos y confirmá los pesajes que envía manicura. Todo termina en stock.</p>
     </div>
 
-    <!-- Lotes del flujo anterior pendientes de aprobación -->
-    <RouterLink v-if="lotesFlujoViejo > 0" to="/aprobaciones" class="apm__legacy-banner">
-      <Clock :size="15" :stroke-width="2" />
-      <span><strong>{{ lotesFlujoViejo }}</strong> lote{{ lotesFlujoViejo === 1 ? '' : 's' }} del flujo anterior esperando aprobación</span>
-      <span class="apm__legacy-cta">Ir a aprobar →</span>
-    </RouterLink>
-
     <div v-if="loading" class="apm__loading">
       <DsSpinner />
     </div>
@@ -239,9 +232,6 @@ function onPesado() { showPesar.value = false; cargar() }
 
 const loading      = ref(true)
 const pesajes      = ref([])
-// Lotes del flujo anterior (manicura_pendiente) que aún esperan aprobación.
-// Cuando este contador llegue a 0 de forma permanente, /aprobaciones puede eliminarse.
-const lotesFlujoViejo = ref(0)
 const modalOpen    = ref(false)
 const pesajeActivo = ref(null)
 const loadingStocks = ref(false)
@@ -277,10 +267,6 @@ async function cargar() {
   } finally {
     loading.value = false
   }
-  try {
-    const { data } = await listLotes({ estado: 'manicura_pendiente' })
-    lotesFlujoViejo.value = (data || []).length
-  } catch { lotesFlujoViejo.value = 0 }
   // Cosechas en manicura asignadas a mí, todavía sin un pesaje enviado.
   try {
     const { data } = await listLotes({ estado: 'en_manicura' })

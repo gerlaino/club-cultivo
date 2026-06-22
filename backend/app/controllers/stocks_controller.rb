@@ -390,6 +390,7 @@ class StocksController < ApplicationController
       forma_producto:          s.forma_producto,
       unidad:                  s.unidad,
       cantidad:                s.cantidad.to_f,
+      cantidad_inicial:        s.cantidad_inicial&.to_f,
       costo_unitario_ars:      s.costo_unitario_ars&.to_f,
       precio_sugerido_ars:     s.precio_sugerido_ars&.to_f,
       proveedor:               s.proveedor,

@@ -239,9 +239,10 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     await plants.fetchByLote(loteId)
   }
 
-  async function onManicuraCompletada(data) {
-    lotes.current = data
-    toast.success(`Lote ${data.codigo} — manicura completada y stock generado`)
+  async function onManicuraCompletada() {
+    // El modal ahora crea un PesajeManicura enviado (no finaliza el lote): el admin lo
+    // confirma desde Manicura y ahí se genera el stock.
+    toast.success('Pesaje enviado a confirmar — el admin lo confirma y genera el stock')
     onPhaseChange?.()
   }
 

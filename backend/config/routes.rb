@@ -118,11 +118,7 @@ Rails.application.routes.draw do
         post  :cerrar_curado
         post  :avanzar_fase
         post  :cosechar_plantas
-        post  :aprobar_manicura
-        post  :rechazar_manicura
         post  :asignar_manicurador
-        post  :completar_manicura
-        post  :finalizar_pesaje_manicura
         patch :completar_datos
         get   :timeline
         get   :preview_plan

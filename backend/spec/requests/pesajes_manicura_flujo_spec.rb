@@ -99,4 +99,42 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(response).to have_http_status(:ok)
     expect(JSON.parse(response.body).first['peso_calculado_g']).to eq(0.0)
   end
+
+  it 'carga manual (sin QR): create con plantas_count + peso_total_g + enviar crea un pesaje enviado' do
+    expect {
+      post "/lotes/#{lote.id}/pesajes_manicura",
+           params: { plantas_count: 3, peso_total_g: 300, enviar: true },
+           headers: auth_headers
+    }.to change(PesajeManicura, :count).by(1)
+    expect(response).to have_http_status(:created)
+    pesaje = PesajeManicura.last
+    expect(pesaje.estado).to eq('enviado')
+    expect(pesaje.peso_total_g.to_f).to eq(300.0)
+    expect(pesaje.plantas_count).to eq(3)
+  end
+
+  it 'el admin confirma un pesaje y genera stock pendiente_asignacion (sin sede)' do
+    pesaje = lote.pesajes_manicura.create!(
+      manicurador: manicura, club: club, fecha_pesaje: Date.current,
+      estado: 'enviado', enviado_at: Time.current, peso_total_g: 200, plantas_count: 1,
+    )
+    delete '/api/users/sign_out'
+    sign_in_as(admin)
+    expect {
+      post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje.id}/confirmar",
+           params: { peso_confirmado_g: 200 }, headers: auth_headers
+    }.to change(Stock, :count).by(1)
+    expect(response).to have_http_status(:ok), "confirm falló: #{response.status} #{response.body}"
+    stock = Stock.last
+    expect(stock.estado).to eq('pendiente_asignacion')
+    expect(stock.sede_id).to be_nil
+    expect(stock.cantidad.to_f).to eq(200.0)
+  end
+
+  it 'transiciones con manicurado=true ya no carga manicura (devuelve 422)' do
+    post "/lotes/#{lote.id}/transiciones",
+         params: { nueva_fase: 'secado', pesada: { peso_seco_g: 100, manicurado: true } },
+         headers: auth_headers
+    expect(response).to have_http_status(:unprocessable_entity)
+  end
 end

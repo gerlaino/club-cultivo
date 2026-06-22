@@ -393,7 +393,7 @@ onUnmounted(() => {
             class="ld__btn-completar-manicura"
             @click="showCompletarManicuraModal = true"
           >
-            <i class="bi bi-check2-circle"></i>Completar manicura
+            <i class="bi bi-check2-circle"></i>Registrar pesaje
           </button>
           <button
             v-if="(canEdit || isCultivador) && lote.puede_transicionar && lote.proxima_fase_posible"

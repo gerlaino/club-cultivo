@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_21_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_22_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1218,6 +1218,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_21_000002) do
     t.date "fecha_vencimiento_est"
     t.string "codigo_qr"
     t.bigint "genetica_id"
+    t.decimal "cantidad_inicial", precision: 10, scale: 2
     t.index ["club_id", "numero_lote_producto"], name: "index_stocks_on_club_id_and_numero_lote_producto", unique: true, where: "(numero_lote_producto IS NOT NULL)"
     t.index ["club_id"], name: "index_stocks_on_club_id"
     t.index ["codigo_qr"], name: "index_stocks_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"

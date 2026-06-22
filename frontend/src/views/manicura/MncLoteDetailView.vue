@@ -126,16 +126,15 @@
         </div>
       </div>
 
-      <!-- Footer: enviar a aprobación (solo flujo per-planta QR) -->
+      <!-- Footer: el cierre del pesaje (QR) se hace en "Mis pesajes" -->
       <div v-if="['en_manicura','secado'].includes(lote.estado) && pesadasKpi > 0" class="mnl__footer">
         <p class="mnl__footer-txt">
           {{ pesadasKpi }}/{{ plantas.length }} plantas · {{ totalGramosKpi }}g total
         </p>
-        <button class="mnl__btn-submit" :disabled="submitting" @click="enviarAprobacion">
-          <DsSpinner v-if="submitting" :size="14" />
-          <Send v-else :size="14" :stroke-width="2" />
-          Enviar para aprobación
-        </button>
+        <RouterLink to="/mnc/pesajes" class="mnl__btn-submit">
+          <Send :size="14" :stroke-width="2" />
+          Cerrar pesaje en Mis pesajes
+        </RouterLink>
       </div>
 
     </template>
@@ -199,10 +198,10 @@
 
 <script setup>
 import { ref, computed, onMounted, onActivated } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { ChevronLeft, Scissors, Leaf, CheckCircle, Scale, Send, X, Lock, RefreshCw } from 'lucide-vue-next'
-import { getLote, listPlants, transicionarLote, finalizarPesajeManicura } from '../../lib/api.js'
+import { getLote, listPlants, createPesajeManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const route  = useRoute()
@@ -214,15 +213,13 @@ const loading = ref(true)
 const lote    = ref(null)
 const plantas = ref([])
 
-const submitting  = ref(false)
 const modalOpen   = ref(false)
 const savingBatch = ref(false)
 const modalError  = ref('')
 const batchForm   = ref({ plantas_manicuradas: null, peso_seco_g: null, notas: '' })
 
-// KPIs — per-plant flow sets plant.peso_seco individually.
-// Batch flow (transicionarLote) creates a lote-level pesada but doesn't touch plant.peso_seco.
-// We prefer plant-level counts; fall back to ultima_pesada_manicura for the batch case.
+// KPIs — el flujo por QR setea plant.peso_seco por planta.
+// La carga manual no toca plant.peso_seco; en ese caso caemos a ultima_pesada_manicura.
 const pesadasKpi = computed(() => {
   const fromPlants = plantas.value.filter(p => parseFloat(p.peso_seco) > 0).length
   if (fromPlants > 0) return fromPlants
@@ -271,40 +268,26 @@ function abrirModal() {
 }
 function cerrarModal() { modalOpen.value = false }
 
+// Carga manual sin QR: crea un PesajeManicura con el total declarado y lo manda a
+// confirmar en un solo paso (mismo modelo que el flujo QR).
 async function submitBatch() {
   if (!batchForm.value.plantas_manicuradas || !batchForm.value.peso_seco_g) return
   savingBatch.value = true
   modalError.value  = ''
   try {
-    await transicionarLote(id, {
-      pesada: {
-        manicurado:          true,
-        peso_seco_g:         batchForm.value.peso_seco_g,
-        plantas_manicuradas: batchForm.value.plantas_manicuradas,
-        notas:               batchForm.value.notas || undefined,
-      },
+    await createPesajeManicura(id, {
+      plantas_count: batchForm.value.plantas_manicuradas,
+      peso_total_g:  batchForm.value.peso_seco_g,
+      notas:         batchForm.value.notas || undefined,
+      enviar:        true,
     })
-    toast.success(`Lote ${lote.value.codigo} enviado para aprobación`)
+    toast.success(`Lote ${lote.value.codigo} — pesaje enviado a confirmar`)
     cerrarModal()
     await cargar()
   } catch (e) {
     modalError.value = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al registrar'
   } finally {
     savingBatch.value = false
-  }
-}
-
-async function enviarAprobacion() {
-  if (pesadasKpi.value === 0 || submitting.value) return
-  submitting.value = true
-  try {
-    await finalizarPesajeManicura(id)
-    toast.success(`Lote ${lote.value.codigo} enviado para aprobación`)
-    await cargar()
-  } catch (e) {
-    toast.error(e.response?.data?.error || e.response?.data?.errors?.[0] || 'Error al enviar')
-  } finally {
-    submitting.value = false
   }
 }
 
