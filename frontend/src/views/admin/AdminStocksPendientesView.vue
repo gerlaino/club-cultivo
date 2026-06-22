@@ -58,7 +58,7 @@
         <div class="stk__kpi">
           <div class="stk__kpi-ico">🏪</div>
           <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ sedesConStock.length }}</div>
+            <div class="stk__kpi-val">{{ sedesConStock }}</div>
             <div class="stk__kpi-lbl">Sedes con stock</div>
           </div>
         </div>
@@ -69,17 +69,17 @@
             <div class="stk__kpi-lbl">Producción propia</div>
           </div>
         </div>
-        <div v-if="stocksVencidos.length" class="stk__kpi stk__kpi--error">
+        <div v-if="stocksVencidos > 0" class="stk__kpi stk__kpi--error">
           <div class="stk__kpi-ico">🚫</div>
           <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ stocksVencidos.length }}</div>
+            <div class="stk__kpi-val">{{ stocksVencidos }}</div>
             <div class="stk__kpi-lbl">Stock vencido</div>
           </div>
         </div>
-        <div v-if="stocksPorVencer.length" class="stk__kpi stk__kpi--warn">
+        <div v-if="stocksPorVencer > 0" class="stk__kpi stk__kpi--warn">
           <div class="stk__kpi-ico">⚠️</div>
           <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ stocksPorVencer.length }}</div>
+            <div class="stk__kpi-val">{{ stocksPorVencer }}</div>
             <div class="stk__kpi-lbl">Por vencer</div>
           </div>
         </div>
@@ -146,59 +146,79 @@
 
       <!-- ── Tab: Inventario ────────────────────────────────────── -->
       <div v-if="tabActiva === 'inventario'">
-        <div v-if="!inventario.length" class="stk__empty">
+
+        <!-- Filtros -->
+        <div class="stk__inv-filtros">
+          <select v-model="invFiltros.forma_producto" class="stk__inv-select">
+            <option value="">Todos los tipos</option>
+            <option v-for="f in FORMAS" :key="f.value" :value="f.value">{{ f.label }}</option>
+          </select>
+          <select v-model="invFiltros.sede_id" class="stk__inv-select">
+            <option value="">Todas las sedes</option>
+            <option value="pool">Sin asignar (pool)</option>
+            <option v-for="s in sedes" :key="s.id" :value="String(s.id)">{{ s.nombre }}</option>
+          </select>
+          <label class="stk__inv-date">Desde<input type="date" v-model="invFiltros.fecha_desde" class="stk__inv-input"></label>
+          <label class="stk__inv-date">Hasta<input type="date" v-model="invFiltros.fecha_hasta" class="stk__inv-input"></label>
+          <button v-if="hayFiltrosInv" class="stk__btn-outline stk__inv-clear" @click="limpiarFiltrosInv">
+            <i class="bi bi-x-lg"></i> Limpiar
+          </button>
+        </div>
+
+        <div v-if="loadingInv" class="stk__loading"><DsSpinner /></div>
+
+        <div v-else-if="!inventario.length" class="stk__empty">
           <span class="stk__empty-ico">📭</span>
-          <p class="stk__empty-title">Sin stock asignado</p>
-          <span class="stk__empty-sub">Asigná stock desde "Por asignar" o agregá stock externo.</span>
+          <p class="stk__empty-title">Sin stock para este filtro</p>
+          <span class="stk__empty-sub">Ajustá los filtros o agregá stock externo.</span>
           <button class="stk__btn-outline stk__empty-cta" @click="openCrear">
             <i class="bi bi-plus-lg"></i> Agregar stock externo
           </button>
         </div>
+
         <template v-else>
-          <div class="stk__filters">
-            <button
-              v-for="f in filtrosForma" :key="f.value"
-              class="stk__chip-btn" :class="{ 'stk__chip-btn--active': filtroForma === f.value }"
-              @click="filtroForma = f.value"
-            >{{ f.label }}</button>
-          </div>
-          <div v-for="grupo in inventarioAgrupado" :key="grupo.sede_nombre" class="stk__grupo">
-            <div class="stk__grupo-hd">
-              <span class="stk__grupo-nombre">🏪 {{ grupo.sede_nombre }}</span>
-              <span class="stk__grupo-total">{{ grupo.total }}g</span>
-            </div>
-            <div class="stk__inv-list">
-              <RouterLink
-                v-for="s in grupo.items" :key="s.id"
-                :to="`/admin/stock/${s.id}`"
-                class="stk__inv-row stk__inv-row--link"
-              >
-                <div class="stk__inv-main">
-                  <span class="stk__inv-forma">{{ formaLabel(s.forma_producto) }}</span>
-                  <div class="stk__inv-chips">
-                    <span v-if="s.numero_lote_producto" class="stk__chip stk__chip--np">{{ s.numero_lote_producto }}</span>
-                    <span v-if="s.lote" class="stk__chip stk__chip--lote">{{ s.lote.codigo }}</span>
-                    <span v-if="s.lote?.genetica" class="stk__chip stk__chip--gen">{{ s.lote.genetica.nombre }}</span>
-                    <span v-else-if="s.genetica" class="stk__chip stk__chip--gen">{{ s.genetica.nombre }}</span>
+          <div class="stk__inv-table-wrap">
+            <table class="stk__inv-table">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Cepa</th>
+                  <th>Lote</th>
+                  <th>Sede</th>
+                  <th>Ingresó</th>
+                  <th class="stk__inv-num">Total cosechado</th>
+                  <th class="stk__inv-num">Actual</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="s in inventario" :key="s.id"
+                  class="stk__inv-trow" :class="{ 'stk__inv-trow--flash': flashIds.has(s.id) }"
+                  @click="router.push(`/admin/stock/${s.id}`)"
+                >
+                  <td class="stk__inv-td-tipo">
+                    {{ formaLabel(s.forma_producto) }}
                     <span v-if="s.origen === 'compra_externa'" class="stk__chip stk__chip--ext">Externo</span>
-                    <span v-if="s.proveedor" class="stk__chip">{{ s.proveedor }}</span>
-                    <span v-if="s.created_at" class="stk__chip stk__chip--muted">Ingresó {{ timeAgo(s.created_at) }}</span>
-                  </div>
-                </div>
-                <div class="stk__inv-right">
-                  <span class="stk__inv-g" :class="{ 'stk__inv-g--flash': flashIds.has(s.id) }">{{ s.cantidad_disponible_real?.toFixed(1) ?? s.cantidad }}g</span>
-                  <span v-if="mostrarInicial(s)" class="stk__inv-inicial">de {{ s.cantidad_inicial?.toFixed(1) }}g</span>
-                  <span v-if="s.gramos_reservados > 0" class="stk__badge-reservado" :title="`${s.gramos_reservados}g en delivery pendiente`">
-                    −{{ s.gramos_reservados?.toFixed(1) }}g
-                  </span>
-                  <span v-if="s.estado_vencimiento && s.estado_vencimiento !== 'ok'" class="stk__badge-venc" :class="`stk__badge-venc--${s.estado_vencimiento}`">
-                    {{ badgeVencLabel(s) }}
-                  </span>
-                  <i class="bi bi-chevron-right stk__inv-arrow"></i>
-                </div>
-              </RouterLink>
-            </div>
+                  </td>
+                  <td class="stk__inv-td-cepa">{{ s.lote?.genetica?.nombre || s.genetica?.nombre || '—' }}</td>
+                  <td class="stk__inv-td-mono">{{ s.lote?.codigo || '—' }}</td>
+                  <td>{{ s.sede?.nombre || 'Sin asignar' }}</td>
+                  <td class="stk__inv-td-fecha">{{ formatDate(s.created_at) }}</td>
+                  <td class="stk__inv-num stk__inv-td-cosechado">
+                    {{ s.cantidad_inicial != null ? s.cantidad_inicial.toFixed(1) + 'g' : '—' }}
+                  </td>
+                  <td class="stk__inv-num stk__inv-td-actual" :class="{ 'stk__inv-td-bajo': (s.cantidad_disponible_real ?? s.cantidad) < umbralValor }">
+                    {{ (s.cantidad_disponible_real ?? s.cantidad).toFixed(1) }}g
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
+
+          <Paginator
+            :page="invPage" :per-page="invPerPage" :total="invTotal"
+            @update:page="onInvPage" @update:per-page="onInvPerPage"
+          />
         </template>
       </div>
 
@@ -661,13 +681,17 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import Paginator from '../../components/ui/Paginator.vue'
 import {
-  listStocksPendientes, listStocks, listStocksHistorial,
+  listStocksPendientes, listStocks, listStocksHistorial, listStockInventario,
   asignarStock, ajustarStock, descartarStock, getStockMovimientos,
   listSedes, createStock, updateStock,
   getPreferences, updatePreferences, listGeneticas,
 } from '../../lib/api.js'
+
+const router = useRouter()
 import { useToast } from '../../composables/useToast.js'
 import { useStockChannel } from '../../composables/useStockChannel.js'
 
@@ -706,7 +730,7 @@ const procesando     = ref(false)
 const tabActiva = ref('por_asignar')
 const TABS = computed(() => [
   { key: 'por_asignar', label: '⏳ Por asignar', count: pendientes.value.length },
-  { key: 'inventario',  label: '📦 Inventario',  count: inventario.value.length },
+  { key: 'inventario',  label: '📦 Inventario',  count: invTotal.value },
   { key: 'historial',   label: '📋 Historial',   count: null },
 ])
 
@@ -758,49 +782,45 @@ async function guardarUmbral() {
   }
 }
 
-// ── KPIs ───────────────────────────────────────────────────────────────────────
-const totalG = computed(() =>
-  parseFloat(inventario.value.reduce((s, x) => s + x.cantidad, 0).toFixed(1))
-)
-const stockPropio = computed(() =>
-  parseFloat(inventario.value
-    .filter(x => x.origen !== 'compra_externa')
-    .reduce((s, x) => s + x.cantidad, 0).toFixed(1))
-)
-const sedesConStock = computed(() =>
-  [...new Set(inventario.value.map(x => x.sede_id).filter(Boolean))]
-)
-const stocksVencidos = computed(() =>
-  inventario.value.filter(x => x.estado_vencimiento === 'vencido')
-)
-const stocksPorVencer = computed(() =>
-  inventario.value.filter(x => ['critico', 'proximo'].includes(x.estado_vencimiento))
-)
+// ── KPIs ── (sobre el set FILTRADO del inventario; vienen del server en `invTotales`)
+const totalG          = computed(() => (invTotales.value.total_g || 0).toFixed(1))
+const stockPropio     = computed(() => (invTotales.value.produccion_propia_g || 0).toFixed(1))
+const sedesConStock   = computed(() => invTotales.value.sedes_con_stock || 0)
+const stocksVencidos  = computed(() => invTotales.value.vencidos || 0)
+const stocksPorVencer = computed(() => invTotales.value.por_vencer || 0)
 
-// ── Inventario ─────────────────────────────────────────────────────────────────
-const filtroForma = ref('todos')
-const filtrosForma = computed(() => {
-  const formas = [...new Set(inventario.value.map(x => x.forma_producto))]
-  return [
-    { value: 'todos', label: 'Todos' },
-    ...formas.map(f => ({ value: f, label: formaLabel(f) })),
-  ]
-})
-const inventarioFiltrado = computed(() =>
-  filtroForma.value === 'todos'
-    ? inventario.value
-    : inventario.value.filter(x => x.forma_producto === filtroForma.value)
-)
-const inventarioAgrupado = computed(() => {
-  const grupos = {}
-  for (const s of inventarioFiltrado.value) {
-    const key = s.sede?.nombre || 'Sin sede'
-    if (!grupos[key]) grupos[key] = { sede_nombre: key, items: [], total: 0 }
-    grupos[key].items.push(s)
-    grupos[key].total = parseFloat((grupos[key].total + s.cantidad).toFixed(1))
-  }
-  return Object.values(grupos).sort((a, b) => b.total - a.total)
-})
+// ── Inventario (tabla paginada + filtros server-side) ────────────────────────────
+const loadingInv  = ref(false)
+const invPage     = ref(1)
+const invPerPage  = ref(25)
+const invTotal    = ref(0)
+const invTotales  = ref({})
+const invFiltros  = ref({ forma_producto: '', sede_id: '', fecha_desde: '', fecha_hasta: '' })
+
+const hayFiltrosInv = computed(() => Object.values(invFiltros.value).some(v => v))
+
+async function cargarInventario() {
+  loadingInv.value = true
+  try {
+    const params = { page: invPage.value, per_page: invPerPage.value }
+    for (const [k, v] of Object.entries(invFiltros.value)) { if (v) params[k] = v }
+    const { data } = await listStockInventario(params)
+    inventario.value = data.stocks  || []
+    invTotal.value   = data.meta?.total || 0
+    invTotales.value = data.totales || {}
+  } catch {
+    toast.error('Error al cargar inventario')
+  } finally { loadingInv.value = false }
+}
+
+function onInvPage(p)    { invPage.value = p;    cargarInventario() }
+function onInvPerPage(n) { invPerPage.value = n; invPage.value = 1; cargarInventario() }
+function limpiarFiltrosInv() {
+  invFiltros.value = { forma_producto: '', sede_id: '', fecha_desde: '', fecha_hasta: '' }
+}
+
+// Cualquier cambio de filtro vuelve a página 1 y recarga.
+watch(invFiltros, () => { invPage.value = 1; cargarInventario() }, { deep: true })
 
 // ── Historial ──────────────────────────────────────────────────────────────────
 const filtroEstado = ref('todos')
@@ -819,15 +839,15 @@ const historialFiltrado = computed(() =>
 // ── Load ───────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
-    const [rPend, rInv, rSedes, rPref] = await Promise.all([
-      listStocksPendientes(), listStocks(), listSedes(), getPreferences(),
+    const [rPend, rSedes, rPref] = await Promise.all([
+      listStocksPendientes(), listSedes(), getPreferences(),
     ])
     pendientes.value = rPend.data || []
-    inventario.value = rInv.data  || []
     sedes.value      = rSedes.data || []
     umbralValor.value = rPref.data?.data?.umbral_stock_g ?? rPref.data?.umbral_stock_g ?? 50
     pendientes.value.forEach(s => { asignaciones.value[s.id] = ''; cantidades.value[s.id] = '' })
     if (!pendientes.value.length) tabActiva.value = 'inventario'
+    await cargarInventario()
     liveConectado.value = true
   } catch { toast.error('Error al cargar stocks') }
   finally { loading.value = false }
@@ -848,8 +868,7 @@ async function asignar(stock) {
     if (cant > 0 && cant < stock.cantidad) payload.cantidad = cant
     await asignarStock(stock.id, payload)
     pendientes.value = pendientes.value.filter(s => s.id !== stock.id)
-    const { data } = await listStocks()
-    inventario.value = data || []
+    await cargarInventario()
     if (historialLoaded.value) {
       const { data: h } = await listStocksHistorial()
       historial.value = h || []
@@ -893,8 +912,7 @@ async function guardarEditar() {
     if (f.proveedor)                   payload.proveedor           = f.proveedor
     await updateStock(editandoStock.value.id, payload)
     showEditarModal.value = false
-    const { data } = await listStocks()
-    inventario.value = data || []
+    await cargarInventario()
     if (historialLoaded.value) {
       const { data: h } = await listStocksHistorial()
       historial.value = h || []
@@ -960,9 +978,9 @@ async function guardarStock() {
     await createStock(p)
     toast.success('Stock externo creado')
     closeCrear()
-    const [rPend, rInv] = await Promise.all([listStocksPendientes(), listStocks()])
+    const [rPend] = await Promise.all([listStocksPendientes()])
     pendientes.value = rPend.data || []
-    inventario.value = rInv.data  || []
+    await cargarInventario()
     if (historialLoaded.value) {
       const { data: h } = await listStocksHistorial()
       historial.value = h || []
@@ -994,9 +1012,9 @@ async function ejecutarRepartir() {
     await asignarStock(s.id, { sede_id: repartirForm.value.sede_id, cantidad: cant })
     toast.success('Stock repartido')
     closeRepartir()
-    const [rPend, rInv] = await Promise.all([listStocksPendientes(), listStocks()])
+    const [rPend] = await Promise.all([listStocksPendientes()])
     pendientes.value = rPend.data || []
-    inventario.value = rInv.data || []
+    await cargarInventario()
     if (historialLoaded.value) {
       const { data: h } = await listStocksHistorial()
       historial.value = h || []
@@ -1064,9 +1082,9 @@ async function ejecutarProcesar() {
     })
     toast.success('Derivado procesado')
     closeProcesar()
-    const [rPend, rInv] = await Promise.all([listStocksPendientes(), listStocks()])
+    const [rPend] = await Promise.all([listStocksPendientes()])
     pendientes.value = rPend.data || []
-    inventario.value = rInv.data || []
+    await cargarInventario()
     if (historialLoaded.value) {
       const { data: h } = await listStocksHistorial()
       historial.value = h || []
@@ -1134,9 +1152,9 @@ async function ejecutarAjustar() {
   try {
     await ajustarStock(ajustarTarget.value.id, { tipo: ajustarForm.value.tipo, gramos, motivo })
     closeAjustar()
-    const [rPend, rInv] = await Promise.all([listStocksPendientes(), listStocks()])
+    const [rPend] = await Promise.all([listStocksPendientes()])
     pendientes.value = rPend.data || []
-    inventario.value = rInv.data || []
+    await cargarInventario()
     if (historialLoaded.value) {
       const { data: h } = await listStocksHistorial()
       historial.value = h || []
@@ -1170,9 +1188,9 @@ async function ejecutarDescartar() {
   try {
     await descartarStock(descartarTarget.value.id, { motivo })
     closeDescartar()
-    const [rPend, rInv] = await Promise.all([listStocksPendientes(), listStocks()])
+    const [rPend] = await Promise.all([listStocksPendientes()])
     pendientes.value = rPend.data || []
-    inventario.value = rInv.data || []
+    await cargarInventario()
     if (historialLoaded.value) {
       const { data: h } = await listStocksHistorial()
       historial.value = h || []
@@ -1216,18 +1234,11 @@ const FORMAS = [
   { value: 'capsula',    label: 'Cápsula' },
   { value: 'comestible', label: 'Comestible' },
   { value: 'prensado',   label: 'Prensado' },
+  { value: 'externo',    label: 'Externo' },
   { value: 'otro',       label: 'Otro' },
 ]
 const FORMA_MAP = Object.fromEntries(FORMAS.map(f => [f.value, f.label]))
 function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
-
-function badgeVencLabel(s) {
-  const dias = s.dias_para_vencimiento
-  if (dias === null || dias === undefined) return ''
-  if (dias < 0)   return `Vencido +${Math.abs(dias)}d`
-  if (dias === 0) return 'Vence hoy'
-  return `Vence ${dias}d`
-}
 
 function estadoLabel(e) {
   return { pendiente_asignacion: 'Por asignar', asignado: 'Asignado', agotado: 'Agotado' }[e] || e
@@ -1240,13 +1251,6 @@ function timeAgo(dateStr) {
 }
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-}
-// Muestra "de Xg" solo si ya se consumió algo del stock (inicial > disponible real).
-function mostrarInicial(s) {
-  const ini = s.cantidad_inicial
-  if (ini == null) return false
-  const disp = s.cantidad_disponible_real ?? s.cantidad ?? 0
-  return ini - disp > 0.05
 }
 </script>
 
@@ -1431,6 +1435,53 @@ function mostrarInicial(s) {
 .stk__inv-right { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
 .stk__inv-arrow { font-size: .7rem; color: #cbd5e1; margin-left: .25rem; }
 .stk__inv-row--link:hover .stk__inv-arrow { color: #1b5e20; }
+
+/* ── Inventario: filtros + tabla paginada ─────────────────────────────────── */
+.stk__inv-filtros {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+  margin-bottom: 1rem;
+}
+.stk__inv-select, .stk__inv-input {
+  border: 1.5px solid #e2e8f0; border-radius: 8px;
+  padding: .45rem .6rem; font-size: .82rem; color: #0f172a;
+  background: #fff; outline: none; transition: border-color .15s;
+}
+.stk__inv-select:focus, .stk__inv-input:focus { border-color: #15803d; }
+.stk__inv-date {
+  display: inline-flex; align-items: center; gap: .35rem;
+  font-size: .72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .03em;
+}
+.stk__inv-clear {
+  display: inline-flex; align-items: center; gap: .3rem;
+  font-size: .78rem; padding: .4rem .7rem;
+}
+
+.stk__inv-table-wrap {
+  border: 1px solid #e2e8f0; border-radius: 12px;
+  overflow: hidden; overflow-x: auto; margin-bottom: 1rem;
+}
+.stk__inv-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.stk__inv-table th {
+  text-align: left; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: #64748b; padding: .6rem .85rem; background: #f8fafc; border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+}
+.stk__inv-table td { padding: .6rem .85rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+.stk__inv-table tbody tr:last-child td { border-bottom: none; }
+.stk__inv-num { text-align: right; }
+.stk__inv-trow { cursor: pointer; transition: background .12s; }
+.stk__inv-trow:hover { background: #f6faf4; }
+.stk__inv-trow--flash { animation: stkRowFlash .6s ease-out; }
+@keyframes stkRowFlash { 0% { background: #dcfce7; } 100% { background: transparent; } }
+.stk__inv-td-tipo { font-weight: 600; color: #0f172a; white-space: nowrap; }
+.stk__inv-td-cepa { font-style: italic; color: #475569; }
+.stk__inv-td-mono { font-family: var(--font-mono, monospace); font-size: .8rem; color: #475569; }
+.stk__inv-td-fecha { white-space: nowrap; color: #64748b; }
+.stk__inv-td-cosechado { color: #64748b; font-weight: 600; white-space: nowrap; }
+.stk__inv-td-actual { font-weight: 800; color: #15803d; white-space: nowrap; }
+.stk__inv-td-bajo { color: #dc2626 !important; }
+@media (max-width: 640px) {
+  .stk__inv-td-mono, .stk__inv-table th:nth-child(3), .stk__inv-table td:nth-child(3) { display: none; }
+}
 .stk__inv-forma { font-size: .88rem; font-weight: 600; color: #0f172a; display: block; margin-bottom: .25rem; }
 .stk__inv-chips { display: flex; flex-wrap: wrap; gap: .25rem; }
 .stk__inv-g     { font-size: .95rem; font-weight: 800; color: #15803d; }

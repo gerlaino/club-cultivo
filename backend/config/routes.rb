@@ -131,6 +131,9 @@ Rails.application.routes.draw do
 
     get '/stocks/qr/:codigo_qr', to: 'stocks#show_by_qr'
     resources :stocks, only: [:index, :show, :create, :update, :destroy] do
+      collection do
+        get :inventario
+      end
       member do
         post :asignar
         get  :trazabilidad

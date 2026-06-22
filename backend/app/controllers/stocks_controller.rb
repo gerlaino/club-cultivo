@@ -1,6 +1,6 @@
 class StocksController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_lectura_stock!,        only: [:index, :show, :movimientos]
+  before_action :require_lectura_stock!,        only: [:index, :inventario, :show, :movimientos]
   before_action :require_auditor_lectura!,      only: [:trazabilidad]
   before_action :require_escritura_stock!,      only: [:create, :update, :asignar, :ajuste, :descartar]
   before_action :require_admin_o_supervisor!,   only: [:show_by_qr, :destroy]
@@ -41,6 +41,43 @@ class StocksController < ApplicationController
     end
 
     render json: stocks.map { |s| serialize_stock(s) }
+  end
+
+  # GET /stocks/inventario — tabla de inventario paginada y filtrable.
+  # Filtros: forma_producto, sede_id ('pool' = stock del club sin sede), fecha_desde,
+  # fecha_hasta (sobre created_at). Devuelve la página + totales sobre el set FILTRADO
+  # (para que los KPIs respeten el filtro).
+  def inventario
+    scope = Stock.where(club_id: current_user.club_id).where('cantidad > 0')
+
+    scope = scope.where(forma_producto: params[:forma_producto]) if params[:forma_producto].present?
+    if params[:sede_id].present?
+      scope = params[:sede_id] == 'pool' ? scope.where(sede_id: nil) : scope.where(sede_id: params[:sede_id])
+    end
+    scope = scope.where('stocks.created_at >= ?', params[:fecha_desde]) if params[:fecha_desde].present?
+    scope = scope.where('stocks.created_at <= ?', "#{params[:fecha_hasta]} 23:59:59") if params[:fecha_hasta].present?
+
+    hoy = Date.today
+    totales = {
+      total_g:             scope.sum(:cantidad).to_f,
+      items:               scope.count,
+      sedes_con_stock:     scope.where.not(sede_id: nil).distinct.count(:sede_id),
+      produccion_propia_g: scope.where(origen: %w[lote derivado_lote]).sum(:cantidad).to_f,
+      vencidos:            scope.where('fecha_vencimiento_est < ?', hoy).count,
+      por_vencer:          scope.where('fecha_vencimiento_est >= ? AND fecha_vencimiento_est <= ?', hoy, hoy + 30).count,
+    }
+
+    page = [params[:page].to_i, 1].max
+    per  = (params[:per_page].presence || 25).to_i.clamp(1, 100)
+    stocks = scope.includes(:lote, :genetica, :sede)
+                  .order(created_at: :desc)
+                  .offset((page - 1) * per).limit(per)
+
+    render json: {
+      stocks:  stocks.map { |s| serialize_stock(s) },
+      meta:    { total: totales[:items], page: page, per_page: per },
+      totales: totales,
+    }
   end
 
   # GET /stocks/:id
