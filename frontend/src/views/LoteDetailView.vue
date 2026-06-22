@@ -282,6 +282,17 @@ const cicloIndex = computed(() => lote.value ? cicloPasos.value.indexOf(lote.val
 // ── Composables ────────────────────────────────────────────
 const editarOpen = ref(false)
 
+// Tras editar el lote (puede cambiar estado/fechas): refrescamos lote, historial,
+// plantas y gráficos — antes solo se refrescaba el lote y quedaban viejos.
+async function onLoteEditado() {
+  await Promise.all([
+    lotes.fetchOne(id),
+    loadEventos(),
+    plants.fetchByLote(id),
+  ])
+  graficosKey.value++
+}
+
 const {
   showTransicionModal, savingTransicion, transicionError, transicionForm, transicionSalaId,
   showAvanzarSalaModal, avanzarSalaId, transicionandoRapido,
@@ -639,7 +650,7 @@ onUnmounted(() => {
       v-model:open="editarOpen"
       :lote="lote"
       :lote-id="id"
-      @saved="lotes.fetchOne(id)"
+      @saved="onLoteEditado"
     />
 
     <!-- ══ Modal Registro del Lote (nuevo) ══ -->

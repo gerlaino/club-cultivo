@@ -36,4 +36,28 @@ RSpec.describe 'PATCH /lotes/:id — corrección de estado e historia', type: :r
     expect(eventos_flor.count).to eq(1)
     expect(eventos_flor.first.registrado_en.to_date).to eq(nueva)
   end
+
+  context 'propagación del estado a las plantas' do
+    let(:lote) { create(:lote, club: club, sala: sala, estado: 'esqueje', start_date: 60.days.ago.to_date) }
+    let!(:p1)  { create(:plant, lote: lote, club: club, state: 'esqueje') }
+    let!(:p2)  { create(:plant, lote: lote, club: club, state: 'esqueje') }
+    let!(:descartada) { create(:plant, lote: lote, club: club, state: 'descartada') }
+
+    it 'al cambiar esqueje → vegetativo pasa las plantas a vegetativo' do
+      patch "/lotes/#{lote.id}", params: { lote: { estado: 'vegetativo' } }, headers: auth_headers, as: :json
+      expect(response).to have_http_status(:ok)
+      expect(p1.reload.state).to eq('vegetativo')
+      expect(p2.reload.state).to eq('vegetativo')
+    end
+
+    it 'no toca plantas descartadas' do
+      patch "/lotes/#{lote.id}", params: { lote: { estado: 'vegetativo' } }, headers: auth_headers, as: :json
+      expect(descartada.reload.state).to eq('descartada')
+    end
+
+    it 'no toca plantas si el estado no cambió' do
+      patch "/lotes/#{lote.id}", params: { lote: { estado: 'esqueje', notes: 'solo nota' } }, headers: auth_headers, as: :json
+      expect(p1.reload.state).to eq('esqueje')
+    end
+  end
 end

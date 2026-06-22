@@ -179,7 +179,11 @@ class LotesController < ApplicationController
       return render json: { error: 'Los lotes finalizados son inmutables. Para correcciones de datos contactá al soporte.' }, status: :forbidden
     end
 
+    estado_anterior = @lote.estado
     if @lote.update(lote_update_params)
+      # Si la edición cambió el estado del lote (corrección manual), propagamos el estado
+      # a las plantas igual que la máquina de estados — para que el listado no quede viejo.
+      sincronizar_estado_plantas!(@lote) if @lote.estado != estado_anterior
       # Corrección de historia: reconciliar las fechas de inicio de cada fase con sus
       # eventos de cambio de estado (fuente de verdad de la analítica de días por fase).
       reconciliar_fechas_fase(@lote, params[:fechas_fase]) if params[:fechas_fase].present?
@@ -191,6 +195,14 @@ class LotesController < ApplicationController
 
   # Ajusta el registrado_en del evento 'cambio_estado' de cada fase (o lo crea si falta),
   # para reflejar las fechas reales de un lote cargado/corregido a mano.
+  # Propaga el estado del lote a sus plantas (mismo criterio que avanzar_fase!/transicionar!):
+  # solo las fases con plant_state definido, sin tocar plantas descartadas o ya cosechadas.
+  def sincronizar_estado_plantas!(lote)
+    plant_state = Lote::FASE_A_PLANT_STATE[lote.estado]
+    return unless plant_state
+    lote.plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state)
+  end
+
   def reconciliar_fechas_fase(lote, fechas)
     %w[vegetativo floracion cosecha].each do |fase|
       valor = fechas[fase].presence

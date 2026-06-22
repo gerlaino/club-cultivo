@@ -182,11 +182,12 @@
               <thead>
                 <tr>
                   <th>Tipo</th>
-                  <th>Cepa</th>
+                  <th>Origen</th>
+                  <th>Genética</th>
                   <th>Lote</th>
                   <th>Sede</th>
                   <th>Ingresó</th>
-                  <th class="stk__inv-num">Total cosechado</th>
+                  <th class="stk__inv-num">Total</th>
                   <th class="stk__inv-num">Actual</th>
                 </tr>
               </thead>
@@ -196,9 +197,11 @@
                   class="stk__inv-trow" :class="{ 'stk__inv-trow--flash': flashIds.has(s.id) }"
                   @click="router.push(`/admin/stock/${s.id}`)"
                 >
-                  <td class="stk__inv-td-tipo">
-                    {{ formaLabel(s.forma_producto) }}
-                    <span v-if="s.origen === 'compra_externa'" class="stk__chip stk__chip--ext">Externo</span>
+                  <td class="stk__inv-td-tipo">{{ formaLabel(s.forma_producto) }}</td>
+                  <td>
+                    <span class="stk__chip" :class="s.regulatorio ? 'stk__chip--propio' : 'stk__chip--ext'">
+                      {{ s.regulatorio ? 'Propio' : 'Externo' }}
+                    </span>
                   </td>
                   <td class="stk__inv-td-cepa">{{ s.lote?.genetica?.nombre || s.genetica?.nombre || '—' }}</td>
                   <td class="stk__inv-td-mono">{{ s.lote?.codigo || '—' }}</td>
@@ -1379,6 +1382,7 @@ function formatDate(dateStr) {
 .stk__chip--lote { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 .stk__chip--gen  { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
 .stk__chip--ext  { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.stk__chip--propio { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
 .stk__chip--muted { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
 .stk__chip--np { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; font-family: var(--font-mono, monospace); }
 .stk__inv-inicial { display: block; font-size: .68rem; color: #94a3b8; font-weight: 500; text-align: right; }
@@ -1480,7 +1484,7 @@ function formatDate(dateStr) {
 .stk__inv-td-actual { font-weight: 800; color: #15803d; white-space: nowrap; }
 .stk__inv-td-bajo { color: #dc2626 !important; }
 @media (max-width: 640px) {
-  .stk__inv-td-mono, .stk__inv-table th:nth-child(3), .stk__inv-table td:nth-child(3) { display: none; }
+  .stk__inv-td-mono, .stk__inv-table th:nth-child(4) { display: none; }
 }
 .stk__inv-forma { font-size: .88rem; font-weight: 600; color: #0f172a; display: block; margin-bottom: .25rem; }
 .stk__inv-chips { display: flex; flex-wrap: wrap; gap: .25rem; }

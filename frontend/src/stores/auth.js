@@ -74,12 +74,18 @@ export const useAuthStore = defineStore("auth", {
           delivery:    '/delivery',
         }
         const roleHome = ROLE_HOME[this.user?.role]
-        if (roleHome) {
-          router.push({ path: roleHome });
-        } else {
+        // Los roles "normales" (admin, dispensador, etc.) necesitan el club cargado.
+        if (!roleHome) {
           const club = useClubStore();
           await club.fetch();
-          router.push(redirect ? String(redirect) : { name: "dashboard" });
+        }
+        // Si veníamos de un deep-link / QR (?redirect=…), volvemos ahí sin importar el rol.
+        // Si el rol no tiene permiso para ese destino, el router.beforeEach lo reencauza
+        // a su home — así nunca perdemos a dónde quería ir el usuario.
+        if (redirect) {
+          router.push(String(redirect));
+        } else {
+          router.push(roleHome ? { path: roleHome } : { name: "dashboard" });
         }
       } catch (e) {
         if (e?.response?.status === 401) {

@@ -35,8 +35,16 @@ api.interceptors.response.use(
         auth.user = null;
         auth.bootstrapped = true;
       } catch {}
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login';
+
+      // El 401 del bootstrap (/me) NO fuerza redirect acá: el router.beforeEach ya manda
+      // a /login preservando la ruta de origen (?redirect=…) — así un QR escaneado sin
+      // sesión vuelve a su página tras loguearse. Para otros 401 (sesión vencida mientras
+      // usabas una página protegida) mandamos a login conservando a dónde volver.
+      const esBootstrap = url.replace(/\?.*$/, '').endsWith('/me');
+      const path = window.location.pathname;
+      if (!esBootstrap && !path.startsWith('/login')) {
+        const retorno = encodeURIComponent(path + window.location.search);
+        window.location.href = `/login?redirect=${retorno}`;
       }
     }
 
