@@ -79,6 +79,16 @@ export const useLotesStore = defineStore("lotes", {
       try {
         const { data } = await getLote(id);
         this.current = data;
+        // Mantener la lista en sync: si el lote ya está en items / itemsBySala, lo
+        // reemplazamos para que /lotes (y la sala) no queden con el estado viejo tras editar.
+        if (this.items.some(l => l.id === data.id)) {
+          this.items = this.items.map(l => (l.id === data.id ? data : l));
+        }
+        for (const [k, arr] of this.itemsBySala) {
+          if (arr.some(l => l.id === data.id)) {
+            this.itemsBySala.set(k, arr.map(l => (l.id === data.id ? data : l)));
+          }
+        }
         return data;
       } catch (e) {
         logger.error("Lotes.fetchOne", e);
