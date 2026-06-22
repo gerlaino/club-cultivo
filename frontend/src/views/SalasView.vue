@@ -394,10 +394,10 @@ async function confirmDelete(s) {
               <i class="bi bi-person"></i> {{ s.created_by_name }}
             </span>
             <div v-if="canEdit" class="slv__card-actions" @click.prevent>
-              <button class="slv__icon-btn" title="Editar" @click.stop="startEdit(s)">
+              <button class="slv__icon-btn" title="Editar" @click.stop.prevent="startEdit(s)">
                 <i class="bi bi-pencil"></i>
               </button>
-              <button class="slv__icon-btn slv__icon-btn--danger" title="Eliminar" @click.stop="confirmDelete(s)" :disabled="salas.removing">
+              <button class="slv__icon-btn slv__icon-btn--danger" title="Eliminar" @click.stop.prevent="confirmDelete(s)" :disabled="salas.removing">
                 <i class="bi bi-trash3"></i>
               </button>
             </div>

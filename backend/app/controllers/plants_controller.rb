@@ -297,11 +297,12 @@ class PlantsController < ApplicationController
         genetica_id:     plant.lote.genetica_id,
         manicurador_id:  plant.lote.manicurador_id,
         plants_count:    plant.lote.plants_count,
-        sala: {
+        # Los lotes finalizados quedan sin sala (sala_id: nil) — nil-safe para no romper.
+        sala: plant.lote.sala ? {
           id:     plant.lote.sala.id,
           nombre: plant.lote.sala.nombre,
-          sede:   { id: plant.lote.sala.sede_id, nombre: plant.lote.sala.sede.nombre },
-        },
+          sede:   plant.lote.sala.sede ? { id: plant.lote.sala.sede_id, nombre: plant.lote.sala.sede.nombre } : nil,
+        } : nil,
       },
       genetica: g ? { id: g.id, nombre: g.nombre, tipo: g.tipo, thc: g.thc, cbd: g.cbd } : nil,
       fecha_germinacion:      plant.fecha_germinacion,

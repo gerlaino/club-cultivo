@@ -119,12 +119,13 @@ class ReservasController < ApplicationController
       dispensacion.delivery_id = params[:delivery_id]
       usar_domicilio = ActiveModel::Type::Boolean.new.cast(params[:usar_domicilio_paciente])
       if usar_domicilio || params[:envio_calle].blank?
-        dispensacion.envio_calle  = paciente.domicilio_calle
-        dispensacion.envio_altura = paciente.domicilio_altura
-        dispensacion.envio_piso   = paciente.domicilio_piso
-        dispensacion.envio_depto  = paciente.domicilio_depto
-        dispensacion.envio_barrio = paciente.domicilio_barrio
-        dispensacion.envio_ciudad = paciente.domicilio_ciudad
+        dir = paciente.direccion_entrega
+        dispensacion.envio_calle  = dir[:calle]
+        dispensacion.envio_altura = dir[:altura]
+        dispensacion.envio_piso   = dir[:piso]
+        dispensacion.envio_depto  = dir[:depto]
+        dispensacion.envio_barrio = dir[:barrio]
+        dispensacion.envio_ciudad = dir[:ciudad]
       else
         dispensacion.envio_calle  = params[:envio_calle]
         dispensacion.envio_altura = params[:envio_altura]

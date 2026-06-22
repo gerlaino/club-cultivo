@@ -29,6 +29,12 @@ const form = ref({
   domicilio_depto:      '',
   domicilio_barrio:     '',
   domicilio_ciudad:     '',
+  envio_calle:          '',
+  envio_altura:         '',
+  envio_piso:           '',
+  envio_depto:          '',
+  envio_barrio:         '',
+  envio_ciudad:         '',
   reprocann_numero:     '',
   reprocann_vencimiento:'',
   reprocann_estado:     'sin_registro',
@@ -64,6 +70,7 @@ function validate() {
   if (!form.value.fecha_nacimiento) e.fecha_nacimiento = 'Requerida'
   if (form.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email))
     e.email = 'Email inválido'
+  if (!form.value.domicilio_calle.trim()) e.domicilio_calle = 'Requerida'
   formErrors.value = e
   return !Object.keys(e).length
 }
@@ -170,15 +177,16 @@ async function handleSubmit() {
             <i class="bi bi-geo-alt"></i>
           </div>
           <div>
-            <div class="snv__section-title">Domicilio</div>
-            <div class="snv__section-sub">Se reutiliza como dirección de entrega por defecto</div>
+            <div class="snv__section-title">Domicilio del paciente</div>
+            <div class="snv__section-sub">Dirección del paciente · se usa como entrega por defecto</div>
           </div>
         </div>
 
         <div class="snv__grid snv__grid--2">
           <div class="snv__field">
-            <label class="snv__label">Calle</label>
-            <input v-model.trim="form.domicilio_calle" class="snv__input" placeholder="Ej: Av. Corrientes" />
+            <label class="snv__label">Calle <span class="snv__req">*</span></label>
+            <input v-model.trim="form.domicilio_calle" class="snv__input" :class="{ 'snv__input--err': formErrors.domicilio_calle }" placeholder="Ej: Av. Corrientes" />
+            <span v-if="formErrors.domicilio_calle" class="snv__err">{{ formErrors.domicilio_calle }}</span>
           </div>
           <div class="snv__field">
             <label class="snv__label">Altura</label>
@@ -201,6 +209,37 @@ async function handleSubmit() {
             <input v-model.trim="form.domicilio_ciudad" class="snv__input" placeholder="Ej: CABA" />
           </div>
         </div>
+
+        <!-- Dirección de entrega (opcional, si es distinta del domicilio) -->
+        <details class="snv__envio">
+          <summary class="snv__envio-sum">Dirección de entrega distinta <span class="snv__opt">opcional</span></summary>
+          <div class="snv__grid snv__grid--2" style="margin-top:.75rem">
+            <div class="snv__field">
+              <label class="snv__label">Calle</label>
+              <input v-model.trim="form.envio_calle" class="snv__input" placeholder="Calle de entrega" />
+            </div>
+            <div class="snv__field">
+              <label class="snv__label">Altura</label>
+              <input v-model.trim="form.envio_altura" class="snv__input" placeholder="Altura" />
+            </div>
+            <div class="snv__field">
+              <label class="snv__label">Piso</label>
+              <input v-model.trim="form.envio_piso" class="snv__input" placeholder="Piso" />
+            </div>
+            <div class="snv__field">
+              <label class="snv__label">Depto</label>
+              <input v-model.trim="form.envio_depto" class="snv__input" placeholder="Depto" />
+            </div>
+            <div class="snv__field">
+              <label class="snv__label">Barrio</label>
+              <input v-model.trim="form.envio_barrio" class="snv__input" placeholder="Barrio" />
+            </div>
+            <div class="snv__field">
+              <label class="snv__label">Ciudad</label>
+              <input v-model.trim="form.envio_ciudad" class="snv__input" placeholder="Ciudad" />
+            </div>
+          </div>
+        </details>
       </div>
 
       <!-- ── REPROCANN ── -->
@@ -378,6 +417,11 @@ async function handleSubmit() {
 .snv__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
 .snv__req   { color: #dc2626; }
 .snv__err   { font-size: .72rem; color: #dc2626; font-weight: 600; }
+.snv__opt   { font-size: .72rem; font-weight: 500; color: #94a3b8; }
+.snv__envio { margin-top: 1rem; border-top: 1px dashed #e2e8f0; padding-top: .75rem; }
+.snv__envio-sum { cursor: pointer; font-size: .85rem; font-weight: 700; color: #b45309; list-style: none; display: flex; align-items: center; gap: .4rem; }
+.snv__envio-sum::before { content: '＋'; font-weight: 800; }
+.snv__envio[open] .snv__envio-sum::before { content: '−'; }
 .snv__hint  { font-size: .7rem; color: #94a3b8; }
 
 .snv__input {

@@ -599,6 +599,12 @@ const routes = [
     component: () => import('../views/EtiquetaStockView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/despachos/:id/etiqueta',
+    name: 'despacho-etiqueta',
+    component: () => import('../views/delivery/EtiquetaDespachoView.vue'),
+    meta: { requiresAuth: true },
+  },
 
   // ── Dispensador routes ──
   {

@@ -6,7 +6,7 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import AplicarPlanModal       from '../components/plan-trabajo/AplicarPlanModal.vue'
 import EditarPlantillaModal   from '../components/plan-trabajo/EditarPlantillaModal.vue'
 import ExportarCalendarioModal from '../components/plan-trabajo/ExportarCalendarioModal.vue'
-import { listPlanTrabajos, deletePlanTrabajo, getPlanTrabajo, exportPlanCSV, listAplicaciones, cancelarAplicacion } from '../lib/api.js'
+import { listPlanTrabajos, deletePlanTrabajo, getPlanTrabajo, exportPlanCSV, listAplicaciones, cancelarAplicacion, publicarPlanTrabajo } from '../lib/api.js'
 
 const toast   = useToast()
 const confirm = useConfirm()
@@ -101,6 +101,17 @@ async function eliminar(plan) {
       : 'Plan eliminado.')
   } catch (e) {
     toast.error(e.response?.data?.error || 'Error al eliminar')
+  }
+}
+
+async function publicar(plan) {
+  try {
+    await publicarPlanTrabajo(plan.id)
+    const idx = plantillas.value.findIndex(p => p.id === plan.id)
+    if (idx !== -1) plantillas.value[idx] = { ...plantillas.value[idx], estado: 'publicado' }
+    toast.success('Plan publicado — ya podés aplicarlo a un lote.')
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'Error al publicar')
   }
 }
 
@@ -250,6 +261,16 @@ onMounted(() => {
               </div>
             </div>
 
+            <!-- Publicar (solo borradores: un plan en borrador no se puede aplicar) -->
+            <button
+              v-if="plan.estado === 'borrador'"
+              class="ptv__btn-publicar"
+              @click="publicar(plan)"
+              title="Publicar — necesario para poder aplicarlo a un lote"
+            >
+              <i class="bi bi-send-check"></i> Publicar
+            </button>
+
             <!-- Editar -->
             <button class="ptv__btn-ghost" @click="abrirEditar(plan)" title="Editar">
               <i class="bi bi-pencil"></i>
@@ -364,6 +385,8 @@ onMounted(() => {
 .ptv__btn-ghost:hover { border-color: #94a3b8; color: #1b5e20; }
 .ptv__btn-danger-sm { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #fef2f2; color: #dc2626; border: 1.5px solid #fecaca; border-radius: 7px; font-size: .85rem; cursor: pointer; transition: all .15s; }
 .ptv__btn-danger-sm:hover { background: #fee2e2; }
+.ptv__btn-publicar { display: inline-flex; align-items: center; gap: .35rem; height: 32px; padding: 0 .7rem; background: #dcfce7; color: #15803d; border: 1.5px solid #bbf7d0; border-radius: 7px; font-size: .78rem; font-weight: 700; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.ptv__btn-publicar:hover { background: #bbf7d0; }
 
 /* Loading */
 .ptv__loading { display: flex; justify-content: center; padding: 4rem; }

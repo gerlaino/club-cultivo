@@ -31,9 +31,10 @@
             </div>
             <p v-if="loadingPlanes" class="apm__hint">Cargando planes…</p>
             <p v-else-if="planes.length === 0" class="apm__hint apm__hint--warn">
-              Sin plantillas creadas. Andá a
+              Sin planes <strong>publicados</strong>. Solo se pueden aplicar planes publicados —
+              si el tuyo quedó en borrador, andá a
               <a href="/plan-trabajo" class="apm__link">Planes de trabajo</a>
-              y creá una plantilla con tareas.
+              y publicalo (o creá uno con "Crear y publicar").
             </p>
           </div>
 
@@ -148,7 +149,8 @@ const TIPO_LABELS = {
 onMounted(async () => {
   loadingPlanes.value = true
   try {
-    const { data } = await listPlanTrabajos({ plantilla: 'true', per_page: 50 })
+    // Solo planes PUBLICADOS: aplicar un borrador da 404 (el backend exige .publicados).
+    const { data } = await listPlanTrabajos({ plantilla: 'true', estado: 'publicado', per_page: 50 })
     planes.value = Array.isArray(data) ? data : (data.planes ?? data.data ?? [])
   } catch {
     error.value = 'No se pudieron cargar los planes.'

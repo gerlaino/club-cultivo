@@ -1,12 +1,6 @@
 import { onMounted, onUnmounted } from 'vue'
 import { createConsumer } from '@rails/actioncable'
-
-function cableUrl() {
-  const base = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
-  const root = base.replace(/\/api$/, '')
-  const ws   = root.replace(/^http/, 'ws')
-  return `${ws}/cable` // httpOnly cookie se envía automáticamente en el upgrade WS
-}
+import { cableUrl } from '../lib/cable.js'
 
 let consumer      = null
 let instanceCount = 0

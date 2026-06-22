@@ -1,11 +1,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   PackageCheck, Truck, CheckCircle2, XCircle, User, MapPin,
   Phone, FileText, RefreshCw, ChevronDown, ChevronUp, AlertCircle,
-  CalendarClock, ArrowRight, BookmarkCheck
+  CalendarClock, ArrowRight, BookmarkCheck, QrCode
 } from 'lucide-vue-next'
 import {
   listDespachos, listEntregadores, reasignarDelivery, reprogramarPaquete,
@@ -255,7 +256,21 @@ async function reprogramar(id) {
   finally { reprogramando.value = false }
 }
 
-onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
+const route = useRoute()
+onMounted(async () => {
+  await Promise.all([load(), loadDeliveryUsers(), loadReservas()])
+  // Si venís desde el QR de una etiqueta (?paquete=CODIGO), abrir/enfocar ese despacho.
+  const code = route.query.paquete
+  if (code) {
+    const match = despachos.value.find(d => d.codigo_paquete === code || String(d.id) === String(code))
+    if (match) {
+      expandedId.value = match.id
+      requestAnimationFrame(() => {
+        document.getElementById(`despacho-${match.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+    }
+  }
+})
 </script>
 
 <template>
@@ -365,14 +380,16 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
           {{ entregadorLabel(u) }}
         </option>
       </select>
-      <label class="dsp__date-field">
-        <span class="dsp__date-label">Dispensadas desde</span>
-        <AppDatePicker v-model="filtroDesde" @update:model-value="load" />
-      </label>
-      <label class="dsp__date-field">
-        <span class="dsp__date-label">hasta</span>
-        <AppDatePicker v-model="filtroHasta" @update:model-value="load" />
-      </label>
+      <div class="dsp__date-range">
+        <label class="dsp__date-field">
+          <span class="dsp__date-label">Dispensadas desde</span>
+          <AppDatePicker v-model="filtroDesde" @update:model-value="load" />
+        </label>
+        <label class="dsp__date-field">
+          <span class="dsp__date-label">Hasta</span>
+          <AppDatePicker v-model="filtroHasta" @update:model-value="load" />
+        </label>
+      </div>
       <button
         v-if="filtroEstado || filtroDelivery || filtroDesde || filtroHasta || filtroBusca"
         class="dsp__btn-clear"
@@ -399,6 +416,7 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
       <div
         v-for="d in despachosFiltered"
         :key="d.id"
+        :id="`despacho-${d.id}`"
         class="dsp__row"
         :class="`dsp__row--${d.estado_envio}`"
       >
@@ -542,6 +560,14 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
                 <Truck :size="14" :stroke-width="2" />
                 Repartidor: <strong>{{ d.delivery_nombre || deliveryNombre(d) || 'Sin asignar' }}</strong>
               </span>
+              <RouterLink
+                class="dsp__btn-outline"
+                :to="{ name: 'despacho-etiqueta', params: { id: d.id } }"
+                target="_blank"
+                @click.stop
+              >
+                <QrCode :size="13" :stroke-width="2" /> Etiqueta
+              </RouterLink>
               <button
                 v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)"
                 class="dsp__btn-confirm"
@@ -709,7 +735,7 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
 }
 .dsp__kpi {
   background: var(--c-paper);
-  border: 1.5px solid var(--c-ink-100);
+  border: 1.5px solid var(--c-ink-300);
   border-radius: var(--r-lg);
   padding: var(--sp-4) var(--sp-3);
   display: flex;
@@ -751,13 +777,14 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
   margin-bottom: var(--sp-5);
   align-items: flex-end;
 }
-.dsp__date-field { display: flex; flex-direction: column; gap: 2px; }
-.dsp__date-label { font-size: 11px; font-weight: 600; color: var(--c-text-soft, #64748b); text-transform: uppercase; letter-spacing: .03em; }
+.dsp__date-range { display: flex; gap: var(--sp-2); align-items: flex-end; }
+.dsp__date-field { display: flex; flex-direction: column; gap: 3px; }
+.dsp__date-label { font-size: 11px; font-weight: 600; color: var(--c-text-soft, #64748b); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; height: 13px; line-height: 13px; }
 .dsp__search {
   flex: 1;
   min-width: 220px;
   background: var(--c-paper);
-  border: 1.5px solid var(--c-ink-200);
+  border: 1.5px solid var(--c-ink-300);
   border-radius: var(--r-md);
   padding: .45rem .8rem;
   font-size: var(--fs-13);
@@ -767,7 +794,7 @@ onMounted(() => Promise.all([load(), loadDeliveryUsers(), loadReservas()]))
 .dsp__select,
 .dsp__input-date {
   background: var(--c-paper);
-  border: 1.5px solid var(--c-ink-200);
+  border: 1.5px solid var(--c-ink-300);
   border-radius: var(--r-md);
   padding: .42rem .7rem;
   font-size: var(--fs-13);

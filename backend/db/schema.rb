@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_22_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_22_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -769,6 +769,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_22_000002) do
     t.string "domicilio_depto"
     t.string "domicilio_barrio"
     t.string "domicilio_ciudad"
+    t.string "envio_calle"
+    t.string "envio_altura"
+    t.string "envio_piso"
+    t.string "envio_depto"
+    t.string "envio_barrio"
+    t.string "envio_ciudad"
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["carnet_token"], name: "index_pacientes_on_carnet_token", unique: true

@@ -1,5 +1,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { createConsumer } from '@rails/actioncable'
+import { cableUrl } from '../lib/cable.js'
 import { getAlertasInternas, marcarAlertaInterna, marcarTodasAlertasLeidas } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 
@@ -14,13 +15,6 @@ const count    = computed(() => noLeidas.value.length)
 let instanceCount = 0
 let intervalId    = null
 let consumer      = null
-
-function cableUrl() {
-  const base = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
-  const root = base.replace(/\/api$/, '')
-  const ws   = root.replace(/^http/, 'ws')
-  return `${ws}/cable` // httpOnly cookie se envía automáticamente en el upgrade WS
-}
 
 async function refresh() {
   if (document.hidden) return

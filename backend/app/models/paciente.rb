@@ -43,6 +43,16 @@ class Paciente < ApplicationRecord
     "#{nombre} #{apellido}"
   end
 
+  # Dirección de entrega efectiva: la de envío si el paciente la cargó (envio_calle),
+  # si no, su domicilio. Se usa como snapshot al dispensar/reservar con envío.
+  def direccion_entrega
+    if envio_calle.present?
+      { calle: envio_calle, altura: envio_altura, piso: envio_piso, depto: envio_depto, barrio: envio_barrio, ciudad: envio_ciudad }
+    else
+      { calle: domicilio_calle, altura: domicilio_altura, piso: domicilio_piso, depto: domicilio_depto, barrio: domicilio_barrio, ciudad: domicilio_ciudad }
+    end
+  end
+
   # Estado REPROCANN cruzado con la fecha: el campo manual puede quedar en
   # "activo" después de vencer — para mostrar, la fecha manda sobre el campo.
   # Estado a mostrar, cruzado con la fecha:

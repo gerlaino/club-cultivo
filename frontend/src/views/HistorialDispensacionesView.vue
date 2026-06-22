@@ -4,7 +4,7 @@ import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, deleteDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink } from 'vue-router'
-import { Download, RefreshCw, Truck, Search, Plus, X, Filter, Pencil, Trash2, QrCode } from 'lucide-vue-next'
+import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode } from 'lucide-vue-next'
 import { useEtiquetaDispensa } from '../composables/useEtiquetaDispensa.js'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
 import ModalEditarDispensacion from '../components/pacientes/ModalEditarDispensacion.vue'
@@ -475,8 +475,8 @@ const FORMAS = [
               </td>
               <td class="hd__td-user">{{ d.usuario?.nombre ?? '—' }}</td>
               <td class="hd__td-envio">
-                <span v-if="d.con_envio" class="hd__envio-badge" :title="d.estado_envio">
-                  <Truck :size="12" :stroke-width="2" />
+                <span v-if="d.con_envio" class="hd__envio-badge" :title="d.estado_envio || 'Con envío'">
+                  <i class="bi bi-scooter"></i>
                 </span>
               </td>
               <td class="hd__td-actions">
@@ -790,11 +790,13 @@ const FORMAS = [
 .hd__envio-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   background: #dbeafe;
   color: #1d4ed8;
-  padding: 2px 6px;
+  padding: 3px 7px;
   border-radius: var(--r-pill);
-  font-size: 11px;
+  font-size: 14px;
+  line-height: 1;
   gap: 3px;
 }
 

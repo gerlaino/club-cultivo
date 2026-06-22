@@ -71,16 +71,29 @@
               </div>
               <div class="sem__field sem__field--full">
                 <label class="sem__label" style="margin-bottom:.4rem">
-                  Domicilio <span class="sem__opt">para entregas a domicilio — opcional</span>
+                  Domicilio del paciente <span class="sem__opt">dirección del paciente · entrega por defecto</span>
                 </label>
                 <div class="sem__domicilio-grid">
-                  <input v-model.trim="editForm.domicilio_calle"  class="sem__input" type="text" placeholder="Calle" style="grid-column: span 2" />
+                  <input v-model.trim="editForm.domicilio_calle"  class="sem__input" type="text" placeholder="Calle *" style="grid-column: span 2" />
                   <input v-model.trim="editForm.domicilio_altura" class="sem__input" type="text" placeholder="Altura" />
                   <input v-model.trim="editForm.domicilio_piso"   class="sem__input" type="text" placeholder="Piso" />
                   <input v-model.trim="editForm.domicilio_depto"  class="sem__input" type="text" placeholder="Depto" />
                   <input v-model.trim="editForm.domicilio_barrio" class="sem__input" type="text" placeholder="Barrio" />
                   <input v-model.trim="editForm.domicilio_ciudad" class="sem__input" type="text" placeholder="Ciudad" style="grid-column: span 2" />
                 </div>
+              </div>
+              <div class="sem__field sem__field--full">
+                <details>
+                  <summary class="sem__envio-sum">Dirección de entrega distinta <span class="sem__opt">opcional</span></summary>
+                  <div class="sem__domicilio-grid" style="margin-top:.5rem">
+                    <input v-model.trim="editForm.envio_calle"  class="sem__input" type="text" placeholder="Calle" style="grid-column: span 2" />
+                    <input v-model.trim="editForm.envio_altura" class="sem__input" type="text" placeholder="Altura" />
+                    <input v-model.trim="editForm.envio_piso"   class="sem__input" type="text" placeholder="Piso" />
+                    <input v-model.trim="editForm.envio_depto"  class="sem__input" type="text" placeholder="Depto" />
+                    <input v-model.trim="editForm.envio_barrio" class="sem__input" type="text" placeholder="Barrio" />
+                    <input v-model.trim="editForm.envio_ciudad" class="sem__input" type="text" placeholder="Ciudad" style="grid-column: span 2" />
+                  </div>
+                </details>
               </div>
               <div class="sem__field sem__field--full">
                 <label class="sem__label">
@@ -155,6 +168,9 @@ async function doSave() {
 .sem__repro-btn { padding: .4rem .8rem; border-radius: 7px; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .sem__repro-btn:hover { border-color: #94a3b8; }
 .sem__opt { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; margin-left: .35rem; }
+.sem__envio-sum { cursor: pointer; font-size: .78rem; font-weight: 700; color: #b45309; list-style: none; }
+.sem__envio-sum::before { content: '＋ '; font-weight: 800; }
+details[open] .sem__envio-sum::before { content: '− '; }
 .sem__limit-wrap { display: flex; align-items: center; gap: .4rem; }
 .sem__input--limit { max-width: 140px; }
 .sem__limit-unit { font-size: .8rem; font-weight: 600; color: #64748b; white-space: nowrap; }

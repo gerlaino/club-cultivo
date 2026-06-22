@@ -248,4 +248,20 @@ RSpec.describe Paciente, type: :model do
       expect(Paciente.where(id: paciente.id)).not_to be_empty
     end
   end
+
+  describe '#direccion_entrega' do
+    it 'usa el domicilio cuando no hay dirección de envío' do
+      p = build(:paciente, domicilio_calle: 'Corrientes', domicilio_ciudad: 'CABA',
+                           envio_calle: nil)
+      expect(p.direccion_entrega[:calle]).to eq('Corrientes')
+      expect(p.direccion_entrega[:ciudad]).to eq('CABA')
+    end
+
+    it 'prefiere la dirección de envío cuando está cargada' do
+      p = build(:paciente, domicilio_calle: 'Corrientes', domicilio_ciudad: 'CABA',
+                           envio_calle: 'Rivadavia', envio_ciudad: 'Quilmes')
+      expect(p.direccion_entrega[:calle]).to eq('Rivadavia')
+      expect(p.direccion_entrega[:ciudad]).to eq('Quilmes')
+    end
+  end
 end

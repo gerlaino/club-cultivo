@@ -20,7 +20,7 @@ class JwtCookieMiddleware
       # Web SPA: el JWT viaja SOLO en cookie httpOnly (inaccesible desde JS).
       # Exponerlo además en el header lo dejaba al alcance de cualquier XSS.
       # El SPA se sirve same-origin (spa_fallback), así que la cookie siempre llega.
-      Rack::Utils.set_cookie_header!(headers, 'jwt_token', {
+      cookie_opts = {
         value:     jwt,
         path:      '/',
         expires:   Time.now + 12 * 3600,
@@ -30,7 +30,12 @@ class JwtCookieMiddleware
         # así que la cookie es first-party. 'None' era innecesario y lo bloquea el
         # modo incógnito (que filtra cookies third-party). Lax funciona en incógnito.
         same_site: 'Lax',
-      })
+      }
+      # Opcional: compartir la cookie entre subdominios (ej. app. y api. del mismo
+      # dominio). Inerte si COOKIE_DOMAIN no está seteado → comportamiento actual.
+      cookie_opts[:domain] = ENV['COOKIE_DOMAIN'] if ENV['COOKIE_DOMAIN'].present?
+
+      Rack::Utils.set_cookie_header!(headers, 'jwt_token', cookie_opts)
       headers.delete('Authorization')
       headers.delete('authorization')
     end

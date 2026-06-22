@@ -39,14 +39,24 @@ export function useSocioEditar(socioId) {
       domicilio_depto:                s?.domicilio_depto      || '',
       domicilio_barrio:               s?.domicilio_barrio     || '',
       domicilio_ciudad:               s?.domicilio_ciudad     || '',
+      envio_calle:                    s?.envio_calle          || '',
+      envio_altura:                   s?.envio_altura         || '',
+      envio_piso:                     s?.envio_piso           || '',
+      envio_depto:                    s?.envio_depto          || '',
+      envio_barrio:                   s?.envio_barrio         || '',
+      envio_ciudad:                   s?.envio_ciudad         || '',
     }
     editError.value = null
     editOpen.value  = true
   }
 
   async function saveEdit() {
+    editError.value = null
+    if (!editForm.value.domicilio_calle?.trim()) {
+      editError.value = 'La calle del domicilio del paciente es requerida'
+      return
+    }
     editSaving.value = true
-    editError.value  = null
     try {
       await updatePaciente(socioId, editForm.value)
       await store.fetchOne(socioId)

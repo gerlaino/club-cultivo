@@ -19,7 +19,10 @@ class Users::SessionsController < Devise::SessionsController
 
   def destroy
     sign_out(resource_name)
-    response.delete_cookie('jwt_token', { path: '/' })
+    # El delete DEBE usar el mismo domain que el set, si no el navegador no la borra.
+    delete_opts = { path: '/' }
+    delete_opts[:domain] = ENV['COOKIE_DOMAIN'] if ENV['COOKIE_DOMAIN'].present?
+    response.delete_cookie('jwt_token', delete_opts)
     head :no_content
   end
 

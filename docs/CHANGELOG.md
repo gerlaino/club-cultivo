@@ -1,5 +1,37 @@
 # Changelog
 
+## Etiqueta de despacho con QR + dos direcciones del paciente (2026-06-22)
+
+### Etiqueta de despacho (QR descargable/imprimible)
+- Vista nueva `EtiquetaDespachoView` en `/despachos/:id/etiqueta`: logo+nombre del club, código de paquete, paciente, dirección, contacto y un **QR** que lleva (con login) a `/delivery/despachos?paquete=<codigo>`. Descargable (PNG/SVG) + imprimible — espeja `EtiquetaStockView`.
+- `DespachoListView`: botón "Etiqueta" por despacho (abre en pestaña nueva) + auto-foco del despacho cuando se entra con `?paquete=`.
+- Redise UI: bordes de KPIs/inputs más visibles; "Dispensadas desde" y "Hasta" agrupadas en una fila alineada.
+
+### Dos direcciones del paciente
+- Migración `20260622000003`: `envio_*` (calle/altura/piso/depto/barrio/ciudad) en `pacientes` = dirección de entrega opcional.
+- Domicilio del paciente ahora **requerido** (calle) en alta y edición; entrega **opcional** (sección desplegable "Dirección de entrega distinta").
+- `Paciente#direccion_entrega`: usa la de envío si está cargada, si no el domicilio. Al dispensar/reservar con envío, el snapshot sale de ahí (`dispensaciones_controller`, `reservas_controller`).
+
+## Fixes UI varios (2026-06-22)
+
+- **/salas**: editar/eliminar desde las cards (grid) redirigía a dashboard. Los botones estaban dentro del `RouterLink` con `@click.stop` pero sin `.prevent` → el ancla navegaba igual. Ahora `@click.stop.prevent`.
+- **/historial**: las dispensaciones con envío mostraban un badge celeste poco legible (ícono Truck chico). Ahora ícono de moto (`bi-scooter`) más grande y centrado.
+- **Forms de paciente**: el campo de domicilio existía en crear y editar pero con rótulos distintos (en editar parecía "solo entrega"). Unificados: "Domicilio del paciente · se usa también para entregas". Es **un solo** domicilio que sirve de dirección y de entrega por defecto (no hay dos direcciones separadas).
+- Doc nuevo: `docs/DOMINIO-SETUP.md` (pasos para el dominio propio).
+
+## Andamiaje para dominio propio (inerte hasta setear ENV) (2026-06-22)
+
+Preparación para mañana (dominio cultivoespacial.com). Todo inerte: sin las ENV nuevas, el comportamiento es idéntico al actual.
+- **`lib/cable.js`** (frontend): helper único `cableUrl()` que deriva la URL del WebSocket del origen actual cuando `VITE_API_URL` es relativa (`/api`) — así el cable sigue al dominio que sirve la app. Reemplaza las 3 copias en composables.
+- **`jwt_cookie_middleware.rb`** + **`sessions_controller#destroy`**: `COOKIE_DOMAIN` opcional (set y delete usan el mismo domain). Solo necesario si alguna vez se separan front/API en subdominios distintos.
+- **`cors.rb`**: orígenes parametrizados por `FRONTEND_URL` + `EXTRA_CORS_ORIGINS` (lista por comas). Agregar dominio = setear ENV, sin tocar código.
+- Recordatorio: el build ya usa `VITE_API_URL=/api` (relativo) y Rails sirve la SPA same-origin → al apuntar el dominio al mismo web service, todo (login/logout/cable/cookie) sigue al dominio solo.
+
+## Fixes: detalle de planta (500) + aplicar plan (404) (2026-06-22)
+
+- **500 en `GET /plants/:id`**: `serialize_plant_detail` accedía a `plant.lote.sala.id` sin nil-check; los lotes finalizados quedan sin sala (`sala_id: nil`) → reventaba. Ahora es nil-safe (igual que el serializer de lista). Spec `plant_show_sin_sala_spec.rb`.
+- **404 "Plan no encontrado" al aplicar un plan a un lote**: `aplicar_plan`/`preview_plan` exigen `.publicados`, pero el modal listaba plantillas en cualquier estado (incluido borrador). Ahora `LoteAplicarPlanModal` lista solo planes **publicados**, con empty-state que explica que hay que publicarlo. Además `PlanTrabajoView` suma botón **"Publicar"** para borradores (antes solo se podía publicar al crear).
+
 ## Fix: editar estado del lote no refrescaba plantas ni historial (2026-06-22)
 
 Al editar un lote por el modal (cambiar estado esqueje→vegetativo + fecha) el historial no se actualizaba sola (había que refrescar) y el listado de plantas quedaba con el estado viejo.
