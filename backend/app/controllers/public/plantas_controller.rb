@@ -17,6 +17,7 @@ module Public
         lote: {
           id:     plant.lote.id,
           codigo: plant.lote.codigo,
+          estado: plant.lote.estado,
         },
         club_nombre: club.name,
         club_logo:   club.logo.attached? ? url_for(club.logo) : nil,

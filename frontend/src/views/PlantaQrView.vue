@@ -25,6 +25,28 @@
       <div class="qr__footer">No verificado</div>
     </div>
 
+    <!-- Mensaje informativo (planta cosechada / aún no en manicura / etc.) -->
+    <div v-else-if="estado === 'mensaje'" class="qr__card">
+      <div class="qr__header">
+        <div class="qr__header-logo-wrap">
+          <img v-if="clubLogo" :src="clubLogo" :alt="clubNombre" class="qr__header-logo" />
+          <span v-else class="qr__header-emoji">🌿</span>
+        </div>
+        <div>
+          <div class="qr__header-club">{{ clubNombre || 'Cultivo Espacial' }}</div>
+          <div class="qr__header-sub">Trazabilidad de planta</div>
+        </div>
+      </div>
+      <div class="qr__body qr__body--center">
+        <div class="qr__err-ico">{{ mensajeCard.ico }}</div>
+        <div class="qr__err-title">{{ mensajeCard.title }}</div>
+        <div class="qr__err-desc">{{ mensajeCard.desc }}</div>
+        <div v-if="plantaInfo?.nombre" class="qr__code-badge">{{ plantaInfo.nombre }}</div>
+        <button class="qr__btn-secondary" @click="irAlDashboard">Ir al inicio</button>
+      </div>
+      <div class="qr__footer"><span class="qr__footer-dot"></span> {{ clubNombre }}</div>
+    </div>
+
     <!-- Público: info de planta sin login -->
     <div v-else-if="estado === 'publico'" class="qr__card">
       <div class="qr__header">
@@ -61,10 +83,7 @@
       </div>
 
       <div class="qr__login-hint">
-        <button v-if="auth.isAuthenticated && puedeVerFicha" class="qr__login-hint-btn" @click="verFichaCompleta">
-          <i class="bi bi-arrow-right-circle"></i> Ver ficha completa
-        </button>
-        <button v-else-if="!auth.isAuthenticated" class="qr__login-hint-btn" @click="estado = 'login'">
+        <button class="qr__login-hint-btn" @click="estado = 'login'">
           <i class="bi bi-person-badge"></i> Soy del equipo — Iniciar sesión
         </button>
       </div>
@@ -273,7 +292,6 @@ const progresoPorc = computed(() => {
   return Math.min(100, Math.round((progreso.value.pesadas / progreso.value.total) * 100))
 })
 
-const puedeVerFicha = computed(() => usePermissions().can('plantas', 'show'))
 
 const ESTADO_LABELS = {
   semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
@@ -309,38 +327,81 @@ onMounted(async () => {
   }
 })
 
+// Una planta está "cosechada" (fuera del dominio del cultivador) una vez que pasó
+// a cosecha o más adelante (secado, manicura, curado, finalizado).
+const ESTADOS_POST_COSECHA = ['cosecha', 'secado', 'en_manicura', 'curado', 'finalizado']
+const LOTE_EN_MANICURA     = ['en_manicura', 'secado']
+
+const mensajeCard = ref({ ico: '🌿', title: '', desc: '' })
+
+// Decide qué mostrar según el rol del usuario y la fase de la planta/lote.
+// IMPORTANTE: decide solo con la data pública (sin getPlant previo). El código viejo
+// llamaba a getPlant para todos y, en el navegador del celular sin cookie cross-site,
+// el 401 disparaba el interceptor (→ /login) a la vez que el catch redirigía al detalle:
+// dos navegaciones en carrera = pantalla en blanco.
 async function resolverEstado() {
-  // Manicura con lote en manicura/secado → flujo de pesaje por QR (necesita el detalle).
-  // Para el resto mostramos la ficha pública EN EL LUGAR (igual que stock/lote), sin
-  // redirigir: el redirect automático a /plantas/:id rompía en el navegador del celular
-  // (cadena de guards / PWA / cookie cross-site) y dejaba la pantalla en blanco.
-  if (auth.user?.role === 'manicura') {
-    try {
-      const { data } = await getPlant(plantaInfo.value.id)
-      plantaDetalle.value = data
-      if (['en_manicura', 'secado'].includes(data.lote?.estado)) {
-        await cargarProgreso(data)
-        estado.value = 'manicura_pesaje'
-        if (data.peso_seco && data.peso_seco > 0) {
-          pesoAnterior.value = data.peso_seco
-          pesoInput.value    = String(data.peso_seco)
-        }
-        if (data.peso_humedo && data.peso_humedo > 0) {
-          pesoHumedoInput.value = String(data.peso_humedo)
-        }
-        await nextTick()
-        pesoInputRef.value?.focus()
-        return
-      }
-    } catch { /* si falla el detalle, cae a la ficha pública */ }
+  const role       = auth.user?.role
+  const plantState = plantaInfo.value.estado
+  const loteEstado = plantaInfo.value.lote?.estado
+  const cosechada  = ESTADOS_POST_COSECHA.includes(plantState) || ESTADOS_POST_COSECHA.includes(loteEstado)
+
+  // Manicura: pesaje si el lote está en manicura/secado; si no, mensaje según la fase.
+  if (role === 'manicura') {
+    if (LOTE_EN_MANICURA.includes(loteEstado)) {
+      await iniciarPesaje()
+      return
+    }
+    mensajeCard.value = cosechada
+      ? { ico: '✅', title: 'Etapa de manicura completada', desc: 'Esta planta ya pasó la etapa de manicura. No hay pesaje pendiente.' }
+      : { ico: '⏳', title: 'Aún no disponible', desc: 'Esta planta todavía no está en etapa de manicura. Vas a poder pesarla cuando el lote pase a manicura.' }
+    estado.value = 'mensaje'
+    return
   }
-  estado.value = 'publico'
+
+  // Cultivador: detalle solo mientras NO esté cosechada; después es dominio de manicura.
+  if (role === 'cultivador') {
+    if (cosechada) {
+      mensajeCard.value = { ico: '🌾', title: 'Planta cosechada', desc: 'Esta planta ya fue cosechada y pasó a post-cosecha. No tenés permisos para ver su detalle.' }
+      estado.value = 'mensaje'
+      return
+    }
+    return irADetalle()
+  }
+
+  // Admin / supervisor: siempre al detalle.
+  if (role === 'admin' || role === 'supervisor') {
+    return irADetalle()
+  }
+
+  // Otros roles: detalle si tienen permiso de ver plantas; si no, sin permisos.
+  if (usePermissions().can('plantas', 'show')) return irADetalle()
+  estado.value = 'sin_permisos'
 }
 
-function verFichaCompleta() {
-  const { can } = usePermissions()
-  if (!can('plantas', 'show')) return
-  router.push({ name: 'planta-detalle', params: { id: plantaInfo.value.id } })
+function irADetalle() {
+  router.replace({ name: 'planta-detalle', params: { id: plantaInfo.value.id } })
+}
+
+// Carga el detalle completo de la planta para el flujo de pesaje de manicura.
+async function iniciarPesaje() {
+  try {
+    const { data } = await getPlant(plantaInfo.value.id)
+    plantaDetalle.value = data
+    await cargarProgreso(data)
+    estado.value = 'manicura_pesaje'
+    if (data.peso_seco && data.peso_seco > 0) {
+      pesoAnterior.value = data.peso_seco
+      pesoInput.value    = String(data.peso_seco)
+    }
+    if (data.peso_humedo && data.peso_humedo > 0) {
+      pesoHumedoInput.value = String(data.peso_humedo)
+    }
+    await nextTick()
+    pesoInputRef.value?.focus()
+  } catch {
+    mensajeCard.value = { ico: '⚠️', title: 'No se pudo cargar la planta', desc: 'Reintentá en unos segundos. Si el problema persiste, avisá al administrador.' }
+    estado.value = 'mensaje'
+  }
 }
 
 async function cargarProgreso(detalle) {

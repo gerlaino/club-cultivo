@@ -1,17 +1,28 @@
 # Changelog
 
-## Fix: el QR de planta quedaba en blanco al escanear (2026-06-23)
+## QR de planta: comportamiento por rol × estado (2026-06-23)
 
-A diferencia de los QR de stock y lote (que muestran la tarjeta en el lugar), `PlantaQrView`
-**redirigía** a `/plantas/:id` para usuarios logueados. En el navegador del celular esa cadena de
-redirección (guards de rol + remapeo PWA + cookie cross-site front/API) dejaba la **pantalla en
-blanco / cargando**. El endpoint backend (`GET /p/:codigo_qr`) siempre estuvo OK (200 + JSON).
+Al escanear el QR de una planta, el destino ahora depende del rol y de la fase de la planta:
 
-- Ahora `PlantaQrView` **muestra la ficha pública de la planta en el lugar** (nombre, estado, lote),
-  igual que stock/lote — usando el estado `'publico'` que ya existía en el template pero nunca se
-  seteaba. Sin redirección automática.
-- Botón **"Ver ficha completa"** (navegación iniciada por el usuario) para quien tenga permiso.
-- El flujo de **pesaje de manicura por QR** (lote en manicura/secado) queda intacto.
+| Rol | Planta pre-cosecha | Planta cosechada+ | Lote en manicura/secado |
+|---|---|---|---|
+| **admin / supervisor** | → detalle | → detalle | → detalle |
+| **cultivador** | → detalle | tarjeta "Planta cosechada — sin permisos" | tarjeta "sin permisos" |
+| **manicura** | tarjeta "Aún no en manicura" | tarjeta según fase | **→ pesaje por QR** |
+| **otros** | detalle si tiene permiso `plantas:show`; si no, "sin permisos" | | |
+
+**Causa del bug que quedaba en blanco**: `PlantaQrView` llamaba a `getPlant()` (instancia `api`)
+para todos antes de decidir. En el navegador del celular sin cookie cross-site, el 401 disparaba
+el interceptor (→ `/login`) a la vez que el `catch` redirigía al detalle: dos navegaciones en
+carrera = pantalla en blanco. Ahora la decisión se toma **solo con la data pública** (sin llamada
+autenticada previa) y la navegación es una sola.
+
+- Backend: `GET /p/:codigo_qr` ahora incluye `lote.estado` (additivo) para poder decidir sin
+  segunda llamada.
+- `getPlant()` se llama únicamente en el flujo de pesaje de manicura (que ya está dentro de la
+  ventana en_manicura/secado).
+- Nuevos estados de tarjeta: `mensaje` (cosechada/sin permisos/aún no en manicura) reutilizando el
+  estilo existente.
 
 ## Delivery: entrega secuencial por orden de ruta (2026-06-23)
 
