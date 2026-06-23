@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send, Route, Navigation, PenLine, Trash2 } from 'lucide-vue-next'
+import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send, Route, Navigation, PenLine, Trash2, Lock } from 'lucide-vue-next'
 import { getMisPaquetes, iniciarViaje, entregarPaquete, reportarFallo, ordenarRuta } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
@@ -378,11 +378,14 @@ onMounted(load)
       <div v-if="enViaje.length" class="dlv__section">
         <div class="dlv__section-title">En camino</div>
         <div class="dlv__list">
-          <div v-for="p in enViaje" :key="p.id" class="dlv__row dlv__row--enviaje">
+          <div v-for="(p, i) in enViaje" :key="p.id"
+               class="dlv__row dlv__row--enviaje"
+               :class="{ 'dlv__row--siguiente': i === 0, 'dlv__row--bloqueada': i !== 0 }">
             <div class="dlv__row-body">
               <div class="dlv__row-top">
                 <span class="dlv__pkg-code">{{ p.codigo_paquete }}</span>
-                <span class="dlv__badge dlv__badge--enviaje">En camino</span>
+                <span v-if="i === 0" class="dlv__chip-sig">▶ Siguiente</span>
+                <span v-else class="dlv__badge dlv__badge--enviaje">En camino</span>
               </div>
               <div class="dlv__row-nombre">
                 <User :size="12" :stroke-width="2" /> {{ p.paciente?.nombre }}
@@ -406,13 +409,16 @@ onMounted(load)
                   <Navigation :size="13" :stroke-width="2" /> Ir
                 </button>
               </div>
-              <div class="dlv__row-actions-main">
+              <div v-if="i === 0" class="dlv__row-actions-main">
                 <button class="dlv__btn-entregar" @click.stop="abrirEntregar(p)">
                   <CheckCircle2 :size="14" :stroke-width="2" /> Entregado
                 </button>
                 <button class="dlv__btn-fallo" @click.stop="abrirFallo(p)">
                   <XCircle :size="14" :stroke-width="2" /> Problema
                 </button>
+              </div>
+              <div v-else class="dlv__row-locked" title="Cerrá primero las paradas anteriores de la ruta">
+                <Lock :size="13" :stroke-width="2" /> Cerrá primero la parada anterior
               </div>
             </div>
           </div>
@@ -587,6 +593,8 @@ onMounted(load)
 .dlv__row--enviaje:hover { border-color: var(--c-amber-500); box-shadow: var(--sh-2); }
 .dlv__row--selected { border-color: var(--c-leaf-600); background: var(--c-leaf-50); }
 .dlv__row--siguiente { border-color: var(--c-leaf-600, #16a34a); box-shadow: 0 0 0 2px var(--c-leaf-100, #dcfce7); }
+.dlv__row--bloqueada { opacity: .62; }
+.dlv__row-locked { display: inline-flex; align-items: center; gap: .35rem; color: var(--c-text-muted, #94a3b8); font-size: .72rem; font-weight: 600; padding: .35rem .2rem; }
 .dlv__chip-sig { display: inline-flex; align-items: center; gap: .2rem; background: var(--c-leaf-700, #15803d); color: #fff; font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: .2em .55em; border-radius: 999px; }
 .dlv__check { margin-top: 3px; cursor: pointer; flex-shrink: 0; }
 .dlv__row-body { flex: 1; min-width: 0; cursor: pointer; }

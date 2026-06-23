@@ -215,6 +215,9 @@ class DispensacionesController < ApplicationController
     unless %w[pendiente en_viaje].include?(@dispensacion.estado_envio)
       return render json: { error: 'La dispensación no está en un estado válido para entregar' }, status: :unprocessable_entity
     end
+    if (err = error_orden_ruta).present?
+      return render json: { error: err }, status: :unprocessable_entity
+    end
     registrar_evento_envio(@dispensacion, 'entregado', motivo: params[:notas_entrega])
     @dispensacion.update!(
       estado_envio:       'entregado',
@@ -239,6 +242,9 @@ class DispensacionesController < ApplicationController
     end
     motivo = params[:motivo_fallo].presence
     return render json: { error: 'El motivo es requerido' }, status: :unprocessable_entity unless motivo
+    if (err = error_orden_ruta).present?
+      return render json: { error: err }, status: :unprocessable_entity
+    end
     registrar_evento_envio(@dispensacion, 'fallido', motivo: motivo)
     @dispensacion.update!(estado_envio: 'fallido', motivo_fallo: motivo, historial_envio: @dispensacion.historial_envio)
     render json: serialize_dispensacion_delivery(@dispensacion)
@@ -366,6 +372,23 @@ class DispensacionesController < ApplicationController
   end
 
   private
+
+  # La entrega es secuencial: el delivery solo puede cerrar (entregar/fallar) el
+  # despacho que es el siguiente sin resolver de su ruta. El admin queda exento
+  # (puede corregir cualquier despacho fuera de orden). Devuelve un mensaje de
+  # error si NO corresponde tocar este despacho todavía, o nil si está OK.
+  def error_orden_ruta
+    return nil if current_user.admin?
+    return nil if @dispensacion.siguiente_en_ruta?
+
+    sig = Dispensacion.siguiente_de_ruta(@dispensacion)
+    nombre = sig&.paciente && "#{sig.paciente.nombre} #{sig.paciente.apellido}".strip
+    if nombre.present?
+      "Tenés que cerrar primero la parada anterior de la ruta (#{nombre})."
+    else
+      "Tenés que cerrar primero la parada anterior de la ruta."
+    end
+  end
 
   def apply_dispensacion_filters(scope)
     scope = scope.where(paciente_id: params[:paciente_id])          if params[:paciente_id].present?

@@ -1,5 +1,23 @@
 # Changelog
 
+## Delivery: entrega secuencial por orden de ruta (2026-06-23)
+
+El delivery solo puede cerrar (entregar / reportar problema) el despacho que es la **siguiente
+parada en camino** de su ruta. No puede saltear: si la 1ra y 2da siguen abiertas, no puede tocar
+la 3ra. Recién al cerrar una parada (entregada **o** fallida — un problema cuenta como resuelto:
+llegó al lugar y no pudo entregar) se habilita la siguiente.
+
+- **Backend (autoritativo)**: `Dispensacion.siguiente_de_ruta` / `siguiente_en_ruta?` calculan la
+  primera parada `en_viaje` por `orden_entrega` dentro del grupo de ruta (mismo `ruta_entrega_id`,
+  o despachos sueltos del delivery si no hay ruta). `dispensaciones_controller#entregar` y
+  `#reportar_fallo` devuelven **422** si no es la siguiente. El **admin queda exento** (puede
+  corregir fuera de orden).
+- **Frontend**: en "En camino", solo la primera parada (orden de ruta) muestra los botones
+  Entregado/Problema y el chip "▶ Siguiente"; las demás quedan atenuadas con candado
+  ("Cerrá primero la parada anterior").
+- Specs: saltear → 422; cerrar en orden habilita la siguiente; fallido habilita la siguiente;
+  admin puede saltear. (7 ejemplos verdes.)
+
 ## Fix: el delivery (en PWA) veía la vista admin de despachos (2026-06-23)
 
 `MOBILE_HOME.delivery` apuntaba a `/m/delivery/despachos`, que renderizaba `DespachoListView`

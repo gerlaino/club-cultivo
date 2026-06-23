@@ -69,6 +69,31 @@ class Dispensacion < ApplicationRecord
   scope :pendientes_envio, ->                   { con_envio.where(estado_envio: 'pendiente') }
   scope :en_viaje,       ->                     { con_envio.where(estado_envio: 'en_viaje') }
 
+  # Despachos que comparten "ruta" con este, para evaluar el orden de entrega.
+  # Si el despacho tiene ruta_id, el grupo es esa ruta; si no (nunca se reordenó),
+  # el grupo son los despachos sueltos (ruta_id NULL) del mismo delivery.
+  scope :del_grupo_ruta, ->(d) {
+    base = del_delivery(d.delivery_id)
+    d.ruta_entrega_id.present? ? base.where(ruta_entrega_id: d.ruta_entrega_id) : base.where(ruta_entrega_id: nil)
+  }
+
+  # El primer despacho EN CAMINO del grupo, según el orden de la ruta. Es el único
+  # que el delivery puede cerrar (entregar/fallar): mientras esté arriba en la ruta
+  # otro despacho en camino sin resolver, no se puede saltear. Los pendientes que
+  # todavía no arrancaron el viaje no cuentan (no están en esta vuelta).
+  def self.siguiente_de_ruta(d)
+    del_grupo_ruta(d)
+      .where(estado_envio: 'en_viaje')
+      .order(Arel.sql('orden_entrega NULLS LAST, created_at ASC'))
+      .first
+  end
+
+  # ¿Este despacho es el siguiente que toca cerrar en su ruta?
+  def siguiente_en_ruta?
+    sig = self.class.siguiente_de_ruta(self)
+    sig.nil? || sig.id == id
+  end
+
   after_create        :decrementar_stock
   after_create_commit :encolar_reporte_ariccame
   after_create_commit :dispatch_webhook
