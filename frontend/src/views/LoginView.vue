@@ -408,15 +408,16 @@ async function onSubmit() {
 .lv__rocket:hover { animation: lv-rocket-launch .9s ease-in forwards; }
 
 @keyframes lv-rocket {
-  0%   { transform: translateY(0) rotate(0); }
-  24%  { transform: translateY(-5px) rotate(0); }     /* flota */
-  48%  { transform: translateY(0) rotate(0); }
-  56%  { transform: translateY(2px) rotate(-4deg); }  /* rumble: enciende motores */
-  60%  { transform: translateY(2px) rotate(4deg); }
-  64%  { transform: translateY(1px) rotate(-3deg); }
-  68%  { transform: translateY(1px) rotate(3deg); }
-  84%  { transform: translateY(-52px) rotate(12deg); opacity: 0; } /* despega */
-  85%  { transform: translateY(30px) rotate(0); opacity: 0; }      /* vuelve a la plataforma */
+  0%   { transform: translateY(0) rotate(0); opacity: 1; }
+  6%   { transform: translateY(2px) rotate(-4deg); }   /* rumble: enciende motores */
+  10%  { transform: translateY(2px) rotate(4deg); }
+  14%  { transform: translateY(1px) rotate(-3deg); }
+  18%  { transform: translateY(1px) rotate(3deg); }
+  22%  { transform: translateY(2px) rotate(0); }       /* crouch antes del impulso */
+  48%  { transform: translateY(-80px) rotate(16deg); opacity: 0; } /* sube desde su lugar y desaparece */
+  49%  { transform: translateY(0) rotate(0); opacity: 0; }         /* reset invisible, ya en su lugar */
+  74%  { transform: translateY(0) rotate(0); opacity: 0; }         /* espera apagado */
+  88%  { transform: translateY(0) rotate(0); opacity: 1; }         /* reaparece en el mismo lugar (fade) */
   100% { transform: translateY(0) rotate(0); opacity: 1; }
 }
 
