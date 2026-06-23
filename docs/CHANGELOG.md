@@ -1,5 +1,12 @@
 # Changelog
 
+## Fix: el delivery no podía marcar entregado (422 + 500 latente) (2026-06-23)
+
+Dos bugs encadenados en `PATCH /dispensaciones/:id/entregar`:
+- **422**: `delivery_fields_presentes` (exige dirección/contacto de envío) corría en **cada** save, no solo al crear → al re-guardar para marcar entregado, un despacho con algún campo de envío vacío rompía. Ahora la validación es `on: :create`.
+- **500 latente** (lo tapaba el 422): `NotificacionDeliveryService` hacía `dispensacion.club`, pero `Dispensacion` no tiene esa asociación (el club va por `sede`). Corregido a `dispensacion.sede&.club`.
+- Spec `despacho_entregar_spec` (entrega normal + despacho con campo de envío vacío).
+
 ## Delivery: reordenar su ruta + ruta en Google Maps (2026-06-23)
 
 - **El repartidor puede reordenar sus entregas** (flechas ↑↓ en su dashboard) **solo si el club NO fijó el orden** (ruta no bloqueada). Backend: `rutas_entrega#ordenar` ahora permite al delivery ordenar su propia ruta no bloqueada (sigue bloqueado para staff-only el candado). Specs nuevos.

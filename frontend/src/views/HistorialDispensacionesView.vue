@@ -476,7 +476,7 @@ const FORMAS = [
               <td class="hd__td-user">{{ d.usuario?.nombre ?? '—' }}</td>
               <td class="hd__td-envio">
                 <span v-if="d.con_envio" class="hd__envio-badge" :title="d.estado_envio || 'Con envío'">
-                  <Truck :size="13" :stroke-width="2" />
+                  <Truck :size="18" :stroke-width="2" />
                 </span>
               </td>
               <td class="hd__td-actions">
@@ -791,10 +791,9 @@ const FORMAS = [
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #dbeafe;
+  background: transparent;
   color: #1d4ed8;
-  padding: 3px 7px;
-  border-radius: var(--r-pill);
+  padding: 0;
   font-size: 14px;
   line-height: 1;
   gap: 3px;

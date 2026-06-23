@@ -1,7 +1,8 @@
 class NotificacionDeliveryService
   def initialize(dispensacion)
     @d    = dispensacion
-    @club = dispensacion.club || dispensacion.sede&.club
+    # Dispensacion no tiene asociación :club directa; el club se obtiene vía la sede.
+    @club = dispensacion.sede&.club
   end
 
   def notificar_despacho

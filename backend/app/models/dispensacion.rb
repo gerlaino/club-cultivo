@@ -48,7 +48,10 @@ class Dispensacion < ApplicationRecord
   validate  :credito_suficiente,        on: :create, if: -> { medio_pago == 'cuenta_corriente' }
   validate  :credito_no_abona,          on: :create, if: -> { medio_pago == 'no_abona' }
   validate  :gramos_suficientes,        on: :create, if: -> { medio_pago == 'credito_gramos' }
-  validate  :delivery_fields_presentes, if: :con_envio?
+  # Solo al crear: los campos de envío se exigen al generar el despacho, no en cada
+  # update. Si no, marcar 'entregado'/'fallido' (que re-guarda) podía romper con 422
+  # cuando un despacho viejo tenía algún campo de envío vacío.
+  validate  :delivery_fields_presentes, on: :create, if: :con_envio?
 
   # Una dispensación cancelada conserva su registro e historia, pero NO cuenta como
   # dispensada (se revirtió stock y plata). Excluila de todo agregado de cantidad/conteo.
