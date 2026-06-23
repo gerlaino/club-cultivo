@@ -1,5 +1,18 @@
 # Changelog
 
+## Fix: el QR de planta quedaba en blanco al escanear (2026-06-23)
+
+A diferencia de los QR de stock y lote (que muestran la tarjeta en el lugar), `PlantaQrView`
+**redirigía** a `/plantas/:id` para usuarios logueados. En el navegador del celular esa cadena de
+redirección (guards de rol + remapeo PWA + cookie cross-site front/API) dejaba la **pantalla en
+blanco / cargando**. El endpoint backend (`GET /p/:codigo_qr`) siempre estuvo OK (200 + JSON).
+
+- Ahora `PlantaQrView` **muestra la ficha pública de la planta en el lugar** (nombre, estado, lote),
+  igual que stock/lote — usando el estado `'publico'` que ya existía en el template pero nunca se
+  seteaba. Sin redirección automática.
+- Botón **"Ver ficha completa"** (navegación iniciada por el usuario) para quien tenga permiso.
+- El flujo de **pesaje de manicura por QR** (lote en manicura/secado) queda intacto.
+
 ## Delivery: entrega secuencial por orden de ruta (2026-06-23)
 
 El delivery solo puede cerrar (entregar / reportar problema) el despacho que es la **siguiente

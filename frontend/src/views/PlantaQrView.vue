@@ -61,7 +61,10 @@
       </div>
 
       <div class="qr__login-hint">
-        <button class="qr__login-hint-btn" @click="estado = 'login'">
+        <button v-if="auth.isAuthenticated && puedeVerFicha" class="qr__login-hint-btn" @click="verFichaCompleta">
+          <i class="bi bi-arrow-right-circle"></i> Ver ficha completa
+        </button>
+        <button v-else-if="!auth.isAuthenticated" class="qr__login-hint-btn" @click="estado = 'login'">
           <i class="bi bi-person-badge"></i> Soy del equipo — Iniciar sesión
         </button>
       </div>
@@ -270,6 +273,8 @@ const progresoPorc = computed(() => {
   return Math.min(100, Math.round((progreso.value.pesadas / progreso.value.total) * 100))
 })
 
+const puedeVerFicha = computed(() => usePermissions().can('plantas', 'show'))
+
 const ESTADO_LABELS = {
   semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
   floracion: 'Floración', cosecha: 'Cosecha', secado: 'Secado',
@@ -305,34 +310,37 @@ onMounted(async () => {
 })
 
 async function resolverEstado() {
+  // Manicura con lote en manicura/secado → flujo de pesaje por QR (necesita el detalle).
+  // Para el resto mostramos la ficha pública EN EL LUGAR (igual que stock/lote), sin
+  // redirigir: el redirect automático a /plantas/:id rompía en el navegador del celular
+  // (cadena de guards / PWA / cookie cross-site) y dejaba la pantalla en blanco.
+  if (auth.user?.role === 'manicura') {
+    try {
+      const { data } = await getPlant(plantaInfo.value.id)
+      plantaDetalle.value = data
+      if (['en_manicura', 'secado'].includes(data.lote?.estado)) {
+        await cargarProgreso(data)
+        estado.value = 'manicura_pesaje'
+        if (data.peso_seco && data.peso_seco > 0) {
+          pesoAnterior.value = data.peso_seco
+          pesoInput.value    = String(data.peso_seco)
+        }
+        if (data.peso_humedo && data.peso_humedo > 0) {
+          pesoHumedoInput.value = String(data.peso_humedo)
+        }
+        await nextTick()
+        pesoInputRef.value?.focus()
+        return
+      }
+    } catch { /* si falla el detalle, cae a la ficha pública */ }
+  }
+  estado.value = 'publico'
+}
+
+function verFichaCompleta() {
   const { can } = usePermissions()
-  if (!can('plantas', 'show')) {
-    estado.value = 'sin_permisos'
-    return
-  }
-  try {
-    const { data } = await getPlant(plantaInfo.value.id)
-    plantaDetalle.value = data
-    const loteEstado = data.lote?.estado
-    const esManicura = auth.user?.role === 'manicura'
-    if (esManicura && ['en_manicura', 'secado'].includes(loteEstado)) {
-      await cargarProgreso(data)
-      estado.value = 'manicura_pesaje'
-      if (data.peso_seco && data.peso_seco > 0) {
-        pesoAnterior.value    = data.peso_seco
-        pesoInput.value       = String(data.peso_seco)
-      }
-      if (data.peso_humedo && data.peso_humedo > 0) {
-        pesoHumedoInput.value = String(data.peso_humedo)
-      }
-      await nextTick()
-      pesoInputRef.value?.focus()
-    } else {
-      router.replace({ name: 'planta-detalle', params: { id: plantaInfo.value.id } })
-    }
-  } catch {
-    router.replace({ name: 'planta-detalle', params: { id: plantaInfo.value.id } })
-  }
+  if (!can('plantas', 'show')) return
+  router.push({ name: 'planta-detalle', params: { id: plantaInfo.value.id } })
 }
 
 async function cargarProgreso(detalle) {
