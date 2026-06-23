@@ -782,9 +782,9 @@ const routes = [
       { path: 'manicura/tareas',    component: () => import('../views/mobile/MTareasView.vue') },
       { path: 'mnc/lotes/:id',      component: () => import('../views/manicura/MncLoteDetailView.vue') },
 
-      // ── Delivery ──
-      { path: 'delivery/despachos', component: () => import('../views/delivery/DespachoListView.vue') },
-      { path: 'delivery/historial', component: () => import('../views/delivery/DespachoListView.vue') },
+      // ── Delivery ── (el repartidor ve SU dashboard, no la vista admin de despachos)
+      { path: 'delivery/despachos', component: () => import('../views/delivery/DeliveryDashboard.vue') },
+      { path: 'delivery/historial', component: () => import('../views/delivery/DeliveryDashboard.vue') },
     ],
   },
 

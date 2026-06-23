@@ -1,5 +1,13 @@
 # Changelog
 
+## Fix: el delivery (en PWA) veía la vista admin de despachos (2026-06-23)
+
+`MOBILE_HOME.delivery` apuntaba a `/m/delivery/despachos`, que renderizaba `DespachoListView`
+(la vista de **admin**: KPIs, reasignar/cancelar, despachos de todos los repartidores) en lugar
+del `DeliveryDashboard` del propio repartidor. Por eso el delivery en la PWA no veía ninguna de
+las mejoras (firma, "siguiente", botón verde, Llamar/Ir) — estaban en su dashboard, que nunca
+se mostraba. Ahora `/m/delivery/despachos` y `/m/delivery/historial` renderizan `DeliveryDashboard`.
+
 ## Delivery: firma, "siguiente", touch targets, acciones por parada (2026-06-23)
 
 - **Fix de la firma de entrega**: el canvas tenía resolución interna fija (400×120) distinta del tamaño mostrado → en mobile la firma quedaba corrida/escalada. Ahora se ajusta al tamaño real (× devicePixelRatio) y el trazo mapea 1:1 con el dedo; canvas más alto (150px) para firmar cómodo.
