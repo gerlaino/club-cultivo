@@ -107,9 +107,36 @@ RSpec.describe 'Rutas de entrega', type: :request do
     expect(JSON.parse(response.body)['despachos']).to eq([d1.id])
   end
 
-  it 'solo admin/supervisor pueden ordenar' do
+  it 'el delivery puede ordenar su propia ruta (no bloqueada)' do
+    sign_in_as(dispensador)
+    d1 = crear_despacho
+    relogin(delivery)
+    post '/rutas_entrega/ordenar',
+         params: { delivery_id: delivery.id, fecha: Date.current.to_s, orden: [d1.id] },
+         headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    expect(d1.reload.orden_entrega).to eq(1)
+  end
+
+  it 'el delivery NO puede ordenar la ruta de otro repartidor' do
+    otro = create(:user, club: club, role: 'delivery')
     sign_in_as(delivery)
-    post '/rutas_entrega/ordenar', params: { delivery_id: delivery.id, orden: [] }, headers: auth_headers
+    post '/rutas_entrega/ordenar',
+         params: { delivery_id: otro.id, fecha: Date.current.to_s, orden: [] },
+         headers: auth_headers
+    expect(response).to have_http_status(:forbidden)
+  end
+
+  it 'el delivery NO puede reordenar una ruta fijada por el club' do
+    sign_in_as(dispensador)
+    d1 = crear_despacho
+    relogin(admin)
+    post '/rutas_entrega/ordenar', params: { delivery_id: delivery.id, fecha: Date.current.to_s, orden: [d1.id] }, headers: auth_headers
+    ruta_id = JSON.parse(response.body)['id']
+    patch "/rutas_entrega/#{ruta_id}/bloqueo", params: { bloqueada: true }, headers: auth_headers
+
+    relogin(delivery)
+    post '/rutas_entrega/ordenar', params: { delivery_id: delivery.id, fecha: Date.current.to_s, orden: [d1.id] }, headers: auth_headers
     expect(response).to have_http_status(:forbidden)
   end
 end

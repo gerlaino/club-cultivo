@@ -81,6 +81,17 @@ const despachosFiltered = computed(() => {
 const despachosPendientesRuta = computed(() =>
   despachosFiltered.value.filter(d => d.estado_envio === 'pendiente'))
 
+// Ruta en Google Maps con los pendientes en orden.
+function abrirEnMaps() {
+  const dirs = despachosPendientesRuta.value.map(d => d.direccion_envio).filter(Boolean)
+  if (!dirs.length) { toast.error('No hay direcciones para armar la ruta'); return }
+  const destino   = encodeURIComponent(dirs[dirs.length - 1])
+  const waypoints = dirs.slice(0, -1).map(encodeURIComponent).join('|')
+  let url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${destino}`
+  if (waypoints) url += `&waypoints=${waypoints}`
+  window.open(url, '_blank', 'noopener')
+}
+
 // ── Ruta de entrega (orden + candado) ──────────────────────────────────────
 // Modo ruta: un repartidor seleccionado → se ordena la ruta de una FECHA (hoy o futura).
 const modoRuta       = computed(() => !!filtroDelivery.value)
@@ -519,6 +530,9 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
         <span class="dsp__date-label">Fecha de ruta</span>
         <AppDatePicker v-model="fechaRuta" />
       </label>
+      <button class="dsp__ruta-maps" :disabled="!despachosPendientesRuta.length" @click="abrirEnMaps">
+        <i class="bi bi-geo-alt-fill"></i> Ruta en Maps
+      </button>
       <button
         class="dsp__ruta-lock"
         :class="{ 'dsp__ruta-lock--on': rutaBloqueada }"
@@ -961,6 +975,13 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 }
 .dsp__ruta-lock:hover { border-color: #94a3b8; }
 .dsp__ruta-lock--on { background: #fef3c7; border-color: #fcd34d; color: #b45309; }
+.dsp__ruta-maps {
+  display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
+  background: #1d4ed8; color: #fff; border: none; border-radius: 8px;
+  padding: .45rem .8rem; font-size: .8rem; font-weight: 700; white-space: nowrap;
+}
+.dsp__ruta-maps:hover:not(:disabled) { background: #1e40af; }
+.dsp__ruta-maps:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Controles de orden en la fila */
 .dsp__orden { display: flex; align-items: center; gap: .4rem; padding-right: var(--sp-2); border-right: 1px solid var(--c-ink-100); margin-right: var(--sp-2); }

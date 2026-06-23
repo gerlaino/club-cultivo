@@ -2,10 +2,12 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send, Route, PenLine, Trash2 } from 'lucide-vue-next'
-import { getMisPaquetes, iniciarViaje, entregarPaquete, reportarFallo } from '../../lib/api.js'
+import { getMisPaquetes, iniciarViaje, entregarPaquete, reportarFallo, ordenarRuta } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useAuthStore } from '../../stores/auth.js'
 
 const toast    = useToast()
+const auth     = useAuthStore()
 const paquetes = ref([])
 const loading  = ref(true)
 
@@ -98,6 +100,57 @@ function toggleTodos() {
   } else {
     selected.value = new Set(pendientes.value.map(p => p.id))
   }
+}
+
+// ── Reordenar (solo si la ruta NO está fijada por el club) ──────────────────
+const guardandoOrden = ref(false)
+async function persistirOrdenDelivery(lista) {
+  guardandoOrden.value = true
+  try {
+    const { data } = await ordenarRuta({
+      delivery_id: auth.user?.id,
+      fecha:       new Date().toISOString().slice(0, 10),
+      orden:       lista.map(p => p.id),
+    })
+    lista.forEach((p, i) => { p.orden_entrega = i + 1 })
+    if (data?.bloqueada !== undefined) lista.forEach(p => { p.ruta_bloqueada = data.bloqueada })
+    // reordenar el array fuente para reflejar el nuevo orden
+    paquetes.value = [...paquetes.value].sort((a, b) =>
+      (a.orden_entrega ?? Infinity) - (b.orden_entrega ?? Infinity))
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo guardar el orden')
+  } finally { guardandoOrden.value = false }
+}
+function moverArriba(p) {
+  if (rutaBloqueada.value) return
+  const lista = [...pendientes.value]
+  const i = lista.findIndex(x => x.id === p.id)
+  if (i <= 0) return
+  ;[lista[i - 1], lista[i]] = [lista[i], lista[i - 1]]
+  persistirOrdenDelivery(lista)
+}
+function moverAbajo(p) {
+  if (rutaBloqueada.value) return
+  const lista = [...pendientes.value]
+  const i = lista.findIndex(x => x.id === p.id)
+  if (i === -1 || i >= lista.length - 1) return
+  ;[lista[i + 1], lista[i]] = [lista[i], lista[i + 1]]
+  persistirOrdenDelivery(lista)
+}
+
+// ── Ruta en Google Maps (según seleccionados, o todos los pendientes en orden) ──
+function abrirEnMaps() {
+  const base = selected.value.size
+    ? pendientes.value.filter(p => selected.value.has(p.id))
+    : pendientes.value
+  const dirs = base.map(p => p.direccion_envio).filter(Boolean)
+  if (!dirs.length) { toast.error('No hay direcciones para armar la ruta'); return }
+  // origin = ubicación actual (se omite); waypoints intermedios + destino final.
+  const destino   = encodeURIComponent(dirs[dirs.length - 1])
+  const waypoints = dirs.slice(0, -1).map(encodeURIComponent).join('|')
+  let url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${destino}`
+  if (waypoints) url += `&waypoints=${waypoints}`
+  window.open(url, '_blank', 'noopener')
 }
 
 async function load() {
@@ -217,6 +270,15 @@ onMounted(load)
           <span>{{ todosSeleccionados ? 'Deseleccionar todos' : 'Seleccionar pendientes' }}</span>
         </label>
         <button
+          class="dlv__btn-maps"
+          :disabled="!pendientes.length"
+          :title="selected.size ? 'Ruta en Maps con los seleccionados' : 'Ruta en Maps con todos los pendientes'"
+          @click="abrirEnMaps"
+        >
+          <Route :size="14" :stroke-width="2" />
+          Ruta en Maps
+        </button>
+        <button
           class="dlv__btn-viaje"
           :disabled="!selected.size || saving"
           @click="handleIniciarViaje"
@@ -254,6 +316,11 @@ onMounted(load)
               :checked="selected.has(p.id)"
               @change="toggleSelect(p.id)"
             />
+            <!-- Reordenar (solo si el club no fijó el orden) -->
+            <div v-if="!rutaBloqueada && pendientes.length > 1" class="dlv__orden-ctrl" @click.stop>
+              <button class="dlv__orden-btn" :disabled="guardandoOrden" title="Subir" @click.stop="moverArriba(p)"><i class="bi bi-chevron-up"></i></button>
+              <button class="dlv__orden-btn" :disabled="guardandoOrden" title="Bajar" @click.stop="moverAbajo(p)"><i class="bi bi-chevron-down"></i></button>
+            </div>
             <div class="dlv__row-body" @click="toggleSelect(p.id)">
               <div class="dlv__row-top">
                 <span v-if="p.orden_entrega" class="dlv__orden-n" title="Orden de entrega">{{ p.orden_entrega }}</span>
@@ -459,6 +526,13 @@ onMounted(load)
 .dlv__btn-viaje { display: inline-flex; align-items: center; gap: var(--sp-2); background: var(--c-leaf-700); color: #fff; border: none; padding: .45rem .875rem; border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; cursor: pointer; transition: background .15s; }
 .dlv__btn-viaje:hover:not(:disabled) { background: var(--c-leaf-800); }
 .dlv__btn-viaje:disabled { opacity: .45; cursor: not-allowed; }
+.dlv__btn-maps { display: inline-flex; align-items: center; gap: var(--sp-2); background: #1d4ed8; color: #fff; border: none; padding: .45rem .875rem; border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; cursor: pointer; transition: background .15s; }
+.dlv__btn-maps:hover:not(:disabled) { background: #1e40af; }
+.dlv__btn-maps:disabled { opacity: .45; cursor: not-allowed; }
+.dlv__orden-ctrl { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.dlv__orden-btn { display: flex; align-items: center; justify-content: center; width: 26px; height: 20px; border: 1px solid var(--c-ink-200, #e2e8f0); background: #fff; border-radius: 5px; cursor: pointer; color: #475569; font-size: .75rem; padding: 0; }
+.dlv__orden-btn:hover:not(:disabled) { background: #f0fdf4; border-color: var(--c-leaf-300, #86efac); color: var(--c-leaf-700, #15803d); }
+.dlv__orden-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* Empty */
 .dlv__empty { text-align: center; padding: var(--sp-10) var(--sp-4); color: var(--c-ink-300); }

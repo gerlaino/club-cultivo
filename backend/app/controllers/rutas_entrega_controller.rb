@@ -1,6 +1,6 @@
 class RutasEntregaController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_admin_o_supervisor!, only: [:ordenar, :bloqueo]
+  before_action :require_admin_o_supervisor!, only: [:bloqueo]
 
   # GET /rutas_entrega?delivery_id=&fecha=
   # Ruta de un repartidor para una fecha (o null si no existe).
@@ -17,9 +17,20 @@ class RutasEntregaController < ApplicationController
     delivery_id = params[:delivery_id]
     return render json: { error: 'Falta delivery_id' }, status: :unprocessable_entity if delivery_id.blank?
 
+    es_staff = current_user.admin? || current_user.supervisor?
+    # El repartidor puede ordenar SOLO su propia ruta.
+    unless es_staff || delivery_id.to_s == current_user.id.to_s
+      return render json: { error: 'Sin permiso' }, status: :forbidden
+    end
+
     fecha = parse_fecha(params[:fecha])
     ids   = Array(params[:orden]).map(&:to_i).uniq
     ruta  = RutaEntrega.para(club: current_user.club, delivery_id: delivery_id, fecha: fecha)
+
+    # Si la ruta está fijada por el club, el repartidor no puede reordenarla.
+    if ruta.bloqueada && !es_staff
+      return render json: { error: 'La ruta fue fijada por el club — no se puede reordenar' }, status: :forbidden
+    end
 
     ActiveRecord::Base.transaction do
       ids.each_with_index do |id, i|

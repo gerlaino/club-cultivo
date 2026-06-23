@@ -210,7 +210,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
           <div v-if="d.observaciones" class="dv__item-obs">{{ d.observaciones }}</div>
           <div v-if="d.con_envio" class="dv__item-envio-badge"
                :class="`dv__item-envio-badge--${d.estado_envio || 'pendiente'}`">
-            <i class="bi bi-bicycle"></i>
+            <i class="bi bi-truck"></i>
             {{ { pendiente: 'Pendiente envío', en_viaje: 'En camino', entregado: 'Entregado', fallido: 'Fallo de entrega' }[d.estado_envio] || 'Con envío' }}
           </div>
         </div>
