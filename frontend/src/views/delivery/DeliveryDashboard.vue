@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send, Route, PenLine, Trash2 } from 'lucide-vue-next'
+import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send, Route, Navigation, PenLine, Trash2 } from 'lucide-vue-next'
 import { getMisPaquetes, iniciarViaje, entregarPaquete, reportarFallo, ordenarRuta } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
@@ -41,9 +41,16 @@ function iniciarCanvas() {
   nextTick(() => {
     const canvas = canvasRef.value
     if (!canvas) return
+    // Igualar la resolución interna al tamaño REAL mostrado (× devicePixelRatio).
+    // Si no, en mobile la firma queda corrida/escalada (el bug que tenías).
+    const rect = canvas.getBoundingClientRect()
+    const dpr  = window.devicePixelRatio || 1
+    canvas.width  = Math.round(rect.width  * dpr)
+    canvas.height = Math.round(rect.height * dpr)
     ctx = canvas.getContext('2d')
+    ctx.scale(dpr, dpr)  // dibujamos en coordenadas CSS, mapea 1:1 con el dedo
     ctx.strokeStyle = '#111827'
-    ctx.lineWidth   = 2
+    ctx.lineWidth   = 2.5
     ctx.lineCap     = 'round'
     ctx.lineJoin    = 'round'
     canvas.addEventListener('mousedown',  startDraw)
@@ -64,8 +71,11 @@ function startDrawT(e) { e.preventDefault(); const t = e.touches[0]; const r = c
 function drawT(e)      { e.preventDefault(); const t = e.touches[0]; const r = canvasRef.value.getBoundingClientRect(); draw({ offsetX: t.clientX - r.left, offsetY: t.clientY - r.top }) }
 
 function borrarFirma() {
-  if (!ctx) return
+  if (!ctx || !canvasRef.value) return
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)  // limpiar en coordenadas del canvas, no escaladas
   ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
+  ctx.restore()
   firmaData.value = null
 }
 
@@ -136,6 +146,13 @@ function moverAbajo(p) {
   if (i === -1 || i >= lista.length - 1) return
   ;[lista[i + 1], lista[i]] = [lista[i], lista[i + 1]]
   persistirOrdenDelivery(lista)
+}
+
+// Navegar a UNA parada (Maps con un solo destino).
+function irAParada(p) {
+  if (!p.direccion_envio) { toast.error('Sin dirección'); return }
+  const url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(p.direccion_envio)}`
+  window.open(url, '_blank', 'noopener')
 }
 
 // ── Ruta en Google Maps (según seleccionados, o todos los pendientes en orden) ──
@@ -306,9 +323,9 @@ onMounted(load)
         <div class="dlv__section-title">Pendientes de retirar</div>
         <div class="dlv__list">
           <div
-            v-for="p in pendientes" :key="p.id"
+            v-for="(p, i) in pendientes" :key="p.id"
             class="dlv__row dlv__row--pendiente"
-            :class="{ 'dlv__row--selected': selected.has(p.id) }"
+            :class="{ 'dlv__row--selected': selected.has(p.id), 'dlv__row--siguiente': i === 0 }"
           >
             <input
               type="checkbox"
@@ -324,6 +341,7 @@ onMounted(load)
             <div class="dlv__row-body" @click="toggleSelect(p.id)">
               <div class="dlv__row-top">
                 <span v-if="p.orden_entrega" class="dlv__orden-n" title="Orden de entrega">{{ p.orden_entrega }}</span>
+                <span v-if="i === 0" class="dlv__chip-sig">▶ Siguiente</span>
                 <span class="dlv__pkg-code">{{ p.codigo_paquete }}</span>
                 <span class="dlv__badge dlv__badge--pendiente">Pendiente</span>
               </div>
@@ -342,6 +360,14 @@ onMounted(load)
               <div class="dlv__row-meta">
                 {{ p.cantidad }}{{ p.stock?.unidad || 'g' }} {{ p.stock?.forma_producto || '' }}
                 · {{ fmtFecha(p.fecha_dispensacion) }}
+              </div>
+              <div class="dlv__stop-actions" @click.stop>
+                <a v-if="p.contacto_telefono" :href="`tel:${p.contacto_telefono}`" class="dlv__stop-btn">
+                  <Phone :size="13" :stroke-width="2" /> Llamar
+                </a>
+                <button v-if="p.direccion_envio" class="dlv__stop-btn" @click.stop="irAParada(p)">
+                  <Navigation :size="13" :stroke-width="2" /> Ir
+                </button>
               </div>
             </div>
           </div>
@@ -372,12 +398,22 @@ onMounted(load)
               </div>
             </div>
             <div class="dlv__row-actions">
-              <button class="dlv__btn-entregar" @click.stop="abrirEntregar(p)">
-                <CheckCircle2 :size="14" :stroke-width="2" /> Entregado
-              </button>
-              <button class="dlv__btn-fallo" @click.stop="abrirFallo(p)">
-                <XCircle :size="14" :stroke-width="2" /> Problema
-              </button>
+              <div class="dlv__stop-actions">
+                <a v-if="p.contacto_telefono" :href="`tel:${p.contacto_telefono}`" class="dlv__stop-btn">
+                  <Phone :size="13" :stroke-width="2" /> Llamar
+                </a>
+                <button v-if="p.direccion_envio" class="dlv__stop-btn" @click.stop="irAParada(p)">
+                  <Navigation :size="13" :stroke-width="2" /> Ir
+                </button>
+              </div>
+              <div class="dlv__row-actions-main">
+                <button class="dlv__btn-entregar" @click.stop="abrirEntregar(p)">
+                  <CheckCircle2 :size="14" :stroke-width="2" /> Entregado
+                </button>
+                <button class="dlv__btn-fallo" @click.stop="abrirFallo(p)">
+                  <XCircle :size="14" :stroke-width="2" /> Problema
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -526,8 +562,8 @@ onMounted(load)
 .dlv__btn-viaje { display: inline-flex; align-items: center; gap: var(--sp-2); background: var(--c-leaf-700); color: #fff; border: none; padding: .45rem .875rem; border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; cursor: pointer; transition: background .15s; }
 .dlv__btn-viaje:hover:not(:disabled) { background: var(--c-leaf-800); }
 .dlv__btn-viaje:disabled { opacity: .45; cursor: not-allowed; }
-.dlv__btn-maps { display: inline-flex; align-items: center; gap: var(--sp-2); background: #1d4ed8; color: #fff; border: none; padding: .45rem .875rem; border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; cursor: pointer; transition: background .15s; }
-.dlv__btn-maps:hover:not(:disabled) { background: #1e40af; }
+.dlv__btn-maps { display: inline-flex; align-items: center; gap: var(--sp-2); background: #fff; color: var(--c-leaf-700); border: 1.5px solid var(--c-leaf-300, #86efac); padding: .45rem .875rem; border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; cursor: pointer; transition: all .15s; }
+.dlv__btn-maps:hover:not(:disabled) { background: #f0fdf4; border-color: var(--c-leaf-600, #16a34a); }
 .dlv__btn-maps:disabled { opacity: .45; cursor: not-allowed; }
 .dlv__orden-ctrl { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
 .dlv__orden-btn { display: flex; align-items: center; justify-content: center; width: 26px; height: 20px; border: 1px solid var(--c-ink-200, #e2e8f0); background: #fff; border-radius: 5px; cursor: pointer; color: #475569; font-size: .75rem; padding: 0; }
@@ -550,6 +586,8 @@ onMounted(load)
 .dlv__row--enviaje { border-color: var(--c-amber-100); }
 .dlv__row--enviaje:hover { border-color: var(--c-amber-500); box-shadow: var(--sh-2); }
 .dlv__row--selected { border-color: var(--c-leaf-600); background: var(--c-leaf-50); }
+.dlv__row--siguiente { border-color: var(--c-leaf-600, #16a34a); box-shadow: 0 0 0 2px var(--c-leaf-100, #dcfce7); }
+.dlv__chip-sig { display: inline-flex; align-items: center; gap: .2rem; background: var(--c-leaf-700, #15803d); color: #fff; font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: .2em .55em; border-radius: 999px; }
 .dlv__check { margin-top: 3px; cursor: pointer; flex-shrink: 0; }
 .dlv__row-body { flex: 1; min-width: 0; cursor: pointer; }
 .dlv__row-top { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); flex-wrap: wrap; }
@@ -566,6 +604,14 @@ onMounted(load)
 .dlv__row-notas { color: var(--c-ink-400); font-style: italic; }
 .dlv__row-meta { font-size: 12px; color: var(--c-ink-400); margin-top: var(--sp-2); }
 .dlv__row-actions { display: flex; flex-direction: column; gap: var(--sp-2); flex-shrink: 0; }
+.dlv__row-actions-main { display: flex; flex-direction: column; gap: var(--sp-2); }
+.dlv__stop-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); }
+.dlv__stop-btn {
+  display: inline-flex; align-items: center; gap: .35rem; text-decoration: none;
+  background: #fff; color: var(--c-ink-600, #475569); border: 1.5px solid var(--c-ink-200, #e2e8f0); border-radius: var(--r-md);
+  padding: .4rem .7rem; font-size: var(--fs-12); font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.dlv__stop-btn:hover { background: var(--c-ink-50, #f8fafc); border-color: var(--c-leaf-300, #86efac); color: var(--c-leaf-700, #15803d); }
 .dlv__btn-entregar { display: inline-flex; align-items: center; gap: var(--sp-1); background: var(--c-leaf-100); color: var(--c-leaf-700); border: none; padding: .45rem .75rem; border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; cursor: pointer; white-space: nowrap; transition: background var(--t-fast); }
 .dlv__btn-entregar:hover { background: var(--c-leaf-300); }
 .dlv__btn-fallo { display: inline-flex; align-items: center; gap: var(--sp-1); background: var(--c-rust-100); color: var(--c-rust-600); border: none; padding: .45rem .75rem; border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; cursor: pointer; white-space: nowrap; transition: background var(--t-fast); }
@@ -621,7 +667,7 @@ onMounted(load)
 .dlv__firma-placeholder:hover { border-color: #9ca3af; background: #f9fafb; }
 .dlv__firma-canvas-wrap { position: relative; }
 .dlv__firma-canvas {
-  display: block; width: 100%; height: 120px; border: 1.5px solid #d1d5db; border-radius: var(--r-md);
+  display: block; width: 100%; height: 150px; border: 1.5px solid #d1d5db; border-radius: var(--r-md);
   background: #fff; touch-action: none; cursor: crosshair;
 }
 .dlv__firma-borrar {
@@ -647,13 +693,23 @@ onMounted(load)
 
   .dlv__toolbar { flex-wrap: wrap; }
   .dlv__check-all { flex: 1 1 100%; }
-  .dlv__btn-viaje { flex: 1; justify-content: center; }
+  .dlv__btn-viaje, .dlv__btn-maps { flex: 1; justify-content: center; }
 
   /* En rows "en viaje", bajar los botones de acción debajo del cuerpo */
   .dlv__row--enviaje { flex-wrap: wrap; }
   .dlv__row--enviaje .dlv__row-body { width: 100%; }
-  .dlv__row-actions { flex-direction: row; width: 100%; margin-top: .5rem; }
-  .dlv__btn-entregar,
-  .dlv__btn-fallo { flex: 1; justify-content: center; }
+  .dlv__row-actions { flex-direction: column; width: 100%; margin-top: .5rem; }
+  .dlv__row-actions-main { flex-direction: row; }
+
+  /* Touch targets más grandes y texto legible en la calle */
+  .dlv__row-nombre { font-size: var(--fs-15, 15px); }
+  .dlv__row-dir    { font-size: var(--fs-14, 14px); }
+  .dlv__btn-viaje, .dlv__btn-maps,
+  .dlv__btn-entregar, .dlv__btn-fallo { min-height: 46px; font-size: var(--fs-14, 14px); }
+  .dlv__btn-entregar, .dlv__btn-fallo { flex: 1; justify-content: center; }
+  .dlv__stop-actions { gap: .5rem; }
+  .dlv__stop-btn { flex: 1; justify-content: center; min-height: 42px; font-size: var(--fs-13, 13px); }
+  .dlv__orden-btn { width: 34px; height: 28px; }
+  .dlv__check { width: 22px; height: 22px; }
 }
 </style>

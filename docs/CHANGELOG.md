@@ -1,5 +1,13 @@
 # Changelog
 
+## Delivery: firma, "siguiente", touch targets, acciones por parada (2026-06-23)
+
+- **Fix de la firma de entrega**: el canvas tenía resolución interna fija (400×120) distinta del tamaño mostrado → en mobile la firma quedaba corrida/escalada. Ahora se ajusta al tamaño real (× devicePixelRatio) y el trazo mapea 1:1 con el dedo; canvas más alto (150px) para firmar cómodo.
+- **"Siguiente"**: la primera entrega pendiente se resalta (borde verde + chip "▶ Siguiente").
+- **Touch targets mobile**: botones más grandes (≥46px), texto de nombre/dirección más legible.
+- Botón "Ruta en Maps" en **paleta verde** (outline).
+- Cada parada suma **"Llamar"** (tel:) e **"Ir"** (Maps a esa única dirección) — para usar stop por stop.
+
 ## Fix: el delivery no podía marcar entregado (422 + 500 latente) (2026-06-23)
 
 Dos bugs encadenados en `PATCH /dispensaciones/:id/entregar`:
