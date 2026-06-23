@@ -84,7 +84,7 @@
           <div class="lv__sep"></div>
 
           <div class="lv__welcome">
-            <h2 class="lv__welcome-h">Bienvenido 🚀</h2>
+            <h2 class="lv__welcome-h">Bienvenido <span class="lv__rocket" aria-hidden="true">🚀</span></h2>
             <p class="lv__welcome-p">Iniciá sesión para acceder a tu club</p>
           </div>
 
@@ -397,6 +397,40 @@ async function onSubmit() {
 
 .lv__welcome { padding: 1.1rem 1.5rem 0; }
 .lv__welcome-h { font-size: 1.25rem; font-weight: 800; color: #0f172a; letter-spacing: -.04em; margin-bottom: .18rem; }
+
+/* Cohete: flota, "carbura" (rumble) y despega periódicamente */
+.lv__rocket {
+  display: inline-block;
+  transform-origin: 50% 80%;
+  will-change: transform, opacity;
+  animation: lv-rocket 5s ease-in-out infinite;
+}
+.lv__rocket:hover { animation: lv-rocket-launch .9s ease-in forwards; }
+
+@keyframes lv-rocket {
+  0%   { transform: translateY(0) rotate(0); }
+  24%  { transform: translateY(-5px) rotate(0); }     /* flota */
+  48%  { transform: translateY(0) rotate(0); }
+  56%  { transform: translateY(2px) rotate(-4deg); }  /* rumble: enciende motores */
+  60%  { transform: translateY(2px) rotate(4deg); }
+  64%  { transform: translateY(1px) rotate(-3deg); }
+  68%  { transform: translateY(1px) rotate(3deg); }
+  84%  { transform: translateY(-52px) rotate(12deg); opacity: 0; } /* despega */
+  85%  { transform: translateY(30px) rotate(0); opacity: 0; }      /* vuelve a la plataforma */
+  100% { transform: translateY(0) rotate(0); opacity: 1; }
+}
+
+/* Al pasar el mouse, despega de una */
+@keyframes lv-rocket-launch {
+  0%   { transform: translateY(0) rotate(0); }
+  20%  { transform: translateY(3px) rotate(-5deg); }
+  35%  { transform: translateY(3px) rotate(5deg); }
+  100% { transform: translateY(-90px) rotate(15deg); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lv__rocket, .lv__rocket:hover { animation: none; }
+}
 .lv__welcome-p { font-size: .78rem; color: #64748b; }
 
 .lv__form { padding: 1rem 1.5rem 1.1rem; display: flex; flex-direction: column; gap: .8rem; }
