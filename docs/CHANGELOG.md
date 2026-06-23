@@ -1,5 +1,17 @@
 # Changelog
 
+## Guard de cambio de rol (2026-06-23)
+
+El cambio de rol queda permitido (el historial se atribuye por FK al usuario, no al rol, así que persiste), con dos resguardos:
+- **Backend (`club_users#update`)**: bloquea cambiar el rol de un **delivery con despachos pendientes/en viaje** hasta reasignarlos (error con el número). Spec `cambio_rol_guard_spec`.
+- **Frontend (`UsuariosView`)**: al cambiar el rol pide confirmación ("los permisos cambian de inmediato, el historial se conserva, revisá asignaciones").
+
+## Ajustes UI: despachos, historial, equipo (2026-06-23)
+
+- **Despachos**: la ruta solo reordena **pendientes** (la hoja de ruta se arma con esos); hint para descubrir la ruta cuando no hay repartidor filtrado; acciones de cada despacho agrupadas en **Etiqueta · Acciones ▾ (completar/fallo/reprogramar/reasignar) · Cancelar**.
+- **Historial**: el ícono de "con envío" volvió a **camión** (lucide `Truck`), consistente con despachos.
+- **Equipo**: la fila del usuario es clickeable → va al detalle; se quitó el ícono "ver perfil".
+
 ## Ruta de entrega: orden + candado (2026-06-23)
 
 El admin puede fijar el orden en que el repartidor entrega los despachos y bloquearlo.

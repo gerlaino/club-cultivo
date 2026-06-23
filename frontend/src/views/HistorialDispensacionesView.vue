@@ -4,7 +4,7 @@ import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, deleteDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink } from 'vue-router'
-import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode } from 'lucide-vue-next'
+import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode, Truck } from 'lucide-vue-next'
 import { useEtiquetaDispensa } from '../composables/useEtiquetaDispensa.js'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
 import ModalEditarDispensacion from '../components/pacientes/ModalEditarDispensacion.vue'
@@ -476,7 +476,7 @@ const FORMAS = [
               <td class="hd__td-user">{{ d.usuario?.nombre ?? '—' }}</td>
               <td class="hd__td-envio">
                 <span v-if="d.con_envio" class="hd__envio-badge" :title="d.estado_envio || 'Con envío'">
-                  <i class="bi bi-scooter"></i>
+                  <Truck :size="13" :stroke-width="2" />
                 </span>
               </td>
               <td class="hd__td-actions">

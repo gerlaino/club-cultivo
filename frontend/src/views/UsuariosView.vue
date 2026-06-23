@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue"
+import { useRouter } from "vue-router"
 import { useUsuariosStore } from "../stores/usuarios"
 import { useAuthStore } from "../stores/auth"
 import { listSalas, listSedes, asignarSedeAUsuario } from '../lib/api.js'
@@ -83,6 +84,7 @@ function roleStyle(role)  { return { color: roleColor(role), background: roleBg(
 // ── Modal ─────────────────────────────────────────────────────────────────
 const showModal  = ref(false)
 const editing    = ref(false)
+const originalRole = ref(null)
 const wizardStep = ref(1)
 
 const todasLasSalas       = ref([])
@@ -125,8 +127,12 @@ function startCreate() {
   showModal.value          = true
 }
 
+const router = useRouter()
+function irADetalle(u) { router.push({ name: 'usuario-detail', params: { id: u.id } }) }
+
 function startEdit(u) {
-  editing.value   = true
+  editing.value     = true
+  originalRole.value = u.role
   form.value      = { id: u.id, first_name: u.first_name || "", last_name: u.last_name || "", email: u.email || "", role: u.role || "admin", sede_id: "", sala_id: "" }
   showModal.value = true
 }
@@ -148,6 +154,17 @@ function prevStep() {
 async function save() {
   if (editing.value) {
     if (!form.value.first_name.trim() || !form.value.last_name.trim() || !form.value.email.trim()) return
+
+    // Aviso si cambia el rol: los permisos cambian de inmediato; el historial se conserva.
+    if (form.value.role !== originalRole.value) {
+      const ok = await confirm({
+        title: 'Cambiar rol del usuario',
+        message: `Vas a cambiar el rol de ${form.value.first_name} de "${getRoleInfo(originalRole.value).label}" a "${getRoleInfo(form.value.role).label}".\n\nSus permisos cambian de inmediato, pero su historial (lo que hizo) se conserva tal cual. Revisá sus asignaciones (sedes, salas, despachos) por si quedan sin sentido con el rol nuevo.`,
+        confirmText: 'Cambiar rol',
+      })
+      if (!ok) return
+    }
+
     try {
       await store.update(form.value.id, {
         first_name: form.value.first_name,
@@ -255,7 +272,7 @@ async function removeOne(u) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="u in pagedUsers" :key="u.id" class="uv__table-row">
+          <tr v-for="u in pagedUsers" :key="u.id" class="uv__table-row uv__table-row--link" @click="irADetalle(u)">
             <td>
               <div class="uv__user-cell">
                 <div class="uv__avatar" :style="{ background: getAvatarColor(u) }">{{ getInitials(u) }}</div>
@@ -276,13 +293,10 @@ async function removeOne(u) {
             </td>
             <td>
               <div class="uv__row-actions">
-                <RouterLink :to="{ name: 'usuario-detail', params: { id: u.id } }" class="uv__row-btn" title="Ver perfil">
-                  <i class="bi bi-person-lines-fill"></i>
-                </RouterLink>
-                <button class="uv__row-btn" @click="startEdit(u)" title="Editar datos">
+                <button class="uv__row-btn" @click.stop="startEdit(u)" title="Editar datos">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <button class="uv__row-btn uv__row-btn--danger" @click="removeOne(u)" title="Eliminar">
+                <button class="uv__row-btn uv__row-btn--danger" @click.stop="removeOne(u)" title="Eliminar">
                   <i class="bi bi-trash"></i>
                 </button>
               </div>
@@ -544,6 +558,7 @@ async function removeOne(u) {
 .uv__table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; }
 .uv__table tbody tr:last-child { border-bottom: none; }
 .uv__table tbody tr:hover { background: #f8fafc; }
+.uv__table-row--link { cursor: pointer; }
 .uv__table td { padding: 10px 14px; vertical-align: middle; }
 .uv__user-cell { display: flex; align-items: center; gap: .75rem; }
 .uv__avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: .72rem; font-weight: 700; flex-shrink: 0; }

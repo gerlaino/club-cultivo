@@ -69,6 +69,19 @@ class ClubUsersController < ApplicationController
 
   # PUT/PATCH /usuarios/:id
   def update
+    nuevo_rol = params.dig(:user, :role).to_s
+
+    # Guard: un delivery con despachos pendientes no puede cambiar de rol hasta
+    # reasignarlos (si no, quedarían asignados a alguien que ya no es repartidor).
+    if nuevo_rol.present? && nuevo_rol != @user.role && @user.role == 'delivery'
+      pend = despachos_pendientes_de(@user)
+      if pend > 0
+        return render json: {
+          errors: ["#{@user.first_name} tiene #{pend} despacho#{'s' if pend != 1} pendiente#{'s' if pend != 1} asignado#{'s' if pend != 1}. Reasignalos antes de cambiarle el rol."]
+        }, status: :unprocessable_entity
+      end
+    end
+
     if @user.update(user_params)
       render json: { data: @user.as_json(only: [:id, :email, :first_name, :last_name, :role]) }
     else
@@ -207,6 +220,14 @@ class ClubUsersController < ApplicationController
   # Solo campos que EXISTEN en tu schema
   def user_params
     params.require(:user).permit(:email, :first_name, :last_name, :role, :password, :password_confirmation)
+  end
+
+  # Despachos (dispensaciones con envío) pendientes o en viaje asignados al usuario.
+  def despachos_pendientes_de(user)
+    Dispensacion.joins(stock: :sede)
+                .where(sedes: { club_id: current_user.club_id })
+                .where(delivery_id: user.id, con_envio: true, estado_envio: %w[pendiente en_viaje])
+                .count
   end
 end
 

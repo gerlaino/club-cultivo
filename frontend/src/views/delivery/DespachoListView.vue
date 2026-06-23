@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
@@ -35,6 +35,11 @@ const expandedId     = ref(null)
 const reasignandoId  = ref(null)
 const nuevoDelivery  = ref('')
 
+// Menú "Acciones" desplegable por despacho (guarda el id abierto).
+const menuAbierto = ref(null)
+function toggleMenu(id) { menuAbierto.value = menuAbierto.value === id ? null : id }
+function cerrarMenu()   { menuAbierto.value = null }
+
 // Reservas con envío pendientes: entregas futuras que todavía no son un despacho real.
 // Al "preparar entrega" se convierten en Dispensacion con envío y bajan a la lista.
 const reservas          = ref([])
@@ -58,13 +63,23 @@ const despachosFiltered = computed(() => {
       d.delivery_nombre?.toLowerCase().includes(q)
     )
   }
-  // En modo ruta (un repartidor seleccionado) ordenamos por orden de entrega.
+  // En modo ruta: pendientes primero (en orden de entrega), el resto después por fecha.
+  // La hoja de ruta se arma solo con los pendientes.
   if (modoRuta.value) {
-    list = [...list].sort((a, b) =>
-      (a.orden_entrega ?? Infinity) - (b.orden_entrega ?? Infinity))
+    const peso = e => (e === 'pendiente' ? 0 : 1)
+    list = [...list].sort((a, b) => {
+      const pa = peso(a.estado_envio), pb = peso(b.estado_envio)
+      if (pa !== pb) return pa - pb
+      if (pa === 0) return (a.orden_entrega ?? Infinity) - (b.orden_entrega ?? Infinity)
+      return new Date(b.created_at) - new Date(a.created_at)
+    })
   }
   return list
 })
+
+// Solo los pendientes se reordenan en la ruta.
+const despachosPendientesRuta = computed(() =>
+  despachosFiltered.value.filter(d => d.estado_envio === 'pendiente'))
 
 // ── Ruta de entrega (orden + candado) ──────────────────────────────────────
 // Modo ruta: un repartidor seleccionado → se ordena la ruta de una FECHA (hoy o futura).
@@ -113,7 +128,7 @@ function aplicarOrden(nueva) {
 }
 function moverArriba(d) {
   if (rutaBloqueada.value) return
-  const lista = [...despachosFiltered.value]
+  const lista = [...despachosPendientesRuta.value]
   const i = lista.findIndex(x => x.id === d.id)
   if (i <= 0) return
   ;[lista[i - 1], lista[i]] = [lista[i], lista[i - 1]]
@@ -121,7 +136,7 @@ function moverArriba(d) {
 }
 function moverAbajo(d) {
   if (rutaBloqueada.value) return
-  const lista = [...despachosFiltered.value]
+  const lista = [...despachosPendientesRuta.value]
   const i = lista.findIndex(x => x.id === d.id)
   if (i === -1 || i >= lista.length - 1) return
   ;[lista[i + 1], lista[i]] = [lista[i], lista[i + 1]]
@@ -131,7 +146,7 @@ function moverAbajo(d) {
 async function toggleBloqueoRuta() {
   let id = rutaId.value
   if (!id) {
-    const data = await persistirOrden(despachosFiltered.value)  // crea la ruta
+    const data = await persistirOrden(despachosPendientesRuta.value)  // crea la ruta
     id = data?.id
   }
   if (!id) { toast.error('Ordená los despachos primero'); return }
@@ -344,6 +359,7 @@ async function reprogramar(id) {
 
 const route = useRoute()
 onMounted(async () => {
+  document.addEventListener('click', cerrarMenu)  // cerrar el menú Acciones al clickear afuera
   await Promise.all([load(), loadDeliveryUsers(), loadReservas()])
   // Si venís desde el QR de una etiqueta (?paquete=CODIGO), abrir/enfocar ese despacho.
   const code = route.query.paquete
@@ -357,6 +373,7 @@ onMounted(async () => {
     }
   }
 })
+onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 </script>
 
 <template>
@@ -485,11 +502,17 @@ onMounted(async () => {
       </button>
     </div>
 
+    <!-- Hint: cómo armar la ruta (cuando no hay repartidor elegido) -->
+    <div v-if="!modoRuta && !loading && despachosFiltered.length" class="dsp__ruta-hint">
+      <i class="bi bi-signpost-split"></i>
+      Para <strong>armar la hoja de ruta</strong> y fijar el orden de entrega, elegí un <strong>repartidor</strong> en el filtro de arriba.
+    </div>
+
     <!-- Barra de ruta (al filtrar por repartidor) -->
     <div v-if="modoRuta && despachosFiltered.length" class="dsp__ruta-bar">
       <div class="dsp__ruta-info">
         <Truck :size="15" :stroke-width="2" />
-        <span><strong>Ruta de entrega</strong> · ordená con ↑↓ el orden de entrega</span>
+        <span><strong>Ruta de entrega</strong> · ordená con ↑↓ los pendientes</span>
         <DsSpinner v-if="guardandoOrden" :size="13" />
       </div>
       <label class="dsp__ruta-fecha">
@@ -531,8 +554,8 @@ onMounted(async () => {
         <!-- Fila principal (clickable) -->
         <div class="dsp__row-main" @click="toggleExpand(d.id)">
 
-          <!-- Orden de ruta (al filtrar por repartidor) -->
-          <div v-if="modoRuta" class="dsp__orden" @click.stop>
+          <!-- Orden de ruta (solo pendientes, al filtrar por repartidor) -->
+          <div v-if="modoRuta && d.estado_envio === 'pendiente'" class="dsp__orden" @click.stop>
             <span class="dsp__orden-n">{{ d.orden_entrega ?? '—' }}</span>
             <div class="dsp__orden-btns">
               <button class="dsp__orden-btn" :disabled="rutaBloqueada || guardandoOrden" title="Subir" @click.stop="moverArriba(d)"><i class="bi bi-chevron-up"></i></button>
@@ -676,6 +699,8 @@ onMounted(async () => {
                 <Truck :size="14" :stroke-width="2" />
                 Repartidor: <strong>{{ d.delivery_nombre || deliveryNombre(d) || 'Sin asignar' }}</strong>
               </span>
+
+              <!-- Etiqueta -->
               <RouterLink
                 class="dsp__btn-outline"
                 :to="{ name: 'despacho-etiqueta', params: { id: d.id } }"
@@ -683,37 +708,33 @@ onMounted(async () => {
               >
                 <Tag :size="13" :stroke-width="2" /> Etiqueta
               </RouterLink>
-              <button
-                v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)"
-                class="dsp__btn-confirm"
-                @click.stop="abrirEntrega(d)"
-              >
-                <CheckCircle2 :size="13" :stroke-width="2" /> Completar entrega
-              </button>
-              <button
-                v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)"
-                class="dsp__btn-fallo"
-                @click.stop="abrirFallo(d)"
-              >
-                <AlertCircle :size="13" :stroke-width="2" /> Reportar fallo
-              </button>
-              <button
-                v-if="d.estado_envio === 'fallido'"
-                class="dsp__btn-reprogramar"
-                :disabled="reprogramando"
-                @click.stop="reprogramar(d.id)"
-              >
-                <DsSpinner v-if="reprogramando" :size="12" />
-                <RefreshCw v-else :size="13" :stroke-width="2" />
-                Reprogramar
-              </button>
-              <button
+
+              <!-- Acciones (agrupa completar / reportar fallo / reprogramar / reasignar) -->
+              <div
                 v-if="!['entregado', 'cancelada'].includes(d.estado_envio)"
-                class="dsp__btn-outline"
-                @click.stop="iniciarReasignacion(d)"
+                class="dsp__acc"
+                @click.stop
               >
-                Reasignar
-              </button>
+                <button class="dsp__btn-confirm" @click="toggleMenu(d.id)">
+                  Acciones <ChevronDown :size="13" :stroke-width="2" />
+                </button>
+                <div v-if="menuAbierto === d.id" class="dsp__acc-menu">
+                  <button v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)" class="dsp__acc-item" @click="cerrarMenu(); abrirEntrega(d)">
+                    <CheckCircle2 :size="14" :stroke-width="2" /> Completar entrega
+                  </button>
+                  <button v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)" class="dsp__acc-item" @click="cerrarMenu(); abrirFallo(d)">
+                    <AlertCircle :size="14" :stroke-width="2" /> Reportar fallo
+                  </button>
+                  <button v-if="d.estado_envio === 'fallido'" class="dsp__acc-item" :disabled="reprogramando" @click="cerrarMenu(); reprogramar(d.id)">
+                    <RefreshCw :size="14" :stroke-width="2" /> Reprogramar
+                  </button>
+                  <button class="dsp__acc-item" @click="cerrarMenu(); iniciarReasignacion(d)">
+                    <Truck :size="14" :stroke-width="2" /> Reasignar
+                  </button>
+                </div>
+              </div>
+
+              <!-- Cancelar -->
               <button
                 v-if="!['entregado', 'cancelada'].includes(d.estado_envio)"
                 class="dsp__btn-fallo"
@@ -928,6 +949,11 @@ onMounted(async () => {
 }
 .dsp__ruta-info { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); color: #166534; }
 .dsp__ruta-fecha { display: flex; flex-direction: column; gap: 2px; }
+.dsp__ruta-hint {
+  display: flex; align-items: center; gap: .5rem; margin-bottom: var(--sp-4);
+  background: #eff6ff; border: 1.5px solid #bfdbfe; color: #1e40af;
+  border-radius: var(--r-lg); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-13);
+}
 .dsp__ruta-lock {
   display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
   background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px;
@@ -1155,6 +1181,23 @@ onMounted(async () => {
   min-width: 160px;
 }
 .dsp__reasign-select:focus { outline: none; border-color: var(--c-leaf-600); }
+
+/* Menú Acciones */
+.dsp__acc { position: relative; display: inline-block; }
+.dsp__acc-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 20;
+  min-width: 190px; background: #fff; border: 1px solid var(--c-ink-200);
+  border-radius: 10px; box-shadow: var(--sh-3, 0 8px 24px rgba(0,0,0,.12));
+  padding: 4px; display: flex; flex-direction: column;
+}
+.dsp__acc-item {
+  display: flex; align-items: center; gap: .5rem; width: 100%;
+  background: none; border: none; cursor: pointer; text-align: left;
+  padding: .5rem .65rem; border-radius: 7px; font-size: var(--fs-13);
+  color: var(--c-ink-700); white-space: nowrap;
+}
+.dsp__acc-item:hover:not(:disabled) { background: var(--c-ink-50, #f1f5f9); }
+.dsp__acc-item:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Botones */
 .dsp__btn-confirm {
