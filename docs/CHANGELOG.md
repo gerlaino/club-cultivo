@@ -1,5 +1,17 @@
 # Changelog
 
+## Ruta de entrega: orden + candado (2026-06-23)
+
+El admin puede fijar el orden en que el repartidor entrega los despachos y bloquearlo.
+- **Backend**: migración `20260623000001` — tabla `rutas_entrega` (delivery+fecha+`bloqueada`, una por repartidor/día) + `ruta_entrega_id`/`orden_entrega` en `dispensaciones`. Modelo `RutaEntrega`. Controller `RutasEntregaController` (`#show`, `#ordenar`, `#bloqueo`). El serializer expone `orden_entrega`/`ruta_bloqueada`; `mis_paquetes` ordena por `orden_entrega`. Specs (`rutas_entrega_spec`: ordenar, bloquear, aislamiento de tenant, permisos).
+- **Admin (`DespachoListView`)**: al filtrar por repartidor aparece la barra de ruta con **selector de fecha** (hoy o futura), flechas ↑↓ por despacho y toggle "Respetar orden" (candado). La ruta se trae/guarda por (repartidor, fecha elegida).
+- **Delivery (`DeliveryDashboard`)**: los paquetes vienen en el orden de la ruta, con número visible; si está bloqueada, banner "orden fijado por el club".
+
+## Fix: etiqueta de despacho en PWA + sin QR (2026-06-23)
+
+- Tocar "Etiqueta" en PWA rebotaba a la home mobile: el guard de PWA no permitía la ruta. Se permiten las rutas que terminan en `/etiqueta` y el link abre in-app (sin `target="_blank"`, que rompe en PWA standalone).
+- La etiqueta de despacho quedó **sin QR** (decisión de seguridad): club, destinatario, dirección, teléfono y código de paquete. Imprimible + descargable como PDF (`html2pdf.js`).
+
 ## Etiqueta de despacho con QR + dos direcciones del paciente (2026-06-22)
 
 ### Etiqueta de despacho (sin QR — decisión de seguridad)

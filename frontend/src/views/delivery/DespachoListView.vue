@@ -1,16 +1,17 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   PackageCheck, Truck, CheckCircle2, XCircle, User, MapPin,
   Phone, FileText, RefreshCw, ChevronDown, ChevronUp, AlertCircle,
-  CalendarClock, ArrowRight, BookmarkCheck, QrCode
+  CalendarClock, ArrowRight, BookmarkCheck, Tag
 } from 'lucide-vue-next'
 import {
   listDespachos, listEntregadores, reasignarDelivery, reprogramarPaquete,
   listReservas, entregarReserva, entregarPaquete, reportarFallo, cancelarEntregaDispensacion,
+  getRutaEntrega, ordenarRuta, bloquearRuta,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -47,15 +48,100 @@ const kpis = computed(() => ({
 }))
 
 const despachosFiltered = computed(() => {
-  if (!filtroBusca.value.trim()) return despachos.value
-  const q = filtroBusca.value.toLowerCase()
-  return despachos.value.filter(d =>
-    d.codigo_paquete?.toLowerCase().includes(q) ||
-    d.paciente_nombre?.toLowerCase().includes(q) ||
-    d.direccion_envio?.toLowerCase().includes(q) ||
-    d.delivery_nombre?.toLowerCase().includes(q)
-  )
+  let list = despachos.value
+  if (filtroBusca.value.trim()) {
+    const q = filtroBusca.value.toLowerCase()
+    list = list.filter(d =>
+      d.codigo_paquete?.toLowerCase().includes(q) ||
+      d.paciente_nombre?.toLowerCase().includes(q) ||
+      d.direccion_envio?.toLowerCase().includes(q) ||
+      d.delivery_nombre?.toLowerCase().includes(q)
+    )
+  }
+  // En modo ruta (un repartidor seleccionado) ordenamos por orden de entrega.
+  if (modoRuta.value) {
+    list = [...list].sort((a, b) =>
+      (a.orden_entrega ?? Infinity) - (b.orden_entrega ?? Infinity))
+  }
+  return list
 })
+
+// ── Ruta de entrega (orden + candado) ──────────────────────────────────────
+// Modo ruta: un repartidor seleccionado → se ordena la ruta de una FECHA (hoy o futura).
+const modoRuta       = computed(() => !!filtroDelivery.value)
+const fechaRuta      = ref(new Date().toISOString().slice(0, 10))
+const rutaActual     = ref(null)   // { id, bloqueada, despachos: [ids] } de (repartidor, fechaRuta)
+const guardandoOrden = ref(false)
+
+const rutaId        = computed(() => rutaActual.value?.id || null)
+const rutaBloqueada = computed(() => rutaActual.value?.bloqueada || false)
+
+async function cargarRuta() {
+  if (!filtroDelivery.value) { rutaActual.value = null; return }
+  try {
+    const { data } = await getRutaEntrega({ delivery_id: filtroDelivery.value, fecha: fechaRuta.value })
+    rutaActual.value = (data && data.id) ? data : null
+  } catch { rutaActual.value = null }
+}
+watch([filtroDelivery, fechaRuta], cargarRuta)
+
+async function persistirOrden(lista) {
+  guardandoOrden.value = true
+  try {
+    const { data } = await ordenarRuta({
+      delivery_id: filtroDelivery.value,
+      fecha:       fechaRuta.value,
+      orden:       lista.map(d => d.id),
+    })
+    rutaActual.value = data
+    despachos.value.forEach(d => {
+      if (data.despachos.includes(d.id)) {
+        d.ruta_id        = data.id
+        d.ruta_bloqueada = data.bloqueada
+        d.orden_entrega  = data.despachos.indexOf(d.id) + 1
+      }
+    })
+    return data
+  } catch {
+    toast.error('No se pudo guardar el orden')
+  } finally { guardandoOrden.value = false }
+}
+
+function aplicarOrden(nueva) {
+  nueva.forEach((d, i) => { d.orden_entrega = i + 1 })  // refleja al instante
+  persistirOrden(nueva)
+}
+function moverArriba(d) {
+  if (rutaBloqueada.value) return
+  const lista = [...despachosFiltered.value]
+  const i = lista.findIndex(x => x.id === d.id)
+  if (i <= 0) return
+  ;[lista[i - 1], lista[i]] = [lista[i], lista[i - 1]]
+  aplicarOrden(lista)
+}
+function moverAbajo(d) {
+  if (rutaBloqueada.value) return
+  const lista = [...despachosFiltered.value]
+  const i = lista.findIndex(x => x.id === d.id)
+  if (i === -1 || i >= lista.length - 1) return
+  ;[lista[i + 1], lista[i]] = [lista[i], lista[i + 1]]
+  aplicarOrden(lista)
+}
+
+async function toggleBloqueoRuta() {
+  let id = rutaId.value
+  if (!id) {
+    const data = await persistirOrden(despachosFiltered.value)  // crea la ruta
+    id = data?.id
+  }
+  if (!id) { toast.error('Ordená los despachos primero'); return }
+  try {
+    const { data } = await bloquearRuta(id, !rutaBloqueada.value)
+    rutaActual.value = data
+    despachos.value.forEach(d => { if (d.ruta_id === id) d.ruta_bloqueada = data.bloqueada })
+    toast.success(data.bloqueada ? 'Orden fijado — el repartidor debe respetarlo' : 'Orden liberado')
+  } catch { toast.error('No se pudo cambiar el candado') }
+}
 
 const ESTADO_META = {
   pendiente: { label: 'Pendiente', bg: '#dbeafe', color: '#1d4ed8' },
@@ -399,6 +485,27 @@ onMounted(async () => {
       </button>
     </div>
 
+    <!-- Barra de ruta (al filtrar por repartidor) -->
+    <div v-if="modoRuta && despachosFiltered.length" class="dsp__ruta-bar">
+      <div class="dsp__ruta-info">
+        <Truck :size="15" :stroke-width="2" />
+        <span><strong>Ruta de entrega</strong> · ordená con ↑↓ el orden de entrega</span>
+        <DsSpinner v-if="guardandoOrden" :size="13" />
+      </div>
+      <label class="dsp__ruta-fecha">
+        <span class="dsp__date-label">Fecha de ruta</span>
+        <AppDatePicker v-model="fechaRuta" />
+      </label>
+      <button
+        class="dsp__ruta-lock"
+        :class="{ 'dsp__ruta-lock--on': rutaBloqueada }"
+        @click="toggleBloqueoRuta"
+      >
+        <i :class="rutaBloqueada ? 'bi bi-lock-fill' : 'bi bi-unlock'"></i>
+        {{ rutaBloqueada ? 'Orden fijo' : 'Respetar orden' }}
+      </button>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="dsp__loading">
       <DsSpinner />
@@ -423,6 +530,15 @@ onMounted(async () => {
 
         <!-- Fila principal (clickable) -->
         <div class="dsp__row-main" @click="toggleExpand(d.id)">
+
+          <!-- Orden de ruta (al filtrar por repartidor) -->
+          <div v-if="modoRuta" class="dsp__orden" @click.stop>
+            <span class="dsp__orden-n">{{ d.orden_entrega ?? '—' }}</span>
+            <div class="dsp__orden-btns">
+              <button class="dsp__orden-btn" :disabled="rutaBloqueada || guardandoOrden" title="Subir" @click.stop="moverArriba(d)"><i class="bi bi-chevron-up"></i></button>
+              <button class="dsp__orden-btn" :disabled="rutaBloqueada || guardandoOrden" title="Bajar" @click.stop="moverAbajo(d)"><i class="bi bi-chevron-down"></i></button>
+            </div>
+          </div>
 
           <div class="dsp__row-left">
             <span class="dsp__code">{{ d.codigo_paquete || `#${d.id}` }}</span>
@@ -563,10 +679,9 @@ onMounted(async () => {
               <RouterLink
                 class="dsp__btn-outline"
                 :to="{ name: 'despacho-etiqueta', params: { id: d.id } }"
-                target="_blank"
                 @click.stop
               >
-                <QrCode :size="13" :stroke-width="2" /> Etiqueta
+                <Tag :size="13" :stroke-width="2" /> Etiqueta
               </RouterLink>
               <button
                 v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)"
@@ -803,6 +918,31 @@ onMounted(async () => {
 }
 .dsp__select:focus,
 .dsp__input-date:focus { outline: none; border-color: var(--c-leaf-600); }
+
+/* Barra de ruta */
+.dsp__ruta-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  flex-wrap: wrap; margin-bottom: var(--sp-4);
+  background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4);
+}
+.dsp__ruta-info { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); color: #166534; }
+.dsp__ruta-fecha { display: flex; flex-direction: column; gap: 2px; }
+.dsp__ruta-lock {
+  display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
+  background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px;
+  padding: .45rem .8rem; font-size: .8rem; font-weight: 700; color: #475569; white-space: nowrap;
+}
+.dsp__ruta-lock:hover { border-color: #94a3b8; }
+.dsp__ruta-lock--on { background: #fef3c7; border-color: #fcd34d; color: #b45309; }
+
+/* Controles de orden en la fila */
+.dsp__orden { display: flex; align-items: center; gap: .4rem; padding-right: var(--sp-2); border-right: 1px solid var(--c-ink-100); margin-right: var(--sp-2); }
+.dsp__orden-n { font-size: 1rem; font-weight: 800; color: var(--c-leaf-700); min-width: 18px; text-align: center; }
+.dsp__orden-btns { display: flex; flex-direction: column; gap: 2px; }
+.dsp__orden-btn { display: flex; align-items: center; justify-content: center; width: 22px; height: 18px; border: 1px solid var(--c-ink-200); background: #fff; border-radius: 4px; cursor: pointer; color: #475569; font-size: .7rem; padding: 0; }
+.dsp__orden-btn:hover:not(:disabled) { background: #f0fdf4; border-color: var(--c-leaf-300); color: var(--c-leaf-700); }
+.dsp__orden-btn:disabled { opacity: .4; cursor: not-allowed; }
 .dsp__btn-clear {
   background: none;
   border: 1.5px solid var(--c-ink-200);

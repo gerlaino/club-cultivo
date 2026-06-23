@@ -212,6 +212,9 @@ export const cancelarEntregaDispensacion = (id, motivo) => api.patch(`/dispensac
 export const listDeliveryUsers  = ()                => api.get('/usuarios', { params: { role: 'delivery' } })
 export const listEntregadores   = ()                => api.get('/usuarios', { params: { roles: ['delivery', 'admin', 'supervisor'] } })
 export const listDespachos     = (params = {})      => api.get('/dispensaciones', { params: { con_envio: 'true', ...params } })
+export const getRutaEntrega    = (params = {})      => api.get('/rutas_entrega', { params })
+export const ordenarRuta       = (payload)          => api.post('/rutas_entrega/ordenar', payload)
+export const bloquearRuta      = (id, bloqueada)    => api.patch(`/rutas_entrega/${id}/bloqueo`, { bloqueada })
 export const reasignarDelivery = (id, deliveryId)  => api.patch(`/dispensaciones/${id}`, { dispensacion: { delivery_id: deliveryId } })
 
 // -------- USUARIOS (equipo del club) --------

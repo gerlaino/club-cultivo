@@ -851,6 +851,7 @@ router.beforeEach(async (to) => {
     !to.path.startsWith('/c/') &&
     !to.path.startsWith('/d/') &&
     !to.path.startsWith('/l/') &&
+    !to.path.endsWith('/etiqueta') &&
     !to.path.startsWith('/login')
   ) {
     // Si es una página de detalle conocida, redirigir a su equivalente /m/

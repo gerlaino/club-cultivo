@@ -37,6 +37,9 @@ class DispensacionSerializer
       entregado_at:       d.entregado_at,
       motivo_fallo:       d.motivo_fallo,
       historial_envio:    d.historial_envio || [],
+      orden_entrega:      d.orden_entrega,
+      ruta_id:            d.ruta_entrega_id,
+      ruta_bloqueada:     d.ruta_entrega&.bloqueada || false,
       created_at:         d.created_at,
     }
   end
@@ -46,6 +49,8 @@ class DispensacionSerializer
       id:                 d.id,
       codigo_paquete:     d.codigo_paquete,
       estado_envio:       d.estado_envio,
+      orden_entrega:      d.orden_entrega,
+      ruta_bloqueada:     d.ruta_entrega&.bloqueada || false,
       entregado_at:       d.entregado_at,
       notas_entrega:      d.notas_entrega,
       firma_entrega_data: d.firma_entrega_data,

@@ -22,7 +22,7 @@ class DispensacionesController < ApplicationController
         .joins(stock: :sede)
         .where(sedes: { club_id: current_user.club_id })
         .where(con_envio: true)
-        .includes(:user, :paciente, :sede, :delivery_user, stock: :lote)
+        .includes(:user, :paciente, :sede, :delivery_user, :ruta_entrega, stock: :lote)
       scope = scope.where(estado_envio: params[:estado_envio]) if params[:estado_envio].present?
       scope = scope.where(delivery_id: params[:delivery_id])   if params[:delivery_id].present?
       scope = scope.where("fecha_dispensacion >= ?", Date.parse(params[:desde])) if params[:desde].present?
@@ -189,8 +189,8 @@ class DispensacionesController < ApplicationController
       .del_delivery(current_user.id)
       .joins(stock: :sede)
       .where(sedes: { club_id: current_user.club_id })
-      .includes(:paciente, :sede, stock: :lote)
-      .order(created_at: :asc)
+      .includes(:paciente, :sede, :ruta_entrega, stock: :lote)
+      .order(Arel.sql('orden_entrega NULLS LAST, created_at ASC'))
     render json: { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion_delivery(d) } }
   end
 

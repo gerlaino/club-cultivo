@@ -129,6 +129,11 @@ Rails.application.routes.draw do
 
     get '/pesajes_manicura', to: 'pesajes_manicura#index_admin'
 
+    # Rutas de entrega (orden + candado del repartidor)
+    get   '/rutas_entrega',             to: 'rutas_entrega#show'
+    post  '/rutas_entrega/ordenar',     to: 'rutas_entrega#ordenar'
+    patch '/rutas_entrega/:id/bloqueo', to: 'rutas_entrega#bloqueo'
+
     get '/stocks/qr/:codigo_qr', to: 'stocks#show_by_qr'
     resources :stocks, only: [:index, :show, :create, :update, :destroy] do
       collection do

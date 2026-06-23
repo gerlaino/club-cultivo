@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_22_000003) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_23_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -347,6 +347,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_22_000003) do
     t.string "genetica_nombre"
     t.string "token"
     t.jsonb "producto_snapshot", default: {}, null: false
+    t.bigint "ruta_entrega_id"
+    t.integer "orden_entrega"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["delivery_id"], name: "index_dispensaciones_on_delivery_id"
@@ -356,6 +358,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_22_000003) do
     t.index ["medio_pago"], name: "index_dispensaciones_on_medio_pago"
     t.index ["paciente_id", "fecha_dispensacion"], name: "index_dispensaciones_on_paciente_id_and_fecha_dispensacion"
     t.index ["paciente_id"], name: "index_dispensaciones_on_paciente_id"
+    t.index ["ruta_entrega_id"], name: "index_dispensaciones_on_ruta_entrega_id"
     t.index ["sede_id"], name: "index_dispensaciones_on_sede_id"
     t.index ["stock_id"], name: "index_dispensaciones_on_stock_id"
     t.index ["token"], name: "index_dispensaciones_on_token", unique: true
@@ -1106,6 +1109,18 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_22_000003) do
     t.index ["user_id"], name: "index_reservas_on_user_id"
   end
 
+  create_table "rutas_entrega", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "delivery_id", null: false
+    t.date "fecha", null: false
+    t.boolean "bloqueada", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_rutas_entrega_on_club_id"
+    t.index ["delivery_id", "fecha"], name: "index_rutas_entrega_on_delivery_id_and_fecha", unique: true
+    t.index ["delivery_id"], name: "index_rutas_entrega_on_delivery_id"
+  end
+
   create_table "sala_cultivadores", force: :cascade do |t|
     t.bigint "sala_id", null: false
     t.bigint "user_id", null: false
@@ -1409,6 +1424,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_22_000003) do
   add_foreign_key "cuenta_corrientes", "pacientes"
   add_foreign_key "dispensaciones", "indicacion_medicas"
   add_foreign_key "dispensaciones", "pacientes"
+  add_foreign_key "dispensaciones", "rutas_entrega", column: "ruta_entrega_id"
   add_foreign_key "dispensaciones", "sedes"
   add_foreign_key "dispensaciones", "stocks", on_delete: :nullify
   add_foreign_key "dispensaciones", "users"
@@ -1504,6 +1520,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_22_000003) do
   add_foreign_key "reservas", "pacientes"
   add_foreign_key "reservas", "stocks"
   add_foreign_key "reservas", "users"
+  add_foreign_key "rutas_entrega", "clubs"
+  add_foreign_key "rutas_entrega", "users", column: "delivery_id"
   add_foreign_key "sala_cultivadores", "salas"
   add_foreign_key "sala_cultivadores", "users"
   add_foreign_key "salas", "clubs"

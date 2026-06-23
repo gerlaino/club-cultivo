@@ -10,6 +10,7 @@ class Dispensacion < ApplicationRecord
   belongs_to :stock
   belongs_to :sede,          optional: true
   belongs_to :delivery_user, class_name: 'User', foreign_key: :delivery_id, optional: true
+  belongs_to :ruta_entrega,  optional: true
 
   # Los asientos contables de la dispensación viven y mueren con ella. Puede haber
   # más de uno cuando se paga parte con crédito (deuda) y parte en efectivo (ingreso).

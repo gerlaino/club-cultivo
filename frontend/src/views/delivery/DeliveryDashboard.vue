@@ -76,6 +76,7 @@ function verRutaEnMaps() {
   window.open(base + waypoints, '_blank', 'noopener')
 }
 
+const rutaBloqueada = computed(() => paquetes.value.some(p => p.ruta_bloqueada))
 const pendientes = computed(() => paquetes.value.filter(p => p.estado_envio === 'pendiente'))
 const enViaje    = computed(() => paquetes.value.filter(p => p.estado_envio === 'en_viaje'))
 const fallidos   = computed(() => paquetes.value.filter(p => p.estado_envio === 'fallido'))
@@ -232,6 +233,12 @@ onMounted(load)
         <div class="dlv__empty-sub">Cuando te asignen dispensaciones aparecerán acá</div>
       </div>
 
+      <!-- Aviso de orden fijado por el club -->
+      <div v-if="rutaBloqueada" class="dlv__ruta-fija">
+        <i class="bi bi-lock-fill"></i>
+        El club fijó el <strong>orden de entrega</strong> — respetá la secuencia (número a la izquierda de cada paquete).
+      </div>
+
       <!-- Pendientes -->
       <div v-if="pendientes.length" class="dlv__section">
         <div class="dlv__section-title">Pendientes de retirar</div>
@@ -249,6 +256,7 @@ onMounted(load)
             />
             <div class="dlv__row-body" @click="toggleSelect(p.id)">
               <div class="dlv__row-top">
+                <span v-if="p.orden_entrega" class="dlv__orden-n" title="Orden de entrega">{{ p.orden_entrega }}</span>
                 <span class="dlv__pkg-code">{{ p.codigo_paquete }}</span>
                 <span class="dlv__badge dlv__badge--pendiente">Pendiente</span>
               </div>
@@ -472,6 +480,8 @@ onMounted(load)
 .dlv__row-body { flex: 1; min-width: 0; cursor: pointer; }
 .dlv__row-top { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); flex-wrap: wrap; }
 .dlv__pkg-code { font-family: monospace; font-size: var(--fs-13); font-weight: 700; color: var(--c-ink-800); background: var(--c-ink-50, #f1f5f9); padding: .15em .5em; border-radius: 5px; }
+.dlv__orden-n { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; background: #1b5e20; color: #fff; font-size: .8rem; font-weight: 800; border-radius: 6px; padding: 0 .3em; }
+.dlv__ruta-fija { display: flex; align-items: center; gap: .5rem; background: #fef3c7; border: 1.5px solid #fcd34d; color: #b45309; border-radius: 10px; padding: .7rem .9rem; font-size: .82rem; margin-bottom: var(--sp-4); }
 .dlv__badge { font-size: 12px; font-weight: 600; padding: .15em .55em; border-radius: 5px; }
 .dlv__badge--pendiente { background: var(--c-sky-100); color: var(--c-sky-600); }
 .dlv__badge--enviaje   { background: var(--c-amber-100); color: var(--c-amber-500); }
