@@ -81,10 +81,20 @@ const despachosFiltered = computed(() => {
 const despachosPendientesRuta = computed(() =>
   despachosFiltered.value.filter(d => d.estado_envio === 'pendiente'))
 
-// Ruta en Google Maps con los pendientes en orden.
+// Selección de despachos (en modo ruta) para armar la ruta en Maps.
+const seleccionados = ref(new Set())
+function toggleSel(id) {
+  const s = new Set(seleccionados.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  seleccionados.value = s
+}
+
+// Ruta en Google Maps: usa los seleccionados (si hay) o todos los pendientes en orden.
 function abrirEnMaps() {
-  const dirs = despachosPendientesRuta.value.map(d => d.direccion_envio).filter(Boolean)
-  if (!dirs.length) { toast.error('No hay direcciones para armar la ruta'); return }
+  let base = despachosPendientesRuta.value
+  if (seleccionados.value.size) base = base.filter(d => seleccionados.value.has(d.id))
+  const dirs = base.map(d => d.direccion_envio).filter(Boolean)
+  if (!dirs.length) { toast.error('Seleccioná despachos con dirección para armar la ruta'); return }
   const destino   = encodeURIComponent(dirs[dirs.length - 1])
   const waypoints = dirs.slice(0, -1).map(encodeURIComponent).join('|')
   let url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${destino}`
@@ -523,7 +533,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
     <div v-if="modoRuta && despachosFiltered.length" class="dsp__ruta-bar">
       <div class="dsp__ruta-info">
         <Truck :size="15" :stroke-width="2" />
-        <span><strong>Ruta de entrega</strong> · ordená con ↑↓ los pendientes</span>
+        <span><strong>Ruta de entrega</strong> · ordená con ↑↓ · tildá los que mandás a Maps</span>
         <DsSpinner v-if="guardandoOrden" :size="13" />
       </div>
       <label class="dsp__ruta-fecha">
@@ -531,7 +541,8 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
         <AppDatePicker v-model="fechaRuta" />
       </label>
       <button class="dsp__ruta-maps" :disabled="!despachosPendientesRuta.length" @click="abrirEnMaps">
-        <i class="bi bi-geo-alt-fill"></i> Ruta en Maps
+        <i class="bi bi-geo-alt-fill"></i>
+        Ruta en Maps<template v-if="seleccionados.size"> ({{ seleccionados.size }})</template>
       </button>
       <button
         class="dsp__ruta-lock"
@@ -567,6 +578,15 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 
         <!-- Fila principal (clickable) -->
         <div class="dsp__row-main" @click="toggleExpand(d.id)">
+
+          <!-- Selección para la ruta en Maps (solo pendientes, en modo ruta) -->
+          <input
+            v-if="modoRuta && d.estado_envio === 'pendiente'"
+            type="checkbox" class="dsp__sel"
+            :checked="seleccionados.has(d.id)"
+            title="Incluir en la ruta de Maps"
+            @click.stop="toggleSel(d.id)"
+          />
 
           <!-- Orden de ruta (solo pendientes, al filtrar por repartidor) -->
           <div v-if="modoRuta && d.estado_envio === 'pendiente'" class="dsp__orden" @click.stop>
@@ -984,6 +1004,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 .dsp__ruta-maps:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Controles de orden en la fila */
+.dsp__sel { width: 17px; height: 17px; accent-color: var(--c-leaf-700, #15803d); cursor: pointer; flex-shrink: 0; margin-right: var(--sp-1); }
 .dsp__orden { display: flex; align-items: center; gap: .4rem; padding-right: var(--sp-2); border-right: 1px solid var(--c-ink-100); margin-right: var(--sp-2); }
 .dsp__orden-n { font-size: 1rem; font-weight: 800; color: var(--c-leaf-700); min-width: 18px; text-align: center; }
 .dsp__orden-btns { display: flex; flex-direction: column; gap: 2px; }

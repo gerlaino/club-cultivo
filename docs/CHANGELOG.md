@@ -3,7 +3,7 @@
 ## Delivery: reordenar su ruta + ruta en Google Maps (2026-06-23)
 
 - **El repartidor puede reordenar sus entregas** (flechas ↑↓ en su dashboard) **solo si el club NO fijó el orden** (ruta no bloqueada). Backend: `rutas_entrega#ordenar` ahora permite al delivery ordenar su propia ruta no bloqueada (sigue bloqueado para staff-only el candado). Specs nuevos.
-- **Botón "Ruta en Maps"**: arma la ruta en Google Maps (directions, modo conducción) con las direcciones de los despachos pendientes en orden — en el dashboard del repartidor (según seleccionados o todos los pendientes) y en la barra de ruta del admin.
+- **Botón "Ruta en Maps"**: arma la ruta en Google Maps (directions, modo conducción) con las direcciones **de los despachos seleccionados** (o todos los pendientes en orden si no hay selección). En la vista admin se agregaron **checkboxes** a los pendientes (en modo ruta) para elegir cuáles mandar a Maps; el dashboard del repartidor ya tenía selección.
 - Ícono "con envío" del historial y de la lista del paciente: **camión** (consistente con despachos).
 
 ## Guard de cambio de rol (2026-06-23)
