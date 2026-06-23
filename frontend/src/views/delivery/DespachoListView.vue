@@ -573,7 +573,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
         :key="d.id"
         :id="`despacho-${d.id}`"
         class="dsp__row"
-        :class="`dsp__row--${d.estado_envio}`"
+        :class="[`dsp__row--${d.estado_envio}`, { 'dsp__row--menu-open': menuAbierto === d.id }]"
       >
 
         <!-- Fila principal (clickable) -->
@@ -1055,6 +1055,8 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
   overflow: hidden;
   transition: border-color .15s, box-shadow .15s;
 }
+/* Con el menú Acciones abierto, la fila no debe recortarlo (overflow) y debe quedar por encima. */
+.dsp__row--menu-open { overflow: visible; position: relative; z-index: 30; }
 .dsp__row--pendiente { border-left: 3px solid #60a5fa; }
 .dsp__row--en_viaje  { border-left: 3px solid #fbbf24; }
 .dsp__row--entregado { border-left: 3px solid var(--c-leaf-400); }
