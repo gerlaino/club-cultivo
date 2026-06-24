@@ -546,6 +546,39 @@ async function onOnboardingCompletado() {
 
       </div>
 
+      <!-- ── Reservas para preparar ──────────────────────────────────────── -->
+      <div class="ad__widget ad__widget--lotes ad__widget--reservas">
+        <div class="ad__widget-hdr">
+          <span class="ad__widget-title">📦 Reservas para preparar</span>
+          <RouterLink to="/reservas" class="ad__widget-link">Ver todas →</RouterLink>
+        </div>
+        <div v-if="!reservasLista.length" class="ad__empty ad__empty--pad">
+          No hay reservas para preparar hoy ·
+          <RouterLink to="/reservas" style="color:#2563eb">Ver reservas →</RouterLink>
+        </div>
+        <div v-else class="ad__reservas">
+          <RouterLink
+            v-for="r in reservasLista.slice(0, 8)" :key="r.id"
+            to="/reservas"
+            class="ad__reserva"
+            :class="{ 'ad__reserva--venc': r.vencida }"
+          >
+            <div class="ad__reserva-main">
+              <span class="ad__reserva-nombre">{{ r.paciente }}</span>
+              <span class="ad__reserva-prod">{{ fmtG(r.cantidad) }} · {{ formaLabelRes(r.forma_producto) }}</span>
+            </div>
+            <div class="ad__reserva-side">
+              <span class="ad__reserva-fecha" :class="{ 'ad__reserva-fecha--venc': r.vencida }">
+                <i v-if="r.vencida" class="bi bi-exclamation-circle"></i>
+                {{ r.vencida ? 'Venció ' : '' }}{{ fmtFechaRes(r.fecha) }}
+              </span>
+              <span v-if="r.resta_ars > 0" class="ad__reserva-resta">Resta {{ fmtARSres(r.resta_ars) }}</span>
+              <span v-else class="ad__reserva-sena">Señada ✓</span>
+            </div>
+          </RouterLink>
+        </div>
+      </div>
+
       <!-- ── ZONA 2.5: RESUMEN ANUAL ───────────────────────────────────────── -->
       <div v-if="ejActual" class="ad__anual">
         <div class="ad__anual-hdr">
@@ -645,35 +678,6 @@ async function onOnboardingCompletado() {
         <div v-else class="ad__empty ad__empty--pad">
           Sin lotes activos ·
           <RouterLink to="/lotes" style="color:#2563eb">Ver lotes →</RouterLink>
-        </div>
-      </div>
-
-      <!-- ── Reservas para preparar ──────────────────────────────────────── -->
-      <div v-if="reservasLista.length" class="ad__widget ad__widget--lotes">
-        <div class="ad__widget-hdr">
-          <span class="ad__widget-title">Reservas para preparar</span>
-          <RouterLink to="/reservas" class="ad__widget-link">Ver todas →</RouterLink>
-        </div>
-        <div class="ad__reservas">
-          <RouterLink
-            v-for="r in reservasLista.slice(0, 8)" :key="r.id"
-            to="/reservas"
-            class="ad__reserva"
-            :class="{ 'ad__reserva--venc': r.vencida }"
-          >
-            <div class="ad__reserva-main">
-              <span class="ad__reserva-nombre">{{ r.paciente }}</span>
-              <span class="ad__reserva-prod">{{ fmtG(r.cantidad) }} · {{ formaLabelRes(r.forma_producto) }}</span>
-            </div>
-            <div class="ad__reserva-side">
-              <span class="ad__reserva-fecha" :class="{ 'ad__reserva-fecha--venc': r.vencida }">
-                <i v-if="r.vencida" class="bi bi-exclamation-circle"></i>
-                {{ r.vencida ? 'Venció ' : '' }}{{ fmtFechaRes(r.fecha) }}
-              </span>
-              <span v-if="r.resta_ars > 0" class="ad__reserva-resta">Resta {{ fmtARSres(r.resta_ars) }}</span>
-              <span v-else class="ad__reserva-sena">Señada ✓</span>
-            </div>
-          </RouterLink>
         </div>
       </div>
 
@@ -1069,6 +1073,8 @@ async function onOnboardingCompletado() {
 
 /* Pacientes hoy */
 /* Reservas para preparar */
+.ad__widget--reservas { border-color: #bbf7d0; }
+.ad__widget--reservas .ad__widget-hdr { background: #f0fdf4; }
 .ad__reservas { display: flex; flex-direction: column; }
 .ad__reserva {
   display: flex; align-items: center; justify-content: space-between; gap: .75rem;
