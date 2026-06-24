@@ -14,11 +14,14 @@ const MOBILE_HOME  = {
 }
 
 const requiresPermission = (resource, action) => {
-  return (to, from, next) => {
+  return async (to, from, next) => {
     const auth = useAuthStore();
+    // Esperar el bootstrap: en un refresh, el beforeEnter corre antes de que fetchMe
+    // traiga el usuario, y can() devolvía false (rol vacío) → redirigía a dashboard.
+    await auth.ensureBootstrapped();
     const { can } = usePermissions();
     if (!auth.isAuthenticated) {
-      next("/login");
+      next({ name: "login", query: { redirect: to.fullPath } });
     } else if (!can(resource, action)) {
       next("/");
     } else {
@@ -819,13 +822,16 @@ const ROLE_ALLOWED_PREFIX = {
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
-  // Las rutas que necesitan saber si hay sesión esperan el bootstrap; las públicas
-  // (QR, carnet, login, dispensa) NO se bloquean — así renderizan al instante aunque
-  // el backend esté despertando (free tier) y no quede la pantalla en negro.
-  if (to.meta.requiresAuth || to.meta.guestOnly) {
-    await auth.ensureBootstrapped();
-  } else {
+  // Esperamos el bootstrap en TODAS las rutas de la app (no solo las requiresAuth):
+  // muchas tienen beforeEnter que chequean el rol, y en un refresh corrían antes de
+  // que fetchMe trajera el usuario → can()/role daban vacío y redirigían a dashboard.
+  // Las páginas públicas por token (carnet, dispensa, genética) NO se bloquean — así
+  // renderizan al instante aunque el backend esté despertando (free tier).
+  const esPublicaToken = /^\/(c|d|g)\//.test(to.path);
+  if (esPublicaToken) {
     auth.ensureBootstrapped();
+  } else {
+    await auth.ensureBootstrapped();
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
