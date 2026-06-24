@@ -11,7 +11,7 @@ import {
 import {
   listDespachos, listEntregadores, reasignarDelivery, reprogramarPaquete,
   listReservas, entregarReserva, entregarPaquete, reportarFallo, cancelarEntregaDispensacion,
-  getRutaEntrega, ordenarRuta, bloquearRuta,
+  getRutaEntrega, ordenarRuta, bloquearRuta, assetUrl,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -687,6 +687,22 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
                   <img :src="d.firma_entrega_data" alt="Firma" class="dsp__firma-img" />
                 </div>
               </template>
+
+              <!-- Comprobantes de pago (por cobro) -->
+              <template v-for="c in (d.cobros || []).filter(c => c.comprobante_url)" :key="`comp-${c.id}`">
+                <div class="dsp__detail-label dsp__detail-label--green">Comprobante de pago</div>
+                <a :href="assetUrl(c.comprobante_url)" target="_blank" rel="noopener" class="dsp__comp-link">
+                  <img :src="assetUrl(c.comprobante_url)" alt="Comprobante de pago" class="dsp__comp-img" />
+                </a>
+              </template>
+
+              <!-- Comprobante de entrega -->
+              <template v-if="d.comprobante_entrega_url">
+                <div class="dsp__detail-label dsp__detail-label--green">Comprobante de entrega</div>
+                <a :href="assetUrl(d.comprobante_entrega_url)" target="_blank" rel="noopener" class="dsp__comp-link">
+                  <img :src="assetUrl(d.comprobante_entrega_url)" alt="Comprobante de entrega" class="dsp__comp-img" />
+                </a>
+              </template>
             </div>
 
           </div>
@@ -1181,6 +1197,8 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 .dsp__detail-val--green  { color: var(--c-leaf-700); }
 .dsp__firma-preview { border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; padding: .4rem; display: inline-block; }
 .dsp__firma-img { display: block; max-width: 240px; height: auto; }
+.dsp__comp-link { display: inline-block; }
+.dsp__comp-img { display: block; max-width: 240px; max-height: 320px; height: auto; border-radius: 8px; border: 1px solid #e2e8f0; }
 .dsp__code-sm {
   font-family: monospace;
   font-size: var(--fs-13);
