@@ -12,6 +12,13 @@
       </RouterLink>
     </div>
 
+    <!-- Banner: reservas vencidas sin preparar -->
+    <RouterLink v-if="!loading && reservasVencidas > 0" to="/reservas" class="dd__banner-alert">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <span>Tenés <strong>{{ reservasVencidas }}</strong> reserva{{ reservasVencidas !== 1 ? 's' : '' }} vencida{{ reservasVencidas !== 1 ? 's' : '' }} sin preparar</span>
+      <span class="dd__banner-arrow">Ir a reservas →</span>
+    </RouterLink>
+
     <!-- KPIs periodo -->
     <div class="dd__kpis">
       <div class="dd__kpi-card">
@@ -36,6 +43,41 @@
           {{ analytics.reprocann.vencidos }} vencidos · {{ analytics.reprocann.por_vencer }} por vencer
         </div>
         <div class="dd__kpi-sub" v-else-if="!loading">pacientes con atención requerida</div>
+      </div>
+      <div class="dd__kpi-card" :class="{ 'dd__kpi-card--warn': reservasVencidas > 0 }">
+        <div class="dd__kpi-label">Reservas para hoy</div>
+        <div class="dd__kpi-val">{{ loading ? '…' : reservasHoy }}</div>
+        <div class="dd__kpi-sub dd__kpi-sub--warn" v-if="!loading && reservasVencidas > 0">+ {{ reservasVencidas }} vencida{{ reservasVencidas !== 1 ? 's' : '' }}</div>
+        <div class="dd__kpi-sub" v-else-if="!loading">para preparar</div>
+      </div>
+    </div>
+
+    <!-- Reservas para preparar -->
+    <div v-if="!loading && reservasLista.length" class="dd__section">
+      <div class="dd__section-head">
+        <h2 class="dd__section-title">Reservas para preparar</h2>
+        <RouterLink to="/reservas" class="dd__section-link">Ver todas →</RouterLink>
+      </div>
+      <div class="dd__reservas">
+        <RouterLink
+          v-for="r in reservasLista" :key="r.id"
+          to="/reservas"
+          class="dd__reserva"
+          :class="{ 'dd__reserva--vencida': r.vencida }"
+        >
+          <div class="dd__reserva-main">
+            <div class="dd__reserva-nombre">{{ r.paciente }}</div>
+            <div class="dd__reserva-prod">{{ formatG(r.cantidad) }} · {{ formaLabel(r.forma_producto) }}</div>
+          </div>
+          <div class="dd__reserva-side">
+            <div class="dd__reserva-fecha" :class="{ 'dd__reserva-fecha--vencida': r.vencida }">
+              <i v-if="r.vencida" class="bi bi-exclamation-circle"></i>
+              {{ r.vencida ? 'Venció ' : '' }}{{ fmtFechaReserva(r.fecha) }}
+            </div>
+            <div v-if="r.resta_ars > 0" class="dd__reserva-resta">Resta {{ fmtARS(r.resta_ars) }}</div>
+            <div v-else class="dd__reserva-pago">Señada ✓</div>
+          </div>
+        </RouterLink>
       </div>
     </div>
 
@@ -153,6 +195,23 @@ const reprocannAlerta = computed(() => {
 
 function formatG(g) { return g != null ? `${Number(g).toLocaleString('es-AR')} g` : '—' }
 
+// ── Reservas para preparar ────────────────────────────────────────────────
+const reservasHoy      = computed(() => analytics.value?.reservas?.hoy ?? 0)
+const reservasVencidas = computed(() => analytics.value?.reservas?.vencidas ?? 0)
+const reservasLista    = computed(() => analytics.value?.reservas?.lista ?? [])
+
+const FORMA_LABEL = {
+  flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
+  crema: 'Crema', capsula: 'Cápsula', comestible: 'Comestible', prensado: 'Prensado',
+  preroll: 'Preroll', externo: 'Externo', otro: 'Otro',
+}
+function formaLabel(f) { return FORMA_LABEL[f] || f || '—' }
+function fmtFechaReserva(f) {
+  if (!f) return '—'
+  return new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+}
+function fmtARS(n) { return '$' + (Number(n) || 0).toLocaleString('es-AR') }
+
 function formatHora(ts) {
   if (!ts) return '—'
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
@@ -206,6 +265,34 @@ onMounted(async () => {
 .dd__section-title { font-size: var(--fs-15); font-weight: 700; color: var(--c-ink-900); margin: 0; }
 .dd__section-link { font-size: var(--fs-13); color: var(--c-ink-500); text-decoration: none; }
 .dd__section-link:hover { color: var(--c-ink-900); }
+
+/* Banner reservas vencidas */
+.dd__banner-alert {
+  display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
+  background: #fff5f5; border: 1.5px solid #fca5a5; color: #991b1b;
+  font-size: var(--fs-14); text-decoration: none;
+}
+.dd__banner-alert:hover { background: #fef2f2; }
+.dd__banner-arrow { margin-left: auto; font-weight: 700; white-space: nowrap; }
+
+/* Reservas para preparar */
+.dd__reservas { display: flex; flex-direction: column; gap: var(--sp-2); }
+.dd__reserva {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
+  background: var(--c-paper, #fff); border: 1px solid var(--c-ink-100, #e2e8f0);
+  text-decoration: none; color: inherit; transition: border-color .15s, box-shadow .15s;
+}
+.dd__reserva:hover { border-color: var(--c-leaf-400, #86efac); box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+.dd__reserva--vencida { border-left: 3px solid #ef4444; }
+.dd__reserva-nombre { font-weight: 700; color: var(--c-ink-900, #0f172a); font-size: var(--fs-14); }
+.dd__reserva-prod { font-size: var(--fs-13); color: var(--c-ink-500, #64748b); margin-top: 1px; }
+.dd__reserva-side { text-align: right; white-space: nowrap; }
+.dd__reserva-fecha { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700, #334155); }
+.dd__reserva-fecha--vencida { color: #dc2626; }
+.dd__reserva-resta { font-size: var(--fs-12); color: #b45309; margin-top: 1px; }
+.dd__reserva-pago { font-size: var(--fs-12); color: #15803d; margin-top: 1px; }
 
 /* Stock grid */
 .dd__stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); }

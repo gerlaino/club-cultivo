@@ -158,6 +158,24 @@ class AnalyticsController < ApplicationController
       { fecha: date.strftime('%d/%m'), count: base_disps.where(fecha_dispensacion: date).count }
     end
 
+    # Reservas a preparar: pendientes con fecha de entrega <= hoy (las de hoy + las vencidas).
+    reservas_scope = Reserva.where(club_id: club.id).pendientes
+    reservas_por_preparar = reservas_scope.where('fecha_entrega_estimada <= ?', hoy)
+                                          .includes(:paciente, :stock)
+                                          .order(fecha_entrega_estimada: :asc)
+    reservas_lista = reservas_por_preparar.limit(20).map do |r|
+      {
+        id:             r.id,
+        paciente:       r.paciente ? "#{r.paciente.nombre} #{r.paciente.apellido}".strip : '—',
+        fecha:          r.fecha_entrega_estimada,
+        vencida:        r.fecha_entrega_estimada < hoy,
+        forma_producto: r.stock&.forma_producto,
+        cantidad:       r.cantidad.to_f,
+        sena_ars:       r.sena_ars.to_f,
+        resta_ars:      r.aporte_restante_ars.to_f,
+      }
+    end
+
     {
       resumen: {
         dispensaciones_hoy:    disps_hoy.count,
@@ -174,6 +192,12 @@ class AnalyticsController < ApplicationController
       stocks:        stocks_data,
       top_pacientes: top_pacientes,
       por_dia:       por_dia,
+      reservas: {
+        hoy:      reservas_por_preparar.where(fecha_entrega_estimada: hoy).count,
+        vencidas: reservas_por_preparar.where('fecha_entrega_estimada < ?', hoy).count,
+        total:    reservas_por_preparar.count,
+        lista:    reservas_lista,
+      },
     }
   end
 
