@@ -633,7 +633,7 @@ const FORMAS = [
 .hd__buscar-item:hover { background: #f0fdf4; }
 .hd__buscar-item:last-child { border-bottom: none; }
 .hd__buscar-nombre { font-size: .875rem; font-weight: 600; color: #0f172a; }
-.hd__buscar-dni { font-size: .75rem; color: #94a3b8; font-family: monospace; }
+.hd__buscar-dni { font-size: .75rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
 
 .hd-modal-enter-active, .hd-modal-leave-active { transition: opacity .2s; }
 .hd-modal-enter-from, .hd-modal-leave-to { opacity: 0; }
@@ -741,7 +741,7 @@ const FORMAS = [
 .hd__th-num, .hd__td-num { text-align: right; }
 .hd__td-fecha { white-space: nowrap; }
 .hd__fecha-day { display: block; font-weight: 600; font-size: var(--fs-13); color: var(--c-ink-900); }
-.hd__fecha-hora { display: block; font-size: 11px; color: var(--c-ink-400); font-family: var(--font-mono, monospace); margin-top: 1px; }
+.hd__fecha-hora { display: block; font-size: 11px; color: var(--c-ink-400); font-variant-numeric: tabular-nums; margin-top: 1px; }
 .hd__td-paciente { font-weight: 500; }
 .hd__link-paciente { color: var(--c-ink-800); text-decoration: none; font-weight: 600; }
 .hd__link-paciente:hover { color: #1b5e20; }
@@ -756,9 +756,9 @@ const FORMAS = [
   font-weight: 600;
   white-space: nowrap;
 }
-.hd__td-qty { font-family: var(--font-mono, monospace); font-weight: 600; color: var(--c-ink-700); }
-.hd__td-price { font-family: var(--font-mono, monospace); color: var(--c-ink-500); }
-.hd__td-monto { font-weight: 700; color: #15803d; font-family: var(--font-mono, monospace); font-size: var(--fs-14); }
+.hd__td-qty { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--c-ink-700); }
+.hd__td-price { font-variant-numeric: tabular-nums; color: var(--c-ink-500); }
+.hd__td-monto { font-weight: 700; color: #15803d; font-variant-numeric: tabular-nums; font-size: var(--fs-14); }
 .hd__dash { color: var(--c-ink-300); }
 .hd__desc-badge {
   display: inline-block;
