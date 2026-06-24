@@ -43,8 +43,6 @@
             <select v-model="medioPago" class="mer__input">
               <option value="efectivo">Efectivo</option>
               <option value="transferencia">Transferencia</option>
-              <option value="debito">Débito</option>
-              <option value="credito">Crédito</option>
               <option value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin crédito)' : '' }}</option>
             </select>
           </div>

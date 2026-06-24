@@ -77,10 +77,11 @@ module Dispensaciones
       @cuenta_corriente ||= @dispensacion.paciente.cuenta_corriente
     end
 
-    # Efectivo cobrado por el delivery en la entrega: su asiento se difiere hasta la
-    # recepción de caja (caja en tránsito). El resto se asienta en el acto.
+    # Efectivo cobrado por el DELIVERY en la entrega: su asiento se difiere hasta la
+    # recepción de caja (caja en tránsito). Si entrega un admin/supervisor, la plata
+    # entra directo a la caja del club → se asienta en el acto (no se difiere).
     def diferido_a_rendicion?
-      @medio == 'efectivo' && @contexto == 'entrega'
+      @medio == 'efectivo' && @contexto == 'entrega' && @usuario&.role == 'delivery'
     end
 
     def asiento_contable(cobro)

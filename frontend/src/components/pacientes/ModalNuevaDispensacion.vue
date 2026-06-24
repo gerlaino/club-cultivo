@@ -478,11 +478,8 @@ async function handleSubmit() {
               <select v-model="form.medio_pago" class="mnd__input">
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
-                <option value="debito">Débito</option>
-                <option value="credito">Crédito</option>
                 <option value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite configurado)' : '' }}</option>
                 <option v-if="!form.es_reserva" value="contra_entrega">Contra entrega (cobra el delivery)</option>
-                <option value="otro">Otro</option>
               </select>
             </div>
           </div>

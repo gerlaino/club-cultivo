@@ -183,11 +183,8 @@ const stk = computed(() => props.dispensacion?.stock)
               <select v-model="form.medio_pago" class="med__input">
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
-                <option value="debito">Débito</option>
-                <option value="credito">Crédito</option>
                 <option value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite)' : '' }}</option>
                 <option value="no_abona">No abona</option>
-                <option value="otro">Otro</option>
               </select>
             </div>
           </div>

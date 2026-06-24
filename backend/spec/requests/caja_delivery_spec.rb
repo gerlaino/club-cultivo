@@ -52,4 +52,27 @@ RSpec.describe 'Caja del delivery: efectivo en tránsito', type: :request do
     get "/usuarios/#{delivery.id}/stats", headers: auth_headers
     expect(JSON.parse(response.body).dig('caja_delivery', 'efectivo_en_mano')).to eq(0)
   end
+
+  it 'si entrega un admin (no el delivery), el efectivo se asienta en el acto' do
+    sign_in_as(dispensador)
+    post "/pacientes/#{paciente.id}/dispensaciones",
+         params: { dispensacion: { stock_id: stock.id, cantidad: 1, cobrar_en_entrega: true,
+                                   con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true } },
+         headers: auth_headers
+    d = Dispensacion.last
+
+    # El ADMIN entrega y cobra efectivo → la plata entra a la caja del club
+    delete '/api/users/sign_out'
+    sign_in_as(admin)
+    patch "/dispensaciones/#{d.id}/entregar",
+          params: { cobros: [{ medio: 'efectivo', monto: 100_000 }], notas_entrega: 'OK' },
+          headers: auth_headers
+    expect(response).to have_http_status(:ok)
+
+    cobro = d.cobros.find_by(medio: 'efectivo')
+    expect(cobro.rendido).to be true                                  # NO queda en tránsito
+    expect(d.movimientos_contables.where(medio_pago: 'efectivo')).to be_present  # asiento al instante
+    get "/usuarios/#{delivery.id}/stats", headers: auth_headers
+    expect(JSON.parse(response.body).dig('caja_delivery', 'efectivo_en_mano')).to eq(0)
+  end
 end

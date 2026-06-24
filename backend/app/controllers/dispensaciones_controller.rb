@@ -237,7 +237,7 @@ class DispensacionesController < ApplicationController
 
   # PATCH /dispensaciones/:id/entregar
   def entregar
-    unless @dispensacion.delivery_id == current_user.id || current_user.admin?
+    unless @dispensacion.delivery_id == current_user.id || current_user.admin? || current_user.supervisor?
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
     unless %w[pendiente en_viaje].include?(@dispensacion.estado_envio)
@@ -276,7 +276,7 @@ class DispensacionesController < ApplicationController
 
   # PATCH /dispensaciones/:id/reportar_fallo
   def reportar_fallo
-    unless @dispensacion.delivery_id == current_user.id || current_user.admin?
+    unless @dispensacion.delivery_id == current_user.id || current_user.admin? || current_user.supervisor?
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
     unless %w[pendiente en_viaje].include?(@dispensacion.estado_envio)

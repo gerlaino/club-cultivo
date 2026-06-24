@@ -234,8 +234,8 @@ function descuentoTitle(d) {
 
 const MEDIOS_PAGO = [
   { value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' },
-  { value: 'debito', label: 'Débito' }, { value: 'credito', label: 'Crédito' },
   { value: 'cuenta_corriente', label: 'Cta. corriente' },
+  { value: 'mixto', label: 'Mixto' },
   { value: 'no_abona', label: 'No abona' },
 ]
 const FORMAS = [
