@@ -83,6 +83,8 @@
             <input v-model.number="editForm.cantidad" type="number" min="0.01" step="0.01" class="rsv__modal-input" />
             <label class="rsv__modal-label">Fecha de entrega estimada</label>
             <AppDatePicker v-model="editForm.fecha_entrega_estimada" :min="hoy" />
+            <label class="rsv__modal-label">Seña</label>
+            <input v-model.number="editForm.sena_ars" type="number" min="0" step="1" class="rsv__modal-input" placeholder="0" />
             <template v-if="editTieneSena">
               <label class="rsv__modal-label">Medio de pago de la seña</label>
               <select v-model="editForm.medio_pago" class="rsv__modal-input">
@@ -170,7 +172,7 @@ async function guardarEdicion() {
   savingEdit.value = true
   editError.value = null
   try {
-    const { id, sena_ars, ...payload } = editForm.value
+    const { id, ...payload } = editForm.value
     await updateReserva(id, payload)
     toast.success('Reserva actualizada')
     showEdit.value = false

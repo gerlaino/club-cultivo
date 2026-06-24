@@ -141,6 +141,28 @@ RSpec.describe 'Reservas', type: :request do
       patch "/reservas/#{reserva.id}", params: { reserva: { cantidad: 5 } }, headers: auth_headers
       expect(response).to have_http_status(:unprocessable_entity)
     end
+
+    it 'editar la seña sincroniza el asiento contable y la cuenta corriente' do
+      cc = CuentaCorriente.create!(paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 5000)
+      post "/pacientes/#{paciente.id}/reservas",
+           params: { reserva: { stock_id: stock.id, cantidad: 10, sena_ars: 300,
+                                aporte_estimado_ars: 2000, fecha_entrega_estimada: 3.days.from_now.to_date } },
+           headers: auth_headers
+      r = Reserva.last
+      expect(cc.reload.saldo_disponible.to_f).to eq(300.0)   # la seña acreditó la CC
+
+      patch "/reservas/#{r.id}", params: { reserva: { sena_ars: 500 } }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(r.reload.sena_ars.to_f).to eq(500.0)
+      mov = MovimientoContable.where(paciente_id: paciente.id, categoria: 'aporte_socio').last
+      expect(mov.monto_ars.to_f).to eq(500.0)               # asiento actualizado
+      expect(cc.reload.saldo_disponible.to_f).to eq(500.0)  # -300 +500 = neto 500
+    end
+
+    it 'rechaza una seña mayor al total estimado' do
+      patch "/reservas/#{reserva.id}", params: { reserva: { sena_ars: 99999 } }, headers: auth_headers
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
   end
 
   describe 'DELETE /reservas/:id (eliminar)' do

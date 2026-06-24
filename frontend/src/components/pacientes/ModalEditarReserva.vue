@@ -12,6 +12,8 @@
           <input v-model.number="form.cantidad" type="number" min="0.01" step="0.01" class="mre__input" />
           <label class="mre__label">Fecha de entrega estimada</label>
           <AppDatePicker v-model="form.fecha_entrega_estimada" :min="hoy" />
+          <label class="mre__label">Seña</label>
+          <input v-model.number="form.sena_ars" type="number" min="0" step="1" class="mre__input" placeholder="0" />
           <!-- El medio de pago solo aplica si se dejó seña (es el medio con que se pagó). -->
           <template v-if="tieneSena">
             <label class="mre__label">Medio de pago de la seña</label>
@@ -44,10 +46,11 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 const toast = useToast()
 
 const hoy    = new Date().toISOString().split('T')[0]
-const tieneSena = computed(() => Number(props.reserva?.sena_ars) > 0)
 const saving = ref(false)
 const error  = ref(null)
-const form   = ref({ cantidad: null, fecha_entrega_estimada: '', medio_pago: 'efectivo' })
+const form   = ref({ cantidad: null, fecha_entrega_estimada: '', medio_pago: 'efectivo', sena_ars: 0 })
+// El medio de pago solo aplica si hay seña (es el medio con que se pagó esa seña).
+const tieneSena = computed(() => Number(form.value.sena_ars) > 0)
 
 watch(() => props.modelValue, (open) => {
   if (!open || !props.reserva) return
@@ -55,6 +58,7 @@ watch(() => props.modelValue, (open) => {
     cantidad: props.reserva.cantidad,
     fecha_entrega_estimada: props.reserva.fecha_entrega_estimada,
     medio_pago: props.reserva.medio_pago || 'efectivo',
+    sena_ars: props.reserva.sena_ars || 0,
   }
   error.value = null
 })

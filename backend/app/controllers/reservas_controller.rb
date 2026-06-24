@@ -70,8 +70,20 @@ class ReservasController < ApplicationController
         return render json: { errors: ["Cantidad inválida. Disponible: #{disponible.to_f}#{@reserva.stock.unidad}"] }, status: :unprocessable_entity
       end
     end
+    # La seña no puede superar el total estimado.
+    nueva_sena = attrs[:sena_ars].present? ? attrs[:sena_ars].to_d : @reserva.sena_ars.to_d
+    if nueva_sena > @reserva.aporte_estimado_ars.to_d
+      return render json: { errors: ['La seña no puede superar el total estimado.'] }, status: :unprocessable_entity
+    end
+
+    sena_anterior  = @reserva.sena_ars.to_d
+    medio_anterior = @reserva.medio_pago
     if @reserva.update(attrs)
-      sincronizar_medio_sena!(@reserva)   # si hay seña, el medio editado es el de la seña
+      # Si cambió la seña (monto o medio), re-registramos su asiento contable: revierte
+      # el viejo (y su crédito de cuenta corriente) y crea el nuevo.
+      if @reserva.sena_ars.to_d != sena_anterior || @reserva.medio_pago != medio_anterior
+        re_registrar_sena!(@reserva)
+      end
       render json: serialize_reserva(@reserva)
     else
       render json: { errors: @reserva.errors.full_messages }, status: :unprocessable_entity
@@ -211,10 +223,10 @@ class ReservasController < ApplicationController
     )
   end
 
-  # Edición de reserva pendiente: campos sin impacto financiero complejo. La seña
-  # no se edita (ya quedó asentada); para cambiarla, cancelar y rehacer.
+  # Edición de reserva pendiente. La seña SÍ se puede editar (monto y medio): al cambiarla
+  # se re-registra su asiento contable y se ajusta el crédito de cuenta corriente.
   def reserva_update_params
-    params.require(:reserva).permit(:cantidad, :fecha_entrega_estimada, :medio_pago, :notas)
+    params.require(:reserva).permit(:cantidad, :fecha_entrega_estimada, :medio_pago, :notas, :sena_ars)
   end
 
   # Reservan: dispensador, admin, supervisor.
@@ -230,13 +242,14 @@ class ReservasController < ApplicationController
     (precio_base * (1 - descuento) * cantidad.to_d).round(2)
   end
 
-  # Si la reserva tiene seña, su medio_pago ES el de la seña: al editarlo, sincronizamos
-  # el asiento contable de la seña para que el libro no quede desincronizado.
-  def sincronizar_medio_sena!(reserva)
-    return unless reserva.sena_ars.to_d > 0
+  # Al editar la seña (monto o medio) re-registramos su asiento contable: destruye el
+  # anterior —lo que revierte el crédito de cuenta corriente que había generado— y crea
+  # el nuevo con los valores actualizados. Así libro y crédito quedan sincronizados.
+  def re_registrar_sena!(reserva)
     MovimientoContable.where(paciente_id: reserva.paciente_id, categoria: 'aporte_socio')
                       .where('descripcion LIKE ?', "Seña reserva ##{reserva.id} —%")
-                      .update_all(medio_pago: reserva.medio_pago.presence || 'efectivo')
+                      .destroy_all   # corre el callback que revierte el crédito de CC
+    registrar_sena(reserva) if reserva.sena_ars.to_d > 0
   end
 
   # La seña es plata real que entra al reservar. Se asienta como ingreso (no reembolsable
