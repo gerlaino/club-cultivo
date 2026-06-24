@@ -149,6 +149,9 @@ Rails.application.routes.draw do
     end
 
     resources :plants do
+      collection do
+        get 'por_qr/:codigo_qr', action: :por_qr
+      end
       member do
         post   :add_foto
         post   :registrar_peso

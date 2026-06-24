@@ -258,8 +258,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useClubStore } from '../stores/club'
 import { usePermissions } from '../composables/usePermissions'
-import { getPlant, listPlants, registrarPesoPlanta } from '../lib/api'
-import axios from 'axios'
+import { getPlant, listPlants, registrarPesoPlanta, getPlantaPorQR } from '../lib/api'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
@@ -301,29 +300,18 @@ const ESTADO_LABELS = {
 function estadoPlantaLabel(e) { return ESTADO_LABELS[e] || e || '—' }
 
 onMounted(async () => {
-  // Watchdog: pase lo que pase, nunca quedar en "cargando" para siempre.
-  const watchdog = setTimeout(() => { if (estado.value === 'cargando') estado.value = 'no_encontrada' }, 14000)
+  // Mismo patrón que LoteQrView: la ruta /p/:codigo_qr exige auth, así que llegamos
+  // siempre logueados. Usamos la instancia api autenticada (cookie + CORS de /api que
+  // ya funcionan) en vez del fetch crudo cross-origin al endpoint público, que en
+  // producción (front y API en hosts distintos) se colgaba.
   try {
-  await auth.ensureBootstrapped()
-  const base = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/api\/?$/, '')
-  try {
-    const { data } = await axios.get(`${base}/p/${codigoQr}`, { timeout: 12000 })
+    const { data } = await getPlantaPorQR(codigoQr)
     plantaInfo.value = data
-    clubNombre.value = data.club_nombre || ''
-    clubLogo.value   = data.club_logo   || ''
-  } catch {
+    clubNombre.value = club.name || ''
+    clubLogo.value   = club.logoUrl || ''
+    await resolverEstado()
+  } catch (e) {
     estado.value = 'no_encontrada'
-    return
-  }
-
-  if (!auth.isAuthenticated) {
-    estado.value = 'login'
-    return
-  }
-
-  await resolverEstado()
-  } finally {
-    clearTimeout(watchdog)
   }
 })
 

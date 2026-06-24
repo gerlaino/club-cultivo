@@ -434,6 +434,8 @@ export const removePlantFoto    = (plantId, blobId)   => api.delete(`/plants/${p
 export const registrarPesoPlanta      = (plantId, payload) => api.post(`/plants/${plantId}/registrar_peso`, payload)
 
 export const getPlantaByQR = (codigoQr) => api.get(`/p/${codigoQr}`)
+// Resuelve una planta por QR vía la instancia api autenticada (igual que getLotePorQR).
+export const getPlantaPorQR = (codigoQr) => api.get(`/plants/por_qr/${codigoQr}`)
 
 // ── Lote ciclo productivo ─────────────────────────────────────────────────────
 export const transicionarLote  = (loteId, payload) => api.post(`/lotes/${loteId}/transiciones`, payload)

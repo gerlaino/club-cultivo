@@ -1,5 +1,20 @@
 # Changelog
 
+## Fix REAL: QR de planta se colgaba cargando (endpoint autenticado) (2026-06-23)
+
+La causa de fondo de por qué **lote andaba y planta no**: `LoteQrView` usa `getLotePorQR` →
+`api.get('/lotes/por_qr/...')` (instancia **api autenticada**, mismo baseURL/cookie/CORS que todo
+lo demás). `PlantaQrView`, en cambio, hacía `auth.ensureBootstrapped()` (podía colgarse en
+cold-start) + un `axios.get` **crudo cross-origin** al endpoint público raíz `/p/...`. En
+producción el front y la API están en hosts onrender distintos, así que ese fetch quedaba colgado
+(CORS / cross-site) → pantalla trabada en "cargando".
+
+- **Nuevo endpoint autenticado** `GET /api/plants/por_qr/:codigo_qr` (`plants#por_qr`), scoped al
+  club, espejo de `lotes#por_qr`. Devuelve `id`, `estado` y `lote.estado`.
+- `PlantaQrView` ahora resuelve con `getPlantaPorQR` (instancia `api`), **sin** `ensureBootstrapped`
+  ni axios crudo — exactamente el patrón de `LoteQrView`. El nombre/logo del club salen del store.
+- Spec con aislamiento de tenant (no expone plantas de otro club).
+
 ## QR de planta: comportamiento por rol × estado (2026-06-23)
 
 Al escanear el QR de una planta, el destino ahora depende del rol y de la fase de la planta:

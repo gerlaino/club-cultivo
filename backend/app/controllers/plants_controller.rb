@@ -2,6 +2,29 @@ class PlantsController < ApplicationController
   before_action :authenticate_user!
   before_action :set_plant, only: [:show, :update, :destroy, :add_foto, :remove_foto, :registrar_peso]
 
+  # GET /plants/por_qr/:codigo_qr
+  # Resuelve una planta por su código QR, scoped al club. Mismo patrón que
+  # lotes#por_qr: usa la instancia api autenticada, así el front lo consume igual
+  # que el QR de lote (sin fetch crudo cross-origin que se colgaba en producción).
+  def por_qr
+    plant = Plant.joins(:lote)
+                 .where(lotes: { club_id: current_user.club_id })
+                 .find_by(codigo_qr: params[:codigo_qr])
+    return render json: { error: 'Planta no encontrada' }, status: :not_found unless plant
+
+    render json: {
+      id:        plant.id,
+      nombre:    plant.nombre,
+      codigo_qr: plant.codigo_qr,
+      estado:    plant.state,
+      lote: {
+        id:     plant.lote.id,
+        codigo: plant.lote.codigo,
+        estado: plant.lote.estado,
+      },
+    }
+  end
+
   # GET /plants
   def index
     plants = Plant.joins(:lote).where(lotes: { club_id: current_user.club_id })
