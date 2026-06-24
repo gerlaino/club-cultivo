@@ -15,7 +15,9 @@ cobrar al entregar (con foto de comprobante de transferencia).
 **Reglas (bloquea cuando corresponde)**
 - Lo que no se paga en efectivo/transferencia → cuenta corriente (acotado por el cupo del socio).
 - Cuenta corriente exige cuenta activa y cupo suficiente; si no, se bloquea (rollback total).
-- No se puede cobrar más que el saldo pendiente.
+- **Sobrepago permitido**: si el socio paga de más (transfirió de más, le pagó de más al delivery),
+  el excedente se acredita a favor en su cuenta corriente (reusa el asiento `aporte_socio`). Solo se
+  bloquea si no tiene cuenta corriente donde acreditarlo. El delivery no es quien lo determina.
 - Contra-entrega: al crear no se asienta nada; el delivery cobra al entregar.
 - Las dispensas legacy (sin cobros) quedan saldadas y no entran al flujo nuevo.
 - Editar el monto de una dispensa con cobros se bloquea (cancelar y rehacer); cancelar revierte

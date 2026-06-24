@@ -209,7 +209,10 @@ const fmtMoneda = (n) => '$' + (Number(n) || 0).toLocaleString('es-AR', { minimu
 const saldoACobrar = computed(() => r2(modalEntregar.value?.saldo_pendiente || 0))
 const cobradoEntrega = computed(() => r2((Number(cobroEfectivo.value) || 0) + (Number(cobroTransf.value) || 0)))
 const restoEntregaCuenta = computed(() => r2(Math.max(0, saldoACobrar.value - cobradoEntrega.value)))
-const entregaCobroValido = computed(() => cobradoEntrega.value <= saldoACobrar.value + 0.001)
+const excedenteEntrega = computed(() => r2(Math.max(0, cobradoEntrega.value - saldoACobrar.value)))
+// El sobrepago no se bloquea: si el socio tiene cuenta, queda a favor; si no, el
+// backend lo rechaza con un mensaje claro (el delivery no es quien lo determina).
+const entregaCobroValido = computed(() => true)
 
 function setComprobante(e) { comprobanteFile.value = e.target.files?.[0] || null }
 function lineasCobroEntrega() {
@@ -516,8 +519,8 @@ onMounted(load)
                   <input type="file" accept="image/*" capture="environment" @change="setComprobante" hidden />
                 </label>
               </div>
-              <div class="dlv__cobro-resto" :class="{ 'dlv__cobro-resto--err': !entregaCobroValido }">
-                <template v-if="!entregaCobroValido">El cobro supera el saldo</template>
+              <div class="dlv__cobro-resto" :class="{ 'dlv__cobro-resto--info': excedenteEntrega > 0 }">
+                <template v-if="excedenteEntrega > 0">Paga de más: <strong>{{ fmtMoneda(excedenteEntrega) }}</strong> → queda a favor en su cuenta</template>
                 <template v-else-if="restoEntregaCuenta > 0">Resto a cuenta corriente: <strong>{{ fmtMoneda(restoEntregaCuenta) }}</strong></template>
                 <template v-else>Cubierto ✓</template>
               </div>
@@ -723,6 +726,7 @@ onMounted(load)
 .dlv__cobro-comp-btn { display: inline-flex; align-items: center; gap: .4rem; background: #f0fdf4; border: 1.5px dashed #86efac; color: #15803d; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; font-weight: 600; cursor: pointer; width: 100%; }
 .dlv__cobro-resto { margin-top: .5rem; padding: .45rem .65rem; border-radius: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; font-size: .8rem; color: #15803d; }
 .dlv__cobro-resto--err { background: #fff5f5; border-color: #fca5a5; color: #991b1b; }
+.dlv__cobro-resto--info { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
 .dlv__btn-danger { display: inline-flex; align-items: center; gap: var(--sp-1); background: var(--c-rust-600); color: #fff; border: none; padding: .5rem 1.1rem; border-radius: var(--r-md); font-size: var(--fs-14); font-weight: 600; cursor: pointer; }
 .dlv__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
 .dlv__opt { font-size: var(--fs-11); font-weight: 400; color: var(--c-ink-400); text-transform: none; letter-spacing: 0; }

@@ -197,8 +197,12 @@
                     <button type="button" @click="setTodoCobro('transferencia')">Todo transf.</button>
                     <button type="button" v-if="tieneCc" @click="setTodoCobro('cuenta')">Todo a cuenta</button>
                   </div>
-                  <div class="dv__cobro-resto" :class="{ 'dv__cobro-resto--err': (restoCuenta > 0 && !restoCuentaOk) || pagadoAhora > cartTotal }">
-                    <template v-if="pagadoAhora > cartTotal">El cobro (<strong>{{ formatARS(pagadoAhora) }}</strong>) supera el total</template>
+                  <div class="dv__cobro-resto" :class="{ 'dv__cobro-resto--err': !cobroValido }">
+                    <template v-if="excedente > 0">
+                      Paga de más: <strong>{{ formatARS(excedente) }}</strong>
+                      <span v-if="tieneCc"> → queda a favor en su cuenta</span>
+                      <span v-else class="dv__balance-error"> — el socio no tiene cuenta corriente para acreditarlo, ajustá el monto</span>
+                    </template>
                     <template v-else-if="restoCuenta > 0">
                       Resto a cuenta corriente: <strong>{{ formatARS(restoCuenta) }}</strong>
                       <span v-if="!tieneCc" class="dv__balance-error"> — el socio no tiene cuenta corriente, cobrá el total</span>
@@ -418,11 +422,13 @@ const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100
 
 const pagadoAhora = computed(() => round2((Number(pagoEfectivo.value) || 0) + (Number(pagoTransf.value) || 0)))
 const restoCuenta = computed(() => round2(Math.max(0, cartTotal.value - pagadoAhora.value)))
+const excedente   = computed(() => round2(Math.max(0, pagadoAhora.value - cartTotal.value)))
 const restoCuentaOk = computed(() => restoCuenta.value <= 0 || (tieneCc.value && (ccBalance.value === null || restoCuenta.value <= ccBalance.value)))
 const cobroValido = computed(() => {
   if (cobraDelivery.value) return true
-  if (pagadoAhora.value > cartTotal.value + 0.001) return false
-  return restoCuentaOk.value
+  if (!restoCuentaOk.value) return false
+  if (excedente.value > 0 && !tieneCc.value) return false   // sin cuenta no hay dónde dejar el excedente
+  return true
 })
 
 function setTodoCobro(medio) {
@@ -449,11 +455,17 @@ function distribuirCobros(items, lines, total) {
     let rem = round2(line.monto)
     items.forEach((item, idx) => {
       if (rem <= 0.001) return
-      const room = round2(item.total - used[idx])
-      if (room <= 0.001) return
-      let monto = idx === items.length - 1
-        ? Math.min(rem, room)
-        : Math.min(round2(line.monto * item.total / total), room, rem)
+      const isLast = idx === items.length - 1
+      // El último ítem absorbe todo lo que reste, incluido el excedente (el backend
+      // lo cobra hasta el saldo del ítem y acredita el sobrante a favor).
+      let monto
+      if (isLast) {
+        monto = rem
+      } else {
+        const room = round2(item.total - used[idx])
+        if (room <= 0.001) return
+        monto = Math.min(round2(line.monto * item.total / total), room, rem)
+      }
       monto = round2(monto)
       if (monto > 0.001) { out[idx].push({ medio: line.medio, monto }); used[idx] = round2(used[idx] + monto); rem = round2(rem - monto) }
     })

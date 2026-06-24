@@ -444,22 +444,32 @@ class DispensacionesController < ApplicationController
     params[:comprobante] || params.dig(:dispensacion, :comprobante)
   end
 
-  # Registra cada línea de cobro y, si queda saldo, lo deja en cuenta corriente
-  # (la regla: lo que no se paga en efectivo/transferencia va a la cuenta del socio).
-  # La foto de comprobante se adjunta al primer cobro de transferencia.
-  # Cualquier bloqueo (cupo insuficiente, sin cuenta) aborta la transacción.
+  # Registra los cobros de una dispensa. Cada línea cubre hasta el saldo; lo que pague
+  # de más (transfirió de más, le pagó de más al delivery, etc.) NO se bloquea: el
+  # excedente se acredita a favor en su cuenta corriente. Lo que falte cubrir queda como
+  # deuda en cuenta corriente. La foto se adjunta al primer cobro de transferencia.
   def aplicar_lineas_cobro!(disp, lineas, contexto)
     comp = comprobante_param
     comp_usado = false
+    excedente  = 0.to_d
+
     lineas.each do |l|
+      saldo = disp.monto_sin_cobrar
+      monto = l[:monto].to_d
+      cobro = [monto, saldo].min          # lo que entra contra esta dispensa
+      excedente += (monto - cobro)        # lo que sobra → a favor
+
+      next if cobro <= 0
       usar = l[:medio] == 'transferencia' && !comp_usado && comp.present?
       comp_usado ||= usar
       res = Dispensaciones::RegistrarCobro.call(
         dispensacion: disp, club: current_user.club, usuario: current_user,
-        medio: l[:medio], monto: l[:monto], contexto: contexto,
+        medio: l[:medio], monto: cobro, contexto: contexto,
         comprobante: (usar ? comp : nil))
       raise res.error unless res.ok?
     end
+
+    # Lo que falta cubrir → deuda en cuenta corriente.
     saldo = disp.monto_sin_cobrar
     if saldo > 0.001
       res = Dispensaciones::RegistrarCobro.call(
@@ -467,6 +477,31 @@ class DispensacionesController < ApplicationController
         medio: 'cuenta_corriente', monto: saldo, contexto: contexto)
       raise res.error unless res.ok?
     end
+
+    acreditar_excedente!(disp, excedente.round(2)) if excedente > 0.001
+  end
+
+  # Excedente pagado por el socio → crédito a favor en su cuenta corriente. Reusa el
+  # asiento 'aporte_socio' (cuyo callback acredita la CC). Requiere que tenga cuenta.
+  def acreditar_excedente!(disp, monto)
+    unless disp.paciente.cuenta_corriente
+      raise "El socio no tiene cuenta corriente para acreditar el excedente ($#{monto.to_f}). Ajustá el monto cobrado."
+    end
+    MovimientoContable.create!(
+      club:             current_user.club,
+      sede_id:          disp.sede_id,
+      dispensacion:     disp,
+      paciente:         disp.paciente,
+      created_by:       current_user,
+      tipo:             'ingreso',
+      categoria:        'aporte_socio',
+      descripcion:      "Excedente de pago — Dispensación ##{disp.id}",
+      monto_ars:        monto,
+      fecha:            disp.fecha_dispensacion,
+      pagado:           true,
+      medio_pago:       'efectivo',
+      comprobante_tipo: 'sin_comprobante',
+    )
   end
 
   # medio_pago denormalizado de la dispensa: el único medio, o 'mixto' si hay varios.

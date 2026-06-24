@@ -75,6 +75,26 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
     end
   end
 
+  context 'sobrepago: el socio paga de más' do
+    it 'con cuenta corriente: cubre la dispensa y acredita el excedente a favor' do
+      cc = create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 80_000)
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'efectivo', monto: 120_000 }])   # total 100.000 → 20.000 de más
+      expect(response).to have_http_status(:created)
+      d = Dispensacion.last
+      expect(d.saldo_pendiente).to eq(0)
+      expect(d.cobros.sum(:monto_ars)).to eq(100_000)          # los cobros no superan el total
+      expect(cc.reload.saldo_disponible).to eq(20_000)          # excedente a favor
+    end
+
+    it 'sin cuenta corriente: bloquea (no hay dónde acreditar el excedente)' do
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'efectivo', monto: 120_000 }])
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(Dispensacion.count).to eq(0)
+    end
+  end
+
   context 'cancelación revierte los cobros y la cuenta corriente' do
     let!(:cc) { create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 80_000) }
 
