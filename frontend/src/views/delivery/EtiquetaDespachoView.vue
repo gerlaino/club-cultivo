@@ -37,6 +37,11 @@
         <div v-if="despacho.direccion_envio" class="et__dir">{{ despacho.direccion_envio }}</div>
         <div v-if="despacho.contacto_telefono" class="et__tel">Tel: {{ despacho.contacto_telefono }}</div>
 
+        <!-- Cobrar al entregar (contra-entrega) -->
+        <div v-if="cobrarAlEntregar" class="et__cobrar">
+          💵 COBRAR AL ENTREGAR<span v-if="montoCobrar"> · {{ montoCobrar }}</span>
+        </div>
+
         <!-- Footer: código de paquete -->
         <div class="et__footer">
           <span class="et__cod-lbl">Paquete</span>
@@ -49,7 +54,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import html2pdf from 'html2pdf.js'
 import { getDispensacion } from '../../lib/api.js'
@@ -62,6 +67,12 @@ const loading = ref(true)
 const despacho = ref(null)
 const tamano   = ref('100x70')
 const descargando = ref(false)
+
+const cobrarAlEntregar = computed(() => despacho.value?.cobrar_en_entrega || (despacho.value?.saldo_pendiente || 0) > 0)
+const montoCobrar = computed(() => {
+  const m = despacho.value?.saldo_pendiente || 0
+  return m > 0 ? '$' + Number(m).toLocaleString('es-AR') : ''
+})
 
 function imprimir() { window.print() }
 
@@ -135,6 +146,7 @@ onMounted(async () => {
 .et__para { font-weight: 800; font-size: 1.6em; line-height: 1.15; color: #0f172a; margin-bottom: 2mm; }
 .et__dir { font-size: 1em; line-height: 1.3; color: #334155; }
 .et__tel { font-size: .95em; color: #475569; margin-top: 1mm; }
+.et__cobrar { margin-top: 2mm; padding: 1.5mm 2mm; border: 1pt solid #166534; border-radius: 1.5mm; background: #f0fdf4; color: #166534; font-weight: 800; font-size: .95em; text-align: center; letter-spacing: .02em; }
 
 .et__footer { display: flex; align-items: center; gap: 2mm; border-top: .5pt solid #cbd5e1; padding-top: 2mm; margin-top: auto; }
 .et__cod-lbl { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }

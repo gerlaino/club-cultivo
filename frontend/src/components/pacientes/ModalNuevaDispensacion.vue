@@ -125,7 +125,7 @@ function emptyForm() {
   return {
     stock_id: null, cantidad: null, descuento_pct: 0, aporte_socio_ars: null,
     fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo',
-    con_envio: false, cobrar_en_entrega: false, delivery_id: null, direccion_envio: '',
+    con_envio: false, delivery_id: null, direccion_envio: '',
     contacto_nombre: '', contacto_telefono: '', notas_envio: '',
     // Dirección de entrega estructurada (o usar el domicilio registrado del paciente)
     usar_domicilio_paciente: true,
@@ -138,7 +138,13 @@ function emptyForm() {
 const form               = ref(emptyForm())
 const precioUnitarioManual = ref(null)
 
-watch(() => form.value.con_envio, (val) => { if (val) cargarDeliveryUsers(); else form.value.cobrar_en_entrega = false })
+// "Contra entrega" como medio de pago = el delivery cobra al entregar. Requiere envío.
+const cobraDelivery = computed(() => form.value.medio_pago === 'contra_entrega')
+watch(() => form.value.medio_pago, (val) => { if (val === 'contra_entrega') form.value.con_envio = true })
+watch(() => form.value.con_envio, (val) => {
+  if (val) cargarDeliveryUsers()
+  else if (form.value.medio_pago === 'contra_entrega') form.value.medio_pago = 'efectivo'
+})
 watch(() => form.value.stock_id,  ()    => { precioUnitarioManual.value = null })
 
 const stockSeleccionado    = computed(() => stocks.value.find(s => s.id === form.value.stock_id) || null)
@@ -242,12 +248,11 @@ async function handleSubmit() {
       : 'El aporte del socio debe ser mayor a $0.'
     saving.value = false; return
   }
-  const cobraDelivery = form.value.con_envio && form.value.cobrar_en_entrega
-  if (!cobraDelivery && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
+  if (!cobraDelivery.value && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
     formError.value = 'El paciente no tiene crédito configurado para cobrar por cuenta corriente'
     saving.value = false; return
   }
-  if (!cobraDelivery && ccInsuficiente.value) {
+  if (!cobraDelivery.value && ccInsuficiente.value) {
     const msg = puedeVerCredito.value
       ? `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
       : 'Crédito insuficiente. Consultá con un administrador.'
@@ -270,7 +275,7 @@ async function handleSubmit() {
       stock_id: form.value.stock_id, cantidad: form.value.cantidad,
       fecha_dispensacion: form.value.fecha_dispensacion,
       observaciones: form.value.observaciones || undefined,
-      medio_pago: form.value.medio_pago, con_envio: form.value.con_envio,
+      medio_pago: cobraDelivery.value ? undefined : form.value.medio_pago, con_envio: form.value.con_envio,
       // Descuento de la dispensa (puntual). El del paciente lo aplica el server desde la ficha.
       descuento_dispensa_pct: descDispensaPct.value,
     }
@@ -283,7 +288,7 @@ async function handleSubmit() {
       payload.precio_unitario_ars = (parseFloat(precioUnitarioManual.value) * (1 - descTotalPct.value / 100)).toFixed(2)
     }
     if (form.value.con_envio) {
-      payload.cobrar_en_entrega = form.value.cobrar_en_entrega
+      payload.cobrar_en_entrega = cobraDelivery.value
       payload.delivery_id       = form.value.delivery_id
       payload.usar_domicilio_paciente = form.value.usar_domicilio_paciente
       payload.envio_calle       = form.value.envio_calle || undefined
@@ -476,6 +481,7 @@ async function handleSubmit() {
                 <option value="debito">Débito</option>
                 <option value="credito">Crédito</option>
                 <option value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite configurado)' : '' }}</option>
+                <option v-if="!form.es_reserva" value="contra_entrega">Contra entrega (cobra el delivery)</option>
                 <option value="otro">Otro</option>
               </select>
             </div>
@@ -539,15 +545,6 @@ async function handleSubmit() {
             <div v-else class="mnd__field-hint" style="margin-bottom:.5rem">
               El delivery se asigna al entregar la reserva.
             </div>
-
-            <!-- Cobro contra-entrega: el delivery cobra al entregar -->
-            <label v-if="!form.es_reserva" class="mnd__contraentrega">
-              <input type="checkbox" v-model="form.cobrar_en_entrega" />
-              <span>
-                <strong>Cobra el delivery al entregar</strong>
-                <small>No se cobra ahora; el delivery registra el pago (efectivo / transferencia / cuenta corriente) en la entrega.</small>
-              </span>
-            </label>
 
             <!-- Dirección de entrega: domicilio del paciente u otra -->
             <div class="mnd__field">
@@ -723,11 +720,6 @@ async function handleSubmit() {
 .mnd__toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 .mnd__toggle-switch--on .mnd__toggle-knob { transform: translateX(16px); }
 .mnd__delivery-section { display: flex; flex-direction: column; gap: .75rem; padding: .75rem; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; }
-.mnd__contraentrega { display: flex; align-items: flex-start; gap: .5rem; padding: .6rem .7rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 8px; cursor: pointer; }
-.mnd__contraentrega input { margin-top: 2px; }
-.mnd__contraentrega span { display: flex; flex-direction: column; gap: 1px; }
-.mnd__contraentrega strong { font-size: .82rem; color: #0f172a; }
-.mnd__contraentrega small { font-size: .72rem; color: #64748b; line-height: 1.3; }
 
 /* Buttons */
 .mnd__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
