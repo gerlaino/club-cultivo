@@ -5,7 +5,7 @@ import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
-import { createDispensacion, createReserva, listStocks, listEntregadores } from '../../lib/api.js'
+import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores } from '../../lib/api.js'
 
 const props = defineProps({
   modelValue:     { type: Boolean, required: true },
@@ -14,7 +14,14 @@ const props = defineProps({
   saldoCc:        { type: Number,  default: null },
   limiteCc:       { type: Number,  default: null },
   descuentoPorcentaje: { type: Number,  default: 0 },
+  // Si viene una reserva, el modal entra en modo "entregar reserva": convierte la
+  // reserva en una dispensación (cobra el resto = total − seña).
+  reserva:        { type: Object,  default: null },
 })
+
+const modoReserva   = computed(() => !!props.reserva)
+const restoReserva  = computed(() => Number(props.reserva?.aporte_restante_ars) || 0)
+const senaReserva   = computed(() => Number(props.reserva?.sena_ars) || 0)
 
 const emit = defineEmits(['update:modelValue', 'saved'])
 
@@ -185,6 +192,13 @@ watch(() => props.modelValue, (open) => {
     formError.value = null
     deliveryUsers.value = []
     cargarStocks()
+    // Modo entrega de reserva: pre-cargar producto/cantidad de la reserva.
+    if (modoReserva.value) {
+      form.value.es_reserva = false
+      form.value.stock_id   = props.reserva.stock?.id ?? props.reserva.stock_id ?? null
+      form.value.cantidad   = Number(props.reserva.cantidad) || null
+      form.value.medio_pago = 'efectivo'
+    }
   }
 }, { immediate: true })
 
@@ -209,9 +223,52 @@ async function handleSubmit() {
 
   if (!form.value.stock_id) { formError.value = 'Seleccioná un stock'; saving.value = false; return }
   if (!form.value.cantidad || form.value.cantidad <= 0) { formError.value = 'La cantidad debe ser > 0'; saving.value = false; return }
-  if (excederiaStock.value) {
+  // En modo reserva el backend libera el stock apartado de la propia reserva, así que
+  // no aplicamos el chequeo de disponible local (mostraría de menos por su propio hold).
+  if (!modoReserva.value && excederiaStock.value) {
     formError.value = `Stock insuficiente: solo hay ${stockSeleccionado.value.cantidad}${stockSeleccionado.value.unidad || 'g'} disponibles`
     saving.value = false; return
+  }
+
+  // ── Rama ENTREGAR RESERVA: convierte la reserva en dispensación, cobra el resto ──
+  if (modoReserva.value) {
+    const cobrarDelivery = form.value.medio_pago === 'contra_entrega'
+    if (!cobrarDelivery && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
+      formError.value = 'El paciente no tiene crédito configurado para cobrar por cuenta corriente'; saving.value = false; return
+    }
+    if (form.value.con_envio && !form.value.delivery_id) {
+      formError.value = 'Seleccioná un delivery para asignar el envío'; saving.value = false; return
+    }
+    try {
+      const payload = {
+        cantidad:          form.value.cantidad,
+        con_envio:         form.value.con_envio,
+        cobrar_en_entrega: cobrarDelivery,
+      }
+      if (!cobrarDelivery && restoReserva.value > 0) {
+        payload.cobros = [{ medio: form.value.medio_pago, monto: Number(restoReserva.value).toFixed(2) }]
+      }
+      if (form.value.con_envio) {
+        payload.delivery_id             = form.value.delivery_id
+        payload.usar_domicilio_paciente = form.value.usar_domicilio_paciente
+        payload.envio_calle       = form.value.envio_calle || undefined
+        payload.envio_altura      = form.value.envio_altura || undefined
+        payload.envio_piso        = form.value.envio_piso || undefined
+        payload.envio_depto       = form.value.envio_depto || undefined
+        payload.envio_barrio      = form.value.envio_barrio || undefined
+        payload.envio_ciudad      = form.value.envio_ciudad || undefined
+        payload.contacto_nombre   = form.value.contacto_nombre || undefined
+        payload.contacto_telefono = form.value.contacto_telefono || undefined
+      }
+      await entregarReserva(props.reserva.id, payload)
+      cerrar()
+      toast.success('Reserva entregada')
+      emit('saved')
+    } catch (e) {
+      const msg = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al entregar la reserva'
+      formError.value = msg; toast.error(msg)
+    } finally { saving.value = false }
+    return
   }
 
   // ── Rama RESERVA: aparta stock para una fecha futura, no se entrega ahora ──
@@ -324,7 +381,8 @@ async function handleSubmit() {
 
         <div class="mnd__modal-header">
           <h3 class="mnd__modal-title">
-            Nueva dispensación<template v-if="props.pacienteNombre"> para <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template>
+            <template v-if="modoReserva">Entregar reserva<template v-if="props.pacienteNombre"> de <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template></template>
+            <template v-else>Nueva dispensación<template v-if="props.pacienteNombre"> para <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template></template>
           </h3>
           <button class="mnd__modal-close" @click="cerrar"><i class="bi bi-x-lg"></i></button>
         </div>
@@ -332,8 +390,17 @@ async function handleSubmit() {
         <div class="mnd__modal-body">
           <div v-if="formError" class="mnd__error"><i class="bi bi-exclamation-triangle-fill"></i> {{ formError }}</div>
 
+          <!-- Seña / resto a cobrar (modo entrega de reserva) -->
+          <div v-if="modoReserva" class="mnd__reserva-info">
+            <i class="bi bi-bookmark-star"></i>
+            <span>Convertís la reserva en dispensación.
+              <template v-if="senaReserva > 0">Seña ya pagada <strong>{{ fmt(senaReserva) }}</strong> · </template>
+              A cobrar ahora: <strong>{{ fmt(restoReserva) }}</strong>
+            </span>
+          </div>
+
           <!-- Tipo: entrega inmediata o reserva -->
-          <div class="mnd__segmented">
+          <div v-if="!modoReserva" class="mnd__segmented">
             <button type="button" class="mnd__seg-btn" :class="{ 'mnd__seg-btn--active': !form.es_reserva }" @click="form.es_reserva = false">
               <i class="bi bi-bag-check"></i> Entrega inmediata
             </button>
@@ -342,9 +409,25 @@ async function handleSubmit() {
             </button>
           </div>
 
+          <!-- Stock de la reserva (solo lectura) -->
+          <template v-if="modoReserva">
+            <div class="mnd__section-label">Producto reservado</div>
+            <div class="mnd__stock-row mnd__stock-row--active" style="cursor:default">
+              <span class="mnd__stock-emoji">{{ FORMA_EMOJI[props.reserva.stock?.forma_producto] || '📦' }}</span>
+              <span class="mnd__stock-info">
+                <span class="mnd__stock-nombre">{{ FORMA_LABEL[props.reserva.stock?.forma_producto] || props.reserva.stock?.forma_producto || '—' }}</span>
+                <span v-if="props.reserva.stock?.lote" class="mnd__stock-gen">Lote {{ props.reserva.stock.lote }}</span>
+              </span>
+              <span class="mnd__stock-right">
+                <span class="mnd__stock-disp">{{ props.reserva.cantidad }}{{ props.reserva.stock?.unidad || 'g' }}</span>
+              </span>
+            </div>
+          </template>
+
           <!-- Stock -->
-          <div class="mnd__section-label">Stock a dispensar <span class="mnd__req">*</span></div>
-          <div v-if="loadingStocks" class="mnd__loading-inline"><DsSpinner :size="13" /> Cargando stocks…</div>
+          <div v-if="!modoReserva" class="mnd__section-label">Stock a dispensar <span class="mnd__req">*</span></div>
+          <div v-if="modoReserva"></div>
+          <div v-else-if="loadingStocks" class="mnd__loading-inline"><DsSpinner :size="13" /> Cargando stocks…</div>
           <div v-else-if="!stocksDisponibles.length" class="mnd__warn-box">
             <i class="bi bi-exclamation-triangle"></i> Sin stock disponible
           </div>
@@ -375,7 +458,7 @@ async function handleSubmit() {
           </div>
 
           <!-- Precio manual -->
-          <div v-if="necesitaPrecioManual" class="mnd__field">
+          <div v-if="!modoReserva && necesitaPrecioManual" class="mnd__field">
             <label class="mnd__label">
               Precio por {{ stockSeleccionado?.unidad || 'g' }}
               <span class="mnd__opt">solo para el cálculo — no se guarda</span>
@@ -387,10 +470,10 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <div class="mnd__divider"></div>
+          <div v-if="!modoReserva" class="mnd__divider"></div>
 
           <!-- Cantidad + descuento -->
-          <div class="mnd__form-row">
+          <div v-if="!modoReserva" class="mnd__form-row">
             <div class="mnd__field">
               <label class="mnd__label">Cantidad <span class="mnd__req">*</span></label>
               <div class="mnd__input-suffix-wrap">
@@ -418,7 +501,7 @@ async function handleSubmit() {
           </div>
 
           <!-- Precio + aporte -->
-          <div class="mnd__aporte-wrap">
+          <div v-if="!modoReserva" class="mnd__aporte-wrap">
             <div v-if="precioFinal != null" class="mnd__precio-box">
               <!-- Desglose completo: solo admin/supervisor -->
               <template v-if="puedeVerDescPaciente">
@@ -478,7 +561,7 @@ async function handleSubmit() {
               <AppDatePicker v-else v-model="form.fecha_dispensacion" :max="today" />
             </div>
             <div class="mnd__field">
-              <label class="mnd__label">{{ form.es_reserva ? 'Medio de pago de la seña' : 'Medio de pago' }}</label>
+              <label class="mnd__label">{{ modoReserva ? 'Medio de pago del resto' : (form.es_reserva ? 'Medio de pago de la seña' : 'Medio de pago') }}</label>
               <select v-model="form.medio_pago" class="mnd__input">
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
@@ -619,10 +702,10 @@ async function handleSubmit() {
 
         <div class="mnd__modal-footer">
           <button class="mnd__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
-          <button class="mnd__btn-primary" :disabled="saving || !form.stock_id || (!form.es_reserva && ccInsuficiente)" @click="handleSubmit">
+          <button class="mnd__btn-primary" :disabled="saving || !form.stock_id || (!form.es_reserva && !modoReserva && ccInsuficiente)" @click="handleSubmit">
             <DsSpinner v-if="saving" :size="14" />
             <i v-else class="bi" :class="form.es_reserva ? 'bi-bookmark-star' : 'bi-check-lg'"></i>
-            {{ form.es_reserva ? 'Crear reserva' : 'Registrar dispensación' }}
+            {{ modoReserva ? 'Entregar reserva' : (form.es_reserva ? 'Crear reserva' : 'Registrar dispensación') }}
           </button>
         </div>
 
@@ -672,6 +755,8 @@ async function handleSubmit() {
 
 /* Form */
 .mnd__divider { height: 1px; background: #f1f5f9; }
+.mnd__reserva-info { display: flex; align-items: flex-start; gap: .5rem; padding: .6rem .75rem; margin-bottom: .75rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 9px; font-size: .82rem; color: #166534; }
+.mnd__reserva-info i { margin-top: 1px; }
 .mnd__form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 @media (max-width: 400px) { .mnd__form-row { grid-template-columns: 1fr; } }
 .mnd__field { display: flex; flex-direction: column; gap: .3rem; }

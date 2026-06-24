@@ -99,22 +99,24 @@ class ReservasController < ApplicationController
       return render json: { error: "La reserva no está pendiente (#{@reserva.estado})" }, status: :unprocessable_entity
     end
 
-    paciente   = @reserva.paciente
-    medio_pago = params[:medio_pago].presence || @reserva.medio_pago.presence || 'efectivo'
-    # Se puede ajustar al entregar: cantidad real entregada y monto a cobrar.
-    cantidad   = params[:cantidad].presence ? params[:cantidad].to_d : @reserva.cantidad
-    aporte     = params[:aporte_socio_ars].presence ? params[:aporte_socio_ars].to_d : @reserva.aporte_restante_ars
-    con_envio  = ActiveModel::Type::Boolean.new.cast(params[:con_envio]) == true
+    paciente  = @reserva.paciente
+    # Se puede ajustar al entregar: cantidad real entregada y monto a cobrar (el RESTO,
+    # total − seña). El cobro de ese resto usa el motor nuevo de cobros.
+    cantidad  = params[:cantidad].presence ? params[:cantidad].to_d : @reserva.cantidad
+    aporte    = params[:aporte_socio_ars].presence ? params[:aporte_socio_ars].to_d : @reserva.aporte_restante_ars
+    con_envio = ActiveModel::Type::Boolean.new.cast(params[:con_envio]) == true
+    cobrar_en_entrega = ActiveModel::Type::Boolean.new.cast(params[:cobrar_en_entrega]) || false
 
     dispensacion = paciente.dispensaciones.build(
       stock:                  @reserva.stock,
       sede_id:                @reserva.stock&.sede_id,
       cantidad:               cantidad,
-      medio_pago:             medio_pago,
+      medio_pago:             'mixto',          # placeholder; los cobros lo afinan
       aporte_socio_ars:       aporte,
       descuento_paciente_pct: paciente.descuento_porcentaje.to_d.clamp(0, 100),
       fecha_dispensacion:     Date.current,
       con_envio:              con_envio,
+      cobrar_en_entrega:      cobrar_en_entrega,
       observaciones:          "Entrega de reserva ##{@reserva.id}",
     )
     dispensacion.user = current_user
@@ -142,38 +144,24 @@ class ReservasController < ApplicationController
       dispensacion.contacto_telefono = params[:contacto_telefono].presence || paciente.telefono
     end
 
-    # Split de crédito (misma lógica que dispensaciones#create).
-    cc = paciente.cuenta_corriente
-    if dispensacion.a_credito?
-      unless cc&.limite_credito.to_f > 0
-        return render json: { errors: ['El paciente no tiene crédito configurado.'] }, status: :unprocessable_entity
+    begin
+      ActiveRecord::Base.transaction do
+        # Liberamos primero el bloqueo de esta reserva para que la dispensación no choque
+        # con su propio stock apartado en la validación stock_disponible.
+        @reserva.update!(estado: 'entregada', entregada_at: Time.current)
+        dispensacion.save! # corre validaciones on:create (stock/REPROCANN) + callbacks
+        # Cobro del resto con el motor nuevo (efectivo/transf/cuenta + contra-entrega).
+        # Si es contra-entrega, el delivery lo cobra al entregar.
+        aplicar_lineas_cobro!(dispensacion, cobros_param, 'creacion') unless cobrar_en_entrega
+        afinar_medio_pago!(dispensacion)
+        @reserva.update!(dispensacion: dispensacion)
       end
-      credito_disp = [cc.saldo_disponible.to_d + cc.limite_credito.to_d, 0].max
-      if medio_pago == 'no_abona'
-        unless cc.puede_dispensar?(aporte.to_d)
-          return render json: { errors: ['Crédito insuficiente para realizar la entrega.'] }, status: :unprocessable_entity
-        end
-        dispensacion.monto_credito_ars = aporte
-      else
-        dispensacion.monto_credito_ars = [aporte.to_d, credito_disp].min
-      end
-    end
-
-    ActiveRecord::Base.transaction do
-      # Liberamos primero el bloqueo de esta reserva para que la dispensación no choque
-      # con su propio stock apartado en la validación stock_disponible.
-      @reserva.update!(estado: 'entregada', entregada_at: Time.current)
-      dispensacion.save! # corre validaciones on:create (stock/crédito/REPROCANN) + callbacks
-      crear_movimiento_contable(dispensacion)
-      debitar_cuenta_corriente(dispensacion) if dispensacion.a_credito? && cc
-      debitar_gramos(dispensacion)           if dispensacion.medio_pago == 'credito_gramos'
-      @reserva.update!(dispensacion: dispensacion)
+    rescue ActiveRecord::RecordInvalid => e
+      return render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+    rescue => e
+      return render json: { errors: [e.message] }, status: :unprocessable_entity
     end
     render json: serialize_reserva(@reserva.reload)
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-  rescue => e
-    render json: { errors: [e.message] }, status: :unprocessable_entity
   end
 
   # PATCH /reservas/:id/cancelar

@@ -57,8 +57,17 @@
       </tbody>
     </table>
 
-    <!-- Modal entregar -->
-    <ModalEntregarReserva v-model="showEntrega" :reserva="reservaSel" @entregada="cargar" />
+    <!-- Modal entregar: reusa el modal de nueva dispensación en modo "entregar reserva" -->
+    <ModalNuevaDispensacion
+      v-if="reservaSel"
+      v-model="showEntrega"
+      :socio-id="reservaSel.paciente?.id"
+      :paciente-nombre="reservaSel.paciente?.nombre"
+      :saldo-cc="reservaSel.paciente?.saldo_cc ?? null"
+      :limite-cc="reservaSel.paciente?.limite_cc ?? null"
+      :reserva="reservaSel"
+      @saved="cargar"
+    />
 
     <!-- Modal editar -->
     <Teleport to="body">
@@ -95,7 +104,7 @@
 import { ref, onMounted } from 'vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
-import ModalEntregarReserva from '../components/pacientes/ModalEntregarReserva.vue'
+import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
 import { listReservas, cancelarReserva, updateReserva, deleteReserva } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'

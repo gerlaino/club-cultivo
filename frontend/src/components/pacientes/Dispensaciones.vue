@@ -9,7 +9,6 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import { listDispensaciones, deleteDispensacion, listReservasPaciente, deleteReserva, cancelarReserva } from '../../lib/api.js'
 import ModalNuevaDispensacion from './ModalNuevaDispensacion.vue'
 import ModalEditarDispensacion from './ModalEditarDispensacion.vue'
-import ModalEntregarReserva from './ModalEntregarReserva.vue'
 import ModalEditarReserva from './ModalEditarReserva.vue'
 
 const props = defineProps({
@@ -253,8 +252,17 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       @saved="onDispensacionGuardadaConReservas"
     />
 
-    <!-- Modal entregar reserva -->
-    <ModalEntregarReserva v-model="showEntrega" :reserva="reservaSel" @entregada="onReservaEntregada" />
+    <!-- Modal entregar reserva: reusa el modal de nueva dispensación en modo "entregar reserva" -->
+    <ModalNuevaDispensacion
+      v-if="reservaSel"
+      v-model="showEntrega"
+      :socio-id="props.socioId"
+      :paciente-nombre="props.pacienteNombre"
+      :saldo-cc="props.saldoCc"
+      :limite-cc="props.limiteCc"
+      :reserva="reservaSel"
+      @saved="onReservaEntregada"
+    />
 
     <!-- Modal editar reserva -->
     <ModalEditarReserva v-model="showEditarReserva" :reserva="reservaSel" @saved="loadReservas" />

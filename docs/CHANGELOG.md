@@ -1,5 +1,23 @@
 # Changelog
 
+## Entregar reserva = crear dispensación (unificado con el modal y el flujo de cobros) (2026-06-24)
+
+Entregar una reserva ahora reusa el modal de **nueva dispensación** (modo "entregar reserva") y el
+**motor de cobros** — antes usaba un modal aparte y el camino viejo de cobro (medio único, sin pago
+partido ni contra-entrega).
+
+- **Backend**: el motor de cobros (`cobros_param`, `aplicar_lineas_cobro!`, `afinar_medio_pago!`,
+  `acreditar_excedente!`) se movió al concern `DispensacionesFinancieras` para compartirlo.
+  `reservas#entregar` ahora cobra el **resto** (total − seña) con ese motor: soporta efectivo,
+  transferencia, cuenta corriente, **contra-entrega** y excedente a favor. Mantiene el link de la
+  reserva, marca entregada y libera el stock apartado.
+- **Frontend**: `ModalNuevaDispensacion` acepta una prop `reserva` → modo "entregar reserva":
+  producto/cantidad de la reserva (solo lectura), banner "Seña $X · A cobrar $resto", y el medio
+  de pago del resto. `ReservasView` y la tab de dispensaciones del socio abren ese modal (en vez
+  de `ModalEntregarReserva`).
+- Specs de reservas actualizados al flujo de cobros (incl. contra-entrega y parcial a cuenta).
+  Suite backend 775 verde.
+
 ## Caja del delivery: efectivo en tránsito + recepción (2026-06-24)
 
 El efectivo que cobra el delivery en las entregas queda "en tránsito": NO se asienta como ingreso

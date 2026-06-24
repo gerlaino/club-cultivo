@@ -77,7 +77,7 @@ RSpec.describe 'Reservas', type: :request do
     it 'crea una dispensación, descuenta el stock real y deja la reserva entregada' do
       reserva = crear_reserva
       expect {
-        patch "/reservas/#{reserva.id}/entregar", headers: auth_headers
+        patch "/reservas/#{reserva.id}/entregar", params: { cobros: [{ medio: 'efectivo', monto: 2000 }] }, headers: auth_headers
       }.to change(Dispensacion, :count).by(1)
 
       expect(response).to have_http_status(:ok)
@@ -90,17 +90,18 @@ RSpec.describe 'Reservas', type: :request do
 
     it 'con seña previa, cobra sólo el resto (total - seña) en la dispensación' do
       reserva = crear_reserva(sena_ars: 500, aporte_estimado_ars: 2000)
-      patch "/reservas/#{reserva.id}/entregar", headers: auth_headers
+      patch "/reservas/#{reserva.id}/entregar", params: { cobros: [{ medio: 'efectivo', monto: 1500 }] }, headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       disp = reserva.reload.dispensacion
       expect(disp.aporte_socio_ars).to eq(1500) # 2000 - 500
+      expect(disp.cobros.sum(:monto_ars)).to eq(1500)
     end
 
     it 'no permite entregar dos veces' do
       reserva = crear_reserva
-      patch "/reservas/#{reserva.id}/entregar", headers: auth_headers
-      patch "/reservas/#{reserva.id}/entregar", headers: auth_headers
+      patch "/reservas/#{reserva.id}/entregar", params: { cobros: [{ medio: 'efectivo', monto: 2000 }] }, headers: auth_headers
+      patch "/reservas/#{reserva.id}/entregar", params: { cobros: [{ medio: 'efectivo', monto: 2000 }] }, headers: auth_headers
       expect(response).to have_http_status(:unprocessable_entity)
     end
   end
@@ -168,24 +169,26 @@ RSpec.describe 'Reservas', type: :request do
     let(:paciente2) { create(:paciente, club: club, created_by: admin, domicilio_calle: 'Corrientes', domicilio_altura: '1234', domicilio_ciudad: 'CABA') }
     let(:reserva)   { Reserva.create!(club: club, paciente: paciente2, user: dispensador, stock: stock, cantidad: 10, fecha_entrega_estimada: Date.current, aporte_estimado_ars: 1000) }
 
-    it 'asigna delivery y toma el domicilio del paciente al entregar' do
+    it 'asigna delivery y toma el domicilio del paciente al entregar (contra-entrega)' do
       patch "/reservas/#{reserva.id}/entregar",
-            params: { con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true },
+            params: { con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true, cobrar_en_entrega: true },
             headers: auth_headers
       expect(response).to have_http_status(:ok)
       disp = reserva.reload.dispensacion
       expect(disp.con_envio).to be(true)
       expect(disp.delivery_id).to eq(delivery.id)
       expect(disp.envio_calle).to eq('Corrientes')
+      expect(disp.cobrar_en_entrega).to be(true)
     end
 
-    it 'reparte crédito/efectivo al entregar por cuenta corriente' do
-      CuentaCorriente.create!(paciente: paciente2, club: club, saldo_disponible: 0, limite_credito: 600)
-      patch "/reservas/#{reserva.id}/entregar", params: { medio_pago: 'cuenta_corriente' }, headers: auth_headers
+    it 'paga parte en efectivo y el resto queda en cuenta corriente' do
+      cc = CuentaCorriente.create!(paciente: paciente2, club: club, saldo_disponible: 0, limite_credito: 600)
+      patch "/reservas/#{reserva.id}/entregar", params: { cobros: [{ medio: 'efectivo', monto: 400 }] }, headers: auth_headers
       expect(response).to have_http_status(:ok)
       disp = reserva.reload.dispensacion
       expect(disp.aporte_socio_ars.to_f).to eq(1000.0)
-      expect(disp.monto_credito_ars.to_f).to eq(600.0) # crédito disp; resto 400 a efectivo
+      expect(disp.monto_credito_ars.to_f).to eq(600.0)   # 400 efectivo + 600 a cuenta
+      expect(cc.reload.saldo_disponible.to_f).to eq(-600.0)
     end
   end
 
