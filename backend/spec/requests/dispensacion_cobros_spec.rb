@@ -73,6 +73,21 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
       expect(d.cobros.a_credito.sum(:monto_ars)).to eq(70_000)
       expect(cc.reload.saldo_disponible).to eq(-70_000)
     end
+
+    it 'acepta los cobros en forma de hash (multipart, cuando se sube foto)' do
+      sign_in_as(dispensador)
+      crear(cobrar_en_entrega: true, con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true)
+      d = Dispensacion.last
+      delete '/api/users/sign_out'
+      sign_in_as(delivery)
+      # Multipart manda cobros[0][medio]/[monto] → en el backend llegan como {"0" => {...}}
+      patch "/dispensaciones/#{d.id}/entregar",
+            params: { cobros: { '0' => { medio: 'efectivo', monto: 100_000 } }, notas_entrega: 'OK' },
+            headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(d.reload.estado_envio).to eq('entregado')
+      expect(d.saldo_pendiente).to eq(0)
+    end
   end
 
   context 'sobrepago: el socio paga de más' do

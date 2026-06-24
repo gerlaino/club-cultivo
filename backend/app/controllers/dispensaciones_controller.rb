@@ -434,11 +434,13 @@ class DispensacionesController < ApplicationController
   end
 
   # Líneas de cobro que manda el front: [{ medio, monto }]. Acepta el array bajo
-  # :dispensacion (create) o al tope (entrega). Filtra montos <= 0.
+  # :dispensacion (create) o al tope (entrega). En multipart (cuando hay foto) llegan
+  # como hash {"0" => {...}}, así que normalizamos a lista. Filtra montos <= 0.
   def cobros_param
     raw = params.dig(:dispensacion, :cobros) || params[:cobros]
     return [] if raw.blank?
-    raw.map { |c| { medio: c[:medio].to_s, monto: c[:monto].to_d } }.reject { |c| c[:monto] <= 0 }
+    entries = raw.respond_to?(:values) ? raw.values : raw   # hash multipart → lista
+    entries.map { |c| { medio: c[:medio].to_s, monto: c[:monto].to_d } }.reject { |c| c[:monto] <= 0 }
   end
 
   def comprobante_param
