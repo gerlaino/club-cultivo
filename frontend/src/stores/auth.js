@@ -10,6 +10,9 @@ export const useAuthStore = defineStore("auth", {
     error: null,
     redirectTo: null,
     bootstrapped: false,
+    // Mientras cerramos sesión, los 401 de requests en vuelo NO deben capturar la
+    // ruta actual como ?redirect (si no, el próximo usuario cae en la página del anterior).
+    loggingOut: false,
   }),
   getters: {
     isAuthenticated: (s) => !!s.user,
@@ -56,6 +59,7 @@ export const useAuthStore = defineStore("auth", {
     async login(email, password, redirect = null) {
       this.loading = true;
       this.error = null;
+      this.loggingOut = false;
       try {
         await signIn(email, password);
         await this.fetchMe();
@@ -79,11 +83,14 @@ export const useAuthStore = defineStore("auth", {
           const club = useClubStore();
           await club.fetch();
         }
-        // Si veníamos de un deep-link / QR (?redirect=…), volvemos ahí sin importar el rol.
-        // Si el rol no tiene permiso para ese destino, el router.beforeEach lo reencauza
-        // a su home — así nunca perdemos a dónde quería ir el usuario.
-        if (redirect) {
-          router.push(String(redirect));
+        // Si veníamos de un deep-link / QR (?redirect=…), volvemos ahí. PERO nunca a la
+        // home de OTRO rol (un redirect viejo del usuario anterior no debe ganar): los
+        // deep-links normales (QR, fichas, etc.) sí se respetan.
+        const r = redirect ? String(redirect) : null
+        const homesDeRol = Object.values(ROLE_HOME)
+        const apuntaAOtraHome = r && homesDeRol.some(h => (r === h || r.startsWith(h + '/')) && h !== roleHome)
+        if (r && !apuntaAOtraHome) {
+          router.push(r);
         } else {
           router.push(roleHome ? { path: roleHome } : { name: "dashboard" });
         }
@@ -102,6 +109,7 @@ export const useAuthStore = defineStore("auth", {
     async logOut() {
       this.loading = true;
       this.error = null;
+      this.loggingOut = true;   // los 401 en vuelo no deben setear ?redirect
       try {
         await signOut();
       } catch (_) {

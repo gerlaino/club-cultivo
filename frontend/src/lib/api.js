@@ -29,9 +29,11 @@ api.interceptors.response.use(
     const url = error?.config?.url || "";
 
     if (status === 401 && !url.includes('/users/sign_in')) {
+      let loggingOut = false;
       try {
         const { useAuthStore } = await import("../stores/auth");
         const auth = useAuthStore();
+        loggingOut = auth.loggingOut;
         auth.user = null;
         auth.bootstrapped = true;
       } catch {}
@@ -40,9 +42,11 @@ api.interceptors.response.use(
       // a /login preservando la ruta de origen (?redirect=…) — así un QR escaneado sin
       // sesión vuelve a su página tras loguearse. Para otros 401 (sesión vencida mientras
       // usabas una página protegida) mandamos a login conservando a dónde volver.
+      // Si estamos cerrando sesión, NO capturamos la ruta actual: el próximo usuario
+      // no debe caer en la página del anterior.
       const esBootstrap = url.replace(/\?.*$/, '').endsWith('/me');
       const path = window.location.pathname;
-      if (!esBootstrap && !path.startsWith('/login')) {
+      if (!esBootstrap && !loggingOut && !path.startsWith('/login')) {
         const retorno = encodeURIComponent(path + window.location.search);
         window.location.href = `/login?redirect=${retorno}`;
       }
