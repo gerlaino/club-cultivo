@@ -49,8 +49,9 @@
             <template v-if="r.estado === 'pendiente'">
               <button class="rsv__btn rsv__btn--primary" :disabled="busy === r.id" @click="abrirEntrega(r)">Entregar</button>
               <button class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="abrirEdicion(r)" title="Editar"><i class="bi bi-pencil"></i></button>
-              <button class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="cancelar(r)" title="Cancelar (libera stock)">Cancelar</button>
-              <button v-if="!r.sena_ars" class="rsv__btn rsv__btn--danger" :disabled="busy === r.id" @click="eliminar(r)" title="Eliminar"><i class="bi bi-trash3"></i></button>
+              <!-- Con seña: cancelar (preserva el asiento). Sin seña: eliminar (borrado limpio). -->
+              <button v-if="r.sena_ars > 0" class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="cancelar(r)" title="Cancelar (libera stock; la seña no se reembolsa)">Cancelar</button>
+              <button v-else class="rsv__btn rsv__btn--danger" :disabled="busy === r.id" @click="eliminar(r)" title="Eliminar (libera stock)"><i class="bi bi-trash3"></i></button>
             </template>
           </td>
         </tr>
