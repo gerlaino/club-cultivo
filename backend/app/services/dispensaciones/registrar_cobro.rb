@@ -43,9 +43,12 @@ module Dispensaciones
           monto_ars:  @monto,
           contexto:   @contexto,
           notas:      @notas,
+          # Efectivo de entrega: queda en tránsito (se asienta al recibir la caja).
+          rendido:    !diferido_a_rendicion?,
         )
         cobro.comprobante.attach(@comprobante) if @comprobante.present?
-        asiento_contable(cobro)
+        # El asiento del efectivo de entrega se difiere hasta la recepción de caja.
+        asiento_contable(cobro) unless diferido_a_rendicion?
         debitar_cuenta_corriente(cobro) if @medio == 'cuenta_corriente'
       end
       Result.new(ok: true, cobro: cobro)
@@ -72,6 +75,12 @@ module Dispensaciones
 
     def cuenta_corriente
       @cuenta_corriente ||= @dispensacion.paciente.cuenta_corriente
+    end
+
+    # Efectivo cobrado por el delivery en la entrega: su asiento se difiere hasta la
+    # recepción de caja (caja en tránsito). El resto se asienta en el acto.
+    def diferido_a_rendicion?
+      @medio == 'efectivo' && @contexto == 'entrega'
     end
 
     def asiento_contable(cobro)

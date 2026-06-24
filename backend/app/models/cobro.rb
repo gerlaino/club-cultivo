@@ -25,8 +25,18 @@ class Cobro < ApplicationRecord
   scope :a_credito, -> { where(medio: 'cuenta_corriente') }
   scope :recientes, -> { order(created_at: :desc) }
 
+  # Efectivo cobrado por el delivery en la entrega y todavía no rendido al club.
+  scope :efectivo_en_transito, -> { where(medio: 'efectivo', contexto: 'entrega', rendido: false) }
+  scope :del_delivery,         ->(user_id) { where(created_by_id: user_id) }
+
   def a_credito?
     medio == 'cuenta_corriente'
+  end
+
+  # ¿El asiento contable de este cobro se difiere hasta la recepción de caja?
+  # Solo el efectivo cobrado por el delivery en la entrega (caja en tránsito).
+  def diferido_a_rendicion?
+    medio == 'efectivo' && contexto == 'entrega'
   end
 
   private

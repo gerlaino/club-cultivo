@@ -292,6 +292,7 @@ Rails.application.routes.draw do
         post   :asignar_sede
         delete :desasignar_sede
         get    :stats
+        post   :recibir_caja
       end
     end
 

@@ -233,6 +233,7 @@ export const reasignarDelivery = (id, deliveryId)  => api.patch(`/dispensaciones
 export const listUsers         = (params = {}) => api.get('/usuarios', { params });
 export const getUser           = (id) => api.get(`/usuarios/${id}`);
 export const getUsuarioStats   = (id, params = {}) => api.get(`/usuarios/${id}/stats`, { params });
+export const recibirCajaDelivery = (id) => api.post(`/usuarios/${id}/recibir_caja`);
 export const createUser        = (payload) => api.post('/usuarios', { user: payload });
 export const updateUser        = (id, payload) => api.put(`/usuarios/${id}`, { user: payload });
 export const deleteUser        = (id) => api.delete(`/usuarios/${id}`);

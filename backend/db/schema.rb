@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_24_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_24_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -254,8 +254,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_24_000002) do
     t.text "notas"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "rendido", default: true, null: false
+    t.datetime "rendido_at"
     t.index ["club_id", "created_at"], name: "index_cobros_on_club_id_and_created_at"
     t.index ["club_id"], name: "index_cobros_on_club_id"
+    t.index ["created_by_id", "rendido"], name: "index_cobros_on_created_by_id_and_rendido"
     t.index ["created_by_id"], name: "index_cobros_on_created_by_id"
     t.index ["dispensacion_id", "medio"], name: "index_cobros_on_dispensacion_id_and_medio"
     t.index ["dispensacion_id"], name: "index_cobros_on_dispensacion_id"

@@ -1,5 +1,21 @@
 # Changelog
 
+## Caja del delivery: efectivo en tránsito + recepción (2026-06-24)
+
+El efectivo que cobra el delivery en las entregas queda "en tránsito": NO se asienta como ingreso
+hasta que el admin recibe la caja. Da control de faltantes.
+
+- `cobros.rendido` (default true) + `rendido_at`. El efectivo de entrega se crea `rendido: false`
+  y `RegistrarCobro` **no** crea su asiento (lo difiere). Transferencia y cuenta corriente se
+  asientan al entregar como siempre.
+- `Dispensaciones::RecibirCajaDelivery`: al recibir la caja, asienta el ingreso de cada cobro
+  efectivo pendiente y lo marca rendido.
+- `GET /usuarios/:id/stats` incluye `caja_delivery` (efectivo en mano, cobros pendientes, en viaje).
+- `POST /usuarios/:id/recibir_caja` (admin).
+- UsuarioDetail (admin → equipo → delivery): card "Caja del delivery" con efectivo en mano +
+  botón "Recibir caja".
+- Spec: efectivo no asentado hasta recibir; al recibir se crea el movimiento y se marca rendido.
+
 ## Cobros: pagos múltiples / parciales / contra-entrega por dispensa (2026-06-24)
 
 Rediseño completo del cobro de dispensaciones. Una dispensa ahora puede cobrarse con varios medios

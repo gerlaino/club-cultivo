@@ -10,7 +10,7 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import { getUsuarioStats } from '../lib/api.js'
+import { getUsuarioStats, recibirCajaDelivery } from '../lib/api.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -144,6 +144,25 @@ async function cargarStats() {
     const { data } = await getUsuarioStats(userId, { anio: statsAnio.value, mes: statsMes.value })
     stats.value = data
   } catch { stats.value = null } finally { loadingStats.value = false }
+}
+
+// ── Caja del delivery (efectivo en mano) ──────────────────────────────────
+const recibiendoCaja = ref(false)
+const fmtARS = (n) => '$' + (Number(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+const cajaEfectivo = computed(() => stats.value?.caja_delivery?.efectivo_en_mano || 0)
+const cajaCobros   = computed(() => stats.value?.caja_delivery?.cobros_pendientes || 0)
+const cajaEnViaje  = computed(() => stats.value?.caja_delivery?.en_viaje || 0)
+
+async function recibirCaja() {
+  if (cajaEfectivo.value <= 0) return
+  recibiendoCaja.value = true
+  try {
+    const { data } = await recibirCajaDelivery(userId)
+    toast.success(`Caja recibida: ${fmtARS(data.recibido_ars)} (${data.cobros} cobro${data.cobros !== 1 ? 's' : ''})`)
+    await cargarStats()
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo recibir la caja')
+  } finally { recibiendoCaja.value = false }
 }
 function cambiarMesStats(delta) {
   let m = statsMes.value + delta, a = statsAnio.value
@@ -325,6 +344,29 @@ onMounted(async () => {
               <span class="ud__card-hint">Solo lectura</span>
             </div>
             <MedicoCalendarioWidget :medico-id="userId" />
+          </div>
+
+          <!-- Delivery → Caja (efectivo en mano) -->
+          <div v-if="u.role === 'delivery'" class="ud__card">
+            <div class="ud__card-hdr">
+              <div class="ud__card-ico" style="background:rgba(21,128,61,.1);color:#15803d">
+                <i class="bi bi-cash-stack"></i>
+              </div>
+              <span class="ud__card-title">Caja del delivery</span>
+              <span class="ud__card-hint">Efectivo cobrado en entregas, pendiente de rendir</span>
+            </div>
+            <div class="udc">
+              <div class="udc__monto">
+                <span class="udc__monto-lbl">Efectivo en mano</span>
+                <span class="udc__monto-val">{{ fmtARS(cajaEfectivo) }}</span>
+                <span class="udc__monto-sub">{{ cajaCobros }} cobro{{ cajaCobros !== 1 ? 's' : '' }} · {{ cajaEnViaje }} en viaje</span>
+              </div>
+              <button v-if="canEdit" class="udc__btn" :disabled="recibiendoCaja || cajaEfectivo <= 0" @click="recibirCaja">
+                <DsSpinner v-if="recibiendoCaja" :size="14" />
+                <template v-else><i class="bi bi-check2-circle"></i> Recibir caja</template>
+              </button>
+            </div>
+            <p class="udc__hint">Al recibir la caja, el efectivo se asienta en contabilidad como ingreso y se marca como rendido.</p>
           </div>
 
           <!-- Cultivador → Salas asignadas -->
@@ -589,6 +631,17 @@ onMounted(async () => {
 .ud__card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
 .ud__card--mt { margin-top: 1.25rem; }
 .ud__aside .ud__card + .ud__card { margin-top: 1rem; }
+
+/* Caja del delivery */
+.udc { display: flex; align-items: center; gap: 1rem; padding: 1rem; }
+.udc__monto { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.udc__monto-lbl { font-size: .72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+.udc__monto-val { font-size: 1.6rem; font-weight: 800; letter-spacing: -.03em; color: #15803d; font-variant-numeric: tabular-nums; }
+.udc__monto-sub { font-size: .75rem; color: #94a3b8; }
+.udc__btn { display: inline-flex; align-items: center; gap: .4rem; background: #15803d; color: #fff; border: none; border-radius: 9px; padding: .6rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.udc__btn:hover:not(:disabled) { background: #14532d; }
+.udc__btn:disabled { opacity: .45; cursor: not-allowed; }
+.udc__hint { font-size: .72rem; color: #94a3b8; padding: 0 1rem 1rem; margin: 0; line-height: 1.4; }
 .ud__card-hdr {
   display: flex; align-items: center; gap: .65rem;
   padding: .875rem 1.25rem;

@@ -1,7 +1,7 @@
 class ClubUsersController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!
-  before_action :set_user, only: [:show, :update, :destroy, :reset_password, :salas_asignadas, :asignar_sala, :desasignar_sala, :sedes_asignadas, :asignar_sede, :desasignar_sede, :stats]
+  before_action :set_user, only: [:show, :update, :destroy, :reset_password, :salas_asignadas, :asignar_sala, :desasignar_sala, :sedes_asignadas, :asignar_sede, :desasignar_sede, :stats, :recibir_caja]
 
   # GET /usuarios
   def index
@@ -197,6 +197,15 @@ class ClubUsersController < ApplicationController
       gramos:       disp_scope.sum(:cantidad).to_f.round(2),
     }
 
+    # Caja del delivery: efectivo cobrado en entregas todavía en tránsito (no rendido).
+    # Es un saldo vivo (todo el histórico pendiente), no del mes.
+    en_transito = Cobro.efectivo_en_transito.del_delivery(@user.id).where(club_id: club.id)
+    caja_delivery = {
+      efectivo_en_mano: en_transito.sum(:monto_ars).to_f,
+      cobros_pendientes: en_transito.count,
+      en_viaje: Dispensacion.where(delivery_id: @user.id, estado_envio: 'en_viaje').count,
+    }
+
     render json: {
       anio: anio, mes: mes,
       usuario: { id: @user.id, nombre: @user.nombre_completo, rol: @user.role },
@@ -204,7 +213,21 @@ class ClubUsersController < ApplicationController
       produccion: produccion,
       despachos: despachos,
       dispensaciones: dispensaciones,
+      caja_delivery: caja_delivery,
     }
+  end
+
+  # POST /usuarios/:id/recibir_caja
+  # El admin recibe el efectivo en tránsito del delivery: asienta los ingresos y
+  # marca los cobros como rendidos.
+  def recibir_caja
+    res = Dispensaciones::RecibirCajaDelivery.call(
+      delivery: @user, club: current_user.club, receptor: current_user)
+    if res.ok?
+      render json: { recibido_ars: res.total.to_f, cobros: res.cantidad }
+    else
+      render json: { error: res.error }, status: :unprocessable_entity
+    end
   end
 
   private
