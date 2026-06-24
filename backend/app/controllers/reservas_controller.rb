@@ -71,6 +71,7 @@ class ReservasController < ApplicationController
       end
     end
     if @reserva.update(attrs)
+      sincronizar_medio_sena!(@reserva)   # si hay seña, el medio editado es el de la seña
       render json: serialize_reserva(@reserva)
     else
       render json: { errors: @reserva.errors.full_messages }, status: :unprocessable_entity
@@ -239,6 +240,15 @@ class ReservasController < ApplicationController
     precio_base = stock.precio_sugerido_ars.to_d
     descuento   = paciente.descuento_porcentaje.to_d.clamp(0, 100) / 100
     (precio_base * (1 - descuento) * cantidad.to_d).round(2)
+  end
+
+  # Si la reserva tiene seña, su medio_pago ES el de la seña: al editarlo, sincronizamos
+  # el asiento contable de la seña para que el libro no quede desincronizado.
+  def sincronizar_medio_sena!(reserva)
+    return unless reserva.sena_ars.to_d > 0
+    MovimientoContable.where(paciente_id: reserva.paciente_id, categoria: 'aporte_socio')
+                      .where('descripcion LIKE ?', "Seña reserva ##{reserva.id} —%")
+                      .update_all(medio_pago: reserva.medio_pago.presence || 'efectivo')
   end
 
   # La seña es plata real que entra al reservar. Se asienta como ingreso (no reembolsable

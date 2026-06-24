@@ -12,12 +12,14 @@
           <input v-model.number="form.cantidad" type="number" min="0.01" step="0.01" class="mre__input" />
           <label class="mre__label">Fecha de entrega estimada</label>
           <AppDatePicker v-model="form.fecha_entrega_estimada" :min="hoy" />
-          <label class="mre__label">Medio de pago previsto</label>
-          <select v-model="form.medio_pago" class="mre__input">
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="cuenta_corriente">Cuenta corriente</option>
-          </select>
+          <!-- El medio de pago solo aplica si se dejó seña (es el medio con que se pagó). -->
+          <template v-if="tieneSena">
+            <label class="mre__label">Medio de pago de la seña</label>
+            <select v-model="form.medio_pago" class="mre__input">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+            </select>
+          </template>
         </div>
         <div class="mre__foot">
           <button class="mre__btn-ghost" @click="cerrar">Cancelar</button>
@@ -29,7 +31,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { updateReserva } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -42,6 +44,7 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 const toast = useToast()
 
 const hoy    = new Date().toISOString().split('T')[0]
+const tieneSena = computed(() => Number(props.reserva?.sena_ars) > 0)
 const saving = ref(false)
 const error  = ref(null)
 const form   = ref({ cantidad: null, fecha_entrega_estimada: '', medio_pago: 'efectivo' })
