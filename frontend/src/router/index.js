@@ -608,6 +608,12 @@ const routes = [
     component: () => import('../views/delivery/EtiquetaDespachoView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/despachos/etiquetas',
+    name: 'despacho-etiquetas-lote',
+    component: () => import('../views/delivery/EtiquetasLoteView.vue'),
+    meta: { requiresAuth: true },
+  },
 
   // ── Dispensador routes ──
   {

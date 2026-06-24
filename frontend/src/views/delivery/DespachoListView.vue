@@ -102,6 +102,15 @@ function abrirEnMaps() {
   window.open(url, '_blank', 'noopener')
 }
 
+// Imprimir etiquetas de la ruta: seleccionados (si hay) o todos los pendientes.
+function imprimirEtiquetas() {
+  let base = despachosPendientesRuta.value
+  if (seleccionados.value.size) base = base.filter(d => seleccionados.value.has(d.id))
+  const ids = base.map(d => d.id)
+  if (!ids.length) { toast.error('No hay despachos para imprimir'); return }
+  window.open(`/despachos/etiquetas?ids=${ids.join(',')}`, '_blank', 'noopener')
+}
+
 // ── Ruta de entrega (orden + candado) ──────────────────────────────────────
 // Modo ruta: un repartidor seleccionado → se ordena la ruta de una FECHA (hoy o futura).
 const modoRuta       = computed(() => !!filtroDelivery.value)
@@ -543,6 +552,10 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
       <button class="dsp__ruta-maps" :disabled="!despachosPendientesRuta.length" @click="abrirEnMaps">
         <i class="bi bi-geo-alt-fill"></i>
         Ruta en Maps<template v-if="seleccionados.size"> ({{ seleccionados.size }})</template>
+      </button>
+      <button class="dsp__ruta-print" :disabled="!despachosPendientesRuta.length" @click="imprimirEtiquetas">
+        <i class="bi bi-printer-fill"></i>
+        Etiquetas<template v-if="seleccionados.size"> ({{ seleccionados.size }})</template>
       </button>
       <button
         class="dsp__ruta-lock"
@@ -1018,6 +1031,13 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 }
 .dsp__ruta-maps:hover:not(:disabled) { background: #1e40af; }
 .dsp__ruta-maps:disabled { opacity: .5; cursor: not-allowed; }
+.dsp__ruta-print {
+  display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
+  background: #1b5e20; color: #fff; border: none; border-radius: 8px;
+  padding: .45rem .8rem; font-size: .8rem; font-weight: 700; white-space: nowrap;
+}
+.dsp__ruta-print:hover:not(:disabled) { background: #104417; }
+.dsp__ruta-print:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Controles de orden en la fila */
 .dsp__sel { width: 17px; height: 17px; accent-color: var(--c-leaf-700, #15803d); cursor: pointer; flex-shrink: 0; margin-right: var(--sp-1); }

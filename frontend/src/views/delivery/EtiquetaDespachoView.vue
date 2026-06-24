@@ -22,31 +22,8 @@
 
     <!-- Etiqueta -->
     <div v-else class="et__preview">
-      <div id="despacho-label" class="et__etiqueta" :class="`et__etiqueta--${tamano}`">
-
-        <!-- Header: club (remitente) -->
-        <div class="et__header">
-          <img v-if="club.logoUrl" :src="club.logoUrl" alt="logo" class="et__logo" crossorigin="anonymous" />
-          <span class="et__club-nombre">{{ club.name }}</span>
-        </div>
-
-        <!-- Destinatario -->
-        <div class="et__para-lbl">Para</div>
-        <div class="et__para">{{ despacho.contacto_nombre || despacho.paciente_nombre || '—' }}</div>
-
-        <div v-if="despacho.direccion_envio" class="et__dir">{{ despacho.direccion_envio }}</div>
-        <div v-if="despacho.contacto_telefono" class="et__tel">Tel: {{ despacho.contacto_telefono }}</div>
-
-        <!-- Cobrar al entregar (contra-entrega) -->
-        <div v-if="cobrarAlEntregar" class="et__cobrar">
-          💵 COBRAR AL ENTREGAR<span v-if="montoCobrar"> · {{ montoCobrar }}</span>
-        </div>
-
-        <!-- Footer: código de paquete -->
-        <div class="et__footer">
-          <span class="et__cod-lbl">Paquete</span>
-          <span class="et__cod">{{ despacho.codigo_paquete || `#${despacho.id}` }}</span>
-        </div>
+      <div id="despacho-label">
+        <EtiquetaDespacho :despacho="despacho" :tamano="tamano" />
       </div>
     </div>
 
@@ -54,11 +31,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import html2pdf from 'html2pdf.js'
 import { getDispensacion } from '../../lib/api.js'
 import { useClubStore } from '../../stores/club.js'
+import EtiquetaDespacho from '../../components/delivery/EtiquetaDespacho.vue'
 
 const route   = useRoute()
 const club    = useClubStore()
@@ -67,12 +45,6 @@ const loading = ref(true)
 const despacho = ref(null)
 const tamano   = ref('100x70')
 const descargando = ref(false)
-
-const cobrarAlEntregar = computed(() => despacho.value?.cobrar_en_entrega || (despacho.value?.saldo_pendiente || 0) > 0)
-const montoCobrar = computed(() => {
-  const m = despacho.value?.saldo_pendiente || 0
-  return m > 0 ? '$' + Number(m).toLocaleString('es-AR') : ''
-})
 
 function imprimir() { window.print() }
 
