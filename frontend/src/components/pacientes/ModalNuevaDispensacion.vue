@@ -146,6 +146,10 @@ watch(() => form.value.con_envio, (val) => {
   else if (form.value.medio_pago === 'contra_entrega') form.value.medio_pago = 'efectivo'
 })
 watch(() => form.value.stock_id,  ()    => { precioUnitarioManual.value = null })
+// La seña de una reserva solo se cobra en efectivo o transferencia.
+watch(() => form.value.es_reserva, (val) => {
+  if (val && !['efectivo', 'transferencia'].includes(form.value.medio_pago)) form.value.medio_pago = 'efectivo'
+})
 
 const stockSeleccionado    = computed(() => stocks.value.find(s => s.id === form.value.stock_id) || null)
 const necesitaPrecioManual = computed(() => stockSeleccionado.value != null && !stockSeleccionado.value.precio_sugerido_ars)
@@ -474,11 +478,12 @@ async function handleSubmit() {
               <AppDatePicker v-else v-model="form.fecha_dispensacion" :max="today" />
             </div>
             <div class="mnd__field">
-              <label class="mnd__label">Medio de pago <span v-if="form.es_reserva" class="mnd__opt">previsto</span></label>
+              <label class="mnd__label">{{ form.es_reserva ? 'Medio de pago de la seña' : 'Medio de pago' }}</label>
               <select v-model="form.medio_pago" class="mnd__input">
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
-                <option value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite configurado)' : '' }}</option>
+                <!-- Cuenta corriente y contra-entrega no aplican a la seña de una reserva -->
+                <option v-if="!form.es_reserva" value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite configurado)' : '' }}</option>
                 <option v-if="!form.es_reserva" value="contra_entrega">Contra entrega (cobra el delivery)</option>
               </select>
             </div>
@@ -508,7 +513,7 @@ async function handleSubmit() {
 
           <!-- Reserva: el envío se define al entregar, no al reservar -->
           <div v-if="form.es_reserva" class="mnd__warn-box" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
-            <i class="bi bi-info-circle"></i> El delivery y la dirección se definen al momento de entregar la reserva.
+            <i class="bi bi-info-circle"></i> El delivery y la dirección se definen al momento de crear la dispensación en base a la reserva.
           </div>
 
           <!-- Delivery (solo entrega inmediata) -->
