@@ -6,6 +6,9 @@ class ReservasController < ApplicationController
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
   before_action :set_reserva,      only: [:show, :update, :destroy, :entregar, :cancelar]
+  # El dashboard cachea sus métricas 10 min; al tocar una reserva lo invalidamos para
+  # que la sección "Reservas para preparar" se actualice al instante.
+  after_action :bust_dashboard_cache, only: [:create, :update, :destroy, :entregar, :cancelar]
 
   # GET /pacientes/:paciente_id/reservas  OR  GET /reservas[?estado=pendiente]
   def index
@@ -184,6 +187,11 @@ class ReservasController < ApplicationController
   private
 
   def club_sede_ids = current_user.club.sede_ids
+
+  # Invalida el cache del dashboard del día para este club (analytics dispensador).
+  def bust_dashboard_cache
+    Rails.cache.delete("analytics/dispensador/#{current_user.club_id}/#{Date.today}")
+  end
 
   def set_paciente
     @paciente = current_user.club.pacientes.find(params[:paciente_id])
