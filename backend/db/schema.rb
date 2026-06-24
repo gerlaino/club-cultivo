@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_23_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_24_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -243,6 +243,24 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_23_000001) do
     t.index ["slug"], name: "index_clubs_on_slug", unique: true
   end
 
+  create_table "cobros", force: :cascade do |t|
+    t.bigint "dispensacion_id", null: false
+    t.bigint "club_id", null: false
+    t.bigint "created_by_id", null: false
+    t.string "medio", null: false
+    t.decimal "monto_ars", precision: 12, scale: 2, null: false
+    t.boolean "pagado", default: true, null: false
+    t.string "contexto", default: "creacion", null: false
+    t.text "notas"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "created_at"], name: "index_cobros_on_club_id_and_created_at"
+    t.index ["club_id"], name: "index_cobros_on_club_id"
+    t.index ["created_by_id"], name: "index_cobros_on_created_by_id"
+    t.index ["dispensacion_id", "medio"], name: "index_cobros_on_dispensacion_id_and_medio"
+    t.index ["dispensacion_id"], name: "index_cobros_on_dispensacion_id"
+  end
+
   create_table "conversaciones_asistente", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.bigint "user_id", null: false
@@ -349,6 +367,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_23_000001) do
     t.jsonb "producto_snapshot", default: {}, null: false
     t.bigint "ruta_entrega_id"
     t.integer "orden_entrega"
+    t.boolean "cobrar_en_entrega", default: false, null: false
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["delivery_id"], name: "index_dispensaciones_on_delivery_id"
@@ -1412,6 +1431,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_23_000001) do
   add_foreign_key "check_ins", "clubs"
   add_foreign_key "check_ins", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "check_ins", "pacientes"
+  add_foreign_key "cobros", "clubs"
+  add_foreign_key "cobros", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "cobros", "users", column: "created_by_id"
   add_foreign_key "conversaciones_asistente", "clubs"
   add_foreign_key "conversaciones_asistente", "users"
   add_foreign_key "costo_lotes", "clubs"

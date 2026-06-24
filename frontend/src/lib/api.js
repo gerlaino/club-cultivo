@@ -205,7 +205,18 @@ export const deleteReserva   = (id)                  => api.delete(`/reservas/${
 export const exportDispensacionesCSV = (params = {}) => api.get('/dispensaciones/export_csv', { params, responseType: 'blob' })
 export const getMisPaquetes   = ()                  => api.get('/dispensaciones/mis_paquetes')
 export const iniciarViaje     = (ids)               => api.patch('/dispensaciones/iniciar_viaje', { ids })
-export const entregarPaquete  = (id, notasEntrega, firmaData) => api.patch(`/dispensaciones/${id}/entregar`, { notas_entrega: notasEntrega, firma_entrega_data: firmaData || null })
+// Entrega + cobros del delivery. Si hay comprobante (foto), va como multipart.
+export const entregarPaquete  = (id, { notasEntrega, firmaData, cobros = [], comprobante = null } = {}) => {
+  if (comprobante) {
+    const fd = new FormData()
+    if (notasEntrega) fd.append('notas_entrega', notasEntrega)
+    if (firmaData)    fd.append('firma_entrega_data', firmaData)
+    cobros.forEach((c, i) => { fd.append(`cobros[${i}][medio]`, c.medio); fd.append(`cobros[${i}][monto]`, c.monto) })
+    fd.append('comprobante', comprobante)
+    return api.patch(`/dispensaciones/${id}/entregar`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  }
+  return api.patch(`/dispensaciones/${id}/entregar`, { notas_entrega: notasEntrega, firma_entrega_data: firmaData || null, cobros })
+}
 export const reportarFallo    = (id, motivoFallo)   => api.patch(`/dispensaciones/${id}/reportar_fallo`, { motivo_fallo: motivoFallo })
 export const reprogramarPaquete = (id)             => api.patch(`/dispensaciones/${id}/reprogramar`)
 export const cancelarEntregaDispensacion = (id, motivo) => api.patch(`/dispensaciones/${id}/cancelar_entrega`, { motivo })

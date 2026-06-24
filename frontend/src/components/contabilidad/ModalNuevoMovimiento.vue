@@ -34,7 +34,7 @@ const ALL_CATS = [
   { value: 'seguro',        label: 'Seguros',               tipos: ['egreso'] },
   { value: 'admin',         label: 'Administrativo',        tipos: ['egreso'] },
   { value: 'aporte_socio',  label: 'Aporte socio',          tipos: ['ingreso'], requiresPaciente: true },
-  { value: 'dispensacion',  label: 'Recupero dispensación', tipos: ['ingreso'] },
+  { value: 'dispensacion',  label: 'Recupero dispensación', tipos: ['ingreso'], allowsPaciente: true },
   { value: 'subvencion',    label: 'Subvención',            tipos: ['ingreso'] },
   { value: 'otro',          label: 'Otros',                 tipos: ['egreso','ingreso'] },
 ]
@@ -152,13 +152,16 @@ const catsFiltradas = computed(() => {
 
 const catActual     = computed(() => ALL_CATS.find(c => c.value === form.value.categoria) || null)
 const needsPaciente = computed(() => catActual.value?.requiresPaciente || false)
+// Categorías que muestran el selector de paciente (obligatorio en aporte_socio,
+// opcional en recupero dispensación para poder atribuirlo a un socio).
+const showsPaciente = computed(() => catActual.value?.requiresPaciente || catActual.value?.allowsPaciente || false)
 const descPH        = computed(() => PLACEHOLDERS[form.value.categoria] || 'Describí brevemente el movimiento')
 
 function openCat()   { catOpen.value = true; catHL.value = -1; catQuery.value = ''; nextTick(() => catInput.value?.focus()) }
 function closeCat()  { catOpen.value = false; catQuery.value = '' }
 function pickCat(c)  {
   form.value.categoria = c.value
-  if (!c.requiresPaciente) form.value.paciente_id = null
+  if (!c.requiresPaciente && !c.allowsPaciente) form.value.paciente_id = null
   delete errors.value.categoria
   closeCat()
 }
@@ -241,7 +244,8 @@ watch(() => form.value.tipo, (t) => {
 })
 
 watch(() => form.value.categoria, (v) => {
-  if (!ALL_CATS.find(c => c.value === v)?.requiresPaciente) form.value.paciente_id = null
+  const c = ALL_CATS.find(c => c.value === v)
+  if (!c?.requiresPaciente && !c?.allowsPaciente) form.value.paciente_id = null
 })
 
 watch(() => props.modelValue, (val) => {
@@ -453,8 +457,8 @@ async function submit() {
 
               <!-- Paciente (condicional) -->
               <Transition name="field-slide">
-                <div v-if="needsPaciente" class="nm-field" ref="pacRef">
-                  <label class="nm-label">Socio / Paciente <span class="nm-req">*</span></label>
+                <div v-if="showsPaciente" class="nm-field" ref="pacRef">
+                  <label class="nm-label">Socio / Paciente <span v-if="needsPaciente" class="nm-req">*</span><span v-else class="nm-opt">(opcional)</span></label>
                   <template v-if="pacActual && !pacOpen">
                     <div class="nm-combo nm-combo--sel" @click="openPac">
                       <span class="nm-combo-val">{{ pacActual.label }}</span>
@@ -493,9 +497,12 @@ async function submit() {
                     </div>
                   </Transition>
                   <span v-if="errors.paciente_id" class="nm-err">{{ errors.paciente_id }}</span>
-                  <p v-if="pacActual" class="nm-pac-hint">
+                  <p v-if="pacActual && needsPaciente" class="nm-pac-hint">
                     Al guardar se acreditará en la cuenta corriente de
                     <strong>{{ pacActual.label.split('—')[0].trim() }}</strong>.
+                  </p>
+                  <p v-else-if="pacActual" class="nm-pac-hint">
+                    Se atribuye el ingreso a <strong>{{ pacActual.label.split('—')[0].trim() }}</strong> (no afecta su cuenta corriente).
                   </p>
                 </div>
               </Transition>

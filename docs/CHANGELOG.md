@@ -1,5 +1,45 @@
 # Changelog
 
+## Cobros: pagos múltiples / parciales / contra-entrega por dispensa (2026-06-24)
+
+Rediseño completo del cobro de dispensaciones. Una dispensa ahora puede cobrarse con varios medios
+(efectivo + transferencia), parcialmente, o dejar el resto en cuenta corriente; y el delivery puede
+cobrar al entregar (con foto de comprobante de transferencia).
+
+**Modelo / contabilidad**
+- Tabla `cobros` (medio, monto, pagado, contexto, comprobante ActiveStorage) + `dispensaciones.cobrar_en_entrega`.
+- `Cobro` + `Dispensacion#saldo_pendiente` / `total_cobrado` / `monto_sin_cobrar` / `usa_cobros?`.
+- `Dispensaciones::RegistrarCobro` (service): única fuente de verdad. Registra una línea, valida
+  bloqueos y arma la contabilidad (asiento + débito de cuenta corriente) en una transacción.
+
+**Reglas (bloquea cuando corresponde)**
+- Lo que no se paga en efectivo/transferencia → cuenta corriente (acotado por el cupo del socio).
+- Cuenta corriente exige cuenta activa y cupo suficiente; si no, se bloquea (rollback total).
+- No se puede cobrar más que el saldo pendiente.
+- Contra-entrega: al crear no se asienta nada; el delivery cobra al entregar.
+- Las dispensas legacy (sin cobros) quedan saldadas y no entran al flujo nuevo.
+- Editar el monto de una dispensa con cobros se bloquea (cancelar y rehacer); cancelar revierte
+  cobros + cuenta corriente.
+
+**Backfill**: las dispensaciones existentes se espejaron a `cobros` (sin re-ejecutar contabilidad).
+
+**Frontend**
+- Dispensar (`DispensarView`): composer de cobro (efectivo + transferencia, resto a cuenta) + toggle
+  "cobra el delivery"; se distribuye por ítem del carrito.
+- Entrega (`DeliveryDashboard`): muestra "a cobrar", inputs de efectivo/transferencia, resto a cuenta,
+  y subida de foto de comprobante; entrega vía multipart.
+
+Tests: service (6) + flujos create/entrega/cancelación (4) + suite backend completa (**770**) verde;
+vitest **58** verde.
+
+## Contabilidad / cuenta corriente: 2 fixes de UI (2026-06-24)
+
+- **"Recupero dispensación"** ahora muestra el selector de paciente (opcional) en Contabilidad,
+  para atribuir el ingreso a un socio. No toca la cuenta corriente (saldar deuda sigue siendo
+  "Registrar cobro" en la ficha del socio).
+- **Cuenta corriente**: tipografía uniformada con Contabilidad — se sacó el `monospace` ("máquina
+  de escribir"); números con `tabular-nums` y el valor grande igual al KPI de Contabilidad.
+
 ## Fix REAL: QR de planta se colgaba cargando (endpoint autenticado) (2026-06-23)
 
 La causa de fondo de por qué **lote andaba y planta no**: `LoteQrView` usa `getLotePorQR` →

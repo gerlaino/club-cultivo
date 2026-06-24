@@ -172,30 +172,44 @@
                 </div>
               </div>
 
-              <!-- Medio de pago -->
+              <!-- Cobro -->
               <div class="dv__modal-field">
-                <label class="dv__label">Medio de pago</label>
-                <div class="dv__medio-pago">
-                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'efectivo' }" @click="medioPago = 'efectivo'">
-                    Efectivo
-                  </button>
-                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'transferencia' }" @click="medioPago = 'transferencia'">
-                    Transferencia
-                  </button>
-                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'cuenta_corriente' }" :disabled="!tieneCc" :title="!tieneCc ? 'El paciente no tiene cuenta corriente configurada' : ''" @click="medioPago = 'cuenta_corriente'">
-                    Cta. corriente
-                  </button>
-                  <button type="button" class="dv__mp-btn" :class="{ 'dv__mp-btn--active': medioPago === 'no_abona' }" :disabled="!tieneCc" :title="!tieneCc ? 'El paciente no tiene crédito configurado' : ''" @click="medioPago = 'no_abona'">
-                    No abona
-                  </button>
-                </div>
-              </div>
+                <label class="dv__label">Cobro</label>
 
-              <!-- Saldo CC — siempre visible cuando el paciente tiene crédito configurado -->
-              <div v-if="tieneCc && ccBalance !== null" class="dv__balance-info" :class="{ 'dv__balance-info--alerta': ccBalance < cartTotal }">
-                <span>Crédito disponible:</span>
-                <strong>{{ formatARS(ccBalance) }}</strong>
-                <span v-if="ccBalance < cartTotal" class="dv__balance-error">— crédito insuficiente</span>
+                <label v-if="conEnvio" class="dv__label-check dv__cobro-delivery">
+                  <input type="checkbox" v-model="cobraDelivery" class="dv__checkbox" />
+                  Cobra el delivery al entregar
+                </label>
+
+                <template v-if="!cobraDelivery">
+                  <div class="dv__cobro-grid">
+                    <div class="dv__cobro-cell">
+                      <span class="dv__cobro-lbl">Efectivo</span>
+                      <input type="number" min="0" step="any" v-model.number="pagoEfectivo" class="dv__input" placeholder="0" />
+                    </div>
+                    <div class="dv__cobro-cell">
+                      <span class="dv__cobro-lbl">Transferencia</span>
+                      <input type="number" min="0" step="any" v-model.number="pagoTransf" class="dv__input" placeholder="0" />
+                    </div>
+                  </div>
+                  <div class="dv__cobro-quick">
+                    <button type="button" @click="setTodoCobro('efectivo')">Todo efectivo</button>
+                    <button type="button" @click="setTodoCobro('transferencia')">Todo transf.</button>
+                    <button type="button" v-if="tieneCc" @click="setTodoCobro('cuenta')">Todo a cuenta</button>
+                  </div>
+                  <div class="dv__cobro-resto" :class="{ 'dv__cobro-resto--err': (restoCuenta > 0 && !restoCuentaOk) || pagadoAhora > cartTotal }">
+                    <template v-if="pagadoAhora > cartTotal">El cobro (<strong>{{ formatARS(pagadoAhora) }}</strong>) supera el total</template>
+                    <template v-else-if="restoCuenta > 0">
+                      Resto a cuenta corriente: <strong>{{ formatARS(restoCuenta) }}</strong>
+                      <span v-if="!tieneCc" class="dv__balance-error"> — el socio no tiene cuenta corriente, cobrá el total</span>
+                      <span v-else-if="restoCuenta > ccBalance" class="dv__balance-error"> — supera el crédito disponible ({{ formatARS(ccBalance) }})</span>
+                    </template>
+                    <template v-else>Cubierto: <strong>{{ formatARS(pagadoAhora) }}</strong></template>
+                  </div>
+                  <div v-if="tieneCc && ccBalance !== null" class="dv__balance-info">
+                    <span>Crédito disponible:</span> <strong>{{ formatARS(ccBalance) }}</strong>
+                  </div>
+                </template>
               </div>
 
 
@@ -249,7 +263,7 @@
               <button class="dv__modal-cancel" @click="confirmOpen = false" :disabled="submitting">
                 Cancelar
               </button>
-              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || pagoExcedido || !pacienteActivo">
+              <button class="dv__modal-submit" @click="submitDispensacion" :disabled="submitting || !cobroValido || !pacienteActivo">
                 <DsSpinner v-if="submitting" :size="16" />
                 <template v-else>Confirmar</template>
               </button>
@@ -396,6 +410,57 @@ const ccExcedido     = computed(() =>
 )
 const pagoExcedido   = computed(() => ccExcedido.value)
 
+// ── Cobro: efectivo + transferencia, el resto a cuenta corriente ──────────
+const pagoEfectivo = ref(null)
+const pagoTransf   = ref(null)
+const cobraDelivery = ref(false)
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100
+
+const pagadoAhora = computed(() => round2((Number(pagoEfectivo.value) || 0) + (Number(pagoTransf.value) || 0)))
+const restoCuenta = computed(() => round2(Math.max(0, cartTotal.value - pagadoAhora.value)))
+const restoCuentaOk = computed(() => restoCuenta.value <= 0 || (tieneCc.value && (ccBalance.value === null || restoCuenta.value <= ccBalance.value)))
+const cobroValido = computed(() => {
+  if (cobraDelivery.value) return true
+  if (pagadoAhora.value > cartTotal.value + 0.001) return false
+  return restoCuentaOk.value
+})
+
+function setTodoCobro(medio) {
+  if (medio === 'efectivo')      { pagoEfectivo.value = round2(cartTotal.value); pagoTransf.value = null }
+  else if (medio === 'transferencia') { pagoTransf.value = round2(cartTotal.value); pagoEfectivo.value = null }
+  else if (medio === 'cuenta')   { pagoEfectivo.value = null; pagoTransf.value = null } // resto = total → todo a cuenta
+}
+
+// Líneas de cobro del carrito completo (efectivo, transferencia, resto a cuenta).
+function lineasCobro() {
+  const ls = []
+  if ((Number(pagoEfectivo.value) || 0) > 0) ls.push({ medio: 'efectivo', monto: round2(pagoEfectivo.value) })
+  if ((Number(pagoTransf.value) || 0) > 0)   ls.push({ medio: 'transferencia', monto: round2(pagoTransf.value) })
+  if (restoCuenta.value > 0)                  ls.push({ medio: 'cuenta_corriente', monto: restoCuenta.value })
+  return ls
+}
+
+// Distribuye las líneas proporcionalmente entre los ítems del carrito (cada ítem es
+// una dispensa). El último ítem absorbe el redondeo; nunca supera el total del ítem.
+function distribuirCobros(items, lines, total) {
+  const out  = items.map(() => [])
+  const used = items.map(() => 0)
+  for (const line of lines) {
+    let rem = round2(line.monto)
+    items.forEach((item, idx) => {
+      if (rem <= 0.001) return
+      const room = round2(item.total - used[idx])
+      if (room <= 0.001) return
+      let monto = idx === items.length - 1
+        ? Math.min(rem, room)
+        : Math.min(round2(line.monto * item.total / total), room, rem)
+      monto = round2(monto)
+      if (monto > 0.001) { out[idx].push({ medio: line.medio, monto }); used[idx] = round2(used[idx] + monto); rem = round2(rem - monto) }
+    })
+  }
+  return out
+}
+
 const cartTotalG = computed(() => cart.value.filter(i => i.stock.unidad === 'g').reduce((s, i) => s + i.cantidad, 0))
 
 // Estado del paciente
@@ -443,6 +508,9 @@ function removeFromCart(i) {
 
 function resetModal() {
   medioPago.value      = 'efectivo'
+  pagoEfectivo.value   = null
+  pagoTransf.value     = null
+  cobraDelivery.value  = false
   conEnvio.value       = false
   direccionEnvio.value = ''
   contactoNombre.value = ''
@@ -468,15 +536,19 @@ async function submitDispensacion() {
 
   const today  = new Date().toISOString().slice(0, 10)
   const items  = [...cart.value]
+  const cobrosPorItem = cobraDelivery.value
+    ? items.map(() => [])
+    : distribuirCobros(items, lineasCobro(), cartTotal.value)
   const results = await Promise.allSettled(
-    items.map(item =>
+    items.map((item, idx) =>
       dispensarOffline(selectedPaciente.value.id, {
         stock_id:            item.stock.id,
         cantidad:            item.cantidad,
         precio_unitario_ars: precioConDescuento(item.stock.precio_sugerido_ars ?? 0),
         aporte_socio_ars:    item.total,
         fecha_dispensacion:  today,
-        medio_pago:          medioPago.value,
+        cobrar_en_entrega:   cobraDelivery.value,
+        cobros:              cobrosPorItem[idx],
         con_envio:           conEnvio.value,
         ...(conEnvio.value ? {
           direccion_envio:   direccionEnvio.value,
@@ -991,6 +1063,23 @@ function reprocannLabel(p) {
 }
 .dv__balance-info--alerta { background: #fff5f5; border-color: #fca5a5; color: #991b1b; }
 .dv__balance-error { font-weight: 700; color: #dc2626; }
+
+/* Composer de cobro */
+.dv__cobro-delivery { margin-bottom: var(--sp-3); }
+.dv__cobro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+.dv__cobro-cell { display: flex; flex-direction: column; gap: 2px; }
+.dv__cobro-lbl { font-size: var(--fs-12); font-weight: 600; color: var(--c-ink-600); }
+.dv__cobro-quick { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-2); }
+.dv__cobro-quick button {
+  background: var(--c-ink-50); border: 1px solid var(--c-ink-200); border-radius: var(--r-sm);
+  padding: 3px 10px; font-size: var(--fs-12); font-weight: 600; color: var(--c-ink-700); cursor: pointer;
+}
+.dv__cobro-quick button:hover { border-color: var(--c-role-dispensador); color: var(--c-role-dispensador); }
+.dv__cobro-resto {
+  margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
+  background: #f0fdf4; border: 1px solid #bbf7d0; font-size: var(--fs-13); color: #15803d;
+}
+.dv__cobro-resto--err { background: #fff5f5; border-color: #fca5a5; color: #991b1b; }
 
 /* Avisos en modal */
 .dv__modal-aviso {

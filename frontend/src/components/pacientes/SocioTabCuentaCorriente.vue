@@ -333,7 +333,7 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
   display: flex; align-items: center; gap: .4rem;
 }
 .scc__input {
-  font-family: monospace; font-size: .92rem; font-weight: 600;
+  font-size: .92rem; font-weight: 600; font-variant-numeric: tabular-nums;
   border: 1.5px solid #cbd5e1; border-radius: 8px;
   padding: .35rem .6rem; width: 9rem; color: #1e293b; background: #f8fafc; outline: none;
   transition: border-color .15s, box-shadow .15s;
@@ -414,7 +414,7 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 .scc__estado-row { display: flex; gap: 1rem; }
 .scc__estado-block { flex: 1; display: flex; flex-direction: column; gap: .2rem; }
 .scc__estado-label { font-size: .7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
-.scc__estado-val   { font-family: monospace; font-size: 1.35rem; font-weight: 800; color: #0f172a; }
+.scc__estado-val   { font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: #0f172a; }
 .scc__val--ok   { color: #15803d; }
 .scc__val--zero { color: #94a3b8; }
 .scc__val--deuda { color: #dc2626; }
@@ -426,7 +426,7 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 .scc__progreso-fill { height: 100%; background: #15803d; border-radius: 999px; transition: width .4s; }
 .scc__progreso-fill--warn   { background: #d97706; }
 .scc__progreso-fill--danger { background: #dc2626; }
-.scc__progreso-pct  { font-size: .72rem; color: #94a3b8; white-space: nowrap; font-family: monospace; }
+.scc__progreso-pct  { font-size: .72rem; color: #94a3b8; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* ── Historial ───────────────────────────────────────────── */
 .scc__historial       { margin-top: 1rem; }
@@ -444,9 +444,9 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 .scc__mov-tipo--ajuste { background: #fffbeb; color: #b45309; }
 .scc__mov-tipo--pago   { background: #eff6ff; color: #2563eb; }
 .scc__mov-desc   { grid-column: 2; grid-row: 1; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scc__mov-monto  { grid-column: 3; grid-row: 1; font-family: monospace; font-weight: 700; text-align: right; white-space: nowrap; }
+.scc__mov-monto  { grid-column: 3; grid-row: 1; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; text-align: right; white-space: nowrap; }
 .scc__mov--pos   { color: #15803d; }
 .scc__mov--neg   { color: #dc2626; }
-.scc__mov-saldo  { grid-column: 2; grid-row: 2; font-family: monospace; font-size: .72rem; color: #94a3b8; }
+.scc__mov-saldo  { grid-column: 2; grid-row: 2; font-variant-numeric: tabular-nums; font-size: .72rem; color: #94a3b8; }
 .scc__mov-meta   { grid-column: 3; grid-row: 2; font-size: .7rem; color: #94a3b8; text-align: right; }
 </style>

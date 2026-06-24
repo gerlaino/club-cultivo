@@ -104,16 +104,38 @@ class DispensacionesController < ApplicationController
       @dispensacion.precio_unitario_ars ||= (@dispensacion.aporte_socio_ars.to_d / cantidad).round(2)
     end
 
-    cc = @paciente.cuenta_corriente
-    if (err = validar_y_calcular_credito(@dispensacion, cc))
-      return render json: { error: err }, status: :unprocessable_entity
-    end
+    @dispensacion.cobrar_en_entrega = ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :cobrar_en_entrega)) || false
+    lineas_cobro = cobros_param
+    usa_cobros   = @dispensacion.cobrar_en_entrega || lineas_cobro.present?
 
-    ActiveRecord::Base.transaction do
-      @dispensacion.save!
-      crear_movimiento_contable(@dispensacion)
-      debitar_cuenta_corriente(@dispensacion) if @dispensacion.a_credito? && cc
-      debitar_gramos(@dispensacion)           if @dispensacion.medio_pago == 'credito_gramos'
+    cc = @paciente.cuenta_corriente
+
+    # Camino nuevo (cobros) vs legacy (medio_pago único: gramos / no_abona / single).
+    if usa_cobros
+      # El precio/total ya se calculó arriba; los cobros validan crédito por su cuenta.
+      if @dispensacion.aporte_socio_ars.to_d <= 0
+        return render json: { error: 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.' }, status: :unprocessable_entity
+      end
+      @dispensacion.medio_pago = 'mixto'   # placeholder; se afina según los cobros
+      begin
+        ActiveRecord::Base.transaction do
+          @dispensacion.save!
+          aplicar_lineas_cobro!(@dispensacion, lineas_cobro, 'creacion') unless @dispensacion.cobrar_en_entrega
+          afinar_medio_pago!(@dispensacion)
+        end
+      rescue => e
+        return render json: { error: e.message }, status: :unprocessable_entity
+      end
+    else
+      if (err = validar_y_calcular_credito(@dispensacion, cc))
+        return render json: { error: err }, status: :unprocessable_entity
+      end
+      ActiveRecord::Base.transaction do
+        @dispensacion.save!
+        crear_movimiento_contable(@dispensacion)
+        debitar_cuenta_corriente(@dispensacion) if @dispensacion.a_credito? && cc
+        debitar_gramos(@dispensacion)           if @dispensacion.medio_pago == 'credito_gramos'
+      end
     end
 
     render json: serialize_dispensacion(@dispensacion), status: :created
@@ -135,6 +157,12 @@ class DispensacionesController < ApplicationController
       else
         return render json: { errors: @dispensacion.errors.full_messages }, status: :unprocessable_entity
       end
+    end
+
+    # Las dispensas con cobros (pagos partidos / contra-entrega) no se editan en monto
+    # por la vía legacy —corrompería el desglose de cobros—. Se cancela y se rehace.
+    if @dispensacion.usa_cobros?
+      return render json: { error: 'Esta dispensación tiene cobros registrados. Para cambiar el monto, cancelala y volvé a crearla.' }, status: :unprocessable_entity
     end
 
     # Cambio financiero (incl. cantidad): se revierten los efectos actuales (stock,
@@ -218,18 +246,31 @@ class DispensacionesController < ApplicationController
     if (err = error_orden_ruta).present?
       return render json: { error: err }, status: :unprocessable_entity
     end
-    registrar_evento_envio(@dispensacion, 'entregado', motivo: params[:notas_entrega])
-    @dispensacion.update!(
-      estado_envio:       'entregado',
-      notas_entrega:      params[:notas_entrega],
-      firma_entrega_data: params[:firma_entrega_data],
-      entregado_at:       Time.current,
-      historial_envio:    @dispensacion.historial_envio,
-    )
+    begin
+      ActiveRecord::Base.transaction do
+        # Cobro contra-entrega: el delivery carga los cobros (efectivo/transf/cuenta).
+        # Lo que no cubra en efectivo/transf queda a cuenta corriente (si hay cupo).
+        # Las legacy (usa_cobros? = false) ya están saldadas y no entran acá.
+        if @dispensacion.usa_cobros? || cobros_param.present?
+          aplicar_lineas_cobro!(@dispensacion, cobros_param, 'entrega')
+          afinar_medio_pago!(@dispensacion)
+        end
+        registrar_evento_envio(@dispensacion, 'entregado', motivo: params[:notas_entrega])
+        @dispensacion.update!(
+          estado_envio:       'entregado',
+          notas_entrega:      params[:notas_entrega],
+          firma_entrega_data: params[:firma_entrega_data],
+          entregado_at:       Time.current,
+          historial_envio:    @dispensacion.historial_envio,
+        )
+      end
+    rescue ActiveRecord::RecordInvalid => e
+      return render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+    rescue => e
+      return render json: { error: e.message }, status: :unprocessable_entity
+    end
     NotificacionDeliveryService.new(@dispensacion).notificar_entrega
     render json: serialize_dispensacion_delivery(@dispensacion)
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
   # PATCH /dispensaciones/:id/reportar_fallo
@@ -288,6 +329,7 @@ class DispensacionesController < ApplicationController
       revertir_cuenta_corriente(@dispensacion)
       CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)
       @dispensacion.movimientos_contables.destroy_all
+      @dispensacion.cobros.destroy_all          # los cobros (y sus comprobantes) se van con la cancelación
       @dispensacion.send(:incrementar_stock)   # el producto vuelve al stock
       registrar_evento_envio(@dispensacion, 'cancelado', motivo: motivo)
       @dispensacion.update!(estado_envio: 'cancelada', historial_envio: @dispensacion.historial_envio)
@@ -388,6 +430,53 @@ class DispensacionesController < ApplicationController
     else
       "Tenés que cerrar primero la parada anterior de la ruta."
     end
+  end
+
+  # Líneas de cobro que manda el front: [{ medio, monto }]. Acepta el array bajo
+  # :dispensacion (create) o al tope (entrega). Filtra montos <= 0.
+  def cobros_param
+    raw = params.dig(:dispensacion, :cobros) || params[:cobros]
+    return [] if raw.blank?
+    raw.map { |c| { medio: c[:medio].to_s, monto: c[:monto].to_d } }.reject { |c| c[:monto] <= 0 }
+  end
+
+  def comprobante_param
+    params[:comprobante] || params.dig(:dispensacion, :comprobante)
+  end
+
+  # Registra cada línea de cobro y, si queda saldo, lo deja en cuenta corriente
+  # (la regla: lo que no se paga en efectivo/transferencia va a la cuenta del socio).
+  # La foto de comprobante se adjunta al primer cobro de transferencia.
+  # Cualquier bloqueo (cupo insuficiente, sin cuenta) aborta la transacción.
+  def aplicar_lineas_cobro!(disp, lineas, contexto)
+    comp = comprobante_param
+    comp_usado = false
+    lineas.each do |l|
+      usar = l[:medio] == 'transferencia' && !comp_usado && comp.present?
+      comp_usado ||= usar
+      res = Dispensaciones::RegistrarCobro.call(
+        dispensacion: disp, club: current_user.club, usuario: current_user,
+        medio: l[:medio], monto: l[:monto], contexto: contexto,
+        comprobante: (usar ? comp : nil))
+      raise res.error unless res.ok?
+    end
+    saldo = disp.monto_sin_cobrar
+    if saldo > 0.001
+      res = Dispensaciones::RegistrarCobro.call(
+        dispensacion: disp, club: current_user.club, usuario: current_user,
+        medio: 'cuenta_corriente', monto: saldo, contexto: contexto)
+      raise res.error unless res.ok?
+    end
+  end
+
+  # medio_pago denormalizado de la dispensa: el único medio, o 'mixto' si hay varios.
+  # También sincroniza monto_credito_ars (lo que quedó a cuenta) para los serializers.
+  def afinar_medio_pago!(disp)
+    medios = disp.cobros.pluck(:medio).uniq
+    disp.update_columns(
+      medio_pago:        medios.size == 1 ? medios.first : 'mixto',
+      monto_credito_ars: disp.cobros.a_credito.sum(:monto_ars),
+    )
   end
 
   def apply_dispensacion_filters(scope)

@@ -2,7 +2,7 @@ class Dispensacion < ApplicationRecord
   self.table_name = 'dispensaciones'
 
   ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido cancelada].freeze
-  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos].freeze
+  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos mixto].freeze
 
   belongs_to :paciente
   belongs_to :user
@@ -15,6 +15,38 @@ class Dispensacion < ApplicationRecord
   # Los asientos contables de la dispensación viven y mueren con ella. Puede haber
   # más de uno cuando se paga parte con crédito (deuda) y parte en efectivo (ingreso).
   has_many :movimientos_contables, class_name: 'MovimientoContable', dependent: :destroy
+
+  # Líneas de cobro (efectivo/transferencia/cuenta_corriente). Una dispensa puede tener
+  # varias: pagos partidos, parcial, o el resto a cuenta corriente. Ver Cobro.
+  has_many :cobros, dependent: :destroy
+
+  # ¿Esta dispensa usa el flujo de cobros? (vs. legacy: asentada por medio_pago único,
+  # gramos, etc.). Una legacy ya está saldada por sus movimientos, no por cobros.
+  def usa_cobros?
+    cobrar_en_entrega? || cobros.exists?
+  end
+
+  # Total efectivamente asignado a cobros (pagados + lo que quedó a cuenta corriente).
+  def total_cobrado
+    cobros.sum(:monto_ars).to_d
+  end
+
+  # Monto del total que todavía no se asignó a ningún cobro (crudo, sin el guard
+  # legacy). Lo usa el motor de cobros para saber cuánto falta asignar.
+  def monto_sin_cobrar
+    (aporte_socio_ars.to_d - total_cobrado).round(2)
+  end
+
+  # Lo que falta cobrar/asignar. > 0 = pendiente (contra-entrega o cobro parcial).
+  # Las dispensas legacy (sin cobros) se consideran saldadas → 0.
+  def saldo_pendiente
+    return 0.to_d unless usa_cobros?
+    (aporte_socio_ars.to_d - total_cobrado).round(2)
+  end
+
+  def cobro_completo?
+    saldo_pendiente <= 0
+  end
 
   MEDIOS_A_CREDITO = %w[cuenta_corriente no_abona].freeze
 

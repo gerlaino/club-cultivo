@@ -21,6 +21,11 @@ const notasEntrega  = ref('')
 const motivoFallo   = ref('')
 const saving        = ref(false)
 
+// cobro en la entrega
+const cobroEfectivo   = ref(null)
+const cobroTransf     = ref(null)
+const comprobanteFile = ref(null)
+
 // firma digital
 const canvasRef      = ref(null)
 const firmaActiva    = ref(false)
@@ -194,6 +199,24 @@ async function handleIniciarViaje() {
 function abrirEntregar(p) {
   modalEntregar.value = p
   notasEntrega.value  = ''
+  cobroEfectivo.value = null
+  cobroTransf.value   = null
+  comprobanteFile.value = null
+}
+
+const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100
+const fmtMoneda = (n) => '$' + (Number(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+const saldoACobrar = computed(() => r2(modalEntregar.value?.saldo_pendiente || 0))
+const cobradoEntrega = computed(() => r2((Number(cobroEfectivo.value) || 0) + (Number(cobroTransf.value) || 0)))
+const restoEntregaCuenta = computed(() => r2(Math.max(0, saldoACobrar.value - cobradoEntrega.value)))
+const entregaCobroValido = computed(() => cobradoEntrega.value <= saldoACobrar.value + 0.001)
+
+function setComprobante(e) { comprobanteFile.value = e.target.files?.[0] || null }
+function lineasCobroEntrega() {
+  const ls = []
+  if ((Number(cobroEfectivo.value) || 0) > 0) ls.push({ medio: 'efectivo', monto: r2(cobroEfectivo.value) })
+  if ((Number(cobroTransf.value) || 0) > 0)   ls.push({ medio: 'transferencia', monto: r2(cobroTransf.value) })
+  return ls
 }
 
 function abrirFallo(p) {
@@ -204,13 +227,21 @@ function abrirFallo(p) {
 async function confirmarEntrega() {
   saving.value = true
   try {
-    await entregarPaquete(modalEntregar.value.id, notasEntrega.value, firmaData.value)
+    await entregarPaquete(modalEntregar.value.id, {
+      notasEntrega: notasEntrega.value,
+      firmaData:    firmaData.value,
+      cobros:       lineasCobroEntrega(),
+      comprobante:  comprobanteFile.value,
+    })
     modalEntregar.value = null
     firmaData.value     = null
     firmaActiva.value   = false
+    comprobanteFile.value = null
     await load()
     toast.success('Entrega registrada')
-  } catch { toast.error('Error al registrar entrega') }
+  } catch (e) {
+    toast.error(e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al registrar entrega')
+  }
   finally { saving.value = false }
 }
 
@@ -461,6 +492,37 @@ onMounted(load)
           <div class="dlv__modal-body">
             <div class="dlv__modal-pkg">{{ modalEntregar.codigo_paquete }} — {{ modalEntregar.paciente?.nombre }}</div>
 
+            <!-- Cobro (solo si hay saldo pendiente) -->
+            <div v-if="saldoACobrar > 0" class="dlv__cobro">
+              <div class="dlv__cobro-head">
+                <span>A cobrar</span>
+                <strong>{{ fmtMoneda(saldoACobrar) }}</strong>
+              </div>
+              <div class="dlv__cobro-grid">
+                <label class="dlv__cobro-cell">
+                  <span>Efectivo</span>
+                  <input type="number" min="0" step="any" v-model.number="cobroEfectivo" placeholder="0" />
+                </label>
+                <label class="dlv__cobro-cell">
+                  <span>Transferencia</span>
+                  <input type="number" min="0" step="any" v-model.number="cobroTransf" placeholder="0" />
+                </label>
+              </div>
+              <!-- Comprobante de transferencia -->
+              <div v-if="(Number(cobroTransf) || 0) > 0" class="dlv__cobro-comp">
+                <label class="dlv__cobro-comp-btn">
+                  <FileText :size="13" :stroke-width="2" />
+                  {{ comprobanteFile ? comprobanteFile.name : 'Subir comprobante (opcional)' }}
+                  <input type="file" accept="image/*" capture="environment" @change="setComprobante" hidden />
+                </label>
+              </div>
+              <div class="dlv__cobro-resto" :class="{ 'dlv__cobro-resto--err': !entregaCobroValido }">
+                <template v-if="!entregaCobroValido">El cobro supera el saldo</template>
+                <template v-else-if="restoEntregaCuenta > 0">Resto a cuenta corriente: <strong>{{ fmtMoneda(restoEntregaCuenta) }}</strong></template>
+                <template v-else>Cubierto ✓</template>
+              </div>
+            </div>
+
             <!-- Firma digital -->
             <div class="dlv__firma-section">
               <div class="dlv__firma-label">
@@ -496,7 +558,7 @@ onMounted(load)
           </div>
           <div class="dlv__modal-footer">
             <button class="dlv__btn-ghost" :disabled="saving" @click="modalEntregar = null">Cancelar</button>
-            <button class="dlv__btn-confirm" :disabled="saving" @click="confirmarEntrega">
+            <button class="dlv__btn-confirm" :disabled="saving || !entregaCobroValido" @click="confirmarEntrega">
               <DsSpinner v-if="saving" :size="13" />
               <CheckCircle2 v-else :size="14" :stroke-width="2" />
               Confirmar entrega
@@ -648,6 +710,19 @@ onMounted(load)
 .dlv__btn-confirm { display: inline-flex; align-items: center; gap: var(--sp-1); background: var(--c-leaf-700); color: #fff; border: none; padding: .5rem 1.1rem; border-radius: var(--r-md); font-size: var(--fs-14); font-weight: 600; cursor: pointer; }
 .dlv__btn-confirm:hover:not(:disabled) { background: var(--c-leaf-800); }
 .dlv__btn-confirm:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Cobro en la entrega */
+.dlv__cobro { border: 1.5px solid #e2e8f0; border-radius: 12px; padding: .75rem; margin-bottom: 1rem; }
+.dlv__cobro-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .6rem; font-size: .82rem; color: #475569; }
+.dlv__cobro-head strong { font-size: 1.1rem; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; }
+.dlv__cobro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.dlv__cobro-cell { display: flex; flex-direction: column; gap: 3px; font-size: .72rem; font-weight: 600; color: #64748b; }
+.dlv__cobro-cell input { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .6rem; font-size: .95rem; font-weight: 700; color: #0f172a; outline: none; font-variant-numeric: tabular-nums; }
+.dlv__cobro-cell input:focus { border-color: #16a34a; }
+.dlv__cobro-comp { margin-top: .5rem; }
+.dlv__cobro-comp-btn { display: inline-flex; align-items: center; gap: .4rem; background: #f0fdf4; border: 1.5px dashed #86efac; color: #15803d; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; font-weight: 600; cursor: pointer; width: 100%; }
+.dlv__cobro-resto { margin-top: .5rem; padding: .45rem .65rem; border-radius: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; font-size: .8rem; color: #15803d; }
+.dlv__cobro-resto--err { background: #fff5f5; border-color: #fca5a5; color: #991b1b; }
 .dlv__btn-danger { display: inline-flex; align-items: center; gap: var(--sp-1); background: var(--c-rust-600); color: #fff; border: none; padding: .5rem 1.1rem; border-radius: var(--r-md); font-size: var(--fs-14); font-weight: 600; cursor: pointer; }
 .dlv__btn-danger:disabled { opacity: .5; cursor: not-allowed; }
 .dlv__opt { font-size: var(--fs-11); font-weight: 400; color: var(--c-ink-400); text-transform: none; letter-spacing: 0; }
