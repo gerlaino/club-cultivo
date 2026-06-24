@@ -83,12 +83,13 @@
             <input v-model.number="editForm.cantidad" type="number" min="0.01" step="0.01" class="rsv__modal-input" />
             <label class="rsv__modal-label">Fecha de entrega estimada</label>
             <AppDatePicker v-model="editForm.fecha_entrega_estimada" :min="hoy" />
-            <label class="rsv__modal-label">Medio de pago previsto</label>
-            <select v-model="editForm.medio_pago" class="rsv__modal-input">
-              <option value="efectivo">Efectivo</option>
-              <option value="transferencia">Transferencia</option>
-              <option value="cuenta_corriente">Cuenta corriente</option>
-            </select>
+            <template v-if="editTieneSena">
+              <label class="rsv__modal-label">Medio de pago de la seña</label>
+              <select v-model="editForm.medio_pago" class="rsv__modal-input">
+                <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia</option>
+              </select>
+            </template>
           </div>
           <div class="rsv__modal-foot">
             <button class="rsv__btn rsv__btn--ghost" @click="showEdit = false">Cancelar</button>
@@ -101,7 +102,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
@@ -150,13 +151,16 @@ function abrirEntrega(r) { reservaSel.value = r; showEntrega.value = true }
 const showEdit   = ref(false)
 const savingEdit = ref(false)
 const editError  = ref(null)
-const editForm   = ref({ id: null, cantidad: null, fecha_entrega_estimada: '', medio_pago: 'efectivo' })
+const editForm   = ref({ id: null, cantidad: null, fecha_entrega_estimada: '', medio_pago: 'efectivo', sena_ars: 0 })
+// El medio de pago solo aplica si se dejó seña (es el medio con que se pagó esa seña).
+const editTieneSena = computed(() => Number(editForm.value.sena_ars) > 0)
 
 function abrirEdicion(r) {
   editForm.value = {
     id: r.id, cantidad: r.cantidad,
     fecha_entrega_estimada: r.fecha_entrega_estimada,
     medio_pago: r.medio_pago || 'efectivo',
+    sena_ars: r.sena_ars || 0,
   }
   editError.value = null
   showEdit.value = true
@@ -166,7 +170,7 @@ async function guardarEdicion() {
   savingEdit.value = true
   editError.value = null
   try {
-    const { id, ...payload } = editForm.value
+    const { id, sena_ars, ...payload } = editForm.value
     await updateReserva(id, payload)
     toast.success('Reserva actualizada')
     showEdit.value = false
