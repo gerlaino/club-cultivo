@@ -121,6 +121,23 @@ const proximaCosecha = computed(() => {
   return candidatos[0] ?? null
 })
 
+// ── Reservas para preparar (desde el analytics del dispensador) ──────────────
+const reservasHoy      = computed(() => analyticsDisp.value?.reservas?.hoy ?? 0)
+const reservasVencidas = computed(() => analyticsDisp.value?.reservas?.vencidas ?? 0)
+const reservasLista    = computed(() => analyticsDisp.value?.reservas?.lista ?? [])
+
+const FORMA_LABEL_RES = {
+  flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
+  crema: 'Crema', capsula: 'Cápsula', comestible: 'Comestible', prensado: 'Prensado',
+  preroll: 'Preroll', externo: 'Externo', otro: 'Otro',
+}
+function formaLabelRes(f) { return FORMA_LABEL_RES[f] || f || '—' }
+function fmtFechaRes(f) {
+  if (!f) return '—'
+  return new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+}
+function fmtARSres(n) { return '$' + (Number(n) || 0).toLocaleString('es-AR') }
+
 // ── ZONA 1: Alertas ─────────────────────────────────────────────────────────
 
 const tareasVencidas = computed(() =>
@@ -183,6 +200,26 @@ const alertas = computed(() => {
       texto: `${tareasVencidas.value.length} tarea${tareasVencidas.value.length > 1 ? 's' : ''} vencida${tareasVencidas.value.length > 1 ? 's' : ''}`,
       cta:   'Ver tareas',
       ruta:  '/tareas',
+      nivel: 'amber',
+    })
+  }
+
+  if (reservasVencidas.value > 0) {
+    list.push({
+      key:   'reservas_vencidas',
+      icono: '📦',
+      texto: `${reservasVencidas.value} reserva${reservasVencidas.value > 1 ? 's' : ''} vencida${reservasVencidas.value > 1 ? 's' : ''} sin preparar`,
+      cta:   'Ver reservas',
+      ruta:  '/reservas',
+      nivel: 'rojo',
+    })
+  } else if (reservasHoy.value > 0) {
+    list.push({
+      key:   'reservas_hoy',
+      icono: '📦',
+      texto: `${reservasHoy.value} reserva${reservasHoy.value > 1 ? 's' : ''} para preparar hoy`,
+      cta:   'Ver reservas',
+      ruta:  '/reservas',
       nivel: 'amber',
     })
   }
@@ -611,6 +648,35 @@ async function onOnboardingCompletado() {
         </div>
       </div>
 
+      <!-- ── Reservas para preparar ──────────────────────────────────────── -->
+      <div v-if="reservasLista.length" class="ad__widget ad__widget--lotes">
+        <div class="ad__widget-hdr">
+          <span class="ad__widget-title">Reservas para preparar</span>
+          <RouterLink to="/reservas" class="ad__widget-link">Ver todas →</RouterLink>
+        </div>
+        <div class="ad__reservas">
+          <RouterLink
+            v-for="r in reservasLista.slice(0, 8)" :key="r.id"
+            to="/reservas"
+            class="ad__reserva"
+            :class="{ 'ad__reserva--venc': r.vencida }"
+          >
+            <div class="ad__reserva-main">
+              <span class="ad__reserva-nombre">{{ r.paciente }}</span>
+              <span class="ad__reserva-prod">{{ fmtG(r.cantidad) }} · {{ formaLabelRes(r.forma_producto) }}</span>
+            </div>
+            <div class="ad__reserva-side">
+              <span class="ad__reserva-fecha" :class="{ 'ad__reserva-fecha--venc': r.vencida }">
+                <i v-if="r.vencida" class="bi bi-exclamation-circle"></i>
+                {{ r.vencida ? 'Venció ' : '' }}{{ fmtFechaRes(r.fecha) }}
+              </span>
+              <span v-if="r.resta_ars > 0" class="ad__reserva-resta">Resta {{ fmtARSres(r.resta_ars) }}</span>
+              <span v-else class="ad__reserva-sena">Señada ✓</span>
+            </div>
+          </RouterLink>
+        </div>
+      </div>
+
       <!-- ── ZONA 4: Pacientes hoy + Actividad reciente ─────────────────── -->
       <div class="ad__body">
 
@@ -1002,6 +1068,24 @@ async function onOnboardingCompletado() {
 }
 
 /* Pacientes hoy */
+/* Reservas para preparar */
+.ad__reservas { display: flex; flex-direction: column; }
+.ad__reserva {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  padding: .6rem 1rem; border-bottom: 1px solid #f1f5f9; text-decoration: none; color: inherit;
+}
+.ad__reserva:last-child { border-bottom: none; }
+.ad__reserva:hover { background: #f8fafc; }
+.ad__reserva--venc { border-left: 3px solid #ef4444; }
+.ad__reserva-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ad__reserva-nombre { font-weight: 700; color: #0f172a; font-size: .85rem; }
+.ad__reserva-prod { font-size: .78rem; color: #64748b; }
+.ad__reserva-side { text-align: right; white-space: nowrap; }
+.ad__reserva-fecha { font-size: .8rem; font-weight: 600; color: #334155; }
+.ad__reserva-fecha--venc { color: #dc2626; }
+.ad__reserva-resta { display: block; font-size: .72rem; color: #b45309; }
+.ad__reserva-sena { display: block; font-size: .72rem; color: #15803d; }
+
 .ad__disp-item {
   display: flex;
   align-items: center;
