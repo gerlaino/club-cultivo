@@ -255,6 +255,7 @@ class DispensacionesController < ApplicationController
           aplicar_lineas_cobro!(@dispensacion, cobros_param, 'entrega')
           afinar_medio_pago!(@dispensacion)
         end
+        @dispensacion.comprobante_entrega.attach(params[:comprobante_entrega]) if params[:comprobante_entrega].present?
         registrar_evento_envio(@dispensacion, 'entregado', motivo: params[:notas_entrega])
         @dispensacion.update!(
           estado_envio:       'entregado',
@@ -460,7 +461,7 @@ class DispensacionesController < ApplicationController
       excedente += (monto - cobro)        # lo que sobra → a favor
 
       next if cobro <= 0
-      usar = l[:medio] == 'transferencia' && !comp_usado && comp.present?
+      usar = !comp_usado && comp.present?  # comprobante de pago → al primer cobro
       comp_usado ||= usar
       res = Dispensaciones::RegistrarCobro.call(
         dispensacion: disp, club: current_user.club, usuario: current_user,

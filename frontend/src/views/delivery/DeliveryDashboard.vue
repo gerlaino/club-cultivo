@@ -24,7 +24,33 @@ const saving        = ref(false)
 // cobro en la entrega
 const cobroEfectivo   = ref(null)
 const cobroTransf     = ref(null)
-const comprobanteFile = ref(null)
+const comprobanteFile = ref(null)         // comprobante de pago
+const comprobantePreview = ref(null)
+const comprobanteEntregaFile = ref(null)  // comprobante de entrega
+const comprobanteEntregaPreview = ref(null)
+
+function setComprobante(e) {
+  const f = e.target.files?.[0] || null
+  if (comprobantePreview.value) URL.revokeObjectURL(comprobantePreview.value)
+  comprobanteFile.value = f
+  comprobantePreview.value = f ? URL.createObjectURL(f) : null
+}
+function clearComprobante() {
+  if (comprobantePreview.value) URL.revokeObjectURL(comprobantePreview.value)
+  comprobanteFile.value = null
+  comprobantePreview.value = null
+}
+function setComprobanteEntrega(e) {
+  const f = e.target.files?.[0] || null
+  if (comprobanteEntregaPreview.value) URL.revokeObjectURL(comprobanteEntregaPreview.value)
+  comprobanteEntregaFile.value = f
+  comprobanteEntregaPreview.value = f ? URL.createObjectURL(f) : null
+}
+function clearComprobanteEntrega() {
+  if (comprobanteEntregaPreview.value) URL.revokeObjectURL(comprobanteEntregaPreview.value)
+  comprobanteEntregaFile.value = null
+  comprobanteEntregaPreview.value = null
+}
 
 // firma digital
 const canvasRef      = ref(null)
@@ -201,7 +227,8 @@ function abrirEntregar(p) {
   notasEntrega.value  = ''
   cobroEfectivo.value = null
   cobroTransf.value   = null
-  comprobanteFile.value = null
+  clearComprobante()
+  clearComprobanteEntrega()
 }
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100
@@ -214,7 +241,6 @@ const excedenteEntrega = computed(() => r2(Math.max(0, cobradoEntrega.value - sa
 // backend lo rechaza con un mensaje claro (el delivery no es quien lo determina).
 const entregaCobroValido = computed(() => true)
 
-function setComprobante(e) { comprobanteFile.value = e.target.files?.[0] || null }
 function lineasCobroEntrega() {
   const ls = []
   if ((Number(cobroEfectivo.value) || 0) > 0) ls.push({ medio: 'efectivo', monto: r2(cobroEfectivo.value) })
@@ -231,15 +257,17 @@ async function confirmarEntrega() {
   saving.value = true
   try {
     await entregarPaquete(modalEntregar.value.id, {
-      notasEntrega: notasEntrega.value,
-      firmaData:    firmaData.value,
-      cobros:       lineasCobroEntrega(),
-      comprobante:  comprobanteFile.value,
+      notasEntrega:       notasEntrega.value,
+      firmaData:          firmaData.value,
+      cobros:             lineasCobroEntrega(),
+      comprobante:        comprobanteFile.value,
+      comprobanteEntrega: comprobanteEntregaFile.value,
     })
     modalEntregar.value = null
     firmaData.value     = null
     firmaActiva.value   = false
-    comprobanteFile.value = null
+    clearComprobante()
+    clearComprobanteEntrega()
     await load()
     toast.success('Entrega registrada')
   } catch (e) {
@@ -511,11 +539,15 @@ onMounted(load)
                   <input type="number" min="0" step="any" v-model.number="cobroTransf" placeholder="0" />
                 </label>
               </div>
-              <!-- Comprobante de transferencia -->
-              <div v-if="(Number(cobroTransf) || 0) > 0" class="dlv__cobro-comp">
-                <label class="dlv__cobro-comp-btn">
-                  <FileText :size="13" :stroke-width="2" />
-                  {{ comprobanteFile ? comprobanteFile.name : 'Subir comprobante (opcional)' }}
+              <!-- Comprobante de pago (foto, opcional) -->
+              <div class="dlv__foto">
+                <div class="dlv__foto-label"><FileText :size="13" :stroke-width="2" /> Comprobante de pago <span class="dlv__opt">opcional</span></div>
+                <div v-if="comprobantePreview" class="dlv__foto-preview">
+                  <img :src="comprobantePreview" alt="comprobante de pago" />
+                  <button type="button" class="dlv__foto-del" @click="clearComprobante"><Trash2 :size="13" :stroke-width="2" /></button>
+                </div>
+                <label v-else class="dlv__foto-btn">
+                  <FileText :size="14" :stroke-width="2" /> Subir / tomar foto
                   <input type="file" accept="image/*" capture="environment" @change="setComprobante" hidden />
                 </label>
               </div>
@@ -542,13 +574,26 @@ onMounted(load)
                   ref="canvasRef"
                   class="dlv__firma-canvas"
                   width="400"
-                  height="120"
+                  height="170"
                 ></canvas>
                 <button class="dlv__firma-borrar" @click="borrarFirma" title="Borrar firma">
                   <Trash2 :size="13" :stroke-width="2" /> Borrar
                 </button>
               </div>
               <p v-if="firmaData" class="dlv__firma-ok">✓ Firma capturada</p>
+            </div>
+
+            <!-- Comprobante de entrega (foto, opcional) -->
+            <div class="dlv__foto">
+              <div class="dlv__foto-label"><FileText :size="13" :stroke-width="2" /> Comprobante de entrega <span class="dlv__opt">opcional</span></div>
+              <div v-if="comprobanteEntregaPreview" class="dlv__foto-preview">
+                <img :src="comprobanteEntregaPreview" alt="comprobante de entrega" />
+                <button type="button" class="dlv__foto-del" @click="clearComprobanteEntrega"><Trash2 :size="13" :stroke-width="2" /></button>
+              </div>
+              <label v-else class="dlv__foto-btn">
+                <FileText :size="14" :stroke-width="2" /> Subir / tomar foto
+                <input type="file" accept="image/*" capture="environment" @change="setComprobanteEntrega" hidden />
+              </label>
             </div>
 
             <label class="dlv__modal-label">Notas de entrega <span class="dlv__opt">opcional</span></label>
@@ -719,11 +764,17 @@ onMounted(load)
 .dlv__cobro-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .6rem; font-size: .82rem; color: #475569; }
 .dlv__cobro-head strong { font-size: 1.1rem; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; }
 .dlv__cobro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
-.dlv__cobro-cell { display: flex; flex-direction: column; gap: 3px; font-size: .72rem; font-weight: 600; color: #64748b; }
-.dlv__cobro-cell input { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .6rem; font-size: .95rem; font-weight: 700; color: #0f172a; outline: none; font-variant-numeric: tabular-nums; }
+.dlv__cobro-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: .72rem; font-weight: 600; color: #64748b; }
+.dlv__cobro-cell input { width: 100%; box-sizing: border-box; min-width: 0; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .6rem; font-size: .95rem; font-weight: 700; color: #0f172a; outline: none; font-variant-numeric: tabular-nums; }
 .dlv__cobro-cell input:focus { border-color: #16a34a; }
-.dlv__cobro-comp { margin-top: .5rem; }
-.dlv__cobro-comp-btn { display: inline-flex; align-items: center; gap: .4rem; background: #f0fdf4; border: 1.5px dashed #86efac; color: #15803d; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; font-weight: 600; cursor: pointer; width: 100%; }
+
+/* Foto (comprobante de pago / entrega) */
+.dlv__foto { margin-top: .6rem; }
+.dlv__foto-label { display: flex; align-items: center; gap: .35rem; font-size: .75rem; font-weight: 600; color: #475569; margin-bottom: .35rem; }
+.dlv__foto-btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; width: 100%; box-sizing: border-box; background: #f0fdf4; border: 1.5px dashed #86efac; color: #15803d; border-radius: 8px; padding: .65rem .75rem; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.dlv__foto-preview { position: relative; display: inline-block; }
+.dlv__foto-preview img { max-width: 100%; max-height: 160px; border-radius: 8px; border: 1px solid #e2e8f0; display: block; }
+.dlv__foto-del { position: absolute; top: .35rem; right: .35rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: rgba(255,255,255,.92); border: 1px solid #fca5a5; color: #dc2626; border-radius: 7px; cursor: pointer; }
 .dlv__cobro-resto { margin-top: .5rem; padding: .45rem .65rem; border-radius: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; font-size: .8rem; color: #15803d; }
 .dlv__cobro-resto--err { background: #fff5f5; border-color: #fca5a5; color: #991b1b; }
 .dlv__cobro-resto--info { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
@@ -754,7 +805,7 @@ onMounted(load)
 .dlv__firma-placeholder:hover { border-color: #9ca3af; background: #f9fafb; }
 .dlv__firma-canvas-wrap { position: relative; }
 .dlv__firma-canvas {
-  display: block; width: 100%; height: 150px; border: 1.5px solid #d1d5db; border-radius: var(--r-md);
+  display: block; width: 100%; height: 200px; border: 1.5px solid #d1d5db; border-radius: var(--r-md);
   background: #fff; touch-action: none; cursor: crosshair;
 }
 .dlv__firma-borrar {

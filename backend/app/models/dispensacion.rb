@@ -20,6 +20,10 @@ class Dispensacion < ApplicationRecord
   # varias: pagos partidos, parcial, o el resto a cuenta corriente. Ver Cobro.
   has_many :cobros, dependent: :destroy
 
+  # Foto opcional que sube el delivery como prueba de la entrega (distinta del
+  # comprobante de pago, que vive en el Cobro de transferencia).
+  has_one_attached :comprobante_entrega
+
   # ¿Esta dispensa usa el flujo de cobros? (vs. legacy: asentada por medio_pago único,
   # gramos, etc.). Una legacy ya está saldada por sus movimientos, no por cobros.
   def usa_cobros?
