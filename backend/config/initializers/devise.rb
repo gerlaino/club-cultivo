@@ -316,9 +316,16 @@ Devise.setup do |config|
   # changed. Defaults to true, so a user is signed in automatically after changing a password.
   # config.sign_in_after_change_password = true
 
-  # ==> JWT Configuration (AGREGAR ESTO)
+  # ==> JWT Configuration
   config.jwt do |jwt|
-    jwt.secret = ENV.fetch('DEVISE_JWT_SECRET_KEY', 'temporary_secret_for_dev')
+    # El secreto de firma JWT viene EXCLUSIVAMENTE de la variable de entorno.
+    # Sin fallback: si falta (o está vacía), la app NO arranca. Un fallback
+    # hardcodeado permitiría forjar tokens de cualquier usuario/rol si la ENV
+    # no estuviera seteada en algún entorno. Falla fuerte al boot, a propósito.
+    jwt.secret = ENV['DEVISE_JWT_SECRET_KEY'].presence ||
+      raise('DEVISE_JWT_SECRET_KEY no está definida (o está vacía). ' \
+            'La app no arranca sin el secreto de firma JWT — no hay fallback. ' \
+            'Definila en el entorno: backend/.env (dev/docker) o las env vars del deploy (prod).')
     jwt.dispatch_requests = [
       ['POST', %r{^/users/sign_in$}]
     ]

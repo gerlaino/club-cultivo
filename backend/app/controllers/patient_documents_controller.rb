@@ -1,5 +1,6 @@
 class PatientDocumentsController < ApplicationController
   before_action :authenticate_user!
+  before_action :require_medico_or_admin
   before_action :set_paciente
   before_action :set_document, only: [:show, :update, :destroy, :firmar, :archivar]
 
@@ -108,6 +109,14 @@ class PatientDocumentsController < ApplicationController
   end
 
   private
+
+  # Datos clínicos: sólo médico o admin. Documentos clínicos (incl. firmados)
+  # no deben ser legibles por cultivador/dispensador/delivery/manicura/abogado/auditor.
+  def require_medico_or_admin
+    unless current_user.admin? || current_user.medico?
+      render json: { error: 'No autorizado' }, status: :forbidden
+    end
+  end
 
   def set_paciente
     @paciente = Paciente.for_club(current_user.club_id).find(params[:paciente_id])

@@ -30,8 +30,10 @@ class PacienteNotasController < ApplicationController
   private
 
   def check_notas_role!
-    blocked = %w[dispensador delivery]
-    if blocked.include?(current_user&.role)
+    # Allowlist explícita: sólo médico o admin. Las notas de paciente son
+    # contenido clínico → mínimo privilegio (antes era una blocklist que dejaba
+    # entrar a cultivador/manicura/supervisor/abogado/auditor).
+    unless current_user&.admin? || current_user&.medico?
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end

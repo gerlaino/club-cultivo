@@ -1,6 +1,6 @@
 class IndicacionMedicaController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_medico_or_admin, except: [:index, :show, :index_medico, :prescripcion_pdf]
+  before_action :require_medico_or_admin
   before_action :set_paciente, only: [:index, :create]
   before_action :set_indicacion, only: [:show, :update, :destroy, :prescripcion_pdf]
 
