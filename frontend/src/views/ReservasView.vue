@@ -49,8 +49,11 @@
             <template v-if="r.estado === 'pendiente'">
               <button class="rsv__btn rsv__btn--primary" :disabled="busy === r.id" @click="abrirEntrega(r)">Entregar</button>
               <button class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="abrirEdicion(r)" title="Editar"><i class="bi bi-pencil"></i></button>
-              <!-- Con seña: cancelar (preserva el asiento). Sin seña: eliminar (borrado limpio). -->
-              <button v-if="r.sena_ars > 0" class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="cancelar(r)" title="Cancelar (libera stock; la seña no se reembolsa)">Cancelar</button>
+              <!-- Con seña: cancelar (preserva el asiento como ingreso) o anular seña (revierte el asiento + crédito de CC). Sin seña: eliminar (borrado limpio). -->
+              <template v-if="r.sena_ars > 0">
+                <button class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="cancelar(r)" title="Cancelar (libera stock; la seña queda como ingreso, no se reembolsa)">Cancelar</button>
+                <button class="rsv__btn rsv__btn--danger" :disabled="busy === r.id" @click="anularSena(r)" title="Anular seña: revierte el asiento contable y el crédito de cuenta corriente">Anular seña</button>
+              </template>
               <button v-else class="rsv__btn rsv__btn--danger" :disabled="busy === r.id" @click="eliminar(r)" title="Eliminar (libera stock)"><i class="bi bi-trash3"></i></button>
             </template>
           </td>
@@ -109,7 +112,7 @@ import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
-import { listReservas, cancelarReserva, updateReserva, deleteReserva } from '../lib/api.js'
+import { listReservas, cancelarReserva, anularSenaReserva, updateReserva, deleteReserva } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 
@@ -214,6 +217,23 @@ async function cancelar(r) {
     await cargar()
   } catch (e) {
     toast.error(e.response?.data?.error || 'No se pudo cancelar')
+  } finally { busy.value = null }
+}
+
+async function anularSena(r) {
+  const ok = await confirm({
+    title: 'Anular seña',
+    message: `¿Anular la seña de ${fmt(r.sena_ars)} de ${r.paciente?.nombre}? Se revierte el ingreso del libro contable y el crédito en su cuenta corriente. La reserva queda sin seña (después podés eliminarla).`,
+    confirmText: 'Anular seña', danger: true,
+  })
+  if (!ok) return
+  busy.value = r.id
+  try {
+    await anularSenaReserva(r.id)
+    toast.success('Seña anulada (asiento y crédito revertidos)')
+    await cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo anular la seña')
   } finally { busy.value = null }
 }
 

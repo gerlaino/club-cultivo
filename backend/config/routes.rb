@@ -259,6 +259,7 @@ Rails.application.routes.draw do
       member do
         patch :entregar
         patch :cancelar
+        patch :anular_sena
       end
     end
 

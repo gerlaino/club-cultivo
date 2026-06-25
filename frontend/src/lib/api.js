@@ -203,6 +203,7 @@ export const listReservas    = (params = {})         => api.get('/reservas', { p
 export const listReservasPaciente = (pacienteId)     => api.get(`/pacientes/${pacienteId}/reservas`);
 export const entregarReserva = (id, payload = {})    => api.patch(`/reservas/${id}/entregar`, payload);
 export const cancelarReserva = (id, motivo = null)   => api.patch(`/reservas/${id}/cancelar`, { motivo });
+export const anularSenaReserva = (id)                => api.patch(`/reservas/${id}/anular_sena`);
 export const updateReserva   = (id, payload)         => api.patch(`/reservas/${id}`, { reserva: payload });
 export const deleteReserva   = (id)                  => api.delete(`/reservas/${id}`);
 

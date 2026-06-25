@@ -483,9 +483,9 @@ class AnalyticsController < ApplicationController
   # Resumen anual — KPIs del año en curso vs año anterior
   def ejecutivo
     club         = current_user.club
-    año_actual   = Date.today.year
+    año_actual   = Time.zone.today.year
     año_anterior = año_actual - 1
-    cache_key    = "analytics/ejecutivo/#{club.id}/#{año_actual}/#{Date.today}"
+    cache_key    = "analytics/ejecutivo/#{club.id}/#{año_actual}/#{analytics_stamp(club)}"
     Rails.cache.delete(cache_key) if params[:bust]
     data = Rails.cache.fetch(cache_key, expires_in: 1.hour) do
       { año: año_actual, actual: kpis_anuales(club, año_actual), anterior: kpis_anuales(club, año_anterior) }
@@ -497,7 +497,7 @@ class AnalyticsController < ApplicationController
   # Para: admin, supervisor
   def pl_lotes
     club      = current_user.club
-    cache_key = "analytics/pl_lotes/#{club.id}/#{Date.today}"
+    cache_key = "analytics/pl_lotes/#{club.id}/#{analytics_stamp(club)}"
     Rails.cache.delete(cache_key) if params[:bust]
     data = Rails.cache.fetch(cache_key, expires_in: 15.minutes) do
       calcular_pl_lotes(club)
@@ -520,7 +520,12 @@ class AnalyticsController < ApplicationController
                              .where(stocks: { club_id: club.id })
                              .where(fecha_dispensacion: inicio..fin)
 
-    ingresos           = base_disps.sum('dispensaciones.cantidad * COALESCE(dispensaciones.precio_unitario_ars, 0)').to_f.round(2)
+    # Ingresos = libro contable de caja (MISMA definición que el dashboard de Negocio):
+    # incluye recupero por dispensación Y señas/aportes, excluye crédito impago. Antes
+    # se recomputaba desde Dispensacion (solo facturación), lo que dejaba las señas
+    # afuera y contradecía el KPI mensual ("10000 arriba / sin ingresos abajo").
+    ingresos           = MovimientoContable.ingresos.where(club_id: club.id)
+                                           .where(fecha: inicio..fin).sum(:monto_ars).to_f.round(2)
     gramos_dispensados = base_disps.sum(:cantidad).to_f.round(2)
 
     costo_total = CostoLote.joins(:lote)
@@ -637,7 +642,7 @@ class AnalyticsController < ApplicationController
   # P&L mensual últimos 12 meses + proyección de lotes en curso
   def contabilidad
     club = current_user.club
-    cache_key = "analytics/contabilidad/#{club.id}/#{Date.today}"
+    cache_key = "analytics/contabilidad/#{club.id}/#{analytics_stamp(club)}"
     Rails.cache.delete(cache_key) if params[:bust]
     data = Rails.cache.fetch(cache_key, expires_in: 30.minutes) do
       calcular_contabilidad(club)
@@ -726,6 +731,23 @@ class AnalyticsController < ApplicationController
     end
   end
 
+  # Sello que cambia ante CUALQUIER mutación que afecte los números de la analítica
+  # financiera/productiva del club: libro contable, costos de lote y lotes. Al
+  # incluirlo en la cache key, la analítica se auto-invalida en el instante en que
+  # cambian los datos (alta/edición/anulación de seña, dispensación, costo, fase de
+  # lote) — sin callbacks ni busts manuales. El TTL queda como respaldo. Son 3
+  # agregados baratos (max(updated_at) + count) sobre columnas indexadas por club.
+  def analytics_stamp(club)
+    mov = MovimientoContable.where(club_id: club.id)
+    cl  = CostoLote.joins(:lote).where(lotes: { club_id: club.id })
+    lo  = club.lotes
+    [
+      mov.maximum(:updated_at)&.to_i, mov.count,
+      cl.maximum(:updated_at)&.to_i,  cl.count,
+      lo.maximum(:updated_at)&.to_i,  lo.count,
+    ].join('-')
+  end
+
   def require_dispensador_access!
     unless %w[admin dispensador super_admin].include?(current_user.role)
       render json: { error: 'No autorizado' }, status: :forbidden
@@ -733,7 +755,7 @@ class AnalyticsController < ApplicationController
   end
 
   def calcular_contabilidad(club)
-    hoy   = Date.today
+    hoy   = Time.zone.today
     inicio = (hoy - 11.months).beginning_of_month
 
     # P&L mensual — agrupado por mes
@@ -743,10 +765,10 @@ class AnalyticsController < ApplicationController
       mes_fin = mes_ini.end_of_month
       label   = mes_ini.strftime('%b %Y')
 
-      ingresos = Dispensacion.no_canceladas.joins(:stock)
-                             .where(stocks: { club_id: club.id })
-                             .where(fecha_dispensacion: mes_ini..mes_fin)
-                             .sum('dispensaciones.cantidad * COALESCE(dispensaciones.precio_unitario_ars, 0)').to_f.round(2)
+      # Ingresos del mes desde el libro de caja (mismo criterio que el dashboard y
+      # que kpis_anuales): dispensaciones cobradas + señas, sin crédito impago.
+      ingresos = MovimientoContable.ingresos.where(club_id: club.id)
+                                   .where(fecha: mes_ini..mes_fin).sum(:monto_ars).to_f.round(2)
 
       costos = CostoLote.joins(:lote)
                         .where(lotes: { club_id: club.id })

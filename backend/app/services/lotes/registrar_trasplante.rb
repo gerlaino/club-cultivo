@@ -1,9 +1,15 @@
 module Lotes
   # Registra un trasplante de un lote: crea un PlantActivity 'transplant' por planta
-  # activa con la maceta origen→destino (lo que muestra la timeline) y actualiza el
-  # tamaño de maceta actual del lote. Se puede backdatear (fecha pasada).
-  # Lo usan el botón "Registrar trasplante" del lote y la completación de la tarea.
+  # (incluidas las ya cosechadas, porque un trasplante pasado se registra sobre el
+  # lote tal como estaba) con la maceta origen→destino que muestra la timeline.
+  # Si el lote sigue en cultivo, actualiza además su tamaño de maceta actual.
+  # Se puede backdatear (fecha pasada). Lo usan el botón "Registrar trasplante" del
+  # lote y la completación de la tarea de trasplante.
   class RegistrarTrasplante
+    # Estados en los que el lote ya salió del cultivo: registrar un trasplante pasado
+    # sigue siendo válido (es historia), pero NO se toca la "maceta actual".
+    ESTADOS_POST_COSECHA = %w[cosecha secado curado en_manicura manicura_pendiente finalizado].freeze
+
     Result = Struct.new(:ok, :error, keyword_init: true) do
       def ok? = ok
     end
@@ -23,8 +29,10 @@ module Lotes
 
       occurred = (@fecha.present? ? (Date.parse(@fecha.to_s) rescue Date.current) : Date.current)
                    .in_time_zone.change(hour: 12)
-      plants = @lote.plants.where.not(state: %w[descartada cosechado])
-      return Result.new(ok: false, error: 'El lote no tiene plantas activas para trasplantar.') if plants.empty?
+      # Incluimos cosechadas (NO descartadas): un trasplante pasado se registra sobre
+      # las plantas que vivieron ese trasplante, aunque el lote ya esté cosechado.
+      plants = @lote.plants.where.not(state: 'descartada')
+      return Result.new(ok: false, error: 'El lote no tiene plantas para registrar el trasplante.') if plants.empty?
 
       ActiveRecord::Base.transaction do
         plants.find_each do |p|
@@ -36,7 +44,8 @@ module Lotes
             metadata:      { 'maceta_origen_l' => @origen&.to_f, 'maceta_destino_l' => @destino.to_f },
           )
         end
-        @lote.update!(tamanio_maceta: @destino)
+        # Solo actualizamos la "maceta actual" si el lote sigue en cultivo.
+        @lote.update!(tamanio_maceta: @destino) unless ESTADOS_POST_COSECHA.include?(@lote.estado)
       end
       Result.new(ok: true)
     rescue => e

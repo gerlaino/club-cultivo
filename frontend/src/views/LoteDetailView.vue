@@ -531,10 +531,11 @@ onUnmounted(() => {
           </div>
 
           <!-- 4. Timeline del ciclo -->
-          <div v-if="canAdmin" class="ld__trasplante-bar">
-            <button class="ld__trasplante-btn" @click="trasplanteOpen = true">🪴 Registrar trasplante</button>
-          </div>
-          <LoteTimelineSection :lote-id="id" :key="graficosKey" />
+          <LoteTimelineSection :lote-id="id" :key="graficosKey">
+            <template v-if="canAdmin" #actions>
+              <button class="ld__trasplante-btn" @click="trasplanteOpen = true">🪴 Registrar trasplante</button>
+            </template>
+          </LoteTimelineSection>
 
           <!-- 5. Análisis de laboratorio -->
           <div class="ld__section ld__section--mt">
@@ -1099,7 +1100,6 @@ onUnmounted(() => {
 .ld__aside { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: start; }
 .ld__section { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
 .ld__section--mt { margin-top: 1.25rem; }
-.ld__trasplante-bar { display: flex; justify-content: flex-end; margin-bottom: .5rem; }
 .ld__trasplante-btn { background: #fff8e1; border: 1.5px solid #fde68a; color: #92400e; border-radius: 8px; padding: .4rem .8rem; font-size: .8rem; font-weight: 700; cursor: pointer; }
 .ld__trasplante-btn:hover { background: #fef3c7; }
 .ld__section-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: .9rem 1.1rem; background: transparent; border: none; cursor: pointer; transition: background .15s; text-align: left; }

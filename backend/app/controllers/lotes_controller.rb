@@ -354,7 +354,7 @@ class LotesController < ApplicationController
           registrado_at:      Time.current,
           notas:              pesada_attrs[:notas],
         )
-        @lote.avanzar_fase!(sala_id: params[:sala_id])
+        @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user)
         @lote.lote_eventos.create!(
           tipo:            'cambio_estado',
           estado_anterior: estado_anterior,
@@ -383,7 +383,7 @@ class LotesController < ApplicationController
 
     # semilla/esqueje → vegetativo: no generan pesada, usan avanzar_fase!
     if %w[semilla esqueje].include?(@lote.estado)
-      @lote.avanzar_fase!(sala_id: params[:sala_id])
+      @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user)
     else
       @lote.transicionar!(
         nueva_fase,
@@ -505,7 +505,7 @@ class LotesController < ApplicationController
     end
     estado_anterior  = @lote.estado
     sala_anterior_id = @lote.sala_id
-    @lote.avanzar_fase!(sala_id: params[:sala_id])
+    @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user)
     @lote.lote_eventos.create!(
       tipo:            'cambio_estado',
       estado_anterior: estado_anterior,
@@ -574,7 +574,7 @@ class LotesController < ApplicationController
       if @lote.plants.where.not(state: %w[cosechado descartada]).none?
         estado_anterior  = @lote.estado
         sala_anterior_id = @lote.sala_id
-        @lote.avanzar_fase!(sala_id: params[:sala_id])
+        @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user)
         @lote.lote_eventos.create!(
           tipo:            'cambio_estado',
           estado_anterior: estado_anterior,

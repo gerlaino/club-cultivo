@@ -5,10 +5,10 @@ class ReservasController < ApplicationController
   before_action :require_reservas_role!
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
-  before_action :set_reserva,      only: [:show, :update, :destroy, :entregar, :cancelar]
+  before_action :set_reserva,      only: [:show, :update, :destroy, :entregar, :cancelar, :anular_sena]
   # El dashboard cachea sus métricas 10 min; al tocar una reserva lo invalidamos para
   # que la sección "Reservas para preparar" se actualice al instante.
-  after_action :bust_dashboard_cache, only: [:create, :update, :destroy, :entregar, :cancelar]
+  after_action :bust_dashboard_cache, only: [:create, :update, :destroy, :entregar, :cancelar, :anular_sena]
 
   # GET /pacientes/:paciente_id/reservas  OR  GET /reservas[?estado=pendiente]
   def index
@@ -183,6 +183,33 @@ class ReservasController < ApplicationController
     end
     @reserva.cancelar!(motivo: params[:motivo])
     render json: serialize_reserva(@reserva)
+  end
+
+  # PATCH /reservas/:id/anular_sena
+  # Anula la seña: revierte su asiento contable y, con él, el crédito de cuenta
+  # corriente que había generado, dejando la reserva en sena_ars = 0. A diferencia
+  # de "cancelar" (que conserva la seña como ingreso no reembolsable), esto la borra
+  # del libro — es la acción consciente para "devolver/eliminar" una seña.
+  def anular_sena
+    if @reserva.sena_ars.to_d <= 0
+      return render json: { error: 'Esta reserva no tiene seña para anular.' }, status: :unprocessable_entity
+    end
+    begin
+      ActiveRecord::Base.transaction do
+        MovimientoContable
+          .where(paciente_id: @reserva.paciente_id, categoria: 'aporte_socio')
+          .where('descripcion LIKE ?', "Seña reserva ##{@reserva.id} —%")
+          .each(&:destroy!)   # callback revierte el crédito de CC; si el período está cerrado, levanta
+        @reserva.update!(sena_ars: 0)
+      end
+    rescue ActiveRecord::RecordNotDestroyed
+      return render json: {
+        error: 'La seña pertenece a un período contable cerrado y no se puede anular automáticamente. Reabrí el período o registrá un ajuste manual.'
+      }, status: :unprocessable_entity
+    rescue => e
+      return render json: { error: e.message }, status: :unprocessable_entity
+    end
+    render json: serialize_reserva(@reserva.reload)
   end
 
   private

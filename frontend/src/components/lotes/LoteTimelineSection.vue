@@ -10,6 +10,7 @@
     </button>
 
     <div v-show="expanded" class="lts__body">
+      <div v-if="$slots.actions" class="lts__actions"><slot name="actions" /></div>
       <div v-if="loading" class="lts__loading">Cargando timeline…</div>
       <EmptyState v-else-if="!timeline" icon="📦" title="Sin datos de ciclo" compact />
       <div v-else class="lts__list">
@@ -120,6 +121,7 @@ function toggle() {
 .lts__pill { background: #e8f5e9; color: #1b5e20; font-size: .68rem; font-weight: 700; padding: .15em .55em; border-radius: 999px; }
 .lts__chevron { color: #60725d; font-size: .75rem; }
 .lts__body { border-top: 1px solid #e8f0e9; }
+.lts__actions { display: flex; justify-content: flex-end; padding: .65rem 1.1rem; border-bottom: 1px solid #f0fdf4; }
 .lts__loading { padding: 1rem 1.1rem; color: #94a3b8; font-size: .875rem; }
 .lts__list { display: flex; flex-direction: column; gap: .5rem; padding: .75rem 1.1rem; }
 .lts__group { border: 1px solid #e8f0e9; border-radius: 10px; overflow: hidden; }

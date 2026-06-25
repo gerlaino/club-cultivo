@@ -106,6 +106,37 @@ RSpec.describe 'Reservas', type: :request do
     end
   end
 
+  describe 'PATCH /reservas/:id/anular_sena' do
+    before { sign_in_as(dispensador) }
+
+    it 'revierte el asiento de la seña y el crédito de cuenta corriente, y deja sena_ars en 0' do
+      create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 5000)
+      # Crear la reserva con seña vía el flujo real (genera el MovimientoContable + crédito CC)
+      post "/pacientes/#{paciente.id}/reservas",
+           params: { reserva: { stock_id: stock.id, cantidad: 10, sena_ars: 400,
+                                aporte_estimado_ars: 2000, fecha_entrega_estimada: 3.days.from_now.to_date } },
+           headers: auth_headers
+      reserva_id = JSON.parse(response.body)['id']
+      cc_antes   = paciente.reload.cuenta_corriente.saldo_disponible
+
+      expect {
+        patch "/reservas/#{reserva_id}/anular_sena", headers: auth_headers
+      }.to change(MovimientoContable.where(categoria: 'aporte_socio'), :count).by(-1)
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)['sena_ars']).to eq(0.0)
+      # el crédito que había sumado la seña se revierte
+      expect(paciente.reload.cuenta_corriente.saldo_disponible).to eq(cc_antes - 400)
+    end
+
+    it 'rechaza si la reserva no tiene seña' do
+      reserva = Reserva.create!(club: club, paciente: paciente, user: dispensador, stock: stock,
+                                cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date)
+      patch "/reservas/#{reserva.id}/anular_sena", headers: auth_headers
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
+
   describe 'PATCH /reservas/:id/cancelar' do
     before { sign_in_as(dispensador) }
 

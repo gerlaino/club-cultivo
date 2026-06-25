@@ -42,4 +42,20 @@ RSpec.describe 'POST /lotes/:id/registrar_trasplante', type: :request do
     post "/lotes/#{lote.id}/registrar_trasplante", params: { fecha: Date.current.to_s }, headers: auth_headers
     expect(response).to have_http_status(:unprocessable_entity)
   end
+
+  it 'permite registrar un trasplante pasado en un lote ya cosechado (plantas cosechadas)' do
+    lote.update!(estado: 'cosecha')
+    [p1, p2].each { |p| p.update!(state: 'cosechado') }
+    sign_in_as(admin)
+
+    expect {
+      post "/lotes/#{lote.id}/registrar_trasplante",
+           params: { fecha: 20.days.ago.to_date.to_s, maceta_origen_l: 1, maceta_destino_l: 3 },
+           headers: auth_headers
+    }.to change(PlantActivity.where(activity_type: 'transplant'), :count).by(2)
+
+    expect(response).to have_http_status(:ok)
+    # En un lote cosechado NO se toca la maceta "actual"
+    expect(lote.reload.tamanio_maceta.to_f).to eq(1.0)
+  end
 end

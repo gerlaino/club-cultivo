@@ -627,8 +627,12 @@ const canSeeAmbiente = computed(() =>
 // ── Tabs (Layout / Historial) ──────────────────────────────
 const tabActiva = ref('lotes')
 
+// Slots ocupados de la sala = solo lotes realmente en cultivo. Los estados de
+// post-cosecha (cosecha/secado/curado/manicura) ya no viven en una sala de cultivo
+// (van a su sala de proceso), así que no deben ocupar el layout de esta sala.
+const ESTADOS_POST_COSECHA = ['cosecha', 'secado', 'curado', 'en_manicura', 'manicura_pendiente', 'finalizado']
 const lotesActivos = computed(() =>
-  (sala.value?.lotes_historial || []).filter(l => !['finalizado', 'curado'].includes(l.estado))
+  (sala.value?.lotes_historial || []).filter(l => !ESTADOS_POST_COSECHA.includes(l.estado))
 )
 const historialLotes = computed(() => sala.value?.lotes_historial || [])
 const historialKpis  = computed(() => sala.value?.historial_kpis  || null)

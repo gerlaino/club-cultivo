@@ -1,5 +1,6 @@
 class Lote < ApplicationRecord
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :sala, optional: true
   validates :sala_id, presence: true, unless: -> { estado == 'finalizado' }
   belongs_to :genetica,    optional: true
@@ -26,6 +27,10 @@ class Lote < ApplicationRecord
   ESTADOS       = %w[semilla esqueje vegetativo floracion cosecha en_manicura secado manicura_pendiente curado finalizado].freeze
   ORIGENES      = %w[semilla esqueje].freeze
   CICLO_FASES   = %w[vegetativo floracion cosecha secado curado].freeze
+  # Fases de post-cosecha: NO usan sala de cultivo. Al entrar en una de ellas el
+  # lote sale de su sala de floración (libera el slot) y va a una sala de proceso
+  # "Cosecha/Secado/Curado · sede" auto-gestionada, conservando la sede.
+  FASES_PROCESO = %w[cosecha secado curado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
   TIPOS_LUZ     = %w[led hps cmh natural mixta].freeze
   SUSTRATOS     = %w[tierra coco perlita mezcla rockwool fibra_coco].freeze
@@ -86,7 +91,7 @@ class Lote < ApplicationRecord
   # Avance rápido sin pesada — usado por el cultivador desde el botón "Avanzar fase".
   # Si sala_id se provee, mueve el lote a esa sala. Si no, intenta auto-detectar:
   # si existe exactamente una sala activa del tipo destino en el club, la elige.
-  def avanzar_fase!(sala_id: nil)
+  def avanzar_fase!(sala_id: nil, usuario: nil)
     nueva_fase = if %w[semilla esqueje].include?(estado)
       'vegetativo'
     else
@@ -97,6 +102,10 @@ class Lote < ApplicationRecord
     ActiveRecord::Base.transaction do
       sala_nueva = if sala_id.present?
         club.salas.activas.find_by(id: sala_id)
+      elsif FASES_PROCESO.include?(nueva_fase) && sala&.sede
+        # Post-cosecha: liberar la sala de cultivo y mandar a la sala de proceso de la sede
+        # (igual que transicionar!). Si no hay sede resoluble, cae al else (auto-detección).
+        Sala.find_or_create_proceso!(sede: sala.sede, tipo: nueva_fase, created_by: usuario)
       else
         candidatas = club.salas.activas.de_tipo(nueva_fase).to_a
         candidatas.length == 1 ? candidatas.first : nil
