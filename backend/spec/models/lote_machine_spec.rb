@@ -22,10 +22,9 @@ RSpec.describe Lote, type: :model do
     end
 
     context 'lote en cosecha' do
-      it 'avanza a secado' do
+      it 'no avanza por avanzar_fase! (cosecha es terminal del ciclo; pasa a manicura por asignación)' do
         lote = lote_en('cosecha')
-        lote.avanzar_fase!
-        expect(lote.reload.estado).to eq('secado')
+        expect { lote.avanzar_fase! }.to raise_error(ArgumentError)
       end
     end
 
@@ -164,12 +163,12 @@ RSpec.describe Lote, type: :model do
       expect(stock.forma_producto).to eq('flor_seca')
     end
 
-    it 'al cubrir TODAS las plantas el lote se finaliza solo' do
+    it 'al cubrir TODAS las plantas el lote pasa a curado' do
       lote = lote_con_plantas(2)
       pesaje = pesaje_por_qr(lote, lote.plants.to_a, 100)
       pesaje.enviar!
       pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
-      expect(lote.reload.estado).to eq('finalizado')
+      expect(lote.reload.estado).to eq('curado')
     end
 
     it 'un pesaje PARCIAL deja el lote en en_manicura' do
@@ -180,7 +179,7 @@ RSpec.describe Lote, type: :model do
       expect(lote.reload.estado).to eq('en_manicura')
     end
 
-    it 'dos pesajes parciales que cubren todo finalizan el lote' do
+    it 'dos pesajes parciales que cubren todo dejan el lote en curado' do
       lote = lote_con_plantas(4)
       p1 = pesaje_por_qr(lote, lote.plants.first(2), 100); p1.enviar!
       p1.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
@@ -188,10 +187,10 @@ RSpec.describe Lote, type: :model do
 
       p2 = pesaje_por_qr(lote, lote.plants.last(2), 100); p2.enviar!
       p2.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
-      expect(lote.reload.estado).to eq('finalizado')
+      expect(lote.reload.estado).to eq('curado')
     end
 
-    it 'carga manual (sin QR) suma al stock y finaliza vía plantas_count' do
+    it 'carga manual (sin QR) suma al stock y deja el lote en curado vía plantas_count' do
       lote = lote_con_plantas(3)
       pesaje = lote.pesajes_manicura.create!(club: club, manicurador: manicurador, fecha_pesaje: Date.current)
       pesaje.cargar_manual!(plantas: 3, peso: 300)
@@ -201,7 +200,7 @@ RSpec.describe Lote, type: :model do
       expect {
         pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 300)
       }.to change(Stock, :count).by(1)
-      expect(lote.reload.estado).to eq('finalizado')
+      expect(lote.reload.estado).to eq('curado')
     end
 
     it 'enviar! sin plantas ni carga lanza error' do
@@ -262,7 +261,7 @@ RSpec.describe Lote, type: :model do
     end
 
     it 'lanza error si el lote no está en curado' do
-      lote = lote_en('secado')
+      lote = lote_en('cosecha')
       expect {
         lote.cerrar_curado!(
           splitter:            { flor_seca: 100, descarte: 0 },

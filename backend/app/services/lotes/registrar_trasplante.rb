@@ -8,7 +8,7 @@ module Lotes
   class RegistrarTrasplante
     # Estados en los que el lote ya salió del cultivo: registrar un trasplante pasado
     # sigue siendo válido (es historia), pero NO se toca la "maceta actual".
-    ESTADOS_POST_COSECHA = %w[cosecha secado curado en_manicura manicura_pendiente finalizado].freeze
+    ESTADOS_POST_COSECHA = %w[cosecha en_manicura manicura_pendiente curado finalizado].freeze
 
     Result = Struct.new(:ok, :error, keyword_init: true) do
       def ok? = ok

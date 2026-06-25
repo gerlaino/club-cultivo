@@ -39,7 +39,7 @@ class LotesController < ApplicationController
       ).or(lotes.where(
         lotes: { estado: 'manicura_pendiente', manicurador_id: current_user.id }
       )).or(lotes.where(
-        lotes: { estado: %w[secado manicura_pendiente], manicurador_id: nil }
+        lotes: { estado: %w[manicura_pendiente], manicurador_id: nil }
       ))
       # Flujo nuevo: "en espera de aprobación" = lotes con un pesaje ya enviado por
       # este manicura (el lote sigue en_manicura, lo que espera es el PesajeManicura).
@@ -52,7 +52,7 @@ class LotesController < ApplicationController
         lotes = lotes.where(estado: params[:estado])
       end
     elsif params[:manicura].present?
-      lotes = lotes.where(estado: %w[cosecha secado curado])
+      lotes = lotes.where(estado: %w[cosecha en_manicura manicura_pendiente curado])
     else
       lotes = lotes.where(estado: params[:estado]) if params[:estado].present?
     end
@@ -93,18 +93,18 @@ class LotesController < ApplicationController
       return render json: PlanEnforcer.error_limite('lotes', info[:limites][:lotes]), status: :payment_required
     end
 
-    # Lote cosechado sin sala de cultivo: viene con sede_id y lo ubicamos en la
-    # sala de proceso "Cosecha · sede" (igual que al avanzar floración → cosecha),
-    # así conserva la sede para el flujo de manicura y se ve en /cosechado.
-    if @sala.nil? && params[:sede_id].present?
-      sede = current_user.club.sedes.find_by(id: params[:sede_id])
-      return render json: { errors: ['Sede no encontrada'] }, status: :unprocessable_entity unless sede
-      @sala = Sala.find_or_create_proceso!(sede: sede, tipo: 'cosecha', created_by: current_user)
+    # Lote cosechado: no usa sala de cultivo. Viene con sede_id y se trackea por estado
+    # (sala_id = nil, sede propia). Para lotes de cultivo, la sala viene en @sala.
+    sede_directa = nil
+    if @sala.nil?
+      return render json: { errors: ['Falta la sala o la sede'] }, status: :unprocessable_entity if params[:sede_id].blank?
+      sede_directa = current_user.club.sedes.find_by(id: params[:sede_id])
+      return render json: { errors: ['Sede no encontrada'] }, status: :unprocessable_entity unless sede_directa
     end
-    return render json: { errors: ['Falta la sala o la sede'] }, status: :unprocessable_entity if @sala.nil?
 
-    @lote = @sala.lotes.build(lote_params)
+    @lote = (@sala ? @sala.lotes : current_user.club.lotes).build(lote_params)
     @lote.club = current_user.club
+    @lote.sede = sede_directa || @sala&.sede
     # Legacy: planta_madre_id (single) = la primera del array de madres, para compatibilidad.
     @lote.planta_madre_id ||= @lote.planta_madre_ids&.first
 
@@ -118,7 +118,7 @@ class LotesController < ApplicationController
 
     # Estados creables: ciclo previo a stock + cosechado. secado/curado/finalizado
     # y los de manicura son post-stock o de proceso y no se cargan a mano.
-    estados_no_creables = %w[secado curado en_manicura manicura_pendiente finalizado]
+    estados_no_creables = %w[en_manicura manicura_pendiente curado finalizado]
     if estados_no_creables.include?(@lote.estado.to_s)
       return render json: { errors: ["No se puede crear un lote en estado '#{@lote.estado}'"] }, status: :unprocessable_entity
     end
@@ -877,7 +877,7 @@ class LotesController < ApplicationController
       ).or(scope.where(
         lotes: { estado: 'manicura_pendiente', manicurador_id: current_user.id }
       )).or(scope.where(
-        lotes: { estado: %w[secado manicura_pendiente], manicurador_id: nil }
+        lotes: { estado: %w[manicura_pendiente], manicurador_id: nil }
       ))
     end
     @lote = scope.find(params[:id])

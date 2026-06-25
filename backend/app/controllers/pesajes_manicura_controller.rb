@@ -39,18 +39,8 @@ class PesajesManicuraController < ApplicationController
     unless current_user.manicura? || current_user.admin? || current_user.supervisor?
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
-    unless %w[en_manicura secado].include?(@lote.estado)
+    unless @lote.estado == 'en_manicura'
       return render json: { error: 'El lote no está en manicura activa' }, status: :unprocessable_entity
-    end
-
-    # Lotes legacy en 'secado' (sin manicura asignada) entran a manicura activa acá.
-    if @lote.estado == 'secado'
-      @lote.update!(estado: 'en_manicura', manicurador_id: @lote.manicurador_id || current_user.id)
-      @lote.lote_eventos.create!(
-        tipo: 'cambio_estado', estado_anterior: 'secado', estado_nuevo: 'en_manicura',
-        descripcion: 'Inicio de manicura (carga de pesaje desde secado)',
-        user: current_user, club: current_user.club, registrado_en: Time.current,
-      )
     end
 
     carga_manual = params[:peso_total_g].present?

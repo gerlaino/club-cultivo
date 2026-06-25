@@ -30,7 +30,7 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
   end
 
   context 'estados no creables (post-stock / proceso)' do
-    %w[secado curado finalizado en_manicura manicura_pendiente].each do |estado|
+    %w[curado finalizado en_manicura manicura_pendiente].each do |estado|
       it "rechaza crear en estado '#{estado}'" do
         crear(estado: estado, plants_count: 3, start_date: Date.today)
         expect(response).to have_http_status(:unprocessable_entity)
@@ -49,7 +49,7 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
   end
 
   context 'lote cosechado sin sala (por sede)' do
-    it 'crea el lote en la sala de proceso Cosecha de la sede, sin pedir sala' do
+    it 'crea el lote sin sala (sala_id nil) y con la sede directa' do
       expect {
         post '/lotes', params: {
           lote: { estado: 'cosecha', plants_count: 4 },
@@ -59,8 +59,8 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
       expect(response).to have_http_status(:created)
       lote = Lote.last
       expect(lote.estado).to eq('cosecha')
-      expect(lote.sala.sede_id).to eq(sede.id)
-      expect(lote.sala.kind).to eq('cosecha').or eq('cosecha')
+      expect(lote.sala_id).to be_nil        # post-cosecha no usa sala
+      expect(lote.sede_id).to eq(sede.id)   # sede directa
     end
 
     it 'rechaza si no hay sala ni sede' do

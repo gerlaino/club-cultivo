@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_25_000004) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_25_000006) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -658,6 +658,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_25_000004) do
     t.integer "dias_vegetativo_objetivo"
     t.integer "dias_floracion_objetivo"
     t.integer "dias_cosecha_objetivo"
+    t.bigint "sede_id"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"
@@ -668,6 +669,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_25_000004) do
     t.index ["manicurador_id"], name: "index_lotes_on_manicurador_id"
     t.index ["planta_madre_id"], name: "index_lotes_on_planta_madre_id"
     t.index ["sala_id"], name: "index_lotes_on_sala_id"
+    t.index ["sede_id"], name: "index_lotes_on_sede_id"
   end
 
   create_table "mails_enviados", force: :cascade do |t|
@@ -1491,6 +1493,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_25_000004) do
   add_foreign_key "lotes", "geneticas", on_delete: :nullify
   add_foreign_key "lotes", "plants", column: "planta_madre_id"
   add_foreign_key "lotes", "salas"
+  add_foreign_key "lotes", "sedes"
   add_foreign_key "lotes", "users", column: "manicurador_id"
   add_foreign_key "mails_enviados", "clubs"
   add_foreign_key "mails_enviados", "pacientes"

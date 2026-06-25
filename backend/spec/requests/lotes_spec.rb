@@ -10,7 +10,7 @@ RSpec.describe 'POST /lotes/:id/avanzar_fase', type: :request do
 
   let(:lote_floracion) { create(:lote, club: club, sala: sala, estado: 'floracion') }
   let(:lote_cosecha)   { create(:lote, club: club, sala: sala, estado: 'cosecha') }
-  let(:lote_secado)    { create(:lote, club: club, sala: sala, estado: 'secado') }
+  let(:lote_secado)    { create(:lote, club: club, sala: sala, estado: 'en_manicura', manicurador: manicura) }
   let(:lote_curado)    { create(:lote, club: club, sala: sala, estado: 'curado') }
 
   context 'cultivador del mismo club — lote en floracion (→ cosecha)' do
@@ -23,13 +23,12 @@ RSpec.describe 'POST /lotes/:id/avanzar_fase', type: :request do
     end
   end
 
-  context 'cultivador del mismo club — lote en cosecha (→ secado)' do
+  context 'cultivador del mismo club — lote en cosecha (terminal del ciclo)' do
     before { sign_in_as(cultivador) }
 
-    it 'devuelve 200 y el lote pasa a secado' do
+    it 'no avanza por avanzar_fase! (cosecha → manicura es por asignación, no por avance)' do
       post "/lotes/#{lote_cosecha.id}/avanzar_fase", headers: auth_headers
-      expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)['estado']).to eq('secado')
+      expect(response).to have_http_status(:unprocessable_entity)
     end
   end
 
@@ -42,10 +41,10 @@ RSpec.describe 'POST /lotes/:id/avanzar_fase', type: :request do
     end
   end
 
-  context 'manicura — lote en secado (→ manicura_pendiente vía pesada, no avanzar_fase)' do
+  context 'manicura — lote en_manicura (no avanzar_fase)' do
     before { sign_in_as(manicura) }
 
-    it 'devuelve 403 (avanzar_fase ya no aplica a manicura para secado)' do
+    it 'devuelve 403 (avanzar_fase no aplica a manicura)' do
       post "/lotes/#{lote_secado.id}/avanzar_fase", headers: auth_headers
       expect(response).to have_http_status(:forbidden)
     end

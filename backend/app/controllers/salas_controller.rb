@@ -4,10 +4,9 @@ class SalasController < ApplicationController
   before_action :require_salas_role!
   before_action :set_sala, only: [:show, :update, :destroy, :cargar_lote, :cambiar_fase, :registrar_sala]
 
-  TRANSICIONES_KIND = {
-    'secado'   => { desde: 'floracion', hacia: 'cosecha',  label_desde: 'floración',  label_hacia: 'cosecha'  },
-    'manicura' => { desde: 'cosecha',   hacia: 'curado',   label_desde: 'cosecha',    label_hacia: 'curado'   },
-  }.freeze
+  # Las salas son solo de cultivo (vegetativo/floración). Post-cosecha el lote no usa
+  # sala (se ve por estado en Cosecha/Manicura), así que ya no hay transiciones por kind.
+  TRANSICIONES_KIND = {}.freeze
 
   # Salas de proceso (cosecha/secado/curado): se autocrean para conservar la sede del
   # lote post-cosecha, pero NO son salas que el usuario gestione. No se listan en el ABM

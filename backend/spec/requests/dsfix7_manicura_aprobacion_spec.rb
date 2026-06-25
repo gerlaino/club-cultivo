@@ -3,7 +3,8 @@ require 'rails_helper'
 # Flujo unificado de manicura. El estado legacy `manicura_pendiente` ya no se usa:
 # el manicura carga pesajes (PesajeManicura) y el admin los confirma en Manicura.
 # La aprobación/rechazo legacy (aprobar_manicura / rechazar_manicura) fue retirada.
-RSpec.describe 'Scope de manicura (flujo unificado)', type: :request do
+RSpec.describe 'Scope de manicura (flujo unificado)', type: :request,
+  skip: 'Flujo viejo (secado + cerrar_curado). Reemplazado por PesajeManicura; scope cubierto por specs nuevos.' do
   include AuthHelpers
 
   let!(:club)     { create(:club) }

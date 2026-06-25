@@ -2,7 +2,11 @@ class Lote < ApplicationRecord
   belongs_to :club
   acts_as_tenant(:club)
   belongs_to :sala, optional: true
-  validates :sala_id, presence: true, unless: -> { estado == 'finalizado' }
+  belongs_to :sede, optional: true
+  # La sala es solo de cultivo. Post-cosecha el lote no tiene sala (se ve por estado),
+  # pero conserva su sede. Exigimos sala solo en estados de cultivo.
+  CULTIVO_ESTADOS = %w[semilla esqueje vegetativo floracion].freeze
+  validates :sala_id, presence: true, if: -> { CULTIVO_ESTADOS.include?(estado) }
   belongs_to :genetica,    optional: true
   belongs_to :manicurador,   class_name: 'User',  optional: true
   belongs_to :planta_madre,  class_name: 'Plant', optional: true
@@ -21,16 +25,18 @@ class Lote < ApplicationRecord
   # class_name explícito: el nombre ya es "singular", Rails no lo inferiría bien.
   has_many :analisis_laboratorio, class_name: 'AnalisisLaboratorio', dependent: :destroy
 
-  # en_manicura: admin asigna un manicurador y el lote espera ser procesado.
-  # manicura_pendiente: manicurador registró pesada, espera aprobación admin.
-  # secado/curado: estados legacy — lotes anteriores al nuevo flujo.
-  ESTADOS       = %w[semilla esqueje vegetativo floracion cosecha en_manicura secado manicura_pendiente curado finalizado].freeze
+  # Secuencia: semilla/esqueje → vegetativo → floración → cosecha → en_manicura
+  # (admin asigna manicura) → curado (se confirma el pesaje + se crea el stock; acá
+  # empieza el curado) → finalizado (cuando se agota el stock del lote).
+  # manicura_pendiente: sub-fase de aprobación (manicurador pesó, espera al admin).
+  # 'secado' YA NO es un estado: es una métrica (días de cosecha→stock). Ver dias_secado.
+  ESTADOS       = %w[semilla esqueje vegetativo floracion cosecha en_manicura manicura_pendiente curado finalizado].freeze
   ORIGENES      = %w[semilla esqueje].freeze
-  CICLO_FASES   = %w[vegetativo floracion cosecha secado curado].freeze
-  # Fases de post-cosecha: NO usan sala de cultivo. Al entrar en una de ellas el
-  # lote sale de su sala de floración (libera el slot) y va a una sala de proceso
-  # "Cosecha/Secado/Curado · sede" auto-gestionada, conservando la sede.
-  FASES_PROCESO = %w[cosecha secado curado].freeze
+  # Camino de cultivo con pesada/avance (con sala). Post-cosecha (en_manicura/curado)
+  # se maneja por el flujo de manicura, no por avanzar_fase!.
+  CICLO_FASES   = %w[vegetativo floracion cosecha].freeze
+  # Estados post-cosecha: el lote NO tiene sala (se ve por estado en Cosecha/Manicura).
+  POST_COSECHA  = %w[cosecha en_manicura manicura_pendiente curado finalizado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
   TIPOS_LUZ     = %w[led hps cmh natural mixta].freeze
   SUSTRATOS     = %w[tierra coco perlita mezcla rockwool fibra_coco].freeze
@@ -74,10 +80,9 @@ class Lote < ApplicationRecord
     when 'vegetativo'          then 20
     when 'floracion'           then 40
     when 'cosecha'             then 60
-    when 'en_manicura'         then 68
-    when 'secado'              then 72
+    when 'en_manicura'         then 72
     when 'manicura_pendiente'  then 82
-    when 'curado'              then 90
+    when 'curado'              then 92
     when 'finalizado'          then 100
     else 0
     end
@@ -87,7 +92,6 @@ class Lote < ApplicationRecord
     'vegetativo' => 'vegetativo',
     'floracion'  => 'floracion',
     'cosecha'    => 'cosechado',
-    'secado'     => 'secado',
   }.freeze
 
   # Avance rápido sin pesada — usado por el cultivador desde el botón "Avanzar fase".
@@ -102,19 +106,20 @@ class Lote < ApplicationRecord
       CICLO_FASES[idx + 1]
     end
     ActiveRecord::Base.transaction do
-      sala_nueva = if sala_id.present?
-        club.salas.activas.find_by(id: sala_id)
-      elsif FASES_PROCESO.include?(nueva_fase) && sala&.sede
-        # Post-cosecha: liberar la sala de cultivo y mandar a la sala de proceso de la sede
-        # (igual que transicionar!). Si no hay sede resoluble, cae al else (auto-detección).
-        Sala.find_or_create_proceso!(sede: sala.sede, tipo: nueva_fase, created_by: usuario)
-      else
-        candidatas = club.salas.activas.de_tipo(nueva_fase).to_a
-        candidatas.length == 1 ? candidatas.first : nil
-      end
-
       attrs = { estado: nueva_fase }
-      attrs[:sala] = sala_nueva if sala_nueva
+      if POST_COSECHA.include?(nueva_fase)
+        # Cosecha: el lote sale de la sala de cultivo (libera el slot) y conserva la sede.
+        attrs[:sede]    = sede || sala&.sede
+        attrs[:sala_id] = nil
+      else
+        sala_nueva = if sala_id.present?
+          club.salas.activas.find_by(id: sala_id)
+        else
+          candidatas = club.salas.activas.de_tipo(nueva_fase).to_a
+          candidatas.length == 1 ? candidatas.first : nil
+        end
+        attrs[:sala] = sala_nueva if sala_nueva
+      end
       update!(attrs)
 
       plant_state = FASE_A_PLANT_STATE[nueva_fase]
@@ -140,17 +145,6 @@ class Lote < ApplicationRecord
     raise ArgumentError, "registrado_por es obligatorio" unless registrado_por
 
     ActiveRecord::Base.transaction do
-      # La cosecha NO usa una sala de cultivo: el lote sale de floración (liberando su
-      # slot) hacia una sala de proceso "Cosecha · sede" (auto-gestionada, igual que
-      # Secado y Curado). Así queda en post-cosecha conservando la sede para el flujo
-      # de manicura, y se ve en /cosechado por estado.
-      sala_destino = if sala_id.present?
-        club.salas.activas.find_by(id: sala_id) ||
-          Sala.find_or_create_proceso!(sede: sala.sede, tipo: nueva_fase, created_by: registrado_por)
-      else
-        Sala.find_or_create_proceso!(sede: sala.sede, tipo: nueva_fase, created_by: registrado_por)
-      end
-
       pesada = pesadas.create!(
         fase_origen:    estado,
         fase_destino:   nueva_fase,
@@ -171,7 +165,18 @@ class Lote < ApplicationRecord
         )
       end
 
-      update!(estado: nueva_fase, sala: sala_destino)
+      # Cosecha (única fase post-cosecha alcanzable por transicionar!): sale de la sala
+      # de cultivo y conserva la sede. El resto (vegetativo/floración) usa su sala.
+      attrs = { estado: nueva_fase }
+      if POST_COSECHA.include?(nueva_fase)
+        attrs[:sede]    = sede || sala&.sede
+        attrs[:sala_id] = nil
+      elsif sala_id.present?
+        sala_nueva = club.salas.activas.find_by(id: sala_id)
+        attrs[:sala] = sala_nueva if sala_nueva
+      end
+      update!(attrs)
+
       plant_state = FASE_A_PLANT_STATE[nueva_fase]
       plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state) if plant_state
     end
@@ -184,14 +189,9 @@ class Lote < ApplicationRecord
     raise ArgumentError, "El lote no está en cosecha" unless estado == 'cosecha'
     raise ArgumentError, "El usuario no tiene rol válido para manicura" unless ROLES_MANICURA.include?(manicurador.role)
 
-    attrs = { estado: 'en_manicura', manicurador: manicurador }
-    if sala_id.present?
-      sala_destino = club.salas.activas.find_by(id: sala_id)
-      attrs[:sala] = sala_destino if sala_destino
-    end
-
+    # Post-cosecha no usa sala (se ve en la sección Manicura por estado).
     ActiveRecord::Base.transaction do
-      update!(attrs)
+      update!(estado: 'en_manicura', manicurador: manicurador)
       lote_eventos.create!(
         tipo:            'cambio_estado',
         estado_anterior: 'cosecha',
@@ -279,8 +279,9 @@ class Lote < ApplicationRecord
   end
 
   # Llamado tras cada confirmación de PesajeManicura.
-  # Finaliza el lote automáticamente cuando todas las plantas del lote
-  # tienen registro en pesajes confirmados.
+  # Cuando todas las plantas están procesadas, el lote pasa a 'curado' (el stock de
+  # flor_seca ya lo creó PesajeManicura#confirmar — acá empieza el curado). El lote
+  # llega a 'finalizado' recién cuando se agota su stock (ver finalizar_si_stock_agotado!).
   def check_and_finalize_manicura!(finalizador: nil)
     return unless estado == 'en_manicura'
 
@@ -306,7 +307,7 @@ class Lote < ApplicationRecord
     peso_total = pesajes_manicura.where(estado: 'confirmado').sum(:peso_confirmado_g).to_d
 
     update!(
-      estado:             'finalizado',
+      estado:             'curado',
       rendimiento_real_g: peso_total,
       manicurador:        nil,
       sala_id:            nil,
@@ -315,11 +316,27 @@ class Lote < ApplicationRecord
     lote_eventos.create!(
       tipo:            'cambio_estado',
       estado_anterior: 'en_manicura',
-      estado_nuevo:    'finalizado',
-      descripcion:     "Manicura completada — #{total_plantas} plantas · #{peso_total.round(1)}g acumulados en #{pesajes_manicura.confirmados.count} pesajes",
+      estado_nuevo:    'curado',
+      descripcion:     "Manicura completada — #{total_plantas} plantas · #{peso_total.round(1)}g acumulados en #{pesajes_manicura.confirmados.count} pesajes. En curado.",
       user:            finalizador,
       club:            club,
       registrado_en:   Time.current,
+    )
+  end
+
+  # El lote pasa a 'finalizado' cuando se agota todo su stock (lo llama Stock al quedar
+  # en 0). Solo aplica desde 'curado' (ya tuvo stock); requiere que exista al menos un
+  # stock y que todos estén agotados.
+  def finalizar_si_stock_agotado!(usuario: nil)
+    return unless estado == 'curado'
+    activos = stocks.where.not(estado: 'agotado')
+    return if activos.exists? || stocks.empty?
+
+    update!(estado: 'finalizado')
+    lote_eventos.create!(
+      tipo: 'cambio_estado', estado_anterior: 'curado', estado_nuevo: 'finalizado',
+      descripcion: 'Stock agotado — lote finalizado.', user: usuario, club: club,
+      registrado_en: Time.current,
     )
   end
 

@@ -2,7 +2,8 @@ require 'rails_helper'
 
 # Ola 4 — Manicura role: pesadas CRUD, lote scope, stock create, cerrar_curado multi-stock
 
-RSpec.describe 'Ola 4 — Manicura backend', type: :request do
+RSpec.describe 'Ola 4 — Manicura backend', type: :request,
+  skip: 'Flujo viejo de manicura (pesadas/secado/cerrar_curado). Reemplazado por PesajeManicura; cubierto por lote_machine_spec + pesajes_manicura_flujo_spec.' do
   let(:club)       { create(:club) }
   let(:sede)       { create(:sede, club: club) }
   let(:sala)       { create(:sala, club: club, sede: sede) }

@@ -164,7 +164,7 @@ class PlantsController < ApplicationController
     return render json: { error: 'El peso debe ser mayor a 0' }, status: :unprocessable_entity if peso_seco <= 0
 
     lote = @plant.lote
-    unless %w[en_manicura secado].include?(lote.estado)
+    unless lote.estado == 'en_manicura'
       return render json: { error: 'El lote no está en una fase de manicura activa' }, status: :unprocessable_entity
     end
 
@@ -179,17 +179,6 @@ class PlantsController < ApplicationController
       plant_attrs = { peso_seco: peso_seco }
       plant_attrs[:peso_humedo] = peso_humedo if peso_humedo&.positive?
       @plant.update!(plant_attrs)
-
-      # Si el lote venía de 'secado' (camino viejo, sin manicura asignada), entra a
-      # manicura activa al primer pesaje por QR. Mismo criterio que la carga por lote.
-      if lote.estado == 'secado'
-        lote.update!(estado: 'en_manicura', manicurador_id: lote.manicurador_id || current_user.id)
-        lote.lote_eventos.create!(
-          tipo: 'cambio_estado', estado_anterior: 'secado', estado_nuevo: 'en_manicura',
-          descripcion: 'Inicio de manicura (pesaje por QR desde secado)',
-          user: current_user, club: lote.club, registrado_en: Time.current,
-        )
-      end
 
       # Resolvemos la jornada (PesajeManicura): por id explícito, o el borrador abierto del
       # manicura para este lote. Si no hay ninguno, se crea. Flujo único: el peso siempre

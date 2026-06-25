@@ -23,7 +23,7 @@ class LoteSerializer
 
     # Días en cosecha: desde que se cosechó hasta que el lote se transforma en stock o
     # pasa a curado (lo que ocurra primero); si sigue en cosecha, hasta hoy.
-    dias_cosechado = if fecha_cosechado
+    dias_secado = if fecha_cosechado
       ev_curado    = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'curado' }.min_by(&:registrado_en)
       fin_cosecha  = [ev_curado&.registrado_en&.to_date, lote.stocks.minimum(:created_at)&.to_date].compact.min || Date.current
       (fin_cosecha - fecha_cosechado).to_i
@@ -88,7 +88,7 @@ class LoteSerializer
       fecha_cosechado:        fecha_cosechado,
       dias_vegetacion:        dias_vegetacion,
       dias_floracion:         dias_floracion,
-      dias_cosechado:         dias_cosechado,
+      dias_secado:         dias_secado,
       rendimiento_real_g:     lote.rendimiento_real_g&.to_f,
       plants_count_cosechadas: lote.plants_count_cosechadas,
       manicurador_id: lote.manicurador_id,
@@ -99,6 +99,9 @@ class LoteSerializer
         tipo:   lote.sala.tipo,
         sede:   lote.sala.sede ? { id: lote.sala.sede_id, nombre: lote.sala.sede.nombre } : nil,
       } : nil,
+      # El lote tiene sede propia (post-cosecha no tiene sala). Fallback a la sala.
+      sede_id: lote.sede_id || lote.sala&.sede_id,
+      sede:    (lote.sede || lote.sala&.sede) ? { id: (lote.sede_id || lote.sala&.sede_id), nombre: (lote.sede || lote.sala&.sede)&.nombre } : nil,
       created_at: lote.created_at,
       updated_at: lote.updated_at,
     }

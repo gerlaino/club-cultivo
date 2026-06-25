@@ -7,7 +7,7 @@ RSpec.describe 'Lote#avanzar_fase! hacia cosecha', type: :model do
   let(:sala_flora) { create(:sala, club: club, sede: sede, tipo: 'floracion', kind: 'floracion', created_by: admin) }
   let(:lote)  { create(:lote, club: club, sala: sala_flora, estado: 'floracion') }
 
-  it 'saca el lote de la sala de floración y lo manda a una sala de proceso de cosecha' do
+  it 'saca el lote de la sala de cultivo (sala_id nil) y conserva la sede' do
     expect(lote.estado).to eq('floracion')
     expect(lote.sala).to eq(sala_flora)
 
@@ -15,9 +15,8 @@ RSpec.describe 'Lote#avanzar_fase! hacia cosecha', type: :model do
     lote.reload
 
     expect(lote.estado).to eq('cosecha')
-    expect(lote.sala).not_to eq(sala_flora)
-    expect(lote.sala.tipo).to eq('cosecha')
-    expect(lote.sala.sede).to eq(sede)
+    expect(lote.sala).to be_nil          # post-cosecha no usa sala
+    expect(lote.sede).to eq(sede)        # conserva la sede
   end
 
   it 'el lote cosechado ya no aparece entre los lotes de la sala de floración' do

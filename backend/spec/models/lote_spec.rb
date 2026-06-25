@@ -161,10 +161,9 @@ RSpec.describe Lote, type: :model do
       'vegetativo'        => 20,
       'floracion'         => 40,
       'cosecha'           => 60,
-      'en_manicura'       => 68,
-      'secado'            => 72,
+      'en_manicura'       => 72,
       'manicura_pendiente'=> 82,
-      'curado'            => 90,
+      'curado'            => 92,
       'finalizado'        => 100,
     }.each do |estado, pct|
       it "retorna #{pct} para estado '#{estado}'" do

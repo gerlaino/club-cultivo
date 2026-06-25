@@ -33,6 +33,8 @@ class Stock < ApplicationRecord
   before_create :generar_numero_lote_producto
   before_create :generar_codigo_qr
   before_create :descontar_lote_origen_si_corresponde, unless: -> { es_split }
+  # Cuando el stock de un lote se agota, el lote pasa a 'finalizado' (si era el último).
+  after_save :finalizar_lote_si_agotado, if: -> { saved_change_to_estado? && estado == 'agotado' && lote_id.present? }
 
   scope :regulatorios,             -> { where(origen: %w[lote derivado_lote]) }
   scope :sociales,                 -> { where(origen: 'compra_externa') }
@@ -149,6 +151,10 @@ class Stock < ApplicationRecord
       errors.add(:proveedor, 'es obligatorio para compra externa') if proveedor.blank?
       errors.add(:lote_id,   'debe ser nulo para compra externa')  if lote_id.present?
     end
+  end
+
+  def finalizar_lote_si_agotado
+    lote&.finalizar_si_stock_agotado!
   end
 
   def descontar_lote_origen_si_corresponde
