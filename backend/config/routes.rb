@@ -117,6 +117,7 @@ Rails.application.routes.draw do
         post  :transiciones
         post  :cerrar_curado
         post  :avanzar_fase
+        post  :registrar_trasplante
         post  :cosechar_plantas
         post  :asignar_manicurador
         patch :completar_datos

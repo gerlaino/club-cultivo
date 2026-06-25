@@ -24,6 +24,7 @@ import LotePlanVsReal       from '../components/lotes/LotePlanVsReal.vue'
 import LoteTimelineSection  from '../components/lotes/LoteTimelineSection.vue'
 import LoteFotosSection     from '../components/lotes/LoteFotosSection.vue'
 import LoteEditarModal      from '../components/lotes/LoteEditarModal.vue'
+import RegistrarTrasplanteModal from '../components/lotes/RegistrarTrasplanteModal.vue'
 import LotePLCard           from '../components/lotes/LotePLCard.vue'
 import LoteIACard           from '../components/lotes/LoteIACard.vue'
 import DsBanner from '../design-system/components/Banner.vue'
@@ -281,6 +282,11 @@ const cicloIndex = computed(() => lote.value ? cicloPasos.value.indexOf(lote.val
 
 // ── Composables ────────────────────────────────────────────
 const editarOpen = ref(false)
+const trasplanteOpen = ref(false)
+async function onTrasplanteRegistrado() {
+  await Promise.all([lotes.fetchOne(id), loadEventos()])
+  graficosKey.value++   // recarga la timeline
+}
 
 // Tras editar el lote (puede cambiar estado/fechas): refrescamos lote, historial,
 // plantas y gráficos — antes solo se refrescaba el lote y quedaban viejos.
@@ -517,7 +523,10 @@ onUnmounted(() => {
           </div>
 
           <!-- 4. Timeline del ciclo -->
-          <LoteTimelineSection :lote-id="id" />
+          <div v-if="canAdmin" class="ld__trasplante-bar">
+            <button class="ld__trasplante-btn" @click="trasplanteOpen = true">🪴 Registrar trasplante</button>
+          </div>
+          <LoteTimelineSection :lote-id="id" :key="graficosKey" />
 
           <!-- 5. Análisis de laboratorio -->
           <div class="ld__section ld__section--mt">
@@ -651,6 +660,14 @@ onUnmounted(() => {
       :lote="lote"
       :lote-id="id"
       @saved="onLoteEditado"
+    />
+
+    <!-- ══ Modal Registrar Trasplante ══ -->
+    <RegistrarTrasplanteModal
+      v-model="trasplanteOpen"
+      :lote-id="id"
+      :maceta-actual="lote?.tamanio_maceta != null ? Number(lote.tamanio_maceta) : null"
+      @saved="onTrasplanteRegistrado"
     />
 
     <!-- ══ Modal Registro del Lote (nuevo) ══ -->
@@ -1082,6 +1099,9 @@ onUnmounted(() => {
 .ld__aside { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: start; }
 .ld__section { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
 .ld__section--mt { margin-top: 1.25rem; }
+.ld__trasplante-bar { display: flex; justify-content: flex-end; margin-bottom: .5rem; }
+.ld__trasplante-btn { background: #fff8e1; border: 1.5px solid #fde68a; color: #92400e; border-radius: 8px; padding: .4rem .8rem; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.ld__trasplante-btn:hover { background: #fef3c7; }
 .ld__section-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: .9rem 1.1rem; background: transparent; border: none; cursor: pointer; transition: background .15s; text-align: left; }
 .ld__section-toggle:hover { background: #f0fdf4; }
 .ld__section-toggle-left { display: flex; align-items: center; gap: .6rem; }

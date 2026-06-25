@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :asignar_manicurador]
+  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :asignar_manicurador, :registrar_trasplante]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -187,6 +187,7 @@ class LotesController < ApplicationController
       # Corrección de historia: reconciliar las fechas de inicio de cada fase con sus
       # eventos de cambio de estado (fuente de verdad de la analítica de días por fase).
       reconciliar_fechas_fase(@lote, params[:fechas_fase]) if params[:fechas_fase].present?
+      reconciliar_evento_inicio!(@lote) if params.dig(:lote, :start_date).present?
       render json: LoteSerializer.serialize(@lote.reload)
     else
       render json: { errors: @lote.errors.full_messages }, status: :unprocessable_entity
@@ -201,6 +202,58 @@ class LotesController < ApplicationController
     plant_state = Lote::FASE_A_PLANT_STATE[lote.estado]
     return unless plant_state
     lote.plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state)
+  end
+
+  # POST /lotes/:id/registrar_trasplante  { fecha, maceta_origen_l, maceta_destino_l }
+  # Registra un trasplante del lote (se puede backdatear): crea un PlantActivity
+  # 'transplant' por planta activa con la maceta origen→destino (lo que muestra la
+  # timeline) y actualiza el tamaño de maceta actual del lote.
+  def registrar_trasplante
+    origen  = params[:maceta_origen_l].presence&.to_d
+    destino = params[:maceta_destino_l].presence&.to_d
+    if destino.nil? || destino <= 0
+      return render json: { error: 'Indicá la maceta destino (en litros).' }, status: :unprocessable_entity
+    end
+    fecha    = (Date.parse(params[:fecha].to_s) rescue Date.current)
+    occurred = fecha.in_time_zone.change(hour: 12)
+    plants   = @lote.plants.where.not(state: %w[descartada cosechado])
+    if plants.empty?
+      return render json: { error: 'El lote no tiene plantas activas para trasplantar.' }, status: :unprocessable_entity
+    end
+
+    ActiveRecord::Base.transaction do
+      plants.find_each do |p|
+        p.activities.create!(
+          user:          current_user,
+          activity_type: 'transplant',
+          description:   "Trasplante#{origen ? " de #{origen.to_f}L" : ''} a #{destino.to_f}L",
+          occurred_at:   occurred,
+          metadata:      { 'maceta_origen_l' => origen&.to_f, 'maceta_destino_l' => destino.to_f },
+        )
+      end
+      @lote.update!(tamanio_maceta: destino)
+    end
+    render json: { ok: true, tamanio_maceta: destino.to_f }
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  # Refleja en la timeline/historial la fecha de inicio (esqueje/semilla): crea o mueve
+  # un evento de la fase de origen a la start_date del lote.
+  def reconciliar_evento_inicio!(lote)
+    return unless lote.start_date
+    fase = lote.origen.presence_in(%w[semilla esqueje]) || 'esqueje'
+    ts   = lote.start_date.in_time_zone.change(hour: 12)
+    ev   = lote.lote_eventos.where(tipo: 'cambio_estado', estado_nuevo: fase).order(:registrado_en).first
+    if ev
+      ev.update!(registrado_en: ts)
+    else
+      lote.lote_eventos.create!(
+        tipo: 'cambio_estado', estado_nuevo: fase, estado_anterior: nil,
+        descripcion: "Inicio (#{fase})", registrado_en: ts,
+        user: current_user, club: lote.club,
+      )
+    end
   end
 
   def reconciliar_fechas_fase(lote, fechas)
@@ -578,7 +631,7 @@ class LotesController < ApplicationController
       .map do |(fecha, origen, destino), acts|
         { fecha: fecha, usuario: acts.first.user&.first_name,
           maceta_origen: origen, maceta_destino: destino,
-          plantas: acts.size, notas: acts.map(&:notes).compact.uniq.first }
+          plantas: acts.size, notas: acts.map(&:description).compact.uniq.first }
       end
 
     render json: {
