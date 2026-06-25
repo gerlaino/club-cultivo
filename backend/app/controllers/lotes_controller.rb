@@ -209,33 +209,14 @@ class LotesController < ApplicationController
   # 'transplant' por planta activa con la maceta origen→destino (lo que muestra la
   # timeline) y actualiza el tamaño de maceta actual del lote.
   def registrar_trasplante
-    origen  = params[:maceta_origen_l].presence&.to_d
-    destino = params[:maceta_destino_l].presence&.to_d
-    if destino.nil? || destino <= 0
-      return render json: { error: 'Indicá la maceta destino (en litros).' }, status: :unprocessable_entity
+    res = Lotes::RegistrarTrasplante.call(
+      lote: @lote, usuario: current_user,
+      destino: params[:maceta_destino_l], origen: params[:maceta_origen_l], fecha: params[:fecha])
+    if res.ok?
+      render json: { ok: true, tamanio_maceta: @lote.reload.tamanio_maceta&.to_f }
+    else
+      render json: { error: res.error }, status: :unprocessable_entity
     end
-    fecha    = (Date.parse(params[:fecha].to_s) rescue Date.current)
-    occurred = fecha.in_time_zone.change(hour: 12)
-    plants   = @lote.plants.where.not(state: %w[descartada cosechado])
-    if plants.empty?
-      return render json: { error: 'El lote no tiene plantas activas para trasplantar.' }, status: :unprocessable_entity
-    end
-
-    ActiveRecord::Base.transaction do
-      plants.find_each do |p|
-        p.activities.create!(
-          user:          current_user,
-          activity_type: 'transplant',
-          description:   "Trasplante#{origen ? " de #{origen.to_f}L" : ''} a #{destino.to_f}L",
-          occurred_at:   occurred,
-          metadata:      { 'maceta_origen_l' => origen&.to_f, 'maceta_destino_l' => destino.to_f },
-        )
-      end
-      @lote.update!(tamanio_maceta: destino)
-    end
-    render json: { ok: true, tamanio_maceta: destino.to_f }
-  rescue => e
-    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   # Refleja en la timeline/historial la fecha de inicio (esqueje/semilla): crea o mueve

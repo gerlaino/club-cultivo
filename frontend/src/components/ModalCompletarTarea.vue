@@ -44,6 +44,24 @@
               Se registrarán <strong>{{ horas }}h</strong> para el lote <strong>{{ tarea.lote.codigo }}</strong>.
             </div>
 
+            <div v-if="esTrasplante" class="mct__trasplante">
+              <div class="mct__trasplante-titulo">
+                <i class="bi bi-flower1 me-1"></i>¿De qué maceta a qué maceta?
+              </div>
+              <div class="mct__trasplante-row">
+                <div class="mct__field mct__field--inline">
+                  <label class="mct__label">Origen <span class="mct__opt">(L)</span></label>
+                  <input v-model.number="macetaOrigen" type="number" min="0" step="0.5" class="mct__input" placeholder="ej: 1" />
+                </div>
+                <div class="mct__trasplante-arrow">→</div>
+                <div class="mct__field mct__field--inline">
+                  <label class="mct__label">Destino <span class="mct__opt">(L)</span></label>
+                  <input v-model.number="macetaDestino" type="number" min="0.1" step="0.5" class="mct__input" placeholder="ej: 3" />
+                </div>
+              </div>
+              <div class="mct__hint"><i class="bi bi-info-circle me-1"></i>Queda en la timeline del lote. Opcional.</div>
+            </div>
+
             <div class="mct__field">
               <label class="mct__label">Notas de completado</label>
               <textarea
@@ -75,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useTareasStore } from '../stores/tareas.js'
 import { useModalEscape } from '../composables/useModalEscape.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -88,16 +106,22 @@ const props = defineProps({
 const emit = defineEmits(['completada', 'cerrar'])
 
 const tareasStore = useTareasStore()
-const horas       = ref(null)
-const notas       = ref('')
-const error       = ref('')
-const guardando   = ref(false)
+const horas         = ref(null)
+const notas         = ref('')
+const error         = ref('')
+const guardando     = ref(false)
+const macetaOrigen  = ref(null)
+const macetaDestino = ref(null)
+
+const esTrasplante = computed(() => props.tarea?.tipo === 'transplante' && !!props.tarea?.lote)
 
 watch(() => props.tarea, (val) => {
   if (val) {
     horas.value  = val.horas_estimadas || null
     notas.value  = ''
     error.value  = ''
+    macetaOrigen.value  = null
+    macetaDestino.value = null
   }
 })
 
@@ -111,10 +135,14 @@ async function confirmar() {
   error.value   = ''
   guardando.value = true
   try {
+    const extra = esTrasplante.value && macetaDestino.value > 0
+      ? { maceta_origen_l: macetaOrigen.value || undefined, maceta_destino_l: macetaDestino.value }
+      : {}
     const resultado = await tareasStore.completar(
       props.tarea.id,
       horas.value  || null,
-      notas.value  || null
+      notas.value  || null,
+      extra
     )
     emit('completada', resultado)
   } catch (e) {
@@ -126,6 +154,15 @@ async function confirmar() {
 </script>
 
 <style scoped>
+.mct__trasplante {
+  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;
+  padding: .75rem .85rem; margin-bottom: 1rem;
+}
+.mct__trasplante-titulo { font-size: .82rem; font-weight: 700; color: #166534; margin-bottom: .6rem; }
+.mct__trasplante-row { display: flex; align-items: flex-end; gap: .5rem; }
+.mct__field--inline { flex: 1; min-width: 0; margin-bottom: 0; }
+.mct__trasplante-arrow { padding-bottom: .55rem; color: #16a34a; font-weight: 800; }
+
 .mct__overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.45);

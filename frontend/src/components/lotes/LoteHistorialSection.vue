@@ -1,7 +1,29 @@
 <template>
-  <div v-if="loadingEventos" class="lhs__placeholder">Cargando historial…</div>
-  <EmptyState v-else-if="eventos.length === 0" icon="📜" title="Sin eventos" message="Sin eventos registrados todavía." compact />
-  <div v-else>
+  <div>
+    <!-- Registrar evento pasado -->
+    <div v-if="canAdmin" class="lhs__add">
+      <button v-if="!formAbierto" class="lhs__add-btn" @click="abrirForm">
+        <i class="bi bi-plus-circle me-1"></i>Registrar evento pasado
+      </button>
+      <div v-else class="lhs__form">
+        <div class="lhs__form-row">
+          <select v-model="form.tipo" class="lhs__form-sel">
+            <option v-for="t in TIPOS_EVENTO" :key="t.value" :value="t.value">{{ t.emoji }} {{ t.label }}</option>
+          </select>
+          <AppDatePicker v-model="form.fecha" :max="hoy" class="lhs__form-date" />
+        </div>
+        <input v-model="form.descripcion" type="text" class="lhs__form-input" maxlength="200"
+               placeholder="¿Qué pasó? (ej: regué con 1.2 EC, podé las bajeras…)" @keyup.enter="guardar" />
+        <div class="lhs__form-actions">
+          <button class="lhs__form-cancel" @click="cerrarForm">Cancelar</button>
+          <button class="lhs__form-save" :disabled="!form.descripcion.trim()" @click="guardar">Registrar</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="loadingEventos" class="lhs__placeholder">Cargando historial…</div>
+    <EmptyState v-else-if="eventos.length === 0" icon="📜" title="Sin eventos" message="Sin eventos registrados todavía." compact />
+    <div v-else>
     <div class="lhs__eventos">
       <div v-for="e in eventosPaginados" :key="e._tipo + e.id" class="lhs__evento">
 
@@ -124,22 +146,58 @@
       <span class="lhs__pag-info">{{ (pagina - 1) * PER_PAGE + 1 }}–{{ Math.min(pagina * PER_PAGE, eventos.length) }} de {{ eventos.length }}</span>
     </div>
   </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { em, sm, pgm, formatDateTime, TAREAS_LOTE } from '../../lib/loteHelpers.js'
 import EmptyState from '../ui/EmptyState.vue'
+import AppDatePicker from '../ui/AppDatePicker.vue'
 
 const props = defineProps({
   eventos:        { type: Array,   required: true },
   loadingEventos: { type: Boolean, default: false },
   canAdmin:       { type: Boolean, default: false },
 })
-defineEmits(['delete'])
+const emit = defineEmits(['delete', 'crear'])
 
 const PER_PAGE = 10
 const pagina   = ref(1)
+
+// ── Registrar evento pasado ───────────────────────────────
+const TIPOS_EVENTO = [
+  { value: 'nota',       label: 'Nota',       emoji: '📝' },
+  { value: 'riego',      label: 'Riego',      emoji: '💧' },
+  { value: 'poda',       label: 'Poda',       emoji: '✂️' },
+  { value: 'fertilizacion', label: 'Fertilización', emoji: '🌿' },
+  { value: 'inspeccion', label: 'Inspección', emoji: '🔍' },
+  { value: 'tratamiento', label: 'Tratamiento', emoji: '🧪' },
+  { value: 'otro',       label: 'Otro',       emoji: '•' },
+]
+const hoy = new Date().toISOString().split('T')[0]
+const formAbierto = ref(false)
+const form = ref({ tipo: 'nota', fecha: hoy, descripcion: '' })
+
+function abrirForm() {
+  form.value = { tipo: 'nota', fecha: hoy, descripcion: '' }
+  formAbierto.value = true
+}
+function cerrarForm() { formAbierto.value = false }
+
+function guardar() {
+  const desc = form.value.descripcion.trim()
+  if (!desc) return
+  const meta = TIPOS_EVENTO.find(t => t.value === form.value.tipo)
+  // El backend guarda tipo libre en 'descripcion'; prefijamos el rótulo del tipo
+  // para que se lea claro en el historial (no es 'cambio_estado').
+  emit('crear', {
+    tipo: 'nota',
+    descripcion: `${meta.emoji} ${meta.label}: ${desc}`,
+    registrado_en: `${form.value.fecha}T12:00:00`,
+  })
+  formAbierto.value = false
+}
 
 watch(() => props.eventos, () => { pagina.value = 1 })
 
@@ -156,6 +214,19 @@ const TIPO_LABELS = {
 </script>
 
 <style scoped>
+.lhs__add { padding: .75rem 1.1rem; border-bottom: 1px solid #f0fdf4; }
+.lhs__add-btn { background: #f0fdf4; border: 1px dashed #86c98a; color: #15803d; border-radius: 8px; padding: .5rem .85rem; font-size: .8rem; font-weight: 600; cursor: pointer; width: 100%; transition: all .15s; }
+.lhs__add-btn:hover { background: #dcfce7; border-style: solid; }
+.lhs__form { display: flex; flex-direction: column; gap: .5rem; }
+.lhs__form-row { display: flex; gap: .5rem; }
+.lhs__form-sel { flex: 1; min-width: 0; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .45rem .55rem; font-size: .82rem; color: #0f172a; background: #fff; }
+.lhs__form-date { flex: 1; min-width: 0; }
+.lhs__form-input { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; color: #0f172a; outline: none; }
+.lhs__form-input:focus { border-color: #16a34a; }
+.lhs__form-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+.lhs__form-cancel { background: #fff; border: 1.5px solid #cbd5e1; color: #334155; border-radius: 8px; padding: .4rem .85rem; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.lhs__form-save { background: #1b5e20; border: none; color: #fff; border-radius: 8px; padding: .4rem 1rem; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.lhs__form-save:disabled { opacity: .5; cursor: not-allowed; }
 .lhs__placeholder { padding: 1rem 1.1rem; color: #94a3b8; font-size: .875rem; }
 .lhs__eventos { display: flex; flex-direction: column; }
 .lhs__evento { display: flex; gap: .85rem; padding: .75rem 1.1rem; border-bottom: 1px solid #f0fdf4; }

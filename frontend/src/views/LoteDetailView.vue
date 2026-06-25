@@ -6,7 +6,7 @@ import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
-import { getRegistrosAmbientales, getLoteEventos, listTareas, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
+import { getRegistrosAmbientales, getLoteEventos, listTareas, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, createLoteEvento, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
 import { useQRCode } from '../composables/useQRCode.js'
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
@@ -30,7 +30,6 @@ import LoteIACard           from '../components/lotes/LoteIACard.vue'
 import DsBanner from '../design-system/components/Banner.vue'
 import IniciarManicuraModal   from '../components/lotes/IniciarManicuraModal.vue'
 import CompletarManicuraModal  from '../components/lotes/CompletarManicuraModal.vue'
-import LoteTrasplanteModal     from '../components/lotes/LoteTrasplanteModal.vue'
 import RegistroLoteModal       from '../components/lotes/registro/RegistroLoteModal.vue'
 import ActionsDropdown         from '../components/ui/ActionsDropdown.vue'
 import { useLoteTransiciones }     from '../composables/useLoteTransiciones.js'
@@ -171,6 +170,20 @@ async function loadEventos() {
   finally { loadingEventos.value = false }
 }
 
+async function onCrearEvento(payload) {
+  // Registra un evento/nota pasado (o de hoy) en el historial. El backend
+  // backdatea con registrado_en. No se permite 'cambio_estado' desde acá:
+  // para corregir una fase se usa Editar lote.
+  try {
+    await createLoteEvento(id, payload)
+    toast.success('Evento registrado en el historial')
+    await loadEventos()
+    graficosKey.value++
+  } catch (err) {
+    toast.error(err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo registrar el evento')
+  }
+}
+
 async function onDeleteEvento(e) {
   const LABEL = { evento: 'evento', registro: 'registro', tarea: 'tarea completada' }
   const ok = await confirm({
@@ -252,10 +265,6 @@ const contextoAsistente = computed(() => lote.value ? {
   estado:        lote.value.estado,
 } : null)
 
-// ── Trasplante de lote ────────────────────────────────────
-const showTrasplanteLote = ref(false)
-function abrirTrasplanteLote() { showTrasplanteLote.value = true }
-
 // ── Registro modal (nuevo) ────────────────────────────────
 const showRegistroModalNew = ref(false)
 
@@ -318,7 +327,6 @@ function loteEscapeHandler(e) {
   if (e.key !== 'Escape') return
   if (editarOpen.value)               { editarOpen.value = false; return }
   if (showRegistroModalNew.value)     { showRegistroModalNew.value = false; return }
-  if (showTrasplanteLote.value)       { showTrasplanteLote.value = false; return }
   if (showPreFinModal.value)          { showPreFinModal.value = false; return }
   if (showCerrarCuradoModal.value)    { showCerrarCuradoModal.value = false; return }
   if (showCosechaPartialModal.value)  { showCosechaPartialModal.value = false; return }
@@ -504,7 +512,7 @@ onUnmounted(() => {
               <i class="bi ld__chevron" :class="historialExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </button>
             <div v-show="historialExpanded" class="ld__section-body ld__section-body--flush">
-              <LoteHistorialSection :eventos="eventos" :loading-eventos="loadingEventos" :can-admin="esAdmin" @delete="onDeleteEvento" />
+              <LoteHistorialSection :eventos="eventos" :loading-eventos="loadingEventos" :can-admin="esAdmin" @delete="onDeleteEvento" @crear="onCrearEvento" />
             </div>
           </div>
 
@@ -943,14 +951,6 @@ onUnmounted(() => {
         </div>
       </div>
     </Teleport>
-
-    <!-- ══ Modal Trasplante de Lote ══ -->
-    <LoteTrasplanteModal
-      v-model="showTrasplanteLote"
-      :lote="lote"
-      :plants="plantList"
-      @saved="lotes.fetchOne(id)"
-    />
 
     <!-- ══ Modal Cosecha Parcial ══ -->
     <ModalCosechaPartial

@@ -139,6 +139,15 @@ class TareasController < ApplicationController
 
     @tarea.completar!(horas_reales: horas, notas: notas)
 
+    # Tarea de trasplante con maceta cargada → registra el trasplante en el lote
+    # (PlantActivity + actualiza la maceta), igual que el botón "Registrar trasplante".
+    if @tarea.tipo == 'transplante' && @tarea.lote_id && params[:maceta_destino_l].present?
+      Lotes::RegistrarTrasplante.call(
+        lote: @tarea.lote, usuario: current_user,
+        destino: params[:maceta_destino_l], origen: params[:maceta_origen_l],
+        fecha: @tarea.fecha_completada&.to_date || Date.current)
+    end
+
     render json: {
       tarea: serialize_tarea(@tarea),
       tiene_horas_para_lote: @tarea.tiene_horas_para_lote?

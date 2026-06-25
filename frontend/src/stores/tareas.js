@@ -90,8 +90,8 @@ export const useTareasStore = defineStore('tareas', () => {
     return actualizada
   }
 
-  async function completar(id, horas_reales, notas_completado = '') {
-    const res  = await completarTarea(id, { horas_reales, notas_completado })
+  async function completar(id, horas_reales, notas_completado = '', extra = {}) {
+    const res  = await completarTarea(id, { horas_reales, notas_completado, ...extra })
     const { tarea: actualizada, tiene_horas_para_lote } = res.data
     _reemplazarEnDashboard(id, actualizada)
     // Actualizar stats
