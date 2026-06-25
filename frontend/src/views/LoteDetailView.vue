@@ -521,8 +521,8 @@ onUnmounted(() => {
             </button>
             <div v-show="historialExpanded" class="ld__section-body ld__section-body--flush">
               <LoteHistorialSection
-                :historial="historial" :loading-historial="loadingHistorial" :can-admin="esAdmin"
-                @crear="onCrearEvento" @trasplante="onTrasplante" @ver="verHistorialOpen = true" />
+                :historial="historial" :loading-historial="loadingHistorial"
+                @ver="verHistorialOpen = true" />
             </div>
           </div>
 
@@ -674,11 +674,13 @@ onUnmounted(() => {
       @saved="onLoteEditado"
     />
 
-    <!-- ══ Modal Historial completo (ver + filtrar + editar) ══ -->
+    <!-- ══ Modal Historial completo (registrar + ver + filtrar + editar) ══ -->
     <LoteHistorialModal
       v-model="verHistorialOpen"
       :historial="historial"
       :can-admin="esAdmin"
+      @crear="onCrearEvento"
+      @trasplante="onTrasplante"
       @editar="onEditarEvento"
       @delete="onDeleteEvento"
     />

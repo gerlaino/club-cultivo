@@ -4,13 +4,20 @@
       <div class="lhm__modal">
         <div class="lhm__head">
           <h3>📜 Historial del lote</h3>
-          <div class="lhm__head-actions">
-            <button v-if="canAdmin" class="lhm__edit-toggle" :class="{ 'lhm__edit-toggle--on': editMode }" @click="editMode = !editMode">
-              <i class="bi" :class="editMode ? 'bi-check2' : 'bi-pencil'"></i>
-              {{ editMode ? 'Listo' : 'Editar' }}
-            </button>
-            <button class="lhm__close" @click="cerrar"><i class="bi bi-x-lg"></i></button>
-          </div>
+          <button class="lhm__close" @click="cerrar"><i class="bi bi-x-lg"></i></button>
+        </div>
+
+        <!-- Registrar actividad -->
+        <div v-if="canAdmin" class="lhm__registrar">
+          <button v-if="!formAbierto" class="lhm__add-btn" @click="formAbierto = true">
+            <i class="bi bi-plus-circle me-1"></i>Registrar actividad
+          </button>
+          <RegistrarActividadForm
+            v-else
+            @crear="(p) => { $emit('crear', p); formAbierto = false }"
+            @trasplante="(p) => { $emit('trasplante', p); formAbierto = false }"
+            @cancelar="formAbierto = false"
+          />
         </div>
 
         <!-- Filtros -->
@@ -57,7 +64,7 @@
                   <span class="lhm__row-titulo">{{ it.emoji }} {{ it.titulo }}<span v-if="metaDetalle(it)" class="lhm__row-detalle"> · {{ metaDetalle(it) }}</span></span>
                   <div class="lhm__row-right">
                     <span class="lhm__row-fecha">{{ formatDateTime(it.fecha) }}</span>
-                    <template v-if="editMode">
+                    <template v-if="canAdmin">
                       <button v-if="it.editable" class="lhm__icon lhm__icon--edit" title="Editar" @click="empezarEdicion(it)"><i class="bi bi-pencil"></i></button>
                       <button v-if="it.deletable" class="lhm__icon lhm__icon--del" title="Borrar" @click="$emit('delete', it)"><i class="bi bi-trash"></i></button>
                     </template>
@@ -82,15 +89,16 @@
 import { ref, computed, watch } from 'vue'
 import { formatDateTime } from '../../lib/loteHelpers.js'
 import { KINDS, dotColor, metaDetalle } from '../../lib/historialHelpers.js'
+import RegistrarActividadForm from './RegistrarActividadForm.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   historial:  { type: Array,   default: () => [] },
   canAdmin:   { type: Boolean, default: false },
 })
-const emit = defineEmits(['update:modelValue', 'editar', 'delete'])
+const emit = defineEmits(['update:modelValue', 'editar', 'delete', 'crear', 'trasplante'])
 
-const editMode   = ref(false)
+const formAbierto = ref(false)
 const busqueda   = ref('')
 const filtroKind = ref('')
 const desde      = ref('')
@@ -149,8 +157,8 @@ function guardarEdicion(it) {
   editandoId.value = null
 }
 
-function cerrar() { editMode.value = false; editandoId.value = null; emit('update:modelValue', false) }
-watch(() => props.modelValue, (open) => { if (!open) { editMode.value = false; editandoId.value = null } })
+function cerrar() { editandoId.value = null; formAbierto.value = false; emit('update:modelValue', false) }
+watch(() => props.modelValue, (open) => { if (!open) { editandoId.value = null; formAbierto.value = false } })
 </script>
 
 <style scoped>
@@ -158,10 +166,11 @@ watch(() => props.modelValue, (open) => { if (!open) { editMode.value = false; e
 .lhm__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 680px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
 .lhm__head { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
 .lhm__head h3 { margin: 0; font-size: 1rem; font-weight: 800; color: #0f172a; }
-.lhm__head-actions { display: flex; align-items: center; gap: .5rem; }
-.lhm__edit-toggle { background: #fff; border: 1.5px solid #cbd5e1; color: #334155; border-radius: 8px; padding: .35rem .75rem; font-size: .8rem; font-weight: 700; cursor: pointer; }
-.lhm__edit-toggle--on { background: #1b5e20; border-color: #1b5e20; color: #fff; }
 .lhm__close { background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 1rem; }
+
+.lhm__registrar { padding: .75rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
+.lhm__add-btn { width: 100%; background: #f0fdf4; border: 1px dashed #86c98a; color: #15803d; border-radius: 8px; padding: .55rem .85rem; font-size: .82rem; font-weight: 700; cursor: pointer; transition: all .15s; }
+.lhm__add-btn:hover { background: #dcfce7; border-style: solid; }
 
 .lhm__filtros { display: flex; gap: .5rem; flex-wrap: wrap; padding: .75rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
 .lhm__buscar { flex: 1 1 220px; min-width: 0; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; outline: none; }
