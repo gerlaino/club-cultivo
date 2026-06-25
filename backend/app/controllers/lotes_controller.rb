@@ -108,6 +108,14 @@ class LotesController < ApplicationController
     # Legacy: planta_madre_id (single) = la primera del array de madres, para compatibilidad.
     @lote.planta_madre_id ||= @lote.planta_madre_ids&.first
 
+    # Herencia: si la genética define días objetivo por fase, el lote los toma como default
+    # (se pueden sobrescribir desde el form). Floración = tiempo_floracion (ya en días).
+    if @lote.genetica
+      @lote.dias_vegetativo_objetivo ||= @lote.genetica.dias_vegetativo_objetivo
+      @lote.dias_floracion_objetivo  ||= @lote.genetica.tiempo_floracion
+      @lote.dias_cosecha_objetivo    ||= @lote.genetica.dias_cosecha_objetivo
+    end
+
     # Estados creables: ciclo previo a stock + cosechado. secado/curado/finalizado
     # y los de manicura son post-stock o de proceso y no se cargan a mano.
     estados_no_creables = %w[secado curado en_manicura manicura_pendiente finalizado]
@@ -880,7 +888,7 @@ class LotesController < ApplicationController
   def lote_params
     params.require(:lote).permit(
       :start_date, :estado, :origen, :planta_madre_id, :plants_count, :strain, :notes,
-      :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta,
+      :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
       :rendimiento_real_g, :plants_count_cosechadas,
       :fotoperiodo, :fotoperiodo_vegetativo,
@@ -893,7 +901,7 @@ class LotesController < ApplicationController
   def lote_update_params
     params.require(:lote).permit(
       :estado, :start_date, :origen, :planta_madre_id, :plants_count, :strain, :notes,
-      :grow_type, :light_type, :genetica_id, :semanas_floracion, :tamanio_maceta,
+      :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
       :rendimiento_real_g, :plants_count_cosechadas,
       :fotoperiodo, :fotoperiodo_vegetativo,

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_25_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_25_000004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -502,6 +502,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_25_000002) do
     t.string "numero_registro_inase"
     t.date "fecha_registro_inase"
     t.string "categoria_inase"
+    t.integer "dias_vegetativo_objetivo"
+    t.integer "dias_cosecha_objetivo"
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
     t.index ["club_id", "slug"], name: "index_geneticas_on_club_id_and_slug", unique: true
@@ -653,6 +655,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_25_000002) do
     t.string "codigo_qr_cosecha"
     t.string "codigo_qr"
     t.integer "planta_madre_ids", default: [], null: false, array: true
+    t.integer "dias_vegetativo_objetivo"
+    t.integer "dias_floracion_objetivo"
+    t.integer "dias_cosecha_objetivo"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"

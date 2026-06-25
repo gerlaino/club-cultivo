@@ -33,8 +33,9 @@ export function useLoteEditar(loteId) {
       genetica_id:       l.genetica?.id      || '',
       grow_type:         l.grow_type         || '',
       light_type:        l.light_type        || '',
-      tiene_semanas:     !!l.semanas_floracion,
-      semanas_floracion: l.semanas_floracion ?? '',
+      dias_vegetativo_objetivo: l.dias_vegetativo_objetivo ?? '',
+      dias_floracion_objetivo:  l.dias_floracion_objetivo  ?? '',
+      dias_cosecha_objetivo:    l.dias_cosecha_objetivo    ?? '',
       // El backend serializa decimal(4,1) como "5.0"; el <select> usa "5". Normalizar para que matchee.
       tamanio_maceta:    l.tamanio_maceta != null && l.tamanio_maceta !== '' ? String(parseFloat(l.tamanio_maceta)) : '',
       notes:             l.notes             || '',
@@ -48,10 +49,12 @@ export function useLoteEditar(loteId) {
     editLoteError.value  = null
     try {
       // Las fechas de fase NO son columnas del lote: van aparte y el backend reconcilia los eventos.
-      const { tiene_semanas, codigo, fecha_vegetativo, fecha_floracion, fecha_cosecha, ...rest } = editLoteForm.value
+      const { codigo, fecha_vegetativo, fecha_floracion, fecha_cosecha, ...rest } = editLoteForm.value
       const payload = {
         ...rest,
-        semanas_floracion: tiene_semanas ? (Number(rest.semanas_floracion) || null) : null,
+        dias_vegetativo_objetivo: Number(rest.dias_vegetativo_objetivo) || null,
+        dias_floracion_objetivo:  Number(rest.dias_floracion_objetivo)  || null,
+        dias_cosecha_objetivo:    Number(rest.dias_cosecha_objetivo)    || null,
         tamanio_maceta:    rest.tamanio_maceta || null,
       }
       if (!payload.genetica_id) delete payload.genetica_id

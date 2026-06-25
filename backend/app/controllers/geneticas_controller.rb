@@ -44,9 +44,10 @@ class GeneticasController < ApplicationController
 
   # PATCH /geneticas/:id
   def update
-    # Campos protegidos para genéticas INASE
+    # Campos protegidos para genéticas INASE (vienen con info previa, incl. los días por fase)
     permitted = if @genetica.registrada_inase?
-                  genetica_params.except(:nombre, :tipo, :thc, :cbd, :criador, :registrada_inase)
+                  genetica_params.except(:nombre, :tipo, :thc, :cbd, :criador, :registrada_inase,
+                                         :tiempo_floracion, :dias_vegetativo_objetivo, :dias_cosecha_objetivo)
                 else
                   genetica_params
                 end
@@ -111,7 +112,7 @@ class GeneticasController < ApplicationController
   def genetica_params
     params.require(:genetica).permit(
       :nombre, :tipo, :thc, :cbd, :descripcion,
-      :origen, :tiempo_floracion, :rendimiento,
+      :origen, :tiempo_floracion, :dias_vegetativo_objetivo, :dias_cosecha_objetivo, :rendimiento,
       :altura, :dificultad, :activa, :disponible,
       :registrada_inase, :numero_registro_inase, :fecha_registro_inase, :categoria_inase,
       :criador, :terpenos, :visible_web
@@ -225,6 +226,8 @@ class GeneticasController < ApplicationController
       descripcion:            genetica.descripcion,
       origen:                 genetica.origen,
       tiempo_floracion:       genetica.tiempo_floracion,
+      dias_vegetativo_objetivo: genetica.dias_vegetativo_objetivo,
+      dias_cosecha_objetivo:    genetica.dias_cosecha_objetivo,
       rendimiento:            genetica.rendimiento,
       altura:                 genetica.altura,
       dificultad:             genetica.dificultad,

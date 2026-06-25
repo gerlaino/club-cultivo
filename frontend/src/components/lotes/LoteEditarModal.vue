@@ -92,10 +92,19 @@
             </div>
 
             <div class="lem__field">
-              <label class="lem__label">Semanas de floración <span class="lem__opt">estimadas</span></label>
-              <input type="number" min="1" max="24" step="1" class="lem__input"
-                     v-model.number="editLoteForm.semanas_floracion"
-                     placeholder="Ej: 9" @input="editLoteForm.tiene_semanas = true" />
+              <label class="lem__label">Días de vegetativo <span class="lem__opt">objetivo</span></label>
+              <input type="number" min="1" max="365" step="1" class="lem__input"
+                     v-model.number="editLoteForm.dias_vegetativo_objetivo" placeholder="Ej: 30" />
+            </div>
+            <div class="lem__field">
+              <label class="lem__label">Días de floración <span class="lem__opt">objetivo</span></label>
+              <input type="number" min="1" max="365" step="1" class="lem__input"
+                     v-model.number="editLoteForm.dias_floracion_objetivo" placeholder="Ej: 63" />
+            </div>
+            <div class="lem__field">
+              <label class="lem__label">Días de cosecha <span class="lem__opt">objetivo</span></label>
+              <input type="number" min="1" max="365" step="1" class="lem__input"
+                     v-model.number="editLoteForm.dias_cosecha_objetivo" placeholder="Ej: 14" />
             </div>
 
             <div class="lem__field lem__field--full">
@@ -180,8 +189,6 @@ watch(() => props.open, async (v) => {
 })
 
 async function doSave() {
-  // semanas_floracion: si quedó vacío, no definimos semanas.
-  editLoteForm.value.tiene_semanas = !!(Number(editLoteForm.value.semanas_floracion) > 0)
   await saveEditLote()
   if (!editLoteError.value) { emit('update:open', false); emit('saved') }
 }

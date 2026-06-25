@@ -140,9 +140,10 @@ class AlertaDetectorService
   end
 
   def detectar_cosecha_pendiente(lote)
-    return unless lote.estado == 'floracion' && lote.start_date.present? && lote.semanas_floracion.present?
+    dias_obj = lote.dias_floracion_objetivo || (lote.semanas_floracion && lote.semanas_floracion * 7)
+    return unless lote.estado == 'floracion' && lote.start_date.present? && dias_obj.present?
 
-    fecha_est    = lote.start_date + lote.semanas_floracion.weeks
+    fecha_est    = lote.start_date + dias_obj.days
     dias_pasados = (Date.current - fecha_est).to_i
     umbral_cosecha = (@club.alertas_config&.dig('cosecha_pendiente_umbral_dias') || 0).to_i
     return unless dias_pasados > umbral_cosecha
@@ -152,8 +153,8 @@ class AlertaDetectorService
       tipo:      'cosecha_pendiente',
       lote:      lote,
       severidad: sev,
-      mensaje:   "#{lote.codigo} completó sus #{lote.semanas_floracion} semanas estimadas de floración hace #{dias_pasados} días.",
-      contexto:  { dias_pasados: dias_pasados, semanas_floracion: lote.semanas_floracion }
+      mensaje:   "#{lote.codigo} completó sus #{dias_obj} días estimados de floración hace #{dias_pasados} días.",
+      contexto:  { dias_pasados: dias_pasados, dias_floracion_objetivo: dias_obj }
     )
   end
 

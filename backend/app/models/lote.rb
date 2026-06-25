@@ -42,7 +42,9 @@ class Lote < ApplicationRecord
   validates :grow_type,         inclusion: { in: TIPOS_CULTIVO }, allow_blank: true
   validates :light_type,        inclusion: { in: TIPOS_LUZ },     allow_blank: true
   validates :tamanio_maceta,    numericality: { greater_than: 0 }, allow_nil: true
-  validates :semanas_floracion, numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
+  validates :semanas_floracion, numericality: { only_integer: true, greater_than: 0 }, allow_nil: true # deprecado
+  validates :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo,
+            numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
   validates :start_date,        presence: true
 
   before_create :generar_codigo

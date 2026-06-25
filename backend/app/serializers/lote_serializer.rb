@@ -58,7 +58,10 @@ class LoteSerializer
       notes:              lote.notes,
       grow_type:                 lote.grow_type,
       light_type:                lote.light_type,
-      semanas_floracion:         lote.semanas_floracion,
+      semanas_floracion:         lote.semanas_floracion, # deprecado
+      dias_vegetativo_objetivo:  lote.dias_vegetativo_objetivo,
+      dias_floracion_objetivo:   lote.dias_floracion_objetivo,
+      dias_cosecha_objetivo:     lote.dias_cosecha_objetivo,
       tamanio_maceta:            lote.tamanio_maceta,
       tamanio_maceta_inicial:    lote.tamanio_maceta_inicial,
       fecha_trasplante:          lote.fecha_trasplante,

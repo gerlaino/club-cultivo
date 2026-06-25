@@ -389,7 +389,7 @@ class AsistenteController < BaseController
     ctx += "Cepa: #{cepa} | Estadío: #{lote.estado} | Sala: #{lote.sala&.nombre || '—'}\n"
     ctx += "Plantas: #{lote.plants_count || 0}"
     ctx += " | Semana #{semanas_desde(lote.start_date)} desde inicio" if lote.start_date
-    ctx += " | Floración estimada: #{lote.semanas_floracion} semanas" if lote.semanas_floracion
+    ctx += " | Floración estimada: #{lote.dias_floracion_objetivo} días" if lote.dias_floracion_objetivo
     ctx += "\n"
     ctx += "Maceta: #{lote.tamanio_maceta}L" if lote.tamanio_maceta
     ctx += " | Sustrato: #{lote.sustrato_especifico}" if lote.sustrato_especifico.present?

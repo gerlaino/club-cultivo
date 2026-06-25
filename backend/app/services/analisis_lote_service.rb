@@ -38,7 +38,7 @@ class AnalisisLoteService
 
     ctx  = "LOTE: #{@lote.codigo} | Cepa: #{cepa} | Estado: #{@lote.estado}\n"
     ctx += "Semana #{semanas_desde(@lote.start_date)} desde inicio del lote\n" if @lote.start_date
-    ctx += "Floración estimada: #{@lote.semanas_floracion} semanas\n"           if @lote.semanas_floracion
+    ctx += "Floración estimada: #{@lote.dias_floracion_objetivo} días\n"         if @lote.dias_floracion_objetivo
     ctx += "Maceta: #{@lote.tamanio_maceta}L"                                   if @lote.tamanio_maceta
     ctx += " | Sustrato: #{@lote.sustrato_especifico}"                          if @lote.sustrato_especifico.present?
     ctx += " | Fotoperiodo: #{@lote.fotoperiodo}"                               if @lote.fotoperiodo.present?

@@ -34,7 +34,7 @@ const form = ref({
   // Fotoperiodos
   fotoperiodo_vegetativo: '',
   fotoperiodo: '',           // floración
-  semanas_floracion: null,
+  dias_floracion_objetivo: null,
   // Macetas
   tamanio_maceta_inicial: '',
   tamanio_maceta: '',        // final
@@ -169,7 +169,7 @@ async function crear() {
     if (hayTrasplante.value && form.value.fecha_trasplante) lotePayload.fecha_trasplante = form.value.fecha_trasplante
     if (form.value.fotoperiodo)            lotePayload.fotoperiodo            = form.value.fotoperiodo
     if (form.value.fotoperiodo_vegetativo) lotePayload.fotoperiodo_vegetativo = form.value.fotoperiodo_vegetativo
-    if (form.value.semanas_floracion)      lotePayload.semanas_floracion      = form.value.semanas_floracion
+    if (form.value.dias_floracion_objetivo) lotePayload.dias_floracion_objetivo = form.value.dias_floracion_objetivo
     if (form.value.sustrato_especifico)    lotePayload.sustrato_especifico    = form.value.sustrato_especifico
     if (form.value.sistema_hidro)          lotePayload.sistema_hidro          = form.value.sistema_hidro
     if (form.value.ph_riego)               lotePayload.ph_riego               = form.value.ph_riego
@@ -495,8 +495,8 @@ async function crear() {
                 </div>
 
                 <div class="clc__field">
-                  <label class="clc__label">Semanas en floración <span class="clc__label-opt">(opc.)</span></label>
-                  <input type="number" min="1" max="30" step="1" class="clc__input" placeholder="Ej: 9" v-model.number="form.semanas_floracion" />
+                  <label class="clc__label">Días de floración <span class="clc__label-opt">objetivo (opc.)</span></label>
+                  <input type="number" min="1" max="365" step="1" class="clc__input" placeholder="Ej: 63" v-model.number="form.dias_floracion_objetivo" />
                 </div>
 
               </div>

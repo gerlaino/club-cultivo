@@ -110,7 +110,8 @@ function emptyForm() {
   return {
     nombre: '', tipo: '', thc: null, cbd: null,
     descripcion: '', origen: '', criador: '', terpenos: '',
-    tiempo_floracion: null, rendimiento: null, altura: null,
+    tiempo_floracion: null, dias_vegetativo_objetivo: null, dias_cosecha_objetivo: null,
+    rendimiento: null, altura: null,
     dificultad: '', disponible: true,
   }
 }
@@ -164,6 +165,8 @@ function openEdit(gen) {
     criador:          gen.criador          || '',
     terpenos:         gen.terpenos         || '',
     tiempo_floracion: gen.tiempo_floracion ?? null,
+    dias_vegetativo_objetivo: gen.dias_vegetativo_objetivo ?? null,
+    dias_cosecha_objetivo:    gen.dias_cosecha_objetivo    ?? null,
     rendimiento:      gen.rendimiento      ?? null,
     altura:           gen.altura           ?? null,
     dificultad:       gen.dificultad       || '',
@@ -596,10 +599,18 @@ onMounted(loadGeneticas)
                 <div v-if="formErrors.cbd" class="gv-form__field-error">{{ formErrors.cbd }}</div>
               </div>
 
-              <!-- Floración / Rendimiento / Altura -->
+              <!-- Días objetivo por fase / Rendimiento / Altura -->
+              <div class="gv-form__field">
+                <label class="gv-form__label">Vegetativo (días)</label>
+                <input v-model.number="form.dias_vegetativo_objetivo" type="number" min="1" class="gv-form__input" placeholder="30" :disabled="editingInase" />
+              </div>
               <div class="gv-form__field">
                 <label class="gv-form__label">Floración (días)</label>
-                <input v-model.number="form.tiempo_floracion" type="number" min="1" class="gv-form__input" placeholder="60" />
+                <input v-model.number="form.tiempo_floracion" type="number" min="1" class="gv-form__input" placeholder="60" :disabled="editingInase" />
+              </div>
+              <div class="gv-form__field">
+                <label class="gv-form__label">Cosecha (días)</label>
+                <input v-model.number="form.dias_cosecha_objetivo" type="number" min="1" class="gv-form__input" placeholder="14" :disabled="editingInase" />
               </div>
               <div class="gv-form__field">
                 <label class="gv-form__label">Rendimiento (g)</label>
