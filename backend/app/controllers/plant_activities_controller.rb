@@ -10,8 +10,11 @@ class PlantActivitiesController < ApplicationController
                        .limit(50)
     # Eventos heredados del lote: la planta vivió las fases y las actividades del lote,
     # así que su historial los refleja igual que el del lote (no solo las notas).
+    # Excluimos el trasplante a nivel lote: cada planta ya tiene su propio PlantActivity
+    # de trasplante (si no, se vería duplicado).
     eventos    = @plant.lote.lote_eventos
                        .where(tipo: %w[cambio_estado actividad nota alerta])
+                       .where.not("tipo = 'actividad' AND categoria = 'trasplante'")
                        .order(registrado_en: :desc)
                        .limit(60)
 
