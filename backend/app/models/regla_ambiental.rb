@@ -2,6 +2,7 @@ class ReglaAmbiental < ApplicationRecord
   self.table_name = 'reglas_ambientales'
 
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :sala, optional: true
   has_many   :alertas, foreign_key: :regla_id, dependent: :destroy
 

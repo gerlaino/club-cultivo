@@ -3,6 +3,7 @@ class AriccameRegistro < ApplicationRecord
   ESTADOS = %w[pendiente enviado confirmado error omitido].freeze
 
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :stock,        optional: true
   belongs_to :dispensacion, optional: true
 

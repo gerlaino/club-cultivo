@@ -2,6 +2,7 @@ class Noticia < ApplicationRecord
   self.table_name = 'noticias'
 
   belongs_to :club
+  acts_as_tenant(:club)
 
   # Active Storage para cover image
   has_one_attached :cover_image

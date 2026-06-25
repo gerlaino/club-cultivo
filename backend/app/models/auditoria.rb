@@ -7,6 +7,7 @@ class Auditoria < ApplicationRecord
   # auditable_type/id quedan guardados igual como referencia histórica.
   belongs_to :auditable, polymorphic: true, optional: true
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :user, optional: true
 
   ACCIONES = %w[crear actualizar eliminar].freeze

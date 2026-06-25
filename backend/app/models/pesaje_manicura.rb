@@ -6,6 +6,7 @@ class PesajeManicura < ApplicationRecord
   belongs_to :lote
   belongs_to :manicurador,    class_name: 'User'
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :stock,           optional: true
   belongs_to :confirmado_por,  class_name: 'User', optional: true, foreign_key: :confirmado_por_id
   # class_name explícito: el nombre de la asociación inferiría 'PesadasPlanta' (con 's'),

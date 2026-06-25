@@ -1,6 +1,7 @@
 class Paciente < ApplicationRecord
   acts_as_paranoid
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :created_by, class_name: "User"
   belongs_to :updated_by, class_name: "User", optional: true
   belongs_to :deleted_by, class_name: "User", optional: true
@@ -17,6 +18,27 @@ class Paciente < ApplicationRecord
   has_many :turnos, dependent: :destroy
 
   has_one_attached :reprocann_documento
+
+  # ==> Cifrado at-rest de datos sensibles (Ley 25.326 art. 9 / Res. AAIP 47/2018).
+  # Determinístico donde hace falta igualdad/uniqueness/búsqueda exacta; no-determinístico
+  # (más seguro) en el resto. nombre/apellido y domicilio_* quedan en claro a propósito:
+  # se usan en búsquedas LIKE / lógica de envíos (ver ENC-01b en SECURITY_AUDIT.md).
+  encrypts :dni,              deterministic: true
+  encrypts :dni_normalizado, deterministic: true
+  encrypts :reprocann_numero, deterministic: true
+  encrypts :email
+  encrypts :telefono
+  encrypts :notas_clinicas
+  encrypts :motivo_consulta
+  encrypts :anamnesis
+  encrypts :antecedentes_personales
+  encrypts :antecedentes_familiares
+  encrypts :diagnostico_principal
+  encrypts :diagnostico_secundario
+  encrypts :evolucion_clinica
+  encrypts :alergias
+  encrypts :medicacion_habitual
+  encrypts :grupo_sanguineo
 
   before_validation :normalize_dni!
   before_create     :assign_carnet_token

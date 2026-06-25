@@ -1,6 +1,7 @@
 class CuentaCorriente < ApplicationRecord
   belongs_to :paciente
   belongs_to :club
+  acts_as_tenant(:club)
 
   has_many :movimientos, class_name: 'CuentaCorrienteMovimiento', dependent: :destroy
 

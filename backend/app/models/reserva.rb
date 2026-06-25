@@ -9,6 +9,7 @@ class Reserva < ApplicationRecord
   DIAS_VENCIMIENTO = 7 # días posteriores a la fecha de entrega estimada sin retirar → vencida
 
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :paciente
   # optional: si se borra el stock, la reserva puede quedar huérfana y aún así
   # poder cancelarse/eliminarse sin romper por la FK requerida.

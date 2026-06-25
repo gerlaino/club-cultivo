@@ -5,6 +5,7 @@ class MovimientoContable < ApplicationRecord
   self.table_name = "movimientos_contables"
 
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :sede
   belongs_to :lote,         optional: true
   belongs_to :dispensacion, optional: true

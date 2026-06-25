@@ -1,6 +1,7 @@
 class DisponibilidadMedico < ApplicationRecord
   belongs_to :medico, class_name: 'User'
   belongs_to :club
+  acts_as_tenant(:club)
 
   DIAS = %w[lunes martes miercoles jueves viernes sabado domingo].freeze
 

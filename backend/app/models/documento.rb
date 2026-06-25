@@ -1,5 +1,6 @@
 class Documento < ApplicationRecord
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :user
   belongs_to :subido_por, class_name: 'User', foreign_key: :subido_por_id, optional: true
   belongs_to :paciente, optional: true

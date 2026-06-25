@@ -2,6 +2,7 @@
 class SedeInventario < ApplicationRecord
   belongs_to :sede
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :created_by, class_name: 'User'
   belongs_to :lote,     optional: true
   belongs_to :genetica, optional: true

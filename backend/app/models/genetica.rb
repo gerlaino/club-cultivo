@@ -1,5 +1,8 @@
 class Genetica < ApplicationRecord
-  belongs_to :club, optional: true
+  # has_global_records: las genéticas globales (club_id nil) son un catálogo compartido
+  # visible para todos los clubes, además de las genéticas propias de cada club.
+  # optional: true → club_id nil es válido (genéticas globales no pertenecen a un club).
+  acts_as_tenant(:club, has_global_records: true, optional: true)
   has_many :lotes, dependent: :nullify
   has_many_attached :fotos
 

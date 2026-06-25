@@ -21,14 +21,15 @@ class PacientesController < ApplicationController
       scope = scope.where(con_seguimiento_medico: false)
     end
 
+    # dni_normalizado va cifrado at-rest (determinístico) → no admite LIKE parcial,
+    # sólo igualdad exacta. La búsqueda por nombre/apellido sigue siendo LIKE.
     if query.present?
-      q = query.downcase
-      scope = scope.where(
-        "lower(nombre) LIKE :q OR lower(apellido) LIKE :q OR dni_normalizado LIKE :dni",
-        q: "%#{q}%", dni: "%#{dni}%"
-      )
+      q = "%#{query.downcase}%"
+      by_name  = scope.where("lower(nombre) LIKE :q OR lower(apellido) LIKE :q", q: q)
+      dni_term = dni.presence || query.gsub(/\D/, "")
+      scope = dni_term.present? ? by_name.or(scope.where(dni_normalizado: dni_term)) : by_name
     elsif dni.present?
-      scope = scope.where("dni_normalizado LIKE ?", "%#{dni}%")
+      scope = scope.where(dni_normalizado: dni)
     end
 
     total    = scope.count
@@ -244,8 +245,10 @@ class PacientesController < ApplicationController
     end
 
     if params[:query].present?
-      q = params[:query].downcase
-      scope = scope.where("lower(nombre) LIKE :q OR lower(apellido) LIKE :q OR dni_normalizado LIKE :q", q: "%#{q}%")
+      q = "%#{params[:query].downcase}%"
+      by_name  = scope.where("lower(nombre) LIKE :q OR lower(apellido) LIKE :q", q: q)
+      dni_term = params[:query].gsub(/\D/, "")
+      scope = dni_term.present? ? by_name.or(scope.where(dni_normalizado: dni_term)) : by_name
     end
 
     scope = scope.order(apellido: :asc, nombre: :asc)

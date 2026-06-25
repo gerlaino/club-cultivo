@@ -3,6 +3,7 @@ class AplicacionPlan < ApplicationRecord
 
   belongs_to :plan_trabajo
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :aplicado_por, class_name: 'User'
   has_many   :tareas, foreign_key: :aplicacion_plan_id, dependent: :nullify
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_24_000003) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_25_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -786,7 +786,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_24_000003) do
     t.text "evolucion_clinica"
     t.text "alergias"
     t.text "medicacion_habitual"
-    t.string "grupo_sanguineo", limit: 5
+    t.text "grupo_sanguineo"
     t.decimal "descuento_porcentaje", precision: 5, scale: 2, default: "0.0", null: false
     t.string "domicilio_calle"
     t.string "domicilio_altura"

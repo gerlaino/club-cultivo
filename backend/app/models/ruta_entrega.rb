@@ -2,6 +2,7 @@ class RutaEntrega < ApplicationRecord
   self.table_name = 'rutas_entrega'
 
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :delivery, class_name: 'User'
   has_many   :dispensaciones, class_name: 'Dispensacion', dependent: :nullify
 

@@ -2,6 +2,7 @@ class AnalisisIa < ApplicationRecord
   self.table_name = 'analisis_ia'
 
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :lote, optional: true
   belongs_to :user
 

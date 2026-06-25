@@ -73,6 +73,8 @@ GEM
       minitest (>= 5.1)
       securerandom (>= 0.3)
       tzinfo (~> 2.0, >= 2.0.5)
+    acts_as_tenant (1.0.1)
+      rails (>= 6.0)
     addressable (2.8.9)
       public_suffix (>= 2.0.2, < 8.0)
     afm (1.0.0)
@@ -411,6 +413,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  acts_as_tenant (~> 1.0)
   aws-sdk-s3 (~> 1.0)
   bootsnap
   brakeman

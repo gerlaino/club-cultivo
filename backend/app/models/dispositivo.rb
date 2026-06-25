@@ -1,5 +1,6 @@
 class Dispositivo < ApplicationRecord
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :sala
   has_many   :lecturas_ambientales, dependent: :nullify
 

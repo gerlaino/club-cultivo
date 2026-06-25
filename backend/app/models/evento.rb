@@ -1,5 +1,6 @@
 class Evento < ApplicationRecord
   belongs_to :club
+  acts_as_tenant(:club)
 
   # Active Storage para imágenes
   has_many_attached :imagenes

@@ -64,6 +64,9 @@ gem 'devise-jwt'
 gem "pundit", "~> 2.5"
 gem "rack-cors", "~> 3.0", require: 'rack/cors'
 
+# Multi-tenancy: aislamiento por club a nivel modelo (defensa en profundidad).
+gem "acts_as_tenant", "~> 1.0"
+
 # Background jobs
 gem "sidekiq", "~> 7.0"
 gem "sidekiq-cron", "~> 1.9"

@@ -146,7 +146,7 @@ cd frontend && npm run dev                                 # Vite dev server
 - Lógica de negocio compleja → service objects en `app/services/` (convención aspiracional: hoy hay mucha lógica en controllers — al tocar un flujo, preferir extraer antes que engordar).
 - Serialización: hay pocos serializers dedicados; al tocar un payload, considerar extraerlo a `app/serializers/`.
 - Migraciones reversibles. Nunca modificar migraciones ya corridas.
-- **Multi-tenancy es manual**: todo query debe scoping por `current_user.club_id`. Es el punto más sensible del sistema — ante cualquier endpoint nuevo, verificar el scope dos veces.
+- **Multi-tenancy**: desde TEN-01 hay aislamiento a nivel modelo vía `acts_as_tenant(:club)` en los 42 modelos de dominio (tenant fijado en `ApplicationController` desde `current_user.club`; super_admin/público/webhooks sin tenant). Es **defensa en profundidad, no reemplazo**: `require_tenant=false`, así que el scoping manual por `current_user.club_id` sigue siendo la barrera primaria. Ante cualquier endpoint nuevo, seguir verificando el scope a mano. `users` queda fuera de acts_as_tenant (auth/super_admin). Ver `SECURITY_AUDIT.md`.
 - Autorización: hoy es vía `before_action :require_*` ad-hoc por controller. La matriz `Permissions::PERMISSIONS` y `can?` existen pero no se usan en backend (sí se espeja en `usePermissions.js` del frontend). No agregar un cuarto mecanismo.
 
 ### Vue

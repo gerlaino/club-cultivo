@@ -3,6 +3,7 @@ class JornadaLaboral < ApplicationRecord
 
   belongs_to :user
   belongs_to :club
+  acts_as_tenant(:club)
 
   validates :fecha,        presence: true
   validates :hora_entrada, :hora_salida, presence: true, format: { with: /\A\d{2}:\d{2}\z/, message: 'formato HH:MM' }

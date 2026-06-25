@@ -4,8 +4,11 @@ class ApplicationController < ActionController::API
 
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
 
+  set_current_tenant_through_filter
+
   before_action :inject_jwt_from_cookie
   before_action :set_current_user
+  before_action :set_tenant_from_current_user
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
 
@@ -46,6 +49,21 @@ class ApplicationController < ActionController::API
     unless current_user&.admin? || current_user&.super_admin?
       render json: { error: "No autorizado" }, status: :forbidden
     end
+  end
+
+  # Multi-tenancy (TEN-01): fija el tenant del request a partir del usuario logueado.
+  # - sin usuario (público / webhooks / login) → sin tenant (require_tenant=false → sin scope)
+  # - super_admin → sin tenant (opera cross-club a propósito)
+  # - resto → tenant = club del usuario → queries auto-scopeadas por club_id
+  def set_tenant_from_current_user
+    return unless respond_to?(:current_user, true)
+    user = current_user
+    return if user.nil? || user.super_admin?
+    set_current_tenant(user.club) if user.club_id
+  rescue StandardError
+    # No bloquear el request si la resolución de tenant falla; el scoping manual
+    # de los controllers sigue siendo la barrera primaria.
+    ActsAsTenant.current_tenant = nil
   end
 
   # Expone el usuario del request a la capa de modelos (concern Auditable)

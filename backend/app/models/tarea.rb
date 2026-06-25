@@ -1,6 +1,7 @@
 class Tarea < ApplicationRecord
   # ── Asociaciones ──────────────────────────────────────────────
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :asignada_a, class_name: 'User', optional: true
   belongs_to :creada_por, class_name: 'User'
   belongs_to :sala,  optional: true

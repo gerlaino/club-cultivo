@@ -47,5 +47,31 @@ module App
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+
+    # ==> Active Record Encryption (datos sensibles de salud + DNI cifrados at-rest)
+    # Ley 25.326 art. 9 / Res. AAIP 47/2018 (nivel reforzado para datos sensibles).
+    # Las claves viajan por ENV: credentials.yml.enc está gitignored (per-entorno),
+    # así que no sirve para propagar claves a prod. Mismo patrón que DEVISE_JWT_SECRET_KEY.
+    # Sin claves la app NO arranca — no hay fallback silencioso.
+    %w[
+      ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY
+      ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY
+      ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT
+    ].each do |var|
+      next if ENV[var].present?
+      raise "Falta #{var}: la app no arranca sin las claves de cifrado at-rest " \
+            "(datos sensibles de salud). No hay fallback. Definila en backend/.env (dev) " \
+            "o en las env vars del deploy (prod)."
+    end
+
+    config.active_record.encryption.primary_key         = ENV["ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY"]
+    config.active_record.encryption.deterministic_key   = ENV["ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY"]
+    config.active_record.encryption.key_derivation_salt = ENV["ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT"]
+
+    # Transición: leer filas viejas en texto plano y, para columnas determinísticas,
+    # buscar tanto por valor cifrado como sin cifrar hasta completar el backfill.
+    # Endurecer (support_unencrypted_data = false) una vez backfilleada la prod.
+    config.active_record.encryption.support_unencrypted_data = true
+    config.active_record.encryption.extend_queries           = true
   end
 end

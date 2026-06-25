@@ -4,6 +4,7 @@ class RegistroAmbiental < ApplicationRecord
   belongs_to :lote
   belongs_to :user
   belongs_to :club
+  acts_as_tenant(:club)
 
   has_one_attached :archivo_csv
 

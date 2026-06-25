@@ -1,6 +1,7 @@
 # backend/app/models/sala.rb
 class Sala < ApplicationRecord
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :sede, optional: true
   belongs_to :created_by,  class_name: "User", optional: true
   belongs_to :responsable, class_name: "User", optional: true

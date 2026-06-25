@@ -1,5 +1,6 @@
 class Sede < ApplicationRecord
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :created_by, class_name: 'User'
 
   has_many :salas,               dependent: :nullify

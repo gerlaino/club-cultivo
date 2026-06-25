@@ -1,5 +1,6 @@
 class PlanTrabajo < ApplicationRecord
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :creado_por, class_name: 'User'
   belongs_to :sede, optional: true
   has_many   :plan_tareas, dependent: :destroy

@@ -2,6 +2,7 @@ class ConversacionAsistente < ApplicationRecord
   self.table_name = 'conversaciones_asistente'
 
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :user
 
   MAX_TURNOS = 8

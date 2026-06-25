@@ -4,6 +4,7 @@ class Nota < ApplicationRecord
 
   belongs_to :noteable, polymorphic: true
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :user
 
   validates :contenido, presence: true

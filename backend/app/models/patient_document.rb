@@ -1,8 +1,14 @@
 class PatientDocument < ApplicationRecord
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :paciente
   belongs_to :template, class_name: 'DocumentTemplate', optional: true
   belongs_to :created_by, class_name: 'User'
+
+  # Cifrado at-rest: documento clínico + DNI de las firmas (Ley 25.326 art. 9 / Res. 47/2018).
+  encrypts :contenido_html
+  encrypts :firma_paciente_dni
+  encrypts :firma_medico_dni
 
   has_one_attached :archivo_pdf
 

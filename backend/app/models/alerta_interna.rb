@@ -2,6 +2,7 @@ class AlertaInterna < ApplicationRecord
   self.table_name = 'alertas_internas'
 
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :creada_por, class_name: 'User', optional: true
   belongs_to :lote, optional: true
 

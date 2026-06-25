@@ -2,6 +2,12 @@ class IndicacionMedica < ApplicationRecord
   belongs_to :paciente
   belongs_to :user # médico que emite
 
+  # Cifrado at-rest de la prescripción (datos de salud — Ley 25.326 art. 9 / Res. 47/2018).
+  encrypts :patologia
+  encrypts :dosificacion
+  encrypts :via_administracion
+  encrypts :observaciones
+
   VIAS_ADMINISTRACION = %w[
     oral
     sublingual

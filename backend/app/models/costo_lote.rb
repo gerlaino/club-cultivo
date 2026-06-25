@@ -2,6 +2,7 @@
 class CostoLote < ApplicationRecord
   belongs_to :lote
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :calculado_por, class_name: "User", optional: true
 
   validates :costo_total,       numericality: { greater_than_or_equal_to: 0 }

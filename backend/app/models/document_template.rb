@@ -1,6 +1,7 @@
 # backend/app/models/document_template.rb
 class DocumentTemplate < ApplicationRecord
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :created_by, class_name: 'User'
   has_many   :patient_documents, foreign_key: :template_id, dependent: :nullify
 

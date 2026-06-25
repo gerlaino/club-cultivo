@@ -4,6 +4,7 @@ class MailEnviado < ApplicationRecord
   belongs_to :paciente
   belongs_to :user
   belongs_to :club
+  acts_as_tenant(:club)
 
   TIPOS = %w[bienvenida reprocann disponibilidad personalizado].freeze
 

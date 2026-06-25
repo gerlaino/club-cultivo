@@ -1,13 +1,16 @@
 class Plant < ApplicationRecord
   belongs_to :lote
   belongs_to :club, optional: true
+  acts_as_tenant(:club)
   belongs_to :planta_madre, class_name: 'Plant', optional: true
 
   has_many   :esquejes, class_name: 'Plant', foreign_key: :planta_madre_id, dependent: :nullify
   has_many :activities, class_name: 'PlantActivity', dependent: :destroy
   has_many :observaciones, as: :noteable, dependent: :destroy
 
-  before_create :set_club_id
+  # set_club_id corre en before_validation (no before_create): acts_as_tenant exige
+  # el tenant en la validación, y el club_id de la planta se deriva del lote.
+  before_validation :set_club_id
   before_create :generate_codigo_qr
   has_one_attached  :foto
   has_many_attached :fotos

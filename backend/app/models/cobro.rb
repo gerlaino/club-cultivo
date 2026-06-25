@@ -10,6 +10,7 @@ class Cobro < ApplicationRecord
 
   belongs_to :dispensacion
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :created_by, class_name: 'User'
 
   # Comprobante de la transferencia (foto que sube el delivery/admin). Opcional.

@@ -2,6 +2,7 @@ class CheckIn < ApplicationRecord
   belongs_to :paciente
   belongs_to :dispensacion, optional: true
   belongs_to :club
+  acts_as_tenant(:club)
 
   VIAS = %w[dispensacion medico autoregistro].freeze
 

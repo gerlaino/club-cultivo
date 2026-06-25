@@ -2,6 +2,12 @@ class User < ApplicationRecord
   include Permissions
   belongs_to :club, optional: true
 
+  # Cifrado at-rest del DNI y teléfono del operador (Ley 25.326 art. 9).
+  # NO se cifra email: es el identificador de login de Devise (uniqueness + lookup
+  # en cada autenticación) — cifrarlo es alto riesgo y queda fuera del alcance ENC-01.
+  encrypts :dni
+  encrypts :phone
+
   has_one_attached :avatar
   has_many :sala_cultivadores, class_name: 'SalaCultivador', foreign_key: 'user_id', dependent: :destroy
   has_many :salas_asignadas,   through: :sala_cultivadores, source: :sala

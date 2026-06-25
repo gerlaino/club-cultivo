@@ -5,6 +5,7 @@ class ReprocannRenovacion < ApplicationRecord
 
   belongs_to :paciente
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :iniciada_por, class_name: 'User', optional: true
 
   validates :estado,       inclusion: { in: ESTADOS }

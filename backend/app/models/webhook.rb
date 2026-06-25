@@ -1,5 +1,6 @@
 class Webhook < ApplicationRecord
   belongs_to :club
+  acts_as_tenant(:club)
   belongs_to :created_by, class_name: 'User'
   has_many   :webhook_deliveries, dependent: :destroy
 
