@@ -32,10 +32,10 @@
           <div class="imm__field">
             <label class="imm__label">
               Responsable
-              <span class="imm__optional">opcional</span>
+              <span class="imm__optional">requerido</span>
             </label>
             <select v-model="form.responsable_id" class="imm__select" :disabled="loadingUsuarios">
-              <option :value="null">— Sin asignar (lote libre) —</option>
+              <option :value="null">— Elegí un responsable —</option>
               <option v-for="u in usuarios" :key="u.id" :value="u.id">
                 {{ u.nombre_completo || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email }}
                 ({{ roleLabel(u.role) }})
@@ -98,7 +98,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Scissors, X } from 'lucide-vue-next'
-import { listUsers, asignarManicurador, transicionarLote, createSala } from '../../lib/api.js'
+import { listUsers, asignarManicurador } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useToast } from '../../composables/useToast.js'
 
@@ -152,47 +152,19 @@ async function cargarUsuarios() {
   }
 }
 
-async function resolverSalaManicura() {
-  if (salaManiucuraExistente.value) return salaManiucuraExistente.value.id
-
-  const sedeId    = props.lote?.sala?.sede?.id || null
-  const sedeNombre = props.lote?.sala?.sede?.nombre || 'Sede'
-  const { data: nuevaSala } = await createSala({
-    nombre:  `Manicura · ${sedeNombre}`,
-    kind:    'manicura',
-    sede_id: sedeId,
-  })
-  emit('sala-creada', nuevaSala)
-  return nuevaSala.id
-}
 
 async function confirmar() {
   if (!props.lote) return
+  // La manicura siempre se asigna a un responsable (el lote pasa a en_manicura).
+  if (!form.value.responsable_id) { error.value = 'Elegí un responsable para la manicura'; return }
   saving.value = true
   error.value  = null
   try {
-    const sala_id = await resolverSalaManicura()
-
-    let data
-    if (form.value.responsable_id) {
-      const res = await asignarManicurador(props.lote.id, form.value.responsable_id, {
-        sala_id,
-        peso_humedo_g: form.value.peso_humedo_g || undefined,
-        notas:         form.value.notas        || undefined,
-      })
-      data = res.data
-    } else {
-      const res = await transicionarLote(props.lote.id, {
-        nueva_fase: 'secado',
-        sala_id,
-        pesada: {
-          peso_humedo_g: form.value.peso_humedo_g || undefined,
-          notas:         form.value.notas        || undefined,
-        },
-      })
-      data = res.data
-    }
-    emit('avanzado', data)
+    const res = await asignarManicurador(props.lote.id, form.value.responsable_id, {
+      peso_humedo_g: form.value.peso_humedo_g || undefined,
+      notas:         form.value.notas        || undefined,
+    })
+    emit('avanzado', res.data)
     cerrar()
   } catch (e) {
     error.value = e?.response?.data?.error

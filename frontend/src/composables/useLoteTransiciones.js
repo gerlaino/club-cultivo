@@ -128,7 +128,8 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
         cosechaSalaId.value = lote?.sala_id ?? null
         showCosechaModal.value = true
       }
-    } else if (lote?.proxima_fase_posible === 'secado' && canAdmin.value) {
+    } else if (lote?.estado === 'cosecha' && canAdmin.value) {
+      // Cosecha → manicura: se asigna un responsable (no hay fase 'secado').
       showIniciarManicuraModal.value = true
     } else if (isCultivador.value) {
       avanzarSalaId.value = lote?.sala_id ?? null

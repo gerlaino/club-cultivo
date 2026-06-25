@@ -387,7 +387,7 @@ async function onLoteCargado() {
 }
 
 // ── Crear lote ─────────────────────────────────────────────
-const KIND_TO_ESTADO = { floracion:"floracion", secado:"secado", manicura:"curado" }
+const KIND_TO_ESTADO = { floracion:"floracion" }
 const KINDS_CON_ORIGEN = ['vegetativo', 'madre', 'clon', 'mixta']
 
 const ESTADOS_HEREDADO = [

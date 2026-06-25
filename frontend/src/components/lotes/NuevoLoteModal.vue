@@ -251,7 +251,7 @@ const lotes = useLotesStore()
 
 const ESTADOS_LOTE     = ['semilla','esqueje','vegetativo','floracion','cosecha','curado','finalizado']
 const KINDS_CON_ORIGEN = ['vegetativo','madre','clon','mixta']
-const KIND_TO_ESTADO   = { floracion: 'floracion', secado: 'secado', manicura: 'curado' }
+const KIND_TO_ESTADO   = { floracion: 'floracion' }
 const ESTADOS_HEREDADO = [
   { value: 'semilla',    label: 'Germinación / Plántula' },
   { value: 'vegetativo', label: 'Vegetativo' },
