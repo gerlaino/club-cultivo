@@ -92,7 +92,7 @@ watch(lotes, () => { page.value = 1 })
 async function cargar() {
   loading.value = true
   try {
-    const { data } = await listLotes({ estado: 'secado' })
+    const { data } = await listLotes({ estado: 'en_manicura' })
     lotes.value = data
   } catch {
     lotes.value = []
