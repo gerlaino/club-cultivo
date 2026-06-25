@@ -8,14 +8,16 @@ class PlantActivitiesController < ApplicationController
     registros  = @plant.lote.registros_ambientales
                        .order(registrado_en: :desc)
                        .limit(50)
-    notas      = @plant.lote.lote_eventos
-                       .where(tipo: 'nota')
+    # Eventos heredados del lote: la planta vivió las fases y las actividades del lote,
+    # así que su historial los refleja igual que el del lote (no solo las notas).
+    eventos    = @plant.lote.lote_eventos
+                       .where(tipo: %w[cambio_estado actividad nota alerta])
                        .order(registrado_en: :desc)
-                       .limit(30)
+                       .limit(60)
 
     merged = activities.map { |a| serialize(a) } +
              registros.map  { |r| serialize_registro(r) } +
-             notas.map      { |e| serialize_nota(e) }
+             eventos.map    { |e| serialize_evento(e) }
 
     merged.sort_by! { |e| e[:occurred_at] || '' }.reverse!
     merged = merged.first(80)
@@ -103,12 +105,33 @@ class PlantActivitiesController < ApplicationController
     }
   end
 
-  def serialize_nota(e)
+  FASE_LABELS = {
+    'semilla' => 'Semilla', 'esqueje' => 'Esqueje', 'germinacion' => 'Germinación',
+    'vegetativo' => 'Vegetativo', 'floracion' => 'Floración', 'cosecha' => 'Cosecha',
+    'secado' => 'Secado', 'curado' => 'Curado', 'finalizado' => 'Finalizado',
+  }.freeze
+
+  def serialize_evento(e)
+    case e.tipo
+    when 'cambio_estado'
+      atype = 'lote_fase'
+      desc  = "#{FASE_LABELS[e.estado_anterior] || e.estado_anterior} → #{FASE_LABELS[e.estado_nuevo] || e.estado_nuevo}".sub(/^ → /, '')
+      meta  = {}
+    when 'actividad'
+      cat   = LoteEvento::CATEGORIA_META[e.categoria] || {}
+      atype = 'lote_actividad'
+      desc  = [[cat['emoji'], cat['label']].compact.join(' '), e.descripcion].reject(&:blank?).join(' · ')
+      meta  = e.metadata || {}
+    else # nota / alerta
+      atype = e.tipo == 'alerta' ? 'lote_alerta' : 'lote_nota'
+      desc  = e.descripcion
+      meta  = {}
+    end
     {
       id:            "le_#{e.id}",
-      activity_type: 'lote_nota',
-      description:   e.descripcion,
-      metadata:      {},
+      activity_type: atype,
+      description:   desc,
+      metadata:      meta,
       occurred_at:   e.registrado_en,
       usuario:       e.user&.nombre_completo || 'Sistema',
       created_at:    e.created_at,

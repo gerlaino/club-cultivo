@@ -93,13 +93,19 @@ const ESTADO_META = {
   floracion:   { label:'Floración',   color:'#d97706', bg:'#fef3c7', emoji:'🌸' },
   cosechado:   { label:'Cosechada',   color:'#92400e', bg:'#fff7ed', emoji:'✂️'  },
   secado:      { label:'Secado',      color:'#7c3aed', bg:'#ede9fe', emoji:'🌬️' },
+  curado:      { label:'Curado',      color:'#b45309', bg:'#fef3c7', emoji:'🫙' },
   descartada:  { label:'Descartada',  color:'#dc2626', bg:'#fef2f2', emoji:'🗑️' },
 }
+// La planta como entidad llega hasta 'cosechado'; secado/curado son estados del LOTE
+// (post-cosecha en lote). El stepper refleja el viaje completo hasta curado usando el
+// estado del lote para esa parte final.
 const CICLO_PLANTA = computed(() => {
-  const origen = planta.value?.origen
-  if (origen === 'esqueje') return ['esqueje', 'vegetativo', 'floracion', 'cosechado']
-  return ['germinacion', 'vegetativo', 'floracion', 'cosechado']
+  const base = planta.value?.origen === 'esqueje'
+    ? ['esqueje', 'vegetativo', 'floracion']
+    : ['germinacion', 'vegetativo', 'floracion']
+  return [...base, 'cosechado', 'secado', 'curado']
 })
+const LOTE_A_CICLO = { cosecha: 'cosechado', secado: 'secado', curado: 'curado', finalizado: 'curado' }
 const SALUD_META = {
   excelente: { color:'#16a34a', emoji:'🟢', label:'Excelente' },
   bueno:     { color:'#65a30d', emoji:'🟡', label:'Bueno'     },
@@ -151,7 +157,12 @@ function formatDateTime(d) {
 // ── Datos computados ──────────────────────────────────────
 const cicloIndex = computed(() => {
   if (!planta.value) return -1
-  return CICLO_PLANTA.value.indexOf(planta.value.state)
+  const ciclo = CICLO_PLANTA.value
+  // Si la planta ya está cosechada, la posición la marca el estado del LOTE (cosecha/secado/curado).
+  if (planta.value.state === 'cosechado') {
+    return ciclo.indexOf(LOTE_A_CICLO[planta.value?.lote?.estado] || 'cosechado')
+  }
+  return ciclo.indexOf(planta.value.state)
 })
 
 const diasEnCiclo = computed(() => {
@@ -594,6 +605,9 @@ onMounted(async () => {
                                    : a.activity_type === 'measurement'            ? '#16a34a'
                                    : a.activity_type === 'transplant'             ? '#d97706'
                                    : a.activity_type === 'registro_ambiental_lote'? '#94a3b8'
+                                   : a.activity_type === 'lote_fase'              ? '#1b5e20'
+                                   : a.activity_type === 'lote_actividad'         ? '#16a34a'
+                                   : a.activity_type === 'lote_alerta'            ? '#dc2626'
                                    : '#64748b'
                        }">
                   </div>
@@ -667,6 +681,19 @@ onMounted(async () => {
                           <div v-if="a.metadata?.co2"         class="pd__metrica"><span>💨</span><span>{{ a.metadata.co2 }} ppm</span></div>
                         </div>
                         <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
+                      </template>
+
+                      <template v-else-if="a.activity_type === 'lote_fase'">
+                        <div class="pd__act-titulo">🔄 {{ a.description }}<span class="pd__heredado-badge">fase del lote</span></div>
+                      </template>
+                      <template v-else-if="a.activity_type === 'lote_actividad'">
+                        <div class="pd__act-titulo">{{ a.description }}<span class="pd__heredado-badge">heredado</span></div>
+                      </template>
+                      <template v-else-if="a.activity_type === 'lote_alerta'">
+                        <div class="pd__act-titulo">⚠️ {{ a.description }}</div>
+                      </template>
+                      <template v-else-if="a.activity_type === 'lote_nota'">
+                        <div class="pd__act-titulo">📝 {{ a.description }}<span class="pd__heredado-badge">nota del lote</span></div>
                       </template>
 
                       <template v-else>

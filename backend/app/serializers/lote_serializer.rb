@@ -21,6 +21,14 @@ class LoteSerializer
     dias_vegetacion = (lote.start_date && fecha_inicio_floracion) ? (fecha_inicio_floracion - lote.start_date).to_i : nil
     dias_floracion  = (fecha_inicio_floracion && fecha_cosechado)  ? (fecha_cosechado - fecha_inicio_floracion).to_i   : nil
 
+    # Días en cosecha: desde que se cosechó hasta que el lote se transforma en stock o
+    # pasa a curado (lo que ocurra primero); si sigue en cosecha, hasta hoy.
+    dias_cosechado = if fecha_cosechado
+      ev_curado    = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'curado' }.min_by(&:registrado_en)
+      fin_cosecha  = [ev_curado&.registrado_en&.to_date, lote.stocks.minimum(:created_at)&.to_date].compact.min || Date.current
+      (fin_cosecha - fecha_cosechado).to_i
+    end
+
     # Días en el estado actual: desde el último cambio a este estado (o desde el
     # inicio del lote si nunca cambió de estado, ej. creado en vegetativo/semilla).
     ev_estado_actual = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == lote.estado }.max_by(&:registrado_en)
@@ -77,6 +85,7 @@ class LoteSerializer
       fecha_cosechado:        fecha_cosechado,
       dias_vegetacion:        dias_vegetacion,
       dias_floracion:         dias_floracion,
+      dias_cosechado:         dias_cosechado,
       rendimiento_real_g:     lote.rendimiento_real_g&.to_f,
       plants_count_cosechadas: lote.plants_count_cosechadas,
       manicurador_id: lote.manicurador_id,
