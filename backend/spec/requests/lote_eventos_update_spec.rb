@@ -29,6 +29,17 @@ RSpec.describe 'PATCH /api/lotes/:lote_id/lote_eventos/:id', type: :request do
       expect(ev.registrado_en.to_date).to eq(nueva_fecha)
     end
 
+    it 'edita la metadata de una actividad (ej: corregir EC de una fertilización)' do
+      ev = lote.lote_eventos.create!(tipo: 'actividad', categoria: 'fertilizacion', user: admin, club: club,
+                                     registrado_en: Time.current, metadata: { 'producto' => 'X', 'ec' => 1.0 })
+      patch "/api/lotes/#{lote.id}/lote_eventos/#{ev.id}",
+            params: { lote_evento: { metadata: { producto: 'Bio-Bloom', ec: 1.6 } } }, as: :json
+      expect(response).to have_http_status(:ok)
+      ev.reload
+      expect(ev.metadata['producto']).to eq('Bio-Bloom')
+      expect(ev.metadata['ec']).to eq(1.6)
+    end
+
     it 'NO edita un evento cambio_estado (protege la historia de fases)' do
       ev = crear_evento(tipo: 'cambio_estado')
       patch "/api/lotes/#{lote.id}/lote_eventos/#{ev.id}",

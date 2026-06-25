@@ -185,7 +185,9 @@ async function onTrasplante(payload) {
 async function onEditarEvento(payload) {
   // Solo edita eventos manuales de lote (el modal solo muestra ✏️ en los editables).
   try {
-    await updateLoteEvento(id, payload.id, { descripcion: payload.descripcion, registrado_en: payload.registrado_en })
+    const attrs = { descripcion: payload.descripcion, registrado_en: payload.registrado_en }
+    if (payload.metadata) attrs.metadata = payload.metadata
+    await updateLoteEvento(id, payload.id, attrs)
     toast.success('Evento actualizado')
     await loadHistorial()
     graficosKey.value++

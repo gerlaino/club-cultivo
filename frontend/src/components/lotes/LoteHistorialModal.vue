@@ -29,9 +29,20 @@
           <div v-for="it in filtrados" :key="it.source + it.id" class="lhm__row">
             <div class="lhm__dot" :style="{ background: dotColor(it) }"></div>
             <div class="lhm__row-body">
-              <!-- Edición inline -->
+              <!-- Edición inline (campos según la categoría de la actividad) -->
               <div v-if="editandoId === rowKey(it)" class="lhm__edit">
-                <input v-model="editForm.descripcion" type="text" class="lhm__edit-input" maxlength="200" placeholder="Descripción" @keyup.enter="guardarEdicion(it)" />
+                <div class="lhm__edit-titulo">{{ it.emoji }} {{ it.titulo }}</div>
+
+                <div v-if="it.categoria === 'fertilizacion'" class="lhm__edit-row">
+                  <input v-model="editForm.producto" type="text" class="lhm__edit-input" maxlength="120" placeholder="Producto / fórmula" />
+                  <input v-model.number="editForm.ec" type="number" step="0.1" min="0" class="lhm__edit-num" placeholder="EC" />
+                </div>
+                <div v-else-if="it.categoria === 'riego'" class="lhm__edit-row">
+                  <input v-model.number="editForm.volumen" type="number" step="0.1" min="0" class="lhm__edit-num" placeholder="Volumen (L)" />
+                  <input v-model.number="editForm.ec" type="number" step="0.1" min="0" class="lhm__edit-num" placeholder="EC" />
+                </div>
+
+                <input v-model="editForm.descripcion" type="text" class="lhm__edit-input" maxlength="200" placeholder="Descripción (opcional)" @keyup.enter="guardarEdicion(it)" />
                 <div class="lhm__edit-row">
                   <input v-model="editForm.fecha" type="date" class="lhm__fecha" />
                   <div class="lhm__edit-actions">
@@ -103,17 +114,37 @@ const filtrados = computed(() => {
 
 // ── Edición inline ────────────────────────────────────────
 const editandoId = ref(null)
-const editForm   = ref({ descripcion: '', fecha: '' })
+const editForm   = ref({ descripcion: '', fecha: '', producto: '', ec: null, volumen: null })
 
 function empezarEdicion(it) {
   editandoId.value = rowKey(it)
-  editForm.value = { descripcion: it.detalle || it.titulo || '', fecha: (it.fecha || '').slice(0, 10) }
+  const m = it.metadata || {}
+  editForm.value = {
+    descripcion: it.detalle || '',                 // it.detalle es la descripción real (no el título)
+    fecha: (it.fecha || '').slice(0, 10),
+    producto: m.producto || '',
+    ec: m.ec ?? null,
+    volumen: m.volumen_l ?? null,
+  }
 }
 function guardarEdicion(it) {
+  const f = editForm.value
+  // Reconstruyo la metadata completa (el update REEMPLAZA el jsonb) preservando lo no editado.
+  const metadata = { ...(it.metadata || {}) }
+  if (it.categoria === 'fertilizacion') {
+    if (f.producto.trim()) metadata.producto = f.producto.trim(); else delete metadata.producto
+  }
+  if (['fertilizacion', 'riego'].includes(it.categoria)) {
+    if (f.ec != null && f.ec !== '') metadata.ec = Number(f.ec); else delete metadata.ec
+  }
+  if (it.categoria === 'riego') {
+    if (f.volumen != null && f.volumen !== '') metadata.volumen_l = Number(f.volumen); else delete metadata.volumen_l
+  }
   emit('editar', {
     id: it.id,
-    descripcion: editForm.value.descripcion.trim() || null,
-    registrado_en: `${editForm.value.fecha}T12:00:00`,
+    descripcion: f.descripcion.trim() || null,
+    registrado_en: `${f.fecha}T12:00:00`,
+    metadata,
   })
   editandoId.value = null
 }
@@ -155,8 +186,11 @@ watch(() => props.modelValue, (open) => { if (!open) { editMode.value = false; e
 .lhm__row-meta { font-size: .72rem; color: #94a3b8; margin-top: .15rem; }
 
 .lhm__edit { display: flex; flex-direction: column; gap: .5rem; }
+.lhm__edit-titulo { font-size: .82rem; font-weight: 700; color: #166534; }
 .lhm__edit-input { width: 100%; box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; outline: none; }
 .lhm__edit-input:focus { border-color: #16a34a; }
+.lhm__edit-num { width: 100px; flex-shrink: 0; box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .55rem; font-size: .85rem; outline: none; }
+.lhm__edit-num:focus { border-color: #16a34a; }
 .lhm__edit-row { display: flex; justify-content: space-between; gap: .5rem; }
 .lhm__edit-actions { display: flex; gap: .5rem; }
 .lhm__btn-ghost { background: #fff; border: 1.5px solid #cbd5e1; color: #334155; border-radius: 8px; padding: .4rem .85rem; font-size: .8rem; font-weight: 600; cursor: pointer; }

@@ -34,11 +34,13 @@ RSpec.describe 'GET /lotes/:id/historial (bitácora unificada)', type: :request 
     fechas = items.map { |i| i['fecha'] }.compact
     expect(fechas).to eq(fechas.sort.reverse)
 
-    # la actividad de riego es editable; la fase no
+    # la actividad de riego es editable; la fase y el trasplante no
     riego = items.find { |i| i['categoria'] == 'riego' }
     fase  = items.find { |i| i['kind'] == 'fase' }
+    trasp = items.find { |i| i['categoria'] == 'trasplante' }
     expect(riego['editable']).to be(true)
     expect(riego['metadata']['ec']).to eq(1.2)
     expect(fase['editable']).to be(false)
+    expect(trasp['editable']).to be(false)   # denormalizado → se corrige borrando + recargando
   end
 end

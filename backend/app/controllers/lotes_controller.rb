@@ -665,9 +665,12 @@ class LotesController < ApplicationController
           detalle: e.descripcion, editable: false, deletable: false)
       elsif e.tipo == 'actividad'
         meta = LoteEvento::CATEGORIA_META[e.categoria] || {}
+        # El trasplante está denormalizado (PlantActivity por planta + maceta del lote):
+        # editarlo inline desincronizaría → no editable (se corrige borrando y recargando).
         items << evento_item(e, kind: 'actividad', emoji: meta['emoji'] || '•',
           titulo: meta['label'] || e.categoria, detalle: e.descripcion,
-          categoria: e.categoria, metadata: e.metadata || {})
+          categoria: e.categoria, metadata: e.metadata || {},
+          editable: e.categoria != 'trasplante')
       else # nota / alerta (legacy)
         items << evento_item(e, kind: e.tipo, emoji: (e.tipo == 'alerta' ? '⚠️' : '📝'),
           titulo: e.descripcion, metadata: e.metadata || {})
