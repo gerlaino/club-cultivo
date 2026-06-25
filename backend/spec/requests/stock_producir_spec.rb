@@ -39,6 +39,19 @@ RSpec.describe 'POST /stocks/:id/producir (transformación)', type: :request do
     expect(response).to have_http_status(:unprocessable_entity)
   end
 
+  it 'produce desde flor seca EXTERNA (sin lote) descontando del stock origen' do
+    externo = create(:stock, :externo, club: club, sede: sede, forma_producto: 'flor_seca', cantidad: 200, costo_unitario_ars: 3)
+    post "/stocks/#{externo.id}/producir",
+         params: { gramos_usados: 80, forma_producto: 'prensado', cantidad_producida: 8, unidad: 'un' },
+         headers: auth_headers, as: :json
+    expect(response).to have_http_status(:created)
+    expect(externo.reload.cantidad.to_f).to eq(120.0)   # 200 − 80
+    nuevo = Stock.find(JSON.parse(response.body)['id'])
+    expect(nuevo.origen).to eq('compra_externa')
+    expect(nuevo.lote_id).to be_nil
+    expect(nuevo.costo_unitario_ars.to_f).to eq(30.0)   # (3 × 80) / 8
+  end
+
   it 'rechaza producto flor_seca' do
     post "/stocks/#{stock.id}/producir",
          params: { gramos_usados: 10, forma_producto: 'flor_seca', cantidad_producida: 10, unidad: 'g' },

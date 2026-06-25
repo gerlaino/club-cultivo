@@ -92,20 +92,24 @@ const ESTADO_META = {
   vegetativo:  { label:'Vegetativo',  color:'#16a34a', bg:'#dcfce7', emoji:'🍃' },
   floracion:   { label:'Floración',   color:'#d97706', bg:'#fef3c7', emoji:'🌸' },
   cosechado:   { label:'Cosechada',   color:'#92400e', bg:'#fff7ed', emoji:'✂️'  },
-  secado:      { label:'Secado',      color:'#7c3aed', bg:'#ede9fe', emoji:'🌬️' },
+  cosecha:     { label:'Cosecha',     color:'#92400e', bg:'#fff7ed', emoji:'✂️'  },
+  manicura:    { label:'Manicura',    color:'#7c3aed', bg:'#ede9fe', emoji:'✋' },
   curado:      { label:'Curado',      color:'#b45309', bg:'#fef3c7', emoji:'🫙' },
   descartada:  { label:'Descartada',  color:'#dc2626', bg:'#fef2f2', emoji:'🗑️' },
 }
-// La planta como entidad llega hasta 'cosechado'; secado/curado son estados del LOTE
-// (post-cosecha en lote). El stepper refleja el viaje completo hasta curado usando el
-// estado del lote para esa parte final.
+// Secuencia canónica del ciclo: esqueje · vegetativo · floración · cosecha · manicura · curado.
+// La planta como entidad llega hasta 'cosechado' (= cosecha); manicura y curado son estados
+// del LOTE (post-cosecha), que el stepper refleja para esa parte final. (Secado = curado.)
 const CICLO_PLANTA = computed(() => {
   const base = planta.value?.origen === 'esqueje'
     ? ['esqueje', 'vegetativo', 'floracion']
     : ['germinacion', 'vegetativo', 'floracion']
-  return [...base, 'cosechado', 'secado', 'curado']
+  return [...base, 'cosecha', 'manicura', 'curado']
 })
-const LOTE_A_CICLO = { cosecha: 'cosechado', secado: 'secado', curado: 'curado', finalizado: 'curado' }
+const LOTE_A_CICLO = {
+  cosecha: 'cosecha', en_manicura: 'manicura', manicura_pendiente: 'manicura',
+  secado: 'curado', curado: 'curado', finalizado: 'curado',
+}
 const SALUD_META = {
   excelente: { color:'#16a34a', emoji:'🟢', label:'Excelente' },
   bueno:     { color:'#65a30d', emoji:'🟡', label:'Bueno'     },
@@ -158,9 +162,9 @@ function formatDateTime(d) {
 const cicloIndex = computed(() => {
   if (!planta.value) return -1
   const ciclo = CICLO_PLANTA.value
-  // Si la planta ya está cosechada, la posición la marca el estado del LOTE (cosecha/secado/curado).
+  // Si la planta ya está cosechada, la posición la marca el estado del LOTE (cosecha/manicura/curado).
   if (planta.value.state === 'cosechado') {
-    return ciclo.indexOf(LOTE_A_CICLO[planta.value?.lote?.estado] || 'cosechado')
+    return ciclo.indexOf(LOTE_A_CICLO[planta.value?.lote?.estado] || 'cosecha')
   }
   return ciclo.indexOf(planta.value.state)
 })

@@ -189,7 +189,7 @@
                 </div>
               </button>
               <button
-                v-if="stock.forma_producto === 'flor_seca' && stock.lote_id"
+                v-if="stock.forma_producto === 'flor_seca'"
                 class="sd__action sd__action--amber"
                 @click="openProcesar"
                 :disabled="stock.agotado"

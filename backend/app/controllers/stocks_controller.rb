@@ -179,6 +179,10 @@ class StocksController < ApplicationController
 
     ActiveRecord::Base.transaction do
       @stock.update!(cantidad: nueva_cantidad)
+      # Un reconteo redefine la línea base (lo que realmente hay): actualizamos también
+      # la cantidad inicial para que "Total" nunca quede por debajo de "Actual". Una merma
+      # o pérdida NO toca el inicial (se descuenta de lo que había).
+      @stock.update!(cantidad_inicial: nueva_cantidad) if tipo_ajuste == 'reconteo'
       @stock.stock_movimientos.create!(
         tipo:    'ajuste',
         gramos:  gramos,
@@ -199,8 +203,8 @@ class StocksController < ApplicationController
   # flor lo hace el modelo (before_create de derivado_lote).
   # Body: { gramos_usados, forma_producto, cantidad_producida, unidad, precio_sugerido_ars? }
   def producir
-    unless @stock.lote_id.present?
-      return render json: { error: 'Solo se puede producir desde stock de flor de un lote' }, status: :unprocessable_entity
+    unless @stock.forma_producto == 'flor_seca'
+      return render json: { error: 'Solo se puede producir desde flor seca' }, status: :unprocessable_entity
     end
     gramos       = params[:gramos_usados].to_f
     cantidad_out = params[:cantidad_producida].to_f
@@ -217,28 +221,40 @@ class StocksController < ApplicationController
     costo_consumido    = @stock.costo_unitario_ars.to_d * gramos.to_d       # costo por gramo × gramos usados
     costo_unitario_out = cantidad_out.positive? ? (costo_consumido / cantidad_out.to_d).round(2) : nil
 
-    nuevo = current_user.club.stocks.build(
-      origen:                  'derivado_lote',
-      lote_id:                 @stock.lote_id,
-      sede_id:                 @stock.sede_id,
-      forma_producto:          forma,
-      unidad:                  unidad,
-      cantidad:                cantidad_out,
-      lote_origen_consumido_g: gramos,
-      costo_unitario_ars:      costo_unitario_out,
-      precio_sugerido_ars:     params[:precio_sugerido_ars].presence,
-      estado:                  'asignado',
-    )
-
-    if nuevo.save   # el before_create de derivado_lote descuenta la flor del lote
-      @stock.reload.stock_movimientos.create!(
+    nuevo = nil
+    ActiveRecord::Base.transaction do
+      # 1) Descontar la flor del stock origen (sea de lote o externo) + movimiento.
+      nueva_cant = @stock.cantidad.to_f - gramos
+      @stock.update!(cantidad: nueva_cant)
+      @stock.update!(estado: 'agotado') if nueva_cant.zero?
+      @stock.stock_movimientos.create!(
         tipo: 'produccion', gramos: -gramos, usuario: current_user,
         notas: "[PRODUCCIÓN] #{cantidad_out} #{unidad} de #{forma} (#{gramos}g usados)",
       )
-      render json: serialize_stock(nuevo), status: :created
-    else
-      render json: { errors: nuevo.errors.full_messages }, status: :unprocessable_entity
+
+      # 2) Crear el producto elaborado. es_split evita el auto-descuento del modelo
+      # (ya descontamos arriba). Hereda el lote si lo hay; si es externo, queda externo.
+      nuevo = current_user.club.stocks.new(
+        sede_id:             @stock.sede_id,
+        forma_producto:      forma,
+        unidad:              unidad,
+        cantidad:            cantidad_out,
+        costo_unitario_ars:  costo_unitario_out,
+        precio_sugerido_ars: params[:precio_sugerido_ars].presence,
+        estado:              'asignado',
+        es_split:            true,
+      )
+      if @stock.lote_id
+        nuevo.origen  = 'derivado_lote'
+        nuevo.lote_id = @stock.lote_id
+        nuevo.lote_origen_consumido_g = gramos
+      else
+        nuevo.origen    = 'compra_externa'
+        nuevo.proveedor = @stock.proveedor.presence || 'Producción propia'
+      end
+      nuevo.save!
     end
+    render json: serialize_stock(nuevo), status: :created
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
