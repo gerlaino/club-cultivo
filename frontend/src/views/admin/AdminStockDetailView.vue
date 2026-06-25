@@ -202,10 +202,10 @@
               </button>
               <div class="sd__actions-sep"></div>
               <button class="sd__action sd__action--danger" @click="showDescartar = true" :disabled="stock.agotado">
-                <span class="sd__action-ico sd__action-ico--red"><i class="bi bi-trash"></i></span>
+                <span class="sd__action-ico sd__action-ico--red"><i class="bi bi-flag"></i></span>
                 <div class="sd__action-txt">
-                  <div class="sd__action-lbl">Descartar stock</div>
-                  <div class="sd__action-sub">Marcar como agotado con merma</div>
+                  <div class="sd__action-lbl">Finalizar stock</div>
+                  <div class="sd__action-sub">Cierra el stock; lo que sobra queda como merma</div>
                 </div>
               </button>
               <button class="sd__action sd__action--danger" @click="eliminarStock" :disabled="eliminando">
@@ -300,20 +300,11 @@
                     <option value="reconteo">Reconteo (corrección de inventario)</option>
                   </select>
                 </div>
-                <div class="sd__field" v-if="ajustarForm.tipo !== 'reconteo'">
-                  <label class="sd__label">Gramos a descontar <span class="sd__req">*</span></label>
-                  <div class="sd__input-row">
-                    <input type="number" min="0.01" :max="stock?.cantidad" step="0.01"
-                      class="sd__input" v-model.number="ajustarForm.gramos"
-                      :placeholder="`máx ${stock?.cantidad}g`" />
-                    <span class="sd__input-suf">g</span>
-                  </div>
-                </div>
-                <div class="sd__field" v-else>
-                  <label class="sd__label">Nueva cantidad real (g) <span class="sd__req">*</span></label>
+                <div class="sd__field">
+                  <label class="sd__label">Cantidad exacta que tenés ahora <span class="sd__req">*</span></label>
                   <div class="sd__input-row">
                     <input type="number" min="0" step="0.01"
-                      class="sd__input" v-model.number="ajustarForm.nuevaCantidad"
+                      class="sd__input" v-model.number="ajustarForm.cantidad_real"
                       :placeholder="`actual: ${stock?.cantidad}g`" />
                     <span class="sd__input-suf">g</span>
                   </div>
@@ -347,10 +338,10 @@
         <div v-if="showDescartar" class="sd__overlay" @click.self="showDescartar = false">
           <div class="sd__modal">
             <div class="sd__modal-hd">
-              <div class="sd__modal-ico sd__modal-ico--danger"><i class="bi bi-trash"></i></div>
+              <div class="sd__modal-ico sd__modal-ico--danger"><i class="bi bi-flag"></i></div>
               <div>
-                <h2 class="sd__modal-title">Descartar stock</h2>
-                <p class="sd__modal-sub">Se registrará una merma de <strong>{{ stock?.cantidad }}g</strong></p>
+                <h2 class="sd__modal-title">Finalizar stock</h2>
+                <p class="sd__modal-sub">Lo que queda (<strong>{{ stock?.cantidad }}g</strong>) se registra como merma</p>
               </div>
               <button class="sd__modal-close" @click="showDescartar = false"><i class="bi bi-x-lg"></i></button>
             </div>
@@ -358,12 +349,12 @@
               <div v-if="descartarError" class="sd__alert">{{ descartarError }}</div>
               <div class="sd__descarte-warn">
                 <i class="bi bi-exclamation-triangle-fill"></i>
-                Esta acción marca el stock como <strong>agotado</strong> y no se puede revertir.
+                Cierra el stock (queda <strong>agotado</strong>) y no se puede revertir. La diferencia entre lo rendido y el peso total del lote queda como <strong>merma</strong>.
               </div>
               <div class="sd__form-grid">
                 <div class="sd__field sd__field--full">
-                  <label class="sd__label">Motivo del descarte <span class="sd__req">*</span></label>
-                  <textarea class="sd__input sd__textarea" rows="3" v-model="descartarForm.motivo" placeholder="Ej: vencimiento, contaminación, pérdida irreversible…"></textarea>
+                  <label class="sd__label">Motivo <span class="sd__req">*</span></label>
+                  <textarea class="sd__input sd__textarea" rows="3" v-model="descartarForm.motivo" placeholder="Ej: se terminó, vencimiento, contaminación, pérdida…"></textarea>
                 </div>
               </div>
             </div>
@@ -371,8 +362,8 @@
               <button class="sd__btn-ghost" @click="showDescartar = false">Cancelar</button>
               <button class="sd__btn-danger" :disabled="descartando || !descartarForm.motivo.trim()" @click="ejecutarDescartar">
                 <DsSpinner v-if="descartando" :size="12" />
-                <i v-else class="bi bi-trash"></i>
-                Descartar {{ stock?.cantidad }}g
+                <i v-else class="bi bi-flag"></i>
+                Finalizar ({{ stock?.cantidad }}g a merma)
               </button>
             </div>
           </div>
@@ -622,46 +613,32 @@ async function guardarEdit() {
 
 // ── Ajustar ────────────────────────────────────────────────────────────────────
 const showAjustar  = ref(false)
-const ajustarForm  = ref({ tipo: 'merma', gramos: null, nuevaCantidad: null, motivo: '' })
+const ajustarForm  = ref({ tipo: 'merma', cantidad_real: null, motivo: '' })
 const ajustarError = ref(null)
 const ajustando    = ref(false)
 
+// Se ingresa la cantidad exacta actual; el delta es real − actual (informativo).
 const ajustarDelta = computed(() => {
-  if (!stock.value) return 0
-  const actual = parseFloat(stock.value.cantidad)
-  if (ajustarForm.value.tipo !== 'reconteo') return -(ajustarForm.value.gramos || 0)
-  const nueva = ajustarForm.value.nuevaCantidad
-  return nueva != null ? nueva - actual : 0
+  if (!stock.value || ajustarForm.value.cantidad_real == null) return 0
+  return ajustarForm.value.cantidad_real - parseFloat(stock.value.cantidad)
 })
-const ajustarPreview = computed(() => {
-  if (!stock.value) return null
-  const actual = parseFloat(stock.value.cantidad)
-  if (ajustarForm.value.tipo !== 'reconteo') {
-    if (!ajustarForm.value.gramos) return null
-    return Math.max(0, actual - ajustarForm.value.gramos)
-  }
-  return ajustarForm.value.nuevaCantidad != null ? ajustarForm.value.nuevaCantidad : null
-})
+const ajustarPreview = computed(() =>
+  ajustarForm.value.cantidad_real != null ? ajustarForm.value.cantidad_real : null
+)
 
 async function ejecutarAjustar() {
   ajustarError.value = null
-  const actual = parseFloat(stock.value.cantidad)
   const motivo = ajustarForm.value.motivo.trim()
-  let gramos
   if (!motivo) { ajustarError.value = 'El motivo es obligatorio'; return }
-  if (ajustarForm.value.tipo !== 'reconteo') {
-    if (!ajustarForm.value.gramos || ajustarForm.value.gramos <= 0) { ajustarError.value = 'Ingresá los gramos a descontar'; return }
-    gramos = -ajustarForm.value.gramos
-  } else {
-    if (ajustarForm.value.nuevaCantidad == null) { ajustarError.value = 'Ingresá la nueva cantidad'; return }
-    gramos = ajustarForm.value.nuevaCantidad - actual
-    if (gramos === 0) { ajustarError.value = 'La nueva cantidad es igual a la actual'; return }
+  if (ajustarForm.value.cantidad_real == null || ajustarForm.value.cantidad_real < 0) {
+    ajustarError.value = 'Ingresá la cantidad exacta que tenés ahora'; return
   }
+  if (ajustarDelta.value === 0) { ajustarError.value = 'La cantidad ingresada es igual a la actual'; return }
   ajustando.value = true
   try {
-    await ajustarStock(stock.value.id, { tipo: ajustarForm.value.tipo, gramos, motivo })
+    await ajustarStock(stock.value.id, { tipo: ajustarForm.value.tipo, cantidad_real: ajustarForm.value.cantidad_real, motivo })
     showAjustar.value = false
-    ajustarForm.value = { tipo: 'merma', gramos: null, nuevaCantidad: null, motivo: '' }
+    ajustarForm.value = { tipo: 'merma', cantidad_real: null, motivo: '' }
     await recargar()
     toast.success('Stock ajustado')
   } catch (e) {
@@ -682,7 +659,7 @@ async function ejecutarDescartar() {
   descartando.value = true
   try {
     await descartarStock(stock.value.id, { motivo })
-    toast.success('Stock descartado')
+    toast.success('Stock finalizado')
     router.push('/admin/stock')
   } catch (e) {
     descartarError.value = e?.response?.data?.error || 'Error al descartar'

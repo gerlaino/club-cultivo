@@ -157,15 +157,22 @@ class StocksController < ApplicationController
   end
 
   # POST /stocks/:id/ajuste
-  # Body: { tipo: merma|reconteo|perdida, gramos: float, motivo: string }
+  # Body: { tipo: merma|reconteo|perdida, cantidad_real: float, motivo: string }
+  # Se ingresa la cantidad EXACTA actual; el backend calcula el delta a aplicar.
+  # (compat: si llega `gramos`, se toma como delta directo.)
   def ajuste
     tipo_ajuste = params[:tipo].presence
-    gramos      = params[:gramos].to_f
     motivo      = params[:motivo].to_s.strip
 
     return render json: { error: 'Tipo de ajuste inválido' }, status: :unprocessable_entity unless %w[merma reconteo perdida].include?(tipo_ajuste)
-    return render json: { error: 'Los gramos deben ser distinto de 0' }, status: :unprocessable_entity if gramos.zero?
     return render json: { error: 'El motivo es obligatorio' }, status: :unprocessable_entity if motivo.blank?
+
+    gramos = if params[:cantidad_real].present?
+      params[:cantidad_real].to_f - @stock.cantidad.to_f
+    else
+      params[:gramos].to_f
+    end
+    return render json: { error: 'La cantidad ingresada no cambia el stock (delta 0)' }, status: :unprocessable_entity if gramos.zero?
 
     nueva_cantidad = @stock.cantidad.to_f + gramos
     return render json: { error: "La cantidad resultante sería negativa (#{nueva_cantidad.round(2)}g)" }, status: :unprocessable_entity if nueva_cantidad < 0
@@ -198,7 +205,7 @@ class StocksController < ApplicationController
         tipo:    'merma',
         gramos:  -gramos_descartados,
         usuario: current_user,
-        notas:   "[DESCARTE] #{motivo}",
+        notas:   "[FINALIZADO] #{motivo}",
       )
       @stock.update!(cantidad: 0, estado: 'agotado')
     end
