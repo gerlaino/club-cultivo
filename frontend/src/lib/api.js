@@ -514,6 +514,7 @@ export const updateStock          = (id, payload)         => api.patch(`/stocks/
 export const asignarStock         = (id, payload)         => api.post(`/stocks/${id}/asignar`, payload)
 export const ajustarStock         = (id, payload)         => api.post(`/stocks/${id}/ajuste`, payload)
 export const descartarStock       = (id, payload)         => api.post(`/stocks/${id}/descartar`, payload)
+export const producirStock        = (id, payload)         => api.post(`/stocks/${id}/producir`, payload)
 export const deleteStock          = (id)                  => api.delete(`/stocks/${id}`)
 export const getStockMovimientos  = (id)                  => api.get(`/stocks/${id}/movimientos`)
 export const getSedeStocks        = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/stocks`, { params })

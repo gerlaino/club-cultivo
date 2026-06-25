@@ -196,7 +196,7 @@
               >
                 <span class="sd__action-ico sd__action-ico--amber"><i class="bi bi-arrow-right-square"></i></span>
                 <div class="sd__action-txt">
-                  <div class="sd__action-lbl">Procesar derivado</div>
+                  <div class="sd__action-lbl">Producir</div>
                   <div class="sd__action-sub">Convertir en hash, aceite, etc.</div>
                 </div>
               </button>
@@ -426,7 +426,7 @@
             <div class="sd__modal-hd">
               <div class="sd__modal-ico sd__modal-ico--amber"><i class="bi bi-arrow-right-square"></i></div>
               <div>
-                <h2 class="sd__modal-title">Procesar derivado</h2>
+                <h2 class="sd__modal-title">Producir derivado</h2>
                 <p class="sd__modal-sub">{{ stock?.cantidad }}g de flor seca · {{ stock?.lote?.codigo }}</p>
               </div>
               <button class="sd__modal-close" @click="showProcesar = false"><i class="bi bi-x-lg"></i></button>
@@ -450,32 +450,36 @@
                   </select>
                 </div>
                 <div class="sd__field">
-                  <label class="sd__label">Cantidad resultante (g) <span class="sd__req">*</span></label>
+                  <label class="sd__label">Cantidad producida <span class="sd__req">*</span></label>
                   <div class="sd__input-row">
                     <input type="number" min="0.01" step="0.01"
                       class="sd__input" v-model.number="procesarForm.cantidad_resultado" placeholder="0.0" />
-                    <span class="sd__input-suf">g</span>
+                    <select class="sd__input sd__input--unidad" v-model="procesarForm.unidad">
+                      <option value="un">unidades</option>
+                      <option value="ml">ml</option>
+                      <option value="g">g</option>
+                    </select>
                   </div>
                 </div>
                 <div class="sd__field">
-                  <label class="sd__label">Sede destino <span class="sd__req">*</span></label>
-                  <select class="sd__input" v-model="procesarForm.sede_id">
-                    <option value="">— Elegir sede —</option>
-                    <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-                  </select>
+                  <label class="sd__label">Precio sugerido <span class="sd__label-opt">(opc.)</span></label>
+                  <div class="sd__input-row">
+                    <span class="sd__input-pre">$</span>
+                    <input type="number" min="0" step="1" class="sd__input" v-model.number="procesarForm.precio_sugerido_ars" placeholder="por unidad" />
+                  </div>
                 </div>
               </div>
-              <div v-if="mermaG > 0" class="sd__merma">
-                <span>⚠️</span>
-                <span>Merma: <strong>{{ mermaG }}g ({{ mermaPct }}%)</strong></span>
+              <div v-if="costoDerivado" class="sd__merma">
+                <span>🧮</span>
+                <span>Costo: <strong>${{ Math.round(costoDerivado.total) }}</strong> total · <strong>${{ costoDerivado.unitario.toFixed(2) }}</strong> por {{ procesarForm.unidad === 'un' ? 'unidad' : procesarForm.unidad }}</span>
               </div>
             </div>
             <div class="sd__modal-ft">
               <button class="sd__btn-ghost" @click="showProcesar = false">Cancelar</button>
               <button class="sd__btn-amber" :disabled="procesando" @click="ejecutarProcesar">
                 <DsSpinner v-if="procesando" :size="12" />
-                <i v-else class="bi bi-arrow-right-square"></i>
-                Procesar
+                <i v-else class="bi bi-box-seam"></i>
+                Producir
               </button>
             </div>
           </div>
@@ -492,7 +496,7 @@ import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   getStock, updateStock, asignarStock, ajustarStock, descartarStock, deleteStock,
-  getStockMovimientos, listSedes, createStock,
+  getStockMovimientos, listSedes, producirStock,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -697,9 +701,18 @@ async function ejecutarRepartir() {
 
 // ── Procesar derivado ──────────────────────────────────────────────────────────
 const showProcesar  = ref(false)
-const procesarForm  = ref({ gramos_consumir: null, forma_producto: 'aceite', cantidad_resultado: null, sede_id: '' })
+const procesarForm  = ref({ gramos_consumir: null, forma_producto: 'aceite', cantidad_resultado: null, unidad: 'un', precio_sugerido_ars: null })
 const procesarError = ref(null)
 const procesando    = ref(false)
+
+// Costo derivado: costo por gramo del stock origen × gramos consumidos / cantidad producida.
+const costoDerivado = computed(() => {
+  const cu = Number(stock.value?.costo_unitario_ars)
+  const consumir = Number(procesarForm.value.gramos_consumir)
+  const resultado = Number(procesarForm.value.cantidad_resultado)
+  if (!cu || !consumir || !resultado) return null
+  return { total: cu * consumir, unitario: (cu * consumir) / resultado }
+})
 
 const FORMAS_DERIVADO = [
   { value: 'hash', label: 'Hash' }, { value: 'aceite', label: 'Aceite' },
@@ -708,21 +721,8 @@ const FORMAS_DERIVADO = [
   { value: 'prensado', label: 'Prensado' }, { value: 'otro', label: 'Otro' },
 ]
 
-const mermaG = computed(() => {
-  const consumir  = Number(procesarForm.value.gramos_consumir)
-  const resultado = Number(procesarForm.value.cantidad_resultado)
-  if (!consumir || !resultado || resultado >= consumir) return 0
-  return parseFloat((consumir - resultado).toFixed(2))
-})
-const mermaPct = computed(() => {
-  const consumir  = Number(procesarForm.value.gramos_consumir)
-  const resultado = Number(procesarForm.value.cantidad_resultado)
-  if (!consumir || !resultado || resultado >= consumir) return 0
-  return parseFloat(((consumir - resultado) / consumir * 100).toFixed(1))
-})
-
 function openProcesar() {
-  procesarForm.value  = { gramos_consumir: null, forma_producto: 'aceite', cantidad_resultado: null, sede_id: '' }
+  procesarForm.value  = { gramos_consumir: null, forma_producto: 'aceite', cantidad_resultado: null, unidad: 'un', precio_sugerido_ars: null }
   procesarError.value = null
   showProcesar.value  = true
 }
@@ -731,23 +731,23 @@ async function ejecutarProcesar() {
   procesarError.value = null
   const consumir  = Number(procesarForm.value.gramos_consumir)
   const resultado = Number(procesarForm.value.cantidad_resultado)
-  if (!consumir || consumir <= 0)        { procesarError.value = 'Ingresá los gramos a consumir'; return }
+  if (!consumir || consumir <= 0)        { procesarError.value = 'Ingresá los gramos a usar'; return }
   if (consumir > stock.value.cantidad)   { procesarError.value = `Máximo: ${stock.value.cantidad}g`; return }
-  if (!resultado || resultado <= 0)      { procesarError.value = 'Ingresá la cantidad resultante'; return }
-  if (!procesarForm.value.sede_id)       { procesarError.value = 'Elegí una sede destino'; return }
+  if (!resultado || resultado <= 0)      { procesarError.value = 'Ingresá la cantidad producida'; return }
   procesando.value = true
   try {
-    await createStock({
-      origen: 'derivado_lote', lote_id: stock.value.lote_id,
-      lote_origen_consumido_g: consumir, forma_producto: procesarForm.value.forma_producto,
-      cantidad: resultado, unidad: 'g', estado: 'asignado',
-      sede_id: Number(procesarForm.value.sede_id),
+    await producirStock(stock.value.id, {
+      gramos_usados:       consumir,
+      forma_producto:      procesarForm.value.forma_producto,
+      cantidad_producida:  resultado,
+      unidad:              procesarForm.value.unidad,
+      precio_sugerido_ars: procesarForm.value.precio_sugerido_ars || undefined,
     })
     showProcesar.value = false
     await recargar()
-    toast.success('Derivado procesado correctamente')
+    toast.success('Producto elaborado creado')
   } catch (e) {
-    procesarError.value = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al procesar'
+    procesarError.value = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al producir'
   } finally { procesando.value = false }
 }
 

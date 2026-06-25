@@ -2,9 +2,9 @@ class StocksController < ApplicationController
   before_action :authenticate_user!
   before_action :require_lectura_stock!,        only: [:index, :inventario, :show, :movimientos]
   before_action :require_auditor_lectura!,      only: [:trazabilidad]
-  before_action :require_escritura_stock!,      only: [:create, :update, :asignar, :ajuste, :descartar]
+  before_action :require_escritura_stock!,      only: [:create, :update, :asignar, :ajuste, :descartar, :producir]
   before_action :require_admin_o_supervisor!,   only: [:show_by_qr, :destroy]
-  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :movimientos, :destroy]
+  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :producir, :movimientos, :destroy]
 
   # GET /stocks?sede_id=&canal=regulatorio|social&incluir_pendientes=true
   # GET /sedes/:sede_id/stocks
@@ -188,6 +188,57 @@ class StocksController < ApplicationController
       @stock.update!(estado: 'agotado') if nueva_cantidad == 0
     end
     render json: serialize_stock(@stock.reload)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /stocks/:id/producir
+  # Transforma flor del lote en un producto elaborado (aceite, prensado, etc.): consume
+  # gramos del stock de flor y crea un Stock nuevo 'derivado_lote' con su costo derivado
+  # (costo por gramo × gramos usados / cantidad producida) y su precio. El descuento de la
+  # flor lo hace el modelo (before_create de derivado_lote).
+  # Body: { gramos_usados, forma_producto, cantidad_producida, unidad, precio_sugerido_ars? }
+  def producir
+    unless @stock.lote_id.present?
+      return render json: { error: 'Solo se puede producir desde stock de flor de un lote' }, status: :unprocessable_entity
+    end
+    gramos       = params[:gramos_usados].to_f
+    cantidad_out = params[:cantidad_producida].to_f
+    forma        = params[:forma_producto].to_s
+    unidad       = params[:unidad].presence || 'un'
+
+    return render json: { error: 'Indicá los gramos a utilizar (> 0)' }, status: :unprocessable_entity if gramos <= 0
+    return render json: { error: 'Indicá la cantidad producida (> 0)' }, status: :unprocessable_entity if cantidad_out <= 0
+    return render json: { error: "No hay tantos gramos disponibles (#{@stock.cantidad}g)" }, status: :unprocessable_entity if gramos > @stock.cantidad.to_f
+    if forma.blank? || forma == 'flor_seca'
+      return render json: { error: 'Elegí el producto resultante (no flor seca)' }, status: :unprocessable_entity
+    end
+
+    costo_consumido    = @stock.costo_unitario_ars.to_d * gramos.to_d       # costo por gramo × gramos usados
+    costo_unitario_out = cantidad_out.positive? ? (costo_consumido / cantidad_out.to_d).round(2) : nil
+
+    nuevo = current_user.club.stocks.build(
+      origen:                  'derivado_lote',
+      lote_id:                 @stock.lote_id,
+      sede_id:                 @stock.sede_id,
+      forma_producto:          forma,
+      unidad:                  unidad,
+      cantidad:                cantidad_out,
+      lote_origen_consumido_g: gramos,
+      costo_unitario_ars:      costo_unitario_out,
+      precio_sugerido_ars:     params[:precio_sugerido_ars].presence,
+      estado:                  'asignado',
+    )
+
+    if nuevo.save   # el before_create de derivado_lote descuenta la flor del lote
+      @stock.reload.stock_movimientos.create!(
+        tipo: 'produccion', gramos: -gramos, usuario: current_user,
+        notas: "[PRODUCCIÓN] #{cantidad_out} #{unidad} de #{forma} (#{gramos}g usados)",
+      )
+      render json: serialize_stock(nuevo), status: :created
+    else
+      render json: { errors: nuevo.errors.full_messages }, status: :unprocessable_entity
+    end
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
