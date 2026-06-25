@@ -413,6 +413,7 @@ export const deleteSetpointFase  = (id)          => api.delete(`/setpoints_fase/
 
 export const getLoteEventos    = (loteId)          => api.get(`/lotes/${loteId}/lote_eventos`)
 export const createLoteEvento  = (loteId, payload)  => api.post(`/lotes/${loteId}/lote_eventos`, { lote_evento: payload })
+export const updateLoteEvento  = (loteId, eventoId, payload) => api.patch(`/lotes/${loteId}/lote_eventos/${eventoId}`, { lote_evento: payload })
 export const deleteLoteEvento  = (loteId, eventoId) => api.delete(`/lotes/${loteId}/lote_eventos/${eventoId}`)
 export const cosecharPlantas   = (loteId, payload)  => api.post(`/lotes/${loteId}/cosechar_plantas`, payload)
 

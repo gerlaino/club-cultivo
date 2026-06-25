@@ -61,6 +61,32 @@ class LoteEventosController < ApplicationController
     render json: { error: 'Evento no encontrado' }, status: :not_found
   end
 
+  # PATCH /api/lotes/:lote_id/lote_eventos/:id
+  # Edita una nota/alerta manual (descripción y/o fecha). Mismo criterio que destroy:
+  # solo admin, y los cambio_estado NO se editan acá (definen la fase del lote → se
+  # corrigen con Editar lote).
+  def update
+    unless current_user.admin?
+      return render json: { error: 'Solo un administrador puede editar eventos' }, status: :forbidden
+    end
+
+    evento = @lote.lote_eventos.find(params[:id])
+
+    if evento.tipo == 'cambio_estado'
+      return render json: {
+        error: 'Este evento define la fase del lote. Para corregir una fase, usá Editar lote (estado y fechas).'
+      }, status: :unprocessable_entity
+    end
+
+    if evento.update(evento_update_params)
+      render json: serialize(evento)
+    else
+      render json: { errors: evento.errors.full_messages }, status: :unprocessable_entity
+    end
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Evento no encontrado' }, status: :not_found
+  end
+
   private
 
   def set_lote
@@ -71,6 +97,11 @@ class LoteEventosController < ApplicationController
 
   def evento_params
     params.require(:lote_evento).permit(:tipo, :estado_nuevo, :descripcion, :registrado_en)
+  end
+
+  # En la edición solo se tocan descripción y fecha; nunca tipo/estado_nuevo.
+  def evento_update_params
+    params.require(:lote_evento).permit(:descripcion, :registrado_en)
   end
 
   def serialize(e)

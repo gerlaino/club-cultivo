@@ -6,7 +6,7 @@ import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
-import { getRegistrosAmbientales, getLoteEventos, listTareas, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, createLoteEvento, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
+import { getRegistrosAmbientales, getLoteEventos, listTareas, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, createLoteEvento, updateLoteEvento, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
 import { useQRCode } from '../composables/useQRCode.js'
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
@@ -181,6 +181,18 @@ async function onCrearEvento(payload) {
     graficosKey.value++
   } catch (err) {
     toast.error(err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo registrar el evento')
+  }
+}
+
+async function onEditarEvento(payload) {
+  // Solo edita notas/eventos manuales (el componente ya oculta el ✏️ en cambio_estado).
+  try {
+    await updateLoteEvento(id, payload.id, { descripcion: payload.descripcion, registrado_en: payload.registrado_en })
+    toast.success('Evento actualizado')
+    await loadEventos()
+    graficosKey.value++
+  } catch (err) {
+    toast.error(err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo actualizar el evento')
   }
 }
 
@@ -512,7 +524,7 @@ onUnmounted(() => {
               <i class="bi ld__chevron" :class="historialExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </button>
             <div v-show="historialExpanded" class="ld__section-body ld__section-body--flush">
-              <LoteHistorialSection :eventos="eventos" :loading-eventos="loadingEventos" :can-admin="esAdmin" @delete="onDeleteEvento" @crear="onCrearEvento" />
+              <LoteHistorialSection :eventos="eventos" :loading-eventos="loadingEventos" :can-admin="esAdmin" @delete="onDeleteEvento" @crear="onCrearEvento" @editar="onEditarEvento" />
             </div>
           </div>
 

@@ -31,31 +31,52 @@
         <template v-if="e._tipo === 'evento'">
           <div class="lhs__evento-dot" :style="{ background: e.tipo === 'cambio_estado' ? '#1b5e20' : '#64748b' }"></div>
           <div class="lhs__evento-content">
-            <div class="lhs__evento-head">
-              <span v-if="e.tipo === 'cambio_estado'" class="lhs__evento-titulo">
-                {{ em(e.estado_anterior).emoji }} {{ em(e.estado_anterior).label }}
-                <span class="lhs__evento-arrow">→</span>
-                {{ em(e.estado_nuevo).emoji }} {{ em(e.estado_nuevo).label }}
-              </span>
-              <span v-else class="lhs__evento-titulo">{{ e.descripcion }}</span>
-              <div class="lhs__evento-head-right">
-                <span class="lhs__evento-fecha">{{ formatDateTime(e.registrado_en) }}</span>
-                <button
-                  v-if="canAdmin && e.tipo !== 'cambio_estado'"
-                  class="lhs__del-btn"
-                  title="Borrar evento"
-                  @click="$emit('delete', e)"
-                ><i class="bi bi-trash"></i></button>
+            <!-- Modo edición (solo notas/alertas manuales) -->
+            <div v-if="editandoId === e.id" class="lhs__form">
+              <input v-model="editForm.descripcion" type="text" class="lhs__form-input" maxlength="200"
+                     placeholder="Descripción del evento" @keyup.enter="guardarEdicion(e)" />
+              <div class="lhs__form-row">
+                <AppDatePicker v-model="editForm.fecha" :max="hoy" class="lhs__form-date" />
+                <div class="lhs__form-actions">
+                  <button class="lhs__form-cancel" @click="cancelarEdicion">Cancelar</button>
+                  <button class="lhs__form-save" :disabled="!editForm.descripcion.trim()" @click="guardarEdicion(e)">Guardar</button>
+                </div>
               </div>
             </div>
-            <div class="lhs__evento-meta">{{ e.usuario }}</div>
-            <div v-if="e.sala_origen && e.sala_destino" class="lhs__evento-sala-move">
-              <i class="bi bi-house-door"></i>
-              <span>{{ e.sala_origen.nombre }}</span>
-              <i class="bi bi-arrow-right"></i>
-              <span>{{ e.sala_destino.nombre }}</span>
-            </div>
-            <div v-if="e.tipo === 'cambio_estado' && e.descripcion" class="lhs__evento-desc">{{ e.descripcion }}</div>
+            <!-- Modo normal -->
+            <template v-else>
+              <div class="lhs__evento-head">
+                <span v-if="e.tipo === 'cambio_estado'" class="lhs__evento-titulo">
+                  {{ em(e.estado_anterior).emoji }} {{ em(e.estado_anterior).label }}
+                  <span class="lhs__evento-arrow">→</span>
+                  {{ em(e.estado_nuevo).emoji }} {{ em(e.estado_nuevo).label }}
+                </span>
+                <span v-else class="lhs__evento-titulo">{{ e.descripcion }}</span>
+                <div class="lhs__evento-head-right">
+                  <span class="lhs__evento-fecha">{{ formatDateTime(e.registrado_en) }}</span>
+                  <button
+                    v-if="canAdmin && e.tipo !== 'cambio_estado'"
+                    class="lhs__edit-btn"
+                    title="Editar evento"
+                    @click="empezarEdicion(e)"
+                  ><i class="bi bi-pencil"></i></button>
+                  <button
+                    v-if="canAdmin && e.tipo !== 'cambio_estado'"
+                    class="lhs__del-btn"
+                    title="Borrar evento"
+                    @click="$emit('delete', e)"
+                  ><i class="bi bi-trash"></i></button>
+                </div>
+              </div>
+              <div class="lhs__evento-meta">{{ e.usuario }}</div>
+              <div v-if="e.sala_origen && e.sala_destino" class="lhs__evento-sala-move">
+                <i class="bi bi-house-door"></i>
+                <span>{{ e.sala_origen.nombre }}</span>
+                <i class="bi bi-arrow-right"></i>
+                <span>{{ e.sala_destino.nombre }}</span>
+              </div>
+              <div v-if="e.tipo === 'cambio_estado' && e.descripcion" class="lhs__evento-desc">{{ e.descripcion }}</div>
+            </template>
           </div>
         </template>
 
@@ -160,7 +181,7 @@ const props = defineProps({
   loadingEventos: { type: Boolean, default: false },
   canAdmin:       { type: Boolean, default: false },
 })
-const emit = defineEmits(['delete', 'crear'])
+const emit = defineEmits(['delete', 'crear', 'editar'])
 
 const PER_PAGE = 10
 const pagina   = ref(1)
@@ -197,6 +218,31 @@ function guardar() {
     registrado_en: `${form.value.fecha}T12:00:00`,
   })
   formAbierto.value = false
+}
+
+// ── Editar nota/evento manual existente ───────────────────
+const editandoId = ref(null)
+const editForm   = ref({ descripcion: '', fecha: hoy })
+
+function empezarEdicion(e) {
+  formAbierto.value = false   // cerrar el form de alta si estaba abierto
+  editandoId.value = e.id
+  editForm.value = {
+    descripcion: e.descripcion || '',
+    fecha: (e.registrado_en || '').slice(0, 10) || hoy,
+  }
+}
+function cancelarEdicion() { editandoId.value = null }
+
+function guardarEdicion(e) {
+  const desc = editForm.value.descripcion.trim()
+  if (!desc) return
+  emit('editar', {
+    id: e.id,
+    descripcion: desc,
+    registrado_en: `${editForm.value.fecha}T12:00:00`,
+  })
+  editandoId.value = null
 }
 
 watch(() => props.eventos, () => { pagina.value = 1 })
@@ -240,6 +286,8 @@ const TIPO_LABELS = {
 .lhs__evento-head-right { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
 .lhs__del-btn { background: none; border: none; color: #cbd5e1; cursor: pointer; padding: .1rem .25rem; font-size: .78rem; line-height: 1; border-radius: 5px; transition: all .15s; }
 .lhs__del-btn:hover { color: #dc2626; background: #fef2f2; }
+.lhs__edit-btn { background: none; border: none; color: #cbd5e1; cursor: pointer; padding: .1rem .25rem; font-size: .78rem; line-height: 1; border-radius: 5px; transition: all .15s; }
+.lhs__edit-btn:hover { color: #2563eb; background: #eff6ff; }
 .lhs__evento-meta   { font-size: .72rem; color: #64748b; margin-bottom: .2rem; }
 .lhs__evento-sala-move { display: flex; align-items: center; gap: .35rem; font-size: .75rem; color: #475569; margin: .2rem 0; }
 .lhs__evento-desc   { font-size: .78rem; color: #475569; margin-top: .25rem; line-height: 1.5; }
