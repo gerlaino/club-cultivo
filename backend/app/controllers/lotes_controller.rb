@@ -179,6 +179,11 @@ class LotesController < ApplicationController
       return render json: { error: 'Los lotes finalizados son inmutables. Para correcciones de datos contactá al soporte.' }, status: :forbidden
     end
 
+    # Las fechas de fase deben ser correlativas (inicio ≤ vegetativo ≤ floración ≤ cosecha).
+    if (msg = validar_orden_fechas(@lote))
+      return render json: { errors: [msg] }, status: :unprocessable_entity
+    end
+
     estado_anterior = @lote.estado
     if @lote.update(lote_update_params)
       # Si la edición cambió el estado del lote (corrección manual), propagamos el estado
@@ -235,6 +240,36 @@ class LotesController < ApplicationController
         user: current_user, club: lote.club,
       )
     end
+  end
+
+  # Valida que las fechas de fase queden en orden cronológico. Usa los valores que
+  # vienen en el request (start_date + fechas_fase) y, para los que no se tocan, las
+  # fechas ya registradas. Devuelve un mensaje de error si algo queda fuera de orden,
+  # o nil si está OK. Solo corre si la edición toca fechas.
+  def validar_orden_fechas(lote)
+    return nil if params[:fechas_fase].blank? && params.dig(:lote, :start_date).blank?
+
+    inicio = parse_fecha(params.dig(:lote, :start_date)) || lote.start_date&.to_date
+    veg    = parse_fecha(params.dig(:fechas_fase, :vegetativo)) || fecha_evento(lote, 'vegetativo')
+    flo    = parse_fecha(params.dig(:fechas_fase, :floracion))  || fecha_evento(lote, 'floracion')
+    cos    = parse_fecha(params.dig(:fechas_fase, :cosecha))    || fecha_evento(lote, 'cosecha')
+
+    secuencia = [['inicio', inicio], ['vegetativo', veg], ['floración', flo], ['cosecha', cos]].select { |_, d| d }
+    secuencia.each_cons(2) do |(label_a, fecha_a), (label_b, fecha_b)|
+      if fecha_b < fecha_a
+        return "La fecha de #{label_b} (#{fecha_b.strftime('%d/%m/%Y')}) no puede ser anterior a la de #{label_a} (#{fecha_a.strftime('%d/%m/%Y')})."
+      end
+    end
+    nil
+  end
+
+  def parse_fecha(valor)
+    return nil if valor.blank?
+    Date.parse(valor.to_s) rescue nil
+  end
+
+  def fecha_evento(lote, fase)
+    lote.lote_eventos.where(tipo: 'cambio_estado', estado_nuevo: fase).order(:registrado_en).first&.registrado_en&.to_date
   end
 
   def reconciliar_fechas_fase(lote, fechas)

@@ -37,6 +37,30 @@ RSpec.describe 'PATCH /lotes/:id — corrección de estado e historia', type: :r
     expect(eventos_flor.first.registrado_en.to_date).to eq(nueva)
   end
 
+  context 'validación de fechas correlativas' do
+    it 'rechaza si floración queda antes que vegetativo' do
+      patch "/lotes/#{lote.id}",
+            params: { lote: { start_date: '2026-01-01' }, fechas_fase: { vegetativo: '2026-03-01', floracion: '2026-02-01' } },
+            headers: auth_headers, as: :json
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['errors'].first).to match(/floración.*no puede ser anterior.*vegetativo/i)
+    end
+
+    it 'rechaza si una fase queda antes del inicio (start_date)' do
+      patch "/lotes/#{lote.id}",
+            params: { lote: { start_date: '2026-02-01' }, fechas_fase: { vegetativo: '2026-01-15' } },
+            headers: auth_headers, as: :json
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'acepta fechas en orden correlativo' do
+      patch "/lotes/#{lote.id}",
+            params: { lote: { start_date: '2026-01-14' }, fechas_fase: { vegetativo: '2026-01-26', floracion: '2026-04-26' } },
+            headers: auth_headers, as: :json
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
   context 'propagación del estado a las plantas' do
     let(:lote) { create(:lote, club: club, sala: sala, estado: 'esqueje', start_date: 60.days.ago.to_date) }
     let!(:p1)  { create(:plant, lote: lote, club: club, state: 'esqueje') }
