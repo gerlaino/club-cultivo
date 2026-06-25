@@ -11,9 +11,9 @@ class LoteEvento < ApplicationRecord
   # actividad de cultivo tipada (categoria + metadata) — el caso de backfill.
   TIPOS = %w[cambio_estado nota alerta actividad].freeze
 
-  # Categorías de actividad de cultivo. El trasplante NO está acá: tiene su propio
-  # flujo por-planta (PlantActivity + maceta), que ya alimenta la timeline.
-  CATEGORIAS = %w[riego fertilizacion poda defoliacion tratamiento medicion inspeccion nota otro].freeze
+  # Categorías de actividad de cultivo. El trasplante también vive acá (además de su
+  # registro por-planta en PlantActivity) para aparecer en el historial unificado.
+  CATEGORIAS = %w[riego fertilizacion poda defoliacion tratamiento medicion inspeccion trasplante nota otro].freeze
 
   CATEGORIA_META = {
     'riego'         => { 'label' => 'Riego',         'emoji' => '💧' },
@@ -23,6 +23,7 @@ class LoteEvento < ApplicationRecord
     'tratamiento'   => { 'label' => 'Tratamiento',   'emoji' => '🧪' },
     'medicion'      => { 'label' => 'Medición',      'emoji' => '📏' },
     'inspeccion'    => { 'label' => 'Inspección',    'emoji' => '🔍' },
+    'trasplante'    => { 'label' => 'Trasplante',    'emoji' => '🪴' },
     'nota'          => { 'label' => 'Nota',          'emoji' => '📝' },
     'otro'          => { 'label' => 'Otro',          'emoji' => '•'  },
   }.freeze

@@ -44,6 +44,19 @@ module Lotes
             metadata:      { 'maceta_origen_l' => @origen&.to_f, 'maceta_destino_l' => @destino.to_f },
           )
         end
+
+        # Rastro en el historial unificado (categoria=trasplante con la maceta en metadata).
+        @lote.lote_eventos.create!(
+          tipo: 'actividad', categoria: 'trasplante', user: @usuario, club: @lote.club,
+          registrado_en: occurred,
+          descripcion: nil,
+          metadata: {
+            'maceta_origen_l'  => @origen&.to_f,
+            'maceta_destino_l' => @destino.to_f,
+            'plantas'          => plants.size,
+          },
+        )
+
         # Solo actualizamos la "maceta actual" si el lote sigue en cultivo.
         @lote.update!(tamanio_maceta: @destino) unless ESTADOS_POST_COSECHA.include?(@lote.estado)
       end

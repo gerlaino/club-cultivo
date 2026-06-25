@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :asignar_manicurador, :registrar_trasplante]
+  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :registrar_trasplante]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -642,6 +642,96 @@ class LotesController < ApplicationController
     }
   end
 
+  FASE_LABELS = {
+    'semilla' => 'Semilla', 'esqueje' => 'Esqueje', 'germinacion' => 'Germinación',
+    'vegetativo' => 'Vegetativo', 'floracion' => 'Floración', 'cosecha' => 'Cosecha',
+    'secado' => 'Secado', 'curado' => 'Curado', 'finalizado' => 'Finalizado',
+    'en_manicura' => 'En manicura', 'manicura_pendiente' => 'Manicura pendiente',
+  }.freeze
+
+  # GET /lotes/:id/historial
+  # Bitácora UNIFICADA del lote: normaliza todo (fases, actividades, registros,
+  # tareas completadas, pesadas, stocks, dispensaciones) en una lista plana y
+  # ordenada por fecha. Es la fuente única del historial (reemplaza al timeline) y
+  # la base de los informes scopeables. `editable`/`deletable` indican qué se puede
+  # gestionar desde el historial (solo eventos manuales de lote).
+  def historial
+    items = []
+
+    @lote.lote_eventos.includes(:user).find_each do |e|
+      if e.tipo == 'cambio_estado'
+        items << evento_item(e, kind: 'fase', emoji: '🔄',
+          titulo: "#{fase_label(e.estado_anterior)} → #{fase_label(e.estado_nuevo)}",
+          detalle: e.descripcion, editable: false, deletable: false)
+      elsif e.tipo == 'actividad'
+        meta = LoteEvento::CATEGORIA_META[e.categoria] || {}
+        items << evento_item(e, kind: 'actividad', emoji: meta['emoji'] || '•',
+          titulo: meta['label'] || e.categoria, detalle: e.descripcion,
+          categoria: e.categoria, metadata: e.metadata || {})
+      else # nota / alerta (legacy)
+        items << evento_item(e, kind: e.tipo, emoji: (e.tipo == 'alerta' ? '⚠️' : '📝'),
+          titulo: e.descripcion, metadata: e.metadata || {})
+      end
+    end
+
+    @lote.registros_ambientales.includes(:user).find_each do |r|
+      chips = []
+      chips << "#{r.temperatura}°C" if r.temperatura
+      chips << "#{r.humedad}%"      if r.humedad
+      chips << "pH #{r.ph}"         if r.ph
+      chips << "EC #{r.ec}"         if r.ec
+      chips << 'fertilización'      if r.fertilizacion
+      items << {
+        kind: 'registro', source: 'registro_ambiental', id: r.id, fecha: r.registrado_en,
+        emoji: '📋', titulo: 'Registro del lote',
+        detalle: [chips.join(' · '), r.observaciones].reject(&:blank?).join(' — ').presence,
+        categoria: nil, metadata: {}, usuario: r.user&.nombre_completo,
+        editable: false, deletable: true,
+      }
+    end
+
+    Tarea.where(lote_id: @lote.id, estado: 'completada').includes(:asignada_a).find_each do |t|
+      items << {
+        kind: 'tarea', source: 'tarea', id: t.id, fecha: t.fecha_completada || t.updated_at,
+        emoji: '✅', titulo: t.titulo, detalle: t.notas_completado, categoria: t.tipo,
+        metadata: {}, usuario: t.asignada_a&.nombre_completo, editable: false, deletable: true,
+      }
+    end
+
+    @lote.pesadas.includes(:registrado_por).find_each do |p|
+      pesos = []
+      pesos << "húmedo #{p.peso_humedo_g}g" if p.peso_humedo_g
+      pesos << "seco #{p.peso_seco_g}g"     if p.peso_seco_g
+      pesos << "curado #{p.peso_curado_g}g" if p.peso_curado_g
+      items << {
+        kind: 'pesada', source: 'pesada', id: p.id, fecha: p.registrado_at, emoji: '🏋️',
+        titulo: "Pesada (#{fase_label(p.fase_origen)} → #{fase_label(p.fase_destino)})",
+        detalle: pesos.join(' · ').presence, categoria: nil, metadata: {},
+        usuario: p.registrado_por&.nombre_completo, editable: false, deletable: false,
+      }
+    end
+
+    @lote.stocks.find_each do |s|
+      items << {
+        kind: 'stock', source: 'stock', id: s.id, fecha: s.created_at, emoji: '🛒',
+        titulo: "Stock generado · #{s.forma_producto}", detalle: "#{s.cantidad.to_f} #{s.unidad}",
+        categoria: nil, metadata: {}, usuario: nil, editable: false, deletable: false,
+      }
+    end
+
+    Dispensacion.joins(:stock).where(stocks: { lote_id: @lote.id }).includes(:paciente, :stock).find_each do |d|
+      items << {
+        kind: 'dispensacion', source: 'dispensacion', id: d.id, fecha: d.fecha_dispensacion,
+        emoji: '🧑‍⚕️', titulo: "Dispensación · #{d.paciente&.nombre} #{d.paciente&.apellido}".strip,
+        detalle: "#{d.cantidad.to_f} #{d.stock&.unidad}", categoria: nil, metadata: {},
+        usuario: nil, editable: false, deletable: false,
+      }
+    end
+
+    items.sort_by! { |i| i[:fecha].respond_to?(:to_time) ? i[:fecha].to_time : Time.at(0) }
+    render json: { historial: items.reverse }
+  end
+
   # GET /lotes/:id/pl
   def pl
     lote = current_user.club.lotes.includes(:costo_lote, :stocks).find(params[:id])
@@ -651,6 +741,18 @@ class LotesController < ApplicationController
   end
 
   private
+
+  def fase_label(estado) = FASE_LABELS[estado] || estado
+
+  # Normaliza un LoteEvento a un item del historial unificado.
+  def evento_item(e, kind:, emoji:, titulo:, detalle: nil, categoria: nil, metadata: {}, editable: true, deletable: true)
+    {
+      kind: kind, source: 'lote_evento', id: e.id, fecha: e.registrado_en,
+      emoji: emoji, titulo: titulo, detalle: detalle, categoria: categoria,
+      metadata: metadata, usuario: e.user&.nombre_completo,
+      editable: editable, deletable: deletable,
+    }
+  end
 
   def calcular_pl(lote)
     stock_ids = lote.stocks.map(&:id)

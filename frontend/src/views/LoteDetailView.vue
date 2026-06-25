@@ -6,7 +6,7 @@ import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
-import { getRegistrosAmbientales, getLoteEventos, listTareas, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, createLoteEvento, updateLoteEvento, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
+import { getLoteHistorial, registrarTrasplante, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, createLoteEvento, updateLoteEvento, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
 import { useQRCode } from '../composables/useQRCode.js'
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
@@ -19,12 +19,11 @@ import { ArrowRight, ChevronRight } from 'lucide-vue-next'
 import { em, sm, pgm, growLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate, formatDateTime,
   capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS } from '../lib/loteHelpers.js'
 import LoteHistorialSection from '../components/lotes/LoteHistorialSection.vue'
+import LoteHistorialModal   from '../components/lotes/LoteHistorialModal.vue'
 import LotePlantasSection   from '../components/lotes/LotePlantasSection.vue'
 import LotePlanVsReal       from '../components/lotes/LotePlanVsReal.vue'
-import LoteTimelineSection  from '../components/lotes/LoteTimelineSection.vue'
 import LoteFotosSection     from '../components/lotes/LoteFotosSection.vue'
 import LoteEditarModal      from '../components/lotes/LoteEditarModal.vue'
-import RegistrarTrasplanteModal from '../components/lotes/RegistrarTrasplanteModal.vue'
 import LotePLCard           from '../components/lotes/LotePLCard.vue'
 import LoteIACard           from '../components/lotes/LoteIACard.vue'
 import DsBanner from '../design-system/components/Banner.vue'
@@ -147,70 +146,70 @@ async function crearSalaInline(kind) {
   } finally { crearSalaLoading.value = false }
 }
 
-// ── Historial ─────────────────────────────────────────────
-const eventos        = ref([])
-const loadingEventos = ref(false)
+// ── Historial unificado ───────────────────────────────────
+const historial        = ref([])
+const loadingHistorial = ref(false)
+const verHistorialOpen = ref(false)
 
-async function loadEventos() {
-  loadingEventos.value = true
+async function loadHistorial() {
+  loadingHistorial.value = true
   try {
-    const [evRes, regRes, tareasRes] = await Promise.all([
-      getLoteEventos(id),
-      getRegistrosAmbientales(id),
-      listTareas({ lote_id: id, estado: 'completada' }),
-    ])
-    const evs    = (evRes.data      || []).map(e => ({ ...e, _tipo: 'evento' }))
-    const regs   = (regRes.data     || []).map(r => ({ ...r, _tipo: 'registro' }))
-    const tareas = (tareasRes.data  || []).map(t => ({
-      ...t, _tipo: 'tarea', registrado_en: t.fecha_completada || t.updated_at
-    }))
-    eventos.value = [...evs, ...regs, ...tareas]
-      .sort((a, b) => new Date(b.registrado_en) - new Date(a.registrado_en))
-  } catch { eventos.value = [] }
-  finally { loadingEventos.value = false }
+    const { data } = await getLoteHistorial(id)
+    historial.value = data.historial || []
+  } catch { historial.value = [] }
+  finally { loadingHistorial.value = false }
 }
 
 async function onCrearEvento(payload) {
-  // Registra un evento/nota pasado (o de hoy) en el historial. El backend
-  // backdatea con registrado_en. No se permite 'cambio_estado' desde acá:
-  // para corregir una fase se usa Editar lote.
   try {
     await createLoteEvento(id, payload)
-    toast.success('Evento registrado en el historial')
-    await loadEventos()
+    toast.success('Actividad registrada')
+    await loadHistorial()
     graficosKey.value++
   } catch (err) {
-    toast.error(err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo registrar el evento')
+    toast.error(err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo registrar la actividad')
+  }
+}
+
+async function onTrasplante(payload) {
+  try {
+    await registrarTrasplante(id, payload)
+    toast.success('Trasplante registrado')
+    await Promise.all([lotes.fetchOne(id), loadHistorial()])
+    graficosKey.value++
+  } catch (err) {
+    toast.error(err?.response?.data?.error || 'No se pudo registrar el trasplante')
   }
 }
 
 async function onEditarEvento(payload) {
-  // Solo edita notas/eventos manuales (el componente ya oculta el ✏️ en cambio_estado).
+  // Solo edita eventos manuales de lote (el modal solo muestra ✏️ en los editables).
   try {
     await updateLoteEvento(id, payload.id, { descripcion: payload.descripcion, registrado_en: payload.registrado_en })
     toast.success('Evento actualizado')
-    await loadEventos()
+    await loadHistorial()
     graficosKey.value++
   } catch (err) {
     toast.error(err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo actualizar el evento')
   }
 }
 
-async function onDeleteEvento(e) {
-  const LABEL = { evento: 'evento', registro: 'registro', tarea: 'tarea completada' }
+async function onDeleteEvento(it) {
+  const LABEL = { lote_evento: 'evento', registro_ambiental: 'registro', tarea: 'tarea completada' }
   const ok = await confirm({
-    title:       `Borrar ${LABEL[e._tipo] || 'ítem'} del historial`,
-    message:     `¿Borrás este ${LABEL[e._tipo] || 'ítem'} del historial?\n\n"${e.descripcion || e.titulo || e.observaciones || 'Sin descripción'}"\n\nEsta acción no se puede deshacer.`,
+    title:       `Borrar ${LABEL[it.source] || 'ítem'} del historial`,
+    message:     `¿Borrás "${it.titulo}" del historial?\n\nEsta acción no se puede deshacer.`,
     confirmText: 'Sí, borrar',
     variant:     'danger',
   })
   if (!ok) return
   try {
-    if (e._tipo === 'registro')   await deleteRegistroAmbiental(id, e.id)
-    else if (e._tipo === 'tarea') await deleteTarea(e.id)
-    else                          await deleteLoteEvento(id, e.id)
+    if (it.source === 'registro_ambiental') await deleteRegistroAmbiental(id, it.id)
+    else if (it.source === 'tarea')          await deleteTarea(it.id)
+    else                                     await deleteLoteEvento(id, it.id)
     toast.success('Borrado del historial')
-    await loadEventos()
+    await loadHistorial()
+    graficosKey.value++
   } catch (err) {
     toast.error(err?.response?.data?.error || 'No se pudo borrar')
   }
@@ -303,18 +302,13 @@ const cicloIndex = computed(() => lote.value ? cicloPasos.value.indexOf(lote.val
 
 // ── Composables ────────────────────────────────────────────
 const editarOpen = ref(false)
-const trasplanteOpen = ref(false)
-async function onTrasplanteRegistrado() {
-  await Promise.all([lotes.fetchOne(id), loadEventos()])
-  graficosKey.value++   // recarga la timeline
-}
 
 // Tras editar el lote (puede cambiar estado/fechas): refrescamos lote, historial,
 // plantas y gráficos — antes solo se refrescaba el lote y quedaban viejos.
 async function onLoteEditado() {
   await Promise.all([
     lotes.fetchOne(id),
-    loadEventos(),
+    loadHistorial(),
     plants.fetchByLote(id),
   ])
   graficosKey.value++
@@ -332,7 +326,7 @@ const {
   avanzarFaseRapido, ejecutarCosecha, onCosechadoParcial,
   onManicuraIniciada, onManicuraCompletada,
   openCerrarCuradoModal, ejecutarCerrarCurado,
-} = useLoteTransiciones(id, { onPhaseChange: loadEventos, sedes })
+} = useLoteTransiciones(id, { onPhaseChange: loadHistorial, sedes })
 
 // ── Escape key handler ─────────────────────────────────────
 function loteEscapeHandler(e) {
@@ -373,7 +367,7 @@ onMounted(async () => {
   } catch { error.value = 'No se pudo cargar el lote.' }
   try   { await plants.fetchByLote(id) }
   catch {}
-  await loadEventos()
+  await loadHistorial()
   try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
   cargarAnalisisLab()
 })
@@ -524,7 +518,9 @@ onUnmounted(() => {
               <i class="bi ld__chevron" :class="historialExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </button>
             <div v-show="historialExpanded" class="ld__section-body ld__section-body--flush">
-              <LoteHistorialSection :eventos="eventos" :loading-eventos="loadingEventos" :can-admin="esAdmin" @delete="onDeleteEvento" @crear="onCrearEvento" @editar="onEditarEvento" />
+              <LoteHistorialSection
+                :historial="historial" :loading-historial="loadingHistorial" :can-admin="esAdmin"
+                @crear="onCrearEvento" @trasplante="onTrasplante" @ver="verHistorialOpen = true" />
             </div>
           </div>
 
@@ -542,14 +538,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- 4. Timeline del ciclo -->
-          <LoteTimelineSection :lote-id="id" :key="graficosKey">
-            <template v-if="canAdmin" #actions>
-              <button class="ld__trasplante-btn" @click="trasplanteOpen = true">🪴 Registrar trasplante</button>
-            </template>
-          </LoteTimelineSection>
-
-          <!-- 5. Análisis de laboratorio -->
+          <!-- Análisis de laboratorio -->
           <div class="ld__section ld__section--mt">
             <button class="ld__section-toggle" @click="labExpanded = !labExpanded">
               <div class="ld__section-toggle-left">
@@ -683,12 +672,13 @@ onUnmounted(() => {
       @saved="onLoteEditado"
     />
 
-    <!-- ══ Modal Registrar Trasplante ══ -->
-    <RegistrarTrasplanteModal
-      v-model="trasplanteOpen"
-      :lote-id="id"
-      :maceta-actual="lote?.tamanio_maceta != null ? Number(lote.tamanio_maceta) : null"
-      @saved="onTrasplanteRegistrado"
+    <!-- ══ Modal Historial completo (ver + filtrar + editar) ══ -->
+    <LoteHistorialModal
+      v-model="verHistorialOpen"
+      :historial="historial"
+      :can-admin="esAdmin"
+      @editar="onEditarEvento"
+      @delete="onDeleteEvento"
     />
 
     <!-- ══ Modal Registro del Lote (nuevo) ══ -->
@@ -696,7 +686,7 @@ onUnmounted(() => {
       v-model="showRegistroModalNew"
       :lote="lote"
       :plants="plantasActivas"
-      @saved="loadEventos(); lotes.fetchOne(id); graficosKey++"
+      @saved="loadHistorial(); lotes.fetchOne(id); graficosKey++"
     />
 
     <!-- ══ Modal Avanzar Fase ══ -->
@@ -1112,8 +1102,6 @@ onUnmounted(() => {
 .ld__aside { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: start; }
 .ld__section { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
 .ld__section--mt { margin-top: 1.25rem; }
-.ld__trasplante-btn { background: #fff8e1; border: 1.5px solid #fde68a; color: #92400e; border-radius: 8px; padding: .4rem .8rem; font-size: .8rem; font-weight: 700; cursor: pointer; }
-.ld__trasplante-btn:hover { background: #fef3c7; }
 .ld__section-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: .9rem 1.1rem; background: transparent; border: none; cursor: pointer; transition: background .15s; text-align: left; }
 .ld__section-toggle:hover { background: #f0fdf4; }
 .ld__section-toggle-left { display: flex; align-items: center; gap: .6rem; }

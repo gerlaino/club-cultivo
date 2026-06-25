@@ -122,6 +122,7 @@ Rails.application.routes.draw do
         post  :asignar_manicurador
         patch :completar_datos
         get   :timeline
+        get   :historial
         get   :preview_plan
         post  :aplicar_plan
         get   :pl
