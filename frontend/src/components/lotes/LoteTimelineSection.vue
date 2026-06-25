@@ -75,8 +75,23 @@
           </div>
         </div>
 
+        <div v-if="timeline.actividades?.length" class="lts__group">
+          <div class="lts__group-title">🌱 Actividades</div>
+          <div v-for="a in timeline.actividades" :key="a.id" class="lts__row">
+            <div class="lts__fase">
+              <span class="lts__pill-fase" style="background:#f0fdf4;color:#166534">{{ a.emoji }} {{ a.label }}</span>
+              <span v-if="detalleActividad(a)" class="lts__act-detalle">{{ detalleActividad(a) }}</span>
+            </div>
+            <div class="lts__meta">
+              <template v-if="a.descripcion">{{ a.descripcion }} · </template>
+              <template v-if="a.usuario">{{ a.usuario }} · </template>
+              {{ formatDate(a.fecha) }}
+            </div>
+          </div>
+        </div>
+
         <EmptyState
-          v-if="!timeline.pesadas?.length && !timeline.stocks?.length && !timeline.transplantes?.length"
+          v-if="!timeline.pesadas?.length && !timeline.stocks?.length && !timeline.transplantes?.length && !timeline.actividades?.length"
           icon="📦" title="Sin actividad de ciclo" compact
         />
       </div>
@@ -97,6 +112,15 @@ const props = defineProps({
 const expanded = ref(false)
 const timeline = ref(null)
 const loading  = ref(false)
+
+function detalleActividad(a) {
+  const m = a.metadata || {}
+  const parts = []
+  if (m.producto)  parts.push(m.producto)
+  if (m.ec != null)        parts.push(`EC ${m.ec}`)
+  if (m.volumen_l != null) parts.push(`${m.volumen_l}L`)
+  return parts.join(' · ')
+}
 
 async function load() {
   loading.value = true
@@ -130,6 +154,7 @@ function toggle() {
 .lts__row:last-child { border-bottom: none; }
 .lts__fase { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 .lts__pill-fase { font-size: .68rem; font-weight: 700; padding: .2em .6em; border-radius: 6px; white-space: nowrap; }
+.lts__act-detalle { font-size: .72rem; font-weight: 600; color: #64748b; }
 .lts__pesos { display: flex; flex-wrap: wrap; gap: .75rem; color: #374151; font-size: .78rem; }
 .lts__merma { color: #d97706; font-size: .7rem; margin-left: .2rem; }
 .lts__meta { font-size: .7rem; color: #94a3b8; margin-left: auto; white-space: nowrap; }

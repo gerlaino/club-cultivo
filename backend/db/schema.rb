@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_25_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_25_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -605,6 +605,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_25_000001) do
     t.datetime "updated_at", null: false
     t.bigint "sala_origen_id"
     t.bigint "sala_destino_id"
+    t.string "categoria"
+    t.jsonb "metadata", default: {}, null: false
+    t.index ["categoria"], name: "index_lote_eventos_on_categoria"
     t.index ["club_id"], name: "index_lote_eventos_on_club_id"
     t.index ["lote_id"], name: "index_lote_eventos_on_lote_id"
     t.index ["registrado_en"], name: "index_lote_eventos_on_registrado_en"

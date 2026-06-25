@@ -96,18 +96,23 @@ class LoteEventosController < ApplicationController
   end
 
   def evento_params
-    params.require(:lote_evento).permit(:tipo, :estado_nuevo, :descripcion, :registrado_en)
+    params.require(:lote_evento).permit(:tipo, :estado_nuevo, :descripcion, :registrado_en, :categoria, metadata: {})
   end
 
-  # En la edición solo se tocan descripción y fecha; nunca tipo/estado_nuevo.
+  # En la edición se tocan descripción, fecha y el detalle (categoría + metadata) de
+  # las actividades; nunca tipo/estado_nuevo.
   def evento_update_params
-    params.require(:lote_evento).permit(:descripcion, :registrado_en)
+    params.require(:lote_evento).permit(:descripcion, :registrado_en, :categoria, metadata: {})
   end
 
   def serialize(e)
     {
       id:              e.id,
       tipo:            e.tipo,
+      categoria:       e.categoria,
+      categoria_label: e.categoria ? e.categoria_meta['label'] : nil,
+      categoria_emoji: e.categoria ? e.categoria_meta['emoji'] : nil,
+      metadata:        e.metadata || {},
       estado_anterior: e.estado_anterior,
       estado_nuevo:    e.estado_nuevo,
       descripcion:     e.descripcion,

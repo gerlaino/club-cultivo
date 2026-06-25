@@ -615,6 +615,20 @@ class LotesController < ApplicationController
           plantas: acts.size, notas: acts.map(&:description).compact.uniq.first }
       end
 
+    actividades = @lote.lote_eventos.actividades.includes(:user).order(registrado_en: :asc).map do |e|
+      meta = LoteEvento::CATEGORIA_META[e.categoria] || {}
+      {
+        id:          e.id,
+        categoria:   e.categoria,
+        label:       meta['label'] || e.categoria,
+        emoji:       meta['emoji'] || '•',
+        descripcion: e.descripcion,
+        metadata:    e.metadata || {},
+        fecha:       e.registrado_en,
+        usuario:     e.user&.first_name,
+      }
+    end
+
     render json: {
       lote:          LoteSerializer.serialize(@lote, include_cycle_data: true),
       pesadas:       pesadas.map { |p| PesadaSerializer.serialize(p) },
@@ -624,6 +638,7 @@ class LotesController < ApplicationController
           cantidad: d.cantidad.to_f, unidad: d.stock&.unidad, forma_producto: d.stock&.forma_producto }
       },
       transplantes:,
+      actividades:,
     }
   end
 

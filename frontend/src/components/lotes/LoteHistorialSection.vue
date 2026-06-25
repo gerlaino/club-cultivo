@@ -1,22 +1,33 @@
 <template>
   <div>
-    <!-- Registrar evento pasado -->
+    <!-- Registrar actividad (backfill de historia real) -->
     <div v-if="canAdmin" class="lhs__add">
       <button v-if="!formAbierto" class="lhs__add-btn" @click="abrirForm">
-        <i class="bi bi-plus-circle me-1"></i>Registrar evento pasado
+        <i class="bi bi-plus-circle me-1"></i>Registrar actividad
       </button>
       <div v-else class="lhs__form">
         <div class="lhs__form-row">
-          <select v-model="form.tipo" class="lhs__form-sel">
-            <option v-for="t in TIPOS_EVENTO" :key="t.value" :value="t.value">{{ t.emoji }} {{ t.label }}</option>
+          <select v-model="form.categoria" class="lhs__form-sel">
+            <option v-for="t in CATEGORIAS" :key="t.value" :value="t.value">{{ t.emoji }} {{ t.label }}</option>
           </select>
           <AppDatePicker v-model="form.fecha" :max="hoy" class="lhs__form-date" />
         </div>
+
+        <!-- Campos según el tipo de actividad -->
+        <div v-if="form.categoria === 'fertilizacion'" class="lhs__form-row">
+          <input v-model="form.producto" type="text" class="lhs__form-input" maxlength="120" placeholder="Producto / fórmula (ej: Bio-Grow 2ml/L)" />
+          <input v-model.number="form.ec" type="number" step="0.1" min="0" class="lhs__form-num" placeholder="EC" />
+        </div>
+        <div v-else-if="form.categoria === 'riego'" class="lhs__form-row">
+          <input v-model.number="form.volumen" type="number" step="0.1" min="0" class="lhs__form-num" placeholder="Volumen (L)" />
+          <input v-model.number="form.ec" type="number" step="0.1" min="0" class="lhs__form-num" placeholder="EC" />
+        </div>
+
         <input v-model="form.descripcion" type="text" class="lhs__form-input" maxlength="200"
-               placeholder="¿Qué pasó? (ej: regué con 1.2 EC, podé las bajeras…)" @keyup.enter="guardar" />
+               :placeholder="placeholderDescripcion" @keyup.enter="guardar" />
         <div class="lhs__form-actions">
           <button class="lhs__form-cancel" @click="cerrarForm">Cancelar</button>
-          <button class="lhs__form-save" :disabled="!form.descripcion.trim()" @click="guardar">Registrar</button>
+          <button class="lhs__form-save" :disabled="!formValido" @click="guardar">Registrar</button>
         </div>
       </div>
     </div>
@@ -29,7 +40,7 @@
 
         <!-- Evento de estado -->
         <template v-if="e._tipo === 'evento'">
-          <div class="lhs__evento-dot" :style="{ background: e.tipo === 'cambio_estado' ? '#1b5e20' : '#64748b' }"></div>
+          <div class="lhs__evento-dot" :style="{ background: dotColor(e) }"></div>
           <div class="lhs__evento-content">
             <!-- Modo edición (solo notas/alertas manuales) -->
             <div v-if="editandoId === e.id" class="lhs__form">
@@ -39,7 +50,7 @@
                 <AppDatePicker v-model="editForm.fecha" :max="hoy" class="lhs__form-date" />
                 <div class="lhs__form-actions">
                   <button class="lhs__form-cancel" @click="cancelarEdicion">Cancelar</button>
-                  <button class="lhs__form-save" :disabled="!editForm.descripcion.trim()" @click="guardarEdicion(e)">Guardar</button>
+                  <button class="lhs__form-save" @click="guardarEdicion(e)">Guardar</button>
                 </div>
               </div>
             </div>
@@ -50,6 +61,9 @@
                   {{ em(e.estado_anterior).emoji }} {{ em(e.estado_anterior).label }}
                   <span class="lhs__evento-arrow">→</span>
                   {{ em(e.estado_nuevo).emoji }} {{ em(e.estado_nuevo).label }}
+                </span>
+                <span v-else-if="e.tipo === 'actividad'" class="lhs__evento-titulo">
+                  {{ e.categoria_emoji }} {{ e.categoria_label }}<span v-if="metaDetalle(e)" class="lhs__evento-detalle"> · {{ metaDetalle(e) }}</span>
                 </span>
                 <span v-else class="lhs__evento-titulo">{{ e.descripcion }}</span>
                 <div class="lhs__evento-head-right">
@@ -75,7 +89,7 @@
                 <i class="bi bi-arrow-right"></i>
                 <span>{{ e.sala_destino.nombre }}</span>
               </div>
-              <div v-if="e.tipo === 'cambio_estado' && e.descripcion" class="lhs__evento-desc">{{ e.descripcion }}</div>
+              <div v-if="(e.tipo === 'cambio_estado' || e.tipo === 'actividad') && e.descripcion" class="lhs__evento-desc">{{ e.descripcion }}</div>
             </template>
           </div>
         </template>
@@ -186,36 +200,53 @@ const emit = defineEmits(['delete', 'crear', 'editar'])
 const PER_PAGE = 10
 const pagina   = ref(1)
 
-// ── Registrar evento pasado ───────────────────────────────
-const TIPOS_EVENTO = [
-  { value: 'nota',       label: 'Nota',       emoji: '📝' },
-  { value: 'riego',      label: 'Riego',      emoji: '💧' },
-  { value: 'poda',       label: 'Poda',       emoji: '✂️' },
+// ── Registrar actividad (eventos tipados, backfill) ───────
+const CATEGORIAS = [
+  { value: 'riego',         label: 'Riego',         emoji: '💧' },
   { value: 'fertilizacion', label: 'Fertilización', emoji: '🌿' },
-  { value: 'inspeccion', label: 'Inspección', emoji: '🔍' },
-  { value: 'tratamiento', label: 'Tratamiento', emoji: '🧪' },
-  { value: 'otro',       label: 'Otro',       emoji: '•' },
+  { value: 'poda',          label: 'Poda',          emoji: '✂️' },
+  { value: 'defoliacion',   label: 'Defoliación',   emoji: '🍃' },
+  { value: 'tratamiento',   label: 'Tratamiento',   emoji: '🧪' },
+  { value: 'medicion',      label: 'Medición',      emoji: '📏' },
+  { value: 'inspeccion',    label: 'Inspección',    emoji: '🔍' },
+  { value: 'nota',          label: 'Nota',          emoji: '📝' },
+  { value: 'otro',          label: 'Otro',          emoji: '•' },
 ]
 const hoy = new Date().toISOString().split('T')[0]
 const formAbierto = ref(false)
-const form = ref({ tipo: 'nota', fecha: hoy, descripcion: '' })
+const form = ref({ categoria: 'riego', fecha: hoy, descripcion: '', producto: '', ec: null, volumen: null })
+
+// Solo nota/otro exigen texto; las demás se entienden por su categoría + detalle.
+const formValido = computed(() =>
+  !['nota', 'otro'].includes(form.value.categoria) || form.value.descripcion.trim().length > 0
+)
+const placeholderDescripcion = computed(() => ({
+  riego: 'Detalle (opcional)', fertilizacion: 'Detalle (opcional)',
+  poda: '¿Qué podaste? (opcional)', defoliacion: 'Detalle (opcional)',
+  tratamiento: 'Producto / plaga tratada', medicion: '¿Qué mediste?',
+  inspeccion: 'Observaciones', nota: '¿Qué pasó?', otro: 'Describí la actividad',
+}[form.value.categoria] || 'Detalle'))
 
 function abrirForm() {
-  form.value = { tipo: 'nota', fecha: hoy, descripcion: '' }
+  form.value = { categoria: 'riego', fecha: hoy, descripcion: '', producto: '', ec: null, volumen: null }
   formAbierto.value = true
 }
 function cerrarForm() { formAbierto.value = false }
 
 function guardar() {
-  const desc = form.value.descripcion.trim()
-  if (!desc) return
-  const meta = TIPOS_EVENTO.find(t => t.value === form.value.tipo)
-  // El backend guarda tipo libre en 'descripcion'; prefijamos el rótulo del tipo
-  // para que se lea claro en el historial (no es 'cambio_estado').
+  if (!formValido.value) return
+  const f = form.value
+  const metadata = {}
+  if (f.ec != null && f.ec !== '')           metadata.ec = Number(f.ec)
+  if (f.volumen != null && f.volumen !== '')  metadata.volumen_l = Number(f.volumen)
+  if (f.categoria === 'fertilizacion' && f.producto.trim()) metadata.producto = f.producto.trim()
+
   emit('crear', {
-    tipo: 'nota',
-    descripcion: `${meta.emoji} ${meta.label}: ${desc}`,
-    registrado_en: `${form.value.fecha}T12:00:00`,
+    tipo: 'actividad',
+    categoria: f.categoria,
+    descripcion: f.descripcion.trim() || null,
+    metadata,
+    registrado_en: `${f.fecha}T12:00:00`,
   })
   formAbierto.value = false
 }
@@ -235,14 +266,32 @@ function empezarEdicion(e) {
 function cancelarEdicion() { editandoId.value = null }
 
 function guardarEdicion(e) {
-  const desc = editForm.value.descripcion.trim()
-  if (!desc) return
+  // descripción opcional (una actividad puede no tener texto; se puede editar solo la fecha)
   emit('editar', {
     id: e.id,
-    descripcion: desc,
+    descripcion: editForm.value.descripcion.trim() || null,
     registrado_en: `${editForm.value.fecha}T12:00:00`,
   })
   editandoId.value = null
+}
+
+// ── Render de actividades ─────────────────────────────────
+const CAT_COLOR = {
+  riego: '#0891b2', fertilizacion: '#16a34a', poda: '#d97706', defoliacion: '#65a30d',
+  tratamiento: '#9333ea', medicion: '#0ea5e9', inspeccion: '#64748b', nota: '#64748b', otro: '#94a3b8',
+}
+function dotColor(e) {
+  if (e.tipo === 'cambio_estado') return '#1b5e20'
+  if (e.tipo === 'actividad')     return CAT_COLOR[e.categoria] || '#64748b'
+  return '#64748b'
+}
+function metaDetalle(e) {
+  const m = e.metadata || {}
+  const parts = []
+  if (m.producto)  parts.push(m.producto)
+  if (m.ec != null)        parts.push(`EC ${m.ec}`)
+  if (m.volumen_l != null) parts.push(`${m.volumen_l}L`)
+  return parts.join(' · ')
 }
 
 watch(() => props.eventos, () => { pagina.value = 1 })
@@ -269,6 +318,9 @@ const TIPO_LABELS = {
 .lhs__form-date { flex: 1; min-width: 0; }
 .lhs__form-input { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; color: #0f172a; outline: none; }
 .lhs__form-input:focus { border-color: #16a34a; }
+.lhs__form-num { width: 90px; flex-shrink: 0; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .55rem; font-size: .85rem; color: #0f172a; outline: none; }
+.lhs__form-num:focus { border-color: #16a34a; }
+.lhs__evento-detalle { color: #64748b; font-weight: 600; }
 .lhs__form-actions { display: flex; justify-content: flex-end; gap: .5rem; }
 .lhs__form-cancel { background: #fff; border: 1.5px solid #cbd5e1; color: #334155; border-radius: 8px; padding: .4rem .85rem; font-size: .8rem; font-weight: 600; cursor: pointer; }
 .lhs__form-save { background: #1b5e20; border: none; color: #fff; border-radius: 8px; padding: .4rem 1rem; font-size: .8rem; font-weight: 700; cursor: pointer; }
