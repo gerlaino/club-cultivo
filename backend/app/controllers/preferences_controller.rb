@@ -118,6 +118,54 @@ class PreferencesController < ApplicationController
     render json: { error: "Error de conexión SMTP: #{e.message}" }, status: :unprocessable_entity
   end
 
+  # PATCH /preferences/conectar_email — el club conecta su propia casilla. Solo carga email +
+  # contraseña de aplicación (+ nombre opcional); el servidor/puerto se autodetectan del dominio.
+  # Verifica la conexión ANTES de guardar (manda un mail de confirmación al admin).
+  def conectar_email
+    return render json: { error: 'Sin permiso' }, status: :forbidden unless current_user.admin? || current_user.super_admin?
+
+    email    = params[:email].to_s.strip
+    password = params[:app_password].to_s.strip
+    nombre   = params[:from_name].to_s.strip.presence || @club.name
+    return render json: { error: 'Ingresá el email del club.' }, status: :unprocessable_entity if email.blank?
+    return render json: { error: 'Ingresá la contraseña de aplicación.' }, status: :unprocessable_entity if password.blank?
+
+    proveedor = Club.smtp_provider_for(email)
+    host = params[:smtp_host].presence || proveedor&.dig(:host)
+    port = (params[:smtp_port].presence || proveedor&.dig(:port) || 587).to_i
+    if host.blank?
+      return render json: { error: 'No reconocemos ese proveedor. Si no es Gmail/Outlook/Yahoo, indicá el servidor SMTP.' }, status: :unprocessable_entity
+    end
+
+    settings = { address: host, port: port, user_name: email, password: password,
+                 authentication: :plain, enable_starttls_auto: true }
+    # En test no abrimos conexión SMTP real (usa el delivery :test).
+    metodo, opts_envio = Rails.env.test? ? [:test, {}] : [:smtp, settings]
+    begin
+      destino = current_user.email
+      Mail.deliver do
+        from    "#{nombre} <#{email}>"
+        to      destino
+        subject "✓ Correo conectado — #{nombre}"
+        body    "Tu casilla quedó conectada a Club Cultivo. Desde ahora los correos del club salen desde acá."
+        delivery_method metodo, opts_envio
+      end
+    rescue => e
+      return render json: { error: "No se pudo conectar: #{e.message}. Revisá el email y la contraseña de aplicación." }, status: :unprocessable_entity
+    end
+
+    @club.update!(smtp_host: host, smtp_port: port, smtp_user: email, smtp_pass: password,
+                  smtp_from: email, smtp_from_name: nombre)
+    render json: serialize(@club)
+  end
+
+  # DELETE /preferences/desconectar_email — vuelve al modo plataforma-gestionado.
+  def desconectar_email
+    return render json: { error: 'Sin permiso' }, status: :forbidden unless current_user.admin? || current_user.super_admin?
+    @club.update!(smtp_host: nil, smtp_port: nil, smtp_user: nil, smtp_pass: nil, smtp_from: nil, smtp_from_name: nil)
+    render json: serialize(@club)
+  end
+
   private
 
   def require_club_user!
@@ -178,6 +226,9 @@ class PreferencesController < ApplicationController
       smtp_user:                    club.smtp_user,
       smtp_from:                    club.smtp_from,
       smtp_from_name:               club.smtp_from_name,
+      email_modo:                   club.email_propio? ? 'propio' : 'plataforma',
+      email_remitente:              club.email_from,
+      email_reply_to:               club.email_reply_to,
       # smtp_pass / twilio_auth_token_enc nunca se serializan
       twilio_configurado:           club.twilio_configurado?,
       twilio_account_sid:           club.twilio_account_sid,

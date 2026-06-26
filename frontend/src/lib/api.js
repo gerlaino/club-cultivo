@@ -129,6 +129,8 @@ export const uploadAvatar     = (file) => {
 export const getPreferences    = () => api.get("/preferences");
 export const updatePreferences = (payload) => api.put("/preferences", { club: payload });
 export const testSmtp          = () => api.post("/preferences/test_smtp");
+export const conectarEmail     = (payload) => api.patch("/preferences/conectar_email", payload);
+export const desconectarEmail  = () => api.delete("/preferences/desconectar_email");
 export const updateTwilio      = (payload) => api.patch("/preferences/update_twilio", payload);
 export const destroyTwilio     = () => api.delete("/preferences/destroy_twilio");
 export const testTwilio        = () => api.post("/preferences/test_twilio");

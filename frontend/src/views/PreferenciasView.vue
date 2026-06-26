@@ -4,7 +4,7 @@ import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useClubStore } from '../stores/club'
 import Avatar from '../components/Avatar.vue'
 import { useConfirm } from '../composables/useConfirm.js'
-import { updatePreferences, testSmtp } from '../lib/api.js'
+import { testSmtp, conectarEmail, desconectarEmail } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const club  = useClubStore()
@@ -14,15 +14,14 @@ const logoPreview = ref(null)
 let toastTimer = null
 const { confirm } = useConfirm()
 
-// SMTP — admin del club solo ve email remitente + contraseña; el host/port/user lo configura el super admin
-const smtpForm = reactive({
-  smtp_pass:      '',
-  smtp_from:      '',
-  smtp_from_name: '',
-})
-const smtpSaving  = ref(false)
+// Email — modo plataforma por defecto; el club puede conectar SU casilla (email + contraseña de app).
+const emailModo      = ref('plataforma')   // 'plataforma' | 'propio'
+const emailRemitente = ref('')
+const emailReplyTo   = ref('')
+const conectarForm = reactive({ email: '', app_password: '', from_name: '' })
+const mostrarConectar = ref(false)
+const conectando = ref(false)
 const smtpTesting = ref(false)
-const smtpConfigured = ref(false)
 
 const TIPOS_ORGANIZACION = [
   { value: 'asociacion_civil',  label: 'Asociación Civil' },
@@ -93,12 +92,11 @@ function loadFromStore() {
     tipo_organizacion:           club.data.tipo_organizacion           || '',
   })
   logoPreview.value = club.data.logo_url || null
-  smtpConfigured.value = club.data.smtp_configured || false
-  Object.assign(smtpForm, {
-    smtp_pass:      '',
-    smtp_from:      club.data.smtp_from      || '',
-    smtp_from_name: club.data.smtp_from_name || '',
-  })
+  emailModo.value      = club.data.email_modo || 'plataforma'
+  emailRemitente.value = club.data.email_remitente || ''
+  emailReplyTo.value   = club.data.email_reply_to || club.data.email || ''
+  conectarForm.email = ''; conectarForm.app_password = ''; conectarForm.from_name = ''
+  mostrarConectar.value = false
   pristine.value = true
 }
 
@@ -162,20 +160,36 @@ function showToast(type, msg) {
   toastTimer = setTimeout(() => { toast.value = null }, 5000)
 }
 
-async function saveSmtp() {
-  smtpSaving.value = true
+async function conectarMiEmail() {
+  if (!conectarForm.email || !conectarForm.app_password) {
+    showToast('danger', 'Ingresá el email del club y la contraseña de aplicación.')
+    return
+  }
+  conectando.value = true
   try {
-    const payload = { ...smtpForm }
-    if (!payload.smtp_pass) delete payload.smtp_pass  // no sobrescribir si está vacío
-    await updatePreferences(payload)
-    await club.fetch()
-    smtpConfigured.value = club.data.smtp_configured || false
-    smtpForm.smtp_pass = ''
-    showToast('success', 'Configuración de correo guardada')
+    await conectarEmail({ ...conectarForm })
+    await club.fetch()  // dispara loadFromStore por el watch
+    showToast('success', 'Correo conectado — ya mandás desde tu casilla ✓')
   } catch (e) {
-    showToast('danger', e?.response?.data?.errors?.join(', ') || 'Error al guardar SMTP')
+    showToast('danger', e?.response?.data?.error || 'No se pudo conectar')
   } finally {
-    smtpSaving.value = false
+    conectando.value = false
+  }
+}
+
+async function desconectarMiEmail() {
+  const ok = await confirm({
+    title: '¿Volver al correo de la plataforma?',
+    message: 'Tus mails dejarán de salir desde tu casilla y volverán a salir desde la plataforma (con tu email de contacto como respuesta).',
+    confirmText: 'Desconectar',
+  })
+  if (!ok) return
+  try {
+    await desconectarEmail()
+    await club.fetch()
+    showToast('success', 'Volviste al correo de la plataforma')
+  } catch (e) {
+    showToast('danger', e?.response?.data?.error || 'Error al desconectar')
   }
 }
 
@@ -378,55 +392,86 @@ async function runTestSmtp() {
           </div>
         </div>
 
-        <!-- Configuración de correo (SMTP) -->
+        <!-- Correo del club -->
         <div class="pv__card pv__card--mt">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:#f0fdf4;color:#15803d"><i class="bi bi-envelope-at"></i></div>
             <div>
-              <div class="pv__card-title">Correo saliente</div>
-              <div class="pv__card-sub">Personalización del remitente para mails a socios</div>
+              <div class="pv__card-title">Correo del club</div>
+              <div class="pv__card-sub">Desde dónde salen los mails a los socios</div>
             </div>
-            <div class="pv__smtp-badge" :class="smtpConfigured ? 'pv__smtp-badge--ok' : 'pv__smtp-badge--off'">
-              <i :class="smtpConfigured ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
-              {{ smtpConfigured ? 'Activo' : 'Sin configurar' }}
+            <div class="pv__smtp-badge" :class="emailModo === 'propio' ? 'pv__smtp-badge--ok' : 'pv__smtp-badge--off'">
+              <i :class="emailModo === 'propio' ? 'bi bi-check-circle-fill' : 'bi bi-cloud-fill'"></i>
+              {{ emailModo === 'propio' ? 'Tu casilla' : 'Plataforma' }}
             </div>
           </div>
           <div class="pv__card-body">
 
-            <div v-if="!smtpConfigured" class="pv__infobox">
-              <i class="bi bi-info-circle-fill"></i>
-              <span>El servidor de correo aún no está configurado. Contactá al administrador de la plataforma para activar el envío de mails.</span>
-            </div>
+            <!-- Modo plataforma -->
+            <template v-if="emailModo !== 'propio'">
+              <div class="pv__infobox" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
+                <i class="bi bi-info-circle-fill"></i>
+                <span>Tus mails salen <strong>a nombre del club</strong> desde la plataforma. Las respuestas de los socios llegan a tu email de contacto (<strong>{{ emailReplyTo || '—' }}</strong>). No tenés que configurar nada.</span>
+              </div>
+              <div>
+                <button class="pv__btn-outline" @click="mostrarConectar = !mostrarConectar">
+                  <i class="bi bi-box-arrow-in-right"></i> Conectar mi propio email
+                </button>
+              </div>
+            </template>
 
-            <div class="pv__grid">
-              <div class="pv__field">
-                <label class="pv__label">Nombre del remitente</label>
-                <input class="pv__input" v-model.trim="smtpForm.smtp_from_name" placeholder="Club Verde Cannabis" :disabled="!smtpConfigured" />
-                <span class="pv__hint">El nombre que verá el socio como "De:"</span>
+            <!-- Modo propio (conectado) -->
+            <template v-else>
+              <div class="pv__infobox" style="background:#f0fdf4;border-color:#bbf7d0;color:#15803d">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Conectado. Los mails salen desde <strong>{{ emailRemitente }}</strong>.</span>
               </div>
-              <div class="pv__field">
-                <label class="pv__label">Email remitente</label>
-                <input class="pv__input" type="email" v-model.trim="smtpForm.smtp_from" placeholder="no-reply@clubverde.com" :disabled="!smtpConfigured" />
-                <span class="pv__hint">Dejá vacío para usar el usuario del servidor</span>
+              <div class="pv__smtp-actions">
+                <button class="pv__btn-outline" :disabled="smtpTesting" @click="runTestSmtp">
+                  <DsSpinner v-if="smtpTesting" :size="15" />
+                  <i v-else class="bi bi-send"></i>
+                  {{ smtpTesting ? 'Enviando…' : 'Enviar mail de prueba' }}
+                </button>
+                <button class="pv__btn-danger-ghost" @click="desconectarMiEmail">
+                  <i class="bi bi-box-arrow-left"></i> Desconectar
+                </button>
               </div>
-              <div class="pv__field pv__field--full">
-                <label class="pv__label">Contraseña del servidor de correo</label>
-                <input class="pv__input" type="password" v-model="smtpForm.smtp_pass" :placeholder="smtpConfigured ? 'Dejar vacío para no cambiar' : '—'" autocomplete="new-password" :disabled="!smtpConfigured" />
-                <span class="pv__hint">Solo si necesitás actualizarla (ej: cambiaste tu App Password de Gmail)</span>
-              </div>
-            </div>
+            </template>
 
-            <div class="pv__smtp-actions">
-              <button class="pv__btn-save" :disabled="smtpSaving || !smtpConfigured" @click="saveSmtp">
-                <DsSpinner v-if="smtpSaving" :size="15" />
-                <i v-else class="bi bi-floppy"></i>
-                {{ smtpSaving ? 'Guardando…' : 'Guardar' }}
-              </button>
-              <button class="pv__btn-outline" :disabled="!smtpConfigured || smtpTesting" @click="runTestSmtp">
-                <DsSpinner v-if="smtpTesting" :size="15" />
-                <i v-else class="bi bi-send"></i>
-                {{ smtpTesting ? 'Enviando…' : 'Enviar mail de prueba' }}
-              </button>
+            <!-- Form conectar mi email -->
+            <div v-if="emailModo !== 'propio' && mostrarConectar" class="pv__connect">
+              <div class="pv__infobox">
+                <i class="bi bi-shield-lock-fill"></i>
+                <span>
+                  Para conectar Gmail necesitás una <strong>contraseña de aplicación</strong> (no tu contraseña normal):
+                  activá la verificación en 2 pasos y generá una en
+                  <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">myaccount.google.com/apppasswords</a>.
+                </span>
+              </div>
+              <div class="pv__grid">
+                <div class="pv__field">
+                  <label class="pv__label">Email del club</label>
+                  <input class="pv__input" type="email" v-model.trim="conectarForm.email" placeholder="miclub@gmail.com" autocomplete="off" />
+                  <span class="pv__hint">Gmail, Outlook o Yahoo se detectan solos</span>
+                </div>
+                <div class="pv__field">
+                  <label class="pv__label">Contraseña de aplicación</label>
+                  <input class="pv__input" type="password" v-model.trim="conectarForm.app_password" placeholder="16 caracteres" autocomplete="new-password" />
+                </div>
+                <div class="pv__field pv__field--full">
+                  <label class="pv__label">Nombre para mostrar <span style="font-weight:400;color:#94a3b8">(opcional)</span></label>
+                  <input class="pv__input" v-model.trim="conectarForm.from_name" :placeholder="form.name || 'Mi Club'" />
+                  <span class="pv__hint">Lo que ve el socio como remitente</span>
+                </div>
+              </div>
+              <div class="pv__smtp-actions">
+                <button class="pv__btn-save" :disabled="conectando" @click="conectarMiEmail">
+                  <DsSpinner v-if="conectando" :size="15" />
+                  <i v-else class="bi bi-plug"></i>
+                  {{ conectando ? 'Conectando…' : 'Probar y conectar' }}
+                </button>
+                <button class="pv__btn-outline" @click="mostrarConectar = false">Cancelar</button>
+              </div>
             </div>
 
           </div>
@@ -567,5 +612,7 @@ async function runTestSmtp() {
 .pv__smtp-badge--off { background: #f1f5f9; color: #64748b; }
 
 .pv__smtp-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.pv__connect { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #e2e8f0; display: flex; flex-direction: column; gap: 1rem; }
+.pv__connect a { color: #2563eb; font-weight: 600; }
 </style>
 

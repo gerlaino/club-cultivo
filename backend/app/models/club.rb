@@ -188,6 +188,48 @@ class Club < ApplicationRecord
     }
   end
 
+  # ── Envío de email: plataforma-gestionado por defecto, "propio" si el club conectó su casilla ──
+  PLATFORM_FROM = ENV.fetch('MAIL_FROM', 'noreply@cultivoespacial.com').freeze
+
+  # Servidor/puerto SMTP por dominio de email — para que el club solo cargue email + contraseña.
+  SMTP_PROVIDERS = {
+    'gmail.com'      => { host: 'smtp.gmail.com',      port: 587 },
+    'googlemail.com' => { host: 'smtp.gmail.com',      port: 587 },
+    'outlook.com'    => { host: 'smtp.office365.com',  port: 587 },
+    'hotmail.com'    => { host: 'smtp.office365.com',  port: 587 },
+    'live.com'       => { host: 'smtp.office365.com',  port: 587 },
+    'live.com.ar'    => { host: 'smtp.office365.com',  port: 587 },
+    'yahoo.com'      => { host: 'smtp.mail.yahoo.com', port: 587 },
+    'yahoo.com.ar'   => { host: 'smtp.mail.yahoo.com', port: 587 },
+  }.freeze
+
+  def self.smtp_provider_for(email)
+    dominio = email.to_s.split('@').last&.downcase
+    SMTP_PROVIDERS[dominio]
+  end
+
+  # El club conectó su propia casilla (manda desde su email).
+  def email_propio? = smtp_configured?
+
+  # Remitente del correo según el modo.
+  def email_from
+    if email_propio?
+      "#{smtp_from_name.presence || name} <#{smtp_from.presence || smtp_user}>"
+    else
+      "#{name} <#{PLATFORM_FROM}>"
+    end
+  end
+
+  # En modo plataforma, las respuestas van al email del club.
+  def email_reply_to
+    email_propio? ? nil : email.presence
+  end
+
+  # nil → usa la config global de ActionMailer (plataforma); si propio, el SMTP del club.
+  def email_delivery_options
+    email_propio? ? smtp_settings : nil
+  end
+
   def twilio_configurado?
     twilio_account_sid.present? && twilio_auth_token_enc.present? && twilio_whatsapp_from.present?
   end
