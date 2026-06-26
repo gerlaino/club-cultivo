@@ -523,6 +523,8 @@ export const getStockTrazabilidad = (id)                  => api.get(`/stocks/${
 // ── ARICCAME ──────────────────────────────────────────────────────────────────
 export const listAriccameRegistros = (params = {}) => api.get('/ariccame_registros', { params })
 export const getAriccameRegistro   = (id)          => api.get(`/ariccame_registros/${id}`)
+export const reenviarAriccame      = (id)          => api.post(`/ariccame_registros/${id}/reenviar`)
+export const transmitirPendientesAriccame = ()     => api.post('/ariccame_registros/transmitir_pendientes')
 
 // ── Público — QR stocks ───────────────────────────────────────────────────────
 export const getStockPublico  = (codigoQr) => axios.get(`/s/${codigoQr}`)

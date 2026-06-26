@@ -29,12 +29,17 @@
         <span class="aud-card__label">Cumplimiento</span>
         <span class="aud-card__desc">Alertas y tasas regulatorias</span>
       </RouterLink>
+      <RouterLink to="/auditor/inase" class="aud-card">
+        <FileBadge :size="28" :stroke-width="1.5" />
+        <span class="aud-card__label">INASE</span>
+        <span class="aud-card__desc">Variedades registradas y su producción</span>
+      </RouterLink>
     </div>
   </div>
 </template>
 
 <script setup>
-import { FileCheck, Sprout, Package, Building2, ShieldAlert } from 'lucide-vue-next'
+import { FileCheck, Sprout, Package, Building2, ShieldAlert, FileBadge } from 'lucide-vue-next'
 </script>
 
 <style scoped>

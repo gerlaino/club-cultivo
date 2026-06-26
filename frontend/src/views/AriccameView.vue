@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { listAriccameRegistros } from '../lib/api.js'
+import { listAriccameRegistros, reenviarAriccame, transmitirPendientesAriccame } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const registros  = ref([])
@@ -8,6 +8,8 @@ const meta       = ref({ total: 0, pagina: 1, limite: 30, pendientes: 0, con_err
 const loading    = ref(true)
 const detalle    = ref(null)
 const infoAbierto = ref(false)
+const txId       = ref(null)
+const txBatch    = ref(false)
 
 const filtros = ref({ estado: '', tipo: '', pagina: 1 })
 
@@ -85,6 +87,33 @@ function tipoLabel(t) {
 }
 
 const hayFiltros = computed(() => filtros.value.estado || filtros.value.tipo)
+
+const reintentables = computed(() => meta.value.pendientes + meta.value.con_error)
+
+async function transmitir(r) {
+  if (txId.value) return
+  txId.value = r.id
+  try {
+    await reenviarAriccame(r.id)
+    await cargar()
+  } catch {
+    // el error queda reflejado en el estado del registro al recargar
+    await cargar()
+  } finally {
+    txId.value = null
+  }
+}
+
+async function transmitirPendientes() {
+  if (txBatch.value || reintentables.value === 0) return
+  txBatch.value = true
+  try {
+    await transmitirPendientesAriccame()
+    await cargar()
+  } finally {
+    txBatch.value = false
+  }
+}
 </script>
 
 <template>
@@ -99,10 +128,19 @@ const hayFiltros = computed(() => filtros.value.estado || filtros.value.tipo)
         </div>
         <p class="ar__sub">Trazabilidad de ingresos y dispensaciones reportados al sistema nacional</p>
       </div>
-      <button class="ar__info-toggle" @click="infoAbierto = !infoAbierto">
-        <i class="bi" :class="infoAbierto ? 'bi-chevron-up' : 'bi-info-circle'"></i>
-        {{ infoAbierto ? 'Ocultar' : '¿Cómo funciona?' }}
-      </button>
+      <div class="ar__header-actions">
+        <button
+          v-if="reintentables > 0"
+          class="ar__btn-tx-batch" :disabled="txBatch"
+          @click="transmitirPendientes">
+          <i class="bi" :class="txBatch ? 'bi-arrow-repeat ar__spin' : 'bi-send'"></i>
+          {{ txBatch ? 'Transmitiendo…' : `Transmitir pendientes (${reintentables})` }}
+        </button>
+        <button class="ar__info-toggle" @click="infoAbierto = !infoAbierto">
+          <i class="bi" :class="infoAbierto ? 'bi-chevron-up' : 'bi-info-circle'"></i>
+          {{ infoAbierto ? 'Ocultar' : '¿Cómo funciona?' }}
+        </button>
+      </div>
     </div>
 
     <!-- Panel info colapsable -->
@@ -258,7 +296,13 @@ const hayFiltros = computed(() => filtros.value.estado || filtros.value.tipo)
             <td class="ar__td-fecha">{{ formatFecha(r.created_at) }}</td>
             <td class="ar__td-fecha">{{ formatFecha(r.enviado_at) }}</td>
             <td class="ar__td-fecha">{{ formatFecha(r.confirmado_at) }}</td>
-            <td>
+            <td class="ar__td-acciones">
+              <button
+                v-if="['pendiente', 'error'].includes(r.estado) && r.intentos < 3"
+                class="ar__btn-tx" :disabled="txId === r.id"
+                @click="transmitir(r)" :title="r.estado === 'error' ? 'Reintentar' : 'Transmitir'">
+                <i class="bi bi-send"></i>
+              </button>
               <button class="ar__btn-detail" @click="detalle = r" title="Ver detalle">
                 <i class="bi bi-eye"></i>
               </button>
@@ -369,6 +413,18 @@ const hayFiltros = computed(() => filtros.value.estado || filtros.value.tipo)
   cursor: pointer; transition: all .15s; white-space: nowrap; flex-shrink: 0;
 }
 .ar__info-toggle:hover { background: #f1f5f9; border-color: #cbd5e1; }
+
+.ar__header-actions { display: inline-flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+.ar__btn-tx-batch {
+  display: inline-flex; align-items: center; gap: .45rem;
+  background: #2563eb; border: 1px solid #2563eb; border-radius: 8px;
+  padding: .5rem .95rem; font-size: .82rem; font-weight: 600; color: #fff;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.ar__btn-tx-batch:hover { background: #1d4ed8; border-color: #1d4ed8; }
+.ar__btn-tx-batch:disabled { opacity: .6; cursor: default; }
+.ar__spin { display: inline-block; animation: ar-spin 1s linear infinite; }
+@keyframes ar-spin { to { transform: rotate(360deg); } }
 
 /* Info panel */
 .ar__info-panel {
@@ -486,6 +542,15 @@ const hayFiltros = computed(() => filtros.value.estado || filtros.value.tipo)
   transition: all .12s;
 }
 .ar__btn-detail:hover { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+
+.ar__td-acciones { display: flex; align-items: center; gap: .35rem; }
+.ar__btn-tx {
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;
+  padding: .2rem .45rem; cursor: pointer; color: #2563eb; font-size: .85rem;
+  transition: all .12s;
+}
+.ar__btn-tx:hover { background: #dbeafe; border-color: #93c5fd; }
+.ar__btn-tx:disabled { opacity: .5; cursor: default; }
 
 /* Pagination */
 .ar__pagination {

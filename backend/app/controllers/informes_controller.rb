@@ -217,6 +217,47 @@ class InformesController < ApplicationController
     }
   end
 
+  # INASE — Registro de variedades del club + trazabilidad a producción.
+  # Liga cada genética (con su dato INASE) con lo que realmente produjo: lotes,
+  # plantas y gramos. Es el informe regulatorio de variedades cultivadas.
+  def inase
+    club      = current_user.club
+    geneticas = club.geneticas.order(:nombre)
+    lotes     = club.lotes
+
+    lotes_por_gen   = lotes.group(:genetica_id).count
+    plantas_por_gen = lotes.group(:genetica_id).sum(:plants_count)
+    gramos_por_gen  = lotes.where.not(rendimiento_real_g: nil).group(:genetica_id).sum(:rendimiento_real_g)
+
+    filas = geneticas.map do |g|
+      {
+        id:                    g.id,
+        nombre:                g.nombre,
+        tipo:                  g.tipo,
+        registrada_inase:      g.registrada_inase,
+        numero_registro_inase: g.numero_registro_inase,
+        categoria_inase:       g.categoria_inase,
+        fecha_registro_inase:  g.fecha_registro_inase,
+        criador:               g.criador,
+        thc:                   g.thc&.to_f,
+        cbd:                   g.cbd&.to_f,
+        lotes:                 lotes_por_gen[g.id] || 0,
+        plantas:               plantas_por_gen[g.id].to_i,
+        gramos_producidos:     (gramos_por_gen[g.id] || 0).to_f.round(1),
+      }
+    end
+
+    registradas = filas.count { |f| f[:registrada_inase] }
+    render json: {
+      total_geneticas:   filas.size,
+      registradas_inase: registradas,
+      sin_registrar:     filas.size - registradas,
+      gramos_totales:    filas.sum { |f| f[:gramos_producidos] }.round(1),
+      lotes_totales:     filas.sum { |f| f[:lotes] },
+      geneticas:         filas,
+    }
+  end
+
   private
 
   # Datos del informe REPROCANN — compartidos por la respuesta JSON y el PDF

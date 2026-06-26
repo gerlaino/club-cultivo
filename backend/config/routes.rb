@@ -302,7 +302,10 @@ Rails.application.routes.draw do
 
     resources :document_templates
 
-    resources :ariccame_registros, only: [:index, :show]
+    resources :ariccame_registros, only: [:index, :show] do
+      member     { post :reenviar }
+      collection { post :transmitir_pendientes }
+    end
 
     resource :plan, only: [:show], controller: 'plan'
     resources :documentos, only: [:index, :show, :create, :update, :destroy] do
@@ -328,6 +331,7 @@ Rails.application.routes.draw do
       get :sedes,           action: :sedes
       get :cumplimiento
       get :plan_vs_real
+      get :inase
     end
 
     resources :sedes do

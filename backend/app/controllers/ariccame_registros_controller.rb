@@ -33,6 +33,33 @@ class AriccameRegistrosController < ApplicationController
     render json: { error: 'Registro no encontrado' }, status: :not_found
   end
 
+  # POST /ariccame_registros/:id/reenviar — transmite (o reintenta) un registro.
+  def reenviar
+    registro = current_user.club.ariccame_registros.find(params[:id])
+    res = Ariccame::Transmisor.call(registro)
+    if res.ok?
+      render json: { data: serialize(registro.reload) }
+    else
+      render json: { error: res.error, data: serialize(registro.reload) }, status: :unprocessable_entity
+    end
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Registro no encontrado' }, status: :not_found
+  end
+
+  # POST /ariccame_registros/transmitir_pendientes — transmite todos los pendientes
+  # y los errores reintentables de una.
+  def transmitir_pendientes
+    registros = current_user.club.ariccame_registros
+                            .where(estado: %w[pendiente error])
+                            .where('intentos < ?', Ariccame::Transmisor::MAX_INTENTOS)
+    ok = 0
+    err = 0
+    registros.find_each do |r|
+      Ariccame::Transmisor.call(r).ok? ? (ok += 1) : (err += 1)
+    end
+    render json: { confirmados: ok, con_error: err, total: ok + err }
+  end
+
   private
 
   def require_admin!
