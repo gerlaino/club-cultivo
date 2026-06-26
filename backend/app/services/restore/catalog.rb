@@ -6,9 +6,16 @@ module Restore
   # `complex: true` = la restauración re-aplica efectos colaterales y necesita un Restorer con
   # validación de conflictos (Fase 3). Hasta entonces la papelera no las restaura.
   module Catalog
-    Entry = Struct.new(:key, :model_name, :label, :group, :complex, :descriptor, :search, keyword_init: true) do
+    Entry = Struct.new(:key, :model_name, :label, :group, :complex, :restorer, :descriptor, :search, keyword_init: true) do
       def model = model_name.constantize
       def complex? = complex
+
+      # Clase Restorer dedicada (validación + re-aplicación de efectos), si la entidad la tiene.
+      def restorer_class = restorer&.constantize
+
+      # ¿Se puede restaurar hoy desde la papelera? Las simples siempre; las complejas, solo si
+      # ya tienen su Restorer implementado.
+      def restaurable_ahora? = !complex? || restorer.present?
 
       # Texto humano para identificar el registro en la lista.
       def describe(record)
@@ -75,11 +82,11 @@ module Restore
       { key: 'cobro',               model_name: 'Cobro',              label: 'Cobro',               group: 'Dispensación', complex: true, descriptor: ->(r) { "Cobro ##{r.id}" } },
       { key: 'cuenta_corriente_movimiento', model_name: 'CuentaCorrienteMovimiento', label: 'Movimiento de cuenta corriente', group: 'Socios', complex: true, descriptor: ->(r) { "Movimiento ##{r.id}" } },
       { key: 'movimiento_contable', model_name: 'MovimientoContable', label: 'Movimiento contable', group: 'Contabilidad', complex: true, descriptor: ->(r) { "Asiento ##{r.id}" } },
-      { key: 'costo_lote',          model_name: 'CostoLote',          label: 'Costo de lote',       group: 'Contabilidad', complex: true, descriptor: ->(r) { "Costo ##{r.id}" } },
+      { key: 'costo_lote',          model_name: 'CostoLote',          label: 'Costo de lote',       group: 'Contabilidad', complex: true, restorer: 'Restore::Restorers::CostoLote', descriptor: ->(r) { "Costo ##{r.id}" } },
       { key: 'pesada',              model_name: 'Pesada',             label: 'Pesada',              group: 'Cultivo', complex: true, descriptor: ->(r) { "Pesada ##{r.id}" } },
       { key: 'pesaje_manicura',     model_name: 'PesajeManicura',     label: 'Pesaje de manicura',  group: 'Cultivo', complex: true, descriptor: ->(r) { "Pesaje ##{r.id}" } },
       { key: 'reserva',             model_name: 'Reserva',            label: 'Reserva',             group: 'Stock', complex: true, descriptor: ->(r) { "Reserva ##{r.id}" } },
-      { key: 'ariccame_registro',   model_name: 'AriccameRegistro',   label: 'Registro ARICCAME',   group: 'Regulatorio', complex: true, descriptor: ->(r) { "Registro ##{r.id}" } },
+      { key: 'ariccame_registro',   model_name: 'AriccameRegistro',   label: 'Registro ARICCAME',   group: 'Regulatorio', complex: true, restorer: 'Restore::Restorers::AriccameRegistro', descriptor: ->(r) { "Registro ##{r.id}" } },
     ].map { |h| Entry.new(**h) }.freeze
 
     BY_KEY = ENTRIES.index_by(&:key).freeze

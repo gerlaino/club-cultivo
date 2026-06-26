@@ -58,7 +58,14 @@ async function restaurar(fila) {
     toast.success(data.mensaje || 'Restaurado')
     await cargar()
   } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo restaurar')
+    const resp = e?.response?.data
+    const conflictos = resp?.conflictos
+    if (conflictos?.length) {
+      // Bloqueo por conflictos con el estado actual: mostramos el motivo exacto.
+      conflictos.forEach(c => toast.error(c.mensaje, { timeout: 7000 }))
+    } else {
+      toast.error(resp?.error || 'No se pudo restaurar')
+    }
   } finally {
     restaurando.value = null
   }

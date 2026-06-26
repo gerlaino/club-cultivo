@@ -33,7 +33,7 @@ class PapeleraController < ApplicationController
             descripcion: desc,
             deleted_at:  record.deleted_at,
             deleted_by:  nombre_deleter(record),
-            restaurable: !entry.complex?,
+            restaurable: entry.restaurable_ahora?,
           }
         end
       end
@@ -53,13 +53,15 @@ class PapeleraController < ApplicationController
   end
 
   # POST /papelera/restaurar { tipo, id } — restaura un registro borrado.
+  # Simples → des-borra. Complejas → Restorer dedicado (valida conflictos y re-aplica efectos);
+  # si choca con el estado actual, bloquea (422) y devuelve los motivos.
   def restaurar
     entry = Restore::Catalog.find(params[:tipo])
     return render json: { error: 'Tipo no restaurable' }, status: :unprocessable_entity unless entry
 
-    if entry.complex?
+    if entry.complex? && entry.restorer_class.nil?
       return render json: {
-        error: 'Esta entidad requiere restauración con validación de conflictos (próximamente).',
+        error: 'Esta entidad todavía no tiene restauración con validación disponible.',
       }, status: :unprocessable_entity
     end
 
@@ -67,7 +69,17 @@ class PapeleraController < ApplicationController
       record = entry.model.find_soft_deleted(params[:id])
       return render json: { error: 'No pertenece a tu club' }, status: :forbidden unless del_club?(record)
 
-      record.restore_record!
+      if entry.restorer_class
+        res = entry.restorer_class.call(record)
+        unless res.ok?
+          return render json: {
+            error:      'No se puede restaurar por conflictos con el estado actual.',
+            conflictos: res.conflicts.map { |c| { codigo: c.codigo, mensaje: c.mensaje } },
+          }, status: :unprocessable_entity
+        end
+      else
+        record.restore_record!
+      end
     end
 
     render json: { ok: true, mensaje: "#{entry.label} restaurado." }
