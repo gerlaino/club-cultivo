@@ -104,7 +104,7 @@ const salas = computed(() => salasStore.items.filter(s => s.state === 'activa'))
 const lotesEnSala = computed(() =>
   lotesStore.items.filter(l =>
     String(l.sala_id) === String(salaId.value) &&
-    ['vegetativo', 'floracion', 'secado'].includes(l.estado)
+    ['vegetativo', 'floracion'].includes(l.estado)
   )
 )
 

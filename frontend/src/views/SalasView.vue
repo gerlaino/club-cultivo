@@ -24,8 +24,7 @@ const canCreate = computed(() => ["admin","supervisor"].includes(auth.role));
 function kindLabel(k) {
   const map = {
     vegetativo: "Vegetativo", floracion: "Floración", cosecha: "Cosecha",
-    mixta: "Mixta", madre: "Madres", clon: "Clones", secado: "Secado",
-    curado: "Curado", manicura: "Manicura",
+    mixta: "Mixta", madre: "Madres", clon: "Clones", curado: "Curado", manicura: "Manicura",
   };
   return map[k] || k || "—";
 }
@@ -45,7 +44,6 @@ function stateLabel(state) {
 function kindColor(k) {
   const map = {
     vegetativo: '#15803d', floracion: '#9333ea', cosecha: '#dc2626',
-    secado: '#b45309', curado: '#0369a1', manicura: '#db2777',
     madre: '#16a34a', clon: '#2563eb', mixta: '#7c3aed',
   };
   return map[k] || '#64748b';
@@ -53,8 +51,7 @@ function kindColor(k) {
 
 function kindEmoji(k) {
   const map = {
-    vegetativo: '🍃', floracion: '🌸', cosecha: '🌾', secado: '💨',
-    curado: '🫙', manicura: '✂️', madre: '🌱', clon: '🔁', mixta: '🔀',
+    vegetativo: '🍃', floracion: '🌸', cosecha: '🌾', curado: '🫙', manicura: '✂️', madre: '🌱', clon: '🔁', mixta: '🔀',
   };
   return map[k] || '🏠';
 }
@@ -73,7 +70,6 @@ const KIND_TABS = [
   { value: 'vegetativo', emoji: '🍃', label: 'Vegetativo' },
   { value: 'floracion',  emoji: '🌸', label: 'Floración'  },
   { value: 'cosecha',    emoji: '🌾', label: 'Cosecha'    },
-  { value: 'secado',     emoji: '💨', label: 'Secado'     },
   { value: 'curado',     emoji: '🫙', label: 'Curado'     },
   { value: 'mixta',      emoji: '🔀', label: 'Mixta'      },
   { value: 'madre',      emoji: '🌱', label: 'Madres'     },

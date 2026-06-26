@@ -5,7 +5,6 @@ export const ESTADO_META = {
   floracion:          { label: 'Floración',          color: '#d97706', bg: '#fef3c7', emoji: '🌸' },
   cosecha:            { label: 'Cosecha',            color: '#059669', bg: '#d1fae5', emoji: '🌿' },
   en_manicura:        { label: 'En manicura',        color: '#7c3aed', bg: '#ede9fe', emoji: '✂️'  },
-  secado:             { label: 'Manicura',           color: '#78350f', bg: '#fef3c7', emoji: '✂️'  },
   manicura_pendiente: { label: 'Manicura pendiente', color: '#7c3aed', bg: '#ede9fe', emoji: '✂️'  },
   curado:             { label: 'Curado',             color: '#2563eb', bg: '#dbeafe', emoji: '🫙' },
   finalizado:         { label: 'Finalizado',         color: '#1b5e20', bg: '#dcfce7', emoji: '✅' },
@@ -53,11 +52,10 @@ export const TAREAS_LOTE = [
   { key: 'registro_ambiental',   label: 'Registro ambiental',  emoji: '🌡️' },
 ]
 
-export const CICLO_BASE = ['vegetativo', 'floracion', 'cosecha', 'secado', 'curado']
+export const CICLO_BASE = ['vegetativo', 'floracion', 'cosecha', 'curado']
 
 export const FASE_LABELS = {
-  vegetativo: 'Vegetativo', floracion: 'Floración', secado: 'Manicura',
-  curado: 'Curado', cosecha: 'Cosecha', semilla: 'Germinación',
+  vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', semilla: 'Germinación',
   manicura: 'Manicura', cerrado: 'Cerrado',
 }
 
@@ -67,7 +65,7 @@ export const STATE_MAP = {
   curado: 'cosechado', finalizado: 'cosechado',
 }
 
-export const POST_HARVEST_ESTADOS = ['cosecha', 'secado', 'manicura_pendiente', 'en_manicura', 'curado', 'finalizado']
+export const POST_HARVEST_ESTADOS = ['cosecha', 'manicura_pendiente', 'en_manicura', 'curado', 'finalizado']
 
 export function em(e)  { return ESTADO_META[e]       || { label: e || '—', color: '#64748b', bg: '#f1f5f9', emoji: '•' } }
 export function pm(s)  { return PLANT_STATE_META[s]  || { label: s || '—', color: '#64748b', emoji: '🌿' } }
@@ -115,6 +113,6 @@ export function phaseBannerMsg(estado) {
   if (estado === 'cosecha') return 'Lote cosechado. Manicura toma desde acá.'
   if (estado === 'semilla') return 'Plantas en germinación. El sistema avanzará automáticamente cuando estén listas.'
   if (estado === 'finalizado') return 'Lote finalizado. Stock confirmado y disponible para dispensar.'
-  if (['en_manicura', 'secado', 'manicura_pendiente', 'manicura', 'curado', 'cerrado'].includes(estado)) return 'Este lote pasó tu turno. Otro rol toma desde acá.'
+  if (['en_manicura', 'manicura_pendiente', 'manicura', 'curado', 'cerrado'].includes(estado)) return 'Este lote pasó tu turno. Otro rol toma desde acá.'
   return null
 }

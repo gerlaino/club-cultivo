@@ -30,13 +30,12 @@ const canEdit = computed(() => ["admin","cultivador"].includes(auth.role));
 const canExport = computed(() => ["admin","auditor","supervisor","cultivador"].includes(auth.role));
 
 // ---------- Estado meta ----------
-const ESTADOS = ["planificacion","vegetativo","floracion","secado","cosechado","finalizado"];
+const ESTADOS = ["planificacion","vegetativo","floracion","cosechado","finalizado"];
 
 const ESTADO_META = {
   planificacion: { label:"Planificación", dot:"#0284C7", bg:"#E0F2FE", text:"#0369a1", bar:"#0284C7", icon:"📋" },
   vegetativo:    { label:"Vegetativo",    dot:"#3F6452", bg:"#E8F0EB", text:"#2D4A3E", bar:"#5A8A72", icon:"🌱" },
   floracion:     { label:"Floración",     dot:"#D97706", bg:"#FEF3C7", text:"#92400e", bar:"#D97706", icon:"🌸" },
-  secado:        { label:"Manicura",       dot:"#6B7280", bg:"#F3F4F6", text:"#374151", bar:"#9CA3AF", icon:"✂️" },
   cosechado:     { label:"Cosechado",     dot:"#5A8A72", bg:"#F4F8F5", text:"#1A3D2E", bar:"#3F6452", icon:"✂️" },
   finalizado:    { label:"Finalizado",    dot:"#1A3D2E", bg:"#E8F0EB", text:"#0F2A1E", bar:"#1A3D2E", icon:"✅" },
 };

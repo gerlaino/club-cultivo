@@ -180,7 +180,7 @@ const cantidadCambiada = computed(() =>
 const ESTADOS_EXTRA = computed(() => {
   const base = ['semilla', 'esqueje', 'vegetativo', 'floracion', 'cosecha']
   const cur = editLoteForm.value.estado
-  const labels = { en_manicura: 'En manicura', secado: 'Secado / Manicura', manicura_pendiente: 'Manicura pendiente', curado: 'Curado', finalizado: 'Finalizado' }
+  const labels = { en_manicura: 'En manicura', manicura_pendiente: 'Manicura pendiente', curado: 'Curado', finalizado: 'Finalizado' }
   return (cur && !base.includes(cur)) ? [{ v: cur, l: labels[cur] || cur }] : []
 })
 

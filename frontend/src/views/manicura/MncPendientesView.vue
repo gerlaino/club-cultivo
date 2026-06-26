@@ -5,7 +5,7 @@
     <div class="mnp__header">
       <div>
         <h1 class="mnp__title">Cosechas pendientes</h1>
-        <p class="mnp__sub">Cosechas en secado listas para manicurar y enviadas a aprobación.</p>
+        <p class="mnp__sub">Cosechas en manicura y enviadas a aprobación.</p>
       </div>
     </div>
 
@@ -31,7 +31,7 @@
     <div v-else-if="!lotesFiltrados.length" class="mnp__empty">
       <Wind :size="32" :stroke-width="1.25" />
       <p>Sin cosechas pendientes</p>
-      <span>Cuando una cosecha complete el secado aparecerá aquí.</span>
+      <span>Cuando una cosecha entre en manicura aparecerá aquí.</span>
     </div>
 
     <!-- List -->
@@ -57,7 +57,7 @@
             <Package :size="12" :stroke-width="2" /> {{ lote.plants_count }}
           </span>
           <span class="mnp__badge" :class="{
-            'mnp__badge--secado':   lote.estado === 'en_manicura' || lote.estado === 'secado',
+            'mnp__badge--secado':    lote.estado === 'en_manicura',
             'mnp__badge--pendiente': lote.estado === 'manicura_pendiente'
           }">
             {{ lote.estado === 'manicura_pendiente' ? 'Pdte. aprobación' : 'Asignado' }}
@@ -112,7 +112,7 @@ async function cargar() {
   loading.value = true
   try {
     const { data } = await listLotes()
-    lotes.value = (data || []).filter(l => ['en_manicura', 'secado', 'manicura_pendiente'].includes(l.estado))
+    lotes.value = (data || []).filter(l => ['en_manicura', 'manicura_pendiente'].includes(l.estado))
   } catch {
     lotes.value = []
   } finally {

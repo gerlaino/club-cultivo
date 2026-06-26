@@ -82,11 +82,10 @@ const ESTADOS = [
   { value:'floracion',  label:'Floración' },
   { value:'cosecha',    label:'Cosecha' },
   { value:'en_manicura',label:'Manicura' },
-  { value:'secado',     label:'Secado' },
-  { value:'curado',     label:'Curado' },
+    { value:'curado',     label:'Curado' },
 ]
 
-const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', secado:'#d97706', curado:'#2563eb' }
+const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', curado:'#2563eb' }
 const estadoColor = e => EC[e] || '#64748b'
 const estadoLabel = e => ESTADOS.find(x => x.value === e)?.label || e || '—'
 

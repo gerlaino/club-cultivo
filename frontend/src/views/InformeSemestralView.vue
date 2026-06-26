@@ -48,7 +48,6 @@ function estadoMeta(estado) {
     semilla:    { label: "Semilla",    color: "#64748b", bg: "rgba(100,116,139,.1)" },
     vegetativo: { label: "Vegetativo", color: "#15803d", bg: "rgba(21,128,61,.1)"  },
     floracion:  { label: "Floración",  color: "#d97706", bg: "rgba(217,119,6,.1)"  },
-    secado:     { label: "Manicura",   color: "#475569", bg: "rgba(71,85,105,.1)"  },
     cosechado:  { label: "Cosechado",  color: "#0369a1", bg: "rgba(3,105,161,.1)"  },
     finalizado: { label: "Finalizado", color: "#1b5e20", bg: "rgba(27,94,32,.1)"   },
   }[estado] || { label: estado, color: "#64748b", bg: "rgba(100,116,139,.1)" }
@@ -312,7 +311,7 @@ onMounted(() => cargar())
               <div class="ir__section-footer">
                 <div class="ir__stat"><span class="ir__stat-val ir__stat-val--green">{{ informe.produccion.plantas_en_vegetativo }}</span><span class="ir__stat-label">En vegetativo</span></div>
                 <div class="ir__stat"><span class="ir__stat-val ir__stat-val--amber">{{ informe.produccion.plantas_en_floracion }}</span><span class="ir__stat-label">En floración</span></div>
-                <div class="ir__stat"><span class="ir__stat-val">{{ informe.produccion.plantas_en_secado }}</span><span class="ir__stat-label">En secado</span></div>
+                <div class="ir__stat"><span class="ir__stat-val">{{ informe.produccion.plantas_en_secado }}</span><span class="ir__stat-label">En manicura</span></div>
                 <div class="ir__stat"><span class="ir__stat-val ir__stat-val--blue">{{ informe.produccion.plantas_totales }}</span><span class="ir__stat-label">Total plantas</span></div>
               </div>
             </div>

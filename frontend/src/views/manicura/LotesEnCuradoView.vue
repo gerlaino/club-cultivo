@@ -16,7 +16,7 @@
     <div v-else-if="!lotes.length" class="lv__empty">
       <div class="lv__empty-ico"><Container :size="40" :stroke-width="1.25" /></div>
       <p class="lv__empty-title">Sin lotes en curado</p>
-      <p class="lv__empty-sub">Los lotes que completen el secado aparecerán aquí.</p>
+      <p class="lv__empty-sub">Los lotes que completen la manicura aparecerán aquí.</p>
     </div>
 
     <div v-else class="lv__cards">

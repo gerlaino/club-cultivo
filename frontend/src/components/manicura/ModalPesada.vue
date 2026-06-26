@@ -102,14 +102,14 @@ useModalEscape(() => emit('update:modelValue', false))
 const FASE_CONFIG = {
   cosecha: {
     fase_origen:  'cosecha',
-    fase_destino: 'secado',
+    fase_destino: 'en_manicura',
     label:        'Cosecha → Manicura',
     pesoLabel:    'Peso húmedo (g)',
     pesoKey:      'peso_humedo_g',
     showManicurado: false,
   },
-  secado: {
-    fase_origen:  'secado',
+  en_manicura: {
+    fase_origen:  'en_manicura',
     fase_destino: 'curado',
     label:        'Manicura → Curado',
     pesoLabel:    'Peso seco (g)',

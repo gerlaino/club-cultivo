@@ -108,7 +108,6 @@ const CICLO_PLANTA = computed(() => {
 })
 const LOTE_A_CICLO = {
   cosecha: 'cosecha', en_manicura: 'manicura', manicura_pendiente: 'manicura',
-  secado: 'curado', curado: 'curado', finalizado: 'curado',
 }
 const SALUD_META = {
   excelente: { color:'#16a34a', emoji:'🟢', label:'Excelente' },
@@ -410,7 +409,7 @@ async function saveManicura() {
 
 const canManicura = computed(() =>
   ['manicura', 'admin'].includes(auth.user?.role) &&
-  ['secado', 'manicura_pendiente'].includes(planta.value?.lote?.estado)
+  ['manicura_pendiente'].includes(planta.value?.lote?.estado)
 )
 
 // ── Nuevo modal registro planta ───────────────────────────
@@ -478,7 +477,7 @@ onMounted(async () => {
 
     // Manicura no accede a la vista de detalle — va al flujo de pesaje por QR
     if (auth.user?.role === 'manicura' &&
-        ['en_manicura', 'secado'].includes(plants.current?.lote?.estado) &&
+        ['en_manicura'].includes(plants.current?.lote?.estado) &&
         plants.current?.codigo_qr) {
       router.replace(`/p/${plants.current.codigo_qr}`)
       return

@@ -129,8 +129,8 @@ const listaMostrada = computed(() => tab.value === 'activos' ? activos.value : f
 
 const form = ref({ sala_id: null, genetica_id: null, estado: 'vegetativo', plants_count: 1 })
 
-const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', secado:'#d97706', curado:'#2563eb', finalizado:'#1a3d2e' }
-const EL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', secado:'Secado', curado:'Curado', finalizado:'Finalizado' }
+const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', curado:'#2563eb', finalizado:'#1a3d2e' }
+const EL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado', finalizado:'Finalizado' }
 const estadoColor = e => EC[e] || '#64748b'
 const estadoLabel = e => EL[e] || e || '—'
 

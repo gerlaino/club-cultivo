@@ -355,7 +355,7 @@ const FORMA_LABELS = {
 }
 const FASE_ICONS = {
   germinacion: '🌱', vegetativo: '🌿', floracion: '🌸',
-  cosecha: '✂️', secado: '💨', curado: '🫙', finalizado: '✅',
+  cosecha: '✂️', curado: '🫙', finalizado: '✅',
 }
 
 const query       = ref('')

@@ -10,7 +10,6 @@ const ESTADO_META = {
   vegetativo:         { label: 'Vegetativo',         emoji: '🍃' },
   floracion:          { label: 'Floración',          emoji: '🌸' },
   cosecha:            { label: 'Cosecha',            emoji: '🌿' },
-  secado:             { label: 'Manicura',           emoji: '✂️'  },
   manicura_pendiente: { label: 'Manicura pendiente', emoji: '✂️'  },
   curado:             { label: 'Curado',             emoji: '🫙' },
   finalizado:         { label: 'Finalizado',         emoji: '✅' },
@@ -100,7 +99,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
 
   // ── Helpers ───────────────────────────────────────────────
   function capitalizarFase(f) {
-    const LABELS = { vegetativo: 'Vegetativo', floracion: 'Floración', secado: 'Manicura', curado: 'Curado', cosecha: 'Cosecha', semilla: 'Germinación', manicura: 'Manicura', cerrado: 'Cerrado' }
+    const LABELS = { vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', semilla: 'Germinación', manicura: 'Manicura', cerrado: 'Cerrado' }
     return LABELS[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : '')
   }
 
@@ -148,10 +147,6 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     transicionError.value  = null
     try {
       const pesada = {}
-      if (faseSig === 'secado') {
-        pesada.peso_humedo_g = transicionForm.value.peso_humedo_g
-        pesada.manicurado    = transicionForm.value.manicurado
-      }
       if (faseSig === 'curado') pesada.peso_seco_g = transicionForm.value.peso_seco_g
       if (transicionForm.value.notas) pesada.notas = transicionForm.value.notas
       const { data } = await transicionarLote(loteId, {

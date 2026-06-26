@@ -24,7 +24,7 @@
           <button class="mnl__btn-icon" @click="cargar" title="Actualizar">
             <RefreshCw :size="14" :stroke-width="2" />
           </button>
-          <button v-if="['en_manicura','secado'].includes(lote.estado)" class="mnl__btn-primary" @click="abrirModal">
+          <button v-if="['en_manicura'].includes(lote.estado)" class="mnl__btn-primary" @click="abrirModal">
             <Scale :size="14" :stroke-width="2" /> Registrar por lote
           </button>
         </div>
@@ -99,8 +99,8 @@
                 v-for="(planta, i) in plantas"
                 :key="planta.id"
                 class="mnl__tr"
-                :class="{ 'mnl__tr--clickable': ['en_manicura','secado'].includes(lote.estado) }"
-                @click="['en_manicura','secado'].includes(lote.estado) ? irAPlanta(planta) : null"
+                :class="{ 'mnl__tr--clickable': ['en_manicura'].includes(lote.estado) }"
+                @click="['en_manicura'].includes(lote.estado) ? irAPlanta(planta) : null"
               >
                 <td class="mnl__td mnl__td--num">{{ i + 1 }}</td>
                 <td class="mnl__td mnl__td--nombre">{{ planta.nombre || `Planta #${planta.id}` }}</td>
@@ -127,7 +127,7 @@
       </div>
 
       <!-- Footer: el cierre del pesaje (QR) se hace en "Mis pesajes" -->
-      <div v-if="['en_manicura','secado'].includes(lote.estado) && pesadasKpi > 0" class="mnl__footer">
+      <div v-if="['en_manicura'].includes(lote.estado) && pesadasKpi > 0" class="mnl__footer">
         <p class="mnl__footer-txt">
           {{ pesadasKpi }}/{{ plantas.length }} plantas · {{ totalGramosKpi }}g total
         </p>
@@ -238,7 +238,7 @@ const kpiPorc         = computed(() => plantas.value.length ? Math.min(100, Math
 const hasAnyHumedo    = computed(() => plantas.value.some(p => parseFloat(p.peso_humedo) > 0))
 
 const estadoBadgeClass = computed(() => ({
-  'mnl__estado-badge--asignado':   ['en_manicura', 'secado'].includes(lote.value?.estado),
+  'mnl__estado-badge--asignado':   ['en_manicura'].includes(lote.value?.estado),
   'mnl__estado-badge--pendiente':  lote.value?.estado === 'manicura_pendiente',
 }))
 const estadoLabel = computed(() =>

@@ -51,14 +51,14 @@ import { listLotes } from '../../lib/api'
 const cosechas = ref([])
 const loading  = ref(false)
 
-const EL = { en_manicura: 'Manicura activa', secado: 'Secado' }
+const EL = { en_manicura: 'Manicura activa' }
 const estadoLabel = e => EL[e] || e
 
 onMounted(async () => {
   loading.value = true
   try {
     const { data } = await listLotes()
-    cosechas.value = (data || []).filter(l => ['en_manicura', 'secado'].includes(l.estado))
+    cosechas.value = (data || []).filter(l => ['en_manicura'].includes(l.estado))
   } catch {} finally { loading.value = false }
 })
 </script>

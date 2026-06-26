@@ -113,11 +113,10 @@ const loading = ref(true)
 const lotes   = ref([])
 const pagina  = ref(1)
 
-const POST_HARVEST = ['cosecha', 'secado', 'manicura_pendiente', 'en_manicura', 'curado', 'finalizado']
+const POST_HARVEST = ['cosecha', 'manicura_pendiente', 'en_manicura', 'curado', 'finalizado']
 const ESTADO_LABEL = {
   floracion:         'Cosecha parcial',
   cosecha:           'Cosecha',
-  secado:            'Secado',
   manicura_pendiente:'Manicura pend.',
   en_manicura:       'En manicura',
   curado:            'Curado',

@@ -12,7 +12,6 @@ useModalEscape(() => emit('close'))
 
 // Qué estado de lote acepta cada tipo de sala
 const CONFIG = {
-  secado:   { estadoElegible: 'floracion', label: 'Floración',  icon: 'bi-flower1',   color: '#d97706', bg: '#fffbeb',  etiquetaOrigen: 'sala de floración' },
   manicura: { estadoElegible: 'cosecha',   label: 'Cosecha',    icon: 'bi-scissors',  color: '#b45309', bg: '#fff7ed',  etiquetaOrigen: 'sala de secado'    },
 }
 

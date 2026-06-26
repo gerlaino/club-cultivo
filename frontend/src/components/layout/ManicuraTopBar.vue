@@ -100,7 +100,6 @@ function openHelp() {
 const SEGMENT_LABELS = {
   mnc:     'Manicura',
   cosecha: 'En Cosecha',
-  secado:  'En Manicura',
   curado:  'En Curado',
   stocks:  'Stocks',
   lotes:   'Lotes',

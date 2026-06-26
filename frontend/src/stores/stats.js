@@ -15,7 +15,6 @@ export const useStatsStore = defineStore('stats', {
       germinacion: s.data?.germinacion ?? 0,
       vegetativo:  s.data?.vegetativo  ?? 0,
       floracion:   s.data?.floracion   ?? 0,
-      secado:      s.data?.secado      ?? 0,
     }),
     plantasPorGenetica: (s) => s.data?.plantas_por_genetica ?? [],
     plantasPorLote:     (s) => s.data?.plantas_por_lote     ?? {},

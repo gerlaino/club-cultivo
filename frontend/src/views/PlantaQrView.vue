@@ -216,7 +216,7 @@
               <input v-model="pesoHumedoInput" type="number" min="0.1" step="0.1" placeholder="0.0" class="qr__peso-input" :disabled="registrando" />
               <span class="qr__peso-unit">g</span>
             </div>
-            <span class="qr__field-hint">Antes del recorte / secado</span>
+            <span class="qr__field-hint">Antes del recorte / manicura</span>
           </div>
           <div class="qr__field">
             <label>Peso seco post-manicura</label>
@@ -294,8 +294,7 @@ const progresoPorc = computed(() => {
 
 const ESTADO_LABELS = {
   semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
-  floracion: 'Floración', cosecha: 'Cosecha', secado: 'Secado',
-  en_manicura: 'Manicura', curado: 'Curado', finalizado: 'Finalizado',
+  floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'Manicura', curado: 'Curado', finalizado: 'Finalizado',
 }
 function estadoPlantaLabel(e) { return ESTADO_LABELS[e] || e || '—' }
 
@@ -317,8 +316,8 @@ onMounted(async () => {
 
 // Una planta está "cosechada" (fuera del dominio del cultivador) una vez que pasó
 // a cosecha o más adelante (secado, manicura, curado, finalizado).
-const ESTADOS_POST_COSECHA = ['cosecha', 'secado', 'en_manicura', 'curado', 'finalizado']
-const LOTE_EN_MANICURA     = ['en_manicura', 'secado']
+const ESTADOS_POST_COSECHA = ['cosecha', 'en_manicura', 'curado', 'finalizado']
+const LOTE_EN_MANICURA     = ['en_manicura']
 
 const mensajeCard = ref({ ico: '🌿', title: '', desc: '' })
 

@@ -297,7 +297,7 @@ const ESTADO_META = {
 }
 function estadoMeta(e) { return ESTADO_META[e] || { label:e, color:"#64748b", emoji:"📦" } }
 function growLabel(g)  { return { sustrato:"Sustrato", hidroponia:"Hidroponia", aeroponia:"Aeroponia" }[g] || g || "—" }
-function kindLabel(k)  { return { vegetativo:"Vegetativo", floracion:"Floración", mixta:"Mixta", madre:"Madres", clon:"Clones", secado:"Secado", manicura:"Manicura" }[k] || k || "—" }
+function kindLabel(k)  { return { vegetativo:"Vegetativo", floracion:"Floración", mixta:"Mixta", madre:"Madres", clon:"Clones", manicura:"Manicura" }[k] || k || "—" }
 
 function salaEstadoStyle(state) {
   return { activa:{bg:"#dcfce7",color:"#15803d"}, mantenimiento:{bg:"#fef3c7",color:"#b45309"}, cerrada:{bg:"#f1f5f9",color:"#64748b"} }[state] || {bg:"#f1f5f9",color:"#64748b"}
@@ -630,7 +630,7 @@ const tabActiva = ref('lotes')
 // Slots ocupados de la sala = solo lotes realmente en cultivo. Los estados de
 // post-cosecha (cosecha/secado/curado/manicura) ya no viven en una sala de cultivo
 // (van a su sala de proceso), así que no deben ocupar el layout de esta sala.
-const ESTADOS_POST_COSECHA = ['cosecha', 'secado', 'curado', 'en_manicura', 'manicura_pendiente', 'finalizado']
+const ESTADOS_POST_COSECHA = ['cosecha', 'curado', 'en_manicura', 'manicura_pendiente', 'finalizado']
 const lotesActivos = computed(() =>
   (sala.value?.lotes_historial || []).filter(l => !ESTADOS_POST_COSECHA.includes(l.estado))
 )

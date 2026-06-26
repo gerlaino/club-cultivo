@@ -462,7 +462,6 @@ function salaNombre(salaId) {
 function kindColor(k) {
   const map = {
     vegetativo: '#15803d', floracion: '#9333ea', cosecha: '#dc2626',
-    secado: '#b45309', curado: '#0369a1', manicura: '#db2777',
     madre: '#16a34a', clon: '#2563eb', mixta: '#7c3aed', cosechado: '#dc2626',
   }
   return map[k] || '#64748b'
@@ -470,8 +469,7 @@ function kindColor(k) {
 
 function kindEmoji(k) {
   const map = {
-    vegetativo: '🍃', floracion: '🌸', cosecha: '🌾', secado: '💨',
-    curado: '🫙', manicura: '✂️', madre: '🌱', clon: '🔁', mixta: '🔀', cosechado: '🌾',
+    vegetativo: '🍃', floracion: '🌸', cosecha: '🌾', curado: '🫙', manicura: '✂️', madre: '🌱', clon: '🔁', mixta: '🔀', cosechado: '🌾',
   }
   return map[k] || '🏠'
 }
@@ -479,8 +477,7 @@ function kindEmoji(k) {
 function kindLabel(k) {
   const map = {
     vegetativo: 'Vegetativo', floracion: 'Floración', cosechado: 'Cosechado',
-    mixta: 'Mixta', madre: 'Madres', clon: 'Clones', secado: 'Secado',
-    curado: 'Curado', manicura: 'Manicura', cosecha: 'Cosecha',
+    mixta: 'Mixta', madre: 'Madres', clon: 'Clones', curado: 'Curado', manicura: 'Manicura', cosecha: 'Cosecha',
   }
   return map[k] || k || '—'
 }
@@ -500,7 +497,7 @@ function stateLabel(state) {
 const totalPlantas    = computed(() => salas.value.reduce((acc, s) => acc + (s.plantas_totales || 0), 0))
 const plantasVeg      = computed(() => lotesStore.items.filter(l => l.estado === 'vegetativo').reduce((a, l) => a + (l.plants_count || 0), 0))
 const plantasFlor     = computed(() => lotesStore.items.filter(l => l.estado === 'floracion').reduce((a, l) => a + (l.plants_count || 0), 0))
-const lotesEnCiclo    = computed(() => lotesStore.items.filter(l => ['vegetativo', 'floracion', 'secado'].includes(l.estado)).length)
+const lotesEnCiclo    = computed(() => lotesStore.items.filter(l => ['vegetativo', 'floracion'].includes(l.estado)).length)
 const lotesListos     = computed(() => lotesStore.items.filter(l => l.puede_transicionar === true).length)
 const notifCount      = computed(() => ambienteStore.alertasCount)
 const alertasCriticas = computed(() => ambienteStore.alertasActivas.filter(a => ['temperatura', 'co2'].includes(a.tipo)))

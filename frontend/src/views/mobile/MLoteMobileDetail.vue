@@ -249,19 +249,18 @@ const EG = {
   en_manicura:'linear-gradient(150deg,#1c1000,#78350f)',
   curado:     'linear-gradient(150deg,#0c1a33,#1d4ed8)',
 }
-const EE = { semilla:'🌱', esqueje:'🪴', vegetativo:'🍃', floracion:'🌸', cosecha:'✂️', en_manicura:'✂️', secado:'💨', curado:'🫙' }
-const EL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', secado:'Secado', curado:'Curado' }
-const PC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', secado:'#d97706', curado:'#2563eb', cosechado:'#dc2626', descartada:'#94a3b8' }
-const PL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Veget.', floracion:'Florac.', cosecha:'Cosecha', en_manicura:'Manicura', secado:'Secado', curado:'Curado', cosechado:'Cosechado', descartada:'Descartada' }
+const EE = { semilla:'🌱', esqueje:'🪴', vegetativo:'🍃', floracion:'🌸', cosecha:'✂️', en_manicura:'✂️', curado:'🫙' }
+const EL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado' }
+const PC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', curado:'#2563eb', cosechado:'#dc2626', descartada:'#94a3b8' }
+const PL = { semilla:'Semilla', esqueje:'Esqueje', vegetativo:'Veget.', floracion:'Florac.', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado', cosechado:'Cosechado', descartada:'Descartada' }
 
-const FASES_ORDEN = ['semilla', 'esqueje', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'secado', 'curado']
+const FASES_ORDEN = ['semilla', 'esqueje', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado']
 const FASES_META  = [
   { value:'vegetativo',  label:'Vegetativo',  emoji:'🍃' },
   { value:'floracion',   label:'Floración',   emoji:'🌸' },
   { value:'cosecha',     label:'Cosecha',     emoji:'✂️' },
   { value:'en_manicura', label:'Manicura',    emoji:'✂️' },
-  { value:'secado',      label:'Secado',      emoji:'💨' },
-  { value:'curado',      label:'Curado',      emoji:'🫙' },
+    { value:'curado',      label:'Curado',      emoji:'🫙' },
 ]
 
 const fasesSiguientes = computed(() => {

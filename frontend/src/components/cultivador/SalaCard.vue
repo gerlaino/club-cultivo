@@ -103,11 +103,10 @@ const FASE_BADGE = {
   esqueje:      { variant: 'sky',  label: 'Esqueje' },
   vegetativo:   { variant: 'leaf', label: 'Vegetativo' },
   floracion:    { variant: 'gold', label: 'Floración' },
-  secado:       { variant: 'sky',  label: 'Manicura' },
   planificacion:{ variant: 'ink',  label: 'Planificación' },
   finalizado:   { variant: 'ink',  label: 'Finalizado' },
 }
-const FASE_PRIORIDAD = ['floracion', 'vegetativo', 'esqueje', 'semilla', 'secado', 'cosecha', 'planificacion', 'finalizado']
+const FASE_PRIORIDAD = ['floracion', 'vegetativo', 'esqueje', 'semilla', 'cosecha', 'planificacion', 'finalizado']
 
 const faseDominante = computed(() => {
   if (!props.lotes.length) return null

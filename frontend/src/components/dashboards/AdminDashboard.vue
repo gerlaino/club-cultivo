@@ -275,7 +275,6 @@ const ESTADO_COLOR = {
   cosecha:            '#dc2626',
   en_manicura:        '#d97706',
   manicura_pendiente: '#f59e0b',
-  secado:             '#78350f',
   curado:             '#2563eb',
   finalizado:         '#94a3b8',
 }
@@ -283,7 +282,7 @@ const ESTADO_COLOR = {
 const ESTADO_LABEL = {
   semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
   floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'En manicura',
-  manicura_pendiente: 'Pdte. aprobación', secado: 'Secado', curado: 'Curado',
+  manicura_pendiente: 'Pdte. aprobación', curado: 'Curado',
   finalizado: 'Finalizado',
 }
 

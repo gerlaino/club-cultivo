@@ -219,7 +219,6 @@ const ESTADO_COLORS = {
   vegetativo:        { color: '#15803d', bg: 'rgba(21,128,61,.1)'   },
   floracion:         { color: '#d97706', bg: 'rgba(217,119,6,.1)'   },
   cosecha:           { color: '#0369a1', bg: 'rgba(3,105,161,.1)'   },
-  secado:            { color: '#64748b', bg: 'rgba(100,116,139,.1)' },
   manicura_pendiente:{ color: '#b45309', bg: 'rgba(180,83,9,.1)'    },
   curado:            { color: '#065f46', bg: 'rgba(6,95,70,.1)'     },
   finalizado:        { color: '#1e293b', bg: 'rgba(30,41,59,.1)'    },

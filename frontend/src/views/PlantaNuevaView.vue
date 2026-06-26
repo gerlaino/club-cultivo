@@ -26,7 +26,6 @@ const STATE_META = {
   germinacion:{ label: 'Semilla',    icon: '🌰',  color: '#92400e' },
   vegetativo: { label: 'Vegetativo', icon: '🌱',  color: '#15803d' },
   floracion:  { label: 'Floración',  icon: '🌸',  color: '#b45309' },
-  secado:     { label: 'Manicura',   icon: '✂️',   color: '#64748b' },
   cosechado:  { label: 'Cosechado',  icon: '✅',  color: '#0369a1' },
 }
 
@@ -260,7 +259,7 @@ onMounted(async () => {
               <AppDatePicker v-model="form.fecha_vegetativo" :max="today" />
             </div>
 
-            <div class="pnv__field" v-if="['floracion','secado','cosechado'].includes(form.state)">
+            <div class="pnv__field" v-if="['floracion','cosechado'].includes(form.state)">
               <label class="pnv__label">🌸 Inicio floración</label>
               <AppDatePicker v-model="form.fecha_floracion" :max="today" />
             </div>

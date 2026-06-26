@@ -214,7 +214,6 @@ const ESTADOS = [
   { value: 'germinacion', emoji: '🌰', label: 'Germinación' },
   { value: 'vegetativo',  emoji: '🌱', label: 'Vegetativo' },
   { value: 'floracion',   emoji: '🌸', label: 'Floración' },
-  { value: 'secado',      emoji: '✂️', label: 'Manicura' },
   { value: 'cosechada',   emoji: '✅', label: 'Cosechada' },
   { value: 'descartada',  emoji: '❌', label: 'Descartada' },
 ]

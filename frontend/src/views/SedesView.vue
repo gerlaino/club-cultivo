@@ -68,7 +68,7 @@ function tipoMeta(tipo) { return TIPO_META[tipo] || TIPO_META.produccion }
 function cicloMeta(ciclo) { return CICLO_META[ciclo] || CICLO_META.vegetativo }
 const KIND_LABEL = {
   vegetativo: 'Vegetativo', floracion: 'Floración', mixta: 'Mixta',
-  madre: 'Madres', clon: 'Clones', secado: 'Secado', curado: 'Curado',
+  madre: 'Madres', clon: 'Clones', curado: 'Curado',
   manicura: 'Manicura', cosecha: 'Cosecha',
 }
 function kindLabel(k) { return KIND_LABEL[k] || k || '' }

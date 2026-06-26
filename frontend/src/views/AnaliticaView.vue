@@ -124,7 +124,6 @@ const ESTADO_COLOR = {
   vegetativo: { bg: 'rgba(45,138,107,.12)', color: '#1b5e20' },
   floracion:  { bg: 'rgba(217,119,6,.12)',  color: '#b45309' },
   cosecha:    { bg: 'rgba(91,100,115,.1)',  color: '#475569' },
-  secado:     { bg: 'rgba(91,100,115,.1)',  color: '#475569' },
   curado:     { bg: 'rgba(139,92,246,.1)',  color: '#7c3aed' },
   finalizado: { bg: '#f1f5f9',              color: '#94a3b8' },
 }
@@ -145,7 +144,7 @@ function barPct(val) { return val != null ? Math.min((val / maxRendimiento.value
 
 // ── Ciclos ───────────────────────────────────────────────────────
 const ciclos = computed(() => dataProd.value?.ciclos ?? [])
-const FASES_CICLO = ['vegetativo', 'floracion', 'cosecha', 'secado', 'curado']
+const FASES_CICLO = ['vegetativo', 'floracion', 'cosecha', 'curado']
 function totalCiclo(c) {
   return FASES_CICLO.reduce((s, f) => s + (c[f] ?? 0), 0).toFixed(1)
 }

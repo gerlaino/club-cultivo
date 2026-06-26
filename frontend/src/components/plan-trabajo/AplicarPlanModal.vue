@@ -23,7 +23,6 @@ const TIPO_SALA_LABEL = {
   vegetativo:  'Vegetativo',
   floracion:   'Floración',
   cosecha:     'Cosecha',
-  secado:      'Secado',
   curado:      'Curado',
   madre:       'Madre',
   clones:      'Clones',

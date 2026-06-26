@@ -422,7 +422,7 @@ onUnmounted(() => {
             <i class="bi bi-box-seam"></i>Cerrar curado
           </button>
           <button
-            v-if="canAdmin && ['en_manicura', 'secado'].includes(lote.estado)"
+            v-if="canAdmin && ['en_manicura'].includes(lote.estado)"
             class="ld__btn-completar-manicura"
             @click="showCompletarManicuraModal = true"
           >

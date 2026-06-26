@@ -52,7 +52,7 @@ const TIPOS_HISTORICO = [
 
 const isCultivador = computed(() => auth.user?.role === 'cultivador')
 
-const ESTADO_LABEL = { vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', secado: 'Manicura', curado: 'Curado', planificacion: 'Planificación', finalizado: 'Finalizado' }
+const ESTADO_LABEL = { vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', curado: 'Curado', planificacion: 'Planificación', finalizado: 'Finalizado' }
 function estadoLabel(e) { return ESTADO_LABEL[e] || e || '' }
 
 const loteActivo = computed(() =>

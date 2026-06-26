@@ -237,7 +237,6 @@ const FASES_LABELS = {
   clon:       'Clones',
   madre:      'Madres',
   lavado:     'Lavado',
-  secado:     'Secado',
   curado:     'Curado',
 }
 
