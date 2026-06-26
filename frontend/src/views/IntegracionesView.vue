@@ -9,7 +9,7 @@
     <!-- WhatsApp Business -->
     <div class="int__section">
       <div class="int__section-title">Mensajería</div>
-      <IntegracionWhatsapp
+      <IntegracionWhatsappSimple
         v-if="!loading"
         :data="prefData"
         @updated="onTwilioUpdated"
@@ -224,7 +224,7 @@ import { Plus, Pencil, Trash2, X, Activity, CheckCircle2, XCircle, Clock } from 
 import DsSpinner from '../design-system/components/Spinner.vue'
 import api from '../lib/api.js'
 import { getPreferences } from '../lib/api.js'
-import IntegracionWhatsapp from '../components/integraciones/IntegracionWhatsapp.vue'
+import IntegracionWhatsappSimple from '../components/integraciones/IntegracionWhatsappSimple.vue'
 
 const EVENTS_DISPONIBLES = [
   { key: 'dispensacion.creada',  desc: 'Cada vez que se registra una dispensación' },

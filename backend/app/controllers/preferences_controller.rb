@@ -166,6 +166,17 @@ class PreferencesController < ApplicationController
     render json: serialize(@club)
   end
 
+  # PATCH /preferences/solicitar_whatsapp — el admin pide activar WhatsApp con su número.
+  # Lo deja en estado "pendiente"; el super_admin lo provisiona en Twilio (Fase 3).
+  def solicitar_whatsapp
+    return render json: { error: 'Sin permiso' }, status: :forbidden unless current_user.admin? || current_user.super_admin?
+    numero = params[:numero].to_s.strip
+    return render json: { error: 'Ingresá tu número de WhatsApp.' }, status: :unprocessable_entity if numero.blank?
+
+    @club.update!(whatsapp_numero: numero)
+    render json: serialize(@club)
+  end
+
   private
 
   def require_club_user!
@@ -233,6 +244,8 @@ class PreferencesController < ApplicationController
       twilio_configurado:           club.twilio_configurado?,
       twilio_account_sid:           club.twilio_account_sid,
       twilio_whatsapp_from:         club.twilio_whatsapp_from,
+      whatsapp_estado:              club.whatsapp_estado,
+      whatsapp_numero:              club.whatsapp_numero,
       umbral_stock_g:               club.umbral_stock_g,
       alertas_config:               club.alertas_config || {},
     }

@@ -134,6 +134,7 @@ export const desconectarEmail  = () => api.delete("/preferences/desconectar_emai
 export const updateTwilio      = (payload) => api.patch("/preferences/update_twilio", payload);
 export const destroyTwilio     = () => api.delete("/preferences/destroy_twilio");
 export const testTwilio        = () => api.post("/preferences/test_twilio");
+export const solicitarWhatsapp = (numero) => api.patch("/preferences/solicitar_whatsapp", { numero });
 export const uploadClubLogo    = (file) => {
   const form = new FormData();
   form.append("logo", file);

@@ -282,9 +282,10 @@ Rails.application.routes.draw do
     resource :preferences, only: [:show, :update], controller: "preferences" do
       post   :upload_logo,       on: :collection
       post   :test_smtp,         on: :collection
-      patch  :conectar_email,    on: :collection
-      delete :desconectar_email, on: :collection
-      patch  :update_twilio,     on: :collection
+      patch  :conectar_email,     on: :collection
+      delete :desconectar_email,  on: :collection
+      patch  :solicitar_whatsapp, on: :collection
+      patch  :update_twilio,      on: :collection
       delete :destroy_twilio, on: :collection
       post   :test_twilio,    on: :collection
     end

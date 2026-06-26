@@ -234,6 +234,16 @@ class Club < ApplicationRecord
     twilio_account_sid.present? && twilio_auth_token_enc.present? && twilio_whatsapp_from.present?
   end
 
+  # Estado del WhatsApp del club (derivado, no se persiste):
+  #   conectado     → el super_admin ya provisionó Twilio.
+  #   pendiente     → el admin solicitó activación (cargó su número), falta provisionar.
+  #   sin_configurar → nada todavía.
+  def whatsapp_estado
+    return 'conectado'  if twilio_configurado?
+    return 'pendiente'  if whatsapp_numero.present?
+    'sin_configurar'
+  end
+
   def twilio_auth_token
     return nil unless twilio_auth_token_enc.present?
     Rails.application.message_verifier(:twilio).verify(twilio_auth_token_enc)

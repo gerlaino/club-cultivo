@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_26_000004) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_26_000005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -261,6 +261,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_26_000004) do
     t.integer "lote_numero_seq", default: 0, null: false
     t.date "contabilidad_cerrada_hasta"
     t.bigint "deleted_by_id"
+    t.string "whatsapp_numero"
     t.index ["benchmark_opt_in"], name: "index_clubs_on_benchmark_opt_in"
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_clubs_on_deleted_by_id"
