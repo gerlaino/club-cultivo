@@ -237,9 +237,8 @@ class PreferencesController < ApplicationController
       smtp_user:                    club.smtp_user,
       smtp_from:                    club.smtp_from,
       smtp_from_name:               club.smtp_from_name,
-      email_modo:                   club.email_propio? ? 'propio' : 'plataforma',
-      email_remitente:              club.email_from,
-      email_reply_to:               club.email_reply_to,
+      email_modo:                   club.email_modo,
+      email_remitente:              club.email_propio? ? club.email_from : nil,
       # smtp_pass / twilio_auth_token_enc nunca se serializan
       twilio_configurado:           club.twilio_configurado?,
       twilio_account_sid:           club.twilio_account_sid,

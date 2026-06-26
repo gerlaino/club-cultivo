@@ -14,12 +14,10 @@ const logoPreview = ref(null)
 let toastTimer = null
 const { confirm } = useConfirm()
 
-// Email — modo plataforma por defecto; el club puede conectar SU casilla (email + contraseña de app).
-const emailModo      = ref('plataforma')   // 'plataforma' | 'propio'
+// Email — cada club conecta SU casilla (email + contraseña de aplicación). Sin correo, no manda.
+const emailModo      = ref('sin_configurar')  // 'propio' | 'sin_configurar'
 const emailRemitente = ref('')
-const emailReplyTo   = ref('')
 const conectarForm = reactive({ email: '', app_password: '', from_name: '' })
-const mostrarConectar = ref(false)
 const conectando = ref(false)
 const smtpTesting = ref(false)
 
@@ -92,11 +90,9 @@ function loadFromStore() {
     tipo_organizacion:           club.data.tipo_organizacion           || '',
   })
   logoPreview.value = club.data.logo_url || null
-  emailModo.value      = club.data.email_modo || 'plataforma'
+  emailModo.value      = club.data.email_modo || 'sin_configurar'
   emailRemitente.value = club.data.email_remitente || ''
-  emailReplyTo.value   = club.data.email_reply_to || club.data.email || ''
   conectarForm.email = ''; conectarForm.app_password = ''; conectarForm.from_name = ''
-  mostrarConectar.value = false
   pristine.value = true
 }
 
@@ -401,30 +397,17 @@ async function runTestSmtp() {
               <div class="pv__card-sub">Desde dónde salen los mails a los socios</div>
             </div>
             <div class="pv__smtp-badge" :class="emailModo === 'propio' ? 'pv__smtp-badge--ok' : 'pv__smtp-badge--off'">
-              <i :class="emailModo === 'propio' ? 'bi bi-check-circle-fill' : 'bi bi-cloud-fill'"></i>
-              {{ emailModo === 'propio' ? 'Tu casilla' : 'Plataforma' }}
+              <i :class="emailModo === 'propio' ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+              {{ emailModo === 'propio' ? 'Conectado' : 'Sin configurar' }}
             </div>
           </div>
           <div class="pv__card-body">
 
-            <!-- Modo plataforma -->
-            <template v-if="emailModo !== 'propio'">
-              <div class="pv__infobox" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
-                <i class="bi bi-info-circle-fill"></i>
-                <span>Tus mails salen <strong>a nombre del club</strong> desde la plataforma. Las respuestas de los socios llegan a tu email de contacto (<strong>{{ emailReplyTo || '—' }}</strong>). No tenés que configurar nada.</span>
-              </div>
-              <div>
-                <button class="pv__btn-outline" @click="mostrarConectar = !mostrarConectar">
-                  <i class="bi bi-box-arrow-in-right"></i> Conectar mi propio email
-                </button>
-              </div>
-            </template>
-
-            <!-- Modo propio (conectado) -->
-            <template v-else>
+            <!-- Conectado -->
+            <template v-if="emailModo === 'propio'">
               <div class="pv__infobox" style="background:#f0fdf4;border-color:#bbf7d0;color:#15803d">
                 <i class="bi bi-check-circle-fill"></i>
-                <span>Conectado. Los mails salen desde <strong>{{ emailRemitente }}</strong>.</span>
+                <span>Conectado. Los mails del club salen desde <strong>{{ emailRemitente }}</strong>.</span>
               </div>
               <div class="pv__smtp-actions">
                 <button class="pv__btn-outline" :disabled="smtpTesting" @click="runTestSmtp">
@@ -438,16 +421,18 @@ async function runTestSmtp() {
               </div>
             </template>
 
-            <!-- Form conectar mi email -->
-            <div v-if="emailModo !== 'propio' && mostrarConectar" class="pv__connect">
-              <div class="pv__infobox">
-                <i class="bi bi-shield-lock-fill"></i>
-                <span>
-                  Para conectar Gmail necesitás una <strong>contraseña de aplicación</strong> (no tu contraseña normal):
-                  activá la verificación en 2 pasos y generá una en
-                  <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">myaccount.google.com/apppasswords</a>.
-                </span>
+            <!-- Sin configurar: conectar el correo -->
+            <div v-else class="pv__connect">
+              <div class="pv__infobox" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
+                <i class="bi bi-info-circle-fill"></i>
+                <span>Conectá el correo del club para poder mandarles mails a tus socios. Para Gmail necesitás una <strong>contraseña de aplicación</strong> (no tu contraseña normal):</span>
               </div>
+              <ol class="pv__steps">
+                <li>Entrá a tu cuenta de Google → <strong>Seguridad</strong>.</li>
+                <li>Activá la <strong>Verificación en 2 pasos</strong> (si no la tenés).</li>
+                <li>Abrí <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">myaccount.google.com/apppasswords</a> y creá una <strong>contraseña de aplicación</strong>.</li>
+                <li>Copiá las <strong>16 letras</strong> y pegalas abajo.</li>
+              </ol>
               <div class="pv__grid">
                 <div class="pv__field">
                   <label class="pv__label">Email del club</label>
@@ -470,7 +455,6 @@ async function runTestSmtp() {
                   <i v-else class="bi bi-plug"></i>
                   {{ conectando ? 'Conectando…' : 'Probar y conectar' }}
                 </button>
-                <button class="pv__btn-outline" @click="mostrarConectar = false">Cancelar</button>
               </div>
             </div>
 
@@ -612,7 +596,9 @@ async function runTestSmtp() {
 .pv__smtp-badge--off { background: #f1f5f9; color: #64748b; }
 
 .pv__smtp-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.pv__connect { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #e2e8f0; display: flex; flex-direction: column; gap: 1rem; }
+.pv__connect { display: flex; flex-direction: column; gap: 1rem; }
 .pv__connect a { color: #2563eb; font-weight: 600; }
+.pv__steps { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: .4rem; font-size: .82rem; color: #475569; line-height: 1.45; }
+.pv__steps li::marker { color: #16a34a; font-weight: 700; }
 </style>
 

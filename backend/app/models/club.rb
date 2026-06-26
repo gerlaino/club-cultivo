@@ -208,26 +208,19 @@ class Club < ApplicationRecord
     SMTP_PROVIDERS[dominio]
   end
 
-  # El club conectó su propia casilla (manda desde su email).
+  # El club conectó su propia casilla (manda desde su email). Es requisito para enviar.
   def email_propio? = smtp_configured?
 
-  # Remitente del correo según el modo.
+  # 'propio' (correo conectado) | 'sin_configurar'.
+  def email_modo = email_propio? ? 'propio' : 'sin_configurar'
+
+  # Remitente: la casilla del club.
   def email_from
-    if email_propio?
-      "#{smtp_from_name.presence || name} <#{smtp_from.presence || smtp_user}>"
-    else
-      "#{name} <#{PLATFORM_FROM}>"
-    end
+    "#{smtp_from_name.presence || name} <#{smtp_from.presence || smtp_user}>"
   end
 
-  # En modo plataforma, las respuestas van al email del club.
-  def email_reply_to
-    email_propio? ? nil : email.presence
-  end
-
-  # nil → usa la config global de ActionMailer (plataforma); si propio, el SMTP del club.
   def email_delivery_options
-    email_propio? ? smtp_settings : nil
+    smtp_settings
   end
 
   def twilio_configurado?

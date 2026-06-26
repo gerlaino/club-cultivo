@@ -24,12 +24,12 @@ RSpec.describe 'PATCH /preferences/conectar_email', type: :request do
     expect(club.smtp_from).to eq('miclub@gmail.com')
   end
 
-  it 'desconectar vuelve al modo plataforma' do
+  it 'desconectar deja el correo sin configurar' do
     club.update!(smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_user: 'x@gmail.com', smtp_pass: 'p',
                  smtp_from: 'x@gmail.com', smtp_from_name: 'X')
     delete '/preferences/desconectar_email', headers: auth_headers, as: :json
     expect(response).to have_http_status(:ok)
-    expect(JSON.parse(response.body)['email_modo']).to eq('plataforma')
+    expect(JSON.parse(response.body)['email_modo']).to eq('sin_configurar')
     expect(club.reload.smtp_configured?).to be false
   end
 

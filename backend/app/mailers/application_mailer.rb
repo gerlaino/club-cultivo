@@ -4,16 +4,14 @@ class ApplicationMailer < ActionMailer::Base
 
   private
 
-  # Arma el mail con el "sobre" del club: remitente + reply-to + delivery según el modo
-  # (plataforma-gestionado por defecto, o el SMTP propio del club si conectó su casilla).
+  # Arma y manda el mail desde la casilla propia del club. Si el club NO conectó su correo
+  # (email + contraseña de app), NO se manda (NullMail = deliver es no-op). El correo del club
+  # es requisito para enviar — no hay fallback de plataforma.
   def mail_para_club(club, **opts)
+    return unless club&.email_propio?
+
     opts[:from] ||= club.email_from
-    if (rt = club.email_reply_to)
-      opts[:reply_to] ||= rt
-    end
-    if (dopts = club.email_delivery_options)
-      opts[:delivery_method_options] ||= dopts
-    end
+    opts[:delivery_method_options] ||= club.email_delivery_options
     mail(**opts)
   end
 end
