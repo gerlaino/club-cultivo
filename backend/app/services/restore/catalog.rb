@@ -6,9 +6,13 @@ module Restore
   # `complex: true` = la restauración re-aplica efectos colaterales y necesita un Restorer con
   # validación de conflictos (Fase 3). Hasta entonces la papelera no las restaura.
   module Catalog
-    Entry = Struct.new(:key, :model_name, :label, :group, :complex, :restorer, :descriptor, :search, keyword_init: true) do
+    Entry = Struct.new(:key, :model_name, :label, :group, :complex, :restorer, :top_level, :descriptor, :search, keyword_init: true) do
       def model = model_name.constantize
       def complex? = complex
+
+      # Los dependientes (cobros, movimientos, etc.) NO se listan en la papelera: vuelven con su
+      # agregado padre (Dispensación/Stock). top_level: false los excluye del listado.
+      def top_level? = top_level.nil? ? true : top_level
 
       # Clase Restorer dedicada (validación + re-aplicación de efectos), si la entidad la tiene.
       def restorer_class = restorer&.constantize
@@ -78,13 +82,16 @@ module Restore
       # --- Complejas (necesitan Restorer con validación — Fase 3) --------------
       { key: 'dispensacion',        model_name: 'Dispensacion',       label: 'Dispensación',        group: 'Dispensación', complex: true, restorer: 'Restore::Restorers::Dispensacion', descriptor: ->(r) { "Dispensación ##{r.id}" } },
       { key: 'stock',               model_name: 'Stock',              label: 'Stock',               group: 'Stock', complex: true, restorer: 'Restore::Restorers::Stock' },
-      { key: 'stock_movimiento',    model_name: 'StockMovimiento',    label: 'Movimiento de stock', group: 'Stock', complex: true, descriptor: ->(r) { "Movimiento ##{r.id}" } },
-      { key: 'cobro',               model_name: 'Cobro',              label: 'Cobro',               group: 'Dispensación', complex: true, descriptor: ->(r) { "Cobro ##{r.id}" } },
-      { key: 'cuenta_corriente_movimiento', model_name: 'CuentaCorrienteMovimiento', label: 'Movimiento de cuenta corriente', group: 'Socios', complex: true, descriptor: ->(r) { "Movimiento ##{r.id}" } },
-      { key: 'movimiento_contable', model_name: 'MovimientoContable', label: 'Movimiento contable', group: 'Contabilidad', complex: true, descriptor: ->(r) { "Asiento ##{r.id}" } },
+      # Dependientes: vuelven con su agregado padre (Dispensación/Stock), no se listan sueltos.
+      { key: 'stock_movimiento',    model_name: 'StockMovimiento',    label: 'Movimiento de stock', group: 'Stock', complex: true, top_level: false, descriptor: ->(r) { "Movimiento ##{r.id}" } },
+      { key: 'cobro',               model_name: 'Cobro',              label: 'Cobro',               group: 'Dispensación', complex: true, top_level: false, descriptor: ->(r) { "Cobro ##{r.id}" } },
+      { key: 'cuenta_corriente_movimiento', model_name: 'CuentaCorrienteMovimiento', label: 'Movimiento de cuenta corriente', group: 'Socios', complex: true, top_level: false, descriptor: ->(r) { "Movimiento ##{r.id}" } },
+      { key: 'movimiento_contable', model_name: 'MovimientoContable', label: 'Movimiento contable', group: 'Contabilidad', complex: true, top_level: false, descriptor: ->(r) { "Asiento ##{r.id}" } },
       { key: 'costo_lote',          model_name: 'CostoLote',          label: 'Costo de lote',       group: 'Contabilidad', complex: true, restorer: 'Restore::Restorers::CostoLote', descriptor: ->(r) { "Costo ##{r.id}" } },
-      { key: 'pesada',              model_name: 'Pesada',             label: 'Pesada',              group: 'Cultivo', complex: true, descriptor: ->(r) { "Pesada ##{r.id}" } },
-      { key: 'pesaje_manicura',     model_name: 'PesajeManicura',     label: 'Pesaje de manicura',  group: 'Cultivo', complex: true, descriptor: ->(r) { "Pesaje ##{r.id}" } },
+      # Pesada/PesajeManicura: el stock que crearon NO se borra con ellas, así que restaurar es
+      # solo des-borrar (con su detalle). Sin efectos a re-aplicar → restore simple.
+      { key: 'pesada',              model_name: 'Pesada',             label: 'Pesada',              group: 'Cultivo', descriptor: ->(r) { "Pesada ##{r.id}" } },
+      { key: 'pesaje_manicura',     model_name: 'PesajeManicura',     label: 'Pesaje de manicura',  group: 'Cultivo', descriptor: ->(r) { "Pesaje ##{r.id}" } },
       { key: 'reserva',             model_name: 'Reserva',            label: 'Reserva',             group: 'Stock', complex: true, restorer: 'Restore::Restorers::Reserva', descriptor: ->(r) { "Reserva ##{r.id}" } },
       { key: 'ariccame_registro',   model_name: 'AriccameRegistro',   label: 'Registro ARICCAME',   group: 'Regulatorio', complex: true, restorer: 'Restore::Restorers::AriccameRegistro', descriptor: ->(r) { "Registro ##{r.id}" } },
     ].map { |h| Entry.new(**h) }.freeze
@@ -92,6 +99,7 @@ module Restore
     BY_KEY = ENTRIES.index_by(&:key).freeze
 
     def self.all = ENTRIES
+    def self.top_level = ENTRIES.select(&:top_level?) # lo que se lista en la papelera
     def self.simple = ENTRIES.reject(&:complex?)
     def self.find(key) = BY_KEY[key.to_s]
   end

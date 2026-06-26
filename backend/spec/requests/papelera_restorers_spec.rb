@@ -35,6 +35,19 @@ RSpec.describe 'Papelera — restauración con validación (Restorers)', type: :
     end
   end
 
+  describe 'Catálogo' do
+    it 'no lista dependientes en la papelera (vuelven con su agregado padre)' do
+      keys = Restore::Catalog.top_level.map(&:key)
+      expect(keys).not_to include('cobro', 'movimiento_contable', 'stock_movimiento', 'cuenta_corriente_movimiento')
+      expect(keys).to include('dispensacion', 'stock', 'pesada', 'pesaje_manicura')
+    end
+
+    it 'Pesada y PesajeManicura son restore simple (sin efectos a re-aplicar)' do
+      expect(Restore::Catalog.find('pesada').complex?).to be_falsey
+      expect(Restore::Catalog.find('pesaje_manicura').complex?).to be_falsey
+    end
+  end
+
   describe 'AriccameRegistro' do
     it 'bloquea si el stock asociado ya no existe' do
       stock = create(:stock, club: club)

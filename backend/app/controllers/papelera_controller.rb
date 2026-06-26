@@ -90,7 +90,7 @@ class PapeleraController < ApplicationController
   private
 
   def restorable_entries
-    Restore::Catalog.all # incluye complejas (se listan, no se restauran aún)
+    Restore::Catalog.top_level # agregados restaurables; los dependientes vuelven con su padre
   end
 
   # Relación de borrados de un modelo, scopeada al club y al rango de fechas. nil si no aplica.
