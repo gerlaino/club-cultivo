@@ -1,4 +1,5 @@
 class AnalisisIa < ApplicationRecord
+  include Restorable
   self.table_name = 'analisis_ia'
 
   belongs_to :club

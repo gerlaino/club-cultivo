@@ -1,4 +1,5 @@
 class AnalisisLaboratorio < ApplicationRecord
+  include Restorable
   self.table_name = 'analisis_laboratorio'
 
   belongs_to :lote

@@ -1,4 +1,5 @@
 class Dispositivo < ApplicationRecord
+  include Restorable
   belongs_to :club
   acts_as_tenant(:club)
   belongs_to :sala

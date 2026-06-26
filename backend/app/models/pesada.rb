@@ -1,4 +1,5 @@
 class Pesada < ApplicationRecord
+  include Restorable
   belongs_to :lote
   belongs_to :registrado_por,  class_name: 'User'
   belongs_to :aprobada_por,    class_name: 'User', optional: true, foreign_key: :aprobada_por_id

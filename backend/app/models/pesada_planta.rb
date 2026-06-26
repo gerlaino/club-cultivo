@@ -1,4 +1,5 @@
 class PesadaPlanta < ApplicationRecord
+  include Restorable
   self.table_name = 'pesadas_plantas'
 
   belongs_to :pesada,          optional: true

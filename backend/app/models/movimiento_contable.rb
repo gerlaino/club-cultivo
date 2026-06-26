@@ -1,5 +1,6 @@
 # backend/app/models/movimiento_contable.rb
 class MovimientoContable < ApplicationRecord
+  include Restorable
   include Auditable
 
   self.table_name = "movimientos_contables"

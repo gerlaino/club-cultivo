@@ -1,4 +1,5 @@
 class LoteEvento < ApplicationRecord
+  include Restorable
   belongs_to :lote
   belongs_to :user
   belongs_to :club

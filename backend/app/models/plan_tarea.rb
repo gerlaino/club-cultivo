@@ -1,4 +1,5 @@
 class PlanTarea < ApplicationRecord
+  include Restorable
   belongs_to :plan_trabajo
   belongs_to :responsable, class_name: 'User', optional: true
   belongs_to :sala, optional: true

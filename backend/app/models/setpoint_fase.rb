@@ -1,4 +1,5 @@
 class SetpointFase < ApplicationRecord
+  include Restorable
   self.table_name = 'setpoints_fase'
 
   belongs_to :genetica, optional: true

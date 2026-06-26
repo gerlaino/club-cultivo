@@ -1,4 +1,5 @@
 class PesajeManicura < ApplicationRecord
+  include Restorable
   self.table_name = 'pesajes_manicura'
 
   ESTADOS = %w[borrador enviado confirmado].freeze

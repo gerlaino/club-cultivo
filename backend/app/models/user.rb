@@ -1,4 +1,5 @@
 class User < ApplicationRecord
+  include Restorable
   include Permissions
   belongs_to :club, optional: true
 

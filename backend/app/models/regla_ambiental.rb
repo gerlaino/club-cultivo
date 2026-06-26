@@ -1,4 +1,5 @@
 class ReglaAmbiental < ApplicationRecord
+  include Restorable
   self.table_name = 'reglas_ambientales'
 
   belongs_to :club

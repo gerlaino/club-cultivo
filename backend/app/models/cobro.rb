@@ -4,6 +4,7 @@
 #   cuenta_corriente         → pagado: false (queda en cuenta del socio, deuda)
 # La suma de los cobros nunca debe superar el total (aporte_socio_ars) de la dispensa.
 class Cobro < ApplicationRecord
+  include Restorable
   MEDIOS    = %w[efectivo transferencia cuenta_corriente].freeze
   CONTEXTOS = %w[creacion entrega contabilidad].freeze
   MEDIOS_PAGADOS = %w[efectivo transferencia].freeze

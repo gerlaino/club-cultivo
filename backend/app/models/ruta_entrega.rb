@@ -1,4 +1,5 @@
 class RutaEntrega < ApplicationRecord
+  include Restorable
   self.table_name = 'rutas_entrega'
 
   belongs_to :club

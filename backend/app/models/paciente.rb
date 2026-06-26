@@ -1,4 +1,5 @@
 class Paciente < ApplicationRecord
+  include RestorableInterface
   acts_as_paranoid
   belongs_to :club
   acts_as_tenant(:club)

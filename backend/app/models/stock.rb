@@ -1,4 +1,5 @@
 class Stock < ApplicationRecord
+  include Restorable
   belongs_to :sede,     optional: true
   belongs_to :lote,     optional: true
   belongs_to :pesada,   optional: true

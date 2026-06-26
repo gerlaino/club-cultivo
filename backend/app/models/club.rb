@@ -1,4 +1,6 @@
 class Club < ApplicationRecord
+  include RestorableInterface
+  belongs_to :deleted_by, class_name: "User", optional: true
   has_many :users
   has_many :salas,                dependent: :destroy
   has_many :lotes,                dependent: :destroy

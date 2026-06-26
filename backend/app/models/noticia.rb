@@ -1,4 +1,5 @@
 class Noticia < ApplicationRecord
+  include Restorable
   self.table_name = 'noticias'
 
   belongs_to :club

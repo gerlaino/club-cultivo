@@ -1,4 +1,5 @@
 class SalaCultivador < ApplicationRecord
+  include Restorable
   self.table_name = 'sala_cultivadores'
 
   belongs_to :sala

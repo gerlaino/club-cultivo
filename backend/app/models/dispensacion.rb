@@ -1,4 +1,5 @@
 class Dispensacion < ApplicationRecord
+  include Restorable
   self.table_name = 'dispensaciones'
 
   ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido cancelada].freeze

@@ -1,4 +1,5 @@
 class PlantActivity < ApplicationRecord
+  include Restorable
   belongs_to :plant
   belongs_to :user
 

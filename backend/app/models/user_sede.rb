@@ -1,4 +1,5 @@
 class UserSede < ApplicationRecord
+  include Restorable
   self.table_name = 'user_sedes'
   belongs_to :user
   belongs_to :sede

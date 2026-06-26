@@ -1,4 +1,5 @@
 class DisponibilidadMedico < ApplicationRecord
+  include Restorable
   belongs_to :medico, class_name: 'User'
   belongs_to :club
   acts_as_tenant(:club)

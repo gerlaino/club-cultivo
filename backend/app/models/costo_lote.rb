@@ -1,5 +1,6 @@
 # backend/app/models/costo_lote.rb
 class CostoLote < ApplicationRecord
+  include Restorable
   belongs_to :lote
   belongs_to :club
   acts_as_tenant(:club)

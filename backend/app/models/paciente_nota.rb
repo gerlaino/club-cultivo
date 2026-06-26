@@ -1,4 +1,5 @@
 class PacienteNota < ApplicationRecord
+  include RestorableInterface
   self.table_name = 'paciente_notas'
   acts_as_paranoid
 

@@ -1,5 +1,6 @@
 # backend/app/models/document_template.rb
 class DocumentTemplate < ApplicationRecord
+  include Restorable
   belongs_to :club
   acts_as_tenant(:club)
   belongs_to :created_by, class_name: 'User'

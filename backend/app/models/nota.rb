@@ -1,4 +1,6 @@
 class Nota < ApplicationRecord
+  include RestorableInterface
+  belongs_to :deleted_by, class_name: "User", optional: true
   self.table_name = 'notas'
   acts_as_paranoid
 

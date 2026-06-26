@@ -5,6 +5,7 @@
 # opcionalmente registra una seña. Recién al ENTREGARLA se crea la Dispensacion real, que
 # corre todas sus validaciones (REPROCANN/crédito/stock) y callbacks financieros.
 class Reserva < ApplicationRecord
+  include Restorable
   ESTADOS          = %w[pendiente entregada cancelada vencida].freeze
   DIAS_VENCIMIENTO = 7 # días posteriores a la fecha de entrega estimada sin retirar → vencida
 

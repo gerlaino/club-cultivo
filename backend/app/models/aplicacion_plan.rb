@@ -1,4 +1,5 @@
 class AplicacionPlan < ApplicationRecord
+  include Restorable
   self.table_name = 'aplicacion_planes'
 
   belongs_to :plan_trabajo

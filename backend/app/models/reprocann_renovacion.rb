@@ -1,4 +1,5 @@
 class ReprocannRenovacion < ApplicationRecord
+  include Restorable
   self.table_name = 'reprocann_renovaciones'
 
   ESTADOS = %w[en_tramite aprobada rechazada].freeze

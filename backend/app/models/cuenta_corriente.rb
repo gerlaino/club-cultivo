@@ -1,4 +1,5 @@
 class CuentaCorriente < ApplicationRecord
+  include Restorable
   belongs_to :paciente
   belongs_to :club
   acts_as_tenant(:club)

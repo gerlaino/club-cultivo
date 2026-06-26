@@ -1,4 +1,5 @@
 class MailEnviado < ApplicationRecord
+  include Restorable
   self.table_name = 'mails_enviados'
 
   belongs_to :paciente

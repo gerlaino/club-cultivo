@@ -1,4 +1,5 @@
 class IndicacionMedica < ApplicationRecord
+  include Restorable
   belongs_to :paciente
   belongs_to :user # médico que emite
 

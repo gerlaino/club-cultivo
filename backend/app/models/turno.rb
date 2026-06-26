@@ -1,4 +1,5 @@
 class Turno < ApplicationRecord
+  include Restorable
   belongs_to :paciente
   belongs_to :medico, class_name: 'User'
   belongs_to :club

@@ -1,4 +1,5 @@
 class AriccameRegistro < ApplicationRecord
+  include Restorable
   TIPOS   = %w[entrada_producto dispensacion ajuste].freeze
   ESTADOS = %w[pendiente enviado confirmado error omitido].freeze
 

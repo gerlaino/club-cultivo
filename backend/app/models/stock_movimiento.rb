@@ -1,4 +1,5 @@
 class StockMovimiento < ApplicationRecord
+  include Restorable
   belongs_to :stock
   belongs_to :dispensacion, optional: true
   belongs_to :usuario, class_name: 'User'

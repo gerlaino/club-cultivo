@@ -1,4 +1,5 @@
 class Evento < ApplicationRecord
+  include Restorable
   belongs_to :club
   acts_as_tenant(:club)
 

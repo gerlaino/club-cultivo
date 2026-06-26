@@ -1,4 +1,5 @@
 class Alerta < ApplicationRecord
+  include Restorable
   self.table_name = 'alertas'
 
   belongs_to :regla,    class_name: 'ReglaAmbiental', foreign_key: :regla_id

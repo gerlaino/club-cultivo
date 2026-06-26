@@ -1,4 +1,6 @@
 class Plant < ApplicationRecord
+  include RestorableInterface
+  belongs_to :deleted_by, class_name: "User", optional: true
   belongs_to :lote
   belongs_to :club, optional: true
   acts_as_tenant(:club)

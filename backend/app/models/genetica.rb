@@ -1,4 +1,5 @@
 class Genetica < ApplicationRecord
+  include Restorable
   # has_global_records: las genéticas globales (club_id nil) son un catálogo compartido
   # visible para todos los clubes, además de las genéticas propias de cada club.
   # optional: true → club_id nil es válido (genéticas globales no pertenecen a un club).

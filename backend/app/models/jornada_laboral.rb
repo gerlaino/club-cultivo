@@ -1,4 +1,5 @@
 class JornadaLaboral < ApplicationRecord
+  include Restorable
   self.table_name = 'jornadas_laborales'
 
   belongs_to :user

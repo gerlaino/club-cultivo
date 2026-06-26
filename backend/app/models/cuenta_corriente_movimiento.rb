@@ -1,4 +1,5 @@
 class CuentaCorrienteMovimiento < ApplicationRecord
+  include Restorable
   belongs_to :cuenta_corriente
   belongs_to :dispensacion, optional: true
   belongs_to :created_by, class_name: 'User'

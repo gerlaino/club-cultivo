@@ -1,4 +1,5 @@
 class Tarea < ApplicationRecord
+  include Restorable
   # ── Asociaciones ──────────────────────────────────────────────
   belongs_to :club
   acts_as_tenant(:club)

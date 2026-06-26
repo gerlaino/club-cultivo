@@ -1,4 +1,5 @@
 class CheckIn < ApplicationRecord
+  include Restorable
   belongs_to :paciente
   belongs_to :dispensacion, optional: true
   belongs_to :club
