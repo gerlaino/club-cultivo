@@ -80,6 +80,7 @@ module Restore
       { key: 'user',                model_name: 'User',               label: 'Usuario',             group: 'Configuración', descriptor: ->(r) { [r.try(:first_name), r.try(:last_name)].compact.join(' ').presence || r.try(:email) || "Usuario ##{r.id}" }, search: %i[first_name last_name email] },
 
       # --- Complejas (necesitan Restorer con validación — Fase 3) --------------
+      # Restaura tanto medio único (legacy) como cobros partidos (mixto/contra-entrega).
       { key: 'dispensacion',        model_name: 'Dispensacion',       label: 'Dispensación',        group: 'Dispensación', complex: true, restorer: 'Restore::Restorers::Dispensacion', descriptor: ->(r) { "Dispensación ##{r.id}" } },
       { key: 'stock',               model_name: 'Stock',              label: 'Stock',               group: 'Stock', complex: true, restorer: 'Restore::Restorers::Stock' },
       # Dependientes: vuelven con su agregado padre (Dispensación/Stock), no se listan sueltos.

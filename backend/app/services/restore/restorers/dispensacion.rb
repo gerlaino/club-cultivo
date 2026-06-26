@@ -1,13 +1,9 @@
 module Restore
   module Restorers
     # Restaura una dispensación re-aplicando sus efectos (descuenta stock, asiento contable,
-    # débito de cuenta corriente/gramos) con la MISMA lógica que la creación (vía
-    # Dispensaciones::AplicarEfectos). Valida contra el estado ACTUAL y bloquea con motivos:
-    # si el crédito ya se consumió o el stock no alcanza, no restaura (política del proyecto).
-    #
-    # v1: cubre el medio de pago legacy (efectivo/transferencia/cuenta_corriente/no_abona/
-    # credito_gramos). Las dispensaciones con cobros partidos se bloquean con motivo (su
-    # restauración —reconstruir el desglose de cobros— es un paso aparte).
+    # débito de cuenta corriente/gramos) con la MISMA lógica que la creación. Valida contra el
+    # estado ACTUAL y bloquea con motivos: si el crédito ya se consumió o el stock no alcanza,
+    # no restaura (política del proyecto). Soporta tanto medio único legacy como cobros partidos.
     class Dispensacion < Restore::Base
       def conflicts
         d  = record
@@ -24,12 +20,6 @@ module Restore
             "Stock insuficiente: hay #{disp.round(2)}#{stock.unidad || 'g'} disponibles y la dispensa requiere #{d.cantidad}#{stock.unidad || 'g'}.")
         end
 
-        if cobros?
-          cs << conflict('cobros_no_soportado',
-            'Esta dispensación tiene cobros partidos / contra-entrega. Su restauración todavía no está soportada.')
-          return cs # sin sentido validar crédito en este caso
-        end
-
         cs.concat(conflictos_credito(d))
         cs << conflict('periodo_cerrado', 'La fecha cae en un período contable ya cerrado.') if periodo_cerrado?(d)
         cs
@@ -44,16 +34,22 @@ module Restore
       def conflictos_credito(d)
         cc = d.paciente&.cuenta_corriente
 
+        # Cobros partidos: la parte que cae en cuenta corriente debe entrar en el cupo actual.
+        if cobros?
+          monto = d.cobros.with_deleted.a_credito.sum(:monto_ars).to_d
+          return [] if monto <= 0
+          return [conflict('sin_cuenta_corriente', 'El socio no tiene cuenta corriente configurada.')] if cc.nil?
+          disponible = cc.saldo_disponible.to_d + cc.limite_credito.to_d
+          return [credito_insuficiente(monto, disponible)] if disponible < monto
+          return []
+        end
+
         if d.a_credito?
           monto = d.monto_credito_ars.to_d
           return [] if monto <= 0
           return [conflict('sin_cuenta_corriente', 'El socio no tiene cuenta corriente configurada.')] if cc.nil?
-
           disponible = cc.saldo_disponible.to_d + cc.limite_credito.to_d
-          if disponible < monto
-            return [conflict('credito_insuficiente',
-              "Crédito insuficiente: necesita $#{monto.to_f} y el socio dispone de $#{disponible.to_f}.")]
-          end
+          return [credito_insuficiente(monto, disponible)] if disponible < monto
         elsif d.medio_pago == 'credito_gramos'
           saldo_g = cc&.saldo_disponible_g.to_d
           if !cc&.credito_gramos_activo? || saldo_g < d.cantidad.to_d
@@ -65,15 +61,39 @@ module Restore
         []
       end
 
+      def credito_insuficiente(monto, disponible)
+        conflict('credito_insuficiente',
+          "Crédito insuficiente: necesita $#{monto.to_f} y el socio dispone de $#{disponible.to_f}.")
+      end
+
       def periodo_cerrado?(d)
         cierre = d.paciente&.club&.contabilidad_cerrada_hasta
         cierre.present? && d.fecha_dispensacion.present? && d.fecha_dispensacion <= cierre
       end
 
       def apply!
-        d = record
+        d     = record
+        actor = usuario || d.deleted_by || d.user
         d.send(:decrementar_stock)
-        Dispensaciones::AplicarEfectos.financiero!(dispensacion: d, usuario: usuario || d.deleted_by || d.user)
+        cobros? ? reaplicar_cobros!(d, actor) : Dispensaciones::AplicarEfectos.financiero!(dispensacion: d, usuario: actor)
+      end
+
+      # Re-crea cada línea de cobro (fresca) con su asiento/débito, vía el mismo servicio que la
+      # creación. Las líneas viejas quedan soft-borradas (ocultas); las nuevas son las válidas.
+      def reaplicar_cobros!(d, actor)
+        d.cobros.with_deleted.order(:created_at).each do |viejo|
+          res = Dispensaciones::RegistrarCobro.call(
+            dispensacion: d, club: d.paciente.club, usuario: actor,
+            medio: viejo.medio, monto: viejo.monto_ars, contexto: 'creacion',
+          )
+          raise res.error unless res.ok?
+        end
+        # Re-sincroniza el medio_pago denormalizado y el monto a crédito (como afinar_medio_pago!).
+        medios = d.cobros.pluck(:medio).uniq
+        d.update_columns(
+          medio_pago:        medios.size == 1 ? medios.first : 'mixto',
+          monto_credito_ars: d.cobros.a_credito.sum(:monto_ars),
+        )
       end
 
       # apply! crea asientos/movimientos frescos; no des-borramos los viejos (quedarían duplicados).

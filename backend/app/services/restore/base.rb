@@ -34,9 +34,12 @@ module Restore
       c = conflicts
       return Result.new(ok: false, conflicts: c) if c.any?
 
+      # Des-borrar PRIMERO y re-aplicar efectos después: así los registros nuevos (cobros,
+      # asientos) que referencian el registro restaurado lo ven vigente (si no, acts_as_tenant
+      # y otras validaciones de asociación fallan contra un registro todavía oculto).
       ActiveRecord::Base.transaction do
-        apply!
         record.restore_record!(recursive: recursive_restore?)
+        apply!
       end
       Result.new(ok: true, mensaje: 'Restaurado')
     end
