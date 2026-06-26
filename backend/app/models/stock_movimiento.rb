@@ -2,6 +2,7 @@ class StockMovimiento < ApplicationRecord
   include Restorable
   belongs_to :stock
   belongs_to :dispensacion, optional: true
+  belongs_to :stock_resultante, class_name: 'Stock', optional: true # derivado producido por este mov.
   belongs_to :usuario, class_name: 'User'
   belongs_to :sede_origen,  class_name: 'Sede', optional: true
   belongs_to :sede_destino, class_name: 'Sede', optional: true

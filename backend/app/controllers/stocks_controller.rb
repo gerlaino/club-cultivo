@@ -138,17 +138,28 @@ class StocksController < ApplicationController
 
   # PATCH /stocks/:id
   def update
-    cantidad_anterior = @stock.cantidad.to_f
-    if @stock.update(stock_update_params)
-      nueva_cantidad = @stock.cantidad.to_f
-      if nueva_cantidad != cantidad_anterior
-        delta = nueva_cantidad - cantidad_anterior
-        @stock.stock_movimientos.create!(
-          tipo:    'ajuste',
-          gramos:  delta,
-          usuario: current_user,
-          notas:   "Edición manual: #{cantidad_anterior}g → #{nueva_cantidad}g",
-        )
+    attrs            = stock_update_params
+    edita_inicial    = attrs.key?(:cantidad_inicial)
+    inicial_anterior = @stock.cantidad_inicial.to_d
+
+    # La cantidad inicial de un stock de LOTE no se edita acá: viene de la suma de los pesajes.
+    if edita_inicial && @stock.origen != 'compra_externa'
+      return render json: { error: 'La cantidad inicial de un stock de lote se edita desde el pesaje del lote, no desde acá.' }, status: :unprocessable_entity
+    end
+
+    if @stock.update(attrs)
+      # Corregir el inicial ajusta el actual por el mismo delta (respeta lo ya operado) + auditoría.
+      if edita_inicial
+        delta = @stock.cantidad_inicial.to_d - inicial_anterior
+        if delta != 0
+          @stock.update!(cantidad: [@stock.cantidad.to_d + delta, 0].max)
+          @stock.stock_movimientos.create!(
+            tipo:    'ajuste',
+            gramos:  delta,
+            usuario: current_user,
+            notas:   "Corrección de cantidad inicial: #{inicial_anterior.to_f}g → #{@stock.cantidad_inicial.to_f}g",
+          )
+        end
       end
       render json: serialize_stock(@stock.reload)
     else
@@ -221,14 +232,10 @@ class StocksController < ApplicationController
 
     nuevo = nil
     ActiveRecord::Base.transaction do
-      # 1) Descontar la flor del stock origen (sea de lote o externo) + movimiento.
+      # 1) Descontar la flor del stock origen (sea de lote o externo).
       nueva_cant = @stock.cantidad.to_f - gramos
       @stock.update!(cantidad: nueva_cant)
       @stock.update!(estado: 'agotado') if nueva_cant.zero?
-      @stock.stock_movimientos.create!(
-        tipo: 'produccion', gramos: -gramos, usuario: current_user,
-        notas: "[PRODUCCIÓN] #{cantidad_out} #{unidad} de #{forma} (#{gramos}g usados)",
-      )
 
       # 2) Crear el producto elaborado. es_split evita el auto-descuento del modelo
       # (ya descontamos arriba). Hereda el lote si lo hay; si es externo, queda externo.
@@ -254,6 +261,14 @@ class StocksController < ApplicationController
         nuevo.proveedor = @stock.proveedor.presence || 'Producción propia'
       end
       nuevo.save!
+
+      # 3) Movimiento de producción en el origen, vinculado al derivado: al borrar el derivado
+      #    este movimiento se quita del historial (no queda rastro huérfano).
+      @stock.stock_movimientos.create!(
+        tipo: 'produccion', gramos: -gramos, usuario: current_user,
+        stock_resultante: nuevo,
+        notas: "[PRODUCCIÓN] #{cantidad_out} #{unidad} de #{forma} (#{gramos}g usados)",
+      )
     end
     render json: serialize_stock(nuevo), status: :created
   rescue ActiveRecord::RecordInvalid => e
@@ -457,7 +472,7 @@ class StocksController < ApplicationController
 
   def stock_update_params
     params.require(:stock).permit(
-      :cantidad, :costo_unitario_ars, :precio_sugerido_ars, :descripcion, :proveedor
+      :cantidad_inicial, :costo_unitario_ars, :precio_sugerido_ars, :descripcion, :proveedor
     )
   end
 

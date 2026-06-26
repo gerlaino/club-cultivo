@@ -1,7 +1,7 @@
 class PesajesManicuraController < ApplicationController
   before_action :authenticate_user!
   before_action :set_lote, except: [:index_admin]
-  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir]
+  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir, :reajustar_peso]
 
   # GET /lotes/:lote_id/pesajes_manicura
   # Manicurador ve sus pesajes activos del lote; admin ve todos.
@@ -163,6 +163,26 @@ class PesajesManicuraController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Stock no encontrado para este lote' }, status: :not_found
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # PATCH /lotes/:lote_id/pesajes_manicura/:id/reajustar_peso
+  # Corrige el peso de un pesaje confirmado y propaga la diferencia al stock del lote.
+  def reajustar_peso
+    unless current_user.admin? || current_user.supervisor?
+      return render json: { error: 'Solo admin o supervisor pueden reajustar' }, status: :forbidden
+    end
+
+    @pesaje.reajustar_peso_confirmado!(
+      nuevo_peso: params.require(:peso_confirmado_g),
+      usuario:    current_user,
+    )
+    render json: PesajeManicuraSerializer.serialize(@pesaje.reload, include_plantas: true)
+  rescue ActionController::ParameterMissing => e
+    render json: { error: "Falta: #{e.param}" }, status: :unprocessable_entity
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end

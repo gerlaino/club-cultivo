@@ -492,6 +492,7 @@ export const enviarPesajeManicura     = (loteId, id)       => api.post(`/lotes/$
 export const deletePesajeManicura      = (loteId, id)       => api.delete(`/lotes/${loteId}/pesajes_manicura/${id}`)
 export const reabrirPesajeManicura     = (loteId, id)       => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/reabrir`)
 export const confirmarPesajeManicura  = (loteId, id, payload) => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/confirmar`, payload)
+export const reajustarPesoPesajeManicura = (loteId, id, peso) => api.patch(`/lotes/${loteId}/pesajes_manicura/${id}/reajustar_peso`, { peso_confirmado_g: peso })
 export const listPesajesManicuraAdmin = (params = {})      => api.get('/pesajes_manicura', { params })
 
 // ── Lecturas ambientales ──────────────────────────────────────────────────────

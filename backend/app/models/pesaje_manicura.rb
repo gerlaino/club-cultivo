@@ -146,6 +146,35 @@ class PesajeManicura < ApplicationRecord
     end
   end
 
+  # Corrige el peso de un pesaje YA confirmado y propaga la diferencia al stock que generó
+  # (cantidad y cantidad_inicial), con un movimiento de auditoría. Es la forma coherente de
+  # editar la "cantidad inicial" de un stock de lote: se edita el pesaje, no el agregado.
+  def reajustar_peso_confirmado!(nuevo_peso:, usuario:)
+    raise "Solo un pesaje confirmado puede reajustarse" unless confirmado?
+    raise "Este pesaje no tiene stock asociado" if stock.nil?
+
+    peso  = nuevo_peso.to_d
+    raise ArgumentError, "El peso debe ser mayor a 0" unless peso > 0
+    delta = peso - peso_confirmado_g.to_d
+    return self if delta.zero?
+
+    nueva_cant = stock.cantidad.to_d + delta
+    raise ArgumentError, "El ajuste dejaría el stock en negativo (#{nueva_cant.to_f}g)" if nueva_cant < 0
+
+    ActiveRecord::Base.transaction do
+      stock.update!(
+        cantidad:         nueva_cant,
+        cantidad_inicial: stock.cantidad_inicial.to_d + delta,
+      )
+      stock.stock_movimientos.create!(
+        tipo: 'ajuste', gramos: delta, usuario: usuario,
+        notas: "Reajuste de pesaje del lote #{lote.codigo}: #{peso_confirmado_g.to_f}g → #{peso.to_f}g",
+      )
+      update!(peso_confirmado_g: peso)
+    end
+    self
+  end
+
   private
 
   # Aviso push al admin: hay un pesaje esperando confirmación (reemplaza al push viejo

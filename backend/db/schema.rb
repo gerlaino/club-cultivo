@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_26_000003) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_26_000004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1398,12 +1398,14 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_26_000003) do
     t.bigint "dispensacion_id"
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.bigint "stock_resultante_id"
     t.index ["deleted_at"], name: "index_stock_movimientos_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_stock_movimientos_on_deleted_by_id"
     t.index ["dispensacion_id"], name: "index_stock_movimientos_on_dispensacion_id"
     t.index ["sede_destino_id"], name: "index_stock_movimientos_on_sede_destino_id"
     t.index ["sede_origen_id"], name: "index_stock_movimientos_on_sede_origen_id"
     t.index ["stock_id"], name: "index_stock_movimientos_on_stock_id"
+    t.index ["stock_resultante_id"], name: "index_stock_movimientos_on_stock_resultante_id"
     t.index ["tipo"], name: "index_stock_movimientos_on_tipo"
     t.index ["usuario_id"], name: "index_stock_movimientos_on_usuario_id"
   end
@@ -1794,6 +1796,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_26_000003) do
   add_foreign_key "stock_movimientos", "sedes", column: "sede_destino_id"
   add_foreign_key "stock_movimientos", "sedes", column: "sede_origen_id"
   add_foreign_key "stock_movimientos", "stocks"
+  add_foreign_key "stock_movimientos", "stocks", column: "stock_resultante_id"
   add_foreign_key "stock_movimientos", "users", column: "deleted_by_id"
   add_foreign_key "stock_movimientos", "users", column: "usuario_id"
   add_foreign_key "stocks", "clubs"

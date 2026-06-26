@@ -104,6 +104,20 @@
             <template v-else>
               <div v-if="editError" class="sd__alert">{{ editError }}</div>
               <div class="sd__form-grid">
+                <div class="sd__field sd__field--full">
+                  <label class="sd__label">Cantidad inicial ({{ unidad }})</label>
+                  <input
+                    v-if="esExterno"
+                    type="number" min="0" step="0.01" class="sd__input"
+                    v-model.number="editForm.cantidad_inicial" placeholder="0.0" />
+                  <template v-else>
+                    <input type="number" class="sd__input" :value="editForm.cantidad_inicial" disabled />
+                    <span class="sd__hint">Viene de la suma de los pesajes del lote. Para corregirla, editá el peso del pesaje.</span>
+                    <button type="button" class="sd__btn-link" @click="abrirReajustePesaje">
+                      <i class="bi bi-pencil"></i> Editar pesaje del lote
+                    </button>
+                  </template>
+                </div>
                 <div class="sd__field">
                   <label class="sd__label">Precio sugerido (ARS/g)</label>
                   <input type="number" min="0" step="0.01" class="sd__input" v-model.number="editForm.precio_sugerido_ars" placeholder="0.00" />
@@ -491,6 +505,39 @@
       </Transition>
     </Teleport>
 
+    <!-- Modal reajustar peso de pesaje (corrige la cantidad inicial de un stock de lote) -->
+    <Teleport to="body">
+      <Transition name="sd-fade">
+        <div v-if="showReajustePesaje" class="sd__overlay" @click.self="showReajustePesaje = false">
+          <div class="sd__modal">
+            <div class="sd__modal-hd">
+              <div class="sd__modal-ico"><i class="bi bi-pencil"></i></div>
+              <div>
+                <h2 class="sd__modal-title">Editar peso del pesaje</h2>
+                <p class="sd__modal-sub">El stock se ajusta por la diferencia.</p>
+              </div>
+              <button class="sd__modal-close" @click="showReajustePesaje = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="sd__modal-body">
+              <div v-if="reajusteError" class="sd__alert">{{ reajusteError }}</div>
+              <div v-if="!pesajesLote.length" class="sd__hint">No hay pesajes confirmados para este stock.</div>
+              <div v-for="p in pesajesLote" :key="p.id" class="sd__reajuste-row">
+                <div class="sd__reajuste-info">
+                  <strong>{{ p.lote_codigo || ('Pesaje #' + p.id) }}</strong>
+                  <span>confirmado: {{ Number(p.peso_confirmado_g).toFixed(1) }}g</span>
+                </div>
+                <div class="sd__input-row sd__reajuste-input">
+                  <input type="number" min="0.1" step="0.1" class="sd__input" v-model.number="p._nuevoPeso" />
+                  <span class="sd__input-suf">g</span>
+                </div>
+                <button class="sd__btn-amber" :disabled="reajusteSaving" @click="guardarReajuste(p)">Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -501,6 +548,7 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   getStock, updateStock, asignarStock, ajustarStock, descartarStock, deleteStock,
   getStockMovimientos, listSedes, producirStock,
+  listPesajesManicura, reajustarPesoPesajeManicura,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -590,8 +638,47 @@ const saving    = ref(false)
 const editError = ref(null)
 const editForm  = ref({})
 
+// La cantidad inicial solo se edita en stock externo; en uno de lote viene del pesaje.
+const esExterno = computed(() => stock.value?.origen === 'compra_externa')
+
+// Reajuste de pesaje: forma coherente de corregir la cantidad inicial de un stock de lote.
+const showReajustePesaje = ref(false)
+const pesajesLote        = ref([])
+const reajusteSaving     = ref(false)
+const reajusteError      = ref(null)
+
+async function abrirReajustePesaje() {
+  reajusteError.value = null
+  try {
+    const { data } = await listPesajesManicura(stock.value.lote_id)
+    pesajesLote.value = (data || [])
+      .filter(p => p.estado === 'confirmado' && p.stock_id === stock.value.id)
+      .map(p => ({ ...p, _nuevoPeso: Number(p.peso_confirmado_g) }))
+    showReajustePesaje.value = true
+  } catch {
+    toast.error('No se pudieron cargar los pesajes del lote')
+  }
+}
+
+async function guardarReajuste(pesaje) {
+  if (!pesaje._nuevoPeso || pesaje._nuevoPeso <= 0) { reajusteError.value = 'Peso inválido'; return }
+  reajusteSaving.value = true
+  reajusteError.value  = null
+  try {
+    await reajustarPesoPesajeManicura(stock.value.lote_id, pesaje.id, pesaje._nuevoPeso)
+    await recargar()
+    showReajustePesaje.value = false
+    toast.success('Pesaje reajustado — stock actualizado')
+  } catch (e) {
+    reajusteError.value = e?.response?.data?.error || 'No se pudo reajustar'
+  } finally {
+    reajusteSaving.value = false
+  }
+}
+
 function startEdit() {
   editForm.value = {
+    cantidad_inicial:    stock.value.cantidad_inicial != null ? Number(stock.value.cantidad_inicial) : null,
     precio_sugerido_ars: stock.value.precio_sugerido_ars ? Number(stock.value.precio_sugerido_ars) : null,
     costo_unitario_ars:  stock.value.costo_unitario_ars  ? Number(stock.value.costo_unitario_ars)  : null,
     proveedor:   stock.value.proveedor   || '',
@@ -608,6 +695,7 @@ async function guardarEdit() {
   try {
     const f = editForm.value
     const payload = {}
+    if (esExterno.value && f.cantidad_inicial != null) payload.cantidad_inicial = f.cantidad_inicial
     if (f.precio_sugerido_ars != null) payload.precio_sugerido_ars = f.precio_sugerido_ars
     if (f.costo_unitario_ars  != null) payload.costo_unitario_ars  = f.costo_unitario_ars
     if (f.proveedor)                   payload.proveedor           = f.proveedor
@@ -617,7 +705,7 @@ async function guardarEdit() {
     editando.value = false
     toast.success('Datos actualizados')
   } catch (e) {
-    editError.value = e?.response?.data?.errors?.[0] || 'Error al guardar'
+    editError.value = e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al guardar'
   } finally { saving.value = false }
 }
 
@@ -1098,4 +1186,14 @@ function badgeVencLabel(s) {
 /* Transitions */
 .sd-fade-enter-active, .sd-fade-leave-active { transition: opacity .2s; }
 .sd-fade-enter-from,  .sd-fade-leave-to      { opacity: 0; }
+
+/* Editar pesaje del lote */
+.sd__btn-link { background: none; border: none; color: #2563eb; font-size: .8rem; font-weight: 600; cursor: pointer; padding: .25rem 0; display: inline-flex; align-items: center; gap: .3rem; }
+.sd__btn-link:hover { text-decoration: underline; }
+.sd__reajuste-row { display: flex; align-items: center; gap: .75rem; padding: .65rem 0; border-bottom: 1px solid #f1f5f9; }
+.sd__reajuste-row:last-child { border-bottom: none; }
+.sd__reajuste-info { display: flex; flex-direction: column; gap: .15rem; flex: 1; min-width: 0; }
+.sd__reajuste-info strong { font-size: .85rem; color: #1e293b; }
+.sd__reajuste-info span { font-size: .75rem; color: #64748b; }
+.sd__reajuste-input { width: 120px; flex-shrink: 0; }
 </style>

@@ -108,9 +108,10 @@ Rails.application.routes.draw do
       resources :analisis_laboratorio, only: [:index, :create, :update, :destroy]
       resources :pesajes_manicura, only: [:index, :show, :create, :destroy] do
         member do
-          post :enviar
-          post :confirmar
-          post :reabrir
+          post  :enviar
+          post  :confirmar
+          post  :reabrir
+          patch :reajustar_peso
         end
       end
       member do

@@ -25,7 +25,8 @@ class EliminarStockService
   private
 
   # Un derivado (producido vía /producir) consumió gramos de un stock de origen. Al borrarlo,
-  # se los devolvemos —simétrico a cómo se revierten las dispensaciones—.
+  # devolvemos los gramos Y quitamos el movimiento de producción del historial del origen
+  # (igual que una dispensación borrada quita su movimiento — no queda rastro huérfano).
   def devolver_gramos_al_origen
     origen = @stock.producido_desde_stock
     gramos = @stock.lote_origen_consumido_g.to_d
@@ -35,10 +36,7 @@ class EliminarStockService
       cantidad: origen.cantidad.to_d + gramos,
       estado:   origen.estado == 'agotado' ? 'asignado' : origen.estado,
     )
-    origen.stock_movimientos.create!(
-      tipo: 'ajuste', gramos: gramos, usuario: @usuario,
-      notas: "[REVERSA PRODUCCIÓN] Borrado del derivado ##{@stock.id} — #{gramos}g devueltos al origen",
-    )
+    origen.stock_movimientos.where(stock_resultante_id: @stock.id).destroy_all
   end
 
   def validar!

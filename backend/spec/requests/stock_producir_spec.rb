@@ -76,17 +76,18 @@ RSpec.describe 'POST /stocks/:id/producir (transformación)', type: :request do
     expect(nuevo.unidad).to eq('un')
   end
 
-  it 'borrar el derivado devuelve los gramos consumidos al stock origen' do
+  it 'borrar el derivado devuelve los gramos y quita la producción del historial del origen' do
     origen = create(:stock, :externo, club: club, sede: sede, forma_producto: 'flor_seca', cantidad: 200, costo_unitario_ars: 3)
     post "/stocks/#{origen.id}/producir",
          params: { gramos_usados: 80, forma_producto: 'prensado', cantidad_producida: 8, unidad: 'un' },
          headers: auth_headers, as: :json
     derivado = Stock.find(JSON.parse(response.body)['id'])
-    expect(origen.reload.cantidad.to_f).to eq(120.0)           # 200 − 80
+    expect(origen.reload.cantidad.to_f).to eq(120.0)                          # 200 − 80
+    expect(origen.stock_movimientos.where(tipo: 'produccion').count).to eq(1) # movimiento de producción
 
     delete "/stocks/#{derivado.id}", headers: auth_headers, as: :json
     expect(response).to have_http_status(:no_content).or have_http_status(:ok)
-    expect(origen.reload.cantidad.to_f).to eq(200.0)           # 80g devueltos
-    expect(origen.stock_movimientos.where(tipo: 'ajuste').last.notas).to include('REVERSA PRODUCCIÓN')
+    expect(origen.reload.cantidad.to_f).to eq(200.0)                          # 80g devueltos
+    expect(origen.stock_movimientos.where(tipo: 'produccion').count).to eq(0) # quitado del historial
   end
 end
