@@ -44,6 +44,19 @@ RSpec.describe 'DELETE /stocks/:id — cascada a derivados', type: :request do
     expect(Stock.where(id: derivado.id)).to exist
   end
 
+  it 'borra un stock con reservas no-pendientes y dispensaciones canceladas (sin violar FK)' do
+    stock = create(:stock, :externo, club: club, sede: sede, forma_producto: 'flor_seca', cantidad: 200, costo_unitario_ars: 3)
+    Reserva.create!(club: club, paciente: paciente, stock: stock, user: admin, cantidad: 10,
+                    estado: 'entregada', fecha_entrega_estimada: Date.yesterday)
+    disp = Dispensacion.create!(paciente: paciente, user: admin, stock: stock, sede: sede,
+                                cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 100)
+    disp.update_column(:estado_envio, 'cancelada')
+
+    delete "/stocks/#{stock.id}", headers: auth_headers, as: :json
+    expect(response).to have_http_status(:no_content)
+    expect(Stock.where(id: stock.id)).to be_empty
+  end
+
   it 'bloquea si un derivado tiene un despacho EN CAMINO (en_viaje)' do
     origen   = create(:stock, :externo, club: club, sede: sede, forma_producto: 'flor_seca', cantidad: 200, costo_unitario_ars: 3)
     derivado = producir_derivado(origen)

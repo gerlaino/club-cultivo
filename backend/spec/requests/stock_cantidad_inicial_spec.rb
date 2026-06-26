@@ -9,16 +9,17 @@ RSpec.describe 'Edición de cantidad inicial del stock', type: :request do
   let(:sede)     { create(:sede, club: club, created_by: admin) }
 
   describe 'PATCH /stocks/:id (stock externo)' do
-    it 'edita la cantidad inicial y ajusta el actual por el mismo delta + movimiento' do
+    it 'edita la cantidad inicial sin tocar el actual ni crear movimiento' do
       stock = create(:stock, :externo, club: club, sede: sede, forma_producto: 'flor_seca', cantidad: 800, cantidad_inicial: 1000)
       sign_in_as(admin)
 
-      patch "/stocks/#{stock.id}", params: { stock: { cantidad_inicial: 985 } }, headers: auth_headers, as: :json
+      expect {
+        patch "/stocks/#{stock.id}", params: { stock: { cantidad_inicial: 985 } }, headers: auth_headers, as: :json
+      }.not_to change { stock.stock_movimientos.count }
       expect(response).to have_http_status(:ok)
       stock.reload
-      expect(stock.cantidad_inicial.to_f).to eq(985.0)
-      expect(stock.cantidad.to_f).to eq(785.0) # 800 + (985 − 1000)
-      expect(stock.stock_movimientos.where(tipo: 'ajuste').last.notas).to include('Corrección de cantidad inicial')
+      expect(stock.cantidad_inicial.to_f).to eq(985.0) # inicial corregido
+      expect(stock.cantidad.to_f).to eq(800.0)         # actual intacto
     end
 
     it 'no permite editar la inicial de un stock de lote (viene del pesaje)' do

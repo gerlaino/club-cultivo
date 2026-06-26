@@ -25,8 +25,13 @@ class EliminarStockService
   # Borra un stock y, primero, sus derivados (en profundidad), con la misma reversión.
   def eliminar_recursivo(stock)
     stock.derivados.find_each { |d| eliminar_recursivo(d) }
-    stock.reservas.where(estado: 'pendiente').find_each(&:destroy!)
+    # Revertir las dispensaciones reversibles (devuelven stock/plata).
     stock.dispensaciones.no_canceladas.find_each { |d| revertir_y_destruir(d) }
+    # Soft-borrar TODO lo que referencia al stock con FK NOT NULL antes de destruirlo: si quedara
+    # algo, el dependent: :nullify intentaría poner stock_id = NULL y violaría la constraint.
+    # (Las reservas pendientes con seña y las entregas en curso ya bloquearon en validar!).
+    stock.reservas.find_each(&:destroy!)
+    stock.dispensaciones.find_each(&:destroy!) # las canceladas que hayan quedado
     devolver_gramos_al_origen(stock)
     stock.reload.destroy! # stock_movimientos se borran en cascada
   end

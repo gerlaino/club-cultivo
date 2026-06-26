@@ -138,29 +138,16 @@ class StocksController < ApplicationController
 
   # PATCH /stocks/:id
   def update
-    attrs            = stock_update_params
-    edita_inicial    = attrs.key?(:cantidad_inicial)
-    inicial_anterior = @stock.cantidad_inicial.to_d
+    attrs = stock_update_params
 
     # La cantidad inicial de un stock de LOTE no se edita acá: viene de la suma de los pesajes.
-    if edita_inicial && @stock.origen != 'compra_externa'
+    if attrs.key?(:cantidad_inicial) && @stock.origen != 'compra_externa'
       return render json: { error: 'La cantidad inicial de un stock de lote se edita desde el pesaje del lote, no desde acá.' }, status: :unprocessable_entity
     end
 
+    # El inicial es solo el registro de lo que ingresó: editarlo NO toca el actual (que lo
+    # manejan las operaciones y "Ajustar gramos"). Sin movimiento de stock.
     if @stock.update(attrs)
-      # Corregir el inicial ajusta el actual por el mismo delta (respeta lo ya operado) + auditoría.
-      if edita_inicial
-        delta = @stock.cantidad_inicial.to_d - inicial_anterior
-        if delta != 0
-          @stock.update!(cantidad: [@stock.cantidad.to_d + delta, 0].max)
-          @stock.stock_movimientos.create!(
-            tipo:    'ajuste',
-            gramos:  delta,
-            usuario: current_user,
-            notas:   "Corrección de cantidad inicial: #{inicial_anterior.to_f}g → #{@stock.cantidad_inicial.to_f}g",
-          )
-        end
-      end
       render json: serialize_stock(@stock.reload)
     else
       render json: { errors: @stock.errors.full_messages }, status: :unprocessable_entity
