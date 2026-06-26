@@ -37,4 +37,12 @@ RSpec.describe 'PATCH /preferences/conectar_email', type: :request do
     patch '/preferences/conectar_email', params: { email: '' }, headers: auth_headers, as: :json
     expect(response).to have_http_status(:unprocessable_entity)
   end
+
+  it 'el mail de prueba usa el remitente del club (no rompe con @club nil en el bloque)' do
+    club.update!(smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_user: 'miclub@gmail.com', smtp_pass: 'p',
+                 smtp_from: 'miclub@gmail.com', smtp_from_name: 'Mi Club')
+    post '/preferences/test_smtp', headers: auth_headers, as: :json
+    expect(response).to have_http_status(:ok)
+    expect(ActionMailer::Base.deliveries.last.from).to include('miclub@gmail.com')
+  end
 end

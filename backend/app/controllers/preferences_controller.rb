@@ -104,13 +104,20 @@ class PreferencesController < ApplicationController
       return render json: { error: 'SMTP no configurado' }, status: :unprocessable_entity
     end
 
-    dest = current_user.email
+    # OJO: el bloque de Mail.deliver corre en el contexto del Mail::Message (instance_eval),
+    # así que @club adentro es nil. Capturamos todo en variables locales (las captura el closure).
+    dest      = current_user.email
+    remitente = @club.email_from
+    settings  = @club.smtp_settings
+    asunto    = "✓ Prueba de correo — #{@club.name}"
+    cuerpo    = "Este es un correo de prueba enviado desde Club Cultivo para verificar el correo del club #{@club.name}."
+    metodo, opts_envio = Rails.env.test? ? [:test, {}] : [:smtp, settings]
     Mail.deliver do
-      from    "#{@club.smtp_from_name.presence || @club.name} <#{@club.smtp_from.presence || @club.smtp_user}>"
+      from    remitente
       to      dest
-      subject "✓ Prueba de correo — #{@club.name}"
-      body    "Este es un correo de prueba enviado desde Club Cultivo para verificar la configuración SMTP del club #{@club.name}."
-      delivery_method :smtp, @club.smtp_settings
+      subject asunto
+      body    cuerpo
+      delivery_method metodo, opts_envio
     end
 
     render json: { ok: true, enviado_a: dest }
