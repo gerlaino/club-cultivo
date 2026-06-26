@@ -91,7 +91,7 @@ const todasLasSalas       = ref([])
 const todasLasSedes       = ref([])
 const sedesSeleccionadas  = ref([])
 
-const form = ref({ id: null, first_name: "", last_name: "", email: "", role: "admin", sede_id: "", sala_id: "" })
+const form = ref({ id: null, first_name: "", last_name: "", email: "", email_personal: "", role: "admin", sede_id: "", sala_id: "" })
 
 const roleConfig = computed(() => ROLES_CONFIG[form.value.role] || { sedes: false, salas: false })
 
@@ -123,7 +123,7 @@ function startCreate() {
   editing.value            = false
   wizardStep.value         = 1
   sedesSeleccionadas.value = []
-  form.value               = { id: null, first_name: "", last_name: "", email: "", role: "admin", sede_id: "", sala_id: "" }
+  form.value               = { id: null, first_name: "", last_name: "", email: "", email_personal: "", role: "admin", sede_id: "", sala_id: "" }
   showModal.value          = true
 }
 
@@ -133,7 +133,7 @@ function irADetalle(u) { router.push({ name: 'usuario-detail', params: { id: u.i
 function startEdit(u) {
   editing.value     = true
   originalRole.value = u.role
-  form.value      = { id: u.id, first_name: u.first_name || "", last_name: u.last_name || "", email: u.email || "", role: u.role || "admin", sede_id: "", sala_id: "" }
+  form.value      = { id: u.id, first_name: u.first_name || "", last_name: u.last_name || "", email: u.email || "", email_personal: u.email_personal || "", role: u.role || "admin", sede_id: "", sala_id: "" }
   showModal.value = true
 }
 
@@ -170,6 +170,7 @@ async function save() {
         first_name: form.value.first_name,
         last_name:  form.value.last_name,
         email:      form.value.email,
+      email_personal: form.value.email_personal,
         role:       form.value.role,
       })
       closeModal()
@@ -186,6 +187,7 @@ async function save() {
       first_name:            form.value.first_name,
       last_name:             form.value.last_name,
       email:                 form.value.email,
+      email_personal:        form.value.email_personal,
       role:                  form.value.role,
       password:              '123456Aa',
       password_confirmation: '123456Aa',
@@ -394,11 +396,18 @@ async function removeOne(u) {
                 <input class="uv__input" v-model.trim="form.last_name" placeholder="Pérez" />
               </div>
 
-              <!-- Email -->
+              <!-- Usuario de ingreso (login) -->
               <div class="uv__field uv__field--full">
-                <label class="uv__label">Email <span class="uv__req">*</span></label>
-                <input type="email" class="uv__input" v-model.trim="form.email" placeholder="usuario@club.org" autocomplete="off" />
-                <span class="uv__hint">Contraseña inicial: <strong>123456Aa</strong> — el usuario deberá cambiarla.</span>
+                <label class="uv__label">Usuario de ingreso <span class="uv__req">*</span></label>
+                <input type="email" class="uv__input" v-model.trim="form.email" placeholder="rol@nombreclub.com" autocomplete="off" />
+                <span class="uv__hint">Es con lo que se loguea. Puede ser inventado (no necesita ser un mail real). Contraseña inicial: <strong>123456Aa</strong>.</span>
+              </div>
+
+              <!-- Email personal (real) -->
+              <div class="uv__field uv__field--full">
+                <label class="uv__label">Email personal <span style="font-weight:400;color:#94a3b8">(opcional)</span></label>
+                <input type="email" class="uv__input" v-model.trim="form.email_personal" placeholder="persona@gmail.com" autocomplete="off" />
+                <span class="uv__hint">El mail REAL del usuario, para poder mandarle correos.</span>
               </div>
 
               <!-- Sedes (supervisor, medico, dispensador, delivery) -->
@@ -474,8 +483,14 @@ async function removeOne(u) {
                 <input class="uv__input" v-model.trim="form.last_name" placeholder="Pérez" />
               </div>
               <div class="uv__field uv__field--full">
-                <label class="uv__label">Email <span class="uv__req">*</span></label>
-                <input type="email" class="uv__input" v-model.trim="form.email" placeholder="usuario@club.org" />
+                <label class="uv__label">Usuario de ingreso <span class="uv__req">*</span></label>
+                <input type="email" class="uv__input" v-model.trim="form.email" placeholder="rol@nombreclub.com" />
+                <span class="uv__hint">Con lo que se loguea. Puede ser inventado.</span>
+              </div>
+              <div class="uv__field uv__field--full">
+                <label class="uv__label">Email personal <span style="font-weight:400;color:#94a3b8">(opcional)</span></label>
+                <input type="email" class="uv__input" v-model.trim="form.email_personal" placeholder="persona@gmail.com" />
+                <span class="uv__hint">El mail REAL, para mandarle correos.</span>
               </div>
             </div>
             <p class="uv__edit-note">

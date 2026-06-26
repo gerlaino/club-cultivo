@@ -106,7 +106,9 @@ class PreferencesController < ApplicationController
 
     # OJO: el bloque de Mail.deliver corre en el contexto del Mail::Message (instance_eval),
     # así que @club adentro es nil. Capturamos todo en variables locales (las captura el closure).
-    dest      = current_user.email
+    # La prueba va a la casilla INSTITUCIONAL (a sí misma), no al login del usuario (que puede ser
+    # un identificador inventado tipo rol@club.com y rebotaría).
+    dest      = @club.smtp_from.presence || @club.smtp_user
     remitente = @club.email_from
     settings  = @club.smtp_settings
     asunto    = "✓ Prueba de correo — #{@club.name}"
@@ -149,7 +151,7 @@ class PreferencesController < ApplicationController
     # En test no abrimos conexión SMTP real (usa el delivery :test).
     metodo, opts_envio = Rails.env.test? ? [:test, {}] : [:smtp, settings]
     begin
-      destino = current_user.email
+      destino = email # confirmación a la propia casilla que se está conectando
       Mail.deliver do
         from    "#{nombre} <#{email}>"
         to      destino

@@ -34,3 +34,21 @@ RSpec.describe 'POST /usuarios (alta de usuarios del club)', type: :request do
     end
   end
 end
+
+RSpec.describe 'Usuario: email de ingreso vs email personal', type: :request do
+  include AuthHelpers
+  let(:club)  { create(:club) }
+  let(:admin) { create(:user, club: club, role: 'admin') }
+  before { sign_in_as(admin) }
+
+  it 'guarda el email_personal separado del email de login' do
+    post '/usuarios', params: {
+      user: { email: 'cultivador@miclub.com', email_personal: 'juan@gmail.com',
+              first_name: 'Juan', last_name: 'P', role: 'admin', password: '123456Aa' }
+    }, headers: auth_headers, as: :json
+    expect(response).to have_http_status(:created)
+    body = JSON.parse(response.body)['data']
+    expect(body['email']).to eq('cultivador@miclub.com')
+    expect(body['email_personal']).to eq('juan@gmail.com')
+  end
+end

@@ -23,13 +23,13 @@ class ClubUsersController < ApplicationController
 
     users = rel.order("created_at DESC")
     render json: { data: users.map { |u|
-      u.as_json(only: [:id, :email, :first_name, :last_name, :role, :created_at, :updated_at])
+      u.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role, :created_at, :updated_at])
     } }
   end
 
   # GET /usuarios/:id
   def show
-    render json: { data: @user.as_json(only: [:id, :email, :first_name, :last_name, :role, :created_at, :updated_at]) }
+    render json: { data: @user.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role, :created_at, :updated_at]) }
   end
 
   # POST /usuarios
@@ -61,7 +61,7 @@ class ClubUsersController < ApplicationController
 
     if user.save
       user.send_reset_password_instructions if send_reset
-      render json: { data: user.as_json(only: [:id, :email, :first_name, :last_name, :role]) }, status: :created
+      render json: { data: user.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role]) }, status: :created
     else
       render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
     end
@@ -83,7 +83,7 @@ class ClubUsersController < ApplicationController
     end
 
     if @user.update(user_params)
-      render json: { data: @user.as_json(only: [:id, :email, :first_name, :last_name, :role]) }
+      render json: { data: @user.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role]) }
     else
       render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
     end
@@ -242,7 +242,7 @@ class ClubUsersController < ApplicationController
 
   # Solo campos que EXISTEN en tu schema
   def user_params
-    params.require(:user).permit(:email, :first_name, :last_name, :role, :password, :password_confirmation)
+    params.require(:user).permit(:email, :email_personal, :first_name, :last_name, :role, :password, :password_confirmation)
   end
 
   # Despachos (dispensaciones con envío) pendientes o en viaje asignados al usuario.

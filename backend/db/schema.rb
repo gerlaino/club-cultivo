@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_26_000005) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_26_000006) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1562,6 +1562,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_26_000005) do
     t.datetime "observer_expires_at"
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.string "email_personal"
     t.index ["club_id"], name: "index_users_on_club_id"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_users_on_deleted_by_id"
