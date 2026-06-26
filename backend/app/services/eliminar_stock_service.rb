@@ -57,8 +57,9 @@ class EliminarStockService
 
   def validar_stock!(stock)
     etiqueta = "'#{stock.forma_producto}'"
-    if stock.dispensaciones.where(estado_envio: 'entregado').exists?
-      raise Bloqueado, "No se puede borrar: #{etiqueta} tiene despachos ya entregados. Cancelalos primero."
+    # Despacho en camino o entregado = el producto está físicamente afuera: no se puede revertir.
+    if stock.dispensaciones.where(estado_envio: %w[en_viaje entregado]).exists?
+      raise Bloqueado, "No se puede borrar: #{etiqueta} tiene despachos en camino o ya entregados. Cancelalos primero."
     end
     if stock.dispensaciones.any? { |d| d.movimientos_contables.any?(&:cerrado?) }
       raise Bloqueado, "No se puede borrar: #{etiqueta} tiene dispensaciones en un período contable cerrado."
