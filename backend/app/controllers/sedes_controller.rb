@@ -207,7 +207,7 @@ class SedesController < ApplicationController
       direccion_completa:  [s.direccion, s.ciudad, s.provincia, s.pais].compact.reject(&:empty?).join(', '),
       activa:              s.activa,
       declarada_reprocann: s.declarada_reprocann,
-      salas_count:         s.salas.count,
+      salas_count:         s.salas.cultivo.count,
       created_at:          s.created_at,
     }
 

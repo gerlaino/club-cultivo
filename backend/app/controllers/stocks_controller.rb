@@ -235,19 +235,22 @@ class StocksController < ApplicationController
       # 2) Crear el producto elaborado. es_split evita el auto-descuento del modelo
       # (ya descontamos arriba). Hereda el lote si lo hay; si es externo, queda externo.
       nuevo = current_user.club.stocks.new(
-        sede_id:             @stock.sede_id,
-        forma_producto:      forma,
-        unidad:              unidad,
-        cantidad:            cantidad_out,
-        costo_unitario_ars:  costo_unitario_out,
-        precio_sugerido_ars: params[:precio_sugerido_ars].presence,
-        estado:              'asignado',
-        es_split:            true,
+        sede_id:                  @stock.sede_id,
+        forma_producto:           forma,
+        unidad:                   unidad,
+        cantidad:                 cantidad_out,
+        costo_unitario_ars:       costo_unitario_out,
+        precio_sugerido_ars:      params[:precio_sugerido_ars].presence,
+        descripcion:              params[:observaciones].presence,
+        genetica_id:              @stock.genetica_id,           # hereda la genética del origen
+        producido_desde_stock_id: @stock.id,                   # link para revertir al borrar
+        lote_origen_consumido_g:  gramos,                      # gramos consumidos del origen
+        estado:                   'asignado',
+        es_split:                 true,
       )
       if @stock.lote_id
         nuevo.origen  = 'derivado_lote'
         nuevo.lote_id = @stock.lote_id
-        nuevo.lote_origen_consumido_g = gramos
       else
         nuevo.origen    = 'compra_externa'
         nuevo.proveedor = @stock.proveedor.presence || 'Producción propia'

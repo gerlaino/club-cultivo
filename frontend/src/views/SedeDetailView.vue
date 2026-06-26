@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
+import { useClubStore } from "../stores/club"
 import { getSede, listSalas, getSedeStocks, updateStock, deleteSede } from "../lib/api"
 import ModalCrearSala    from '../components/salas/ModalCrearSala.vue'
 import Breadcrumb         from '../components/ui/Breadcrumb.vue'
@@ -14,8 +15,12 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 const route  = useRoute()
 const router = useRouter()
 const auth   = useAuthStore()
+const club   = useClubStore()
 const toast  = useToast()
 const { confirm } = useConfirm()
+
+// Umbral de stock bajo configurable (Stock → "Alerta stock bajo"), no hardcodeado.
+const umbralStockBajo = computed(() => Number(club.data?.umbral_stock_g ?? 50))
 
 const deleting = ref(false)
 async function eliminarSede() {
@@ -53,7 +58,7 @@ const canEditStock   = computed(() => ["admin", "supervisor"].includes(auth.user
 const tieneInv   = computed(() => ['social', 'mixta'].includes(sede.value?.tipo))
 const tieneSalas = computed(() => ['produccion', 'mixta'].includes(sede.value?.tipo))
 const stockTotal = computed(() => tiendaStocks.value.reduce((a, s) => a + Number(s.cantidad || 0), 0))
-const itemsBajos = computed(() => tiendaStocks.value.filter(s => Number(s.cantidad) < 5).length)
+const itemsBajos = computed(() => tiendaStocks.value.filter(s => Number(s.cantidad) < umbralStockBajo.value).length)
 
 
 // ── Tienda social (stocks asignados a esta sede) ─────────────────
@@ -123,7 +128,6 @@ const kpis = computed(() => ({
   total:     salas.value.length,
   activas:   salas.value.filter(s => s.state === "activa").length,
   plantas:   salas.value.reduce((a, s) => a + Number(s.plantas_totales || 0), 0),
-  capacidad: salas.value.reduce((a, s) => a + Number(s.pots_count || s.plants_max || 0), 0),
 }))
 
 function ocupacionColor(pct) {
@@ -223,17 +227,16 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="tieneSalas" class="sdv__kpis">
+      <div v-if="tieneSalas" class="sdv__kpis sdv__kpis--3">
         <div class="sdv__kpi"><div class="sdv__kpi-val">{{ kpis.total }}</div><div class="sdv__kpi-lbl">Salas totales</div></div>
         <div class="sdv__kpi"><div class="sdv__kpi-val" style="color:#15803d">{{ kpis.activas }}</div><div class="sdv__kpi-lbl">Activas</div></div>
         <div class="sdv__kpi"><div class="sdv__kpi-val">{{ kpis.plantas }}</div><div class="sdv__kpi-lbl">Plantas totales</div></div>
-        <div class="sdv__kpi"><div class="sdv__kpi-val">{{ kpis.capacidad }}</div><div class="sdv__kpi-lbl">Capacidad total</div></div>
       </div>
 
       <div v-if="tieneInv" class="sdv__kpis">
         <div class="sdv__kpi"><div class="sdv__kpi-val">{{ tiendaStocks.length }}</div><div class="sdv__kpi-lbl">Productos en stock</div></div>
         <div class="sdv__kpi"><div class="sdv__kpi-val" style="color:#0369a1">{{ stockTotal.toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}g</div><div class="sdv__kpi-lbl">Gramos totales</div></div>
-        <div class="sdv__kpi"><div class="sdv__kpi-val" :style="{ color: itemsBajos > 0 ? '#dc2626' : '#15803d' }">{{ itemsBajos }}</div><div class="sdv__kpi-lbl">Stock bajo (&lt;5g)</div></div>
+        <div class="sdv__kpi"><div class="sdv__kpi-val" :style="{ color: itemsBajos > 0 ? '#dc2626' : '#15803d' }">{{ itemsBajos }}</div><div class="sdv__kpi-lbl">Stock bajo (&lt;{{ umbralStockBajo }}g)</div></div>
       </div>
 
       <div class="sdv__layout">
@@ -303,14 +306,8 @@ onMounted(async () => {
                   </div>
                   <div class="sdv__sala-meta">
                     <span><i class="bi bi-flower1"></i> {{ s.plantas_totales ?? 0 }} plantas</span>
-                    <span v-if="s.pots_count || s.plants_max"><i class="bi bi-box-seam"></i> cap. {{ s.pots_count ?? s.plants_max }}</span>
                     <span v-if="s.lotes_count !== undefined"><i class="bi bi-collection"></i> {{ s.lotes_count }} lotes</span>
                   </div>
-                </div>
-                <div v-if="s.pots_count || s.plants_max" class="sdv__sala-ocupacion">
-                  <div class="sdv__ocu-pct" :style="{ color: ocupacionColor(s.porcentaje_ocupacion || 0) }">{{ (s.porcentaje_ocupacion || 0).toFixed(0) }}%</div>
-                  <div class="sdv__ocu-bar"><div class="sdv__ocu-fill" :style="{ width: Math.min(s.porcentaje_ocupacion || 0, 100) + '%', background: ocupacionColor(s.porcentaje_ocupacion || 0) }"></div></div>
-                  <div class="sdv__ocu-label">ocupación</div>
                 </div>
                 <i class="bi bi-arrow-right sdv__sala-arrow"></i>
               </RouterLink>
@@ -433,6 +430,7 @@ onMounted(async () => {
 .sdv__subtitle { font-size: .83rem; color: #64748b; margin: 0; display: flex; align-items: center; gap: .35rem; }
 .sdv__header-actions { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
 .sdv__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.75rem; }
+.sdv__kpis--3 { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 640px) { .sdv__kpis { grid-template-columns: repeat(2, 1fr); } }
 .sdv__kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.1rem 1rem; text-align: center; }
 .sdv__kpi-val { font-size: 2rem; font-weight: 800; color: #0f172a; line-height: 1; letter-spacing: -.04em; }

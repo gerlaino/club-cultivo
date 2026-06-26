@@ -17,11 +17,29 @@ class EliminarStockService
     ActiveRecord::Base.transaction do
       @stock.reservas.where(estado: 'pendiente').find_each(&:destroy!)
       @stock.dispensaciones.no_canceladas.find_each { |d| revertir_y_destruir(d) }
+      devolver_gramos_al_origen   # si es un derivado, devuelve los gramos consumidos al origen
       @stock.reload.destroy!  # dependent: :nullify limpia el resto; stock_movimientos se borran en cascada
     end
   end
 
   private
+
+  # Un derivado (producido vía /producir) consumió gramos de un stock de origen. Al borrarlo,
+  # se los devolvemos —simétrico a cómo se revierten las dispensaciones—.
+  def devolver_gramos_al_origen
+    origen = @stock.producido_desde_stock
+    gramos = @stock.lote_origen_consumido_g.to_d
+    return unless origen && gramos > 0
+
+    origen.update!(
+      cantidad: origen.cantidad.to_d + gramos,
+      estado:   origen.estado == 'agotado' ? 'asignado' : origen.estado,
+    )
+    origen.stock_movimientos.create!(
+      tipo: 'ajuste', gramos: gramos, usuario: @usuario,
+      notas: "[REVERSA PRODUCCIÓN] Borrado del derivado ##{@stock.id} — #{gramos}g devueltos al origen",
+    )
+  end
 
   def validar!
     if @stock.dispensaciones.where(estado_envio: 'entregado').exists?

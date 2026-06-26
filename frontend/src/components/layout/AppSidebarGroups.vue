@@ -131,7 +131,12 @@ watch(() => route.path, () => {
 .sbg__brand-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,.1); }
 .sbg__brand-name { font-family: var(--font-display); font-size: var(--fs-16); font-weight: 500; color: var(--c-paper); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.sbg__nav { flex: 1; padding: var(--sp-3) var(--sp-2); display: flex; flex-direction: column; gap: 1px; overflow-y: auto; scrollbar-width: thin; }
+.sbg__nav { flex: 1; padding: var(--sp-3) var(--sp-2); display: flex; flex-direction: column; gap: 1px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(168,201,181,0.22) transparent; }
+/* Scrollbar fundida con el verde del menú (sin barra gris del navegador). */
+.sbg__nav::-webkit-scrollbar { width: 6px; }
+.sbg__nav::-webkit-scrollbar-track { background: transparent; }
+.sbg__nav::-webkit-scrollbar-thumb { background: rgba(168,201,181,0.22); border-radius: 6px; }
+.sbg__nav::-webkit-scrollbar-thumb:hover { background: rgba(168,201,181,0.4); }
 
 .sbg__link { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: var(--r-md); font-size: var(--fs-13); color: var(--c-leaf-300); text-decoration: none; transition: background var(--t-fast), color var(--t-fast); border-left: 3px solid transparent; }
 .sbg__link:hover { background: rgba(255,255,255,0.06); color: var(--c-paper); }

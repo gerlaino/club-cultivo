@@ -6,13 +6,15 @@ class Stock < ApplicationRecord
   belongs_to :club
   acts_as_tenant(:club)
   belongs_to :genetica, optional: true
+  belongs_to :producido_desde_stock, class_name: 'Stock', optional: true
 
   has_many :stock_movimientos, dependent: :destroy
   has_many :dispensaciones, class_name: 'Dispensacion', dependent: :nullify
   has_many :reservas, dependent: :nullify
+  has_many :derivados, class_name: 'Stock', foreign_key: :producido_desde_stock_id, dependent: :nullify
 
   ORIGENES         = %w[lote derivado_lote compra_externa].freeze
-  FORMAS_PRODUCTO  = %w[flor_seca hash aceite tintura crema capsula comestible prensado otro externo].freeze
+  FORMAS_PRODUCTO  = %w[flor_seca hash aceite tintura crema capsula comestible prensado preroll prearmado otro externo].freeze
   UNIDADES         = %w[g ml un].freeze
   CATEGORIAS_EXTERNA = %w[merch bebida insumo otros].freeze
   ESTADOS          = %w[pendiente_asignacion asignado agotado].freeze

@@ -58,4 +58,35 @@ RSpec.describe 'POST /stocks/:id/producir (transformación)', type: :request do
          headers: auth_headers, as: :json
     expect(response).to have_http_status(:unprocessable_entity)
   end
+
+  it 'el derivado hereda la genética, guarda observaciones y el link al origen' do
+    genetica = create(:genetica, club: club, nombre: 'Lemon')
+    origen   = create(:stock, :externo, club: club, sede: sede, forma_producto: 'flor_seca',
+                       cantidad: 200, costo_unitario_ars: 3, genetica: genetica)
+    post "/stocks/#{origen.id}/producir",
+         params: { gramos_usados: 50, forma_producto: 'preroll', cantidad_producida: 25, unidad: 'un',
+                   observaciones: 'lote de prueba' },
+         headers: auth_headers, as: :json
+    expect(response).to have_http_status(:created)
+
+    nuevo = Stock.find(JSON.parse(response.body)['id'])
+    expect(nuevo.genetica_id).to eq(genetica.id)               # heredó la genética
+    expect(nuevo.descripcion).to eq('lote de prueba')          # observaciones
+    expect(nuevo.producido_desde_stock_id).to eq(origen.id)    # link al origen
+    expect(nuevo.unidad).to eq('un')
+  end
+
+  it 'borrar el derivado devuelve los gramos consumidos al stock origen' do
+    origen = create(:stock, :externo, club: club, sede: sede, forma_producto: 'flor_seca', cantidad: 200, costo_unitario_ars: 3)
+    post "/stocks/#{origen.id}/producir",
+         params: { gramos_usados: 80, forma_producto: 'prensado', cantidad_producida: 8, unidad: 'un' },
+         headers: auth_headers, as: :json
+    derivado = Stock.find(JSON.parse(response.body)['id'])
+    expect(origen.reload.cantidad.to_f).to eq(120.0)           # 200 − 80
+
+    delete "/stocks/#{derivado.id}", headers: auth_headers, as: :json
+    expect(response).to have_http_status(:no_content).or have_http_status(:ok)
+    expect(origen.reload.cantidad.to_f).to eq(200.0)           # 80g devueltos
+    expect(origen.stock_movimientos.where(tipo: 'ajuste').last.notas).to include('REVERSA PRODUCCIÓN')
+  end
 end

@@ -125,7 +125,7 @@ class AnalyticsController < ApplicationController
                   .asignados
                   .includes(:lote)
 
-    stock_bajo_umbral = 50.0
+    stock_bajo_umbral = club.umbral_stock_g.to_f
     stocks_data = stocks.group_by(&:forma_producto).map do |forma, ss|
       total = ss.sum { |s| s.cantidad.to_f }
       { forma: forma, cantidad_g: total.round(2), alerta: total < stock_bajo_umbral }

@@ -35,15 +35,15 @@
         </div>
         <div class="sd__hero-kpis">
           <div class="sd__kpi">
-            <div class="sd__kpi-val">{{ Number(stock.cantidad).toFixed(1) }}<span class="sd__kpi-unit">g</span></div>
-            <div class="sd__kpi-lbl">Total físico</div>
+            <div class="sd__kpi-val">{{ Number(stock.cantidad_inicial ?? stock.cantidad).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
+            <div class="sd__kpi-lbl">Total inicial</div>
           </div>
           <div class="sd__kpi" :class="{ 'sd__kpi--warn': stock.gramos_reservados > 0 }">
-            <div class="sd__kpi-val">{{ Number(stock.cantidad_disponible_real).toFixed(1) }}<span class="sd__kpi-unit">g</span></div>
+            <div class="sd__kpi-val">{{ Number(stock.cantidad_disponible_real).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
             <div class="sd__kpi-lbl">Disponible</div>
           </div>
           <div v-if="stock.gramos_reservados > 0" class="sd__kpi sd__kpi--amber">
-            <div class="sd__kpi-val">{{ Number(stock.gramos_reservados).toFixed(1) }}<span class="sd__kpi-unit">g</span></div>
+            <div class="sd__kpi-val">{{ Number(stock.gramos_reservados).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
             <div class="sd__kpi-lbl">En delivery</div>
           </div>
         </div>
@@ -469,6 +469,10 @@
                   </div>
                 </div>
               </div>
+              <div class="sd__field">
+                <label class="sd__label">Observaciones <span class="sd__label-opt">(opc.)</span></label>
+                <textarea class="sd__input" rows="2" v-model="procesarForm.observaciones" placeholder="notas de la producción…"></textarea>
+              </div>
               <div v-if="costoDerivado" class="sd__merma">
                 <span>🧮</span>
                 <span>Costo: <strong>${{ Math.round(costoDerivado.total) }}</strong> total · <strong>${{ costoDerivado.unitario.toFixed(2) }}</strong> por {{ procesarForm.unidad === 'un' ? 'unidad' : procesarForm.unidad }}</span>
@@ -532,6 +536,8 @@ const { generatePNG, generateSVG, downloadPNG, downloadSVG } = useQRCode()
 // ── Data ───────────────────────────────────────────────────────────────────────
 const loading    = ref(true)
 const stock      = ref(null)
+// Unidad real del stock (g/ml/un) — no asumir gramos para derivados (preroll, cápsulas…).
+const unidad     = computed(() => stock.value?.unidad || 'g')
 const qrDataUrl  = ref(null)
 const movimientos = ref([])
 const loadingMov = ref(false)
@@ -701,7 +707,7 @@ async function ejecutarRepartir() {
 
 // ── Procesar derivado ──────────────────────────────────────────────────────────
 const showProcesar  = ref(false)
-const procesarForm  = ref({ gramos_consumir: null, forma_producto: 'aceite', cantidad_resultado: null, unidad: 'un', precio_sugerido_ars: null })
+const procesarForm  = ref({ gramos_consumir: null, forma_producto: 'aceite', cantidad_resultado: null, unidad: 'un', precio_sugerido_ars: null, observaciones: '' })
 const procesarError = ref(null)
 const procesando    = ref(false)
 
@@ -718,11 +724,12 @@ const FORMAS_DERIVADO = [
   { value: 'hash', label: 'Hash' }, { value: 'aceite', label: 'Aceite' },
   { value: 'tintura', label: 'Tintura' }, { value: 'crema', label: 'Crema' },
   { value: 'capsula', label: 'Cápsula' }, { value: 'comestible', label: 'Comestible' },
-  { value: 'prensado', label: 'Prensado' }, { value: 'otro', label: 'Otro' },
+  { value: 'prensado', label: 'Prensado' }, { value: 'preroll', label: 'Preroll' },
+  { value: 'prearmado', label: 'Prearmado' }, { value: 'otro', label: 'Otro' },
 ]
 
 function openProcesar() {
-  procesarForm.value  = { gramos_consumir: null, forma_producto: 'aceite', cantidad_resultado: null, unidad: 'un', precio_sugerido_ars: null }
+  procesarForm.value  = { gramos_consumir: null, forma_producto: 'aceite', cantidad_resultado: null, unidad: 'un', precio_sugerido_ars: null, observaciones: '' }
   procesarError.value = null
   showProcesar.value  = true
 }
@@ -742,6 +749,7 @@ async function ejecutarProcesar() {
       cantidad_producida:  resultado,
       unidad:              procesarForm.value.unidad,
       precio_sugerido_ars: procesarForm.value.precio_sugerido_ars || undefined,
+      observaciones:       procesarForm.value.observaciones || undefined,
     })
     showProcesar.value = false
     await recargar()

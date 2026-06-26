@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_26_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_26_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1434,6 +1434,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_26_000002) do
     t.decimal "cantidad_inicial", precision: 10, scale: 2
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.bigint "producido_desde_stock_id"
     t.index ["club_id", "numero_lote_producto"], name: "index_stocks_on_club_id_and_numero_lote_producto", unique: true, where: "(numero_lote_producto IS NOT NULL)"
     t.index ["club_id"], name: "index_stocks_on_club_id"
     t.index ["codigo_qr"], name: "index_stocks_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"
@@ -1445,6 +1446,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_26_000002) do
     t.index ["lote_id"], name: "index_stocks_on_lote_id"
     t.index ["origen"], name: "index_stocks_on_origen"
     t.index ["pesada_id"], name: "index_stocks_on_pesada_id"
+    t.index ["producido_desde_stock_id"], name: "index_stocks_on_producido_desde_stock_id"
     t.index ["sede_id", "origen"], name: "index_stocks_on_sede_id_and_origen"
     t.index ["sede_id"], name: "index_stocks_on_sede_id"
   end
@@ -1799,6 +1801,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_26_000002) do
   add_foreign_key "stocks", "lotes"
   add_foreign_key "stocks", "pesadas"
   add_foreign_key "stocks", "sedes"
+  add_foreign_key "stocks", "stocks", column: "producido_desde_stock_id"
   add_foreign_key "stocks", "users", column: "deleted_by_id"
   add_foreign_key "tareas", "aplicacion_planes", column: "aplicacion_plan_id"
   add_foreign_key "tareas", "clubs"
