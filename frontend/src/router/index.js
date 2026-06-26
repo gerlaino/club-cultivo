@@ -336,6 +336,7 @@ const routes = [
       { path: 'sedes',      name: 'config-sedes',       component: () => import("../views/SedesView.vue") },
       { path: 'equipo',     name: 'config-equipo',      component: () => import("../views/UsuariosView.vue") },
       { path: 'suscripcion',name: 'config-suscripcion', component: () => import("../views/SuscripcionTabView.vue") },
+      { path: 'papelera',   name: 'config-papelera',    component: () => import("../views/admin/PapeleraView.vue") },
     ],
   },
   {
@@ -443,6 +444,17 @@ const routes = [
     },
   },
 
+  {
+    path: '/admin/papelera',
+    name: 'admin-papelera',
+    component: () => import('../views/admin/PapeleraView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'super_admin'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+  },
   {
     path: '/admin/stock',
     alias: '/admin/stocks/pendientes',

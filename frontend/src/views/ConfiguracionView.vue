@@ -18,7 +18,7 @@
 
 <script setup>
 import { useRoute } from 'vue-router'
-import { Building2, Users, SlidersHorizontal, Leaf } from 'lucide-vue-next'
+import { Building2, Users, SlidersHorizontal, Leaf, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
 
@@ -27,6 +27,7 @@ const TABS = [
   { to: '/configuracion/sedes',       label: 'Sedes',       icon: Building2       },
   { to: '/configuracion/equipo',      label: 'Equipo',      icon: Users           },
   { to: '/configuracion/suscripcion', label: 'Suscripción', icon: SlidersHorizontal },
+  { to: '/configuracion/papelera',    label: 'Papelera',    icon: Trash2          },
 ]
 
 function isActive(to) {

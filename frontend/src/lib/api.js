@@ -526,6 +526,10 @@ export const getAriccameRegistro   = (id)          => api.get(`/ariccame_registr
 export const reenviarAriccame      = (id)          => api.post(`/ariccame_registros/${id}/reenviar`)
 export const transmitirPendientesAriccame = ()     => api.post('/ariccame_registros/transmitir_pendientes')
 
+// Papelera (historial de borrados / restauración)
+export const getPapelera        = (params = {})    => api.get('/papelera', { params })
+export const restaurarPapelera  = (tipo, id)       => api.post('/papelera/restaurar', { tipo, id })
+
 // ── Público — QR stocks ───────────────────────────────────────────────────────
 export const getStockPublico  = (codigoQr) => axios.get(`/s/${codigoQr}`)
 export const getStockByQR     = (codigoQr) => api.get(`/stocks/qr/${codigoQr}`)

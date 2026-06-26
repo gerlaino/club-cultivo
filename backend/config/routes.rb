@@ -334,6 +334,10 @@ Rails.application.routes.draw do
       get :inase
     end
 
+    # Papelera — historial de borrados / restauración (admin + super_admin)
+    get  'papelera',            to: 'papelera#index'
+    post 'papelera/restaurar',  to: 'papelera#restaurar'
+
     resources :sedes do
       resources :stocks, only: [:index]
     end
