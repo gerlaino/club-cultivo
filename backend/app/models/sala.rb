@@ -15,6 +15,11 @@ class Sala < ApplicationRecord
   KINDS   = %w[vegetativo floracion manicura cosecha mixta madre clon secado].freeze
   TIPOS   = %w[cultivo vegetativo floracion cosecha secado curado madre clones].freeze
 
+  # Las salas son SOLO de cultivo (vegetativo/floración y variantes). Los kinds/tipos de
+  # proceso post-cosecha son legacy del flujo viejo (auto-creaban "Cosecha/Secado · Sede"):
+  # ya no se crean y el lote post-cosecha no usa sala. Se excluyen de listados y conteos.
+  KINDS_PROCESO = %w[cosecha secado curado].freeze
+
   before_validation :set_default_state, on: :create
 
   validates :nombre, presence: true, uniqueness: { scope: :club_id, conditions: -> { where(deleted_at: nil) } }
@@ -47,6 +52,8 @@ class Sala < ApplicationRecord
   scope :activas,           -> { where(state: 'activa') }
   scope :en_mantenimiento,  -> { where(state: 'mantenimiento') }
   scope :de_tipo,           ->(t) { where('tipo = ? OR kind = ?', t, t) }
+  # Solo salas de cultivo: excluye las de proceso post-cosecha (legacy).
+  scope :cultivo,           -> { where.not(kind: KINDS_PROCESO).where.not(tipo: KINDS_PROCESO) }
 
   def soft_delete!
     update_column(:deleted_at, Time.current)

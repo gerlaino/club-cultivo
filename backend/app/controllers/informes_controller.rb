@@ -107,14 +107,14 @@ class InformesController < ApplicationController
       stock_g = Stock.joins(:sede).where(sede: s).disponibles.sum(:cantidad).to_f rescue 0
       {
         nombre:          s.nombre,
-        salas:           s.salas.count,
+        salas:           s.salas.cultivo.count,
         plantas:         plantas,
         stock_disponible: stock_g,
       }
     end
 
     sedes_activas  = sedes.where(activa: true).count rescue sedes.count
-    salas_totales  = sedes.sum { |s| s.salas.count }
+    salas_totales  = sedes.sum { |s| s.salas.cultivo.count }
     plantas_totales = por_sede.sum { |r| r[:plantas] }
 
     render json: {
