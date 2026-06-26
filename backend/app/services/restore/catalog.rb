@@ -76,7 +76,7 @@ module Restore
       { key: 'user',                model_name: 'User',               label: 'Usuario',             group: 'Configuración', descriptor: ->(r) { [r.try(:first_name), r.try(:last_name)].compact.join(' ').presence || r.try(:email) || "Usuario ##{r.id}" }, search: %i[first_name last_name email] },
 
       # --- Complejas (necesitan Restorer con validación — Fase 3) --------------
-      { key: 'dispensacion',        model_name: 'Dispensacion',       label: 'Dispensación',        group: 'Dispensación', complex: true, descriptor: ->(r) { "Dispensación ##{r.id}" } },
+      { key: 'dispensacion',        model_name: 'Dispensacion',       label: 'Dispensación',        group: 'Dispensación', complex: true, restorer: 'Restore::Restorers::Dispensacion', descriptor: ->(r) { "Dispensación ##{r.id}" } },
       { key: 'stock',               model_name: 'Stock',              label: 'Stock',               group: 'Stock', complex: true },
       { key: 'stock_movimiento',    model_name: 'StockMovimiento',    label: 'Movimiento de stock', group: 'Stock', complex: true, descriptor: ->(r) { "Movimiento ##{r.id}" } },
       { key: 'cobro',               model_name: 'Cobro',              label: 'Cobro',               group: 'Dispensación', complex: true, descriptor: ->(r) { "Cobro ##{r.id}" } },

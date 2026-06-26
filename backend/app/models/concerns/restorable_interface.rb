@@ -24,11 +24,13 @@ module RestorableInterface
     deleted_at.present?
   end
 
-  # Restaura el registro (y sus dependientes borrados en la misma operación, si la gema lo
-  # soporta). NO valida efectos colaterales: eso es responsabilidad de los Restorers (Fase 3).
-  def restore_record!
+  # Restaura el registro. `recursive: true` (default) también des-borra los dependientes
+  # borrados en la misma operación (p. ej. un lote vuelve con sus plantas/eventos). Los Restorers
+  # que re-aplican efectos frescos lo desactivan para no duplicar (recursive: false).
+  # NO valida efectos colaterales: eso es responsabilidad de los Restorers (Fase 3).
+  def restore_record!(recursive: true)
     if self.class.respond_to?(:restore) # paranoia
-      self.class.restore(id, recursive: true)
+      self.class.restore(id, recursive: recursive)
     else                                # manual
       update_column(:deleted_at, nil)
     end

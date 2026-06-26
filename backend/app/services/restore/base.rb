@@ -35,7 +35,7 @@ module Restore
 
       ActiveRecord::Base.transaction do
         apply!
-        record.restore_record!
+        record.restore_record!(recursive: recursive_restore?)
       end
       Result.new(ok: true, mensaje: 'Restaurado')
     end
@@ -48,6 +48,10 @@ module Restore
 
     # Re-aplica los efectos colaterales de la creación. Default: nada (solo des-borra).
     def apply!; end
+
+    # ¿Des-borrar también los dependientes? Off cuando apply! ya crea efectos frescos
+    # (evita duplicar asientos/movimientos que volverían con el recursive).
+    def recursive_restore? = true
 
     def conflict(codigo, mensaje)
       Conflict.new(codigo: codigo, mensaje: mensaje)

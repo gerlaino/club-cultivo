@@ -63,9 +63,10 @@ RSpec.describe 'Papelera', type: :request do
       expect(Genetica.where(id: g.id)).to exist
     end
 
-    it 'no restaura entidades complejas (requieren validación — Fase 3)' do
+    it 'no restaura entidades complejas que aún no tienen Restorer' do
       sign_in_as(admin)
-      post '/papelera/restaurar', params: { tipo: 'dispensacion', id: 999 }, headers: auth_headers, as: :json
+      # 'stock' es compleja y todavía sin Restorer implementado.
+      post '/papelera/restaurar', params: { tipo: 'stock', id: 999 }, headers: auth_headers, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
     end
 
