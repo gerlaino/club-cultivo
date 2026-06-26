@@ -563,7 +563,7 @@ const eliminando = ref(false)
 async function eliminarStock() {
   const ok = await confirm({
     title:       'Eliminar stock',
-    message:     'Se borra este stock y se revierten las reservas y dispensaciones PENDIENTES (vuelve el producto, se ajusta la cuenta corriente y la contabilidad). Si hay despachos entregados o asientos en un período cerrado, no se podrá borrar.',
+    message:     'Se borra este stock Y los productos elaborados a partir de él (derivados), revirtiendo las reservas y dispensaciones PENDIENTES (vuelve el producto, se ajusta la cuenta corriente y la contabilidad). Si este stock o alguno de sus derivados tiene despachos entregados o asientos en un período cerrado, no se podrá borrar.',
     confirmText: 'Sí, eliminar',
     variant:     'danger',
   })
