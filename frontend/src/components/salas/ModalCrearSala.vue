@@ -146,7 +146,7 @@ onMounted(async () => {
                 v-model.number="form.pots_count"
                 placeholder="Ej: 6"
               />
-              <span class="mcr__hint">Capacidad de lotes simultáneos</span>
+              <span class="mcr__hint">Posiciones para el layout visual (opcional, no es un límite)</span>
             </div>
           </div>
 

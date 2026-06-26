@@ -51,23 +51,18 @@ class StatsController < ApplicationController
     end
   end
 
+  # Plantas vivas por sala de cultivo (sin capacidad — la sala no tiene tope).
   def salas_ocupacion(club)
-    club.salas.includes(:lotes).map do |sala|
+    club.salas.cultivo.includes(:lotes).map do |sala|
       plantas_count = Plant.joins(:lote)
                            .where(lotes: { sala_id: sala.id })
                            .where.not(plants: { state: %w[cosechado descartada] })
                            .count
-      capacidad = sala.plants_max.to_i
-      porcentaje = capacidad > 0 ? [(plantas_count.to_f / capacidad * 100).round, 100].min : 0
-      inconsistente = capacidad == 0 && plantas_count > 0
       {
         sala_id:      sala.id,
         nombre:       sala.nombre,
         sede_id:      sala.sede_id,
         plants_count: plantas_count,
-        capacidad:    capacidad,
-        porcentaje:   porcentaje,
-        inconsistente: inconsistente,
       }
     end
   end

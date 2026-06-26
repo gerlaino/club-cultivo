@@ -100,23 +100,8 @@ class Sala < ApplicationRecord
     Plant.where(lote_id: lotes.select(:id)).where.not(state: 'descartada').count
   end
 
-  def porcentaje_ocupacion
-    return 0 unless tiene_limite_capacidad?
-    (plantas_totales.to_f / capacidad_maxima * 100).round(1)
-  end
-
-  def tiene_limite_capacidad?
-    plants_max.to_i > 0 || pots_count.to_i > 0
-  end
-
-  def capacidad_maxima
-    plants_max.to_i > 0 ? plants_max.to_i : pots_count.to_i
-  end
-
-  def capacidad_disponible
-    return Float::INFINITY unless tiene_limite_capacidad?
-    capacidad_maxima - plantas_totales
-  end
+  # La sala no tiene capacidad/límite. `pots_count` sobrevive solo como nº de posiciones físicas
+  # para dibujar el Layout (SalaLayoutGrid); no es un tope de plantas.
 
   def created_by_name
     [created_by&.first_name, created_by&.last_name].compact.join(" ").presence || created_by&.email || "Sistema"

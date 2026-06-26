@@ -178,11 +178,9 @@ class StocksController < ApplicationController
     return render json: { error: "La cantidad resultante sería negativa (#{nueva_cantidad.round(2)}g)" }, status: :unprocessable_entity if nueva_cantidad < 0
 
     ActiveRecord::Base.transaction do
+      # Un ajuste (reconteo / merma / pérdida) corrige lo que HAY AHORA (cantidad). NO toca el
+      # inicial: el inicial es lo que se ingresó al crear y solo cambia editándolo a propósito.
       @stock.update!(cantidad: nueva_cantidad)
-      # Un reconteo redefine la línea base (lo que realmente hay): actualizamos también
-      # la cantidad inicial para que "Total" nunca quede por debajo de "Actual". Una merma
-      # o pérdida NO toca el inicial (se descuenta de lo que había).
-      @stock.update!(cantidad_inicial: nueva_cantidad) if tipo_ajuste == 'reconteo'
       @stock.stock_movimientos.create!(
         tipo:    'ajuste',
         gramos:  gramos,
@@ -350,7 +348,7 @@ class StocksController < ApplicationController
 
     gramos_dispensados  = dispensaciones.sum { |d| d[:cantidad_g].to_f }.round(2)
     cantidad_disponible = s.cantidad.to_f.round(2)
-    cantidad_inicial    = (cantidad_disponible + gramos_dispensados).round(2)
+    cantidad_inicial    = s.cantidad_inicial.to_f.round(2) # verdad única (no reconstruir)
 
     render json: {
       stock: {

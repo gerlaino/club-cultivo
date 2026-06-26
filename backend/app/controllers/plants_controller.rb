@@ -64,13 +64,6 @@ class PlantsController < ApplicationController
     end
 
     lote = current_user.club.lotes.find(params[:plant][:lote_id])
-    sala = lote.sala
-
-    if sala&.tiene_limite_capacidad? && sala.capacidad_disponible == 0
-      return render json: {
-        errors: ["La sala '#{sala.nombre}' está al límite de su capacidad (#{sala.capacidad_maxima} plantas)"]
-      }, status: :unprocessable_entity
-    end
 
     # Nombre autogenerado — el usuario no lo ingresa
     count  = lote.plants.count + 1

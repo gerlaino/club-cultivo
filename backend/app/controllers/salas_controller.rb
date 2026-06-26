@@ -277,7 +277,7 @@ class SalasController < ApplicationController
 
   def sala_params
     params.require(:sala).permit(
-      :nombre, :state, :kind, :notes, :pots_count, :plants_max, :sede_id,
+      :nombre, :state, :kind, :notes, :pots_count, :sede_id,
       :camera_stream_url, :camera_snapshot_url, :responsable_id
     )
   end
@@ -291,11 +291,8 @@ class SalasController < ApplicationController
       state:                s.state,
       kind:                 s.kind,
       notes:                s.notes,
-      pots_count:           s.pots_count,
-      plants_max:           s.plants_max,
+      pots_count:           s.pots_count,   # posiciones físicas para el Layout (no es capacidad)
       plantas_totales:      s.plantas_totales,
-      capacidad_disponible: s.tiene_limite_capacidad? ? s.capacidad_disponible : nil,
-      porcentaje_ocupacion: s.porcentaje_ocupacion,
       lotes_count:          s.lotes.count,
       sede_id:              s.sede_id,
       sede: s.sede ? { id: s.sede.id, nombre: s.sede.nombre, tipo: s.sede.tipo } : nil,

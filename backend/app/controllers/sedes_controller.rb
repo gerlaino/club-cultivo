@@ -269,7 +269,6 @@ class SedesController < ApplicationController
             nombre: sala.nombre,
             state:  sala.state,
             kind:   sala.kind,
-            plants_max:    sala.plants_max,
             plantas_count: lotes_sala.sum { |l| l.plants.count },
             lotes_count:   lotes_sala.count,
             lotes:         lotes_sala.map { |l|

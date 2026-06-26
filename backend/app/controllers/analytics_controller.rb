@@ -710,7 +710,6 @@ class AnalyticsController < ApplicationController
         id:             sala.id,
         nombre:         sala.nombre,
         tipo:           sala.tipo,
-        plants_max:     sala.plants_max,
         ciclos:         ciclos,
         kg_producidos:  kg_producidos.round(3),
         kg_por_planta:  kg_por_planta,

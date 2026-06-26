@@ -31,7 +31,7 @@ const CHECKLISTS = {
       pasos: [
         'Andá a Salas en el menú lateral.',
         'Hacé clic en "Nueva sala".',
-        'Asignale un nombre descriptivo y una capacidad máxima de plantas.',
+        'Asignale un nombre descriptivo y su tipo (vegetativo, floración…).',
         'Asigná el cultivador responsable de esa sala.',
         'Repetí por cada espacio activo del club.',
       ],

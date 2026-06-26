@@ -11,7 +11,7 @@ import {
   Sprout, FileCheck, FileText, UserCog, Globe,
   ShieldCheck, Truck, TrendingUp, History,
   GitBranch, Layers, Dna, Archive, Leaf, Boxes, Scissors,
-  ClipboardList, Package, Settings, Scale, Webhook, BellRing, BookmarkCheck,
+  ClipboardList, Package, Settings, Scale, Webhook, BellRing, BookmarkCheck, Trash2,
 } from 'lucide-vue-next'
 import { listLotes, listPesajesManicuraAdmin } from '../../lib/api.js'
 import { useAuthStore } from '../../stores/auth'
@@ -96,11 +96,12 @@ const GRUPOS = computed(() => [
   {
     label: 'Configuración', icon: Settings, defaultOpen: false,
     items: [
-      { to: '/configuracion',         icon: Settings, label: 'General' },
-      { to: '/alertas-configuracion', icon: BellRing, label: 'Alertas' },
-      { to: '/web',                   icon: Globe,    label: 'Sitio web' },
-      { to: '/integraciones',         icon: Webhook,  label: 'Integraciones' },
-      { to: '/usuarios',              icon: UserCog,  label: 'Equipo' },
+      { to: '/configuracion',          icon: Settings, label: 'General' },
+      { to: '/configuracion/papelera', icon: Trash2,   label: 'Papelera', hint: 'Restaurar lo eliminado' },
+      { to: '/alertas-configuracion',  icon: BellRing, label: 'Alertas' },
+      { to: '/web',                    icon: Globe,    label: 'Sitio web' },
+      { to: '/integraciones',          icon: Webhook,  label: 'Integraciones' },
+      { to: '/usuarios',               icon: UserCog,  label: 'Equipo' },
     ],
   },
 ])

@@ -98,7 +98,6 @@ const sorted = computed(() => {
   const arr = [...filtered.value];
   arr.sort((a, b) => {
     const nA = (a.nombre || '').toLowerCase(), nB = (b.nombre || '').toLowerCase();
-    const oA = Number(a.porcentaje_ocupacion ?? 0), oB = Number(b.porcentaje_ocupacion ?? 0);
     const pA = Number(a.plantas_totales ?? 0), pB = Number(b.plantas_totales ?? 0);
     switch (sortBy.value) {
       case 'nombre_desc':    return nA < nB ? 1 : -1;

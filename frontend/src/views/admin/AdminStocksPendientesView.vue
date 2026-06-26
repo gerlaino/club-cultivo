@@ -187,7 +187,7 @@
                   <th>Lote</th>
                   <th>Sede</th>
                   <th>Ingresó</th>
-                  <th class="stk__inv-num">Total</th>
+                  <th class="stk__inv-num">Cantidad inicial</th>
                   <th class="stk__inv-num">Actual</th>
                 </tr>
               </thead>
@@ -208,10 +208,10 @@
                   <td>{{ s.sede?.nombre || 'Sin asignar' }}</td>
                   <td class="stk__inv-td-fecha">{{ formatDate(s.created_at) }}</td>
                   <td class="stk__inv-num stk__inv-td-cosechado">
-                    {{ s.cantidad_inicial != null ? s.cantidad_inicial.toFixed(1) + 'g' : '—' }}
+                    {{ s.cantidad_inicial != null ? s.cantidad_inicial.toFixed(1) + (s.unidad || 'g') : '—' }}
                   </td>
                   <td class="stk__inv-num stk__inv-td-actual" :class="{ 'stk__inv-td-bajo': (s.cantidad_disponible_real ?? s.cantidad) < umbralValor }">
-                    {{ (s.cantidad_disponible_real ?? s.cantidad).toFixed(1) }}g
+                    {{ (s.cantidad_disponible_real ?? s.cantidad).toFixed(1) }}{{ s.unidad || 'g' }}
                   </td>
                 </tr>
               </tbody>

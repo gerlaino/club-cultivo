@@ -300,9 +300,6 @@ function tieneActividad(sede) {
                     <span class="agri-sala__stat">
                       <i class="bi bi-boxes"></i> {{ sala.lotes_count }}
                     </span>
-                    <span v-if="sala.plants_max" class="agri-sala__cap">
-                      / {{ sala.plants_max }} cap.
-                    </span>
                   </div>
                 </div>
 

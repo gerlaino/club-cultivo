@@ -113,6 +113,16 @@ class Stock < ApplicationRecord
     self.cantidad_inicial ||= cantidad
   end
 
+  public
+
+  # ── VERDAD ÚNICA de las cantidades de un stock ─────────────────────────────────
+  # cantidad_inicial = lo que se INGRESÓ al crear el stock (externo: lo cargado; de lote: la
+  #                    suma del pesaje de cada planta). Es editable: si se corrige, ese número
+  #                    pasa a ser el inicial. Es el "Total". Las operaciones NO lo tocan.
+  # cantidad         = lo que hay AHORA, ya descontadas dispensaciones, producción y traslados.
+  #                    Es el "Actual". Lo mutan las operaciones.
+  def disponible = cantidad_disponible_real.to_d # lo que queda libre (actual − reservado)
+
   def generar_numero_lote_producto
     return if numero_lote_producto.present?
     return unless club_id
