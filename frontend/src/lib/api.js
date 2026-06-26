@@ -190,7 +190,7 @@ export const registrarPagoCC     = (pacienteId, payload) => api.post(`/pacientes
 export const setLimiteCC         = (pacienteId, limite)  => api.patch(`/pacientes/${pacienteId}/cuenta_corriente/set_limite`, { limite_credito: limite })
 
 export const exportPacientesCSV  = (params = {}) => api.get('/pacientes/export_csv', { params, responseType: 'blob' })
-export const listDispensaciones = (pacienteId) => api.get(`/pacientes/${pacienteId}/dispensaciones`);
+export const listDispensaciones = (pacienteId, params = {}) => api.get(`/pacientes/${pacienteId}/dispensaciones`, { params });
 export const listDispensacionesFecha = (params = {}) => api.get('/dispensaciones', { params });
 export const getDispensacion = (id) => api.get(`/dispensaciones/${id}`);
 export const createDispensacion = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/dispensaciones`, { dispensacion: payload });

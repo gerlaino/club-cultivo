@@ -30,6 +30,11 @@ const dispensaciones = ref([])
 const loading        = ref(true)
 const showModal      = ref(false)
 
+// Paginación del historial (10 por página)
+const pagina    = ref(1)
+const meta      = ref({ total: 0, pagina: 1, limite: 10 })
+const totalPaginas = computed(() => Math.max(1, Math.ceil((meta.value.total || 0) / (meta.value.limite || 10))))
+
 // Edit modal state
 const editModal  = ref(false)
 const editTarget = ref(null)
@@ -80,10 +85,17 @@ function openEdit(d) {
 async function loadDispensaciones() {
   loading.value = true
   try {
-    const { data } = await listDispensaciones(props.socioId)
+    const { data } = await listDispensaciones(props.socioId, { pagina: pagina.value, limite: 10 })
     dispensaciones.value = data.dispensaciones || data || []
+    if (data.meta) meta.value = data.meta
   } catch (e) { logger.error(e) }
   finally { loading.value = false }
+}
+
+function irPagina(p) {
+  if (p < 1 || p > totalPaginas.value) return
+  pagina.value = p
+  loadDispensaciones()
 }
 
 const totalCantidad = computed(() => dispensaciones.value.reduce((s, d) => s + (parseFloat(d.cantidad) || 0), 0))
@@ -144,7 +156,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
         <div class="dv__header-title"><i class="bi bi-capsule"></i> Dispensaciones</div>
         <div class="dv__header-sub">
           Entregas regulatorias al socio
-          <span v-if="dispensaciones.length"> · <strong>{{ totalCantidad.toFixed(1) }}g</strong> dispensados en total</span>
+          <span v-if="meta.total"> · <strong>{{ (meta.gramos_totales ?? 0).toFixed(1) }}g</strong> en {{ meta.total }} dispensa{{ meta.total === 1 ? '' : 's' }}</span>
         </div>
       </div>
       <button v-if="canCreate" class="dv__btn-primary" @click="openCreate">
@@ -230,6 +242,12 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
           </button>
         </div>
       </div>
+    </div>
+
+    <div v-if="!loading && totalPaginas > 1" class="dv__pager">
+      <button :disabled="pagina <= 1" @click="irPagina(pagina - 1)">‹</button>
+      <span>{{ pagina }} / {{ totalPaginas }}</span>
+      <button :disabled="pagina >= totalPaginas" @click="irPagina(pagina + 1)">›</button>
     </div>
 
     <!-- Modal editar dispensación -->
@@ -463,4 +481,8 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__cc-tras  { font-size: .75rem; color: #475569; }
 .dv__cc-tras strong { color: #0f172a; font-family: monospace; }
 .dv__cc-warn  { font-size: .75rem; color: #dc2626; display: flex; align-items: center; gap: .3rem; }
+
+.dv__pager { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1rem; color: #475569; font-size: .85rem; }
+.dv__pager button { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; width: 30px; height: 30px; cursor: pointer; font-size: 1rem; }
+.dv__pager button:disabled { opacity: .4; cursor: default; }
 </style>

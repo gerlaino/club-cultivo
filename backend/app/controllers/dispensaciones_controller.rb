@@ -12,9 +12,13 @@ class DispensacionesController < ApplicationController
   # GET /dispensaciones?con_envio=true[&estado_envio=pendiente][&delivery_id=N][&desde=YYYY-MM-DD][&hasta=YYYY-MM-DD]
   def index
     if @paciente
-      @dispensaciones = @paciente.dispensaciones
-                                 .includes(:user, :indicacion_medica, :sede, stock: :lote)
-                                 .recientes
+      base  = @paciente.dispensaciones
+                       .includes(:user, :indicacion_medica, :sede, stock: :lote)
+                       .recientes
+      page  = [params[:pagina].to_i, 1].max
+      limit = [[(params[:limite] || 10).to_i, 1].max, 100].min
+      @meta = { total: base.count, pagina: page, limite: limit, gramos_totales: base.sum(:cantidad).to_f }
+      @dispensaciones = base.offset((page - 1) * limit).limit(limit)
     elsif params[:con_envio] == 'true'
       require_dispensador_o_admin
       return if performed?
@@ -48,7 +52,9 @@ class DispensacionesController < ApplicationController
       end
     end
 
-    render json: { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion(d) } }
+    payload = { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion(d) } }
+    payload[:meta] = @meta if @meta
+    render json: payload
   rescue ArgumentError
     render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
   end
