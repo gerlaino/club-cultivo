@@ -73,7 +73,7 @@ module Restore
       def apply!
         d = record
         d.send(:decrementar_stock)
-        Dispensaciones::AplicarEfectos.financiero!(dispensacion: d, usuario: d.deleted_by || d.user)
+        Dispensaciones::AplicarEfectos.financiero!(dispensacion: d, usuario: usuario || d.deleted_by || d.user)
       end
 
       # apply! crea asientos/movimientos frescos; no des-borramos los viejos (quedarían duplicados).

@@ -70,7 +70,7 @@ class PapeleraController < ApplicationController
       return render json: { error: 'No pertenece a tu club' }, status: :forbidden unless del_club?(record)
 
       if entry.restorer_class
-        res = entry.restorer_class.call(record)
+        res = entry.restorer_class.call(record, usuario: current_user)
         unless res.ok?
           return render json: {
             error:      'No se puede restaurar por conflictos con el estado actual.',

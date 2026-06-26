@@ -77,7 +77,7 @@ module Restore
 
       # --- Complejas (necesitan Restorer con validación — Fase 3) --------------
       { key: 'dispensacion',        model_name: 'Dispensacion',       label: 'Dispensación',        group: 'Dispensación', complex: true, restorer: 'Restore::Restorers::Dispensacion', descriptor: ->(r) { "Dispensación ##{r.id}" } },
-      { key: 'stock',               model_name: 'Stock',              label: 'Stock',               group: 'Stock', complex: true },
+      { key: 'stock',               model_name: 'Stock',              label: 'Stock',               group: 'Stock', complex: true, restorer: 'Restore::Restorers::Stock' },
       { key: 'stock_movimiento',    model_name: 'StockMovimiento',    label: 'Movimiento de stock', group: 'Stock', complex: true, descriptor: ->(r) { "Movimiento ##{r.id}" } },
       { key: 'cobro',               model_name: 'Cobro',              label: 'Cobro',               group: 'Dispensación', complex: true, descriptor: ->(r) { "Cobro ##{r.id}" } },
       { key: 'cuenta_corriente_movimiento', model_name: 'CuentaCorrienteMovimiento', label: 'Movimiento de cuenta corriente', group: 'Socios', complex: true, descriptor: ->(r) { "Movimiento ##{r.id}" } },
@@ -85,7 +85,7 @@ module Restore
       { key: 'costo_lote',          model_name: 'CostoLote',          label: 'Costo de lote',       group: 'Contabilidad', complex: true, restorer: 'Restore::Restorers::CostoLote', descriptor: ->(r) { "Costo ##{r.id}" } },
       { key: 'pesada',              model_name: 'Pesada',             label: 'Pesada',              group: 'Cultivo', complex: true, descriptor: ->(r) { "Pesada ##{r.id}" } },
       { key: 'pesaje_manicura',     model_name: 'PesajeManicura',     label: 'Pesaje de manicura',  group: 'Cultivo', complex: true, descriptor: ->(r) { "Pesaje ##{r.id}" } },
-      { key: 'reserva',             model_name: 'Reserva',            label: 'Reserva',             group: 'Stock', complex: true, descriptor: ->(r) { "Reserva ##{r.id}" } },
+      { key: 'reserva',             model_name: 'Reserva',            label: 'Reserva',             group: 'Stock', complex: true, restorer: 'Restore::Restorers::Reserva', descriptor: ->(r) { "Reserva ##{r.id}" } },
       { key: 'ariccame_registro',   model_name: 'AriccameRegistro',   label: 'Registro ARICCAME',   group: 'Regulatorio', complex: true, restorer: 'Restore::Restorers::AriccameRegistro', descriptor: ->(r) { "Registro ##{r.id}" } },
     ].map { |h| Entry.new(**h) }.freeze
 

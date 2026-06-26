@@ -14,14 +14,15 @@ module Restore
   #   2. re-aplica los efectos de la creación (#apply!) dentro de una transacción.
   # Política de conflictos (decisión del proyecto): bloquear con motivos, nunca forzar.
   class Base
-    def self.check(record)   = new(record).check
-    def self.call(record)    = new(record).restore!
+    def self.check(record, usuario: nil) = new(record, usuario: usuario).check
+    def self.call(record, usuario: nil)  = new(record, usuario: usuario).restore!
 
-    def initialize(record)
-      @record = record
+    def initialize(record, usuario: nil)
+      @record  = record
+      @usuario = usuario # quien ejecuta la restauración (actor de los efectos re-aplicados)
     end
 
-    attr_reader :record
+    attr_reader :record, :usuario
 
     # Dry-run: ¿se puede restaurar ahora? Devuelve Result con la lista de conflictos.
     def check

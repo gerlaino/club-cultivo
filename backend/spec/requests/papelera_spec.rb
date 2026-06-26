@@ -65,8 +65,8 @@ RSpec.describe 'Papelera', type: :request do
 
     it 'no restaura entidades complejas que aún no tienen Restorer' do
       sign_in_as(admin)
-      # 'stock' es compleja y todavía sin Restorer implementado.
-      post '/papelera/restaurar', params: { tipo: 'stock', id: 999 }, headers: auth_headers, as: :json
+      # 'cobro' es compleja y todavía sin Restorer implementado.
+      post '/papelera/restaurar', params: { tipo: 'cobro', id: 999 }, headers: auth_headers, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
     end
 
