@@ -63,11 +63,6 @@ async function guardarInfo() {
   }
 }
 
-const smtpForm     = ref({ smtp_host: '', smtp_port: 587, smtp_user: '', smtp_pass: '', smtp_from: '', smtp_from_name: '' })
-const savingSmtp   = ref(false)
-const smtpError    = ref(null)
-const smtpSuccess  = ref(false)
-
 // WhatsApp (provisión Twilio — solo super_admin)
 const waForm    = ref({ twilio_account_sid: '', twilio_auth_token: '', twilio_whatsapp_from: '' })
 const savingWa  = ref(false)
@@ -132,14 +127,6 @@ async function cargar() {
   try {
     const { data } = await getSuperAdminClub(id)
     club.value = data
-    smtpForm.value = {
-      smtp_host:      data.smtp_host      || '',
-      smtp_port:      data.smtp_port      || 587,
-      smtp_user:      data.smtp_user      || '',
-      smtp_pass:      '',
-      smtp_from:      data.smtp_from      || '',
-      smtp_from_name: data.smtp_from_name || '',
-    }
     waForm.value = {
       twilio_account_sid:   data.twilio_account_sid   || '',
       twilio_auth_token:    '',
@@ -274,25 +261,6 @@ async function guardarFeatures() {
     setTimeout(() => { featuresSuccess.value = false }, 3000)
   } finally {
     savingFeatures.value = false
-  }
-}
-
-async function guardarSmtp() {
-  savingSmtp.value = true
-  smtpError.value  = null
-  smtpSuccess.value = false
-  try {
-    const payload = { ...smtpForm.value }
-    if (!payload.smtp_pass) delete payload.smtp_pass
-    const { data } = await updateSuperAdminClub(id, payload)
-    club.value = { ...club.value, ...data }
-    smtpForm.value.smtp_pass = ''
-    smtpSuccess.value = true
-    setTimeout(() => { smtpSuccess.value = false }, 3000)
-  } catch (e) {
-    smtpError.value = e?.response?.data?.errors?.join(', ') || 'Error al guardar'
-  } finally {
-    savingSmtp.value = false
   }
 }
 
@@ -554,54 +522,7 @@ onMounted(cargar)
         </div>
       </div>
 
-      <!-- ── SMTP ── -->
-      <div class="scd__card">
-        <div class="scd__card-hd">
-          <Mail :size="14" :stroke-width="1.75" class="scd__card-ico scd__card-ico--orange" /> Correo saliente (SMTP)
-          <span v-if="club.smtp_configured" class="scd__ok-badge">Configurado</span>
-          <span v-else class="scd__warn-badge">Sin configurar</span>
-          <span v-if="smtpSuccess" class="scd__saved-badge" style="margin-left:.5rem"><Check :size="11" :stroke-width="3" /> Guardado</span>
-        </div>
-        <form class="scd__smtp-body" @submit.prevent="guardarSmtp">
-          <div v-if="smtpError" class="scd__alert">{{ smtpError }}</div>
-          <div class="scd__smtp-grid">
-            <div class="scd__field">
-              <label class="scd__lbl">Nombre remitente</label>
-              <input v-model.trim="smtpForm.smtp_from_name" class="scd__input" placeholder="Club Medicinal del Sur" />
-            </div>
-            <div class="scd__field">
-              <label class="scd__lbl">Email remitente</label>
-              <input v-model.trim="smtpForm.smtp_from" type="email" class="scd__input" placeholder="no-reply@clubmedicinal.org" />
-              <span class="scd__hint">Vacío = usa el usuario SMTP</span>
-            </div>
-            <div class="scd__field">
-              <label class="scd__lbl">Host SMTP</label>
-              <input v-model.trim="smtpForm.smtp_host" class="scd__input" placeholder="smtp.gmail.com" />
-            </div>
-            <div class="scd__field">
-              <label class="scd__lbl">Puerto</label>
-              <input v-model.number="smtpForm.smtp_port" type="number" class="scd__input" placeholder="587" />
-              <span class="scd__hint">587 TLS · 465 SSL</span>
-            </div>
-            <div class="scd__field">
-              <label class="scd__lbl">Usuario SMTP</label>
-              <input v-model.trim="smtpForm.smtp_user" class="scd__input" placeholder="correo@gmail.com" />
-            </div>
-            <div class="scd__field">
-              <label class="scd__lbl">Contraseña SMTP</label>
-              <input v-model="smtpForm.smtp_pass" type="password" class="scd__input" placeholder="Dejá vacío para no cambiar" autocomplete="new-password" />
-              <span class="scd__hint">Gmail: usá una App Password</span>
-            </div>
-          </div>
-          <div class="scd__smtp-footer">
-            <button type="submit" class="scd__btn-sm scd__btn-primary" :disabled="savingSmtp">
-              <DsSpinner v-if="savingSmtp" :size="13" />
-              <Save v-else :size="13" :stroke-width="1.75" />
-              {{ savingSmtp ? 'Guardando…' : 'Guardar SMTP' }}
-            </button>
-          </div>
-        </form>
-      </div>
+      <!-- El correo lo configura el ADMIN del club (conecta su Gmail), no el super_admin. -->
 
       <!-- ── WhatsApp (provisión Twilio) ── -->
       <div class="scd__card">
