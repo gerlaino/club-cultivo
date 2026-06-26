@@ -320,12 +320,21 @@ class PacientesController < ApplicationController
       enviado_at:    Time.current
     )
 
-    if mail_record.save
-      PacienteMailer.mensaje(mail_enviado: mail_record).deliver_later
-      render json: serialize_mail(mail_record), status: :created
-    else
-      render json: { errors: mail_record.errors.full_messages }, status: :unprocessable_entity
+    unless mail_record.save
+      return render json: { errors: mail_record.errors.full_messages }, status: :unprocessable_entity
     end
+
+    # Envío SINCRÓNICO: es una acción manual que necesita feedback inmediato. Si falla (Gmail
+    # rechaza, app-password mal, etc.), el usuario ve el error en el acto en vez de un "enviado"
+    # falso (deliver_later lo mandaba a Sidekiq y el error quedaba oculto en el worker).
+    begin
+      PacienteMailer.mensaje(mail_enviado: mail_record).deliver_now
+    rescue => e
+      mail_record.destroy
+      return render json: { error: "No se pudo enviar el correo: #{e.message}" }, status: :unprocessable_entity
+    end
+
+    render json: serialize_mail(mail_record), status: :created
   end
 
   # GET /pacientes/:id/mails_enviados
