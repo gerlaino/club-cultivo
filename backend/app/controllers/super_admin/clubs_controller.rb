@@ -1,5 +1,5 @@
 class SuperAdmin::ClubsController < SuperAdmin::BaseController
-  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar]
+  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :provisionar_whatsapp, :desconectar_whatsapp]
 
   def index
     clubs = Club.unscoped.includes(:users, :pacientes).order(:created_at)
@@ -97,6 +97,35 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     render json: serialize_club_detail(@club)
   end
 
+  # PATCH /super_admin/clubs/:id/provisionar_whatsapp — el super_admin carga las credenciales
+  # de Twilio del club (lo que el admin no debe tocar). Al quedar completo, el estado pasa a
+  # 'conectado' automáticamente.
+  def provisionar_whatsapp
+    sid    = params[:twilio_account_sid].to_s.strip
+    token  = params[:twilio_auth_token].to_s.strip
+    numero = params[:twilio_whatsapp_from].to_s.strip
+    if sid.blank? || numero.blank?
+      return render json: { error: 'Account SID y número son obligatorios.' }, status: :unprocessable_entity
+    end
+    if token.blank? && @club.twilio_auth_token_enc.blank?
+      return render json: { error: 'El Auth Token es obligatorio la primera vez.' }, status: :unprocessable_entity
+    end
+    # Normalizar el número al formato que espera Twilio.
+    numero = "whatsapp:#{numero}" unless numero.start_with?('whatsapp:')
+
+    @club.twilio_account_sid   = sid
+    @club.twilio_whatsapp_from = numero
+    @club.twilio_auth_token    = token if token.present? # setter encripta; vacío = no cambiar
+    @club.save!
+    render json: serialize_club_detail(@club)
+  end
+
+  # DELETE /super_admin/clubs/:id/desconectar_whatsapp
+  def desconectar_whatsapp
+    @club.update!(twilio_account_sid: nil, twilio_auth_token_enc: nil, twilio_whatsapp_from: nil)
+    render json: serialize_club_detail(@club)
+  end
+
   private
 
   def set_club
@@ -155,6 +184,11 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       features:        c.features,
       ia_tier:         c.ia_tier,
       ia_limite_hora:  c.ia_limite_hora,
+      whatsapp_estado:      c.whatsapp_estado,
+      whatsapp_numero:      c.whatsapp_numero,
+      twilio_configurado:   c.twilio_configurado?,
+      twilio_account_sid:   c.twilio_account_sid,
+      twilio_whatsapp_from: c.twilio_whatsapp_from,
     )
   end
 end

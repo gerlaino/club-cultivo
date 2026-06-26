@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, provisionarWhatsappClub, desconectarWhatsappClub } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Save, Mail, Zap, Users, Info, CreditCard } from 'lucide-vue-next'
@@ -67,6 +67,11 @@ const smtpForm     = ref({ smtp_host: '', smtp_port: 587, smtp_user: '', smtp_pa
 const savingSmtp   = ref(false)
 const smtpError    = ref(null)
 const smtpSuccess  = ref(false)
+
+// WhatsApp (provisión Twilio — solo super_admin)
+const waForm    = ref({ twilio_account_sid: '', twilio_auth_token: '', twilio_whatsapp_from: '' })
+const savingWa  = ref(false)
+const waError   = ref(null)
 
 const featuresForm    = ref({})
 const iaTier          = ref('basico')
@@ -134,6 +139,11 @@ async function cargar() {
       smtp_pass:      '',
       smtp_from:      data.smtp_from      || '',
       smtp_from_name: data.smtp_from_name || '',
+    }
+    waForm.value = {
+      twilio_account_sid:   data.twilio_account_sid   || '',
+      twilio_auth_token:    '',
+      twilio_whatsapp_from: data.twilio_whatsapp_from || '',
     }
     const features = { ...(data.features || {}) }
     if (features.web_publica === undefined) features.web_publica = data.web_activa || false
@@ -283,6 +293,33 @@ async function guardarSmtp() {
     smtpError.value = e?.response?.data?.errors?.join(', ') || 'Error al guardar'
   } finally {
     savingSmtp.value = false
+  }
+}
+
+async function provisionarWa() {
+  savingWa.value = true
+  waError.value  = null
+  try {
+    const payload = { ...waForm.value }
+    if (!payload.twilio_auth_token) delete payload.twilio_auth_token
+    const { data } = await provisionarWhatsappClub(id, payload)
+    club.value = { ...club.value, ...data }
+    waForm.value.twilio_auth_token = ''
+    toast.success('WhatsApp provisionado — el club queda conectado')
+  } catch (e) {
+    waError.value = e?.response?.data?.error || 'Error al provisionar'
+  } finally {
+    savingWa.value = false
+  }
+}
+
+async function desconectarWa() {
+  try {
+    const { data } = await desconectarWhatsappClub(id)
+    club.value = { ...club.value, ...data }
+    toast.success('WhatsApp desconectado')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error')
   }
 }
 
@@ -562,6 +599,45 @@ onMounted(cargar)
               <Save v-else :size="13" :stroke-width="1.75" />
               {{ savingSmtp ? 'Guardando…' : 'Guardar SMTP' }}
             </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ── WhatsApp (provisión Twilio) ── -->
+      <div class="scd__card">
+        <div class="scd__card-hd">
+          <Mail :size="14" :stroke-width="1.75" class="scd__card-ico scd__card-ico--orange" /> WhatsApp (Twilio)
+          <span v-if="club.whatsapp_estado === 'conectado'" class="scd__ok-badge">Conectado</span>
+          <span v-else-if="club.whatsapp_estado === 'pendiente'" class="scd__warn-badge">Pendiente</span>
+          <span v-else class="scd__warn-badge">Sin activar</span>
+        </div>
+        <form class="scd__smtp-body" @submit.prevent="provisionarWa">
+          <div v-if="waError" class="scd__alert">{{ waError }}</div>
+          <div v-if="club.whatsapp_numero" class="scd__alert" style="background:#fef9c3;border-color:#fde68a;color:#854d0e">
+            El club pidió activar el número <strong>{{ club.whatsapp_numero }}</strong>. Registralo en Twilio y cargá las credenciales acá.
+          </div>
+          <div class="scd__smtp-grid">
+            <div class="scd__field">
+              <label class="scd__lbl">Account SID</label>
+              <input v-model.trim="waForm.twilio_account_sid" class="scd__input" placeholder="ACxxxxxxxx..." />
+            </div>
+            <div class="scd__field">
+              <label class="scd__lbl">Auth Token</label>
+              <input v-model.trim="waForm.twilio_auth_token" type="password" class="scd__input" placeholder="Dejá vacío para no cambiar" autocomplete="new-password" />
+            </div>
+            <div class="scd__field">
+              <label class="scd__lbl">Número WhatsApp (sender)</label>
+              <input v-model.trim="waForm.twilio_whatsapp_from" class="scd__input" placeholder="+14155238886" />
+              <span class="scd__hint">Le agregamos "whatsapp:" solo</span>
+            </div>
+          </div>
+          <div class="scd__smtp-footer">
+            <button type="submit" class="scd__btn-sm scd__btn-primary" :disabled="savingWa">
+              <DsSpinner v-if="savingWa" :size="13" />
+              <Save v-else :size="13" :stroke-width="1.75" />
+              {{ savingWa ? 'Guardando…' : 'Provisionar WhatsApp' }}
+            </button>
+            <button v-if="club.twilio_configurado" type="button" class="scd__btn-sm" @click="desconectarWa" style="color:#dc2626">Desconectar</button>
           </div>
         </form>
       </div>

@@ -434,6 +434,8 @@ export const cambiarPlanClub     = (id, payload)  => api.patch(`/super_admin/clu
 export const crearUsuariosDefault = (id)          => api.post(`/super_admin/clubs/${id}/crear_usuarios_default`)
 export const eliminarClub        = (id)           => api.delete(`/super_admin/clubs/${id}`)
 export const restaurarClub       = (id)           => api.patch(`/super_admin/clubs/${id}/restaurar`)
+export const provisionarWhatsappClub = (id, payload) => api.patch(`/super_admin/clubs/${id}/provisionar_whatsapp`, payload)
+export const desconectarWhatsappClub = (id)          => api.delete(`/super_admin/clubs/${id}/desconectar_whatsapp`)
 export const listSuperAdminUsers = ()             => api.get('/super_admin/users')
 export const createSuperAdminUser = (payload)     => api.post('/super_admin/users', { user: payload })
 export const updateSuperAdminUser = (id, payload) => api.put(`/super_admin/users/${id}`, { user: payload })
