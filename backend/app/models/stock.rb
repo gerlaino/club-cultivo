@@ -62,7 +62,11 @@ class Stock < ApplicationRecord
   end
 
   def cantidad_disponible_real
-    [cantidad.to_f - gramos_reservados, 0].max
+    # OJO: los envíos pendientes/en viaje YA se descontaron de `cantidad` al crearse la
+    # dispensación (after_create :decrementar_stock). NO se vuelven a restar acá (eso era un
+    # doble descuento que dejaba el disponible en ~0 tras una entrega grande). Solo restamos las
+    # reservas (apartado), que comprometen stock SIN descontar el real.
+    [cantidad.to_f - reservas.pendientes.sum(:cantidad).to_f, 0].max
   end
 
   def dias_para_vencimiento

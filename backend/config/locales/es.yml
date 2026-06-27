@@ -56,6 +56,7 @@ es:
   activerecord:
     errors:
       messages:
+        record_invalid: "La validación falló: %{errors}"
         required: "es obligatorio"
         blank: "no puede estar vacío"
         taken: "ya está en uso"

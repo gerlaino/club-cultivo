@@ -129,6 +129,8 @@ class DispensacionesController < ApplicationController
           aplicar_lineas_cobro!(@dispensacion, lineas_cobro, 'creacion') unless @dispensacion.cobrar_en_entrega
           afinar_medio_pago!(@dispensacion)
         end
+      rescue ActiveRecord::RecordInvalid => e
+        return render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
       rescue => e
         return render json: { error: e.message }, status: :unprocessable_entity
       end
