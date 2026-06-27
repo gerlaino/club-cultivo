@@ -3,7 +3,7 @@ import { ref, watch, computed, onMounted } from 'vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, deleteDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode, Truck } from 'lucide-vue-next'
 import { useEtiquetaDispensa } from '../composables/useEtiquetaDispensa.js'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
@@ -13,6 +13,7 @@ import { useConfirm } from '../composables/useConfirm.js'
 import { useToast } from '../composables/useToast.js'
 
 const auth    = useAuthStore()
+const router  = useRouter()
 const { confirm } = useConfirm()
 const toast   = useToast()
 const { imprimirEtiqueta } = useEtiquetaDispensa()
@@ -51,12 +52,10 @@ const cargandoPaciente     = ref(false)
 const showDispensarModal   = ref(false)
 const pacienteSeleccionado = ref(null)
 
-async function abrirNuevaDispensacion() {
-  modoModal.value       = 'dispensar'
-  buscaPaciente.value   = ''
-  pacientesLista.value  = []
-  showBuscarPaciente.value = true
-  await buscarPacientes()
+// Motor único: el dispensado vive en /dispensar (carrito multi-item + offline). El buscador
+// de paciente ya está allá, así que delegamos en vez de abrir el modal single-stock.
+function abrirNuevaDispensacion() {
+  router.push('/dispensar')
 }
 
 function abrirFiltrarSocio() {

@@ -36,7 +36,7 @@ const auth   = useAuthStore()
 const socioId   = Number(route.params.id)
 const loading   = ref(true)
 const error     = ref(null)
-const activeTab = ref('info')
+const activeTab = ref(auth.user?.role === 'dispensador' ? 'dispensaciones' : 'info')
 
 const canEdit    = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
 const s          = computed(() => store.current)
@@ -252,6 +252,8 @@ const ALL_TABS = [
 
 const TABS = computed(() => {
   const role = auth.user?.role
+  // El dispensador entra a la ficha solo para dispensar: ve únicamente esa tab.
+  if (role === 'dispensador') return ALL_TABS.filter(t => t.key === 'dispensaciones')
   return ALL_TABS.filter(t => !t.roles || t.roles.includes(role))
 })
 

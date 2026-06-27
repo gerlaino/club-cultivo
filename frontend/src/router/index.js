@@ -269,7 +269,7 @@ const routes = [
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
       const role = auth.user?.role
-      if (role === 'dispensador') return next('/pacientes')
+      // El dispensador entra a la ficha pero solo ve la tab Dispensaciones (ver SocioDetailView).
       if (['delivery', 'abogado', 'cultivador', 'manicura'].includes(role)) return next('/')
       const { can } = usePermissions()
       if (!can('socios', 'show')) return next('/')

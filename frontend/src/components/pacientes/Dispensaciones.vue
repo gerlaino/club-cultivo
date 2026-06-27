@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { logger } from '../../utils/logger.js'
 import { useAuthStore } from '../../stores/auth'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -39,9 +40,17 @@ const totalPaginas = computed(() => Math.max(1, Math.ceil((meta.value.total || 0
 const editModal  = ref(false)
 const editTarget = ref(null)
 
-const canCreate = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
+const router = useRouter()
+// Dispensar (inmediato) → motor único /dispensar. Reservas → solo admin/supervisor (por ahora).
+const canDispensar = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
+const canReservar  = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 const canDelete = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
 const canEdit   = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
+
+// Lleva al motor de dispensado con el socio precargado (carrito multi-item + offline).
+function irADispensar() {
+  router.push({ path: '/dispensar', query: { paciente: props.socioId } })
+}
 
 const fmt = n => n == null ? '—' :
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(n)
@@ -161,13 +170,18 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
           <span v-if="meta.total"> · <strong>{{ (meta.gramos_totales ?? 0).toFixed(1) }}g</strong> en {{ meta.total }} dispensa{{ meta.total === 1 ? '' : 's' }}</span>
         </div>
       </div>
-      <button v-if="canCreate" class="dv__btn-primary" @click="openCreate">
-        <i class="bi bi-plus-lg"></i> Nueva
-      </button>
+      <div class="dv__header-actions">
+        <button v-if="canReservar" class="dv__btn-ghost" @click="openCreate">
+          <i class="bi bi-bookmark-star"></i> Reservar
+        </button>
+        <button v-if="canDispensar" class="dv__btn-primary" @click="irADispensar">
+          <i class="bi bi-plus-lg"></i> Dispensar
+        </button>
+      </div>
     </div>
 
     <!-- Reservas pendientes -->
-    <div v-if="reservasPend.length" class="dv__reservas">
+    <div v-if="canReservar && reservasPend.length" class="dv__reservas">
       <div class="dv__reservas-title"><i class="bi bi-bookmark-star"></i> Reservas pendientes</div>
       <div v-for="r in reservasPend" :key="r.id" class="dv__reserva"
            :class="{ 'dv__reserva--vencida': r.fecha_entrega_estimada < hoyISO }">
@@ -179,7 +193,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
             <template v-if="r.aporte_restante_ars != null"> · resta {{ fmt(r.aporte_restante_ars) }}</template>
           </span>
         </div>
-        <div v-if="canCreate" class="dv__reserva-acts">
+        <div v-if="canReservar" class="dv__reserva-acts">
           <button class="dv__reserva-btn dv__reserva-btn--primary" @click="abrirEntregaReserva(r)">Entregar</button>
           <button class="dv__reserva-btn" @click="abrirEditarReserva(r)">Editar</button>
           <button class="dv__reserva-btn" @click="eliminarReserva(r)">{{ r.sena_ars > 0 ? 'Cancelar' : 'Eliminar' }}</button>
@@ -194,8 +208,8 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
     <div v-else-if="!dispensaciones.length" class="dv__empty">
       <div class="dv__empty-icon"><i class="bi bi-capsule"></i></div>
       <div class="dv__empty-title">Sin dispensaciones registradas</div>
-      <button v-if="canCreate" class="dv__btn-primary" @click="openCreate" style="margin-top:.75rem">
-        <i class="bi bi-plus-lg"></i> Registrar primera
+      <button v-if="canDispensar" class="dv__btn-primary" @click="irADispensar" style="margin-top:.75rem">
+        <i class="bi bi-plus-lg"></i> Dispensar
       </button>
     </div>
 
@@ -359,6 +373,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 
 
 /* Buttons */
+.dv__header-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .dv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .dv__btn-primary:hover:not(:disabled) { background: #144a18; }
 .dv__btn-primary:disabled { opacity: .5; cursor: not-allowed; }

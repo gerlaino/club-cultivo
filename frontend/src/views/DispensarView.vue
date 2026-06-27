@@ -281,6 +281,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { listPacientes, getPaciente, listStocks, listEntregadores } from '../lib/api.js'
 import { dispensarOffline, cacheStock, getCachedStock, cacheSocios, getCachedSocios } from '../lib/offlineApi.js'
 import { useNetwork } from '../composables/useNetwork.js'
@@ -290,6 +291,7 @@ import { Search, Users, Plus, X, AlertTriangle } from 'lucide-vue-next'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const { isOnline } = useNetwork()
+const route = useRoute()
 
 const toast = useToast()
 
@@ -326,6 +328,21 @@ onMounted(async () => {
     entregadores.value = entRes.data.data ?? []
     pacientes.value    = pacRes.data.data ?? []
     cacheSocios(pacientes.value)
+
+    // Paciente precargado por query (?paciente=ID): viene de la ficha o del historial,
+    // que ahora delegan el dispensado a esta vista (motor único). Lo autoseleccionamos.
+    const pid = route.query.paciente
+    if (pid) {
+      const enLista = pacientes.value.find(p => String(p.id) === String(pid))
+      if (enLista) selectPaciente(enLista)
+      else {
+        try {
+          const { data } = await getPaciente(pid)
+          const p = data?.data ?? data
+          if (p) selectPaciente(p)
+        } catch {}
+      }
+    }
   } catch {}
 })
 
