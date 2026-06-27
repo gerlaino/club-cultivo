@@ -47,7 +47,14 @@ function cerrarMenu()   { menuAbierto.value = null }
 const reservas          = ref([])
 const entregandoReservaId = ref(null)
 
+// "Pendiente de envío" = todo lo que falta entregar (no iniciado + en camino + fallido).
+// Es el paraguas operativo; los buckets granulares (por salir / en camino / fallido) viven
+// abajo. 'pendiente_envio' es un valor sintético del filtro: NO se manda al backend (que
+// filtra por estado exacto), se resuelve client-side en despachosFiltered.
+const NO_ENTREGADOS = ['pendiente', 'en_viaje', 'fallido']
+
 const kpis = computed(() => ({
+  por_entregar: despachos.value.filter(d => NO_ENTREGADOS.includes(d.estado_envio)).length,
   pendientes: despachos.value.filter(d => d.estado_envio === 'pendiente').length,
   en_viaje:   despachos.value.filter(d => d.estado_envio === 'en_viaje').length,
   entregados: despachos.value.filter(d => d.estado_envio === 'entregado').length,
@@ -56,6 +63,11 @@ const kpis = computed(() => ({
 
 const despachosFiltered = computed(() => {
   let list = despachos.value
+  // Paraguas "Pendientes de envío": el backend devolvió todo (no se le manda estado), acá
+  // recortamos a lo no entregado.
+  if (filtroEstado.value === 'pendiente_envio') {
+    list = list.filter(d => NO_ENTREGADOS.includes(d.estado_envio))
+  }
   if (filtroBusca.value.trim()) {
     const q = filtroBusca.value.toLowerCase()
     list = list.filter(d =>
@@ -245,7 +257,8 @@ async function load() {
   loading.value = true
   try {
     const params = {}
-    if (filtroEstado.value)   params.estado_envio = filtroEstado.value
+    // 'pendiente_envio' es sintético (paraguas): se filtra client-side, no es un estado real.
+    if (filtroEstado.value && filtroEstado.value !== 'pendiente_envio') params.estado_envio = filtroEstado.value
     if (filtroDelivery.value) params.delivery_id  = filtroDelivery.value
     if (filtroDesde.value)    params.desde        = filtroDesde.value
     if (filtroHasta.value)    params.hasta        = filtroHasta.value
@@ -443,9 +456,14 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 
     <!-- KPI strip -->
     <div class="dsp__kpis">
+      <div class="dsp__kpi dsp__kpi--ink" @click="filtroEstado = filtroEstado === 'pendiente_envio' ? '' : 'pendiente_envio'; load()">
+        <PackageCheck :size="18" :stroke-width="1.75" class="dsp__kpi-icon" />
+        <span class="dsp__kpi-n">{{ kpis.por_entregar }}</span>
+        <span class="dsp__kpi-l">Por entregar</span>
+      </div>
       <div class="dsp__kpi dsp__kpi--blue" @click="filtroEstado = filtroEstado === 'pendiente' ? '' : 'pendiente'; load()">
         <span class="dsp__kpi-n">{{ kpis.pendientes }}</span>
-        <span class="dsp__kpi-l">Pendientes</span>
+        <span class="dsp__kpi-l">Por salir</span>
       </div>
       <div class="dsp__kpi dsp__kpi--amber" @click="filtroEstado = filtroEstado === 'en_viaje' ? '' : 'en_viaje'; load()">
         <Truck :size="18" :stroke-width="1.75" class="dsp__kpi-icon" />
@@ -519,7 +537,8 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
       />
       <select v-model="filtroEstado" class="dsp__select" @change="load">
         <option value="">Todos los estados</option>
-        <option value="pendiente">Pendiente</option>
+        <option value="pendiente_envio">Pendientes de envío</option>
+        <option value="pendiente">Por salir</option>
         <option value="en_viaje">En camino</option>
         <option value="entregado">Entregado</option>
         <option value="fallido">Fallido</option>
@@ -944,7 +963,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 /* KPI strip */
 .dsp__kpis {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: var(--sp-3);
   margin-bottom: var(--sp-5);
 }
@@ -962,6 +981,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
   position: relative;
 }
 .dsp__kpi:hover { box-shadow: var(--sh-2); }
+.dsp__kpi--ink:hover   { border-color: var(--c-ink-500); }
 .dsp__kpi--blue:hover  { border-color: #93c5fd; }
 .dsp__kpi--amber:hover { border-color: #fcd34d; }
 .dsp__kpi--green:hover { border-color: var(--c-leaf-300); }
@@ -972,6 +992,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
   font-weight: 800;
   line-height: 1;
 }
+.dsp__kpi--ink   .dsp__kpi-n { color: var(--c-ink-900); }
 .dsp__kpi--blue  .dsp__kpi-n { color: #1d4ed8; }
 .dsp__kpi--amber .dsp__kpi-n { color: #d97706; }
 .dsp__kpi--green .dsp__kpi-n { color: var(--c-leaf-700); }
