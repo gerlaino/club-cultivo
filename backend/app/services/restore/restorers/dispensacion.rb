@@ -74,8 +74,15 @@ module Restore
       def apply!
         d     = record
         actor = usuario || d.deleted_by || d.user
+        restaurar_items!(d)
         d.send(:decrementar_stock)
         cobros? ? reaplicar_cobros!(d, actor) : Dispensaciones::AplicarEfectos.financiero!(dispensacion: d, usuario: actor)
+      end
+
+      # Las líneas son estructura (no efectos): se restauran con la dispensa. Sin esto,
+      # decrementar_stock (que itera líneas vivas) no descontaría nada al restaurar.
+      def restaurar_items!(d)
+        d.items.with_deleted.where.not(deleted_at: nil).each(&:restore)
       end
 
       # Re-crea cada línea de cobro (fresca) con su asiento/débito, vía el mismo servicio que la

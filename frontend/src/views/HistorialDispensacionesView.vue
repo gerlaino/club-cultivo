@@ -231,6 +231,12 @@ function descuentoTitle(d) {
   if (dd > 0) parts.push(`Esta dispensa: ${dd}%${d.descuento_otorgado_por ? ` (otorgó ${d.descuento_otorgado_por})` : ''}`)
   return parts.join(' · ')
 }
+// Tooltip con el detalle de las líneas de una dispensa multi-stock.
+function itemsTitle(d) {
+  return (d.items || [])
+    .map(it => `${it.cantidad}${it.stock?.unidad || 'g'} ${formaLabel(it.stock?.forma_producto)}`)
+    .join(' · ')
+}
 
 const MEDIOS_PAGO = [
   { value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' },
@@ -458,9 +464,13 @@ const FORMAS = [
                 </button>
               </td>
               <td class="hd__td-producto">
-                <span class="hd__forma-chip">{{ formaLabel(d.stock?.forma_producto) }}</span>
+                <span v-if="d.multi_stock && d.items?.length" class="hd__forma-chip" :title="itemsTitle(d)">{{ d.items.length }} productos</span>
+                <span v-else class="hd__forma-chip">{{ formaLabel(d.stock?.forma_producto) }}</span>
               </td>
-              <td class="hd__td-num hd__td-qty">{{ d.cantidad }}{{ d.stock?.unidad ?? 'g' }}</td>
+              <td class="hd__td-num hd__td-qty">
+                <template v-if="d.multi_stock && d.items?.length" title="Varios productos">{{ d.items.length }} ítems</template>
+                <template v-else>{{ d.cantidad }}{{ d.stock?.unidad ?? 'g' }}</template>
+              </td>
               <td class="hd__td-num hd__td-price">
                 <span v-if="d.precio_unitario_ars">{{ formatARS(d.precio_unitario_ars) }}</span>
                 <span v-else class="hd__dash">—</span>

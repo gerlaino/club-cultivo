@@ -51,8 +51,12 @@ export async function dispensarOffline(pacienteId, payload) {
         method:  'POST',
         payload: { dispensacion: payload },
       })
-      // Decrementar el stock en caché local para que la UI refleje la dispensación pendiente
-      _decrementarStockCache(payload.stock_id, payload.cantidad)
+      // Decrementar el stock en caché local para que la UI refleje la dispensación pendiente.
+      // Multi-stock: una línea por cada item; legacy: stock_id/cantidad sueltos.
+      const lineas = Array.isArray(payload.items) && payload.items.length
+        ? payload.items
+        : [{ stock_id: payload.stock_id, cantidad: payload.cantidad }]
+      lineas.forEach(l => _decrementarStockCache(l.stock_id, l.cantidad))
       return { offline: true, queued: true }
     }
     throw e

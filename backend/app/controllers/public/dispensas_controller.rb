@@ -39,6 +39,7 @@ module Public
       {
         codigo:    disp.token,
         fecha:     disp.fecha_dispensacion,
+        multi:     items_pasaporte(disp, snap).size > 1,
         cantidad:  (snap['cantidad'] || disp.cantidad)&.to_f,
         unidad:    snap['unidad'] || stock&.unidad || 'g',
         forma:     snap['forma_producto'] || stock&.forma_producto,
@@ -53,12 +54,53 @@ module Public
           registrada_inase:      gen['registrada_inase'],
           numero_registro_inase: gen['numero_registro_inase'],
         },
+        items:        items_pasaporte(disp, snap),
         socio_numero: pac&.id,
         club: club ? {
           nombre: club.name,
           logo:   club.logo.attached? ? url_for(club.logo) : nil,
         } : nil,
       }
+    end
+
+    # Líneas del paquete para el pasaporte. Preferimos el snapshot (inmutable); si una
+    # dispensa multi-stock no lo tuviera, caemos a las líneas vivas. Single-stock → 1 línea.
+    def items_pasaporte(disp, snap)
+      fuente = if snap['items'].present?
+        snap['items'].map do |it|
+          g = it['genetica'] || {}
+          { forma: it['forma_producto'], cantidad: it['cantidad']&.to_f, unidad: it['unidad'],
+            lote: it['lote_codigo'], genetica: g }
+        end
+      else
+        disp.items.map do |it|
+          st = it.stock
+          g  = st&.genetica || st&.lote&.genetica
+          { forma: st&.forma_producto, cantidad: it.cantidad&.to_f, unidad: st&.unidad,
+            lote: it.lote_codigo || st&.lote&.codigo,
+            genetica: g && { 'nombre' => g.nombre, 'tipo' => g.tipo, 'thc_pct' => g.thc&.to_f,
+                             'cbd_pct' => g.cbd&.to_f, 'terpenos' => g.terpenos } }
+        end
+      end
+
+      fuente.map do |it|
+        g = it[:genetica] || {}
+        {
+          forma:    it[:forma],
+          cantidad: it[:cantidad],
+          unidad:   it[:unidad] || 'g',
+          lote:     it[:lote],
+          genetica: {
+            nombre:   g['nombre'],
+            tipo:     g['tipo'],
+            thc_pct:  g['thc_pct'],
+            cbd_pct:  g['cbd_pct'],
+            terpenos: g['terpenos'],
+            registrada_inase:      g['registrada_inase'],
+            numero_registro_inase: g['numero_registro_inase'],
+          },
+        }
+      end
     end
   end
 end

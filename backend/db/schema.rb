@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_26_000006) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_27_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -368,6 +368,23 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_26_000006) do
     t.index ["deleted_at"], name: "index_cuenta_corrientes_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_cuenta_corrientes_on_deleted_by_id"
     t.index ["paciente_id"], name: "index_cuenta_corrientes_on_paciente_id"
+  end
+
+  create_table "dispensacion_items", force: :cascade do |t|
+    t.bigint "dispensacion_id", null: false
+    t.bigint "stock_id"
+    t.decimal "cantidad", precision: 10, scale: 3, default: "0.0", null: false
+    t.decimal "precio_unitario_ars", precision: 10, scale: 2
+    t.decimal "costo_unitario_ars", precision: 10, scale: 2
+    t.string "lote_codigo"
+    t.string "genetica_nombre"
+    t.datetime "deleted_at"
+    t.bigint "deleted_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["deleted_at"], name: "index_dispensacion_items_on_deleted_at"
+    t.index ["dispensacion_id"], name: "index_dispensacion_items_on_dispensacion_id"
+    t.index ["stock_id"], name: "index_dispensacion_items_on_stock_id"
   end
 
   create_table "dispensaciones", force: :cascade do |t|
@@ -1654,6 +1671,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_26_000006) do
   add_foreign_key "cuenta_corrientes", "clubs"
   add_foreign_key "cuenta_corrientes", "pacientes"
   add_foreign_key "cuenta_corrientes", "users", column: "deleted_by_id"
+  add_foreign_key "dispensacion_items", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "dispensacion_items", "stocks"
+  add_foreign_key "dispensacion_items", "users", column: "deleted_by_id"
   add_foreign_key "dispensaciones", "indicacion_medicas"
   add_foreign_key "dispensaciones", "pacientes"
   add_foreign_key "dispensaciones", "rutas_entrega", column: "ruta_entrega_id"

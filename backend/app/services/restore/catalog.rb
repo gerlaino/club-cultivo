@@ -86,6 +86,7 @@ module Restore
       # Dependientes: vuelven con su agregado padre (Dispensación/Stock), no se listan sueltos.
       { key: 'stock_movimiento',    model_name: 'StockMovimiento',    label: 'Movimiento de stock', group: 'Stock', complex: true, top_level: false, descriptor: ->(r) { "Movimiento ##{r.id}" } },
       { key: 'cobro',               model_name: 'Cobro',              label: 'Cobro',               group: 'Dispensación', complex: true, top_level: false, descriptor: ->(r) { "Cobro ##{r.id}" } },
+      { key: 'dispensacion_item',   model_name: 'DispensacionItem',   label: 'Línea de dispensación', group: 'Dispensación', complex: true, top_level: false, descriptor: ->(r) { "Línea ##{r.id}" } },
       { key: 'cuenta_corriente_movimiento', model_name: 'CuentaCorrienteMovimiento', label: 'Movimiento de cuenta corriente', group: 'Socios', complex: true, top_level: false, descriptor: ->(r) { "Movimiento ##{r.id}" } },
       { key: 'movimiento_contable', model_name: 'MovimientoContable', label: 'Movimiento contable', group: 'Contabilidad', complex: true, top_level: false, descriptor: ->(r) { "Asiento ##{r.id}" } },
       { key: 'costo_lote',          model_name: 'CostoLote',          label: 'Costo de lote',       group: 'Contabilidad', complex: true, restorer: 'Restore::Restorers::CostoLote', descriptor: ->(r) { "Costo ##{r.id}" } },

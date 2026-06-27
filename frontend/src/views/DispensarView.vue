@@ -446,33 +446,6 @@ function lineasCobro() {
   return ls
 }
 
-// Distribuye las líneas proporcionalmente entre los ítems del carrito (cada ítem es
-// una dispensa). El último ítem absorbe el redondeo; nunca supera el total del ítem.
-function distribuirCobros(items, lines, total) {
-  const out  = items.map(() => [])
-  const used = items.map(() => 0)
-  for (const line of lines) {
-    let rem = round2(line.monto)
-    items.forEach((item, idx) => {
-      if (rem <= 0.001) return
-      const isLast = idx === items.length - 1
-      // El último ítem absorbe todo lo que reste, incluido el excedente (el backend
-      // lo cobra hasta el saldo del ítem y acredita el sobrante a favor).
-      let monto
-      if (isLast) {
-        monto = rem
-      } else {
-        const room = round2(item.total - used[idx])
-        if (room <= 0.001) return
-        monto = Math.min(round2(line.monto * item.total / total), room, rem)
-      }
-      monto = round2(monto)
-      if (monto > 0.001) { out[idx].push({ medio: line.medio, monto }); used[idx] = round2(used[idx] + monto); rem = round2(rem - monto) }
-    })
-  }
-  return out
-}
-
 const cartTotalG = computed(() => cart.value.filter(i => i.stock.unidad === 'g').reduce((s, i) => s + i.cantidad, 0))
 
 // Estado del paciente
@@ -487,8 +460,10 @@ const descuentoPaciente = computed(() => {
 })
 
 function precioConDescuento(precioBase) {
-  if (!descuentoPaciente.value) return precioBase
-  return precioBase * (1 - descuentoPaciente.value / 100)
+  // Redondeo a 2 decimales para que el total del carrito coincida exacto con el que
+  // recalcula el backend por línea (evita descuadres de centavos en el resto a cuenta).
+  if (!descuentoPaciente.value) return round2(precioBase)
+  return round2(precioBase * (1 - descuentoPaciente.value / 100))
 }
 
 function addToCart(s) {
@@ -546,78 +521,51 @@ async function submitDispensacion() {
   }
   submitting.value = true
 
-  const today  = new Date().toISOString().slice(0, 10)
-  const items  = [...cart.value]
-  const cobrosPorItem = cobraDelivery.value
-    ? items.map(() => [])
-    : distribuirCobros(items, lineasCobro(), cartTotal.value)
-  const results = await Promise.allSettled(
-    items.map((item, idx) =>
-      dispensarOffline(selectedPaciente.value.id, {
-        stock_id:            item.stock.id,
-        cantidad:            item.cantidad,
-        precio_unitario_ars: precioConDescuento(item.stock.precio_sugerido_ars ?? 0),
-        aporte_socio_ars:    item.total,
-        fecha_dispensacion:  today,
-        cobrar_en_entrega:   cobraDelivery.value,
-        cobros:              cobrosPorItem[idx],
-        con_envio:           conEnvio.value,
-        ...(conEnvio.value ? {
-          direccion_envio:   direccionEnvio.value,
-          contacto_nombre:   contactoNombre.value,
-          contacto_telefono: contactoTel.value,
-        } : {}),
-        ...(observaciones.value.trim() ? { observaciones: observaciones.value.trim() } : {}),
+  const today = new Date().toISOString().slice(0, 10)
+  const items = [...cart.value]
+
+  // Multi-stock: UNA sola dispensa con todas las líneas. El backend recalcula el precio de
+  // cada línea (con el descuento del socio) y suma el total; los cobros se cargan una vez.
+  const payload = {
+    items:              items.map(i => ({ stock_id: i.stock.id, cantidad: i.cantidad })),
+    fecha_dispensacion: today,
+    cobrar_en_entrega:  cobraDelivery.value,
+    cobros:             cobraDelivery.value ? [] : lineasCobro(),
+    con_envio:          conEnvio.value,
+    ...(conEnvio.value ? {
+      direccion_envio:   direccionEnvio.value,
+      contacto_nombre:   contactoNombre.value,
+      contacto_telefono: contactoTel.value,
+    } : {}),
+    ...(observaciones.value.trim() ? { observaciones: observaciones.value.trim() } : {}),
+  }
+
+  try {
+    const res = await dispensarOffline(selectedPaciente.value.id, payload)
+    submitting.value = false
+
+    if (res?.queued) {
+      // Offline: el stock en caché ya lo decrementó dispensarOffline; reflejarlo en la vista.
+      items.forEach(({ stock, cantidad }) => {
+        const s = stocks.value.find(x => x.id === stock.id)
+        if (s) s.cantidad = Math.max(0, (s.cantidad || 0) - cantidad)
       })
-        .then(res => ({ ok: true, item, _queued: res?.queued === true }))
-        .catch(e => ({
-          ok:  false,
-          item,
-          msg: e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar',
-        }))
-    )
-  )
-
-  submitting.value = false
-
-  const ok     = results.map(r => r.value).filter(v => v.ok).map(v => v.item)
-  const errors = results.map(r => r.value).filter(v => !v.ok)
-
-  if (ok.length > 0) {
-    cart.value = cart.value.filter(i => !ok.includes(i))
-    Promise.all([getPaciente(selectedPaciente.value.id), listStocks()])
-      .then(([detRes, stockRes]) => {
-        pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
-        stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
-      }).catch(() => {})
-  }
-
-  // Detectar items que fueron encolados (offline)
-  const queued   = ok.filter(i => i._queued)
-  const enviados = ok.filter(i => !i._queued)
-
-  // Actualizar stock local inmediatamente para los items encolados
-  if (queued.length) {
-    queued.forEach(({ item }) => {
-      const s = stocks.value.find(x => x.id === item.stock.id)
-      if (s) s.cantidad = Math.max(0, (s.cantidad || 0) - item.cantidad)
-    })
-  }
-
-  if (errors.length === 0) {
-    if (queued.length > 0 && enviados.length === 0) {
-      toast.warning(`Dispensación guardada localmente. Se enviará cuando haya conexión.`)
-    } else if (queued.length > 0) {
-      toast.warning(`${enviados.length} enviados, ${queued.length} guardados offline — se sincronizarán al reconectarse.`)
+      toast.warning('Dispensación guardada localmente. Se enviará cuando haya conexión.')
     } else {
       toast.success(`Dispensación registrada para ${selectedPaciente.value.nombre}`)
+      Promise.all([getPaciente(selectedPaciente.value.id), listStocks()])
+        .then(([detRes, stockRes]) => {
+          pacienteDetalle.value = detRes.data?.data ?? detRes.data ?? null
+          stocks.value = stockRes.data.stocks ?? stockRes.data ?? []
+        }).catch(() => {})
     }
+
+    cart.value = []
     confirmOpen.value = false
     resetModal()
-  } else if (ok.length === 0) {
-    toast.error(errors[0].msg)
-  } else {
-    toast.warning(`${ok.length} de ${items.length} ítems registrados. ${errors[0].msg}`)
+  } catch (e) {
+    submitting.value = false
+    toast.error(e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'Error al registrar')
   }
 }
 

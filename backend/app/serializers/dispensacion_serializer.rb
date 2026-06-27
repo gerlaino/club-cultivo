@@ -9,6 +9,8 @@ class DispensacionSerializer
       usuario:         { id: d.user.id, nombre: d.user.first_name || d.user.email },
       sede:            d.sede ? { id: d.sede.id, nombre: d.sede.nombre } : nil,
       stock:           StockSerializer.serialize_dispensacion(d.stock),
+      items:           serialize_items(d),
+      multi_stock:     d.multi_stock?,
       cantidad:            d.cantidad.to_f,
       precio_unitario_ars: d.precio_unitario_ars&.to_f,
       aporte_socio_ars:    d.aporte_socio_ars&.to_f,
@@ -81,6 +83,23 @@ class DispensacionSerializer
       },
       sede:  d.sede ? { id: d.sede.id, nombre: d.sede.nombre } : nil,
       stock: d.stock ? { forma_producto: d.stock.forma_producto, unidad: d.stock.unidad } : nil,
+      items: serialize_items(d),
     }
+  end
+
+  # Líneas de la dispensación (multi-stock). Cada una con su stock, cantidad, precio y trazabilidad.
+  def self.serialize_items(d)
+    d.items.map do |it|
+      {
+        id:                  it.id,
+        stock_id:            it.stock_id,
+        stock:               StockSerializer.serialize_dispensacion(it.stock),
+        cantidad:            it.cantidad.to_f,
+        precio_unitario_ars: it.precio_unitario_ars&.to_f,
+        subtotal_ars:        it.subtotal_ars.to_f,
+        lote_codigo:         it.lote_codigo,
+        genetica_nombre:     it.genetica_nombre,
+      }
+    end
   end
 end

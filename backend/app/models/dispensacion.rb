@@ -13,6 +13,12 @@ class Dispensacion < ApplicationRecord
   belongs_to :delivery_user, class_name: 'User', foreign_key: :delivery_id, optional: true
   belongs_to :ruta_entrega,  optional: true
 
+  # Líneas de la dispensación: cada una es un stock + cantidad (con precio/costo/trazabilidad
+  # propios). Una dispensa puede abarcar varios stocks. En la transición conviven con las
+  # columnas stock_id/cantidad de `dispensaciones` (mirror de la primera línea).
+  has_many :items, class_name: 'DispensacionItem', dependent: :destroy
+  accepts_nested_attributes_for :items, reject_if: ->(a) { a[:stock_id].blank? && a[:cantidad].to_d <= 0 }
+
   # Los asientos contables de la dispensación viven y mueren con ella. Puede haber
   # más de uno cuando se paga parte con crédito (deuda) y parte en efectivo (ingreso).
   has_many :movimientos_contables, class_name: 'MovimientoContable', dependent: :destroy
@@ -24,6 +30,18 @@ class Dispensacion < ApplicationRecord
   # Foto opcional que sube el delivery como prueba de la entrega (distinta del
   # comprobante de pago, que vive en el Cobro de transferencia).
   has_one_attached :comprobante_entrega
+
+  # --- Lectura derivada de líneas (preferida; cae al legacy si todavía no hay líneas) ---
+
+  # Cantidad total dispensada sumando todas las líneas.
+  def cantidad_total
+    items.exists? ? items.sum(:cantidad).to_d : cantidad.to_d
+  end
+
+  # ¿La dispensa abarca más de un stock?
+  def multi_stock?
+    items.where.not(stock_id: nil).distinct.count(:stock_id) > 1
+  end
 
   # ¿Esta dispensa usa el flujo de cobros? (vs. legacy: asentada por medio_pago único,
   # gramos, etc.). Una legacy ya está saldada por sus movimientos, no por cobros.
@@ -67,6 +85,7 @@ class Dispensacion < ApplicationRecord
   end
 
   before_validation { self.fecha_dispensacion ||= Date.current }
+  before_validation :sincronizar_mirror_desde_items, if: :lineas_explicitas?
   before_validation :componer_direccion_envio, if: :con_envio?
   before_create     :generar_codigo_paquete, if: :con_envio?
   before_create     :capturar_snapshot_trazabilidad
@@ -79,8 +98,9 @@ class Dispensacion < ApplicationRecord
   validates :medio_pago,         inclusion: { in: MEDIOS_PAGO }, allow_blank: true
   validate  :fecha_no_futura
   validate  :paciente_activo_como_socio, on: :create
-  validate  :stock_pertenece_al_club,    on: :create
-  validate  :stock_disponible,           on: :create
+  validate  :stock_pertenece_al_club,    on: :create, unless: :lineas_explicitas?
+  validate  :stock_disponible,           on: :create, unless: :lineas_explicitas?
+  validate  :lineas_validas,             on: :create, if:     :lineas_explicitas?
   validate  :limite_mensual_no_superado, on: :create
   validate  :credito_suficiente,        on: :create, if: -> { medio_pago == 'cuenta_corriente' }
   validate  :credito_no_abona,          on: :create, if: -> { medio_pago == 'no_abona' }
@@ -131,6 +151,7 @@ class Dispensacion < ApplicationRecord
     sig.nil? || sig.id == id
   end
 
+  after_create        :asegurar_item_espejo
   after_create        :decrementar_stock
   after_create_commit :encolar_reporte_ariccame
   after_create_commit :dispatch_webhook
@@ -164,6 +185,49 @@ class Dispensacion < ApplicationRecord
       if cantidad.to_d > stock.cantidad_disponible_real
         errors.add(:cantidad,
           "supera el stock disponible (#{stock.cantidad_disponible_real.round(2)} #{stock.unidad || 'g'} disponibles)")
+      end
+    end
+  end
+
+  # --- Flujo multi-stock: líneas construidas explícitamente (items_attributes) ---
+
+  # Líneas nuevas (en memoria) que trae la dispensa al crearse por el flujo multi-stock.
+  def lineas_nuevas
+    items.select(&:new_record?)
+  end
+
+  # ¿La dispensa se está creando con líneas explícitas (multi-stock) en vez del single legacy?
+  def lineas_explicitas?
+    new_record? && lineas_nuevas.any?
+  end
+
+  # Espeja en las columnas legacy (stock_id/cantidad/precio) la realidad de las líneas:
+  # stock primario = primera línea; cantidad = suma de las líneas. Mantiene compatibles a los
+  # lectores que todavía leen dispensacion.stock/.cantidad mientras dura la transición.
+  def sincronizar_mirror_desde_items
+    ls = lineas_nuevas
+    self.stock_id  ||= ls.first&.stock_id
+    self.cantidad    = ls.sum { |l| l.cantidad.to_d }
+  end
+
+  # Valida cada línea contra el estado actual: stock existente, del club, y con disponible
+  # suficiente (agrupando por stock para sumar líneas que repiten el mismo inventario).
+  def lineas_validas
+    lineas_nuevas.group_by(&:stock_id).each do |_sid, ls|
+      st = ls.first.stock
+      if st.nil?
+        errors.add(:base, 'Una línea no tiene un stock válido.')
+        next
+      end
+      unless st.club_id == paciente&.club_id || st.sede&.club_id == paciente&.club_id
+        errors.add(:base, 'Una línea usa stock de otro club.')
+        next
+      end
+      pedido = ls.sum { |l| l.cantidad.to_d }
+      disp   = st.cantidad_disponible_real.to_d
+      if pedido > disp
+        nombre = st.forma_producto.to_s.humanize
+        errors.add(:base, "Stock insuficiente (#{nombre}): hay #{disp.round(2)}#{st.unidad || 'g'} y se piden #{pedido.to_f}#{st.unidad || 'g'}.")
       end
     end
   end
@@ -224,34 +288,58 @@ class Dispensacion < ApplicationRecord
     end
   end
 
+  # Descuenta el stock de CADA línea (multi-stock). Cada dispensa tiene al menos su línea espejo
+  # (ver asegurar_item_espejo), así que el flujo single-stock legacy descuenta vía esa única línea.
   def decrementar_stock
-    return unless stock
-    ActiveRecord::Base.transaction do
-      stock.decrement!(:cantidad, cantidad)
-      stock.stock_movimientos.create!(
-        tipo:           'dispensacion',
-        gramos:         -cantidad,
-        usuario:        user,
-        dispensacion_id: id,
-        notas:          "Dispensación ##{id} — #{paciente&.nombre_completo}",
-      )
+    items.reload.each do |it|
+      next unless it.stock
+      ActiveRecord::Base.transaction do
+        it.stock.decrement!(:cantidad, it.cantidad)
+        it.stock.stock_movimientos.create!(
+          tipo:           'dispensacion',
+          gramos:         -it.cantidad,
+          usuario:        user,
+          dispensacion_id: id,
+          notas:          "Dispensación ##{id} — #{paciente&.nombre_completo}",
+        )
+      end
     end
   end
 
+  # Revierte el stock de cada línea. Se llama en after_destroy: para entonces las líneas ya
+  # están soft-borradas por la cascada (dependent: :destroy), así que se leen con with_deleted.
   def incrementar_stock
-    return unless stock
-    ActiveRecord::Base.transaction do
-      stock.increment!(:cantidad, cantidad)
-      # Borra el movimiento por FK exacta; fallback por texto para registros viejos.
-      movs    = stock.stock_movimientos.where(tipo: 'dispensacion')
-      borrados = movs.where(dispensacion_id: id).destroy_all
-      movs.where("notas LIKE ?", "Dispensación ##{id} —%").destroy_all if borrados.empty?
+    items.with_deleted.each do |it|
+      next unless it.stock
+      ActiveRecord::Base.transaction do
+        it.stock.increment!(:cantidad, it.cantidad)
+        # Borra el movimiento por FK exacta; fallback por texto para registros viejos.
+        movs     = it.stock.stock_movimientos.where(tipo: 'dispensacion')
+        borrados = movs.where(dispensacion_id: id).destroy_all
+        movs.where("notas LIKE ?", "Dispensación ##{id} —%").destroy_all if borrados.empty?
+      end
     end
   end
 
   def generar_codigo_paquete
     self.codigo_paquete = "PKG-#{Date.today.strftime('%Y%m%d')}-#{SecureRandom.hex(3).upcase}"
     self.estado_envio   = 'pendiente'
+  end
+
+  # Puente multi-stock: garantiza que toda dispensa tenga al menos una línea espejo de su
+  # contenido (stock + cantidad + precio + trazabilidad). Las dispensas creadas por el flujo
+  # legacy de un solo stock quedan así representadas también como líneas, que pasan a ser la
+  # fuente canónica. Si la dispensa ya trae líneas propias (flujo multi-stock), no hace nada.
+  def asegurar_item_espejo
+    return if items.exists?
+    return if cantidad.to_f <= 0
+    items.create!(
+      stock_id:            stock_id,
+      cantidad:            cantidad,
+      precio_unitario_ars: precio_unitario_ars,
+      lote_codigo:         lote_codigo,
+      genetica_nombre:     genetica_nombre,
+    )
   end
 
   # Snapshot inmutable de trazabilidad: copia código de lote y genética del stock al
@@ -272,25 +360,49 @@ class Dispensacion < ApplicationRecord
 
   # Foto inmutable del producto al dispensar: datos que muestra la etiqueta/pasaporte.
   # Se lee de acá (no en vivo) para que sobreviva a ediciones de genética o borrado de stock.
+  # Para multi-stock guarda además `items[]` con una foto por línea, para que el pasaporte
+  # liste todos los productos del paquete (no solo el stock espejo de la primera línea).
   def capturar_snapshot_producto
     return if producto_snapshot.present? && producto_snapshot != {}
-    g = stock&.genetica || stock&.lote&.genetica
-    self.producto_snapshot = {
+    snap = {
       forma_producto: stock&.forma_producto,
       cantidad:       cantidad&.to_f,
       unidad:         stock&.unidad,
       lote_codigo:    lote_codigo || stock&.lote&.codigo,
       fecha:          (fecha_dispensacion || Date.current).to_s,
-      genetica: g && {
-        nombre:    g.nombre,
-        tipo:      g.tipo,
-        thc_pct:   g.thc&.to_f,
-        cbd_pct:   g.cbd&.to_f,
-        terpenos:  g.terpenos,
-        registrada_inase:      g.registrada_inase,
-        numero_registro_inase: g.numero_registro_inase,
-      },
+      genetica:       snapshot_genetica(stock),
     }.compact
+
+    # `items` (en memoria, antes de persistirse) trae las líneas del flujo multi-stock.
+    lineas = items.to_a
+    if lineas.size > 1
+      snap[:items] = lineas.map do |it|
+        {
+          forma_producto: it.stock&.forma_producto,
+          cantidad:       it.cantidad&.to_f,
+          unidad:         it.stock&.unidad,
+          lote_codigo:    it.lote_codigo || it.stock&.lote&.codigo,
+          genetica:       snapshot_genetica(it.stock),
+        }.compact
+      end
+    end
+
+    self.producto_snapshot = snap
+  end
+
+  # Foto de la genética de un stock para el snapshot (nil si el stock no tiene).
+  def snapshot_genetica(st)
+    g = st&.genetica || st&.lote&.genetica
+    return nil unless g
+    {
+      nombre:    g.nombre,
+      tipo:      g.tipo,
+      thc_pct:   g.thc&.to_f,
+      cbd_pct:   g.cbd&.to_f,
+      terpenos:  g.terpenos,
+      registrada_inase:      g.registrada_inase,
+      numero_registro_inase: g.numero_registro_inase,
+    }
   end
 
   # Compone direccion_envio (texto para mostrar) a partir de los campos estructurados.

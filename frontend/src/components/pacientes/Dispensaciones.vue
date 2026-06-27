@@ -67,7 +67,9 @@ async function onDispensacionGuardada() {
 
 async function handleDelete(d) {
   const stk   = d.stock
-  const label = `${d.cantidad}${stk?.unidad || 'g'} de ${FORMA_LABEL[stk?.forma_producto] || stk?.forma_producto || '—'} · ${fmtDate(d.fecha_dispensacion)}`
+  const label = d.multi_stock && d.items?.length
+    ? `${d.items.length} productos · ${fmtDate(d.fecha_dispensacion)}`
+    : `${d.cantidad}${stk?.unidad || 'g'} de ${FORMA_LABEL[stk?.forma_producto] || stk?.forma_producto || '—'} · ${fmtDate(d.fecha_dispensacion)}`
   const ok    = await confirm({ title: '¿Eliminar dispensación?', message: label, confirmText: 'Eliminar', variant: 'danger' })
   if (!ok) return
   try {
@@ -202,7 +204,19 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       <div v-for="d in dispensaciones" :key="d.id" class="dv__item">
         <div class="dv__item-left">
           <div class="dv__item-fecha">{{ fmtDate(d.fecha_dispensacion) }}</div>
-          <div class="dv__item-desc">
+          <!-- Multi-stock: una línea por producto del paquete -->
+          <div v-if="d.multi_stock && d.items?.length" class="dv__item-lines">
+            <div v-for="it in d.items" :key="it.id" class="dv__item-line">
+              <span class="dv__stock-pill">{{ FORMA_EMOJI[it.stock?.forma_producto] }} {{ FORMA_LABEL[it.stock?.forma_producto] || it.stock?.forma_producto || '—' }}</span>
+              <span class="dv__item-line-qty">{{ it.cantidad }}{{ it.stock?.unidad || 'g' }}</span>
+              <span v-if="it.lote_codigo || it.stock?.lote?.codigo" class="dv__lote-ref">
+                <i class="bi bi-box-seam"></i> {{ it.lote_codigo || it.stock?.lote?.codigo }}
+                <span v-if="!it.stock" class="dv__lote-snap" title="Stock eliminado — dato preservado">(histórico)</span>
+              </span>
+            </div>
+          </div>
+          <!-- Single-stock -->
+          <div v-else class="dv__item-desc">
             <span class="dv__stock-pill">
               {{ FORMA_EMOJI[d.stock?.forma_producto] }} {{ FORMA_LABEL[d.stock?.forma_producto] || d.stock?.forma_producto || '—' }}
             </span>
@@ -226,7 +240,10 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
           </div>
         </div>
         <div class="dv__item-right">
-          <div class="dv__item-cantidad">{{ d.cantidad }}{{ d.stock?.unidad || 'g' }}</div>
+          <div class="dv__item-cantidad">
+            <template v-if="d.multi_stock && d.items?.length">{{ d.items.length }} ítems</template>
+            <template v-else>{{ d.cantidad }}{{ d.stock?.unidad || 'g' }}</template>
+          </div>
           <div v-if="d.aporte_socio_ars" class="dv__item-aporte">{{ fmt(d.aporte_socio_ars) }}</div>
           <div v-if="d.usuario?.nombre" class="dv__item-usuario">{{ d.usuario.nombre }}</div>
         </div>
@@ -308,6 +325,10 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__item-desc { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .15rem; }
 .dv__stock-pill { font-size: .7rem; font-weight: 700; background: rgba(21,128,61,.1); color: #15803d; padding: .2em .65em; border-radius: 6px; }
 .dv__lote-ref { font-size: .7rem; color: #64748b; display: flex; align-items: center; gap: .25rem; }
+/* Multi-stock: líneas del paquete */
+.dv__item-lines { display: flex; flex-direction: column; gap: .25rem; margin-bottom: .15rem; }
+.dv__item-line { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.dv__item-line-qty { font-size: .72rem; font-weight: 700; color: #1b5e20; font-family: monospace; }
 .dv__lote-snap { color: #94a3b8; font-style: italic; }
 .dv__item-obs { font-size: .73rem; color: #94a3b8; font-style: italic; }
 .dv__item-desc-info { font-size: .72rem; color: #b45309; display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }

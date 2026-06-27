@@ -13,7 +13,7 @@ class DispensacionesController < ApplicationController
   def index
     if @paciente
       base  = @paciente.dispensaciones
-                       .includes(:user, :indicacion_medica, :sede, stock: :lote)
+                       .includes(:user, :indicacion_medica, :sede, { stock: :lote }, { items: { stock: :lote } })
                        .recientes
       page  = [params[:pagina].to_i, 1].max
       limit = [[(params[:limite] || 10).to_i, 1].max, 100].min
@@ -26,7 +26,7 @@ class DispensacionesController < ApplicationController
         .joins(stock: :sede)
         .where(sedes: { club_id: current_user.club_id })
         .where(con_envio: true)
-        .includes(:user, :paciente, :sede, :delivery_user, :ruta_entrega, stock: :lote)
+        .includes(:user, :paciente, :sede, :delivery_user, :ruta_entrega, { stock: :lote }, { items: { stock: :lote } })
       scope = scope.where(estado_envio: params[:estado_envio]) if params[:estado_envio].present?
       scope = scope.where(delivery_id: params[:delivery_id])   if params[:delivery_id].present?
       scope = scope.where("fecha_dispensacion >= ?", Date.parse(params[:desde])) if params[:desde].present?
@@ -38,7 +38,7 @@ class DispensacionesController < ApplicationController
       scope = Dispensacion
         .joins(stock: :sede)
         .where(sedes: { club_id: current_user.club_id })
-        .includes(:user, :paciente, :sede, stock: :lote)
+        .includes(:user, :paciente, :sede, { stock: :lote }, { items: { stock: :lote } })
       scope = apply_dispensacion_filters(scope)
       if params[:desde].present? || params[:hasta].present?
         desde = params[:desde].present? ? Date.parse(params[:desde]) : nil
@@ -98,16 +98,24 @@ class DispensacionesController < ApplicationController
 
     # El total lo calcula el server. Solo admin/supervisor pueden pisarlo a mano (override).
     override_admin = (current_user.admin? || current_user.supervisor?) && @dispensacion.aporte_socio_ars.to_d > 0
-    cantidad       = @dispensacion.cantidad.to_d
-    precio_unit_base = @dispensacion.stock&.precio_sugerido_ars.to_d
+    items_param    = params.dig(:dispensacion, :items)
 
-    if precio_unit_base > 0
-      precio_unit_desc = (precio_unit_base * (1 - desc_total / 100)).round(2)
-      @dispensacion.precio_unitario_ars = precio_unit_desc
-      @dispensacion.aporte_socio_ars    = override_admin ? @dispensacion.aporte_socio_ars : (precio_unit_desc * cantidad).round(2)
-    elsif override_admin && cantidad > 0
-      # Stock sin precio configurado: admin fija el total a mano.
-      @dispensacion.precio_unitario_ars ||= (@dispensacion.aporte_socio_ars.to_d / cantidad).round(2)
+    if items_param.present?
+      # ── Multi-stock: una dispensa con varias líneas. El total se suma por línea, cada una
+      #    con el precio de su propio stock (con el descuento total aplicado). ──
+      construir_items_multistock(@dispensacion, items_param, desc_total, override_admin)
+    else
+      cantidad         = @dispensacion.cantidad.to_d
+      precio_unit_base = @dispensacion.stock&.precio_sugerido_ars.to_d
+
+      if precio_unit_base > 0
+        precio_unit_desc = (precio_unit_base * (1 - desc_total / 100)).round(2)
+        @dispensacion.precio_unitario_ars = precio_unit_desc
+        @dispensacion.aporte_socio_ars    = override_admin ? @dispensacion.aporte_socio_ars : (precio_unit_desc * cantidad).round(2)
+      elsif override_admin && cantidad > 0
+        # Stock sin precio configurado: admin fija el total a mano.
+        @dispensacion.precio_unitario_ars ||= (@dispensacion.aporte_socio_ars.to_d / cantidad).round(2)
+      end
     end
 
     @dispensacion.cobrar_en_entrega = ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :cobrar_en_entrega)) || false
@@ -206,7 +214,8 @@ class DispensacionesController < ApplicationController
         end
 
         @dispensacion.save!
-        @dispensacion.send(:decrementar_stock)   # descuenta la cantidad nueva
+        sincronizar_item_legacy!(@dispensacion)  # la línea espejo refleja stock/cantidad nuevos
+        @dispensacion.send(:decrementar_stock)   # descuenta la cantidad nueva (por línea)
         crear_movimiento_contable(@dispensacion)
         debitar_cuenta_corriente(@dispensacion) if @dispensacion.a_credito? && cc
         debitar_gramos(@dispensacion)           if @dispensacion.medio_pago == 'credito_gramos'
@@ -225,7 +234,7 @@ class DispensacionesController < ApplicationController
       .del_delivery(current_user.id)
       .joins(stock: :sede)
       .where(sedes: { club_id: current_user.club_id })
-      .includes(:paciente, :sede, :ruta_entrega, stock: :lote)
+      .includes(:paciente, :sede, :ruta_entrega, { stock: :lote }, { items: { stock: :lote } })
       .order(Arel.sql('orden_entrega NULLS LAST, created_at ASC'))
     render json: { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion_delivery(d) } }
   end
@@ -519,6 +528,40 @@ class DispensacionesController < ApplicationController
       .find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Dispensación no encontrada' }, status: :not_found
+  end
+
+  # Arma las líneas de una dispensa multi-stock: cada `{stock_id, cantidad}` se convierte en un
+  # item con el precio de su propio stock (con el descuento total ya aplicado). El total de la
+  # dispensa es la suma de las líneas; las columnas legacy stock_id/cantidad las espeja el modelo.
+  def construir_items_multistock(disp, lineas, desc_total, override_admin)
+    total = 0.to_d
+    Array(lineas).each do |ln|
+      st   = Stock.find_by(id: ln[:stock_id])
+      cant = ln[:cantidad].to_d
+      next if st.nil? || cant <= 0
+
+      base        = st.precio_sugerido_ars.to_d
+      precio_desc = base > 0 ? (base * (1 - desc_total / 100)).round(2) : 0.to_d
+      disp.items.build(stock: st, cantidad: cant, precio_unitario_ars: precio_desc)
+      total += precio_desc * cant
+    end
+
+    disp.sede_id            ||= disp.items.first&.stock&.sede_id
+    disp.precio_unitario_ars  = disp.items.first&.precio_unitario_ars
+    disp.aporte_socio_ars     = override_admin ? disp.aporte_socio_ars : total.round(2)
+  end
+
+  # Edición legacy (single-stock): vuelca los valores nuevos de la dispensa a su única línea
+  # espejo, para que el descuento por línea sea consistente con la cantidad/stock editados.
+  def sincronizar_item_legacy!(d)
+    item = d.items.first_or_initialize
+    item.update!(
+      stock_id:            d.stock_id,
+      cantidad:            d.cantidad,
+      precio_unitario_ars: d.precio_unitario_ars,
+      lote_codigo:         item.lote_codigo.presence || d.lote_codigo,
+      genetica_nombre:     item.genetica_nombre.presence || d.genetica_nombre,
+    )
   end
 
   def dispensacion_params

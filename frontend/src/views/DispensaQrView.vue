@@ -41,37 +41,72 @@
 
       <!-- Pasaporte -->
       <div v-else-if="estado === 'ok'" class="dqr__pass">
-        <div class="dqr__hero">
-          <span class="dqr__hero-tipo" v-if="data.genetica?.tipo">{{ data.genetica.tipo }}</span>
-          <h1 class="dqr__hero-nombre">{{ data.genetica?.nombre || 'Producto' }}</h1>
-          <p class="dqr__hero-forma">{{ formaLabel(data.forma) }} · {{ data.cantidad }}{{ data.unidad }}</p>
-        </div>
 
-        <!-- Cannabinoides -->
-        <div v-if="data.genetica?.thc_pct != null || data.genetica?.cbd_pct != null" class="dqr__cannab">
-          <div class="dqr__cannab-item">
-            <span class="dqr__cannab-val">{{ fmtPct(data.genetica?.thc_pct) }}</span>
-            <span class="dqr__cannab-lbl">THC</span>
+        <!-- Multi-stock: una tarjeta por producto del paquete -->
+        <template v-if="data.multi && data.items?.length">
+          <div class="dqr__multi-head">Tu paquete · {{ data.items.length }} productos</div>
+          <div v-for="(it, i) in data.items" :key="i" class="dqr__prod-card">
+            <div class="dqr__prod-head">
+              <span class="dqr__hero-tipo" v-if="it.genetica?.tipo">{{ it.genetica.tipo }}</span>
+              <h2 class="dqr__prod-nombre">{{ it.genetica?.nombre || formaLabel(it.forma) }}</h2>
+              <p class="dqr__prod-forma">{{ formaLabel(it.forma) }} · {{ it.cantidad }}{{ it.unidad }}</p>
+            </div>
+            <div v-if="it.genetica?.thc_pct != null || it.genetica?.cbd_pct != null" class="dqr__cannab dqr__cannab--sm">
+              <div class="dqr__cannab-item">
+                <span class="dqr__cannab-val">{{ fmtPct(it.genetica?.thc_pct) }}</span>
+                <span class="dqr__cannab-lbl">THC</span>
+              </div>
+              <div class="dqr__cannab-item">
+                <span class="dqr__cannab-val">{{ fmtPct(it.genetica?.cbd_pct) }}</span>
+                <span class="dqr__cannab-lbl">CBD</span>
+              </div>
+            </div>
+            <div v-if="it.genetica?.terpenos" class="dqr__terp">
+              <span class="dqr__terp-lbl">Terpenos</span>
+              <span class="dqr__terp-val">{{ it.genetica.terpenos }}</span>
+            </div>
+            <div v-if="it.lote" class="dqr__prod-lote"><span>Lote</span> <span class="dqr__mono">{{ it.lote }}</span></div>
           </div>
-          <div class="dqr__cannab-item">
-            <span class="dqr__cannab-val">{{ fmtPct(data.genetica?.cbd_pct) }}</span>
-            <span class="dqr__cannab-lbl">CBD</span>
+          <dl class="dqr__rows">
+            <div class="dqr__row"><dt>Fecha de dispensa</dt><dd>{{ fmtFecha(data.fecha) }}</dd></div>
+            <div class="dqr__row" v-if="data.socio_numero"><dt>Socio</dt><dd>#{{ data.socio_numero }}</dd></div>
+          </dl>
+        </template>
+
+        <!-- Single-stock -->
+        <template v-else>
+          <div class="dqr__hero">
+            <span class="dqr__hero-tipo" v-if="data.genetica?.tipo">{{ data.genetica.tipo }}</span>
+            <h1 class="dqr__hero-nombre">{{ data.genetica?.nombre || 'Producto' }}</h1>
+            <p class="dqr__hero-forma">{{ formaLabel(data.forma) }} · {{ data.cantidad }}{{ data.unidad }}</p>
           </div>
-        </div>
 
-        <div v-if="data.genetica?.terpenos" class="dqr__terp">
-          <span class="dqr__terp-lbl">Terpenos</span>
-          <span class="dqr__terp-val">{{ data.genetica.terpenos }}</span>
-        </div>
+          <!-- Cannabinoides -->
+          <div v-if="data.genetica?.thc_pct != null || data.genetica?.cbd_pct != null" class="dqr__cannab">
+            <div class="dqr__cannab-item">
+              <span class="dqr__cannab-val">{{ fmtPct(data.genetica?.thc_pct) }}</span>
+              <span class="dqr__cannab-lbl">THC</span>
+            </div>
+            <div class="dqr__cannab-item">
+              <span class="dqr__cannab-val">{{ fmtPct(data.genetica?.cbd_pct) }}</span>
+              <span class="dqr__cannab-lbl">CBD</span>
+            </div>
+          </div>
 
-        <!-- Datos -->
-        <dl class="dqr__rows">
-          <div class="dqr__row"><dt>Fecha de dispensa</dt><dd>{{ fmtFecha(data.fecha) }}</dd></div>
-          <div class="dqr__row" v-if="data.lote"><dt>Lote</dt><dd class="dqr__mono">{{ data.lote }}</dd></div>
-          <div class="dqr__row" v-if="data.vencimiento"><dt>Vencimiento est.</dt><dd>{{ fmtFecha(data.vencimiento) }}</dd></div>
-          <div class="dqr__row" v-if="data.socio_numero"><dt>Socio</dt><dd>#{{ data.socio_numero }}</dd></div>
-          <div class="dqr__row" v-if="data.genetica?.registrada_inase"><dt>INASE</dt><dd>{{ data.genetica.numero_registro_inase || 'Registrada' }}</dd></div>
-        </dl>
+          <div v-if="data.genetica?.terpenos" class="dqr__terp">
+            <span class="dqr__terp-lbl">Terpenos</span>
+            <span class="dqr__terp-val">{{ data.genetica.terpenos }}</span>
+          </div>
+
+          <!-- Datos -->
+          <dl class="dqr__rows">
+            <div class="dqr__row"><dt>Fecha de dispensa</dt><dd>{{ fmtFecha(data.fecha) }}</dd></div>
+            <div class="dqr__row" v-if="data.lote"><dt>Lote</dt><dd class="dqr__mono">{{ data.lote }}</dd></div>
+            <div class="dqr__row" v-if="data.vencimiento"><dt>Vencimiento est.</dt><dd>{{ fmtFecha(data.vencimiento) }}</dd></div>
+            <div class="dqr__row" v-if="data.socio_numero"><dt>Socio</dt><dd>#{{ data.socio_numero }}</dd></div>
+            <div class="dqr__row" v-if="data.genetica?.registrada_inase"><dt>INASE</dt><dd>{{ data.genetica.numero_registro_inase || 'Registrada' }}</dd></div>
+          </dl>
+        </template>
 
         <p class="dqr__foot">{{ club?.nombre }} · Trazabilidad verificada</p>
       </div>
@@ -194,6 +229,16 @@ onMounted(async () => {
 .dqr__hero-tipo { display: inline-block; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-leaf-700, #2d4a3e); background: var(--c-leaf-100, #e8f0eb); padding: .2em .7em; border-radius: 999px; }
 .dqr__hero-nombre { font-family: var(--font-display, sans-serif); font-size: 1.5rem; font-weight: 700; color: var(--c-ink-900, #1a1d1f); margin: .4rem 0 .15rem; }
 .dqr__hero-forma { font-size: .85rem; color: var(--c-ink-500, #6b7280); margin: 0; }
+
+/* Multi-stock */
+.dqr__multi-head { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-ink-500, #6b7280); margin-bottom: .8rem; }
+.dqr__prod-card { background: #fff; border: 1px solid var(--c-leaf-100, #e8f0eb); border-radius: 16px; padding: 1rem; margin-bottom: .8rem; }
+.dqr__prod-head { text-align: center; margin-bottom: .7rem; }
+.dqr__prod-nombre { font-family: var(--font-display, sans-serif); font-size: 1.2rem; font-weight: 700; color: var(--c-ink-900, #1a1d1f); margin: .35rem 0 .1rem; }
+.dqr__prod-forma { font-size: .8rem; color: var(--c-ink-500, #6b7280); margin: 0; }
+.dqr__cannab--sm .dqr__cannab-val { font-size: 1.2rem; }
+.dqr__prod-lote { display: flex; align-items: center; justify-content: space-between; margin-top: .7rem; padding-top: .6rem; border-top: 1px solid var(--c-leaf-100, #e8f0eb); font-size: .8rem; color: var(--c-ink-500, #6b7280); }
+.dqr__prod-lote .dqr__mono { font-weight: 600; color: var(--c-ink-900, #1a1d1f); }
 
 .dqr__cannab { display: flex; gap: .7rem; margin-bottom: .9rem; }
 .dqr__cannab-item { flex: 1; background: #fff; border: 1px solid var(--c-leaf-100, #e8f0eb); border-radius: 14px; padding: .8rem; text-align: center; }
