@@ -5,7 +5,8 @@ import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
-import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores } from '../../lib/api.js'
+import { createReserva, entregarReserva, listStocks, listEntregadores } from '../../lib/api.js'
+import { dispensarOffline } from '../../lib/offlineApi.js'
 
 const props = defineProps({
   modelValue:     { type: Boolean, required: true },
@@ -17,6 +18,8 @@ const props = defineProps({
   // Si viene una reserva, el modal entra en modo "entregar reserva": convierte la
   // reserva en una dispensación (cobra el resto = total − seña).
   reserva:        { type: Object,  default: null },
+  // Modo en el que se abre: 'dispensa' (carrito) o 'reserva'. Solo aplica si puede reservar.
+  modoInicial:    { type: String,  default: 'dispensa' },
 })
 
 const modoReserva   = computed(() => !!props.reserva)
@@ -37,6 +40,13 @@ const esAdminoSup = computed(() =>
 const puedeVerCredito       = esAdminoSup
 const puedeEditarAporte     = esAdminoSup
 const puedeVerDescPaciente  = esAdminoSup
+// Reservas: solo admin/supervisor. El dispensador no ve el toggle de reserva.
+const puedeReservar         = esAdminoSup
+
+// Carrito multi-item de la dispensa inmediata: cada línea es un stock + cantidad. El total
+// es la suma y el descuento se aplica sobre ella. Las reservas siguen siendo de un producto.
+const items = ref([])
+const esDispensaInmediata = computed(() => !modoReserva.value && !form.value.es_reserva)
 
 const stocks          = ref([])
 const loadingStocks   = ref(false)
@@ -97,7 +107,11 @@ const estadoCc = computed(() => {
 
 const excederiaStock = computed(() => {
   if (!stockSeleccionado.value || !form.value.cantidad) return false
-  return parseFloat(form.value.cantidad) > stockSeleccionado.value.cantidad
+  // En el carrito ya puede haber líneas del mismo stock: descontalas del disponible.
+  const yaEnCarrito = items.value
+    .filter(it => it.stock.id === stockSeleccionado.value.id)
+    .reduce((a, it) => a + it.cantidad, 0)
+  return parseFloat(form.value.cantidad) + yaEnCarrito > stockSeleccionado.value.cantidad
 })
 
 const fmt = n => n == null ? '—' :
@@ -117,6 +131,39 @@ async function cargarStocks() {
   } catch { stocks.value = [] }
   finally { loadingStocks.value = false }
 }
+
+// ── Carrito multi-item (dispensa inmediata) ──────────────────────────────────────
+// Subtotal de una línea con el precio sugerido del stock (sin descuento; el descuento
+// se muestra sobre el total). 0 si el stock no tiene precio configurado.
+function subtotalItem(it) {
+  return (Number(it.stock.precio_sugerido_ars) || 0) * it.cantidad
+}
+
+// Agrega la línea en edición (stock seleccionado + cantidad) al carrito.
+function agregarItem() {
+  const s = stockSeleccionado.value
+  if (!s) { formError.value = 'Elegí un stock para agregar'; return }
+  const cant = parseFloat(form.value.cantidad)
+  if (!cant || cant <= 0) { formError.value = 'Ingresá una cantidad válida'; return }
+  const yaEnCarrito = items.value.filter(it => it.stock.id === s.id).reduce((a, it) => a + it.cantidad, 0)
+  if (cant + yaEnCarrito > s.cantidad) {
+    formError.value = `Stock insuficiente: ${(s.cantidad - yaEnCarrito).toFixed(2)}${s.unidad || 'g'} disponibles`
+    return
+  }
+  // El dispensador no puede dispensar stock sin precio (no fija precios).
+  if (!(Number(s.precio_sugerido_ars) > 0) && !puedeEditarAporte.value) {
+    formError.value = 'Ese stock no tiene precio configurado. Pedile al administrador que lo cargue.'
+    return
+  }
+  const existente = items.value.find(it => it.stock.id === s.id)
+  if (existente) existente.cantidad = Number((existente.cantidad + cant).toFixed(3))
+  else items.value.push({ stock: s, cantidad: cant })
+  form.value.stock_id = null
+  form.value.cantidad = null
+  formError.value = null
+}
+
+function quitarItem(i) { items.value.splice(i, 1) }
 
 async function cargarDeliveryUsers() {
   if (deliveryUsers.value.length) return
@@ -162,6 +209,13 @@ const stockSeleccionado    = computed(() => stocks.value.find(s => s.id === form
 const necesitaPrecioManual = computed(() => stockSeleccionado.value != null && !stockSeleccionado.value.precio_sugerido_ars)
 
 const precioBase = computed(() => {
+  // Dispensa inmediata: suma del carrito (cada línea por su precio sugerido).
+  if (esDispensaInmediata.value) {
+    if (!items.value.length) return null
+    const total = items.value.reduce((a, it) => a + (Number(it.stock.precio_sugerido_ars) || 0) * it.cantidad, 0)
+    return total > 0 ? total : null
+  }
+  // Reserva / entregar reserva: un solo producto (con precio manual si el stock no tiene).
   const s   = stockSeleccionado.value
   const cnt = parseFloat(form.value.cantidad) || 0
   if (!s || cnt <= 0) return null
@@ -188,6 +242,7 @@ watch(precioFinal, (val) => { if (val != null) form.value.aporte_socio_ars = Mat
 watch(() => props.modelValue, (open) => {
   if (open) {
     form.value = emptyForm()
+    items.value = []
     precioUnitarioManual.value = null
     formError.value = null
     deliveryUsers.value = []
@@ -198,6 +253,9 @@ watch(() => props.modelValue, (open) => {
       form.value.stock_id   = props.reserva.stock?.id ?? props.reserva.stock_id ?? null
       form.value.cantidad   = Number(props.reserva.cantidad) || null
       form.value.medio_pago = 'efectivo'
+    } else if (props.modoInicial === 'reserva' && puedeReservar.value) {
+      // Abierto desde el botón "Reservar" (admin/supervisor).
+      form.value.es_reserva = true
     }
   }
 }, { immediate: true })
@@ -221,13 +279,18 @@ async function handleSubmit() {
   saving.value = true
   formError.value = null
 
-  if (!form.value.stock_id) { formError.value = 'Seleccioná un stock'; saving.value = false; return }
-  if (!form.value.cantidad || form.value.cantidad <= 0) { formError.value = 'La cantidad debe ser > 0'; saving.value = false; return }
-  // En modo reserva el backend libera el stock apartado de la propia reserva, así que
-  // no aplicamos el chequeo de disponible local (mostraría de menos por su propio hold).
-  if (!modoReserva.value && excederiaStock.value) {
-    formError.value = `Stock insuficiente: solo hay ${stockSeleccionado.value.cantidad}${stockSeleccionado.value.unidad || 'g'} disponibles`
-    saving.value = false; return
+  // Dispensa inmediata: validamos el carrito. Reserva / entregar reserva: un solo producto.
+  if (esDispensaInmediata.value) {
+    if (!items.value.length) { formError.value = 'Agregá al menos un producto al carrito'; saving.value = false; return }
+  } else {
+    if (!form.value.stock_id) { formError.value = 'Seleccioná un stock'; saving.value = false; return }
+    if (!form.value.cantidad || form.value.cantidad <= 0) { formError.value = 'La cantidad debe ser > 0'; saving.value = false; return }
+    // En modo reserva el backend libera el stock apartado de la propia reserva, así que
+    // no aplicamos el chequeo de disponible local (mostraría de menos por su propio hold).
+    if (!modoReserva.value && excederiaStock.value) {
+      formError.value = `Stock insuficiente: solo hay ${stockSeleccionado.value.cantidad}${stockSeleccionado.value.unidad || 'g'} disponibles`
+      saving.value = false; return
+    }
   }
 
   // ── Rama ENTREGAR RESERVA: convierte la reserva en dispensación, cobra el resto ──
@@ -303,9 +366,9 @@ async function handleSubmit() {
   }
   // Aporte obligatorio para todos los medios de pago
   if (!(Number(form.value.aporte_socio_ars) > 0)) {
-    const sinPrecio = stockSeleccionado.value && !(stockSeleccionado.value.precio_sugerido_ars > 0)
+    const sinPrecio = items.value.some(it => !(Number(it.stock.precio_sugerido_ars) > 0))
     formError.value = sinPrecio
-      ? 'El stock no tiene precio configurado. Pedile al administrador que lo configure.'
+      ? 'Hay un producto sin precio configurado. Pedile al administrador que lo cargue.'
       : 'El aporte del socio debe ser mayor a $0.'
     saving.value = false; return
   }
@@ -333,7 +396,9 @@ async function handleSubmit() {
 
   try {
     const payload = {
-      stock_id: form.value.stock_id, cantidad: form.value.cantidad,
+      // Multi-item: una dispensa con varias líneas. El backend recalcula el precio de cada
+      // línea (con el descuento del socio) y suma el total.
+      items: items.value.map(it => ({ stock_id: it.stock.id, cantidad: it.cantidad })),
       fecha_dispensacion: form.value.fecha_dispensacion,
       observaciones: form.value.observaciones || undefined,
       medio_pago: cobraDelivery.value ? undefined : form.value.medio_pago, con_envio: form.value.con_envio,
@@ -341,13 +406,9 @@ async function handleSubmit() {
       descuento_dispensa_pct: descDispensaPct.value,
     }
     // El total lo calcula el server (descuento paciente + dispensa). Solo admin/supervisor
-    // pueden pisar el aporte a mano; el dispensador no manda aporte.
+    // pueden pisar el aporte a mano (sobre el total del carrito); el dispensador no manda aporte.
     if (puedeEditarAporte.value && form.value.aporte_socio_ars != null && form.value.aporte_socio_ars !== '')
       payload.aporte_socio_ars = Number(form.value.aporte_socio_ars).toFixed(2)
-    // Stock sin precio configurado: si admin cargó precio manual, lo mandamos como override.
-    if (puedeEditarAporte.value && necesitaPrecioManual.value && precioUnitarioManual.value > 0) {
-      payload.precio_unitario_ars = (parseFloat(precioUnitarioManual.value) * (1 - descTotalPct.value / 100)).toFixed(2)
-    }
     if (form.value.con_envio) {
       payload.cobrar_en_entrega = cobraDelivery.value
       payload.delivery_id       = form.value.delivery_id
@@ -362,9 +423,11 @@ async function handleSubmit() {
       payload.contacto_telefono = form.value.contacto_telefono || undefined
       payload.notas_envio       = form.value.notas_envio || undefined
     }
-    await createDispensacion(props.socioId, payload)
+    const res = await dispensarOffline(props.socioId, payload)
     cerrar()
-    toast.success('Dispensación registrada')
+    toast[res?.queued ? 'warning' : 'success'](
+      res?.queued ? 'Dispensación guardada localmente — se enviará al reconectarse.' : 'Dispensación registrada'
+    )
     emit('saved')
   } catch (e) {
     const msg = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al guardar'
@@ -399,8 +462,8 @@ async function handleSubmit() {
             </span>
           </div>
 
-          <!-- Tipo: entrega inmediata o reserva -->
-          <div v-if="!modoReserva" class="mnd__segmented">
+          <!-- Tipo: entrega inmediata o reserva (reservas solo admin/supervisor) -->
+          <div v-if="!modoReserva && puedeReservar" class="mnd__segmented">
             <button type="button" class="mnd__seg-btn" :class="{ 'mnd__seg-btn--active': !form.es_reserva }" @click="form.es_reserva = false">
               <i class="bi bi-bag-check"></i> Entrega inmediata
             </button>
@@ -425,7 +488,7 @@ async function handleSubmit() {
           </template>
 
           <!-- Stock -->
-          <div v-if="!modoReserva" class="mnd__section-label">Stock a dispensar <span class="mnd__req">*</span></div>
+          <div v-if="!modoReserva" class="mnd__section-label">{{ esDispensaInmediata ? 'Agregar producto' : 'Stock a reservar' }} <span class="mnd__req">*</span></div>
           <div v-if="modoReserva"></div>
           <div v-else-if="loadingStocks" class="mnd__loading-inline"><DsSpinner :size="13" /> Cargando stocks…</div>
           <div v-else-if="!stocksDisponibles.length" class="mnd__warn-box">
@@ -457,8 +520,8 @@ async function handleSubmit() {
             </button>
           </div>
 
-          <!-- Precio manual -->
-          <div v-if="!modoReserva && necesitaPrecioManual" class="mnd__field">
+          <!-- Precio manual (solo al reservar un stock sin precio) -->
+          <div v-if="form.es_reserva && necesitaPrecioManual" class="mnd__field">
             <label class="mnd__label">
               Precio por {{ stockSeleccionado?.unidad || 'g' }}
               <span class="mnd__opt">solo para el cálculo — no se guarda</span>
@@ -472,7 +535,7 @@ async function handleSubmit() {
 
           <div v-if="!modoReserva" class="mnd__divider"></div>
 
-          <!-- Cantidad + descuento -->
+          <!-- Cantidad: en dispensa inmediata se carga y se "Agrega" al carrito; en reserva es único -->
           <div v-if="!modoReserva" class="mnd__form-row">
             <div class="mnd__field">
               <label class="mnd__label">Cantidad <span class="mnd__req">*</span></label>
@@ -480,7 +543,8 @@ async function handleSubmit() {
                 <input v-model.number="form.cantidad" type="number" step="0.01" min="0.01"
                        class="mnd__input mnd__input--with-suffix"
                        :class="{ 'mnd__input--error': excederiaStock }"
-                       placeholder="0" />
+                       placeholder="0"
+                       @keyup.enter="esDispensaInmediata && agregarItem()" />
                 <span class="mnd__input-suffix">{{ stockSeleccionado?.unidad || 'g' }}</span>
               </div>
               <span v-if="excederiaStock" class="mnd__field-error">
@@ -490,13 +554,45 @@ async function handleSubmit() {
                 Disponible: {{ stockSeleccionado.cantidad }}{{ stockSeleccionado.unidad || 'g' }}
               </span>
             </div>
-            <div class="mnd__field">
+            <!-- Inmediata: sumar la línea al carrito. Reserva: descuento al lado. -->
+            <div v-if="esDispensaInmediata" class="mnd__field mnd__add-field">
+              <label class="mnd__label">&nbsp;</label>
+              <button type="button" class="mnd__add-item"
+                      :disabled="!form.stock_id || !form.cantidad || excederiaStock" @click="agregarItem">
+                <i class="bi bi-plus-lg"></i> Agregar item
+              </button>
+            </div>
+            <div v-else class="mnd__field">
               <label class="mnd__label">Descuento <span class="mnd__opt">esta dispensa</span></label>
               <div class="mnd__input-suffix-wrap">
                 <input v-model.number="form.descuento_pct" type="number" step="1" min="0" max="100"
                        class="mnd__input mnd__input--with-suffix" placeholder="0" />
                 <span class="mnd__input-suffix">%</span>
               </div>
+            </div>
+          </div>
+
+          <!-- Carrito de la dispensa (multi-item) -->
+          <div v-if="esDispensaInmediata && items.length" class="mnd__cart">
+            <div class="mnd__section-label">Carrito · {{ items.length }} {{ items.length === 1 ? 'producto' : 'productos' }}</div>
+            <div v-for="(it, i) in items" :key="i" class="mnd__cart-item">
+              <span class="mnd__cart-emoji">{{ FORMA_EMOJI[it.stock.forma_producto] || '📦' }}</span>
+              <span class="mnd__cart-info">
+                <span class="mnd__cart-nombre">{{ FORMA_LABEL[it.stock.forma_producto] || it.stock.forma_producto }}</span>
+                <span class="mnd__cart-qty">{{ it.cantidad }}{{ it.stock.unidad || 'g' }}</span>
+              </span>
+              <span class="mnd__cart-sub">{{ subtotalItem(it) > 0 ? fmt(subtotalItem(it)) : 'sin precio' }}</span>
+              <button type="button" class="mnd__cart-rm" @click="quitarItem(i)" title="Quitar"><i class="bi bi-x-lg"></i></button>
+            </div>
+          </div>
+
+          <!-- Descuento global (dispensa inmediata): aplica a la suma del carrito -->
+          <div v-if="esDispensaInmediata" class="mnd__field">
+            <label class="mnd__label">Descuento <span class="mnd__opt">esta dispensa — sobre el total</span></label>
+            <div class="mnd__input-suffix-wrap mnd__desc-input">
+              <input v-model.number="form.descuento_pct" type="number" step="1" min="0" max="100"
+                     class="mnd__input mnd__input--with-suffix" placeholder="0" />
+              <span class="mnd__input-suffix">%</span>
             </div>
           </div>
 
@@ -702,7 +798,7 @@ async function handleSubmit() {
 
         <div class="mnd__modal-footer">
           <button class="mnd__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
-          <button class="mnd__btn-primary" :disabled="saving || !form.stock_id || (!form.es_reserva && !modoReserva && ccInsuficiente)" @click="handleSubmit">
+          <button class="mnd__btn-primary" :disabled="saving || (esDispensaInmediata ? !items.length : !form.stock_id) || (esDispensaInmediata && ccInsuficiente)" @click="handleSubmit">
             <DsSpinner v-if="saving" :size="14" />
             <i v-else class="bi" :class="form.es_reserva ? 'bi-bookmark-star' : 'bi-check-lg'"></i>
             {{ modoReserva ? 'Entregar reserva' : (form.es_reserva ? 'Crear reserva' : 'Registrar dispensación') }}
@@ -752,6 +848,22 @@ async function handleSubmit() {
 .mnd__stock-precio { font-size: .7rem; color: #64748b; font-family: monospace; white-space: nowrap; }
 .mnd__stock-check { color: #1b5e20; font-size: .9rem; flex-shrink: 0; }
 .mnd__warn-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; color: #92400e; display: flex; align-items: center; gap: .4rem; }
+
+/* Agregar item + carrito */
+.mnd__add-field { justify-content: flex-start; }
+.mnd__add-item { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; border-radius: 9px; padding: .6rem .8rem; font-size: .82rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.mnd__add-item:hover:not(:disabled) { background: #144a18; }
+.mnd__add-item:disabled { opacity: .45; cursor: not-allowed; }
+.mnd__desc-input { max-width: 140px; }
+.mnd__cart { display: flex; flex-direction: column; gap: .35rem; }
+.mnd__cart-item { display: flex; align-items: center; gap: .6rem; padding: .5rem .7rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 9px; }
+.mnd__cart-emoji { font-size: 1rem; flex-shrink: 0; }
+.mnd__cart-info { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.mnd__cart-nombre { font-size: .82rem; font-weight: 700; color: #0f172a; }
+.mnd__cart-qty { font-size: .75rem; font-family: monospace; color: #15803d; font-weight: 700; }
+.mnd__cart-sub { font-size: .8rem; font-weight: 700; color: #166534; font-family: monospace; white-space: nowrap; }
+.mnd__cart-rm { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 2px 4px; display: flex; border-radius: 5px; }
+.mnd__cart-rm:hover { color: #dc2626; background: #fef2f2; }
 
 /* Form */
 .mnd__divider { height: 1px; background: #f1f5f9; }

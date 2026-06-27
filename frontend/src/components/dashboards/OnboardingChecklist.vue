@@ -204,7 +204,7 @@ const CHECKLISTS = {
         'Confirmá — queda registrada con fecha, hora y operador.',
       ],
       tip: 'Cada dispensación se guarda automáticamente en el historial del socio y en el libro contable.',
-      ruta: '/dispensar',
+      ruta: '/historial',
       rutaLabel: 'Nueva dispensación',
     },
     {

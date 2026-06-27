@@ -6,7 +6,7 @@
         <h1 class="dd__title">{{ saludo }}, {{ auth.user?.first_name || auth.displayName }}</h1>
         <p class="dd__subtitle">{{ fechaHoy }}</p>
       </div>
-      <RouterLink to="/dispensar" class="dd__cta">
+      <RouterLink to="/historial" class="dd__cta">
         <PackagePlus :size="16" :stroke-width="1.75" />
         Nueva dispensación
       </RouterLink>

@@ -1,6 +1,5 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { logger } from '../../utils/logger.js'
 import { useAuthStore } from '../../stores/auth'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -30,6 +29,7 @@ const { imprimirEtiqueta } = useEtiquetaDispensa()
 const dispensaciones = ref([])
 const loading        = ref(true)
 const showModal      = ref(false)
+const modoModal      = ref('dispensa')   // 'dispensa' | 'reserva'
 
 // Paginación del historial (10 por página)
 const pagina    = ref(1)
@@ -40,17 +40,11 @@ const totalPaginas = computed(() => Math.max(1, Math.ceil((meta.value.total || 0
 const editModal  = ref(false)
 const editTarget = ref(null)
 
-const router = useRouter()
-// Dispensar (inmediato) → motor único /dispensar. Reservas → solo admin/supervisor (por ahora).
+// Dispensar (inmediato): admin/dispensador. Reservas: solo admin/supervisor (por ahora).
 const canDispensar = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
 const canReservar  = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 const canDelete = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
 const canEdit   = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
-
-// Lleva al motor de dispensado con el socio precargado (carrito multi-item + offline).
-function irADispensar() {
-  router.push({ path: '/dispensar', query: { paciente: props.socioId } })
-}
 
 const fmt = n => n == null ? '—' :
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(n)
@@ -67,7 +61,7 @@ const FORMA_EMOJI = {
   preroll: '🚬', crema: '💊', descarte: '🗑️', otro: '📦',
 }
 
-function openCreate() { showModal.value = true }
+function openCreate(modo = 'dispensa') { modoModal.value = modo; showModal.value = true }
 
 async function onDispensacionGuardada() {
   await loadDispensaciones()
@@ -171,11 +165,11 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
         </div>
       </div>
       <div class="dv__header-actions">
-        <button v-if="canReservar" class="dv__btn-ghost" @click="openCreate">
+        <button v-if="canReservar" class="dv__btn-ghost" @click="openCreate('reserva')">
           <i class="bi bi-bookmark-star"></i> Reservar
         </button>
-        <button v-if="canDispensar" class="dv__btn-primary" @click="irADispensar">
-          <i class="bi bi-plus-lg"></i> Dispensar
+        <button v-if="canDispensar" class="dv__btn-primary" @click="openCreate('dispensa')">
+          <i class="bi bi-plus-lg"></i> Nueva dispensación
         </button>
       </div>
     </div>
@@ -208,8 +202,8 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
     <div v-else-if="!dispensaciones.length" class="dv__empty">
       <div class="dv__empty-icon"><i class="bi bi-capsule"></i></div>
       <div class="dv__empty-title">Sin dispensaciones registradas</div>
-      <button v-if="canDispensar" class="dv__btn-primary" @click="irADispensar" style="margin-top:.75rem">
-        <i class="bi bi-plus-lg"></i> Dispensar
+      <button v-if="canDispensar" class="dv__btn-primary" @click="openCreate('dispensa')" style="margin-top:.75rem">
+        <i class="bi bi-plus-lg"></i> Nueva dispensación
       </button>
     </div>
 
@@ -298,6 +292,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       :saldo-cc="props.saldoCc"
       :limite-cc="props.limiteCc"
       :descuento-porcentaje="props.descuentoPorcentaje"
+      :modo-inicial="modoModal"
       @saved="onDispensacionGuardadaConReservas"
     />
 

@@ -106,7 +106,6 @@ function openHelp() {
 }
 
 const SEGMENT_LABELS = {
-  dispensar: 'Dispensar',
   historial: 'Historial',
   stock:     'Stock',
   pacientes: 'Pacientes',

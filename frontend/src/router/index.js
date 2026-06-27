@@ -628,17 +628,8 @@ const routes = [
   },
 
   // ── Dispensador routes ──
-  {
-    path: '/dispensar',
-    name: 'dispensar',
-    component: () => import('../views/DispensarView.vue'),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore()
-      if (auth.user?.role === 'dispensador' || auth.user?.role === 'admin') next()
-      else next('/')
-    },
-  },
+  // (Se eliminó /dispensar: el dispensado ahora vive en el modal de la ficha del socio
+  //  y del historial — ver ModalNuevaDispensacion, con carrito multi-item.)
   {
     path: '/historial',
     name: 'historial-dispensaciones',
