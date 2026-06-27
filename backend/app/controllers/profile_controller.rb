@@ -41,7 +41,7 @@ class ProfileController < ApplicationController
   private
 
   def profile_params
-    params.require(:user).permit(:first_name, :last_name, :dni, :birth_date, :email, :phone)
+    params.require(:user).permit(:first_name, :last_name, :dni, :birth_date, :email, :email_personal, :phone)
   end
 
   def password_params
@@ -52,6 +52,7 @@ class ProfileController < ApplicationController
     {
       id: u.id,
       email: u.email,
+      email_personal: u.email_personal,
       role: u.role,
       club_id: u.club_id,
       first_name: u.first_name,

@@ -22,12 +22,13 @@ const showNew       = ref(false)
 const showConfirm   = ref(false)
 
 const form = reactive({
-  first_name: '',
-  last_name:  '',
-  dni:        '',
-  birth_date: '',
-  email:      '',
-  phone:      '',
+  first_name:     '',
+  last_name:      '',
+  dni:            '',
+  birth_date:     '',
+  email:          '',
+  email_personal: '',
+  phone:          '',
 })
 
 const pass = reactive({
@@ -84,6 +85,7 @@ async function fetchProfile() {
       dni:        me.value.dni        || '',
       birth_date: me.value.birth_date || '',
       email:      me.value.email      || '',
+      email_personal: me.value.email_personal || '',
       phone:      me.value.phone      || '',
     })
     avatarPreview.value = me.value.avatar_url || null
@@ -275,9 +277,14 @@ onMounted(fetchProfile)
                 <input v-model.trim="form.phone" class="pfl__input" placeholder="+54 9 11..." />
               </div>
               <div class="pfl__field pfl__field--full">
-                <label class="pfl__label">Email <span class="pfl__required">*</span></label>
-                <input v-model.trim="form.email" type="email" class="pfl__input" placeholder="tu@email.com" />
-                <div class="pfl__hint">Cambiar el email afecta tu acceso al sistema.</div>
+                <label class="pfl__label">Usuario de ingreso <span class="pfl__required">*</span></label>
+                <input v-model.trim="form.email" type="email" class="pfl__input" placeholder="rol@nombreclub.com" />
+                <div class="pfl__hint">Es con lo que iniciás sesión. Cambiarlo afecta tu acceso.</div>
+              </div>
+              <div class="pfl__field">
+                <label class="pfl__label">Email personal</label>
+                <input v-model.trim="form.email_personal" type="email" class="pfl__input" placeholder="tu@gmail.com" />
+                <div class="pfl__hint">Tu mail real, donde el club puede contactarte.</div>
               </div>
             </div>
           </div>
