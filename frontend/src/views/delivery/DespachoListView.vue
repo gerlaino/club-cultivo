@@ -11,13 +11,15 @@ import {
 import {
   listDespachos, listEntregadores, reasignarDelivery, reprogramarPaquete,
   listReservas, entregarReserva, entregarPaquete, reportarFallo, cancelarEntregaDispensacion,
-  getRutaEntrega, ordenarRuta, bloquearRuta, assetUrl,
+  getRutaEntrega, ordenarRuta, bloquearRuta, assetUrl, iniciarViaje,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import { useAuthStore } from '../../stores/auth'
 
 const toast = useToast()
 const { confirm } = useConfirm()
+const auth = useAuthStore()
 
 const despachos      = ref([])
 const deliveryUsers  = ref([])
@@ -385,6 +387,18 @@ async function reprogramar(id) {
     toast.success('Paquete reprogramado — volvió a Pendiente')
   } catch { toast.error('Error al reprogramar') }
   finally { reprogramando.value = false }
+}
+
+// Iniciar viaje desde Despachos cuando el admin/supervisor se autoasignó el envío (club sin
+// delivery). Dispara las alertas al paciente ("sos el próximo" / "empezó el recorrido"), que
+// se perdían al marcar "entregado" directo desde pendiente. El backend scopea por current_user,
+// así que solo afecta despachos propios.
+async function iniciarViajeDespacho(d) {
+  try {
+    await iniciarViaje([d.id])
+    await load()
+    toast.success('Viaje iniciado — se avisó al paciente')
+  } catch { toast.error('No se pudo iniciar el viaje') }
 }
 
 const route = useRoute()
@@ -782,6 +796,9 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
                   Acciones <ChevronDown :size="13" :stroke-width="2" />
                 </button>
                 <div v-if="menuAbierto === d.id" class="dsp__acc-menu">
+                  <button v-if="d.estado_envio === 'pendiente' && d.delivery_id === auth.user?.id" class="dsp__acc-item" @click="cerrarMenu(); iniciarViajeDespacho(d)">
+                    <ArrowRight :size="14" :stroke-width="2" /> Iniciar viaje
+                  </button>
                   <button v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)" class="dsp__acc-item" @click="cerrarMenu(); abrirEntrega(d)">
                     <CheckCircle2 :size="14" :stroke-width="2" /> Completar entrega
                   </button>
