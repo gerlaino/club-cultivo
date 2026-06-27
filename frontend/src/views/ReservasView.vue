@@ -48,13 +48,16 @@
           <td class="rsv__actions">
             <template v-if="r.estado === 'pendiente'">
               <button class="rsv__btn rsv__btn--primary" :disabled="busy === r.id" @click="abrirEntrega(r)">Entregar</button>
-              <button class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="abrirEdicion(r)" title="Editar"><i class="bi bi-pencil"></i></button>
-              <!-- Con seña: cancelar (preserva el asiento como ingreso) o anular seña (revierte el asiento + crédito de CC). Sin seña: eliminar (borrado limpio). -->
-              <template v-if="r.sena_ars > 0">
-                <button class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="cancelar(r)" title="Cancelar (libera stock; la seña queda como ingreso, no se reembolsa)">Cancelar</button>
-                <button class="rsv__btn rsv__btn--danger" :disabled="busy === r.id" @click="anularSena(r)" title="Anular seña: revierte el asiento contable y el crédito de cuenta corriente">Anular seña</button>
+              <!-- Gestión de la reserva: solo admin/supervisor. -->
+              <template v-if="canGestionarReservas">
+                <button class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="abrirEdicion(r)" title="Editar"><i class="bi bi-pencil"></i></button>
+                <!-- Con seña: cancelar (preserva el asiento como ingreso) o anular seña (revierte el asiento + crédito de CC). Sin seña: eliminar (borrado limpio). -->
+                <template v-if="r.sena_ars > 0">
+                  <button class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="cancelar(r)" title="Cancelar (libera stock; la seña queda como ingreso, no se reembolsa)">Cancelar</button>
+                  <button class="rsv__btn rsv__btn--danger" :disabled="busy === r.id" @click="anularSena(r)" title="Anular seña: revierte el asiento contable y el crédito de cuenta corriente">Anular seña</button>
+                </template>
+                <button v-else class="rsv__btn rsv__btn--danger" :disabled="busy === r.id" @click="eliminar(r)" title="Eliminar (libera stock)"><i class="bi bi-trash3"></i></button>
               </template>
-              <button v-else class="rsv__btn rsv__btn--danger" :disabled="busy === r.id" @click="eliminar(r)" title="Eliminar (libera stock)"><i class="bi bi-trash3"></i></button>
             </template>
           </td>
         </tr>
@@ -115,9 +118,15 @@ import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensaci
 import { listReservas, cancelarReserva, anularSenaReserva, updateReserva, deleteReserva } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import { useAuthStore } from '../stores/auth'
 
 const toast = useToast()
 const { confirm } = useConfirm()
+const auth = useAuthStore()
+
+// El dispensador VE las reservas y las pasa a dispensa (Entregar), pero no las gestiona
+// (editar/cancelar/eliminar) — eso es de admin/supervisor.
+const canGestionarReservas = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 
 const ESTADO_LABEL = {
   pendiente: 'Pendiente', entregada: 'Entregada', cancelada: 'Cancelada', vencida: 'Vencida',

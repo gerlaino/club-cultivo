@@ -636,7 +636,7 @@ class DispensacionesController < ApplicationController
   end
 
   def require_dispensador_o_admin
-    unless current_user.admin? || current_user.medico? || current_user.dispensador?
+    unless current_user.admin? || current_user.medico? || current_user.dispensador? || current_user.supervisor?
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end

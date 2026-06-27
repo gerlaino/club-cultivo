@@ -40,8 +40,9 @@ const totalPaginas = computed(() => Math.max(1, Math.ceil((meta.value.total || 0
 const editModal  = ref(false)
 const editTarget = ref(null)
 
-// Dispensar (inmediato): admin/dispensador. Reservas: solo admin/supervisor (por ahora).
-const canDispensar = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
+// Dispensar (inmediato + entregar reservas): admin/dispensador/supervisor.
+// Crear/editar reservas: solo admin/supervisor (el dispensador las ve y las pasa a dispensa).
+const canDispensar = computed(() => ['admin', 'dispensador', 'supervisor', 'super_admin'].includes(auth.user?.role))
 const canReservar  = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 const canDelete = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
 const canEdit   = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
@@ -175,7 +176,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
     </div>
 
     <!-- Reservas pendientes -->
-    <div v-if="canReservar && reservasPend.length" class="dv__reservas">
+    <div v-if="(canDispensar || canReservar) && reservasPend.length" class="dv__reservas">
       <div class="dv__reservas-title"><i class="bi bi-bookmark-star"></i> Reservas pendientes</div>
       <div v-for="r in reservasPend" :key="r.id" class="dv__reserva"
            :class="{ 'dv__reserva--vencida': r.fecha_entrega_estimada < hoyISO }">
@@ -187,10 +188,12 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
             <template v-if="r.aporte_restante_ars != null"> · resta {{ fmt(r.aporte_restante_ars) }}</template>
           </span>
         </div>
-        <div v-if="canReservar" class="dv__reserva-acts">
-          <button class="dv__reserva-btn dv__reserva-btn--primary" @click="abrirEntregaReserva(r)">Entregar</button>
-          <button class="dv__reserva-btn" @click="abrirEditarReserva(r)">Editar</button>
-          <button class="dv__reserva-btn" @click="eliminarReserva(r)">{{ r.sena_ars > 0 ? 'Cancelar' : 'Eliminar' }}</button>
+        <div v-if="canDispensar || canReservar" class="dv__reserva-acts">
+          <!-- Entregar = pasar la reserva a dispensa: lo hace quien dispensa (incl. dispensador). -->
+          <button v-if="canDispensar" class="dv__reserva-btn dv__reserva-btn--primary" @click="abrirEntregaReserva(r)">Entregar</button>
+          <!-- Editar / cancelar la reserva: solo admin/supervisor. -->
+          <button v-if="canReservar" class="dv__reserva-btn" @click="abrirEditarReserva(r)">Editar</button>
+          <button v-if="canReservar" class="dv__reserva-btn" @click="eliminarReserva(r)">{{ r.sena_ars > 0 ? 'Cancelar' : 'Eliminar' }}</button>
         </div>
       </div>
     </div>

@@ -26,12 +26,25 @@ module Ariccame
     private
 
     def build_payload
+      # Una dispensa puede abarcar varias líneas (multi-stock). Reportamos cada producto por
+      # separado en `items`; los campos planos quedan para compatibilidad (primera línea).
+      lineas = @dispensacion.items.map do |it|
+        st = it.stock
+        {
+          cantidad_g:     it.cantidad&.to_f,
+          forma_producto: st&.forma_producto,
+          numero_lote:    st&.numero_lote_producto || it.lote_codigo,
+        }
+      end
+      primera = lineas.first || {}
+
       {
         fecha:              @dispensacion.fecha_dispensacion&.to_s,
-        cantidad_g:         @dispensacion.cantidad&.to_f,
+        cantidad_g:         @dispensacion.cantidad_total.to_f,
         unidad:             @dispensacion.unidad,
-        forma_producto:     @dispensacion.stock&.forma_producto,
-        numero_lote:        @dispensacion.stock&.numero_lote_producto,
+        forma_producto:     primera[:forma_producto],
+        numero_lote:        primera[:numero_lote],
+        items:              lineas,
         club_cuit:          @dispensacion.paciente.club.cuit,
         paciente_reprocann: @dispensacion.paciente.reprocann_numero,
         indicacion_id:      @dispensacion.indicacion_medica_id,
