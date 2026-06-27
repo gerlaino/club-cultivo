@@ -116,6 +116,9 @@ function imprimirEtiquetas() {
 // ── Ruta de entrega (orden + candado) ──────────────────────────────────────
 // Modo ruta: un repartidor seleccionado → se ordena la ruta de una FECHA (hoy o futura).
 const modoRuta       = computed(() => !!filtroDelivery.value)
+// La ruta es siempre la del día: los despachos se arman y se envían en el día (una dispensa
+// futura es una Reserva, no un despacho — el modelo prohíbe fecha_dispensacion futura). Por eso
+// fechaRuta queda fija a hoy y no se expone un selector: solo indexa el orden guardado de la ruta.
 const fechaRuta      = ref(new Date().toISOString().slice(0, 10))
 const rutaActual     = ref(null)   // { id, bloqueada, despachos: [ids] } de (repartidor, fechaRuta)
 const guardandoOrden = ref(false)
@@ -337,7 +340,7 @@ function abrirEntrega(d) {
 async function confirmarEntrega() {
   saving.value = true
   try {
-    await entregarPaquete(entregaModal.value.id, entregaModal.value.notas || null, null)
+    await entregarPaquete(entregaModal.value.id, { notasEntrega: entregaModal.value.notas || null })
     toast.success('Entrega completada')
     entregaModal.value.open = false
     await load()
@@ -559,10 +562,6 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
         <span><strong>Ruta de entrega</strong> · ordená con ↑↓ · tildá los que mandás a Maps</span>
         <DsSpinner v-if="guardandoOrden" :size="13" />
       </div>
-      <label class="dsp__ruta-fecha">
-        <span class="dsp__date-label">Fecha de ruta</span>
-        <AppDatePicker v-model="fechaRuta" />
-      </label>
       <button class="dsp__ruta-maps" :disabled="!despachosPendientesRuta.length" @click="abrirEnMaps">
         <i class="bi bi-geo-alt-fill"></i>
         Ruta en Maps<template v-if="seleccionados.size"> ({{ seleccionados.size }})</template>
@@ -1028,7 +1027,6 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
   padding: var(--sp-3) var(--sp-4);
 }
 .dsp__ruta-info { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); color: #166534; }
-.dsp__ruta-fecha { display: flex; flex-direction: column; gap: 2px; }
 .dsp__ruta-hint {
   display: flex; align-items: center; gap: .5rem; margin-bottom: var(--sp-4);
   background: #eff6ff; border: 1.5px solid #bfdbfe; color: #1e40af;
@@ -1043,17 +1041,17 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 .dsp__ruta-lock--on { background: #fef3c7; border-color: #fcd34d; color: #b45309; }
 .dsp__ruta-maps {
   display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
-  background: #1d4ed8; color: #fff; border: none; border-radius: 8px;
-  padding: .45rem .8rem; font-size: .8rem; font-weight: 700; white-space: nowrap;
-}
-.dsp__ruta-maps:hover:not(:disabled) { background: #1e40af; }
-.dsp__ruta-maps:disabled { opacity: .5; cursor: not-allowed; }
-.dsp__ruta-print {
-  display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
   background: #1b5e20; color: #fff; border: none; border-radius: 8px;
   padding: .45rem .8rem; font-size: .8rem; font-weight: 700; white-space: nowrap;
 }
-.dsp__ruta-print:hover:not(:disabled) { background: #104417; }
+.dsp__ruta-maps:hover:not(:disabled) { background: #104417; }
+.dsp__ruta-maps:disabled { opacity: .5; cursor: not-allowed; }
+.dsp__ruta-print {
+  display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
+  background: #fff; color: #1b5e20; border: 1.5px solid #1b5e20; border-radius: 8px;
+  padding: .45rem .8rem; font-size: .8rem; font-weight: 700; white-space: nowrap;
+}
+.dsp__ruta-print:hover:not(:disabled) { background: #f0fdf4; }
 .dsp__ruta-print:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Controles de orden en la fila */
