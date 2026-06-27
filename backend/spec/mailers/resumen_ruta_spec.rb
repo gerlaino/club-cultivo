@@ -32,4 +32,13 @@ RSpec.describe NotificacionesMailer, '#resumen_ruta', type: :mailer do
     expect(cuerpo).to match(/5\.000/)              # monto formateado
     expect(cuerpo).to match(/Efectivo/)            # cómo pagó
   end
+
+  it 'va a TODOS los admins, usando el email personal (real) cuando existe' do
+    admin.update!(email: 'admin1@login.local', email_personal: 'admin1@gmail.com') # login inventado, personal real
+    create(:user, :admin, club: club, email: 'admin2@gmail.com')                   # sin personal → cae al login
+
+    mail = described_class.resumen_ruta(club: club, delivery: delivery,
+                                        entregados: [disp.reload], fallidos: [], caja_efectivo: 0)
+    expect(mail.to).to contain_exactly('admin1@gmail.com', 'admin2@gmail.com')
+  end
 end

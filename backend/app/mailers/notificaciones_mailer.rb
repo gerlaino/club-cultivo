@@ -10,7 +10,7 @@ class NotificacionesMailer < ApplicationMailer
     return if admins.none?
 
     mail_para_club(@club,
-      to:      admins.pluck(:email),
+      to:      admins.map(&:email_notificacion),
       subject: "[#{club.name}] REPROCANN — #{@total} paciente#{@total == 1 ? '' : 's'} requieren atención")
   end
 
@@ -21,7 +21,7 @@ class NotificacionesMailer < ApplicationMailer
     @por_vencer = por_vencer
     @total      = vencidas.size + por_vencer.sum { |_, lista| lista.size }
 
-    destinatarios = club.users.where(role: %w[admin medico]).where.not(email: nil).pluck(:email).uniq
+    destinatarios = club.users.where(role: %w[admin medico]).map(&:email_notificacion).compact.uniq
     return if destinatarios.empty?
 
     mail_para_club(@club,
@@ -46,7 +46,7 @@ class NotificacionesMailer < ApplicationMailer
       "[#{club.name}] Informe semestral #{semestre}° semestre #{anio}"
     end
 
-    mail_para_club(@club, to: admins.pluck(:email), subject: asunto)
+    mail_para_club(@club, to: admins.map(&:email_notificacion), subject: asunto)
   end
 
   # Notificación de delivery al paciente (fallback cuando no hay WhatsApp configurado)
@@ -83,7 +83,7 @@ class NotificacionesMailer < ApplicationMailer
     return if admins.none?
 
     mail_para_club(@club,
-      to:      admins.pluck(:email),
+      to:      admins.map(&:email_notificacion),
       subject: "[#{club.name}] Ruta de entregas finalizada — #{entregados.size} entregado#{'s' if entregados.size != 1}, #{fallidos.size} fallido#{'s' if fallidos.size != 1}")
   end
 
@@ -96,7 +96,7 @@ class NotificacionesMailer < ApplicationMailer
     return if admins.none?
 
     mail_para_club(@club,
-      to:      admins.pluck(:email),
+      to:      admins.map(&:email_notificacion),
       subject: "[#{club.name}] Alerta: stock bajo en dispensario")
   end
 end

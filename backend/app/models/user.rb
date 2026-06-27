@@ -44,6 +44,12 @@ class User < ApplicationRecord
     "#{first_name} #{last_name}".strip
   end
 
+  # Email REAL para mandarle notificaciones: el personal si lo cargó; si no, el de login
+  # (que puede ser un identificador inventado tipo rol@club.com y rebotar).
+  def email_notificacion
+    email_personal.presence || email
+  end
+
   KINDS_CULTIVADOR = %w[vegetativo floracion mixta madre clon].freeze
   KINDS_MANICURA   = %w[manicura].freeze
 
