@@ -45,12 +45,14 @@ class NotificacionDeliveryService
     email = @d.paciente&.email.presence
     return unless email.present?
 
+    # Sincrónico: deliver_later dependía de Sidekiq y fallaba silencioso. Se manda en el acto;
+    # si una falla, el rescue de #enviar la registra y el lote sigue (best-effort por paquete).
     NotificacionesMailer.notificacion_delivery(
       email:   email,
       nombre:  nombre_destinatario,
       mensaje: mensaje,
       club:    @club
-    ).deliver_later
+    ).deliver_now
   end
 
   def nombre_destinatario

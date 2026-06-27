@@ -231,14 +231,18 @@ class DispensacionesController < ApplicationController
   # PATCH /dispensaciones/iniciar_viaje  { ids: [1,2,3] }
   def iniciar_viaje
     ids = params[:ids].to_a.map(&:to_i)
+    # OJO: cargamos a array ANTES del update_all. Si dejáramos la relación lazy (con
+    # estado_envio: 'pendiente'), el .each posterior re-consultaría y, ya cambiados a 'en_viaje',
+    # devolvería vacío → no se notificaba a nadie.
     dispensaciones = Dispensacion
       .del_delivery(current_user.id)
       .joins(stock: :sede)
       .where(sedes: { club_id: current_user.club_id })
       .where(id: ids, estado_envio: 'pendiente')
-    updated = dispensaciones.update_all(estado_envio: 'en_viaje')
-    dispensaciones.each { |d| NotificacionDeliveryService.new(d).notificar_despacho }
-    render json: { updated: updated }
+      .to_a
+    Dispensacion.where(id: dispensaciones.map(&:id)).update_all(estado_envio: 'en_viaje')
+    dispensaciones.each { |d| d.estado_envio = 'en_viaje'; NotificacionDeliveryService.new(d).notificar_despacho }
+    render json: { updated: dispensaciones.size }
   end
 
   # PATCH /dispensaciones/:id/entregar
