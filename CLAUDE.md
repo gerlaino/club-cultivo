@@ -89,7 +89,7 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 3. **Cultivo** — genéticas, lotes (estados/fases), plantas con QR, pesadas, plan de trabajo (+ generación IA), tareas (recurrentes + automáticas por fase), fotos, análisis de laboratorio.
 4. **Manicura / post-cosecha** — pesajes, flujo de aprobación admin, curado, stocks de manicura.
 5. **Stock** — por sede, movimientos, QR/etiquetas, aprobaciones pendientes.
-6. **Dispensaciones** — carrito, medios de pago (efectivo/transferencia/cuenta corriente/no abona), validación de crédito, CSV. (`limite_dispensacion_mensual_g` existe en el schema pero **no es una feature en uso** — ver Dominio.)
+6. **Dispensaciones** — **multi-stock**: una dispensa abarca varias líneas (`DispensacionItem`); UI = carrito en `ModalNuevaDispensacion` (abierto desde la ficha del socio y el historial; la vista `/dispensar` se eliminó). Medios de pago (efectivo/transferencia/cuenta corriente/no abona/contra-entrega), validación de crédito, descuento sobre el total, reservas (apartar stock a futuro), CSV. (`limite_dispensacion_mensual_g` existe en el schema pero **no es una feature en uso** — ver Dominio.)
 7. **Delivery** — paquetes, estados (pendiente/en viaje/entregado/fallido), firma de entrega, reprogramación.
 8. **Ambiente / IoT** — dispositivos con webhook token, lecturas, reglas y alertas, setpoints por fase, VPD, drivers (Sonoff, CSV manual, CSV-IA).
 9. **Contabilidad** — movimientos contables, costos por lote, P&L.
@@ -110,9 +110,9 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 | `super_admin` | Plataforma: clubes, planes, métricas globales, modo observador |
 | `admin` | Todo dentro de su club |
 | `cultivador` | Plantas, lotes, salas asignadas (por sede), ambiente, plan de trabajo |
-| `supervisor` | Lectura de cultivo + gestión de tareas |
+| `supervisor` | Lectura de cultivo + gestión de tareas; **dispensa** y **gestiona reservas** (crear/editar/cancelar) |
 | `manicura` | Post-cosecha: pesajes, inventario, salas kind=manicura |
-| `dispensador` | Dispensaciones, stock por sede, socios (lectura) |
+| `dispensador` | Dispensaciones, stock por sede, socios (lectura); **convierte reservas a dispensa** (Entregar), pero NO las crea ni gestiona |
 | `delivery` | Paquetes asignados: iniciar viaje, entregar, reportar fallo |
 | `medico` | Pacientes, indicaciones, turnos, documentos clínicos |
 | `abogado` | Socios (lectura), informes legales/REPROCANN |
@@ -221,4 +221,4 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 ---
 
-*Última actualización: 2026-06-12. Mantener actualizado: cuando se cierre un bloque de trabajo, actualizar "Módulos existentes" acá y `docs/CHANGELOG.md`.*
+*Última actualización: 2026-06-27. Mantener actualizado: cuando se cierre un bloque de trabajo, actualizar "Módulos existentes" acá y `docs/CHANGELOG.md`.*
