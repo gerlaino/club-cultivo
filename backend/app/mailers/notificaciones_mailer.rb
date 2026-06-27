@@ -72,11 +72,12 @@ class NotificacionesMailer < ApplicationMailer
   end
 
   # Resumen de una ruta de entregas finalizada — enviado a los admins del club.
-  def resumen_ruta(club:, delivery:, entregados:, fallidos:)
-    @club       = club
-    @delivery   = delivery
-    @entregados = entregados
-    @fallidos   = fallidos
+  def resumen_ruta(club:, delivery:, entregados:, fallidos:, caja_efectivo: 0)
+    @club          = club
+    @delivery      = delivery
+    @entregados    = entregados
+    @fallidos      = fallidos
+    @caja_efectivo = caja_efectivo.to_d
 
     admins = club.users.where(role: 'admin').where.not(email: nil)
     return if admins.none?

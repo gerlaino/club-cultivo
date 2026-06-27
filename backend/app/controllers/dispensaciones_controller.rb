@@ -457,15 +457,19 @@ class DispensacionesController < ApplicationController
     resueltos  = Dispensacion.del_grupo_ruta(d)
                              .where(estado_envio: %w[entregado fallido])
                              .where('dispensaciones.updated_at >= ?', 12.hours.ago)
-                             .includes(:paciente)
+                             .includes(:paciente, :cobros)
     entregados = resueltos.select { |x| x.estado_envio == 'entregado' }
     fallidos   = resueltos.select { |x| x.estado_envio == 'fallido' }
     return if entregados.empty? && fallidos.empty?
 
     club = d.paciente&.club
     return unless club
+
+    # Caja del delivery: efectivo cobrado en la entrega y todavía no rendido al club.
+    caja = Cobro.efectivo_en_transito.del_delivery(d.delivery_id).sum(:monto_ars)
+
     NotificacionesMailer.resumen_ruta(
-      club: club, delivery: d.delivery_user, entregados: entregados, fallidos: fallidos
+      club: club, delivery: d.delivery_user, entregados: entregados, fallidos: fallidos, caja_efectivo: caja
     ).deliver_now
   rescue => e
     Rails.logger.error("[ResumenRuta] #{e.message}")

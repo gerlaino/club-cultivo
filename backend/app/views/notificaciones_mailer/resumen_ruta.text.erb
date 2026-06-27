@@ -1,9 +1,12 @@
 RUTA DE ENTREGAS FINALIZADA — <%= @club.name %>
 
+<% medio_label = ->(m) { { 'efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'cuenta_corriente' => 'Cuenta corriente' }[m] || m } %>
 <%= @delivery&.nombre_completo.presence || @delivery&.email || 'El repartidor' %> terminó su recorrido.
-
+<% if @caja_efectivo && @caja_efectivo > 0 %>
+CAJA DEL DELIVERY: $<%= number_with_delimiter(@caja_efectivo.to_i, delimiter: '.') %> en efectivo a rendir.
+<% end %>
 ENTREGADOS (<%= @entregados.size %>):
-<% if @entregados.any? %><% @entregados.each do |d| %>- <%= d.paciente&.nombre_completo.presence || d.contacto_nombre.presence || "Paciente ##{d.paciente_id}" %> — paquete <%= d.codigo_paquete %>
+<% if @entregados.any? %><% @entregados.each do |d| %>- <%= d.paciente&.nombre_completo.presence || d.contacto_nombre.presence || "Paciente ##{d.paciente_id}" %> — paquete <%= d.codigo_paquete %><% pagos = d.cobros.reject { |c| c.monto_ars.to_d <= 0 } %><%= " | Pagó: #{pagos.map { |c| "#{medio_label.call(c.medio)} $#{number_with_delimiter(c.monto_ars.to_i, delimiter: '.')}" }.join(' · ')}" if pagos.any? %>
 <% end %><% else %>Ninguno.
 <% end %>
 FALLIDOS (<%= @fallidos.size %>):

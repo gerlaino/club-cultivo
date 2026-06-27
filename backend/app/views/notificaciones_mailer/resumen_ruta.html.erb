@@ -5,13 +5,28 @@
     <%= l(Date.current, format: :long) rescue Date.current.strftime('%d/%m/%Y') %>.
   </p>
 
+  <% medio_label = ->(m) { { 'efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'cuenta_corriente' => 'Cuenta corriente' }[m] || m } %>
+
+  <% if @caja_efectivo && @caja_efectivo > 0 %>
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin-top: 16px;">
+      💵 <strong>Caja del delivery:</strong> $<%= number_with_delimiter(@caja_efectivo.to_i, delimiter: '.') %> en efectivo a rendir.
+    </div>
+  <% end %>
+
   <h3 style="color: #15803d; margin-top: 24px;">✅ Entregados (<%= @entregados.size %>)</h3>
   <% if @entregados.any? %>
     <ul>
       <% @entregados.each do |d| %>
-        <li>
+        <li style="margin-bottom: 8px;">
           <strong><%= d.paciente&.nombre_completo.presence || d.contacto_nombre.presence || "Paciente ##{d.paciente_id}" %></strong>
           — paquete <%= d.codigo_paquete %>
+          <% pagos = d.cobros.reject { |c| c.monto_ars.to_d <= 0 } %>
+          <% if pagos.any? %>
+            <br><span style="color: #64748b; font-size: 13px;">
+              Pagó:
+              <%= pagos.map { |c| "#{medio_label.call(c.medio)} $#{number_with_delimiter(c.monto_ars.to_i, delimiter: '.')}" }.join(' · ') %>
+            </span>
+          <% end %>
         </li>
       <% end %>
     </ul>
