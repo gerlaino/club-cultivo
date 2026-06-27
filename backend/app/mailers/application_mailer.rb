@@ -10,8 +10,18 @@ class ApplicationMailer < ActionMailer::Base
   def mail_para_club(club, **opts)
     return unless club&.email_propio?
 
+    @club ||= club
+    adjuntar_logo(club)
     opts[:from] ||= club.email_from
     opts[:delivery_method_options] ||= club.email_delivery_options
     mail(**opts)
+  end
+
+  # Logo del club embebido (inline/CID) para que se vea en el encabezado de todos los mails.
+  def adjuntar_logo(club)
+    return unless club.logo.attached?
+    attachments.inline['logo'] = { mime_type: club.logo.content_type, content: club.logo.download }
+  rescue => e
+    Rails.logger.warn("[mailer logo] #{e.message}")
   end
 end
