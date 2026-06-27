@@ -5,14 +5,22 @@ class NotificacionDeliveryService
     @club = dispensacion.sede&.club
   end
 
-  def notificar_despacho
-    mensaje = "Hola #{nombre_destinatario}, tu paquete #{@d.codigo_paquete} está en camino. Pronto llegará a #{@d.direccion_envio}. — #{@club&.name}"
-    enviar(mensaje)
+  # El servicio salió a la calle (a todos menos al próximo en entregar).
+  def notificar_recorrido_iniciado
+    enviar("Hola #{nombre_destinatario}, el servicio de logística empezó el recorrido. Pronto llegará tu paquete #{@d.codigo_paquete}. — #{@club&.name}")
+  end
+
+  # Sos el próximo en recibir tu pedido (al primero de la ruta y a cada uno cuando pasa al frente).
+  def notificar_proximo
+    enviar("Hola #{nombre_destinatario}, sos el próximo en recibir tu pedido — el servicio de logística está llegando a tu domicilio con tu paquete #{@d.codigo_paquete}. — #{@club&.name}")
   end
 
   def notificar_entrega
-    mensaje = "Hola #{nombre_destinatario}, tu paquete #{@d.codigo_paquete} fue entregado exitosamente. ¡Gracias! — #{@club&.name}"
-    enviar(mensaje)
+    enviar("Hola #{nombre_destinatario}, tu paquete #{@d.codigo_paquete} fue entregado. ¡Gracias! — #{@club&.name}")
+  end
+
+  def notificar_fallo
+    enviar("Hola #{nombre_destinatario}, tuvimos un problema con la entrega de tu paquete #{@d.codigo_paquete}. Por favor comunicate con la administración de #{@club&.name}.")
   end
 
   private

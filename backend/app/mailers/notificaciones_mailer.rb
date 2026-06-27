@@ -71,6 +71,21 @@ class NotificacionesMailer < ApplicationMailer
       subject: "#{club.name} — Tu autorización REPROCANN vence en #{dias_restantes} día#{dias_restantes == 1 ? '' : 's'}")
   end
 
+  # Resumen de una ruta de entregas finalizada — enviado a los admins del club.
+  def resumen_ruta(club:, delivery:, entregados:, fallidos:)
+    @club       = club
+    @delivery   = delivery
+    @entregados = entregados
+    @fallidos   = fallidos
+
+    admins = club.users.where(role: 'admin').where.not(email: nil)
+    return if admins.none?
+
+    mail_para_club(@club,
+      to:      admins.pluck(:email),
+      subject: "[#{club.name}] Ruta de entregas finalizada — #{entregados.size} entregado#{'s' if entregados.size != 1}, #{fallidos.size} fallido#{'s' if fallidos.size != 1}")
+  end
+
   # Alerta de stock bajo — enviada al admin
   def stock_bajo(club:, stocks_data:)
     @club        = club

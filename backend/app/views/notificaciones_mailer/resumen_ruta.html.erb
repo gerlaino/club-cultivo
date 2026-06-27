@@ -1,0 +1,39 @@
+<div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto;">
+  <h2 style="color: #15803d;">Ruta de entregas finalizada</h2>
+  <p>
+    <%= @delivery&.nombre_completo.presence || @delivery&.email || 'El repartidor' %> terminó su recorrido del
+    <%= l(Date.current, format: :long) rescue Date.current.strftime('%d/%m/%Y') %>.
+  </p>
+
+  <h3 style="color: #15803d; margin-top: 24px;">✅ Entregados (<%= @entregados.size %>)</h3>
+  <% if @entregados.any? %>
+    <ul>
+      <% @entregados.each do |d| %>
+        <li>
+          <strong><%= d.paciente&.nombre_completo.presence || d.contacto_nombre.presence || "Paciente ##{d.paciente_id}" %></strong>
+          — paquete <%= d.codigo_paquete %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p style="color: #64748b;">Ninguno.</p>
+  <% end %>
+
+  <h3 style="color: #b91c1c; margin-top: 24px;">⚠️ Fallidos (<%= @fallidos.size %>)</h3>
+  <% if @fallidos.any? %>
+    <ul>
+      <% @fallidos.each do |d| %>
+        <li>
+          <strong><%= d.paciente&.nombre_completo.presence || d.contacto_nombre.presence || "Paciente ##{d.paciente_id}" %></strong>
+          — paquete <%= d.codigo_paquete %>
+          <% if d.motivo_fallo.present? %><br><span style="color: #64748b;">Motivo: <%= d.motivo_fallo %></span><% end %>
+        </li>
+      <% end %>
+    </ul>
+    <p style="color: #b91c1c;">Hay entregas fallidas que requieren tu atención. Entrá a la app para reprogramarlas.</p>
+  <% else %>
+    <p style="color: #64748b;">Ninguno.</p>
+  <% end %>
+
+  <p style="color: #94a3b8; font-size: 12px; margin-top: 32px;">— <%= @club.name %> · Club Cultivo</p>
+</div>

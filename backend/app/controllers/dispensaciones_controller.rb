@@ -241,7 +241,14 @@ class DispensacionesController < ApplicationController
       .where(id: ids, estado_envio: 'pendiente')
       .to_a
     Dispensacion.where(id: dispensaciones.map(&:id)).update_all(estado_envio: 'en_viaje')
-    dispensaciones.each { |d| d.estado_envio = 'en_viaje'; NotificacionDeliveryService.new(d).notificar_despacho }
+    dispensaciones.each { |d| d.estado_envio = 'en_viaje' }
+
+    # El "próximo en entregar" de cada ruta recibe "sos el próximo"; el resto, "empezó el recorrido".
+    proximos_ids = dispensaciones.map { |d| Dispensacion.siguiente_de_ruta(d)&.id }.compact.uniq
+    dispensaciones.each do |d|
+      svc = NotificacionDeliveryService.new(d)
+      proximos_ids.include?(d.id) ? svc.notificar_proximo : svc.notificar_recorrido_iniciado
+    end
     render json: { updated: dispensaciones.size }
   end
 
@@ -281,6 +288,8 @@ class DispensacionesController < ApplicationController
       return render json: { error: e.message }, status: :unprocessable_entity
     end
     NotificacionDeliveryService.new(@dispensacion).notificar_entrega
+    avisar_proximo_de_ruta(@dispensacion)
+    resumen_ruta_si_termino(@dispensacion)
     render json: serialize_dispensacion_delivery(@dispensacion)
   end
 
@@ -299,6 +308,9 @@ class DispensacionesController < ApplicationController
     end
     registrar_evento_envio(@dispensacion, 'fallido', motivo: motivo)
     @dispensacion.update!(estado_envio: 'fallido', motivo_fallo: motivo, historial_envio: @dispensacion.historial_envio)
+    NotificacionDeliveryService.new(@dispensacion).notificar_fallo
+    avisar_proximo_de_ruta(@dispensacion)
+    resumen_ruta_si_termino(@dispensacion)
     render json: serialize_dispensacion_delivery(@dispensacion)
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
@@ -430,6 +442,35 @@ class DispensacionesController < ApplicationController
   # despacho que es el siguiente sin resolver de su ruta. El admin queda exento
   # (puede corregir cualquier despacho fuera de orden). Devuelve un mensaje de
   # error si NO corresponde tocar este despacho todavía, o nil si está OK.
+  # Tras cerrar un despacho, al que pasa a ser el próximo de la ruta le avisamos "sos el próximo".
+  def avisar_proximo_de_ruta(d)
+    sig = Dispensacion.siguiente_de_ruta(d)
+    NotificacionDeliveryService.new(sig).notificar_proximo if sig
+  end
+
+  # Si ya no queda ningún despacho en viaje en la ruta, la vuelta terminó → resumen al club.
+  def resumen_ruta_si_termino(d)
+    return if Dispensacion.del_grupo_ruta(d).where(estado_envio: 'en_viaje').exists?
+
+    # Acotamos a lo resuelto en las últimas horas (la vuelta actual). updated_at evita el lío de
+    # timezone de fecha_dispensacion y, para grupos de ruta NULL (sin ruta), no arrastra días viejos.
+    resueltos  = Dispensacion.del_grupo_ruta(d)
+                             .where(estado_envio: %w[entregado fallido])
+                             .where('dispensaciones.updated_at >= ?', 12.hours.ago)
+                             .includes(:paciente)
+    entregados = resueltos.select { |x| x.estado_envio == 'entregado' }
+    fallidos   = resueltos.select { |x| x.estado_envio == 'fallido' }
+    return if entregados.empty? && fallidos.empty?
+
+    club = d.paciente&.club
+    return unless club
+    NotificacionesMailer.resumen_ruta(
+      club: club, delivery: d.delivery_user, entregados: entregados, fallidos: fallidos
+    ).deliver_now
+  rescue => e
+    Rails.logger.error("[ResumenRuta] #{e.message}")
+  end
+
   def error_orden_ruta
     return nil if current_user.admin?
     return nil if @dispensacion.siguiente_en_ruta?

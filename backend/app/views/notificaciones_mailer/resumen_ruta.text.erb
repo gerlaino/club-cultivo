@@ -1,0 +1,14 @@
+RUTA DE ENTREGAS FINALIZADA — <%= @club.name %>
+
+<%= @delivery&.nombre_completo.presence || @delivery&.email || 'El repartidor' %> terminó su recorrido.
+
+ENTREGADOS (<%= @entregados.size %>):
+<% if @entregados.any? %><% @entregados.each do |d| %>- <%= d.paciente&.nombre_completo.presence || d.contacto_nombre.presence || "Paciente ##{d.paciente_id}" %> — paquete <%= d.codigo_paquete %>
+<% end %><% else %>Ninguno.
+<% end %>
+FALLIDOS (<%= @fallidos.size %>):
+<% if @fallidos.any? %><% @fallidos.each do |d| %>- <%= d.paciente&.nombre_completo.presence || d.contacto_nombre.presence || "Paciente ##{d.paciente_id}" %> — paquete <%= d.codigo_paquete %><%= " (Motivo: #{d.motivo_fallo})" if d.motivo_fallo.present? %>
+<% end %>Entrá a la app para reprogramarlas.
+<% else %>Ninguno.
+<% end %>
+— <%= @club.name %> · Club Cultivo
