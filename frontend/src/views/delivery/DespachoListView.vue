@@ -346,14 +346,36 @@ function entregadorLabel(u) {
 }
 
 // ── Completar entrega (admin cierra el círculo) ──
-const entregaModal = ref({ open: false, id: null, codigo: '', paciente: '', notas: '' })
+const entregaModal = ref({ open: false, id: null, codigo: '', paciente: '', notas: '', saldo: 0, efectivo: null, transf: null })
 function abrirEntrega(d) {
-  entregaModal.value = { open: true, id: d.id, codigo: d.codigo_paquete || `#${d.id}`, paciente: d.paciente?.nombre || '', notas: '' }
+  // saldo_pendiente > 0 = contra-entrega: hay que cobrarlo al entregar (efectivo/transf;
+  // lo que no se cubra cae a cuenta corriente, igual que en el dashboard de delivery).
+  entregaModal.value = {
+    open: true, id: d.id, codigo: d.codigo_paquete || `#${d.id}`,
+    paciente: d.paciente?.nombre || '', notas: '',
+    saldo: Number(d.saldo_pendiente) || 0, efectivo: null, transf: null,
+  }
 }
+
+const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100
+const saldoEntrega       = computed(() => r2(entregaModal.value.saldo))
+const cobradoEntrega     = computed(() => r2((Number(entregaModal.value.efectivo) || 0) + (Number(entregaModal.value.transf) || 0)))
+const restoEntregaCuenta = computed(() => r2(Math.max(0, saldoEntrega.value - cobradoEntrega.value)))
+const excedenteEntrega   = computed(() => r2(Math.max(0, cobradoEntrega.value - saldoEntrega.value)))
+function lineasCobroEntrega() {
+  const ls = []
+  if ((Number(entregaModal.value.efectivo) || 0) > 0) ls.push({ medio: 'efectivo', monto: r2(entregaModal.value.efectivo) })
+  if ((Number(entregaModal.value.transf) || 0) > 0)   ls.push({ medio: 'transferencia', monto: r2(entregaModal.value.transf) })
+  return ls
+}
+
 async function confirmarEntrega() {
   saving.value = true
   try {
-    await entregarPaquete(entregaModal.value.id, { notasEntrega: entregaModal.value.notas || null })
+    await entregarPaquete(entregaModal.value.id, {
+      notasEntrega: entregaModal.value.notas || null,
+      cobros:       lineasCobroEntrega(),
+    })
     toast.success('Entrega completada')
     entregaModal.value.open = false
     await load()
@@ -817,10 +839,12 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
                   <button v-if="d.estado_envio === 'pendiente' && d.delivery_id === auth.user?.id" class="dsp__acc-item" @click="cerrarMenu(); iniciarViajeDespacho(d)">
                     <ArrowRight :size="14" :stroke-width="2" /> Iniciar viaje
                   </button>
-                  <button v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)" class="dsp__acc-item" @click="cerrarMenu(); abrirEntrega(d)">
+                  <!-- Entregar / fallar solo si el viaje arrancó (en_viaje). Un pendiente primero
+                       se inicia (botón "Iniciar viaje"); así salen las alertas al paciente. -->
+                  <button v-if="d.estado_envio === 'en_viaje'" class="dsp__acc-item" @click="cerrarMenu(); abrirEntrega(d)">
                     <CheckCircle2 :size="14" :stroke-width="2" /> Completar entrega
                   </button>
-                  <button v-if="['pendiente', 'en_viaje'].includes(d.estado_envio)" class="dsp__acc-item" @click="cerrarMenu(); abrirFallo(d)">
+                  <button v-if="d.estado_envio === 'en_viaje'" class="dsp__acc-item" @click="cerrarMenu(); abrirFallo(d)">
                     <AlertCircle :size="14" :stroke-width="2" /> Reportar fallo
                   </button>
                   <button v-if="d.estado_envio === 'fallido'" class="dsp__acc-item" :disabled="reprogramando" @click="cerrarMenu(); reprogramar(d.id)">
@@ -854,6 +878,30 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
         <div class="dsp__modal">
           <h3 class="dsp__modal-title">Completar entrega</h3>
           <p class="dsp__modal-sub">{{ entregaModal.codigo }} · {{ entregaModal.paciente }}</p>
+
+          <!-- Cobro contra-entrega (solo si quedó saldo pendiente) -->
+          <div v-if="saldoEntrega > 0" class="dsp__cobro">
+            <div class="dsp__cobro-head">
+              <span>A cobrar</span>
+              <strong>{{ fmtMoneda(saldoEntrega) }}</strong>
+            </div>
+            <div class="dsp__cobro-grid">
+              <label class="dsp__cobro-cell">
+                <span>Efectivo</span>
+                <input type="number" min="0" step="any" v-model.number="entregaModal.efectivo" placeholder="0" />
+              </label>
+              <label class="dsp__cobro-cell">
+                <span>Transferencia</span>
+                <input type="number" min="0" step="any" v-model.number="entregaModal.transf" placeholder="0" />
+              </label>
+            </div>
+            <div class="dsp__cobro-resto" :class="{ 'dsp__cobro-resto--info': excedenteEntrega > 0 }">
+              <template v-if="excedenteEntrega > 0">Paga de más: <strong>{{ fmtMoneda(excedenteEntrega) }}</strong> → queda a favor en su cuenta</template>
+              <template v-else-if="restoEntregaCuenta > 0">Resto a cuenta corriente: <strong>{{ fmtMoneda(restoEntregaCuenta) }}</strong></template>
+              <template v-else>Cubierto ✓</template>
+            </div>
+          </div>
+
           <label class="dsp__modal-label">Notas de entrega <span class="dsp__opt">opcional</span></label>
           <textarea v-model.trim="entregaModal.notas" class="dsp__modal-input" rows="2" placeholder="Quién recibió, observaciones…"></textarea>
           <div class="dsp__modal-foot">
@@ -1348,6 +1396,16 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 .dsp__modal { background: #fff; border-radius: 14px; width: 100%; max-width: 420px; padding: 1.25rem; box-shadow: 0 24px 64px rgba(0,0,0,.18); }
 .dsp__modal-title { font-size: 1rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; }
 .dsp__modal-sub { font-size: .8rem; color: #64748b; margin: 0 0 .9rem; }
+/* Cobro contra-entrega */
+.dsp__cobro { border: 1.5px solid #e2e8f0; border-radius: 12px; padding: .75rem; margin-bottom: 1rem; }
+.dsp__cobro-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .6rem; font-size: .82rem; color: #475569; }
+.dsp__cobro-head strong { font-size: 1.1rem; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; }
+.dsp__cobro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.dsp__cobro-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: .72rem; font-weight: 600; color: #64748b; }
+.dsp__cobro-cell input { width: 100%; box-sizing: border-box; min-width: 0; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .6rem; font-size: .95rem; font-weight: 700; color: #0f172a; outline: none; font-variant-numeric: tabular-nums; }
+.dsp__cobro-cell input:focus { border-color: #16a34a; }
+.dsp__cobro-resto { margin-top: .5rem; padding: .45rem .65rem; border-radius: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; font-size: .8rem; color: #15803d; }
+.dsp__cobro-resto--info { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
 .dsp__modal-label { display: block; font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
 .dsp__opt { font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
 .dsp__req { color: #dc2626; }
