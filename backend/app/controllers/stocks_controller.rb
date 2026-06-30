@@ -25,6 +25,18 @@ class StocksController < ApplicationController
       return render json: stocks.map { |s| serialize_stock(s) }
     end
 
+    # Contenedores de un lote: usado al confirmar pesajes de manicura para elegir a qué
+    # contenedor sumar. Incluye los pendiente_asignacion (recién creados, sin sede), que
+    # el listado general excluye. Solo flor_seca: el resto son derivados (inventario).
+    if params[:lote_id].present?
+      stocks = Stock.where(club_id: current_user.club_id, lote_id: params[:lote_id])
+                    .disponibles
+                    .where(estado: %w[pendiente_asignacion asignado], forma_producto: 'flor_seca')
+                    .includes(:lote, :genetica, :sede)
+                    .order(created_at: :desc)
+      return render json: stocks.map { |s| serialize_stock(s) }
+    end
+
     if sede_id.present?
       sede   = current_user.club.sedes.find_by(id: sede_id)
       stocks = sede ? sede.stocks.includes(:lote, :genetica).disponibles.asignados.to_a : []
@@ -519,6 +531,7 @@ class StocksController < ApplicationController
                          numero_registro_inase: s.lote.genetica.numero_registro_inase,
                        } : nil } : nil,
       genetica: s.genetica ? { id: s.genetica.id, nombre: s.genetica.nombre } : nil,
+      genetica_nombre: (s.genetica || s.lote&.genetica)&.nombre,
       sede:  s.sede  ? { id: s.sede.id, nombre: s.sede.nombre } : nil,
       club:  s.club  ? { id: s.club.id, nombre: s.club.name,
                          logo_url: s.club.logo.attached? ? url_for(s.club.logo) : nil } : nil,

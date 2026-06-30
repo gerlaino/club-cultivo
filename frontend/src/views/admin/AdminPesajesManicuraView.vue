@@ -163,27 +163,49 @@
               </div>
 
               <div class="apm-field">
-                <label class="apm-label">Contenedor de stock</label>
-                <div v-if="loadingStocks" class="apm-hint">Cargando stocks disponibles…</div>
-                <template v-else>
-                  <select v-model="form.stock_id" class="apm-input apm-select">
-                    <option :value="null">— Crear nuevo contenedor —</option>
-                    <optgroup v-if="stocksMismaGenetica.length" label="Misma genética (recomendado)">
-                      <option v-for="s in stocksMismaGenetica" :key="s.id" :value="s.id">
-                        {{ s.numero_lote_producto || `Stock #${s.id}` }} · {{ s.cantidad?.toFixed(0) }}g disponibles · {{ s.sede_nombre || 'Sin sede' }}
-                      </option>
-                    </optgroup>
-                    <optgroup v-if="stocksOtros.length" label="Otros contenedores">
-                      <option v-for="s in stocksOtros" :key="s.id" :value="s.id">
-                        {{ s.numero_lote_producto || `Stock #${s.id}` }} · {{ s.cantidad?.toFixed(0) }}g · {{ s.sede_nombre || 'Sin sede' }}
-                      </option>
-                    </optgroup>
-                  </select>
-                  <span class="apm-hint">
-                    <template v-if="form.stock_id">Se sumará el peso al stock seleccionado.</template>
-                    <template v-else>Se creará un nuevo contenedor para esta genética.</template>
-                  </span>
-                </template>
+                <label class="apm-label">Contenedor de stock <span class="apm-label-note">(solo flor seca)</span></label>
+                <div v-if="loadingStocks" class="apm-hint">Cargando contenedores…</div>
+                <div v-else class="apm-cont-list">
+                  <!-- Crear nuevo -->
+                  <button
+                    type="button" class="apm-cont apm-cont--new"
+                    :class="{ 'apm-cont--sel': form.stock_id === null }"
+                    @click="form.stock_id = null"
+                  >
+                    <span class="apm-cont__radio"><span v-if="form.stock_id === null" class="apm-cont__dot" /></span>
+                    <span class="apm-cont__ico"><Plus :size="16" :stroke-width="2" /></span>
+                    <span class="apm-cont__body">
+                      <span class="apm-cont__title">Crear nuevo contenedor</span>
+                      <span class="apm-cont__meta">Genera un contenedor nuevo de flor seca para este lote</span>
+                    </span>
+                  </button>
+
+                  <!-- Contenedores existentes del lote -->
+                  <button
+                    v-for="s in contenedores" :key="s.id"
+                    type="button" class="apm-cont"
+                    :class="{ 'apm-cont--sel': form.stock_id === s.id }"
+                    @click="form.stock_id = s.id"
+                  >
+                    <span class="apm-cont__radio"><span v-if="form.stock_id === s.id" class="apm-cont__dot" /></span>
+                    <span class="apm-cont__ico apm-cont__ico--stock"><Package :size="16" :stroke-width="2" /></span>
+                    <span class="apm-cont__body">
+                      <span class="apm-cont__title">
+                        {{ s.numero_lote_producto || `Contenedor #${s.id}` }}
+                        <span class="apm-cont__qty">{{ (s.cantidad || 0).toFixed(0) }}g</span>
+                      </span>
+                      <span class="apm-cont__tags">
+                        <span class="apm-cont__tag apm-cont__tag--gen"><Leaf :size="11" :stroke-width="2" /> {{ s.genetica_nombre || '—' }}</span>
+                        <span class="apm-cont__tag">Lote {{ s.lote_codigo || s.lote?.codigo || '—' }}</span>
+                        <span class="apm-cont__tag">{{ s.sede?.nombre || (s.estado === 'pendiente_asignacion' ? 'Sin asignar' : 'Sin sede') }}</span>
+                      </span>
+                    </span>
+                  </button>
+                </div>
+                <span class="apm-hint">
+                  <template v-if="form.stock_id">Se sumará el peso al contenedor seleccionado.</template>
+                  <template v-else>Se creará un contenedor nuevo de flor seca para este lote.</template>
+                </span>
               </div>
 
               <div v-if="modalError" class="apm-error">{{ modalError }}</div>
@@ -212,7 +234,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, MessageCircle, List, Trash2, RotateCcw } from 'lucide-vue-next'
+import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, MessageCircle, List, Trash2, RotateCcw, Plus } from 'lucide-vue-next'
 import { listPesajesManicuraAdmin, confirmarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura, listStocks, listLotes } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -241,20 +263,14 @@ const modalError    = ref('')
 
 const form = ref({ peso_confirmado_g: null, stock_id: null })
 
-const stocksMismaGenetica = computed(() => {
-  if (!pesajeActivo.value?.lote_genetica) return []
-  return stocks.value.filter(s =>
-    s.genetica_nombre === pesajeActivo.value.lote_genetica &&
+// El backend (GET /stocks?lote_id) ya devuelve solo los contenedores flor_seca del lote
+// en estado pendiente_asignacion/asignado; filtramos de nuevo por las dudas.
+const contenedores = computed(() =>
+  stocks.value.filter(s =>
+    s.forma_producto === 'flor_seca' &&
     ['pendiente_asignacion', 'asignado'].includes(s.estado)
   )
-})
-
-const stocksOtros = computed(() => {
-  const mismaIds = new Set(stocksMismaGenetica.value.map(s => s.id))
-  return stocks.value.filter(s =>
-    !mismaIds.has(s.id) && ['pendiente_asignacion', 'asignado'].includes(s.estado)
-  )
-})
+)
 
 async function cargar() {
   loading.value = true
@@ -532,7 +548,7 @@ onMounted(cargar)
 }
 .apm-modal {
   background: #fff; border-radius: 14px;
-  width: 100%; max-width: 440px; max-height: 92vh; overflow-y: auto;
+  width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto;
   box-shadow: 0 24px 64px rgba(0,0,0,.18);
 }
 .apm-modal__hd {
@@ -566,12 +582,49 @@ onMounted(cargar)
   font-size: .9rem; color: #0f172a; outline: none; transition: border-color .15s;
 }
 .apm-input:focus { border-color: var(--c-leaf-700); background: #fff; }
-.apm-select { border-radius: 6px; appearance: none; -webkit-appearance: none; cursor: pointer; }
 .apm-suffix {
   background: #f1f5f9; border: 1.5px solid #e2e8f0; border-left: none;
   padding: .55rem .75rem; font-size: .82rem; font-weight: 600;
   color: #64748b; border-radius: 0 6px 6px 0; white-space: nowrap;
 }
+.apm-label-note { font-weight: 600; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+
+/* Selector de contenedores (tarjetas) */
+.apm-cont-list { display: flex; flex-direction: column; gap: .4rem; max-height: 320px; overflow-y: auto; padding: 2px; }
+.apm-cont {
+  display: flex; align-items: center; gap: .7rem; width: 100%; text-align: left;
+  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px;
+  padding: .65rem .8rem; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.apm-cont:hover { border-color: #cbd5e1; background: #fff; }
+.apm-cont--sel { border-color: var(--c-leaf-700); background: var(--c-leaf-50, #f0fdf4); }
+.apm-cont__radio {
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid #cbd5e1;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+}
+.apm-cont--sel .apm-cont__radio { border-color: var(--c-leaf-700); }
+.apm-cont__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-leaf-700); }
+.apm-cont__ico {
+  width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #e2e8f0; color: #475569;
+}
+.apm-cont__ico--stock { background: var(--c-leaf-100); color: var(--c-leaf-700); }
+.apm-cont__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .25rem; }
+.apm-cont__title {
+  display: flex; align-items: center; gap: .5rem; justify-content: space-between;
+  font-size: .85rem; font-weight: 700; color: #0f172a;
+}
+.apm-cont__qty { font-size: .8rem; font-weight: 700; color: var(--c-leaf-700); white-space: nowrap; }
+.apm-cont__meta { font-size: .74rem; color: #94a3b8; }
+.apm-cont__tags { display: flex; flex-wrap: wrap; gap: .3rem; }
+.apm-cont__tag {
+  display: inline-flex; align-items: center; gap: .2rem;
+  font-size: .7rem; font-weight: 600; color: #64748b;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 999px; padding: .1rem .5rem;
+}
+.apm-cont__tag--gen { color: var(--c-leaf-700); border-color: var(--c-leaf-200, #bbf7d0); }
+
 .apm-error {
   background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;
   padding: .5rem .75rem; border-radius: 6px; font-size: .82rem;

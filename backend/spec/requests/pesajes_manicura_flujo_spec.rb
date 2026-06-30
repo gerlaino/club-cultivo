@@ -192,4 +192,32 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(lote.estado).to eq('curado')
     expect(lote.rendimiento_real_g.to_f).to eq(30.0)
   end
+
+  # Al confirmar un pesaje sin elegir contenedor se crea un Stock 'pendiente_asignacion'
+  # (sin sede). Ese contenedor debe poder elegirse al confirmar el siguiente pesaje del
+  # mismo lote → GET /stocks?lote_id lo lista (el listado general lo excluía) y trae
+  # genetica_nombre (que la UI usa para agrupar por genética).
+  it 'el contenedor pendiente_asignacion creado al confirmar aparece en GET /stocks?lote_id' do
+    genetica = create(:genetica, club: club)
+    lote2 = create(:lote, club: club, sala: sala, estado: 'en_manicura',
+                   manicurador: manicura, genetica: genetica)
+    pesaje = lote2.pesajes_manicura.create!(
+      manicurador: manicura, club: club, fecha_pesaje: Date.current,
+      estado: 'enviado', enviado_at: Time.current, peso_total_g: 100, plantas_count: 1,
+    )
+
+    delete '/api/users/sign_out'
+    sign_in_as(admin)
+    post "/lotes/#{lote2.id}/pesajes_manicura/#{pesaje.id}/confirmar",
+         params: { peso_confirmado_g: 100 }, headers: auth_headers
+    expect(response).to have_http_status(:ok), response.body
+    stock = Stock.where(lote_id: lote2.id).last
+    expect(stock.estado).to eq('pendiente_asignacion')
+
+    get '/stocks', params: { lote_id: lote2.id }, headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    cont = JSON.parse(response.body).find { |s| s['id'] == stock.id }
+    expect(cont).to be_present
+    expect(cont['genetica_nombre']).to eq(genetica.nombre)
+  end
 end
