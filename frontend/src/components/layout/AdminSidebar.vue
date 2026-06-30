@@ -1,11 +1,10 @@
 <template>
   <aside class="asb" :class="{ 'asb--collapsed': collapsed }">
 
-    <!-- Marca del club (tenant) — protagonista -->
-    <RouterLink to="/" class="asb__brand" :title="clubName">
-      <img v-if="club.logoUrl" :src="club.logoUrl" class="asb__brand-logo" :alt="clubName" />
-      <span v-else class="asb__brand-fallback">{{ inicialClub }}</span>
-      <span class="asb__brand-name">{{ clubName }}</span>
+    <!-- Marca de la plataforma (el club va en el topbar) -->
+    <RouterLink to="/" class="asb__brand" title="Cultivo Espacial">
+      <img src="/logo-ce-icono.png" class="asb__brand-logo" alt="Cultivo Espacial" />
+      <span class="asb__brand-name">Cultivo Espacial</span>
     </RouterLink>
 
     <!-- Grupos primarios (1 click → su vista principal) -->
@@ -22,12 +21,6 @@
       </RouterLink>
     </nav>
 
-    <!-- Plataforma: presente pero discreta (powered by) -->
-    <div class="asb__platform" title="Cultivo Espacial">
-      <img src="/logo-ce-icono.png" class="asb__platform-logo" alt="" />
-      <span class="asb__platform-txt">por Cultivo Espacial</span>
-    </div>
-
     <button class="asb__collapse" @click="toggleCollapse" :title="collapsed ? 'Expandir menú' : 'Contraer menú'">
       <PanelLeftClose v-if="!collapsed" :size="15" :stroke-width="1.75" />
       <PanelLeftOpen  v-else            :size="15" :stroke-width="1.75" />
@@ -43,11 +36,9 @@ import {
   LayoutDashboard, Sprout, Users, Factory, ShoppingCart,
   CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-vue-next'
-import { useClubStore } from '../../stores/club.js'
 import { NAV_GROUPS, detectGroup, useNavContext } from '../../composables/useNavContext.js'
 
 const route = useRoute()
-const club  = useClubStore()
 const { collapsed, toggleCollapse, refreshBadges, badgeFor } = useNavContext()
 
 const ICONS = {
@@ -61,9 +52,7 @@ const ICONS = {
   config:    Settings,
 }
 
-const clubName    = computed(() => club.name || 'Mi club')
-const inicialClub = computed(() => (clubName.value || 'C').trim().charAt(0).toUpperCase())
-const activeKey   = computed(() => detectGroup(route.path).key)
+const activeKey = computed(() => detectGroup(route.path).key)
 
 function groupBadge(g) {
   return g.tabs.reduce((s, t) => s + (t.badge ? badgeFor(t.badge) : 0), 0)
@@ -88,12 +77,10 @@ watch(() => route.path, (path, prev) => {
 .asb--collapsed { width: 54px; }
 .asb--collapsed .asb__brand-name,
 .asb--collapsed .asb__label,
-.asb--collapsed .asb__badge,
-.asb--collapsed .asb__platform-txt { display: none; }
-.asb--collapsed .asb__brand    { justify-content: center; padding: 1.1rem .5rem; }
-.asb--collapsed .asb__link     { justify-content: center; padding: 10px 0; }
-.asb--collapsed .asb__platform { justify-content: center; padding: .6rem .5rem; }
-.asb--collapsed .asb__nav      { padding: var(--sp-3) var(--sp-1); }
+.asb--collapsed .asb__badge { display: none; }
+.asb--collapsed .asb__brand { justify-content: center; padding: 1.1rem .5rem; }
+.asb--collapsed .asb__link  { justify-content: center; padding: 10px 0; }
+.asb--collapsed .asb__nav   { padding: var(--sp-3) var(--sp-1); }
 
 /* Club brand */
 .asb__brand {
@@ -101,13 +88,8 @@ watch(() => route.path, (path, prev) => {
   padding: var(--sp-5) var(--sp-5) var(--sp-4);
   border-bottom: 1px solid rgba(168,201,181,0.18); flex-shrink: 0;
 }
-.asb__brand-logo { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,.12); }
-.asb__brand-fallback {
-  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,.16); color: var(--c-paper); font-weight: 800; font-size: .95rem;
-}
-.asb__brand-name { font-family: var(--font-display); font-size: var(--fs-16); font-weight: 600; color: var(--c-paper); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asb__brand-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,.1); }
+.asb__brand-name { font-family: var(--font-display); font-size: var(--fs-16); font-weight: 500; color: var(--c-paper); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Nav primario */
 .asb__nav { flex: 1; padding: var(--sp-3) var(--sp-2); display: flex; flex-direction: column; gap: 2px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(168,201,181,0.22) transparent; }
@@ -124,14 +106,6 @@ watch(() => route.path, (path, prev) => {
 .asb__link-ico { flex-shrink: 0; }
 .asb__label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .asb__badge { background: #d97706; color: #fff; font-size: 10px; font-weight: 700; line-height: 1; padding: 2px 6px; border-radius: 10px; min-width: 16px; text-align: center; }
-
-/* Plataforma (powered by) */
-.asb__platform {
-  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-  padding: .65rem var(--sp-5); border-top: 1px solid rgba(168,201,181,0.12);
-}
-.asb__platform-logo { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; opacity: .6; flex-shrink: 0; }
-.asb__platform-txt { font-size: 11px; color: rgba(168,201,181,0.5); font-weight: 500; white-space: nowrap; }
 
 .asb__collapse { display: flex; align-items: center; justify-content: center; width: 100%; height: 36px; border: none; background: none; color: rgba(168,201,181,0.45); cursor: pointer; flex-shrink: 0; transition: color .15s, background .15s; }
 .asb__collapse:hover { color: rgba(168,201,181,0.9); background: rgba(255,255,255,0.05); }

@@ -64,11 +64,12 @@ export const NAV_GROUPS = [
     key: 'config', label: 'Configuración', to: '/configuracion',
     tabs: [
       { to: '/configuracion', label: 'General' },
+      { to: '/configuracion/suscripcion', label: 'Suscripción' },
+      { to: '/usuarios', label: 'Equipo' },
       { to: '/sedes', label: 'Sedes' },
       { to: '/alertas-configuracion', label: 'Alertas' },
       { to: '/web', label: 'Sitio web' },
       { to: '/integraciones', label: 'Integraciones' },
-      { to: '/usuarios', label: 'Equipo' },
       { to: '/configuracion/papelera', label: 'Papelera' },
     ],
   },

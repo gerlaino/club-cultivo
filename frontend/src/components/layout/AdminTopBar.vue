@@ -7,7 +7,15 @@
         <Menu :size="20" :stroke-width="1.75" />
       </button>
 
-      <!-- Sub-pestañas del grupo activo (el grupo primario vive en el sidebar) -->
+      <!-- Identidad del club (tenant) -->
+      <div class="atb__club" :title="club.name">
+        <img v-if="club.logoUrl" :src="club.logoUrl" class="atb__club-logo" :alt="club.name" />
+        <DsAvatar v-else :name="club.name" tone="role-admin" size="md" />
+        <span class="atb__club-name">{{ club.name }}</span>
+      </div>
+      <span class="atb__club-sep" aria-hidden="true"></span>
+
+      <!-- Sub-pestañas del grupo activo, pegadas al club (el grupo primario vive en el sidebar) -->
       <nav v-if="activeGroup.tabs.length" class="atb__tabs" aria-label="Secciones">
         <RouterLink
           v-for="t in activeGroup.tabs" :key="t.to"
@@ -205,6 +213,20 @@ async function handleLogout() {
 }
 .atb__hamburger:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
 @media (max-width: 1023px) { .atb__hamburger { display: flex; } }
+
+/* Identidad del club */
+.atb__club { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; min-width: 0; }
+.atb__club-logo {
+  width: 36px; height: 36px; border-radius: var(--r-md);
+  object-fit: contain; padding: 2px; border: 1px solid var(--c-ink-100);
+  background: #fff; flex-shrink: 0; box-sizing: border-box;
+}
+.atb__club-name {
+  font-size: var(--fs-14); font-weight: 700; color: var(--c-ink-900);
+  white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em;
+}
+.atb__club-sep { width: 1px; height: 24px; background: var(--c-ink-200); flex-shrink: 0; }
+@media (max-width: 700px) { .atb__club-name { display: none; } }
 
 /* Sub-pestañas del grupo activo */
 .atb__tabs {
