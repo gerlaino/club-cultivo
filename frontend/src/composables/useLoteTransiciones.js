@@ -3,7 +3,7 @@ import { useToast } from './useToast.js'
 import { useLotesStore } from '../stores/lotes'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore } from '../stores/auth'
-import { transicionarLote, avanzarFaseLote, cerrarCurado, getSedeStocks, completarDatosLote, listGeneticas } from '../lib/api'
+import { transicionarLote, avanzarFaseLote } from '../lib/api'
 
 const ESTADO_META = {
   semilla:            { label: 'Semilla/Esqueje',   emoji: '🌱' },
@@ -49,52 +49,6 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
 
   // ── Cosecha parcial ───────────────────────────────────────
   const showCosechaPartialModal = ref(false)
-
-  // ── Cerrar curado ─────────────────────────────────────────
-  const showCerrarCuradoModal = ref(false)
-  const savingCurado          = ref(false)
-  const curadoError           = ref(null)
-  const curadoForm            = ref({ peso_curado_g: null, flor_seca: null, descarte: null, sede_destino_id: null, costo_unitario_ars: null, precio_sugerido_ars: null })
-
-  // ── Modal pre-finalización (campos incompletos post-cierre) ──
-  const showPreFinModal    = ref(false)
-  const preFinCampos       = ref([])  // [{ campo, label, valor }]
-  const savingPreFin       = ref(false)
-  const geneticasPreFin    = ref([])
-
-  async function cargarGeneticasPreFin() {
-    if (geneticasPreFin.value.length) return
-    try {
-      const { data } = await listGeneticas({ solo_club: 'true' })
-      geneticasPreFin.value = data || []
-    } catch { /* no crítico */ }
-  }
-
-  async function guardarCamposPreFin() {
-    const payload = {}
-    for (const c of preFinCampos.value) {
-      if (c.valor !== '' && c.valor != null) payload[c.campo] = c.valor
-    }
-    if (!Object.keys(payload).length) { showPreFinModal.value = false; return }
-    savingPreFin.value = true
-    try {
-      const { data } = await completarDatosLote(loteId, payload)
-      lotes.current = data
-    } catch { /* best-effort: el modal se cierra igual */ }
-    finally { savingPreFin.value = false; showPreFinModal.value = false }
-  }
-
-  const pesadaUltimaCurado = computed(() => {
-    if (!lotes.current?.pesadas) return null
-    return [...lotes.current.pesadas].reverse().find(p => p.fase_destino === 'curado') || null
-  })
-
-  const splitOk = computed(() => {
-    const f = curadoForm.value
-    if (!f.peso_curado_g) return false
-    const sum = (parseFloat(f.flor_seca) || 0) + (parseFloat(f.descarte) || 0)
-    return Math.abs(sum - parseFloat(f.peso_curado_g)) < 0.01
-  })
 
   // ── Helpers ───────────────────────────────────────────────
   function capitalizarFase(f) {
@@ -241,61 +195,6 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     onPhaseChange?.()
   }
 
-  // ── Cerrar curado ─────────────────────────────────────────
-  async function openCerrarCuradoModal() {
-    const sedeId = sedes?.value?.[0]?.id || null
-    curadoForm.value = {
-      peso_curado_g:       pesadaUltimaCurado.value?.peso_curado_g || null,
-      flor_seca:           null,
-      descarte:            null,
-      sede_destino_id:     sedeId,
-      costo_unitario_ars:  null,
-      precio_sugerido_ars: null,
-    }
-    curadoError.value           = null
-    showCerrarCuradoModal.value = true
-    if (sedeId) {
-      try {
-        const { data } = await getSedeStocks(sedeId, { canal: 'regulatorio' })
-        const stocks = (data || []).filter(s => s.forma_producto === 'flor_seca' && s.precio_sugerido_ars != null)
-        if (stocks.length) {
-          const ultimo = stocks.reduce((a, b) => (b.id > a.id ? b : a))
-          curadoForm.value.precio_sugerido_ars = parseFloat(ultimo.precio_sugerido_ars)
-        }
-      } catch {}
-    }
-  }
-
-  async function ejecutarCerrarCurado() {
-    savingCurado.value = true
-    curadoError.value  = null
-    try {
-      const { data } = await cerrarCurado(loteId, {
-        peso_curado_g:       curadoForm.value.peso_curado_g,
-        splitter:            { flor_seca: curadoForm.value.flor_seca, descarte: curadoForm.value.descarte },
-        sede_destino_id:     curadoForm.value.sede_destino_id,
-        costo_unitario_ars:  curadoForm.value.costo_unitario_ars,
-        precio_sugerido_ars: curadoForm.value.precio_sugerido_ars,
-      })
-      lotes.current               = data.lote
-      showCerrarCuradoModal.value = false
-      toast.success('Curado cerrado. Stock generado exitosamente.')
-      onPhaseChange?.()
-
-      // Mostrar modal de campos incompletos si hay campos críticos vacíos
-      const incompletos = data.campos_incompletos || []
-      if (incompletos.length) {
-        preFinCampos.value = incompletos.map(c => ({ ...c, valor: '' }))
-        showPreFinModal.value = true
-        cargarGeneticasPreFin()
-      }
-    } catch (e) {
-      curadoError.value = e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'Error al cerrar curado'
-    } finally {
-      savingCurado.value = false
-    }
-  }
-
   return {
     // Transición
     showTransicionModal, savingTransicion, transicionError, transicionForm, transicionSalaId,
@@ -307,15 +206,9 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     showCosechaModal, cosechaSalaId, savingCosecha, cosechaError, cosechaForm,
     // Cosecha parcial
     showCosechaPartialModal,
-    // Cerrar curado
-    showCerrarCuradoModal, savingCurado, curadoError, curadoForm, splitOk, pesadaUltimaCurado,
-    // Pre-finalización
-    showPreFinModal, preFinCampos, savingPreFin, geneticasPreFin,
-    guardarCamposPreFin,
     // Methods
     handleAvanzarFase, openTransicionModal, ejecutarTransicion,
     avanzarFaseRapido, ejecutarCosecha, onCosechadoParcial,
     onManicuraIniciada, onManicuraCompletada,
-    openCerrarCuradoModal, ejecutarCerrarCurado,
   }
 }

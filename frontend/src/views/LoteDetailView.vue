@@ -322,12 +322,9 @@ const {
   showIniciarManicuraModal, showCompletarManicuraModal,
   showCosechaModal, cosechaSalaId, savingCosecha, cosechaError, cosechaForm,
   showCosechaPartialModal,
-  showCerrarCuradoModal, savingCurado, curadoError, curadoForm, splitOk, pesadaUltimaCurado,
-  showPreFinModal, preFinCampos, savingPreFin, geneticasPreFin, guardarCamposPreFin,
   handleAvanzarFase, openTransicionModal, ejecutarTransicion,
   avanzarFaseRapido, ejecutarCosecha, onCosechadoParcial,
   onManicuraIniciada, onManicuraCompletada,
-  openCerrarCuradoModal, ejecutarCerrarCurado,
 } = useLoteTransiciones(id, { onPhaseChange: loadHistorial, sedes })
 
 // ── Escape key handler ─────────────────────────────────────
@@ -335,8 +332,6 @@ function loteEscapeHandler(e) {
   if (e.key !== 'Escape') return
   if (editarOpen.value)               { editarOpen.value = false; return }
   if (showRegistroModalNew.value)     { showRegistroModalNew.value = false; return }
-  if (showPreFinModal.value)          { showPreFinModal.value = false; return }
-  if (showCerrarCuradoModal.value)    { showCerrarCuradoModal.value = false; return }
   if (showCosechaPartialModal.value)  { showCosechaPartialModal.value = false; return }
   if (showCosechaModal.value)         { showCosechaModal.value = false; return }
   if (showAvanzarSalaModal.value)     { showAvanzarSalaModal.value = false; return }
@@ -418,9 +413,6 @@ onUnmounted(() => {
           </p>
         </div>
         <div class="ld__hero-actions">
-          <button v-if="canEdit && lote.puede_cerrar_curado" class="ld__btn-curado" @click="openCerrarCuradoModal">
-            <i class="bi bi-box-seam"></i>Cerrar curado
-          </button>
           <button
             v-if="canAdmin && ['en_manicura'].includes(lote.estado)"
             class="ld__btn-completar-manicura"
@@ -887,80 +879,6 @@ onUnmounted(() => {
       </div>
     </Teleport>
 
-    <!-- ══ Modal Cerrar Curado ══ -->
-    <Teleport to="body">
-      <div v-if="showCerrarCuradoModal" class="ld__overlay">
-        <div class="ld__modal" style="max-width:500px">
-          <div class="ld__modal-header">
-            <div>
-              <h3 class="ld__modal-title">🫙 Cerrar curado y generar stock</h3>
-              <p class="ld__modal-sub">{{ lote?.codigo }}</p>
-            </div>
-            <button class="ld__modal-close" @click="showCerrarCuradoModal = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="ld__modal-body">
-            <div v-if="curadoError" class="ld__alert">{{ curadoError }}</div>
-
-            <!-- Peso curado -->
-            <div class="ld__field" style="margin-bottom:1rem">
-              <label class="ld__label">Peso curado (g) <span style="color:#dc2626">*</span></label>
-              <input type="number" step="0.1" min="0" class="ld__input" v-model.number="curadoForm.peso_curado_g" placeholder="ej: 320.0" />
-              <span class="ld__optional">Peso final del producto curado</span>
-            </div>
-
-            <!-- Splitter -->
-            <div class="ld__modal-section-title">Distribución del lote</div>
-            <div class="ld__grid" style="margin-bottom:.5rem">
-              <div class="ld__field">
-                <label class="ld__label">Flor seca (g) <span style="color:#dc2626">*</span></label>
-                <input type="number" step="0.1" min="0" class="ld__input" v-model.number="curadoForm.flor_seca" placeholder="ej: 280.0" />
-              </div>
-              <div class="ld__field">
-                <label class="ld__label">Descarte (g) <span style="color:#dc2626">*</span></label>
-                <input type="number" step="0.1" min="0" class="ld__input" v-model.number="curadoForm.descarte" placeholder="ej: 40.0" />
-              </div>
-            </div>
-            <div class="ld__split-check" :class="splitOk ? 'ld__split-check--ok' : 'ld__split-check--err'">
-              <span v-if="curadoForm.peso_curado_g">
-                Total: {{ ((parseFloat(curadoForm.flor_seca) || 0) + (parseFloat(curadoForm.descarte) || 0)).toFixed(1) }}g
-                / {{ parseFloat(curadoForm.peso_curado_g).toFixed(1) }}g
-                <strong v-if="splitOk"> ✓</strong>
-                <span v-else style="color:#dc2626"> ✗ debe coincidir exactamente</span>
-              </span>
-              <span v-else style="color:#94a3b8">Ingresá el peso curado para validar el splitter</span>
-            </div>
-
-            <!-- Stock -->
-            <div class="ld__modal-section-title">Stock generado (flor seca)</div>
-            <div class="ld__field" style="margin-bottom:1rem">
-              <label class="ld__label">Sede destino <span style="color:#dc2626">*</span></label>
-              <select class="ld__input" v-model="curadoForm.sede_destino_id">
-                <option :value="null" disabled>Seleccioná una sede…</option>
-                <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-              </select>
-            </div>
-            <div class="ld__grid">
-              <div class="ld__field">
-                <label class="ld__label">Costo unitario (ARS/g) <span class="ld__optional">opcional</span></label>
-                <input type="number" step="0.01" min="0" class="ld__input" v-model.number="curadoForm.costo_unitario_ars" placeholder="ej: 1200.00" />
-              </div>
-              <div class="ld__field">
-                <label class="ld__label">Precio sugerido (ARS/g) <span class="ld__optional">opcional</span></label>
-                <input type="number" step="0.01" min="0" class="ld__input" v-model.number="curadoForm.precio_sugerido_ars" placeholder="ej: 2500.00" />
-              </div>
-            </div>
-          </div>
-          <div class="ld__modal-footer">
-            <button class="ld__btn-ghost" :disabled="savingCurado" @click="showCerrarCuradoModal = false">Cancelar</button>
-            <button class="ld__btn-primary" :disabled="savingCurado || !splitOk || !curadoForm.sede_destino_id" @click="ejecutarCerrarCurado">
-              <DsSpinner v-if="savingCurado" :size="14" />
-              <i v-else class="bi bi-box-seam"></i>Cerrar curado
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
     <!-- ══ Modal Cosecha Parcial ══ -->
     <ModalCosechaPartial
       v-if="showCosechaPartialModal && lote"
@@ -988,87 +906,6 @@ onUnmounted(() => {
       @completado="onManicuraCompletada"
     />
 
-    <!-- ══ Modal Campos Incompletos (post-finalización) ══ -->
-    <Teleport to="body">
-      <div v-if="showPreFinModal" class="ld__overlay">
-        <div class="ld__modal" style="max-width:480px">
-          <div class="ld__modal-header">
-            <div>
-              <h3 class="ld__modal-title">✅ Lote finalizado</h3>
-              <p class="ld__modal-sub">Hay campos que quedaron sin completar. Podés hacerlo ahora o saltear.</p>
-            </div>
-            <button class="ld__modal-close" @click="showPreFinModal = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="ld__modal-body">
-            <p class="ld__prefin-desc">
-              Una vez cerrado el modal, el lote queda <strong>bloqueado para edición</strong>.
-              Si completás estos datos ahora quedan registrados para analítica y trazabilidad.
-            </p>
-
-            <div v-for="campo in preFinCampos" :key="campo.campo" class="ld__field" style="margin-bottom:.875rem">
-              <label class="ld__label">{{ campo.label }}</label>
-
-              <!-- Genética -->
-              <select v-if="campo.campo === 'genetica_id'" v-model="campo.valor" class="ld__input">
-                <option value="">— No especificar —</option>
-                <option v-for="g in geneticasPreFin" :key="g.id" :value="g.id">
-                  {{ g.nombre }} — {{ g.tipo }}
-                </option>
-              </select>
-
-              <!-- Fotoperiodo floración -->
-              <select v-else-if="campo.campo === 'fotoperiodo'" v-model="campo.valor" class="ld__input">
-                <option value="">— No especificar —</option>
-                <option value="14/10">14/10 hs</option>
-                <option value="13/11">13/11 hs</option>
-                <option value="12/12">12/12 hs</option>
-                <option value="auto">Auto (autofloreciente)</option>
-              </select>
-
-              <!-- Fotoperiodo vegetativo -->
-              <select v-else-if="campo.campo === 'fotoperiodo_vegetativo'" v-model="campo.valor" class="ld__input">
-                <option value="">— No especificar —</option>
-                <option value="24/0">24/0 hs</option>
-                <option value="20/4">20/4 hs</option>
-                <option value="18/6">18/6 hs</option>
-                <option value="16/8">16/8 hs</option>
-              </select>
-
-              <!-- Semanas en floración -->
-              <input v-else-if="campo.campo === 'semanas_floracion'"
-                type="number" min="1" max="30" step="1"
-                class="ld__input" placeholder="Ej: 9" v-model.number="campo.valor" />
-
-              <!-- Tamaño de maceta final -->
-              <select v-else-if="campo.campo === 'tamanio_maceta'" v-model="campo.valor" class="ld__input">
-                <option value="">— No especificar —</option>
-                <option value="0.5">Vaso (0.5 L)</option>
-                <option value="1">1 litro</option>
-                <option value="3">3 litros</option>
-                <option value="5">5 litros</option>
-                <option value="7">7 litros</option>
-                <option value="10">10 litros</option>
-                <option value="12">12 litros</option>
-                <option value="15">15 litros</option>
-                <option value="20">20 litros</option>
-              </select>
-
-              <input v-else v-model="campo.valor" type="text" class="ld__input" />
-            </div>
-          </div>
-          <div class="ld__modal-footer">
-            <button class="ld__btn-ghost" :disabled="savingPreFin" @click="showPreFinModal = false">
-              Saltear
-            </button>
-            <button class="ld__btn-primary" :disabled="savingPreFin" @click="guardarCamposPreFin">
-              <DsSpinner v-if="savingPreFin" :size="14" />
-              <i v-else class="bi bi-check2-circle"></i>
-              Guardar y cerrar
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
   </div>
 </template>
@@ -1246,8 +1083,6 @@ onUnmounted(() => {
 .ld__finalizado-banner i { color: #64748b; flex-shrink: 0; margin-top: .1rem; font-size: 1rem; }
 .ld__finalizado-banner strong { color: #0f172a; }
 
-/* Modal pre-fin */
-.ld__prefin-desc { font-size: .82rem; color: #64748b; margin-bottom: 1.25rem; line-height: 1.6; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: .65rem .875rem; }
 .ld__crear-sala-link { margin-top: .4rem; }
 .ld__link-btn { background: none; border: none; color: #15803d; font-size: .78rem; font-weight: 600; cursor: pointer; padding: 0; display: inline-flex; align-items: center; gap: .3rem; }
 .ld__link-btn:hover { color: #14532d; text-decoration: underline; }
@@ -1268,15 +1103,8 @@ onUnmounted(() => {
 .ld__checkbox-row { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: #374151; cursor: pointer; user-select: none; }
 .ld__checkbox-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; flex-shrink: 0; }
 .ld__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; margin-bottom: 1rem; }
-/* Cerrar curado button */
-.ld__btn-curado { display: inline-flex; align-items: center; gap: .35rem; background: #1d4ed8; color: #fff; border: none; padding: .5rem .9rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
-.ld__btn-curado:hover { background: #1e40af; }
 .ld__btn-completar-manicura { display: inline-flex; align-items: center; gap: .35rem; background: #059669; color: #fff; border: none; padding: .5rem .9rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .ld__btn-completar-manicura:hover { background: #047857; }
-/* Split validator */
-.ld__split-check { font-size: .8rem; padding: .5rem .75rem; border-radius: 8px; margin-top: .25rem; }
-.ld__split-check--ok { background: #f0fdf4; color: #16a34a; }
-.ld__split-check--err { background: #fef2f2; color: #dc2626; }
 
 /* Sección badge + chevron */
 .ld__section-badge { display: inline-flex; align-items: center; justify-content: center; background: #d4e6d4; color: #1b5e20; border-radius: 99px; font-size: .68rem; font-weight: 700; min-width: 18px; height: 18px; padding: 0 5px; margin-left: .3rem; }

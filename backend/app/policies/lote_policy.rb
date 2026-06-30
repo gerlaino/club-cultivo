@@ -8,10 +8,6 @@ class LotePolicy < ApplicationPolicy
     mismo_club? && puede_avanzar_fase_actual?
   end
 
-  def cerrar_curado?
-    mismo_club? && admin?
-  end
-
   def asignar_manicurador?
     mismo_club? && admin?
   end

@@ -85,7 +85,6 @@ export const getLote      = (id)         => api.get(`/lotes/${id}`)
 export const getLotePorQR = (codigoQr)   => api.get(`/lotes/por_qr/${codigoQr}`)
 export const createLote = (salaId, payload) => api.post(`/salas/${salaId}/lotes`, { lote: payload });
 export const updateLote         = (id, payload, extra = {}) => api.put(`/lotes/${id}`, { lote: payload, ...extra });
-export const completarDatosLote = (id, payload) => api.patch(`/lotes/${id}/completar_datos`, { lote: payload });
 export const registrarTrasplante = (id, payload) => api.post(`/lotes/${id}/registrar_trasplante`, payload);
 export const deleteLote = (id) => api.delete(`/lotes/${id}`);
 export const getLoteProximoCodigo = () => api.get('/lotes/proximo_codigo')
@@ -474,7 +473,6 @@ export const getPlantaPorQR = (codigoQr) => api.get(`/plants/por_qr/${codigoQr}`
 // ── Lote ciclo productivo ─────────────────────────────────────────────────────
 export const transicionarLote  = (loteId, payload) => api.post(`/lotes/${loteId}/transiciones`, payload)
 export const avanzarFaseLote   = (loteId, payload = {}) => api.post(`/lotes/${loteId}/avanzar_fase`, payload)
-export const cerrarCurado      = (loteId, payload) => api.post(`/lotes/${loteId}/cerrar_curado`, payload)
 export const getLoteTimeline  = (loteId)          => api.get(`/lotes/${loteId}/timeline`)
 export const getLoteHistorial = (loteId)          => api.get(`/lotes/${loteId}/historial`)
 export const previewLotePlan  = (loteId, planId, fechaInicio)  => api.get(`/lotes/${loteId}/preview_plan`, { params: { plan_trabajo_id: planId, fecha_inicio: fechaInicio || undefined } })

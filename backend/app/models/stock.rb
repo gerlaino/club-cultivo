@@ -155,7 +155,7 @@ class Stock < ApplicationRecord
     case origen
     when 'lote'
       errors.add(:lote_id, 'es obligatorio para origen lote')        if lote_id.blank?
-      # cualquier forma_producto válida al cerrar curado
+      # el stock de un lote es flor_seca (lo genera la confirmación de manicura)
     when 'derivado_lote'
       return if es_split
       errors.add(:lote_id, 'es obligatorio para derivados')           if lote_id.blank?

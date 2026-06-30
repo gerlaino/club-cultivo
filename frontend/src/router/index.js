@@ -422,17 +422,6 @@ const routes = [
   },
 
   {
-    path: '/admin/curado',
-    name: 'admin-curado',
-    component: () => import('../views/admin/AdminCuradoView.vue'),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore()
-      if (auth.user?.role !== 'admin') return next('/')
-      next()
-    },
-  },
-  {
     path: '/admin/cosechado',
     name: 'admin-cosechado',
     component: () => import('../views/admin/AdminCosechadoView.vue'),

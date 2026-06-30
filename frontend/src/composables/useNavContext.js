@@ -19,7 +19,7 @@ const TAB_ROUTES = {
   cultivo:     ['/salas', '/lotes', '/plantas', '/geneticas'],
   pacientes:   ['/pacientes', '/historial', '/informe-semestral', '/socios'],
   operaciones: [
-    '/admin/stock', '/admin/cosechado', '/admin/curado', '/admin/pesajes-manicura',
+    '/admin/stock', '/admin/cosechado', '/admin/pesajes-manicura',
     '/delivery/despachos', '/contabilidad',
   ],
   tareas: ['/tareas', '/plan-trabajo'],

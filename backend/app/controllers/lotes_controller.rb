@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :cerrar_curado, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :registrar_trasplante]
+  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :registrar_trasplante]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -488,17 +488,6 @@ class LotesController < ApplicationController
     end
   end
 
-  # POST /lotes/:id/cerrar_curado
-  # Formato nuevo: { pesada: {tipo, cantidad_g, mermas_g}, stocks: [{sede_id, forma_producto, ...}] }
-  # Formato legacy: { splitter:, sede_destino_id:, ... }
-  def cerrar_curado
-    authorize @lote, :cerrar_curado?
-    if params[:stocks].present?
-      cerrar_curado_con_stocks
-    else
-      cerrar_curado_legacy
-    end
-  end
 
   # GET /lotes/:id/preview_plan?plan_trabajo_id=X
   def preview_plan
@@ -897,102 +886,6 @@ class LotesController < ApplicationController
       :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico,
       planta_madre_ids: []
     )
-  end
-
-  def cerrar_curado_con_stocks
-    raise RuntimeError, 'El lote no está en curado' unless @lote.estado == 'curado'
-
-    pesada_data   = params.require(:pesada).permit(:fase_origen, :fase_destino, :peso_curado_g, :notas)
-    stocks_params = params[:stocks].map { |s| s.permit(:forma_producto, :cantidad, :unidad, :precio_sugerido_ars) }
-
-    peso_curado_g = pesada_data[:peso_curado_g].to_d
-    total_stock   = stocks_params.sum { |s| s[:cantidad].to_d }
-
-    if total_stock > peso_curado_g
-      return render json: { error: "Stocks generados (#{total_stock}g) exceden peso curado disponible (#{peso_curado_g}g)" },
-                    status: :unprocessable_entity
-    end
-
-    ActiveRecord::Base.transaction do
-      pesada = @lote.pesadas.create!(
-        fase_origen:    pesada_data[:fase_origen]  || 'curado',
-        fase_destino:   pesada_data[:fase_destino] || 'finalizado',
-        peso_curado_g:  peso_curado_g,
-        notas:          pesada_data[:notas],
-        registrado_por: current_user,
-        registrado_at:  Time.current,
-      )
-
-      # Stocks nacen sin sede asignada — el admin decide destino en el siguiente paso
-      stocks_creados = stocks_params.map do |sp|
-        stock = Stock.create!(
-          sede:               nil,
-          lote:               @lote,
-          origen:             'lote',
-          estado:             'pendiente_asignacion',
-          forma_producto:     sp[:forma_producto],
-          cantidad:           sp[:cantidad].to_d,
-          unidad:             sp[:unidad] || 'g',
-          precio_sugerido_ars: sp[:precio_sugerido_ars],
-        )
-        stock.stock_movimientos.create!(
-          tipo:    'produccion',
-          gramos:  stock.cantidad,
-          usuario: current_user,
-        )
-        stock
-      end
-
-      @lote.update!(estado: 'finalizado')
-
-      lote_final = @lote.reload
-      render json: {
-        lote:               LoteSerializer.serialize(lote_final),
-        pesada:             PesadaSerializer.serialize(pesada),
-        stocks:             stocks_creados.map { |s| StockSerializer.serialize_inline(s) },
-        campos_incompletos: campos_incompletos_lote(lote_final),
-      }, status: :created
-    end
-  rescue RuntimeError, ArgumentError => e
-    render json: { error: e.message }, status: :unprocessable_entity
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-  end
-
-  def cerrar_curado_legacy
-    splitter = params[:splitter]&.to_unsafe_h&.symbolize_keys || {}
-    stock = @lote.cerrar_curado!(
-      splitter:            splitter,
-      sede_destino_id:     params[:sede_destino_id],
-      costo_unitario_ars:  params[:costo_unitario_ars],
-      precio_sugerido_ars: params[:precio_sugerido_ars],
-      registrado_por:      current_user,
-      peso_curado_g:       params[:peso_curado_g],
-    )
-    lote_final = @lote.reload
-    render json: {
-      lote:               LoteSerializer.serialize(lote_final),
-      stock:              StockSerializer.serialize_inline(stock),
-      campos_incompletos: campos_incompletos_lote(lote_final),
-    }, status: :created
-  rescue ArgumentError, RuntimeError => e
-    render json: { error: e.message }, status: :unprocessable_entity
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-  end
-
-  CAMPOS_CRITICOS = {
-    genetica_id:            'Genética / variedad',
-    fotoperiodo:            'Fotoperiodo floración',
-    fotoperiodo_vegetativo: 'Fotoperiodo vegetativo',
-    semanas_floracion:      'Semanas en floración',
-    tamanio_maceta:         'Tamaño de maceta final',
-  }.freeze
-
-  def campos_incompletos_lote(lote)
-    CAMPOS_CRITICOS.filter_map do |campo, label|
-      { campo: campo, label: label } if lote.send(campo).blank?
-    end
   end
 
   def siguiente_pasada(lote)
