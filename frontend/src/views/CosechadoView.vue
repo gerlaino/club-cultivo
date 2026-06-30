@@ -113,11 +113,10 @@ const loading = ref(true)
 const lotes   = ref([])
 const pagina  = ref(1)
 
-const POST_HARVEST = ['cosecha', 'manicura_pendiente', 'en_manicura', 'curado', 'finalizado']
+const POST_HARVEST = ['cosecha', 'en_manicura', 'curado', 'finalizado']
 const ESTADO_LABEL = {
   floracion:         'Cosecha parcial',
   cosecha:           'Cosecha',
-  manicura_pendiente:'Manicura pend.',
   en_manicura:       'En manicura',
   curado:            'Curado',
   finalizado:        'Finalizado',
@@ -230,7 +229,6 @@ onMounted(async () => {
 .cv__estado-pill--floracion         { background: #fef3c7; color: #92400e; border: 1px dashed #fcd34d; }
 .cv__estado-pill--cosecha           { background: #fef9c3; color: #854d0e; }
 .cv__estado-pill--secado            { background: #e0f2fe; color: #0369a1; }
-.cv__estado-pill--manicura_pendiente{ background: #fce7f3; color: #9d174d; }
 .cv__estado-pill--en_manicura       { background: #ede9fe; color: #5b21b6; }
 .cv__estado-pill--curado            { background: #dcfce7; color: #14532d; }
 .cv__estado-pill--finalizado        { background: #f1f5f9; color: #475569; }

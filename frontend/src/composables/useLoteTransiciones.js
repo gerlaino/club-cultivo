@@ -10,7 +10,6 @@ const ESTADO_META = {
   vegetativo:         { label: 'Vegetativo',         emoji: '🍃' },
   floracion:          { label: 'Floración',          emoji: '🌸' },
   cosecha:            { label: 'Cosecha',            emoji: '🌿' },
-  manicura_pendiente: { label: 'Manicura pendiente', emoji: '✂️'  },
   curado:             { label: 'Curado',             emoji: '🫙' },
   finalizado:         { label: 'Finalizado',         emoji: '✅' },
 }

@@ -51,9 +51,7 @@
         <tbody>
           <tr v-for="s in stocksFiltrados" :key="s.id">
             <td>
-              <RouterLink v-if="s.lote_id" :to="`/lotes/${s.lote_id}`" class="sv__lote-link">
-                {{ s.lote_codigo }}
-              </RouterLink>
+              <span v-if="s.lote_id" class="sv__lote-codigo">{{ s.lote_codigo }}</span>
               <span v-else class="sv__ext">externo</span>
             </td>
             <td>{{ nombreSede(s.sede_id) }}</td>
@@ -168,8 +166,7 @@ onMounted(cargar)
 .sv__table tbody tr:hover td { background: var(--c-ink-50); }
 .sv__th-num, .sv__td-num { text-align: right; }
 
-.sv__lote-link { font-weight: 700; color: #6B4FBE; text-decoration: none; font-family: var(--font-mono); }
-.sv__lote-link:hover { text-decoration: underline; }
+.sv__lote-codigo { font-weight: 700; color: var(--c-ink-800); font-family: var(--font-mono); }
 .sv__ext { font-size: var(--fs-12); color: var(--c-ink-400); font-style: italic; }
 .sv__forma { font-size: var(--fs-12); background: var(--c-ink-100); color: var(--c-ink-600); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 .sv__td-date { white-space: nowrap; color: var(--c-ink-400); font-size: var(--fs-13); }

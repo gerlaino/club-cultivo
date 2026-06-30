@@ -30,7 +30,7 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
   end
 
   context 'estados no creables (post-stock / proceso)' do
-    %w[curado finalizado en_manicura manicura_pendiente].each do |estado|
+    %w[curado finalizado en_manicura].each do |estado|
       it "rechaza crear en estado '#{estado}'" do
         crear(estado: estado, plants_count: 3, start_date: Date.today)
         expect(response).to have_http_status(:unprocessable_entity)

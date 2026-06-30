@@ -15,7 +15,7 @@ const error = ref(null)
 // Estados donde el cultivador todavía opera el lote
 const ESTADOS_CULTIVADOR = ['semilla', 'esqueje', 'vegetativo', 'floracion']
 // Estados donde la manicura puede actuar
-const ESTADOS_MANICURA   = ['manicura_pendiente', 'en_manicura']
+const ESTADOS_MANICURA   = ['en_manicura']
 
 onMounted(async () => {
   try {

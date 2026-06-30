@@ -96,7 +96,7 @@ const ALL_NAV_LINKS = [
   { to: '/contabilidad',      icon: 'bi-cash-stack',         label: 'Caja',       perm: ['movimientos_contables','index'] },
   { to: '/tareas',            icon: 'bi-clipboard-check',    label: 'Tareas',     perm: ['tareas','index'] },
   { to: '/geneticas',         icon: 'bi-diagram-3',          label: 'Genéticas',  perm: ['geneticas','index'] },
-  { to: '/manicura',          icon: 'bi-scissors',           label: 'Manicura',   perm: ['manicura','access'] },
+  { to: '/mnc/pendientes',    icon: 'bi-scissors',           label: 'Manicura',   perm: ['manicura','access'] },
   { to: '/informe-semestral', icon: 'bi-file-earmark-text',  label: 'REPROCANN',  perm: ['informe_semestral','show'] },
   { to: '/documentos',        icon: 'bi-file-earmark',       label: 'Docs',       perm: ['documentos','index'] },
   { to: '/usuarios',          icon: 'bi-person-badge',       label: 'Equipo',     adminOnly: true },
@@ -110,7 +110,7 @@ const ROLE_PRIORITY = {
   dispensador: ['/', '/pacientes', '/__dispensario__', '/tareas'],
   cultivador:  ['/', '/sedes', '/tareas', '/geneticas'],
   supervisor:  ['/', '/sedes', '/salas', '/tareas'],
-  manicura:    ['/', '/sedes', '/manicura', '/geneticas'],
+  manicura:    ['/', '/sedes', '/mnc/pendientes', '/geneticas'],
   abogado:     ['/documentos'],
   auditor:     ['/', '/pacientes', '/informe-semestral'],
   socio:       ['/'],
@@ -467,7 +467,7 @@ onMounted(async () => {
               <RouterLink class="nav-link px-2" to="/tareas" @click="closeNav">Tareas</RouterLink>
             </li>
             <li class="nav-item" v-if="can('manicura', 'access')">
-              <RouterLink class="nav-link px-2" to="/manicura" @click="closeNav">Manicura</RouterLink>
+              <RouterLink class="nav-link px-2" to="/mnc/pendientes" @click="closeNav">Manicura</RouterLink>
             </li>
             <li class="nav-item" v-if="isAdmin">
               <RouterLink class="nav-link px-2" to="/web" @click="closeNav">Web</RouterLink>

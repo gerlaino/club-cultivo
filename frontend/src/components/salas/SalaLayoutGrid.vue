@@ -13,7 +13,6 @@ const STAGE_GRADIENT = {
   vegetativo:        'linear-gradient(160deg, #15803d 0%, #166534 100%)',
   floracion:         'linear-gradient(160deg, #b45309 0%, #92400e 100%)',
   cosecha:           'linear-gradient(160deg, #1d4ed8 0%, #1e3a8a 100%)',
-  manicura_pendiente:'linear-gradient(160deg, #7c3aed 0%, #5b21b6 100%)',
   en_manicura:       'linear-gradient(160deg, #9333ea 0%, #6d28d9 100%)',
   curado:            'linear-gradient(160deg, #0369a1 0%, #075985 100%)',
   finalizado:        'linear-gradient(160deg, #374151 0%, #1f2937 100%)',
@@ -21,13 +20,13 @@ const STAGE_GRADIENT = {
 
 const STAGE_LABEL = {
   semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
-  floracion: 'Floración', cosecha: 'Cosecha', manicura_pendiente: 'Manicura pendiente', en_manicura: 'En manicura',
+  floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'En manicura',
   curado: 'Curado', finalizado: 'Finalizado',
 }
 
 const STAGE_EMOJI = {
   semilla: '🌱', esqueje: '✂️', vegetativo: '🍃', floracion: '🌸',
-  cosecha: '✅', manicura_pendiente: '⏳', en_manicura: '✂️',
+  cosecha: '✅', en_manicura: '✂️',
   curado: '🫙', finalizado: '📦',
 }
 

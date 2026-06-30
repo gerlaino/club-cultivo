@@ -162,7 +162,6 @@ RSpec.describe Lote, type: :model do
       'floracion'         => 40,
       'cosecha'           => 60,
       'en_manicura'       => 72,
-      'manicura_pendiente'=> 82,
       'curado'            => 92,
       'finalizado'        => 100,
     }.each do |estado, pct|

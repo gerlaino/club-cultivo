@@ -172,7 +172,7 @@ const tareas        = ref([])
 
 const ESTADO_LABEL = {
   semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
-  floracion: 'Floración', cosecha: 'Cosecha', manicura_pendiente: 'Manicura pend.', en_manicura: 'En manicura',
+  floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'En manicura',
   curado: 'Curado', finalizado: 'Finalizado',
 }
 const TAREA_EMOJI = {

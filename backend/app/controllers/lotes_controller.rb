@@ -32,15 +32,9 @@ class LotesController < ApplicationController
     end
 
     if current_user.manicura?
-      # Nuevo flujo: lotes asignados (en_manicura o manicura_pendiente con manicurador_id)
-      # Legacy: lotes en secado/manicura_pendiente sin manicurador_id
-      lotes = lotes.where(
-        lotes: { estado: 'en_manicura', manicurador_id: current_user.id }
-      ).or(lotes.where(
-        lotes: { estado: 'manicura_pendiente', manicurador_id: current_user.id }
-      )).or(lotes.where(
-        lotes: { estado: %w[manicura_pendiente], manicurador_id: nil }
-      ))
+      # El manicura ve los lotes en manicura que el admin le asignó. La "espera de
+      # aprobación" no es un estado del lote: es un PesajeManicura ya enviado (ver abajo).
+      lotes = lotes.where(lotes: { estado: 'en_manicura', manicurador_id: current_user.id })
       # Flujo nuevo: "en espera de aprobación" = lotes con un pesaje ya enviado por
       # este manicura (el lote sigue en_manicura, lo que espera es el PesajeManicura).
       if ActiveModel::Type::Boolean.new.cast(params[:pesaje_enviado])
@@ -52,7 +46,7 @@ class LotesController < ApplicationController
         lotes = lotes.where(estado: params[:estado])
       end
     elsif params[:manicura].present?
-      lotes = lotes.where(estado: %w[cosecha en_manicura manicura_pendiente curado])
+      lotes = lotes.where(estado: %w[cosecha en_manicura curado])
     else
       lotes = lotes.where(estado: params[:estado]) if params[:estado].present?
     end
@@ -118,7 +112,7 @@ class LotesController < ApplicationController
 
     # Estados creables: ciclo previo a stock + cosechado. secado/curado/finalizado
     # y los de manicura son post-stock o de proceso y no se cargan a mano.
-    estados_no_creables = %w[en_manicura manicura_pendiente curado finalizado]
+    estados_no_creables = %w[en_manicura curado finalizado]
     if estados_no_creables.include?(@lote.estado.to_s)
       return render json: { errors: ["No se puede crear un lote en estado '#{@lote.estado}'"] }, status: :unprocessable_entity
     end
@@ -689,7 +683,7 @@ class LotesController < ApplicationController
     'semilla' => 'Semilla', 'esqueje' => 'Esqueje', 'germinacion' => 'Germinación',
     'vegetativo' => 'Vegetativo', 'floracion' => 'Floración', 'cosecha' => 'Cosecha',
     'secado' => 'Secado', 'curado' => 'Curado', 'finalizado' => 'Finalizado',
-    'en_manicura' => 'En manicura', 'manicura_pendiente' => 'Manicura pendiente',
+    'en_manicura' => 'En manicura',
   }.freeze
 
   # GET /lotes/:id/historial
@@ -872,13 +866,7 @@ class LotesController < ApplicationController
       salas_ids = current_user.salas_ids_en_sedes_asignadas
       scope = scope.where(sala_id: salas_ids)
     elsif current_user.manicura?
-      scope = scope.where(
-        lotes: { estado: 'en_manicura', manicurador_id: current_user.id }
-      ).or(scope.where(
-        lotes: { estado: 'manicura_pendiente', manicurador_id: current_user.id }
-      )).or(scope.where(
-        lotes: { estado: %w[manicura_pendiente], manicurador_id: nil }
-      ))
+      scope = scope.where(lotes: { estado: 'en_manicura', manicurador_id: current_user.id })
     end
     @lote = scope.find(params[:id])
   rescue ActiveRecord::RecordNotFound

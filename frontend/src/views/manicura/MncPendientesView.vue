@@ -4,22 +4,9 @@
     <!-- Header -->
     <div class="mnp__header">
       <div>
-        <h1 class="mnp__title">Cosechas pendientes</h1>
-        <p class="mnp__sub">Cosechas en manicura y enviadas a aprobación.</p>
+        <h1 class="mnp__title">Cosechas asignadas</h1>
+        <p class="mnp__sub">Cosechas que el admin te asignó para manicurar.</p>
       </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="mnp__filters">
-      <button
-        v-for="f in FILTROS" :key="f.key"
-        class="mnp__chip"
-        :class="{ 'mnp__chip--active': filtro === f.key }"
-        @click="filtro = f.key"
-      >
-        {{ f.label }}
-        <span class="mnp__chip-count">{{ contar(f.key) }}</span>
-      </button>
     </div>
 
     <!-- Loading -->
@@ -28,10 +15,10 @@
     </div>
 
     <!-- Empty -->
-    <div v-else-if="!lotesFiltrados.length" class="mnp__empty">
+    <div v-else-if="!lotes.length" class="mnp__empty">
       <Wind :size="32" :stroke-width="1.25" />
-      <p>Sin cosechas pendientes</p>
-      <span>Cuando una cosecha entre en manicura aparecerá aquí.</span>
+      <p>Sin cosechas asignadas</p>
+      <span>El admin te asignará las cosechas cuando estén listas para manicurar.</span>
     </div>
 
     <!-- List -->
@@ -42,7 +29,7 @@
         :to="`/mnc/lotes/${lote.id}`"
         class="mnp__row"
       >
-        <div class="mnp__row-av" :class="lote.estado === 'secado' ? 'mnp__av--secado' : 'mnp__av--pendiente'">
+        <div class="mnp__row-av mnp__av--pendiente">
           <Scissors :size="14" :stroke-width="2" />
         </div>
         <div class="mnp__row-info">
@@ -56,12 +43,7 @@
           <span class="mnp__row-plants">
             <Package :size="12" :stroke-width="2" /> {{ lote.plants_count }}
           </span>
-          <span class="mnp__badge" :class="{
-            'mnp__badge--secado':    lote.estado === 'en_manicura',
-            'mnp__badge--pendiente': lote.estado === 'manicura_pendiente'
-          }">
-            {{ lote.estado === 'manicura_pendiente' ? 'Pdte. aprobación' : 'Asignado' }}
-          </span>
+          <span class="mnp__badge mnp__badge--pendiente">Asignado</span>
           <ChevronRight :size="15" class="mnp__row-arrow" />
         </div>
       </RouterLink>
@@ -82,37 +64,20 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Scissors, Wind, Package, ChevronRight } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
 
-const FILTROS = [
-  { key: 'todos',              label: 'Todos' },
-  { key: 'en_manicura',        label: 'Asignados' },
-  { key: 'manicura_pendiente', label: 'Pdte. aprobación' },
-]
-
 const loading = ref(true)
 const lotes   = ref([])
-const filtro  = ref('todos')
-
-const lotesFiltrados = computed(() => {
-  if (filtro.value === 'todos') return lotes.value
-  return lotes.value.filter(l => l.estado === filtro.value)
-})
 
 const PER_PAGE   = 10
 const page       = ref(1)
-const paginados  = computed(() => lotesFiltrados.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
-const totalPages = computed(() => Math.max(1, Math.ceil(lotesFiltrados.value.length / PER_PAGE)))
-watch([lotesFiltrados], () => { page.value = 1 })
-
-function contar(key) {
-  if (key === 'todos') return lotes.value.length
-  return lotes.value.filter(l => l.estado === key).length
-}
+const paginados  = computed(() => lotes.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
+const totalPages = computed(() => Math.max(1, Math.ceil(lotes.value.length / PER_PAGE)))
+watch(lotes, () => { page.value = 1 })
 
 async function cargar() {
   loading.value = true
   try {
     const { data } = await listLotes()
-    lotes.value = (data || []).filter(l => ['en_manicura', 'manicura_pendiente'].includes(l.estado))
+    lotes.value = (data || []).filter(l => l.estado === 'en_manicura')
   } catch {
     lotes.value = []
   } finally {
@@ -130,28 +95,6 @@ onMounted(cargar)
 .mnp__header { margin-bottom: var(--sp-5); }
 .mnp__title  { font-size: var(--fs-24); font-weight: 800; color: var(--c-ink-900); margin: 0 0 var(--sp-1); }
 .mnp__sub    { font-size: var(--fs-14); color: var(--c-ink-500); margin: 0; }
-
-/* Filters */
-.mnp__filters { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-5); flex-wrap: wrap; }
-.mnp__chip {
-  display: inline-flex; align-items: center; gap: var(--sp-2);
-  background: var(--c-paper); border: 1px solid var(--c-ink-200);
-  border-radius: 999px; padding: var(--sp-1) var(--sp-3);
-  font-size: var(--fs-13); font-weight: 500; color: var(--c-ink-600);
-  cursor: pointer; transition: all .15s;
-}
-.mnp__chip:hover { border-color: #5C7A4A; color: #5C7A4A; }
-.mnp__chip--active {
-  background: #5C7A4A; border-color: #5C7A4A; color: #fff;
-}
-.mnp__chip-count {
-  font-size: var(--fs-11); font-weight: 700;
-  background: rgba(255,255,255,.25); border-radius: 999px;
-  padding: 1px 6px; line-height: 1.4;
-}
-.mnp__chip:not(.mnp__chip--active) .mnp__chip-count {
-  background: var(--c-ink-100); color: var(--c-ink-500);
-}
 
 /* Loading */
 .mnp__loading {
@@ -181,7 +124,6 @@ onMounted(cargar)
   width: 32px; height: 32px; border-radius: var(--r-sm);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.mnp__av--secado    { background: #fffbeb; color: #b45309; }
 .mnp__av--pendiente { background: var(--c-leaf-100); color: var(--c-leaf-700); }
 
 .mnp__row-info {
@@ -207,7 +149,6 @@ onMounted(cargar)
   font-size: 12px; font-weight: 600; padding: .2em .65em;
   border-radius: 999px; text-transform: uppercase; letter-spacing: .04em;
 }
-.mnp__badge--secado    { background: #fffbeb; color: #b45309; }
 .mnp__badge--pendiente { background: var(--c-leaf-100); color: var(--c-leaf-700); }
 
 .mnp__row-arrow { color: var(--c-ink-300); }

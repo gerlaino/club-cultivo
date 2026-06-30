@@ -410,11 +410,11 @@ const routes = [
     meta: { requiresAuth: true }
   },
 
-  // Flujo de manicura unificado: la aprobación vive en /admin/pesajes-manicura.
-  // Rutas viejas redirigen para no romper bookmarks.
+  // Rutas legacy: el home del manicura es /mnc/pendientes; la aprobación (admin/supervisor)
+  // vive en /admin/pesajes-manicura. Se redirigen para no romper bookmarks viejos.
   {
     path: '/manicura',
-    redirect: '/admin/pesajes-manicura',
+    redirect: '/mnc/pendientes',
   },
   {
     path: '/aprobaciones',
@@ -540,6 +540,17 @@ const routes = [
     path: '/mnc/pesajes',
     name: 'mnc-pesajes',
     component: () => import('../views/manicura/MncPesajesView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (!['admin', 'manicura'].includes(auth.user?.role)) return next('/')
+      next()
+    },
+  },
+  {
+    path: '/mnc/stocks',
+    name: 'mnc-stocks',
+    component: () => import('../views/manicura/StocksManicuraView.vue'),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()

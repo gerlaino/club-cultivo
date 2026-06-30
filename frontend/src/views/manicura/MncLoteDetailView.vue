@@ -30,19 +30,6 @@
         </div>
       </div>
 
-      <!-- Waiting banner -->
-      <div v-if="lote.estado === 'manicura_pendiente'" class="mnl__waiting">
-        <CheckCircle :size="14" :stroke-width="2" />
-        <span>
-          <strong>Enviado para aprobación</strong>
-          <template v-if="lote.ultima_pesada_manicura">
-            — {{ pesadasKpi }} plantas · {{ totalGramosKpi }}g
-            <template v-if="lote.ultima_pesada_manicura.registrado_por"> · por {{ lote.ultima_pesada_manicura.registrado_por }}</template>
-          </template>
-        </span>
-        <span class="mnl__waiting-note">El admin revisará y puede ajustar el peso al aprobar.</span>
-      </div>
-
       <!-- KPIs — mismo patrón que SalaDetailView -->
       <div class="mnl__kpis">
         <div class="mnl__kpi">
@@ -77,9 +64,6 @@
       <div class="mnl__section">
         <div class="mnl__section-head">
           <h2 class="mnl__section-title"><Leaf :size="12" :stroke-width="2" /> Plantas del lote</h2>
-          <span v-if="lote.estado === 'manicura_pendiente'" class="mnl__locked-tag">
-            <Lock :size="11" /> Solo lectura
-          </span>
         </div>
 
         <div class="mnl__table-wrap">
@@ -200,7 +184,7 @@
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { ChevronLeft, Scissors, Leaf, CheckCircle, Scale, Send, X, Lock, RefreshCw } from 'lucide-vue-next'
+import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw } from 'lucide-vue-next'
 import { getLote, listPlants, createPesajeManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
@@ -238,12 +222,9 @@ const kpiPorc         = computed(() => plantas.value.length ? Math.min(100, Math
 const hasAnyHumedo    = computed(() => plantas.value.some(p => parseFloat(p.peso_humedo) > 0))
 
 const estadoBadgeClass = computed(() => ({
-  'mnl__estado-badge--asignado':   ['en_manicura'].includes(lote.value?.estado),
-  'mnl__estado-badge--pendiente':  lote.value?.estado === 'manicura_pendiente',
+  'mnl__estado-badge--asignado': lote.value?.estado === 'en_manicura',
 }))
-const estadoLabel = computed(() =>
-  lote.value?.estado === 'manicura_pendiente' ? 'Pdte. aprobación' : 'Asignado'
-)
+const estadoLabel = computed(() => 'Asignado')
 
 async function cargar() {
   loading.value = true
@@ -344,15 +325,6 @@ onActivated(cargar)
 }
 .mnl__btn-primary:hover { background: #4a6239; }
 
-/* Waiting banner */
-.mnl__waiting {
-  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
-  background: var(--c-leaf-100); border: 1px solid var(--c-leaf-300); border-radius: 10px;
-  padding: .75rem 1rem; margin-bottom: 1.5rem;
-  font-size: .82rem; color: var(--c-leaf-700);
-}
-.mnl__waiting-note { margin-left: auto; font-size: .75rem; color: var(--c-leaf-800); }
-
 /* KPIs — mismo patrón que SalaDetailView */
 .mnl__kpis {
   display: grid; grid-template-columns: repeat(3, 1fr);
@@ -386,10 +358,6 @@ onActivated(cargar)
   display: flex; align-items: center; gap: .35rem;
   font-size: .7rem; font-weight: 700; color: #60725d;
   text-transform: uppercase; letter-spacing: .07em; margin: 0;
-}
-.mnl__locked-tag {
-  display: inline-flex; align-items: center; gap: .25rem;
-  font-size: .72rem; color: var(--c-leaf-700); font-weight: 600;
 }
 
 /* Table */

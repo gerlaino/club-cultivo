@@ -1,5 +1,31 @@
 # Changelog
 
+## Limpieza del flujo de manicura (web) + estado fantasma `manicura_pendiente` eliminado (2026-06-30)
+
+Relevamiento del flujo del rol **manicura** en la versión web (no PWA) y limpieza integral.
+
+- **`manicura_pendiente` eliminado de toda la base**: era un sub-estado de aprobación que ya
+  **nunca se asignaba** (la aprobación vive en `PesajeManicura` enviado→confirmado; el lote sigue
+  `en_manicura` hasta pasar a `curado`). Se sacó de `Lote::ESTADOS`/`POST_COSECHA`/`progreso_ciclo`,
+  scopes y labels de `lotes_controller`, `lote_serializer` (`puede_aprobar_manicura`, sin
+  consumidores), `lote_policy`, `pesada`, `registrar_trasplante`, y de ~13 mapas de display del
+  frontend. Verificado: 0 filas con ese estado en DB.
+- **Autorización unificada**: `pesajes_manicura#create` ahora exige que el manicura esté **asignado**
+  al lote (o que el lote no tenga manicurador), igual que `plants#registrar_peso`. Antes cualquier
+  manicura podía pesar cualquier lote `en_manicura`. + 2 specs.
+- **Bug funcional corregido**: en `PlantaDetailView`, `canManicura` gateaba sobre `manicura_pendiente`
+  (nunca verdadero) → el manicura nunca podía actuar desde la ficha de planta. Ahora `en_manicura`.
+- **Badge admin "aprobaciones pendientes"** (`useNavContext`): consultaba `manicura_pendiente`
+  (siempre 0). Ahora cuenta los pesajes **enviados** reales.
+- **Inventario en web para manicura**: nueva ruta `/mnc/stocks` + ítem "Inventario" en el sidebar
+  (`StocksManicuraView` ya existía pero estaba huérfana).
+- **Routing legacy**: `/manicura` redirige a `/mnc/pendientes` (antes a una pantalla admin-only);
+  `App.vue` (nav link + ROLE_PRIORITY) repuntados.
+- **Salas**: se retiró `manicura` del alta de salas (`ModalCrearSala`) — las salas son solo de
+  cultivo; la manicura se trabaja por estado del lote, no en una sala. El kind sigue válido en el
+  backend para salas existentes (mismo criterio que `cosecha`).
+- rspec backend verde · vitest 58/58 · `vite build` OK.
+
 ## Entregar reserva = crear dispensación (unificado con el modal y el flujo de cobros) (2026-06-24)
 
 Entregar una reserva ahora reusa el modal de **nueva dispensación** (modo "entregar reserva") y el

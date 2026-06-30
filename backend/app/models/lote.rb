@@ -30,15 +30,16 @@ class Lote < ApplicationRecord
   # Secuencia: semilla/esqueje → vegetativo → floración → cosecha → en_manicura
   # (admin asigna manicura) → curado (se confirma el pesaje + se crea el stock; acá
   # empieza el curado) → finalizado (cuando se agota el stock del lote).
-  # manicura_pendiente: sub-fase de aprobación (manicurador pesó, espera al admin).
+  # La aprobación del pesaje vive en PesajeManicura (estado enviado→confirmado), no en
+  # un estado del lote: el lote sigue 'en_manicura' hasta que se confirma y pasa a 'curado'.
   # 'secado' YA NO es un estado: es una métrica (días de cosecha→stock). Ver dias_secado.
-  ESTADOS       = %w[semilla esqueje vegetativo floracion cosecha en_manicura manicura_pendiente curado finalizado].freeze
+  ESTADOS       = %w[semilla esqueje vegetativo floracion cosecha en_manicura curado finalizado].freeze
   ORIGENES      = %w[semilla esqueje].freeze
   # Camino de cultivo con pesada/avance (con sala). Post-cosecha (en_manicura/curado)
   # se maneja por el flujo de manicura, no por avanzar_fase!.
   CICLO_FASES   = %w[vegetativo floracion cosecha].freeze
   # Estados post-cosecha: el lote NO tiene sala (se ve por estado en Cosecha/Manicura).
-  POST_COSECHA  = %w[cosecha en_manicura manicura_pendiente curado finalizado].freeze
+  POST_COSECHA  = %w[cosecha en_manicura curado finalizado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
   TIPOS_LUZ     = %w[led hps cmh natural mixta].freeze
   SUSTRATOS     = %w[tierra coco perlita mezcla rockwool fibra_coco].freeze
@@ -83,7 +84,6 @@ class Lote < ApplicationRecord
     when 'floracion'           then 40
     when 'cosecha'             then 60
     when 'en_manicura'         then 72
-    when 'manicura_pendiente'  then 82
     when 'curado'              then 92
     when 'finalizado'          then 100
     else 0

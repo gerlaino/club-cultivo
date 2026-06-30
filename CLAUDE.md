@@ -111,7 +111,7 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 | `admin` | Todo dentro de su club |
 | `cultivador` | Plantas, lotes, salas asignadas (por sede), ambiente, plan de trabajo |
 | `supervisor` | Lectura de cultivo + gestión de tareas; **dispensa** y **gestiona reservas** (crear/editar/cancelar) |
-| `manicura` | Post-cosecha: pesajes, inventario, salas kind=manicura |
+| `manicura` | Post-cosecha: pesajes e inventario de los lotes `en_manicura` que el admin le asigna (trabaja por estado del lote, no por sala) |
 | `dispensador` | Dispensaciones, stock por sede, socios (lectura); **convierte reservas a dispensa** (Entregar), pero NO las crea ni gestiona |
 | `delivery` | Paquetes asignados: iniciar viaje, entregar, reportar fallo |
 | `medico` | Pacientes, indicaciones, turnos, documentos clínicos |
@@ -221,4 +221,4 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 ---
 
-*Última actualización: 2026-06-27. Mantener actualizado: cuando se cierre un bloque de trabajo, actualizar "Módulos existentes" acá y `docs/CHANGELOG.md`.*
+*Última actualización: 2026-06-30. Mantener actualizado: cuando se cierre un bloque de trabajo, actualizar "Módulos existentes" acá y `docs/CHANGELOG.md`.*

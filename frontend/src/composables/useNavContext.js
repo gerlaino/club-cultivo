@@ -3,7 +3,7 @@
  * El `collapsed` ref es module-level: ambos componentes comparten la misma instancia.
  */
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { listLotes, getTareasDashboard } from '../lib/api.js'
+import { listPesajesManicuraAdmin, getTareasDashboard } from '../lib/api.js'
 
 // ── Singleton state ───────────────────────────────────────────────────────────
 const collapsed = ref(
@@ -50,12 +50,13 @@ export function useNavContext() {
 
   async function refreshBadges() {
     try {
-      const [lotesRes, dashRes] = await Promise.allSettled([
-        listLotes({ estado: 'manicura_pendiente' }),
+      // Aprobaciones pendientes = pesajes de manicura ya enviados (no un estado del lote).
+      const [pesajesRes, dashRes] = await Promise.allSettled([
+        listPesajesManicuraAdmin(),
         getTareasDashboard(),
       ])
-      if (lotesRes.status === 'fulfilled') {
-        aprobPendientes.value = (lotesRes.value.data || []).length
+      if (pesajesRes.status === 'fulfilled') {
+        aprobPendientes.value = (pesajesRes.value.data || []).length
       }
       if (dashRes.status === 'fulfilled') {
         // Pendientes reales del día (vencidas + hoy), no futuras.

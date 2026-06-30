@@ -177,8 +177,7 @@ class PesajeManicura < ApplicationRecord
 
   private
 
-  # Aviso push al admin: hay un pesaje esperando confirmación (reemplaza al push viejo
-  # de manicura_pendiente, que apuntaba a la pantalla deprecada /aprobaciones).
+  # Aviso push al admin: hay un pesaje esperando confirmación.
   def notificar_admins_pendiente(peso)
     PushNotificationService.notify_admins_async(
       club,

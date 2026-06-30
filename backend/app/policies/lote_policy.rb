@@ -20,9 +20,8 @@ class LotePolicy < ApplicationPolicy
     def resolve
       base = scope.where(club_id: user.club_id)
       if user.manicura?
-        # Flujo único: el manicura ve sus lotes en manicura y los de secado sin asignar.
+        # El manicura solo ve los lotes en manicura que el admin le asignó.
         base.where(estado: 'en_manicura', manicurador_id: user.id)
-           .or(base.where(estado: 'secado'))
       else
         base
       end

@@ -36,8 +36,12 @@ class PesajesManicuraController < ApplicationController
   # Crea un pesaje (borrador) para cargar plantas por QR. Si se pasan plantas_count +
   # peso_total_g es una CARGA MANUAL sin QR; con enviar=true se manda a confirmar en el acto.
   def create
-    unless current_user.manicura? || current_user.admin? || current_user.supervisor?
-      return render json: { error: 'No autorizado' }, status: :forbidden
+    # Misma regla que PlantsController#registrar_peso: el manicura solo puede pesar
+    # el lote que el admin le asignó (o uno sin asignar). Admin/supervisor, libres.
+    autorizado = current_user.admin? || current_user.supervisor? ||
+                 (current_user.manicura? && (@lote.manicurador_id == current_user.id || @lote.manicurador_id.nil?))
+    unless autorizado
+      return render json: { error: 'No estás asignado a este lote' }, status: :forbidden
     end
     unless @lote.estado == 'en_manicura'
       return render json: { error: 'El lote no está en manicura activa' }, status: :unprocessable_entity

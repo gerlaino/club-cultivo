@@ -274,7 +274,6 @@ const ESTADO_COLOR = {
   floracion:          '#9333ea',
   cosecha:            '#dc2626',
   en_manicura:        '#d97706',
-  manicura_pendiente: '#f59e0b',
   curado:             '#2563eb',
   finalizado:         '#94a3b8',
 }
@@ -282,7 +281,7 @@ const ESTADO_COLOR = {
 const ESTADO_LABEL = {
   semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
   floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'En manicura',
-  manicura_pendiente: 'Pdte. aprobación', curado: 'Curado',
+  curado: 'Curado',
   finalizado: 'Finalizado',
 }
 
@@ -656,7 +655,6 @@ async function onOnboardingCompletado() {
                 >
                   {{ ESTADO_LABEL[lote.estado] || lote.estado }}
                 </span>
-                <span v-if="lote.estado === 'manicura_pendiente'" class="ad__lote-urgente">⚡ Acción requerida</span>
               </div>
               <div class="ad__lote-meta">
                 <span v-if="lote.genetica?.nombre">{{ lote.genetica.nombre }}</span>

@@ -49,7 +49,6 @@ class LoteSerializer
       proxima_fase_posible: proxima_fase,
       puede_transicionar:   puede_transicion,
       puede_cerrar_curado:     lote.estado == 'curado',
-      puede_aprobar_manicura:  lote.estado == 'manicura_pendiente',
       start_date:           lote.start_date,
       plants_count:            lote.plants_count,
       plantas_seleccion_count: lote.plants.where(es_seleccion: true).count,

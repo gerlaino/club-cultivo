@@ -107,7 +107,7 @@ const CICLO_PLANTA = computed(() => {
   return [...base, 'cosecha', 'manicura', 'curado']
 })
 const LOTE_A_CICLO = {
-  cosecha: 'cosecha', en_manicura: 'manicura', manicura_pendiente: 'manicura',
+  cosecha: 'cosecha', en_manicura: 'manicura',
 }
 const SALUD_META = {
   excelente: { color:'#16a34a', emoji:'🟢', label:'Excelente' },
@@ -409,7 +409,7 @@ async function saveManicura() {
 
 const canManicura = computed(() =>
   ['manicura', 'admin'].includes(auth.user?.role) &&
-  ['manicura_pendiente'].includes(planta.value?.lote?.estado)
+  ['en_manicura'].includes(planta.value?.lote?.estado)
 )
 
 // ── Nuevo modal registro planta ───────────────────────────

@@ -17,12 +17,12 @@ const sedes = ref([])
 const saving = ref(false)
 const error  = ref(null)
 
-// 'cosecha' se retiró del alta de salas (la cosecha es un evento → post-cosecha).
-// El kind 'cosecha' sigue siendo válido en el backend para salas existentes y uso futuro.
+// Las salas son SOLO de cultivo. 'cosecha' y 'manicura' se retiraron del alta: la cosecha
+// es un evento → post-cosecha, y la manicura se trabaja por estado del lote (en_manicura),
+// no en una sala. Esos kinds siguen válidos en el backend para salas ya existentes.
 const KINDS = [
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración'  },
-  { value: 'manicura',   label: 'Manicura'   },
 ]
 
 const form = ref({
@@ -160,12 +160,6 @@ onMounted(async () => {
               </option>
             </select>
             <span v-if="errors.sede_id" class="mcr__err">{{ errors.sede_id }}</span>
-          </div>
-
-          <!-- Nota manicura -->
-          <div v-if="form.kind === 'manicura'" class="mcr__capacity-info" style="background:#fffbeb;border-color:#fde68a;color:#92400e">
-            <i class="bi bi-info-circle"></i>
-            La sala de manicura solo puede estar en sedes de <strong>producción</strong> o <strong>mixta</strong>.
           </div>
 
           <!-- Notas -->
