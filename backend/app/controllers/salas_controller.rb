@@ -8,7 +8,7 @@ class SalasController < ApplicationController
   # sala (se ve por estado en Cosecha/Manicura), así que ya no hay transiciones por kind.
   TRANSICIONES_KIND = {}.freeze
 
-  # Salas de proceso (cosecha/secado/curado): se autocrean para conservar la sede del
+  # Salas de proceso (cosecha/curado): se autocrean para conservar la sede del
   # lote post-cosecha, pero NO son salas que el usuario gestione. No se listan en el ABM
   # (los lotes cosechados/en proceso se ven desde Cosecha / Manicura, no como salas).
   KINDS_PROCESO = Sala::KINDS_PROCESO
@@ -83,10 +83,6 @@ class SalasController < ApplicationController
     transicion = TRANSICIONES_KIND[@sala.kind]
     unless transicion
       return render json: { error: "Esta sala (#{@sala.kind}) no acepta carga de lotes" }, status: :unprocessable_entity
-    end
-
-    if @sala.kind == 'secado' && current_user.manicura?
-      return render json: { error: 'Solo el cultivador puede mover lotes a secado' }, status: :forbidden
     end
 
     lote = current_user.club.lotes.find(params.require(:lote_id))

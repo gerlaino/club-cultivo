@@ -9,46 +9,40 @@ class StockBajoJob < ApplicationJob
 
   private
 
+  # Stock bajo = poca FLOR SECA. Se mira el TOTAL disponible por SEDE (no por contenedor
+  # individual, y los derivados quedan afuera — son inventario). Una alerta por sede que
+  # maneje flor seca y esté por debajo del umbral del club.
   def procesar_club(club)
-    umbral = club.umbral_stock_g.presence || UMBRAL_G_DEFAULT
+    umbral = (club.umbral_stock_g.presence || UMBRAL_G_DEFAULT).to_d
+    bajos  = []
 
-    stocks_bajos = Stock
-      .where(club_id: club.id, unidad: 'g')
-      .where.not(estado: 'agotado')
-      .where('cantidad < ? AND cantidad > 0', umbral)
-      .to_a
+    club.sedes.find_each do |sede|
+      flor = Stock.where(club_id: club.id, sede_id: sede.id, forma_producto: 'flor_seca', unidad: 'g')
+      next unless flor.exists? # solo sedes que efectivamente manejan flor seca
 
-    return if stocks_bajos.empty?
-
-    stocks_data = stocks_bajos.map do |s|
-      {
-        id:         s.id,
-        forma:      s.forma_producto.humanize,
-        cantidad_g: s.cantidad.to_f.round(1),
-        sede_id:    s.sede_id,
-        alerta:     true,
-      }
-    end
-
-    stocks_data.each do |s|
-      next if alerta_reciente?(club, s[:id])
+      disponible = flor.where.not(estado: 'agotado').sum(:cantidad).to_d
+      next if disponible >= umbral
+      next if alerta_reciente?(club, sede.id)
 
       AlertaInterna.create!(
         club:             club,
         tipo:             'stock_bajo',
-        mensaje:          "Stock bajo: #{s[:forma]} — #{s[:cantidad_g]}g disponibles (umbral: #{umbral}g)",
+        mensaje:          "Stock de flor seca bajo en #{sede.nombre}: #{disponible.to_f.round(1)}g (umbral: #{umbral.to_i}g)",
         severidad:        'warning',
         destinada_a_role: 'admin',
-        contexto:         { stock_id: s[:id], cantidad_g: s[:cantidad_g], umbral_g: umbral }
+        contexto:         { sede_id: sede.id, sede_nombre: sede.nombre, total_g: disponible.to_f, umbral_g: umbral.to_f },
       )
+      bajos << { forma: "Flor seca · #{sede.nombre}", cantidad_g: disponible.to_f.round(1) }
     end
 
-    NotificacionesMailer.stock_bajo(club: club, stocks_data: stocks_data).deliver_later
+    return if bajos.empty?
+
+    NotificacionesMailer.stock_bajo(club: club, stocks_data: bajos).deliver_later
   end
 
-  def alerta_reciente?(club, stock_id)
+  def alerta_reciente?(club, sede_id)
     AlertaInterna.where(club: club, tipo: 'stock_bajo')
-                 .where("contexto->>'stock_id' = ?", stock_id.to_s)
+                 .where("contexto->>'sede_id' = ?", sede_id.to_s)
                  .where('created_at >= ?', 1.day.ago)
                  .exists?
   end

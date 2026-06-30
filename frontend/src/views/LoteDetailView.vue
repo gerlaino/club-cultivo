@@ -705,22 +705,6 @@ onUnmounted(() => {
           <div class="ld__modal-body">
             <div v-if="transicionError" class="ld__alert">{{ transicionError }}</div>
 
-            <!-- Peso húmedo (cosecha → manicura, opcional) -->
-            <template v-if="lote?.proxima_fase_posible === 'secado'">
-              <div class="ld__field" style="margin-bottom:1rem">
-                <label class="ld__label">Peso húmedo total (g) <span class="ld__optional">opcional</span></label>
-                <input type="number" step="0.1" min="0" class="ld__input" v-model.number="transicionForm.peso_humedo_g" placeholder="ej: 1200.5" />
-                <span class="ld__optional">Peso cosechado fresco al inicio del secado</span>
-              </div>
-            </template>
-
-            <!-- Peso seco (secado → curado) -->
-            <div v-if="lote?.proxima_fase_posible === 'curado'" class="ld__field" style="margin-bottom:1rem">
-              <label class="ld__label">Peso seco (g) <span style="color:#dc2626">*</span></label>
-              <input type="number" step="0.1" min="0" class="ld__input" v-model.number="transicionForm.peso_seco_g" placeholder="ej: 350.0" />
-              <span class="ld__optional">Al ingreso del curado</span>
-            </div>
-
             <div class="ld__field">
               <label class="ld__label">Notas <span class="ld__optional">opcional</span></label>
               <textarea class="ld__input ld__textarea" rows="2" v-model="transicionForm.notas" placeholder="Observaciones del cambio de fase…"></textarea>

@@ -128,7 +128,8 @@ class AnalyticsController < ApplicationController
     stock_bajo_umbral = club.umbral_stock_g.to_f
     stocks_data = stocks.group_by(&:forma_producto).map do |forma, ss|
       total = ss.sum { |s| s.cantidad.to_f }
-      { forma: forma, cantidad_g: total.round(2), alerta: total < stock_bajo_umbral }
+      # "Stock bajo" solo aplica a flor seca; los derivados son inventario, no disparan alerta.
+      { forma: forma, cantidad_g: total.round(2), alerta: forma == 'flor_seca' && total < stock_bajo_umbral }
     end.sort_by { |s| s[:cantidad_g] }
 
     # Pacientes REPROCANN por vencer

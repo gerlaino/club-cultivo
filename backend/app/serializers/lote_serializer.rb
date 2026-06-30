@@ -156,8 +156,6 @@ class LoteSerializer
         when 'cosecha'    then salas_base.where('tipo = ? OR kind = ?', 'cosecha', 'cosecha')
         when 'vegetativo' then salas_base.where('tipo = ? OR kind = ?', 'vegetativo', 'vegetativo')
         when 'floracion'  then salas_base.where('tipo = ? OR kind = ?', 'floracion',  'floracion')
-        when 'secado'     then salas_base.where('tipo = ? OR kind IN (?)', 'secado', %w[secado manicura])
-        when 'curado'     then salas_base.where('tipo = ?', 'curado')
         else salas_base
       end
       result[:salas_destino] = salas_base

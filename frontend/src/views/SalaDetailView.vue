@@ -188,7 +188,7 @@ const salaAcciones = computed(() => {
     items.push({ emoji: '🌿', label: 'Registrar sala', onClick: () => { lecturaOpen.value = true } })
   }
   if (puedeCargarLote.value) {
-    const lbl = esSalaSecado.value ? 'Cargar lote de floración' : esSalaManicura.value ? 'Cargar lote de cosecha' : 'Cargar lote de secado'
+    const lbl = 'Cargar lote de cosecha'
     items.push({ emoji: '📦', label: lbl, onClick: () => { showCargarLote.value = true } })
   }
   if (canCambiarFase.value) {
@@ -372,12 +372,10 @@ async function ejecutarCambioFase() {
   }
 }
 
-const esSalaSecado   = computed(() => sala.value?.kind === 'secado')
 const esSalaManicura = computed(() => sala.value?.kind === 'manicura')
 const esSalaCosecha  = computed(() => sala.value?.kind === 'cosecha')
 const puedeCargarLote = computed(() =>
-  (esSalaSecado.value   && (canEdit.value || isAgricultor.value)) ||
-  (esSalaManicura.value && (canEdit.value || isAgricultor.value || isManicurador.value))
+  esSalaManicura.value && (canEdit.value || isAgricultor.value || isManicurador.value)
 )
 
 async function onLoteCargado() {
@@ -689,7 +687,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           </p>
         </div>
         <div class="sd__hero-actions">
-          <button v-if="(canEdit || isCultivador) && !esSalaSecado && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
+          <button v-if="(canEdit || isCultivador) && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
             <i class="bi bi-plus-lg"></i>Nuevo lote
           </button>
           <ActionsDropdown v-if="(canEdit || isCultivador) && salaAcciones.length" :items="salaAcciones" />
@@ -747,10 +745,10 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
               <div v-if="lotes.loading" class="sd__placeholder">Cargando lotes…</div>
               <EmptyState v-else-if="!items.length" icon="📦" title="Sin lotes todavía" message="Esta sala no tiene lotes asignados." compact>
                 <template #actions>
-                  <button v-if="(canEdit || isCultivador) && !esSalaSecado && !esSalaManicura" class="sd__btn-outline" @click="openCreate">Crear primer lote</button>
+                  <button v-if="(canEdit || isCultivador) && !esSalaManicura" class="sd__btn-outline" @click="openCreate">Crear primer lote</button>
                   <button v-else-if="puedeCargarLote" class="sd__btn-outline" style="color:#b45309;border-color:#fde68a" @click="showCargarLote=true">
                     <i class="bi bi-box-arrow-in-down"></i>
-                    {{ esSalaSecado ? 'Cargar lote de floración' : esSalaManicura ? 'Cargar lote de cosecha' : 'Cargar lote de secado' }}
+                    Cargar lote de cosecha
                   </button>
                 </template>
               </EmptyState>
