@@ -112,7 +112,7 @@
             <div v-for="p in pesajesHistorial" :key="p.id" class="mpv__hist-row">
               <div class="mpv__hist-date">{{ fmtDate(p.fecha_pesaje) }}</div>
               <div class="mpv__hist-info">
-                <span>{{ p.plantas_registradas || 0 }} plantas</span>
+                <span>{{ p.plantas_count || p.plantas_registradas || 0 }} plantas</span>
                 <span>{{ (p.peso_total_g || p.peso_calculado_g || 0).toFixed(1) }}g</span>
               </div>
               <span class="mpv__badge" :class="badgeClass(p.estado)">
@@ -195,7 +195,7 @@ const pesajesHistorial = computed(() =>
 const pesajesConfirmadosCount = computed(() =>
   pesajes.value
     .filter(p => p.estado === 'confirmado')
-    .reduce((s, p) => s + (p.plantas_registradas || 0), 0)
+    .reduce((s, p) => s + (p.plantas_count || p.plantas_registradas || 0), 0)
 )
 
 async function cargarLotes() {
