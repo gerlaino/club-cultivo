@@ -9,6 +9,7 @@ class Plant < ApplicationRecord
   has_many   :esquejes, class_name: 'Plant', foreign_key: :planta_madre_id, dependent: :nullify
   has_many :activities, class_name: 'PlantActivity', dependent: :destroy
   has_many :observaciones, as: :noteable, dependent: :destroy
+  has_many :pesadas_plantas, class_name: 'PesadaPlanta', dependent: :destroy
 
   # set_club_id corre en before_validation (no before_create): acts_as_tenant exige
   # el tenant en la validación, y el club_id de la planta se deriva del lote.
