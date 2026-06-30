@@ -159,4 +159,37 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     post "/lotes/#{lote.id}/pesajes_manicura", headers: auth_headers
     expect(response).to have_http_status(:created)
   end
+
+  # Mixto: el manicura pesa algunas plantas por QR y el resto por batch. El batch cubre
+  # SOLO las restantes; al confirmar ambos, el total procesado debe llegar al total del
+  # lote (no quedarse corto) y el lote pasa a curado con los gramos sumados.
+  it 'pesadas individuales + batch del resto finaliza el lote en el total (curado)' do
+    create(:plant, lote: lote, club: club, state: 'cosechado') # planta + 2 = 3 en total
+    create(:plant, lote: lote, club: club, state: 'cosechado')
+    expect(lote.plants.count).to eq(3)
+
+    # 1 planta por QR
+    post "/plants/#{planta.id}/registrar_peso", params: { peso_seco_g: 10 }, headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    pesaje_qr = lote.pesajes_manicura.find_by(estado: 'borrador')
+    post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje_qr.id}/enviar", headers: auth_headers
+
+    # las 2 restantes por batch
+    post "/lotes/#{lote.id}/pesajes_manicura",
+         params: { plantas_count: 2, peso_total_g: 20, enviar: true }, headers: auth_headers
+    pesaje_batch = lote.pesajes_manicura.where.not(plantas_count: nil).last
+
+    # admin confirma ambos
+    delete '/api/users/sign_out'
+    sign_in_as(admin)
+    post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje_qr.id}/confirmar",
+         params: { peso_confirmado_g: 10 }, headers: auth_headers
+    expect(lote.reload.estado).to eq('en_manicura') # 1 de 3, todavía no finaliza
+    post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje_batch.id}/confirmar",
+         params: { peso_confirmado_g: 20 }, headers: auth_headers
+
+    lote.reload
+    expect(lote.estado).to eq('curado')
+    expect(lote.rendimiento_real_g.to_f).to eq(30.0)
+  end
 end

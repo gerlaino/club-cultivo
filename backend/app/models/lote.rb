@@ -297,7 +297,10 @@ class Lote < ApplicationRecord
       .distinct
       .count
 
-    # Batch registrations without individual plant records
+    # Total procesado = suma de plantas_count de todos los pesajes confirmados. Como los
+    # pesajes por QR también llevan plantas_count (= sus pesadas individuales), se resta
+    # plantas_confirmadas para no contarlas dos veces; los batch (carga manual de las
+    # plantas restantes) quedan sumados. Resultado neto: sum(plantas_count).
     batch_count = pesajes_manicura
       .where(estado: 'confirmado')
       .where.not(plantas_count: nil)

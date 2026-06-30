@@ -547,17 +547,6 @@ const routes = [
       next()
     },
   },
-  {
-    path: '/mnc/stocks',
-    name: 'mnc-stocks',
-    component: () => import('../views/manicura/StocksManicuraView.vue'),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore()
-      if (!['admin', 'manicura'].includes(auth.user?.role)) return next('/')
-      next()
-    },
-  },
 
   {
     path: '/super-admin',

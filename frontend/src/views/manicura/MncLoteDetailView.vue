@@ -142,8 +142,8 @@
                 <label class="mnl-label">Plantas manicuradas <span class="mnl-req">*</span></label>
                 <div class="mnl-input-row">
                   <input v-model.number="batchForm.plantas_manicuradas" type="number" step="1" min="1"
-                    :max="lote?.plants_count" class="mnl-input" placeholder="0" required autofocus />
-                  <span class="mnl-suffix">de {{ lote?.plants_count }}</span>
+                    :max="sinPesar" class="mnl-input" placeholder="0" required autofocus />
+                  <span class="mnl-suffix">de {{ sinPesar }} restantes</span>
                 </div>
               </div>
 
@@ -243,7 +243,8 @@ async function cargar() {
 function irAPlanta(p) { router.push(`/p/${p.codigo_qr}`) }
 
 function abrirModal() {
-  batchForm.value  = { plantas_manicuradas: lote.value?.plants_count || null, peso_seco_g: null, notas: '' }
+  // El batch cubre las plantas restantes (las ya pesadas por QR no se vuelven a contar).
+  batchForm.value  = { plantas_manicuradas: sinPesar.value || null, peso_seco_g: null, notas: '' }
   modalError.value = ''
   modalOpen.value  = true
 }
