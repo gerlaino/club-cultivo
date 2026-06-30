@@ -813,7 +813,7 @@ const FORMAS_DERIVADO = [
   { value: 'tintura', label: 'Tintura' }, { value: 'crema', label: 'Crema' },
   { value: 'capsula', label: 'Cápsula' }, { value: 'comestible', label: 'Comestible' },
   { value: 'prensado', label: 'Prensado' }, { value: 'preroll', label: 'Preroll' },
-  { value: 'prearmado', label: 'Prearmado' }, { value: 'otro', label: 'Otro' },
+  { value: 'otro', label: 'Otro' },
 ]
 
 function openProcesar() {
