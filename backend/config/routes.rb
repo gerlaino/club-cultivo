@@ -107,6 +107,9 @@ Rails.application.routes.draw do
       resources :pesadas, only: [:index, :create, :destroy]
       resources :analisis_laboratorio, only: [:index, :create, :update, :destroy]
       resources :pesajes_manicura, only: [:index, :show, :create, :destroy] do
+        collection do
+          post :registrar_directo
+        end
         member do
           post  :enviar
           post  :confirmar

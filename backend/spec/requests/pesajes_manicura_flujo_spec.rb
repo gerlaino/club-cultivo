@@ -209,6 +209,44 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(lote.rendimiento_real_g.to_f).to eq(30.0)
   end
 
+  # registrar_directo: atajo del admin (pesa + confirma en un paso). Acepta pesos
+  # individuales y/o carga del resto, contenedor y sede; genera stock y finaliza el lote.
+  it 'registrar_directo: el admin pesa individual + resto y confirma en un paso con sede' do
+    genetica = create(:genetica, club: club)
+    lote3 = create(:lote, club: club, sala: sala, estado: 'en_manicura',
+                   manicurador: nil, genetica: genetica)
+    p1 = create(:plant, lote: lote3, club: club, state: 'cosechado')
+    create(:plant, lote: lote3, club: club, state: 'cosechado')
+    create(:plant, lote: lote3, club: club, state: 'cosechado') # 3 plantas
+
+    delete '/api/users/sign_out'
+    sign_in_as(admin)
+    expect {
+      post "/lotes/#{lote3.id}/pesajes_manicura/registrar_directo",
+           params: {
+             pesos: [{ plant_id: p1.id, peso_seco_g: 10 }],
+             resto: { plantas_count: 2, peso_total_g: 20 },
+             sede_id: sede.id,
+           }, headers: auth_headers, as: :json
+    }.to change(Stock, :count).by(1)
+    expect(response).to have_http_status(:created), response.body
+
+    stock = Stock.last
+    expect(stock.estado).to eq('asignado')
+    expect(stock.sede_id).to eq(sede.id)
+    expect(stock.cantidad.to_f).to eq(30.0)
+    expect(lote3.reload.estado).to eq('curado')
+  end
+
+  it 'registrar_directo: bloqueado si el lote tiene un manicura asignado' do
+    delete '/api/users/sign_out'
+    sign_in_as(admin)
+    post "/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
+         params: { resto: { plantas_count: 1, peso_total_g: 10 } },
+         headers: auth_headers, as: :json
+    expect(response).to have_http_status(:forbidden)
+  end
+
   # Al confirmar un pesaje sin elegir contenedor se crea un Stock 'pendiente_asignacion'
   # (sin sede). Ese contenedor debe poder elegirse al confirmar el siguiente pesaje del
   # mismo lote → GET /stocks?lote_id lo lista (el listado general lo excluía) y trae

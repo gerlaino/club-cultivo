@@ -73,6 +73,62 @@ class PesajesManicuraController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  # POST /lotes/:lote_id/pesajes_manicura/registrar_directo
+  # Atajo del admin/supervisor (última palabra): pesa Y confirma en un solo paso, sin pasar
+  # por la cola de aprobación. Acepta pesos individuales por planta y/o una carga conjunta
+  # del resto, más un contenedor (stock_id) y sede destino. Solo si el lote no tiene un
+  # manicura asignado (o está asignado a sí mismo).
+  def registrar_directo
+    unless current_user.admin? || current_user.supervisor?
+      return render json: { error: 'Solo admin o supervisor pueden registrar directo' }, status: :forbidden
+    end
+    unless @lote.manicurador_id.nil? || @lote.manicurador_id == current_user.id
+      return render json: { error: 'El lote está asignado a un manicura' }, status: :forbidden
+    end
+    unless @lote.estado == 'en_manicura'
+      return render json: { error: 'El lote no está en manicura activa' }, status: :unprocessable_entity
+    end
+
+    pesos      = params[:pesos] || []
+    resto_peso = params.dig(:resto, :peso_total_g)
+    resto_cnt  = params.dig(:resto, :plantas_count).to_i
+
+    ActiveRecord::Base.transaction do
+      stock = resolver_stock_destino!
+      creo_algo = false
+
+      if pesos.present?
+        pesaje = @lote.pesajes_manicura.create!(manicurador: current_user, club: current_user.club, fecha_pesaje: Date.today)
+        pesos.each do |pp|
+          peso  = pp[:peso_seco_g].to_d
+          next if peso <= 0
+          plant = @lote.plants.find(pp[:plant_id])
+          plant.update!(peso_seco: peso)
+          pesaje.pesadas_plantas.create!(plant: plant, peso_seco_g: peso)
+        end
+        raise ArgumentError, 'Ningún peso individual válido' unless pesaje.pesadas_plantas.exists?
+        pesaje.confirmar_directo!(confirmado_por: current_user, stock: stock)
+        creo_algo = true
+      end
+
+      if resto_peso.present? && resto_cnt > 0
+        pesaje2 = @lote.pesajes_manicura.create!(manicurador: current_user, club: current_user.club, fecha_pesaje: Date.today)
+        pesaje2.cargar_manual!(plantas: resto_cnt, peso: resto_peso.to_d)
+        pesaje2.confirmar_directo!(confirmado_por: current_user, stock: stock)
+        creo_algo = true
+      end
+
+      raise ArgumentError, 'Cargá al menos un peso (individual o del resto)' unless creo_algo
+
+      @lote.reload.check_and_finalize_manicura!(finalizador: current_user)
+      render json: { stock_id: stock.id, lote_estado: @lote.reload.estado }, status: :created
+    end
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Planta o contenedor no encontrado' }, status: :not_found
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   # DELETE /lotes/:lote_id/pesajes_manicura/:id
   # Borra un pesaje propio que todavía no se confirmó (limpiar jornadas erróneas/duplicadas).
   def destroy
@@ -193,6 +249,24 @@ class PesajesManicuraController < ApplicationController
   end
 
   private
+
+  # Contenedor destino para registrar_directo: existente (stock_id) o nuevo. Si viene
+  # sede_id y el contenedor no tiene sede, lo asigna a esa sede.
+  def resolver_stock_destino!
+    stock = if params[:stock_id].present?
+      current_user.club.stocks.where(lote_id: @lote.id, forma_producto: 'flor_seca').find(params[:stock_id])
+    else
+      current_user.club.stocks.create!(
+        lote: @lote, genetica: @lote.genetica, origen: 'lote',
+        forma_producto: 'flor_seca', estado: 'pendiente_asignacion', cantidad: 0, unidad: 'g',
+      )
+    end
+    if params[:sede_id].present? && stock.sede_id.nil?
+      sede = current_user.club.sedes.find(params[:sede_id])
+      stock.update!(sede: sede, estado: 'asignado')
+    end
+    stock
+  end
 
   def set_lote
     @lote = current_user.club.lotes.find(params[:lote_id])

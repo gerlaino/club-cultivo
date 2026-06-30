@@ -93,30 +93,8 @@ class PesajeManicura < ApplicationRecord
     raise ArgumentError, "El peso confirmado debe ser mayor a 0" unless peso > 0
 
     ActiveRecord::Base.transaction do
-      stock_destino = if stock_id.present?
-        # Merge with existing stock for this lote
-        club.stocks.where(lote_id: lote.id).find(stock_id)
-      else
-        # Create a new stock container (sede assigned separately via asignar!)
-        club.stocks.create!(
-          lote:          lote,
-          genetica:      lote.genetica,
-          origen:        'lote',
-          forma_producto: 'flor_seca',
-          estado:        'pendiente_asignacion',
-          cantidad:      0,
-          unidad:        'g',
-        )
-      end
-
-      # Accumulate weight via movimiento
-      stock_destino.stock_movimientos.create!(
-        tipo:    'produccion',
-        gramos:  peso,
-        usuario: confirmado_por,
-      )
-      stock_destino.increment!(:cantidad, peso)
-      stock_destino.increment!(:cantidad_inicial, peso)
+      stock_destino = stock_id.present? ? club.stocks.where(lote_id: lote.id).find(stock_id) : crear_stock_contenedor!
+      aplicar_a_stock!(stock_destino, peso, confirmado_por)
 
       update!(
         estado:            'confirmado',
@@ -175,7 +153,48 @@ class PesajeManicura < ApplicationRecord
     self
   end
 
+  # Atajo del admin (última palabra): confirma un BORRADOR directo, sin pasar por 'enviado'
+  # ni generar alertas de aprobación. Suma el peso al stock destino que resolvió el caller
+  # (contenedor + sede). El caller corre lote.check_and_finalize_manicura! al final.
+  def confirmar_directo!(confirmado_por:, stock:)
+    raise "Solo un borrador puede confirmarse directo" unless borrador?
+    peso = peso_calculado_g
+    raise ArgumentError, "Registrá al menos una planta o una carga antes de confirmar" if peso.zero?
+
+    aplicar_a_stock!(stock, peso, confirmado_por)
+    update!(
+      estado:            'confirmado',
+      confirmado_por:    confirmado_por,
+      confirmado_at:     Time.current,
+      peso_total_g:      peso,
+      peso_confirmado_g: peso,
+      plantas_count:     plantas_registradas_count,
+      stock:             stock,
+    )
+    self
+  end
+
   private
+
+  # Contenedor nuevo de flor_seca para este lote (sin sede: se asigna aparte).
+  def crear_stock_contenedor!
+    club.stocks.create!(
+      lote:           lote,
+      genetica:       lote.genetica,
+      origen:         'lote',
+      forma_producto: 'flor_seca',
+      estado:         'pendiente_asignacion',
+      cantidad:       0,
+      unidad:         'g',
+    )
+  end
+
+  # Suma `peso` al stock destino con un movimiento de producción.
+  def aplicar_a_stock!(stock_destino, peso, usuario)
+    stock_destino.stock_movimientos.create!(tipo: 'produccion', gramos: peso, usuario: usuario)
+    stock_destino.increment!(:cantidad, peso)
+    stock_destino.increment!(:cantidad_inicial, peso)
+  end
 
   # Aviso push al admin: hay un pesaje esperando confirmación.
   def notificar_admins_pendiente(peso)

@@ -493,6 +493,7 @@ export const deleteAnalisisLaboratorio = (loteId, id)      => api.delete(`/lotes
 export const listPesajesManicura      = (loteId)           => api.get(`/lotes/${loteId}/pesajes_manicura`)
 export const getPesajeManicura        = (loteId, id)       => api.get(`/lotes/${loteId}/pesajes_manicura/${id}`)
 export const createPesajeManicura     = (loteId, payload = {}) => api.post(`/lotes/${loteId}/pesajes_manicura`, payload)
+export const registrarDirectoManicura = (loteId, payload = {}) => api.post(`/lotes/${loteId}/pesajes_manicura/registrar_directo`, payload)
 export const enviarPesajeManicura     = (loteId, id)       => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/enviar`)
 export const deletePesajeManicura      = (loteId, id)       => api.delete(`/lotes/${loteId}/pesajes_manicura/${id}`)
 export const reabrirPesajeManicura     = (loteId, id)       => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/reabrir`)

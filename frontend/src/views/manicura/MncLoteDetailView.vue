@@ -127,17 +127,78 @@
     <Teleport to="body">
       <Transition name="mnl-fade">
         <div v-if="modalOpen" class="mnl-overlay" @click.self="cerrarModal">
-          <div class="mnl-modal">
+          <div class="mnl-modal" :class="{ 'mnl-modal--wide': esAdmin }">
             <div class="mnl-modal__hd">
               <div class="mnl-modal__ico"><Scale :size="18" :stroke-width="1.75" /></div>
               <div>
-                <h2 class="mnl-modal__title">Registrar manicura del lote</h2>
+                <h2 class="mnl-modal__title">{{ esAdmin ? 'Pesar y confirmar manicura' : 'Registrar manicura del lote' }}</h2>
                 <p class="mnl-modal__sub">{{ lote?.codigo }}<span v-if="lote?.genetica"> · {{ lote.genetica.nombre }}</span></p>
               </div>
               <button class="mnl-modal__close" @click="cerrarModal"><X :size="16" /></button>
             </div>
 
-            <form class="mnl-modal__body" @submit.prevent="submitBatch">
+            <!-- ADMIN: pesa + confirma + genera stock en un paso -->
+            <form v-if="esAdmin" class="mnl-modal__body" @submit.prevent="submitDirecto">
+              <div v-if="plantasSinPesar.length" class="mnl-field">
+                <label class="mnl-label">Peso individual <span class="mnl-opt">opcional · {{ plantasSinPesar.length }} sin pesar</span></label>
+                <div class="mnl-plist">
+                  <div v-for="p in plantasSinPesar" :key="p.id" class="mnl-prow">
+                    <span class="mnl-prow__code">{{ p.codigo_qr || `#${p.id}` }}</span>
+                    <div class="mnl-input-row mnl-prow__input">
+                      <input v-model.number="adminForm.pesos[p.id]" type="number" step="0.1" min="0" class="mnl-input" placeholder="—" />
+                      <span class="mnl-suffix">g</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="restoCount > 0" class="mnl-field">
+                <label class="mnl-label">Peso conjunto del resto <span class="mnl-opt">{{ restoCount }} plantas sin peso individual</span></label>
+                <div class="mnl-input-row">
+                  <input v-model.number="adminForm.restoPeso" type="number" step="0.1" min="0" class="mnl-input" placeholder="0.0" />
+                  <span class="mnl-suffix">g</span>
+                </div>
+              </div>
+
+              <div class="mnl-field">
+                <label class="mnl-label">Contenedor <span class="mnl-opt">solo flor seca</span></label>
+                <div v-if="loadingDirecto" class="mnl-hint">Cargando contenedores…</div>
+                <div v-else class="mnl-cont-list">
+                  <button type="button" class="mnl-cont" :class="{ 'mnl-cont--sel': adminForm.stock_id === null }" @click="adminForm.stock_id = null">
+                    <span class="mnl-cont__radio"><span v-if="adminForm.stock_id === null" class="mnl-cont__dot" /></span>
+                    <Plus :size="15" :stroke-width="2" />
+                    <span class="mnl-cont__txt">Crear nuevo contenedor</span>
+                  </button>
+                  <button v-for="s in contenedores" :key="s.id" type="button" class="mnl-cont" :class="{ 'mnl-cont--sel': adminForm.stock_id === s.id }" @click="adminForm.stock_id = s.id">
+                    <span class="mnl-cont__radio"><span v-if="adminForm.stock_id === s.id" class="mnl-cont__dot" /></span>
+                    <Package :size="15" :stroke-width="2" />
+                    <span class="mnl-cont__txt">{{ s.numero_lote_producto || `Contenedor #${s.id}` }} · {{ (s.cantidad || 0).toFixed(0) }}g · {{ s.sede?.nombre || 'Sin asignar' }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="mnl-field">
+                <label class="mnl-label">Sede destino <span class="mnl-opt">opcional</span></label>
+                <select v-model="adminForm.sede_id" class="mnl-input mnl-select">
+                  <option :value="null">— Sin asignar (queda pendiente) —</option>
+                  <option v-for="se in sedes" :key="se.id" :value="se.id">{{ se.nombre }}</option>
+                </select>
+              </div>
+
+              <div v-if="modalError" class="mnl-error">{{ modalError }}</div>
+
+              <div class="mnl-actions">
+                <button type="button" class="mnl-btn-cancel" @click="cerrarModal">Cancelar</button>
+                <button type="submit" class="mnl-btn-ok" :disabled="savingBatch || !hayPesoDirecto">
+                  <DsSpinner v-if="savingBatch" :size="14" />
+                  <CheckCircle v-else :size="13" :stroke-width="2" />
+                  Registrar y generar stock
+                </button>
+              </div>
+            </form>
+
+            <!-- MANICURA: carga conjunta → a aprobación -->
+            <form v-else class="mnl-modal__body" @submit.prevent="submitBatch">
               <div class="mnl-field">
                 <label class="mnl-label">Plantas manicuradas <span class="mnl-req">*</span></label>
                 <div class="mnl-input-row">
@@ -184,8 +245,8 @@
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw } from 'lucide-vue-next'
-import { getLote, listPlants, createPesajeManicura } from '../../lib/api.js'
+import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw, Package, Plus, CheckCircle } from 'lucide-vue-next'
+import { getLote, listPlants, createPesajeManicura, registrarDirectoManicura, listStocks, listSedes } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth'
 
@@ -203,6 +264,13 @@ const modalOpen   = ref(false)
 const savingBatch = ref(false)
 const modalError  = ref('')
 const batchForm   = ref({ plantas_manicuradas: null, peso_seco_g: null, notas: '' })
+
+// Flujo directo del admin: pesa (individual y/o resto) + confirma + genera stock en un paso.
+const adminForm      = ref({ pesos: {}, restoPeso: null, stock_id: null, sede_id: null })
+const contenedores   = ref([])
+const sedes          = ref([])
+const loadingDirecto = ref(false)
+const esAdmin = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 
 // KPIs — el flujo por QR setea plant.peso_seco por planta.
 // La carga manual no toca plant.peso_seco; en ese caso caemos a ultima_pesada_manicura.
@@ -226,6 +294,17 @@ const sinPesar        = computed(() => Math.max(0, plantas.value.length - pesada
 const puedeRegistrar = computed(() =>
   lote.value?.estado === 'en_manicura' &&
   (!lote.value?.manicurador_id || lote.value?.manicurador_id === auth.user?.id)
+)
+
+const plantasSinPesar = computed(() => plantas.value.filter(p => !(parseFloat(p.peso_seco) > 0)))
+// Plantas que quedan para el "resto conjunto" = sin pesar y sin peso individual cargado.
+const restoCount = computed(() =>
+  plantasSinPesar.value.length -
+  plantasSinPesar.value.filter(p => parseFloat(adminForm.value.pesos[p.id]) > 0).length
+)
+const hayPesoDirecto = computed(() =>
+  plantasSinPesar.value.some(p => parseFloat(adminForm.value.pesos[p.id]) > 0) ||
+  (parseFloat(adminForm.value.restoPeso) > 0 && restoCount.value > 0)
 )
 const kpiPorc         = computed(() => plantas.value.length ? Math.min(100, Math.round(pesadasKpi.value / plantas.value.length * 100)) : 0)
 const hasAnyHumedo    = computed(() => plantas.value.some(p => parseFloat(p.peso_humedo) > 0))
@@ -251,11 +330,61 @@ async function cargar() {
 
 function irAPlanta(p) { router.push(`/p/${p.codigo_qr}`) }
 
-function abrirModal() {
-  // El batch cubre las plantas restantes (las ya pesadas por QR no se vuelven a contar).
-  batchForm.value  = { plantas_manicuradas: sinPesar.value || null, peso_seco_g: null, notas: '' }
+async function abrirModal() {
   modalError.value = ''
-  modalOpen.value  = true
+  if (esAdmin.value) {
+    // El admin pesa + confirma en un paso: precargamos contenedores (flor seca del lote) y sedes.
+    adminForm.value = {
+      pesos: Object.fromEntries(plantasSinPesar.value.map(p => [p.id, null])),
+      restoPeso: null, stock_id: null, sede_id: null,
+    }
+    modalOpen.value = true
+    loadingDirecto.value = true
+    try {
+      const [cs, ss] = await Promise.all([listStocks({ lote_id: id }), listSedes()])
+      contenedores.value = (cs.data || []).filter(s =>
+        s.forma_producto === 'flor_seca' && ['pendiente_asignacion', 'asignado'].includes(s.estado)
+      )
+      sedes.value = ss.data || []
+    } catch {
+      contenedores.value = []; sedes.value = []
+    } finally {
+      loadingDirecto.value = false
+    }
+  } else {
+    // El batch cubre las plantas restantes (las ya pesadas por QR no se vuelven a contar).
+    batchForm.value = { plantas_manicuradas: sinPesar.value || null, peso_seco_g: null, notas: '' }
+    modalOpen.value = true
+  }
+}
+
+async function submitDirecto() {
+  if (!hayPesoDirecto.value || savingBatch.value) return
+  savingBatch.value = true
+  modalError.value  = ''
+  try {
+    const pesos = plantasSinPesar.value
+      .filter(p => parseFloat(adminForm.value.pesos[p.id]) > 0)
+      .map(p => ({ plant_id: p.id, peso_seco_g: parseFloat(adminForm.value.pesos[p.id]) }))
+    const payload = {}
+    if (pesos.length) payload.pesos = pesos
+    if (parseFloat(adminForm.value.restoPeso) > 0 && restoCount.value > 0) {
+      payload.resto = { plantas_count: restoCount.value, peso_total_g: parseFloat(adminForm.value.restoPeso) }
+    }
+    if (adminForm.value.stock_id) payload.stock_id = adminForm.value.stock_id
+    if (adminForm.value.sede_id)  payload.sede_id  = adminForm.value.sede_id
+
+    const { data } = await registrarDirectoManicura(id, payload)
+    toast.success(data.lote_estado === 'curado'
+      ? `Manicura completada — lote ${lote.value.codigo} en curado`
+      : 'Pesaje registrado y stock generado')
+    cerrarModal()
+    await cargar()
+  } catch (e) {
+    modalError.value = e.response?.data?.error || e.response?.data?.errors?.[0] || 'Error al registrar'
+  } finally {
+    savingBatch.value = false
+  }
 }
 function cerrarModal() { modalOpen.value = false }
 
@@ -443,6 +572,34 @@ onActivated(cargar)
   width: 100%; max-width: 420px; max-height: 92vh; overflow-y: auto;
   box-shadow: 0 24px 64px rgba(0,0,0,.18);
 }
+.mnl-modal--wide { max-width: 560px; }
+
+/* Lista de plantas (peso individual) */
+.mnl-plist { display: flex; flex-direction: column; gap: .35rem; max-height: 230px; overflow-y: auto; padding: 2px; }
+.mnl-prow { display: flex; align-items: center; gap: .6rem; }
+.mnl-prow__code { font-family: var(--font-mono, monospace); font-size: .78rem; font-weight: 700; color: #334155; flex: 1; min-width: 0; }
+.mnl-prow__input { width: 130px; flex-shrink: 0; }
+.mnl-hint { font-size: .74rem; color: #94a3b8; }
+
+/* Selector de sede */
+.mnl-select { border-radius: 6px; cursor: pointer; appearance: none; -webkit-appearance: none; }
+
+/* Selector de contenedores (tarjetas) */
+.mnl-cont-list { display: flex; flex-direction: column; gap: .35rem; max-height: 180px; overflow-y: auto; padding: 2px; }
+.mnl-cont {
+  display: flex; align-items: center; gap: .55rem; width: 100%; text-align: left;
+  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px;
+  padding: .5rem .7rem; cursor: pointer; color: #334155; transition: border-color .15s, background .15s;
+}
+.mnl-cont:hover { border-color: #cbd5e1; background: #fff; }
+.mnl-cont--sel { border-color: #5C7A4A; background: rgba(92,122,74,.07); }
+.mnl-cont__radio {
+  width: 15px; height: 15px; border-radius: 50%; border: 2px solid #cbd5e1; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.mnl-cont--sel .mnl-cont__radio { border-color: #5C7A4A; }
+.mnl-cont__dot { width: 7px; height: 7px; border-radius: 50%; background: #5C7A4A; }
+.mnl-cont__txt { font-size: .8rem; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mnl-modal__hd {
   display: flex; align-items: flex-start; gap: .75rem;
   padding: 1.25rem 1.25rem 1rem; border-bottom: 1px solid #f1f5f9;
