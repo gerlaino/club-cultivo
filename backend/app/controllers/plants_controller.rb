@@ -46,7 +46,7 @@ class PlantsController < ApplicationController
     end
     plants = plants.where(state: params[:state])                if params[:state].present?
     plants = plants.where(lotes: { estado: params[:lote_estado] }) if params[:lote_estado].present?
-    plants = plants.includes(lote: [:genetica, { sala: :sede }]).order(created_at: :desc)
+    plants = plants.includes(:pesadas_plantas, lote: [:genetica, { sala: :sede }]).order(created_at: :desc)
     render json: plants.map { |p| serialize_plant(p) }
   end
 
@@ -274,6 +274,8 @@ class PlantsController < ApplicationController
       es_seleccion: plant.es_seleccion,
       peso_seco:    plant.peso_seco,
       peso_humedo:  plant.peso_humedo,
+      # El peso es estimado (promedio de una carga conjunta) si la pesada más reciente lo es.
+      peso_es_promedio: (plant.pesadas_plantas.max_by(&:created_at)&.es_promedio || false),
       foto_url:     foto_url(plant),
       lote: {
         id:     plant.lote.id,

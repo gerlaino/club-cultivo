@@ -97,11 +97,12 @@
                 <td class="mnl__td mnl__td--peso">
                   <span :class="parseFloat(planta.peso_seco) > 0 ? 'mnl__peso--ok' : 'mnl__peso--none'">
                     {{ parseFloat(planta.peso_seco) > 0 ? parseFloat(planta.peso_seco).toFixed(1) : '—' }}
+                    <span v-if="planta.peso_es_promedio" class="mnl__prom">(prom)</span>
                   </span>
                 </td>
                 <td class="mnl__td mnl__td--estado">
-                  <span class="mnl__chip" :class="parseFloat(planta.peso_seco) > 0 ? 'mnl__chip--done' : 'mnl__chip--pending'">
-                    {{ parseFloat(planta.peso_seco) > 0 ? 'Pesada' : 'Sin pesar' }}
+                  <span class="mnl__chip" :class="planta.peso_es_promedio ? 'mnl__chip--prom' : (parseFloat(planta.peso_seco) > 0 ? 'mnl__chip--done' : 'mnl__chip--pending')">
+                    {{ planta.peso_es_promedio ? 'Promedio' : (parseFloat(planta.peso_seco) > 0 ? 'Pesada' : 'Sin pesar') }}
                   </span>
                 </td>
               </tr>
@@ -534,6 +535,7 @@ onActivated(cargar)
 .mnl__peso--ok     { color: #16a34a; }
 .mnl__peso--humedo { color: #0284c7; }
 .mnl__peso--none   { color: #cbd5e1; }
+.mnl__prom         { font-size: .68rem; font-weight: 600; color: #d97706; margin-left: 2px; }
 
 .mnl__chip {
   display: inline-block; font-size: .65rem; font-weight: 700;
@@ -541,6 +543,7 @@ onActivated(cargar)
 }
 .mnl__chip--done    { background: #dcfce7; color: #15803d; }
 .mnl__chip--pending { background: #f1f5f9; color: #94a3b8; }
+.mnl__chip--prom    { background: #fef3c7; color: #b45309; }
 
 /* Footer */
 .mnl__footer {

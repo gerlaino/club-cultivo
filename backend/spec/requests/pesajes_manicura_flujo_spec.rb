@@ -211,13 +211,13 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
 
   # registrar_directo: atajo del admin (pesa + confirma en un paso). Acepta pesos
   # individuales y/o carga del resto, contenedor y sede; genera stock y finaliza el lote.
-  it 'registrar_directo: el admin pesa individual + resto y confirma en un paso con sede' do
+  it 'registrar_directo: el admin pesa individual + resto (promedio) y confirma en un paso con sede' do
     genetica = create(:genetica, club: club)
     lote3 = create(:lote, club: club, sala: sala, estado: 'en_manicura',
                    manicurador: nil, genetica: genetica)
     p1 = create(:plant, lote: lote3, club: club, state: 'cosechado')
-    create(:plant, lote: lote3, club: club, state: 'cosechado')
-    create(:plant, lote: lote3, club: club, state: 'cosechado') # 3 plantas
+    p2 = create(:plant, lote: lote3, club: club, state: 'cosechado')
+    p3 = create(:plant, lote: lote3, club: club, state: 'cosechado') # 3 plantas
 
     delete '/api/users/sign_out'
     sign_in_as(admin)
@@ -225,7 +225,7 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
       post "/lotes/#{lote3.id}/pesajes_manicura/registrar_directo",
            params: {
              pesos: [{ plant_id: p1.id, peso_seco_g: 10 }],
-             resto: { plantas_count: 2, peso_total_g: 20 },
+             resto: { peso_total_g: 20 },   # 2 restantes → 10g c/u (promedio)
              sede_id: sede.id,
            }, headers: auth_headers, as: :json
     }.to change(Stock, :count).by(1)
@@ -236,6 +236,13 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(stock.sede_id).to eq(sede.id)
     expect(stock.cantidad.to_f).to eq(30.0)
     expect(lote3.reload.estado).to eq('curado')
+
+    # El individual NO es promedio; los del resto SÍ, con el peso promedio.
+    expect(PesadaPlanta.find_by(plant_id: p1.id).es_promedio).to be(false)
+    resto = PesadaPlanta.where(plant_id: [p2.id, p3.id])
+    expect(resto.pluck(:es_promedio)).to all(be(true))
+    expect(resto.sum(:peso_seco_g).to_f).to eq(20.0)
+    expect(p2.reload.peso_seco.to_f).to eq(10.0)
   end
 
   it 'registrar_directo: bloqueado si el lote tiene un manicura asignado' do

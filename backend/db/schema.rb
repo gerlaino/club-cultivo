@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_06_27_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_06_30_045534) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1013,6 +1013,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_06_27_000001) do
     t.bigint "pesaje_manicura_id"
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.boolean "es_promedio", default: false, null: false
     t.index ["deleted_at"], name: "index_pesadas_plantas_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_pesadas_plantas_on_deleted_by_id"
     t.index ["pesada_id"], name: "index_pesadas_plantas_on_pesada_id"

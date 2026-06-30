@@ -90,36 +90,42 @@ class PesajesManicuraController < ApplicationController
     end
 
     pesos      = params[:pesos] || []
-    resto_peso = params.dig(:resto, :peso_total_g)
-    resto_cnt  = params.dig(:resto, :plantas_count).to_i
+    resto_peso = params.dig(:resto, :peso_total_g).to_d
 
     ActiveRecord::Base.transaction do
-      stock = resolver_stock_destino!
-      creo_algo = false
+      stock  = resolver_stock_destino!
+      pesaje = @lote.pesajes_manicura.create!(manicurador: current_user, club: current_user.club, fecha_pesaje: Date.today)
 
-      if pesos.present?
-        pesaje = @lote.pesajes_manicura.create!(manicurador: current_user, club: current_user.club, fecha_pesaje: Date.today)
-        pesos.each do |pp|
-          peso  = pp[:peso_seco_g].to_d
-          next if peso <= 0
-          plant = @lote.plants.find(pp[:plant_id])
-          plant.update!(peso_seco: peso)
-          pesaje.pesadas_plantas.create!(plant: plant, peso_seco_g: peso)
+      # Pesos individuales (medidos).
+      individuales_ids = []
+      pesos.each do |pp|
+        peso = pp[:peso_seco_g].to_d
+        next if peso <= 0
+        plant = @lote.plants.find(pp[:plant_id])
+        plant.update!(peso_seco: peso)
+        pesaje.pesadas_plantas.create!(plant: plant, peso_seco_g: peso, es_promedio: false)
+        individuales_ids << plant.id
+      end
+
+      # Resto: el peso conjunto se reparte como PROMEDIO entre las plantas que quedan sin
+      # pesar (ni individual ahora, ni de un pesaje previo). Cada una queda con es_promedio.
+      if resto_peso.positive?
+        restantes = @lote.plants.where.not(id: individuales_ids)
+                                .where('peso_seco IS NULL OR peso_seco <= 0').to_a
+        n = restantes.size
+        if n.positive?
+          base = (resto_peso / n).round(2)
+          restantes.each_with_index do |plant, i|
+            peso = (i == n - 1) ? (resto_peso - base * (n - 1)) : base # la última absorbe el remanente
+            plant.update!(peso_seco: peso)
+            pesaje.pesadas_plantas.create!(plant: plant, peso_seco_g: peso, es_promedio: true)
+          end
         end
-        raise ArgumentError, 'Ningún peso individual válido' unless pesaje.pesadas_plantas.exists?
-        pesaje.confirmar_directo!(confirmado_por: current_user, stock: stock)
-        creo_algo = true
       end
 
-      if resto_peso.present? && resto_cnt > 0
-        pesaje2 = @lote.pesajes_manicura.create!(manicurador: current_user, club: current_user.club, fecha_pesaje: Date.today)
-        pesaje2.cargar_manual!(plantas: resto_cnt, peso: resto_peso.to_d)
-        pesaje2.confirmar_directo!(confirmado_por: current_user, stock: stock)
-        creo_algo = true
-      end
+      raise ArgumentError, 'Cargá al menos un peso (individual o del resto)' unless pesaje.pesadas_plantas.exists?
 
-      raise ArgumentError, 'Cargá al menos un peso (individual o del resto)' unless creo_algo
-
+      pesaje.confirmar_directo!(confirmado_por: current_user, stock: stock)
       @lote.reload.check_and_finalize_manicura!(finalizador: current_user)
       render json: { stock_id: stock.id, lote_estado: @lote.reload.estado }, status: :created
     end
