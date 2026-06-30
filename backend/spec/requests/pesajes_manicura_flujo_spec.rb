@@ -100,7 +100,10 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(JSON.parse(response.body).first['peso_calculado_g']).to eq(0.0)
   end
 
-  it 'carga manual (sin QR): create con plantas_count + peso_total_g + enviar crea un pesaje enviado' do
+  it 'carga conjunta (sin QR): reparte el total como promedio por planta y lo envía' do
+    create(:plant, lote: lote, club: club, state: 'cosechado')
+    create(:plant, lote: lote, club: club, state: 'cosechado') # planta + 2 = 3 sin pesar
+
     expect {
       post "/lotes/#{lote.id}/pesajes_manicura",
            params: { plantas_count: 3, peso_total_g: 300, enviar: true },
@@ -111,6 +114,9 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(pesaje.estado).to eq('enviado')
     expect(pesaje.peso_total_g.to_f).to eq(300.0)
     expect(pesaje.plantas_count).to eq(3)
+    # cada planta queda con el promedio (100g) marcado como estimado
+    expect(pesaje.pesadas_plantas.pluck(:es_promedio)).to all(be(true))
+    expect(pesaje.pesadas_plantas.pluck(:peso_seco_g).map(&:to_f)).to all(eq(100.0))
   end
 
   it 'el admin confirma un pesaje y genera stock pendiente_asignacion (sin sede)' do

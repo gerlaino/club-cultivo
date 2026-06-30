@@ -58,17 +58,20 @@ class PesajesManicuraController < ApplicationController
       notas:        params[:notas],
     )
 
-    if carga_manual
-      pesaje.peso_total_g  = params[:peso_total_g].to_d
-      pesaje.plantas_count = params[:plantas_count]
+    ActiveRecord::Base.transaction do
+      pesaje.save!
+      if carga_manual
+        # La carga conjunta reparte el peso como PROMEDIO entre las plantas declaradas, así
+        # cada una queda con su peso (prom) y se ve reflejada en el lote.
+        n = distribuir_resto!(pesaje, params[:peso_total_g].to_d, count: params[:plantas_count].to_i)
+        raise ArgumentError, 'No quedan plantas sin pesar para la carga conjunta' if n.zero?
+        pesaje.enviar! if enviar_ya
+      end
     end
 
-    if pesaje.save
-      pesaje.enviar! if enviar_ya && carga_manual
-      render json: PesajeManicuraSerializer.serialize(pesaje.reload, include_plantas: true), status: :created
-    else
-      render json: { errors: pesaje.errors.full_messages }, status: :unprocessable_entity
-    end
+    render json: PesajeManicuraSerializer.serialize(pesaje.reload, include_plantas: true), status: :created
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
@@ -109,19 +112,7 @@ class PesajesManicuraController < ApplicationController
 
       # Resto: el peso conjunto se reparte como PROMEDIO entre las plantas que quedan sin
       # pesar (ni individual ahora, ni de un pesaje previo). Cada una queda con es_promedio.
-      if resto_peso.positive?
-        restantes = @lote.plants.where.not(id: individuales_ids)
-                                .where('peso_seco IS NULL OR peso_seco <= 0').to_a
-        n = restantes.size
-        if n.positive?
-          base = (resto_peso / n).round(2)
-          restantes.each_with_index do |plant, i|
-            peso = (i == n - 1) ? (resto_peso - base * (n - 1)) : base # la última absorbe el remanente
-            plant.update!(peso_seco: peso)
-            pesaje.pesadas_plantas.create!(plant: plant, peso_seco_g: peso, es_promedio: true)
-          end
-        end
-      end
+      distribuir_resto!(pesaje, resto_peso, excluir_ids: individuales_ids) if resto_peso.positive?
 
       raise ArgumentError, 'Cargá al menos un peso (individual o del resto)' unless pesaje.pesadas_plantas.exists?
 
@@ -255,6 +246,27 @@ class PesajesManicuraController < ApplicationController
   end
 
   private
+
+  # Reparte `peso_total` como PROMEDIO entre las plantas del lote que aún no tienen peso
+  # (excluyendo `excluir_ids` y, opcionalmente, limitando a `count` plantas). Crea una
+  # pesada por planta con es_promedio: true y le setea el peso_seco. Devuelve cuántas tocó.
+  def distribuir_resto!(pesaje, peso_total, count: nil, excluir_ids: [])
+    return 0 if peso_total <= 0
+    restantes = pesaje.lote.plants.where.not(id: excluir_ids)
+                      .where('peso_seco IS NULL OR peso_seco <= 0')
+                      .order(:id).to_a
+    restantes = restantes.first(count) if count && count.positive?
+    n = restantes.size
+    return 0 if n.zero?
+
+    base = (peso_total / n).round(2)
+    restantes.each_with_index do |plant, i|
+      peso = (i == n - 1) ? (peso_total - base * (n - 1)) : base # la última absorbe el remanente
+      plant.update!(peso_seco: peso)
+      pesaje.pesadas_plantas.create!(plant: plant, peso_seco_g: peso, es_promedio: true)
+    end
+    n
+  end
 
   # Contenedor destino para registrar_directo: existente (stock_id) o nuevo. Si viene
   # sede_id y el contenedor no tiene sede, lo asigna a esa sede.
