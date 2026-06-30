@@ -194,7 +194,7 @@
         <div class="qr__progreso">
           <div class="qr__progreso-top">
             <span class="qr__progreso-cnt"><strong>{{ progreso.pesadas }}</strong> / {{ progreso.total }} plantas</span>
-            <span class="qr__progreso-total">{{ progreso.peso_total_g.toFixed(1) }}g total</span>
+            <span class="qr__progreso-total">{{ Number(progreso.peso_total_g || 0).toFixed(1) }}g total</span>
           </div>
           <div class="qr__progreso-bar">
             <div class="qr__progreso-fill"
@@ -395,14 +395,16 @@ async function cargarProgreso(detalle) {
   try {
     const { data: plantas } = await listPlants({ lote_id: detalle.lote.id })
     const total    = plantas.length
-    const pesadas  = plantas.filter(p => p.peso_seco && p.peso_seco > 0).length
-    const pesoTotal = plantas.reduce((s, p) => s + (p.peso_seco || 0), 0)
+    // peso_seco llega como string (decimal de Rails): parseamos antes de comparar/sumar,
+    // si no el reduce concatena strings y el .toFixed del render explota.
+    const pesadas  = plantas.filter(p => parseFloat(p.peso_seco) > 0).length
+    const pesoTotal = plantas.reduce((s, p) => s + (parseFloat(p.peso_seco) || 0), 0)
     progreso.value = { pesadas, total, peso_total_g: pesoTotal, completado: pesadas >= total }
   } catch {
     progreso.value = {
-      pesadas:      detalle.peso_seco > 0 ? 1 : 0,
+      pesadas:      parseFloat(detalle.peso_seco) > 0 ? 1 : 0,
       total:        detalle.lote?.plants_count || 1,
-      peso_total_g: detalle.peso_seco || 0,
+      peso_total_g: parseFloat(detalle.peso_seco) || 0,
       completado:   false,
     }
   }

@@ -152,7 +152,6 @@ const SALA_KINDS = [
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración'  },
   { value: 'cosecha',    label: 'Cosecha'    },
-  { value: 'manicura',   label: 'Manicura'   },
 ]
 
 function openEditSala() {

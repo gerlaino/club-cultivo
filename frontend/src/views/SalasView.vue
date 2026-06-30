@@ -74,7 +74,6 @@ const KIND_TABS = [
   { value: 'mixta',      emoji: '🔀', label: 'Mixta'      },
   { value: 'madre',      emoji: '🌱', label: 'Madres'     },
   { value: 'clon',       emoji: '🔁', label: 'Clones'     },
-  { value: 'manicura',   emoji: '✂️', label: 'Manicura'   },
 ];
 
 const kindTabs = computed(() =>
