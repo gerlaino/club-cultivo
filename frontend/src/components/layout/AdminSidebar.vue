@@ -70,7 +70,9 @@ watch(() => route.path, (path, prev) => {
 .asb {
   width: 220px; flex-shrink: 0;
   display: flex; flex-direction: column;
-  height: 100vh; position: sticky; top: 0; overflow-x: hidden;
+  height: 100vh; height: 100dvh; /* dvh: en iOS Safari evita que la barra de URL recorte el menú */
+  position: sticky; top: 0; overflow-x: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0); /* el botón de colapsar no queda bajo el home indicator */
   background: var(--c-role-admin);
   transition: width .25s cubic-bezier(.4,0,.2,1);
 }

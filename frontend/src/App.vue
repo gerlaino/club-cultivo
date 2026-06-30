@@ -644,6 +644,7 @@ onMounted(async () => {
 /* ── Shell ── */
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -655,6 +656,7 @@ onMounted(async () => {
 .admin-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* Drawer overlay (mobile <1024px) */

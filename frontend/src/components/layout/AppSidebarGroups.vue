@@ -109,7 +109,8 @@ watch(() => route.path, () => {
 .sbg {
   width: 220px; flex-shrink: 0;
   display: flex; flex-direction: column;
-  height: 100vh; position: sticky; top: 0;
+  height: 100vh; height: 100dvh; position: sticky; top: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0);
   overflow-x: hidden;
   transition: width .25s cubic-bezier(.4,0,.2,1);
 }

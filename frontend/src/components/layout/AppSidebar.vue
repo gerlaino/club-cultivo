@@ -78,8 +78,10 @@ function badgeValue(link) {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh; /* iOS Safari: la barra de URL no recorta el menú */
   position: sticky;
   top: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0);
   overflow-x: hidden;
   transition: width .25s cubic-bezier(.4,0,.2,1);
 }

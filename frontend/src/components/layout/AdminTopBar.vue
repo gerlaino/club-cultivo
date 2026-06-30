@@ -187,6 +187,8 @@ async function handleLogout() {
   background: var(--c-paper);
   border-bottom: 1px solid var(--c-ink-300);
   flex-shrink: 0;
+  /* iOS/PWA: el contenido no queda bajo el notch (en navegador el inset es 0, sin efecto) */
+  padding-top: env(safe-area-inset-top, 0);
 }
 .atb__inner {
   height: 64px;
