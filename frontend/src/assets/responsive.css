@@ -236,3 +236,18 @@
     border-radius: 2px;
   }
 }
+
+/* ── Tablas del admin en mobile/tablet ──────────────────────────────────────────
+   Muchas vistas admin renderizan <table> sin wrapper de scroll → en pantallas
+   chicas se cortaban o empujaban el ancho de toda la página. Acá cada tabla del
+   contenido admin scrollea horizontal por sí sola (sin tocar cada vista). En
+   desktop (>1023px) no aplica, así que las tablas se ven igual que siempre. */
+@media (max-width: 1023px) {
+  .admin-main table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
