@@ -350,12 +350,13 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import { getStockTrazabilidad, listStocks } from '../../lib/api.js'
 
 const FORMA_LABELS = {
-  flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite',
-  tintura: 'Tintura', topico: 'Tópico', otro: 'Otro',
+  flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
+  crema: 'Crema', capsula: 'Cápsula', comestible: 'Comestible', prensado: 'Prensado',
+  preroll: 'Preroll', otro: 'Otro', externo: 'Externo',
 }
 const FASE_ICONS = {
-  germinacion: '🌱', vegetativo: '🌿', floracion: '🌸',
-  cosecha: '✂️', curado: '🫙', finalizado: '✅',
+  semilla: '🌰', esqueje: '🌱', germinacion: '🌱', vegetativo: '🌿', floracion: '🌸',
+  cosecha: '🌾', en_manicura: '✂️', curado: '🫙', finalizado: '✅',
 }
 
 const query       = ref('')

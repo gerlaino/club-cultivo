@@ -164,8 +164,8 @@
                 <div class="sd__mov-body">
                   <div class="sd__mov-row">
                     <span class="sd__mov-tipo" :class="`sd__mov-tipo--${m.tipo}`">{{ movTipoLabel(m.tipo) }}</span>
-                    <span class="sd__mov-g" :class="m.gramos >= 0 ? 'sd__mov-g--pos' : 'sd__mov-g--neg'">
-                      {{ m.gramos >= 0 ? '+' : '' }}{{ m.gramos.toFixed(2) }}g
+                    <span class="sd__mov-g" :class="Number(m.gramos) >= 0 ? 'sd__mov-g--pos' : 'sd__mov-g--neg'">
+                      {{ Number(m.gramos) >= 0 ? '+' : '' }}{{ Number(m.gramos).toFixed(2) }}g
                     </span>
                   </div>
                   <div class="sd__mov-notas">{{ m.notas || '—' }}</div>

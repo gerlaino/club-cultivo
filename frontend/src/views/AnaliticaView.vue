@@ -146,7 +146,9 @@ function barPct(val) { return val != null ? Math.min((val / maxRendimiento.value
 const ciclos = computed(() => dataProd.value?.ciclos ?? [])
 const FASES_CICLO = ['vegetativo', 'floracion', 'cosecha', 'curado']
 function totalCiclo(c) {
-  return FASES_CICLO.reduce((s, f) => s + (c[f] ?? 0), 0).toFixed(1)
+  // Number(): los días por fase pueden venir como string (decimal de Rails) y el +
+  // concatenaría en vez de sumar, rompiendo el .toFixed.
+  return FASES_CICLO.reduce((s, f) => s + Number(c[f] ?? 0), 0).toFixed(1)
 }
 
 // ── Pérdidas ─────────────────────────────────────────────────────
