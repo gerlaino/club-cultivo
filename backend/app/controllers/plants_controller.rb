@@ -161,10 +161,11 @@ class PlantsController < ApplicationController
       return render json: { error: 'El lote no está en una fase de manicura activa' }, status: :unprocessable_entity
     end
 
-    authorized = current_user.admin? || current_user.supervisor? ||
-                 (current_user.manicura? && lote.manicurador_id == current_user.id) ||
-                 (current_user.manicura? && lote.manicurador_id.nil?)
-    return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless authorized
+    # Pesa quien tenga rol de manicura/admin/supervisor Y el lote esté sin asignar o
+    # asignado a sí mismo (el admin no pisa el pesaje de un manicura ya asignado).
+    rol_ok        = current_user.manicura? || current_user.admin? || current_user.supervisor?
+    asignacion_ok = lote.manicurador_id.nil? || lote.manicurador_id == current_user.id
+    return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless rol_ok && asignacion_ok
 
     pesaje_manicura_id = params[:pesaje_manicura_id]
 

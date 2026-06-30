@@ -160,6 +160,22 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(response).to have_http_status(:created)
   end
 
+  it 'el admin NO puede crear un pesaje si el lote está asignado a un manicura' do
+    # lote ya está asignado a `manicura`; el admin no debe pisar su pesaje.
+    delete '/api/users/sign_out'
+    sign_in_as(admin)
+    post "/lotes/#{lote.id}/pesajes_manicura", headers: auth_headers
+    expect(response).to have_http_status(:forbidden)
+  end
+
+  it 'el admin SÍ puede crear un pesaje si el lote no tiene manicura asignado' do
+    lote.update!(manicurador: nil)
+    delete '/api/users/sign_out'
+    sign_in_as(admin)
+    post "/lotes/#{lote.id}/pesajes_manicura", headers: auth_headers
+    expect(response).to have_http_status(:created)
+  end
+
   # Mixto: el manicura pesa algunas plantas por QR y el resto por batch. El batch cubre
   # SOLO las restantes; al confirmar ambos, el total procesado debe llegar al total del
   # lote (no quedarse corto) y el lote pasa a curado con los gramos sumados.

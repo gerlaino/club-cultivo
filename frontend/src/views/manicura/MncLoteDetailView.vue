@@ -24,7 +24,7 @@
           <button class="mnl__btn-icon" @click="cargar" title="Actualizar">
             <RefreshCw :size="14" :stroke-width="2" />
           </button>
-          <button v-if="['en_manicura'].includes(lote.estado)" class="mnl__btn-primary" @click="abrirModal">
+          <button v-if="puedeRegistrar" class="mnl__btn-primary" @click="abrirModal">
             <Scale :size="14" :stroke-width="2" /> Registrar por lote
           </button>
         </div>
@@ -187,10 +187,12 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw } from 'lucide-vue-next'
 import { getLote, listPlants, createPesajeManicura } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useAuthStore } from '../../stores/auth'
 
 const route  = useRoute()
 const router = useRouter()
 const toast  = useToast()
+const auth   = useAuthStore()
 
 const id      = Number(route.params.id)
 const loading = ref(true)
@@ -218,6 +220,13 @@ const totalGramosKpi = computed(() => {
 })
 
 const sinPesar        = computed(() => Math.max(0, plantas.value.length - pesadasKpi.value))
+
+// Puede registrar pesaje quien tiene el lote sin asignar o asignado a sí mismo (espejo de
+// la regla del backend). El admin no ve el botón si el lote ya tiene un manicura asignado.
+const puedeRegistrar = computed(() =>
+  lote.value?.estado === 'en_manicura' &&
+  (!lote.value?.manicurador_id || lote.value?.manicurador_id === auth.user?.id)
+)
 const kpiPorc         = computed(() => plantas.value.length ? Math.min(100, Math.round(pesadasKpi.value / plantas.value.length * 100)) : 0)
 const hasAnyHumedo    = computed(() => plantas.value.some(p => parseFloat(p.peso_humedo) > 0))
 

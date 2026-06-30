@@ -252,6 +252,20 @@ async function crearPesaje() {
 async function cerrarDia() {
   const p = pesajeBorrador.value
   if (!p || enviando.value) return
+
+  // Aviso si quedan plantas sin pesar: cerrar el pesaje lo manda a confirmar y las
+  // restantes quedan para un pesaje nuevo (evita cerrar parcial sin querer).
+  const total = loteSeleccionado.value?.plants_count
+  const cubiertas = pesajesConfirmadosCount.value + (p.plantas_registradas || 0)
+  if (total && cubiertas < total) {
+    const ok = await confirm({
+      title: 'Cerrar pesaje incompleto',
+      message: `Vas a enviar ${cubiertas} de ${total} plantas. Las ${total - cubiertas} restantes quedarán para otro pesaje. ¿Cerrar igual?`,
+      confirmText: 'Cerrar y enviar',
+    })
+    if (!ok) return
+  }
+
   enviando.value = true
   try {
     await enviarPesajeManicura(loteSeleccionado.value.id, p.id)
