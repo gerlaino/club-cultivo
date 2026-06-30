@@ -111,15 +111,43 @@
         </div>
       </div>
 
-      <!-- Footer: el cierre del pesaje (QR) se hace en "Mis pesajes" -->
-      <div v-if="['en_manicura'].includes(lote.estado) && pesadasKpi > 0" class="mnl__footer">
-        <p class="mnl__footer-txt">
-          {{ pesadasKpi }}/{{ plantas.length }} plantas · {{ totalGramosKpi }}g total
-        </p>
-        <RouterLink to="/mnc/pesajes" class="mnl__btn-submit">
-          <Send :size="14" :stroke-width="2" />
-          Cerrar pesaje en Mis pesajes
-        </RouterLink>
+      <!-- Pesajes del lote (jornadas) -->
+      <div v-if="['en_manicura'].includes(lote.estado)" class="mnl__section">
+        <div class="mnl__section-head">
+          <h2 class="mnl__section-title"><Scale :size="12" :stroke-width="2" /> Pesajes</h2>
+          <button v-if="!pesajeBorrador" class="mnl__pj-new" :disabled="creando" @click="crearPesaje">
+            <Plus :size="13" :stroke-width="2" /> Nuevo pesaje
+          </button>
+        </div>
+
+        <!-- Jornada en curso (borrador) -->
+        <div v-if="pesajeBorrador" class="mnl__jornada">
+          <div class="mnl__jornada-info">
+            <span class="mnl__jornada-lbl">Jornada en curso</span>
+            <span class="mnl__jornada-kpi">{{ pesajeBorrador.plantas_registradas || 0 }} plantas · {{ (pesajeBorrador.peso_calculado_g || 0).toFixed(1) }}g</span>
+          </div>
+          <div class="mnl__jornada-acts">
+            <button class="mnl__pj-del" :disabled="borrando === pesajeBorrador.id" title="Descartar jornada" @click="borrarPesaje(pesajeBorrador)">
+              <Trash2 :size="14" />
+            </button>
+            <button class="mnl__btn-submit" :disabled="enviando || (pesajeBorrador.plantas_registradas || 0) === 0" @click="cerrarYEnviar">
+              <Send :size="14" :stroke-width="2" /> Cerrar y enviar
+            </button>
+          </div>
+        </div>
+        <p v-else class="mnl__pj-hint">Escaneá el QR de cada planta para pesar, o usá "Registrar por lote" arriba.</p>
+
+        <!-- Historial de pesajes -->
+        <div v-if="pesajesHistorial.length" class="mnl__hist">
+          <div v-for="p in pesajesHistorial" :key="p.id" class="mnl__hist-row">
+            <span class="mnl__hist-date">{{ fmtDate(p.fecha_pesaje) }}</span>
+            <span class="mnl__hist-info">{{ p.plantas_count || p.plantas_registradas || 0 }} plantas · {{ (p.peso_total_g || p.peso_calculado_g || 0).toFixed(1) }}g</span>
+            <span class="mnl__badge" :class="badgeClass(p.estado)">{{ pesajeEstadoLabel(p.estado) }}</span>
+            <button v-if="p.estado === 'enviado'" class="mnl__hist-act" :disabled="reabriendo === p.id" title="Reabrir para corregir" @click="reabrirPesaje(p)">
+              <Undo2 :size="13" />
+            </button>
+          </div>
+        </div>
       </div>
 
     </template>
@@ -246,15 +274,115 @@
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw, Package, Plus, CheckCircle } from 'lucide-vue-next'
-import { getLote, listPlants, createPesajeManicura, registrarDirectoManicura, listStocks, listSedes } from '../../lib/api.js'
+import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw, Package, Plus, CheckCircle, Undo2, Trash2 } from 'lucide-vue-next'
+import {
+  getLote, listPlants, createPesajeManicura, registrarDirectoManicura, listStocks, listSedes,
+  listPesajesManicura, enviarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura,
+} from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useConfirm } from '../../composables/useConfirm.js'
 import { useAuthStore } from '../../stores/auth'
 
 const route  = useRoute()
 const router = useRouter()
 const toast  = useToast()
 const auth   = useAuthStore()
+const { confirm } = useConfirm()
+
+// ── Pesajes del lote (jornadas) — antes vivía en "Mis pesajes" ──
+const pesajes    = ref([])
+const creando    = ref(false)
+const enviando   = ref(false)
+const reabriendo = ref(null)
+const borrando   = ref(null)
+
+const pesajeBorrador   = computed(() => pesajes.value.find(p => p.estado === 'borrador'))
+const pesajesHistorial = computed(() => pesajes.value.filter(p => p.estado !== 'borrador'))
+const pesajesConfirmadosCount = computed(() =>
+  pesajes.value.filter(p => p.estado === 'confirmado')
+    .reduce((s, p) => s + (p.plantas_count || p.plantas_registradas || 0), 0)
+)
+
+async function crearPesaje() {
+  if (creando.value) return
+  creando.value = true
+  try {
+    const { data } = await createPesajeManicura(id)
+    pesajes.value.unshift(data)
+    toast.success('Pesaje iniciado — escaneá el QR de cada planta para cargar su peso')
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'Error al crear el pesaje')
+  } finally { creando.value = false }
+}
+
+async function cerrarYEnviar() {
+  const p = pesajeBorrador.value
+  if (!p || enviando.value) return
+  // Aviso si quedan plantas sin pesar (no cerrar parcial sin querer).
+  const total = lote.value?.plants_count
+  const cubiertas = pesajesConfirmadosCount.value + (p.plantas_registradas || 0)
+  if (total && cubiertas < total) {
+    const ok = await confirm({
+      title: 'Cerrar pesaje incompleto',
+      message: `Vas a enviar ${cubiertas} de ${total} plantas. Las ${total - cubiertas} restantes quedarán para otro pesaje. ¿Cerrar igual?`,
+      confirmText: 'Cerrar y enviar',
+    })
+    if (!ok) return
+  }
+  enviando.value = true
+  try {
+    await enviarPesajeManicura(id, p.id)
+    toast.success('Pesaje cerrado y enviado a confirmar')
+    await cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'Error al enviar el pesaje')
+  } finally { enviando.value = false }
+}
+
+async function reabrirPesaje(p) {
+  if (p.estado !== 'enviado') return
+  reabriendo.value = p.id
+  try {
+    await reabrirPesajeManicura(id, p.id)
+    toast.success('Pesaje reabierto — corregilo y volvé a enviar')
+    await cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo reabrir')
+  } finally { reabriendo.value = null }
+}
+
+async function borrarPesaje(p) {
+  if (p.estado === 'confirmado') return
+  const ok = await confirm({
+    title: 'Borrar pesaje',
+    message: `¿Borrar este pesaje del ${fmtDate(p.fecha_pesaje)}? Esta acción no se puede deshacer.`,
+    confirmText: 'Borrar', danger: true,
+  })
+  if (!ok) return
+  borrando.value = p.id
+  try {
+    await deletePesajeManicura(id, p.id)
+    toast.success('Pesaje borrado')
+    await cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo borrar')
+  } finally { borrando.value = null }
+}
+
+function fmtDate(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+function pesajeEstadoLabel(estado) {
+  return { borrador: 'En progreso', enviado: 'Enviado', confirmado: 'Confirmado' }[estado] || estado
+}
+function badgeClass(estado) {
+  return {
+    'mnl__badge--borrador':   estado === 'borrador',
+    'mnl__badge--enviado':    estado === 'enviado',
+    'mnl__badge--confirmado': estado === 'confirmado',
+  }
+}
 
 const id      = Number(route.params.id)
 const loading = ref(true)
@@ -318,9 +446,10 @@ const estadoLabel = computed(() => 'Asignado')
 async function cargar() {
   loading.value = true
   try {
-    const [lr, pr] = await Promise.all([getLote(id), listPlants({ lote_id: id })])
+    const [lr, pr, psj] = await Promise.all([getLote(id), listPlants({ lote_id: id }), listPesajesManicura(id)])
     lote.value    = lr.data
     plantas.value = pr.data || []
+    pesajes.value = psj.data || []
   } catch {
     toast.error('Error al cargar el lote')
     router.push('/mnc/pendientes')
@@ -546,12 +675,55 @@ onActivated(cargar)
 .mnl__chip--prom    { background: #fef3c7; color: #b45309; }
 
 /* Footer */
-.mnl__footer {
-  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
-  padding: .875rem 1.25rem; flex-wrap: wrap; margin-top: 1rem;
+/* Pesajes (jornadas) */
+.mnl__pj-new {
+  display: inline-flex; align-items: center; gap: .3rem;
+  background: #fff; border: 1.5px solid #d4e6d4; color: #5C7A4A;
+  border-radius: 7px; padding: .35rem .7rem; font-size: .76rem; font-weight: 600; cursor: pointer;
 }
-.mnl__footer-txt { font-size: .82rem; color: #475569; margin: 0; font-weight: 500; }
+.mnl__pj-new:hover:not(:disabled) { background: #f6faf4; }
+.mnl__pj-new:disabled { opacity: .5; cursor: not-allowed; }
+.mnl__pj-hint { font-size: .8rem; color: #94a3b8; margin: .25rem 0 0; }
+
+.mnl__jornada {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  background: #f6faf4; border: 1px solid #d4e6d4; border-radius: 10px; padding: .75rem 1rem;
+}
+.mnl__jornada-info { display: flex; flex-direction: column; gap: .15rem; }
+.mnl__jornada-lbl  { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #5C7A4A; }
+.mnl__jornada-kpi  { font-size: .85rem; font-weight: 700; color: #0f172a; }
+.mnl__jornada-acts { display: flex; align-items: center; gap: .5rem; }
+.mnl__pj-del {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 7px; border: 1.5px solid #fecaca;
+  background: #fff; color: #dc2626; cursor: pointer;
+}
+.mnl__pj-del:hover:not(:disabled) { background: #fef2f2; }
+.mnl__pj-del:disabled { opacity: .5; cursor: not-allowed; }
+
+.mnl__hist { display: flex; flex-direction: column; gap: .35rem; margin-top: .75rem; }
+.mnl__hist-row {
+  display: flex; align-items: center; gap: .65rem;
+  background: #fff; border: 1px solid #f1f5f9; border-radius: 8px; padding: .5rem .8rem;
+}
+.mnl__hist-date { font-size: .76rem; font-weight: 600; color: #64748b; width: 96px; flex-shrink: 0; text-transform: capitalize; }
+.mnl__hist-info { font-size: .8rem; color: #334155; flex: 1; min-width: 0; }
+.mnl__hist-act {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px; border: 1.5px solid #e2e8f0;
+  background: #fff; color: #64748b; cursor: pointer; flex-shrink: 0;
+}
+.mnl__hist-act:hover:not(:disabled) { background: #f8fafc; }
+.mnl__hist-act:disabled { opacity: .5; }
+
+.mnl__badge {
+  font-size: .65rem; font-weight: 700; padding: .2em .6em; border-radius: 999px;
+  text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0;
+}
+.mnl__badge--borrador   { background: #f1f5f9; color: #64748b; }
+.mnl__badge--enviado    { background: #fef3c7; color: #b45309; }
+.mnl__badge--confirmado { background: #dcfce7; color: #15803d; }
+
 .mnl__btn-submit {
   display: inline-flex; align-items: center; gap: .4rem;
   background: #5C7A4A; color: #fff; border: none; border-radius: 7px;

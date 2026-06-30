@@ -526,15 +526,11 @@ const routes = [
     },
   },
   {
+    // El workspace de pesajes se consolidó dentro del detalle del lote (/mnc/lotes/:id).
+    // Se mantiene como redirect para no romper bookmarks. (La PWA sigue usando la vista
+    // en /m/manicura/pesajes.)
     path: '/mnc/pesajes',
-    name: 'mnc-pesajes',
-    component: () => import('../views/manicura/MncPesajesView.vue'),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore()
-      if (!['admin', 'manicura'].includes(auth.user?.role)) return next('/')
-      next()
-    },
+    redirect: '/mnc/pendientes',
   },
 
   {
