@@ -1,115 +1,140 @@
 <template>
-  <AppSidebarGroups :home="HOME" :groups="GRUPOS" role="admin" />
+  <aside class="asb" :class="{ 'asb--collapsed': collapsed }">
+
+    <!-- Marca del club (tenant) — protagonista -->
+    <RouterLink to="/" class="asb__brand" :title="clubName">
+      <img v-if="club.logoUrl" :src="club.logoUrl" class="asb__brand-logo" :alt="clubName" />
+      <span v-else class="asb__brand-fallback">{{ inicialClub }}</span>
+      <span class="asb__brand-name">{{ clubName }}</span>
+    </RouterLink>
+
+    <!-- Grupos primarios (1 click → su vista principal) -->
+    <nav class="asb__nav">
+      <RouterLink
+        v-for="g in NAV_GROUPS" :key="g.key"
+        :to="g.to" class="asb__link"
+        :class="{ 'asb__link--active': activeKey === g.key }"
+        :title="collapsed ? g.label : undefined"
+      >
+        <component :is="ICONS[g.key]" :size="18" :stroke-width="1.75" class="asb__link-ico" />
+        <span class="asb__label">{{ g.label }}</span>
+        <span v-if="groupBadge(g)" class="asb__badge">{{ groupBadge(g) }}</span>
+      </RouterLink>
+    </nav>
+
+    <!-- Plataforma: presente pero discreta (powered by) -->
+    <div class="asb__platform" title="Cultivo Espacial">
+      <img src="/logo-ce-icono.png" class="asb__platform-logo" alt="" />
+      <span class="asb__platform-txt">por Cultivo Espacial</span>
+    </div>
+
+    <button class="asb__collapse" @click="toggleCollapse" :title="collapsed ? 'Expandir menú' : 'Contraer menú'">
+      <PanelLeftClose v-if="!collapsed" :size="15" :stroke-width="1.75" />
+      <PanelLeftOpen  v-else            :size="15" :stroke-width="1.75" />
+    </button>
+
+  </aside>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import AppSidebarGroups from './AppSidebarGroups.vue'
 import {
-  LayoutDashboard, Users, Building2, Wallet, CheckSquare,
-  Sprout, FileCheck, FileText, UserCog, Globe,
-  ShieldCheck, Truck, TrendingUp, History,
-  GitBranch, Layers, Dna, Archive, Leaf, Boxes, Scissors,
-  ClipboardList, Package, Settings, Scale, Webhook, BellRing, BookmarkCheck, Trash2,
+  LayoutDashboard, Sprout, Users, Factory, ShoppingCart,
+  CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-vue-next'
-import { listLotes, listPesajesManicuraAdmin } from '../../lib/api.js'
-import { useAuthStore } from '../../stores/auth'
+import { useClubStore } from '../../stores/club.js'
+import { NAV_GROUPS, detectGroup, useNavContext } from '../../composables/useNavContext.js'
 
 const route = useRoute()
-const auth  = useAuthStore()
+const club  = useClubStore()
+const { collapsed, toggleCollapse, refreshBadges, badgeFor } = useNavContext()
 
-const HOME = { to: '/', icon: LayoutDashboard, label: 'Dashboard' }
-
-// Badge de Manicura: pesajes esperando confirmación + cosechas en manicura asignadas
-// a mí (que todavía tengo que pesar).
-const aprobacionesPendientes = ref(0)
-async function fetchAprobaciones() {
-  try {
-    const [pesajes, enManicura] = await Promise.all([
-      listPesajesManicuraAdmin().catch(() => ({ data: [] })),
-      listLotes({ estado: 'en_manicura' }).catch(() => ({ data: [] })),
-    ])
-    const enviadosLoteIds = new Set((pesajes.data || []).map(p => p.lote_id))
-    const misCosechas = (enManicura.data || []).filter(l => l.manicurador_id === auth.user?.id && !enviadosLoteIds.has(l.id))
-    aprobacionesPendientes.value = (pesajes.data || []).length + misCosechas.length
-  } catch {}
+const ICONS = {
+  dashboard: LayoutDashboard,
+  cultivo:   Sprout,
+  pacientes: Users,
+  produccion: Factory,
+  comercial: ShoppingCart,
+  tareas:    CheckSquare,
+  reportes:  BarChart3,
+  config:    Settings,
 }
 
-const GRUPOS = computed(() => [
-  {
-    label: 'Cultivo', icon: Sprout, defaultOpen: true,
-    items: [
-      { to: '/salas',     icon: Layers,  label: 'Salas' },
-      { to: '/lotes',     icon: Archive, label: 'Lotes' },
-      { to: '/plantas',   icon: Leaf,    label: 'Plantas' },
-      { to: '/geneticas', icon: Dna,     label: 'Genéticas' },
-    ],
-  },
-  {
-    label: 'Pacientes', icon: Users, defaultOpen: true,
-    items: [
-      { to: '/pacientes',         icon: Users,     label: 'Pacientes' },
-      { to: '/historial',         icon: History,   label: 'Dispensaciones' },
-      { to: '/informe-semestral', icon: FileCheck, label: 'REPROCANN' },
-    ],
-  },
-  {
-    label: 'Operaciones', icon: Package, defaultOpen: true,
-    items: [
-      { to: '/admin/stock',            icon: Boxes,         label: 'Stock' },
-      { to: '/admin/cosechado',        icon: Scissors,      label: 'Cosecha', hint: 'Lotes cosechados, esperando manicura' },
-      { to: '/admin/pesajes-manicura', icon: Scale,         label: 'Manicura', badge: aprobacionesPendientes.value, hint: 'Pesajes y aprobaciones de cosecha' },
-      { to: '/reservas',               icon: BookmarkCheck, label: 'Reservas' },
-      { to: '/delivery/despachos',     icon: Truck,         label: 'Despachos' },
-      { to: '/contabilidad',           icon: Wallet,        label: 'Contabilidad' },
-    ],
-  },
-  {
-    label: 'Planificación', icon: ClipboardList, defaultOpen: true,
-    items: [
-      { to: '/tareas',       icon: CheckSquare,   label: 'Tareas' },
-      { to: '/plan-trabajo', icon: ClipboardList, label: 'Plan de trabajo' },
-    ],
-  },
-  {
-    label: 'Infraestructura', icon: Building2, defaultOpen: false,
-    items: [
-      { to: '/sedes', icon: Building2, label: 'Sedes' },
-    ],
-  },
-  {
-    label: 'Compliance', icon: ShieldCheck, defaultOpen: false,
-    items: [
-      { to: '/auditor',              icon: ShieldCheck, label: 'Auditoría' },
-      { to: '/auditor/trazabilidad', icon: GitBranch,   label: 'Trazabilidad' },
-      { to: '/ariccame',             icon: ShieldCheck, label: 'ARICCAME' },
-      { to: '/documentos',           icon: FileText,    label: 'Documentos' },
-    ],
-  },
-  {
-    label: 'Analytics', icon: TrendingUp, defaultOpen: false,
-    items: [
-      { to: '/analitica', icon: TrendingUp, label: 'Analítica' },
-    ],
-  },
-  {
-    label: 'Configuración', icon: Settings, defaultOpen: false,
-    items: [
-      { to: '/configuracion',          icon: Settings, label: 'General' },
-      { to: '/configuracion/papelera', icon: Trash2,   label: 'Papelera', hint: 'Restaurar lo eliminado' },
-      { to: '/alertas-configuracion',  icon: BellRing, label: 'Alertas' },
-      { to: '/web',                    icon: Globe,    label: 'Sitio web' },
-      { to: '/integraciones',          icon: Webhook,  label: 'Integraciones' },
-      { to: '/usuarios',               icon: UserCog,  label: 'Equipo' },
-    ],
-  },
-])
+const clubName    = computed(() => club.name || 'Mi club')
+const inicialClub = computed(() => (clubName.value || 'C').trim().charAt(0).toUpperCase())
+const activeKey   = computed(() => detectGroup(route.path).key)
 
-onMounted(fetchAprobaciones)
+function groupBadge(g) {
+  return g.tabs.reduce((s, t) => s + (t.badge ? badgeFor(t.badge) : 0), 0)
+}
 
+onMounted(refreshBadges)
 watch(() => route.path, (path, prev) => {
-  const rutasManicura = ['/admin/pesajes-manicura']
-  if (rutasManicura.includes(prev) || rutasManicura.includes(path)) fetchAprobaciones()
+  // Refresca el badge al entrar/salir de manicura o tareas.
+  const tocar = ['/admin/pesajes-manicura', '/tareas']
+  if (tocar.some(r => path.startsWith(r) || (prev || '').startsWith(r))) refreshBadges()
 })
 </script>
+
+<style scoped>
+.asb {
+  width: 220px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  height: 100vh; position: sticky; top: 0; overflow-x: hidden;
+  background: var(--c-role-admin);
+  transition: width .25s cubic-bezier(.4,0,.2,1);
+}
+.asb--collapsed { width: 54px; }
+.asb--collapsed .asb__brand-name,
+.asb--collapsed .asb__label,
+.asb--collapsed .asb__badge,
+.asb--collapsed .asb__platform-txt { display: none; }
+.asb--collapsed .asb__brand    { justify-content: center; padding: 1.1rem .5rem; }
+.asb--collapsed .asb__link     { justify-content: center; padding: 10px 0; }
+.asb--collapsed .asb__platform { justify-content: center; padding: .6rem .5rem; }
+.asb--collapsed .asb__nav      { padding: var(--sp-3) var(--sp-1); }
+
+/* Club brand */
+.asb__brand {
+  display: flex; align-items: center; gap: var(--sp-3); text-decoration: none;
+  padding: var(--sp-5) var(--sp-5) var(--sp-4);
+  border-bottom: 1px solid rgba(168,201,181,0.18); flex-shrink: 0;
+}
+.asb__brand-logo { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,.12); }
+.asb__brand-fallback {
+  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.16); color: var(--c-paper); font-weight: 800; font-size: .95rem;
+}
+.asb__brand-name { font-family: var(--font-display); font-size: var(--fs-16); font-weight: 600; color: var(--c-paper); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Nav primario */
+.asb__nav { flex: 1; padding: var(--sp-3) var(--sp-2); display: flex; flex-direction: column; gap: 2px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(168,201,181,0.22) transparent; }
+.asb__nav::-webkit-scrollbar { width: 6px; }
+.asb__nav::-webkit-scrollbar-thumb { background: rgba(168,201,181,0.22); border-radius: 6px; }
+
+.asb__link {
+  display: flex; align-items: center; gap: 11px; padding: 10px 14px; border-radius: var(--r-md);
+  font-size: var(--fs-14); color: var(--c-leaf-300); text-decoration: none;
+  border-left: 3px solid transparent; transition: background var(--t-fast), color var(--t-fast);
+}
+.asb__link:hover { background: rgba(255,255,255,0.06); color: var(--c-paper); }
+.asb__link--active { background: rgba(255,255,255,0.14); color: var(--c-paper); font-weight: 600; border-left-color: var(--c-leaf-300); }
+.asb__link-ico { flex-shrink: 0; }
+.asb__label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asb__badge { background: #d97706; color: #fff; font-size: 10px; font-weight: 700; line-height: 1; padding: 2px 6px; border-radius: 10px; min-width: 16px; text-align: center; }
+
+/* Plataforma (powered by) */
+.asb__platform {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  padding: .65rem var(--sp-5); border-top: 1px solid rgba(168,201,181,0.12);
+}
+.asb__platform-logo { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; opacity: .6; flex-shrink: 0; }
+.asb__platform-txt { font-size: 11px; color: rgba(168,201,181,0.5); font-weight: 500; white-space: nowrap; }
+
+.asb__collapse { display: flex; align-items: center; justify-content: center; width: 100%; height: 36px; border: none; background: none; color: rgba(168,201,181,0.45); cursor: pointer; flex-shrink: 0; transition: color .15s, background .15s; }
+.asb__collapse:hover { color: rgba(168,201,181,0.9); background: rgba(255,255,255,0.05); }
+
+@media (max-width: 1023px) { .asb { display: none; } }
+</style>

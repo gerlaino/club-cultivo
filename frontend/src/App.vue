@@ -670,6 +670,7 @@ onMounted(async () => {
   height: 100%;
   overflow: hidden;
 }
+.admin-drawer :deep(.asb),
 .admin-drawer :deep(.sbg) {
   display: flex !important;
   height: 100%;

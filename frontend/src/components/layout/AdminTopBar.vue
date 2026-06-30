@@ -7,22 +7,18 @@
         <Menu :size="20" :stroke-width="1.75" />
       </button>
 
-      <!-- Identidad del club (tenant) -->
-      <div class="atb__club" :title="club.name">
-        <img v-if="club.logoUrl" :src="club.logoUrl" class="atb__club-logo" :alt="club.name" />
-        <DsAvatar v-else :name="club.name" tone="role-admin" size="md" />
-        <span class="atb__club-name">{{ club.name }}</span>
-      </div>
-      <span class="atb__club-sep" aria-hidden="true"></span>
-
-      <!-- Breadcrumb -->
-      <nav class="atb__bc" aria-label="breadcrumb">
-        <template v-for="(crumb, i) in breadcrumbs" :key="i">
-          <RouterLink v-if="crumb.to" :to="crumb.to" class="atb__bc-link">{{ crumb.label }}</RouterLink>
-          <span v-else class="atb__bc-current">{{ crumb.label }}</span>
-          <span v-if="i < breadcrumbs.length - 1" class="atb__bc-sep" aria-hidden="true">/</span>
-        </template>
+      <!-- Sub-pestañas del grupo activo (el grupo primario vive en el sidebar) -->
+      <nav v-if="activeGroup.tabs.length" class="atb__tabs" aria-label="Secciones">
+        <RouterLink
+          v-for="t in activeGroup.tabs" :key="t.to"
+          :to="t.to" class="atb__tab"
+          :class="{ 'atb__tab--active': isTabActive(t) }"
+        >
+          {{ t.label }}
+          <span v-if="t.badge && badgeFor(t.badge)" class="atb__tab-badge">{{ badgeFor(t.badge) }}</span>
+        </RouterLink>
       </nav>
+      <span v-else class="atb__page-title">{{ activeGroup.label }}</span>
 
       <!-- Right actions -->
       <div class="atb__right">
@@ -65,9 +61,6 @@
                 <RouterLink to="/perfil" class="atb__user-item" @click="avatarOpen = false">
                   <i class="bi bi-person"></i> Mi perfil
                 </RouterLink>
-                <RouterLink to="/preferencias" class="atb__user-item" @click="avatarOpen = false">
-                  <i class="bi bi-gear"></i> Configuración del club
-                </RouterLink>
 
                 <!-- Push notifications toggle -->
                 <button
@@ -107,6 +100,7 @@ import { useClubStore } from '../../stores/club.js'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
+import { detectGroup, useNavContext } from '../../composables/useNavContext.js'
 import DsDropdown         from '../../design-system/components/Dropdown.vue'
 import DsAvatar           from '../../design-system/components/Avatar.vue'
 import { Bell, BellRing, BellOff, Menu, HelpCircle } from 'lucide-vue-next'
@@ -157,53 +151,18 @@ function openHelp() {
 
 const notifCount = computed(() => ambStore.alertasCount + internasNoLeidas.value.length)
 
-const SEGMENT_LABELS = {
-  pacientes:              'Pacientes',
-  sedes:                  'Sedes',
-  salas:                  'Salas',
-  lotes:                  'Lotes',
-  contabilidad:           'Contabilidad',
-  tareas:                 'Tareas',
-  usuarios:               'Usuarios',
-  geneticas:              'Genéticas',
-  manicura:               'Manicura',
-  analitica:              'Analítica',
-  auditor:                'Auditoría',
-  ariccame:               'ARICCAME',
-  configuracion:          'Configuración',
-  integraciones:          'Integraciones',
-  documentos:             'Documentos',
-  perfil:                 'Mi perfil',
-  preferencias:           'Preferencias',
-  web:                    'Sitio web',
-  nuevo:                  'Nuevo',
-  curado:                 'Curado',
-  cosechado:              'Cosechado',
-  stock:                  'Stock',
-  'informe-semestral':    'REPROCANN',
-  'plan-trabajo':         'Plan de trabajo',
-  'pesajes-manicura':     'Manicura',
-  'socios-criticos':      'Socios críticos',
-  'alertas-configuracion':'Alertas',
-  'admin':                'Administración',
-}
-
-const breadcrumbs = computed(() => {
-  const path = route.path
-  if (path === '/') return [{ label: 'Inicio' }]
-  const segments = path.split('/').filter(Boolean)
-  const crumbs = [{ label: 'Inicio', to: '/' }]
-  let acc = ''
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i]
-    acc += '/' + seg
-    if (/^\d+$/.test(seg)) { crumbs.push({ label: 'Detalle' }); break }
-    const label = SEGMENT_LABELS[seg] || (seg.charAt(0).toUpperCase() + seg.slice(1).replace(/-/g, ' '))
-    const isLast = acc === path
-    crumbs.push(isLast ? { label } : { label, to: acc })
+// Grupo activo + tab activo para las sub-pestañas (badges del singleton del sidebar).
+const { badgeFor } = useNavContext()
+const activeGroup = computed(() => detectGroup(route.path))
+function isTabActive(t) {
+  let best = null, len = -1
+  for (const x of activeGroup.value.tabs) {
+    if ((route.path === x.to || route.path.startsWith(x.to + '/')) && x.to.length > len) {
+      best = x; len = x.to.length
+    }
   }
-  return crumbs
-})
+  return best === t
+}
 
 async function handleLogout() {
   await auth.logOut()
@@ -247,64 +206,26 @@ async function handleLogout() {
 .atb__hamburger:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
 @media (max-width: 1023px) { .atb__hamburger { display: flex; } }
 
-/* Identidad del club */
-.atb__club {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-shrink: 0;
-  min-width: 0;
+/* Sub-pestañas del grupo activo */
+.atb__tabs {
+  display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1;
+  overflow-x: auto; scrollbar-width: none;
 }
-.atb__club-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-md);
-  /* contain: muestra el logo completo sin recortarlo (cover recortaba logos no cuadrados) */
-  object-fit: contain;
-  padding: 2px;
-  border: 1px solid var(--c-ink-100);
-  background: #fff;
-  flex-shrink: 0;
-  box-sizing: border-box;
+.atb__tabs::-webkit-scrollbar { display: none; }
+.atb__tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 8px;
+  font-size: var(--fs-14); font-weight: 500; color: var(--c-ink-500);
+  text-decoration: none; white-space: nowrap;
+  transition: background var(--t-fast), color var(--t-fast);
 }
-.atb__club-name {
-  font-size: var(--fs-14);
-  font-weight: 700;
-  color: var(--c-ink-900);
-  white-space: nowrap;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  letter-spacing: -.01em;
+.atb__tab:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
+.atb__tab--active { background: var(--c-leaf-100, #e9f2e4); color: var(--c-role-admin); font-weight: 700; }
+.atb__tab-badge {
+  background: #d97706; color: #fff; font-size: 10px; font-weight: 700; line-height: 1;
+  padding: 2px 5px; border-radius: 10px; min-width: 15px; text-align: center;
 }
-.atb__club-sep {
-  width: 1px;
-  height: 26px;
-  background: var(--c-ink-300);
-  flex-shrink: 0;
-}
-@media (max-width: 640px) {
-  .atb__club-name, .atb__club-sep { display: none; }
-}
-
-/* Breadcrumb */
-.atb__bc {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-width: 0;
-  flex: 1;
-}
-.atb__bc-link {
-  font-size: var(--fs-13);
-  color: var(--c-ink-500);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: color var(--t-fast);
-}
-.atb__bc-link:hover { color: var(--c-ink-900); }
-.atb__bc-sep    { font-size: var(--fs-13); color: var(--c-ink-300); }
-.atb__bc-current { font-size: var(--fs-13); color: var(--c-ink-900); font-weight: 600; }
+.atb__page-title { font-size: var(--fs-15); font-weight: 700; color: var(--c-ink-900); flex: 1; }
 
 /* Right actions */
 .atb__right {
