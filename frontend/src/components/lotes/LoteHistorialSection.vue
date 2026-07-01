@@ -10,7 +10,7 @@
     <div v-if="loadingHistorial" class="lhs__placeholder">Cargando historial…</div>
     <EmptyState v-else-if="!historial.length" icon="📜" title="Sin eventos" message="Todavía no hay actividad registrada." compact />
     <div v-else class="lhs__lista">
-      <div v-for="it in historialCorto" :key="it.source + it.id" class="lhs__row">
+      <div v-for="it in historialPagina" :key="it.source + it.id" class="lhs__row">
         <div class="lhs__dot" :style="{ background: dotColor(it) }"></div>
         <div class="lhs__row-body">
           <div class="lhs__row-head">
@@ -21,17 +21,22 @@
           <div v-if="it.usuario" class="lhs__row-meta">{{ it.usuario }}</div>
         </div>
       </div>
-      <button v-if="historial.length > CORTO" class="lhs__mas" @click="$emit('ver')">
-        + {{ historial.length - CORTO }} más — ver historial completo
-      </button>
+      <Paginator
+        v-if="historial.length > perPage"
+        v-model:page="page"
+        v-model:perPage="perPage"
+        :total="historial.length"
+        :pageSizes="[10, 25, 50]"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { formatDateTime } from '../../lib/loteHelpers.js'
 import EmptyState from '../ui/EmptyState.vue'
+import Paginator  from '../ui/Paginator.vue'
 import { dotColor, metaDetalle } from '../../lib/historialHelpers.js'
 
 const props = defineProps({
@@ -40,8 +45,12 @@ const props = defineProps({
 })
 defineEmits(['ver'])
 
-const CORTO = 6
-const historialCorto = computed(() => props.historial.slice(0, CORTO))
+const page    = ref(1)
+const perPage = ref(10)
+const historialPagina = computed(() => {
+  const start = (page.value - 1) * perPage.value
+  return props.historial.slice(start, start + perPage.value)
+})
 </script>
 
 <style scoped>

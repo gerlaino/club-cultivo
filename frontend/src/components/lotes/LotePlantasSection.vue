@@ -130,8 +130,8 @@
             <!-- Footer de la tarjeta -->
             <div class="lps__pcard-footer">
               <div class="lps__pcard-nombre">{{ p.nombre || `Planta #${i + 1}` }}</div>
-              <div class="lps__pcard-estado" :style="{ background: pm(p.state).color + '33', color: pm(p.state).color === '#64748b' ? '#cbd5e1' : '#fff' }">
-                {{ pm(p.state).emoji }} {{ pm(p.state).label }}
+              <div class="lps__pcard-estado" :style="{ background: estadoPlanta(p).color + '33', color: estadoPlanta(p).color === '#64748b' ? '#cbd5e1' : '#fff' }">
+                {{ estadoPlanta(p).emoji }} {{ estadoPlanta(p).label }}
               </div>
             </div>
 
@@ -157,13 +157,13 @@
             class="lps__planta"
           >
             <div class="lps__planta-num">{{ (plantasPage - 1) * plantasPerPage + i + 1 }}</div>
-            <div class="lps__planta-dot" :style="{ background: pm(p.state).color }"></div>
+            <div class="lps__planta-dot" :style="{ background: estadoPlanta(p).color }"></div>
             <div class="lps__planta-info">
               <div class="lps__planta-nombre">{{ p.nombre || p.codigo_qr || `Planta #${p.id}` }}</div>
               <div class="lps__planta-qr">{{ p.codigo_qr || '—' }}</div>
             </div>
-            <span class="lps__planta-estado" :style="{ background: pm(p.state).color + '18', color: pm(p.state).color }">
-              {{ pm(p.state).emoji }} {{ pm(p.state).label }}
+            <span class="lps__planta-estado" :style="{ background: estadoPlanta(p).color + '18', color: estadoPlanta(p).color }">
+              {{ estadoPlanta(p).emoji }} {{ estadoPlanta(p).label }}
             </span>
             <i class="bi bi-chevron-right lps__planta-arrow"></i>
           </RouterLink>
@@ -177,29 +177,36 @@
           :pageSizes="[10, 25, 50]"
         />
 
-        <!-- Cosechadas agrupadas por pasada -->
-        <template v-if="plantasCosechadasPorPasada.length">
-          <div v-for="grupo in plantasCosechadasPorPasada" :key="grupo.pasada" class="lps__cosecha-grupo">
-            <div class="lps__cosecha-grupo-header">
-              <span class="lps__cosecha-grupo-label">🌿 Cosecha {{ grupo.pasada }}</span>
-              <span class="lps__cosecha-grupo-count">{{ grupo.plantas.length }} planta{{ grupo.plantas.length !== 1 ? 's' : '' }}</span>
-            </div>
+        <!-- Cosechadas: lista plana paginada (la pasada se muestra por fila) -->
+        <template v-if="plantasCosechadas.length">
+          <div class="lps__cosecha-grupo-header">
+            <span class="lps__cosecha-grupo-label">🌿 Cosechadas</span>
+            <span class="lps__cosecha-grupo-count">{{ plantasCosechadas.length }} planta{{ plantasCosechadas.length !== 1 ? 's' : '' }}</span>
+          </div>
+          <div class="lps__list">
             <RouterLink
-              v-for="p in grupo.plantas" :key="p.id"
+              v-for="p in plantasCosechadasMostradas" :key="p.id"
               :to="{ name: 'planta-detalle', params: { id: p.id } }"
               class="lps__planta lps__planta--cosechada"
             >
-              <div class="lps__planta-dot" :style="{ background: pm(p.state).color }"></div>
+              <div class="lps__planta-dot" :style="{ background: estadoPlanta(p).color }"></div>
               <div class="lps__planta-info">
                 <div class="lps__planta-nombre">{{ p.nombre || p.codigo_qr || `Planta #${p.id}` }}</div>
-                <div class="lps__planta-qr">{{ p.codigo_qr || '—' }}</div>
+                <div class="lps__planta-qr">{{ p.codigo_qr || '—' }}<span v-if="p.pasada_cosecha"> · Cosecha {{ p.pasada_cosecha }}</span></div>
               </div>
-              <span class="lps__planta-estado" :style="{ background: pm(p.state).color + '18', color: pm(p.state).color }">
-                {{ pm(p.state).emoji }} {{ pm(p.state).label }}
+              <span class="lps__planta-estado" :style="{ background: estadoPlanta(p).color + '18', color: estadoPlanta(p).color }">
+                {{ estadoPlanta(p).emoji }} {{ estadoPlanta(p).label }}
               </span>
               <i class="bi bi-chevron-right lps__planta-arrow"></i>
             </RouterLink>
           </div>
+          <Paginator
+            v-if="plantasCosechadas.length > plantasPerPage"
+            v-model:page="cosechadasPage"
+            v-model:perPage="plantasPerPage"
+            :total="plantasCosechadas.length"
+            :pageSizes="[10, 25, 50]"
+          />
         </template>
       </template>
     </div>
@@ -262,7 +269,7 @@ import { useClubStore }   from '../../stores/club'
 import { createPlant } from '../../lib/api'
 import { useQRCode } from '../../composables/useQRCode.js'
 import { useToast } from '../../composables/useToast.js'
-import { pm, STATE_MAP } from '../../lib/loteHelpers.js'
+import { pm, em, STATE_MAP } from '../../lib/loteHelpers.js'
 import EmptyState from '../ui/EmptyState.vue'
 import Paginator  from '../ui/Paginator.vue'
 import DsSpinner  from '../../design-system/components/Spinner.vue'
@@ -293,7 +300,18 @@ const PLANT_STAGE_GRADIENT = {
 const expanded       = ref(true)
 const viewMode       = ref('lista')
 const plantasPage    = ref(1)
+const cosechadasPage = ref(1)
 const plantasPerPage = ref(10)
+
+// Post-manicura el lote avanza (en_manicura/curado/finalizado) pero las plantas
+// quedan congeladas en 'cosechado' (Plant no tiene esos estados). Para el display
+// mostramos el estado del LOTE, que es lo que refleja la realidad.
+function estadoPlanta(p) {
+  if (p.state === 'cosechado' && ['en_manicura', 'curado', 'finalizado'].includes(props.lote?.estado)) {
+    return em(props.lote.estado)
+  }
+  return pm(p.state)
+}
 const showAddPlanta  = ref(false)
 const savingPlanta   = ref(false)
 const plantaError    = ref(null)
@@ -320,19 +338,20 @@ const layoutLeyenda = computed(() => {
   for (const p of plantList.value) {
     counts[p.state] = (counts[p.state] || 0) + 1
   }
-  return Object.entries(counts).map(([state, count]) => ({
-    state, count, ...pm(state),
-  }))
+  return Object.entries(counts).map(([state, count]) => {
+    const meta = (state === 'cosechado' && ['en_manicura', 'curado', 'finalizado'].includes(props.lote?.estado))
+      ? em(props.lote.estado) : pm(state)
+    return { state, count, ...meta }
+  })
 })
 
-const plantasCosechadasPorPasada = computed(() => {
-  const grupos = {}
-  for (const p of plantasCosechadas.value) {
-    const pasada = p.pasada_cosecha || '—'
-    if (!grupos[pasada]) grupos[pasada] = []
-    grupos[pasada].push(p)
-  }
-  return Object.entries(grupos).sort(([a], [b]) => a.localeCompare(b)).map(([pasada, plantas]) => ({ pasada, plantas }))
+// Cosechadas ordenadas por pasada y paginadas (la pasada se muestra por fila).
+const plantasCosechadasOrdenadas = computed(() =>
+  [...plantasCosechadas.value].sort((a, b) => (a.pasada_cosecha || '—').localeCompare(b.pasada_cosecha || '—'))
+)
+const plantasCosechadasMostradas = computed(() => {
+  const start = (cosechadasPage.value - 1) * plantasPerPage.value
+  return plantasCosechadasOrdenadas.value.slice(start, start + plantasPerPage.value)
 })
 
 function openAddPlanta() {

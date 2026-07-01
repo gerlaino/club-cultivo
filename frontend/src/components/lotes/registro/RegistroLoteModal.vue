@@ -36,7 +36,7 @@
 
               <div class="rls__acciones-grid">
                 <button
-                  v-for="accion in ACCIONES"
+                  v-for="accion in accionesDisponibles"
                   :key="accion.id"
                   type="button"
                   class="rls__accion-card"
@@ -167,6 +167,17 @@ const ACCIONES = [
   { id: 'limpieza',   emoji: '🧹', label: 'Limpieza' },
   { id: 'trasplante', emoji: '🪴', label: 'Trasplante' },
 ]
+
+// Post-cosecha las plantas están cortadas: riego/poda/luz/trasplante no tienen
+// sentido (registrarlos sería mentira). Se permite ambiental y limpieza del espacio,
+// y plagas para inspección de botritis en secado.
+const ACCIONES_POST_COSECHA = ['ambiental', 'limpieza', 'plagas']
+const accionesDisponibles = computed(() => {
+  if (['cosecha', 'en_manicura', 'curado', 'finalizado'].includes(props.lote?.estado)) {
+    return ACCIONES.filter(a => ACCIONES_POST_COSECHA.includes(a.id))
+  }
+  return ACCIONES
+})
 
 const ESTADO_SALUD = {
   excelente: { color: '#15803d', emoji: '🟢' },
