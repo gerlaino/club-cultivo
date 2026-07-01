@@ -54,6 +54,9 @@ function estadoLabel(e)  { return em(e).label; }
 function growLabel(g)    { return { sustrato:"Sustrato", hidroponia:"Hidroponia", aeroponia:"Aeroponia" }[g] || g || "—"; }
 function lightLabel(l)   { return { led:"LED", hps:"HPS", cmh:"CMH", natural:"Natural", mixta:"Mixta" }[l] || l || "—"; }
 function salaName(id)    { return salas.items.find(s => String(s.id) === String(id))?.nombre || `Sala #${id}`; }
+// Post-cosecha el lote no vive en una sala: mostramos su etapa como "ubicación".
+const SALA_POST = { cosecha: "Cosechado", en_manicura: "En manicura", curado: "Curado", finalizado: "Finalizado" };
+function salaCelda(l)    { return l.sala_id ? salaName(l.sala_id) : (SALA_POST[l.estado] || "—"); }
 function diasDesdeInicio(d) { return d ? Math.floor((Date.now() - new Date(d)) / 86_400_000) : null; }
 
 // ---------- Stats ----------
@@ -323,7 +326,7 @@ async function exportarCSV() {
             <th class="lv-th--sort" @click="sortBy = sortBy === 'codigo_asc' ? 'fecha_desc' : 'codigo_asc'">
               Código <span class="lv-sort-icon">{{ sortBy === 'codigo_asc' ? '↑' : '↕' }}</span>
             </th>
-            <th>Genética / Strain</th>
+            <th>Genética</th>
             <th>Sala</th>
             <th class="lv-th--sort" @click="sortBy = sortBy === 'plantas_desc' ? 'fecha_desc' : 'plantas_desc'">
               Plantas <span class="lv-sort-icon">{{ sortBy === 'plantas_desc' ? '↓' : '↕' }}</span>
@@ -332,7 +335,6 @@ async function exportarCSV() {
             <th class="lv-th--sort" @click="sortBy = sortBy === 'fecha_asc' ? 'fecha_desc' : 'fecha_asc'">
               Días <span class="lv-sort-icon">{{ sortBy.startsWith('fecha') ? (sortBy === 'fecha_asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
-            <th class="lv-th--hide-tablet">Progreso</th>
             <th v-if="canEdit"></th>
           </tr>
         </thead>
@@ -357,7 +359,7 @@ async function exportarCSV() {
               <span v-else class="lv-empty">—</span>
             </td>
             <td data-label="Sala">
-              <span class="lv-sala">{{ salaName(l.sala_id) }}</span>
+              <span class="lv-sala">{{ salaCelda(l) }}</span>
             </td>
             <td data-label="Plantas">
               <span class="lv-num">{{ l.plants_count ?? 0 }}</span>
@@ -368,17 +370,6 @@ async function exportarCSV() {
             </td>
             <td data-label="Días">
               <span v-if="diasDesdeInicio(l.start_date) !== null" class="lv-num">{{ diasDesdeInicio(l.start_date) }}d</span>
-              <span v-else class="lv-empty">—</span>
-            </td>
-            <td data-label="Progreso" class="lv-th--hide-tablet">
-              <template v-if="l.progreso_ciclo != null && ['vegetativo','floracion'].includes(l.estado)">
-                <div class="lv-prog-wrap">
-                  <div class="lv-prog-track">
-                    <div class="lv-prog-bar" :style="{ width: l.progreso_ciclo + '%' }"></div>
-                  </div>
-                  <span class="lv-prog-pct">{{ l.progreso_ciclo }}%</span>
-                </div>
-              </template>
               <span v-else class="lv-empty">—</span>
             </td>
             <td v-if="canEdit" @click.stop>
@@ -602,11 +593,6 @@ async function exportarCSV() {
 .lv-num { font-weight: 600; color: #374151; }
 .lv-empty { color: #cbd5e1; }
 
-.lv-prog-wrap { display: flex; align-items: center; gap: .5rem; }
-.lv-prog-track { flex: 1; min-width: 60px; height: 5px; background: #e8f0eb; border-radius: 99px; overflow: hidden; }
-.lv-prog-bar { height: 100%; background: #3F6452; border-radius: 99px; transition: width .3s; }
-.lv-prog-pct { font-size: .75rem; font-weight: 700; color: #1b5e20; white-space: nowrap; }
-
 .lv-actions { display: flex; align-items: center; gap: .25rem; opacity: 0; transition: opacity .15s; }
 .lv-table tbody tr:hover .lv-actions { opacity: 1; }
 .lv-action-btn { background: none; border: none; cursor: pointer; padding: 5px 7px; border-radius: 6px; color: #6b7280; font-size: .875rem; transition: all .15s; }
@@ -620,11 +606,6 @@ async function exportarCSV() {
 .lv__page-btn:disabled { opacity: .4; cursor: not-allowed; }
 .lv__page-info { font-size: .8rem; color: #64748b; font-weight: 600; }
 .lv__count { font-size: .75rem; color: #94a3b8; }
-
-/* ── Tablet: ocultar columna Progreso ────────────────── */
-@media (max-width: 900px) {
-  .lv-th--hide-tablet { display: none; }
-}
 
 /* ── Mobile: tabla → cards ───────────────────────────── */
 @media (max-width: 640px) {
