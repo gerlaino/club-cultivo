@@ -249,7 +249,7 @@ const emit = defineEmits(['close', 'created'])
 
 const lotes = useLotesStore()
 
-const ESTADOS_LOTE     = ['semilla','esqueje','vegetativo','floracion','cosecha','curado','finalizado']
+const ESTADOS_LOTE     = ['semilla','esqueje','vegetativo','floracion','cosecha','en_manicura','curado','finalizado']
 const KINDS_CON_ORIGEN = ['vegetativo','madre','clon','mixta']
 const KIND_TO_ESTADO   = { floracion: 'floracion' }
 const ESTADOS_HEREDADO = [

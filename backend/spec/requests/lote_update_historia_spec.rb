@@ -84,4 +84,20 @@ RSpec.describe 'PATCH /lotes/:id — corrección de estado e historia', type: :r
       expect(p1.reload.state).to eq('esqueje')
     end
   end
+
+  context 'guarda de máquina de estados — no saltar a post-manicura por PATCH' do
+    %w[en_manicura curado finalizado].each do |destino|
+      it "rechaza pasar el lote a #{destino} editando (implica stock/pesaje)" do
+        patch "/lotes/#{lote.id}", params: { lote: { estado: destino } }, headers: auth_headers, as: :json
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(lote.reload.estado).to eq('vegetativo')
+      end
+    end
+
+    it 'permite corregir a cosecha (límite del cultivo, no genera stock)' do
+      patch "/lotes/#{lote.id}", params: { lote: { estado: 'cosecha' } }, headers: auth_headers, as: :json
+      expect(response).to have_http_status(:ok)
+      expect(lote.reload.estado).to eq('cosecha')
+    end
+  end
 end

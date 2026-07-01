@@ -140,7 +140,7 @@ const SCOPES = [
 const TIPOS = [
   { value: 'riego', label: '💧 Riego' }, { value: 'poda', label: '✂️ Poda' },
   { value: 'medicion', label: '📏 Medición' }, { value: 'limpieza', label: '🧹 Limpieza' },
-  { value: 'cosecha', label: '🌿 Cosecha' }, { value: 'transplante', label: '🪴 Trasplante' },
+  { value: 'cosecha', label: '🌿 Cosecha' }, { value: 'trasplante', label: '🪴 Trasplante' },
   { value: 'inspeccion', label: '🔍 Inspección' }, { value: 'otro', label: '📋 Otro' },
 ]
 const PRIORIDADES = [

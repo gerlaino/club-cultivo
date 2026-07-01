@@ -113,7 +113,7 @@ const guardando     = ref(false)
 const macetaOrigen  = ref(null)
 const macetaDestino = ref(null)
 
-const esTrasplante = computed(() => props.tarea?.tipo === 'transplante' && !!props.tarea?.lote)
+const esTrasplante = computed(() => props.tarea?.tipo === 'trasplante' && !!props.tarea?.lote)
 
 watch(() => props.tarea, (val) => {
   if (val) {

@@ -44,7 +44,7 @@ const emit = defineEmits(['add-tarea', 'edit-tarea'])
 
 const MESES_LABEL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DIAS_MAP = { lun: 1, mar: 2, mie: 3, jue: 4, vie: 5, sab: 6, dom: 0 }
-const TIPO_EMOJI = { riego: '💧', poda: '✂️', medicion: '📏', limpieza: '🧹', cosecha: '🌿', transplante: '🪴', inspeccion: '🔍', otro: '📋' }
+const TIPO_EMOJI = { riego: '💧', poda: '✂️', medicion: '📏', limpieza: '🧹', cosecha: '🌿', trasplante: '🪴', inspeccion: '🔍', otro: '📋' }
 
 function parseDate(iso) {
   const [y, m, d] = iso.split('-').map(Number)

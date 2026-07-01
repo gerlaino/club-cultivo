@@ -15,7 +15,7 @@ class Tarea < ApplicationRecord
   belongs_to :aplicacion_plan, class_name: 'AplicacionPlan', optional: true
 
   # ── Enums ──────────────────────────────────────────────────────
-  TIPOS       = %w[riego poda medicion limpieza cosecha transplante inspeccion otro
+  TIPOS       = %w[riego poda medicion limpieza cosecha trasplante inspeccion otro
                    nutricion defoliacion scrog_lst ajuste_luz revision_plagas].freeze
   ESTADOS     = %w[pendiente en_progreso completada cancelada].freeze
 

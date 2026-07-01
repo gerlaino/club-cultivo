@@ -6,10 +6,12 @@ import { useAuthStore } from '../stores/auth'
 import { transicionarLote, avanzarFaseLote } from '../lib/api'
 
 const ESTADO_META = {
-  semilla:            { label: 'Semilla/Esqueje',   emoji: '🌱' },
+  semilla:            { label: 'Germinación',        emoji: '🌱' },
+  esqueje:            { label: 'Esqueje',            emoji: '🪴' },
   vegetativo:         { label: 'Vegetativo',         emoji: '🍃' },
   floracion:          { label: 'Floración',          emoji: '🌸' },
   cosecha:            { label: 'Cosecha',            emoji: '🌿' },
+  en_manicura:        { label: 'En manicura',        emoji: '✂️'  },
   curado:             { label: 'Curado',             emoji: '🫙' },
   finalizado:         { label: 'Finalizado',         emoji: '✅' },
 }

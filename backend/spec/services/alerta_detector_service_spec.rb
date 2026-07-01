@@ -239,6 +239,28 @@ RSpec.describe AlertaDetectorService do
     end
   end
 
+  # ── paraguas vegetativo (semilla/esqueje usan rangos de vegetativo) ─────────
+
+  describe '#detectar! — rango_ambiental para semilla/esqueje (paraguas vegetativo)' do
+    %w[semilla esqueje].each do |estado_origen|
+      context "cuando el lote está en #{estado_origen}" do
+        let(:lote) { create(:lote, club: club, sala: sala, estado: estado_origen, start_date: 10.days.ago) }
+
+        before do
+          # ph 7.3-7.5 → fuera del rango de vegetativo (5.8-6.2). Antes del paraguas,
+          # semilla/esqueje no tenían fase de setpoint ni RANGOS → no se chequeaban.
+          create(:registro_ambiental, lote: lote, user: user, registrado_en: 1.hour.ago,  ph: 7.5)
+          create(:registro_ambiental, lote: lote, user: user, registrado_en: 2.hours.ago, ph: 7.4)
+          create(:registro_ambiental, lote: lote, user: user, registrado_en: 3.hours.ago, ph: 7.3)
+        end
+
+        it 'usa los rangos de vegetativo y genera alerta ph_fuera_rango' do
+          expect { detectar! }.to change { club.alertas_internas.where(tipo: 'ph_fuera_rango').count }.by(1)
+        end
+      end
+    end
+  end
+
   # ── deduplicación ─────────────────────────────────────────────────────────
 
   describe 'deduplicación' do

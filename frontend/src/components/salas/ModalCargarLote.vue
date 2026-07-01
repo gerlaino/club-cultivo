@@ -12,7 +12,7 @@ useModalEscape(() => emit('close'))
 
 // Qué estado de lote acepta cada tipo de sala
 const CONFIG = {
-  manicura: { estadoElegible: 'cosecha',   label: 'Cosecha',    icon: 'bi-scissors',  color: '#b45309', bg: '#fff7ed',  etiquetaOrigen: 'sala de secado'    },
+  manicura: { estadoElegible: 'cosecha',   label: 'Cosecha',    icon: 'bi-scissors',  color: '#b45309', bg: '#fff7ed',  etiquetaOrigen: 'sala de manicura'  },
 }
 
 const cfg     = computed(() => CONFIG[props.sala.kind] || null)
@@ -89,7 +89,7 @@ async function confirmar() {
             <div v-if="!lotes.length" class="mcl__empty">
               <i class="bi bi-inbox mcl__empty-icon"></i>
               <p>No hay lotes en estado <strong>{{ cfg.label }}</strong> disponibles para cargar.</p>
-              <p class="mcl__empty-hint">Los lotes deben estar en floración antes de pasar a secado, y en cosecha antes de pasar a manicura.</p>
+              <p class="mcl__empty-hint">Los lotes deben estar en cosecha para poder cargarse a manicura.</p>
             </div>
 
             <div v-else class="mcl__list">

@@ -143,7 +143,7 @@ function descargarTemplate() {
                 <span class="icm__chip">prioridad</span>
               </div>
               <div class="icm__tipos-validos">
-                Tipos válidos: <code>riego · poda · medicion · limpieza · cosecha · transplante · inspeccion · nutricion · defoliacion · scrog_lst · ajuste_luz · revision_plagas · otro</code>
+                Tipos válidos: <code>riego · poda · medicion · limpieza · cosecha · trasplante · inspeccion · nutricion · defoliacion · scrog_lst · ajuste_luz · revision_plagas · otro</code>
               </div>
             </div>
 

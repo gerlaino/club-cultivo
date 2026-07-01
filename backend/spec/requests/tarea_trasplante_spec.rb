@@ -13,7 +13,7 @@ RSpec.describe 'POST /tareas/:id/completar (tarea de trasplante)', type: :reques
 
   let(:tarea) do
     club.tareas.create!(
-      titulo: 'Trasplantar a 3L', tipo: 'transplante', estado: 'pendiente',
+      titulo: 'Trasplantar a 3L', tipo: 'trasplante', estado: 'pendiente',
       prioridad: 'normal', lote: lote, creada_por: admin, asignada_a: admin
     )
   end

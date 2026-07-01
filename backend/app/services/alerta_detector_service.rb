@@ -118,7 +118,14 @@ class AlertaDetectorService
     (cfg.dig('dias_sin_registro', estado) || DIAS_SIN_REGISTRO[estado] || 3).to_i
   end
 
+  # semilla/esqueje son el paraguas vegetativo (comparten fotoperíodo/fisiología) →
+  # usan los setpoints/rangos de 'vegetativo'. Sin esto quedaban sin chequeo de rango.
+  def fase_setpoint(estado)
+    %w[semilla esqueje].include?(estado) ? 'vegetativo' : estado
+  end
+
   def rango_para(campo, fase, genetica_id, setpoints_club)
+    fase = fase_setpoint(fase)
     sp = setpoints_club.find do |s|
       s.fase == fase &&
         s.tipo_lectura == campo.to_s &&

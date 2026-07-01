@@ -45,11 +45,14 @@ function formatDateShort(d) { return formatFechaCorta(d) }
 
 function estadoMeta(estado) {
   return {
-    semilla:    { label: "Semilla",    color: "#64748b", bg: "rgba(100,116,139,.1)" },
-    vegetativo: { label: "Vegetativo", color: "#15803d", bg: "rgba(21,128,61,.1)"  },
-    floracion:  { label: "Floración",  color: "#d97706", bg: "rgba(217,119,6,.1)"  },
-    cosechado:  { label: "Cosechado",  color: "#0369a1", bg: "rgba(3,105,161,.1)"  },
-    finalizado: { label: "Finalizado", color: "#1b5e20", bg: "rgba(27,94,32,.1)"   },
+    semilla:     { label: "Germinación", color: "#64748b", bg: "rgba(100,116,139,.1)" },
+    esqueje:     { label: "Esqueje",     color: "#0891b2", bg: "rgba(8,145,178,.1)"   },
+    vegetativo:  { label: "Vegetativo",  color: "#15803d", bg: "rgba(21,128,61,.1)"  },
+    floracion:   { label: "Floración",   color: "#d97706", bg: "rgba(217,119,6,.1)"  },
+    cosecha:     { label: "Cosecha",     color: "#059669", bg: "rgba(5,150,105,.1)"  },
+    en_manicura: { label: "En manicura", color: "#7c3aed", bg: "rgba(124,58,237,.1)" },
+    curado:      { label: "Curado",      color: "#2563eb", bg: "rgba(37,99,235,.1)"  },
+    finalizado:  { label: "Finalizado",  color: "#1b5e20", bg: "rgba(27,94,32,.1)"   },
   }[estado] || { label: estado, color: "#64748b", bg: "rgba(100,116,139,.1)" }
 }
 

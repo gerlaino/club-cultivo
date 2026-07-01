@@ -141,7 +141,7 @@ class TareasController < ApplicationController
 
     # Tarea de trasplante con maceta cargada → registra el trasplante en el lote
     # (PlantActivity + actualiza la maceta), igual que el botón "Registrar trasplante".
-    if @tarea.tipo == 'transplante' && @tarea.lote_id && params[:maceta_destino_l].present?
+    if @tarea.tipo == 'trasplante' && @tarea.lote_id && params[:maceta_destino_l].present?
       Lotes::RegistrarTrasplante.call(
         lote: @tarea.lote, usuario: current_user,
         destino: params[:maceta_destino_l], origen: params[:maceta_origen_l],

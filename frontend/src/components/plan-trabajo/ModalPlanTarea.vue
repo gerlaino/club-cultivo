@@ -16,7 +16,7 @@ const TIPOS = [
   { value: 'medicion',        label: 'Medición',        emoji: '📏', bg: '#e0f7fa', campos: ['ph', 'ec', 'temperatura', 'humedad', 'vpd'] },
   { value: 'limpieza',        label: 'Limpieza',        emoji: '🧹', bg: '#e8f5e9', campos: [] },
   { value: 'cosecha',         label: 'Cosecha',         emoji: '🌿', bg: '#dcedc8', campos: [] },
-  { value: 'transplante',     label: 'Trasplante',      emoji: '🪴', bg: '#fff8e1', campos: ['sustrato'] },
+  { value: 'trasplante',     label: 'Trasplante',      emoji: '🪴', bg: '#fff8e1', campos: ['sustrato'] },
   { value: 'inspeccion',      label: 'Inspección',      emoji: '🔍', bg: '#fff3e0', campos: ['plagas', 'deficiencias'] },
   { value: 'nutricion',       label: 'Nutrición',       emoji: '🧪', bg: '#e3f2fd', campos: ['ph', 'ec', 'fertilizante'] },
   { value: 'defoliacion',     label: 'Defoliación',     emoji: '🍃', bg: '#f1f8e9', campos: [] },

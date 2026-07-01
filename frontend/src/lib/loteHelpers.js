@@ -1,3 +1,18 @@
+// ─────────────────────────────────────────────────────────────────────────
+// FUENTE ÚNICA DE VERDAD de los estados de Cultivo (front).
+// Espeja los enums del backend. Si el backend cambia, se actualiza ACÁ y todo
+// el front lo consume desde este módulo — no redefinir diccionarios de estado
+// sueltos en cada vista (eso genera el drift que veníamos limpiando).
+//   Backend: Lote::ESTADOS  y  Plant::STATES
+// ─────────────────────────────────────────────────────────────────────────
+
+// Estados canónicos del LOTE (== Lote::ESTADOS del backend, en orden de ciclo).
+export const LOTE_ESTADOS = ['semilla', 'esqueje', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado', 'finalizado']
+
+// Estados canónicos de la PLANTA (== Plant::STATES del backend).
+// Ojo: la planta usa 'germinacion' (el lote usa 'semilla'); ver STATE_MAP.
+export const PLANT_STATES = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'secado', 'cosechado', 'descartada']
+
 export const ESTADO_META = {
   semilla:            { label: 'Germinación',        color: '#64748b', bg: '#f1f5f9', emoji: '🌱' },
   esqueje:            { label: 'Esqueje',             color: '#0891b2', bg: '#e0f2fe', emoji: '🪴' },
@@ -9,12 +24,13 @@ export const ESTADO_META = {
   finalizado:         { label: 'Finalizado',         color: '#1b5e20', bg: '#dcfce7', emoji: '✅' },
 }
 
+// Meta de los estados de PLANTA. Claves == PLANT_STATES (canónico backend).
 export const PLANT_STATE_META = {
-  semilla:    { label: 'Semilla',    color: '#64748b', emoji: '🌰' },
   germinacion:{ label: 'Germinación',color: '#16a34a', emoji: '🌱' },
   esqueje:    { label: 'Esqueje',    color: '#0891b2', emoji: '🌿' },
   vegetativo: { label: 'Vegetativo', color: '#16a34a', emoji: '🍃' },
   floracion:  { label: 'Floración',  color: '#d97706', emoji: '🌸' },
+  secado:     { label: 'Secado',     color: '#c2410c', emoji: '🍂' },
   cosechado:  { label: 'Cosechada',  color: '#2563eb', emoji: '✅' },
   descartada: { label: 'Descartada', color: '#dc2626', emoji: '❌' },
 }
@@ -65,6 +81,61 @@ export const STATE_MAP = {
 }
 
 export const POST_HARVEST_ESTADOS = ['cosecha', 'en_manicura', 'curado', 'finalizado']
+
+// ─────────────────────────────────────────────────────────────────────────
+// ESPINA BIOLÓGICA — eje FIJO y comparable entre lotes/cepas (para informes).
+//
+// 'Vegetativo' es un PARAGUAS: germinación (semilla) y enraizado (esqueje)
+// comparten fotoperíodo (18/6) y fisiología, así que se consolidan con el
+// vegetativo propiamente dicho. La espina se mantiene estable aunque el grow
+// haga N trasplantes distintos → permite benchmarking entre lotes/clubes.
+//
+// El desglose de 'Vege' por contenedor (335cm³ → maceta N) es ENRIQUECIMIENTO
+// que el informe superpone desde los eventos de trasplante; no es un estado.
+// ─────────────────────────────────────────────────────────────────────────
+export const ESPINA_BIOLOGICA = [
+  {
+    key: 'vegetativo',
+    label: 'Vegetativo',
+    estados: ['semilla', 'esqueje', 'vegetativo'],   // paraguas
+    subetapas: [
+      { estado: 'semilla',    label: 'Germinación' },
+      { estado: 'esqueje',    label: 'Enraizado'   },
+      { estado: 'vegetativo', label: 'Vege'        },  // se subdivide por trasplantes
+    ],
+  },
+  {
+    key: 'floracion',
+    label: 'Floración',
+    estados: ['floracion'],
+    subetapas: [{ estado: 'floracion', label: 'Floración' }],
+  },
+]
+
+// Grupo paraguas por estado del lote → para consolidar KPIs/labels sin repetir
+// la lógica del agrupamiento. 'post' = todo lo post-cosecha (métrica aparte).
+export const GRUPO_FASE = {
+  semilla: 'vegetativo', esqueje: 'vegetativo', vegetativo: 'vegetativo',
+  floracion: 'floracion',
+  cosecha: 'post', en_manicura: 'post', curado: 'post', finalizado: 'post',
+}
+export function grupoFase(estado) { return GRUPO_FASE[estado] || 'otro' }
+
+// Dado un mapa { estado: dias } (que el informe deriva de los LoteEvento),
+// devuelve el desglose por espina: total por bloque + sub-etapas con días > 0.
+// Ej: desglosarCiclo({ semilla:3, vegetativo:42, floracion:63 }) →
+//   [{ key:'vegetativo', label:'Vegetativo', total:45,
+//      subetapas:[{label:'Germinación',dias:3},{label:'Vege',dias:42}] },
+//    { key:'floracion',  label:'Floración',  total:63, subetapas:[…] }]
+export function desglosarCiclo(diasPorEstado = {}) {
+  return ESPINA_BIOLOGICA.map(bloque => {
+    const subetapas = bloque.subetapas
+      .map(s => ({ label: s.label, dias: Number(diasPorEstado[s.estado]) || 0 }))
+      .filter(s => s.dias > 0)
+    const total = subetapas.reduce((a, s) => a + s.dias, 0)
+    return { key: bloque.key, label: bloque.label, total, subetapas }
+  }).filter(b => b.total > 0)
+}
 
 export function em(e)  { return ESTADO_META[e]       || { label: e || '—', color: '#64748b', bg: '#f1f5f9', emoji: '•' } }
 export function pm(s)  { return PLANT_STATE_META[s]  || { label: s || '—', color: '#64748b', emoji: '🌿' } }

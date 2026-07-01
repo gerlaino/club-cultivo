@@ -5,7 +5,7 @@ class PlanTarea < ApplicationRecord
   belongs_to :sala, optional: true
   belongs_to :tarea_generada, class_name: 'Tarea', optional: true
 
-  TIPOS       = %w[riego poda medicion limpieza cosecha transplante inspeccion otro].freeze
+  TIPOS       = %w[riego poda medicion limpieza cosecha trasplante inspeccion otro].freeze
   PRIORIDADES = %w[baja normal alta urgente].freeze
   DIAS_VALIDOS = %w[lun mar mie jue vie sab dom].freeze
 

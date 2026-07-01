@@ -119,7 +119,7 @@ const TIPO_LABELS = {
   medicion: '📏 Medición',
   limpieza: '🧹 Limpieza',
   cosecha: '🌿 Cosecha',
-  transplante: '🪴 Transplante',
+  trasplante: '🪴 Trasplante',
   inspeccion: '🔍 Inspección',
   otro: '📋 Otro'
 }

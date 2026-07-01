@@ -13,7 +13,7 @@ const toast = useToast()
 
 const TIPO_LABEL = {
   riego: 'Riego', poda: 'Poda', medicion: 'Medición', limpieza: 'Limpieza',
-  cosecha: 'Cosecha', transplante: 'Trasplante', inspeccion: 'Inspección',
+  cosecha: 'Cosecha', trasplante: 'Trasplante', inspeccion: 'Inspección',
   nutricion: 'Nutrición', defoliacion: 'Defoliación', scrog_lst: 'SCROG/LST',
   ajuste_luz: 'Ajuste de luz', revision_plagas: 'Revisión de plagas', otro: 'Otro',
 }

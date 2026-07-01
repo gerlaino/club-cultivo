@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { getGenetica, updateGenetica } from '../lib/api.js'
+import { em } from '../lib/loteHelpers'
 import { useAuthStore } from '../stores/auth.js'
 import { usePermissions } from '../composables/usePermissions.js'
 import { useQRCode } from '../composables/useQRCode.js'
@@ -224,13 +225,10 @@ async function eliminarFoto(fotoId) {
   }
 }
 
+// El backend manda l.estado canónico (Lote::ESTADOS) → usar la fuente única.
 function estadoLote(estado) {
-  const MAP = {
-    activo:    { label: 'Activo',    style: { background: '#1b5e20', color: '#fff' } },
-    cosechado: { label: 'Cosechado', style: { background: '#64748b', color: '#fff' } },
-    cancelado: { label: 'Cancelado', style: { background: '#b91c1c', color: '#fff' } },
-  }
-  return MAP[estado] || { label: estado, style: { background: '#64748b', color: '#fff' } }
+  const m = em(estado)
+  return { label: m.label, style: { background: m.color, color: '#fff' } }
 }
 
 function formatDate(d) {

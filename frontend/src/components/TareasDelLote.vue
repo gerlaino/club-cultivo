@@ -566,7 +566,7 @@ function esRegistroLote(t) {
 // ── Constantes dominio ────────────────────────────────────
 const TIPO_LABELS = {
   riego:'💧 Riego', poda:'✂️ Poda', medicion:'📏 Medición',
-  limpieza:'🧹 Limpieza', cosecha:'🌿 Cosecha', transplante:'🪴 Trasplante',
+  limpieza:'🧹 Limpieza', cosecha:'🌿 Cosecha', trasplante:'🪴 Trasplante',
   inspeccion:'🔍 Inspección', registrar_lote:'📋 Registrar lote',
   registrar_planta:'🌱 Registrar planta', otro:'📋 Otro'
 }
@@ -578,18 +578,23 @@ const PLAGAS_META = {
   ninguna:{color:"#16a34a",emoji:"✅"}, leve:{color:"#d97706",emoji:"⚠️"},
   moderada:{color:"#ea580c",emoji:"🐛"}, severa:{color:"#dc2626",emoji:"🚨"},
 }
-const CICLO = ["semilla","vegetativo","floracion","cosecha","curado","finalizado"]
+// 'semilla' es el ancla de origen; 'esqueje' se normaliza a esa posición (son
+// orígenes alternativos que caen en el mismo punto del ciclo). Ver loteHelpers.
+const CICLO = ["semilla","vegetativo","floracion","cosecha","en_manicura","curado","finalizado"]
 const ESTADO_META = {
-  semilla:    {label:"Semilla",    color:"#64748b",bg:"#f1f5f9",emoji:"🌱"},
-  vegetativo: {label:"Vegetativo", color:"#16a34a",bg:"#dcfce7",emoji:"🍃"},
-  floracion:  {label:"Floración",  color:"#d97706",bg:"#fef3c7",emoji:"🌸"},
-  cosecha:    {label:"Cosecha",    color:"#92400e",bg:"#fff7ed",emoji:"✂️"},
-  curado:     {label:"Curado",     color:"#2563eb",bg:"#dbeafe",emoji:"🫙"},
-  finalizado: {label:"Finalizado", color:"#1b5e20",bg:"#dcfce7",emoji:"✅"},
+  semilla:     {label:"Germinación", color:"#64748b",bg:"#f1f5f9",emoji:"🌱"},
+  esqueje:     {label:"Esqueje",     color:"#0891b2",bg:"#e0f2fe",emoji:"🪴"},
+  vegetativo:  {label:"Vegetativo",  color:"#16a34a",bg:"#dcfce7",emoji:"🍃"},
+  floracion:   {label:"Floración",   color:"#d97706",bg:"#fef3c7",emoji:"🌸"},
+  cosecha:     {label:"Cosecha",     color:"#92400e",bg:"#fff7ed",emoji:"✂️"},
+  en_manicura: {label:"En manicura", color:"#7c3aed",bg:"#ede9fe",emoji:"✂️"},
+  curado:      {label:"Curado",      color:"#2563eb",bg:"#dbeafe",emoji:"🫙"},
+  finalizado:  {label:"Finalizado",  color:"#1b5e20",bg:"#dcfce7",emoji:"✅"},
 }
 function em(e) { return ESTADO_META[e] || {label:e,color:"#64748b",bg:"#f1f5f9",emoji:"•"} }
 const estadosSiguientes = computed(() => {
-  const idx = CICLO.indexOf(props.lote?.estado)
+  const actual = props.lote?.estado === 'esqueje' ? 'semilla' : props.lote?.estado
+  const idx = CICLO.indexOf(actual)
   return CICLO.filter((_,i) => i > idx)
 })
 </script>

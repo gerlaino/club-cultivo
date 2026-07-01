@@ -177,7 +177,7 @@ const ESTADO_LABEL = {
 }
 const TAREA_EMOJI = {
   riego: '💧', poda: '✂️', medicion: '📏', limpieza: '🧹',
-  cosecha: '🌿', transplante: '🪴', inspeccion: '🔍', otro: '📋',
+  cosecha: '🌿', trasplante: '🪴', inspeccion: '🔍', otro: '📋',
 }
 const TAREA_ESTADO_LABEL = {
   pendiente: 'Pendiente', en_progreso: 'En progreso',

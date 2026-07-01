@@ -60,6 +60,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listPlants, listLotes } from '../../lib/api'
+import { PLANT_STATES, pm } from '../../lib/loteHelpers'
 import { useAuthStore } from '../../stores/auth'
 
 const router = useRouter()
@@ -75,19 +76,10 @@ const POR_PAG  = 15
 
 const canCreate = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.role))
 
-const ESTADOS = [
-  { value:'semilla',    label:'Semilla' },
-  { value:'esqueje',    label:'Esqueje' },
-  { value:'vegetativo', label:'Vegetativo' },
-  { value:'floracion',  label:'Floración' },
-  { value:'cosecha',    label:'Cosecha' },
-  { value:'en_manicura',label:'Manicura' },
-    { value:'curado',     label:'Curado' },
-]
-
-const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', curado:'#2563eb' }
-const estadoColor = e => EC[e] || '#64748b'
-const estadoLabel = e => ESTADOS.find(x => x.value === e)?.label || e || '—'
+// Filtra por estado de PLANTA (p.state), no de lote. Fuente: PLANT_STATES.
+const ESTADOS = PLANT_STATES.map(s => ({ value: s, label: pm(s).label }))
+const estadoColor = e => pm(e).color
+const estadoLabel = e => pm(e).label
 
 const lotesFiltro = computed(() => {
   const ids = new Set(plantas.value.map(p => p.lote_id || p.lote?.id).filter(Boolean))

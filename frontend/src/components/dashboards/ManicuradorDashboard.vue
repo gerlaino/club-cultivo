@@ -183,12 +183,14 @@ const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buena
 const hoy    = (() => { const s = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() })()
 
 const ESTADOS = {
-  semilla:    { label: 'Semilla',    color: '#92400e', bg: 'rgba(146,64,14,.12)'  },
-  vegetativo: { label: 'Vegetativo', color: '#15803d', bg: 'rgba(21,128,61,.12)'  },
-  floracion:  { label: 'Floración',  color: 'var(--c-leaf-700)', bg: 'rgba(26,61,46,.12)' },
-  cosecha:    { label: 'Cosecha',    color: '#b45309', bg: 'rgba(180,83,9,.12)'   },
-  curado:     { label: 'Curado',     color: '#0369a1', bg: 'rgba(3,105,161,.12)'  },
-  finalizado: { label: 'Finalizado', color: '#475569', bg: 'rgba(71,85,105,.12)'  },
+  semilla:     { label: 'Germinación', color: '#92400e', bg: 'rgba(146,64,14,.12)'  },
+  esqueje:     { label: 'Esqueje',     color: '#0891b2', bg: 'rgba(8,145,178,.12)'  },
+  vegetativo:  { label: 'Vegetativo',  color: '#15803d', bg: 'rgba(21,128,61,.12)'  },
+  floracion:   { label: 'Floración',   color: 'var(--c-leaf-700)', bg: 'rgba(26,61,46,.12)' },
+  cosecha:     { label: 'Cosecha',     color: '#b45309', bg: 'rgba(180,83,9,.12)'   },
+  en_manicura: { label: 'En manicura', color: '#7c3aed', bg: 'rgba(124,58,237,.12)' },
+  curado:      { label: 'Curado',      color: '#0369a1', bg: 'rgba(3,105,161,.12)'  },
+  finalizado:  { label: 'Finalizado',  color: '#475569', bg: 'rgba(71,85,105,.12)'  },
 }
 const ESTADOS_MOV = {
   pendiente: 'Pendiente',

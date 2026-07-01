@@ -247,11 +247,13 @@ class SedesController < ApplicationController
                      .min_by { |l| l.start_date }
 
     dias_para_cosecha = if proximo_lote&.start_date
-                          # Floracion típica cannabis: 56 días. Días transcurridos desde start_date del lote.
-                          # En producción real esto vendría de genetica.dias_floracion
-                          transcurridos = (Date.today - proximo_lote.start_date).to_i
-                          restantes = [56 - transcurridos, 0].max
-                          restantes > 0 ? restantes : nil
+                          # Ciclo objetivo del lote (vege + floración), heredado de la genética al
+                          # crear el lote. Fallback ~77d (≈21 vege + 56 flora) si el lote no tiene
+                          # objetivos cargados. Restantes = ciclo objetivo − días transcurridos.
+                          ciclo_objetivo = proximo_lote.dias_vegetativo_objetivo.to_i + proximo_lote.dias_floracion_objetivo.to_i
+                          ciclo_objetivo = 77 if ciclo_objetivo <= 0
+                          restantes = ciclo_objetivo - (Date.today - proximo_lote.start_date).to_i
+                          restantes.positive? ? restantes : nil
                         end
 
     {

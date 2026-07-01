@@ -281,7 +281,7 @@ const kpis = computed(() => {
     totalLotes:   ls.length,
     totalPlantas: ls.reduce((a,l) => a + Number(l.plants_count||0), 0),
     enCiclo:      ls.filter(l => ["vegetativo","floracion"].includes(l.estado)).length,
-    cosechados:   ls.filter(l => l.estado === "cosechado").length,
+    cosechados:   ls.filter(l => ["cosecha","en_manicura","curado","finalizado"].includes(l.estado)).length,
   }
 })
 
@@ -290,9 +290,10 @@ const ESTADO_META = {
   esqueje:    { label:"Esqueje",  color:"#16a34a", emoji:"🪴" },
   vegetativo: { label:"Vegetativo",      color:"#16a34a", emoji:"🌱" },
   floracion:  { label:"Floración",       color:"#d97706", emoji:"🌸" },
-  cosecha:    { label:"Cosecha",         color:"#92400e", emoji:"✂️" },
-  curado:     { label:"Curado",          color:"#2563eb", emoji:"🍂" },
-  finalizado: { label:"Finalizado",      color:"#1b5e20", emoji:"✅" },
+  cosecha:     { label:"Cosecha",     color:"#92400e", emoji:"✂️" },
+  en_manicura: { label:"En manicura", color:"#7c3aed", emoji:"✂️" },
+  curado:      { label:"Curado",      color:"#2563eb", emoji:"🍂" },
+  finalizado:  { label:"Finalizado",  color:"#1b5e20", emoji:"✅" },
 }
 function estadoMeta(e) { return ESTADO_META[e] || { label:e, color:"#64748b", emoji:"📦" } }
 function growLabel(g)  { return { sustrato:"Sustrato", hidroponia:"Hidroponia", aeroponia:"Aeroponia" }[g] || g || "—" }
@@ -314,7 +315,7 @@ function progresoCiclo(lote) {
   if (!lote.start_date) return 0
   const dias  = diasDesdeInicio(lote.start_date)
   const total = DIAS_CICLO[lote.estado] || 60
-  if (lote.estado === 'cosechado' || lote.estado === 'finalizado') return 100
+  if (["cosecha","en_manicura","curado","finalizado"].includes(lote.estado)) return 100
   return Math.min(Math.round((dias / total) * 100), 99)
 }
 
@@ -336,7 +337,7 @@ const breadcrumbs = computed(() => {
   return crumbs
 })
 
-// ── Cargar lote (secado / manicura) ────────────────────────
+// ── Cargar lote (manicura) ─────────────────────────────────
 const showCargarLote = ref(false)
 
 // ── Cambiar fase (vege ↔ flora) ────────────────────────────
@@ -625,7 +626,7 @@ const canSeeAmbiente = computed(() =>
 const tabActiva = ref('lotes')
 
 // Slots ocupados de la sala = solo lotes realmente en cultivo. Los estados de
-// post-cosecha (cosecha/secado/curado/manicura) ya no viven en una sala de cultivo
+// post-cosecha (cosecha/en_manicura/curado) ya no viven en una sala de cultivo
 // (van a su sala de proceso), así que no deben ocupar el layout de esta sala.
 const ESTADOS_POST_COSECHA = ['cosecha', 'curado', 'en_manicura', 'finalizado']
 const lotesActivos = computed(() =>

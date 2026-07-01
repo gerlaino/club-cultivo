@@ -358,13 +358,13 @@ const TIPO_META = {
   medicion:    { label: 'Medición',   emoji: '📏' },
   limpieza:    { label: 'Limpieza',   emoji: '🧹' },
   cosecha:     { label: 'Cosecha',    emoji: '🌿' },
-  transplante: { label: 'Trasplante', emoji: '🪴' },
+  trasplante: { label: 'Trasplante', emoji: '🪴' },
   inspeccion:  { label: 'Inspección', emoji: '🔍' },
   otro:        { label: 'Otro',       emoji: '📋' },
 }
 const TIPO_EMOJI = {
   riego: '💧', poda: '✂️', medicion: '📏', limpieza: '🧹',
-  cosecha: '🌿', transplante: '🪴', inspeccion: '🔍', otro: '📋',
+  cosecha: '🌿', trasplante: '🪴', inspeccion: '🔍', otro: '📋',
 }
 function estadoMeta(estado) {
   return {
@@ -476,7 +476,7 @@ function kindEmoji(k) {
 
 function kindLabel(k) {
   const map = {
-    vegetativo: 'Vegetativo', floracion: 'Floración', cosechado: 'Cosechado',
+    vegetativo: 'Vegetativo', floracion: 'Floración',
     mixta: 'Mixta', madre: 'Madres', clon: 'Clones', curado: 'Curado', manicura: 'Manicura', cosecha: 'Cosecha',
   }
   return map[k] || k || '—'

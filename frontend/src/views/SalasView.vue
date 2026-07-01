@@ -142,7 +142,7 @@ async function toggleComparativa() {
 
 function fmtKg(v) {
   if (v == null || v === 0) return '—';
-  return (v * 1000 >= 1000) ? `${v.toFixed(2)} kg` : `${Math.round(v * 1000)} g`;
+  return (v * 1000 >= 1000) ? `${Number(v).toFixed(2)} kg` : `${Math.round(v * 1000)} g`;
 }
 
 const compSorted = computed(() =>
@@ -252,8 +252,8 @@ async function confirmDelete(s) {
                 </td>
                 <td class="slv__comp-num">{{ s.kg_por_planta != null ? (s.kg_por_planta * 1000).toFixed(1) + ' g' : '—' }}</td>
                 <td class="slv__comp-num">{{ s.dias_promedio != null ? s.dias_promedio + ' d' : '—' }}</td>
-                <td class="slv__comp-num">{{ s.temperatura != null ? s.temperatura.toFixed(1) + '°' : '—' }}</td>
-                <td class="slv__comp-num">{{ s.humedad != null ? s.humedad.toFixed(0) + '%' : '—' }}</td>
+                <td class="slv__comp-num">{{ s.temperatura != null ? Number(s.temperatura).toFixed(1) + '°' : '—' }}</td>
+                <td class="slv__comp-num">{{ s.humedad != null ? Number(s.humedad).toFixed(0) + '%' : '—' }}</td>
                 <td class="slv__comp-num">{{ s.co2 != null ? Math.round(s.co2) + ' ppm' : '—' }}</td>
                 <td class="slv__comp-num">{{ s.lotes_activos || '—' }}</td>
               </tr>

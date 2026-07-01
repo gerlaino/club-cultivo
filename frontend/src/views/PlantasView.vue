@@ -19,11 +19,11 @@ const filters = ref({ state: '', lote_id: '', search: '' })
 const sortBy  = ref('created_at_desc')
 
 const STATE_META = {
-  semilla:    { label: 'Germinación', icon: '🌰', bg: '#E0F2FE', color: '#0369a1', bar: '#0284C7', kpiIcon: '🌰', kpiBg: 'rgba(3,105,161,.1)' },
+  germinacion:{ label: 'Germinación', icon: '🌰', bg: '#E0F2FE', color: '#0369a1', bar: '#0284C7', kpiIcon: '🌰', kpiBg: 'rgba(3,105,161,.1)' },
   esqueje:    { label: 'Esqueje',     icon: '✂️',  bg: '#F3E8FF', color: '#7c3aed', bar: '#8b5cf6', kpiIcon: '✂️',  kpiBg: 'rgba(124,58,237,.1)' },
   vegetativo: { label: 'Vegetativo',  icon: '🌱', bg: '#E8F0EB', color: '#1A3D2E', bar: '#1b5e20', kpiIcon: '🌱', kpiBg: 'rgba(27,94,32,.1)'   },
   floracion:  { label: 'Floración',   icon: '🌸', bg: '#FEF3C7', color: '#92400e', bar: '#D97706', kpiIcon: '🌸', kpiBg: 'rgba(217,119,6,.12)'  },
-  maduracion: { label: 'Maduración',  icon: '🍂', bg: '#FFF7ED', color: '#c2410c', bar: '#ea580c', kpiIcon: '🍂', kpiBg: 'rgba(194,65,12,.1)'   },
+  secado:     { label: 'Secado',      icon: '🍂', bg: '#FFF7ED', color: '#c2410c', bar: '#ea580c', kpiIcon: '🍂', kpiBg: 'rgba(194,65,12,.1)'   },
   cosechado:  { label: 'Cosechada',   icon: '🌿', bg: '#F4F8F5', color: '#1A3D2E', bar: '#3F6452', kpiIcon: '🌿', kpiBg: 'rgba(63,100,82,.1)'   },
   descartada: { label: 'Descartada',  icon: '🗑️', bg: '#FEF2F2', color: '#b91c1c', bar: '#ef4444', kpiIcon: '🗑️', kpiBg: 'rgba(185,28,28,.1)'   },
 }
@@ -34,7 +34,8 @@ function stateIcon(s)       { return sm(s).icon }
 function stateBadgeStyle(s) { const m = sm(s); return { background: m.bg, color: m.color } }
 function stateBarStyle(s)   { return { background: sm(s).bar } }
 
-const KPI_STATES = ['semilla', 'esqueje', 'vegetativo', 'floracion', 'maduracion', 'cosechado', 'descartada']
+// Alineado a Plant::STATES (backend). Orden de aparición en KPIs.
+const KPI_STATES = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'secado', 'cosechado', 'descartada']
 
 const kpis = computed(() => {
   const counts = {}

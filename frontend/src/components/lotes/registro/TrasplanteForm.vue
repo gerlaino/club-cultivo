@@ -107,9 +107,10 @@ function togglePlanta(id) {
   emit('update:modelValue', { ...f.value, plantas_seleccionadas: current })
 }
 
+// Colorea p.state (estado de PLANTA). Canónico: ver PLANT_STATES en loteHelpers.
 const PLANT_COLORS = {
-  semilla: '#6b7280', esqueje: '#8b5cf6', vegetativo: '#16a34a',
-  floracion: '#ea580c', maduracion: '#d97706', cosechado: '#9ca3af',
+  germinacion: '#16a34a', esqueje: '#0891b2', vegetativo: '#16a34a',
+  floracion: '#d97706', secado: '#c2410c', cosechado: '#2563eb',
   descartada: '#ef4444',
 }
 function plantaColor(state) { return PLANT_COLORS[state] || '#9ca3af' }

@@ -315,7 +315,7 @@ const TIPOS = [
   { value: 'medicion',    label: 'Medición',   emoji: '📏', bg: '#e0f7fa' },
   { value: 'limpieza',    label: 'Limpieza',   emoji: '🧹', bg: '#e8f5e9' },
   { value: 'cosecha',     label: 'Cosecha',    emoji: '🌿', bg: '#dcedc8' },
-  { value: 'transplante', label: 'Trasplante', emoji: '🪴', bg: '#fff8e1' },
+  { value: 'trasplante', label: 'Trasplante', emoji: '🪴', bg: '#fff8e1' },
   { value: 'inspeccion',  label: 'Inspección', emoji: '🔍', bg: '#fff3e0' },
   { value: 'otro',        label: 'Otro',       emoji: '📋', bg: '#f1f8e9' },
 ]

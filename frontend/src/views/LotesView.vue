@@ -30,15 +30,24 @@ const canEdit = computed(() => ["admin","cultivador"].includes(auth.role));
 const canExport = computed(() => ["admin","auditor","supervisor","cultivador"].includes(auth.role));
 
 // ---------- Estado meta ----------
-const ESTADOS = ["planificacion","vegetativo","floracion","cosechado","finalizado"];
+// Estados canónicos del lote (Lote::ESTADOS). 'cosecha' es el estado del lote cosechado
+// (no 'cosechado', que es estado de PLANTA).
+const ESTADOS = ["semilla","esqueje","vegetativo","floracion","cosecha","en_manicura","curado","finalizado"];
 
 const ESTADO_META = {
-  planificacion: { label:"Planificación", dot:"#0284C7", bg:"#E0F2FE", text:"#0369a1", bar:"#0284C7", icon:"📋" },
-  vegetativo:    { label:"Vegetativo",    dot:"#3F6452", bg:"#E8F0EB", text:"#2D4A3E", bar:"#5A8A72", icon:"🌱" },
-  floracion:     { label:"Floración",     dot:"#D97706", bg:"#FEF3C7", text:"#92400e", bar:"#D97706", icon:"🌸" },
-  cosechado:     { label:"Cosechado",     dot:"#5A8A72", bg:"#F4F8F5", text:"#1A3D2E", bar:"#3F6452", icon:"✂️" },
-  finalizado:    { label:"Finalizado",    dot:"#1A3D2E", bg:"#E8F0EB", text:"#0F2A1E", bar:"#1A3D2E", icon:"✅" },
+  semilla:     { label:"Semilla",     dot:"#64748b", bg:"#f1f5f9", text:"#475569", bar:"#64748b", icon:"🌰" },
+  esqueje:     { label:"Esqueje",     dot:"#0891b2", bg:"#e0f2fe", text:"#0369a1", bar:"#0891b2", icon:"🪴" },
+  vegetativo:  { label:"Vegetativo",  dot:"#3F6452", bg:"#E8F0EB", text:"#2D4A3E", bar:"#5A8A72", icon:"🌱" },
+  floracion:   { label:"Floración",   dot:"#D97706", bg:"#FEF3C7", text:"#92400e", bar:"#D97706", icon:"🌸" },
+  cosecha:     { label:"Cosecha",     dot:"#5A8A72", bg:"#F4F8F5", text:"#1A3D2E", bar:"#3F6452", icon:"✂️" },
+  en_manicura: { label:"En manicura", dot:"#7c3aed", bg:"#ede9fe", text:"#5b21b6", bar:"#7c3aed", icon:"✂️" },
+  curado:      { label:"Curado",      dot:"#2563eb", bg:"#dbeafe", text:"#1e40af", bar:"#2563eb", icon:"🫙" },
+  finalizado:  { label:"Finalizado",  dot:"#1A3D2E", bg:"#E8F0EB", text:"#0F2A1E", bar:"#1A3D2E", icon:"✅" },
 };
+
+// "Cosechado" es todo lo que ya salió de floración: cortado y en secado (cosecha),
+// asignado a manicura (en_manicura), guardado en frasco (curado) y cerrado (finalizado).
+const COSECHADOS = ["cosecha","en_manicura","curado","finalizado"];
 
 function em(e)           { return ESTADO_META[e] || { label: e||"—", dot:"#94a3b8", bg:"#f1f5f9", text:"#64748b", bar:"#94a3b8", icon:"•" }; }
 function estadoLabel(e)  { return em(e).label; }
@@ -54,7 +63,7 @@ const stats = computed(() => {
     total:      all.length,
     enCiclo:    all.filter(l => ["vegetativo","floracion"].includes(l.estado)).length,
     plantas:    all.reduce((a,l) => a + Number(l.plants_count||0), 0),
-    cosechados: all.filter(l => l.estado === "cosechado").length,
+    cosechados: all.filter(l => COSECHADOS.includes(l.estado)).length,
   };
 });
 
@@ -83,7 +92,10 @@ const filtered = computed(() => {
     const esActivo     = l.estado !== "finalizado";
     const matchTab     = tab.value === "activos" ? esActivo : !esActivo;
     const matchText    = !query || (l.codigo||"").toLowerCase().includes(query) || (l.strain||"").toLowerCase().includes(query);
-    const matchEstado  = !filterEstado.value || l.estado === filterEstado.value;
+    const matchEstado  = !filterEstado.value
+      || (filterEstado.value === "cosechados"
+          ? COSECHADOS.includes(l.estado)
+          : l.estado === filterEstado.value);
     const matchSala    = !filterSala.value   || String(l.sala_id) === filterSala.value;
     const matchGrow    = !filterGrow.value   || l.grow_type === filterGrow.value;
     return matchTab && matchText && matchEstado && matchSala && matchGrow;
@@ -253,7 +265,7 @@ async function exportarCSV() {
         <div class="lv__kpi-val">{{ stats.plantas }}</div>
         <div class="lv__kpi-lbl">Plantas totales</div>
       </button>
-      <button class="lv__kpi lv__kpi--amber" :class="{ 'lv__kpi--active': filterEstado === 'cosechado' }" @click="filterEstado = filterEstado === 'cosechado' ? '' : 'cosechado'">
+      <button class="lv__kpi lv__kpi--amber" :class="{ 'lv__kpi--active': filterEstado === 'cosechados' }" @click="filterEstado = filterEstado === 'cosechados' ? '' : 'cosechados'">
         <div class="lv__kpi-val">{{ stats.cosechados }}</div>
         <div class="lv__kpi-lbl">Cosechados</div>
       </button>

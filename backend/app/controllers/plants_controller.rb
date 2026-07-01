@@ -251,13 +251,14 @@ class PlantsController < ApplicationController
   end
 
   def dias_en_fase(plant)
+    # plant.state ∈ Plant::STATES (germinacion/esqueje/vegetativo/floracion/secado/cosechado/descartada)
     ref = case plant.state
-          when 'semilla'    then plant.fecha_germinacion || plant.created_at.to_date
-          when 'esqueje'    then plant.created_at.to_date
-          when 'vegetativo' then plant.fecha_vegetativo || plant.created_at.to_date
-          when 'floracion'  then plant.fecha_floracion
-          when 'maduracion' then plant.fecha_floracion
-          when 'cosechado'  then plant.fecha_cosecha
+          when 'germinacion' then plant.fecha_germinacion || plant.created_at.to_date
+          when 'esqueje'     then plant.created_at.to_date
+          when 'vegetativo'  then plant.fecha_vegetativo || plant.created_at.to_date
+          when 'floracion'   then plant.fecha_floracion
+          when 'secado'      then plant.fecha_cosecha
+          when 'cosechado'   then plant.fecha_cosecha
           end
     ref ? (Date.today - ref.to_date).to_i : nil
   end

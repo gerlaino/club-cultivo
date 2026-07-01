@@ -181,6 +181,16 @@ class LotesController < ApplicationController
       return render json: { error: 'Los lotes finalizados son inmutables. Para correcciones de datos contactá al soporte.' }, status: :forbidden
     end
 
+    # Guarda de máquina de estados: se permite corregir el estado a mano DENTRO del
+    # cultivo (semilla/esqueje/vegetativo/floracion/cosecha), pero NO saltar a estados
+    # post-manicura por PATCH — en_manicura/curado/finalizado implican asignación,
+    # pesaje confirmado y stock de flor_seca. Pasar a esos estados sin ese flujo dejaría
+    # el lote "curado" sin stock y rompería la trazabilidad/dispensación.
+    nuevo_estado = lote_update_params[:estado]
+    if nuevo_estado.present? && nuevo_estado != @lote.estado && (Lote::POST_COSECHA - %w[cosecha]).include?(nuevo_estado)
+      return render json: { error: "No se puede pasar a '#{nuevo_estado}' editando el lote. Usá el flujo de manicura y curado." }, status: :unprocessable_entity
+    end
+
     # Las fechas de fase deben ser correlativas (inicio ≤ vegetativo ≤ floración ≤ cosecha).
     if (msg = validar_orden_fechas(@lote))
       return render json: { errors: [msg] }, status: :unprocessable_entity

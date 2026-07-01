@@ -170,7 +170,7 @@ const TIPO_META_TAREA = {
   medicion:    { emoji: '📏', label: 'Medición' },
   limpieza:    { emoji: '🧹', label: 'Limpieza' },
   cosecha:     { emoji: '🌿', label: 'Cosecha' },
-  transplante: { emoji: '🪴', label: 'Trasplante' },
+  trasplante: { emoji: '🪴', label: 'Trasplante' },
   inspeccion:  { emoji: '🔍', label: 'Inspección' },
   otro:        { emoji: '📋', label: 'Tarea' },
 }

@@ -260,7 +260,7 @@ const TIPO_META = {
   medicion:    { label: 'Medición',   emoji: '📏' },
   limpieza:    { label: 'Limpieza',   emoji: '🧹' },
   cosecha:     { label: 'Cosecha',    emoji: '🌿' },
-  transplante: { label: 'Trasplante', emoji: '🪴' },
+  trasplante: { label: 'Trasplante', emoji: '🪴' },
   inspeccion:  { label: 'Inspección', emoji: '🔍' },
   otro:        { label: 'Otro',       emoji: '📋' },
 }
@@ -332,7 +332,7 @@ function esPasado(fechaStr) {
 
 const TIPO_EMOJI = {
   riego: '💧', poda: '✂️', medicion: '📏', limpieza: '🧹',
-  cosecha: '🌿', transplante: '🪴', inspeccion: '🔍', otro: '📋',
+  cosecha: '🌿', trasplante: '🪴', inspeccion: '🔍', otro: '📋',
 }
 
 function nuevaTareaEnDia(fecha) {

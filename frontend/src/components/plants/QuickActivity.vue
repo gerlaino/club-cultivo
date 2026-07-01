@@ -212,9 +212,11 @@ const TIPOS = [
 
 const ESTADOS = [
   { value: 'germinacion', emoji: '🌰', label: 'Germinación' },
+  { value: 'esqueje',     emoji: '🌿', label: 'Esqueje' },
   { value: 'vegetativo',  emoji: '🌱', label: 'Vegetativo' },
   { value: 'floracion',   emoji: '🌸', label: 'Floración' },
-  { value: 'cosechada',   emoji: '✅', label: 'Cosechada' },
+  { value: 'secado',      emoji: '🍂', label: 'Secado' },
+  { value: 'cosechado',   emoji: '✅', label: 'Cosechada' },
   { value: 'descartada',  emoji: '❌', label: 'Descartada' },
 ]
 
@@ -226,7 +228,7 @@ const accionMeta = computed(() => {
 const totalPlantas = computed(() => {
   if (props.modo !== 'lote' || !props.contexto) return 0
   return (props.contexto.plantas || []).filter(p =>
-    !['cosechada', 'descartada'].includes(p.state)
+    !['cosechado', 'descartada'].includes(p.state)
   ).length
 })
 
@@ -311,7 +313,7 @@ async function guardar() {
     if (props.modo === 'lote') {
       // Aplicar a todas las plantas activas del lote
       const plantasActivas = (props.contexto.plantas || []).filter(p =>
-        !['cosechada', 'descartada'].includes(p.state)
+        !['cosechado', 'descartada'].includes(p.state)
       )
       await Promise.all(
         plantasActivas.map(planta => createPlantActivity(planta.id, payload))
