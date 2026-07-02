@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { logger } from '../utils/logger.js'
 import { useRouter } from 'vue-router'
 import { listPlants, listLotes } from '../lib/api.js'
+import { em } from '../lib/loteHelpers.js'
 import { useAuthStore } from '../stores/auth.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -29,10 +30,18 @@ const STATE_META = {
 }
 
 function sm(s) { return STATE_META[s] || { label: s || '—', icon: '•', bg: '#f3f4f6', color: '#374151', bar: '#94a3b8' } }
-function stateLabel(s)      { return sm(s).label }
-function stateIcon(s)       { return sm(s).icon }
-function stateBadgeStyle(s) { const m = sm(s); return { background: m.bg, color: m.color } }
-function stateBarStyle(s)   { return { background: sm(s).bar } }
+
+// Post-manicura la planta queda congelada en 'cosechado' (Plant no tiene curado/
+// en_manicura/finalizado). Para el display usamos el estado del LOTE, que refleja
+// la realidad. Devuelve el mismo shape que STATE_META.
+const POST_COSECHA_LOTE = ['en_manicura', 'curado', 'finalizado']
+function plantaMeta(p) {
+  if (p.state === 'cosechado' && POST_COSECHA_LOTE.includes(p.lote?.estado)) {
+    const m = em(p.lote.estado)
+    return { label: m.label, icon: m.emoji, bg: m.bg, color: m.color, bar: m.color }
+  }
+  return sm(p.state)
+}
 
 // Alineado a Plant::STATES (backend). Orden de aparición en KPIs.
 const KPI_STATES = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'secado', 'cosechado', 'descartada']
@@ -260,8 +269,8 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
             @click="router.push('/plantas/' + plant.id)"
           >
             <td>
-              <span class="pt-badge" :style="stateBadgeStyle(plant.state)">
-                {{ stateIcon(plant.state) }} {{ stateLabel(plant.state) }}
+              <span class="pt-badge" :style="{ background: plantaMeta(plant).bg, color: plantaMeta(plant).color }">
+                {{ plantaMeta(plant).icon }} {{ plantaMeta(plant).label }}
               </span>
             </td>
             <td>
@@ -277,7 +286,7 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
               <span class="pt-fecha">{{ formatFecha(plant.created_at) }}</span>
             </td>
             <td class="pt-col-dias">
-              <span v-if="plant.dias_en_fase != null" class="pt-dias-badge" :style="stateBadgeStyle(plant.state)">
+              <span v-if="plant.dias_en_fase != null" class="pt-dias-badge" :style="{ background: plantaMeta(plant).bg, color: plantaMeta(plant).color }">
                 {{ plant.dias_en_fase }}d
               </span>
               <span v-else class="pt-dias-empty">—</span>
