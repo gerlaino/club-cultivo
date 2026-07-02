@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { listGeneticas, createGenetica, updateGenetica, deleteGenetica } from '../lib/api.js'
+import { useRouter, useRoute } from 'vue-router'
+import { listGeneticas, getGenetica, createGenetica, updateGenetica, deleteGenetica } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useToast } from '../composables/useToast.js'
@@ -10,6 +10,7 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import api from '../lib/api.js'
 
 const router = useRouter()
+const route  = useRoute()
 
 const auth    = useAuthStore()
 const canEdit = computed(() => auth.role === 'admin')
@@ -132,7 +133,13 @@ function openCreate() {
   showModal.value    = true
 }
 
-function openEdit(gen) {
+async function openEdit(genOrId) {
+  const id = typeof genOrId === 'object' ? genOrId.id : Number(genOrId)
+  // El item de la lista no trae descripción/consejos/objetivos/origen; traemos el
+  // detalle completo para no cargar el form vacío (y borrarlos al guardar).
+  let gen = typeof genOrId === 'object' ? genOrId : null
+  try { const { data } = await getGenetica(id); gen = data } catch { /* usamos lo que haya */ }
+  if (!gen) return
   editingId.value    = gen.id
   editingInase.value = !!gen.registrada_inase
   form.value = {
@@ -254,7 +261,11 @@ async function openDelete(gen) {
   }
 }
 
-onMounted(loadGeneticas)
+onMounted(async () => {
+  await loadGeneticas()
+  // Editar desde el detalle: /geneticas?edit=<id> abre el modal directo.
+  if (route.query.edit) openEdit(route.query.edit)
+})
 </script>
 
 <template>

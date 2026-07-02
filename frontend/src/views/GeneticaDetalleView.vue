@@ -222,6 +222,10 @@ onMounted(async () => {
               </div>
             </div>
 
+            <button v-if="canUpdate" class="gdv__btn-editar" @click="router.push({ name: 'geneticas', query: { edit: gen.id } })">
+              <i class="bi bi-pencil"></i> Editar
+            </button>
+
           </div>
 
           <!-- KPIs rápidos -->
@@ -267,17 +271,17 @@ onMounted(async () => {
           <div class="gdv__card gdv__card--mb">
             <h6 class="section-title">Datos de cultivo</h6>
             <div class="dato-grid">
-              <div v-if="gen.dias_vegetativo_objetivo" class="dato-item">
+              <div class="dato-item">
                 <span class="dato-item__icon">🌱</span>
-                <div><div class="dato-item__label">Vegetativo obj.</div><div class="dato-item__val">{{ gen.dias_vegetativo_objetivo }} días</div></div>
+                <div><div class="dato-item__label">Vegetativo obj.</div><div class="dato-item__val">{{ gen.dias_vegetativo_objetivo ? gen.dias_vegetativo_objetivo + ' días' : '—' }}</div></div>
               </div>
-              <div v-if="gen.tiempo_floracion" class="dato-item">
+              <div class="dato-item">
                 <span class="dato-item__icon">🌸</span>
-                <div><div class="dato-item__label">Floración obj.</div><div class="dato-item__val">{{ gen.tiempo_floracion }} días</div></div>
+                <div><div class="dato-item__label">Floración obj.</div><div class="dato-item__val">{{ gen.tiempo_floracion ? gen.tiempo_floracion + ' días' : '—' }}</div></div>
               </div>
-              <div v-if="gen.dias_cosecha_objetivo" class="dato-item">
+              <div class="dato-item">
                 <span class="dato-item__icon">✂️</span>
-                <div><div class="dato-item__label">Cosecha obj.</div><div class="dato-item__val">{{ gen.dias_cosecha_objetivo }} días</div></div>
+                <div><div class="dato-item__label">Cosecha obj.</div><div class="dato-item__val">{{ gen.dias_cosecha_objetivo ? gen.dias_cosecha_objetivo + ' días' : '—' }}</div></div>
               </div>
               <div v-if="gen.rendimiento" class="dato-item">
                 <span class="dato-item__icon">⚖️</span>
@@ -546,6 +550,8 @@ onMounted(async () => {
 .gdv__nombre { font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0 0 .25rem; }
 .gdv__sub    { font-size: .82rem; color: #64748b; display: flex; gap: .4rem; flex-wrap: wrap; }
 .gdv__sub i  { font-size: .75rem; }
+.gdv__btn-editar { display: inline-flex; align-items: center; gap: .4rem; background: #16a34a; color: #fff; border: none; border-radius: 9px; padding: .5rem .95rem; font-size: .85rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; align-self: flex-start; }
+.gdv__btn-editar:hover { background: #15803d; }
 
 .gdv__hero-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .gdv__btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .9rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; border: 1.5px solid; transition: all .15s; white-space: nowrap; }
@@ -589,7 +595,7 @@ onMounted(async () => {
 .kpi-row { display: flex; flex-wrap: wrap; gap: .75rem; }
 .kpi-cell { background: #f8f9fa; border-radius: .75rem; padding: .5rem .875rem; min-width: 70px; }
 .kpi-cell__label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; margin-bottom: .1rem; }
-.kpi-cell__value { font-size: 1.15rem; font-weight: 800; color: #1a2e1a; line-height: 1; }
+.kpi-cell__value { font-size: 1.15rem; font-weight: 800; color: #0f172a; line-height: 1; }
 
 /* Section titles */
 .section-title { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: #6c757d; font-weight: 700; margin-bottom: .875rem; }
@@ -599,7 +605,7 @@ onMounted(async () => {
 .dato-item { display: flex; align-items: center; gap: .65rem; background: #f8f9fa; border-radius: .6rem; padding: .6rem .875rem; flex: 1 1 140px; }
 .dato-item__icon  { font-size: 1.25rem; flex-shrink: 0; }
 .dato-item__label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; line-height: 1.2; }
-.dato-item__val   { font-size: .875rem; font-weight: 600; color: #1a2e1a; }
+.dato-item__val   { font-size: .875rem; font-weight: 600; color: #0f172a; }
 
 /* Terpenos */
 .terpeno-chip { padding: .3rem .75rem; background: rgba(27,94,32,.1); color: #16a34a; border-radius: 999px; font-size: .8rem; font-weight: 600; border: 1px solid rgba(27,94,32,.2); }
@@ -627,7 +633,7 @@ onMounted(async () => {
 .cannab-label { font-size: .8rem; width: 36px; }
 .cannab-bar-wrap { flex: 1; height: 8px; background: rgba(0,0,0,.07); border-radius: 4px; overflow: hidden; }
 .cannab-bar { height: 100%; border-radius: 4px; transition: width .4s ease; }
-.cannab-val { font-size: .85rem; font-weight: 700; color: #1a2e1a; width: 42px; text-align: right; }
+.cannab-val { font-size: .85rem; font-weight: 700; color: #0f172a; width: 42px; text-align: right; }
 
 /* Foto grid */
 .foto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
