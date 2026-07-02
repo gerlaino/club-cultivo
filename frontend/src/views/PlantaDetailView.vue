@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
+import { logoDataUrl } from '../lib/logoEmbed.js'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
@@ -79,7 +80,7 @@ async function imprimirEtiqueta() {
   const gen    = p.genetica?.nombre || '—'
   const lote   = p.lote?.codigo || '—'
   const inicio = _fechaEt(p.lote?.start_date)
-  const logo   = club.logoUrl
+  const logo   = await logoDataUrl(club.logoUrl)
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Etiqueta ${_escEt(nombre)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}

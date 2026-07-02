@@ -270,6 +270,7 @@ import { createPlant } from '../../lib/api'
 import { useQRCode } from '../../composables/useQRCode.js'
 import { useToast } from '../../composables/useToast.js'
 import { pm, em, STATE_MAP } from '../../lib/loteHelpers.js'
+import { logoDataUrl } from '../../lib/logoEmbed.js'
 import EmptyState from '../ui/EmptyState.vue'
 import Paginator  from '../ui/Paginator.vue'
 import DsSpinner  from '../../design-system/components/Spinner.vue'
@@ -396,7 +397,7 @@ function _fechaCorta(d) {
 async function generarHTMLEtiquetas() {
   const origen   = window.location.origin
   const clubName = clubStore.data?.name || ''
-  const clubLogo = clubStore.data?.logo_url || ''
+  const clubLogo = await logoDataUrl(clubStore.data?.logo_url)
   const loteCode = props.lote?.codigo || 'lote'
   const genetica = props.lote?.genetica?.nombre || props.lote?.strain || '—'
   const inicio   = _fechaCorta(props.lote?.start_date)
