@@ -43,10 +43,34 @@
       </div>
     </section>
 
-    <div v-if="!pesajes.length && !misCosechas.length" class="apm__empty">
+    <!-- En manicura: lotes asignados a un manicura, en curso (aún sin pesaje enviado) -->
+    <section v-if="enCurso.length" class="apm__group">
+      <h2 class="apm__group-title"><Scissors :size="15" :stroke-width="2" /> En manicura — asignadas a manicura</h2>
+      <div class="apm__cards">
+        <div v-for="l in enCurso" :key="l.id" class="apm__card">
+          <div class="apm__card-stripe apm__card-stripe--leaf"></div>
+          <div class="apm__card-body">
+            <div class="apm__card-head">
+              <span class="apm__card-codigo">{{ l.codigo }}</span>
+              <span class="apm__badge apm__badge--leaf"><Scissors :size="11" :stroke-width="2.5" /> {{ l.manicurador?.nombre || 'Sin asignar' }}</span>
+            </div>
+            <div class="apm__card-meta">
+              <span v-if="l.genetica"><Leaf :size="13" :stroke-width="2" /> {{ l.genetica.nombre }}</span>
+              <span><Package :size="13" :stroke-width="2" /> {{ l.plants_count_cosechadas || l.plants_count }} plantas</span>
+              <span v-if="l.dias_en_estado != null"><Clock :size="13" :stroke-width="2" /> hace {{ l.dias_en_estado }} día{{ l.dias_en_estado === 1 ? '' : 's' }}</span>
+            </div>
+          </div>
+          <div class="apm__card-actions">
+            <RouterLink :to="`/lotes/${l.id}`" class="apm__btn-eliminar" style="text-decoration:none">Ver lote</RouterLink>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div v-if="!pesajes.length && !misCosechas.length && !enCurso.length" class="apm__empty">
       <div class="apm__empty-ico"><Scale :size="40" :stroke-width="1.25" /></div>
-      <p class="apm__empty-title">Sin pesajes pendientes</p>
-      <p class="apm__empty-sub">Cuando manicura cierre un día de trabajo aparecerá aquí para tu confirmación.</p>
+      <p class="apm__empty-title">Sin lotes en manicura</p>
+      <p class="apm__empty-sub">Cuando asignes una cosecha a manicura o te envíen un pesaje para confirmar, aparecerá acá.</p>
     </div>
 
     <h2 v-if="pesajes.length" class="apm__group-title"><Clock :size="15" :stroke-width="2" /> Para confirmar — enviadas por manicura</h2>
@@ -246,7 +270,17 @@ const { confirm } = useConfirm()
 const auth = useAuthStore()
 
 // Cosechas en manicura asignadas a este admin/supervisor: las pesa él mismo.
-const misCosechas = ref([])
+const misCosechas     = ref([])
+const lotesEnManicura = ref([])
+
+// Board "en curso": lotes en manicura asignados a un manicura (no al admin) y todavía
+// sin pesaje enviado. Son los que antes no se veían en ningún lado desde acá.
+const enCurso = computed(() => {
+  const enviados = new Set(pesajes.value.map(p => p.lote_id))
+  return lotesEnManicura.value.filter(l =>
+    l.manicurador_id !== auth.user?.id && !enviados.has(l.id)
+  )
+})
 const showPesar   = ref(false)
 const lotePesar   = ref(null)
 function abrirPesar(l) { lotePesar.value = l; showPesar.value = true }
@@ -286,11 +320,12 @@ async function cargar() {
   // Cosechas en manicura asignadas a mí, todavía sin un pesaje enviado.
   try {
     const { data } = await listLotes({ estado: 'en_manicura' })
+    lotesEnManicura.value = data || []
     const enviadosLoteIds = new Set(pesajes.value.map(p => p.lote_id))
     misCosechas.value = (data || []).filter(l =>
       l.manicurador_id === auth.user?.id && !enviadosLoteIds.has(l.id)
     )
-  } catch { misCosechas.value = [] }
+  } catch { misCosechas.value = []; lotesEnManicura.value = [] }
 }
 
 async function abrirConfirmacion(p) {
@@ -429,6 +464,8 @@ onMounted(cargar)
 .apm__cards { display: flex; flex-direction: column; gap: var(--sp-3); }
 .apm__card-stripe--amber { background: linear-gradient(90deg, #b45309, #f59e0b); }
 .apm__badge--amber { background: #fef3c7; color: #b45309; }
+.apm__card-stripe--leaf { background: linear-gradient(90deg, var(--c-leaf-700, #15803d), var(--c-leaf-500, #22c55e)); }
+.apm__badge--leaf { background: var(--c-leaf-100, #dcfce7); color: var(--c-leaf-700, #15803d); }
 .apm__card {
   background: var(--c-paper); border: 1px solid var(--c-ink-100);
   border-radius: var(--r-lg); overflow: hidden;
