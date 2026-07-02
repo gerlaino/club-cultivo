@@ -1,11 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { getGenetica, updateGenetica } from '../lib/api.js'
+import { getGenetica } from '../lib/api.js'
 import { em } from '../lib/loteHelpers'
 import { useAuthStore } from '../stores/auth.js'
 import { usePermissions } from '../composables/usePermissions.js'
-import { useQRCode } from '../composables/useQRCode.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
@@ -21,7 +20,6 @@ const props = defineProps({ id: { type: Number, required: true } })
 const router  = useRouter()
 const auth    = useAuthStore()
 const { can } = usePermissions()
-const { downloadPNG, downloadSVG, generatePNG } = useQRCode()
 const toast   = useToast()
 const { confirm } = useConfirm()
 
@@ -30,8 +28,6 @@ const canUpdate = computed(() => can('geneticas', 'update'))
 const gen            = ref(null)
 const loading        = ref(true)
 const error          = ref(null)
-const toggling       = ref(false)
-const qrDropdownOpen = ref(false)
 
 const TIPO_META = {
   indica:    { label: 'Índica',    color: '#6f42c1' },
@@ -158,58 +154,6 @@ const lightboxImages = computed(() =>
 
 function abrirLightbox(i) { fotoActiva.value = i; lightboxOpen.value = true }
 
-function qrUrl()          { return `${window.location.origin}/g/${gen.value?.slug}` }
-function qrFilename(ext)  { return `qr-genetica-${gen.value?.slug}.${ext}` }
-async function descargarQRpng() { await downloadPNG(qrUrl(), qrFilename('png')) }
-async function descargarQRsvg() { await downloadSVG(qrUrl(), qrFilename('svg')) }
-
-function _escG(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
-async function imprimirEtiquetaGenetica() {
-  const g = gen.value
-  if (!g?.slug) return
-  const dataUrl = await generatePNG(qrUrl(), { width: 260, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' } })
-  const inase = g.registrada_inase ? `INASE${g.numero_registro_inase ? ' ' + g.numero_registro_inase : ''}` : ''
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Etiqueta ${_escG(g.nombre)}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0} @page{size:80mm 50mm;margin:0}
-  body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
-  .et{display:flex;align-items:center;gap:5mm;border:0.4px solid #bbb;border-radius:3mm;padding:5mm}
-  .et img{width:30mm;height:30mm;display:block}
-  .et-d{display:flex;flex-direction:column;gap:1mm}
-  .et-name{font-size:14pt;font-weight:800;color:#0f172a}
-  .et-tipo{font-size:9pt;color:#475569;text-transform:capitalize}
-  .et-can{font-size:10pt;font-weight:700;color:#15803d}
-  .et-inase{font-size:8pt;color:#b45309;font-weight:700;margin-top:1mm}
-</style></head><body>
-  <div class="et">
-    <img src="${dataUrl}" alt="${_escG(g.nombre)}" />
-    <div class="et-d">
-      <div class="et-name">${_escG(g.nombre)}</div>
-      <div class="et-tipo">${_escG(g.tipo || '')}</div>
-      <div class="et-can">THC ${g.thc != null ? g.thc + '%' : '—'} · CBD ${g.cbd != null ? g.cbd + '%' : '—'}</div>
-      ${inase ? `<div class="et-inase">🏛️ ${_escG(inase)}</div>` : ''}
-    </div>
-  </div>
-</body></html>`
-  const win = window.open('', '_blank', 'width=700,height=500')
-  if (!win) { await downloadPNG(qrUrl(), qrFilename('png')); return }
-  win.document.write(html); win.document.close()
-  setTimeout(() => win.print(), 500)
-}
-
-async function toggleVisibleWeb() {
-  if (!canUpdate.value || toggling.value) return
-  toggling.value = true
-  try {
-    const { data } = await updateGenetica(gen.value.id, { visible_web: !gen.value.visible_web })
-    gen.value.visible_web = data.visible_web
-    toast.success(gen.value.visible_web ? 'Publicada en la web' : 'Ocultada de la web')
-  } catch {
-    toast.error('Error al actualizar visibilidad')
-  } finally {
-    toggling.value = false
-  }
-}
 
 async function eliminarFoto(fotoId) {
   if (!canUpdate.value) return
@@ -287,44 +231,6 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Acciones header -->
-            <div class="gdv__hero-actions">
-              <!-- QR dropdown -->
-              <div v-if="gen.slug" class="gdv__dropdown" :class="{ 'gdv__dropdown--open': qrDropdownOpen }">
-                <button class="gdv__btn gdv__btn--outline-green" @click="qrDropdownOpen = !qrDropdownOpen">
-                  <i class="bi bi-qr-code"></i>
-                  <span class="gdv__btn-label">QR público</span>
-                  <i class="bi bi-chevron-down gdv__dropdown-arrow"></i>
-                </button>
-                <div class="gdv__dropdown-menu" v-if="qrDropdownOpen" @mouseleave="qrDropdownOpen=false">
-                  <button class="gdv__dropdown-item" @click="descargarQRsvg(); qrDropdownOpen=false">
-                    <i class="bi bi-file-earmark-code"></i> Descargar SVG
-                  </button>
-                  <button class="gdv__dropdown-item" @click="descargarQRpng(); qrDropdownOpen=false">
-                    <i class="bi bi-file-earmark-image"></i> Descargar PNG
-                  </button>
-                  <button class="gdv__dropdown-item" @click="imprimirEtiquetaGenetica(); qrDropdownOpen=false">
-                    <i class="bi bi-printer"></i> Imprimir etiqueta
-                  </button>
-                  <div class="gdv__dropdown-sep"></div>
-                  <a :href="`/g/${gen.slug}`" target="_blank" class="gdv__dropdown-item">
-                    <i class="bi bi-box-arrow-up-right"></i> Ver ficha pública
-                  </a>
-                </div>
-              </div>
-
-              <!-- Toggle visible_web -->
-              <button
-                v-if="canUpdate"
-                class="gdv__btn"
-                :class="gen.visible_web ? 'gdv__btn--green' : 'gdv__btn--ghost'"
-                :disabled="toggling"
-                @click="toggleVisibleWeb"
-              >
-                <i class="bi" :class="gen.visible_web ? 'bi-globe2' : 'bi-globe'"></i>
-                <span class="gdv__btn-label">{{ gen.visible_web ? 'Publicada' : 'Publicar' }}</span>
-              </button>
-            </div>
           </div>
 
           <!-- KPIs rápidos -->
@@ -603,19 +509,6 @@ onMounted(async () => {
                 <span class="gdv__config-badge" :style="gen.disponible ? { background:'#f0fdf4', color:'#15803d', border:'1px solid #bbf7d0' } : { background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0' }">
                   {{ gen.disponible ? 'Sí' : 'No' }}
                 </span>
-              </div>
-              <div class="gdv__config-row">
-                <span class="gdv__config-label">Web pública</span>
-                <button
-                  class="gdv__toggle-sm"
-                  :class="gen.visible_web ? 'gdv__toggle-sm--on' : 'gdv__toggle-sm--off'"
-                  :disabled="toggling"
-                  @click="toggleVisibleWeb"
-                >{{ gen.visible_web ? 'Publicada' : 'Oculta' }}</button>
-              </div>
-              <div class="gdv__config-row">
-                <span class="gdv__config-label">Slug QR</span>
-                <code class="gdv__config-code">{{ gen.slug || '—' }}</code>
               </div>
               <div class="gdv__config-sep"></div>
               <div class="gdv__config-row gdv__config-row--muted">
