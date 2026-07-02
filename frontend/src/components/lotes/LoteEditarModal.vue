@@ -66,7 +66,6 @@
                 <option value="">Sin especificar</option>
                 <option value="sustrato">Sustrato</option>
                 <option value="hidroponia">Hidroponia</option>
-                <option value="aeroponia">Aeroponia</option>
               </select>
             </div>
 

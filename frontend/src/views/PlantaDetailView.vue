@@ -173,7 +173,7 @@ const TAREAS_META = {
 }
 function tm(t) { return TAREAS_META[t] || { emoji: '📌', label: t } }
 
-function growLabel(g)  { return { sustrato:'Sustrato', hidroponia:'Hidroponia', aeroponia:'Aeroponia' }[g]||g||'—' }
+function growLabel(g)  { return { sustrato:'Sustrato', hidroponia:'Hidroponia' }[g]||g||'—' }
 function origenLabel(o){ return { semilla:'Semilla', esqueje:'Esqueje', clonacion:'Clonación' }[o]||o||'—' }
 function formatDate(d) {
   if (!d) return '—'

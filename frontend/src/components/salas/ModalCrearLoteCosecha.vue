@@ -410,7 +410,6 @@ async function crear() {
                 <div class="clc__pills">
                   <button type="button" class="clc__pill" :class="{ 'clc__pill--active': form.grow_type === 'sustrato' }"   @click="form.grow_type = 'sustrato'">🪨 Sustrato</button>
                   <button type="button" class="clc__pill" :class="{ 'clc__pill--active': form.grow_type === 'hidroponia' }" @click="form.grow_type = 'hidroponia'">💧 Hidroponia</button>
-                  <button type="button" class="clc__pill" :class="{ 'clc__pill--active': form.grow_type === 'aeroponia' }"  @click="form.grow_type = 'aeroponia'">🌬️ Aeroponia</button>
                 </div>
               </div>
 
@@ -438,18 +437,6 @@ async function crear() {
                   <option value="ebb_flow">Ebb & Flow (marea)</option>
                   <option value="kratky">Kratky</option>
                   <option value="rdwc">RDWC (Recirculating DWC)</option>
-                  <option value="otro">Otro</option>
-                </select>
-              </div>
-
-              <!-- Sistema aeropónico -->
-              <div v-if="form.grow_type === 'aeroponia'" class="clc__field clc__field--full">
-                <label class="clc__label">Sistema aeropónico <span class="clc__label-opt">(opc.)</span></label>
-                <select class="clc__input" v-model="form.sistema_hidro">
-                  <option value="">Sin especificar</option>
-                  <option value="aero_alta_presion">Alta presión (HP Aeroponics)</option>
-                  <option value="aero_baja_presion">Baja presión (rociadores)</option>
-                  <option value="aero_ultra">Ultra alta presión</option>
                   <option value="otro">Otro</option>
                 </select>
               </div>

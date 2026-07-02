@@ -54,7 +54,7 @@ const EN_CICLO = ["semilla","esqueje","vegetativo","floracion","cosecha","en_man
 
 function em(e)           { return ESTADO_META[e] || { label: e||"—", dot:"#94a3b8", bg:"#f1f5f9", text:"#64748b", bar:"#94a3b8", icon:"•" }; }
 function estadoLabel(e)  { return em(e).label; }
-function growLabel(g)    { return { sustrato:"Sustrato", hidroponia:"Hidroponia", aeroponia:"Aeroponia" }[g] || g || "—"; }
+function growLabel(g)    { return { sustrato:"Sustrato", hidroponia:"Hidroponia" }[g] || g || "—"; }
 function lightLabel(l)   { return { led:"LED", hps:"HPS", cmh:"CMH", natural:"Natural", mixta:"Mixta" }[l] || l || "—"; }
 function salaName(id)    { return salas.items.find(s => String(s.id) === String(id))?.nombre || `Sala #${id}`; }
 // Post-cosecha el lote no vive en una sala: mostramos su etapa como "ubicación".
@@ -301,7 +301,6 @@ async function exportarCSV() {
         <option value="">Todos los sistemas</option>
         <option value="sustrato">Sustrato</option>
         <option value="hidroponia">Hidroponia</option>
-        <option value="aeroponia">Aeroponia</option>
       </select>
       <select class="lv__select lv__select--sm" v-model="sortBy">
         <option value="fecha_desc">Más recientes</option>
@@ -450,7 +449,6 @@ async function exportarCSV() {
                 <select class="lm-input" v-model="editForm.grow_type">
                   <option value="sustrato">Sustrato</option>
                   <option value="hidroponia">Hidroponia</option>
-                  <option value="aeroponia">Aeroponia</option>
                 </select>
               </div>
               <div class="lm-field">

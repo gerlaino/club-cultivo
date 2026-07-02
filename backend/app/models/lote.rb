@@ -40,7 +40,7 @@ class Lote < ApplicationRecord
   CICLO_FASES   = %w[vegetativo floracion cosecha].freeze
   # Estados post-cosecha: el lote NO tiene sala (se ve por estado en Cosecha/Manicura).
   POST_COSECHA  = %w[cosecha en_manicura curado finalizado].freeze
-  TIPOS_CULTIVO = %w[sustrato hidroponia aeroponia].freeze
+  TIPOS_CULTIVO = %w[sustrato hidroponia].freeze
   TIPOS_LUZ     = %w[led hps cmh natural mixta].freeze
   SUSTRATOS     = %w[tierra coco perlita mezcla rockwool fibra_coco].freeze
   FOTOPERIODOS  = %w[20/4 18/6 16/8 12/12 auto].freeze

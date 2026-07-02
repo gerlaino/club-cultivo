@@ -142,7 +142,7 @@ export function pm(s)  { return PLANT_STATE_META[s]  || { label: s || '—', col
 export function sm(s)  { return ESTADO_SALUD_META[s] || { color: '#94a3b8', emoji: '⚪' } }
 export function pgm(p) { return PLAGAS_META[p]       || { color: '#94a3b8', emoji: '—' } }
 
-export function growLabel(g)  { return { sustrato: 'Sustrato', hidroponia: 'Hidroponia', aeroponia: 'Aeroponia' }[g] || g || '—' }
+export function growLabel(g)  { return { sustrato: 'Sustrato', hidroponia: 'Hidroponia' }[g] || g || '—' }
 export function lightLabel(l) { return { led: 'LED', hps: 'HPS', cmh: 'CMH', natural: 'Natural', mixta: 'Mixta' }[l] || l || '—' }
 export function macetaLabel(m) {
   if (m == null || m === '') return '—'

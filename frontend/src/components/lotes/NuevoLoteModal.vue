@@ -183,7 +183,6 @@
               <select class="nlm__input" v-model="form.grow_type">
                 <option value="sustrato">Sustrato</option>
                 <option value="hidroponia">Hidroponia</option>
-                <option value="aeroponia">Aeroponia</option>
               </select>
             </div>
             <div class="nlm__field">

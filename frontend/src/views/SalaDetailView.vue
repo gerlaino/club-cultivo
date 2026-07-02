@@ -296,7 +296,7 @@ const ESTADO_META = {
   finalizado:  { label:"Finalizado",  color:"#1b5e20", emoji:"✅" },
 }
 function estadoMeta(e) { return ESTADO_META[e] || { label:e, color:"#64748b", emoji:"📦" } }
-function growLabel(g)  { return { sustrato:"Sustrato", hidroponia:"Hidroponia", aeroponia:"Aeroponia" }[g] || g || "—" }
+function growLabel(g)  { return { sustrato:"Sustrato", hidroponia:"Hidroponia" }[g] || g || "—" }
 function kindLabel(k)  { return { vegetativo:"Vegetativo", floracion:"Floración", mixta:"Mixta", madre:"Madres", clon:"Clones", manicura:"Manicura" }[k] || k || "—" }
 
 function salaEstadoStyle(state) {
