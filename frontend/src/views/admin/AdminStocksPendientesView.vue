@@ -210,7 +210,7 @@
                   <td class="stk__inv-num stk__inv-td-cosechado">
                     {{ s.cantidad_inicial != null ? s.cantidad_inicial.toFixed(1) + (s.unidad || 'g') : '—' }}
                   </td>
-                  <td class="stk__inv-num stk__inv-td-actual" :class="{ 'stk__inv-td-bajo': (s.cantidad_disponible_real ?? s.cantidad) < umbralValor }">
+                  <td class="stk__inv-num stk__inv-td-actual" :class="{ 'stk__inv-td-bajo': s.forma_producto === 'flor_seca' && (s.cantidad_disponible_real ?? s.cantidad) < umbralValor }">
                     {{ (s.cantidad_disponible_real ?? s.cantidad).toFixed(1) }}{{ s.unidad || 'g' }}
                   </td>
                 </tr>

@@ -104,7 +104,9 @@ class InformesController < ApplicationController
     por_sede = sedes.map do |s|
       plantas = Plant.joins(lote: :sala).where(salas: { sede_id: s.id })
                      .where.not(state: %w[cosechado finalizado]).count
-      stock_g = Stock.joins(:sede).where(sede: s).disponibles.sum(:cantidad).to_f rescue 0
+      # "Stock disponible (g)" = flor seca solamente. Los derivados (preroll, hash…) son
+      # inventario con su propia unidad y no se suman como gramos de flor.
+      stock_g = Stock.joins(:sede).where(sede: s, forma_producto: 'flor_seca').disponibles.sum(:cantidad).to_f rescue 0
       {
         nombre:          s.nombre,
         salas:           s.salas.cultivo.count,

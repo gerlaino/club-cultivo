@@ -341,12 +341,17 @@ class StocksController < ApplicationController
     # Pesada origen
     pesada = s.pesada
 
-    # Plantas pesadas (via pesadas_plantas)
+    # Plantas de origen. El linkeo fino es via la pesada (qué plantas se pesaron a este
+    # stock); pero la flor seca no siempre queda atada a una pesada con pesadas_plantas.
+    # En ese caso, para producción propia, las plantas de origen son las del lote.
     plantas = []
     if pesada
       plantas = pesada.pesadas_plantas.includes(:plant).map do |pp|
-        { id: pp.plant_id, codigo_qr: pp.plant&.codigo_qr, peso_g: pp.peso_g&.to_f }
+        { id: pp.plant_id, codigo_qr: pp.plant&.codigo_qr, origen: pp.plant&.origen, peso_g: pp.peso_g&.to_f }
       end
+    end
+    if plantas.empty? && lote
+      plantas = lote.plants.map { |p| { id: p.id, codigo_qr: p.codigo_qr, origen: p.origen, peso_g: nil } }
     end
 
     # Dispensaciones

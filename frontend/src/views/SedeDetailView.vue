@@ -57,8 +57,10 @@ const canEditStock   = computed(() => ["admin", "supervisor"].includes(auth.user
 
 const tieneInv   = computed(() => ['social', 'mixta'].includes(sede.value?.tipo))
 const tieneSalas = computed(() => ['produccion', 'mixta'].includes(sede.value?.tipo))
-const stockTotal = computed(() => tiendaStocks.value.reduce((a, s) => a + Number(s.cantidad || 0), 0))
-const itemsBajos = computed(() => tiendaStocks.value.filter(s => Number(s.cantidad) < umbralStockBajo.value).length)
+// Gramos y "stock bajo" = solo flor seca (los derivados son inventario con otra unidad).
+const florSeca   = computed(() => tiendaStocks.value.filter(s => s.forma_producto === 'flor_seca'))
+const stockTotal = computed(() => florSeca.value.reduce((a, s) => a + Number(s.cantidad || 0), 0))
+const itemsBajos = computed(() => florSeca.value.filter(s => Number(s.cantidad) < umbralStockBajo.value).length)
 
 
 // ── Tienda social (stocks asignados a esta sede) ─────────────────
@@ -235,7 +237,7 @@ onMounted(async () => {
 
       <div v-if="tieneInv" class="sdv__kpis">
         <div class="sdv__kpi"><div class="sdv__kpi-val">{{ tiendaStocks.length }}</div><div class="sdv__kpi-lbl">Productos en stock</div></div>
-        <div class="sdv__kpi"><div class="sdv__kpi-val" style="color:#0369a1">{{ stockTotal.toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}g</div><div class="sdv__kpi-lbl">Gramos totales</div></div>
+        <div class="sdv__kpi"><div class="sdv__kpi-val" style="color:#0369a1">{{ stockTotal.toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}g</div><div class="sdv__kpi-lbl">Gramos de flor seca</div></div>
         <div class="sdv__kpi"><div class="sdv__kpi-val" :style="{ color: itemsBajos > 0 ? '#dc2626' : '#15803d' }">{{ itemsBajos }}</div><div class="sdv__kpi-lbl">Stock bajo (&lt;{{ umbralStockBajo }}g)</div></div>
       </div>
 

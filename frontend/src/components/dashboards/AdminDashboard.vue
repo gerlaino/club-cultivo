@@ -83,10 +83,13 @@ const plantasEnCiclo = computed(() => (stats.value?.vegetativo || 0) + (stats.va
 const balanceMes     = computed(() => contable.value?.mes_actual?.balance || 0)
 const balancePositivo = computed(() => balanceMes.value >= 0)
 
+// Stock en gramos = solo flor seca. Los derivados (preroll, hash…) son inventario con
+// su propia unidad y no se suman como gramos.
 const stockTotalG = computed(() => {
   const ss = analyticsDisp.value?.stocks
   if (!ss?.length) return null
-  return ss.reduce((acc, s) => acc + (s.cantidad_g || 0), 0)
+  const flor = ss.find(s => s.forma === 'flor_seca')
+  return flor ? (flor.cantidad_g || 0) : 0
 })
 
 const stockAlerta = computed(() => {
@@ -485,7 +488,7 @@ async function onOnboardingCompletado() {
             </div>
 
             <div class="ad__kpi">
-              <span class="ad__kpi-label">Stock disponible</span>
+              <span class="ad__kpi-label">Flor seca disponible</span>
               <div class="ad__kpi-num" :class="{ 'ad__kpi-num--alerta': stockAlerta === 'critico' }">
                 {{ stockTotalG != null ? stockTotalG.toFixed(0) + ' g' : '0 g' }}
               </div>
