@@ -396,6 +396,7 @@ function _fechaCorta(d) {
 async function generarHTMLEtiquetas() {
   const origen   = window.location.origin
   const clubName = clubStore.data?.name || ''
+  const clubLogo = clubStore.data?.logo_url || ''
   const loteCode = props.lote?.codigo || 'lote'
   const genetica = props.lote?.genetica?.nombre || props.lote?.strain || '—'
   const inicio   = _fechaCorta(props.lote?.start_date)
@@ -432,7 +433,8 @@ async function generarHTMLEtiquetas() {
   .label-code { font-size: 10pt; font-weight: 700; font-family: monospace; color: #0f172a; line-height: 1.1; }
   .label-gen  { font-size: 8.5pt; font-weight: 600; color: #15803d; line-height: 1.15; }
   .label-meta { font-size: 7.5pt; color: #475569; line-height: 1.2; }
-  .label-club { font-size: 6.5pt; color: #94a3b8; line-height: 1.2; }
+  .label-club { display: flex; align-items: center; gap: 1mm; font-size: 6.5pt; color: #15803d; font-weight: 600; line-height: 1.2; }
+  .label-club img { height: 3.5mm; width: auto; object-fit: contain; }
 </style>
 </head>
 <body>
@@ -444,7 +446,7 @@ ${labels.map(l => `
       <div class="label-code">${_esc(l.nombre)}</div>
       <div class="label-gen">🌿 ${_esc(genetica)}</div>
       <div class="label-meta">Lote ${_esc(loteCode)}${inicio ? ` · inicio ${inicio}` : ''}</div>
-      <div class="label-club">${_esc(clubName)}</div>
+      <div class="label-club">${clubLogo ? `<img src="${_esc(clubLogo)}" alt="" />` : ''}${_esc(clubName)}</div>
     </div>
   </div>`).join('')}
 </div>

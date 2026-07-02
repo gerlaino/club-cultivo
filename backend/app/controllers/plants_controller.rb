@@ -303,6 +303,7 @@ class PlantsController < ApplicationController
         id:              plant.lote.id,
         codigo:          plant.lote.codigo,
         estado:          plant.lote.estado,
+        start_date:      plant.lote.start_date,
         genetica_id:     plant.lote.genetica_id,
         manicurador_id:  plant.lote.manicurador_id,
         plants_count:    plant.lote.plants_count,

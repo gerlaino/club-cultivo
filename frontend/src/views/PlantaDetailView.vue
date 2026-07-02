@@ -67,6 +67,49 @@ async function generarQR() {
 async function descargarQRpng() { await downloadPNG(qrPlantaUrl(), qrFilename('png')) }
 async function descargarQRsvg() { await downloadSVG(qrPlantaUrl(), qrFilename('svg')) }
 
+// Banderita: tira 70×25mm (una faz) para envolver el tronco — QR + info de la planta.
+function _escEt(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
+function _fechaEt(d) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : null }
+async function imprimirEtiqueta() {
+  const p = planta.value
+  if (!p?.codigo_qr) return
+  if (!club.data) { try { await club.fetch() } catch { /* club opcional en la etiqueta */ } }
+  const dataUrl = await generatePNG(qrPlantaUrl(), { width: 200, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' } })
+  const nombre = p.nombre || p.codigo_qr
+  const gen    = p.genetica?.nombre || '—'
+  const lote   = p.lote?.codigo || '—'
+  const inicio = _fechaEt(p.lote?.start_date)
+  const logo   = club.logoUrl
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Etiqueta ${_escEt(nombre)}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  @page{size:70mm 25mm;margin:0}
+  body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center}
+  .b{width:70mm;height:25mm;display:flex;align-items:center;gap:2mm;padding:2mm}
+  .b-qr{width:21mm;height:21mm;flex-shrink:0;display:block}
+  .b-info{display:flex;flex-direction:column;gap:.4mm;min-width:0;overflow:hidden}
+  .b-club{display:flex;align-items:center;gap:1mm;font-size:6pt;font-weight:700;color:#15803d}
+  .b-club img{height:4mm;width:auto;object-fit:contain}
+  .b-code{font-family:monospace;font-size:8.5pt;font-weight:800;color:#0f172a;line-height:1.1}
+  .b-gen{font-size:7.5pt;font-weight:600;color:#15803d;line-height:1.15}
+  .b-meta{font-size:6.5pt;color:#475569;line-height:1.2}
+</style></head><body>
+  <div class="b">
+    <img class="b-qr" src="${dataUrl}" alt="${_escEt(nombre)}" />
+    <div class="b-info">
+      <div class="b-club">${logo ? `<img src="${_escEt(logo)}" alt="" />` : ''}${_escEt(club.name)}</div>
+      <div class="b-code">${_escEt(nombre)}</div>
+      <div class="b-gen">🌿 ${_escEt(gen)}</div>
+      <div class="b-meta">Lote ${_escEt(lote)}${inicio ? ` · inicio ${inicio}` : ''}</div>
+    </div>
+  </div>
+</body></html>`
+  const win = window.open('', '_blank', 'width=700,height=400')
+  if (!win) { toast.error('Permitir ventanas emergentes para imprimir'); return }
+  win.document.write(html); win.document.close()
+  setTimeout(() => win.print(), 700)
+}
+
 // Modal registro
 const showModal   = ref(false)
 const guardando   = ref(false)
@@ -826,6 +869,10 @@ onMounted(async () => {
                   <button class="pd__qr-dd-item" @click="descargarQRpng(); qrDropdownOpen = false">
                     <i class="bi bi-file-earmark-image"></i> PNG (digital)
                   </button>
+                  <div class="pd__qr-dd-sep"></div>
+                  <button class="pd__qr-dd-item" @click="imprimirEtiqueta(); qrDropdownOpen = false">
+                    <i class="bi bi-printer"></i> Imprimir banderita
+                  </button>
                 </div>
               </div>
             </div>
@@ -1412,6 +1459,7 @@ onMounted(async () => {
 .pd__qr-dd-menu { position: absolute; top: calc(100% + .35rem); left: 0; right: 0; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.1); z-index: 100; padding: .3rem; display: flex; flex-direction: column; }
 .pd__qr-dd-item { display: flex; align-items: center; gap: .5rem; background: none; border: none; padding: .55rem .75rem; border-radius: 7px; font-size: .8rem; color: #334155; cursor: pointer; text-align: left; transition: background .12s; }
 .pd__qr-dd-item:hover { background: #f1f5f9; }
+.pd__qr-dd-sep { height: 1px; background: #e2e8f0; margin: .25rem .3rem; }
 
 /* Hero actions */
 .pd__hero-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
