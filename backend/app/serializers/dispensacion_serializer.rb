@@ -64,7 +64,8 @@ class DispensacionSerializer
       motivo_fallo:       d.motivo_fallo,
       historial_envio:    d.historial_envio || [],
       fecha_dispensacion: d.fecha_dispensacion,
-      cantidad:           d.cantidad.to_f,
+      # Privacidad del delivery: NO se expone qué ni cuánto lleva (cantidad/stock/items).
+      # Solo lo necesario para entregar y cobrar contra-entrega (monto, saldo, contacto).
       aporte_socio_ars:   d.aporte_socio_ars&.to_f,
       cobrar_en_entrega:  d.cobrar_en_entrega,
       saldo_pendiente:    d.saldo_pendiente.to_f,
@@ -82,8 +83,6 @@ class DispensacionSerializer
         telefono: d.paciente.telefono,
       },
       sede:  d.sede ? { id: d.sede.id, nombre: d.sede.nombre } : nil,
-      stock: d.stock ? { forma_producto: d.stock.forma_producto, unidad: d.stock.unidad } : nil,
-      items: serialize_items(d),
     }
   end
 

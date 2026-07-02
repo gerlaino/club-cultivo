@@ -743,11 +743,11 @@ onMounted(load)
 
 /* Modal */
 .dlv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
-.dlv__modal { background: var(--c-paper); border-radius: 16px; width: 100%; max-width: 440px; box-shadow: 0 20px 60px rgba(0,0,0,.2); display: flex; flex-direction: column; }
+.dlv__modal { background: var(--c-paper); border-radius: 16px; width: 100%; max-width: 440px; max-height: calc(100dvh - 2rem); box-shadow: 0 20px 60px rgba(0,0,0,.2); display: flex; flex-direction: column; }
 .dlv__modal-header { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--c-ink-100); }
 .dlv__modal-title { flex: 1; font-size: var(--fs-15); font-weight: 700; color: var(--c-ink-900); }
 .dlv__modal-close { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--c-ink-400); padding: 0; }
-.dlv__modal-body { padding: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); }
+.dlv__modal-body { padding: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .dlv__modal-pkg { font-size: var(--fs-13); font-weight: 700; color: var(--c-ink-800); background: var(--c-ink-50, #f1f5f9); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); }
 .dlv__modal-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--c-ink-600); }
 .dlv__modal-input { background: var(--c-ink-50, #f8fafc); border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: .6rem .8rem; font-size: var(--fs-14); color: var(--c-ink-900); width: 100%; box-sizing: border-box; resize: vertical; }
