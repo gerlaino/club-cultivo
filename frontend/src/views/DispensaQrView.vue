@@ -42,6 +42,8 @@
       <!-- Pasaporte -->
       <div v-else-if="estado === 'ok'" class="dqr__pass">
 
+        <div class="dqr__seal"><i class="bi bi-patch-check-fill"></i> Producto verificado</div>
+
         <!-- Multi-stock: una tarjeta por producto del paquete -->
         <template v-if="data.multi && data.items?.length">
           <div class="dqr__multi-head">Tu paquete · {{ data.items.length }} productos</div>
@@ -52,11 +54,11 @@
               <p class="dqr__prod-forma">{{ formaLabel(it.forma) }} · {{ it.cantidad }}{{ it.unidad }}</p>
             </div>
             <div v-if="it.genetica?.thc_pct != null || it.genetica?.cbd_pct != null" class="dqr__cannab dqr__cannab--sm">
-              <div class="dqr__cannab-item">
+              <div class="dqr__cannab-item dqr__cannab-item--thc">
                 <span class="dqr__cannab-val">{{ fmtPct(it.genetica?.thc_pct) }}</span>
                 <span class="dqr__cannab-lbl">THC</span>
               </div>
-              <div class="dqr__cannab-item">
+              <div class="dqr__cannab-item dqr__cannab-item--cbd">
                 <span class="dqr__cannab-val">{{ fmtPct(it.genetica?.cbd_pct) }}</span>
                 <span class="dqr__cannab-lbl">CBD</span>
               </div>
@@ -87,11 +89,11 @@
 
           <!-- Cannabinoides -->
           <div v-if="data.genetica?.thc_pct != null || data.genetica?.cbd_pct != null" class="dqr__cannab">
-            <div class="dqr__cannab-item">
+            <div class="dqr__cannab-item dqr__cannab-item--thc">
               <span class="dqr__cannab-val">{{ fmtPct(data.genetica?.thc_pct) }}</span>
               <span class="dqr__cannab-lbl">THC</span>
             </div>
-            <div class="dqr__cannab-item">
+            <div class="dqr__cannab-item dqr__cannab-item--cbd">
               <span class="dqr__cannab-val">{{ fmtPct(data.genetica?.cbd_pct) }}</span>
               <span class="dqr__cannab-lbl">CBD</span>
             </div>
@@ -118,7 +120,7 @@
           </dl>
         </template>
 
-        <p class="dqr__foot">{{ club?.nombre }} · Trazabilidad verificada</p>
+        <p class="dqr__foot"><i class="bi bi-shield-check"></i> {{ club?.nombre }} · Trazabilidad verificada</p>
       </div>
 
     </div>
@@ -235,10 +237,13 @@ onMounted(async () => {
 
 /* Pasaporte */
 .dqr__pass { padding: 1.4rem 1.3rem 1.2rem; }
-.dqr__hero { text-align: center; margin-bottom: 1.2rem; }
-.dqr__hero-tipo { display: inline-block; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-leaf-700, #2d4a3e); background: var(--c-leaf-100, #e8f0eb); padding: .2em .7em; border-radius: 999px; }
-.dqr__hero-nombre { font-family: var(--font-display, sans-serif); font-size: 1.5rem; font-weight: 700; color: var(--c-ink-900, #1a1d1f); margin: .4rem 0 .15rem; }
-.dqr__hero-forma { font-size: .85rem; color: var(--c-ink-500, #6b7280); margin: 0; }
+.dqr__seal { display: flex; align-items: center; gap: .35rem; width: fit-content; margin: 0 auto 1.1rem; font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--c-leaf-700, #2d4a3e); background: var(--c-leaf-100, #e8f0eb); padding: .32rem .75rem; border-radius: 999px; }
+.dqr__seal i { color: #16a34a; font-size: .8rem; }
+
+.dqr__hero { text-align: center; margin-bottom: 1.3rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--c-leaf-100, #e8f0eb); }
+.dqr__hero-tipo { display: inline-block; font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #fff; background: var(--c-leaf-600, #3f6452); padding: .25em .8em; border-radius: 999px; }
+.dqr__hero-nombre { font-family: var(--font-display, sans-serif); font-size: 1.9rem; font-weight: 800; letter-spacing: -.01em; color: var(--c-ink-900, #1a1d1f); margin: .5rem 0 .2rem; line-height: 1.05; }
+.dqr__hero-forma { font-size: .9rem; font-weight: 600; color: var(--c-leaf-700, #2d4a3e); margin: 0; }
 
 /* Multi-stock */
 .dqr__multi-head { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-ink-500, #6b7280); margin-bottom: .8rem; }
@@ -254,6 +259,10 @@ onMounted(async () => {
 .dqr__cannab-item { flex: 1; background: #fff; border: 1px solid var(--c-leaf-100, #e8f0eb); border-radius: 14px; padding: .8rem; text-align: center; }
 .dqr__cannab-val { display: block; font-family: var(--font-display, sans-serif); font-size: 1.5rem; font-weight: 700; color: var(--c-leaf-700, #2d4a3e); line-height: 1; }
 .dqr__cannab-lbl { display: block; font-size: .66rem; font-weight: 700; color: var(--c-ink-500, #6b7280); letter-spacing: .08em; margin-top: .3rem; }
+.dqr__cannab-item--thc { border-top: 3px solid #e11d48; }
+.dqr__cannab-item--thc .dqr__cannab-val { color: #e11d48; }
+.dqr__cannab-item--cbd { border-top: 3px solid #16a34a; }
+.dqr__cannab-item--cbd .dqr__cannab-val { color: #16a34a; }
 
 .dqr__terp { background: #fff; border: 1px solid var(--c-leaf-100, #e8f0eb); border-radius: 12px; padding: .65rem .85rem; margin-bottom: .9rem; }
 .dqr__terp-lbl { display: block; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-ink-500, #6b7280); }

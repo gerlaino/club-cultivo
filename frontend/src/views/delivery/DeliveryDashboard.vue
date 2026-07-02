@@ -420,8 +420,7 @@ onMounted(load)
                 <FileText :size="12" :stroke-width="2" /> {{ p.notas_envio }}
               </div>
               <div class="dlv__row-meta">
-                {{ p.cantidad }}{{ p.stock?.unidad || 'g' }} {{ p.stock?.forma_producto || '' }}
-                · {{ fmtFecha(p.fecha_dispensacion) }}
+                {{ fmtFecha(p.fecha_dispensacion) }}
               </div>
               <div class="dlv__stop-actions" @click.stop>
                 <a v-if="p.contacto_telefono" :href="`tel:${p.contacto_telefono}`" class="dlv__stop-btn">
