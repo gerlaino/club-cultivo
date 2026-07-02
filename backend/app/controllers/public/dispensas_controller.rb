@@ -35,6 +35,9 @@ module Public
       pac    = disp.paciente
       club   = pac&.club
       stock  = disp.stock
+      # Consejos del club = info ACTUAL de la genética (guardado/recomendaciones), no
+      # un valor congelado en el snapshot → se lee de la genética viva.
+      gen_live = stock&.genetica || stock&.lote&.genetica
 
       {
         codigo:    disp.token,
@@ -51,6 +54,7 @@ module Public
           thc_pct:  gen['thc_pct'],
           cbd_pct:  gen['cbd_pct'],
           terpenos: gen['terpenos'],
+          consejos_club:         gen_live&.consejos_club,
           registrada_inase:      gen['registrada_inase'],
           numero_registro_inase: gen['numero_registro_inase'],
         },

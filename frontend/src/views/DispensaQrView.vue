@@ -67,6 +67,10 @@
             </div>
             <div v-if="it.lote" class="dqr__prod-lote"><span>Lote</span> <span class="dqr__mono">{{ it.lote }}</span></div>
           </div>
+          <div v-if="data.genetica?.consejos_club" class="dqr__consejos">
+            <span class="dqr__consejos-lbl">💡 Consejos del club</span>
+            <p class="dqr__consejos-txt">{{ data.genetica.consejos_club }}</p>
+          </div>
           <dl class="dqr__rows">
             <div class="dqr__row"><dt>Fecha de dispensa</dt><dd>{{ fmtFecha(data.fecha) }}</dd></div>
             <div class="dqr__row" v-if="data.socio_numero"><dt>Socio</dt><dd>#{{ data.socio_numero }}</dd></div>
@@ -96,6 +100,12 @@
           <div v-if="data.genetica?.terpenos" class="dqr__terp">
             <span class="dqr__terp-lbl">Terpenos</span>
             <span class="dqr__terp-val">{{ data.genetica.terpenos }}</span>
+          </div>
+
+          <!-- Consejos del club -->
+          <div v-if="data.genetica?.consejos_club" class="dqr__consejos">
+            <span class="dqr__consejos-lbl">💡 Consejos del club</span>
+            <p class="dqr__consejos-txt">{{ data.genetica.consejos_club }}</p>
           </div>
 
           <!-- Datos -->
@@ -248,6 +258,10 @@ onMounted(async () => {
 .dqr__terp { background: #fff; border: 1px solid var(--c-leaf-100, #e8f0eb); border-radius: 12px; padding: .65rem .85rem; margin-bottom: .9rem; }
 .dqr__terp-lbl { display: block; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-ink-500, #6b7280); }
 .dqr__terp-val { font-size: .85rem; color: var(--c-ink-900, #1a1d1f); }
+
+.dqr__consejos { background: #fff; border: 1px solid var(--c-leaf-100, #e8f0eb); border-left: 3px solid var(--c-leaf-500, #5a8a72); border-radius: 12px; padding: .75rem .9rem; margin-bottom: .9rem; }
+.dqr__consejos-lbl { display: block; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--c-leaf-700, #2d4a3e); margin-bottom: .3rem; }
+.dqr__consejos-txt { font-size: .85rem; line-height: 1.45; color: var(--c-ink-700, #374151); margin: 0; white-space: pre-line; }
 
 .dqr__rows { margin: 0; display: flex; flex-direction: column; gap: 0; }
 .dqr__row { display: flex; align-items: center; justify-content: space-between; padding: .6rem 0; border-bottom: 1px solid var(--c-leaf-100, #e8f0eb); }
