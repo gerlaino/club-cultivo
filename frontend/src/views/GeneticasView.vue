@@ -42,7 +42,6 @@ const TIPO_META = {
   indica:    { label: 'Índica',    color: '#6f42c1', bg: 'rgba(111,66,193,.12)' },
   sativa:    { label: 'Sativa',    color: '#198754', bg: 'rgba(25,135,84,.12)'  },
   hibrida:   { label: 'Híbrida',   color: '#fd7e14', bg: 'rgba(253,126,20,.12)' },
-  ruderalis: { label: 'Ruderalis', color: '#0dcaf0', bg: 'rgba(13,202,240,.12)' },
 }
 function tipoMeta(tipo) { return TIPO_META[tipo] || { label: tipo || '—', color: '#6c757d', bg: 'rgba(108,117,125,.1)' } }
 
@@ -275,7 +274,7 @@ onMounted(async () => {
     <div class="gv__header">
       <div>
         <h1 class="gv__title">Genéticas</h1>
-        <p class="gv__sub">Catálogo de cepas del club</p>
+        <p class="gv__sub">Catálogo de genéticas del club</p>
       </div>
       <button v-if="canEdit" class="gv__btn-new" @click="openCreate">
         <i class="bi bi-plus-lg"></i> Nueva genética
@@ -284,7 +283,7 @@ onMounted(async () => {
 
     <!-- Stats row -->
     <div class="gv__stats">
-      <span>🌿 <strong>{{ kpis.total }}</strong> cepas</span>
+      <span>🌿 <strong>{{ kpis.total }}</strong> genéticas</span>
       <span>🏛️ <strong>{{ kpis.inase }}</strong> INASE</span>
       <span>💜 <strong>{{ kpis.indica }}</strong> Índica</span>
       <span>💚 <strong>{{ kpis.sativa }}</strong> Sativa</span>
@@ -354,7 +353,7 @@ onMounted(async () => {
       v-else-if="!filtered.length"
       icon="🌿"
       :title="hasFilters ? 'Sin resultados' : 'No hay genéticas todavía'"
-      :message="hasFilters ? 'Probá ajustando los filtros' : 'Agregá la primera cepa al catálogo'"
+      :message="hasFilters ? 'Probá ajustando los filtros' : 'Agregá la primera genética al catálogo'"
     >
       <template #actions>
         <button v-if="hasFilters" class="gv__btn-ghost" @click="clearFilters">Limpiar filtros</button>
@@ -371,7 +370,9 @@ onMounted(async () => {
             <th title="Registrada INASE">INASE</th>
             <th>Tipo</th>
             <th>THC · CBD</th>
-            <th>Floración</th>
+            <th title="Días objetivo de vegetativo">Veg. obj.</th>
+            <th title="Días objetivo de floración">Flor. obj.</th>
+            <th title="Días objetivo de cosecha">Cos. obj.</th>
             <th>Origen</th>
             <th>🪴</th>
             <th v-if="canEdit">Disponible</th>
@@ -404,7 +405,15 @@ onMounted(async () => {
               </span>
             </td>
             <td>
+              <span v-if="gen.dias_vegetativo_objetivo" class="gen-floracion">{{ gen.dias_vegetativo_objetivo }}d</span>
+              <span v-else class="gen-empty">—</span>
+            </td>
+            <td>
               <span v-if="gen.tiempo_floracion" class="gen-floracion">{{ gen.tiempo_floracion }}d</span>
+              <span v-else class="gen-empty">—</span>
+            </td>
+            <td>
+              <span v-if="gen.dias_cosecha_objetivo" class="gen-floracion">{{ gen.dias_cosecha_objetivo }}d</span>
               <span v-else class="gen-empty">—</span>
             </td>
             <td>
