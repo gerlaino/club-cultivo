@@ -172,7 +172,7 @@ const CONTENT = {
     {
       title: 'Salas y lotes',
       items: [
-        { label: 'Crear lote', text: 'En Mis lotes → Nuevo lote. Asigná cepa, sala y cantidad de plantas. El lote empieza en estado Vegetativo.' },
+        { label: 'Crear lote', text: 'En Mis lotes → Nuevo lote. Asigná genética, sala y cantidad de plantas. El lote empieza en estado Vegetativo.' },
         { label: 'Cambiar fase', text: 'En el detalle del lote avanzá la fase: Vegetativo → Floración → Cosecha.' },
         { label: 'Registrar costos', text: 'En cada lote podés registrar costos: insumos, mano de obra, energía para calcular el costo por gramo.' },
       ]

@@ -319,7 +319,7 @@
                   </select>
                 </div>
                 <div class="stk__field">
-                  <label class="stk__label">Variedad / Cepa <span class="stk__opt">opcional</span></label>
+                  <label class="stk__label">Variedad / Genética <span class="stk__opt">opcional</span></label>
                   <select class="stk__input" v-model="crearForm.genetica_id">
                     <option :value="null">— Sin especificar —</option>
                     <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>

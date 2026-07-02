@@ -98,7 +98,7 @@ const plPorCepa = computed(() => {
   for (const l of todosLotes.value) {
     if (!l.tiene_costo || !l.costo_por_gramo) continue
     const key   = l.genetica_id || 'sin_cepa'
-    const label = l.genetica?.nombre || l.strain || 'Sin cepa'
+    const label = l.genetica?.nombre || l.strain || 'Sin genética'
     if (!map[key]) map[key] = { genetica_id: key, nombre: label, lotes: [] }
     map[key].lotes.push(l)
   }
@@ -804,7 +804,7 @@ onMounted(async () => {
             Por lote
           </button>
           <button class="cv__pl-subtab" :class="{ 'cv__pl-subtab--active': plSubTab === 'cepas' }" @click="plSubTab = 'cepas'">
-            Por cepa
+            Por genética
           </button>
           <button class="cv__btn-ghost cv__pl-pdf" :disabled="generandoPDF" @click="exportarPDF">
             <DsSpinner v-if="generandoPDF" :size="11" />
@@ -832,7 +832,7 @@ onMounted(async () => {
         <div v-else class="cv__pl-table">
           <div class="cv__pl-thead">
             <span>Lote</span>
-            <span>Cepa</span>
+            <span>Genética</span>
             <span>Estado</span>
             <span class="cv__pl-num">Costo total</span>
             <span class="cv__pl-num">Gramos</span>
@@ -869,20 +869,20 @@ onMounted(async () => {
         <div v-if="plSubTab === 'cepas'">
           <div class="cv__pl-header">
             <div>
-              <h2 class="cv__pl-title">Eficiencia por cepa</h2>
+              <h2 class="cv__pl-title">Eficiencia por genética</h2>
               <p class="cv__pl-sub">Promedio de costo/g agrupado por genética · menor es mejor</p>
             </div>
-            <span class="cv__pl-count">{{ plPorCepa.length }} cepa{{ plPorCepa.length !== 1 ? 's' : '' }}</span>
+            <span class="cv__pl-count">{{ plPorCepa.length }} genética{{ plPorCepa.length !== 1 ? 's' : '' }}</span>
           </div>
 
           <div v-if="!plPorCepa.length" class="cv__pl-empty">
             <i class="bi bi-bar-chart" style="font-size:2rem;color:#cbd5e1"></i>
-            <p>No hay datos de costo por cepa aún.</p>
+            <p>No hay datos de costo por genética aún.</p>
           </div>
 
           <div v-else class="cv__pl-table">
             <div class="cv__pl-thead" style="grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr">
-              <span>Cepa</span>
+              <span>Genética</span>
               <span class="cv__pl-num">Lotes</span>
               <span class="cv__pl-num">$/g promedio</span>
               <span class="cv__pl-num">$/g mínimo</span>

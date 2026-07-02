@@ -129,7 +129,7 @@ const ESTADO_COLOR = {
 }
 function estadoStyle(e) { return ESTADO_COLOR[e] || ESTADO_COLOR.finalizado }
 function fmt(v, u = 'g') { return v != null ? `${v} ${u}` : '—' }
-function fmtDias(v) { return v != null ? `${v} d` : '—' }
+function fmtDias(v) { return v != null ? `${Math.round(Number(v))} d` : '—' }
 function fmtPct(v) { return v != null ? `${v}%` : '—' }
 
 // ── Genéticas — datos derivados ──────────────────────────────────
@@ -148,7 +148,7 @@ const FASES_CICLO = ['vegetativo', 'floracion', 'cosecha', 'curado']
 function totalCiclo(c) {
   // Number(): los días por fase pueden venir como string (decimal de Rails) y el +
   // concatenaría en vez de sumar, rompiendo el .toFixed.
-  return FASES_CICLO.reduce((s, f) => s + Number(c[f] ?? 0), 0).toFixed(1)
+  return Math.round(FASES_CICLO.reduce((s, f) => s + Number(c[f] ?? 0), 0))
 }
 
 // ── Pérdidas ─────────────────────────────────────────────────────
@@ -282,7 +282,7 @@ function bucketColor(desv) {
     <div class="an__header">
       <div>
         <h1 class="an__title">Analítica de producción</h1>
-        <p class="an__sub">Rendimiento, ciclos y pérdidas por cepa</p>
+        <p class="an__sub">Rendimiento, ciclos y pérdidas por genética</p>
       </div>
       <div class="an__header-right">
         <div class="an__year-filter">
@@ -481,7 +481,7 @@ function bucketColor(desv) {
     <template v-if="tab === 'ciclos' && dataProd">
       <div class="an__info-box">
         <i class="bi bi-info-circle"></i>
-        Días promedio que cada cepa pasa en cada fase del ciclo, calculados a partir de los eventos de transición registrados.
+        Días promedio que cada genética pasa en cada fase del ciclo, calculados a partir de los eventos de transición registrados.
         Los lotes sin eventos de fase son excluidos.
       </div>
 
@@ -492,7 +492,7 @@ function bucketColor(desv) {
       </div>
 
       <div v-else class="an__card">
-        <div class="an__card-header"><span class="an__card-title">Días promedio por fase por cepa</span></div>
+        <div class="an__card-header"><span class="an__card-title">Días promedio por fase por genética</span></div>
         <div class="an__table-wrap">
           <table class="an__table">
             <thead>
@@ -606,13 +606,13 @@ function bucketColor(desv) {
     <template v-if="tab === 'comparativa' && dataProd">
       <div class="an__info-box">
         <i class="bi bi-info-circle"></i>
-        Lotes finalizados de la misma cepa comparados entre sí. Solo aparecen cepas con 2 o más lotes finalizados.
+        Lotes finalizados de la misma genética comparados entre sí. Solo aparecen genéticas con 2 o más lotes finalizados.
       </div>
 
       <div v-if="!comparativa.length" class="an__empty-lg">
         <i class="bi bi-bar-chart-steps"></i>
         <p>Sin datos comparativos aún.</p>
-        <span>Se necesitan al menos 2 lotes finalizados de la misma cepa.</span>
+        <span>Se necesitan al menos 2 lotes finalizados de la misma genética.</span>
       </div>
 
       <div v-for="c in comparativa" :key="c.genetica_id" class="an__card" style="margin-bottom:1.25rem">

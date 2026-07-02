@@ -24,7 +24,7 @@
         <thead>
           <tr>
             <th>Producto</th>
-            <th>Cepa</th>
+            <th>Genética</th>
             <th>Lote</th>
             <th>Sede</th>
             <th class="sdv__th-ing">Ingresó</th>
