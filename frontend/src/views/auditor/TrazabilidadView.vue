@@ -81,11 +81,12 @@
           <table class="trz__table">
             <thead>
               <tr>
-                <th>N.° lote producto</th>
+                <th>N.° lote</th>
+                <th>Genética</th>
                 <th>Forma</th>
-                <th>Cantidad</th>
+                <th class="trz__th-r">Cantidad</th>
+                <th>Lote origen</th>
                 <th>Elaborado</th>
-                <th>Código QR</th>
                 <th></th>
               </tr>
             </thead>
@@ -97,12 +98,13 @@
                 @click="seleccionarStock(s)"
               >
                 <td class="trz__td-code">{{ s.numero_lote_producto || `#${s.id}` }}</td>
+                <td class="trz__td-gen">{{ s.genetica_nombre || '—' }}</td>
                 <td>
                   <span class="trz__forma-badge">{{ FORMA_LABELS[s.forma_producto] || s.forma_producto }}</span>
                 </td>
-                <td class="trz__td-g">{{ s.cantidad_g ?? '—' }} g</td>
+                <td class="trz__td-g">{{ s.cantidad ?? '—' }} {{ s.unidad || 'g' }}</td>
+                <td class="trz__td-lote">{{ s.lote_codigo || s.lote?.codigo || '—' }}</td>
                 <td class="trz__td-fecha">{{ formatDate(s.fecha_elaboracion) }}</td>
-                <td class="trz__td-qr">{{ s.codigo_qr || '—' }}</td>
                 <td class="trz__td-action">
                   <span class="trz__td-ver">Ver cadena <i class="bi bi-arrow-right"></i></span>
                 </td>
@@ -577,36 +579,37 @@ const formatDate = d => d
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: .75rem; flex-wrap: wrap; gap: .5rem;
 }
-.trz__stocks-count { font-size: .82rem; font-weight: 600; color: #64748b; }
-.trz__stocks-hint { font-size: .78rem; color: #94a3b8; display: flex; align-items: center; gap: .3rem; }
+.trz__stocks-count { font-size: var(--fs-14); font-weight: 700; color: var(--c-ink-800); }
+.trz__stocks-hint { font-size: var(--fs-13); color: var(--c-ink-400); display: flex; align-items: center; gap: .3rem; }
 
 .trz__table-wrap {
-  border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; overflow-x: auto;
+  border: 1px solid var(--c-ink-100); border-radius: 14px; overflow: hidden; overflow-x: auto; background: #fff;
 }
-.trz__table { width: 100%; border-collapse: collapse; font-size: .875rem; background: #fff; }
+.trz__table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); background: #fff; }
 .trz__table thead th {
-  text-align: left; font-size: .65rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .05em; color: #94a3b8;
-  background: #f8fafc; padding: .6rem .875rem;
-  border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+  text-align: left; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: var(--c-ink-500);
+  background: var(--c-ink-50); padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--c-ink-100); white-space: nowrap;
 }
-.trz__tr { cursor: pointer; transition: background .1s; }
-.trz__tr:not(:last-child) td { border-bottom: 1px solid #f1f5f9; }
-.trz__tr:hover { background: #f0fdf4; }
-.trz__tr td { padding: .65rem .875rem; color: #0f172a; }
-.trz__td-code { font-family: monospace; font-weight: 700; color: #0f172a; }
-.trz__td-g { color: #d97706; font-weight: 600; }
-.trz__td-fecha { color: #94a3b8; font-size: .78rem; white-space: nowrap; }
-.trz__td-qr { font-family: monospace; font-size: .75rem; color: #94a3b8; }
+.trz__th-r { text-align: right; }
+.trz__tr { cursor: pointer; transition: background .12s; }
+.trz__tr:not(:last-child) td { border-bottom: 1px solid var(--c-ink-100); }
+.trz__tr:hover { background: var(--c-leaf-50, #f0fdf4); }
+.trz__tr td { padding: var(--sp-3) var(--sp-4); color: var(--c-ink-900); vertical-align: middle; }
+.trz__td-code { font-weight: 700; color: var(--c-ink-900); }
+.trz__td-gen { font-weight: 600; color: var(--c-ink-800); }
+.trz__td-lote { font-family: var(--font-mono, monospace); font-size: var(--fs-13); color: var(--c-ink-500); }
+.trz__td-fecha { color: var(--c-ink-400); font-size: var(--fs-13); white-space: nowrap; }
 .trz__td-action { text-align: right; }
 .trz__td-ver {
-  font-size: .75rem; font-weight: 600; color: #1b5e20;
-  display: inline-flex; align-items: center; gap: .3rem; opacity: 0; transition: opacity .15s;
+  font-size: var(--fs-13); font-weight: 600; color: var(--c-leaf-700, #15803d);
+  display: inline-flex; align-items: center; gap: .3rem; opacity: 0; transition: opacity .15s; white-space: nowrap;
 }
 .trz__tr:hover .trz__td-ver { opacity: 1; }
 .trz__forma-badge {
-  display: inline-block; background: #f1f5f9; color: #475569;
-  font-size: .72rem; font-weight: 600; padding: .15em .6em; border-radius: 999px;
+  display: inline-block; background: var(--c-leaf-100, #dcfce7); color: var(--c-leaf-700, #15803d);
+  font-size: var(--fs-13); font-weight: 600; padding: .15em .65em; border-radius: 999px; white-space: nowrap;
 }
 
 /* Report */
