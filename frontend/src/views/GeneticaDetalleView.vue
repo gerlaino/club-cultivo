@@ -527,8 +527,8 @@ onMounted(async () => {
 .gdv__nombre { font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0 0 .25rem; }
 .gdv__sub    { font-size: .82rem; color: #64748b; display: flex; gap: .4rem; flex-wrap: wrap; }
 .gdv__sub i  { font-size: .75rem; }
-.gdv__btn-editar { display: inline-flex; align-items: center; gap: .4rem; background: #1a3d2e; color: #fff; border: none; border-radius: 9px; padding: .5rem .95rem; font-size: .85rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; align-self: flex-start; }
-.gdv__btn-editar:hover { background: #0f2a1e; }
+.gdv__btn-editar { display: inline-flex; align-items: center; gap: .4rem; background: #15803d; color: #fff; border: none; border-radius: 9px; padding: .5rem .95rem; font-size: .85rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; align-self: flex-start; }
+.gdv__btn-editar:hover { background: #166534; }
 
 .gdv__hero-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .gdv__btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .9rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; border: 1.5px solid; transition: all .15s; white-space: nowrap; }
@@ -569,7 +569,7 @@ onMounted(async () => {
 
 /* KPI row */
 .kpi-row { display: flex; flex-wrap: wrap; gap: .75rem; }
-.kpi-cell { background: #f8f9fa; border-radius: .75rem; padding: .5rem .875rem; min-width: 70px; }
+.kpi-cell { flex: 1 1 90px; background: #f8f9fa; border-radius: .75rem; padding: .5rem .875rem; min-width: 70px; }
 .kpi-cell__label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; margin-bottom: .1rem; }
 .kpi-cell__value { font-size: 1.15rem; font-weight: 800; color: #0f172a; line-height: 1; }
 
