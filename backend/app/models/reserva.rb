@@ -26,6 +26,7 @@ class Reserva < ApplicationRecord
   validate :stock_pertenece_al_club, on: :create
   validate :stock_disponible,        on: :create
   validate :paciente_activo,         on: :create
+  validate :fecha_entrega_futura,    on: :create
 
   scope :pendientes,    -> { where(estado: 'pendiente') }
   scope :del_paciente,  ->(paciente_id) { where(paciente_id: paciente_id) }
@@ -54,6 +55,15 @@ class Reserva < ApplicationRecord
   end
 
   private
+
+  # Una reserva aparta stock a futuro: la entrega estimada debe ser a partir de mañana.
+  # Hoy (o antes) es una dispensación directa, no una reserva.
+  def fecha_entrega_futura
+    return if fecha_entrega_estimada.blank?
+    if fecha_entrega_estimada <= Date.current
+      errors.add(:fecha_entrega_estimada, 'debe ser a partir de mañana (una reserva para hoy es una dispensación)')
+    end
+  end
 
   def stock_pertenece_al_club
     return unless stock && paciente

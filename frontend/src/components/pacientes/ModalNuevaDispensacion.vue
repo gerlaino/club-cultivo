@@ -56,6 +56,8 @@ const deliveryUsers   = ref([])
 const loadingDelivery = ref(false)
 
 const today = new Date().toISOString().split('T')[0]
+// Una reserva es apartar stock a FUTURO: la fecha mínima es mañana (hoy = dispensación directa).
+const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0] })()
 
 const FORMA_LABEL = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite',
@@ -678,7 +680,7 @@ async function handleSubmit() {
             <div class="mnd__field">
               <label class="mnd__label" v-if="form.es_reserva">Fecha de entrega estimada <span class="mnd__req">*</span></label>
               <label class="mnd__label" v-else>Fecha</label>
-              <AppDatePicker v-if="form.es_reserva" v-model="form.fecha_entrega_estimada" :min="today" />
+              <AppDatePicker v-if="form.es_reserva" v-model="form.fecha_entrega_estimada" :min="tomorrow" />
               <AppDatePicker v-else v-model="form.fecha_dispensacion" :max="today" />
             </div>
             <div class="mnd__field">

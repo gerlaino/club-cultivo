@@ -69,7 +69,7 @@ RSpec.describe 'Reservas', type: :request do
     def crear_reserva(attrs = {})
       Reserva.create!({
         club: club, paciente: paciente, user: dispensador, stock: stock,
-        cantidad: 20, fecha_entrega_estimada: Date.current,
+        cantidad: 20, fecha_entrega_estimada: 3.days.from_now.to_date,
         aporte_estimado_ars: 2000,
       }.merge(attrs))
     end
@@ -220,7 +220,7 @@ RSpec.describe 'Reservas', type: :request do
     before { sign_in_as(dispensador) }
     let(:delivery)  { create(:user, club: club, role: 'delivery') }
     let(:paciente2) { create(:paciente, club: club, created_by: admin, domicilio_calle: 'Corrientes', domicilio_altura: '1234', domicilio_ciudad: 'CABA') }
-    let(:reserva)   { Reserva.create!(club: club, paciente: paciente2, user: dispensador, stock: stock, cantidad: 10, fecha_entrega_estimada: Date.current, aporte_estimado_ars: 1000) }
+    let(:reserva)   { Reserva.create!(club: club, paciente: paciente2, user: dispensador, stock: stock, cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date, aporte_estimado_ars: 1000) }
 
     it 'asigna delivery y toma el domicilio del paciente al entregar (contra-entrega)' do
       patch "/reservas/#{reserva.id}/entregar",

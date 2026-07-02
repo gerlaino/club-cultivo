@@ -36,6 +36,14 @@ RSpec.describe Reserva, type: :model do
     it 'no permite seña negativa' do
       expect(nueva(sena_ars: -10)).not_to be_valid
     end
+
+    it 'no permite una reserva para hoy (debe ser a partir de mañana)' do
+      expect(nueva(fecha_entrega_estimada: Date.current).valid?(:create)).to be(false)
+    end
+
+    it 'permite una reserva para mañana' do
+      expect(nueva(fecha_entrega_estimada: Date.current + 1).valid?(:create)).to be(true)
+    end
   end
 
   describe 'bloqueo de stock' do
@@ -94,7 +102,7 @@ RSpec.describe Reserva, type: :model do
     it 'incluye sólo pendientes pasadas de fecha + días de gracia' do
       vieja  = nueva(fecha_entrega_estimada: (Date.current - Reserva::DIAS_VENCIMIENTO - 1))
       vieja.save!(validate: false)
-      reciente = nueva(fecha_entrega_estimada: Date.current)
+      reciente = nueva(fecha_entrega_estimada: 2.days.from_now.to_date)
       reciente.save!
       expect(Reserva.a_vencer).to include(vieja)
       expect(Reserva.a_vencer).not_to include(reciente)
