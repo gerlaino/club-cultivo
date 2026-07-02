@@ -88,6 +88,24 @@ class DispensacionSerializer
 
   # Líneas de la dispensación (multi-stock). Cada una con su stock, cantidad, precio y trazabilidad.
   def self.serialize_items(d)
+    # Legacy: dispensas previas al refactor multi-stock no tienen filas DispensacionItem.
+    # Se sintetiza un ítem único desde el stock+cantidad de la dispensa, así el front trata
+    # a todas por igual (siempre hay al menos un ítem).
+    if d.items.empty?
+      return [] unless d.stock
+      subtotal = d.precio_unitario_ars&.to_f ? (d.precio_unitario_ars.to_f * d.cantidad.to_f).round(2) : d.aporte_socio_ars.to_f
+      return [{
+        id:                  nil,
+        stock_id:            d.stock_id,
+        stock:               StockSerializer.serialize_dispensacion(d.stock),
+        cantidad:            d.cantidad.to_f,
+        precio_unitario_ars: d.precio_unitario_ars&.to_f,
+        subtotal_ars:        subtotal,
+        lote_codigo:         d.lote_codigo     || d.stock&.lote&.codigo,
+        genetica_nombre:     d.genetica_nombre || d.stock&.genetica&.nombre || d.stock&.lote&.genetica&.nombre,
+      }]
+    end
+
     d.items.map do |it|
       {
         id:                  it.id,

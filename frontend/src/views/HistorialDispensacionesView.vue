@@ -4,7 +4,7 @@ import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, deleteDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink } from 'vue-router'
-import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode, Truck } from 'lucide-vue-next'
+import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode, Truck, ChevronRight } from 'lucide-vue-next'
 import { useEtiquetaDispensa } from '../composables/useEtiquetaDispensa.js'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
 import ModalEditarDispensacion from '../components/pacientes/ModalEditarDispensacion.vue'
@@ -232,6 +232,18 @@ function descuentoTitle(d) {
   return parts.join(' · ')
 }
 // Tooltip con el detalle de las líneas de una dispensa multi-stock.
+// Ítems de la dispensa (el serializer garantiza ≥1: legacy sintetiza uno desde el stock).
+function itemsDe(d) { return d.items?.length ? d.items : [] }
+
+// Filas desplegables (solo multi-producto).
+const expandidos = ref(new Set())
+function expandido(id) { return expandidos.value.has(id) }
+function toggleExpand(id) {
+  const s = new Set(expandidos.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  expandidos.value = s
+}
+
 function itemsTitle(d) {
   return (d.items || [])
     .map(it => `${it.cantidad}${it.stock?.unidad || 'g'} ${formaLabel(it.stock?.forma_producto)}`)
@@ -440,9 +452,7 @@ const FORMAS = [
             <tr>
               <th>Fecha</th>
               <th>Paciente</th>
-              <th>Producto</th>
-              <th class="hd__th-num">Cant.</th>
-              <th class="hd__th-num">P. unit.</th>
+              <th>Productos</th>
               <th class="hd__th-num">Desc</th>
               <th class="hd__th-num">Total</th>
               <th>Pago</th>
@@ -452,55 +462,78 @@ const FORMAS = [
             </tr>
           </thead>
           <tbody>
-            <tr v-for="d in dispensaciones" :key="d.id" class="hd__tr">
-              <td class="hd__td-fecha">
-                <span class="hd__fecha-day">{{ formatFecha(d.fecha_dispensacion, false) }}</span>
-                <span class="hd__fecha-hora">{{ formatHora(d.created_at) }}</span>
-              </td>
-              <td class="hd__td-paciente">
-                <RouterLink :to="{ name: 'paciente-detail', params: { id: d.paciente_id } }" class="hd__link-paciente">{{ d.paciente_nombre }}</RouterLink>
-                <button class="hd__btn-filter-socio" @click="filtrarPorSocio(d)" title="Ver solo este socio">
-                  <Filter :size="11" :stroke-width="2" />
-                </button>
-              </td>
-              <td class="hd__td-producto">
-                <span v-if="d.multi_stock && d.items?.length" class="hd__forma-chip" :title="itemsTitle(d)">{{ d.items.length }} productos</span>
-                <span v-else class="hd__forma-chip">{{ formaLabel(d.stock?.forma_producto) }}</span>
-              </td>
-              <td class="hd__td-num hd__td-qty">
-                <template v-if="d.multi_stock && d.items?.length" title="Varios productos">{{ d.items.length }} ítems</template>
-                <template v-else>{{ d.cantidad }}{{ d.stock?.unidad ?? 'g' }}</template>
-              </td>
-              <td class="hd__td-num hd__td-price">
-                <span v-if="d.precio_unitario_ars">{{ formatARS(d.precio_unitario_ars) }}</span>
-                <span v-else class="hd__dash">—</span>
-              </td>
-              <td class="hd__td-num">
-                <span v-if="descuentoPct(d)" class="hd__desc-badge" :title="descuentoTitle(d)">-{{ descuentoPct(d) }}%</span>
-                <span v-else class="hd__dash">—</span>
-              </td>
-              <td class="hd__td-num hd__td-monto">{{ formatARS(d.aporte_socio_ars) }}</td>
-              <td class="hd__td-pago">
-                <span class="hd__pago-badge" :class="medioPagoClass(d.medio_pago)">{{ medioPagoLabel(d.medio_pago) }}</span>
-              </td>
-              <td class="hd__td-user">{{ d.usuario?.nombre ?? '—' }}</td>
-              <td class="hd__td-envio">
-                <span v-if="d.con_envio" class="hd__envio-badge" :title="d.estado_envio || 'Con envío'">
-                  <Truck :size="18" :stroke-width="2" />
-                </span>
-              </td>
-              <td class="hd__td-actions">
-                <button v-if="d.token" class="hd__action-btn" @click="imprimirEtiqueta(d)" title="Imprimir etiqueta">
-                  <QrCode :size="13" :stroke-width="2" />
-                </button>
-                <button v-if="canEdit" class="hd__action-btn" @click="openEdit(d)" title="Editar">
-                  <Pencil :size="13" :stroke-width="2" />
-                </button>
-                <button v-if="canDelete" class="hd__action-btn hd__action-btn--danger" @click="handleDelete(d)" title="Eliminar">
-                  <Trash2 :size="13" :stroke-width="2" />
-                </button>
-              </td>
-            </tr>
+            <template v-for="d in dispensaciones" :key="d.id">
+              <tr class="hd__tr">
+                <td class="hd__td-fecha">
+                  <span class="hd__fecha-day">{{ formatFecha(d.fecha_dispensacion, false) }}</span>
+                  <span class="hd__fecha-hora">{{ formatHora(d.created_at) }}</span>
+                </td>
+                <td class="hd__td-paciente">
+                  <RouterLink :to="{ name: 'paciente-detail', params: { id: d.paciente_id } }" class="hd__link-paciente">{{ d.paciente_nombre }}</RouterLink>
+                  <button class="hd__btn-filter-socio" @click="filtrarPorSocio(d)" title="Ver solo este socio">
+                    <Filter :size="11" :stroke-width="2" />
+                  </button>
+                </td>
+                <td class="hd__td-producto">
+                  <span v-if="itemsDe(d).length <= 1" class="hd__prod-inline">
+                    {{ formaLabel(itemsDe(d)[0]?.stock?.forma_producto) }}<template v-if="itemsDe(d)[0]?.genetica_nombre"> · {{ itemsDe(d)[0].genetica_nombre }}</template> · {{ itemsDe(d)[0]?.cantidad }}{{ itemsDe(d)[0]?.stock?.unidad || 'g' }}
+                  </span>
+                  <button v-else class="hd__prod-toggle" @click="toggleExpand(d.id)" :title="itemsTitle(d)">
+                    <ChevronRight :size="13" :stroke-width="2.5" class="hd__chev" :class="{ 'hd__chev--open': expandido(d.id) }" />
+                    {{ itemsDe(d).length }} productos
+                  </button>
+                </td>
+                <td class="hd__td-num">
+                  <span v-if="descuentoPct(d)" class="hd__desc-badge" :title="descuentoTitle(d)">-{{ descuentoPct(d) }}%</span>
+                  <span v-else class="hd__dash">—</span>
+                </td>
+                <td class="hd__td-num hd__td-monto">{{ formatARS(d.aporte_socio_ars) }}</td>
+                <td class="hd__td-pago">
+                  <span class="hd__pago-badge" :class="medioPagoClass(d.medio_pago)">{{ medioPagoLabel(d.medio_pago) }}</span>
+                </td>
+                <td class="hd__td-user">{{ d.usuario?.nombre ?? '—' }}</td>
+                <td class="hd__td-envio">
+                  <span v-if="d.con_envio" class="hd__envio-badge" :title="d.estado_envio || 'Con envío'">
+                    <Truck :size="18" :stroke-width="2" />
+                  </span>
+                </td>
+                <td class="hd__td-actions">
+                  <button v-if="d.token" class="hd__action-btn" @click="imprimirEtiqueta(d)" title="Imprimir etiqueta">
+                    <QrCode :size="13" :stroke-width="2" />
+                  </button>
+                  <button v-if="canEdit" class="hd__action-btn" @click="openEdit(d)" title="Editar">
+                    <Pencil :size="13" :stroke-width="2" />
+                  </button>
+                  <button v-if="canDelete" class="hd__action-btn hd__action-btn--danger" @click="handleDelete(d)" title="Eliminar">
+                    <Trash2 :size="13" :stroke-width="2" />
+                  </button>
+                </td>
+              </tr>
+              <!-- Desglose por ítem (multi-producto) -->
+              <tr v-if="itemsDe(d).length > 1 && expandido(d.id)" class="hd__tr-detail">
+                <td></td>
+                <td colspan="8">
+                  <table class="hd__subtable">
+                    <thead>
+                      <tr>
+                        <th>Producto</th><th>Genética</th><th>Lote</th>
+                        <th class="hd__th-num">Cant.</th><th class="hd__th-num">P. unit.</th><th class="hd__th-num">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(it, i) in itemsDe(d)" :key="i">
+                        <td>{{ formaLabel(it.stock?.forma_producto) }}</td>
+                        <td>{{ it.genetica_nombre || '—' }}</td>
+                        <td class="hd__mono">{{ it.lote_codigo || '—' }}</td>
+                        <td class="hd__td-num">{{ it.cantidad }}{{ it.stock?.unidad || 'g' }}</td>
+                        <td class="hd__td-num">{{ it.precio_unitario_ars ? formatARS(it.precio_unitario_ars) : '—' }}</td>
+                        <td class="hd__td-num">{{ formatARS(it.subtotal_ars) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
 
@@ -770,6 +803,21 @@ const FORMAS = [
 .hd__td-price { font-variant-numeric: tabular-nums; color: var(--c-ink-500); }
 .hd__td-monto { font-weight: 700; color: #15803d; font-variant-numeric: tabular-nums; font-size: var(--fs-14); }
 .hd__dash { color: var(--c-ink-300); }
+
+/* Producto inline + desglose desplegable */
+.hd__prod-inline { font-size: var(--fs-13); color: var(--c-ink-800); }
+.hd__prod-toggle {
+  display: inline-flex; align-items: center; gap: .3rem; background: var(--c-ink-50); border: 1px solid var(--c-ink-200);
+  border-radius: 999px; padding: .2rem .6rem; font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700); cursor: pointer;
+}
+.hd__prod-toggle:hover { background: var(--c-ink-100); }
+.hd__chev { transition: transform .15s; flex-shrink: 0; }
+.hd__chev--open { transform: rotate(90deg); }
+.hd__tr-detail > td { background: var(--c-ink-50); padding: 0 0 .5rem 0; }
+.hd__subtable { width: 100%; border-collapse: collapse; font-size: var(--fs-13); }
+.hd__subtable th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--c-ink-500); padding: .4rem .6rem; }
+.hd__subtable td { padding: .4rem .6rem; color: var(--c-ink-800); border-top: 1px solid var(--c-ink-100); }
+.hd__mono { font-family: var(--font-mono, monospace); font-size: var(--fs-12); color: var(--c-ink-500); }
 .hd__desc-badge {
   display: inline-block;
   background: #fff7ed;
