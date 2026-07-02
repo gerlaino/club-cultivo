@@ -67,7 +67,7 @@ export const TAREAS_LOTE = [
   { key: 'registro_ambiental',   label: 'Registro ambiental',  emoji: '🌡️' },
 ]
 
-export const CICLO_BASE = ['vegetativo', 'floracion', 'cosecha', 'curado']
+export const CICLO_BASE = ['vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado']
 
 export const FASE_LABELS = {
   vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', semilla: 'Germinación',
