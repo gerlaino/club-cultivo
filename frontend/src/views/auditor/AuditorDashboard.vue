@@ -43,7 +43,7 @@ import { FileCheck, Sprout, Package, Building2, ShieldAlert, FileBadge } from 'l
 </script>
 
 <style scoped>
-.aud-home { padding: var(--sp-6); max-width: 800px; }
+.aud-home { padding: var(--sp-6); max-width: 800px; margin: 0 auto; }
 .aud-home__title { font-size: var(--fs-24); font-weight: 800; color: var(--c-ink-900); margin: 0 0 var(--sp-1); }
 .aud-home__sub { color: var(--c-ink-500); font-size: var(--fs-14); margin: 0 0 var(--sp-6); }
 .aud-home__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--sp-4); }

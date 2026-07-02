@@ -87,7 +87,7 @@ onMounted(cargar)
 </script>
 
 <style scoped>
-.inf { padding: var(--sp-6); max-width: 960px; }
+.inf { padding: var(--sp-6); max-width: 960px; margin: 0 auto; }
 .inf__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-6); gap: var(--sp-4); flex-wrap: wrap; }
 .inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }
