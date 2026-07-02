@@ -271,6 +271,7 @@ import { useQRCode } from '../../composables/useQRCode.js'
 import { useToast } from '../../composables/useToast.js'
 import { pm, em, STATE_MAP } from '../../lib/loteHelpers.js'
 import { logoDataUrl } from '../../lib/logoEmbed.js'
+import { banderitaHTML, banderitaCSS } from '../../lib/etiquetaPlanta.js'
 import EmptyState from '../ui/EmptyState.vue'
 import Paginator  from '../ui/Paginator.vue'
 import DsSpinner  from '../../design-system/components/Spinner.vue'
@@ -402,57 +403,29 @@ async function generarHTMLEtiquetas() {
   const genetica = props.lote?.genetica?.nombre || props.lote?.strain || '—'
   const inicio   = _fechaCorta(props.lote?.start_date)
 
-  const labels = await Promise.all(
+  const etiquetas = await Promise.all(
     plantList.value
       .filter(p => p.codigo_qr)
       .map(async p => {
-        const dataUrl = await generatePNG(`${origen}/p/${p.codigo_qr}`, {
-          width: 180, margin: 1,
-          color: { dark: '#1b5e20', light: '#ffffff' },
+        const qrDataUrl = await generatePNG(`${origen}/p/${p.codigo_qr}`, {
+          width: 180, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' },
         })
-        return { nombre: p.nombre || p.codigo_qr, dataUrl }
+        return banderitaHTML({
+          qrDataUrl, nombre: p.nombre || p.codigo_qr, genetica,
+          lote: loteCode, inicio, clubName, clubLogo,
+        })
       })
   )
 
   return { html: `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Etiquetas QR — ${_esc(loteCode)}</title>
+<html lang="es"><head><meta charset="UTF-8"><title>Etiquetas — ${_esc(loteCode)}</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
   @page { size: A4; margin: 8mm; }
   body { font-family: -apple-system, sans-serif; background: #fff; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; }
-  .label {
-    width: 100%; display: flex; align-items: center; gap: 2.5mm;
-    border: 0.4px solid #bbb; border-radius: 2mm; padding: 2.5mm;
-    page-break-inside: avoid; break-inside: avoid;
-  }
-  .label img { width: 22mm; height: 22mm; flex-shrink: 0; display: block; }
-  .label-data { display: flex; flex-direction: column; gap: .6mm; min-width: 0; }
-  .label-code { font-size: 10pt; font-weight: 700; font-family: monospace; color: #0f172a; line-height: 1.1; }
-  .label-gen  { font-size: 8.5pt; font-weight: 600; color: #15803d; line-height: 1.15; }
-  .label-meta { font-size: 7.5pt; color: #475569; line-height: 1.2; }
-  .label-club { display: flex; align-items: center; gap: 1mm; font-size: 6.5pt; color: #15803d; font-weight: 600; line-height: 1.2; }
-  .label-club img { height: 3.5mm; width: auto; object-fit: contain; }
-</style>
-</head>
-<body>
-<div class="grid">
-${labels.map(l => `
-  <div class="label">
-    <img src="${l.dataUrl}" alt="${_esc(l.nombre)}" />
-    <div class="label-data">
-      <div class="label-code">${_esc(l.nombre)}</div>
-      <div class="label-gen">🌿 ${_esc(genetica)}</div>
-      <div class="label-meta">Lote ${_esc(loteCode)}${inicio ? ` · inicio ${inicio}` : ''}</div>
-      <div class="label-club">${clubLogo ? `<img src="${_esc(clubLogo)}" alt="" />` : ''}${_esc(clubName)}</div>
-    </div>
-  </div>`).join('')}
-</div>
-</body>
-</html>`, loteCode }
+  .lista { display: flex; flex-direction: column; gap: 3mm; align-items: center; }
+  ${banderitaCSS}
+</style></head>
+<body><div class="lista">${etiquetas.join('')}</div></body></html>`, loteCode }
 }
 
 async function imprimirEtiquetas() {

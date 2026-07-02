@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
 import { logoDataUrl } from '../lib/logoEmbed.js'
+import { banderitaHTML, banderitaCSS } from '../lib/etiquetaPlanta.js'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
@@ -68,44 +69,26 @@ async function generarQR() {
 async function descargarQRpng() { await downloadPNG(qrPlantaUrl(), qrFilename('png')) }
 async function descargarQRsvg() { await downloadSVG(qrPlantaUrl(), qrFilename('svg')) }
 
-// Banderita: tira 70×25mm (una faz) para envolver el tronco — QR + info de la planta.
-function _escEt(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
+// Banderita plegable (doble faz) de 140×25mm — se pliega en el medio sobre el tronco.
 function _fechaEt(d) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : null }
 async function imprimirEtiqueta() {
   const p = planta.value
   if (!p?.codigo_qr) return
   if (!club.data) { try { await club.fetch() } catch { /* club opcional en la etiqueta */ } }
-  const dataUrl = await generatePNG(qrPlantaUrl(), { width: 200, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' } })
-  const nombre = p.nombre || p.codigo_qr
-  const gen    = p.genetica?.nombre || '—'
-  const lote   = p.lote?.codigo || '—'
-  const inicio = _fechaEt(p.lote?.start_date)
-  const logo   = await logoDataUrl(club.logoUrl)
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Etiqueta ${_escEt(nombre)}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  @page{size:70mm 25mm;margin:0}
-  body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center}
-  .b{width:70mm;height:25mm;display:flex;align-items:center;gap:2mm;padding:2mm}
-  .b-qr{width:21mm;height:21mm;flex-shrink:0;display:block}
-  .b-info{display:flex;flex-direction:column;gap:.4mm;min-width:0;overflow:hidden}
-  .b-club{display:flex;align-items:center;gap:1mm;font-size:6pt;font-weight:700;color:#15803d}
-  .b-club img{height:4mm;width:auto;object-fit:contain}
-  .b-code{font-family:monospace;font-size:8.5pt;font-weight:800;color:#0f172a;line-height:1.1}
-  .b-gen{font-size:7.5pt;font-weight:600;color:#15803d;line-height:1.15}
-  .b-meta{font-size:6.5pt;color:#475569;line-height:1.2}
-</style></head><body>
-  <div class="b">
-    <img class="b-qr" src="${dataUrl}" alt="${_escEt(nombre)}" />
-    <div class="b-info">
-      <div class="b-club">${logo ? `<img src="${_escEt(logo)}" alt="" />` : ''}${_escEt(club.name)}</div>
-      <div class="b-code">${_escEt(nombre)}</div>
-      <div class="b-gen">🌿 ${_escEt(gen)}</div>
-      <div class="b-meta">Lote ${_escEt(lote)}${inicio ? ` · inicio ${inicio}` : ''}</div>
-    </div>
-  </div>
-</body></html>`
-  const win = window.open('', '_blank', 'width=700,height=400')
+  const qrDataUrl = await generatePNG(qrPlantaUrl(), { width: 200, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' } })
+  const etiqueta = banderitaHTML({
+    qrDataUrl,
+    nombre:    p.nombre || p.codigo_qr,
+    genetica:  p.genetica?.nombre,
+    lote:      p.lote?.codigo,
+    inicio:    _fechaEt(p.lote?.start_date),
+    clubName:  club.name,
+    clubLogo:  await logoDataUrl(club.logoUrl),
+  })
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Etiqueta ${p.codigo_qr}</title>
+<style>@page{size:140mm 25mm;margin:0} body{font-family:-apple-system,sans-serif} ${banderitaCSS}</style>
+</head><body>${etiqueta}</body></html>`
+  const win = window.open('', '_blank', 'width=800,height=400')
   if (!win) { toast.error('Permitir ventanas emergentes para imprimir'); return }
   win.document.write(html); win.document.close()
   setTimeout(() => win.print(), 700)
