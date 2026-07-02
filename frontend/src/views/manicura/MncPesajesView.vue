@@ -171,11 +171,9 @@ import {
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
-import { useAuthStore } from '../../stores/auth.js'
 
 const toast = useToast()
 const { confirm } = useConfirm()
-const auth  = useAuthStore()
 
 const loadingLotes  = ref(true)
 const lotes         = ref([])
@@ -201,10 +199,9 @@ const pesajesConfirmadosCount = computed(() =>
 async function cargarLotes() {
   loadingLotes.value = true
   try {
+    // Todos los lotes en manicura del club: cualquier manicura puede pitchear en cualquiera.
     const { data } = await listLotes({ estado: 'en_manicura' })
-    lotes.value = (data || []).filter(l =>
-      !l.manicurador_id || l.manicurador_id === auth.user?.id
-    )
+    lotes.value = data || []
     if (lotes.value.length === 1 && !loteSeleccionado.value) {
       await seleccionarLote(lotes.value[0])
     }

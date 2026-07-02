@@ -418,11 +418,11 @@ const totalGramosKpi = computed(() => {
 
 const sinPesar        = computed(() => Math.max(0, plantas.value.length - pesadasKpi.value))
 
-// Puede registrar pesaje quien tiene el lote sin asignar o asignado a sí mismo (espejo de
-// la regla del backend). El admin no ve el botón si el lote ya tiene un manicura asignado.
+// Cualquier usuario con rol manicura/admin/supervisor puede registrar en un lote en
+// manicura (trabajo de equipo; espejo del backend). El "responsable" no bloquea al resto.
 const puedeRegistrar = computed(() =>
   lote.value?.estado === 'en_manicura' &&
-  (!lote.value?.manicurador_id || lote.value?.manicurador_id === auth.user?.id)
+  ['manicura', 'admin', 'supervisor'].includes(auth.role)
 )
 
 const plantasSinPesar = computed(() => plantas.value.filter(p => !(parseFloat(p.peso_seco) > 0)))

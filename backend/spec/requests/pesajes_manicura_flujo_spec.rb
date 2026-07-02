@@ -144,16 +144,16 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(response).to have_http_status(:unprocessable_entity)
   end
 
-  # El admin asigna quién manicura cada lote: un manicura distinto al asignado no puede
-  # crear pesajes sobre ese lote (misma regla que PlantsController#registrar_peso).
-  it 'un manicura NO asignado al lote no puede crear un pesaje (403)' do
+  # Opción A (trabajo de equipo): cualquier manicura del club puede crear pesajes sobre un
+  # lote en manicura, aunque no sea el "responsable" asignado. La confirmación + el
+  # historial (guarda quién registró) cubren la trazabilidad.
+  it 'un manicura NO asignado al lote SÍ puede crear un pesaje (equipo)' do
     otro_manicura = create(:user, :manicura, club: club)
     delete '/api/users/sign_out'
     sign_in_as(otro_manicura)
 
     post "/lotes/#{lote.id}/pesajes_manicura", headers: auth_headers
-    expect(response).to have_http_status(:forbidden)
-    expect(JSON.parse(response.body)['error']).to match(/no estás asignado/i)
+    expect(response).to have_http_status(:created)
   end
 
   it 'cualquier manicura puede crear un pesaje si el lote no tiene manicurador asignado' do
@@ -166,12 +166,11 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(response).to have_http_status(:created)
   end
 
-  it 'el admin NO puede crear un pesaje si el lote está asignado a un manicura' do
-    # lote ya está asignado a `manicura`; el admin no debe pisar su pesaje.
+  it 'el admin SÍ puede crear un pesaje aunque el lote esté asignado a un manicura' do
     delete '/api/users/sign_out'
     sign_in_as(admin)
     post "/lotes/#{lote.id}/pesajes_manicura", headers: auth_headers
-    expect(response).to have_http_status(:forbidden)
+    expect(response).to have_http_status(:created)
   end
 
   it 'el admin SÍ puede crear un pesaje si el lote no tiene manicura asignado' do

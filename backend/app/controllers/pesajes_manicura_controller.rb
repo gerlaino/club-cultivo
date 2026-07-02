@@ -4,14 +4,10 @@ class PesajesManicuraController < ApplicationController
   before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir, :reajustar_peso]
 
   # GET /lotes/:lote_id/pesajes_manicura
-  # Manicurador ve sus pesajes activos del lote; admin ve todos.
+  # Trabajo de equipo: todos los que pueden ver el lote ven TODOS los pesajes (para
+  # coordinar qué ya se pesó). Editar/reabrir un pesaje ajeno sigue con su propia guarda.
   def index
-    pesajes = if current_user.admin? || current_user.supervisor?
-      @lote.pesajes_manicura.includes(:manicurador, :stock, pesadas_plantas: :plant)
-    else
-      @lote.pesajes_manicura.where(manicurador: current_user)
-           .includes(:manicurador, :stock, pesadas_plantas: :plant)
-    end
+    pesajes = @lote.pesajes_manicura.includes(:manicurador, :stock, pesadas_plantas: :plant)
     render json: pesajes.recientes.map { |p| PesajeManicuraSerializer.serialize(p) }
   end
 
@@ -36,13 +32,13 @@ class PesajesManicuraController < ApplicationController
   # Crea un pesaje (borrador) para cargar plantas por QR. Si se pasan plantas_count +
   # peso_total_g es una CARGA MANUAL sin QR; con enviar=true se manda a confirmar en el acto.
   def create
-    # Misma regla que PlantsController#registrar_peso: pesa quien tenga rol de manicura/
-    # admin/supervisor Y el lote esté sin asignar o asignado a sí mismo. Así el admin no
-    # pisa el pesaje de un manicura ya asignado al lote.
-    rol_ok        = current_user.manicura? || current_user.admin? || current_user.supervisor?
-    asignacion_ok = @lote.manicurador_id.nil? || @lote.manicurador_id == current_user.id
-    unless rol_ok && asignacion_ok
-      return render json: { error: 'No estás asignado a este lote' }, status: :forbidden
+    # Cualquier usuario con rol manicura/admin/supervisor del club puede registrar un
+    # pesaje en un lote en manicura (es trabajo de equipo sobre el batch — varios pesan a
+    # la vez). El "responsable" (manicurador_id) sigue siendo quien lo tiene asignado, pero
+    # no bloquea a los demás. La trazabilidad queda cubierta: el pesaje guarda quién lo
+    # registró y los de no-admin requieren confirmación antes de impactar el stock.
+    unless current_user.manicura? || current_user.admin? || current_user.supervisor?
+      return render json: { error: 'No autorizado' }, status: :forbidden
     end
     unless @lote.estado == 'en_manicura'
       return render json: { error: 'El lote no está en manicura activa' }, status: :unprocessable_entity
