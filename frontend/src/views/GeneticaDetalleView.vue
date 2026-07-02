@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { getGenetica } from '../lib/api.js'
+import GeneticaEditarModal from '../components/GeneticaEditarModal.vue'
 import { em } from '../lib/loteHelpers'
 import { useAuthStore } from '../stores/auth.js'
 import { usePermissions } from '../composables/usePermissions.js'
@@ -173,7 +174,7 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-onMounted(async () => {
+async function cargar() {
   try {
     const { data } = await getGenetica(props.id)
     gen.value = data
@@ -182,7 +183,12 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+onMounted(cargar)
+
+const editModal = ref(null)
+function editar() { editModal.value?.openEdit(gen.value.id) }
+function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 </script>
 
 <template>
@@ -222,7 +228,7 @@ onMounted(async () => {
               </div>
             </div>
 
-            <button v-if="canUpdate" class="gdv__btn-editar" @click="router.push({ name: 'geneticas', query: { edit: gen.id } })">
+            <button v-if="canUpdate" class="gdv__btn-editar" @click="editar">
               <i class="bi bi-pencil"></i> Editar
             </button>
 
@@ -503,6 +509,8 @@ onMounted(async () => {
       @close="lightboxOpen = false"
       @update:index="fotoActiva = $event"
     />
+
+    <GeneticaEditarModal ref="editModal" @saved="onGeneticaSaved" />
 
   </div>
 </template>

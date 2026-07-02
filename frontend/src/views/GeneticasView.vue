@@ -1,13 +1,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { listGeneticas, getGenetica, createGenetica, updateGenetica, deleteGenetica } from '../lib/api.js'
+import { listGeneticas, updateGenetica, deleteGenetica } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useToast } from '../composables/useToast.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import api from '../lib/api.js'
+import GeneticaEditarModal from '../components/GeneticaEditarModal.vue'
 
 const router = useRouter()
 const route  = useRoute()
@@ -19,24 +19,15 @@ const toast = useToast()
 
 const geneticas    = ref([])
 const loading      = ref(true)
-const saving       = ref(false)
 const deleting     = ref(false)
 const error        = ref(null)
-const showModal    = ref(false)
-const editingId    = ref(null)
-const editingInase = ref(false)
-const formError    = ref(null)
+const editModal    = ref(null)  // ref al componente GeneticaEditarModal
 
 const search            = ref('')
 const filterTipo        = ref('')
 const filterOrigen      = ref('')  // '' | 'inase' | 'propias'
 const filterDisponible  = ref(true) // true = solo disponibles (default), false = todas
 const sortBy            = ref('inase_first')
-
-// Foto
-const fotoFile     = ref(null)
-const fotoPreview  = ref(null)
-const fotoInput    = ref(null)
 
 const TIPO_META = {
   indica:    { label: 'Índica',    color: '#6f42c1', bg: 'rgba(111,66,193,.12)' },
@@ -86,83 +77,17 @@ const filtered = computed(() => {
 const hasFilters = computed(() => search.value.trim() || filterTipo.value || filterOrigen.value || !filterDisponible.value)
 function clearFilters() { search.value = ''; filterTipo.value = ''; filterOrigen.value = ''; filterDisponible.value = true; sortBy.value = 'inase_first' }
 
-function emptyForm() {
-  return {
-    nombre: '', tipo: '', thc: null, cbd: null,
-    descripcion: '', consejos_club: '', origen: '', criador: '', terpenos: '',
-    tiempo_floracion: null, dias_vegetativo_objetivo: null, dias_cosecha_objetivo: null,
-    rendimiento: null, altura: null,
-    disponible: true,
+// El modal de crear/editar vive en el componente GeneticaEditarModal (compartido con
+// el detalle). Estos wrappers delegan al componente vía su ref.
+function openCreate() { editModal.value?.openCreate() }
+function openEdit(gen) { editModal.value?.openEdit(gen) }
+function onGeneticaSaved({ genetica, created }) {
+  if (created) {
+    geneticas.value.unshift(genetica)
+  } else {
+    const idx = geneticas.value.findIndex(g => g.id === genetica.id)
+    if (idx !== -1) geneticas.value[idx] = genetica
   }
-}
-const form       = ref(emptyForm())
-const formErrors = ref({})
-
-function validate() {
-  const e = {}
-  if (!form.value.nombre.trim()) e.nombre = 'El nombre es obligatorio'
-  if (!form.value.tipo)          e.tipo   = 'Seleccioná un tipo'
-  if (form.value.thc !== null && (form.value.thc < 0 || form.value.thc > 100)) e.thc = 'Debe ser entre 0 y 100'
-  if (form.value.cbd !== null && (form.value.cbd < 0 || form.value.cbd > 100)) e.cbd = 'Debe ser entre 0 y 100'
-  formErrors.value = e
-  return !Object.keys(e).length
-}
-
-function onFotoChange(e) {
-  const file = e.target.files?.[0]
-  if (!file) return
-  fotoFile.value = file
-  fotoPreview.value = URL.createObjectURL(file)
-}
-
-function quitarFoto() {
-  fotoFile.value    = null
-  fotoPreview.value = null
-  if (fotoInput.value) fotoInput.value.value = ''
-}
-
-function openCreate() {
-  editingId.value    = null
-  editingInase.value = false
-  form.value         = emptyForm()
-  formErrors.value   = {}
-  formError.value    = null
-  fotoFile.value     = null
-  fotoPreview.value  = null
-  showModal.value    = true
-}
-
-async function openEdit(genOrId) {
-  const id = typeof genOrId === 'object' ? genOrId.id : Number(genOrId)
-  // El item de la lista no trae descripción/consejos/objetivos/origen; traemos el
-  // detalle completo para no cargar el form vacío (y borrarlos al guardar).
-  let gen = typeof genOrId === 'object' ? genOrId : null
-  try { const { data } = await getGenetica(id); gen = data } catch { /* usamos lo que haya */ }
-  if (!gen) return
-  editingId.value    = gen.id
-  editingInase.value = !!gen.registrada_inase
-  form.value = {
-    nombre:           gen.nombre           || '',
-    tipo:             gen.tipo             || '',
-    thc:              gen.thc              ?? null,
-    cbd:              gen.cbd              ?? null,
-    descripcion:      gen.descripcion      || '',
-    consejos_club:    gen.consejos_club    || '',
-    origen:           gen.origen           || '',
-    criador:          gen.criador          || '',
-    terpenos:         gen.terpenos         || '',
-    tiempo_floracion: gen.tiempo_floracion ?? null,
-    dias_vegetativo_objetivo: gen.dias_vegetativo_objetivo ?? null,
-    dias_cosecha_objetivo:    gen.dias_cosecha_objetivo    ?? null,
-    rendimiento:      gen.rendimiento      ?? null,
-    altura:           gen.altura           ?? null,
-    disponible:       gen.disponible       ?? true,
-  }
-  formErrors.value  = {}
-  formError.value   = null
-  fotoFile.value    = null
-  fotoPreview.value = gen.foto_url || null
-  showModal.value   = true
 }
 
 async function loadGeneticas() {
@@ -178,57 +103,6 @@ async function loadGeneticas() {
   }
 }
 
-async function handleSubmit() {
-  if (!validate()) return
-  saving.value    = true
-  formError.value = null
-  try {
-    // Usar FormData si hay foto
-    let result
-    if (fotoFile.value) {
-      const fd = new FormData()
-      const payload = { ...form.value }
-      if (editingInase.value) {
-        delete payload.nombre; delete payload.tipo
-        delete payload.thc; delete payload.cbd; delete payload.criador
-      }
-      Object.entries(payload).forEach(([k, v]) => {
-        if (v !== null && v !== '' && v !== undefined) fd.append(`genetica[${k}]`, v)
-      })
-      fd.append('foto', fotoFile.value)
-      if (editingId.value) {
-        result = await api.patch(`/geneticas/${editingId.value}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      } else {
-        result = await api.post('/geneticas', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      }
-    } else {
-      const payload = { ...form.value }
-      if (editingInase.value) {
-        delete payload.nombre; delete payload.tipo
-        delete payload.thc; delete payload.cbd; delete payload.criador
-      }
-      Object.keys(payload).forEach(k => { if (payload[k] === '' || payload[k] === null) delete payload[k] })
-      if (editingId.value) {
-        result = await updateGenetica(editingId.value, payload)
-      } else {
-        result = await createGenetica(payload)
-      }
-    }
-
-    const savedGen = result.data
-    if (editingId.value) {
-      const idx = geneticas.value.findIndex(g => g.id === editingId.value)
-      if (idx !== -1) geneticas.value[idx] = savedGen
-    } else {
-      geneticas.value.unshift(savedGen)
-    }
-    showModal.value = false
-  } catch (e) {
-    formError.value = e.response?.data?.errors?.join(', ') || 'Error al guardar'
-  } finally {
-    saving.value = false
-  }
-}
 
 async function toggleDisponible(gen) {
   try {
@@ -451,218 +325,7 @@ onMounted(async () => {
       <div class="gv__count">{{ filtered.length }} de {{ filterDisponible ? geneticas.filter(g => g.disponible).length : geneticas.length }} genéticas{{ filterDisponible ? ' disponibles' : '' }}</div>
     </div>
 
-    <!-- ===== MODAL CREAR / EDITAR ===== -->
-    <Teleport to="body">
-      <div v-if="showModal" class="gv-modal-overlay" @click.self="showModal=false">
-        <div class="gv-modal">
-          <div class="gv-modal__header">
-            <div>
-              <h5 class="gv-modal__title">{{ editingId ? 'Editar genética' : 'Nueva genética' }}</h5>
-              <span v-if="editingInase" class="gv-modal__subtitle">Variedad registrada en el INASE</span>
-            </div>
-            <button class="gv-modal__close" @click="showModal=false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="gv-modal__body">
-
-            <!-- Aviso INASE -->
-            <div v-if="editingInase" class="inase-notice gv-modal__inase-notice">
-              <div class="inase-notice__icon">🏛️</div>
-              <div>
-                <div class="inase-notice__title">Genética registrada en el INASE</div>
-                <div class="inase-notice__desc">
-                  Nombre, tipo, THC, CBD y criador están certificados por el INASE y no pueden modificarse
-                  (Resolución 1780/2025). Podés editar disponibilidad, foto, descripción, terpenos y datos de cultivo.
-                </div>
-              </div>
-            </div>
-
-            <div v-if="formError" class="gv__error gv-modal__error">
-              <i class="bi bi-exclamation-triangle-fill"></i>
-              <span>{{ formError }}</span>
-            </div>
-
-            <div class="gv-form">
-
-              <!-- Foto -->
-              <div class="gv-form__field gv-form__field--full">
-                <label class="gv-form__label">Foto de la genética</label>
-                <div class="foto-uploader">
-                  <div v-if="fotoPreview" class="foto-preview">
-                    <img :src="fotoPreview" alt="Preview" />
-                    <button type="button" class="foto-remove" @click="quitarFoto" title="Quitar foto">
-                      <i class="bi bi-x-lg"></i>
-                    </button>
-                  </div>
-                  <label v-else class="foto-placeholder" :for="`foto-input-${editingId || 'new'}`">
-                    <i class="bi bi-camera" style="font-size:1.5rem;color:#94a3b8"></i>
-                    <span style="font-size:.78rem;color:#94a3b8;margin-top:.25rem">Subir foto</span>
-                  </label>
-                  <input
-                    :id="`foto-input-${editingId || 'new'}`"
-                    ref="fotoInput"
-                    type="file"
-                    accept="image/*"
-                    style="display:none"
-                    @change="onFotoChange"
-                  />
-                </div>
-              </div>
-
-              <!-- Nombre -->
-              <div class="gv-form__field gv-form__field--full">
-                <label class="gv-form__label">
-                  Nombre <span class="gv-form__req">*</span>
-                  <span v-if="editingInase" class="field-lock-label">🔒 Protegido INASE</span>
-                </label>
-                <input
-                  v-model.trim="form.nombre"
-                  class="gv-form__input"
-                  :class="{ 'gv-form__input--error': formErrors.nombre, 'field-locked': editingInase }"
-                  :disabled="editingInase"
-                  placeholder="Ej: OG Kush, White Widow…"
-                />
-                <div v-if="formErrors.nombre" class="gv-form__field-error">{{ formErrors.nombre }}</div>
-              </div>
-
-              <!-- Tipo -->
-              <div class="gv-form__field">
-                <label class="gv-form__label">
-                  Tipo <span class="gv-form__req">*</span>
-                  <span v-if="editingInase" class="field-lock-label">🔒 Protegido</span>
-                </label>
-                <div class="gv-form__btn-group">
-                  <button
-                    v-for="(meta, key) in TIPO_META" :key="key"
-                    type="button"
-                    class="gv-form__tipo-btn"
-                    :style="form.tipo === key ? { background: meta.color, borderColor: meta.color, color: '#fff' } : {}"
-                    :disabled="editingInase"
-                    @click="!editingInase && (form.tipo = key)"
-                  >{{ meta.label }}</button>
-                </div>
-                <div v-if="formErrors.tipo" class="gv-form__field-error">{{ formErrors.tipo }}</div>
-              </div>
-
-              <!-- THC / CBD -->
-              <div class="gv-form__field">
-                <label class="gv-form__label">
-                  THC (%) <span v-if="editingInase" class="field-lock-label">🔒</span>
-                </label>
-                <input
-                  v-model.number="form.thc" type="number" step="0.01" min="0" max="100"
-                  class="gv-form__input"
-                  :class="{ 'gv-form__input--error': formErrors.thc, 'field-locked': editingInase }"
-                  :disabled="editingInase" placeholder="0.0"
-                />
-                <div v-if="formErrors.thc" class="gv-form__field-error">{{ formErrors.thc }}</div>
-              </div>
-              <div class="gv-form__field">
-                <label class="gv-form__label">
-                  CBD (%) <span v-if="editingInase" class="field-lock-label">🔒</span>
-                </label>
-                <input
-                  v-model.number="form.cbd" type="number" step="0.01" min="0" max="100"
-                  class="gv-form__input"
-                  :class="{ 'gv-form__input--error': formErrors.cbd, 'field-locked': editingInase }"
-                  :disabled="editingInase" placeholder="0.0"
-                />
-                <div v-if="formErrors.cbd" class="gv-form__field-error">{{ formErrors.cbd }}</div>
-              </div>
-
-              <!-- Días objetivo por fase / Rendimiento / Altura -->
-              <div class="gv-form__field">
-                <label class="gv-form__label">Vegetativo (días)</label>
-                <input v-model.number="form.dias_vegetativo_objetivo" type="number" min="1" class="gv-form__input" placeholder="30" :disabled="editingInase" />
-              </div>
-              <div class="gv-form__field">
-                <label class="gv-form__label">Floración (días)</label>
-                <input v-model.number="form.tiempo_floracion" type="number" min="1" class="gv-form__input" placeholder="60" :disabled="editingInase" />
-              </div>
-              <div class="gv-form__field">
-                <label class="gv-form__label">Cosecha (días)</label>
-                <input v-model.number="form.dias_cosecha_objetivo" type="number" min="1" class="gv-form__input" placeholder="14" :disabled="editingInase" />
-              </div>
-              <div class="gv-form__field">
-                <label class="gv-form__label">Rendimiento (g)</label>
-                <input v-model.number="form.rendimiento" type="number" min="0" class="gv-form__input" placeholder="450" />
-              </div>
-              <div class="gv-form__field">
-                <label class="gv-form__label">Altura (cm)</label>
-                <input v-model.number="form.altura" type="number" min="0" class="gv-form__input" placeholder="120" />
-              </div>
-
-              <!-- Criador -->
-              <div class="gv-form__field gv-form__field--half">
-                <label class="gv-form__label">
-                  Criador / Banco
-                  <span v-if="editingInase" class="field-lock-label">🔒 Protegido</span>
-                </label>
-                <input
-                  v-model.trim="form.criador"
-                  class="gv-form__input"
-                  :class="{ 'field-locked': editingInase }"
-                  :disabled="editingInase"
-                  placeholder="Ej: Sweed Lab Seeds…"
-                />
-              </div>
-
-              <!-- Origen -->
-              <div class="gv-form__field gv-form__field--half">
-                <label class="gv-form__label">Origen</label>
-                <input v-model.trim="form.origen" class="gv-form__input" placeholder="Ej: Argentina, California…" />
-              </div>
-
-              <!-- Terpenos -->
-              <div class="gv-form__field gv-form__field--full">
-                <label class="gv-form__label">Terpenos</label>
-                <input v-model.trim="form.terpenos" class="gv-form__input" placeholder="Ej: Mirceno, Limoneno, Cariofileno…" />
-              </div>
-
-              <!-- Disponible -->
-              <div class="gv-form__field gv-form__field--full">
-                <label class="gv-form__toggle">
-                  <input v-model="form.disponible" type="checkbox" class="gv-form__toggle-input" />
-                  <span class="gv-form__toggle-track"></span>
-                  <span class="gv-form__toggle-label">Disponible para cultivo</span>
-                </label>
-              </div>
-
-              <!-- Descripción -->
-              <div class="gv-form__field gv-form__field--full">
-                <label class="gv-form__label">Descripción <span class="gv-form__label-hint">(interna)</span></label>
-                <textarea
-                  v-model.trim="form.descripcion"
-                  class="gv-form__input gv-form__textarea"
-                  rows="3"
-                  placeholder="Características, efectos, sabor, aromas…"
-                ></textarea>
-              </div>
-
-              <!-- Consejos del club (público, se muestra al paciente en la dispensa) -->
-              <div class="gv-form__field gv-form__field--full">
-                <label class="gv-form__label">
-                  Consejos del club <span class="gv-form__label-hint">👁 visible al paciente</span>
-                </label>
-                <textarea
-                  v-model.trim="form.consejos_club"
-                  class="gv-form__input gv-form__textarea"
-                  rows="3"
-                  placeholder="Guardado ideal, qué hacer al recibir el producto, recomendaciones…"
-                ></textarea>
-              </div>
-
-            </div>
-          </div>
-          <div class="gv-modal__footer">
-            <button class="gv__btn-ghost" :disabled="saving" @click="showModal=false">Cancelar</button>
-            <button class="gv__btn-new" :disabled="saving" @click="handleSubmit">
-              <DsSpinner v-if="saving" :size="14" />
-              {{ editingId ? 'Guardar cambios' : 'Crear genética' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <GeneticaEditarModal ref="editModal" @saved="onGeneticaSaved" />
 
 
   </div>
