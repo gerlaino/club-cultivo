@@ -230,11 +230,22 @@
             <form v-else class="mnl-modal__body" @submit.prevent="submitBatch">
               <div class="mnl-field">
                 <label class="mnl-label">Plantas manicuradas <span class="mnl-req">*</span></label>
-                <div class="mnl-input-row">
-                  <input v-model.number="batchForm.plantas_manicuradas" type="number" step="1" min="1"
-                    :max="sinPesar" class="mnl-input" placeholder="0" required autofocus />
-                  <span class="mnl-suffix">de {{ sinPesar }} restantes</span>
-                </div>
+                <div v-if="!plantasSinPesar.length" class="mnl-hint">No quedan plantas pendientes de pesar.</div>
+                <template v-else>
+                  <div class="mnl-sel-head">
+                    <label class="mnl-check mnl-check--all">
+                      <input type="checkbox" :checked="todasBatch" @change="toggleBatchTodas" /> Seleccionar todas
+                    </label>
+                    <span class="mnl-sel-count">{{ batchSelIds.length }} / {{ plantasSinPesar.length }}</span>
+                  </div>
+                  <div class="mnl-sel-list">
+                    <label v-for="p in plantasSinPesar" :key="p.id" class="mnl-check">
+                      <input type="checkbox" :value="p.id" v-model="batchSelIds" />
+                      <span class="mnl-check-nombre">{{ p.nombre || `Planta #${p.id}` }}</span>
+                      <span class="mnl-check-qr">{{ p.codigo_qr }}</span>
+                    </label>
+                  </div>
+                </template>
               </div>
 
               <div class="mnl-field">
@@ -255,7 +266,7 @@
 
               <div class="mnl-actions">
                 <button type="button" class="mnl-btn-cancel" @click="cerrarModal">Cancelar</button>
-                <button type="submit" class="mnl-btn-ok" :disabled="savingBatch || !batchForm.plantas_manicuradas || !batchForm.peso_seco_g">
+                <button type="submit" class="mnl-btn-ok" :disabled="savingBatch || !batchSelIds.length || !batchForm.peso_seco_g">
                   <DsSpinner v-if="savingBatch" :size="14" />
                   <Send v-else :size="13" />
                   Enviar a aprobación
@@ -392,7 +403,13 @@ const plantas = ref([])
 const modalOpen   = ref(false)
 const savingBatch = ref(false)
 const modalError  = ref('')
-const batchForm   = ref({ plantas_manicuradas: null, peso_seco_g: null, notas: '' })
+const batchForm   = ref({ peso_seco_g: null, notas: '' })
+// Selección de plantas para el batch (el peso se reparte como promedio entre las elegidas).
+const batchSelIds = ref([])
+const todasBatch  = computed(() => plantasSinPesar.value.length > 0 && batchSelIds.value.length === plantasSinPesar.value.length)
+function toggleBatchTodas() {
+  batchSelIds.value = todasBatch.value ? [] : plantasSinPesar.value.map(p => p.id)
+}
 
 // Flujo directo del admin: pesa (individual y/o resto) + confirma + genera stock en un paso.
 const adminForm      = ref({ pesos: {}, restoPeso: null, stock_id: null, sede_id: null })
@@ -483,7 +500,8 @@ async function abrirModal() {
     }
   } else {
     // El batch cubre las plantas restantes (las ya pesadas por QR no se vuelven a contar).
-    batchForm.value = { plantas_manicuradas: sinPesar.value || null, peso_seco_g: null, notas: '' }
+    batchForm.value = { peso_seco_g: null, notas: '' }
+    batchSelIds.value = plantasSinPesar.value.map(p => p.id) // por defecto, todas las pendientes
     modalOpen.value = true
   }
 }
@@ -521,15 +539,15 @@ function cerrarModal() { modalOpen.value = false }
 // Carga manual sin QR: crea un PesajeManicura con el total declarado y lo manda a
 // confirmar en un solo paso (mismo modelo que el flujo QR).
 async function submitBatch() {
-  if (!batchForm.value.plantas_manicuradas || !batchForm.value.peso_seco_g) return
+  if (!batchSelIds.value.length || !batchForm.value.peso_seco_g) return
   savingBatch.value = true
   modalError.value  = ''
   try {
     await createPesajeManicura(id, {
-      plantas_count: batchForm.value.plantas_manicuradas,
-      peso_total_g:  batchForm.value.peso_seco_g,
-      notas:         batchForm.value.notas || undefined,
-      enviar:        true,
+      plant_ids:    batchSelIds.value,
+      peso_total_g: batchForm.value.peso_seco_g,
+      notas:        batchForm.value.notas || undefined,
+      enviar:       true,
     })
     toast.success(`Lote ${lote.value.codigo} — pesaje enviado a confirmar`)
     cerrarModal()
@@ -755,6 +773,16 @@ onActivated(cargar)
 .mnl-prow__code { font-family: var(--font-mono, monospace); font-size: .78rem; font-weight: 700; color: #334155; flex: 1; min-width: 0; }
 .mnl-prow__input { width: 130px; flex-shrink: 0; }
 .mnl-hint { font-size: .74rem; color: #94a3b8; }
+/* Selector de plantas (batch manicura) */
+.mnl-sel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .35rem; }
+.mnl-sel-count { font-size: .78rem; font-weight: 700; color: #15803d; }
+.mnl-sel-list { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+.mnl-check { display: flex; align-items: center; gap: .5rem; padding: .5rem .65rem; font-size: .85rem; color: #0f172a; cursor: pointer; }
+.mnl-sel-list .mnl-check:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
+.mnl-check input { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+.mnl-check--all { font-weight: 600; color: #475569; font-size: .78rem; }
+.mnl-check-nombre { font-weight: 600; }
+.mnl-check-qr { margin-left: auto; font-size: .72rem; color: #94a3b8; font-family: var(--font-mono, monospace); }
 
 /* Selector de sede */
 .mnl-select { border-radius: 6px; cursor: pointer; appearance: none; -webkit-appearance: none; }

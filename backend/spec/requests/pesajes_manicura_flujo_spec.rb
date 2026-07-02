@@ -119,6 +119,22 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(pesaje.pesadas_plantas.pluck(:peso_seco_g).map(&:to_f)).to all(eq(100.0))
   end
 
+  it 'carga conjunta con plant_ids: reparte SOLO entre las plantas seleccionadas' do
+    p2 = create(:plant, lote: lote, club: club, state: 'cosechado')
+    p3 = create(:plant, lote: lote, club: club, state: 'cosechado') # planta + p2 + p3 = 3 sin pesar
+
+    post "/lotes/#{lote.id}/pesajes_manicura",
+         params: { plant_ids: [p2.id, p3.id], peso_total_g: 200, enviar: true },
+         headers: auth_headers
+    expect(response).to have_http_status(:created)
+
+    pesaje = PesajeManicura.last
+    # solo las 2 seleccionadas quedan pesadas (100g promedio); la tercera sigue sin peso
+    expect(pesaje.pesadas_plantas.pluck(:plant_id)).to match_array([p2.id, p3.id])
+    expect(pesaje.pesadas_plantas.pluck(:peso_seco_g).map(&:to_f)).to all(eq(100.0))
+    expect(planta.reload.peso_seco).to be_blank
+  end
+
   it 'el admin confirma un pesaje y genera stock pendiente_asignacion (sin sede)' do
     pesaje = lote.pesajes_manicura.create!(
       manicurador: manicura, club: club, fecha_pesaje: Date.current,

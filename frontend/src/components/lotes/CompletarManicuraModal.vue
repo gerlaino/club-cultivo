@@ -17,20 +17,31 @@
         <div class="cmm__body">
           <div v-if="error" class="cmm__alert">{{ error }}</div>
 
-          <!-- Plantas -->
+          <!-- Plantas: se eligen las que se manicuraron (el peso se reparte entre ellas) -->
           <div class="cmm__field">
             <label class="cmm__label">
               Plantas manicuradas
               <span class="cmm__required">requerido</span>
             </label>
-            <div class="cmm__input-row">
-              <input
-                type="number" step="1" min="1"
-                class="cmm__input" v-model.number="form.plantas_count"
-                :max="lote?.plants_count" placeholder="0" autofocus
-              />
-              <span class="cmm__unit">de {{ lote?.plants_count ?? '—' }}</span>
-            </div>
+
+            <div v-if="loadingPlantas" class="cmm__plantas-msg"><DsSpinner :size="15" /> Cargando plantas…</div>
+            <div v-else-if="!pendientes.length" class="cmm__plantas-msg">No hay plantas pendientes de pesar en este lote.</div>
+            <template v-else>
+              <div class="cmm__plantas-head">
+                <label class="cmm__check cmm__check--all">
+                  <input type="checkbox" :checked="todasSel" @change="toggleTodas" />
+                  Seleccionar todas
+                </label>
+                <span class="cmm__plantas-count">{{ selectedIds.length }} / {{ pendientes.length }}</span>
+              </div>
+              <div class="cmm__plantas-list">
+                <label v-for="p in pendientes" :key="p.id" class="cmm__check">
+                  <input type="checkbox" :value="p.id" v-model="selectedIds" />
+                  <span class="cmm__check-nombre">{{ p.nombre || `Planta #${p.id}` }}</span>
+                  <span class="cmm__check-qr">{{ p.codigo_qr }}</span>
+                </label>
+              </div>
+            </template>
           </div>
 
           <!-- Peso seco -->
@@ -63,7 +74,9 @@
           </div>
 
           <div class="cmm__info">
-            Se crea un pesaje y se manda a confirmar. La sede del stock se asigna después en Stock.
+            El peso seco se reparte como promedio entre las {{ selectedIds.length || '—' }} plantas seleccionadas.
+            Se crea un pesaje y se manda a confirmar; la sede del stock se asigna después en Stock.
+            Para un peso exacto por planta, entrá a la planta (o escaneá su QR).
           </div>
         </div>
 
@@ -84,7 +97,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { CheckCheck, X } from 'lucide-vue-next'
-import { createPesajeManicura } from '../../lib/api.js'
+import { createPesajeManicura, listPlants } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
@@ -93,19 +106,47 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue', 'completado'])
 
-const form = ref({ plantas_count: null, peso_seco_g: null, notas: '' })
+const form = ref({ peso_seco_g: null, notas: '' })
 const error  = ref(null)
 const saving = ref(false)
 
-const canSubmit = computed(() => form.value.peso_seco_g > 0 && form.value.plantas_count > 0)
+// Selección de plantas: se listan las pendientes (sin peso) y se eligen las manicuradas.
+const pendientes    = ref([])
+const selectedIds   = ref([])
+const loadingPlantas = ref(false)
+
+const todasSel  = computed(() => pendientes.value.length > 0 && selectedIds.value.length === pendientes.value.length)
+const canSubmit = computed(() => form.value.peso_seco_g > 0 && selectedIds.value.length > 0)
+
+function toggleTodas() {
+  selectedIds.value = todasSel.value ? [] : pendientes.value.map(p => p.id)
+}
 
 watch(() => props.modelValue, (visible) => {
-  if (visible) resetForm()
+  if (visible) { resetForm(); cargarPlantas() }
 })
 
 function resetForm() {
-  form.value = { plantas_count: props.lote?.plants_count || null, peso_seco_g: null, notas: '' }
+  form.value = { peso_seco_g: null, notas: '' }
+  pendientes.value = []
+  selectedIds.value = []
   error.value = null
+}
+
+async function cargarPlantas() {
+  if (!props.lote) return
+  loadingPlantas.value = true
+  try {
+    const { data } = await listPlants({ lote_id: props.lote.id })
+    // Pendientes = sin peso seco todavía (las ya pesadas no se re-reparten).
+    pendientes.value = (data || []).filter(p => !(parseFloat(p.peso_seco) > 0))
+    selectedIds.value = pendientes.value.map(p => p.id) // por defecto, todas
+  } catch {
+    pendientes.value = []
+    selectedIds.value = []
+  } finally {
+    loadingPlantas.value = false
+  }
 }
 
 async function confirmar() {
@@ -114,10 +155,10 @@ async function confirmar() {
   error.value  = null
   try {
     const { data } = await createPesajeManicura(props.lote.id, {
-      plantas_count: form.value.plantas_count,
-      peso_total_g:  form.value.peso_seco_g,
-      notas:         form.value.notas || undefined,
-      enviar:        true,
+      plant_ids:    selectedIds.value,
+      peso_total_g: form.value.peso_seco_g,
+      notas:        form.value.notas || undefined,
+      enviar:       true,
     })
     emit('completado', data)
     cerrar()
@@ -217,6 +258,18 @@ function cerrar() {
 .cmm__unit { font-size: var(--fs-13); color: var(--c-ink-400); font-weight: 500; flex-shrink: 0; }
 
 .cmm__textarea { resize: vertical; min-height: 60px; }
+
+/* Checklist de plantas */
+.cmm__plantas-msg { font-size: var(--fs-13); color: var(--c-ink-400); padding: .5rem .1rem; display: flex; align-items: center; gap: .4rem; }
+.cmm__plantas-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .35rem; }
+.cmm__plantas-count { font-size: var(--fs-13); font-weight: 700; color: var(--c-leaf-700, #15803d); }
+.cmm__plantas-list { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; border: 1px solid var(--c-ink-200); border-radius: var(--r-md); }
+.cmm__check { display: flex; align-items: center; gap: .5rem; padding: .5rem .65rem; font-size: var(--fs-14); color: var(--c-ink-900); cursor: pointer; }
+.cmm__plantas-list .cmm__check:not(:last-child) { border-bottom: 1px solid var(--c-ink-100); }
+.cmm__check input { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+.cmm__check--all { font-weight: 600; color: var(--c-ink-700); font-size: var(--fs-13); }
+.cmm__check-nombre { font-weight: 600; }
+.cmm__check-qr { margin-left: auto; font-size: var(--fs-12); color: var(--c-ink-400); font-family: var(--font-mono, monospace); }
 
 .cmm__info {
   font-size: var(--fs-12); color: var(--c-ink-400); line-height: 1.5;

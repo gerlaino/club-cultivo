@@ -57,10 +57,11 @@ class PesajesManicuraController < ApplicationController
     ActiveRecord::Base.transaction do
       pesaje.save!
       if carga_manual
-        # La carga conjunta reparte el peso como PROMEDIO entre las plantas declaradas, así
-        # cada una queda con su peso (prom) y se ve reflejada en el lote.
-        n = distribuir_resto!(pesaje, params[:peso_total_g].to_d, count: params[:plantas_count].to_i)
-        raise ArgumentError, 'No quedan plantas sin pesar para la carga conjunta' if n.zero?
+        # La carga conjunta reparte el peso como PROMEDIO entre las plantas seleccionadas
+        # (plant_ids) o, si no se seleccionaron, entre las primeras N sin pesar (plantas_count).
+        n = distribuir_resto!(pesaje, params[:peso_total_g].to_d,
+                              count: params[:plantas_count].to_i, solo_ids: params[:plant_ids])
+        raise ArgumentError, 'No hay plantas sin pesar entre las seleccionadas' if n.zero?
         pesaje.enviar! if enviar_ya
       end
     end
@@ -246,12 +247,15 @@ class PesajesManicuraController < ApplicationController
   # Reparte `peso_total` como PROMEDIO entre las plantas del lote que aún no tienen peso
   # (excluyendo `excluir_ids` y, opcionalmente, limitando a `count` plantas). Crea una
   # pesada por planta con es_promedio: true y le setea el peso_seco. Devuelve cuántas tocó.
-  def distribuir_resto!(pesaje, peso_total, count: nil, excluir_ids: [])
+  # `solo_ids` (opcional): limita el reparto a esas plantas puntuales (selección explícita
+  # del usuario). Si no viene, cae al comportamiento por `count` (primeras N sin pesar).
+  def distribuir_resto!(pesaje, peso_total, count: nil, solo_ids: nil, excluir_ids: [])
     return 0 if peso_total <= 0
     restantes = pesaje.lote.plants.where.not(id: excluir_ids)
                       .where('peso_seco IS NULL OR peso_seco <= 0')
-                      .order(:id).to_a
-    restantes = restantes.first(count) if count && count.positive?
+    restantes = restantes.where(id: solo_ids) if solo_ids.present?
+    restantes = restantes.order(:id).to_a
+    restantes = restantes.first(count) if count && count.positive? && solo_ids.blank?
     n = restantes.size
     return 0 if n.zero?
 
