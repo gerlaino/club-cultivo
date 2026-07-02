@@ -165,8 +165,9 @@ class DispensacionesController < ApplicationController
   # PATCH/PUT /dispensaciones/:id
   def update
     attrs = dispensacion_params_update
+    items_param = params.dig(:dispensacion, :items)
     # Cambios sin impacto financiero (fecha, observaciones, sede, delivery…): update directo.
-    financiero = (attrs.keys.map(&:to_s) & %w[cantidad stock_id aporte_socio_ars medio_pago]).any?
+    financiero = items_param.present? || (attrs.keys.map(&:to_s) & %w[cantidad stock_id aporte_socio_ars medio_pago]).any?
     unless financiero
       if @dispensacion.update(attrs)
         return render json: serialize_dispensacion(@dispensacion)
@@ -203,10 +204,28 @@ class DispensacionesController < ApplicationController
         # 2) aplicar cambios nuevos
         @dispensacion.assign_attributes(attrs)
 
-        # 3) validar stock disponible con la cantidad nueva
-        disp_real = @dispensacion.stock.cantidad_disponible_real.to_d
-        if @dispensacion.cantidad.to_d > disp_real
-          raise "Stock insuficiente: hay #{disp_real.round(2)}#{@dispensacion.stock.unidad || 'g'} disponibles"
+        if items_param.present?
+          # ── Edición multi-ítem: se reconstruyen las líneas desde cero (mismo criterio que
+          #    create) y el stock/total/cc se recalculan sobre ellas. ──
+          desc_paciente = @dispensacion.paciente.descuento_porcentaje.to_d.clamp(0, 100)
+          desc_dispensa = params.dig(:dispensacion, :descuento_dispensa_pct).to_d.clamp(0, 100)
+          desc_total    = [desc_paciente + desc_dispensa, 100].min
+          @dispensacion.descuento_paciente_pct = desc_paciente
+          @dispensacion.descuento_dispensa_pct = desc_dispensa
+          override_admin = (current_user.admin? || current_user.supervisor?) && attrs[:aporte_socio_ars].to_d > 0
+
+          @dispensacion.items.destroy_all
+          @dispensacion.items.reload
+          construir_items_multistock(@dispensacion, items_param, desc_total, override_admin)
+          raise 'La dispensación debe tener al menos un producto' if @dispensacion.items.empty?
+          @dispensacion.cantidad = @dispensacion.items.sum { |it| it.cantidad.to_d }
+          validar_stock_items!(@dispensacion)   # cada línea vs disponible (acumulado por stock)
+        else
+          # 3) validar stock disponible con la cantidad nueva (single legacy)
+          disp_real = @dispensacion.stock.cantidad_disponible_real.to_d
+          if @dispensacion.cantidad.to_d > disp_real
+            raise "Stock insuficiente: hay #{disp_real.round(2)}#{@dispensacion.stock.unidad || 'g'} disponibles"
+          end
         end
 
         if (err = validar_y_calcular_credito(@dispensacion, cc))
@@ -214,7 +233,7 @@ class DispensacionesController < ApplicationController
         end
 
         @dispensacion.save!
-        sincronizar_item_legacy!(@dispensacion)  # la línea espejo refleja stock/cantidad nuevos
+        sincronizar_item_legacy!(@dispensacion) unless items_param.present?  # la línea espejo refleja stock/cantidad nuevos
         @dispensacion.send(:decrementar_stock)   # descuenta la cantidad nueva (por línea)
         crear_movimiento_contable(@dispensacion)
         debitar_cuenta_corriente(@dispensacion) if @dispensacion.a_credito? && cc
@@ -541,17 +560,28 @@ class DispensacionesController < ApplicationController
       next if st.nil? || cant <= 0
 
       base = st.precio_sugerido_ars.to_d
-      # Precio manual (solo admin/supervisor): si el stock no tiene precio configurado y la
-      # línea trae uno, se usa. Con guardar_precio se persiste en el stock para no volver a
-      # pedirlo. El dispensador no puede fijar precios (no manda precio_manual_ars).
-      if base <= 0 && (current_user.admin? || current_user.supervisor?) && ln[:precio_manual_ars].present?
+      manual_usado = false
+      # Precio manual (solo admin/supervisor): pueden fijar/pisar el precio de una línea —
+      # sirve tanto para un stock sin precio configurado como para ajustar el P. unit al
+      # editar una dispensa. Con guardar_precio se persiste en el stock. El dispensador no
+      # puede fijar precios (no manda precio_manual_ars).
+      if (current_user.admin? || current_user.supervisor?) && ln[:precio_manual_ars].present?
         manual = ln[:precio_manual_ars].to_d
         if manual.positive?
           base = manual
+          manual_usado = true
           st.update_column(:precio_sugerido_ars, manual) if ActiveModel::Type::Boolean.new.cast(ln[:guardar_precio])
         end
       end
-      precio_desc = base > 0 ? (base * (1 - desc_total / 100)).round(2) : 0.to_d
+      # Si el admin fijó el precio a mano es LITERAL (ya lo puso con su criterio, no se le
+      # re-aplica descuento). Si no, el descuento total va sobre el precio del stock.
+      precio_desc = if manual_usado
+                      base.round(2)
+                    elsif base > 0
+                      (base * (1 - desc_total / 100)).round(2)
+                    else
+                      0.to_d
+                    end
       disp.items.build(stock: st, cantidad: cant, precio_unitario_ars: precio_desc)
       total += precio_desc * cant
     end
@@ -559,6 +589,20 @@ class DispensacionesController < ApplicationController
     disp.sede_id            ||= disp.items.first&.stock&.sede_id
     disp.precio_unitario_ars  = disp.items.first&.precio_unitario_ars
     disp.aporte_socio_ars     = override_admin ? disp.aporte_socio_ars : total.round(2)
+  end
+
+  # Valida que las líneas no excedan el stock disponible (acumulado por stock, por si dos
+  # líneas comparten el mismo contenedor). Se usa en la edición multi-ítem, donde las
+  # validaciones on:create del modelo no corren.
+  def validar_stock_items!(disp)
+    por_stock = Hash.new(0.to_d)
+    disp.items.each { |it| por_stock[it.stock_id] += it.cantidad.to_d if it.stock_id }
+    por_stock.each do |stock_id, total|
+      st = Stock.find_by(id: stock_id)
+      next unless st
+      disp_real = st.cantidad_disponible_real.to_d
+      raise "Stock insuficiente para #{st.forma_producto}: hay #{disp_real.round(2)}#{st.unidad || 'g'} disponibles" if total > disp_real
+    end
   end
 
   # Edición legacy (single-stock): vuelca los valores nuevos de la dispensa a su única línea

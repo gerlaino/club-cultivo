@@ -4,6 +4,11 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { updateDispensacion } from '../../lib/api.js'
+import { useAuthStore } from '../../stores/auth'
+
+const auth = useAuthStore()
+// Solo admin/supervisor pueden pisar el precio por ítem; el resto edita cantidades.
+const puedeEditarPrecio = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 
 const props = defineProps({
   modelValue:     { type: Boolean, required: true },
@@ -52,9 +57,17 @@ const estadoCc = computed(() => {
 const form = ref({})
 
 function buildForm(d) {
-  if (!d) return {}
+  if (!d) return { items: [], fecha_dispensacion: '', medio_pago: 'efectivo', aporte_socio_ars: null, observaciones: '' }
+  const items = (d.items?.length ? d.items : []).map(it => ({
+    stock_id: it.stock_id,
+    forma:    it.stock?.forma_producto,
+    genetica: it.genetica_nombre || it.stock?.lote?.genetica?.nombre,
+    unidad:   it.stock?.unidad || 'g',
+    cantidad: Number(it.cantidad) || 0,
+    precio:   Number(it.precio_unitario_ars) || 0,
+  }))
   return {
-    cantidad:           d.cantidad ?? null,
+    items,
     fecha_dispensacion: d.fecha_dispensacion || '',
     medio_pago:         d.medio_pago || 'efectivo',
     aporte_socio_ars:   d.aporte_socio_ars ?? null,
@@ -62,16 +75,16 @@ function buildForm(d) {
   }
 }
 
-// Precio unitario original (para re-sugerir el aporte al cambiar la cantidad).
-const precioUnitOrig = computed(() => {
-  const a = Number(props.dispensacion?.aporte_socio_ars) || 0
-  const c = Number(props.dispensacion?.cantidad) || 0
-  return c > 0 ? a / c : 0
-})
-function onCantidadChange() {
-  if (precioUnitOrig.value > 0 && Number(form.value.cantidad) > 0) {
-    form.value.aporte_socio_ars = Math.round(precioUnitOrig.value * Number(form.value.cantidad))
-  }
+// Total sugerido = suma de (cantidad × precio) por ítem. El aporte lo pre-llena pero el
+// admin puede pisarlo (override).
+const totalSugerido = computed(() =>
+  Math.round((form.value.items || []).reduce((s, it) => s + (Number(it.cantidad) || 0) * (Number(it.precio) || 0), 0))
+)
+function recalc() { form.value.aporte_socio_ars = totalSugerido.value }
+function quitarItem(i) {
+  if (form.value.items.length <= 1) return
+  form.value.items.splice(i, 1)
+  recalc()
 }
 
 watch(() => props.modelValue, (open) => {
@@ -97,9 +110,18 @@ async function handleSubmit() {
     saving.value = false; return
   }
 
+  if (!form.value.items?.length) {
+    formError.value = 'La dispensación debe tener al menos un producto'
+    saving.value = false; return
+  }
+
   try {
     await updateDispensacion(props.dispensacion.id, {
-      cantidad:           form.value.cantidad,
+      items: form.value.items.map(it => ({
+        stock_id: it.stock_id,
+        cantidad: it.cantidad,
+        ...(puedeEditarPrecio.value ? { precio_manual_ars: it.precio } : {}),
+      })),
       fecha_dispensacion: form.value.fecha_dispensacion,
       medio_pago:         form.value.medio_pago,
       aporte_socio_ars:   form.value.aporte_socio_ars,
@@ -112,8 +134,6 @@ async function handleSubmit() {
     formError.value = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al guardar'
   } finally { saving.value = false }
 }
-
-const stk = computed(() => props.dispensacion?.stock)
 </script>
 
 <template>
@@ -132,21 +152,30 @@ const stk = computed(() => props.dispensacion?.stock)
         <div class="med__modal-body">
           <div v-if="formError" class="med__error"><i class="bi bi-exclamation-triangle-fill"></i> {{ formError }}</div>
 
-          <!-- Stock dispensado — solo lectura -->
-          <div class="med__section-label">Producto dispensado</div>
-          <div class="med__stock-info">
-            <span class="med__stock-emoji">{{ FORMA_EMOJI[stk?.forma_producto] || '📦' }}</span>
-            <div class="med__stock-detail">
-              <span class="med__stock-nombre">{{ FORMA_LABEL[stk?.forma_producto] || stk?.forma_producto || '—' }}</span>
-              <span v-if="stk?.lote?.genetica?.nombre" class="med__stock-gen">{{ stk.lote.genetica.nombre }}</span>
-            </div>
-            <div class="med__stock-cantidad">
-              <div class="med__qty-edit">
-                <input v-model.number="form.cantidad" type="number" min="0.01" step="0.01" class="med__qty-input" @input="onCantidadChange" />
-                <span class="med__qty-unit">{{ stk?.unidad || 'g' }}</span>
+          <!-- Productos de la dispensa -->
+          <div class="med__section-label">Producto{{ form.items?.length > 1 ? 's' : '' }}</div>
+          <div class="med__items">
+            <div v-for="(it, i) in form.items" :key="i" class="med__item">
+              <span class="med__item-emoji">{{ FORMA_EMOJI[it.forma] || '📦' }}</span>
+              <div class="med__item-detail">
+                <span class="med__item-nombre">{{ FORMA_LABEL[it.forma] || it.forma || '—' }}</span>
+                <span v-if="it.genetica" class="med__item-gen">{{ it.genetica }}</span>
               </div>
+              <div class="med__qty-edit">
+                <input v-model.number="it.cantidad" type="number" min="0.01" step="0.01" class="med__qty-input" @input="recalc" />
+                <span class="med__qty-unit">{{ it.unidad }}</span>
+              </div>
+              <div v-if="puedeEditarPrecio" class="med__price-edit" title="Precio por unidad">
+                <span class="med__price-prefix">$</span>
+                <input v-model.number="it.precio" type="number" min="0" step="1" class="med__price-input" @input="recalc" />
+              </div>
+              <span v-else class="med__item-price">{{ fmt(it.precio) }}</span>
+              <button v-if="form.items.length > 1" class="med__item-del" @click="quitarItem(i)" title="Quitar ítem">
+                <i class="bi bi-trash"></i>
+              </button>
             </div>
           </div>
+          <div class="med__items-total">Total productos <strong>{{ fmt(totalSugerido) }}</strong></div>
 
           <div class="med__divider"></div>
 
@@ -240,6 +269,21 @@ const stk = computed(() => props.dispensacion?.stock)
 .med__qty-edit { display: flex; align-items: center; gap: .3rem; }
 .med__qty-input { width: 72px; text-align: right; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 7px; padding: .35rem .5rem; font-size: .85rem; font-weight: 700; color: #0f172a; outline: none; }
 .med__qty-unit { font-size: .78rem; color: #64748b; font-weight: 600; }
+
+/* Ítems editables */
+.med__items { display: flex; flex-direction: column; gap: .5rem; }
+.med__item { display: flex; align-items: center; gap: .6rem; padding: .6rem .75rem; border-radius: 10px; border: 1.5px solid #e2e8f0; background: #fff; }
+.med__item-emoji { font-size: 1.15rem; flex-shrink: 0; }
+.med__item-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
+.med__item-nombre { font-size: .82rem; font-weight: 700; color: #0f172a; }
+.med__item-gen { font-size: .72rem; color: #64748b; font-style: italic; }
+.med__price-edit { display: flex; align-items: center; gap: .15rem; flex-shrink: 0; }
+.med__price-prefix { font-size: .78rem; color: #64748b; font-weight: 600; }
+.med__price-input { width: 76px; text-align: right; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 7px; padding: .35rem .5rem; font-size: .85rem; font-weight: 700; color: #0f172a; outline: none; }
+.med__item-price { font-size: .82rem; font-weight: 700; color: #15803d; flex-shrink: 0; }
+.med__item-del { background: none; border: none; color: #dc2626; cursor: pointer; padding: .2rem; flex-shrink: 0; font-size: .85rem; }
+.med__items-total { text-align: right; font-size: .8rem; color: #64748b; margin-top: .5rem; }
+.med__items-total strong { color: #15803d; font-size: .95rem; margin-left: .3rem; }
 
 /* Form */
 .med__divider { height: 1px; background: #e2e8f0; }

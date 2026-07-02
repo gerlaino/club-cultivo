@@ -86,4 +86,43 @@ RSpec.describe 'Dispensación multi-stock', type: :request do
       expect(stock_sp.reload.precio_sugerido_ars).to be_nil
     end
   end
+
+  # Fase 2: edición por ítem — reconstruye líneas y reconcilia stock/total.
+  describe 'edición multi-ítem' do
+    def editar(d, items)
+      patch "/dispensaciones/#{d.id}",
+            params: { dispensacion: { items: items } },
+            headers: auth_headers
+    end
+
+    it 'reconstruye las líneas, reconcilia el stock y recalcula el total' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }])
+      d = Dispensacion.last                                   # a:90, b:45
+      editar(d, [{ stock_id: stock_a.id, cantidad: 20 }, { stock_id: stock_b.id, cantidad: 5 }])
+      expect(response).to have_http_status(:ok)
+      expect(d.reload.items.count).to eq(2)
+      expect(d.aporte_socio_ars).to eq(3000)                 # 20*100 + 5*200
+      expect(stock_a.reload.cantidad).to eq(80)              # devolvió 10, descontó 20
+      expect(stock_b.reload.cantidad).to eq(45)              # sin cambio neto
+    end
+
+    it 'puede quitar un ítem y devuelve su stock' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }])
+      d = Dispensacion.last
+      editar(d, [{ stock_id: stock_a.id, cantidad: 10 }])
+      expect(response).to have_http_status(:ok)
+      expect(d.reload.items.count).to eq(1)
+      expect(stock_a.reload.cantidad).to eq(90)
+      expect(stock_b.reload.cantidad).to eq(50)              # devuelto completo
+    end
+
+    it 'bloquea si una línea nueva excede el stock y hace rollback total' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }])
+      d = Dispensacion.last                                   # a:90
+      editar(d, [{ stock_id: stock_a.id, cantidad: 999 }])
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(stock_a.reload.cantidad).to eq(90)              # rollback: sin cambios
+      expect(d.reload.items.first.cantidad).to eq(10)
+    end
+  end
 end
