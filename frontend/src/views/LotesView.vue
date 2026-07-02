@@ -48,6 +48,9 @@ const ESTADO_META = {
 // "Cosechado" es todo lo que ya salió de floración: cortado y en secado (cosecha),
 // asignado a manicura (en_manicura), guardado en frasco (curado) y cerrado (finalizado).
 const COSECHADOS = ["cosecha","en_manicura","curado","finalizado"];
+// "En ciclo activo": el lote sigue activo hasta que pasa a curado (cuando ya se
+// transformó en stock). Cosecha y en_manicura todavía cuentan como ciclo activo.
+const EN_CICLO = ["semilla","esqueje","vegetativo","floracion","cosecha","en_manicura"];
 
 function em(e)           { return ESTADO_META[e] || { label: e||"—", dot:"#94a3b8", bg:"#f1f5f9", text:"#64748b", bar:"#94a3b8", icon:"•" }; }
 function estadoLabel(e)  { return em(e).label; }
@@ -64,7 +67,7 @@ const stats = computed(() => {
   const all = store.items;
   return {
     total:      all.length,
-    enCiclo:    all.filter(l => ["vegetativo","floracion"].includes(l.estado)).length,
+    enCiclo:    all.filter(l => EN_CICLO.includes(l.estado)).length,
     plantas:    all.reduce((a,l) => a + Number(l.plants_count||0), 0),
     cosechados: all.filter(l => COSECHADOS.includes(l.estado)).length,
   };
@@ -96,8 +99,8 @@ const filtered = computed(() => {
     const matchTab     = tab.value === "activos" ? esActivo : !esActivo;
     const matchText    = !query || (l.codigo||"").toLowerCase().includes(query) || (l.strain||"").toLowerCase().includes(query);
     const matchEstado  = !filterEstado.value
-      || (filterEstado.value === "cosechados"
-          ? COSECHADOS.includes(l.estado)
+      || (filterEstado.value === "cosechados" ? COSECHADOS.includes(l.estado)
+          : filterEstado.value === "en_ciclo" ? EN_CICLO.includes(l.estado)
           : l.estado === filterEstado.value);
     const matchSala    = !filterSala.value   || String(l.sala_id) === filterSala.value;
     const matchGrow    = !filterGrow.value   || l.grow_type === filterGrow.value;
@@ -260,7 +263,7 @@ async function exportarCSV() {
         <div class="lv__kpi-val">{{ stats.total }}</div>
         <div class="lv__kpi-lbl">Total</div>
       </button>
-      <button class="lv__kpi lv__kpi--green" :class="{ 'lv__kpi--active': filterEstado === 'vegetativo' || filterEstado === 'floracion' }" @click="filterEstado = filterEstado === 'vegetativo' ? '' : 'vegetativo'">
+      <button class="lv__kpi lv__kpi--green" :class="{ 'lv__kpi--active': filterEstado === 'en_ciclo' }" @click="filterEstado = filterEstado === 'en_ciclo' ? '' : 'en_ciclo'">
         <div class="lv__kpi-val">{{ stats.enCiclo }}</div>
         <div class="lv__kpi-lbl">En ciclo activo</div>
       </button>
