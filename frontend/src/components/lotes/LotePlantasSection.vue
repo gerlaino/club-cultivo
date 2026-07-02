@@ -408,7 +408,7 @@ async function generarHTMLEtiquetas() {
       .filter(p => p.codigo_qr)
       .map(async p => {
         const qrDataUrl = await generatePNG(`${origen}/p/${p.codigo_qr}`, {
-          width: 180, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' },
+          width: 200, margin: 2, color: { dark: '#1b5e20', light: '#ffffff' },
         })
         return banderitaHTML({
           qrDataUrl, nombre: p.nombre || p.codigo_qr, genetica,

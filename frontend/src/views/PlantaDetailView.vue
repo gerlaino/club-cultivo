@@ -75,7 +75,7 @@ async function imprimirEtiqueta() {
   const p = planta.value
   if (!p?.codigo_qr) return
   if (!club.data) { try { await club.fetch() } catch { /* club opcional en la etiqueta */ } }
-  const qrDataUrl = await generatePNG(qrPlantaUrl(), { width: 200, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' } })
+  const qrDataUrl = await generatePNG(qrPlantaUrl(), { width: 220, margin: 2, color: { dark: '#1b5e20', light: '#ffffff' } })
   const etiqueta = banderitaHTML({
     qrDataUrl,
     nombre:    p.nombre || p.codigo_qr,
@@ -86,7 +86,7 @@ async function imprimirEtiqueta() {
     clubLogo:  await logoDataUrl(club.logoUrl),
   })
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Etiqueta ${p.codigo_qr}</title>
-<style>@page{size:140mm 25mm;margin:0} body{font-family:-apple-system,sans-serif} ${banderitaCSS}</style>
+<style>@page{size:160mm 26mm;margin:0} body{font-family:-apple-system,sans-serif} ${banderitaCSS}</style>
 </head><body>${etiqueta}</body></html>`
   const win = window.open('', '_blank', 'width=800,height=400')
   if (!win) { toast.error('Permitir ventanas emergentes para imprimir'); return }
