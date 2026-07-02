@@ -135,8 +135,13 @@ async function cargarStocks() {
 // ── Carrito multi-item (dispensa inmediata) ──────────────────────────────────────
 // Subtotal de una línea con el precio sugerido del stock (sin descuento; el descuento
 // se muestra sobre el total). 0 si el stock no tiene precio configurado.
+// Precio efectivo de la línea: el del stock, o el manual que carga el admin si el stock
+// no tiene precio configurado.
+const precioLinea = (it) => Number(it.stock.precio_sugerido_ars) > 0
+  ? Number(it.stock.precio_sugerido_ars)
+  : (Number(it.precioManual) || 0)
 function subtotalItem(it) {
-  return (Number(it.stock.precio_sugerido_ars) || 0) * it.cantidad
+  return precioLinea(it) * it.cantidad
 }
 
 // Agrega la línea en edición (stock seleccionado + cantidad) al carrito.
@@ -157,7 +162,7 @@ function agregarItem() {
   }
   const existente = items.value.find(it => it.stock.id === s.id)
   if (existente) existente.cantidad = Number((existente.cantidad + cant).toFixed(3))
-  else items.value.push({ stock: s, cantidad: cant })
+  else items.value.push({ stock: s, cantidad: cant, precioManual: null, guardarPrecio: false })
   form.value.stock_id = null
   form.value.cantidad = null
   formError.value = null
@@ -212,7 +217,7 @@ const precioBase = computed(() => {
   // Dispensa inmediata: suma del carrito (cada línea por su precio sugerido).
   if (esDispensaInmediata.value) {
     if (!items.value.length) return null
-    const total = items.value.reduce((a, it) => a + (Number(it.stock.precio_sugerido_ars) || 0) * it.cantidad, 0)
+    const total = items.value.reduce((a, it) => a + precioLinea(it) * it.cantidad, 0)
     return total > 0 ? total : null
   }
   // Reserva / entregar reserva: un solo producto (con precio manual si el stock no tiene).
@@ -366,9 +371,11 @@ async function handleSubmit() {
   }
   // Aporte obligatorio para todos los medios de pago
   if (!(Number(form.value.aporte_socio_ars) > 0)) {
-    const sinPrecio = items.value.some(it => !(Number(it.stock.precio_sugerido_ars) > 0))
+    const sinPrecio = items.value.some(it => !(precioLinea(it) > 0))
     formError.value = sinPrecio
-      ? 'Hay un producto sin precio configurado. Pedile al administrador que lo cargue.'
+      ? (puedeEditarAporte.value
+          ? 'Cargá el precio de los productos sin precio (campo $/u en el carrito).'
+          : 'Hay un producto sin precio configurado. Pedile al administrador que lo cargue.')
       : 'El aporte del socio debe ser mayor a $0.'
     saving.value = false; return
   }
@@ -398,7 +405,15 @@ async function handleSubmit() {
     const payload = {
       // Multi-item: una dispensa con varias líneas. El backend recalcula el precio de cada
       // línea (con el descuento del socio) y suma el total.
-      items: items.value.map(it => ({ stock_id: it.stock.id, cantidad: it.cantidad })),
+      items: items.value.map(it => {
+        const l = { stock_id: it.stock.id, cantidad: it.cantidad }
+        // Precio manual solo cuando el stock no tiene precio configurado.
+        if (!(Number(it.stock.precio_sugerido_ars) > 0) && Number(it.precioManual) > 0) {
+          l.precio_manual_ars = Number(it.precioManual)
+          l.guardar_precio    = !!it.guardarPrecio
+        }
+        return l
+      }),
       fecha_dispensacion: form.value.fecha_dispensacion,
       observaciones: form.value.observaciones || undefined,
       medio_pago: cobraDelivery.value ? undefined : form.value.medio_pago, con_envio: form.value.con_envio,
@@ -580,6 +595,16 @@ async function handleSubmit() {
               <span class="mnd__cart-info">
                 <span class="mnd__cart-nombre">{{ FORMA_LABEL[it.stock.forma_producto] || it.stock.forma_producto }}</span>
                 <span class="mnd__cart-qty">{{ it.cantidad }}{{ it.stock.unidad || 'g' }}</span>
+              </span>
+              <span
+                v-if="!(Number(it.stock.precio_sugerido_ars) > 0) && puedeEditarAporte"
+                class="mnd__cart-precio"
+              >
+                <span class="mnd__cart-precio-sign">$</span>
+                <input v-model.number="it.precioManual" type="number" min="0" step="1" placeholder="precio/u" class="mnd__cart-precio-input" />
+                <label class="mnd__cart-guardar" title="Guardar este precio en el producto">
+                  <input type="checkbox" v-model="it.guardarPrecio" /> guardar
+                </label>
               </span>
               <span class="mnd__cart-sub">{{ subtotalItem(it) > 0 ? fmt(subtotalItem(it)) : 'sin precio' }}</span>
               <button type="button" class="mnd__cart-rm" @click="quitarItem(i)" title="Quitar"><i class="bi bi-x-lg"></i></button>
@@ -860,6 +885,11 @@ async function handleSubmit() {
 .mnd__cart-emoji { font-size: 1rem; flex-shrink: 0; }
 .mnd__cart-info { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
 .mnd__cart-nombre { font-size: .82rem; font-weight: 700; color: #0f172a; }
+.mnd__cart-precio { display: inline-flex; align-items: center; gap: .3rem; flex-shrink: 0; }
+.mnd__cart-precio-sign { font-size: .8rem; color: #64748b; }
+.mnd__cart-precio-input { width: 72px; padding: .25rem .4rem; border: 1.5px solid #86efac; border-radius: 6px; font-size: .8rem; color: #0f172a; background: #fff; outline: none; }
+.mnd__cart-precio-input:focus { border-color: #15803d; }
+.mnd__cart-guardar { display: inline-flex; align-items: center; gap: .2rem; font-size: .68rem; color: #15803d; cursor: pointer; white-space: nowrap; }
 .mnd__cart-qty { font-size: .75rem; font-family: monospace; color: #15803d; font-weight: 700; }
 .mnd__cart-sub { font-size: .8rem; font-weight: 700; color: #166534; font-family: monospace; white-space: nowrap; }
 .mnd__cart-rm { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 2px 4px; display: flex; border-radius: 5px; }

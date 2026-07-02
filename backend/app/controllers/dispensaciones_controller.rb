@@ -540,7 +540,17 @@ class DispensacionesController < ApplicationController
       cant = ln[:cantidad].to_d
       next if st.nil? || cant <= 0
 
-      base        = st.precio_sugerido_ars.to_d
+      base = st.precio_sugerido_ars.to_d
+      # Precio manual (solo admin/supervisor): si el stock no tiene precio configurado y la
+      # línea trae uno, se usa. Con guardar_precio se persiste en el stock para no volver a
+      # pedirlo. El dispensador no puede fijar precios (no manda precio_manual_ars).
+      if base <= 0 && (current_user.admin? || current_user.supervisor?) && ln[:precio_manual_ars].present?
+        manual = ln[:precio_manual_ars].to_d
+        if manual.positive?
+          base = manual
+          st.update_column(:precio_sugerido_ars, manual) if ActiveModel::Type::Boolean.new.cast(ln[:guardar_precio])
+        end
+      end
       precio_desc = base > 0 ? (base * (1 - desc_total / 100)).round(2) : 0.to_d
       disp.items.build(stock: st, cantidad: cant, precio_unitario_ars: precio_desc)
       total += precio_desc * cant

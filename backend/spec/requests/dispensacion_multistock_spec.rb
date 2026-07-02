@@ -54,4 +54,36 @@ RSpec.describe 'Dispensación multi-stock', type: :request do
     expect(stock_a.reload.cantidad).to eq(100)
     expect(stock_b.reload.cantidad).to eq(50)
   end
+
+  # Precio manual para stock sin precio configurado.
+  describe 'precio manual (stock sin precio)' do
+    let!(:stock_sp) { Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 100, precio_sugerido_ars: nil) }
+
+    def crear_como(user, items)
+      delete '/api/users/sign_out'
+      sign_in_as(user)
+      post "/pacientes/#{paciente.id}/dispensaciones",
+           params: { dispensacion: { medio_pago: 'efectivo', items: items } },
+           headers: auth_headers
+    end
+
+    it 'el admin fija el precio y con guardar_precio lo persiste en el stock' do
+      crear_como(admin, [{ stock_id: stock_sp.id, cantidad: 10, precio_manual_ars: 150, guardar_precio: true }])
+      expect(response).to have_http_status(:created)
+      expect(Dispensacion.last.aporte_socio_ars).to eq(1500)      # 10 * 150
+      expect(stock_sp.reload.precio_sugerido_ars).to eq(150)      # guardado en el producto
+    end
+
+    it 'sin guardar_precio usa el precio pero NO lo persiste en el stock' do
+      crear_como(admin, [{ stock_id: stock_sp.id, cantidad: 10, precio_manual_ars: 150 }])
+      expect(response).to have_http_status(:created)
+      expect(Dispensacion.last.aporte_socio_ars).to eq(1500)
+      expect(stock_sp.reload.precio_sugerido_ars).to be_nil
+    end
+
+    it 'el dispensador NO puede fijar precio manual (no toca el stock)' do
+      crear_como(dispensador, [{ stock_id: stock_sp.id, cantidad: 10, precio_manual_ars: 150 }])
+      expect(stock_sp.reload.precio_sugerido_ars).to be_nil
+    end
+  end
 end
