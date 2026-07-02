@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listGeneticas, createGenetica, updateGenetica, deleteGenetica } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
-import { useQRCode } from '../composables/useQRCode.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useToast } from '../composables/useToast.js'
 import EmptyState from '../components/ui/EmptyState.vue'
@@ -14,18 +13,8 @@ const router = useRouter()
 
 const auth    = useAuthStore()
 const canEdit = computed(() => auth.role === 'admin')
-const { downloadPNG, downloadSVG } = useQRCode()
 const { confirm } = useConfirm()
 const toast = useToast()
-
-function qrUrl(gen) {
-  return `${window.location.origin}/g/${gen.slug}`
-}
-function qrFilename(gen, ext) {
-  return `qr-genetica-${gen.slug}.${ext}`
-}
-async function descargarQRpng(gen) { await downloadPNG(qrUrl(gen), qrFilename(gen, 'png')) }
-async function descargarQRsvg(gen) { await downloadSVG(qrUrl(gen), qrFilename(gen, 'svg')) }
 
 const geneticas    = ref([])
 const loading      = ref(true)
@@ -36,7 +25,6 @@ const showModal    = ref(false)
 const editingId    = ref(null)
 const editingInase = ref(false)
 const formError    = ref(null)
-const qrOpenId     = ref(null)
 
 const search            = ref('')
 const filterTipo        = ref('')
@@ -56,14 +44,6 @@ const TIPO_META = {
   ruderalis: { label: 'Ruderalis', color: '#0dcaf0', bg: 'rgba(13,202,240,.12)' },
 }
 function tipoMeta(tipo) { return TIPO_META[tipo] || { label: tipo || '—', color: '#6c757d', bg: 'rgba(108,117,125,.1)' } }
-
-const DIFICULTAD_META = {
-  facil:   { label: 'Fácil',   icon: '🟢' },
-  media:   { label: 'Media',   icon: '🟡' },
-  dificil: { label: 'Difícil', icon: '🔴' },
-}
-function difLabel(d) { return DIFICULTAD_META[d]?.label || '—' }
-function difIcon(d)  { return DIFICULTAD_META[d]?.icon  || '' }
 
 const kpis = computed(() => ({
   total:   geneticas.value.length,
@@ -112,7 +92,7 @@ function emptyForm() {
     descripcion: '', consejos_club: '', origen: '', criador: '', terpenos: '',
     tiempo_floracion: null, dias_vegetativo_objetivo: null, dias_cosecha_objetivo: null,
     rendimiento: null, altura: null,
-    dificultad: '', disponible: true,
+    disponible: true,
   }
 }
 const form       = ref(emptyForm())
@@ -170,7 +150,6 @@ function openEdit(gen) {
     dias_cosecha_objetivo:    gen.dias_cosecha_objetivo    ?? null,
     rendimiento:      gen.rendimiento      ?? null,
     altura:           gen.altura           ?? null,
-    dificultad:       gen.dificultad       || '',
     disponible:       gen.disponible       ?? true,
   }
   formErrors.value  = {}
@@ -381,9 +360,8 @@ onMounted(loadGeneticas)
             <th title="Registrada INASE">INASE</th>
             <th>Tipo</th>
             <th>THC · CBD</th>
-            <th title="Dificultad">Dif.</th>
             <th>Floración</th>
-            <th>Criador</th>
+            <th>Origen</th>
             <th>🪴</th>
             <th v-if="canEdit">Disponible</th>
             <th v-if="canEdit"></th>
@@ -415,15 +393,11 @@ onMounted(loadGeneticas)
               </span>
             </td>
             <td>
-              <span v-if="gen.dificultad" :title="difLabel(gen.dificultad)">{{ difIcon(gen.dificultad) }}</span>
-              <span v-else class="gen-empty">—</span>
-            </td>
-            <td>
               <span v-if="gen.tiempo_floracion" class="gen-floracion">{{ gen.tiempo_floracion }}d</span>
               <span v-else class="gen-empty">—</span>
             </td>
             <td>
-              <span class="gen-criador" :title="gen.criador">{{ gen.criador ? gen.criador.slice(0, 25) + (gen.criador.length > 25 ? '…' : '') : '—' }}</span>
+              <span class="gen-criador" :title="gen.origen">{{ gen.origen ? gen.origen.slice(0, 25) + (gen.origen.length > 25 ? '…' : '') : '—' }}</span>
             </td>
             <td>
               <span :class="gen.plantas_count > 0 ? 'gen-plantas' : 'gen-empty'">{{ gen.plantas_count || 0 }}</span>
@@ -441,17 +415,6 @@ onMounted(loadGeneticas)
                 <button class="gen-edit-btn" @click="openEdit(gen)" title="Editar">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <div v-if="gen.slug" class="gen-qrdd" :class="{ 'gen-qrdd--open': qrOpenId === gen.id }">
-                  <button class="gen-edit-btn" title="QR público" @click.stop="qrOpenId = qrOpenId === gen.id ? null : gen.id">
-                    <i class="bi bi-qr-code"></i>
-                  </button>
-                  <div v-if="qrOpenId === gen.id" class="gen-qrdd__menu" @mouseleave="qrOpenId=null">
-                    <button class="gen-qrdd__item" @click="descargarQRsvg(gen); qrOpenId=null"><i class="bi bi-file-earmark-code"></i> SVG</button>
-                    <button class="gen-qrdd__item" @click="descargarQRpng(gen); qrOpenId=null"><i class="bi bi-file-earmark-image"></i> PNG</button>
-                    <div class="gen-qrdd__sep"></div>
-                    <a :href="`/g/${gen.slug}`" target="_blank" class="gen-qrdd__item"><i class="bi bi-box-arrow-up-right"></i> Ver pública</a>
-                  </div>
-                </div>
                 <button
                   class="gen-edit-btn gen-edit-btn--danger"
                   @click="openDelete(gen)"
@@ -558,20 +521,6 @@ onMounted(loadGeneticas)
                   >{{ meta.label }}</button>
                 </div>
                 <div v-if="formErrors.tipo" class="gv-form__field-error">{{ formErrors.tipo }}</div>
-              </div>
-
-              <!-- Dificultad -->
-              <div class="gv-form__field">
-                <label class="gv-form__label">Dificultad de cultivo</label>
-                <div class="gv-form__btn-group">
-                  <button
-                    v-for="(meta, key) in DIFICULTAD_META" :key="key"
-                    type="button"
-                    class="gv-form__tipo-btn"
-                    :class="{ 'gv-form__tipo-btn--active': form.dificultad === key }"
-                    @click="form.dificultad = form.dificultad === key ? '' : key"
-                  >{{ meta.icon }} {{ meta.label }}</button>
-                </div>
               </div>
 
               <!-- THC / CBD -->

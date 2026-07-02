@@ -35,14 +35,7 @@ const TIPO_META = {
   hibrida:   { label: 'Híbrida',   color: '#fd7e14' },
   ruderalis: { label: 'Ruderalis', color: '#0dcaf0' },
 }
-const DIFICULTAD_META = {
-  facil:   { label: 'Fácil',   icon: '🟢' },
-  media:   { label: 'Media',   icon: '🟡' },
-  dificil: { label: 'Difícil', icon: '🔴' },
-}
-
 const tipoMeta   = computed(() => TIPO_META[gen.value?.tipo] || { label: gen.value?.tipo || '—', color: '#6c757d' })
-const difMeta    = computed(() => DIFICULTAD_META[gen.value?.dificultad] || null)
 const terpenos   = computed(() =>
   gen.value?.terpenos
     ? gen.value.terpenos.split(',').map(t => t.trim()).filter(Boolean)
@@ -109,7 +102,7 @@ function initSparkline() {
       labels:   sparklineData.value.map(p => p.x),
       datasets: [{
         data:            sparklineData.value.map(p => p.y),
-        borderColor:     '#1b5e20',
+        borderColor:     '#16a34a',
         backgroundColor: 'rgba(27,94,32,.08)',
         borderWidth:     2,
         pointRadius:     4,
@@ -224,10 +217,8 @@ onMounted(async () => {
                 <span v-if="!gen.disponible" class="gdv__badge gdv__badge--muted">No disponible</span>
               </div>
               <h1 class="gdv__nombre">{{ gen.nombre }}</h1>
-              <div v-if="gen.criador || gen.origen" class="gdv__sub">
-                <span v-if="gen.criador"><i class="bi bi-person"></i> {{ gen.criador }}</span>
-                <span v-if="gen.criador && gen.origen"> · </span>
-                <span v-if="gen.origen"><i class="bi bi-geo-alt"></i> {{ gen.origen }}</span>
+              <div v-if="gen.origen" class="gdv__sub">
+                <span><i class="bi bi-geo-alt"></i> {{ gen.origen }}</span>
               </div>
             </div>
 
@@ -241,7 +232,7 @@ onMounted(async () => {
             </div>
             <div class="kpi-cell">
               <div class="kpi-cell__label">CBD</div>
-              <div class="kpi-cell__value" style="color:#1b5e20">{{ gen.cbd != null ? gen.cbd + '%' : '—' }}</div>
+              <div class="kpi-cell__value" style="color:#16a34a">{{ gen.cbd != null ? gen.cbd + '%' : '—' }}</div>
             </div>
             <div v-if="gen.tiempo_floracion" class="kpi-cell">
               <div class="kpi-cell__label">Floración</div>
@@ -276,13 +267,17 @@ onMounted(async () => {
           <div class="gdv__card gdv__card--mb">
             <h6 class="section-title">Datos de cultivo</h6>
             <div class="dato-grid">
+              <div v-if="gen.dias_vegetativo_objetivo" class="dato-item">
+                <span class="dato-item__icon">🌱</span>
+                <div><div class="dato-item__label">Vegetativo obj.</div><div class="dato-item__val">{{ gen.dias_vegetativo_objetivo }} días</div></div>
+              </div>
               <div v-if="gen.tiempo_floracion" class="dato-item">
                 <span class="dato-item__icon">🌸</span>
-                <div><div class="dato-item__label">Floración</div><div class="dato-item__val">{{ gen.tiempo_floracion }} días</div></div>
+                <div><div class="dato-item__label">Floración obj.</div><div class="dato-item__val">{{ gen.tiempo_floracion }} días</div></div>
               </div>
-              <div v-if="difMeta" class="dato-item">
-                <span class="dato-item__icon">{{ difMeta.icon }}</span>
-                <div><div class="dato-item__label">Dificultad</div><div class="dato-item__val">{{ difMeta.label }}</div></div>
+              <div v-if="gen.dias_cosecha_objetivo" class="dato-item">
+                <span class="dato-item__icon">✂️</span>
+                <div><div class="dato-item__label">Cosecha obj.</div><div class="dato-item__val">{{ gen.dias_cosecha_objetivo }} días</div></div>
               </div>
               <div v-if="gen.rendimiento" class="dato-item">
                 <span class="dato-item__icon">⚖️</span>
@@ -296,12 +291,8 @@ onMounted(async () => {
                 <span class="dato-item__icon">🌍</span>
                 <div><div class="dato-item__label">Origen</div><div class="dato-item__val">{{ gen.origen }}</div></div>
               </div>
-              <div v-if="gen.criador" class="dato-item">
-                <span class="dato-item__icon">👤</span>
-                <div><div class="dato-item__label">Criador</div><div class="dato-item__val">{{ gen.criador }}</div></div>
-              </div>
             </div>
-            <div v-if="!gen.tiempo_floracion && !difMeta && !gen.rendimiento && !gen.altura && !gen.origen && !gen.criador"
+            <div v-if="!gen.tiempo_floracion && !gen.dias_vegetativo_objetivo && !gen.dias_cosecha_objetivo && !gen.rendimiento && !gen.altura && !gen.origen"
                  class="gdv__empty-note">Sin datos de cultivo registrados</div>
           </div>
 
@@ -323,7 +314,7 @@ onMounted(async () => {
               </div>
               <div class="rend-stat">
                 <div class="rend-stat__label">Máximo</div>
-                <div class="rend-stat__value" style="color:#1b5e20">{{ rendimientoStats.max }}<span class="rend-stat__unit">{{ rendimientoStats.unit }}</span></div>
+                <div class="rend-stat__value" style="color:#16a34a">{{ rendimientoStats.max }}<span class="rend-stat__unit">{{ rendimientoStats.unit }}</span></div>
               </div>
               <div class="rend-stat">
                 <div class="rend-stat__label">Mínimo</div>
@@ -360,7 +351,7 @@ onMounted(async () => {
               </div>
               <div class="rend-stat">
                 <div class="rend-stat__label">Margen prom.</div>
-                <div class="rend-stat__value" :style="{ color: (plResumen.margen_promedio ?? 0) >= 0 ? '#1b5e20' : '#dc2626' }">
+                <div class="rend-stat__value" :style="{ color: (plResumen.margen_promedio ?? 0) >= 0 ? '#16a34a' : '#dc2626' }">
                   {{ plResumen.margen_promedio != null ? '$' + Number(plResumen.margen_promedio).toLocaleString('es-AR') : '—' }}
                   <span v-if="plResumen.margen_pct_promedio != null" class="rend-stat__unit">
                     ({{ plResumen.margen_pct_promedio }}%)
@@ -486,9 +477,9 @@ onMounted(async () => {
               <div class="cannab-val">{{ gen.thc != null ? gen.thc + '%' : '—' }}</div>
             </div>
             <div class="cannab-row">
-              <div class="cannab-label" style="color:#1b5e20;font-weight:700">CBD</div>
+              <div class="cannab-label" style="color:#16a34a;font-weight:700">CBD</div>
               <div class="cannab-bar-wrap">
-                <div class="cannab-bar" :style="{ width: gen.cbd != null ? Math.min(gen.cbd, 30) / 30 * 100 + '%' : '0%', background: '#1b5e20' }"></div>
+                <div class="cannab-bar" :style="{ width: gen.cbd != null ? Math.min(gen.cbd, 30) / 30 * 100 + '%' : '0%', background: '#16a34a' }"></div>
               </div>
               <div class="cannab-val">{{ gen.cbd != null ? gen.cbd + '%' : '—' }}</div>
             </div>
@@ -558,10 +549,6 @@ onMounted(async () => {
 
 .gdv__hero-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .gdv__btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .9rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; border: 1.5px solid; transition: all .15s; white-space: nowrap; }
-.gdv__btn--green   { background: #1a3d2e; border-color: #1a3d2e; color: #fff; }
-.gdv__btn--green:hover:not(:disabled) { background: #0f2a1e; }
-.gdv__btn--outline-green { background: #fff; border-color: #1a3d2e; color: #1a3d2e; }
-.gdv__btn--outline-green:hover { background: #f0f8f4; }
 .gdv__btn--ghost   { background: #fff; border-color: #e2e8f0; color: #374151; }
 .gdv__btn--ghost:hover:not(:disabled) { background: #f8fafc; }
 .gdv__btn:disabled { opacity: .6; cursor: not-allowed; }
@@ -595,7 +582,7 @@ onMounted(async () => {
 
 /* Hero */
 .hero-card { background: white; border-radius: 14px; border: 1.5px solid rgba(0,0,0,.07); overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
-.hero-card__bar { height: 5px; background: var(--tipo-color, #1b5e20); }
+.hero-card__bar { height: 5px; background: var(--tipo-color, #16a34a); }
 .hero-card__body { padding: 1.25rem 1.5rem 1.5rem; }
 
 /* KPI row */
@@ -615,7 +602,7 @@ onMounted(async () => {
 .dato-item__val   { font-size: .875rem; font-weight: 600; color: #1a2e1a; }
 
 /* Terpenos */
-.terpeno-chip { padding: .3rem .75rem; background: rgba(27,94,32,.1); color: #1b5e20; border-radius: 999px; font-size: .8rem; font-weight: 600; border: 1px solid rgba(27,94,32,.2); }
+.terpeno-chip { padding: .3rem .75rem; background: rgba(27,94,32,.1); color: #16a34a; border-radius: 999px; font-size: .8rem; font-weight: 600; border: 1px solid rgba(27,94,32,.2); }
 
 /* Table */
 .gdv__table-wrap { overflow-x: auto; margin-bottom: .75rem; }
@@ -629,7 +616,7 @@ onMounted(async () => {
 @media (min-width: 640px) { .gdv__col-md { display: table-cell; } }
 .gdv__text-right { text-align: right; }
 .gdv__lote-link { font-weight: 600; color: #1e293b; text-decoration: none; cursor: pointer; }
-.gdv__lote-link:hover { color: #1b5e20; text-decoration: underline; }
+.gdv__lote-link:hover { color: #16a34a; text-decoration: underline; }
 .gdv__cell-muted { color: #6b7280; font-size: .78rem; }
 .gdv__cell-sm    { font-size: .78rem; }
 .gdv__cell-bold  { font-weight: 600; font-size: .78rem; }
@@ -655,7 +642,7 @@ onMounted(async () => {
 .rend-stat { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: .75rem; text-align: center; }
 .rend-stat__label { font-size: .68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
 .rend-stat__value { font-size: 1.4rem; font-weight: 800; color: #0f172a; letter-spacing: -.04em; line-height: 1; }
-.rend-stat__value--main { color: #1b5e20; }
+.rend-stat__value--main { color: #16a34a; }
 .rend-stat__unit { font-size: .62rem; font-weight: 500; color: #94a3b8; margin-left: .15rem; }
 
 /* Configuración card */

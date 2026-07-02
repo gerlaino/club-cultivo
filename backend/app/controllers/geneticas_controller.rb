@@ -94,11 +94,16 @@ class GeneticasController < ApplicationController
     Rails.logger.warn "Error adjuntando foto: #{e.message}"
   end
 
+  # Plantas "activas" de la genética = las que siguen en pie hasta que el lote pasa a
+  # curado (momento en que se transforman en stock flor_seca). Por eso contamos por el
+  # ESTADO DEL LOTE (no por el de la planta, que queda congelado en 'cosechado'):
+  # cuentan las de lotes pre-curado, salvo plantas descartadas.
   def plantas_count(genetica, club)
     return 0 unless club
     Plant.joins(:lote)
          .where(lotes: { club_id: club.id, genetica_id: genetica.id })
-         .where.not(plants: { state: %w[cosechado descartada] })
+         .where.not(lotes: { estado: %w[curado finalizado] })
+         .where.not(plants: { state: 'descartada' })
          .count
   end
 
