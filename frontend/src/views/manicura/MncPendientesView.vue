@@ -4,8 +4,8 @@
     <!-- Header -->
     <div class="mnp__header">
       <div>
-        <h1 class="mnp__title">Cosechas asignadas</h1>
-        <p class="mnp__sub">Cosechas que el admin te asignó para manicurar.</p>
+        <h1 class="mnp__title">{{ esGestor ? 'Lotes en manicura' : 'Cosechas asignadas' }}</h1>
+        <p class="mnp__sub">{{ esGestor ? 'Todos los lotes en manicura y su responsable.' : 'Cosechas que el admin te asignó para manicurar.' }}</p>
       </div>
     </div>
 
@@ -17,8 +17,8 @@
     <!-- Empty -->
     <div v-else-if="!lotes.length" class="mnp__empty">
       <Wind :size="32" :stroke-width="1.25" />
-      <p>Sin cosechas asignadas</p>
-      <span>El admin te asignará las cosechas cuando estén listas para manicurar.</span>
+      <p>{{ esGestor ? 'No hay lotes en manicura' : 'Sin cosechas asignadas' }}</p>
+      <span>{{ esGestor ? 'Cuando asignes una cosecha a manicura, va a aparecer acá con su responsable.' : 'El admin te asignará las cosechas cuando estén listas para manicurar.' }}</span>
     </div>
 
     <!-- List -->
@@ -43,7 +43,10 @@
           <span class="mnp__row-plants">
             <Package :size="12" :stroke-width="2" /> {{ lote.plants_count }}
           </span>
-          <span class="mnp__badge mnp__badge--pendiente">Asignado</span>
+          <span v-if="esGestor" class="mnp__badge" :class="lote.manicurador ? 'mnp__badge--resp' : 'mnp__badge--sin'">
+            <User :size="11" :stroke-width="2" /> {{ lote.manicurador?.nombre || 'Sin asignar' }}
+          </span>
+          <span v-else class="mnp__badge mnp__badge--pendiente">Asignado</span>
           <ChevronRight :size="15" class="mnp__row-arrow" />
         </div>
       </RouterLink>
@@ -61,11 +64,15 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { Scissors, Wind, Package, ChevronRight } from 'lucide-vue-next'
+import { Scissors, Wind, Package, ChevronRight, User } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
+import { useAuthStore } from '../../stores/auth'
 
-const loading = ref(true)
-const lotes   = ref([])
+const auth     = useAuthStore()
+// El admin ve el board completo con el responsable; el manicura ve su cola asignada.
+const esGestor = computed(() => auth.user?.role === 'admin')
+const loading  = ref(true)
+const lotes    = ref([])
 
 const PER_PAGE   = 10
 const page       = ref(1)
@@ -146,10 +153,13 @@ onMounted(cargar)
   font-size: var(--fs-12); color: var(--c-ink-400);
 }
 .mnp__badge {
+  display: inline-flex; align-items: center; gap: 4px;
   font-size: 12px; font-weight: 600; padding: .2em .65em;
   border-radius: 999px; text-transform: uppercase; letter-spacing: .04em;
 }
 .mnp__badge--pendiente { background: var(--c-leaf-100); color: var(--c-leaf-700); }
+.mnp__badge--resp { background: var(--c-leaf-100); color: var(--c-leaf-700); text-transform: none; letter-spacing: 0; }
+.mnp__badge--sin { background: #fef3c7; color: #b45309; text-transform: none; letter-spacing: 0; }
 
 .mnp__row-arrow { color: var(--c-ink-300); }
 

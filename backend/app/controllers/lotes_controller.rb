@@ -7,7 +7,7 @@ class LotesController < ApplicationController
 
   # GET /lotes o GET /salas/:sala_id/lotes
   def index
-    lotes = current_user.club.lotes.includes(:costo_lote, :pesadas, :lote_eventos, sala: :sede, genetica: { fotos_attachments: :blob })
+    lotes = current_user.club.lotes.includes(:costo_lote, :pesadas, :lote_eventos, :manicurador, sala: :sede, genetica: { fotos_attachments: :blob })
     lotes = lotes.where(sala_id: @sala.id) if @sala.present?
 
     if current_user.cultivador?
