@@ -2,17 +2,22 @@
   <div class="inf">
     <div class="inf__header">
       <h1 class="inf__title"><ShieldAlert :size="20" :stroke-width="1.75" /> Informe Cumplimiento</h1>
-      <select v-model="periodo" class="inf__periodo" @change="cargar">
+      <div class="inf__head-actions">
+        <select v-model="periodo" class="inf__periodo" @change="cargar">
         <option value="mes_actual">Mes actual</option>
         <option value="mes_anterior">Mes anterior</option>
         <option value="trimestre">Trimestre</option>
         <option value="anio">Año</option>
       </select>
+        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf">
+          <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="inf__loading">Cargando…</div>
 
-    <template v-else-if="data">
+    <div v-else-if="data" ref="hoja" class="inf__hoja">
       <div class="inf__kpis">
         <div class="inf__kpi inf__kpi--ok">
           <span class="inf__kpi-valor">{{ data.pacientes_con_reprocann_vigente }}</span>
@@ -50,7 +55,7 @@
           </tbody>
         </table>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -58,6 +63,9 @@
 import { ref, onMounted } from 'vue'
 import { ShieldAlert } from 'lucide-vue-next'
 import api from '../../lib/api.js'
+import { useInformePdf } from '../../composables/useInformePdf.js'
+
+const { hoja, exporting, exportarPdf } = useInformePdf('informe_cumplimiento')
 
 const periodo = ref('mes_actual')
 const loading = ref(false)
@@ -81,6 +89,9 @@ onMounted(cargar)
 <style scoped>
 .inf { padding: var(--sp-6); max-width: 900px; margin: 0 auto; }
 .inf__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-6); gap: var(--sp-4); flex-wrap: wrap; }
+.inf__head-actions { display: flex; align-items: center; gap: var(--sp-2); }
+.inf__pdf { display: inline-flex; align-items: center; gap: .4rem; background: #fff; border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: 6px 14px; font-size: var(--fs-14); font-weight: 600; color: #b91c1c; cursor: pointer; }
+.inf__pdf:disabled { opacity: .5; cursor: not-allowed; }
 .inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
 .inf__periodo { background: var(--c-ink-50); border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: 6px 12px; font-size: var(--fs-14); color: var(--c-ink-900); }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }

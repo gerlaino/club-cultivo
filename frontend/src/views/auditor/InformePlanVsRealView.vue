@@ -2,11 +2,14 @@
   <div class="inf">
     <div class="inf__header">
       <h1 class="inf__title"><BarChart2 :size="20" :stroke-width="1.75" /> Plan vs Real</h1>
+      <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf">
+          <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
+        </button>
     </div>
 
     <div v-if="loading" class="inf__loading">Cargando…</div>
 
-    <template v-else-if="data">
+    <div v-else-if="data" ref="hoja" class="inf__hoja">
       <div class="inf__kpis">
         <div class="inf__kpi">
           <span class="inf__kpi-valor">{{ data.total_lotes_con_objetivo }}</span>
@@ -58,7 +61,7 @@
           </tbody>
         </table>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -66,6 +69,9 @@
 import { ref, onMounted } from 'vue'
 import { BarChart2 } from 'lucide-vue-next'
 import api from '../../lib/api.js'
+import { useInformePdf } from '../../composables/useInformePdf.js'
+
+const { hoja, exporting, exportarPdf } = useInformePdf('informe_plan_vs_real')
 
 const loading = ref(false)
 const data    = ref(null)
@@ -89,6 +95,9 @@ onMounted(cargar)
 <style scoped>
 .inf { padding: var(--sp-6); max-width: 960px; margin: 0 auto; }
 .inf__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-6); gap: var(--sp-4); flex-wrap: wrap; }
+.inf__head-actions { display: flex; align-items: center; gap: var(--sp-2); }
+.inf__pdf { display: inline-flex; align-items: center; gap: .4rem; background: #fff; border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: 6px 14px; font-size: var(--fs-14); font-weight: 600; color: #b91c1c; cursor: pointer; }
+.inf__pdf:disabled { opacity: .5; cursor: not-allowed; }
 .inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }
 .inf__empty { color: var(--c-ink-500); font-size: var(--fs-14); padding: var(--sp-6); text-align: center; background: var(--c-ink-50); border-radius: var(--r-lg); }
