@@ -238,9 +238,17 @@ onMounted(async () => {
               <div class="kpi-cell__label">CBD</div>
               <div class="kpi-cell__value" style="color:#16a34a">{{ gen.cbd != null ? gen.cbd + '%' : '—' }}</div>
             </div>
-            <div v-if="gen.tiempo_floracion" class="kpi-cell">
-              <div class="kpi-cell__label">Floración</div>
-              <div class="kpi-cell__value">{{ gen.tiempo_floracion }}d</div>
+            <div class="kpi-cell">
+              <div class="kpi-cell__label">Veg. obj.</div>
+              <div class="kpi-cell__value">{{ gen.dias_vegetativo_objetivo ? gen.dias_vegetativo_objetivo + 'd' : '—' }}</div>
+            </div>
+            <div class="kpi-cell">
+              <div class="kpi-cell__label">Flor. obj.</div>
+              <div class="kpi-cell__value">{{ gen.tiempo_floracion ? gen.tiempo_floracion + 'd' : '—' }}</div>
+            </div>
+            <div class="kpi-cell">
+              <div class="kpi-cell__label">Cos. obj.</div>
+              <div class="kpi-cell__value">{{ gen.dias_cosecha_objetivo ? gen.dias_cosecha_objetivo + 'd' : '—' }}</div>
             </div>
             <div v-if="gen.rendimiento" class="kpi-cell">
               <div class="kpi-cell__label">Rend. est.</div>
@@ -271,18 +279,6 @@ onMounted(async () => {
           <div class="gdv__card gdv__card--mb">
             <h6 class="section-title">Datos de cultivo</h6>
             <div class="dato-grid">
-              <div class="dato-item">
-                <span class="dato-item__icon">🌱</span>
-                <div><div class="dato-item__label">Vegetativo obj.</div><div class="dato-item__val">{{ gen.dias_vegetativo_objetivo ? gen.dias_vegetativo_objetivo + ' días' : '—' }}</div></div>
-              </div>
-              <div class="dato-item">
-                <span class="dato-item__icon">🌸</span>
-                <div><div class="dato-item__label">Floración obj.</div><div class="dato-item__val">{{ gen.tiempo_floracion ? gen.tiempo_floracion + ' días' : '—' }}</div></div>
-              </div>
-              <div class="dato-item">
-                <span class="dato-item__icon">✂️</span>
-                <div><div class="dato-item__label">Cosecha obj.</div><div class="dato-item__val">{{ gen.dias_cosecha_objetivo ? gen.dias_cosecha_objetivo + ' días' : '—' }}</div></div>
-              </div>
               <div v-if="gen.rendimiento" class="dato-item">
                 <span class="dato-item__icon">⚖️</span>
                 <div><div class="dato-item__label">Rendimiento</div><div class="dato-item__val">{{ gen.rendimiento }} g/m²</div></div>
@@ -296,7 +292,7 @@ onMounted(async () => {
                 <div><div class="dato-item__label">Origen</div><div class="dato-item__val">{{ gen.origen }}</div></div>
               </div>
             </div>
-            <div v-if="!gen.tiempo_floracion && !gen.dias_vegetativo_objetivo && !gen.dias_cosecha_objetivo && !gen.rendimiento && !gen.altura && !gen.origen"
+            <div v-if="!gen.rendimiento && !gen.altura && !gen.origen"
                  class="gdv__empty-note">Sin datos de cultivo registrados</div>
           </div>
 
@@ -470,25 +466,6 @@ onMounted(async () => {
             <EmptyState v-else icon="📷" title="Sin fotos" compact />
           </div>
 
-          <!-- Cannabinoides -->
-          <div class="gdv__card gdv__card--mb">
-            <h6 class="section-title">Cannabinoides</h6>
-            <div class="cannab-row gdv__cannab-mb">
-              <div class="cannab-label" style="color:#e53935;font-weight:700">THC</div>
-              <div class="cannab-bar-wrap">
-                <div class="cannab-bar" :style="{ width: gen.thc != null ? Math.min(gen.thc, 30) / 30 * 100 + '%' : '0%', background: '#e53935' }"></div>
-              </div>
-              <div class="cannab-val">{{ gen.thc != null ? gen.thc + '%' : '—' }}</div>
-            </div>
-            <div class="cannab-row">
-              <div class="cannab-label" style="color:#16a34a;font-weight:700">CBD</div>
-              <div class="cannab-bar-wrap">
-                <div class="cannab-bar" :style="{ width: gen.cbd != null ? Math.min(gen.cbd, 30) / 30 * 100 + '%' : '0%', background: '#16a34a' }"></div>
-              </div>
-              <div class="cannab-val">{{ gen.cbd != null ? gen.cbd + '%' : '—' }}</div>
-            </div>
-          </div>
-
           <!-- Configuración (solo admin) -->
           <div v-if="canUpdate" class="gdv__card gdv__card--mb">
             <h6 class="section-title">Configuración</h6>
@@ -550,8 +527,8 @@ onMounted(async () => {
 .gdv__nombre { font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0 0 .25rem; }
 .gdv__sub    { font-size: .82rem; color: #64748b; display: flex; gap: .4rem; flex-wrap: wrap; }
 .gdv__sub i  { font-size: .75rem; }
-.gdv__btn-editar { display: inline-flex; align-items: center; gap: .4rem; background: #16a34a; color: #fff; border: none; border-radius: 9px; padding: .5rem .95rem; font-size: .85rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; align-self: flex-start; }
-.gdv__btn-editar:hover { background: #15803d; }
+.gdv__btn-editar { display: inline-flex; align-items: center; gap: .4rem; background: #1a3d2e; color: #fff; border: none; border-radius: 9px; padding: .5rem .95rem; font-size: .85rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; align-self: flex-start; }
+.gdv__btn-editar:hover { background: #0f2a1e; }
 
 .gdv__hero-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .gdv__btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .9rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; border: 1.5px solid; transition: all .15s; white-space: nowrap; }
@@ -584,7 +561,6 @@ onMounted(async () => {
 .gdv__desc { color: #475569; line-height: 1.65; margin: 0; font-size: .9rem; }
 .gdv__empty-note { color: #94a3b8; font-size: .82rem; font-style: italic; }
 .gdv__terpenos { display: flex; flex-wrap: wrap; gap: .4rem; }
-.gdv__cannab-mb { margin-bottom: .75rem; }
 
 /* Hero */
 .hero-card { background: white; border-radius: 14px; border: 1.5px solid rgba(0,0,0,.07); overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
@@ -629,11 +605,6 @@ onMounted(async () => {
 .gdv__estado-badge { display: inline-block; padding: .15rem .5rem; border-radius: 99px; font-size: .7rem; font-weight: 600; }
 
 /* Cannabinoides */
-.cannab-row { display: flex; align-items: center; gap: .75rem; }
-.cannab-label { font-size: .8rem; width: 36px; }
-.cannab-bar-wrap { flex: 1; height: 8px; background: rgba(0,0,0,.07); border-radius: 4px; overflow: hidden; }
-.cannab-bar { height: 100%; border-radius: 4px; transition: width .4s ease; }
-.cannab-val { font-size: .85rem; font-weight: 700; color: #0f172a; width: 42px; text-align: right; }
 
 /* Foto grid */
 .foto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
