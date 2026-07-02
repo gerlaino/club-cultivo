@@ -696,9 +696,12 @@ class LotesController < ApplicationController
 
     @lote.lote_eventos.includes(:user).find_each do |e|
       if e.tipo == 'cambio_estado'
+        # Un cambio de fase se puede borrar solo si NO es la fase actual del lote (para
+        # limpiar una transición accidental sin romper la fase vigente). Solo admin.
+        borrable_fase = current_user.admin? && e.estado_nuevo != @lote.estado
         items << evento_item(e, kind: 'fase', emoji: '🔄',
           titulo: "#{fase_label(e.estado_anterior)} → #{fase_label(e.estado_nuevo)}",
-          detalle: e.descripcion, editable: false, deletable: false)
+          detalle: e.descripcion, editable: false, deletable: borrable_fase)
       elsif e.tipo == 'actividad'
         meta = LoteEvento::CATEGORIA_META[e.categoria] || {}
         # El trasplante está denormalizado (PlantActivity por planta + maceta del lote):

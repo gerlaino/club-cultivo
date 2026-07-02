@@ -24,11 +24,20 @@ RSpec.describe 'DELETE /api/lotes/:lote_id/lote_eventos/:id', type: :request do
       expect(LoteEvento.exists?(ev.id)).to be(false)
     end
 
-    it 'NO borra un evento cambio_estado (protege la historia de fases)' do
-      ev = crear_evento(tipo: 'cambio_estado')
+    it 'NO borra el cambio_estado de la fase ACTUAL (protege la fase vigente)' do
+      lote.update!(estado: 'floracion')
+      ev = crear_evento(tipo: 'cambio_estado')             # estado_nuevo: 'floracion' == actual
       delete "/api/lotes/#{lote.id}/lote_eventos/#{ev.id}", as: :json
       expect(response).to have_http_status(:unprocessable_entity)
       expect(LoteEvento.exists?(ev.id)).to be(true)
+    end
+
+    it 'SÍ borra un cambio_estado que NO es la fase actual (transición accidental)' do
+      lote.update!(estado: 'cosecha')
+      ev = crear_evento(tipo: 'cambio_estado')             # estado_nuevo: 'floracion' != cosecha
+      delete "/api/lotes/#{lote.id}/lote_eventos/#{ev.id}", as: :json
+      expect(response).to have_http_status(:no_content)
+      expect(LoteEvento.exists?(ev.id)).to be(false)
     end
   end
 
