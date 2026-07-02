@@ -111,7 +111,7 @@ class GeneticasController < ApplicationController
 
   def genetica_params
     params.require(:genetica).permit(
-      :nombre, :tipo, :thc, :cbd, :descripcion,
+      :nombre, :tipo, :thc, :cbd, :descripcion, :consejos_club,
       :origen, :tiempo_floracion, :dias_vegetativo_objetivo, :dias_cosecha_objetivo, :rendimiento,
       :altura, :dificultad, :activa, :disponible,
       :registrada_inase, :numero_registro_inase, :fecha_registro_inase, :categoria_inase,
@@ -224,6 +224,7 @@ class GeneticasController < ApplicationController
       thc:                    genetica.thc,
       cbd:                    genetica.cbd,
       descripcion:            genetica.descripcion,
+      consejos_club:          genetica.consejos_club,
       origen:                 genetica.origen,
       tiempo_floracion:       genetica.tiempo_floracion,
       dias_vegetativo_objetivo: genetica.dias_vegetativo_objetivo,

@@ -109,7 +109,7 @@ function clearFilters() { search.value = ''; filterTipo.value = ''; filterOrigen
 function emptyForm() {
   return {
     nombre: '', tipo: '', thc: null, cbd: null,
-    descripcion: '', origen: '', criador: '', terpenos: '',
+    descripcion: '', consejos_club: '', origen: '', criador: '', terpenos: '',
     tiempo_floracion: null, dias_vegetativo_objetivo: null, dias_cosecha_objetivo: null,
     rendimiento: null, altura: null,
     dificultad: '', disponible: true,
@@ -161,6 +161,7 @@ function openEdit(gen) {
     thc:              gen.thc              ?? null,
     cbd:              gen.cbd              ?? null,
     descripcion:      gen.descripcion      || '',
+    consejos_club:    gen.consejos_club    || '',
     origen:           gen.origen           || '',
     criador:          gen.criador          || '',
     terpenos:         gen.terpenos         || '',
@@ -659,12 +660,25 @@ onMounted(loadGeneticas)
 
               <!-- Descripción -->
               <div class="gv-form__field gv-form__field--full">
-                <label class="gv-form__label">Descripción</label>
+                <label class="gv-form__label">Descripción <span class="gv-form__label-hint">(interna)</span></label>
                 <textarea
                   v-model.trim="form.descripcion"
                   class="gv-form__input gv-form__textarea"
                   rows="3"
                   placeholder="Características, efectos, sabor, aromas…"
+                ></textarea>
+              </div>
+
+              <!-- Consejos del club (público, se muestra al paciente en la dispensa) -->
+              <div class="gv-form__field gv-form__field--full">
+                <label class="gv-form__label">
+                  Consejos del club <span class="gv-form__label-hint">👁 visible al paciente</span>
+                </label>
+                <textarea
+                  v-model.trim="form.consejos_club"
+                  class="gv-form__input gv-form__textarea"
+                  rows="3"
+                  placeholder="Guardado ideal, qué hacer al recibir el producto, recomendaciones…"
                 ></textarea>
               </div>
 
@@ -819,6 +833,7 @@ onMounted(loadGeneticas)
 .gv-form__field--half { grid-column: span 1; }
 @media (max-width: 560px) { .gv-form { grid-template-columns: 1fr; } .gv-form__field--full, .gv-form__field--half { grid-column: 1; } }
 .gv-form__label     { font-size: .8rem; font-weight: 600; color: #374151; }
+.gv-form__label-hint { font-size: .7rem; font-weight: 500; color: #94a3b8; }
 .gv-form__req       { color: #dc2626; }
 .gv-form__input     { padding: .5rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; color: #1e293b; background: #fff; outline: none; transition: border-color .15s; width: 100%; box-sizing: border-box; }
 .gv-form__input:focus { border-color: #1a3d2e; }
