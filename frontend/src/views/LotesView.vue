@@ -56,6 +56,20 @@ function em(e)           { return ESTADO_META[e] || { label: e||"—", dot:"#94a
 function estadoLabel(e)  { return em(e).label; }
 function growLabel(g)    { return { sustrato:"Sustrato", hidroponia:"Hidroponia" }[g] || g || "—"; }
 function tipoLabel(t)    { return { sativa:"Sativa", indica:"Índica", hibrida:"Híbrida" }[t] || t; }
+// L1: nivel de avance de la fase actual vs objetivo de la genética (verde/amarillo/rojo).
+const FASE_OBJ = { vegetativo: "dias_vegetativo_objetivo", floracion: "dias_floracion_objetivo", cosecha: "dias_cosecha_objetivo" };
+const FASE_LBL = { vegetativo: "vegetativo", floracion: "floración", cosecha: "cosecha" };
+function objetivoFase(l) { return FASE_OBJ[l.estado] ? l[FASE_OBJ[l.estado]] : null; }
+function diasNivel(l) {
+  const obj = objetivoFase(l), d = l.dias_en_estado;
+  if (!obj || obj <= 0 || d == null) return null;
+  const r = d / obj;
+  return r > 1.1 ? "rojo" : (r >= 0.9 ? "amarillo" : "verde");
+}
+function diasTitle(l) {
+  const obj = objetivoFase(l);
+  return obj ? `${l.dias_en_estado}/${obj} días en ${FASE_LBL[l.estado] || l.estado}` : "";
+}
 function lightLabel(l)   { return { led:"LED", hps:"HPS", cmh:"CMH", natural:"Natural", mixta:"Mixta" }[l] || l || "—"; }
 function salaName(id)    { return salas.items.find(s => String(s.id) === String(id))?.nombre || `Sala #${id}`; }
 // Post-cosecha el lote no vive en una sala: mostramos su etapa como "ubicación".
@@ -373,7 +387,10 @@ async function exportarCSV() {
               <span v-else class="lv-empty">—</span>
             </td>
             <td data-label="Días">
-              <span v-if="diasDesdeInicio(l.start_date) !== null" class="lv-num">{{ diasDesdeInicio(l.start_date) }}d</span>
+              <span v-if="diasDesdeInicio(l.start_date) !== null" class="lv-num">
+                <span v-if="diasNivel(l)" class="lv-dias-dot" :class="`lv-dias-dot--${diasNivel(l)}`" :title="diasTitle(l)"></span>
+                {{ diasDesdeInicio(l.start_date) }}d
+              </span>
               <span v-else class="lv-empty">—</span>
             </td>
             <td v-if="canEdit" @click.stop>
@@ -596,6 +613,10 @@ async function exportarCSV() {
 .lv-tipo--sativa { background: #fef3c7; color: #b45309; }
 .lv-tipo--indica { background: #ede9fe; color: #6d28d9; }
 .lv-tipo--hibrida { background: #dcfce7; color: #15803d; }
+.lv-dias-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.lv-dias-dot--verde { background: #16a34a; }
+.lv-dias-dot--amarillo { background: #f59e0b; }
+.lv-dias-dot--rojo { background: #dc2626; }
 .lv-sala { color: #64748b; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-num { font-weight: 600; color: #374151; }
 .lv-empty { color: #cbd5e1; }

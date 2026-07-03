@@ -14,7 +14,7 @@ import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTu
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
-  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check
+  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal
 } from 'lucide-vue-next'
 import DsDropdown from '../design-system/components/Dropdown.vue'
 import { REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
@@ -237,10 +237,10 @@ const AVATAR_COLORS = ['#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc262
 function avatarColor(id) { return AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length] }
 
 const ALL_TABS = [
-  { key: 'info',             label: 'Datos',            icon: User },
-  { key: 'reprocann',        label: 'REPROCANN',         icon: ShieldCheck },
-  { key: 'dispensaciones',   label: 'Dispensaciones',    icon: Pill },
-  { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin', 'dispensador'] },
+  { key: 'info',             label: 'Datos',            icon: User,          primary: true },
+  { key: 'reprocann',        label: 'REPROCANN',         icon: ShieldCheck,   primary: true },
+  { key: 'dispensaciones',   label: 'Dispensaciones',    icon: Pill,          primary: true },
+  { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin', 'dispensador'], primary: true },
   { key: 'turnos',           label: 'Turnos',            icon: CalendarDays,  roles: ['admin', 'medico'] },
   { key: 'historia',         label: 'Historia clínica',  icon: ClipboardList, roles: ['admin', 'medico'] },
   { key: 'notas',            label: 'Notas',             icon: BookOpen,      roles: ['admin', 'medico'] },
@@ -256,6 +256,13 @@ const TABS = computed(() => {
   if (role === 'dispensador') return ALL_TABS.filter(t => t.key === 'dispensaciones')
   return ALL_TABS.filter(t => !t.roles || t.roles.includes(role))
 })
+
+// P1: tabs primarias (alta frecuencia) visibles; el resto va a un menú "Más".
+const TABS_PRIMARY = computed(() => TABS.value.filter(t => t.primary))
+const TABS_MORE    = computed(() => TABS.value.filter(t => !t.primary))
+const masOpen      = ref(false)
+const activeEnMas  = computed(() => TABS_MORE.value.some(t => t.key === activeTab.value))
+function elegirTab(key) { activeTab.value = key; masOpen.value = false }
 
 // Solo montar el contenido de un tab si el rol actual tiene acceso a él
 const tabVisible = (key) => TABS.value.some(t => t.key === key)
@@ -342,20 +349,41 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         <div><strong>REPROCANN por vencer</strong> — El certificado vence el {{ formatDate(s.reprocann_vencimiento) }}.</div>
       </div>
 
-      <!-- Tabs -->
+      <!-- Tabs: primarias inline + resto en "Más" -->
       <div class="sd__tabs">
         <button
-          v-for="tab in TABS" :key="tab.key"
+          v-for="tab in TABS_PRIMARY" :key="tab.key"
           class="sd__tab"
           :class="{ 'sd__tab--active': activeTab === tab.key }"
           @click="activeTab = tab.key"
         >
           <component :is="tab.icon" :size="14" :stroke-width="1.75" />
           {{ tab.label }}
-          <span v-if="tab.key === 'notas' && store.notas.length" class="sd__tab-badge">
-            {{ store.notas.length }}
-          </span>
         </button>
+
+        <div v-if="TABS_MORE.length" class="sd__tab-mas" @mouseleave="masOpen = false">
+          <button
+            class="sd__tab"
+            :class="{ 'sd__tab--active': activeEnMas }"
+            @click="masOpen = !masOpen"
+          >
+            <MoreHorizontal :size="14" :stroke-width="1.75" />
+            {{ activeEnMas ? (TABS_MORE.find(t => t.key === activeTab)?.label) : 'Más' }}
+            <ChevronDown :size="12" :stroke-width="2" />
+          </button>
+          <div v-if="masOpen" class="sd__tab-mas-menu">
+            <button
+              v-for="tab in TABS_MORE" :key="tab.key"
+              class="sd__tab-mas-item"
+              :class="{ 'sd__tab-mas-item--active': activeTab === tab.key }"
+              @click="elegirTab(tab.key)"
+            >
+              <component :is="tab.icon" :size="14" :stroke-width="1.75" />
+              {{ tab.label }}
+              <span v-if="tab.key === 'notas' && store.notas.length" class="sd__tab-badge">{{ store.notas.length }}</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- ── Tab: Datos ── -->
@@ -730,6 +758,11 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 /* Tabs */
 .sd__tabs { display: flex; gap: .25rem; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.5rem; flex-wrap: wrap; }
 .sd__tab { display: flex; align-items: center; gap: .4rem; padding: .65rem 1rem; border-radius: 8px 8px 0 0; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; background: none; font-size: .82rem; font-weight: 600; color: #64748b; cursor: pointer; transition: all .15s; }
+.sd__tab-mas { position: relative; }
+.sd__tab-mas-menu { position: absolute; top: 100%; right: 0; z-index: 20; min-width: 190px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.12); padding: .3rem; margin-top: .2rem; }
+.sd__tab-mas-item { display: flex; align-items: center; gap: .5rem; width: 100%; padding: .55rem .7rem; border: none; background: none; border-radius: 7px; font-size: .82rem; font-weight: 600; color: #475569; cursor: pointer; text-align: left; }
+.sd__tab-mas-item:hover { background: #f1f5f9; }
+.sd__tab-mas-item--active { background: #f0fdf4; color: #15803d; }
 .sd__tab:hover { color: #0f172a; background: #f8fafc; }
 .sd__tab--active { color: #1b5e20; border-bottom-color: #1b5e20; }
 .sd__tab-badge { background: #e8f5e9; color: #1b5e20; font-size: .65rem; font-weight: 700; padding: .1em .5em; border-radius: 999px; }
