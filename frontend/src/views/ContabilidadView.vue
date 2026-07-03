@@ -317,6 +317,7 @@ async function onMovimientoGuardado(payload) {
         monto_total_ars:     payload.monto_ars,
         cuotas_total:        payload.cuotas_total,
         fecha_primera_cuota: payload.fecha,
+        responsable:         payload.responsable || null,
         proveedor:           payload.proveedor || null,
         notas:               payload.notas || null,
       })

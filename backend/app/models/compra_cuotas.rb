@@ -42,6 +42,8 @@ class CompraCuotas < ApplicationRecord
         proveedor:   proveedor,
         cuota_numero: i,
         pagado:      fecha <= Date.today,  # cuotas pasadas: pagadas; futuras: pendientes
+        # Se refleja quién pagó (tarjeta/responsable) en cada cuota para que sea visible.
+        notas:       [("Pago: #{responsable}" if responsable.present?), notas].compact.join(' · ').presence,
       )
     end
   end

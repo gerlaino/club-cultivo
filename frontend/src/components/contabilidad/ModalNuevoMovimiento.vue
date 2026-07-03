@@ -85,6 +85,7 @@ function emptyForm() {
     pagado: false,
     medio_pago: 'efectivo',
     cuotas_total: 6,
+    responsable: '',
     notas: '',
   }
 }
@@ -554,6 +555,12 @@ async function submit() {
                       El monto de arriba es el <strong>total</strong>: se divide en {{ form.cuotas_total || 0 }} cuotas
                       mensuales desde la fecha elegida. Poné un mes anterior para cuadrar cuotas ya vencidas.
                     </span>
+                  </div>
+
+                  <div v-if="esCuotas" class="nm-field">
+                    <label class="nm-label">Tarjeta / responsable <span class="nm-opt">(opcional)</span></label>
+                    <input type="text" class="nm-input" v-model.trim="form.responsable"
+                           placeholder="Ej: Tarjeta del club / Germán" />
                   </div>
 
                   <div v-if="!esCuotas" class="nm-field">
