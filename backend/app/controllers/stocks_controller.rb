@@ -71,18 +71,24 @@ class StocksController < ApplicationController
 
     # Lista + counts: respetan el filtro de forma.
     scope = params[:forma_producto].present? ? base.where(forma_producto: params[:forma_producto]) : base
-    # KPIs en gramos: SOLO flor seca. Los derivados (preroll, hash…) son inventario con su
-    # propia unidad y NO se suman como gramos.
-    flor  = base.where(forma_producto: 'flor_seca')
+    # KPI en gramos: SOLO flor seca, y DISPONIBLE REAL (cantidad menos lo reservado/apartado),
+    # para que coincida con la columna "Actual" de la tabla. Los derivados (preroll, hash…) son
+    # inventario con su propia unidad y no se suman como gramos.
+    flor           = base.where(forma_producto: 'flor_seca')
+    reservado_flor = Reserva.pendientes.where(stock_id: flor.select(:id)).sum(:cantidad).to_f
+    flor_disponible = [flor.sum(:cantidad).to_f - reservado_flor, 0].max
 
     hoy = Date.today
     totales = {
-      total_g:             flor.sum(:cantidad).to_f,
-      items:               scope.count,
-      sedes_con_stock:     scope.where.not(sede_id: nil).distinct.count(:sede_id),
-      produccion_propia_g: flor.where(origen: %w[lote derivado_lote]).sum(:cantidad).to_f,
-      vencidos:            scope.where('fecha_vencimiento_est < ?', hoy).count,
-      por_vencer:          scope.where('fecha_vencimiento_est >= ? AND fecha_vencimiento_est <= ?', hoy, hoy + 30).count,
+      total_g:         flor_disponible,
+      reservado_g:     reservado_flor,   # flor seca apartada en reservas pendientes
+      items:           scope.count,
+      sedes_con_stock: scope.where.not(sede_id: nil).distinct.count(:sede_id),
+      # Cantidad de ítems de inventario derivado (preroll, hash, aceite…), que no cuentan en
+      # los gramos de flor. Reemplaza al KPI redundante de "flor propia".
+      derivados_items: base.where.not(forma_producto: 'flor_seca').count,
+      vencidos:        scope.where('fecha_vencimiento_est < ?', hoy).count,
+      por_vencer:      scope.where('fecha_vencimiento_est >= ? AND fecha_vencimiento_est <= ?', hoy, hoy + 30).count,
     }
 
     page = [params[:page].to_i, 1].max

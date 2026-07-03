@@ -48,6 +48,13 @@
             <div class="stk__kpi-lbl">Flor seca disponible</div>
           </div>
         </div>
+        <div v-if="Number(reservadoG) > 0" class="stk__kpi">
+          <div class="stk__kpi-ico">🔖</div>
+          <div class="stk__kpi-body">
+            <div class="stk__kpi-val">{{ reservadoG }}<span class="stk__kpi-unit">g</span></div>
+            <div class="stk__kpi-lbl">Reservado (flor)</div>
+          </div>
+        </div>
         <div class="stk__kpi" :class="{ 'stk__kpi--warn': pendientes.length > 0 }">
           <div class="stk__kpi-ico">⏳</div>
           <div class="stk__kpi-body">
@@ -63,10 +70,10 @@
           </div>
         </div>
         <div class="stk__kpi">
-          <div class="stk__kpi-ico">🌿</div>
+          <div class="stk__kpi-ico">🚬</div>
           <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ stockPropio }}<span class="stk__kpi-unit">g</span></div>
-            <div class="stk__kpi-lbl">Flor seca propia</div>
+            <div class="stk__kpi-val">{{ derivadosItems }}</div>
+            <div class="stk__kpi-lbl">Derivados</div>
           </div>
         </div>
         <div v-if="stocksVencidos > 0" class="stk__kpi stk__kpi--error">
@@ -787,7 +794,8 @@ async function guardarUmbral() {
 
 // ── KPIs ── (sobre el set FILTRADO del inventario; vienen del server en `invTotales`)
 const totalG          = computed(() => (invTotales.value.total_g || 0).toFixed(1))
-const stockPropio     = computed(() => (invTotales.value.produccion_propia_g || 0).toFixed(1))
+const derivadosItems  = computed(() => invTotales.value.derivados_items || 0)
+const reservadoG      = computed(() => (invTotales.value.reservado_g || 0).toFixed(1))
 const sedesConStock   = computed(() => invTotales.value.sedes_con_stock || 0)
 const stocksVencidos  = computed(() => invTotales.value.vencidos || 0)
 const stocksPorVencer = computed(() => invTotales.value.por_vencer || 0)

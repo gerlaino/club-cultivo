@@ -61,6 +61,27 @@ RSpec.describe 'GET /stocks/inventario', type: :request do
     expect(body['meta']['total']).to eq(1)
   end
 
+  it 'total_g = disponible real: resta lo reservado (apartado), no la cantidad cruda' do
+    s = stock!(forma_producto: 'flor_seca', cantidad: 100)
+    paciente = create(:paciente, club: club, created_by: admin)
+    Reserva.create!(club: club, paciente: paciente, user: admin, stock: s, estado: 'pendiente',
+                    cantidad: 25, fecha_entrega_estimada: 3.days.from_now.to_date)
+    get '/stocks/inventario', headers: auth_headers
+    body = JSON.parse(response.body)
+    expect(body['totales']['total_g']).to eq(75.0)      # 100 - 25 reservado
+    expect(body['totales']['reservado_g']).to eq(25.0)  # KPI de reservado (flor)
+  end
+
+  it 'derivados_items cuenta los ítems no-flor y NO los suma a los gramos de flor' do
+    stock!(forma_producto: 'flor_seca', cantidad: 100)
+    create(:stock, :externo, club: club, sede: sede, forma_producto: 'preroll', cantidad: 30)
+    create(:stock, :externo, club: club, sede: sede, forma_producto: 'hash',    cantidad: 12)
+    get '/stocks/inventario', headers: auth_headers
+    body = JSON.parse(response.body)
+    expect(body['totales']['total_g']).to eq(100.0)     # solo flor seca
+    expect(body['totales']['derivados_items']).to eq(2) # preroll + hash
+  end
+
   it 'no muestra stock de otro club (aislamiento de tenant)' do
     otro = create(:club)
     o_sede = create(:sede, club: otro)
