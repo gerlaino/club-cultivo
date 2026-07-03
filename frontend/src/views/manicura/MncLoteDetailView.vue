@@ -242,7 +242,6 @@
                     <label v-for="p in plantasSinPesar" :key="p.id" class="mnl-check">
                       <input type="checkbox" :value="p.id" v-model="batchSelIds" />
                       <span class="mnl-check-nombre">{{ p.nombre || `Planta #${p.id}` }}</span>
-                      <span class="mnl-check-qr">{{ p.codigo_qr }}</span>
                     </label>
                   </div>
                 </template>
@@ -782,7 +781,6 @@ onActivated(cargar)
 .mnl-check input { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
 .mnl-check--all { font-weight: 600; color: #475569; font-size: .78rem; }
 .mnl-check-nombre { font-weight: 600; }
-.mnl-check-qr { margin-left: auto; font-size: .72rem; color: #94a3b8; font-family: var(--font-mono, monospace); }
 
 /* Selector de sede */
 .mnl-select { border-radius: 6px; cursor: pointer; appearance: none; -webkit-appearance: none; }

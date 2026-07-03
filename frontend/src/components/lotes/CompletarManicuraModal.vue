@@ -38,7 +38,6 @@
                 <label v-for="p in pendientes" :key="p.id" class="cmm__check">
                   <input type="checkbox" :value="p.id" v-model="selectedIds" />
                   <span class="cmm__check-nombre">{{ p.nombre || `Planta #${p.id}` }}</span>
-                  <span class="cmm__check-qr">{{ p.codigo_qr }}</span>
                 </label>
               </div>
             </template>
@@ -269,7 +268,6 @@ function cerrar() {
 .cmm__check input { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
 .cmm__check--all { font-weight: 600; color: var(--c-ink-700); font-size: var(--fs-13); }
 .cmm__check-nombre { font-weight: 600; }
-.cmm__check-qr { margin-left: auto; font-size: var(--fs-12); color: var(--c-ink-400); font-family: var(--font-mono, monospace); }
 
 .cmm__info {
   font-size: var(--fs-12); color: var(--c-ink-400); line-height: 1.5;
