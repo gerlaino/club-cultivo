@@ -3,17 +3,12 @@
     <div class="inf__header">
       <h1 class="inf__title"><FileCheck :size="20" :stroke-width="1.75" /> Informe REPROCANN</h1>
       <div class="inf__acciones">
-        <div class="inf__head-actions">
         <select v-model="periodo" class="inf__periodo" @change="cargar">
           <option value="mes_actual">Mes actual</option>
           <option value="mes_anterior">Mes anterior</option>
           <option value="trimestre">Trimestre</option>
           <option value="anio">Año</option>
         </select>
-        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf">
-          <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
-        </button>
-      </div>
         <button class="inf__btn" :disabled="descargando" @click="descargar('pdf')">
           <FileDown :size="15" :stroke-width="2" /> PDF
         </button>
@@ -25,7 +20,7 @@
 
     <div v-if="loading" class="inf__loading">Cargando…</div>
 
-    <div v-else-if="data" ref="hoja" class="inf__hoja">
+    <div v-else-if="data">
       <div class="inf__kpis">
         <div class="inf__kpi">
           <span class="inf__kpi-valor">{{ data.total_pacientes }}</span>
@@ -71,9 +66,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { FileCheck, FileDown, Sheet } from 'lucide-vue-next'
 import api from '../../lib/api.js'
-import { useInformePdf } from '../../composables/useInformePdf.js'
-
-const { hoja, exporting, exportarPdf } = useInformePdf('informe_reprocann')
 import { useToast } from '../../composables/useToast.js'
 
 const toast = useToast()
@@ -121,9 +113,6 @@ onMounted(cargar)
 <style scoped>
 .inf { padding: var(--sp-6); max-width: 900px; margin: 0 auto; }
 .inf__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-6); gap: var(--sp-4); flex-wrap: wrap; }
-.inf__head-actions { display: flex; align-items: center; gap: var(--sp-2); }
-.inf__pdf { display: inline-flex; align-items: center; gap: .4rem; background: #fff; border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: 6px 14px; font-size: var(--fs-14); font-weight: 600; color: #b91c1c; cursor: pointer; }
-.inf__pdf:disabled { opacity: .5; cursor: not-allowed; }
 .inf__acciones { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .inf__btn { display: inline-flex; align-items: center; gap: 5px; background: #15803d; color: #fff; border: none; border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-13); font-weight: 600; cursor: pointer; transition: background .15s; }
 .inf__btn:hover:not(:disabled) { background: #166534; }
