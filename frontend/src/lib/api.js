@@ -316,6 +316,7 @@ export const deleteMovimiento       = (id)           => api.delete(`/movimientos
 export const exportMovimientosCSV   = (params = {})  => api.get('/movimientos_contables/export_csv', { params, responseType: 'blob' })
 export const cerrarPeriodoContable  = (hasta)        => api.post('/movimientos_contables/cerrar_periodo', { hasta })
 export const reabrirPeriodoContable = (hasta = null) => api.post('/movimientos_contables/reabrir_periodo', { hasta })
+export const getAmbienteSalas       = ()             => api.get('/stats/ambiente_salas')
 export const listComprasCuotas      = ()             => api.get('/compras_cuotas')
 export const createCompraCuotas     = (payload)      => api.post('/compras_cuotas', { compra_cuotas: payload })
 export const deleteCompraCuotas     = (id)           => api.delete(`/compras_cuotas/${id}`)

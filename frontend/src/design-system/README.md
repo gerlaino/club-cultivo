@@ -41,3 +41,18 @@ Cargadas en `index.html` via `<link>` (NO con `@import url()` en CSS — bug de 
 - Inter → `--font-ui`
 - General Sans → `--font-display`
 - Geist Mono → `--font-mono`
+
+## Iconografía (criterio DG1)
+
+Sistema **híbrido** deliberado — no migrar todo a un solo set:
+
+- **Emojis = identidad de entidad de dominio.** Representan *qué es algo* del negocio cannábico:
+  fases del cultivo (🌱 germinación, ✂️ manicura), formas de producto (💊 aceite, 🚬 preroll,
+  🌿 flor), tipos. Se centralizan en `lib/loteHelpers.js` (`PLANT_STATE_META`, `FORMA_EMOJI`).
+  Son reconocibles de un vistazo y no dependen de un import.
+- **Íconos de línea (lucide-vue-next) = acciones y navegación.** Representan *qué hacés*:
+  editar, borrar, filtrar, buscar, volver, tabs, chevrons. Consistentes en trazo y tamaño.
+
+**Regla:** no mezclar los dos roles dentro de un mismo control (un botón de acción usa lucide,
+no un emoji; una entidad se identifica con su emoji, no con un ícono genérico). Bootstrap Icons
+(`bi bi-*`) es legacy — al tocar una vista, migrar sus íconos de acción a lucide.

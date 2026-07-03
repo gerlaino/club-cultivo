@@ -37,6 +37,26 @@ class StatsController < ApplicationController
     render json: data
   end
 
+  # GET /stats/ambiente_salas — estado ambiental actual (última lectura de temp/humedad) por
+  # sala de cultivo activa. Para el widget del dashboard.
+  def ambiente_salas
+    club  = current_user.club
+    salas = club.salas.where(kind: %w[vegetativo floracion]).order(:nombre)
+    data = salas.filter_map do |s|
+      temp = LecturaAmbiental.de_sala(s.id).del_tipo('temperatura').order(medido_at: :desc).first
+      hum  = LecturaAmbiental.de_sala(s.id).del_tipo('humedad').order(medido_at: :desc).first
+      next nil unless temp || hum
+      {
+        sala_id:     s.id,
+        sala:        s.nombre,
+        temperatura: temp&.valor&.to_f,
+        humedad:     hum&.valor&.to_f,
+        medido_at:   [temp&.medido_at, hum&.medido_at].compact.max,
+      }
+    end
+    render json: { salas: data, con_sensores: data.any? }
+  end
+
   private
 
   def plantas_por_genetica(club, lote_ids)

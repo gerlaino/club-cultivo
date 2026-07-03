@@ -47,6 +47,7 @@ Rails.application.routes.draw do
     get "/me",             to: "me#show"
     get "/me/movimientos", to: "me#movimientos"
     get "/stats",          to: "stats#show"
+    get "/stats/ambiente_salas", to: "stats#ambiente_salas"
 
     scope '/analytics', controller: :analytics do
       get :rendimiento_genetica

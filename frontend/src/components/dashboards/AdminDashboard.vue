@@ -5,7 +5,7 @@ import Chart from 'chart.js/auto'
 import {
   listSedes, getContableDashboard, listLotes, listPesajesManicuraAdmin,
   getAnalyticsDispensador, listStocksPendientes,
-  listDispensacionesFecha, getAnalyticsEjecutivo,
+  listDispensacionesFecha, getAnalyticsEjecutivo, getAmbienteSalas,
 } from '../../lib/api.js'
 import { useAuthStore }  from '../../stores/auth.js'
 import { useClubStore }  from '../../stores/club.js'
@@ -29,6 +29,19 @@ const stocksPendientes       = ref([])
 const analyticsDisp          = ref(null)
 const lotesEnFloracion       = ref([])
 const lotesActivos           = ref([])
+// D5: estado ambiental por sala (última lectura).
+const ambiente               = ref({ salas: [], con_sensores: false })
+function ambienteFresco(medidoAt) {
+  if (!medidoAt) return false
+  return (Date.now() - new Date(medidoAt).getTime()) < 2 * 3600 * 1000  // < 2h = fresco
+}
+function fmtHaceAmb(medidoAt) {
+  if (!medidoAt) return 'sin datos'
+  const min = Math.floor((Date.now() - new Date(medidoAt).getTime()) / 60000)
+  if (min < 60) return `hace ${min}m`
+  const h = Math.floor(min / 60)
+  return h < 24 ? `hace ${h}h` : `hace ${Math.floor(h / 24)}d`
+}
 const dispensacionesHoy      = ref([])
 const ejecutivo              = ref(null)
 const loading                = ref(true)
@@ -401,6 +414,7 @@ onMounted(async () => {
         getAnalyticsEjecutivo(),
       ])
     await Promise.allSettled([statsStore.fetchAll(), tareasStore.fetchDashboard()])
+    getAmbienteSalas().then(r => { ambiente.value = r.data || { salas: [], con_sensores: false } }).catch(() => {})
 
     if (sedesRes.status      === 'fulfilled') sedes.value                  = sedesRes.value.data    || []
     if (contableRes.status   === 'fulfilled') contable.value               = contableRes.value.data
@@ -789,6 +803,30 @@ async function onOnboardingCompletado() {
                 {{ fmtCompacto(balanceMes) }}
               </span>
             </div>
+          </div>
+        </div>
+
+        <!-- Ambiente en vivo (D5) -->
+        <div class="ad__widget">
+          <div class="ad__widget-hdr">
+            <span class="ad__widget-title">Ambiente</span>
+            <RouterLink to="/salas" class="ad__widget-link">Ver salas →</RouterLink>
+          </div>
+          <template v-if="ambiente.salas.length">
+            <div v-for="s in ambiente.salas" :key="s.sala_id" class="ad__amb-row">
+              <span class="ad__amb-dot" :class="ambienteFresco(s.medido_at) ? 'ad__amb-dot--ok' : 'ad__amb-dot--stale'"></span>
+              <span class="ad__amb-sala">{{ s.sala }}</span>
+              <span class="ad__amb-vals">
+                <span v-if="s.temperatura != null" class="ad__amb-val">🌡 {{ s.temperatura.toFixed(1) }}°</span>
+                <span v-if="s.humedad != null" class="ad__amb-val">💧 {{ s.humedad.toFixed(0) }}%</span>
+              </span>
+              <span class="ad__amb-hace">{{ fmtHaceAmb(s.medido_at) }}</span>
+            </div>
+          </template>
+          <div v-else class="ad__amb-empty">
+            <i class="bi bi-thermometer-half"></i>
+            <p>Sin sensores conectados</p>
+            <RouterLink to="/salas" class="ad__amb-cta">Configurar ambiente →</RouterLink>
           </div>
         </div>
 
@@ -1182,6 +1220,19 @@ async function onOnboardingCompletado() {
 .ad__chart-empty-cta { font-size: .78rem; font-weight: 600; color: #15803d; text-decoration: none; }
 .ad__anual-warn { display: block; margin-top: .2rem; font-size: .64rem; font-weight: 600; color: #b45309; }
 .ad__kpi-post { color: #d97706; font-weight: 700; }
+/* D5: widget ambiente */
+.ad__amb-row { display: flex; align-items: center; gap: .5rem; padding: .55rem .875rem; border-top: 1px solid #f1f5f9; }
+.ad__amb-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ad__amb-dot--ok { background: #16a34a; }
+.ad__amb-dot--stale { background: #cbd5e1; }
+.ad__amb-sala { font-size: .82rem; font-weight: 600; color: #0f172a; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ad__amb-vals { display: flex; gap: .5rem; flex-shrink: 0; }
+.ad__amb-val { font-size: .82rem; font-weight: 700; color: #334155; }
+.ad__amb-hace { font-size: .68rem; color: #94a3b8; flex-shrink: 0; min-width: 52px; text-align: right; }
+.ad__amb-empty { display: flex; flex-direction: column; align-items: center; gap: .3rem; padding: 1.25rem; color: #94a3b8; text-align: center; }
+.ad__amb-empty i { font-size: 1.5rem; opacity: .6; }
+.ad__amb-empty p { margin: 0; font-size: .82rem; }
+.ad__amb-cta { font-size: .76rem; font-weight: 600; color: #15803d; text-decoration: none; }
 .ad__chart-footer {
   display: flex;
   align-items: center;
