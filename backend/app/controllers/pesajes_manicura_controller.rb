@@ -40,6 +40,12 @@ class PesajesManicuraController < ApplicationController
     unless current_user.manicura? || current_user.admin? || current_user.supervisor?
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
+    # Si el lote tiene un manicura asignado, SOLO esa persona registra el pesaje (evita
+    # ediciones concurrentes / pesos que se pisan). Si no hay asignado, cualquiera de los
+    # roles habilitados puede. (Provisorio hasta afinar el flujo de equipo.)
+    if @lote.manicurador_id.present? && @lote.manicurador_id != current_user.id
+      return render json: { error: 'Este lote está asignado a otro responsable de manicura. Solo esa persona puede registrar el pesaje.' }, status: :forbidden
+    end
     unless @lote.estado == 'en_manicura'
       return render json: { error: 'El lote no está en manicura activa' }, status: :unprocessable_entity
     end

@@ -92,7 +92,16 @@ class PlantsController < ApplicationController
   def update
     old_state = @plant.state
 
+    # El peso de una planta en manicura se registra SOLO por el flujo de pesaje
+    # (registrar_peso, del manicura asignado), nunca por el "guardar" crudo del detalle:
+    # evita pesos sueltos fuera de la jornada y ediciones concurrentes que "pierden" la planta.
+    if @plant.lote&.estado == 'en_manicura' && plant_params[:peso_seco].present? &&
+       plant_params[:peso_seco].to_f != @plant.peso_seco.to_f
+      return render json: { error: 'El peso en manicura se registra desde el pesaje del lote (solo el manicura asignado). No se edita desde el detalle de la planta.' }, status: :unprocessable_entity
+    end
+
     permitted = plant_params.except(:nombre, :genetica_id) # nombre y genetica_id nunca se editan en la planta
+    permitted = permitted.except(:peso_seco) if @plant.lote&.estado == 'en_manicura'
     if @plant.update(permitted)
       attach_foto(@plant) if params[:foto].present?
       if plant_params[:state].present? && @plant.state != old_state

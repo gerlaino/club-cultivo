@@ -7,7 +7,7 @@ import { banderitaHTML, banderitaCSS } from '../lib/etiquetaPlanta.js'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
-import { getPlantActivities, createPlantActivity, updatePlant, addPlantFoto, removePlantFoto } from '../lib/api'
+import { getPlantActivities, createPlantActivity, updatePlant, registrarPesoPlanta, addPlantFoto, removePlantFoto } from '../lib/api'
 import Breadcrumb            from '../components/ui/Breadcrumb.vue'
 import EmptyState            from '../components/ui/EmptyState.vue'
 import Lightbox              from '../components/ui/Lightbox.vue'
@@ -423,12 +423,15 @@ async function saveManicura() {
   if (savingManicura.value || !pesoManicura.value) return
   savingManicura.value = true
   try {
-    await updatePlant(id, { peso_seco: pesoManicura.value })
-    if (plants.current) plants.current.peso_seco = pesoManicura.value
+    // Va por el flujo de pesaje (registrar_peso): linkea el peso a la jornada del lote y
+    // respeta la asignación (solo el manicura asignado puede). NO por updatePlant (que
+    // dejaba el peso suelto fuera del pesaje).
+    const { data } = await registrarPesoPlanta(id, { peso_seco_g: pesoManicura.value })
+    if (plants.current) plants.current.peso_seco = data?.planta?.peso_seco ?? pesoManicura.value
     manicuraSaved.value = true
-    toast.success('Peso de manicura guardado')
-  } catch {
-    toast.error('Error al guardar el peso')
+    toast.success('Peso registrado en el pesaje del lote')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al guardar el peso')
   } finally {
     savingManicura.value = false
   }

@@ -160,16 +160,15 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(response).to have_http_status(:unprocessable_entity)
   end
 
-  # Opción A (trabajo de equipo): cualquier manicura del club puede crear pesajes sobre un
-  # lote en manicura, aunque no sea el "responsable" asignado. La confirmación + el
-  # historial (guarda quién registró) cubren la trazabilidad.
-  it 'un manicura NO asignado al lote SÍ puede crear un pesaje (equipo)' do
+  # Provisorio: si el lote está asignado a un manicura, SOLO ese responsable registra el
+  # pesaje (evita ediciones concurrentes / pesos que se pisan).
+  it 'un manicura NO asignado a un lote ya asignado a otro NO puede crear un pesaje' do
     otro_manicura = create(:user, :manicura, club: club)
     delete '/api/users/sign_out'
     sign_in_as(otro_manicura)
 
     post "/lotes/#{lote.id}/pesajes_manicura", headers: auth_headers
-    expect(response).to have_http_status(:created)
+    expect(response).to have_http_status(:forbidden)
   end
 
   it 'cualquier manicura puede crear un pesaje si el lote no tiene manicurador asignado' do
@@ -182,11 +181,11 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(response).to have_http_status(:created)
   end
 
-  it 'el admin SÍ puede crear un pesaje aunque el lote esté asignado a un manicura' do
+  it 'el admin NO puede crear un pesaje batch si el lote está asignado a un manicura' do
     delete '/api/users/sign_out'
     sign_in_as(admin)
     post "/lotes/#{lote.id}/pesajes_manicura", headers: auth_headers
-    expect(response).to have_http_status(:created)
+    expect(response).to have_http_status(:forbidden)
   end
 
   it 'el admin SÍ puede crear un pesaje si el lote no tiene manicura asignado' do
@@ -195,6 +194,14 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     sign_in_as(admin)
     post "/lotes/#{lote.id}/pesajes_manicura", headers: auth_headers
     expect(response).to have_http_status(:created)
+  end
+
+  it 'NO permite editar el peso_seco de una planta en manicura desde el detalle (plants#update)' do
+    delete '/api/users/sign_out'
+    sign_in_as(admin)
+    put "/plants/#{planta.id}", params: { plant: { peso_seco: 999 } }, headers: auth_headers, as: :json
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(planta.reload.peso_seco.to_f).not_to eq(999.0)
   end
 
   # Mixto: el manicura pesa algunas plantas por QR y el resto por batch. El batch cubre
