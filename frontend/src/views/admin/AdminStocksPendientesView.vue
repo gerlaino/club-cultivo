@@ -45,7 +45,7 @@
           <div class="stk__kpi-ico">📦</div>
           <div class="stk__kpi-body">
             <div class="stk__kpi-val">{{ totalG }}<span class="stk__kpi-unit">g</span></div>
-            <div class="stk__kpi-lbl">Total disponible</div>
+            <div class="stk__kpi-lbl">Flor seca disponible</div>
           </div>
         </div>
         <div class="stk__kpi" :class="{ 'stk__kpi--warn': pendientes.length > 0 }">
@@ -66,7 +66,7 @@
           <div class="stk__kpi-ico">🌿</div>
           <div class="stk__kpi-body">
             <div class="stk__kpi-val">{{ stockPropio }}<span class="stk__kpi-unit">g</span></div>
-            <div class="stk__kpi-lbl">Producción propia</div>
+            <div class="stk__kpi-lbl">Flor seca propia</div>
           </div>
         </div>
         <div v-if="stocksVencidos > 0" class="stk__kpi stk__kpi--error">

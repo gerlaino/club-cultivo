@@ -60,21 +60,27 @@ class StocksController < ApplicationController
   # fecha_hasta (sobre created_at). Devuelve la página + totales sobre el set FILTRADO
   # (para que los KPIs respeten el filtro).
   def inventario
-    scope = Stock.where(club_id: current_user.club_id).where('cantidad > 0')
-
-    scope = scope.where(forma_producto: params[:forma_producto]) if params[:forma_producto].present?
+    # Base sin el filtro de forma: los KPIs en gramos se calculan sobre flor seca aunque el
+    # usuario esté filtrando por otra forma.
+    base = Stock.where(club_id: current_user.club_id).where('cantidad > 0')
     if params[:sede_id].present?
-      scope = params[:sede_id] == 'pool' ? scope.where(sede_id: nil) : scope.where(sede_id: params[:sede_id])
+      base = params[:sede_id] == 'pool' ? base.where(sede_id: nil) : base.where(sede_id: params[:sede_id])
     end
-    scope = scope.where('stocks.created_at >= ?', params[:fecha_desde]) if params[:fecha_desde].present?
-    scope = scope.where('stocks.created_at <= ?', "#{params[:fecha_hasta]} 23:59:59") if params[:fecha_hasta].present?
+    base = base.where('stocks.created_at >= ?', params[:fecha_desde]) if params[:fecha_desde].present?
+    base = base.where('stocks.created_at <= ?', "#{params[:fecha_hasta]} 23:59:59") if params[:fecha_hasta].present?
+
+    # Lista + counts: respetan el filtro de forma.
+    scope = params[:forma_producto].present? ? base.where(forma_producto: params[:forma_producto]) : base
+    # KPIs en gramos: SOLO flor seca. Los derivados (preroll, hash…) son inventario con su
+    # propia unidad y NO se suman como gramos.
+    flor  = base.where(forma_producto: 'flor_seca')
 
     hoy = Date.today
     totales = {
-      total_g:             scope.sum(:cantidad).to_f,
+      total_g:             flor.sum(:cantidad).to_f,
       items:               scope.count,
       sedes_con_stock:     scope.where.not(sede_id: nil).distinct.count(:sede_id),
-      produccion_propia_g: scope.where(origen: %w[lote derivado_lote]).sum(:cantidad).to_f,
+      produccion_propia_g: flor.where(origen: %w[lote derivado_lote]).sum(:cantidad).to_f,
       vencidos:            scope.where('fecha_vencimiento_est < ?', hoy).count,
       por_vencer:          scope.where('fecha_vencimiento_est >= ? AND fecha_vencimiento_est <= ?', hoy, hoy + 30).count,
     }
