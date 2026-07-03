@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Blueprint de infra de Render — SOLO el cron de backup de Postgres.
+#
+# Los servicios actuales (web backend, frontend, base Postgres) se administran hoy
+# desde el dashboard de Render, no desde este archivo. Este blueprint agrega ÚNICAMENTE
+# el cron job de backup diario. La base NO se declara acá a propósito (para no intentar
+# que el blueprint la administre): la connection string se pasa por env var.
+#
+# Podés aplicarlo de dos formas (cualquiera sirve, ver docs/backups.md):
+#   a) New → Blueprint → apuntar a este repo (Render crea el cron).
+#   b) New → Cron Job (manual), copiando schedule/command/env de acá.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  - type: cron
+    name: db-backup-diario
+    runtime: ruby
+    plan: starter
+    rootDir: backend
+    # 07:00 UTC = 04:00 Argentina (UTC-3) → horario de baja carga. Una corrida por día.
+    schedule: "0 7 * * *"
+    buildCommand: bundle install
+    startCommand: bundle exec rake backup:create
+    autoDeploy: false
+    envVars:
+      # Connection string de la base de PRODUCCIÓN (Internal Database URL del dashboard).
+      - key: DATABASE_URL
+        sync: false
+      # Bucket R2 dedicado a los backups (distinto del bucket de ActiveStorage).
+      - key: BACKUP_BUCKET
+        sync: false
+      # Credenciales R2 del token de backup (least-privilege). Si preferís reusar las del
+      # app storage, borrá estas dos y el task cae a S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY.
+      - key: BACKUP_S3_ACCESS_KEY_ID
+        sync: false
+      - key: BACKUP_S3_SECRET_ACCESS_KEY
+        sync: false
+      # Endpoint R2 (https://<account_id>.r2.cloudflarestorage.com). Mismo que ya usa el app.
+      - key: S3_ENDPOINT
+        sync: false
+      # R2 usa "auto".
+      - key: S3_REGION
+        value: auto
+      - key: RAILS_ENV
+        value: production
