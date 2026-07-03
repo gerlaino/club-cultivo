@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_02_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_03_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -293,6 +293,28 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_02_000001) do
     t.index ["deleted_by_id"], name: "index_cobros_on_deleted_by_id"
     t.index ["dispensacion_id", "medio"], name: "index_cobros_on_dispensacion_id_and_medio"
     t.index ["dispensacion_id"], name: "index_cobros_on_dispensacion_id"
+  end
+
+  create_table "compras_cuotas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "sede_id", null: false
+    t.bigint "created_by_id", null: false
+    t.string "descripcion", null: false
+    t.string "categoria", null: false
+    t.decimal "monto_total_ars", precision: 12, scale: 2, null: false
+    t.integer "cuotas_total", null: false
+    t.date "fecha_primera_cuota", null: false
+    t.string "medio_pago"
+    t.string "responsable"
+    t.string "proveedor"
+    t.text "notas"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_compras_cuotas_on_club_id"
+    t.index ["created_by_id"], name: "index_compras_cuotas_on_created_by_id"
+    t.index ["deleted_at"], name: "index_compras_cuotas_on_deleted_at"
+    t.index ["sede_id"], name: "index_compras_cuotas_on_sede_id"
   end
 
   create_table "conversaciones_asistente", force: :cascade do |t|
@@ -818,9 +840,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_02_000001) do
     t.bigint "paciente_id"
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.bigint "compra_cuotas_id"
+    t.integer "cuota_numero"
     t.index ["club_id", "fecha"], name: "index_movimientos_contables_on_club_id_and_fecha"
     t.index ["club_id", "tipo"], name: "index_movimientos_contables_on_club_id_and_tipo"
     t.index ["club_id"], name: "index_movimientos_contables_on_club_id"
+    t.index ["compra_cuotas_id"], name: "index_movimientos_contables_on_compra_cuotas_id"
     t.index ["deleted_at"], name: "index_movimientos_contables_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_movimientos_contables_on_deleted_by_id"
     t.index ["dispensacion_id"], name: "index_movimientos_contables_on_dispensacion_id"
@@ -1660,6 +1685,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_02_000001) do
   add_foreign_key "cobros", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "cobros", "users", column: "created_by_id"
   add_foreign_key "cobros", "users", column: "deleted_by_id"
+  add_foreign_key "compras_cuotas", "clubs"
+  add_foreign_key "compras_cuotas", "sedes"
+  add_foreign_key "compras_cuotas", "users", column: "created_by_id"
   add_foreign_key "conversaciones_asistente", "clubs"
   add_foreign_key "conversaciones_asistente", "users"
   add_foreign_key "costo_lotes", "clubs"
@@ -1730,6 +1758,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_02_000001) do
   add_foreign_key "mails_enviados", "users"
   add_foreign_key "mails_enviados", "users", column: "deleted_by_id"
   add_foreign_key "movimientos_contables", "clubs"
+  add_foreign_key "movimientos_contables", "compras_cuotas", column: "compra_cuotas_id"
   add_foreign_key "movimientos_contables", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "movimientos_contables", "lotes"
   add_foreign_key "movimientos_contables", "pacientes"

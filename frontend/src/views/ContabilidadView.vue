@@ -7,6 +7,7 @@ import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeri
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
 import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
+import ModalCompraCuotas from "../components/contabilidad/ModalCompraCuotas.vue"
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const store   = useContabilidadStore()
@@ -306,6 +307,13 @@ async function openEdit(m) {
   }
 }
 
+const showCuotas = ref(false)
+async function onCuotasGuardado() {
+  showCuotas.value = false
+  await store.fetch()
+  if (vistaActiva.value === "dashboard") await store.fetchDashboard(dashboardSede.value)
+}
+
 async function onMovimientoGuardado(payload) {
   try {
     if (editingMovimiento.value) {
@@ -375,6 +383,9 @@ onMounted(async () => {
       <div class="cv__header-right">
         <button class="cv__btn-ghost" @click="exportar">
           <i class="bi bi-download"></i> Exportar CSV
+        </button>
+        <button v-if="canEdit" class="cv__btn-ghost" @click="showCuotas = true">
+          <i class="bi bi-credit-card-2-front"></i> Compra en cuotas
         </button>
         <button v-if="canEdit" class="cv__btn-primary" @click="openCreate">
           <i class="bi bi-plus-lg"></i> Nuevo movimiento
@@ -792,6 +803,8 @@ onMounted(async () => {
       :movimiento-editar="editingMovimiento"
       @guardado="onMovimientoGuardado"
     />
+
+    <ModalCompraCuotas v-model="showCuotas" :sedes="sedes" @guardado="onCuotasGuardado" />
 
     <!-- ══════════════ P&L POR LOTE ══════════════ -->
     <div v-if="vistaActiva === 'pl'" ref="plContainerRef">

@@ -11,6 +11,7 @@ class Club < ApplicationRecord
   has_many :eventos,              dependent: :destroy
   has_many :sedes,                dependent: :destroy
   has_many :movimientos_contables, class_name: 'MovimientoContable', dependent: :destroy
+  has_many :compras_cuotas,        class_name: 'CompraCuotas',       dependent: :destroy
   has_many :costo_lotes,          class_name: 'CostoLote', dependent: :destroy
   has_many :tareas,               dependent: :destroy
   has_many :jornadas_laborales,   class_name: 'JornadaLaboral', dependent: :destroy

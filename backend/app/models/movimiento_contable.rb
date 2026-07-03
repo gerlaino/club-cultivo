@@ -9,8 +9,9 @@ class MovimientoContable < ApplicationRecord
   acts_as_tenant(:club)
   belongs_to :sede
   belongs_to :lote,         optional: true
-  belongs_to :dispensacion, optional: true
-  belongs_to :paciente,     optional: true
+  belongs_to :dispensacion,  optional: true
+  belongs_to :paciente,      optional: true
+  belongs_to :compra_cuotas, class_name: 'CompraCuotas', optional: true
   belongs_to :created_by,   class_name: "User"
 
   after_create   :acreditar_cuenta_corriente
@@ -62,7 +63,8 @@ class MovimientoContable < ApplicationRecord
             numericality: { greater_than: 0 }
   validates :fecha,       presence: true
   validates :medio_pago,  inclusion: { in: MEDIOS_PAGO }, allow_blank: true
-  validate  :fecha_no_futura
+  # Las cuotas futuras de una compra financiada SÍ pueden tener fecha futura (vencen adelante).
+  validate  :fecha_no_futura, unless: :cuota?
   validate  :periodo_no_cerrado, on: [:create, :update]
   before_destroy :verificar_periodo_no_cerrado, prepend: true
 
@@ -100,6 +102,11 @@ class MovimientoContable < ApplicationRecord
   def cerrado?
     cierre = club&.contabilidad_cerrada_hasta
     cierre.present? && fecha.present? && fecha <= cierre
+  end
+
+  # Es una cuota de una compra financiada (puede tener fecha futura).
+  def cuota?
+    compra_cuotas_id.present?
   end
 
   private
