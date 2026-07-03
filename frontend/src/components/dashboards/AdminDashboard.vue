@@ -257,6 +257,9 @@ const pulseLine = computed(() => {
 const añoActual = new Date().getFullYear()
 
 const ejActual   = computed(() => ejecutivo.value?.actual   ?? null)
+// D3: hay datos para graficar el mes. D4: el margen no es confiable si no hay costos.
+const tieneChartData = computed(() => (contable.value?.mes_actual?.por_semana?.length || 0) > 0)
+const sinCostosAnual = computed(() => !(ejActual.value?.costo_total > 0))
 const ejAnterior = computed(() => ejecutivo.value?.anterior ?? null)
 
 function deltaAnual(campo) {
@@ -608,12 +611,13 @@ async function onOnboardingCompletado() {
 
           <div class="ad__anual-kpi">
             <span class="ad__anual-lbl">Margen</span>
-            <span class="ad__anual-val" :style="{ color: ejActual.margen >= 0 ? '#16a34a' : '#dc2626' }">
+            <span class="ad__anual-val" :style="{ color: sinCostosAnual ? '#94a3b8' : (ejActual.margen >= 0 ? '#16a34a' : '#dc2626') }">
               {{ fmtCompacto(ejActual.margen) }}
-              <small v-if="ejActual.margen_pct != null" style="font-size:.65em;font-weight:600">
+              <small v-if="!sinCostosAnual && ejActual.margen_pct != null" style="font-size:.65em;font-weight:600">
                 ({{ ejActual.margen_pct }}%)
               </small>
             </span>
+            <span v-if="sinCostosAnual" class="ad__anual-warn">⚠ Sin costos cargados — margen no confiable</span>
             <span v-if="deltaAnual('margen')" class="ad__anual-delta"
                   :class="Number(deltaAnual('margen')) >= 0 ? 'ad__anual-delta--pos' : 'ad__anual-delta--neg'">
               {{ Number(deltaAnual('margen')) >= 0 ? '↑' : '↓' }} {{ Math.abs(deltaAnual('margen')) }}% vs {{ añoActual - 1 }}
@@ -748,7 +752,12 @@ async function onOnboardingCompletado() {
             <RouterLink to="/contabilidad" class="ad__widget-link">Ver detalle →</RouterLink>
           </div>
           <div class="ad__chart-wrap">
-            <canvas ref="chartCanvas" />
+            <canvas v-show="tieneChartData" ref="chartCanvas" />
+            <div v-if="!tieneChartData" class="ad__chart-empty">
+              <i class="bi bi-bar-chart-line"></i>
+              <p>Sin movimientos este mes todavía</p>
+              <RouterLink to="/contabilidad" class="ad__chart-empty-cta">Registrar movimiento →</RouterLink>
+            </div>
           </div>
           <div class="ad__chart-footer">
             <div class="ad__chart-stat">
@@ -1151,6 +1160,14 @@ async function onOnboardingCompletado() {
   padding: .875rem 1rem .5rem;
   position: relative;
 }
+.ad__chart-empty {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .35rem; color: #94a3b8; text-align: center;
+}
+.ad__chart-empty i { font-size: 1.6rem; opacity: .6; }
+.ad__chart-empty p { margin: 0; font-size: .82rem; }
+.ad__chart-empty-cta { font-size: .78rem; font-weight: 600; color: #15803d; text-decoration: none; }
+.ad__anual-warn { display: block; margin-top: .2rem; font-size: .64rem; font-weight: 600; color: #b45309; }
 .ad__chart-footer {
   display: flex;
   align-items: center;

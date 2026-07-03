@@ -73,7 +73,7 @@
                 <th class="mnl__th mnl__th--num">#</th>
                 <th class="mnl__th">Nombre</th>
                 <th class="mnl__th mnl__th--qr">QR</th>
-                <th v-if="hasAnyHumedo" class="mnl__th mnl__th--peso">Peso húmedo (g)</th>
+                <th v-if="hasAnyHumedo" class="mnl__th mnl__th--peso">Peso bruto al corte (g)</th>
                 <th class="mnl__th mnl__th--peso">Peso seco (g)</th>
                 <th class="mnl__th mnl__th--estado">Estado</th>
               </tr>

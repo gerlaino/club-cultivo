@@ -33,7 +33,7 @@
           </div>
           <div v-if="planta.peso_humedo" class="pcd__peso">
             <span class="pcd__peso-val pcd__peso-val--muted">{{ planta.peso_humedo }}g</span>
-            <span class="pcd__peso-lbl">Peso húmedo</span>
+            <span class="pcd__peso-lbl">Peso bruto al corte</span>
           </div>
         </div>
       </div>

@@ -66,9 +66,9 @@
               </div>
             </div>
 
-            <!-- Peso húmedo -->
+            <!-- Peso bruto al corte -->
             <div class="mcp-field">
-              <label class="mcp-label">Peso húmedo total <span class="mcp-opt">opcional</span></label>
+              <label class="mcp-label">Peso bruto al corte <span class="mcp-opt">opcional</span></label>
               <div class="mcp-input-wrap">
                 <input v-model.number="pesoHumedo" type="number" min="0" step="0.1" class="mcp-input" placeholder="0" />
                 <span class="mcp-unit">g</span>
@@ -111,7 +111,7 @@
               <span>
                 <strong>{{ seleccionadas.size }} planta{{ seleccionadas.size !== 1 ? 's' : '' }}</strong>
                 se cosechan en el corte <strong>{{ pasada }}</strong>
-                <span v-if="pesoHumedo"> · {{ pesoHumedo }}g húmedo</span>
+                <span v-if="pesoHumedo"> · {{ pesoHumedo }}g bruto</span>
               </span>
             </div>
 

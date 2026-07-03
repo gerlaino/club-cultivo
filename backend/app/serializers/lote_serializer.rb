@@ -70,7 +70,7 @@ class LoteSerializer
       sistema_hidro:             lote.sistema_hidro,
       sustrato_especifico:       lote.sustrato_especifico,
       genetica_id:        lote.genetica_id,
-      genetica:           lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, registrada_inase: lote.genetica.registrada_inase } : nil,
+      genetica:           lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, tipo: lote.genetica.tipo, registrada_inase: lote.genetica.registrada_inase } : nil,
       dias_desde_inicio:  lote.dias_desde_inicio,
       dias_en_estado:     dias_en_estado,
       progreso_ciclo:     lote.progreso_ciclo,

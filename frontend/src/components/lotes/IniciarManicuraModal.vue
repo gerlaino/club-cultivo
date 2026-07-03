@@ -51,10 +51,10 @@
             </p>
           </div>
 
-          <!-- Peso húmedo -->
+          <!-- Peso bruto al corte -->
           <div class="imm__field">
             <label class="imm__label">
-              Peso húmedo (g)
+              Peso bruto al corte (g)
               <span class="imm__optional">opcional</span>
             </label>
             <div class="imm__input-row">

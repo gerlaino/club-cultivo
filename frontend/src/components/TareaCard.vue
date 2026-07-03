@@ -166,6 +166,7 @@ function planTooltip(t) {
   position: relative;
   background: var(--bs-body-bg);
   border: 1px solid var(--bs-border-color);
+  border-left-width: 4px;   /* indicador visual de prioridad (color según .prioridad-*) */
   border-radius: 10px;
   padding: 12px 14px;
   cursor: pointer;

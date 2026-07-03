@@ -104,7 +104,7 @@ const FASE_CONFIG = {
     fase_origen:  'cosecha',
     fase_destino: 'en_manicura',
     label:        'Cosecha → Manicura',
-    pesoLabel:    'Peso húmedo (g)',
+    pesoLabel:    'Peso bruto al corte (g)',
     pesoKey:      'peso_humedo_g',
     showManicurado: false,
   },

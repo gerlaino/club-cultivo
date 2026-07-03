@@ -55,6 +55,7 @@ const EN_CICLO = ["semilla","esqueje","vegetativo","floracion","cosecha","en_man
 function em(e)           { return ESTADO_META[e] || { label: e||"—", dot:"#94a3b8", bg:"#f1f5f9", text:"#64748b", bar:"#94a3b8", icon:"•" }; }
 function estadoLabel(e)  { return em(e).label; }
 function growLabel(g)    { return { sustrato:"Sustrato", hidroponia:"Hidroponia" }[g] || g || "—"; }
+function tipoLabel(t)    { return { sativa:"Sativa", indica:"Índica", hibrida:"Híbrida" }[t] || t; }
 function lightLabel(l)   { return { led:"LED", hps:"HPS", cmh:"CMH", natural:"Natural", mixta:"Mixta" }[l] || l || "—"; }
 function salaName(id)    { return salas.items.find(s => String(s.id) === String(id))?.nombre || `Sala #${id}`; }
 // Post-cosecha el lote no vive en una sala: mostramos su etapa como "ubicación".
@@ -359,6 +360,7 @@ async function exportarCSV() {
               <span v-if="l.genetica?.nombre" class="lv-genetica">{{ l.genetica.nombre }}</span>
               <span v-else-if="l.strain" class="lv-strain">{{ l.strain }}</span>
               <span v-else class="lv-empty">—</span>
+              <span v-if="l.genetica?.tipo" class="lv-tipo" :class="`lv-tipo--${l.genetica.tipo}`">{{ tipoLabel(l.genetica.tipo) }}</span>
             </td>
             <td data-label="Sala">
               <span class="lv-sala">{{ salaCelda(l) }}</span>
@@ -590,6 +592,10 @@ async function exportarCSV() {
 .lv-codigo { font-weight: 700; color: #0f172a; font-family: monospace; font-size: .85rem; }
 .lv-genetica { font-weight: 600; color: #3F6452; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-strain { font-style: italic; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-tipo { display: inline-block; margin-left: .4rem; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: .1em .45em; border-radius: 999px; vertical-align: middle; }
+.lv-tipo--sativa { background: #fef3c7; color: #b45309; }
+.lv-tipo--indica { background: #ede9fe; color: #6d28d9; }
+.lv-tipo--hibrida { background: #dcfce7; color: #15803d; }
 .lv-sala { color: #64748b; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-num { font-weight: 600; color: #374151; }
 .lv-empty { color: #cbd5e1; }

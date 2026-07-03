@@ -211,7 +211,7 @@
         <!-- Formulario -->
         <div class="qr__peso-form">
           <div class="qr__field">
-            <label>Peso húmedo <span class="qr__field-opt">opcional</span></label>
+            <label>Peso bruto al corte <span class="qr__field-opt">opcional</span></label>
             <div class="qr__peso-wrap">
               <input v-model="pesoHumedoInput" type="number" min="0.1" step="0.1" placeholder="0.0" class="qr__peso-input" :disabled="registrando" />
               <span class="qr__peso-unit">g</span>

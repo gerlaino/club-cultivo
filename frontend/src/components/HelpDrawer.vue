@@ -163,7 +163,7 @@ const CONTENT = {
       title: 'Flujo post-cosecha',
       items: [
         { label: 'Lotes en cosecha', text: 'Cuando el cultivador marca un lote como cosechado, aparece en tu cola de trabajo.' },
-        { label: 'Registrar pesada', text: 'En el detalle del lote → Pesadas podés registrar el peso húmedo, seco y merma de cada lote.' },
+        { label: 'Registrar pesada', text: 'En el detalle del lote → Pesadas podés registrar el peso bruto al corte, seco y merma de cada lote.' },
         { label: 'Avanzar de fase', text: 'Usá los botones de fase (Cosechar → Manicurar → Curar) para avanzar. Al finalizar curado se genera el stock disponible.' },
       ]
     },

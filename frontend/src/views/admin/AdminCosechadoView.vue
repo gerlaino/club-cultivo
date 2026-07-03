@@ -29,7 +29,7 @@
           <th>Genética</th>
           <th>Días cosechado</th>
           <th>Plantas</th>
-          <th>Peso húmedo</th>
+          <th>Peso bruto al corte</th>
           <th>Fecha cosecha</th>
           <th></th>
         </tr>
