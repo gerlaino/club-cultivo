@@ -7,6 +7,25 @@ class PacientesController < ApplicationController
   before_action :normalize_paciente_params, only: [:create, :update]
   before_action :warn_deprecated_route
 
+  # ── ALLOWLIST de campos serializados ──────────────────────────────────────────
+  # Campos NO clínicos: visibles para cualquier rol con lectura de la ficha.
+  CAMPOS_NO_CLINICOS = %w[
+    id club_id nombre apellido dni dni_normalizado fecha_nacimiento es_paciente
+    email telefono reprocann_numero reprocann_vencimiento reprocann_estado
+    con_seguimiento_medico limite_dispensacion_mensual_g descuento_porcentaje carnet_token
+    domicilio_calle domicilio_altura domicilio_piso domicilio_depto domicilio_barrio domicilio_ciudad
+    envio_calle envio_altura envio_piso envio_depto envio_barrio envio_ciudad
+    created_at updated_at
+  ].freeze
+
+  # Campos CLÍNICOS / de salud: SÓLO se agregan si el rol puede ver la historia clínica
+  # (allowlist medico/admin/supervisor, via PacientePolicy#ver_notas_clinicas?).
+  CAMPOS_CLINICOS = %w[
+    notas_clinicas motivo_consulta anamnesis antecedentes_personales antecedentes_familiares
+    diagnostico_principal diagnostico_secundario evolucion_clinica alergias
+    medicacion_habitual grupo_sanguineo
+  ].freeze
+
   def index
     page   = (params[:pagina] || 1).to_i
     limit  = (params[:limite] || 20).to_i
@@ -43,8 +62,9 @@ class PacientesController < ApplicationController
                           .where(paciente_id: pacientes.map(&:id))
                           .group(:paciente_id).maximum(:fecha_dispensacion)
 
+    # La LISTA nunca expone datos clínicos: allowlist estricta de campos no clínicos.
     data = pacientes.map do |p|
-      p.as_json(methods: [:nombre_completo, :reprocann_estado_efectivo])
+      p.as_json(only: CAMPOS_NO_CLINICOS, methods: [:nombre_completo, :reprocann_estado_efectivo])
        .merge('ultima_dispensacion' => ultimas[p.id])
     end
 
@@ -55,11 +75,19 @@ class PacientesController < ApplicationController
   end
 
   def show
+    authorize @paciente
+
+    # Base: SÓLO campos no clínicos (allowlist), para cualquier rol con lectura.
     json = @paciente.as_json(
-      methods: [:nombre_completo, :dispensado_mes_actual_g, :porcentaje_limite_mensual, :saldo_cc, :limite_cc, :saldo_cc_g, :limite_cc_g, :cc_gramos_activo, :reprocann_estado_efectivo],
-      except:  :notas_clinicas
+      only:    CAMPOS_NO_CLINICOS,
+      methods: [:nombre_completo, :dispensado_mes_actual_g, :porcentaje_limite_mensual, :saldo_cc, :limite_cc, :saldo_cc_g, :limite_cc_g, :cc_gramos_activo, :reprocann_estado_efectivo]
     )
-    json['notas_clinicas'] = @paciente.notas_clinicas if policy(@paciente).ver_notas_clinicas?
+
+    # Historia clínica: se agrega SÓLO si el rol puede verla (medico/admin/supervisor).
+    if policy(@paciente).ver_notas_clinicas?
+      json.merge!(@paciente.as_json(only: CAMPOS_CLINICOS))
+    end
+
     json['reprocann_documento_url'] = url_for(@paciente.reprocann_documento) if @paciente.reprocann_documento.attached?
 
     ultima = @paciente.dispensaciones.includes(:stock).recientes.first

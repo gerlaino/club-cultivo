@@ -1,6 +1,13 @@
 class PacientePolicy < ApplicationPolicy
-  ROLES_LECTURA = %w[admin medico dispensador].freeze
-  ROLES_CLINICA = %w[admin medico].freeze
+  # ── Allowlists explícitas por ROL ─────────────────────────────────────────────
+  # Quién puede VER la ficha (datos NO clínicos). El dispensador entra para dispensar.
+  ROLES_LECTURA        = %w[admin medico supervisor dispensador].freeze
+  # Quién puede VER datos clínicos / historia clínica. Decisión POR ROL (allowlist),
+  # NO por presencia/ausencia de club: super_admin y dispensador quedan FUERA a propósito
+  # (super_admin es rol de plataforma; el dispensador no accede a datos de salud).
+  ROLES_CLINICA        = %w[admin medico supervisor].freeze
+  # Quién puede EDITAR datos clínicos (más restrictivo que verlos).
+  ROLES_EDITAR_CLINICA = %w[admin medico].freeze
 
   class Scope < ApplicationPolicy::Scope
     def resolve
@@ -28,28 +35,37 @@ class PacientePolicy < ApplicationPolicy
   end
 
   def update?
-    mismo_club? && ROLES_CLINICA.include?(user&.role)
+    mismo_club? && ROLES_EDITAR_CLINICA.include?(user&.role)
   end
 
   def destroy?
     mismo_club? && admin?
   end
 
-  def update_notas_clinicas?
-    mismo_club? && ROLES_CLINICA.include?(user&.role)
-  end
-
+  # ── Datos clínicos ────────────────────────────────────────────────────────────
+  # Ver historia clínica: allowlist explícita medico/admin/supervisor. super_admin y
+  # dispensador NO están en ROLES_CLINICA → bloqueados por ROL, no por falta de club.
   def ver_notas_clinicas?
     mismo_club? && ROLES_CLINICA.include?(user&.role)
   end
 
+  # Editar datos clínicos: sólo admin/medico.
+  def update_notas_clinicas?
+    mismo_club? && ROLES_EDITAR_CLINICA.include?(user&.role)
+  end
+
+  # El timeline incluye eventos clínicos (indicaciones, turnos con motivo) → mismo
+  # criterio que ver la historia clínica.
   def timeline?
     mismo_club? && ROLES_CLINICA.include?(user&.role)
   end
 
   private
 
+  # Aislamiento multi-tenant (defensa en profundidad). NO es la decisión de acceso
+  # clínico — esa la toma la allowlist de rol de arriba —, sino la barrera de club:
+  # un usuario de un club nunca ve datos de otro club.
   def mismo_club?
-    user.present? && record.club_id == user.club_id
+    user.present? && user.club_id.present? && record.club_id == user.club_id
   end
 end
