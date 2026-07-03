@@ -3,11 +3,10 @@ import { ref, computed, onMounted, nextTick } from "vue"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable } from "../lib/api"
+import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
 import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
-import ModalCompraCuotas from "../components/contabilidad/ModalCompraCuotas.vue"
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const store   = useContabilidadStore()
@@ -307,16 +306,22 @@ async function openEdit(m) {
   }
 }
 
-const showCuotas = ref(false)
-async function onCuotasGuardado() {
-  showCuotas.value = false
-  await store.fetch()
-  if (vistaActiva.value === "dashboard") await store.fetchDashboard(dashboardSede.value)
-}
-
 async function onMovimientoGuardado(payload) {
   try {
-    if (editingMovimiento.value) {
+    if (payload.medio_pago === 'en_cuotas') {
+      // Compra financiada: genera N egresos mensuales (una por cuota).
+      await createCompraCuotas({
+        sede_id:             payload.sede_id || sedes.value[0]?.id,
+        descripcion:         payload.descripcion,
+        categoria:           payload.categoria,
+        monto_total_ars:     payload.monto_ars,
+        cuotas_total:        payload.cuotas_total,
+        fecha_primera_cuota: payload.fecha,
+        proveedor:           payload.proveedor || null,
+        notas:               payload.notas || null,
+      })
+      await store.fetch()
+    } else if (editingMovimiento.value) {
       await store.update(editingMovimiento.value.id, payload)
     } else {
       await store.create(payload)
@@ -383,9 +388,6 @@ onMounted(async () => {
       <div class="cv__header-right">
         <button class="cv__btn-ghost" @click="exportar">
           <i class="bi bi-download"></i> Exportar CSV
-        </button>
-        <button v-if="canEdit" class="cv__btn-ghost" @click="showCuotas = true">
-          <i class="bi bi-credit-card-2-front"></i> Compra en cuotas
         </button>
         <button v-if="canEdit" class="cv__btn-primary" @click="openCreate">
           <i class="bi bi-plus-lg"></i> Nuevo movimiento
@@ -803,8 +805,6 @@ onMounted(async () => {
       :movimiento-editar="editingMovimiento"
       @guardado="onMovimientoGuardado"
     />
-
-    <ModalCompraCuotas v-model="showCuotas" :sedes="sedes" @guardado="onCuotasGuardado" />
 
     <!-- ══════════════ P&L POR LOTE ══════════════ -->
     <div v-if="vistaActiva === 'pl'" ref="plContainerRef">

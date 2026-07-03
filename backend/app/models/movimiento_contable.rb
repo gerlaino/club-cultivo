@@ -45,7 +45,7 @@ class MovimientoContable < ApplicationRecord
 
   TIPOS_COMPROBANTE = %w[factura_a factura_b recibo ticket sin_comprobante].freeze
   # cuenta_corriente y no_abona llegan desde dispensaciones a crédito (pagado: false)
-  MEDIOS_PAGO       = %w[efectivo transferencia mercado_pago cheque cuenta_corriente no_abona].freeze
+  MEDIOS_PAGO       = %w[efectivo transferencia mercado_pago cuenta_corriente no_abona].freeze
 
   # Categorías que típicamente son egresos
   CATEGORIAS_EGRESO = %w[

@@ -84,6 +84,7 @@ function emptyForm() {
     proveedor: '',
     pagado: false,
     medio_pago: 'efectivo',
+    cuotas_total: 6,
     notas: '',
   }
 }
@@ -95,6 +96,17 @@ const saving = ref(false)
 // Fallback a 'egreso' para tipos legacy (recupero_costo, ajuste) que puedan venir de datos viejos
 const tipoMeta = computed(() => TIPO_META[form.value.tipo] || TIPO_META.egreso)
 const tipoNorm = computed(() => TIPO_META[form.value.tipo] ? form.value.tipo : 'egreso')
+
+// Pago en cuotas: solo para egresos NUEVOS. El monto pasa a ser el total y se generan N
+// movimientos mensuales (una compra financiada). No aplica al editar un movimiento existente.
+const esCuotas = computed(() => form.value.medio_pago === 'en_cuotas')
+const mediosDisponibles = computed(() =>
+  (tipoNorm.value === 'egreso' && !props.movimientoEditar)
+    ? [...MEDIOS_PAGO, { value: 'en_cuotas', label: 'En cuotas' }]
+    : MEDIOS_PAGO
+)
+// Si se cambia a ingreso con "en cuotas" activo, se vuelve a efectivo.
+watch(tipoNorm, (t) => { if (t !== 'egreso' && esCuotas.value) form.value.medio_pago = 'efectivo' })
 
 // ─── MONTO ────────────────────────────────────────────────
 const montoDisplay  = ref('')
@@ -301,6 +313,7 @@ function validate() {
   if (!f.monto_ars || f.monto_ars <= 0) e.monto_ars = 'Ingresá un monto'
   if (!f.fecha)                       e.fecha       = 'Requerido'
   if (needsPaciente.value && !f.paciente_id) e.paciente_id = 'Seleccioná el paciente'
+  if (esCuotas.value && !(Number(f.cuotas_total) >= 2)) e.cuotas_total = 'Mínimo 2 cuotas'
   errors.value = e
   return !Object.keys(e).length
 }
@@ -523,14 +536,27 @@ async function submit() {
                   <div class="nm-field">
                     <label class="nm-label">Medio de pago <span class="nm-opt">(opcional)</span></label>
                     <div class="nm-seg">
-                      <button v-for="mp in MEDIOS_PAGO" :key="mp.value" type="button"
+                      <button v-for="mp in mediosDisponibles" :key="mp.value" type="button"
                               class="nm-seg-btn" :class="{ 'nm-seg-btn--active': form.medio_pago === mp.value }"
                               :style="form.medio_pago === mp.value ? { borderColor: tipoMeta.color, background: tipoMeta.bg, color: tipoMeta.color } : {}"
                               @click="form.medio_pago = mp.value"
                       >{{ mp.label }}</button>
                     </div>
                   </div>
-                  <div class="nm-field">
+
+                  <!-- Pago en cuotas: el monto de arriba es el TOTAL; se generan N egresos mensuales -->
+                  <div v-if="esCuotas" class="nm-field">
+                    <label class="nm-label">Cantidad de cuotas</label>
+                    <input v-model.number="form.cuotas_total" type="number" min="2" max="120" step="1"
+                           class="nm-input" :class="{ 'nm-input--err': errors.cuotas_total }" />
+                    <span v-if="errors.cuotas_total" class="nm-monto-err">{{ errors.cuotas_total }}</span>
+                    <span class="nm-cuotas-hint">
+                      El monto de arriba es el <strong>total</strong>: se divide en {{ form.cuotas_total || 0 }} cuotas
+                      mensuales desde la fecha elegida. Poné un mes anterior para cuadrar cuotas ya vencidas.
+                    </span>
+                  </div>
+
+                  <div v-if="!esCuotas" class="nm-field">
                     <label class="nm-label">Estado <span class="nm-opt">(opcional)</span></label>
                     <div class="nm-seg">
                       <button type="button" class="nm-seg-btn" :class="{ 'nm-seg-btn--active': form.pagado }"
@@ -833,6 +859,8 @@ async function submit() {
   box-shadow: 0 0 0 3px var(--tr, rgba(22,163,74,0.1));
 }
 .nm-input--err { border-color: #DC2626; }
+.nm-cuotas-hint { display: block; margin-top: .3rem; font-size: .72rem; line-height: 1.4; color: #64748b; }
+.nm-cuotas-hint strong { color: #15803d; }
 .nm-input--err:focus {
   border-color: #DC2626;
   box-shadow: 0 0 0 3px rgba(220,38,38,0.1);
