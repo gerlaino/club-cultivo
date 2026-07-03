@@ -268,11 +268,15 @@ async function runTestSmtp() {
             </div>
 
             <div class="pv__field">
-              <label class="pv__label">Tipo de organización</label>
-              <select class="pv__input" v-model="form.tipo_organizacion" @change="onChange">
+              <label class="pv__label">
+                Tipo de organización
+                <span v-if="!form.tipo_organizacion" class="pv__falta">Falta completar</span>
+              </label>
+              <select class="pv__input" :class="{ 'pv__input--falta': !form.tipo_organizacion }" v-model="form.tipo_organizacion" @change="onChange">
                 <option value="">Seleccioná…</option>
                 <option v-for="t in TIPOS_ORGANIZACION" :key="t.value" :value="t.value">{{ t.label }}</option>
               </select>
+              <span v-if="!form.tipo_organizacion" class="pv__hint-warn">Se usa en los informes regulatorios (ARICCAME / REPROCANN). Completalo para que salgan correctos.</span>
             </div>
           </div>
         </div>
@@ -517,6 +521,9 @@ async function runTestSmtp() {
 .pv__field      { display: flex; flex-direction: column; gap: .35rem; }
 .pv__field--full { grid-column: 1 / -1; }
 .pv__label { font-size: .75rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
+.pv__falta { margin-left: .4rem; font-size: .6rem; font-weight: 700; color: #b45309; background: #fef3c7; border-radius: 999px; padding: .1em .5em; text-transform: none; letter-spacing: 0; }
+.pv__input--falta { border-color: #f59e0b !important; background: #fffbeb; }
+.pv__hint-warn { display: block; margin-top: .3rem; font-size: .7rem; color: #b45309; }
 .pv__req   { color: #dc2626; }
 .pv__input {
   background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px;

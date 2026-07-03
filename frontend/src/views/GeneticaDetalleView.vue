@@ -238,11 +238,17 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
           <div class="kpi-row gdv__kpi-row">
             <div class="kpi-cell">
               <div class="kpi-cell__label">THC</div>
-              <div class="kpi-cell__value" style="color:#e53935">{{ gen.thc != null ? gen.thc + '%' : '—' }}</div>
+              <div class="kpi-cell__value" style="color:#e53935">
+                <template v-if="gen.thc != null">{{ gen.thc }}%</template>
+                <button v-else class="gdv__completar" @click="editar">＋ Cargar</button>
+              </div>
             </div>
             <div class="kpi-cell">
               <div class="kpi-cell__label">CBD</div>
-              <div class="kpi-cell__value" style="color:#16a34a">{{ gen.cbd != null ? gen.cbd + '%' : '—' }}</div>
+              <div class="kpi-cell__value" style="color:#16a34a">
+                <template v-if="gen.cbd != null">{{ gen.cbd }}%</template>
+                <button v-else class="gdv__completar" @click="editar">＋ Cargar</button>
+              </div>
             </div>
             <div class="kpi-cell">
               <div class="kpi-cell__label">Veg. obj.</div>
@@ -580,6 +586,8 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 .kpi-cell { flex: 1 1 90px; background: #f8f9fa; border-radius: .75rem; padding: .5rem .875rem; min-width: 70px; }
 .kpi-cell__label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; margin-bottom: .1rem; }
 .kpi-cell__value { font-size: 1.15rem; font-weight: 800; color: #0f172a; line-height: 1; }
+.gdv__completar { background: #f0fdf4; border: 1px dashed #86efac; color: #15803d; font-size: .68rem; font-weight: 700; border-radius: 6px; padding: .15em .5em; cursor: pointer; }
+.gdv__completar:hover { background: #dcfce7; }
 
 /* Section titles */
 .section-title { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: #6c757d; font-weight: 700; margin-bottom: .875rem; }
