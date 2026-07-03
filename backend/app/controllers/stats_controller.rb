@@ -24,6 +24,10 @@ class StatsController < ApplicationController
         vegetativo:           plantas_act.where(state: 'vegetativo').count,
         floracion:            plantas_act.where(state: 'floracion').count,
         secado:               plantas_act.where(state: 'secado').count,
+        # Post-cosecha: plantas cosechadas cuyo lote todavía se procesa (cosecha/manicura),
+        # aún no curado. Cuentan como "en ciclo" hasta curado.
+        post_cosecha:         plantas_scope.where(state: 'cosechado')
+                                           .joins(:lote).where(lotes: { estado: %w[cosecha en_manicura] }).count,
         plantas_por_genetica: plantas_por_genetica(club, lote_ids),
         salas_ocupacion:      salas_ocupacion(club),
         plantas_por_sede:     plantas_por_sede(club, lote_ids),

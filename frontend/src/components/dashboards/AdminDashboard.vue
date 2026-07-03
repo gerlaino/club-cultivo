@@ -79,7 +79,9 @@ function fmtHora(ts) {
 
 // ── KPIs principales ────────────────────────────────────────────────────────
 
-const plantasEnCiclo = computed(() => (stats.value?.vegetativo || 0) + (stats.value?.floracion || 0))
+const plantasEnCiclo    = computed(() => (stats.value?.vegetativo || 0) + (stats.value?.floracion || 0))
+// Post-cosecha: cosechadas cuyo lote sigue en proceso (cosecha/manicura), aún no curado.
+const plantasPostCosecha = computed(() => stats.value?.post_cosecha || 0)
 const balanceMes     = computed(() => contable.value?.mes_actual?.balance || 0)
 const balancePositivo = computed(() => balanceMes.value >= 0)
 
@@ -109,7 +111,9 @@ const deltaBalance = computed(() => {
 
 const pacientesActivos = computed(() => stats.value?.pacientes ?? null)
 
-// ── Próxima cosecha ─────────────────────────────────────────────────────────
+// ── Cosecha ─────────────────────────────────────────────────────────────────
+// Lotes YA en estado cosecha (listos para procesar ahora, no una estimación futura).
+const lotesListosCosecha = computed(() => lotesActivos.value.filter(l => l.estado === 'cosecha'))
 
 const proximaCosecha = computed(() => {
   const now = Date.now()
@@ -471,7 +475,10 @@ async function onOnboardingCompletado() {
             <div class="ad__kpi">
               <span class="ad__kpi-label">Plantas en ciclo</span>
               <div class="ad__kpi-num">{{ plantasEnCiclo }}</div>
-              <div class="ad__kpi-sub">{{ stats?.vegetativo ?? 0 }} veg · {{ stats?.floracion ?? 0 }} flor</div>
+              <div class="ad__kpi-sub">
+                {{ stats?.vegetativo ?? 0 }} veg · {{ stats?.floracion ?? 0 }} flor
+                <span v-if="plantasPostCosecha > 0" class="ad__kpi-post">+{{ plantasPostCosecha }} post-cosecha</span>
+              </div>
             </div>
 
             <div class="ad__kpi">
@@ -481,13 +488,19 @@ async function onOnboardingCompletado() {
             </div>
 
             <div class="ad__kpi">
-              <span class="ad__kpi-label">Próxima cosecha</span>
-              <div class="ad__kpi-num" v-if="proximaCosecha !== null">{{ proximaCosecha.diff }}d</div>
-              <div class="ad__kpi-num ad__kpi-num--empty" v-else>—</div>
-              <div class="ad__kpi-sub">
-                <span v-if="proximaCosecha">{{ proximaCosecha.genetica?.nombre || 'Sin genética' }}</span>
-                <span v-else>Sin cosechas programadas</span>
-              </div>
+              <span class="ad__kpi-label">Cosecha</span>
+              <template v-if="lotesListosCosecha.length">
+                <div class="ad__kpi-num" style="color:#dc2626">{{ lotesListosCosecha.length }}</div>
+                <div class="ad__kpi-sub"><span style="color:#dc2626;font-weight:700">Listos para procesar</span></div>
+              </template>
+              <template v-else-if="proximaCosecha !== null">
+                <div class="ad__kpi-num">{{ proximaCosecha.diff }}d</div>
+                <div class="ad__kpi-sub">{{ proximaCosecha.genetica?.nombre || 'Sin genética' }}</div>
+              </template>
+              <template v-else>
+                <div class="ad__kpi-num ad__kpi-num--empty">—</div>
+                <div class="ad__kpi-sub">Sin cosechas próximas</div>
+              </template>
             </div>
 
             <div class="ad__kpi">
@@ -1168,6 +1181,7 @@ async function onOnboardingCompletado() {
 .ad__chart-empty p { margin: 0; font-size: .82rem; }
 .ad__chart-empty-cta { font-size: .78rem; font-weight: 600; color: #15803d; text-decoration: none; }
 .ad__anual-warn { display: block; margin-top: .2rem; font-size: .64rem; font-weight: 600; color: #b45309; }
+.ad__kpi-post { color: #d97706; font-weight: 700; }
 .ad__chart-footer {
   display: flex;
   align-items: center;
