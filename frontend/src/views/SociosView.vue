@@ -312,6 +312,7 @@ async function exportarCSV() {
             <th>DNI</th>
             <th>Edad</th>
             <th>REPROCANN</th>
+            <th>Última dispensa</th>
             <th>Email</th>
             <th v-if="canEdit"></th>
           </tr>
@@ -360,6 +361,10 @@ async function exportarCSV() {
                 <div class="sv-rep-fecha">{{ formatDate(s.reprocann_vencimiento) }}</div>
               </template>
               <span v-else class="sv-empty">Sin REPROCANN</span>
+            </td>
+            <td>
+              <span v-if="s.ultima_dispensacion" class="sv-ultima">{{ formatDate(s.ultima_dispensacion) }}</span>
+              <span v-else class="sv-empty">Nunca</span>
             </td>
             <td>
               <span class="sv-email-cell">{{ s.email || '—' }}</span>

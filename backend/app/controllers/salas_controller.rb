@@ -288,7 +288,10 @@ class SalasController < ApplicationController
       kind:                 s.kind,
       notes:                s.notes,
       pots_count:           s.pots_count,   # posiciones físicas para el Layout (no es capacidad)
-      plantas_totales:      s.plantas_totales,
+      # Conteo LIVE (no el denormalizado plants_count/plantas_totales que driftea): plantas
+      # vivas en los lotes de la sala.
+      plantas_totales:      Plant.joins(:lote).where(lotes: { sala_id: s.id })
+                                 .where.not(plants: { state: %w[cosechado descartada] }).count,
       lotes_count:          s.lotes.count,
       sede_id:              s.sede_id,
       sede: s.sede ? { id: s.sede.id, nombre: s.sede.nombre, tipo: s.sede.tipo } : nil,

@@ -36,9 +36,20 @@ class PacientesController < ApplicationController
     pacientes = scope.order("#{orden} #{dir}")
                      .offset((page - 1) * limit)
                      .limit(limit)
+                     .to_a
+
+    # Última dispensación por paciente en un solo query agrupado (evita N+1 en la lista).
+    ultimas = Dispensacion.no_canceladas
+                          .where(paciente_id: pacientes.map(&:id))
+                          .group(:paciente_id).maximum(:fecha_dispensacion)
+
+    data = pacientes.map do |p|
+      p.as_json(methods: [:nombre_completo, :reprocann_estado_efectivo])
+       .merge('ultima_dispensacion' => ultimas[p.id])
+    end
 
     render json: {
-      data: pacientes.as_json(methods: [:nombre_completo, :reprocann_estado_efectivo]),
+      data: data,
       meta: { pagina: page, limite: limit, total: total }
     }
   end

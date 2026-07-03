@@ -372,7 +372,7 @@ async function confirmDelete(s) {
           <div class="slv__card-stats">
             <span class="slv__card-stat">
               <i class="bi bi-layers"></i>
-              {{ s.lotes_count ?? 0 }} lote{{ s.lotes_count !== 1 ? 's' : '' }}
+              {{ (s.lotes_activos_count ?? s.lotes_count) ?? 0 }} lote{{ (s.lotes_activos_count ?? s.lotes_count) !== 1 ? 's' : '' }}
             </span>
             <span class="slv__card-stat-sep">·</span>
             <span class="slv__card-stat">
