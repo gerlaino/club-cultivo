@@ -29,7 +29,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
           <div v-if="state.title" id="cd-title" class="cd-title">{{ state.title }}</div>
           <p v-if="state.message" class="cd-msg">{{ state.message }}</p>
           <div class="cd-actions">
-            <button class="btn btn-sm btn-outline-secondary" :class="{ 'cd-cancel--push': state.neutralText }" @click="cancel">{{ state.cancelText }}</button>
+            <button class="btn btn-sm" :class="state.neutralText ? 'cd-cancel-ghost' : 'btn-outline-secondary'" @click="cancel">{{ state.cancelText }}</button>
             <button v-if="state.neutralText" class="btn btn-sm btn-outline-secondary" @click="neutral">{{ state.neutralText }}</button>
             <button class="btn btn-sm" :class="VARIANT_BTN[state.variant] || 'btn-danger'" @click="accept" autofocus>
               {{ state.confirmText }}
@@ -75,9 +75,14 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   gap: .5rem;
   flex-wrap: wrap;
 }
-/* Con 3 opciones, "Cancelar" (volver) se separa a la izquierda para no confundirse con las
-   dos elecciones reales. */
-.cd-cancel--push { margin-right: auto; }
+/* Con 3 opciones, "Cancelar" (volver) se separa a la izquierda y va como link tenue para no
+   competir con las dos elecciones reales (Empezar una nueva / Seguir la anterior). */
+.cd-cancel-ghost {
+  margin-right: auto;
+  border: none; background: none; box-shadow: none;
+  color: #94a3b8; text-decoration: underline; padding-left: 0; padding-right: 0;
+}
+.cd-cancel-ghost:hover { color: #64748b; background: none; }
 .cd-enter-active, .cd-leave-active { transition: opacity .15s ease, transform .15s ease; }
 .cd-enter-from, .cd-leave-to { opacity: 0; pointer-events: none; }
 .cd-enter-from .cd-box { transform: scale(.96); }

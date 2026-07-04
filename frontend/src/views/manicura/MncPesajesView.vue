@@ -296,7 +296,7 @@ async function borrarPesaje(p) {
   const ok = await confirm({
     title: 'Borrar pesaje',
     message: `¿Borrar este pesaje del ${fmtDate(p.fecha_pesaje)}? Esta acción no se puede deshacer.`,
-    confirmText: 'Borrar', danger: true,
+    confirmText: 'Borrar', variant: 'danger',
   })
   if (!ok) return
   borrando.value = p.id

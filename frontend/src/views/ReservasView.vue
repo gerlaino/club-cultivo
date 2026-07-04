@@ -199,7 +199,7 @@ async function eliminar(r) {
   const ok = await confirm({
     title: 'Eliminar reserva',
     message: `¿Eliminar la reserva de ${r.paciente?.nombre}? Se libera el stock apartado. Esta acción no se puede deshacer.`,
-    confirmText: 'Eliminar', danger: true,
+    confirmText: 'Eliminar', variant: 'danger',
   })
   if (!ok) return
   busy.value = r.id
@@ -216,7 +216,7 @@ async function cancelar(r) {
   const ok = await confirm({
     title: 'Cancelar reserva',
     message: `¿Cancelar la reserva de ${r.paciente?.nombre}? Se libera el stock apartado.`,
-    confirmText: 'Cancelar reserva', danger: true,
+    confirmText: 'Cancelar reserva', variant: 'danger',
   })
   if (!ok) return
   busy.value = r.id
@@ -233,7 +233,7 @@ async function anularSena(r) {
   const ok = await confirm({
     title: 'Anular seña',
     message: `¿Anular la seña de ${fmt(r.sena_ars)} de ${r.paciente?.nombre}? Se revierte el ingreso del libro contable y el crédito en su cuenta corriente. La reserva queda sin seña (después podés eliminarla).`,
-    confirmText: 'Anular seña', danger: true,
+    confirmText: 'Anular seña', variant: 'danger',
   })
   if (!ok) return
   busy.value = r.id

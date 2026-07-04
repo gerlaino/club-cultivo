@@ -132,7 +132,13 @@
             </button>
           </div>
         </div>
-        <p v-else class="mnl__pj-hint">Escaneá el QR de cada planta para pesar, o usá "Registrar por lote" arriba.</p>
+        <p v-else class="mnl__pj-hint">
+          <template v-if="plantasSinPesar.length">
+            <strong class="mnl__pj-faltan">Faltan {{ plantasSinPesar.length }} de {{ plantas.length }} plantas.</strong>
+            Escaneá el QR de cada una, o usá "Registrar por lote" arriba.
+          </template>
+          <template v-else>✅ Todas las plantas del lote están pesadas.</template>
+        </p>
 
         <!-- Historial de pesajes -->
         <div v-if="pesajesHistorial.length" class="mnl__hist">
@@ -352,7 +358,7 @@ async function borrarPesaje(p) {
   const ok = await confirm({
     title: 'Borrar pesaje',
     message: `¿Borrar este pesaje del ${fmtDate(p.fecha_pesaje)}? Esta acción no se puede deshacer.`,
-    confirmText: 'Borrar', danger: true,
+    confirmText: 'Borrar', variant: 'danger',
   })
   if (!ok) return
   borrando.value = p.id
@@ -681,7 +687,8 @@ onActivated(cargar)
 
 /* Footer */
 /* Pesajes (jornadas) */
-.mnl__pj-hint { font-size: .8rem; color: #94a3b8; margin: .25rem 0 0; }
+.mnl__pj-hint { font-size: .8rem; color: #94a3b8; margin: .25rem 0 0; line-height: 1.5; }
+.mnl__pj-faltan { color: #b45309; font-weight: 700; }
 
 .mnl__jornada {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
