@@ -1,5 +1,21 @@
 # Changelog
 
+## Julio 2026 (b) — endurecimiento para escala + pulido de manicura
+
+- **TEN-01b (jobs):** los 16 jobs con datos de club ahora fijan el tenant
+  (`ActsAsTenant.with_tenant(club)`) — defensa en profundidad completa en la capa de jobs
+  (`jwt_denylist_cleanup` y `push_notification` exentos por ser tenant-agnósticos).
+- **Reservas:** cerrado el gate de backend — el dispensador solo `index/show/entregar`; crear/
+  editar/cancelar/anular seña = admin/supervisor (espeja el front).
+- **Informes:** "plantas por estado" en Producción ya se computa (no venía en 0);
+  `dispensaciones_sobre_limite` → `dispensaciones_sin_reprocann` (label honesto).
+- **Manicura:** aviso "¿seguir la anterior / empezar una nueva / cancelar?" al pesar con una
+  jornada enviada sin confirmar; botón verde + cancelar seguro; se sacó "Nuevo pesaje" (jornada
+  vacía redundante); hint "faltan N de M plantas".
+- **PlantaDetail:** reconectadas las acciones **Medición (Bluelab BLE, EC/pH)** y **Trasplante**
+  (los modales existían pero ningún botón los abría — regresión).
+- **Lint:** limpieza de deuda en las vistas tocadas.
+
 ## Julio 2026 — seguridad clínica, backups, KPIs de stock, candado de manicura
 
 - **Seguridad AZ (historia clínica):** `pacientes#show/#index` filtraban la historia clínica

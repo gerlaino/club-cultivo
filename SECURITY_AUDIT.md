@@ -17,7 +17,11 @@
 >   serializer sólo excluía `notas_clinicas`. Fix: **allowlist** de campos + `authorize` +
 >   `PacientePolicy` por rol (`ROLES_CLINICA = admin/medico/supervisor`; super_admin/dispensador
 >   fuera). Cubierto por `spec/requests/paciente_historia_clinica_leak_spec.rb`.
-> - **Pendiente real:** TEN-01b (jobs sin `ActsAsTenant.with_tenant`) y la rotación de claves de
+> - **TEN-01b (jobs): HECHO.** Todos los jobs que operan sobre datos de un club ahora envuelven
+>   su trabajo en `ActsAsTenant.with_tenant(club)` (sweeps multi-club + jobs de entidad única);
+>   `jwt_denylist_cleanup` y `push_notification` quedan exentos (tenant-agnósticos). Defensa en
+>   profundidad completa en la capa de jobs.
+> - **Pendiente real:** el flip a `require_tenant=true` (ver abajo) y la rotación de claves de
 >   cifrado en prod.
 
 > **Nota metodológica:** cada hallazgo tiene evidencia `archivo:línea`. Donde la realidad del código difiere de lo asumido en `CLAUDE.md` / notas previas, se marca explícitamente en la sección *Realidad vs. asumido*. Los hallazgos de auth/autz/cifrado críticos se verificaron a mano además del relevamiento automatizado.
@@ -48,7 +52,15 @@
 
 **Decisión tomada (TEN-01, require_tenant=false):** la defensa en profundidad queda en la capa de requests (donde ocurren los IDOR de usuarios). El flip a `require_tenant=true` se difiere (ver TEN-01b).
 
-**TEN-01b (follow-up de hardening, NO hecho — alto riesgo):** poner `require_tenant=true` para que cualquier query a un modelo de club sin tenant *crashee* (en vez de quedar sin scope). Requiere cirugía por-job: de los 18 jobs, **8 iteran todos los clubes** (vencimientos, ariccame, informes, stock, alertas, tareas, reservas, postcosecha) y deben envolver cada club en `ActsAsTenant.with_tenant(club){…}`; el resto setear tenant desde su arg o usar `without_tenant`. También afecta endpoints públicos, rake tasks, seeds y consola. Beneficio marginal (la capa de requests ya está defendida) vs blast-radius alto → hacerlo como proyecto dedicado con su pasada de tests.
+**TEN-01b (follow-up de hardening — PARCIAL):**
+- **Jobs: HECHO (julio 2026).** Los 16 jobs con datos de club envuelven su trabajo por-club en
+  `ActsAsTenant.with_tenant(club){…}` (sweeps multi-club + entidad única vía su club);
+  `jwt_denylist_cleanup` y `push_notification` exentos. 67 specs verdes.
+- **Flip `require_tenant=true`: NO hecho (diferido, alto riesgo).** Haría que cualquier query a
+  un modelo de club sin tenant *crashee* en vez de quedar sin scope. Afecta también endpoints
+  públicos, rake tasks, seeds y consola. Con los jobs ya envueltos y la capa de requests
+  defendida, el beneficio es marginal vs el blast-radius → dejar como proyecto dedicado con su
+  pasada de tests.
 
 **Decisión tomada (supervisor):** queda **afuera** del acceso clínico. Supervisor es rol de cultivo ("lectura de cultivo + gestión de tareas"); la historia clínica no está en su dominio (mínimo privilegio + nivel reforzado AAIP 47/2018). Acceso clínico = **médico + admin** únicamente.
 
