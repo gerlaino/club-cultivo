@@ -47,13 +47,16 @@ class InformesController < ApplicationController
     plantas_totales = Plant.joins(lote: :sala).where(salas: { sede_id: club.sede_ids })
                            .where.not(state: %w[cosechado finalizado]).count
 
-    por_estado = Lote::ESTADOS.map do |e|
-      lotes_e = club.lotes.where(estado: e)
+    # Agregados por estado en 2 group-queries (evita N+1) + gramos por estado no vacío.
+    lotes_por_estado   = club.lotes.group(:estado).count
+    plantas_por_estado = club.lotes.group(:estado).sum(:plants_count)
+    por_estado = Lote::ESTADOS.filter_map do |e|
+      next if (lotes_e = lotes_por_estado[e].to_i).zero?
       gramos_e = Pesada.joins(:lote)
                        .where(lotes: { club_id: club.id, estado: e }, fase_destino: 'finalizado')
                        .sum('COALESCE(peso_curado_g, 0)').to_f
-      { estado: e, lotes: lotes_e.count, plantas: 0, gramos: gramos_e }
-    end.reject { |r| r[:lotes].zero? }
+      { estado: e, lotes: lotes_e, plantas: plantas_por_estado[e].to_i, gramos: gramos_e }
+    end
 
     render json: {
       total_lotes:      total_lotes,
@@ -142,7 +145,9 @@ class InformesController < ApplicationController
     total_pax = pacientes.count
     tasa = total_pax.positive? ? ((con_vigente.to_f / total_pax) * 100).round(1) : 0
 
-    disp_sobre_limite = Dispensacion
+    # Socios SIN número REPROCANN que dispensaron en el período (no es un "límite": no existe
+    # tope de gramos — es un indicador de cumplimiento regulatorio).
+    disp_sin_reprocann = Dispensacion
       .joins(:paciente, stock: :sede)
       .where(sedes: { club_id: club.id })
       .where(pacientes: { reprocann_numero: nil })
@@ -167,7 +172,7 @@ class InformesController < ApplicationController
       pacientes_con_reprocann_vigente: con_vigente,
       reprocann_vencen_30d:            vencen_30d,
       reprocann_vencidos:              vencidos,
-      dispensaciones_sobre_limite:     disp_sobre_limite,
+      dispensaciones_sin_reprocann:    disp_sin_reprocann,
       tasa_cumplimiento:               tasa,
       alertas:                         alertas,
     }
