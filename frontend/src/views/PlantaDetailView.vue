@@ -339,6 +339,11 @@ watch(() => ble.lecturas.value.temperatura, (val) => {
   if (val != null && showMedicionModal.value) medicionForm.value.temperatura_sustrato = val
 })
 
+// Desconectada A PROPÓSITO: las acciones de sustrato (medición EC/pH, trasplante) no aplican
+// al flujo actual — p.ej. en un lote cosechado ya no hay sustrato, sería un dato falso. Se
+// conserva el código completo (modales + guardado + integración Bluelab BLE) por si se reactiva
+// más adelante gateado a plantas vivas. No se enlaza a ningún botón.
+// eslint-disable-next-line no-unused-vars
 function abrirMedicion() {
   medicionForm.value = emptyMedicion()
   medicionError.value = null
@@ -381,6 +386,8 @@ const savingTrasplante    = ref(false)
 const trasplanteError     = ref(null)
 const trasplanteForm      = ref({ maceta_origen_l: null, maceta_destino_l: null, notas: '' })
 
+// Desconectada A PROPÓSITO (ver nota en abrirMedicion). Código conservado, sin botón que lo abra.
+// eslint-disable-next-line no-unused-vars
 function abrirTrasplante() {
   trasplanteForm.value = { maceta_origen_l: macetaActual.value, maceta_destino_l: null, notas: '' }
   trasplanteError.value = null
@@ -496,12 +503,6 @@ const plantaAcciones = computed(() => {
   const items = []
   items.push({ emoji: '📋', label: 'Registrar planta', onClick: () => { showRegistroPlanta.value = true } })
   items.push({ emoji: '✏️', label: 'Editar planta',    onClick: abrirEditarPlanta })
-  // Acciones de planta viva: registrar medición de sustrato/solución (con Bluelab BLE) y
-  // trasplante de maceta. Los modales y el guardado ya existían; faltaba el disparador.
-  if (['germinacion', 'esqueje', 'vegetativo', 'floracion'].includes(planta.value?.state)) {
-    items.push({ emoji: '🔬', label: 'Registrar medición (EC/pH)', onClick: abrirMedicion })
-    items.push({ emoji: '🪴', label: 'Trasplante de maceta',       onClick: abrirTrasplante })
-  }
   items.push({ divider: true })
   items.push({ emoji: '🗑️', label: 'Descartar planta', danger: true, onClick: descartarPlanta })
   return items
