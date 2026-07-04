@@ -69,6 +69,8 @@ optimizadas (rutas `/m/*`), pensadas para trabajar en la sala / en la calle desd
   (lectura), reportes de cultivo. Registra riego/fertilización/podas, avanza fases,
   cosecha plantas, carga fotos y análisis de laboratorio.
 - **Ve solo lo suyo:** los lotes/plantas se filtran por las **salas de sus sedes asignadas**.
+- **Asistente por voz** (si el club tiene el feature `ia_voz`): dicta su reporte de sala y la
+  IA lo registra (ver 3.11). No puede crear tareas por voz.
 - **NO puede:** pacientes, dispensación, stock/comercial, contabilidad, configuración,
   reportes oficiales. En la práctica su ciclo termina cuando el lote pasa a **cosecha**
   (ahí lo toma manicura/admin).
@@ -273,6 +275,31 @@ General (datos del club, tipo de organización — usado en informes regulatorio
 (plan), **Equipo** (alta de usuarios y roles), **Sedes**, **Alertas** (umbrales/setpoints),
 **Sitio web** público del club, **Integraciones** (email/WhatsApp), **Papelera**
 (restaurar registros borrados por soft-delete).
+
+---
+
+### 3.11 Asistente IA por voz
+Es un **feature flag por club** (`ia_voz`, con límite de uso / rate limit). Pensado sobre todo
+para el **cultivador**: en vez de tipear, **dicta su reporte oral** desde el teléfono y la IA
+lo convierte en registros estructurados. Aparece en el flujo móvil del cultivador (tarjeta de
+sala, actividad rápida, registro de planta/lote, detalle del lote, barra inferior).
+
+Tres modos:
+1. **Registrar por voz** (`parsear` → confirmar → `ejecutar`): el navegador transcribe la voz,
+   un modelo la interpreta y arma **acciones** que el usuario confirma antes de guardar. Puede
+   generar: registro ambiental (temp/humedad), actividades físicas (riego, nutrición, poda,
+   defoliación, SCROG/LST, revisión de plagas, limpieza de sala, ajuste de luz), observaciones
+   (altura, nº de colas) y **notas** de lote/sala. Regla del prompt: *registra solo lo
+   mencionado, nunca inventa valores*; separa observación de actividad. Máx. 15 acciones por
+   comando y deduplica las idénticas. El **cultivador no puede crear tareas** por voz (las
+   tareas son de admin/supervisor y se filtran).
+2. **Consultar** (`consultar`): preguntarle al asistente con el contexto del club e historial
+   de la sesión.
+3. **Análisis IA de lote** (`analizar_lote` / historial): **solo admin/supervisor** — análisis
+   del lote generado por IA, con su historial.
+
+> Relacionado (no es lo mismo): la **generación IA del plan de trabajo** (`PlanTrabajoIaService`)
+> arma el plan de tareas de un lote con IA — es del módulo Cultivo, no del asistente de voz.
 
 ---
 
