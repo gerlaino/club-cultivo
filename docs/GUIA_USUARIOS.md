@@ -149,8 +149,20 @@ optimizadas (rutas `/m/*`), pensadas para trabajar en la sala / en la calle desd
 ## 3. Flujos de trabajo por sección (end-to-end)
 
 ### 3.1 Cultivo → cosecha → stock (el ciclo central)
-Estados del **lote**: `semilla / esqueje → vegetativo → floración → cosecha → en_manicura → curado → finalizado`.
-Estados de la **planta**: `germinación / esqueje → vegetativo → floración → secado → cosechado → descartada`.
+
+El **lote** es la unidad que avanza de fase, y **las plantas heredan la fase del lote**: al
+avanzar el lote, sus plantas (salvo las descartadas) toman el estado que corresponde
+(`FASE_A_PLANT_STATE`).
+
+- **Lote** (`Lote::ESTADOS`): `semilla`/`esqueje` → `vegetativo` → `floracion` → `cosecha` →
+  `en_manicura` → `curado` → `finalizado`.
+- **Planta** (`Plant::STATES`): arranca en `germinacion` (semilla) o `esqueje`; **hereda**
+  `vegetativo` y `floracion` del lote; cuando el lote pasa a **cosecha**, todas quedan
+  `cosechado`. `descartada` es una baja individual.
+- **Post-cosecha:** con el lote en `en_manicura`/`curado`/`finalizado`, la planta sigue en
+  `cosechado` — la etapa fina (en manicura, curado) se lee del **estado del lote**, no de un
+  estado propio de la planta. (Por eso en `/lotes` y `/plantas` la etapa post-cosecha se
+  deriva del lote.)
 
 1. **Cultivador** crea el **lote** (genética, sala, cantidad de plantas). Empieza en
    vegetativo (o semilla/esqueje según origen).
@@ -198,7 +210,8 @@ Estados de la **planta**: `germinación / esqueje → vegetativo → floración 
 6. **Editar/anular:** el admin puede editar una dispensa multi-ítem (cantidad y precio por
    línea) — el sistema reconcilia stock y cuenta corriente en transacción.
 
-> Quién dispensa: **admin, supervisor, dispensador** (y delivery al entregar contra-entrega).
+> Quién dispensa: **admin, supervisor, dispensador** (el **médico** también puede, desde su
+> flujo de indicación; y **delivery** al entregar contra-entrega).
 > El dispensador **no** ve datos clínicos del socio.
 
 ### 3.4 Reservas
@@ -246,7 +259,7 @@ Estados de la **planta**: `germinación / esqueje → vegetativo → floración 
 - Lo operan **cultivador** (sus salas) y **admin**.
 
 ### 3.9 Informes, Trazabilidad y ARICCAME (Reportes / auditor)
-- **Analítica** (admin): rendimiento por genética, ciclos, pérdidas, comparativa; export
+- **Analítica** (admin/supervisor): rendimiento por genética, ciclos, pérdidas, comparativa; export
   CSV/PDF. La ficha de cada **genética** muestra su historial de rendimiento (g/planta, avg,
   desvíos) + sparkline.
 - **Auditoría** (auditor/admin): informes oficiales (Producción, Cumplimiento, Sedes,
@@ -263,7 +276,131 @@ General (datos del club, tipo de organización — usado en informes regulatorio
 
 ---
 
-## 4. Notas para armar los tutoriales
+## 4. Informes en detalle (qué son, para qué, qué muestran y cómo se calculan)
+
+Hay dos familias de reportes con acceso distinto:
+- **Auditoría** (Reportes → Auditoría): acceso **auditor + admin**. Son los informes
+  "oficiales/regulatorios", con descarga PDF (y Excel en REPROCANN).
+- **Analítica** (Reportes → Analítica): acceso **admin + supervisor** (y super_admin en modo
+  observador). Son los reportes internos de gestión.
+
+Casi todos toman un **período** (mes actual / mes anterior / trimestre / año). Las
+dispensaciones cuentan siempre **no canceladas**. Los datos de socios salen **anonimizados**
+(iniciales + últimos 4 del DNI).
+
+### A) Reportes de Auditoría (auditor / admin)
+
+**REPROCANN** — *estado del registro de todos los socios.*
+- Para qué: control de vigencia REPROCANN; documento presentable (PDF/Excel).
+- Muestra: total de socios; con REPROCANN vigente; vencen en ≤30 días; vencidos; sin
+  REPROCANN; y una lista anonimizada (iniciales, últimos 4 del DNI, estado, vencimiento).
+- Cálculo: cuenta socios del club comparando `reprocann_vencimiento` con hoy — vigente
+  (≥ hoy), por vencer (≤ 30 días), vencido (< hoy), sin REPROCANN (`reprocann_numero` nulo).
+
+**Producción** — *resumen productivo del club en el período.*
+- Muestra: total de lotes; lotes activos (no finalizados); lotes cosechados (finalizados en
+  el período); **gramos producidos**; plantas totales (activas); y un desglose por estado
+  (lotes + gramos por estado).
+- Cálculo: `gramos_producidos` = suma de `peso_curado_g` de las **pesadas** con
+  `fase_destino = finalizado` registradas en el período. `plantas_totales` = plantas que no
+  están `cosechado`/`finalizado`, en las sedes del club.
+- Ojo (limitación conocida): la columna "plantas por estado" viene en **0** (no se computa
+  por estado, solo el total).
+
+**Dispensaciones** — *actividad de dispensación del período (anonimizada).*
+- Muestra: total de dispensaciones; gramos dispensados; pacientes atendidos (distintos);
+  promedio por dispensación; y un resumen por paciente (iniciales, cantidad, total g, última
+  fecha) — hasta 100.
+- Cálculo: dispensaciones no canceladas del club en el período; `gramos` = suma de
+  `cantidad`; `promedio` = gramos ÷ total.
+
+**Sedes** — *foto por sede.*
+- Muestra: total de sedes; activas; salas totales; plantas totales; y por sede: salas de
+  cultivo, plantas activas y **stock disponible (g)**.
+- Cálculo: plantas = Plant no cosechado/finalizado por sede; `stock_disponible` = **solo flor
+  seca** disponible (g) de esa sede (los derivados no se suman como gramos).
+
+**Cumplimiento** — *tablero de cumplimiento REPROCANN + alertas.*
+- Muestra: socios con REPROCANN vigente; vencen 30d; vencidos; "dispensaciones sobre límite";
+  **tasa de cumplimiento** (%); y alertas (vencidos, por vencer, sin seguimiento médico).
+- Cálculo: `tasa = con_vigente ÷ total × 100`. Aclaración: "dispensaciones sobre límite" en
+  realidad cuenta dispensaciones a socios **sin número REPROCANN** en el período (nombre
+  heredado — no existe límite mensual de gramos).
+
+**Plan vs Real** — *objetivo vs resultado real por lote.*
+- Muestra: lotes con objetivo (rendimiento o cantidad de plantas); por lote, objetivo vs
+  real y la **desviación %**; y el promedio de desviación de los lotes cerrados.
+- Cálculo: `desv_rendimiento = (real − objetivo) ÷ objetivo × 100`;
+  `desv_plantas = (cosechadas − objetivo) ÷ objetivo × 100`.
+
+**INASE** — *registro de variedades ligado a la producción real.*
+- Para qué: informe regulatorio de variedades cultivadas.
+- Muestra: por genética, sus datos INASE (registrada, número, categoría, fecha, criador),
+  THC/CBD, y lo que **produjo** (lotes, plantas, gramos); + totales (registradas / sin
+  registrar / gramos / lotes).
+- Cálculo: por genética — lotes = count; plantas = suma de `plants_count`; gramos = suma de
+  `rendimiento_real_g`.
+
+**Trazabilidad** — *cadena de custodia de un stock.*
+- Muestra, escaneando/eligiendo un stock: origen → lote → plantas de origen → dispensaciones,
+  con genética, cantidades y verificación de compliance. Es la trazabilidad "de la góndola a
+  la planta".
+
+### B) Analítica interna (admin / supervisor)
+
+**Rendimiento por genética** — *qué cepa rinde mejor.*
+- Muestra: por genética — lotes totales/finalizados, **rendimiento promedio (g)**, objetivo
+  promedio, desviación %, **merma % promedio**, **g/planta**; + top 20 lotes recientes; +
+  resumen global.
+- Cálculo: rendimiento promedio = media de `rendimiento_real_g` de los lotes con dato;
+  merma % = media de `(plants_count − plants_count_cosechadas) ÷ plants_count × 100`;
+  g/planta = media de `(rendimiento_real_g ÷ plants_count)`.
+
+**Producción: Pérdidas / Ciclos / Comparativa**
+- **Pérdidas** (por genética): merma % = `(total − cosechadas) ÷ total`; descarte % =
+  `descartadas ÷ total`, por lote y promediado.
+- **Ciclos** (por genética): **días promedio por fase** (vegetativo, floración, cosecha,
+  secado, curado), calculados con los **`lote_eventos`** (cambios de estado) — días reales
+  entre transiciones. Además desglosa la propagación (días de propagación / vegetativo puro)
+  usando `start_date`.
+- **Comparativa**: lotes finalizados de la **misma genética** (2 o más) enfrentados —
+  rendimiento, objetivo, plantas, tipo de cultivo y luz.
+
+**P&L por lote** — *rentabilidad de cada lote.*
+- Muestra: por lote — costo total, costo/gramo, **ingresos**, gramos dispensados,
+  ingreso/gramo, **margen** y margen %.
+- Cálculo: ingresos = suma de `cantidad × precio_unitario_ars` de las dispensaciones no
+  canceladas de ese lote; margen = ingresos − costo total.
+
+**Contabilidad (P&L mensual)** — *últimos 12 meses + proyección.*
+- Muestra: por mes — ingresos, costos, margen; + proyección de los lotes en curso.
+- Cálculo: **ingresos = del libro de caja** (`MovimientoContable` de tipo ingreso, incluye
+  señas/aportes, excluye crédito impago) — no se recomputa desde dispensaciones. Costos =
+  `CostoLote` del mes. Proyección = lotes en curso × rendimiento objetivo × precio sugerido.
+
+**Comparativa de salas** — *qué sala produce mejor.*
+- Muestra: por sala — ciclos (lotes finalizados), kg producidos, kg/planta, **días promedio**
+  del ciclo, lotes activos y la **última lectura ambiental** (temp/humedad/CO₂).
+- Cálculo: días promedio = media de `(fecha de finalización − start_date)` desde
+  `lote_eventos`; kg = `rendimiento_real_g ÷ 1000`.
+
+**Ejecutivo (resumen anual)** — *año actual vs anterior.*
+- Muestra: gramos producidos, gramos dispensados, ingresos, costo total, margen, margen %,
+  ciclos cerrados — del año en curso comparado con el anterior.
+
+**Correlación ambiental** — *¿el ambiente explica el rendimiento?*
+- Muestra: correlación (Pearson **r**, **r²**) y regresión lineal entre variables
+  ambientales y el rendimiento de los lotes (requiere ≥3 lotes con datos).
+
+### C) Otros
+- **Informe semestral:** resumen consolidado del semestre (producción + dispensaciones).
+- **ARICCAME:** reporte regulatorio ANMAT de dispensaciones y stock (feature flag por club).
+- **Dashboard del dispensador** (datos, no un informe formal): gramos de hoy/semana/mes,
+  reservas del día, etc. Acceso admin/dispensador.
+
+---
+
+## 5. Notas para armar los tutoriales
 
 - **Por rol:** conviene un tutorial por rol que arranque en su **home** y recorra solo lo que
   ese rol ve (no mostrarle al delivery cosas de cultivo, etc.).
