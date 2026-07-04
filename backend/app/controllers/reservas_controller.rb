@@ -256,9 +256,15 @@ class ReservasController < ApplicationController
     params.require(:reserva).permit(:cantidad, :fecha_entrega_estimada, :medio_pago, :notas, :sena_ars)
   end
 
-  # Reservan: dispensador, admin, supervisor.
+  # Gestionan reservas (crear/editar/cancelar/anular seña): admin y supervisor.
+  # El dispensador SOLO las ve y las convierte en dispensa (entregar) — no las crea ni
+  # gestiona (espeja lo que el front ya restringe con canGestionarReservas).
+  DISPENSADOR_ACCIONES = %w[index show entregar].freeze
+
   def require_reservas_role!
-    return if %w[admin dispensador supervisor].include?(current_user&.role)
+    role = current_user&.role
+    return if %w[admin supervisor].include?(role)
+    return if role == 'dispensador' && DISPENSADOR_ACCIONES.include?(action_name)
     render json: { error: 'No autorizado' }, status: :forbidden
   end
 

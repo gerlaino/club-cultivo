@@ -17,7 +17,7 @@ RSpec.describe 'Reservas', type: :request do
   end
 
   describe 'POST /pacientes/:paciente_id/reservas' do
-    before { sign_in_as(dispensador) }
+    before { sign_in_as(admin) } # crear reservas = admin/supervisor (el dispensador solo entrega)
 
     it 'crea una reserva pendiente y bloquea el stock' do
       post "/pacientes/#{paciente.id}/reservas",
@@ -60,6 +60,47 @@ RSpec.describe 'Reservas', type: :request do
            params: { reserva: { stock_id: stock.id, cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date } },
            headers: auth_headers
       expect(response).to have_http_status(:forbidden)
+    end
+
+    # El dispensador SOLO ve y entrega reservas (las convierte en dispensa); no las
+    # crea ni gestiona — eso es de admin/supervisor.
+    context 'el dispensador no gestiona reservas (solo entrega)' do
+      before { sign_in_as(dispensador) }
+
+      it 'no puede crear' do
+        post "/pacientes/#{paciente.id}/reservas",
+             params: { reserva: { stock_id: stock.id, cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date } },
+             headers: auth_headers
+        expect(response).to have_http_status(:forbidden)
+      end
+
+      it 'no puede cancelar' do
+        reserva = Reserva.create!(club: club, paciente: paciente, user: admin, stock: stock,
+                                  cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date)
+        patch "/reservas/#{reserva.id}/cancelar", headers: auth_headers
+        expect(response).to have_http_status(:forbidden)
+      end
+
+      it 'no puede editar' do
+        reserva = Reserva.create!(club: club, paciente: paciente, user: admin, stock: stock,
+                                  cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date)
+        patch "/reservas/#{reserva.id}", params: { reserva: { cantidad: 5 } }, headers: auth_headers
+        expect(response).to have_http_status(:forbidden)
+      end
+
+      it 'no puede eliminar' do
+        reserva = Reserva.create!(club: club, paciente: paciente, user: admin, stock: stock,
+                                  cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date)
+        delete "/reservas/#{reserva.id}", headers: auth_headers
+        expect(response).to have_http_status(:forbidden)
+      end
+
+      it 'SÍ puede entregar (convertir en dispensa)' do
+        reserva = Reserva.create!(club: club, paciente: paciente, user: admin, stock: stock,
+                                  cantidad: 20, fecha_entrega_estimada: 3.days.from_now.to_date, aporte_estimado_ars: 2000)
+        patch "/reservas/#{reserva.id}/entregar", params: { cobros: [{ medio: 'efectivo', monto: 2000 }] }, headers: auth_headers
+        expect(response).to have_http_status(:ok)
+      end
     end
   end
 
@@ -107,7 +148,7 @@ RSpec.describe 'Reservas', type: :request do
   end
 
   describe 'PATCH /reservas/:id/anular_sena' do
-    before { sign_in_as(dispensador) }
+    before { sign_in_as(admin) }
 
     it 'revierte el asiento de la seña y el crédito de cuenta corriente, y deja sena_ars en 0' do
       create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 5000)
@@ -138,7 +179,7 @@ RSpec.describe 'Reservas', type: :request do
   end
 
   describe 'PATCH /reservas/:id/cancelar' do
-    before { sign_in_as(dispensador) }
+    before { sign_in_as(admin) }
 
     it 'cancela y libera el stock' do
       reserva = Reserva.create!(club: club, paciente: paciente, user: dispensador, stock: stock,
@@ -153,7 +194,7 @@ RSpec.describe 'Reservas', type: :request do
   end
 
   describe 'PATCH /reservas/:id (editar)' do
-    before { sign_in_as(dispensador) }
+    before { sign_in_as(admin) }
     let(:reserva) { Reserva.create!(club: club, paciente: paciente, user: dispensador, stock: stock, cantidad: 20, fecha_entrega_estimada: 3.days.from_now.to_date, aporte_estimado_ars: 2000) }
 
     it 'edita cantidad y fecha de una reserva pendiente' do
@@ -197,7 +238,7 @@ RSpec.describe 'Reservas', type: :request do
   end
 
   describe 'DELETE /reservas/:id (eliminar)' do
-    before { sign_in_as(dispensador) }
+    before { sign_in_as(admin) }
 
     it 'elimina una reserva pendiente sin seña y libera el stock' do
       reserva = Reserva.create!(club: club, paciente: paciente, user: dispensador, stock: stock, cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date)
