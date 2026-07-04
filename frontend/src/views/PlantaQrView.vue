@@ -311,7 +311,7 @@ onMounted(async () => {
     clubNombre.value = club.name || ''
     clubLogo.value   = club.logoUrl || ''
     await resolverEstado()
-  } catch (e) {
+  } catch {
     estado.value = 'no_encontrada'
   }
 })

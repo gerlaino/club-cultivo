@@ -66,7 +66,7 @@ async function generarQR() {
     qrDataUrl.value = await generatePNG(qrPlantaUrl(), {
       width: 256, color: { dark: '#1b5e20', light: '#ffffff' }
     })
-  } catch {}
+  } catch { /* el QR es opcional; si falla la generación no rompe la vista */ }
 }
 async function descargarQRpng() { await downloadPNG(qrPlantaUrl(), qrFilename('png')) }
 async function descargarQRsvg() { await downloadSVG(qrPlantaUrl(), qrFilename('svg')) }
@@ -213,11 +213,6 @@ const ultimoTrasplante = computed(() =>
 const macetaActual = computed(() => {
   if (ultimoTrasplante.value?.metadata?.maceta_destino_l) return ultimoTrasplante.value.metadata.maceta_destino_l
   return planta.value?.lote?.tamanio_maceta || null
-})
-
-const alturaActual = computed(() => {
-  const r = ultimoRegistro.value
-  return r?.metadata?.altura_cm || planta.value?.altura_actual || null
 })
 
 // ── Acciones ──────────────────────────────────────────────
@@ -501,6 +496,12 @@ const plantaAcciones = computed(() => {
   const items = []
   items.push({ emoji: '📋', label: 'Registrar planta', onClick: () => { showRegistroPlanta.value = true } })
   items.push({ emoji: '✏️', label: 'Editar planta',    onClick: abrirEditarPlanta })
+  // Acciones de planta viva: registrar medición de sustrato/solución (con Bluelab BLE) y
+  // trasplante de maceta. Los modales y el guardado ya existían; faltaba el disparador.
+  if (['germinacion', 'esqueje', 'vegetativo', 'floracion'].includes(planta.value?.state)) {
+    items.push({ emoji: '🔬', label: 'Registrar medición (EC/pH)', onClick: abrirMedicion })
+    items.push({ emoji: '🪴', label: 'Trasplante de maceta',       onClick: abrirTrasplante })
+  }
   items.push({ divider: true })
   items.push({ emoji: '🗑️', label: 'Descartar planta', danger: true, onClick: descartarPlanta })
   return items
