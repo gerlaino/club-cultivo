@@ -115,9 +115,6 @@
       <div v-if="['en_manicura'].includes(lote.estado)" class="mnl__section">
         <div class="mnl__section-head">
           <h2 class="mnl__section-title"><Scale :size="12" :stroke-width="2" /> Pesajes</h2>
-          <button v-if="!pesajeBorrador" class="mnl__pj-new" :disabled="creando" @click="crearPesaje">
-            <Plus :size="13" :stroke-width="2" /> Nuevo pesaje
-          </button>
         </div>
 
         <!-- Jornada en curso (borrador) -->
@@ -303,7 +300,6 @@ const { registrarConJornada } = useManicuraJornada()
 
 // ── Pesajes del lote (jornadas) — antes vivía en "Mis pesajes" ──
 const pesajes    = ref([])
-const creando    = ref(false)
 const enviando   = ref(false)
 const reabriendo = ref(null)
 const borrando   = ref(null)
@@ -314,18 +310,6 @@ const pesajesConfirmadosCount = computed(() =>
   pesajes.value.filter(p => p.estado === 'confirmado')
     .reduce((s, p) => s + (p.plantas_count || p.plantas_registradas || 0), 0)
 )
-
-async function crearPesaje() {
-  if (creando.value) return
-  creando.value = true
-  try {
-    const { data } = await createPesajeManicura(id)
-    pesajes.value.unshift(data)
-    toast.success('Pesaje iniciado — escaneá el QR de cada planta para cargar su peso')
-  } catch (e) {
-    toast.error(e.response?.data?.error || 'Error al crear el pesaje')
-  } finally { creando.value = false }
-}
 
 async function cerrarYEnviar() {
   const p = pesajeBorrador.value
@@ -697,13 +681,6 @@ onActivated(cargar)
 
 /* Footer */
 /* Pesajes (jornadas) */
-.mnl__pj-new {
-  display: inline-flex; align-items: center; gap: .3rem;
-  background: #fff; border: 1.5px solid #d4e6d4; color: #5C7A4A;
-  border-radius: 7px; padding: .35rem .7rem; font-size: .76rem; font-weight: 600; cursor: pointer;
-}
-.mnl__pj-new:hover:not(:disabled) { background: #f6faf4; }
-.mnl__pj-new:disabled { opacity: .5; cursor: not-allowed; }
 .mnl__pj-hint { font-size: .8rem; color: #94a3b8; margin: .25rem 0 0; }
 
 .mnl__jornada {
