@@ -428,8 +428,10 @@ async function saveManicura() {
     // Va por el flujo de pesaje (registrar_peso): linkea el peso a la jornada del lote y
     // respeta la asignación (solo el manicura asignado puede). NO por updatePlant (que
     // dejaba el peso suelto fuera del pesaje).
-    const { data } = await registrarConJornada(planta.value?.lote?.id,
+    const res = await registrarConJornada(planta.value?.lote?.id,
       (extra) => registrarPesoPlanta(id, { peso_seco_g: pesoManicura.value, ...extra }))
+    if (!res) return // la manicura canceló
+    const { data } = res
     if (plants.current) plants.current.peso_seco = data?.planta?.peso_seco ?? pesoManicura.value
     manicuraSaved.value = true
     toast.success('Peso registrado en el pesaje del lote')

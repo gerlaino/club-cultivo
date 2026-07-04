@@ -544,13 +544,14 @@ async function submitBatch() {
   savingBatch.value = true
   modalError.value  = ''
   try {
-    await registrarConJornada(id, (extra) => createPesajeManicura(id, {
+    const res = await registrarConJornada(id, (extra) => createPesajeManicura(id, {
       plant_ids:    batchSelIds.value,
       peso_total_g: batchForm.value.peso_seco_g,
       notas:        batchForm.value.notas || undefined,
       enviar:       true,
       ...extra,
     }))
+    if (!res) return // la manicura canceló → dejar el modal abierto
     toast.success(`Lote ${lote.value.codigo} — pesaje enviado a confirmar`)
     cerrarModal()
     await cargar()

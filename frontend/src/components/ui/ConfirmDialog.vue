@@ -2,11 +2,12 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useConfirm } from '../../composables/useConfirm.js'
 
-const { state, accept, cancel } = useConfirm()
+const { state, accept, cancel, neutral } = useConfirm()
 
 const VARIANT_BTN = {
   danger:  'btn-danger',
   warning: 'btn-warning',
+  success: 'btn-success',
   default: 'btn-primary',
 }
 
@@ -28,7 +29,8 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
           <div v-if="state.title" id="cd-title" class="cd-title">{{ state.title }}</div>
           <p v-if="state.message" class="cd-msg">{{ state.message }}</p>
           <div class="cd-actions">
-            <button class="btn btn-sm btn-outline-secondary" @click="cancel">{{ state.cancelText }}</button>
+            <button class="btn btn-sm btn-outline-secondary" :class="{ 'cd-cancel--push': state.neutralText }" @click="cancel">{{ state.cancelText }}</button>
+            <button v-if="state.neutralText" class="btn btn-sm btn-outline-secondary" @click="neutral">{{ state.neutralText }}</button>
             <button class="btn btn-sm" :class="VARIANT_BTN[state.variant] || 'btn-danger'" @click="accept" autofocus>
               {{ state.confirmText }}
             </button>
@@ -71,7 +73,11 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   display: flex;
   justify-content: flex-end;
   gap: .5rem;
+  flex-wrap: wrap;
 }
+/* Con 3 opciones, "Cancelar" (volver) se separa a la izquierda para no confundirse con las
+   dos elecciones reales. */
+.cd-cancel--push { margin-right: auto; }
 .cd-enter-active, .cd-leave-active { transition: opacity .15s ease, transform .15s ease; }
 .cd-enter-from, .cd-leave-to { opacity: 0; pointer-events: none; }
 .cd-enter-from .cd-box { transform: scale(.96); }

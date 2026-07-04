@@ -421,8 +421,10 @@ async function registrarPeso() {
   const payload = { peso_seco_g: peso }
   if (pesoHumedo > 0) payload.peso_humedo_g = pesoHumedo
   try {
-    const { data } = await registrarConJornada(plantaDetalle.value.lote?.id,
+    const res = await registrarConJornada(plantaDetalle.value.lote?.id,
       (extra) => registrarPesoPlanta(plantaDetalle.value.id, { ...payload, ...extra }))
+    if (!res) return // la manicura canceló
+    const { data } = res
     pesoAnterior.value = peso
     progreso.value     = data.progreso
     registroOk.value   = true
