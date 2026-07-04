@@ -1,5 +1,28 @@
 # Changelog
 
+## Julio 2026 — seguridad clínica, backups, KPIs de stock, candado de manicura
+
+- **Seguridad AZ (historia clínica):** `pacientes#show/#index` filtraban la historia clínica
+  (anamnesis, diagnósticos, evolución, alergias, medicación…) a roles no clínicos (dispensador).
+  Se pasó a **allowlist** de campos + `authorize`; `PacientePolicy` decide por rol
+  (`ROLES_CLINICA = admin/medico/supervisor`). super_admin y dispensador bloqueados por rol.
+- **Backups Postgres → R2:** rake `backup:create/list/prune/restore` + cron diario en
+  `render.yaml` + `docs/backups.md`. Retención 30 días.
+- **Stock (KPIs):** "Flor seca disponible" usa disponible **real** (resta reservas); nuevo KPI
+  "Reservado (flor)"; "flor propia" → "Derivados". Stock bajo y gramos = solo flor seca.
+- **Dispensaciones:** edición **multi-ítem** (cantidad + precio por línea) con reconciliación de
+  stock/cc; precio manual por ítem (admin/sup); historial desplegable por ítem.
+- **Contabilidad:** compras **en cuotas** (medio de pago "En cuotas" en Nuevo movimiento →
+  genera N egresos mensuales, backdateable). Se saca "cheque".
+- **Manicura (provisorio):** solo el **manicura asignado** registra el peso de un lote asignado
+  (el "guardar" del detalle iba por `plants#update`, dejando el peso suelto → ahora va por el
+  pesaje). El admin ya no pisa el peso de un lote asignado.
+- **Reservas:** la fecha de entrega debe ser **a partir de mañana**.
+- **UX admin:** widget de ambiente por sala, KPIs de plantas post-cosecha / cosecha lista,
+  semáforo de días por fase, tipo de genética en /lotes, tabs del perfil (primarias + "Más"),
+  botón PDF en informes del auditor.
+- **Guía de usuarios:** nuevo `docs/GUIA_USUARIOS.md` (+ PDF) con roles y flujos.
+
 ## Limpieza del flujo de manicura (web) + estado fantasma `manicura_pendiente` eliminado (2026-06-30)
 
 Relevamiento del flujo del rol **manicura** en la versión web (no PWA) y limpieza integral.

@@ -6,6 +6,20 @@
 **Datos en juego:** datos sensibles de salud (historia clínica, diagnósticos, indicaciones médicas), DNI, datos de contacto de pacientes/socios.
 **Marco legal aplicado:** Ley 25.326 (arts. 9 seguridad, 12 transferencia internacional, 16 supresión/habeas data) y Res. AAIP 47/2018 (datos sensibles → **nivel reforzado**: cifrado at-rest + registro de accesos).
 
+> **⚠️ Actualización julio 2026 — varias filas de abajo quedaron viejas:**
+> - **ENC-01 (cifrado at-rest): RESUELTO.** `Paciente` y `User` ya usan `encrypts` en todos los
+>   campos de salud + DNI (`dni`/`dni_normalizado`/`reprocann_numero` **determinísticos** por el
+>   índice único). Las filas que dicen "`paciente.rb` sin `encrypts`" son de la foto del 25-jun.
+> - **AUTH-01 (secreto JWT): RESUELTO.** `config/initializers/devise.rb` toma el secreto solo de
+>   `ENV['DEVISE_JWT_SECRET_KEY']` **sin fallback** (raise al boot).
+> - **AZ — hallazgo nuevo, ya REMEDIADO:** además de AZ-01/02/03, `pacientes#show/#index`
+>   exponían la historia clínica a roles con lectura de la ficha (dispensador) porque el
+>   serializer sólo excluía `notas_clinicas`. Fix: **allowlist** de campos + `authorize` +
+>   `PacientePolicy` por rol (`ROLES_CLINICA = admin/medico/supervisor`; super_admin/dispensador
+>   fuera). Cubierto por `spec/requests/paciente_historia_clinica_leak_spec.rb`.
+> - **Pendiente real:** TEN-01b (jobs sin `ActsAsTenant.with_tenant`) y la rotación de claves de
+>   cifrado en prod.
+
 > **Nota metodológica:** cada hallazgo tiene evidencia `archivo:línea`. Donde la realidad del código difiere de lo asumido en `CLAUDE.md` / notas previas, se marca explícitamente en la sección *Realidad vs. asumido*. Los hallazgos de auth/autz/cifrado críticos se verificaron a mano además del relevamiento automatizado.
 
 ---
