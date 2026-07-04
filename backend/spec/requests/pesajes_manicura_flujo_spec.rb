@@ -204,6 +204,50 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(planta.reload.peso_seco.to_f).not_to eq(999.0)
   end
 
+  # Guard de jornada: si hay una jornada ENVIADA sin confirmar y no hay borrador, el backend
+  # avisa (409 needs_choice) para que el front pregunte "¿seguir la anterior o una nueva?".
+  context 'jornada enviada sin confirmar (guard needs_choice)' do
+    let!(:enviada) do
+      lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current, estado: 'enviado')
+    end
+
+    it 'registrar_peso responde 409 needs_choice (no crea una jornada nueva en silencio)' do
+      post "/plants/#{planta.id}/registrar_peso", params: { peso_seco_g: 10 }, headers: auth_headers, as: :json
+      expect(response).to have_http_status(:conflict)
+      body = JSON.parse(response.body)
+      expect(body['needs_choice']).to be(true)
+      expect(body.dig('jornada_enviada', 'id')).to eq(enviada.id)
+      expect(lote.pesajes_manicura.borradores.count).to eq(0)
+    end
+
+    it 'registrar_peso con force_new abre una jornada nueva sin preguntar' do
+      post "/plants/#{planta.id}/registrar_peso", params: { peso_seco_g: 10, force_new: true }, headers: auth_headers, as: :json
+      expect(response).to have_http_status(:ok)
+      expect(lote.pesajes_manicura.borradores.count).to eq(1)
+    end
+
+    it 'registrar_peso NO pregunta si ya hay un borrador abierto (continúa esa jornada)' do
+      borr = lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current, estado: 'borrador')
+      post "/plants/#{planta.id}/registrar_peso", params: { peso_seco_g: 10 }, headers: auth_headers, as: :json
+      expect(response).to have_http_status(:ok)
+      expect(lote.pesajes_manicura.borradores.count).to eq(1)
+      expect(PesadaPlanta.find_by(plant_id: planta.id).pesaje_manicura_id).to eq(borr.id)
+    end
+
+    it 'batch (carga conjunta) también responde 409 needs_choice' do
+      post "/lotes/#{lote.id}/pesajes_manicura",
+           params: { peso_total_g: 100, plant_ids: [planta.id] }, headers: auth_headers, as: :json
+      expect(response).to have_http_status(:conflict)
+      expect(JSON.parse(response.body)['needs_choice']).to be(true)
+    end
+
+    it 'batch con force_new abre una jornada nueva' do
+      post "/lotes/#{lote.id}/pesajes_manicura",
+           params: { peso_total_g: 100, plant_ids: [planta.id], force_new: true }, headers: auth_headers, as: :json
+      expect(response).to have_http_status(:created)
+    end
+  end
+
   # Mixto: el manicura pesa algunas plantas por QR y el resto por batch. El batch cubre
   # SOLO las restantes; al confirmar ambos, el total procesado debe llegar al total del
   # lote (no quedarse corto) y el lote pasa a curado con los gramos sumados.
@@ -218,9 +262,10 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     pesaje_qr = lote.pesajes_manicura.find_by(estado: 'borrador')
     post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje_qr.id}/enviar", headers: auth_headers
 
-    # las 2 restantes por batch
+    # las 2 restantes por batch, en una jornada NUEVA aparte (la anterior ya está enviada →
+    # force_new representa la elección "empezar una nueva" del nuevo guard de jornada).
     post "/lotes/#{lote.id}/pesajes_manicura",
-         params: { plantas_count: 2, peso_total_g: 20, enviar: true }, headers: auth_headers
+         params: { plantas_count: 2, peso_total_g: 20, enviar: true, force_new: true }, headers: auth_headers
     pesaje_batch = lote.pesajes_manicura.where.not(plantas_count: nil).last
 
     # admin confirma ambos

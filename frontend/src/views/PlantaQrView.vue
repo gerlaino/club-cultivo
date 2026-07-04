@@ -259,9 +259,11 @@ import { useAuthStore } from '../stores/auth'
 import { useClubStore } from '../stores/club'
 import { usePermissions } from '../composables/usePermissions'
 import { getPlant, listPlants, registrarPesoPlanta, getPlantaPorQR } from '../lib/api'
+import { useManicuraJornada } from '../composables/useManicuraJornada'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
+const { registrarConJornada } = useManicuraJornada()
 const router = useRouter()
 const auth   = useAuthStore()
 const club   = useClubStore()
@@ -419,7 +421,8 @@ async function registrarPeso() {
   const payload = { peso_seco_g: peso }
   if (pesoHumedo > 0) payload.peso_humedo_g = pesoHumedo
   try {
-    const { data } = await registrarPesoPlanta(plantaDetalle.value.id, payload)
+    const { data } = await registrarConJornada(plantaDetalle.value.lote?.id,
+      (extra) => registrarPesoPlanta(plantaDetalle.value.id, { ...payload, ...extra }))
     pesoAnterior.value = peso
     progreso.value     = data.progreso
     registroOk.value   = true

@@ -1,4 +1,6 @@
 class PlantsController < ApplicationController
+  include ManicuraJornadaGuard
+
   before_action :authenticate_user!
   before_action :set_plant, only: [:show, :update, :destroy, :add_foto, :remove_foto, :registrar_peso]
 
@@ -177,6 +179,16 @@ class PlantsController < ApplicationController
     return render json: { error: 'No estás asignado a este lote' }, status: :forbidden unless rol_ok && asignacion_ok
 
     pesaje_manicura_id = params[:pesaje_manicura_id]
+
+    # Si no apunta a una jornada concreta y ya hay una jornada enviada sin confirmar de esta
+    # manicura para el lote, preguntamos antes de abrir una nueva (evita jornadas partidas
+    # en silencio). El front resuelve reabriendo o forzando una nueva (force_new).
+    if pesaje_manicura_id.blank?
+      force_new = ActiveModel::Type::Boolean.new.cast(params[:force_new])
+      if (jp = jornada_a_confirmar(lote, force_new: force_new))
+        return render_needs_choice(jp)
+      end
+    end
 
     ActiveRecord::Base.transaction do
       plant_attrs = { peso_seco: peso_seco }

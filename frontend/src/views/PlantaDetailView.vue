@@ -8,6 +8,7 @@ import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
 import { getPlantActivities, createPlantActivity, updatePlant, registrarPesoPlanta, addPlantFoto, removePlantFoto } from '../lib/api'
+import { useManicuraJornada } from '../composables/useManicuraJornada'
 import Breadcrumb            from '../components/ui/Breadcrumb.vue'
 import EmptyState            from '../components/ui/EmptyState.vue'
 import Lightbox              from '../components/ui/Lightbox.vue'
@@ -26,6 +27,7 @@ const auth   = useAuthStore()
 const club   = useClubStore()
 const toast   = useToast()
 const { confirm } = useConfirm()
+const { registrarConJornada } = useManicuraJornada()
 
 const id           = Number(route.params.id)
 const error        = ref(null)
@@ -426,7 +428,8 @@ async function saveManicura() {
     // Va por el flujo de pesaje (registrar_peso): linkea el peso a la jornada del lote y
     // respeta la asignación (solo el manicura asignado puede). NO por updatePlant (que
     // dejaba el peso suelto fuera del pesaje).
-    const { data } = await registrarPesoPlanta(id, { peso_seco_g: pesoManicura.value })
+    const { data } = await registrarConJornada(planta.value?.lote?.id,
+      (extra) => registrarPesoPlanta(id, { peso_seco_g: pesoManicura.value, ...extra }))
     if (plants.current) plants.current.peso_seco = data?.planta?.peso_seco ?? pesoManicura.value
     manicuraSaved.value = true
     toast.success('Peso registrado en el pesaje del lote')

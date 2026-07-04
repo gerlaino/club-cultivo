@@ -1,4 +1,6 @@
 class PesajesManicuraController < ApplicationController
+  include ManicuraJornadaGuard
+
   before_action :authenticate_user!
   before_action :set_lote, except: [:index_admin]
   before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir, :reajustar_peso]
@@ -52,8 +54,18 @@ class PesajesManicuraController < ApplicationController
 
     carga_manual = params[:peso_total_g].present?
     enviar_ya    = ActiveModel::Type::Boolean.new.cast(params[:enviar])
+    force_new    = ActiveModel::Type::Boolean.new.cast(params[:force_new])
 
-    pesaje = @lote.pesajes_manicura.build(
+    # Carga conjunta (pesar el resto de una): si hay una jornada enviada sin confirmar de
+    # esta manicura, preguntar antes de abrir una nueva (mismo criterio que el pesaje por QR).
+    if carga_manual && (jp = jornada_a_confirmar(@lote, force_new: force_new))
+      return render_needs_choice(jp)
+    end
+
+    # Continuar el borrador abierto de esta manicura (p.ej. una jornada reabierta) en vez de
+    # fragmentar en dos registros; si se pidió una nueva o no hay borrador, se crea una.
+    pesaje = @lote.pesajes_manicura.borradores.where(manicurador_id: current_user.id).recientes.first unless force_new
+    pesaje ||= @lote.pesajes_manicura.build(
       manicurador: current_user,
       club:        current_user.club,
       fecha_pesaje: Date.today,

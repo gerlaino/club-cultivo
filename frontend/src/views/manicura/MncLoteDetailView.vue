@@ -290,6 +290,7 @@ import {
   listPesajesManicura, enviarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useManicuraJornada } from '../../composables/useManicuraJornada.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useAuthStore } from '../../stores/auth'
 
@@ -298,6 +299,7 @@ const router = useRouter()
 const toast  = useToast()
 const auth   = useAuthStore()
 const { confirm } = useConfirm()
+const { registrarConJornada } = useManicuraJornada()
 
 // ── Pesajes del lote (jornadas) — antes vivía en "Mis pesajes" ──
 const pesajes    = ref([])
@@ -542,12 +544,13 @@ async function submitBatch() {
   savingBatch.value = true
   modalError.value  = ''
   try {
-    await createPesajeManicura(id, {
+    await registrarConJornada(id, (extra) => createPesajeManicura(id, {
       plant_ids:    batchSelIds.value,
       peso_total_g: batchForm.value.peso_seco_g,
       notas:        batchForm.value.notas || undefined,
       enviar:       true,
-    })
+      ...extra,
+    }))
     toast.success(`Lote ${lote.value.codigo} — pesaje enviado a confirmar`)
     cerrarModal()
     await cargar()
