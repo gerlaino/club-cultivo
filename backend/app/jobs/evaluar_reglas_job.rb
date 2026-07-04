@@ -5,6 +5,6 @@ class EvaluarReglasJob < ApplicationJob
 
   def perform(sala_id)
     sala = Sala.find(sala_id)
-    Ambiente::EvaluadorReglas.call(sala)
+    ActsAsTenant.with_tenant(sala.club) { Ambiente::EvaluadorReglas.call(sala) }
   end
 end

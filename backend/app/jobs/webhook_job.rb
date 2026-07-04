@@ -5,9 +5,11 @@ class WebhookJob < ApplicationJob
 
   def perform(dispositivo_id, payload)
     dispositivo = Dispositivo.activos.find(dispositivo_id)
-    driver_class = driver_para(dispositivo.tipo)
-    driver_class.new(dispositivo).persist!(payload)
-    EvaluarReglasJob.perform_later(dispositivo.sala_id)
+    ActsAsTenant.with_tenant(dispositivo.club) do
+      driver_class = driver_para(dispositivo.tipo)
+      driver_class.new(dispositivo).persist!(payload)
+      EvaluarReglasJob.perform_later(dispositivo.sala_id)
+    end
   end
 
   private

@@ -6,7 +6,9 @@ class ReportarAriccameJob < ApplicationJob
     return unless dispensacion
     return if dispensacion.ariccame_reportada?
 
-    Ariccame::ReportadorDispensacion.new(dispensacion).call
+    ActsAsTenant.with_tenant(dispensacion.stock&.club) do
+      Ariccame::ReportadorDispensacion.new(dispensacion).call
+    end
   rescue => e
     Rails.logger.error "ReportarAriccameJob failed for dispensacion #{dispensacion_id}: #{e.message}"
   end

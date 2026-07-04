@@ -4,7 +4,7 @@ class StockBajoJob < ApplicationJob
   UMBRAL_G_DEFAULT = 50
 
   def perform
-    Club.all.find_each { |club| procesar_club(club) }
+    Club.all.find_each { |club| ActsAsTenant.with_tenant(club) { procesar_club(club) } }
   end
 
   private

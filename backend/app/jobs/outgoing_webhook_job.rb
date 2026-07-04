@@ -10,6 +10,8 @@ class OutgoingWebhookJob < ApplicationJob
     webhook = Webhook.find_by(id: webhook_id, active: true)
     return unless webhook
 
-    OutgoingWebhookService.new(webhook, event, payload).call
+    ActsAsTenant.with_tenant(webhook.club) do
+      OutgoingWebhookService.new(webhook, event, payload).call
+    end
   end
 end

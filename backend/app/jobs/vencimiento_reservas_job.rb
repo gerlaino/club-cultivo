@@ -8,7 +8,7 @@ class VencimientoReservasJob < ApplicationJob
   queue_as :default
 
   def perform
-    Club.activos.find_each { |club| procesar_club(club) }
+    Club.activos.find_each { |club| ActsAsTenant.with_tenant(club) { procesar_club(club) } }
   end
 
   private

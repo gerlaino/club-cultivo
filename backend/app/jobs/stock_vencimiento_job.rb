@@ -2,7 +2,7 @@ class StockVencimientoJob < ApplicationJob
   queue_as :default
 
   def perform
-    Club.all.find_each { |club| procesar_club(club) }
+    Club.all.find_each { |club| ActsAsTenant.with_tenant(club) { procesar_club(club) } }
   end
 
   private

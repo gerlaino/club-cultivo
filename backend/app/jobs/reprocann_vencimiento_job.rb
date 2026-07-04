@@ -5,7 +5,7 @@ class ReprocannVencimientoJob < ApplicationJob
 
   def perform
     Club.all.find_each do |club|
-      procesar_club(club)
+      ActsAsTenant.with_tenant(club) { procesar_club(club) }
     end
   end
 
