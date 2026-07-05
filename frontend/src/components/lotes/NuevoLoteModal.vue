@@ -15,7 +15,10 @@
 
           <!-- Bifurcación nuevo / existente -->
           <div class="nlm__tabs">
-            <button type="button" class="nlm__tab" :class="{ 'nlm__tab--active': tipoCreacion === 'nuevo' }" @click="tipoCreacion = 'nuevo'">
+            <button type="button" class="nlm__tab" :class="{ 'nlm__tab--active': tipoCreacion === 'nuevo' }"
+                    :disabled="salaVieneDeAntes"
+                    :title="salaVieneDeAntes ? 'Un lote en floración/cosecha siempre viene de una fase previa — cargalo como existente' : ''"
+                    @click="!salaVieneDeAntes && (tipoCreacion = 'nuevo')">
               <i class="bi bi-plus-circle"></i> Lote nuevo
             </button>
             <button type="button" class="nlm__tab" :class="{ 'nlm__tab--active': tipoCreacion === 'existente' }" @click="tipoCreacion = 'existente'">
@@ -264,6 +267,9 @@ const sedes  = ref([])
 const effectiveSala = computed(() => props.sala || (props.salas || []).find(s => s.id === salaId.value) || null)
 // Lote cosechado heredado: no va a sala de cultivo, se ubica por sede.
 const esCosechado = computed(() => tipoCreacion.value === 'existente' && heredadoEstado.value === 'cosecha')
+// En salas de floración/cosecha un lote NO puede ser "nuevo" (no se germina ahí): siempre
+// viene de una fase previa, así que se carga como existente (heredado) y se piden los días.
+const salaVieneDeAntes = computed(() => ['floracion', 'cosecha'].includes(effectiveSala.value?.kind))
 
 const form          = ref(emptyForm())
 const errors        = ref({})
@@ -445,7 +451,8 @@ watch(() => props.show, async (open) => {
   form.value          = emptyForm()
   errors.value        = {}
   apiError.value      = null
-  tipoCreacion.value  = 'nuevo'
+  // En floración/cosecha arranca en "existente" (un lote nuevo no puede nacer ahí).
+  tipoCreacion.value  = salaVieneDeAntes.value ? 'existente' : 'nuevo'
   listSedes().then(({ data }) => {
     sedes.value = (data || []).filter(s => ['produccion', 'mixta'].includes(s.tipo))
     if (sedes.value.length === 1) sedeId.value = sedes.value[0].id
@@ -464,6 +471,7 @@ watch(() => props.show, async (open) => {
 
 // Si cambia la sala elegida, recomputar estado inicial del form nuevo
 watch(salaId, () => {
+  if (salaVieneDeAntes.value) tipoCreacion.value = 'existente'
   if (tipoCreacion.value === 'nuevo' && !form.value.planta_madre_ids.length) {
     const f = emptyForm()
     form.value.estado = f.estado
@@ -485,6 +493,7 @@ watch(salaId, () => {
 .nlm__tabs { display: flex; gap: .5rem; margin-bottom: 1rem; }
 .nlm__tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; padding: .55rem; border: 1.5px solid #e2e8f0; background: #f8fafc; border-radius: 9px; font-size: .82rem; font-weight: 700; color: #64748b; cursor: pointer; transition: all .15s; }
 .nlm__tab--active { border-color: #15803d; background: #f0fdf4; color: #15803d; }
+.nlm__tab:disabled { opacity: .45; cursor: not-allowed; }
 .nlm__grid { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
 @media (max-width: 520px) { .nlm__grid { grid-template-columns: 1fr; } }
 .nlm__field { display: flex; flex-direction: column; gap: .3rem; }
