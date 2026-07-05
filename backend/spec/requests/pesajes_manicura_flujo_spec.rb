@@ -354,4 +354,27 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(cont).to be_present
     expect(cont['genetica_nombre']).to eq(genetica.nombre)
   end
+
+  # Borrar un lote (soft-delete) no debe dejar jornadas de manicura huérfanas: sin lote no se
+  # pueden confirmar y rompían el board del admin (set_lote no encontraba el lote → 500).
+  context 'borrado de lote con manicura pendiente' do
+    it 'Lote#soft_delete! limpia las jornadas pendientes (borrador/enviado)' do
+      lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current, estado: 'enviado')
+      lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current, estado: 'borrador')
+      expect { lote.soft_delete! }
+        .to change { PesajeManicura.where(lote_id: lote.id, estado: %w[borrador enviado]).count }.from(2).to(0)
+    end
+
+    it 'el board del admin NO muestra pesajes de un lote borrado (join defensivo)' do
+      pesaje = lote.pesajes_manicura.create!(manicurador: manicura, club: club, fecha_pesaje: Date.current, estado: 'enviado')
+      # Simula un huérfano preexistente: se oculta el lote SIN pasar por el cleanup nuevo.
+      lote.update_column(:deleted_at, Time.current)
+      delete '/api/users/sign_out'
+      sign_in_as(admin)
+      get '/pesajes_manicura', headers: auth_headers # index_admin
+      expect(response).to have_http_status(:ok)
+      ids = JSON.parse(response.body).map { |p| p['id'] }
+      expect(ids).not_to include(pesaje.id)
+    end
+  end
 end

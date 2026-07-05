@@ -18,8 +18,11 @@ class PesajesManicuraController < ApplicationController
     unless current_user.admin? || current_user.supervisor?
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
+    # joins(:lote) aplica el default_scope del lote (deleted_at: nil) → un pesaje cuyo lote fue
+    # borrado NUNCA aparece en el board (defensa además del cleanup en Lote#soft_delete!).
     pesajes = current_user.club.pesajes_manicura
                           .enviados
+                          .joins(:lote)
                           .includes(:lote, :manicurador, :stock, pesadas_plantas: :plant)
                           .order(enviado_at: :desc)
     render json: pesajes.map { |p| PesajeManicuraSerializer.serialize(p, include_plantas: true) }

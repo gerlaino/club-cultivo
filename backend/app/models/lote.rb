@@ -69,7 +69,17 @@ class Lote < ApplicationRecord
   scope :recientes,   -> { order(created_at: :desc) }
 
   def soft_delete!
-    update_column(:deleted_at, Time.current)
+    transaction do
+      # OJO: update_column saltea callbacks Y los `dependent:` de las asociaciones. Los hijos
+      # que se consultan A TRAVÉS del lote (plants, pesadas, lote_eventos, y también los stocks
+      # via `stock.lote`) quedan ocultos junto con él y vuelven si se restaura — reversible.
+      # El caso problemático son las jornadas de manicura PENDIENTES (borrador/enviado): se
+      # consultan independientes del lote (board del admin) y sin lote no se pueden confirmar,
+      # así que quedaban huérfanas apuntando a un lote inexistente → 500 al gestionarlas.
+      # Se limpian acá (no es reversible, pero una manicura sin lote no tiene sentido).
+      pesajes_manicura.where(estado: %w[borrador enviado]).destroy_all
+      update_column(:deleted_at, Time.current)
+    end
   end
 
   def dias_desde_inicio
