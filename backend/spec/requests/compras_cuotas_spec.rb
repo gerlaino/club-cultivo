@@ -31,6 +31,20 @@ RSpec.describe 'Compras en cuotas', type: :request do
     expect(response).to have_http_status(:no_content)
   end
 
+  it 'el libro (movimientos_contables#index) NO muestra las cuotas futuras' do
+    # 3 cuotas: la 1 es de hoy (ya ocurrió), la 2 y 3 son de meses futuros.
+    # Date.current = hoy en la zona del club (referencia contable correcta).
+    post '/compras_cuotas', params: payload(cuotas_total: 3, fecha_primera_cuota: Date.current), headers: auth_headers
+    expect(MovimientoContable.count).to eq(3)
+
+    get '/movimientos_contables', headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    body   = JSON.parse(response.body)
+    cuotas = body['movimientos'].select { |m| m['descripcion'].to_s.include?('cuota') }
+    expect(cuotas.size).to eq(1)
+    expect(cuotas.first['descripcion']).to include('cuota 1/3')
+  end
+
   it 'aísla por tenant: no ve compras de otro club' do
     otro       = create(:club)
     otro_admin = create(:user, :admin, club: otro)

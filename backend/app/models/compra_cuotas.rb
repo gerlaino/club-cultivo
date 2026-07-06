@@ -41,7 +41,7 @@ class CompraCuotas < ApplicationRecord
         medio_pago:  medio_pago,
         proveedor:   proveedor,
         cuota_numero: i,
-        pagado:      fecha <= Date.today,  # cuotas pasadas: pagadas; futuras: pendientes
+        pagado:      fecha <= Date.current,  # cuotas pasadas: pagadas; futuras: pendientes (zona del club)
         # Se refleja quién pagó (tarjeta/responsable) en cada cuota para que sea visible.
         notas:       [("Pago: #{responsable}" if responsable.present?), notas].compact.join(' · ').presence,
       )

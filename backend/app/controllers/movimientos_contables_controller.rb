@@ -26,6 +26,12 @@ class MovimientosContablesController < ApplicationController
       scope = scope.del_mes(fecha)
     end
 
+    # Las CUOTAS futuras (aún no llegó su mes) no van en el libro ni en los totales: son un
+    # compromiso a futuro, no un gasto ocurrido. Aparecen solas cuando llega su fecha. El
+    # cronograma completo (incluidas las futuras) se ve en el detalle de la compra en cuotas.
+    # Solo afecta a cuotas (compra_cuotas_id); los movimientos normales no se tocan.
+    scope = scope.where('compra_cuotas_id IS NULL OR fecha <= ?', Date.current)
+
     # Totales para el período filtrado (antes de paginar)
     totales = calcular_totales(scope)
 
