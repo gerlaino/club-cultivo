@@ -26,7 +26,7 @@
     <table v-else class="rsv__table">
       <thead>
         <tr>
-          <th>Socio</th>
+          <th>Paciente</th>
           <th>Producto</th>
           <th>Cantidad</th>
           <th>Entrega</th>

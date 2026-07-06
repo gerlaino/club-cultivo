@@ -12,7 +12,7 @@
 
           <!-- Resumen -->
           <div class="mer__resumen">
-            <div><span class="mer__lbl">Socio</span> {{ reserva.paciente?.nombre }}</div>
+            <div><span class="mer__lbl">Paciente</span> {{ reserva.paciente?.nombre }}</div>
             <div><span class="mer__lbl">Producto</span> {{ reserva.stock?.forma_producto }}</div>
             <div v-if="reserva.sena_ars > 0"><span class="mer__lbl">Seña pagada</span> {{ fmt(reserva.sena_ars) }}</div>
           </div>
@@ -81,14 +81,14 @@
               <div class="mer__seg">
                 <button type="button" class="mer__seg-btn" :class="{ 'mer__seg-btn--on': usarDomicilio }"
                         :disabled="!reserva.paciente?.tiene_domicilio" @click="usarDomicilio = true">
-                  <i class="bi bi-house"></i> Domicilio del socio
+                  <i class="bi bi-house"></i> Domicilio del paciente
                 </button>
                 <button type="button" class="mer__seg-btn" :class="{ 'mer__seg-btn--on': !usarDomicilio }" @click="usarDomicilio = false">
                   <i class="bi bi-geo-alt"></i> Otra
                 </button>
               </div>
               <p v-if="usarDomicilio && !reserva.paciente?.tiene_domicilio" class="mer__warn">
-                El socio no tiene domicilio cargado. Elegí "Otra".
+                El paciente no tiene domicilio cargado. Elegí "Otra".
               </p>
             </div>
 

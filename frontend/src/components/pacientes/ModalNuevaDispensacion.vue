@@ -378,7 +378,7 @@ async function handleSubmit() {
       ? (puedeEditarAporte.value
           ? 'Cargá el precio de los productos sin precio (campo $/u en el carrito).'
           : 'Hay un producto sin precio configurado. Pedile al administrador que lo cargue.')
-      : 'El aporte del socio debe ser mayor a $0.'
+      : 'El aporte del paciente debe ser mayor a $0.'
     saving.value = false; return
   }
   if (!cobraDelivery.value && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
@@ -630,7 +630,7 @@ async function handleSubmit() {
               <template v-if="puedeVerDescPaciente">
                 <div class="mnd__precio-row"><span>Precio base</span><span>{{ fmt(precioBase) }}</span></div>
                 <div v-if="descPacientePct > 0" class="mnd__precio-row mnd__precio-row--desc">
-                  <span>Descuento socio {{ descPacientePct }}%</span>
+                  <span>Descuento paciente {{ descPacientePct }}%</span>
                   <span>- {{ fmt(precioBase * descPacientePct / 100) }}</span>
                 </div>
                 <div v-if="descDispensaPct > 0" class="mnd__precio-row mnd__precio-row--desc">
@@ -644,7 +644,7 @@ async function handleSubmit() {
             </div>
             <!-- Override del aporte: solo admin/supervisor -->
             <div v-if="puedeEditarAporte" class="mnd__field">
-              <label class="mnd__label">Aporte del socio <span class="mnd__opt">ARS — editable</span></label>
+              <label class="mnd__label">Aporte del paciente <span class="mnd__opt">ARS — editable</span></label>
               <div class="mnd__input-suffix-wrap">
                 <span class="mnd__input-prefix">$</span>
                 <input v-model.number="form.aporte_socio_ars" type="number" min="0" step="1"

@@ -143,7 +143,7 @@
             <option value="mercado_pago">Mercado Pago</option>
           </select>
           <p v-if="pagoMonto > ccDeudaActual && ccDeudaActual >= 0" class="scc__modal-hint">
-            Quedará <strong>{{ fmtARS(pagoMonto - ccDeudaActual) }}</strong> a favor del socio.
+            Quedará <strong>{{ fmtARS(pagoMonto - ccDeudaActual) }}</strong> a favor del paciente.
           </p>
           <div class="scc__modal-actions">
             <button class="scc__discard-btn" :disabled="pagando" @click="pagoOpen = false">Cancelar</button>

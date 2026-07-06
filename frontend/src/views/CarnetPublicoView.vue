@@ -13,7 +13,7 @@
         <div class="cp__header-logo-wrap"><span class="cp__header-emoji">🌿</span></div>
         <div>
           <div class="cp__header-club">Cultivo Espacial</div>
-          <div class="cp__header-sub">Carnet de Socio</div>
+          <div class="cp__header-sub">Carnet de Paciente</div>
         </div>
       </div>
       <div class="cp__body cp__body--center">
@@ -36,7 +36,7 @@
           </div>
           <div>
             <div class="cp__header-club">{{ data.club?.nombre }}</div>
-            <div class="cp__header-sub">Carnet de Socio</div>
+            <div class="cp__header-sub">Carnet de Paciente</div>
           </div>
         </div>
 
@@ -52,7 +52,7 @@
           <!-- Nombre y número -->
           <div class="cp__identity">
             <div class="cp__nombre">{{ data.nombre }} {{ data.apellido_inicial }}.</div>
-            <div class="cp__numero">Socio N.° {{ String(data.numero_socio).padStart(6, '0') }}</div>
+            <div class="cp__numero">Paciente N.° {{ String(data.numero_socio).padStart(6, '0') }}</div>
           </div>
 
           <!-- REPROCANN -->

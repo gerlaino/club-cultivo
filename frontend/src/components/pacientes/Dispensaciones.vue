@@ -161,7 +161,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       <div>
         <div class="dv__header-title"><i class="bi bi-capsule"></i> Dispensaciones</div>
         <div class="dv__header-sub">
-          Entregas regulatorias al socio
+          Entregas regulatorias al paciente
           <span v-if="meta.total"> · <strong>{{ (meta.gramos_totales ?? 0).toFixed(1) }}g</strong> en {{ meta.total }} dispensa{{ meta.total === 1 ? '' : 's' }}</span>
         </div>
       </div>
@@ -238,7 +238,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
           </div>
           <div v-if="Number(d.descuento_dispensa_pct) > 0 || Number(d.descuento_paciente_pct) > 0" class="dv__item-desc-info">
             <i class="bi bi-tag"></i>
-            <span v-if="Number(d.descuento_paciente_pct) > 0">socio {{ Number(d.descuento_paciente_pct) }}%</span>
+            <span v-if="Number(d.descuento_paciente_pct) > 0">paciente {{ Number(d.descuento_paciente_pct) }}%</span>
             <span v-if="Number(d.descuento_dispensa_pct) > 0">
               · dispensa {{ Number(d.descuento_dispensa_pct) }}%<template v-if="d.descuento_otorgado_por"> (otorgó {{ d.descuento_otorgado_por }})</template>
             </span>

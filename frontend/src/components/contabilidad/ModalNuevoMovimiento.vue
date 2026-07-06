@@ -33,7 +33,7 @@ const ALL_CATS = [
   { value: 'honorario',     label: 'Honorarios',            tipos: ['egreso'] },
   { value: 'seguro',        label: 'Seguros',               tipos: ['egreso'] },
   { value: 'admin',         label: 'Administrativo',        tipos: ['egreso'] },
-  { value: 'aporte_socio',  label: 'Aporte socio',          tipos: ['ingreso'], requiresPaciente: true },
+  { value: 'aporte_socio',  label: 'Aporte paciente',       tipos: ['ingreso'], requiresPaciente: true },
   { value: 'dispensacion',  label: 'Recupero dispensación', tipos: ['ingreso'], allowsPaciente: true },
   { value: 'subvencion',    label: 'Subvención',            tipos: ['ingreso'] },
   { value: 'otro',          label: 'Otros',                 tipos: ['egreso','ingreso'] },
@@ -472,7 +472,7 @@ async function submit() {
               <!-- Paciente (condicional) -->
               <Transition name="field-slide">
                 <div v-if="showsPaciente" class="nm-field" ref="pacRef">
-                  <label class="nm-label">Socio / Paciente <span v-if="needsPaciente" class="nm-req">*</span><span v-else class="nm-opt">(opcional)</span></label>
+                  <label class="nm-label">Paciente <span v-if="needsPaciente" class="nm-req">*</span><span v-else class="nm-opt">(opcional)</span></label>
                   <template v-if="pacActual && !pacOpen">
                     <div class="nm-combo nm-combo--sel" @click="openPac">
                       <span class="nm-combo-val">{{ pacActual.label }}</span>
@@ -486,7 +486,7 @@ async function submit() {
                          :class="{ 'nm-combo--err': errors.paciente_id, 'nm-combo--open': pacOpen }"
                          tabindex="0" role="combobox" :aria-expanded="pacOpen"
                          @click="pacOpen ? closePac() : openPac()">
-                      <span class="nm-combo-ph">Buscar socio...</span>
+                      <span class="nm-combo-ph">Buscar paciente...</span>
                       <i class="bi bi-chevron-down nm-combo-chev" :class="{ 'nm-combo-chev--up': pacOpen }"></i>
                     </div>
                   </template>
@@ -505,7 +505,7 @@ async function submit() {
                           @click="pickPac(p)" @mouseenter="pacHL = i"
                         >{{ p.label }}</button>
                         <div v-if="!pacsFiltrados.length" class="nm-drop-empty">
-                          {{ pacQuery ? 'Sin resultados' : 'No hay socios disponibles' }}
+                          {{ pacQuery ? 'Sin resultados' : 'No hay pacientes disponibles' }}
                         </div>
                       </div>
                     </div>

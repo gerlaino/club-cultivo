@@ -227,7 +227,7 @@ function descuentoTitle(d) {
   const dp = Number(d.descuento_paciente_pct) || 0
   const dd = Number(d.descuento_dispensa_pct) || 0
   const parts = []
-  if (dp > 0) parts.push(`Socio: ${dp}%`)
+  if (dp > 0) parts.push(`Paciente: ${dp}%`)
   if (dd > 0) parts.push(`Esta dispensa: ${dd}%${d.descuento_otorgado_por ? ` (otorgó ${d.descuento_otorgado_por})` : ''}`)
   return parts.join(' · ')
 }
@@ -297,7 +297,7 @@ const FORMAS = [
           <div class="hd__modal-box hd__modal-box--narrow">
             <div class="hd__modal-header">
               <h2 class="hd__modal-title">
-                {{ modoModal === 'filtrar' ? 'Filtrar por socio' : 'Seleccionar paciente' }}
+                {{ modoModal === 'filtrar' ? 'Filtrar por paciente' : 'Seleccionar paciente' }}
               </h2>
               <button class="hd__modal-close" @click="showBuscarPaciente = false">
                 <X :size="16" :stroke-width="2" />
@@ -388,7 +388,7 @@ const FORMAS = [
         <!-- Filtro por socio -->
         <button v-if="!filtroSocio" class="hd__btn-socio" @click="abrirFiltrarSocio">
           <Filter :size="13" :stroke-width="2" />
-          Filtrar por socio
+          Filtrar por paciente
         </button>
         <span v-else class="hd__socio-chip">
           {{ filtroSocio.nombre }}
@@ -470,7 +470,7 @@ const FORMAS = [
                 </td>
                 <td class="hd__td-paciente">
                   <RouterLink :to="{ name: 'paciente-detail', params: { id: d.paciente_id } }" class="hd__link-paciente">{{ d.paciente_nombre }}</RouterLink>
-                  <button class="hd__btn-filter-socio" @click="filtrarPorSocio(d)" title="Ver solo este socio">
+                  <button class="hd__btn-filter-socio" @click="filtrarPorSocio(d)" title="Ver solo este paciente">
                     <Filter :size="11" :stroke-width="2" />
                   </button>
                 </td>

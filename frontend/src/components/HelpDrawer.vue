@@ -80,11 +80,11 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 const CONTENT = {
   admin: [
     {
-      title: 'Socios y dispensaciones',
+      title: 'Pacientes y dispensaciones',
       items: [
-        { label: 'Dar de alta un socio', text: 'Ir a Socios → Nuevo socio. Completá nombre, DNI y datos básicos. El socio queda activo de inmediato.' },
-        { label: 'Crédito y cuenta corriente', text: 'No hay límite mensual de gramos: el control es financiero. Podés habilitarle crédito de cuenta corriente a un socio para que dispense y pague después; el saldo se ve en su ficha.' },
-        { label: 'Historial del socio', text: 'Desde la ficha del socio → pestaña Timeline podés ver todas las dispensaciones, notas e indicaciones.' },
+        { label: 'Dar de alta un paciente', text: 'Ir a Pacientes → Nuevo paciente. Completá nombre, DNI y datos básicos. El paciente queda activo de inmediato.' },
+        { label: 'Crédito y cuenta corriente', text: 'No hay límite mensual de gramos: el control es financiero. Podés habilitarle crédito de cuenta corriente a un paciente para que dispense y pague después; el saldo se ve en su ficha.' },
+        { label: 'Historial del paciente', text: 'Desde la ficha del paciente → pestaña Timeline podés ver todas las dispensaciones, notas e indicaciones.' },
       ]
     },
     {
@@ -98,9 +98,9 @@ const CONTENT = {
     {
       title: 'Reportes y correo',
       items: [
-        { label: 'Exportar socios a CSV', text: 'En el listado de Socios, el botón Exportar genera un CSV con todos los datos.' },
+        { label: 'Exportar pacientes a CSV', text: 'En el listado de Pacientes, el botón Exportar genera un CSV con todos los datos.' },
         { label: 'Informe REPROCANN', text: 'En Reportes → Informe REPROCANN encontrás el estado de vencimientos para presentar ante ARICCAME.' },
-        { label: 'Correo a socios', text: 'Desde la ficha de un socio → pestaña Correo podés enviar emails. Configurá el servidor SMTP en Preferencias → Correo.' },
+        { label: 'Correo a pacientes', text: 'Desde la ficha de un paciente → pestaña Correo podés enviar emails. Configurá el servidor SMTP en Preferencias → Correo.' },
       ]
     },
   ],
@@ -108,8 +108,8 @@ const CONTENT = {
     {
       title: 'Cómo dispensar',
       items: [
-        { label: 'Abrir el carrito', text: 'Desde la ficha del socio (o el Historial) tocá "Nueva dispensación". La dispensa es un carrito: podés sumar varios productos/stocks en una misma entrega.' },
-        { label: 'Agregar productos', text: 'Buscá el socio por nombre, apellido o DNI. Elegí el stock y la cantidad de cada línea; la disponibilidad se valida al confirmar. Podés aplicar un descuento sobre el total.' },
+        { label: 'Abrir el carrito', text: 'Desde la ficha del paciente (o el Historial) tocá "Nueva dispensación". La dispensa es un carrito: podés sumar varios productos/stocks en una misma entrega.' },
+        { label: 'Agregar productos', text: 'Buscá el paciente por nombre, apellido o DNI. Elegí el stock y la cantidad de cada línea; la disponibilidad se valida al confirmar. Podés aplicar un descuento sobre el total.' },
         { label: 'Confirmar', text: 'Revisá el medio de pago y confirmá. El stock de cada línea se descuenta automáticamente.' },
       ]
     },
@@ -117,14 +117,14 @@ const CONTENT = {
       title: 'Medios de pago',
       items: [
         { label: 'Efectivo / Transferencia', text: 'Registra la forma de pago a modo informativo. El sistema no procesa el cobro.' },
-        { label: 'Cuenta corriente / No abona', text: 'Para socios con crédito habilitado por el admin: la dispensa queda como saldo en su cuenta corriente. Si el botón está deshabilitado, el socio no tiene crédito disponible.' },
+        { label: 'Cuenta corriente / No abona', text: 'Para pacientes con crédito habilitado por el admin: la dispensa queda como saldo en su cuenta corriente. Si el botón está deshabilitado, el paciente no tiene crédito disponible.' },
       ]
     },
     {
       title: 'Reservas y historial',
       items: [
         { label: 'Entregar una reserva', text: 'Podés convertir una reserva en dispensa (Entregar), cobrando el resto. Las reservas las crea y gestiona el admin/supervisor.' },
-        { label: 'Ver dispensaciones', text: 'En Historial consultás todas las dispensaciones, con filtros por fecha o por socio.' },
+        { label: 'Ver dispensaciones', text: 'En Historial consultás todas las dispensaciones, con filtros por fecha o por paciente.' },
       ]
     },
   ],
@@ -155,14 +155,14 @@ const CONTENT = {
     {
       title: 'Monitoreo',
       items: [
-        { label: 'Reportes por sede', text: 'En el menú de cada sede podés ver dispensaciones, stocks y socios asociados.' },
+        { label: 'Reportes por sede', text: 'En el menú de cada sede podés ver dispensaciones, stocks y pacientes asociados.' },
       ]
     },
     {
       title: 'Comercial y clínico',
       items: [
-        { label: 'Dispensás y reservás', text: 'Además de la supervisión del cultivo, podés dispensar y crear/gestionar reservas de stock para socios.' },
-        { label: 'Historia clínica (lectura)', text: 'Podés ver la historia clínica de los socios, pero no editarla (eso es de médico y admin).' },
+        { label: 'Dispensás y reservás', text: 'Además de la supervisión del cultivo, podés dispensar y crear/gestionar reservas de stock para pacientes.' },
+        { label: 'Historia clínica (lectura)', text: 'Podés ver la historia clínica de los pacientes, pero no editarla (eso es de médico y admin).' },
       ]
     },
   ],

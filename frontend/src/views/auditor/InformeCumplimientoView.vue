@@ -33,7 +33,7 @@
         </div>
         <div class="inf__kpi inf__kpi--err">
           <span class="inf__kpi-valor">{{ data.dispensaciones_sin_reprocann }}</span>
-          <span class="inf__kpi-label">Socios sin REPROCANN que dispensaron</span>
+          <span class="inf__kpi-label">Pacientes sin REPROCANN que dispensaron</span>
         </div>
         <div class="inf__kpi">
           <span class="inf__kpi-valor">{{ pct(data.tasa_cumplimiento) }}</span>

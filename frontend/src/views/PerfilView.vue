@@ -160,7 +160,7 @@ async function onChangePassword() {
 }
 
 function roleLabel(role) {
-  return { admin: 'Administrador', medico: 'Médico', cultivador: 'Cultivador', abogado: 'Abogado', auditor: 'Auditor', socio: 'Socio' }[role] || role
+  return { admin: 'Administrador', medico: 'Médico', cultivador: 'Cultivador', abogado: 'Abogado', auditor: 'Auditor', socio: 'Paciente' }[role] || role
 }
 
 function initials(first, last) {

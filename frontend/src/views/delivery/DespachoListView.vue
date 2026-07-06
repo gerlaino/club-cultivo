@@ -555,7 +555,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
         v-model="filtroBusca"
         class="dsp__search"
         type="text"
-        placeholder="Buscar código, socio, dirección, repartidor…"
+        placeholder="Buscar código, paciente, dirección, repartidor…"
       />
       <select v-model="filtroEstado" class="dsp__select" @change="load">
         <option value="">Todos los estados</option>
@@ -703,7 +703,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
           <div class="dsp__detail-grid">
 
             <div class="dsp__detail-col">
-              <div class="dsp__detail-label">Socio</div>
+              <div class="dsp__detail-label">Paciente</div>
               <div class="dsp__detail-val"><User :size="13" :stroke-width="2" /> {{ d.paciente_nombre }}</div>
 
               <div class="dsp__detail-label">Dirección de envío</div>
@@ -925,7 +925,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
             Se devuelve el producto al stock y se revierte el cobro. La dispensación queda registrada como <strong>cancelada</strong>.
           </div>
           <label class="dsp__modal-label">Motivo <span class="dsp__opt">opcional</span></label>
-          <textarea v-model.trim="cancelarModal.motivo" class="dsp__modal-input" rows="2" placeholder="Ej: el socio canceló el pedido…"></textarea>
+          <textarea v-model.trim="cancelarModal.motivo" class="dsp__modal-input" rows="2" placeholder="Ej: el paciente canceló el pedido…"></textarea>
           <div class="dsp__modal-foot">
             <button class="dsp__btn-ghost" @click="cancelarModal.open = false">Volver</button>
             <button class="dsp__btn-fallo" :disabled="saving" @click="confirmarCancelar">

@@ -1,8 +1,8 @@
 <template>
   <div class="sc">
     <div class="sc__header">
-      <h1 class="sc__title">Socios en riesgo</h1>
-      <p class="sc__sub">Socios que requieren atención inmediata por REPROCANN vencido, próximo a vencer o sin dispensación reciente.</p>
+      <h1 class="sc__title">Pacientes en riesgo</h1>
+      <p class="sc__sub">Pacientes que requieren atención inmediata por REPROCANN vencido, próximo a vencer o sin dispensación reciente.</p>
     </div>
 
     <div v-if="loading" class="sc__loading">Cargando…</div>
@@ -76,7 +76,7 @@
       </section>
 
       <div v-if="datos.total === 0" class="sc__empty">
-        No hay socios con situaciones críticas pendientes.
+        No hay pacientes con situaciones críticas pendientes.
       </div>
     </template>
   </div>

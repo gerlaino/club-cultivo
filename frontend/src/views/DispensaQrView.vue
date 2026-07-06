@@ -75,7 +75,7 @@
           </div>
           <dl class="dqr__rows">
             <div class="dqr__row"><dt>Fecha de dispensa</dt><dd>{{ fmtFecha(data.fecha) }}</dd></div>
-            <div class="dqr__row" v-if="data.socio_numero"><dt>Socio</dt><dd>#{{ data.socio_numero }}</dd></div>
+            <div class="dqr__row" v-if="data.socio_numero"><dt>Paciente</dt><dd>#{{ data.socio_numero }}</dd></div>
           </dl>
         </template>
 
@@ -115,7 +115,7 @@
             <div class="dqr__row"><dt>Fecha de dispensa</dt><dd>{{ fmtFecha(data.fecha) }}</dd></div>
             <div class="dqr__row" v-if="data.lote"><dt>Lote</dt><dd class="dqr__mono">{{ data.lote }}</dd></div>
             <div class="dqr__row" v-if="data.vencimiento"><dt>Vencimiento est.</dt><dd>{{ fmtFecha(data.vencimiento) }}</dd></div>
-            <div class="dqr__row" v-if="data.socio_numero"><dt>Socio</dt><dd>#{{ data.socio_numero }}</dd></div>
+            <div class="dqr__row" v-if="data.socio_numero"><dt>Paciente</dt><dd>#{{ data.socio_numero }}</dd></div>
             <div class="dqr__row" v-if="data.genetica?.registrada_inase"><dt>INASE</dt><dd>{{ data.genetica.numero_registro_inase || 'Registrada' }}</dd></div>
           </dl>
         </template>

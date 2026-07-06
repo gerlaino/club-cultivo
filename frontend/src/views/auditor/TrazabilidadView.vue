@@ -306,7 +306,7 @@
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Socio</th>
+                    <th>Paciente</th>
                     <th>DNI (últimos 4)</th>
                     <th>Gramos</th>
                     <th>Fecha</th>

@@ -39,11 +39,11 @@ const ROLES = [
   { value: "cultivador",  label: "Cultivador",    color: "#0891b2", bg: "rgba(8,145,178,.1)",   icon: "bi-flower1",             desc: "Accede a las salas de vegetativo y floración de la sede que le asignes. Sin acceso a pacientes." },
   { value: "supervisor",  label: "Supervisor",    color: "#0f766e", bg: "rgba(15,118,110,.1)",  icon: "bi-binoculars-fill",     desc: "Supervisa las sedes que le asigne el admin. Puede crear y gestionar tareas en esas sedes." },
   { value: "manicura",    label: "Manicura",      color: "#7c3aed", bg: "rgba(124,58,237,.1)",  icon: "bi-scissors",            desc: "Ve todas las salas de cosecha y manicura del club. Registra peso de cosecha por lote. Requiere aprobación del admin." },
-  { value: "dispensador", label: "Dispensador",   color: "#0891b2", bg: "rgba(8,145,178,.08)",  icon: "bi-bag-check-fill",      desc: "Opera el dispensario: registra entregas a socios y consulta stock disponible." },
+  { value: "dispensador", label: "Dispensador",   color: "#0891b2", bg: "rgba(8,145,178,.08)",  icon: "bi-bag-check-fill",      desc: "Opera el dispensario: registra entregas a pacientes y consulta stock disponible." },
   { value: "delivery",    label: "Delivery",      color: "#1A3D2E", bg: "rgba(26,61,46,.1)",    icon: "bi-bicycle",             desc: "Gestiona las entregas a domicilio de dispensaciones." },
   { value: "abogado",     label: "Abogado",       color: "#92400e", bg: "rgba(146,64,14,.1)",   icon: "bi-briefcase-fill",      desc: "Acceso a documentos, contabilidad y trazabilidad legal. Solo lectura clínica." },
   { value: "auditor",     label: "Auditor",       color: "#475569", bg: "rgba(71,85,105,.1)",   icon: "bi-clipboard-data-fill", desc: "Lectura de todos los módulos e informes. Sin modificar datos." },
-  { value: "socio",       label: "Socio",         color: "#64748b", bg: "rgba(100,116,139,.1)", icon: "bi-person-badge-fill",   desc: "Acceso al portal del socio: su perfil y su historial de dispensaciones." },
+  { value: "socio",       label: "Paciente",         color: "#64748b", bg: "rgba(100,116,139,.1)", icon: "bi-person-badge-fill",   desc: "Acceso al portal del paciente: su perfil y su historial de dispensaciones." },
 ]
 
 const PERMISOS = {
@@ -51,9 +51,9 @@ const PERMISOS = {
   medico:      [{ ok: true, label: "Gestionar pacientes" }, { ok: true, label: "Indicaciones médicas" }, { ok: true, label: "Dispensaciones" }, { ok: false, label: "Producción" }],
   cultivador:  [{ ok: true, label: "Salas de su sede" }, { ok: true, label: "Lotes y plantas" }, { ok: true, label: "Genéticas" }, { ok: false, label: "Pacientes" }],
   supervisor:  [{ ok: true, label: "Sedes asignadas" }, { ok: true, label: "Crear tareas" }, { ok: true, label: "Ver salas y lotes" }, { ok: false, label: "Usuarios / pacientes" }],
-  manicura:    [{ ok: true, label: "Registrar cosecha" }, { ok: true, label: "Salas cosecha/manicura" }, { ok: false, label: "Aprobar stock" }, { ok: false, label: "Dispensar / socios" }],
-  dispensador: [{ ok: true, label: "Registrar dispensaciones" }, { ok: true, label: "Consultar socios" }, { ok: true, label: "Ver stock" }, { ok: false, label: "Producción" }],
-  delivery:    [{ ok: true, label: "Entregas a domicilio" }, { ok: true, label: "Consultar socios" }, { ok: false, label: "Crear dispensaciones" }, { ok: false, label: "Producción" }],
+  manicura:    [{ ok: true, label: "Registrar cosecha" }, { ok: true, label: "Salas cosecha/manicura" }, { ok: false, label: "Aprobar stock" }, { ok: false, label: "Dispensar / pacientes" }],
+  dispensador: [{ ok: true, label: "Registrar dispensaciones" }, { ok: true, label: "Consultar pacientes" }, { ok: true, label: "Ver stock" }, { ok: false, label: "Producción" }],
+  delivery:    [{ ok: true, label: "Entregas a domicilio" }, { ok: true, label: "Consultar pacientes" }, { ok: false, label: "Crear dispensaciones" }, { ok: false, label: "Producción" }],
   abogado:     [{ ok: true, label: "Documentos legales" }, { ok: true, label: "Contabilidad (lectura)" }, { ok: true, label: "Trazabilidad" }, { ok: false, label: "Modificar datos clínicos" }],
   auditor:     [{ ok: true, label: "Lectura completa" }, { ok: true, label: "Contabilidad" }, { ok: false, label: "Crear / modificar" }, { ok: false, label: "Gestionar usuarios" }],
   socio:       [{ ok: true, label: "Ver su perfil" }, { ok: true, label: "Sus dispensaciones" }, { ok: false, label: "Producción" }, { ok: false, label: "Otros módulos" }],

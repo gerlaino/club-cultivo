@@ -181,7 +181,7 @@ async function handleSubmit() {
 
           <!-- Aporte -->
           <div class="med__field">
-            <label class="med__label">Aporte del socio <span class="med__opt">ARS</span></label>
+            <label class="med__label">Aporte del paciente <span class="med__opt">ARS</span></label>
             <div class="med__input-suffix-wrap">
               <span class="med__input-prefix">$</span>
               <input v-model.number="form.aporte_socio_ars" type="number" min="0" step="1"
