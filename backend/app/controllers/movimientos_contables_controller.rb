@@ -29,8 +29,7 @@ class MovimientosContablesController < ApplicationController
     # Las CUOTAS futuras (aún no llegó su mes) no van en el libro ni en los totales: son un
     # compromiso a futuro, no un gasto ocurrido. Aparecen solas cuando llega su fecha. El
     # cronograma completo (incluidas las futuras) se ve en el detalle de la compra en cuotas.
-    # Solo afecta a cuotas (compra_cuotas_id); los movimientos normales no se tocan.
-    scope = scope.where('compra_cuotas_id IS NULL OR fecha <= ?', Date.current)
+    scope = scope.sin_cuotas_futuras
 
     # Totales para el período filtrado (antes de paginar)
     totales = calcular_totales(scope)
@@ -128,7 +127,7 @@ class MovimientosContablesController < ApplicationController
                                           .where('saldo_disponible < 0')
                                           .sum('-saldo_disponible').to_f,
       contabilidad_cerrada_hasta: club.contabilidad_cerrada_hasta,
-      ultimos_movimientos: scope.recientes.limit(10).map { |m| serialize(m) },
+      ultimos_movimientos: scope.sin_cuotas_futuras.recientes.limit(10).map { |m| serialize(m) },
     }
   end
 
@@ -225,7 +224,7 @@ class MovimientosContablesController < ApplicationController
 
   # GET /movimientos_contables/export_csv
   def export_csv
-    scope = current_user.club.movimientos_contables.recientes
+    scope = current_user.club.movimientos_contables.recientes.sin_cuotas_futuras
 
     if params[:desde].present? && params[:hasta].present?
       desde = Date.parse(params[:desde]) rescue nil

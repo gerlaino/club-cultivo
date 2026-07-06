@@ -80,6 +80,9 @@ class MovimientoContable < ApplicationRecord
   scope :por_sede,         ->(sede_id) { where(sede_id: sede_id) }
   scope :por_lote,         ->(lote_id) { where(lote_id: lote_id) }
   scope :recientes,        -> { order(fecha: :desc, created_at: :desc) }
+  # Excluye las cuotas futuras (aún no llegó su mes): son compromisos a futuro, no gastos
+  # ocurridos. No afecta a los movimientos normales (sin compra_cuotas_id).
+  scope :sin_cuotas_futuras, -> { where('compra_cuotas_id IS NULL OR fecha <= ?', Date.current) }
 
   def categoria_label
     CATEGORIA_LABELS[categoria] || categoria
