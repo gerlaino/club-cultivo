@@ -83,7 +83,7 @@ const CONTENT = {
       title: 'Socios y dispensaciones',
       items: [
         { label: 'Dar de alta un socio', text: 'Ir a Socios → Nuevo socio. Completá nombre, DNI y datos básicos. El socio queda activo de inmediato.' },
-        { label: 'Límite mensual', text: 'Cada socio tiene un límite configurable en su ficha. El sistema bloquea automáticamente al superarlo.' },
+        { label: 'Crédito y cuenta corriente', text: 'No hay límite mensual de gramos: el control es financiero. Podés habilitarle crédito de cuenta corriente a un socio para que dispense y pague después; el saldo se ve en su ficha.' },
         { label: 'Historial del socio', text: 'Desde la ficha del socio → pestaña Timeline podés ver todas las dispensaciones, notas e indicaciones.' },
       ]
     },
@@ -108,22 +108,23 @@ const CONTENT = {
     {
       title: 'Cómo dispensar',
       items: [
-        { label: 'Buscar paciente', text: 'Escribí nombre, apellido o DNI en el buscador. El sistema muestra sugerencias en tiempo real.' },
-        { label: 'Seleccionar stock', text: 'El dropdown muestra los stocks disponibles. La cantidad ingresada se valida al confirmar.' },
-        { label: 'Confirmar', text: 'Revisá cantidad y medio de pago. Al hacer clic en Dispensar, el stock se descuenta automáticamente.' },
+        { label: 'Abrir el carrito', text: 'Desde la ficha del socio (o el Historial) tocá "Nueva dispensación". La dispensa es un carrito: podés sumar varios productos/stocks en una misma entrega.' },
+        { label: 'Agregar productos', text: 'Buscá el socio por nombre, apellido o DNI. Elegí el stock y la cantidad de cada línea; la disponibilidad se valida al confirmar. Podés aplicar un descuento sobre el total.' },
+        { label: 'Confirmar', text: 'Revisá el medio de pago y confirmá. El stock de cada línea se descuenta automáticamente.' },
       ]
     },
     {
       title: 'Medios de pago',
       items: [
         { label: 'Efectivo / Transferencia', text: 'Registra la forma de pago a modo informativo. El sistema no procesa el cobro.' },
-        { label: 'No abona', text: 'Disponible solo para socios con crédito habilitado por el admin. El sistema descuenta el saldo automáticamente. Si el botón está deshabilitado, el socio no tiene crédito disponible.' },
+        { label: 'Cuenta corriente / No abona', text: 'Para socios con crédito habilitado por el admin: la dispensa queda como saldo en su cuenta corriente. Si el botón está deshabilitado, el socio no tiene crédito disponible.' },
       ]
     },
     {
-      title: 'Historial',
+      title: 'Reservas y historial',
       items: [
-        { label: 'Ver dispensaciones', text: 'En Historial podés consultar todas las dispensaciones, filtradas por fecha o paciente.' },
+        { label: 'Entregar una reserva', text: 'Podés convertir una reserva en dispensa (Entregar), cobrando el resto. Las reservas las crea y gestiona el admin/supervisor.' },
+        { label: 'Ver dispensaciones', text: 'En Historial consultás todas las dispensaciones, con filtros por fecha o por socio.' },
       ]
     },
   ],
@@ -138,7 +139,7 @@ const CONTENT = {
     {
       title: 'Notas clínicas',
       items: [
-        { label: 'Historial clínico', text: 'Solo médico y admin pueden ver y editar notas clínicas. Accedé desde la ficha del paciente → Notas.' },
+        { label: 'Historial clínico', text: 'La historia clínica la pueden VER admin, médico y supervisor; editarla, solo médico y admin. Accedé desde la ficha del paciente → Notas.' },
         { label: 'Seguimiento médico', text: 'Marcá "Con seguimiento médico" en la ficha para supervisar clínicamente al paciente.' },
       ]
     },
@@ -157,14 +158,22 @@ const CONTENT = {
         { label: 'Reportes por sede', text: 'En el menú de cada sede podés ver dispensaciones, stocks y socios asociados.' },
       ]
     },
+    {
+      title: 'Comercial y clínico',
+      items: [
+        { label: 'Dispensás y reservás', text: 'Además de la supervisión del cultivo, podés dispensar y crear/gestionar reservas de stock para socios.' },
+        { label: 'Historia clínica (lectura)', text: 'Podés ver la historia clínica de los socios, pero no editarla (eso es de médico y admin).' },
+      ]
+    },
   ],
   manicura: [
     {
       title: 'Flujo post-cosecha',
       items: [
-        { label: 'Lotes en cosecha', text: 'Cuando el cultivador marca un lote como cosechado, aparece en tu cola de trabajo.' },
-        { label: 'Registrar pesada', text: 'En el detalle del lote → Pesadas podés registrar el peso bruto al corte, seco y merma de cada lote.' },
-        { label: 'Avanzar de fase', text: 'Usá los botones de fase (Cosechar → Manicurar → Curar) para avanzar. Al finalizar curado se genera el stock disponible.' },
+        { label: 'Lote asignado', text: 'El admin te asigna un lote cosechado para manicurar. Aparece en tu cola de trabajo (Pendientes).' },
+        { label: 'Registrar el peso', text: 'Escaneá el QR de cada planta, o usá "Registrar por lote" para cargar el peso de varias a la vez. Si el lote está asignado a vos, solo vos registrás su peso.' },
+        { label: 'Cerrar y enviar', text: 'Cuando terminaste, cerrá la jornada y enviala a confirmar. El admin la aprueba y ahí se genera el stock de flor seca.' },
+        { label: '¿Seguir una jornada?', text: 'Si volvés a un lote que ya enviaste sin confirmar, el sistema te pregunta si seguir esa jornada o empezar una nueva.' },
       ]
     },
   ],
@@ -172,7 +181,7 @@ const CONTENT = {
     {
       title: 'Salas y lotes',
       items: [
-        { label: 'Crear lote', text: 'En Mis lotes → Nuevo lote. Asigná genética, sala y cantidad de plantas. El lote empieza en estado Vegetativo.' },
+        { label: 'Crear lote', text: 'Entrá a una sala → Nuevo lote. Asigná genética y cantidad de plantas. Si la sala es de floración/cosecha, el lote se carga como "existente" indicando los días previos (esqueje/vegetativo) y el sistema calcula la fecha de inicio.' },
         { label: 'Cambiar fase', text: 'En el detalle del lote avanzá la fase: Vegetativo → Floración → Cosecha.' },
         { label: 'Registrar costos', text: 'En cada lote podés registrar costos: insumos, mano de obra, energía para calcular el costo por gramo.' },
       ]
@@ -190,7 +199,7 @@ const CONTENT = {
       title: 'Informes disponibles',
       items: [
         { label: 'Solo lectura', text: 'El rol auditor puede ver todos los informes pero no puede modificar datos.' },
-        { label: 'Tipos de informes', text: 'REPROCANN, producción, dispensaciones, sedes y cumplimiento. Cada informe tiene filtros de fecha y exportación.' },
+        { label: 'Tipos de informes', text: 'REPROCANN, producción, dispensaciones, sedes, cumplimiento, plan vs real, INASE y trazabilidad. Cada informe tiene filtros de fecha y descarga en PDF.' },
         { label: 'Acceso por sede', text: 'Si tenés sedes asignadas, solo ves datos de esas sedes. Sin sedes asignadas, ves el club completo.' },
       ]
     },
