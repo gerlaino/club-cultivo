@@ -3,10 +3,11 @@ import { ref, computed, onMounted, nextTick } from "vue"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas } from "../lib/api"
+import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
 import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
+import EditarCompraCuotasModal from "../components/contabilidad/EditarCompraCuotasModal.vue"
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const store   = useContabilidadStore()
@@ -279,6 +280,13 @@ const hayFiltros = computed(() =>
 
 const showModal        = ref(false)
 const editingMovimiento = ref(null)
+const showEditarCuotas = ref(false)
+const compraEditar     = ref(null)
+
+async function onCompraCuotasEditada() {
+  if (vistaActiva.value === 'dashboard') await store.fetchDashboard(dashboardSede.value)
+  else await store.fetch()
+}
 
 async function openCreate() {
   editingMovimiento.value = null
@@ -294,6 +302,20 @@ async function openCreate() {
 }
 
 async function openEdit(m) {
+  // Si es una cuota de una compra financiada, se edita la COMPRA entera (total + nº de cuotas
+  // → regenera), no la cuota suelta.
+  if (m.compra_cuotas_id) {
+    try {
+      const { data } = await listComprasCuotas()
+      const compra = (data || []).find(c => c.id === m.compra_cuotas_id)
+      if (!compra) { toast.error('No se encontró la compra en cuotas'); return }
+      compraEditar.value = compra
+      showEditarCuotas.value = true
+    } catch {
+      toast.error('No se pudo cargar la compra en cuotas')
+    }
+    return
+  }
   editingMovimiento.value = m
   showModal.value = true
   if (!pacientes.value.length) {
@@ -329,7 +351,7 @@ async function onMovimientoGuardado(payload) {
     }
     showModal.value = false
     if (vistaActiva.value === "dashboard") await store.fetchDashboard(dashboardSede.value)
-  } catch {}
+  } catch { /* el store ya expone el error; no rompemos el flujo del modal */ }
 }
 
 async function confirmDelete(m) {
@@ -808,6 +830,13 @@ onMounted(async () => {
       :sedes="sedes"
       :movimiento-editar="editingMovimiento"
       @guardado="onMovimientoGuardado"
+    />
+
+    <EditarCompraCuotasModal
+      v-model="showEditarCuotas"
+      :compra="compraEditar"
+      :sedes="sedes"
+      @saved="onCompraCuotasEditada"
     />
 
     <!-- ══════════════ P&L POR LOTE ══════════════ -->

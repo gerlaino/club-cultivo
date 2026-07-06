@@ -67,6 +67,31 @@ RSpec.describe 'Compras en cuotas', type: :request do
     expect(CompraCuotas.exists?(compra.id)).to be(false)
   end
 
+  it 'PATCH regenera las cuotas con el nuevo total y cantidad (valor por cuota recalculado)' do
+    post '/compras_cuotas', params: payload(monto_total_ars: 180_000, cuotas_total: 6, fecha_primera_cuota: Date.current), headers: auth_headers
+    compra = CompraCuotas.last
+    expect(compra.movimientos_contables.count).to eq(6)
+
+    patch "/compras_cuotas/#{compra.id}",
+          params: payload(monto_total_ars: 100_000, cuotas_total: 4, fecha_primera_cuota: Date.current),
+          headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    compra.reload
+    expect(compra.monto_total_ars.to_f).to eq(100_000)
+    expect(compra.movimientos_contables.count).to eq(4)
+    expect(compra.movimientos_contables.order(:fecha).first.monto_ars.to_f).to eq(25_000) # 100000/4
+  end
+
+  it 'NO edita si alguna cuota está en un período contable cerrado' do
+    post '/compras_cuotas', params: payload(cuotas_total: 3, fecha_primera_cuota: Date.current), headers: auth_headers
+    compra = CompraCuotas.last
+    post '/movimientos_contables/cerrar_periodo', params: { hasta: Date.current.to_s }, headers: auth_headers
+
+    patch "/compras_cuotas/#{compra.id}", params: payload(monto_total_ars: 100_000, cuotas_total: 4), headers: auth_headers
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(compra.reload.movimientos_contables.count).to eq(3) # sin cambios
+  end
+
   it 'aísla por tenant: no ve compras de otro club' do
     otro       = create(:club)
     otro_admin = create(:user, :admin, club: otro)

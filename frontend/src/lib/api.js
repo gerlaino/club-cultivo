@@ -319,6 +319,7 @@ export const reabrirPeriodoContable = (hasta = null) => api.post('/movimientos_c
 export const getAmbienteSalas       = ()             => api.get('/stats/ambiente_salas')
 export const listComprasCuotas      = ()             => api.get('/compras_cuotas')
 export const createCompraCuotas     = (payload)      => api.post('/compras_cuotas', { compra_cuotas: payload })
+export const updateCompraCuotas     = (id, payload)  => api.patch(`/compras_cuotas/${id}`, { compra_cuotas: payload })
 export const deleteCompraCuotas     = (id)           => api.delete(`/compras_cuotas/${id}`)
 export const exportLotesCSV         = (params = {})  => api.get('/lotes/export_csv', { params, responseType: 'blob' })
 

@@ -22,6 +22,20 @@ class CompraCuotas < ApplicationRecord
 
   after_create :generar_cuotas!
 
+  # Edita la compra y REGENERA las cuotas desde cero (borra los movimientos viejos y crea los
+  # nuevos con el total/cantidad actualizados). Atómico. Devuelve true/false (errores en el
+  # record). El guard de período cerrado se valida en el controller antes de llamar.
+  def actualizar_y_regenerar!(attrs)
+    transaction do
+      update!(attrs)
+      movimientos_contables.destroy_all
+      generar_cuotas!
+    end
+    true
+  rescue ActiveRecord::RecordInvalid
+    false
+  end
+
   # El total se reparte en cuotas iguales; la última absorbe el redondeo para que sumen
   # exacto. Cada cuota queda fechada en su mes (cuota i → primera_cuota + (i-1) meses).
   def generar_cuotas!

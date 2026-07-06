@@ -360,7 +360,7 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :compras_cuotas, only: [:index, :create, :destroy]
+    resources :compras_cuotas, only: [:index, :create, :update, :destroy]
 
     resource :informe_semestral, only: [:show], controller: :informe_semestral
 

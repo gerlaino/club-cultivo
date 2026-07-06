@@ -3,7 +3,7 @@
 class ComprasCuotasController < ApplicationController
   before_action :authenticate_user!
   before_action :require_lectura,   only: [:index]
-  before_action :require_escritura, only: [:create, :destroy]
+  before_action :require_escritura, only: [:create, :update, :destroy]
 
   # GET /compras_cuotas
   def index
@@ -20,6 +20,23 @@ class ComprasCuotasController < ApplicationController
     else
       render json: { errors: compra.errors.full_messages }, status: :unprocessable_entity
     end
+  end
+
+  # PATCH /compras_cuotas/:id — edita la compra y REGENERA sus cuotas (borra los movimientos
+  # viejos y crea los nuevos con el total/cantidad actualizados). El valor de cada cuota se
+  # recalcula solo. Bloqueado si alguna cuota cae en un período contable cerrado.
+  def update
+    compra = current_user.club.compras_cuotas.find(params[:id])
+    if compra.movimientos_contables.any?(&:cerrado?)
+      return render json: { error: 'Alguna cuota pertenece a un período contable cerrado y no puede editarse.' }, status: :unprocessable_entity
+    end
+    if compra.actualizar_y_regenerar!(compra_params)
+      render json: serialize(compra.reload)
+    else
+      render json: { errors: compra.errors.full_messages }, status: :unprocessable_entity
+    end
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Compra no encontrada' }, status: :not_found
   end
 
   # DELETE /compras_cuotas/:id — borra la compra y todas sus cuotas (movimientos).
