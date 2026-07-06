@@ -43,11 +43,46 @@ class AlertaInterna < ApplicationRecord
     update!(leida_at: Time.current)
   end
 
+  # Entidad a la que apunta la alerta, para el deep-link del panel de notificaciones.
+  # Se deriva de `tipo` + `contexto` (+ lote_id). El frontend mapea entidad.tipo → ruta.
+  # Devuelve { tipo:, id: } o nil si la alerta no apunta a un recurso navegable.
+  ENTIDAD_POR_TIPO = {
+    'cosecha_pendiente' => 'lote', 'estado_critico_lote' => 'lote',
+    'sin_registro_ambiental' => 'lote', 'ph_fuera_rango' => 'lote', 'ec_fuera_rango' => 'lote',
+    'temperatura_fuera_rango' => 'lote', 'humedad_fuera_rango' => 'lote',
+    'tarea_vencida_cultivo' => 'tarea',
+    'manicura_asignada' => 'lote', 'manicura_aprobada' => 'lote', 'manicura_rechazada' => 'lote',
+    'manicura_eliminada' => 'lote', 'manicura_reabierta' => 'lote',
+    'manicura_aprobacion_pendiente' => 'manicura',
+    'stock_bajo' => 'stock', 'stock_vencimiento' => 'stock',
+    'reserva_por_entregar' => 'reserva', 'reserva_vencida' => 'reserva',
+    'reprocann_vencido' => 'paciente', 'reprocann_por_vencer' => 'paciente',
+    'documento_vencido' => 'paciente', 'saldo_cc_bajo' => 'paciente', 'saldo_gramos_bajo' => 'paciente',
+    'indicacion_vencida' => 'paciente', 'indicacion_por_vencer' => 'paciente',
+    'paciente_creado_por_dispensador' => 'paciente',
+    'delivery_entregado' => 'delivery', 'delivery_fallido' => 'delivery',
+  }.freeze
+
+  def entidad
+    et = ENTIDAD_POR_TIPO[tipo]
+    return nil unless et
+    ctx = contexto || {}
+    id = case et
+         when 'lote', 'manicura' then lote_id || ctx['lote_id']
+         when 'tarea'            then ctx['tarea_id']
+         when 'reserva'          then ctx['reserva_id']
+         when 'paciente'         then ctx['paciente_id']
+         when 'stock'            then ctx['sede_id']          # el stock bajo/venc. se ve por sede
+         when 'delivery'         then ctx['dispensacion_id']
+         end
+    { tipo: et, id: id }
+  end
+
   private
 
   def broadcast_alerta
     payload = { id: id, tipo: tipo, mensaje: mensaje, severidad: severidad,
-                destinada_a_role: destinada_a_role, contexto: contexto, created_at: created_at }
+                destinada_a_role: destinada_a_role, contexto: contexto, entidad: entidad, created_at: created_at }
     ActionCable.server.broadcast("alertas_club_#{club_id}", payload)
     if dirigido_a_user_id = contexto&.dig('dirigido_a_user_id')
       ActionCable.server.broadcast("alertas_user_#{dirigido_a_user_id}", payload)

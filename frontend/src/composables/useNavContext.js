@@ -67,7 +67,7 @@ export const NAV_GROUPS = [
       { to: '/configuracion/suscripcion', label: 'Suscripción' },
       { to: '/usuarios', label: 'Equipo' },
       { to: '/sedes', label: 'Sedes' },
-      { to: '/alertas-configuracion', label: 'Alertas' },
+      { to: '/alertas-configuracion', label: 'Configuración de alertas' },
       { to: '/web', label: 'Sitio web' },
       { to: '/integraciones', label: 'Integraciones' },
       { to: '/configuracion/papelera', label: 'Papelera' },

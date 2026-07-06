@@ -1,6 +1,7 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Dropdown } from 'bootstrap'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
@@ -28,6 +29,35 @@ const INTERNA_ICON  = {
 }
 const SEV_CLASS = { error: 'nb__dot--error', warning: 'nb__dot--warning', info: 'nb__dot--info' }
 
+// ── Deep-link: mapea la entidad de la alerta (backend: alerta.entidad = { tipo, id }) a una
+// ruta del front. Si no hay entidad navegable, el item marca leída pero no navega.
+const triggerRef = ref(null)
+const ENTIDAD_ROUTE = {
+  lote:     (id) => id ? { name: 'lote-detail', params: { id } } : null,
+  sede:     (id) => id ? { name: 'sede-detail', params: { id } } : null,
+  paciente: (id) => id ? { name: 'paciente-detail', params: { id } } : null,
+  tarea:    ()   => ({ path: '/tareas' }),
+  stock:    ()   => ({ path: '/admin/stock' }),
+  reserva:  ()   => ({ path: '/reservas' }),
+  manicura: ()   => ({ path: '/admin/pesajes-manicura' }),
+  delivery: ()   => ({ path: '/delivery/despachos' }),
+}
+function rutaDeAlerta(a) {
+  const e = a.entidad
+  if (!e || !e.tipo) return null
+  const fn = ENTIDAD_ROUTE[e.tipo]
+  return fn ? fn(e.id) : null
+}
+function cerrarPanel() {
+  if (triggerRef.value) Dropdown.getOrCreateInstance(triggerRef.value).hide()
+}
+async function onClickAlerta(a) {
+  const ruta = rutaDeAlerta(a)
+  try { await internas.marcarLeida(a.id) } catch { /* no bloquear la navegación por un fallo del mark */ }
+  cerrarPanel()
+  if (ruta) router.push(ruta)
+}
+
 function formatTime(ts) {
   if (!ts) return ''
   return new Date(ts).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -37,6 +67,7 @@ function formatTime(ts) {
 <template>
   <div class="nb dropdown">
     <button
+      ref="triggerRef"
       class="nb__trigger"
       type="button"
       data-bs-toggle="dropdown"
@@ -64,14 +95,16 @@ function formatTime(ts) {
           <div
             v-for="a in alertasInternas"
             :key="`int-${a.id}`"
-            class="nb__item"
-            @click="internas.marcarLeida(a.id)"
+            class="nb__item nb__item--click"
+            :class="[`nb__item--${a.severidad}`, { 'nb__item--nav': rutaDeAlerta(a) }]"
+            @click="onClickAlerta(a)"
           >
             <span class="nb__item-icon">{{ INTERNA_ICON[a.tipo] || '⚠️' }}</span>
             <div class="nb__item-body">
               <div class="nb__item-nombre">{{ a.mensaje }}</div>
               <div class="nb__item-time">{{ formatTime(a.created_at) }}</div>
             </div>
+            <i v-if="rutaDeAlerta(a)" class="bi bi-chevron-right nb__item-chevron"></i>
             <span class="nb__dot" :class="SEV_CLASS[a.severidad]"></span>
           </div>
         </div>
@@ -163,6 +196,13 @@ function formatTime(ts) {
 }
 .nb__item:hover { background: #fef2f2; }
 .nb__item:last-child { border-bottom: none; }
+.nb__item--click { cursor: pointer; }
+/* Jerarquía visual por severidad: borde izquierdo de color (se compensa el padding). */
+.nb__item--error   { border-left: 3px solid #dc2626; padding-left: calc(1rem - 3px); }
+.nb__item--warning { border-left: 3px solid #f59e0b; padding-left: calc(1rem - 3px); }
+.nb__item--info    { border-left: 3px solid #3b82f6; padding-left: calc(1rem - 3px); }
+.nb__item-chevron  { color: #cbd5e1; font-size: .7rem; flex-shrink: 0; transition: color .12s, transform .12s; }
+.nb__item--nav:hover .nb__item-chevron { color: #1b5e20; transform: translateX(2px); }
 .nb__item-icon { font-size: 1.1rem; flex-shrink: 0; }
 .nb__item-body { flex: 1; min-width: 0; }
 .nb__item-nombre { font-size: .82rem; font-weight: 600; color: #1a1a1a; }

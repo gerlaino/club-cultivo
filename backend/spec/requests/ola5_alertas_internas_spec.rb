@@ -27,6 +27,13 @@ RSpec.describe 'Ola 5 — AlertasInternas', type: :request do
       meta = JSON.parse(response.body)['meta']
       expect(meta['no_leidas']).to be >= 1
     end
+
+    it 'incluye entidad para el deep-link del panel' do
+      get '/alertas_internas', headers: auth_headers
+      a = JSON.parse(response.body)['data'].find { |x| x['id'] == alerta.id }
+      expect(a['entidad']).to be_present
+      expect(a['entidad']['tipo']).to eq('paciente')
+    end
   end
 
   context 'médico GET /alertas_internas' do

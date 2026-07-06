@@ -10,7 +10,10 @@ const POLL_MS = 5 * 60_000
 // Singleton shared state — null means "not yet loaded"
 const alertas  = ref(null)
 const noLeidas = computed(() => (alertas.value ?? []).filter(a => !a.leida))
-const count    = computed(() => noLeidas.value.length)
+// Total real de no leídas (del meta del backend): puede ser mayor que las cargadas (limite=20).
+// Es la fuente del badge de la campana. Se mantiene vivo ante WS / marcar leídas.
+const metaNoLeidas = ref(0)
+const count    = computed(() => metaNoLeidas.value || noLeidas.value.length)
 
 let instanceCount = 0
 let intervalId    = null
@@ -21,6 +24,7 @@ async function refresh() {
   try {
     const res = await getAlertasInternas({ solo_no_leidas: 1, limite: 20 })
     alertas.value = res.data.data ?? []
+    metaNoLeidas.value = res.data.meta?.no_leidas ?? alertas.value.filter(a => !a.leida).length
   } catch {
     // Silently ignore during auth transitions; default to empty so UI isn't stuck on skeletons
     if (alertas.value === null) alertas.value = []
@@ -40,6 +44,7 @@ function conectarWS() {
         const current = alertas.value ?? []
         if (!current.find(a => a.id === data.id)) {
           alertas.value = [{ ...data, leida: false }, ...current].slice(0, 50)
+          metaNoLeidas.value += 1
         }
       },
     })
@@ -88,15 +93,18 @@ export function useAlertasInternas() {
   })
 
   async function marcarLeida(id) {
-    await marcarAlertaInterna(id)
     const idx = alertas.value.findIndex(a => a.id === id)
+    const eraNoLeida = idx !== -1 && !alertas.value[idx].leida
+    await marcarAlertaInterna(id)
     if (idx !== -1) alertas.value[idx] = { ...alertas.value[idx], leida: true }
+    if (eraNoLeida) metaNoLeidas.value = Math.max(0, metaNoLeidas.value - 1)
   }
 
   async function marcarTodas() {
     await marcarTodasAlertasLeidas()
     alertas.value = alertas.value.map(a => ({ ...a, leida: true }))
+    metaNoLeidas.value = 0
   }
 
-  return { alertas, noLeidas, count, refresh, marcarLeida, marcarTodas }
+  return { alertas, noLeidas, count, metaNoLeidas, refresh, marcarLeida, marcarTodas }
 }

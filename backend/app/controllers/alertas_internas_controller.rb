@@ -55,6 +55,7 @@ class AlertasInternasController < ApplicationController
       leida_at:         a.leida_at,
       destinada_a_role: a.destinada_a_role,
       contexto:         a.contexto,
+      entidad:          a.entidad,   # { tipo, id } para el deep-link del panel (nil si no aplica)
       created_at:       a.created_at,
     }
   end
