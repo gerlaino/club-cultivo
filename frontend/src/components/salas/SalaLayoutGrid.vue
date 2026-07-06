@@ -110,11 +110,11 @@ function stageGradient(estado) {
           :class="{ 'slg__card--libre': !slot.lote, 'slg__card--link': !!slot.lote }"
         >
           <template v-if="slot.lote">
-            <!-- Fondo: foto de genética o gradiente por estadío -->
+            <!-- Fondo: foto de portada del lote (marcada → última subida) o gradiente por estadío -->
             <div
               class="slg__card-bg"
-              :style="slot.lote.genetica?.foto_url
-                ? { backgroundImage: `url(${slot.lote.genetica.foto_url})` }
+              :style="slot.lote.foto_url
+                ? { backgroundImage: `url(${slot.lote.foto_url})` }
                 : { background: stageGradient(slot.lote.estado) }"
             ></div>
             <!-- Overlay oscuro para legibilidad -->
@@ -131,7 +131,7 @@ function stageGradient(estado) {
               </div>
 
               <!-- Ilustración SVG de planta (si no hay foto) -->
-              <div v-if="!slot.lote.genetica?.foto_url" class="slg__card-plant">
+              <div v-if="!slot.lote.foto_url" class="slg__card-plant">
                 <!-- Floración -->
                 <svg v-if="slot.lote.estado === 'floracion'" viewBox="0 0 60 90" xmlns="http://www.w3.org/2000/svg" class="slg__plant-svg">
                   <line x1="30" y1="88" x2="30" y2="20" stroke="#86efac" stroke-width="3" stroke-linecap="round"/>

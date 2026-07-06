@@ -29,15 +29,21 @@
         <div v-for="(f, i) in fotos" :key="f.id" class="lfs__foto">
           <div class="lfs__foto-img-wrap" @click="openLightbox(i)">
             <img :src="f.url" :alt="f.filename" class="lfs__foto-img" />
+            <span v-if="f.es_portada" class="lfs__foto-portada-badge" title="Se muestra en el slot del layout">⭐ Portada</span>
           </div>
           <div class="lfs__foto-footer">
             <div class="lfs__foto-info">
               <span v-if="f.descripcion" class="lfs__foto-desc">{{ f.descripcion }}</span>
               <span class="lfs__foto-date">{{ f.created_at_label }}</span>
             </div>
-            <button v-if="canEdit" class="lfs__foto-del" @click.stop="eliminarFoto(f)" title="Eliminar foto">
-              <i class="bi bi-trash"></i>
-            </button>
+            <div class="lfs__foto-acts">
+              <button v-if="canEdit && !f.es_portada" class="lfs__foto-star" @click.stop="marcarPortada(f)" title="Marcar como portada del slot">
+                <i class="bi bi-star"></i>
+              </button>
+              <button v-if="canEdit" class="lfs__foto-del" @click.stop="eliminarFoto(f)" title="Eliminar foto">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -101,7 +107,7 @@ const {
   showFotoUploadModal, fotoUploadFile, fotoUploadDescripcion, fotoUploadPreview,
   fotosExpanded, lightboxOpen, lightboxIndex, lightboxImages,
   toggleFotos, openLightbox,
-  handleFotoSelect, confirmarSubidaFoto, cancelarSubidaFoto, eliminarFoto,
+  handleFotoSelect, confirmarSubidaFoto, cancelarSubidaFoto, eliminarFoto, marcarPortada,
 } = useLoteFotos(props.loteId)
 </script>
 
@@ -120,7 +126,11 @@ const {
 .lfs__body { border-top: 1px solid #e8f0e9; padding: .75rem 1.1rem; }
 .lfs__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; }
 .lfs__foto { border-radius: 10px; overflow: hidden; border: 1px solid #d4e6d4; }
-.lfs__foto-img-wrap { cursor: pointer; }
+.lfs__foto-img-wrap { cursor: pointer; position: relative; }
+.lfs__foto-portada-badge { position: absolute; top: 6px; left: 6px; background: rgba(21,128,61,.92); color: #fff; font-size: .62rem; font-weight: 700; padding: 2px 6px; border-radius: 6px; letter-spacing: .02em; }
+.lfs__foto-acts { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.lfs__foto-star { background: none; border: none; padding: 2px 3px; cursor: pointer; color: #94a3b8; border-radius: 4px; font-size: .7rem; transition: color .12s, background .12s; }
+.lfs__foto-star:hover { color: #d97706; background: #fef3c7; }
 .lfs__foto-img { width: 100%; height: 120px; object-fit: cover; display: block; transition: opacity .15s; }
 .lfs__foto-img-wrap:hover .lfs__foto-img { opacity: .85; }
 .lfs__foto-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: .25rem; padding: .35rem .5rem; background: #f4f8f4; min-height: 28px; }

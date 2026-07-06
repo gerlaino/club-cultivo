@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import { logger } from '../utils/logger.js'
 import { useToast } from './useToast.js'
 import { useConfirm } from './useConfirm.js'
-import { getLoteFotos, uploadFotoLote, deleteFotoLote } from '../lib/api'
+import { getLoteFotos, uploadFotoLote, deleteFotoLote, setFotoPortadaLote } from '../lib/api'
 
 export function useLoteFotos(loteId) {
   const toast   = useToast()
@@ -95,11 +95,22 @@ export function useLoteFotos(loteId) {
     }
   }
 
+  // Marca una foto como portada del lote (la que se muestra en el slot del layout de la sala).
+  async function marcarPortada(foto) {
+    try {
+      await setFotoPortadaLote(loteId, foto.id)
+      fotos.value = fotos.value.map(f => ({ ...f, es_portada: f.id === foto.id }))
+      toast.success('Foto marcada como portada del slot')
+    } catch {
+      toast.error('No se pudo marcar la portada')
+    }
+  }
+
   return {
     fotos, uploadingFoto, fotoInput,
     showFotoUploadModal, fotoUploadFile, fotoUploadDescripcion, fotoUploadPreview,
     fotosExpanded, lightboxOpen, lightboxIndex, lightboxImages,
     loadFotos, toggleFotos, openLightbox,
-    handleFotoSelect, confirmarSubidaFoto, cancelarSubidaFoto, eliminarFoto,
+    handleFotoSelect, confirmarSubidaFoto, cancelarSubidaFoto, eliminarFoto, marcarPortada,
   }
 }

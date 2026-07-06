@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_03_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -783,6 +783,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_03_000001) do
     t.integer "dias_cosecha_objetivo"
     t.bigint "sede_id"
     t.bigint "deleted_by_id"
+    t.bigint "foto_portada_blob_id"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"

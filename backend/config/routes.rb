@@ -103,7 +103,9 @@ Rails.application.routes.draw do
       end
       resources :registros_ambientales, only: [:index, :create, :destroy]
       resources :lote_eventos,          only: [:index, :create, :update, :destroy]
-      resources :fotos, only: [:index, :create, :destroy], controller: 'fotos_lote'
+      resources :fotos, only: [:index, :create, :destroy], controller: 'fotos_lote' do
+        member { patch :portada }
+      end
       resources :notas, only: [:index, :create]
       resources :pesadas, only: [:index, :create, :destroy]
       resources :analisis_laboratorio, only: [:index, :create, :update, :destroy]

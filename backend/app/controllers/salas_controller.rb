@@ -309,7 +309,7 @@ class SalasController < ApplicationController
   end
 
   def serialize_sala_detail(s)
-    lotes_all = s.lotes.includes(:genetica).order(start_date: :desc, created_at: :desc)
+    lotes_all = s.lotes.includes(:genetica, fotos_attachments: :blob).order(start_date: :desc, created_at: :desc)
     lote_ids  = lotes_all.map(&:id)
 
     # Conteo VIVO de plantas por lote (excluye descartadas; el default scope ya excluye
@@ -338,6 +338,8 @@ class SalasController < ApplicationController
         rendimiento_real_g: l.rendimiento_real_g&.to_f,
         fecha_cosecha:      fecha_cosecha,
         duracion_dias:      duracion,
+        # Foto de portada del lote para el slot del layout (portada marcada → última subida).
+        foto_url:           (att = l.foto_portada_attachment) ? url_for(att) : nil,
       }
     end
 

@@ -34,8 +34,21 @@ class FotosLoteController < ApplicationController
       render json: { error: 'Foto no encontrada' }, status: :not_found and return
     end
 
+    # Si era la portada, se limpia (el método foto_portada_attachment ya cae a la última, pero
+    # dejamos la columna consistente).
+    @lote.update_column(:foto_portada_blob_id, nil) if @lote.foto_portada_blob_id == blob.id
     blob.attachments.where(record: @lote, name: 'fotos').each(&:purge)
     head :no_content
+  end
+
+  # PATCH /lotes/:lote_id/fotos/:id/portada — marca esta foto como portada del lote (la que
+  # se muestra en el slot del layout de la sala).
+  def portada
+    blob = @lote.fotos.blobs.find_by(id: params[:id])
+    return render json: { error: 'Foto no encontrada' }, status: :not_found unless blob
+
+    @lote.update_column(:foto_portada_blob_id, blob.id)
+    render json: serialize(blob)
   end
 
   private
@@ -54,6 +67,7 @@ class FotosLoteController < ApplicationController
       descripcion:  blob.metadata['descripcion'],
       content_type: blob.content_type,
       lote_id:      @lote.id,
+      es_portada:   blob.id == @lote.foto_portada_blob_id,
       created_at_label: blob.created_at.strftime('%d/%m/%Y %H:%M'),
     }
   end

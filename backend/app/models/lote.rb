@@ -87,6 +87,15 @@ class Lote < ApplicationRecord
     (Date.today - start_date).to_i
   end
 
+  # Foto de portada del lote (para el slot del layout de la sala): la marcada como portada si
+  # sigue adjunta, o la última subida si no hay marcada. nil si el lote no tiene fotos.
+  def foto_portada_attachment
+    return nil unless fotos.attached?
+    atts = fotos.attachments.to_a
+    (foto_portada_blob_id && atts.find { |a| a.blob_id == foto_portada_blob_id }) ||
+      atts.max_by { |a| [a.created_at, a.id] }
+  end
+
   def progreso_ciclo
     case estado
     when 'semilla', 'esqueje'  then 0

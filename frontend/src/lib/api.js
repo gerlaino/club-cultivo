@@ -426,6 +426,7 @@ export const cosecharPlantas   = (loteId, payload)  => api.post(`/lotes/${loteId
 export const getLoteFotos    = (loteId)          => api.get(`/lotes/${loteId}/fotos`)
 export const uploadFotoLote  = (loteId, formData) => api.post(`/lotes/${loteId}/fotos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const deleteFotoLote  = (loteId, fotoId)   => api.delete(`/lotes/${loteId}/fotos/${fotoId}`)
+export const setFotoPortadaLote = (loteId, fotoId) => api.patch(`/lotes/${loteId}/fotos/${fotoId}/portada`)
 
 // ── Super Admin ──────────────────────────────────────────────────────
 export const getSuperAdminStats  = ()             => api.get('/super_admin/stats')
