@@ -55,6 +55,18 @@ RSpec.describe 'Compras en cuotas', type: :request do
     expect(cuotas.first['descripcion']).to include('cuota 1/3')
   end
 
+  it 'borrar una cuota desde el libro elimina la compra entera (todas las cuotas)' do
+    post '/compras_cuotas', params: payload(cuotas_total: 3, fecha_primera_cuota: Date.current), headers: auth_headers
+    compra    = CompraCuotas.last
+    una_cuota = compra.movimientos_contables.order(:fecha).first
+
+    expect {
+      delete "/movimientos_contables/#{una_cuota.id}", headers: auth_headers
+    }.to change(MovimientoContable, :count).by(-3)
+    expect(response).to have_http_status(:no_content)
+    expect(CompraCuotas.exists?(compra.id)).to be(false)
+  end
+
   it 'aísla por tenant: no ve compras de otro club' do
     otro       = create(:club)
     otro_admin = create(:user, :admin, club: otro)

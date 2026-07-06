@@ -333,16 +333,19 @@ async function onMovimientoGuardado(payload) {
 }
 
 async function confirmDelete(m) {
+  const esCuota = !!m.compra_cuotas_id
   const ok = await confirm({
-    title: '¿Eliminar movimiento?',
-    message: `${m.descripcion} · ${fmt(m.monto_ars)} · ${m.fecha}`,
-    confirmText: 'Eliminar',
+    title:   esCuota ? '¿Eliminar la compra en cuotas?' : '¿Eliminar movimiento?',
+    message: esCuota
+      ? `"${m.descripcion}" es una cuota de una compra financiada. Al eliminar se borran TODAS las cuotas de esa compra, no solo esta.`
+      : `${m.descripcion} · ${fmt(m.monto_ars)} · ${m.fecha}`,
+    confirmText: esCuota ? 'Eliminar la compra completa' : 'Eliminar',
     variant: 'danger',
   })
   if (!ok) return
   try {
     await store.remove(m.id)
-    toast.success('Movimiento eliminado')
+    toast.success(esCuota ? 'Compra en cuotas eliminada' : 'Movimiento eliminado')
   } catch {
     toast.error(store.removeError || 'No se pudo eliminar el movimiento')
   }

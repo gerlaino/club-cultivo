@@ -178,6 +178,17 @@ class MovimientosContablesController < ApplicationController
     if @movimiento.dispensacion_id.present?
       return render json: { error: 'Este movimiento fue generado por una dispensación. Eliminá la dispensación para que el libro y el stock queden consistentes.' }, status: :unprocessable_entity
     end
+
+    # Una cuota no se borra sola: es parte de una compra financiada. Borrar cualquiera de sus
+    # cuotas elimina la COMPRA ENTERA (todas las cuotas), respetando el guard de período cerrado.
+    if (compra = @movimiento.compra_cuotas)
+      if compra.movimientos_contables.any?(&:cerrado?)
+        return render json: { error: 'Alguna cuota pertenece a un período contable cerrado y no puede borrarse.' }, status: :unprocessable_entity
+      end
+      compra.destroy
+      return head :no_content
+    end
+
     if @movimiento.destroy
       head :no_content
     else
@@ -294,6 +305,8 @@ class MovimientosContablesController < ApplicationController
       created_at:           m.created_at,
       updated_at:           m.updated_at,
       cerrado:              m.cerrado?,
+      compra_cuotas_id:     m.compra_cuotas_id,
+      cuota_numero:         m.cuota_numero,
     }
   end
 
