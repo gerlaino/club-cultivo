@@ -80,6 +80,61 @@ const routes = [
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("movimientos_contables", "index"),
   },
+  {
+    path: "/finanzas/catalogo",
+    name: "finanzas-catalogo",
+    component: () => import("../views/admin/FinanzasCatalogoView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (auth.user?.role === "admin") next()
+      else next("/")
+    },
+  },
+  {
+    path: "/finanzas/insumos",
+    name: "finanzas-insumos",
+    component: () => import("../views/admin/InsumosView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "supervisor", "cultivador"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
+  {
+    path: "/finanzas/reporte",
+    name: "finanzas-reporte",
+    component: () => import("../views/admin/ReporteFinanzasView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "auditor"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
+  {
+    path: "/bar",
+    name: "bar-pos",
+    component: () => import("../views/bar/BarPosView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "supervisor", "dispensador"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
+  {
+    path: "/bar/panel",
+    name: "bar-panel",
+    component: () => import("../views/bar/BarPanelView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "supervisor"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
 
   // Salas
   {

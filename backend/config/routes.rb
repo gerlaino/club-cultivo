@@ -362,6 +362,32 @@ Rails.application.routes.draw do
 
     resources :compras_cuotas, only: [:index, :create, :update, :destroy]
 
+    # Finanzas — catálogo editable (Bloque 1)
+    resources :categorias_contables, only: [:index, :create, :update, :destroy]
+    resources :unidades_negocio,     only: [:index, :create, :update, :destroy]
+
+    # Finanzas — insumos / depósito con costo real por lote (Bloque 2)
+    resources :insumos, only: [:index, :show, :create, :update] do
+      member do
+        post :comprar
+        post :consumir
+      end
+    end
+
+    # Finanzas — reporte consolidado con rango de fechas + export (Bloque 4)
+    get 'finanzas/reporte',        to: 'reportes#resumen'
+    get 'finanzas/reporte/export', to: 'reportes#export_csv'
+
+    # Bar — POS + dashboard (Bloque 3, feature flag :bar)
+    namespace :bar do
+      resources :productos, only: [:index, :create, :update, :destroy] do
+        member { post :reponer }
+      end
+      resources :ventas, only: [:index, :create] do
+        collection { get :dashboard }
+      end
+    end
+
     resource :informe_semestral, only: [:show], controller: :informe_semestral
 
     get 'historial', to: 'historial#index'

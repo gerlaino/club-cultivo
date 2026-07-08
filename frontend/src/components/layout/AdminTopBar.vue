@@ -16,9 +16,9 @@
       <span class="atb__club-sep" aria-hidden="true"></span>
 
       <!-- Sub-pestañas del grupo activo, pegadas al club (el grupo primario vive en el sidebar) -->
-      <nav v-if="activeGroup.tabs.length" class="atb__tabs" aria-label="Secciones">
+      <nav v-if="visibleTabs.length" class="atb__tabs" aria-label="Secciones">
         <RouterLink
-          v-for="t in activeGroup.tabs" :key="t.to"
+          v-for="t in visibleTabs" :key="t.to"
           :to="t.to" class="atb__tab"
           :class="{ 'atb__tab--active': isTabActive(t) }"
         >
@@ -162,9 +162,13 @@ const notifCount = computed(() => ambStore.alertasCount + internasNoLeidas.value
 // Grupo activo + tab activo para las sub-pestañas (badges del singleton del sidebar).
 const { badgeFor } = useNavContext()
 const activeGroup = computed(() => detectGroup(route.path))
+// Tabs visibles: oculta las que dependen de un feature flag apagado del club (insumos, bar…)
+const visibleTabs = computed(() =>
+  (activeGroup.value.tabs || []).filter(t => !t.feature || club.data?.features?.[t.feature])
+)
 function isTabActive(t) {
   let best = null, len = -1
-  for (const x of activeGroup.value.tabs) {
+  for (const x of visibleTabs.value) {
     if ((route.path === x.to || route.path.startsWith(x.to + '/')) && x.to.length > len) {
       best = x; len = x.to.length
     }

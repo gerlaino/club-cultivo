@@ -3,7 +3,7 @@ import { ref, computed, onMounted, nextTick } from "vue"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas } from "../lib/api"
+import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
 import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
@@ -13,6 +13,7 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
 const sedes   = ref([])
+const unidades = ref([])
 // Solo admin: el backend rechaza escritura de cualquier otro rol (abogado incluido)
 const canEdit = computed(() => ["admin","super_admin"].includes(auth.role))
 
@@ -398,6 +399,7 @@ onMounted(async () => {
     store.fetchDashboard(),
     store.fetch(),
     listSedes().then(r => { sedes.value = r.data || [] }),
+    listUnidadesNegocio().then(r => { unidades.value = r.data || [] }).catch(() => {}),
   ])
 })
 </script>
@@ -580,6 +582,26 @@ onMounted(async () => {
                 </div>
                 <span class="cv__cat-monto" :style="{ color: tipoMeta(c.tipo).color }">{{ fmt(c.total) }}</span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resultado por unidad de negocio (mes actual) -->
+        <div v-if="store.dashboard?.por_unidad?.length" class="cv__card cv__card--mt">
+          <div class="cv__card-header">
+            <span class="cv__card-title">
+              <i class="bi bi-diagram-3" style="margin-right:6px;color:#2f6b3d;font-size:.9rem"></i>
+              Resultado por unidad de negocio — mes actual
+            </span>
+          </div>
+          <div class="cv__unidad-list">
+            <div v-for="u in store.dashboard.por_unidad" :key="u.id ?? 'sin-unidad'" class="cv__unidad-row">
+              <span class="cv__unidad-name">{{ u.nombre }}</span>
+              <span class="cv__unidad-nums">
+                <span class="cv__unidad-in">+{{ fmt(u.ingresos) }}</span>
+                <span class="cv__unidad-out">−{{ fmt(u.egresos) }}</span>
+                <strong class="cv__unidad-bal" :class="u.balance >= 0 ? 'is-pos' : 'is-neg'">{{ fmt(u.balance) }}</strong>
+              </span>
             </div>
           </div>
         </div>
@@ -828,6 +850,7 @@ onMounted(async () => {
       :balance-actual="store.dashboard?.mes_actual?.balance || 0"
       :pacientes="pacientes"
       :sedes="sedes"
+      :unidades="unidades"
       :movimiento-editar="editingMovimiento"
       @guardado="onMovimientoGuardado"
     />
@@ -1286,4 +1309,19 @@ onMounted(async () => {
   .cv__pl-row   { grid-template-columns: 1fr 1fr 28px; }
   .cv__pl-cepa, .cv__pl-monto, .cv__pl-num:nth-child(5) { display: none; }
 }
+
+/* Resultado por unidad de negocio */
+.cv__unidad-list { display: flex; flex-direction: column; }
+.cv__unidad-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 2px; border-bottom: 1px solid #eef1ec; gap: 12px;
+}
+.cv__unidad-row:last-child { border-bottom: none; }
+.cv__unidad-name { font-weight: 550; color: #1f2a24; font-size: .9rem; }
+.cv__unidad-nums { display: flex; align-items: baseline; gap: 14px; font-variant-numeric: tabular-nums; }
+.cv__unidad-in  { color: #2f6b3d; font-size: .82rem; }
+.cv__unidad-out { color: #b23b2e; font-size: .82rem; }
+.cv__unidad-bal { font-size: .95rem; min-width: 90px; text-align: right; }
+.cv__unidad-bal.is-pos { color: #2f6b3d; }
+.cv__unidad-bal.is-neg { color: #b23b2e; }
 </style>

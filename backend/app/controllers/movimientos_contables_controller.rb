@@ -9,13 +9,15 @@ class MovimientosContablesController < ApplicationController
   # Params opcionales: desde, hasta, tipo, categoria, sede_id, lote_id, page, per_page
   def index
     scope = current_user.club.movimientos_contables
-                        .includes(:sede, :lote, :dispensacion, :created_by)
+                        .includes(:sede, :lote, :dispensacion, :created_by, :categoria_contable, :unidad_negocio)
                         .recientes
 
-    scope = scope.where(tipo: params[:tipo])           if params[:tipo].present?
-    scope = scope.where(categoria: params[:categoria]) if params[:categoria].present?
-    scope = scope.por_sede(params[:sede_id])           if params[:sede_id].present?
-    scope = scope.por_lote(params[:lote_id])           if params[:lote_id].present?
+    scope = scope.where(tipo: params[:tipo])                       if params[:tipo].present?
+    scope = scope.where(categoria: params[:categoria])             if params[:categoria].present?
+    scope = scope.where(categoria_contable_id: params[:categoria_contable_id]) if params[:categoria_contable_id].present?
+    scope = scope.where(unidad_negocio_id: params[:unidad_negocio_id])         if params[:unidad_negocio_id].present?
+    scope = scope.por_sede(params[:sede_id])                       if params[:sede_id].present?
+    scope = scope.por_lote(params[:lote_id])                       if params[:lote_id].present?
 
     if params[:desde].present? && params[:hasta].present?
       desde = Date.parse(params[:desde]) rescue nil
@@ -122,6 +124,8 @@ class MovimientosContablesController < ApplicationController
         por_mes:  resumen_por_mes(anio_actual, hoy),
       },
       por_sede:            por_sede,
+      # P&L por unidad de negocio del mes en curso (eje analítico ortogonal a la sede)
+      por_unidad:          resumen_por_unidad(mes_actual),
       # Deuda real de socios = saldos negativos de cuentas corrientes (caja con deuda visible)
       por_cobrar:          CuentaCorriente.where(club_id: club.id)
                                           .where('saldo_disponible < 0')
@@ -261,7 +265,8 @@ class MovimientosContablesController < ApplicationController
 
   def movimiento_params
     params.require(:movimiento_contable).permit(
-      :tipo, :categoria, :descripcion, :monto_ars, :fecha,
+      :tipo, :categoria, :categoria_contable_id, :unidad_negocio_id,
+      :descripcion, :monto_ars, :fecha,
       :sede_id, :lote_id, :dispensacion_id, :paciente_id,
       :comprobante_numero, :comprobante_tipo, :proveedor,
       :pagado, :medio_pago, :notas
@@ -286,7 +291,10 @@ class MovimientosContablesController < ApplicationController
       tipo:                 m.tipo,
       tipo_label:           m.tipo_label,
       categoria:            m.categoria,
-      categoria_label:      m.categoria_label,
+      categoria_label:      m.categoria_contable&.nombre || m.categoria_label,
+      categoria_contable_id: m.categoria_contable_id,
+      unidad_negocio_id:    m.unidad_negocio_id,
+      unidad_negocio:       m.unidad_negocio ? { id: m.unidad_negocio.id, nombre: m.unidad_negocio.nombre, tipo: m.unidad_negocio.tipo } : nil,
       descripcion:          m.descripcion,
       monto_ars:            m.monto_ars.to_f,
       fecha:                m.fecha,
@@ -318,6 +326,24 @@ class MovimientosContablesController < ApplicationController
       a_credito: scope.a_credito.sum(:monto_ars).to_f,
       count:     scope.count,
     }
+  end
+
+  # Ingresos/egresos/resultado agrupados por unidad de negocio. Los movimientos sin unidad
+  # asignada caen en un grupo "Sin unidad" (id nil), para que el total siempre cuadre.
+  def resumen_por_unidad(scope)
+    unidades = current_user.club.unidades_negocio.index_by(&:id)
+    scope.group(:unidad_negocio_id, :tipo).sum(:monto_ars).each_with_object({}) do |((uid, tipo), total), acc|
+      row = acc[uid] ||= begin
+        u = uid && unidades[uid]
+        { id: uid, nombre: u&.nombre || 'Sin unidad', tipo: u&.tipo, ingresos: 0.0, egresos: 0.0, balance: 0.0 }
+      end
+      if %w[ingreso recupero_costo].include?(tipo)
+        row[:ingresos] += total.to_f
+      elsif tipo == 'egreso'
+        row[:egresos] += total.to_f
+      end
+      row[:balance] = (row[:ingresos] - row[:egresos]).round(2)
+    end.values.sort_by { |r| -r[:balance] }
   end
 
   def resumen_por_categoria(scope)

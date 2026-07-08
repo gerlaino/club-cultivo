@@ -8,6 +8,7 @@ const props = defineProps({
   balanceActual:    { type: Number,  default: 0 },
   pacientes:        { type: Array,   default: () => [] },
   sedes:            { type: Array,   default: () => [] },
+  unidades:         { type: Array,   default: () => [] },
   movimientoEditar: { type: Object,  default: null },
 })
 const emit = defineEmits(['update:modelValue', 'guardado'])
@@ -77,6 +78,7 @@ function emptyForm() {
     monto_ars: null,
     fecha: new Date().toISOString().slice(0, 10),
     sede_id: null,
+    unidad_negocio_id: null,
     lote_id: null,
     paciente_id: null,
     comprobante_numero: '',
@@ -273,6 +275,7 @@ watch(() => props.modelValue, (val) => {
         monto_ars:          m.monto_ars          || null,
         fecha:              m.fecha              || new Date().toISOString().slice(0, 10),
         sede_id:            m.sede?.id           || null,
+        unidad_negocio_id:  m.unidad_negocio_id  || null,
         lote_id:            m.lote?.id           || null,
         paciente_id:        m.paciente_id        || null,
         comprobante_numero: m.comprobante_numero || '',
@@ -594,6 +597,13 @@ async function submit() {
                       <select class="nm-input" v-model="form.sede_id">
                         <option :value="null">— Sin sede —</option>
                         <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                      </select>
+                    </div>
+                    <div class="nm-field" v-if="unidades.length">
+                      <label class="nm-label">Unidad de negocio <span class="nm-opt">(opcional)</span></label>
+                      <select class="nm-input" v-model="form.unidad_negocio_id">
+                        <option :value="null">— Sin unidad —</option>
+                        <option v-for="u in unidades" :key="u.id" :value="u.id">{{ u.nombre }}</option>
                       </select>
                     </div>
                     <div class="nm-field">

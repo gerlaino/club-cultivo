@@ -27,6 +27,11 @@ class CostoDesdeLibroService
       costo[campo] = egresos.where(categoria: categorias).sum(:monto_ars)
     end
 
+    # Costo real de insumos consumidos del depósito e imputados a este lote (Bloque 2).
+    # Se suma a los egresos de insumo cargados directo con lote (ambas fuentes conviven).
+    consumos = InsumoConsumo.where(club_id: @lote.club_id, lote_id: @lote.id).sum(:costo_imputado_ars)
+    costo.costo_insumos = costo.costo_insumos.to_d + consumos
+
     # Si el lote ya tiene rendimiento real y nadie cargó gramos, usarlo
     if costo.gramos_producidos.blank? && @lote.rendimiento_real_g.to_d > 0
       costo.gramos_producidos = @lote.rendimiento_real_g

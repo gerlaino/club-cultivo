@@ -12,6 +12,13 @@ class Club < ApplicationRecord
   has_many :sedes,                dependent: :destroy
   has_many :movimientos_contables, class_name: 'MovimientoContable', dependent: :destroy
   has_many :compras_cuotas,        class_name: 'CompraCuotas',       dependent: :destroy
+  has_many :unidades_negocio,      class_name: 'UnidadNegocio',      dependent: :destroy
+  has_many :categorias_contables,  class_name: 'CategoriaContable',  dependent: :destroy
+  has_many :insumos,               dependent: :destroy
+  has_many :insumo_compras,        class_name: 'InsumoCompra',       dependent: :destroy
+  has_many :insumo_consumos,       class_name: 'InsumoConsumo',      dependent: :destroy
+  has_many :bar_productos,         class_name: 'BarProducto',        dependent: :destroy
+  has_many :bar_ventas,            class_name: 'BarVenta',           dependent: :destroy
   has_many :costo_lotes,          class_name: 'CostoLote', dependent: :destroy
   has_many :tareas,               dependent: :destroy
   has_many :jornadas_laborales,   class_name: 'JornadaLaboral', dependent: :destroy
@@ -154,6 +161,8 @@ class Club < ApplicationRecord
     cuenta_corriente
     analytics
     multi_sede
+    insumos
+    bar
   ].freeze
 
   def feature?(key)

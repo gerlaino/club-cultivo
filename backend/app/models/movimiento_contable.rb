@@ -7,12 +7,20 @@ class MovimientoContable < ApplicationRecord
 
   belongs_to :club
   acts_as_tenant(:club)
-  belongs_to :sede
+  belongs_to :sede,         optional: true
   belongs_to :lote,         optional: true
   belongs_to :dispensacion,  optional: true
   belongs_to :paciente,      optional: true
   belongs_to :compra_cuotas, class_name: 'CompraCuotas', optional: true
   belongs_to :created_by,   class_name: "User"
+  # Categoría editable (fuente de verdad de cara al usuario) y unidad de negocio (eje de P&L).
+  # Ambas opcionales: los movimientos legacy siguen funcionando con el string `categoria`.
+  belongs_to :categoria_contable, optional: true
+  belongs_to :unidad_negocio,     optional: true
+
+  # Puente legacy ⇄ nuevo: si viene una categoría editable, autocompleta el string `categoria`
+  # (que aún dispara aporte_socio / mapeo de costos) y hereda su unidad de negocio.
+  before_validation :sincronizar_desde_categoria_contable
 
   after_create   :acreditar_cuenta_corriente
   before_destroy :revertir_credito_cuenta_corriente
@@ -113,6 +121,16 @@ class MovimientoContable < ApplicationRecord
   end
 
   private
+
+  # Deriva el string legacy `categoria` y la unidad de negocio desde la categoría editable.
+  # No pisa valores ya seteados: un movimiento de sistema (dispensación, cuota) que trae su
+  # categoria string explícita queda intacto. Custom sin clave_sistema → 'otro' (válido en el enum).
+  def sincronizar_desde_categoria_contable
+    return if categoria_contable.nil?
+
+    self.categoria       = categoria_contable.clave_sistema.presence || 'otro' if categoria.blank?
+    self.unidad_negocio_id ||= categoria_contable.unidad_negocio_id
+  end
 
   def fecha_no_futura
     errors.add(:fecha, "no puede ser futura") if fecha.present? && fecha > Date.today

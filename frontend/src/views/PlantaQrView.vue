@@ -320,6 +320,9 @@ onMounted(async () => {
 // a cosecha o más adelante (secado, manicura, curado, finalizado).
 const ESTADOS_POST_COSECHA = ['cosecha', 'en_manicura', 'curado', 'finalizado']
 const LOTE_EN_MANICURA     = ['en_manicura']
+// Estados POSTERIORES a la manicura: sirven para distinguir "ya pasó manicura"
+// de "todavía no llegó" (p.ej. 'cosecha', que es ANTES de manicura).
+const ESTADOS_POST_MANICURA = ['curado', 'finalizado']
 
 const mensajeCard = ref({ ico: '🌿', title: '', desc: '' })
 
@@ -340,7 +343,10 @@ async function resolverEstado() {
       await iniciarPesaje()
       return
     }
-    mensajeCard.value = cosechada
+    // "Ya pasó" solo si el estado es POSTERIOR a manicura (curado/finalizado).
+    // 'cosecha' es ANTERIOR a manicura → cae en "Aún no disponible".
+    const yaPasoManicura = ESTADOS_POST_MANICURA.includes(plantState) || ESTADOS_POST_MANICURA.includes(loteEstado)
+    mensajeCard.value = yaPasoManicura
       ? { ico: '✅', title: 'Etapa de manicura completada', desc: 'Esta planta ya pasó la etapa de manicura. No hay pesaje pendiente.' }
       : { ico: '⏳', title: 'Aún no disponible', desc: 'Esta planta todavía no está en etapa de manicura. Vas a poder pesarla cuando el lote pase a manicura.' }
     estado.value = 'mensaje'

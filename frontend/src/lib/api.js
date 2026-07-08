@@ -316,6 +316,39 @@ export const deleteMovimiento       = (id)           => api.delete(`/movimientos
 export const exportMovimientosCSV   = (params = {})  => api.get('/movimientos_contables/export_csv', { params, responseType: 'blob' })
 export const cerrarPeriodoContable  = (hasta)        => api.post('/movimientos_contables/cerrar_periodo', { hasta })
 export const reabrirPeriodoContable = (hasta = null) => api.post('/movimientos_contables/reabrir_periodo', { hasta })
+
+// ── Finanzas · catálogo editable (categorías + unidades de negocio) ────────────
+export const listCategoriasContables   = (params = {}) => api.get('/categorias_contables', { params })
+export const createCategoriaContable   = (payload)     => api.post('/categorias_contables', { categoria_contable: payload })
+export const updateCategoriaContable   = (id, payload) => api.put(`/categorias_contables/${id}`, { categoria_contable: payload })
+export const deleteCategoriaContable   = (id)          => api.delete(`/categorias_contables/${id}`)
+export const listUnidadesNegocio       = (params = {}) => api.get('/unidades_negocio', { params })
+export const createUnidadNegocio       = (payload)     => api.post('/unidades_negocio', { unidad_negocio: payload })
+export const updateUnidadNegocio       = (id, payload) => api.put(`/unidades_negocio/${id}`, { unidad_negocio: payload })
+export const deleteUnidadNegocio       = (id)          => api.delete(`/unidades_negocio/${id}`)
+
+// ── Finanzas · insumos (depósito + compra/consumo) ─────────────────────────────
+export const listInsumos     = (params = {}) => api.get('/insumos', { params })
+export const getInsumo       = (id)          => api.get(`/insumos/${id}`)
+export const createInsumo    = (payload)     => api.post('/insumos', { insumo: payload })
+export const updateInsumo    = (id, payload) => api.put(`/insumos/${id}`, { insumo: payload })
+export const comprarInsumo   = (id, payload) => api.post(`/insumos/${id}/comprar`, payload)
+export const consumirInsumo  = (id, payload) => api.post(`/insumos/${id}/consumir`, payload)
+
+// ── Bar · POS + dashboard ──────────────────────────────────────────────────────
+export const listBarProductos  = (params = {}) => api.get('/bar/productos', { params })
+export const createBarProducto  = (payload)     => api.post('/bar/productos', { bar_producto: payload })
+export const updateBarProducto  = (id, payload) => api.put(`/bar/productos/${id}`, { bar_producto: payload })
+export const deleteBarProducto  = (id)          => api.delete(`/bar/productos/${id}`)
+export const reponerBarProducto = (id, cantidad) => api.post(`/bar/productos/${id}/reponer`, { cantidad })
+export const crearBarVenta      = (payload)     => api.post('/bar/ventas', payload)
+export const listBarVentas      = ()            => api.get('/bar/ventas')
+export const getBarDashboard    = ()            => api.get('/bar/ventas/dashboard')
+
+// ── Finanzas · reporte consolidado ─────────────────────────────────────────────
+export const getReporteFinanzas    = (params = {}) => api.get('/finanzas/reporte', { params })
+export const exportReporteFinanzas = (params = {}) => api.get('/finanzas/reporte/export', { params, responseType: 'blob' })
+
 export const getAmbienteSalas       = ()             => api.get('/stats/ambiente_salas')
 export const listComprasCuotas      = ()             => api.get('/compras_cuotas')
 export const createCompraCuotas     = (payload)      => api.post('/compras_cuotas', { compra_cuotas: payload })
