@@ -10,6 +10,7 @@ const props = defineProps({
   pacientes:        { type: Array,   default: () => [] },
   sedes:            { type: Array,   default: () => [] },
   unidades:         { type: Array,   default: () => [] },
+  categorias:       { type: Array,   default: () => [] }, // árbol: madres con subcategorias
   insumos:          { type: Array,   default: () => [] },
   bares:            { type: Array,   default: () => [] },
   movimientoEditar: { type: Object,  default: null },
@@ -26,23 +27,7 @@ const TIPOS = [
   { value: 'egreso' },
 ]
 
-// ─── CATEGORÍAS ───────────────────────────────────────────
-const ALL_CATS = [
-  { value: 'insumo',        label: 'Insumos',               tipos: ['egreso'] },
-  { value: 'electricidad',  label: 'Electricidad',          tipos: ['egreso'] },
-  { value: 'agua',          label: 'Agua',                  tipos: ['egreso'] },
-  { value: 'alquiler',      label: 'Alquiler',              tipos: ['egreso'] },
-  { value: 'sueldo',        label: 'Sueldos',               tipos: ['egreso'] },
-  { value: 'mantenimiento', label: 'Mantenimiento',         tipos: ['egreso'] },
-  { value: 'honorario',     label: 'Honorarios',            tipos: ['egreso'] },
-  { value: 'seguro',        label: 'Seguros',               tipos: ['egreso'] },
-  { value: 'admin',         label: 'Administrativo',        tipos: ['egreso'] },
-  { value: 'aporte_socio',  label: 'Aporte paciente',       tipos: ['ingreso'], requiresPaciente: true },
-  { value: 'dispensacion',  label: 'Recupero dispensación', tipos: ['ingreso'], allowsPaciente: true },
-  { value: 'subvencion',    label: 'Subvención',            tipos: ['ingreso'] },
-  { value: 'otro',          label: 'Otros',                 tipos: ['egreso','ingreso'] },
-]
-
+// Las categorías vienen del catálogo editable del club (árbol madre → subcategoría), por props.
 const MEDIOS_PAGO = [
   { value: 'efectivo',      label: 'Efectivo' },
   { value: 'transferencia', label: 'Transferencia' },
@@ -57,26 +42,11 @@ const COMPROBANTE_TIPOS = [
   { value: 'ticket',          label: 'Ticket' },
 ]
 
-const PLACEHOLDERS = {
-  insumo:        'Ej: Sustrato y fertilizantes cultivo sala B',
-  electricidad:  'Ej: Factura Edenor marzo',
-  agua:          'Ej: Factura AYSA marzo',
-  alquiler:      'Ej: Alquiler sede Palermo',
-  sueldo:        'Ej: Sueldo cultivador marzo',
-  mantenimiento: 'Ej: Reparación sistema de ventilación',
-  honorario:     'Ej: Honorario contadora trimestral',
-  seguro:        'Ej: Póliza seguro anual',
-  admin:         'Ej: Papelería y gastos de oficina',
-  aporte_socio:  'Ej: Cuota marzo — Juan García',
-  dispensacion:  'Ej: Recupero dispensaciones semana 12',
-  subvencion:    'Ej: Donación socio fundador',
-}
-
 // ─── FORM ─────────────────────────────────────────────────
 function emptyForm() {
   return {
     tipo: 'ingreso',
-    categoria: '',
+    categoria_contable_id: null,
     descripcion: '',
     monto_ars: null,
     fecha: new Date().toISOString().slice(0, 10),
@@ -99,24 +69,17 @@ const form   = ref(emptyForm())
 const errors = ref({})
 const saving = ref(false)
 
-// ── Destino del egreso: además del gasto, hace la entrada de stock en un paso ──
+// ── Entrada de stock (depósito/salón). La dispara el COMPORTAMIENTO de la categoría elegida. ──
 const UNIDADES_INSUMO = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
-const destino = ref('general') // general | deposito | salon
 const dep = ref({ insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null })
 const sal = ref({ bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null })
 const barProductos = ref([])
 
 function resetDestino() {
-  destino.value = 'general'
   dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null }
   sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null }
   barProductos.value = []
 }
-
-// Un gasto de depósito es un insumo de cultivo → sugerimos esa categoría automáticamente.
-watch(destino, (d) => {
-  if (d === 'deposito' && (!form.value.categoria || form.value.categoria === 'otro')) form.value.categoria = 'insumo'
-})
 
 // Al elegir un bar, cargamos sus productos para el desplegable.
 watch(() => sal.value.bar_id, async (id) => {
@@ -126,17 +89,17 @@ watch(() => sal.value.bar_id, async (id) => {
   try { const { data } = await listBarProductos(id, { activos: 'true' }); barProductos.value = data || [] } catch {}
 })
 
-// Construye el objeto destino para el payload (o null si es general / no aplica).
+// Construye el objeto destino para el payload según el comportamiento de la categoría.
 function buildDestino() {
   if (tipoNorm.value !== 'egreso' || esCuotas.value) return null
-  if (destino.value === 'deposito') {
+  if (compActual.value === 'insumo') {
     const d = dep.value
     if (!(d.cantidad > 0)) return null
     return d.insumo_id
       ? { tipo: 'deposito', insumo_id: d.insumo_id, cantidad: d.cantidad }
       : { tipo: 'deposito', nombre: d.nombre?.trim(), unidad_medida: d.unidad_medida, cantidad: d.cantidad }
   }
-  if (destino.value === 'salon') {
+  if (compActual.value === 'mercaderia') {
     const s = sal.value
     if (!s.bar_id || !(s.cantidad > 0)) return null
     return s.bar_producto_id
@@ -208,25 +171,39 @@ const catHL    = ref(-1)
 const catRef   = ref(null)
 const catInput = ref(null)
 
+// Lista plana de categorías elegibles desde el árbol: subcategorías (hoja) + madres sin hijas.
+const catsSelectables = computed(() => {
+  const out = []
+  for (const m of props.categorias) {
+    if (m.subcategorias?.length) {
+      for (const s of m.subcategorias) out.push({ id: s.id, label: `${m.nombre} › ${s.nombre}`, tipo: s.tipo, comportamiento: s.comportamiento_efectivo, clave: s.clave_efectiva })
+    } else {
+      out.push({ id: m.id, label: m.nombre, tipo: m.tipo, comportamiento: m.comportamiento_efectivo, clave: m.clave_efectiva })
+    }
+  }
+  return out
+})
+
 const catsFiltradas = computed(() => {
-  const tipo = form.value.tipo
-  let base = ALL_CATS.filter(c => c.tipos.includes(tipo))
+  const base = catsSelectables.value.filter(c => c.tipo === tipoNorm.value)
   const q = catQuery.value.trim().toLowerCase()
   return q ? base.filter(c => c.label.toLowerCase().includes(q)) : base
 })
 
-const catActual     = computed(() => ALL_CATS.find(c => c.value === form.value.categoria) || null)
-const needsPaciente = computed(() => catActual.value?.requiresPaciente || false)
-// Categorías que muestran el selector de paciente (obligatorio en aporte_socio,
-// opcional en recupero dispensación para poder atribuirlo a un socio).
-const showsPaciente = computed(() => catActual.value?.requiresPaciente || catActual.value?.allowsPaciente || false)
-const descPH        = computed(() => PLACEHOLDERS[form.value.categoria] || 'Describí brevemente el movimiento')
+const catActual     = computed(() => catsSelectables.value.find(c => c.id === form.value.categoria_contable_id) || null)
+const needsPaciente = computed(() => catActual.value?.clave === 'aporte_socio')
+// Muestra el selector de paciente: obligatorio en aporte de socio, opcional en recupero dispensación.
+const showsPaciente = computed(() => ['aporte_socio', 'dispensacion'].includes(catActual.value?.clave))
+const descPH        = computed(() => 'Describí brevemente el movimiento')
+// Comportamiento efectivo de la categoría elegida → maneja los campos de stock (depósito/salón).
+const compActual    = computed(() => catActual.value?.comportamiento || 'general')
 
 function openCat()   { catOpen.value = true; catHL.value = -1; catQuery.value = ''; nextTick(() => catInput.value?.focus()) }
 function closeCat()  { catOpen.value = false; catQuery.value = '' }
 function pickCat(c)  {
-  form.value.categoria = c.value
-  if (!c.requiresPaciente && !c.allowsPaciente) form.value.paciente_id = null
+  form.value.categoria_contable_id = c.id
+  if (c.clave !== 'aporte_socio' && c.clave !== 'dispensacion') form.value.paciente_id = null
+  if (c.comportamiento !== 'insumo' && c.comportamiento !== 'mercaderia') resetDestino()
   delete errors.value.categoria
   closeCat()
 }
@@ -303,14 +280,18 @@ function setAyer() { const d = new Date(); d.setDate(d.getDate() - 1); form.valu
 
 // ─── WATCHERS ─────────────────────────────────────────────
 watch(() => form.value.tipo, (t) => {
-  const cat = ALL_CATS.find(c => c.value === form.value.categoria)
-  if (cat && !cat.tipos.includes(t)) { form.value.categoria = ''; form.value.paciente_id = null }
+  // Si la categoría elegida no corresponde al nuevo tipo, la limpiamos.
+  if (catActual.value && catActual.value.tipo !== tipoNorm.value) {
+    form.value.categoria_contable_id = null
+    form.value.paciente_id = null
+    resetDestino()
+  }
   acPago.value = (t === 'egreso')
 })
 
-watch(() => form.value.categoria, (v) => {
-  const c = ALL_CATS.find(c => c.value === v)
-  if (!c?.requiresPaciente && !c?.allowsPaciente) form.value.paciente_id = null
+watch(() => form.value.categoria_contable_id, () => {
+  if (!showsPaciente.value) form.value.paciente_id = null
+  if (compActual.value !== 'insumo' && compActual.value !== 'mercaderia') resetDestino()
 })
 
 watch(() => props.modelValue, (val) => {
@@ -320,7 +301,7 @@ watch(() => props.modelValue, (val) => {
       const tipoValido = TIPO_META[m.tipo] ? m.tipo : 'egreso'
       form.value = {
         tipo:               tipoValido,
-        categoria:          m.categoria          || '',
+        categoria_contable_id: m.categoria_contable_id || null,
         descripcion:        m.descripcion        || '',
         monto_ars:          m.monto_ars          || null,
         fecha:              m.fecha              || new Date().toISOString().slice(0, 10),
@@ -363,7 +344,7 @@ function close() { emit('update:modelValue', false) }
 function validate() {
   const e = {}, f = form.value
   if (!f.tipo)                        e.tipo        = 'Requerido'
-  if (!f.categoria)                   e.categoria   = 'Seleccioná una categoría'
+  if (!f.categoria_contable_id)       e.categoria   = 'Seleccioná una categoría'
   if (!f.descripcion?.trim())         e.descripcion = 'Requerido'
   if (!f.monto_ars || f.monto_ars <= 0) e.monto_ars = 'Ingresá un monto'
   if (!f.fecha)                       e.fecha       = 'Requerido'
@@ -375,7 +356,7 @@ function validate() {
 
 const formValid = computed(() => {
   const f = form.value
-  return !!(f.tipo && f.categoria && f.descripcion?.trim() &&
+  return !!(f.tipo && f.categoria_contable_id && f.descripcion?.trim() &&
     f.monto_ars > 0 && f.fecha && (!needsPaciente.value || f.paciente_id))
 })
 
@@ -383,6 +364,8 @@ async function submit() {
   if (!validate()) return
   saving.value = true
   const payload = { ...form.value }
+  // String de categoría legacy (para el flujo de cuotas, que crea la compra financiada aparte).
+  payload.categoria = catActual.value?.clave || 'otro'
   const dst = buildDestino()
   if (dst) payload.destino = dst
   try { emit('guardado', payload) }
@@ -499,9 +482,9 @@ async function submit() {
                     </div>
                     <div class="nm-drop-list">
                       <button
-                        v-for="(c, i) in catsFiltradas" :key="c.value"
+                        v-for="(c, i) in catsFiltradas" :key="c.id"
                         type="button" class="nm-drop-opt"
-                        :class="{ 'nm-drop-opt--sel': form.categoria === c.value, 'nm-drop-opt--hl': catHL === i }"
+                        :class="{ 'nm-drop-opt--sel': form.categoria_contable_id === c.id, 'nm-drop-opt--hl': catHL === i }"
                         @click="pickCat(c)" @mouseenter="catHL = i"
                       >{{ c.label }}</button>
                       <div v-if="!catsFiltradas.length" class="nm-drop-empty">Sin resultados</div>
@@ -637,17 +620,12 @@ async function submit() {
 
             <hr class="nm-hr" />
 
-            <!-- DESTINO: además del gasto, entrada de stock (depósito / salón). Solo al crear. -->
-            <div v-if="tipoNorm === 'egreso' && !esCuotas && !movimientoEditar" class="nm-dest">
-              <label class="nm-label">¿Este gasto es una compra de stock?</label>
-              <div class="nm-dest-tabs">
-                <button type="button" class="nm-dest-tab" :class="{ 'nm-dest-tab--on': destino === 'general' }" @click="destino = 'general'">No, gasto común</button>
-                <button type="button" class="nm-dest-tab" :class="{ 'nm-dest-tab--on': destino === 'deposito' }" @click="destino = 'deposito'">📦 Depósito</button>
-                <button type="button" class="nm-dest-tab" :class="{ 'nm-dest-tab--on': destino === 'salon' }" @click="destino = 'salon'" :disabled="!bares.length">🍷 Salón</button>
-              </div>
+            <!-- ENTRADA DE STOCK: la dispara el comportamiento de la categoría elegida. Solo al crear. -->
+            <div v-if="(compActual === 'insumo' || compActual === 'mercaderia') && tipoNorm === 'egreso' && !esCuotas && !movimientoEditar" class="nm-dest">
+              <label class="nm-label">{{ compActual === 'insumo' ? '📦 Entra al depósito' : '🍷 Entra al salón' }}</label>
 
               <!-- Depósito: compra de insumo -->
-              <div v-if="destino === 'deposito'" class="nm-dest-body">
+              <div v-if="compActual === 'insumo'" class="nm-dest-body">
                 <div class="nm-grid2">
                   <div class="nm-field">
                     <label class="nm-label">Insumo</label>
@@ -675,7 +653,7 @@ async function submit() {
               </div>
 
               <!-- Salón: compra de mercadería del bar -->
-              <div v-if="destino === 'salon'" class="nm-dest-body">
+              <div v-if="compActual === 'mercaderia'" class="nm-dest-body">
                 <div class="nm-grid2">
                   <div class="nm-field">
                     <label class="nm-label">Bar</label>
@@ -865,13 +843,9 @@ async function submit() {
 }
 .nm-body-end { height: 8px; }
 
-/* Destino del egreso (stock) */
+/* Entrada de stock (la dispara el comportamiento de la categoría) */
 .nm-dest { margin: 4px 0 8px; }
-.nm-dest-tabs { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
-.nm-dest-tab { flex: 1; min-width: 110px; padding: 8px 10px; border: 1.5px solid #e2e8f0; border-radius: 9px; background: #fff; color: #64748b; font-size: 13px; font-weight: 600; cursor: pointer; }
-.nm-dest-tab--on { border-color: #1b5e20; background: rgba(27,94,32,.07); color: #1b5e20; }
-.nm-dest-tab:disabled { opacity: .45; cursor: default; }
-.nm-dest-body { margin-top: 10px; padding: 12px; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
+.nm-dest-body { margin-top: 8px; padding: 12px; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
 .nm-dest-hint { font-size: 12px; color: #64748b; margin: 0; }
 
 /* ─── TIPO TABS ──────────────────────────────────────── */
