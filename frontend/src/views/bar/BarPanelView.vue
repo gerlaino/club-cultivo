@@ -1,5 +1,6 @@
 <script setup>
 // Panel de un bar concreto (Capa 1) — cara analítica: resultado del mes + dashboard + config.
+// Estilo alineado a ContabilidadView (paleta slate + verde marca #1b5e20, tipografía Inter).
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
@@ -49,135 +50,175 @@ async function borrarProducto(p) {
 </script>
 
 <template>
-  <div class="bp">
-    <header class="bp__head">
-      <div>
-        <h1>{{ store.barActual?.nombre || 'Bar' }} · Panel</h1>
-        <p>{{ store.barActual?.sede?.nombre }} · el pulso del bar y la config de productos.</p>
+  <div class="cv">
+    <div class="cv__header">
+      <div class="cv__header-left">
+        <h1 class="cv__title">{{ store.barActual?.nombre || 'Bar' }}</h1>
+        <p class="cv__sub">{{ store.barActual?.sede?.nombre }} · pulso del bar y productos</p>
       </div>
-      <div class="bp__nav">
-        <RouterLink to="/bar" class="btn">← Bares</RouterLink>
-        <RouterLink :to="`/bar/${barId}/eventos`" class="btn">🎉 Eventos</RouterLink>
-        <RouterLink :to="`/bar/${barId}/vender`" class="btn btn--primary">Vender →</RouterLink>
-      </div>
-    </header>
-
-    <!-- Resultado del mes adelante -->
-    <div v-if="d" class="bp__result" :class="d.resultado_mes.resultado >= 0 ? 'is-pos' : 'is-neg'">
-      <span>Resultado del mes</span>
-      <strong>{{ fmt(d.resultado_mes.resultado) }}</strong>
-      <small>ingresos {{ fmt(d.resultado_mes.ingresos) }} · egresos {{ fmt(d.resultado_mes.egresos) }}</small>
-    </div>
-
-    <div v-if="d" class="bp__kpis">
-      <div class="kpi"><span>Ventas de hoy</span><strong>{{ fmt(d.hoy.total) }}</strong></div>
-      <div class="kpi"><span>Tickets</span><strong>{{ d.hoy.tickets }}</strong><small>prom. {{ fmt(d.hoy.ticket_promedio) }}</small></div>
-      <div class="kpi"><span>En caja hoy</span><strong>{{ fmt(d.hoy.total) }}</strong>
-        <small>{{ Object.entries(d.hoy.por_medio_pago || {}).map(([m, v]) => `${m}: ${fmt(v)}`).join(' · ') || 'sin ventas' }}</small>
+      <div class="cv__header-right">
+        <RouterLink to="/bar" class="cv__btn-ghost">Bares</RouterLink>
+        <RouterLink :to="`/bar/${barId}/eventos`" class="cv__btn-ghost">Eventos</RouterLink>
+        <RouterLink :to="`/bar/${barId}/vender`" class="cv__btn-primary">Vender</RouterLink>
       </div>
     </div>
 
-    <div class="bp__cols">
-      <section class="card">
-        <h2>Top de hoy</h2>
-        <div v-if="!d?.top_productos?.length" class="empty">Todavía no hubo ventas hoy.</div>
-        <ul v-else class="rank">
-          <li v-for="(t, i) in d.top_productos" :key="t.nombre"><span class="rank__n">{{ i + 1 }}</span><span class="rank__name">{{ t.nombre }}</span><span class="rank__qty">{{ t.cantidad }}</span></li>
-        </ul>
-      </section>
-      <section class="card">
-        <h2>Reponer pronto</h2>
-        <div v-if="!d?.reponer?.length" class="empty">Todo con stock suficiente.</div>
-        <ul v-else class="repo">
-          <li v-for="r in d.reponer" :key="r.id"><span>{{ r.nombre }}</span><span class="repo__low">{{ r.stock }} / mín {{ r.minimo }}</span></li>
-        </ul>
-      </section>
-    </div>
+    <template v-if="d">
+      <!-- Resultado del mes + KPIs -->
+      <div class="cv__kpis">
+        <div class="cv__kpi cv__kpi--hero">
+          <span class="cv__kpi-label">Resultado del mes</span>
+          <span class="cv__kpi-val" :class="d.resultado_mes.resultado >= 0 ? 'cv__kpi-val--green' : 'cv__kpi-val--red'">{{ fmt(d.resultado_mes.resultado) }}</span>
+          <span class="cv__kpi-foot">ingresos {{ fmt(d.resultado_mes.ingresos) }} · egresos {{ fmt(d.resultado_mes.egresos) }}</span>
+          <span class="cv__kpi-bar" :style="{ background: d.resultado_mes.resultado >= 0 ? '#15803d' : '#dc2626' }"></span>
+        </div>
+        <div class="cv__kpi">
+          <span class="cv__kpi-label">Ventas de hoy</span>
+          <span class="cv__kpi-val">{{ fmt(d.hoy.total) }}</span>
+          <span class="cv__kpi-foot">{{ d.hoy.tickets }} tickets · prom. {{ fmt(d.hoy.ticket_promedio) }}</span>
+        </div>
+        <div class="cv__kpi">
+          <span class="cv__kpi-label">En caja hoy</span>
+          <span class="cv__kpi-val">{{ fmt(d.hoy.total) }}</span>
+          <span class="cv__kpi-foot">{{ Object.entries(d.hoy.por_medio_pago || {}).map(([m, v]) => `${m} ${fmt(v)}`).join(' · ') || 'sin ventas' }}</span>
+        </div>
+      </div>
 
-    <section v-if="esAdmin" class="card bp__config">
-      <div class="card__head"><h2>Productos</h2><button class="btn btn--primary" @click="nuevoProducto">+ Producto</button></div>
-      <form v-if="prodForm" class="pform" @submit.prevent="guardarProducto">
-        <input v-model.trim="prodForm.nombre" class="inp" placeholder="Nombre" maxlength="50" />
-        <select v-model="prodForm.categoria" class="inp"><option v-for="c in CATS" :key="c" :value="c">{{ c }}</option></select>
-        <input v-model.number="prodForm.precio_ars" type="number" min="0" step="any" class="inp inp--sm" placeholder="Precio" />
-        <input v-model.number="prodForm.costo_ars" type="number" min="0" step="any" class="inp inp--sm" placeholder="Costo" />
-        <input v-model.number="prodForm.stock" type="number" min="0" step="any" class="inp inp--sm" placeholder="Stock" />
-        <input v-model.number="prodForm.stock_minimo" type="number" min="0" step="any" class="inp inp--sm" placeholder="Mín" />
-        <div class="pform__actions"><button type="button" class="btn" @click="prodForm = null">Cancelar</button><button type="submit" class="btn btn--primary" :disabled="store.saving">Guardar</button></div>
-      </form>
-      <table class="tbl">
-        <thead><tr><th>Producto</th><th>Cat.</th><th>Precio</th><th>Margen</th><th>Stock</th><th></th></tr></thead>
-        <tbody>
-          <tr v-for="p in store.productos" :key="p.id" :class="{ 'is-off': !p.activo }">
-            <td>{{ p.nombre }}</td><td class="mut">{{ p.categoria }}</td><td class="num">{{ fmt(p.precio_ars) }}</td>
-            <td class="num mut">{{ p.margen_pct != null ? p.margen_pct + '%' : '—' }}</td>
-            <td class="num" :class="{ low: p.stock_bajo }">{{ p.stock }}</td>
-            <td class="acts"><button class="lnk" @click="reponer(p)">Reponer</button><button class="lnk" @click="editarProducto(p)">Editar</button><button class="lnk lnk--danger" @click="borrarProducto(p)">Borrar</button></td>
-          </tr>
-          <tr v-if="!store.productos.length"><td colspan="6" class="empty">Sin productos. Creá el primero.</td></tr>
-        </tbody>
-      </table>
-    </section>
+      <div class="cv__grid2">
+        <div class="cv__card">
+          <div class="cv__card-header"><span class="cv__card-title">Top de hoy</span></div>
+          <div class="cv__card-body">
+            <div v-if="!d.top_productos?.length" class="cv__empty-sm">Todavía no hubo ventas hoy.</div>
+            <ul v-else class="cv__rank">
+              <li v-for="(t, i) in d.top_productos" :key="t.nombre"><span class="cv__rank-n">{{ i + 1 }}</span><span class="cv__rank-name">{{ t.nombre }}</span><span class="cv__rank-qty">{{ t.cantidad }}</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="cv__card">
+          <div class="cv__card-header"><span class="cv__card-title">Reponer pronto</span></div>
+          <div class="cv__card-body">
+            <div v-if="!d.reponer?.length" class="cv__empty-sm">Todo con stock suficiente.</div>
+            <ul v-else class="cv__repo">
+              <li v-for="r in d.reponer" :key="r.id"><span>{{ r.nombre }}</span><span class="cv__repo-low">{{ r.stock }} / mín {{ r.minimo }}</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </template>
+    <div v-else class="cv__empty-sm" style="padding:3rem 0;">Cargando…</div>
+
+    <!-- Productos (admin) -->
+    <div v-if="esAdmin" class="cv__card cv__card--mt">
+      <div class="cv__card-header cv__card-header--flex">
+        <span class="cv__card-title">Productos</span>
+        <button class="cv__btn-primary cv__btn-primary--sm" @click="nuevoProducto">+ Producto</button>
+      </div>
+
+      <div v-if="prodForm" class="cv__form-row">
+        <input v-model.trim="prodForm.nombre" class="cv__filtro-input" placeholder="Nombre" maxlength="50" />
+        <select v-model="prodForm.categoria" class="cv__filtro-input"><option v-for="c in CATS" :key="c" :value="c">{{ c }}</option></select>
+        <input v-model.number="prodForm.precio_ars" type="number" min="0" step="any" class="cv__filtro-input cv__filtro-input--sm" placeholder="Precio" />
+        <input v-model.number="prodForm.costo_ars" type="number" min="0" step="any" class="cv__filtro-input cv__filtro-input--sm" placeholder="Costo" />
+        <input v-model.number="prodForm.stock" type="number" min="0" step="any" class="cv__filtro-input cv__filtro-input--sm" placeholder="Stock" />
+        <input v-model.number="prodForm.stock_minimo" type="number" min="0" step="any" class="cv__filtro-input cv__filtro-input--sm" placeholder="Mín" />
+        <div class="cv__form-actions">
+          <button class="cv__btn-ghost" @click="prodForm = null">Cancelar</button>
+          <button class="cv__btn-primary" :disabled="store.saving" @click="guardarProducto">Guardar</button>
+        </div>
+      </div>
+
+      <div class="cv__table-wrap">
+        <table class="cv__table">
+          <thead><tr><th>Producto</th><th>Categoría</th><th class="cv__ta-r">Precio</th><th class="cv__ta-r">Margen</th><th class="cv__ta-r">Stock</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="p in store.productos" :key="p.id" :class="{ 'cv__tr-off': !p.activo }">
+              <td class="cv__td-strong">{{ p.nombre }}</td>
+              <td class="cv__td-muted">{{ p.categoria }}</td>
+              <td class="cv__ta-r cv__num">{{ fmt(p.precio_ars) }}</td>
+              <td class="cv__ta-r cv__td-muted">{{ p.margen_pct != null ? p.margen_pct + '%' : '—' }}</td>
+              <td class="cv__ta-r cv__num" :class="{ 'cv__td-red': p.stock_bajo }">{{ p.stock }}</td>
+              <td class="cv__ta-r cv__acts">
+                <button class="cv__link" @click="reponer(p)">Reponer</button>
+                <button class="cv__link" @click="editarProducto(p)">Editar</button>
+                <button class="cv__link cv__link--danger" @click="borrarProducto(p)">Borrar</button>
+              </td>
+            </tr>
+            <tr v-if="!store.productos.length"><td colspan="6" class="cv__empty-sm">Sin productos. Creá el primero.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.bp { padding: var(--sp-6, 24px); max-width: 940px; margin: 0 auto; }
-.bp__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3, 12px); flex-wrap: wrap; }
-.bp__head h1 { font-size: var(--fs-24, 24px); font-weight: 700; color: var(--c-ink-900); margin: 0; }
-.bp__head p { color: var(--c-ink-500); margin: 4px 0 0; font-size: var(--fs-14, 14px); }
-.bp__nav { display: flex; gap: 10px; }
+/* Kit alineado a ContabilidadView (paleta slate + verde marca). Tipografía Inter (heredada). */
+.cv { padding: 2rem 1.75rem 3rem; max-width: 1280px; margin: 0 auto; color: #0f172a; }
 
-.bp__result { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-4, 16px) var(--sp-5, 20px); border-radius: var(--r-lg, 14px); margin: var(--sp-5, 20px) 0; border: 1px solid var(--c-ink-100); }
-.bp__result.is-pos { background: var(--c-leaf-50, #e7f0e5); }
-.bp__result.is-neg { background: var(--c-rust-100, #f6e5e2); }
-.bp__result span { font-size: var(--fs-12, 12px); text-transform: uppercase; letter-spacing: .05em; color: var(--c-ink-500); }
-.bp__result strong { font-size: 2.2rem; font-weight: 720; letter-spacing: -.03em; color: var(--c-ink-900); }
-.bp__result.is-pos strong { color: var(--c-leaf-700, #2f6b3d); }
-.bp__result.is-neg strong { color: var(--c-rust-600, #b23b2e); }
-.bp__result small { color: var(--c-ink-500); font-size: var(--fs-13, 13px); }
+.cv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.75rem; }
+.cv__title { font-size: 1.75rem; font-weight: 800; margin: 0 0 .15rem; letter-spacing: -.04em; }
+.cv__sub { font-size: .82rem; color: #64748b; margin: 0; }
+.cv__header-right { display: flex; gap: .5rem; }
 
-.bp__kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: var(--sp-4, 16px); }
-@media (max-width: 640px) { .bp__kpis { grid-template-columns: 1fr; } }
-.kpi { background: var(--c-paper, #fff); border: 1px solid var(--c-ink-100); border-radius: var(--r-md, 10px); padding: var(--sp-4, 16px); }
-.kpi span { font-size: var(--fs-12, 12px); color: var(--c-ink-400); text-transform: uppercase; letter-spacing: .05em; }
-.kpi strong { display: block; font-size: var(--fs-24, 24px); font-weight: 700; color: var(--c-ink-900); margin-top: 6px; }
-.kpi small { display: block; color: var(--c-ink-400); font-size: var(--fs-12, 12px); margin-top: 3px; }
+.cv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 10px; font-size: .875rem; font-weight: 600; cursor: pointer; text-decoration: none; }
+.cv__btn-primary:hover:not(:disabled) { background: #144a18; }
+.cv__btn-primary:disabled { opacity: .55; cursor: default; }
+.cv__btn-primary--sm { padding: .5rem .9rem; font-size: .82rem; }
+.cv__btn-ghost { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .65rem 1.1rem; border-radius: 10px; font-size: .875rem; font-weight: 500; cursor: pointer; text-decoration: none; }
+.cv__btn-ghost:hover { border-color: #cbd5e1; color: #334155; }
 
-.bp__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 640px) { .bp__cols { grid-template-columns: 1fr; } }
-.card { background: var(--c-paper, #fff); border: 1px solid var(--c-ink-100); border-radius: var(--r-lg, 14px); padding: var(--sp-4, 16px); }
-.card h2 { font-size: var(--fs-16, 16px); font-weight: 650; color: var(--c-ink-900); margin: 0 0 var(--sp-3, 12px); }
-.card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-3, 12px); }
-.card__head h2 { margin: 0; }
-.empty { color: var(--c-ink-400); font-size: var(--fs-13, 13px); padding: var(--sp-3, 12px) 0; text-align: center; }
+/* KPIs */
+.cv__kpis { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+@media (max-width: 720px) { .cv__kpis { grid-template-columns: 1fr; } }
+.cv__kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.25rem; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: .35rem; }
+.cv__kpi-label { font-size: .72rem; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.cv__kpi-val { font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em; color: #0f172a; }
+.cv__kpi--hero .cv__kpi-val { font-size: 2rem; }
+.cv__kpi-val--green { color: #15803d; } .cv__kpi-val--red { color: #dc2626; }
+.cv__kpi-foot { font-size: .74rem; color: #94a3b8; }
+.cv__kpi-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
 
-.rank, .repo { list-style: none; margin: 0; padding: 0; }
-.rank li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--c-ink-100); font-size: var(--fs-14, 14px); }
-.rank li:last-child, .repo li:last-child { border-bottom: none; }
-.rank__n { width: 20px; height: 20px; border-radius: 6px; background: var(--c-ink-100); color: var(--c-ink-600); font-size: var(--fs-12, 12px); font-weight: 700; display: grid; place-items: center; }
-.rank__name { flex: 1; color: var(--c-ink-800); }
-.rank__qty { font-weight: 700; color: var(--c-ink-900); font-variant-numeric: tabular-nums; }
-.repo li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--c-ink-100); font-size: var(--fs-14, 14px); }
-.repo__low { color: var(--c-rust-600, #b23b2e); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Cards */
+.cv__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 720px) { .cv__grid2 { grid-template-columns: 1fr; } }
+.cv__card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
+.cv__card--mt { margin-top: 1rem; }
+.cv__card-header { padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
+.cv__card-header--flex { display: flex; align-items: center; justify-content: space-between; }
+.cv__card-title { font-size: .9rem; font-weight: 700; color: #0f172a; }
+.cv__card-body { padding: .5rem 1.25rem 1rem; }
+.cv__empty-sm { color: #94a3b8; font-size: .82rem; text-align: center; padding: 1rem 0; }
 
-.bp__config { margin-top: 12px; }
-.pform { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; background: var(--c-ink-50, #f6f7f5); border: 1px solid var(--c-ink-100); border-radius: var(--r-md, 10px); padding: var(--sp-3, 12px); margin-bottom: var(--sp-3, 12px); }
-.pform__actions { display: flex; gap: 8px; margin-left: auto; }
-.inp { padding: 7px 9px; border: 1px solid var(--c-ink-200); border-radius: var(--r-sm, 8px); font-size: var(--fs-14, 14px); background: var(--c-paper, #fff); color: var(--c-ink-900); }
-.inp--sm { width: 84px; }
-.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-14, 14px); }
-.tbl th { text-align: left; font-size: var(--fs-11, 11px); text-transform: uppercase; letter-spacing: .05em; color: var(--c-ink-400); font-weight: 700; padding: 8px 6px; border-bottom: 1px solid var(--c-ink-100); }
-.tbl td { padding: 9px 6px; border-bottom: 1px solid var(--c-ink-100); color: var(--c-ink-800); }
-.tbl tr.is-off { opacity: .5; }
-.tbl .num { text-align: right; font-variant-numeric: tabular-nums; }
-.tbl .mut { color: var(--c-ink-400); }
-.tbl .low { color: var(--c-rust-600, #b23b2e); font-weight: 600; }
-.tbl .acts { text-align: right; white-space: nowrap; }
-.lnk { background: none; border: none; color: var(--c-ink-500); font-size: var(--fs-13, 13px); cursor: pointer; padding: 2px 5px; }
-.lnk:hover { color: var(--c-ink-900); }
-.lnk--danger:hover { color: var(--c-rust-600, #b23b2e); }
-.btn { border: 1px solid var(--c-ink-200); background: var(--c-paper, #fff); color: var(--c-ink-800); border-radius: var(--r-sm, 8px); padding: 8px 14px; font-size: var(--fs-13, 13px); font-weight: 600; cursor: pointer; text-decoration: none; }
-.btn--primary { background: var(--c-leaf-700, #2f6b3d); border-color: var(--c-leaf-700, #2f6b3d); color: #fff; }
-.btn:disabled { opacity: .5; cursor: default; }
+.cv__rank, .cv__repo { list-style: none; margin: 0; padding: 0; }
+.cv__rank li { display: flex; align-items: center; gap: .7rem; padding: .55rem 0; border-bottom: 1px solid #f8fafc; font-size: .85rem; }
+.cv__rank li:last-child, .cv__repo li:last-child { border-bottom: none; }
+.cv__rank-n { width: 20px; height: 20px; border-radius: 6px; background: #f1f5f9; color: #64748b; font-size: .72rem; font-weight: 700; display: grid; place-items: center; }
+.cv__rank-name { flex: 1; color: #334155; }
+.cv__rank-qty { font-weight: 700; color: #0f172a; }
+.cv__repo li { display: flex; justify-content: space-between; padding: .55rem 0; border-bottom: 1px solid #f8fafc; font-size: .85rem; color: #334155; }
+.cv__repo-low { color: #dc2626; font-weight: 600; }
+
+/* Form inline */
+.cv__form-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; padding: 1rem 1.25rem; background: #fafbfc; border-bottom: 1px solid #f1f5f9; }
+.cv__form-actions { display: flex; gap: .5rem; margin-left: auto; }
+.cv__filtro-input { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .55rem .8rem; font-size: .82rem; color: #0f172a; }
+.cv__filtro-input:focus { border-color: #1b5e20; outline: none; }
+.cv__filtro-input--sm { width: 92px; }
+
+/* Tabla */
+.cv__table-wrap { overflow-x: auto; }
+.cv__table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.cv__table th { padding: .75rem 1rem; font-size: .7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1.5px solid #f1f5f9; background: #fafbfc; text-align: left; }
+.cv__table td { padding: .75rem 1rem; border-bottom: 1px solid #f8fafc; color: #334155; }
+.cv__table tbody tr:hover td { background: #fafbfc; }
+.cv__tr-off td { opacity: .5; }
+.cv__ta-r { text-align: right; }
+.cv__num { font-variant-numeric: tabular-nums; }
+.cv__td-strong { font-weight: 600; color: #0f172a; }
+.cv__td-muted { color: #94a3b8; }
+.cv__td-red { color: #dc2626; font-weight: 600; }
+.cv__acts { white-space: nowrap; }
+.cv__link { background: none; border: none; color: #64748b; font-size: .8rem; font-weight: 500; cursor: pointer; padding: .1rem .35rem; }
+.cv__link:hover { color: #0f172a; }
+.cv__link--danger:hover { color: #dc2626; }
 </style>

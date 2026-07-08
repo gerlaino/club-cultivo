@@ -1,6 +1,6 @@
 <script setup>
 // Selector de bar (Capa 1): lista los bares del club (uno por sede social/mixta) con su
-// resultado del mes. Elegís uno para entrar. El admin puede crear/editar/borrar bares.
+// resultado del mes. Estilo alineado a ContabilidadView.
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
@@ -18,10 +18,9 @@ const { confirm } = useConfirm()
 const esAdmin = computed(() => auth.user?.role === 'admin')
 const esGestion = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 const sedes = ref([])
-const form  = ref(null) // { id?, sede_id, nombre }
+const form  = ref(null)
 
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
-// Sedes social/mixta sin bar todavía (para el alta)
 const sedesDisponibles = computed(() => {
   const conBar = new Set(store.bares.map(b => b.sede?.id))
   return sedes.value.filter(s => ['social', 'mixta'].includes(s.tipo) && (form.value?.id || !conBar.has(s.id)))
@@ -32,11 +31,7 @@ onMounted(async () => {
   if (esAdmin.value) listSedes().then(r => { sedes.value = r.data || [] }).catch(() => {})
 })
 
-function entrar(bar) {
-  const destino = esGestion.value ? `/bar/${bar.id}/panel` : `/bar/${bar.id}/vender`
-  router.push(destino)
-}
-
+function entrar(bar) { router.push(esGestion.value ? `/bar/${bar.id}/panel` : `/bar/${bar.id}/vender`) }
 function nuevo() { form.value = { sede_id: null, nombre: '' } }
 function editar(bar) { form.value = { id: bar.id, sede_id: bar.sede?.id, nombre: bar.nombre } }
 async function guardar() {
@@ -57,47 +52,51 @@ async function borrar(bar) {
 </script>
 
 <template>
-  <div class="bs">
-    <header class="bs__head">
-      <div>
-        <h1>Bares</h1>
-        <p>Cada bar vive en su sede, con su caja y su resultado. Elegí uno para gestionarlo.</p>
+  <div class="cv">
+    <div class="cv__header">
+      <div class="cv__header-left">
+        <h1 class="cv__title">Bares</h1>
+        <p class="cv__sub">Cada bar vive en su sede, con su caja y su resultado. Elegí uno para gestionarlo.</p>
       </div>
-      <button v-if="esAdmin" class="btn btn--primary" @click="nuevo">+ Nuevo bar</button>
-    </header>
-
-    <form v-if="form" class="bs__form" @submit.prevent="guardar">
-      <input v-model.trim="form.nombre" class="inp" placeholder="Nombre (ej: La Terraza)" maxlength="50" />
-      <select v-if="!form.id" v-model="form.sede_id" class="inp">
-        <option :value="null">— Elegí la sede (social/mixta) —</option>
-        <option v-for="s in sedesDisponibles" :key="s.id" :value="s.id">{{ s.nombre }} ({{ s.tipo }})</option>
-      </select>
-      <div class="bs__form-actions">
-        <button type="button" class="btn" @click="form = null">Cancelar</button>
-        <button type="submit" class="btn btn--primary" :disabled="store.saving">Guardar</button>
+      <div class="cv__header-right">
+        <button v-if="esAdmin" class="cv__btn-primary" @click="nuevo">+ Nuevo bar</button>
       </div>
-    </form>
+    </div>
 
-    <div v-if="store.loading" class="bs__loading">Cargando…</div>
-    <div v-else-if="!store.bares.length" class="bs__empty">
+    <div v-if="form" class="cv__card cv__card--form">
+      <div class="cv__form-row">
+        <input v-model.trim="form.nombre" class="cv__filtro-input" placeholder="Nombre (ej: La Terraza)" maxlength="50" />
+        <select v-if="!form.id" v-model="form.sede_id" class="cv__filtro-input">
+          <option :value="null">— Elegí la sede (social/mixta) —</option>
+          <option v-for="s in sedesDisponibles" :key="s.id" :value="s.id">{{ s.nombre }} ({{ s.tipo }})</option>
+        </select>
+        <div class="cv__form-actions">
+          <button class="cv__btn-ghost" @click="form = null">Cancelar</button>
+          <button class="cv__btn-primary" :disabled="store.saving" @click="guardar">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="store.loading" class="cv__empty-sm" style="padding:3rem 0;">Cargando…</div>
+    <div v-else-if="!store.bares.length" class="cv__empty-lg">
       Todavía no hay bares.<span v-if="esAdmin"> Creá el primero en una sede social o mixta.</span>
     </div>
 
-    <div v-else class="bs__grid">
-      <div v-for="b in store.bares" :key="b.id" class="barcard" :class="{ 'is-off': !b.activo }">
-        <div class="barcard__top" @click="entrar(b)">
-          <div class="barcard__name">🍺 {{ b.nombre }}</div>
-          <div class="barcard__loc">{{ b.sede?.nombre }} · {{ b.sede?.tipo }}</div>
-          <div class="barcard__res" v-if="b.resultado_mes">
-            <span class="barcard__res-l">Resultado del mes</span>
-            <strong :class="b.resultado_mes.resultado >= 0 ? 'pos' : 'neg'">{{ fmt(b.resultado_mes.resultado) }}</strong>
+    <div v-else class="cv__bars">
+      <div v-for="b in store.bares" :key="b.id" class="cv__barcard" :class="{ 'cv__barcard--off': !b.activo }">
+        <button class="cv__barcard-body" @click="entrar(b)">
+          <div class="cv__barcard-name">{{ b.nombre }}</div>
+          <div class="cv__barcard-loc">{{ b.sede?.nombre }} · {{ b.sede?.tipo }}</div>
+          <div v-if="b.resultado_mes" class="cv__barcard-res">
+            <span class="cv__kpi-label">Resultado del mes</span>
+            <strong :class="b.resultado_mes.resultado >= 0 ? 'cv__kpi-val--green' : 'cv__kpi-val--red'">{{ fmt(b.resultado_mes.resultado) }}</strong>
           </div>
-        </div>
-        <div class="barcard__actions">
-          <button class="lnk" @click="entrar(b)">Entrar →</button>
-          <span class="barcard__spacer"></span>
-          <button v-if="esAdmin" class="lnk" @click="editar(b)">Editar</button>
-          <button v-if="esAdmin" class="lnk lnk--danger" @click="borrar(b)">Borrar</button>
+        </button>
+        <div class="cv__barcard-actions">
+          <button class="cv__link" @click="entrar(b)">Entrar →</button>
+          <span style="flex:1"></span>
+          <button v-if="esAdmin" class="cv__link" @click="editar(b)">Editar</button>
+          <button v-if="esAdmin" class="cv__link cv__link--danger" @click="borrar(b)">Borrar</button>
         </div>
       </div>
     </div>
@@ -105,33 +104,39 @@ async function borrar(bar) {
 </template>
 
 <style scoped>
-.bs { padding: var(--sp-6, 24px); max-width: 960px; margin: 0 auto; }
-.bs__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3, 12px); }
-.bs__head h1 { font-size: var(--fs-24, 24px); font-weight: 700; color: var(--c-ink-900); margin: 0; }
-.bs__head p { color: var(--c-ink-500); margin: 4px 0 0; font-size: var(--fs-14, 14px); }
-.bs__form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; background: var(--c-ink-50, #f6f7f5); border: 1px solid var(--c-ink-100); border-radius: var(--r-md, 10px); padding: var(--sp-3, 12px); margin-top: var(--sp-4, 16px); }
-.bs__form-actions { display: flex; gap: 8px; margin-left: auto; }
-.bs__loading, .bs__empty { color: var(--c-ink-500); padding: var(--sp-8, 32px); text-align: center; }
+.cv { padding: 2rem 1.75rem 3rem; max-width: 1280px; margin: 0 auto; color: #0f172a; }
+.cv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.75rem; }
+.cv__title { font-size: 1.75rem; font-weight: 800; margin: 0 0 .15rem; letter-spacing: -.04em; }
+.cv__sub { font-size: .82rem; color: #64748b; margin: 0; max-width: 60ch; }
 
-.bs__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-top: var(--sp-5, 20px); }
-.barcard { background: var(--c-paper, #fff); border: 1px solid var(--c-ink-100); border-radius: var(--r-lg, 14px); box-shadow: var(--sh-1); overflow: hidden; }
-.barcard.is-off { opacity: .6; }
-.barcard__top { padding: 18px; cursor: pointer; }
-.barcard__name { font-weight: 650; font-size: 1.05rem; color: var(--c-ink-900); }
-.barcard__loc { font-size: .8rem; color: var(--c-ink-400); margin-top: 2px; }
-.barcard__res { margin-top: 16px; }
-.barcard__res-l { display: block; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--c-ink-400); }
-.barcard__res strong { font-size: 1.6rem; font-weight: 700; letter-spacing: -.02em; }
-.barcard__res .pos { color: var(--c-leaf-700, #2f6b3d); }
-.barcard__res .neg { color: var(--c-rust-600, #b23b2e); }
-.barcard__actions { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--c-ink-100); }
-.barcard__spacer { flex: 1; }
-.lnk { background: none; border: none; color: var(--c-ink-600); font-size: var(--fs-13, 13px); cursor: pointer; font-weight: 600; padding: 2px 4px; }
-.lnk:hover { color: var(--c-ink-900); }
-.lnk--danger:hover { color: var(--c-rust-600, #b23b2e); }
+.cv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 10px; font-size: .875rem; font-weight: 600; cursor: pointer; }
+.cv__btn-primary:hover:not(:disabled) { background: #144a18; }
+.cv__btn-primary:disabled { opacity: .55; cursor: default; }
+.cv__btn-ghost { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .65rem 1.1rem; border-radius: 10px; font-size: .875rem; font-weight: 500; cursor: pointer; }
+.cv__btn-ghost:hover { border-color: #cbd5e1; color: #334155; }
 
-.inp { padding: 8px 10px; border: 1px solid var(--c-ink-200); border-radius: var(--r-sm, 8px); font-size: var(--fs-14, 14px); background: var(--c-paper, #fff); color: var(--c-ink-900); }
-.btn { border: 1px solid var(--c-ink-200); background: var(--c-paper, #fff); color: var(--c-ink-800); border-radius: var(--r-sm, 8px); padding: 8px 14px; font-size: var(--fs-13, 13px); font-weight: 600; cursor: pointer; }
-.btn--primary { background: var(--c-leaf-700, #2f6b3d); border-color: var(--c-leaf-700, #2f6b3d); color: #fff; }
-.btn:disabled { opacity: .5; cursor: default; }
+.cv__card--form { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-bottom: 1.25rem; }
+.cv__form-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; padding: 1rem 1.25rem; }
+.cv__form-actions { display: flex; gap: .5rem; margin-left: auto; }
+.cv__filtro-input { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .55rem .8rem; font-size: .82rem; color: #0f172a; min-width: 180px; }
+.cv__filtro-input:focus { border-color: #1b5e20; outline: none; }
+
+.cv__empty-sm { color: #94a3b8; font-size: .82rem; text-align: center; }
+.cv__empty-lg { color: #64748b; font-size: .95rem; text-align: center; padding: 3rem 1rem; background: #fff; border: 1px dashed #e2e8f0; border-radius: 14px; }
+
+.cv__bars { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.cv__barcard { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; transition: border-color .15s, box-shadow .15s; }
+.cv__barcard:hover { border-color: #cbd5e1; box-shadow: 0 4px 12px rgb(0 0 0 / .06); }
+.cv__barcard--off { opacity: .6; }
+.cv__barcard-body { display: block; width: 100%; text-align: left; background: none; border: none; padding: 1.25rem; cursor: pointer; }
+.cv__barcard-name { font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+.cv__barcard-loc { font-size: .78rem; color: #94a3b8; margin-top: .1rem; }
+.cv__barcard-res { margin-top: 1.1rem; display: flex; flex-direction: column; gap: .2rem; }
+.cv__kpi-label { font-size: .68rem; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.cv__barcard-res strong { font-size: 1.7rem; font-weight: 800; letter-spacing: -.03em; }
+.cv__kpi-val--green { color: #15803d; } .cv__kpi-val--red { color: #dc2626; }
+.cv__barcard-actions { display: flex; align-items: center; gap: .6rem; padding: .7rem 1.25rem; border-top: 1px solid #f1f5f9; }
+.cv__link { background: none; border: none; color: #64748b; font-size: .8rem; font-weight: 600; cursor: pointer; padding: .1rem .35rem; }
+.cv__link:hover { color: #0f172a; }
+.cv__link--danger:hover { color: #dc2626; }
 </style>
