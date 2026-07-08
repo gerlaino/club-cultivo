@@ -9,10 +9,8 @@ import { useToast }             from "../composables/useToast.js"
 import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
 import EditarCompraCuotasModal from "../components/contabilidad/EditarCompraCuotasModal.vue"
 import DsSpinner from '../design-system/components/Spinner.vue'
-// Paneles integrados como secciones de Contabilidad (hub contable)
-import ReporteFinanzasView from './admin/ReporteFinanzasView.vue'
+// Categorías integradas como sección de Contabilidad (config del hub contable)
 import FinanzasCatalogoView from './admin/FinanzasCatalogoView.vue'
-import InsumosView from './admin/InsumosView.vue'
 
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
@@ -442,20 +440,12 @@ onMounted(async () => {
       <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'pl' }" @click="irAPL">
         <i class="bi bi-bar-chart-line"></i> P&amp;L por lote
       </button>
-      <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'reporte' }" @click="vistaActiva = 'reporte'">
-        <i class="bi bi-file-earmark-text"></i> Reporte
-      </button>
-      <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'deposito' }" @click="vistaActiva = 'deposito'">
-        <i class="bi bi-box-seam"></i> Depósito
-      </button>
       <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'categorias' }" @click="vistaActiva = 'categorias'">
         <i class="bi bi-tags"></i> Categorías
       </button>
     </div>
 
-    <!-- Secciones integradas: reporte, depósito y categorías como parte del hub contable -->
-    <div v-if="vistaActiva === 'reporte'"    class="cv__embed"><ReporteFinanzasView /></div>
-    <div v-if="vistaActiva === 'deposito'"   class="cv__embed"><InsumosView /></div>
+    <!-- Categorías: configuración contable integrada al hub -->
     <div v-if="vistaActiva === 'categorias'" class="cv__embed"><FinanzasCatalogoView /></div>
 
     <!-- ══════════════ DASHBOARD ══════════════ -->
@@ -1022,8 +1012,6 @@ onMounted(async () => {
 
 /* Paneles embebidos (reporte/depósito/categorías): se anula su chrome de página para que
    se integren como una sección más del hub, sin doble padding ni ancho propio. */
-.cv__embed :deep(.rep),
-.cv__embed :deep(.ins),
 .cv__embed :deep(.cat-view) { padding: 0; max-width: none; margin: 0; }
 
 .cv__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }

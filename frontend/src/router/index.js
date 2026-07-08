@@ -92,8 +92,8 @@ const routes = [
     },
   },
   {
-    path: "/finanzas/insumos",
-    name: "finanzas-insumos",
+    path: "/insumos",
+    name: "insumos",
     component: () => import("../views/admin/InsumosView.vue"),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {

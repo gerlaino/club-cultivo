@@ -113,6 +113,11 @@ function resetDestino() {
   barProductos.value = []
 }
 
+// Un gasto de depósito es un insumo de cultivo → sugerimos esa categoría automáticamente.
+watch(destino, (d) => {
+  if (d === 'deposito' && (!form.value.categoria || form.value.categoria === 'otro')) form.value.categoria = 'insumo'
+})
+
 // Al elegir un bar, cargamos sus productos para el desplegable.
 watch(() => sal.value.bar_id, async (id) => {
   sal.value.bar_producto_id = ''
