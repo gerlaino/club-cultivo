@@ -39,6 +39,30 @@ async function borrarEvento() {
   catch { toast.error('No se pudo eliminar') }
 }
 
+// ── Entradas ──────────────────────────────────────────────────
+const tipoForm = ref(null)
+function nuevoTipo() { tipoForm.value = { nombre: '', precio_ars: null, cupo: null } }
+async function guardarTipo() {
+  const f = tipoForm.value
+  if (!f.nombre?.trim() || !(f.precio_ars >= 0)) { toast.warning('Poné nombre y precio'); return }
+  try { await store.crearTipo(barId, evId, { nombre: f.nombre.trim(), precio_ars: f.precio_ars, cupo: f.cupo || null }); tipoForm.value = null; toast.success('Tipo de entrada creado') }
+  catch { toast.error(store.saveError) }
+}
+async function borrarTipo(t) {
+  if (!(await confirm({ title: 'Eliminar tipo de entrada', message: `¿Eliminar "${t.nombre}"?`, variant: 'danger' }))) return
+  try { await store.eliminarTipo(barId, evId, t.id) } catch { toast.error('No se pudo eliminar') }
+}
+const venderPara = ref(null)
+const venderCant = ref(1)
+const venderComprador = ref('')
+function abrirVender(t) { venderPara.value = t; venderCant.value = 1; venderComprador.value = '' }
+async function confirmarVender() {
+  if (!(venderCant.value > 0)) { toast.warning('Cantidad inválida'); return }
+  try { await store.vender(barId, evId, venderPara.value.id, { cantidad: venderCant.value, comprador: venderComprador.value || null }); venderPara.value = null; toast.success('Entradas vendidas') }
+  catch { toast.error(store.saveError) }
+}
+function cupoPct(t) { return t.cupo ? Math.min(100, Math.round(t.vendidas / t.cupo * 100)) : (t.vendidas > 0 ? 100 : 0) }
+
 // ── Costos ────────────────────────────────────────────────────
 const costoForm = ref(null)
 function nuevoCosto() { costoForm.value = { concepto: '', proveedor: '', monto_ars: null, pagado: false } }
@@ -107,7 +131,49 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
     <div class="be">
       <div class="be__head"><b>Punto de equilibrio</b><span>necesitás <b>{{ fmt(beMeta) }}</b> de ingresos para cubrir costos</span></div>
       <div class="be__track"><i :class="{ over: beActual >= beMeta && beMeta > 0 }" :style="{ width: bePct + '%' }"></i></div>
-      <div class="be__legend"><span>Ingreso <b>{{ fmt(beActual) }}</b></span><span>{{ bePct }}%</span></div>
+      <div class="be__legend">
+        <span>Ingreso <b>{{ fmt(beActual) }}</b></span>
+        <span v-if="e.break_even_entradas">≈ <b>{{ e.break_even_entradas }}</b> entradas · vendidas <b>{{ e.entradas_vendidas }}</b></span>
+        <span>{{ bePct }}%</span>
+      </div>
+    </div>
+
+    <!-- Entradas -->
+    <section class="card ed__entradas">
+      <div class="card__head">
+        <h2>Entradas <span class="mut">· {{ e.entradas_vendidas }} vendidas · {{ fmt(e.recaudacion_entradas) }}</span></h2>
+        <button class="btn btn--sm btn--primary" @click="nuevoTipo">+ Tipo</button>
+      </div>
+      <form v-if="tipoForm" class="cform" @submit.prevent="guardarTipo">
+        <input v-model.trim="tipoForm.nombre" class="inp" placeholder="Nombre (ej: General)" maxlength="50" />
+        <input v-model.number="tipoForm.precio_ars" type="number" min="0" step="any" class="inp inp--sm" placeholder="Precio" />
+        <input v-model.number="tipoForm.cupo" type="number" min="1" class="inp inp--sm" placeholder="Cupo" />
+        <div class="cform__actions"><button type="button" class="btn btn--sm" @click="tipoForm = null">Cancelar</button><button type="submit" class="btn btn--sm btn--primary" :disabled="store.saving">Guardar</button></div>
+      </form>
+      <div v-if="!e.tipos_entrada?.length" class="empty">Sin tipos de entrada. Creá el primero.</div>
+      <ul class="tt" v-else>
+        <li v-for="t in e.tipos_entrada" :key="t.id" class="ttrow" :class="{ sold: t.agotado }">
+          <div class="ttrow__main">
+            <div class="ttrow__top"><span class="ttrow__n">{{ t.nombre }}</span><span class="ttrow__p">{{ fmt(t.precio_ars) }}</span></div>
+            <div class="ttbar"><i :style="{ width: cupoPct(t) + '%' }"></i></div>
+          </div>
+          <span class="ttrow__q">{{ t.vendidas }}<span v-if="t.cupo">/{{ t.cupo }}</span></span>
+          <button class="btn btn--sm btn--primary" :disabled="t.agotado" @click="abrirVender(t)">{{ t.agotado ? 'Agotado' : 'Vender' }}</button>
+          <button class="lnk lnk--danger" @click="borrarTipo(t)">✕</button>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Modal vender -->
+    <div v-if="venderPara" class="ov" @click.self="venderPara = null">
+      <div class="modal">
+        <h3>Vender — {{ venderPara.nombre }}</h3>
+        <p class="modal__hint">{{ fmt(venderPara.precio_ars) }} c/u<span v-if="venderPara.disponibles != null"> · quedan {{ venderPara.disponibles }}</span></p>
+        <label class="fld2">Cantidad<input v-model.number="venderCant" type="number" min="1" class="inp" /></label>
+        <label class="fld2">Comprador (opcional)<input v-model.trim="venderComprador" class="inp" maxlength="60" /></label>
+        <div class="modal__total">Total <strong>{{ fmt((venderCant || 0) * venderPara.precio_ars) }}</strong></div>
+        <div class="cform__actions"><button class="btn" @click="venderPara = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarVender">Confirmar venta</button></div>
+      </div>
     </div>
 
     <div class="ed__cols">
@@ -223,6 +289,26 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 .box.on { background: var(--c-leaf-700, #2f6b3d); border-color: var(--c-leaf-700, #2f6b3d); }
 .tlist__t { flex: 1; color: var(--c-ink-800); }
 .tlist__v { color: var(--c-ink-400); font-size: var(--fs-12, 12px); }
+
+.ed__entradas { margin: var(--sp-4, 16px) 0; }
+.tt { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ttrow { display: grid; grid-template-columns: 1fr auto auto auto; gap: 12px; align-items: center; padding: 10px 12px; background: var(--c-ink-50, #f6f7f5); border: 1px solid var(--c-ink-100); border-radius: var(--r-sm, 8px); }
+.ttrow.sold { opacity: .7; }
+.ttrow__top { display: flex; justify-content: space-between; gap: 10px; }
+.ttrow__n { font-weight: 600; color: var(--c-ink-900); font-size: var(--fs-14, 14px); }
+.ttrow__p { font-family: var(--font-mono, monospace); font-size: var(--fs-13, 13px); color: var(--c-leaf-700, #2f6b3d); font-weight: 600; }
+.ttbar { height: 6px; background: var(--c-paper, #fff); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+.ttbar i { display: block; height: 100%; background: var(--c-leaf-500, #40915a); border-radius: 4px; }
+.ttrow.sold .ttbar i { background: var(--c-leaf-700, #2f6b3d); }
+.ttrow__q { font-size: var(--fs-13, 13px); color: var(--c-ink-600); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.ov { position: fixed; inset: 0; background: rgba(20,20,20,.45); display: grid; place-items: center; z-index: 1000; padding: 16px; }
+.modal { background: var(--c-paper, #fff); border-radius: var(--r-lg, 14px); padding: var(--sp-5, 20px); width: 100%; max-width: 360px; box-shadow: var(--sh-3, 0 20px 50px rgba(0,0,0,.25)); }
+.modal h3 { margin: 0 0 4px; font-size: var(--fs-18, 18px); color: var(--c-ink-900); }
+.modal__hint { color: var(--c-ink-500); font-size: var(--fs-13, 13px); margin: 0 0 var(--sp-3, 12px); }
+.fld2 { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-13, 13px); color: var(--c-ink-600); margin-bottom: var(--sp-3, 12px); }
+.modal__total { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--c-ink-100); margin-bottom: var(--sp-3, 12px); }
+.modal__total strong { font-size: var(--fs-20, 20px); color: var(--c-ink-900); }
 
 .callout { display: flex; gap: 12px; align-items: flex-start; background: var(--c-leaf-50, #e7f0e5); border: 1px solid var(--c-ink-100); border-radius: var(--r-md, 10px); padding: 14px 16px; margin-top: var(--sp-4, 16px); }
 .callout p { font-size: var(--fs-13, 13px); color: var(--c-ink-600); margin: 0; }

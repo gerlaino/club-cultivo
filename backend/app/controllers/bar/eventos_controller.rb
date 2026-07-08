@@ -86,7 +86,17 @@ module Bar
         descripcion: e.descripcion, notas: e.notas,
         costos: e.costos.order(:created_at).map { |c| serialize_costo(c) },
         tareas: e.tareas.ordenadas.map { |t| serialize_tarea(t) },
+        tipos_entrada: e.tipos_entrada.ordenados.map { |t| serialize_tipo(t) },
+        entradas_vendidas:     e.entradas_vendidas,
+        recaudacion_entradas:  e.recaudacion_entradas,
+        break_even_entradas:   e.break_even_entradas,
       )
+    end
+
+    def serialize_tipo(t)
+      { id: t.id, nombre: t.nombre, precio_ars: t.precio_ars.to_f, cupo: t.cupo,
+        vendidas: t.vendidas, disponibles: t.disponibles, agotado: t.agotado?,
+        recaudado: t.recaudado, activo: t.activo }
     end
 
     def serialize_costo(c)

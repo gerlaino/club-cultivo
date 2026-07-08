@@ -388,6 +388,10 @@ Rails.application.routes.draw do
       resources :eventos, controller: 'bar/eventos', only: [:index, :show, :create, :update, :destroy] do
         resources :costos, controller: 'bar/evento_costos', only: [:create, :update, :destroy]
         resources :tareas, controller: 'bar/evento_tareas', only: [:create, :update, :destroy]
+        resources :tipos_entrada, controller: 'bar/tipos_entrada', only: [:create, :update, :destroy] do
+          member { post :vender }
+        end
+        resources :entradas, controller: 'bar/entradas', only: [:index, :destroy]
       end
     end
 

@@ -12,9 +12,14 @@ module Restore
       private
 
       def apply!
-        # Los costos volvieron con el evento (recursivo). Re-aplicamos el egreso de los pagados
-        # (sus movimientos viejos se borraron al eliminar el evento).
+        actor = usuario || record.deleted_by || record.club.users.find_by(role: 'admin')
+        # Costos y tipos de entrada volvieron con el evento (recursivo). Re-aplicamos sus efectos
+        # en el libro (los movimientos viejos se borraron al eliminar el evento).
         record.costos.reload.each(&:sincronizar_egreso)
+        record.tipos_entrada.reload.each do |t|
+          t.entradas.with_deleted.where.not(deleted_at: nil).each(&:restore)
+          t.sincronizar_ingreso!(actor)
+        end
       end
 
       def recursive_restore? = true

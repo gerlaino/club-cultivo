@@ -110,6 +110,8 @@ module Restore
       # El costo re-aplica su egreso si estaba pagado.
       { key: 'evento_bar_costo',    model_name: 'EventoBarCosto',     label: 'Costo de evento',     group: 'Bar', complex: true, restorer: 'Restore::Restorers::EventoBarCosto', descriptor: ->(r) { r.try(:concepto).presence || "Costo ##{r.id}" } },
       { key: 'evento_bar_tarea',    model_name: 'EventoBarTarea',     label: 'Tarea de evento',     group: 'Bar', descriptor: ->(r) { r.try(:titulo).presence || "Tarea ##{r.id}" } },
+      { key: 'evento_bar_tipo_entrada', model_name: 'EventoBarTipoEntrada', label: 'Tipo de entrada', group: 'Bar', complex: true, restorer: 'Restore::Restorers::EventoBarTipoEntrada', descriptor: ->(r) { r.try(:nombre).presence || "Tipo ##{r.id}" } },
+      { key: 'evento_bar_entrada',  model_name: 'EventoBarEntrada',    label: 'Entrada',             group: 'Bar', complex: true, top_level: false, descriptor: ->(r) { "Entrada #{r.try(:codigo)}" } },
     ].map { |h| Entry.new(**h) }.freeze
 
     BY_KEY = ENTRIES.index_by(&:key).freeze

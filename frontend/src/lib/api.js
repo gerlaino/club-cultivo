@@ -363,6 +363,12 @@ export const deleteEventoCosto = (barId, evId, id)   => api.delete(`/bares/${bar
 export const createEventoTarea = (barId, evId, payload) => api.post(`/bares/${barId}/eventos/${evId}/tareas`, { evento_bar_tarea: payload })
 export const updateEventoTarea = (barId, evId, id, payload) => api.put(`/bares/${barId}/eventos/${evId}/tareas/${id}`, { evento_bar_tarea: payload })
 export const deleteEventoTarea = (barId, evId, id)   => api.delete(`/bares/${barId}/eventos/${evId}/tareas/${id}`)
+export const createTipoEntrada = (barId, evId, payload)       => api.post(`/bares/${barId}/eventos/${evId}/tipos_entrada`, { evento_bar_tipo_entrada: payload })
+export const updateTipoEntrada = (barId, evId, id, payload)   => api.put(`/bares/${barId}/eventos/${evId}/tipos_entrada/${id}`, { evento_bar_tipo_entrada: payload })
+export const deleteTipoEntrada = (barId, evId, id)            => api.delete(`/bares/${barId}/eventos/${evId}/tipos_entrada/${id}`)
+export const venderEntradas    = (barId, evId, tipoId, payload) => api.post(`/bares/${barId}/eventos/${evId}/tipos_entrada/${tipoId}/vender`, payload)
+export const listEntradas      = (barId, evId)                => api.get(`/bares/${barId}/eventos/${evId}/entradas`)
+export const anularEntrada     = (barId, evId, id)            => api.delete(`/bares/${barId}/eventos/${evId}/entradas/${id}`)
 
 // ── Finanzas · reporte consolidado ─────────────────────────────────────────────
 export const getReporteFinanzas    = (params = {}) => api.get('/finanzas/reporte', { params })

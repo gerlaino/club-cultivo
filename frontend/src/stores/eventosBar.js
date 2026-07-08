@@ -5,6 +5,7 @@ import {
   listEventosBar, getEventoBar, createEventoBar, updateEventoBar, deleteEventoBar,
   createEventoCosto, updateEventoCosto, deleteEventoCosto,
   createEventoTarea, updateEventoTarea, deleteEventoTarea,
+  createTipoEntrada, updateTipoEntrada, deleteTipoEntrada, venderEntradas,
 } from "../lib/api";
 
 export const useEventosBarStore = defineStore("eventosBar", {
@@ -54,6 +55,12 @@ export const useEventosBarStore = defineStore("eventosBar", {
     async crearTarea(barId, evId, p)          { await this._call(() => createEventoTarea(barId, evId, p)); await this.fetchDetalle(barId, evId); },
     async actualizarTarea(barId, evId, id, p) { await this._call(() => updateEventoTarea(barId, evId, id, p)); await this.fetchDetalle(barId, evId); },
     async eliminarTarea(barId, evId, id)      { await this._call(() => deleteEventoTarea(barId, evId, id)); await this.fetchDetalle(barId, evId); },
+
+    // Tipos de entrada + venta
+    async crearTipo(barId, evId, p)           { await this._call(() => createTipoEntrada(barId, evId, p)); await this.fetchDetalle(barId, evId); },
+    async actualizarTipo(barId, evId, id, p)  { await this._call(() => updateTipoEntrada(barId, evId, id, p)); await this.fetchDetalle(barId, evId); },
+    async eliminarTipo(barId, evId, id)       { await this._call(() => deleteTipoEntrada(barId, evId, id)); await this.fetchDetalle(barId, evId); },
+    async vender(barId, evId, tipoId, p)      { await this._call(() => venderEntradas(barId, evId, tipoId, p)); await this.fetchDetalle(barId, evId); },
 
     async _save(apiCall, isUpdate = false) {
       this.saving = true; this.saveError = null;

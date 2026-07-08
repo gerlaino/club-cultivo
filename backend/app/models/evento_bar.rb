@@ -9,8 +9,10 @@ class EventoBar < ApplicationRecord
 
   belongs_to :club
   belongs_to :bar
-  has_many :costos,  class_name: 'EventoBarCosto', foreign_key: :evento_bar_id, dependent: :destroy
-  has_many :tareas,  class_name: 'EventoBarTarea', foreign_key: :evento_bar_id, dependent: :destroy
+  has_many :costos,        class_name: 'EventoBarCosto', foreign_key: :evento_bar_id, dependent: :destroy
+  has_many :tareas,        class_name: 'EventoBarTarea', foreign_key: :evento_bar_id, dependent: :destroy
+  has_many :tipos_entrada, class_name: 'EventoBarTipoEntrada', foreign_key: :evento_bar_id, dependent: :destroy
+  has_many :entradas,      class_name: 'EventoBarEntrada', foreign_key: :evento_bar_id, dependent: :destroy
   has_many :movimientos_contables, foreign_key: :evento_bar_id, dependent: :nullify
   has_many :bar_ventas,            foreign_key: :evento_bar_id, dependent: :nullify
 
@@ -37,5 +39,25 @@ class EventoBar < ApplicationRecord
   # Resultado proyectado: lo estimado de ingresos menos lo comprometido en costos.
   def resultado_proyectado
     (presupuesto_ingresos.to_d - costos.sum(:monto_ars).to_d).to_f
+  end
+
+  # ── Entradas ──────────────────────────────────────────────
+  def entradas_vendidas   = entradas.vigentes.count
+  def recaudacion_entradas = entradas.vigentes.sum(:precio_ars).to_f
+
+  # Precio promedio de los tipos activos (para estimar el break-even en cantidad de entradas).
+  def precio_entrada_promedio
+    precios = tipos_entrada.activos.where('precio_ars > 0').pluck(:precio_ars)
+    return 0.0 if precios.empty?
+
+    (precios.sum / precios.size).to_f
+  end
+
+  # Cuántas entradas hay que vender para cubrir los costos comprometidos.
+  def break_even_entradas
+    prom = precio_entrada_promedio
+    return nil if prom <= 0
+
+    (costos.sum(:monto_ars).to_d / prom).ceil
   end
 end
