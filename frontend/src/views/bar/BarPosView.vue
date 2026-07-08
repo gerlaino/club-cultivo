@@ -1,15 +1,16 @@
 <script setup>
-// POS del bar (Bloque 3) — cara operativa. La usa admin/supervisor/dispensador para vender.
+// POS de un bar concreto (Capa 1) — cara operativa. La usa admin/supervisor/dispensador.
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
 
 const store  = useBarStore()
 const auth   = useAuthStore()
-const router = useRouter()
+const route  = useRoute()
 const toast  = useToast()
+const barId  = route.params.barId
 
 const CATS = [
   { value: 'bebida', label: 'Bebidas' },
@@ -19,22 +20,17 @@ const CATS = [
 ]
 const catActiva = ref('bebida')
 const medioPago = ref('efectivo')
-
 const esGestion = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 
-onMounted(() => store.fetchProductos({ activos: 'true' }))
+onMounted(() => store.fetchProductos(barId, { activos: 'true' }))
 
 const productosCat = computed(() => store.activos.filter(p => p.categoria === catActiva.value))
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 
 async function cobrar() {
   if (!store.carrito.length) return
-  try {
-    await store.cobrar(medioPago.value)
-    toast.success('Venta cobrada')
-  } catch {
-    toast.error(store.saveError || 'No se pudo cobrar')
-  }
+  try { await store.cobrar(barId, medioPago.value); toast.success('Venta cobrada') }
+  catch { toast.error(store.saveError || 'No se pudo cobrar') }
 }
 </script>
 
@@ -42,14 +38,16 @@ async function cobrar() {
   <div class="pos">
     <header class="pos__head">
       <div>
-        <h1>Vender · Bar</h1>
+        <h1>Vender · {{ store.barActual?.nombre || 'Bar' }}</h1>
         <span class="pos__who">{{ auth.user?.first_name || 'Vendedor' }}</span>
       </div>
-      <RouterLink v-if="esGestion" to="/bar/panel" class="pos__link">Ver panel →</RouterLink>
+      <div class="pos__nav">
+        <RouterLink to="/bar" class="pos__link">← Bares</RouterLink>
+        <RouterLink v-if="esGestion" :to="`/bar/${barId}/panel`" class="pos__link">Panel →</RouterLink>
+      </div>
     </header>
 
     <div class="pos__body">
-      <!-- Grilla de productos -->
       <div class="pos__catalog">
         <div class="pos__tabs">
           <button v-for="c in CATS" :key="c.value" class="pos__tab" :class="{ 'is-on': catActiva === c.value }" @click="catActiva = c.value">{{ c.label }}</button>
@@ -57,12 +55,7 @@ async function cobrar() {
         <div v-if="store.loading" class="pos__empty">Cargando…</div>
         <div v-else-if="!productosCat.length" class="pos__empty">Sin productos en esta categoría.</div>
         <div v-else class="pos__grid">
-          <button
-            v-for="p in productosCat" :key="p.id"
-            class="prod" :class="{ 'prod--off': p.stock <= 0 }"
-            :disabled="p.stock <= 0"
-            @click="store.agregar(p)"
-          >
+          <button v-for="p in productosCat" :key="p.id" class="prod" :class="{ 'prod--off': p.stock <= 0 }" :disabled="p.stock <= 0" @click="store.agregar(p)">
             <span class="prod__name">{{ p.nombre }}</span>
             <span class="prod__price">{{ fmt(p.precio_ars) }}</span>
             <span class="prod__stock" :class="{ low: p.stock_bajo }">stock {{ p.stock }}</span>
@@ -70,7 +63,6 @@ async function cobrar() {
         </div>
       </div>
 
-      <!-- Carrito -->
       <aside class="pos__cart">
         <h2>Pedido</h2>
         <div v-if="!store.carrito.length" class="pos__cart-empty">Tocá un producto para agregarlo.</div>
@@ -83,19 +75,13 @@ async function cobrar() {
             <button class="ci__plus" @click="store.agregar(l.producto)" aria-label="Agregar uno">+</button>
           </li>
         </ul>
-
         <div class="pos__total"><span>Total</span><strong>{{ fmt(store.totalCarrito) }}</strong></div>
-
         <div class="pos__pay">
-          <button v-for="m in ['efectivo','transferencia','mercado_pago']" :key="m"
-                  class="pay" :class="{ 'is-on': medioPago === m }" @click="medioPago = m">
+          <button v-for="m in ['efectivo','transferencia','mercado_pago']" :key="m" class="pay" :class="{ 'is-on': medioPago === m }" @click="medioPago = m">
             {{ m === 'mercado_pago' ? 'QR / MP' : (m === 'transferencia' ? 'Transfer' : 'Efectivo') }}
           </button>
         </div>
-
-        <button class="pos__cobrar" :disabled="!store.carrito.length || store.saving" @click="cobrar">
-          Cobrar {{ fmt(store.totalCarrito) }}
-        </button>
+        <button class="pos__cobrar" :disabled="!store.carrito.length || store.saving" @click="cobrar">Cobrar {{ fmt(store.totalCarrito) }}</button>
         <button v-if="store.carrito.length" class="pos__vaciar" @click="store.vaciar()">Vaciar</button>
       </aside>
     </div>
@@ -104,18 +90,17 @@ async function cobrar() {
 
 <style scoped>
 .pos { padding: var(--sp-5, 20px); max-width: 1080px; margin: 0 auto; }
-.pos__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-4, 16px); }
+.pos__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-4, 16px); gap: 12px; flex-wrap: wrap; }
 .pos__head h1 { font-size: var(--fs-22, 22px); font-weight: 700; color: var(--c-ink-900); margin: 0; }
 .pos__who { font-size: var(--fs-13, 13px); color: var(--c-ink-400); }
+.pos__nav { display: flex; gap: 16px; }
 .pos__link { font-size: var(--fs-14, 14px); color: var(--c-leaf-700, #2f6b3d); text-decoration: none; font-weight: 600; }
 
 .pos__body { display: grid; grid-template-columns: 1fr 300px; gap: var(--sp-4, 16px); align-items: start; }
 @media (max-width: 780px) { .pos__body { grid-template-columns: 1fr; } }
-
 .pos__tabs { display: flex; gap: 6px; margin-bottom: var(--sp-3, 12px); flex-wrap: wrap; }
 .pos__tab { border: 1px solid var(--c-ink-200); background: var(--c-paper, #fff); color: var(--c-ink-600); border-radius: 999px; padding: 6px 14px; font-size: var(--fs-13, 13px); font-weight: 600; cursor: pointer; }
 .pos__tab.is-on { background: var(--c-ink-900); border-color: var(--c-ink-900); color: #fff; }
-
 .pos__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 .prod { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; background: var(--c-paper, #fff); border: 1px solid var(--c-ink-100); border-radius: var(--r-md, 10px); padding: 14px 13px; cursor: pointer; text-align: left; }
 .prod:hover { border-color: var(--c-leaf-700, #2f6b3d); }
@@ -135,7 +120,6 @@ async function cobrar() {
 .ci__qty { font-weight: 700; text-align: center; color: var(--c-ink-900); }
 .ci__name { color: var(--c-ink-700); }
 .ci__sub { font-variant-numeric: tabular-nums; color: var(--c-ink-900); font-weight: 600; }
-
 .pos__total { display: flex; justify-content: space-between; align-items: baseline; margin: var(--sp-4, 16px) 0; padding-top: var(--sp-3, 12px); border-top: 1px solid var(--c-ink-100); }
 .pos__total strong { font-size: var(--fs-24, 24px); font-weight: 700; color: var(--c-ink-900); }
 .pos__pay { display: flex; gap: 6px; margin-bottom: var(--sp-3, 12px); flex-wrap: wrap; }

@@ -335,15 +335,21 @@ export const updateInsumo    = (id, payload) => api.put(`/insumos/${id}`, { insu
 export const comprarInsumo   = (id, payload) => api.post(`/insumos/${id}/comprar`, payload)
 export const consumirInsumo  = (id, payload) => api.post(`/insumos/${id}/consumir`, payload)
 
-// ── Bar · POS + dashboard ──────────────────────────────────────────────────────
-export const listBarProductos  = (params = {}) => api.get('/bar/productos', { params })
-export const createBarProducto  = (payload)     => api.post('/bar/productos', { bar_producto: payload })
-export const updateBarProducto  = (id, payload) => api.put(`/bar/productos/${id}`, { bar_producto: payload })
-export const deleteBarProducto  = (id)          => api.delete(`/bar/productos/${id}`)
-export const reponerBarProducto = (id, cantidad) => api.post(`/bar/productos/${id}/reponer`, { cantidad })
-export const crearBarVenta      = (payload)     => api.post('/bar/ventas', payload)
-export const listBarVentas      = ()            => api.get('/bar/ventas')
-export const getBarDashboard    = ()            => api.get('/bar/ventas/dashboard')
+// ── Bar · entidad por sede + POS + dashboard ───────────────────────────────────
+export const listBares          = ()               => api.get('/bares')
+export const getBar             = (id)             => api.get(`/bares/${id}`)
+export const createBar          = (payload)        => api.post('/bares', { bar: payload })
+export const updateBar          = (id, payload)    => api.put(`/bares/${id}`, { bar: payload })
+export const deleteBar          = (id)             => api.delete(`/bares/${id}`)
+export const getBarDashboard    = (barId)          => api.get(`/bares/${barId}/dashboard`)
+export const listBarProductos   = (barId, params = {}) => api.get(`/bares/${barId}/productos`, { params })
+export const createBarProducto  = (barId, payload) => api.post(`/bares/${barId}/productos`, { bar_producto: payload })
+export const updateBarProducto  = (barId, id, payload) => api.put(`/bares/${barId}/productos/${id}`, { bar_producto: payload })
+export const deleteBarProducto  = (barId, id)      => api.delete(`/bares/${barId}/productos/${id}`)
+export const reponerBarProducto = (barId, id, cantidad) => api.post(`/bares/${barId}/productos/${id}/reponer`, { cantidad })
+export const crearBarVenta      = (barId, payload) => api.post(`/bares/${barId}/ventas`, payload)
+export const listBarVentas      = (barId)          => api.get(`/bares/${barId}/ventas`)
+export const deleteBarVenta     = (barId, id)      => api.delete(`/bares/${barId}/ventas/${id}`)
 
 // ── Finanzas · reporte consolidado ─────────────────────────────────────────────
 export const getReporteFinanzas    = (params = {}) => api.get('/finanzas/reporte', { params })

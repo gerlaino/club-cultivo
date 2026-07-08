@@ -1,24 +1,25 @@
 module Bar
-  # Productos del bar. Lectura y reposición de stock: admin/supervisor/dispensador (operan el POS).
-  # Alta/edición de catálogo (nombre, precio): admin. Feature flag :bar.
+  # Productos de un bar concreto (anidado bajo /bares/:bar_id). Lectura y reposición:
+  # admin/supervisor/dispensador. Alta/edición/borrado de catálogo: admin. Feature flag :bar.
+  # Borrado = soft (recuperable desde la papelera).
   class ProductosController < ApplicationController
     before_action :authenticate_user!
     before_action :require_feature_bar!
+    before_action :set_bar
     before_action :require_operador, only: [:index, :reponer]
     before_action :require_admin_bar, only: [:create, :update, :destroy]
     before_action :set_producto, only: [:update, :destroy, :reponer]
 
-    # GET /bar/productos
+    # GET /bares/:bar_id/productos
     def index
-      scope = current_user.club.bar_productos
+      scope = @bar.bar_productos
       scope = scope.activos if params[:activos] == 'true'
       render json: scope.order(:categoria, :nombre).map { |p| serialize(p) }
     end
 
-    # POST /bar/productos
+    # POST /bares/:bar_id/productos
     def create
-      prod = current_user.club.bar_productos.build(producto_params)
-      prod.unidad_negocio ||= unidad_bar
+      prod = @bar.bar_productos.build(producto_params.merge(club: current_user.club, unidad_negocio: @bar.unidad_negocio_bar))
       if prod.save
         render json: serialize(prod), status: :created
       else
@@ -26,7 +27,7 @@ module Bar
       end
     end
 
-    # PATCH /bar/productos/:id
+    # PATCH /bares/:bar_id/productos/:id
     def update
       if @producto.update(producto_params)
         render json: serialize(@producto)
@@ -35,13 +36,14 @@ module Bar
       end
     end
 
-    # DELETE /bar/productos/:id
+    # DELETE /bares/:bar_id/productos/:id — soft-delete
     def destroy
+      @producto.update!(deleted_by_id: current_user.id)
       @producto.destroy
       head :no_content
     end
 
-    # POST /bar/productos/:id/reponer  { cantidad }
+    # POST /bares/:bar_id/productos/:id/reponer  { cantidad }
     def reponer
       cant = params.require(:cantidad).to_d
       return render json: { error: 'Cantidad inválida' }, status: :unprocessable_entity if cant <= 0
@@ -54,14 +56,16 @@ module Bar
 
     private
 
-    def set_producto
-      @producto = current_user.club.bar_productos.find(params[:id])
+    def set_bar
+      @bar = current_user.club.bares.find(params[:bar_id])
     rescue ActiveRecord::RecordNotFound
-      render json: { error: 'Producto no encontrado' }, status: :not_found
+      render json: { error: 'Bar no encontrado' }, status: :not_found
     end
 
-    def unidad_bar
-      current_user.club.unidades_negocio.create_with(nombre: 'Bar', es_sistema: true).find_or_create_by!(tipo: 'bar')
+    def set_producto
+      @producto = @bar.bar_productos.find(params[:id])
+    rescue ActiveRecord::RecordNotFound
+      render json: { error: 'Producto no encontrado' }, status: :not_found
     end
 
     def require_feature_bar!

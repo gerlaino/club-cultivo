@@ -1,16 +1,18 @@
 module Bar
-  # Ventas del bar. Crear venta (POS): admin/supervisor/dispensador. Listado y dashboard
-  # analítico: admin/supervisor. Feature flag :bar.
+  # Ventas de un bar concreto (anidado bajo /bares/:bar_id). Crear venta (POS):
+  # admin/supervisor/dispensador. Listar: admin/supervisor. Borrar (revierte stock e ingreso):
+  # admin/supervisor. Feature flag :bar. Borrado = soft (recuperable).
   class VentasController < ApplicationController
     before_action :authenticate_user!
     before_action :require_feature_bar!
+    before_action :set_bar
     before_action :require_operador, only: [:create]
-    before_action :require_gestion,  only: [:index, :dashboard]
+    before_action :require_gestion,  only: [:index, :destroy]
 
-    # POST /bar/ventas  { lineas: [{bar_producto_id, cantidad}], medio_pago, turno?, notas? }
+    # POST /bares/:bar_id/ventas  { lineas: [{bar_producto_id, cantidad}], medio_pago, turno?, notas? }
     def create
       venta = ::Bar::RegistrarVenta.new(
-        current_user.club, current_user,
+        @bar, current_user,
         lineas:     params[:lineas],
         medio_pago: params[:medio_pago],
         turno:      params[:turno],
@@ -23,44 +25,28 @@ module Bar
       render json: { error: 'Producto inexistente en la venta' }, status: :unprocessable_entity
     end
 
-    # GET /bar/ventas  (últimas ventas)
+    # GET /bares/:bar_id/ventas
     def index
-      ventas = current_user.club.bar_ventas.includes(:items, :user).recientes.limit(100)
+      ventas = @bar.bar_ventas.includes(:items, :user).recientes.limit(100)
       render json: ventas.map { |v| serialize(v) }
     end
 
-    # GET /bar/ventas/dashboard  — pulso del bar (hoy por defecto)
-    def dashboard
-      club  = current_user.club
-      hoy   = club.bar_ventas.del_dia(Time.zone.today)
-
-      total   = hoy.sum(:total_ars).to_f
-      tickets = hoy.count
-      items   = BarVentaItem.where(club_id: club.id, bar_venta_id: hoy.select(:id))
-
-      render json: {
-        hoy: {
-          total:            total,
-          tickets:          tickets,
-          ticket_promedio:  tickets.positive? ? (total / tickets).round(2) : 0,
-          por_medio_pago:   hoy.group(:medio_pago).sum(:total_ars).transform_values(&:to_f),
-          por_hora:         por_hora(hoy),
-        },
-        top_productos: items.group(:nombre).sum(:cantidad)
-                            .sort_by { |_n, c| -c }.first(8)
-                            .map { |nombre, cant| { nombre: nombre, cantidad: cant.to_f } },
-        reponer: club.bar_productos.activos.stock_bajo.order(:nombre)
-                     .map { |p| { id: p.id, nombre: p.nombre, stock: p.stock.to_f, minimo: p.stock_minimo.to_f } },
-      }
+    # DELETE /bares/:bar_id/ventas/:id — soft-delete; el modelo devuelve stock y saca el ingreso.
+    def destroy
+      venta = @bar.bar_ventas.find(params[:id])
+      venta.update!(deleted_by_id: current_user.id)
+      venta.destroy
+      head :no_content
+    rescue ActiveRecord::RecordNotFound
+      render json: { error: 'Venta no encontrada' }, status: :not_found
     end
 
     private
 
-    # Ventas agrupadas por hora del día (0-23). Devuelve solo las horas con ventas.
-    def por_hora(scope)
-      scope.group_by { |v| v.created_at.in_time_zone.hour }
-           .map { |h, vs| { hora: h, total: vs.sum { |v| v.total_ars.to_f } } }
-           .sort_by { |r| r[:hora] }
+    def set_bar
+      @bar = current_user.club.bares.find(params[:bar_id])
+    rescue ActiveRecord::RecordNotFound
+      render json: { error: 'Bar no encontrado' }, status: :not_found
     end
 
     def require_feature_bar!

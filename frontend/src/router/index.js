@@ -115,6 +115,17 @@ const routes = [
   },
   {
     path: "/bar",
+    name: "bar-selector",
+    component: () => import("../views/bar/BarSelectorView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "supervisor", "dispensador"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
+  {
+    path: "/bar/:barId/vender",
     name: "bar-pos",
     component: () => import("../views/bar/BarPosView.vue"),
     meta: { requiresAuth: true },
@@ -125,7 +136,7 @@ const routes = [
     },
   },
   {
-    path: "/bar/panel",
+    path: "/bar/:barId/panel",
     name: "bar-panel",
     component: () => import("../views/bar/BarPanelView.vue"),
     meta: { requiresAuth: true },

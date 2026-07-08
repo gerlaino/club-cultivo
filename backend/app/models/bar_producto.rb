@@ -1,10 +1,11 @@
 # Producto del bar (café, cerveza, medialuna, merch…). Tiene stock propio que se descuenta
 # en cada venta. `costo_ars` es opcional y sirve para calcular el margen.
 class BarProducto < ApplicationRecord
-  acts_as_paranoid
+  include Restorable
   acts_as_tenant(:club)
 
   belongs_to :club
+  belongs_to :bar
   belongs_to :unidad_negocio, optional: true
   has_many :bar_venta_items, dependent: :nullify
 

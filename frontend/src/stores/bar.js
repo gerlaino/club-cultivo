@@ -1,21 +1,23 @@
 import { logger } from '../utils/logger.js'
-// frontend/src/stores/bar.js — POS + panel del bar (Bloque 3).
+// frontend/src/stores/bar.js — bar como entidad por sede + POS + panel.
 import { defineStore } from "pinia";
 import {
+  listBares, createBar, updateBar, deleteBar, getBarDashboard,
   listBarProductos, createBarProducto, updateBarProducto, deleteBarProducto,
-  reponerBarProducto, crearBarVenta, getBarDashboard,
+  reponerBarProducto, crearBarVenta,
 } from "../lib/api";
 
 export const useBarStore = defineStore("bar", {
   state: () => ({
+    bares:     [],
+    barActual: null,      // objeto bar seleccionado
     productos: [],
     dashboard: null,
     loading:   false,
     error:     null,
     saving:    false,
     saveError: null,
-    // carrito del POS: [{ producto, cantidad }]
-    carrito:   [],
+    carrito:   [],        // POS: [{ producto, cantidad }]
   }),
 
   getters: {
@@ -25,10 +27,43 @@ export const useBarStore = defineStore("bar", {
   },
 
   actions: {
-    async fetchProductos(params = {}) {
+    // ── Bares (entidad) ──────────────────────────────────────
+    async fetchBares() {
       this.loading = true; this.error = null;
       try {
-        const { data } = await listBarProductos(params);
+        const { data } = await listBares();
+        this.bares = data || [];
+      } catch (e) {
+        this.error = e?.response?.data?.error || e.message;
+      } finally {
+        this.loading = false;
+      }
+    },
+    async crearBar(payload) {
+      return this._guardar(() => createBar(payload), (d) => { this.bares = [...this.bares, d]; });
+    },
+    async actualizarBar(id, payload) {
+      return this._guardar(() => updateBar(id, payload), (d) => { this.bares = this.bares.map(b => b.id === id ? d : b); });
+    },
+    async eliminarBar(id) {
+      await deleteBar(id);
+      this.bares = this.bares.filter(b => b.id !== id);
+    },
+
+    // ── Contexto de un bar ───────────────────────────────────
+    async fetchDashboard(barId) {
+      try {
+        const { data } = await getBarDashboard(barId);
+        this.dashboard = data;
+        this.barActual = data.bar;
+      } catch (e) {
+        logger.error("Bar.fetchDashboard", e);
+      }
+    },
+    async fetchProductos(barId, params = {}) {
+      this.loading = true;
+      try {
+        const { data } = await listBarProductos(barId, params);
         this.productos = data || [];
       } catch (e) {
         this.error = e?.response?.data?.error || e.message;
@@ -37,21 +72,12 @@ export const useBarStore = defineStore("bar", {
       }
     },
 
-    async fetchDashboard() {
-      try {
-        const { data } = await getBarDashboard();
-        this.dashboard = data;
-      } catch (e) {
-        logger.error("Bar.fetchDashboard", e);
-      }
-    },
-
-    // ── Carrito ──────────────────────────────────────────────
+    // ── Carrito (POS) ────────────────────────────────────────
     agregar(producto) {
       if (producto.stock <= 0) return;
       const linea = this.carrito.find(l => l.producto.id === producto.id);
       const enCarrito = linea ? linea.cantidad : 0;
-      if (enCarrito + 1 > producto.stock) return; // no vender más que el stock
+      if (enCarrito + 1 > producto.stock) return;
       if (linea) linea.cantidad++;
       else this.carrito.push({ producto, cantidad: 1 });
     },
@@ -63,14 +89,14 @@ export const useBarStore = defineStore("bar", {
     },
     vaciar() { this.carrito = []; },
 
-    async cobrar(medio_pago = 'efectivo') {
+    async cobrar(barId, medio_pago = 'efectivo') {
       if (!this.carrito.length) return null;
       this.saving = true; this.saveError = null;
       try {
         const lineas = this.carrito.map(l => ({ bar_producto_id: l.producto.id, cantidad: l.cantidad }));
-        const { data } = await crearBarVenta({ lineas, medio_pago });
+        const { data } = await crearBarVenta(barId, { lineas, medio_pago });
         this.vaciar();
-        await this.fetchProductos(); // refresca stock
+        await this.fetchProductos(barId, { activos: 'true' });
         return data;
       } catch (e) {
         this.saveError = e?.response?.data?.error || "No se pudo cobrar";
@@ -81,18 +107,18 @@ export const useBarStore = defineStore("bar", {
     },
 
     // ── Config de productos (admin) ──────────────────────────
-    async crearProducto(payload) {
-      return this._guardar(() => createBarProducto(payload), (d) => { this.productos = [...this.productos, d]; });
+    async crearProducto(barId, payload) {
+      return this._guardar(() => createBarProducto(barId, payload), (d) => { this.productos = [...this.productos, d]; });
     },
-    async actualizarProducto(id, payload) {
-      return this._guardar(() => updateBarProducto(id, payload), (d) => { this._merge(d); });
+    async actualizarProducto(barId, id, payload) {
+      return this._guardar(() => updateBarProducto(barId, id, payload), (d) => { this._merge(d); });
     },
-    async eliminarProducto(id) {
-      await deleteBarProducto(id);
+    async eliminarProducto(barId, id) {
+      await deleteBarProducto(barId, id);
       this.productos = this.productos.filter(p => p.id !== id);
     },
-    async reponer(id, cantidad) {
-      return this._guardar(() => reponerBarProducto(id, cantidad), (d) => { this._merge(d); });
+    async reponer(barId, id, cantidad) {
+      return this._guardar(() => reponerBarProducto(barId, id, cantidad), (d) => { this._merge(d); });
     },
 
     _merge(d) {

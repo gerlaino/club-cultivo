@@ -43,8 +43,8 @@ export const NAV_GROUPS = [
       { to: '/contabilidad', label: 'Contabilidad' },
       { to: '/finanzas/reporte', label: 'Reporte' },
       { to: '/finanzas/catalogo', label: 'Categorías' },
-      { to: '/finanzas/insumos', label: 'Insumos', feature: 'insumos' },
-      { to: '/bar/panel', label: 'Bar', feature: 'bar' },
+      { to: '/finanzas/insumos', label: 'Insumos' },
+      { to: '/bar', label: 'Bar', feature: 'bar' },
     ],
   },
   {

@@ -96,6 +96,13 @@ module Restore
       { key: 'pesaje_manicura',     model_name: 'PesajeManicura',     label: 'Pesaje de manicura',  group: 'Cultivo', descriptor: ->(r) { "Pesaje ##{r.id}" } },
       { key: 'reserva',             model_name: 'Reserva',            label: 'Reserva',             group: 'Stock', complex: true, restorer: 'Restore::Restorers::Reserva', descriptor: ->(r) { "Reserva ##{r.id}" } },
       { key: 'ariccame_registro',   model_name: 'AriccameRegistro',   label: 'Registro ARICCAME',   group: 'Regulatorio', complex: true, restorer: 'Restore::Restorers::AriccameRegistro', descriptor: ->(r) { "Registro ##{r.id}" } },
+
+      # --- Bar -----------------------------------------------------------------
+      { key: 'bar',                 model_name: 'Bar',                label: 'Bar',                 group: 'Bar' },
+      { key: 'bar_producto',        model_name: 'BarProducto',        label: 'Producto de bar',     group: 'Bar' },
+      # La venta re-descuenta stock y re-crea el ingreso al restaurar → compleja con restorer.
+      { key: 'bar_venta',           model_name: 'BarVenta',           label: 'Venta de bar',        group: 'Bar', complex: true, restorer: 'Restore::Restorers::BarVenta', descriptor: ->(r) { "Venta ##{r.id}" } },
+      { key: 'bar_venta_item',      model_name: 'BarVentaItem',       label: 'Línea de venta de bar', group: 'Bar', complex: true, top_level: false, descriptor: ->(r) { "Línea ##{r.id}" } },
     ].map { |h| Entry.new(**h) }.freeze
 
     BY_KEY = ENTRIES.index_by(&:key).freeze

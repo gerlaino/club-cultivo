@@ -378,14 +378,13 @@ Rails.application.routes.draw do
     get 'finanzas/reporte',        to: 'reportes#resumen'
     get 'finanzas/reporte/export', to: 'reportes#export_csv'
 
-    # Bar — POS + dashboard (Bloque 3, feature flag :bar)
-    namespace :bar do
-      resources :productos, only: [:index, :create, :update, :destroy] do
+    # Bar — entidad por sede: cada bar con sus productos y ventas (feature flag :bar)
+    resources :bares, only: [:index, :show, :create, :update, :destroy] do
+      member { get :dashboard }
+      resources :productos, controller: 'bar/productos', only: [:index, :create, :update, :destroy] do
         member { post :reponer }
       end
-      resources :ventas, only: [:index, :create] do
-        collection { get :dashboard }
-      end
+      resources :ventas, controller: 'bar/ventas', only: [:index, :create, :destroy]
     end
 
     resource :informe_semestral, only: [:show], controller: :informe_semestral

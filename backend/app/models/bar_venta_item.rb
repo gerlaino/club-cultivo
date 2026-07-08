@@ -1,6 +1,7 @@
 # Línea de una venta del bar. `nombre` es un snapshot: el producto puede cambiar de nombre
 # o borrarse y el ticket histórico se conserva.
 class BarVentaItem < ApplicationRecord
+  acts_as_paranoid # soft-delete: la línea vuelve con su venta al restaurar
   acts_as_tenant(:club)
 
   belongs_to :club

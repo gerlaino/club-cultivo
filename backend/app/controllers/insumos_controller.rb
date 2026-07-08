@@ -3,7 +3,6 @@
 # Registro de consumo: admin/supervisor/cultivador (quien usa el insumo en el grow).
 class InsumosController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_feature_insumos!
   before_action :require_lectura,  only: [:index, :show]
   before_action :require_gestion,  only: [:create, :update, :comprar]
   before_action :require_consumo,  only: [:consumir]
@@ -90,12 +89,6 @@ class InsumosController < ApplicationController
     @insumo = current_user.club.insumos.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Insumo no encontrado' }, status: :not_found
-  end
-
-  def require_feature_insumos!
-    return if current_user.club.feature?(:insumos)
-
-    render json: { error: 'El módulo de insumos no está habilitado para este club.' }, status: :forbidden
   end
 
   ROLES_LECTURA = %w[admin supervisor cultivador auditor].freeze
