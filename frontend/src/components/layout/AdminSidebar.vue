@@ -10,7 +10,7 @@
     <!-- Grupos primarios (1 click → su vista principal) -->
     <nav class="asb__nav">
       <RouterLink
-        v-for="g in NAV_GROUPS" :key="g.key"
+        v-for="g in visibleGroups" :key="g.key"
         :to="g.to" class="asb__link"
         :class="{ 'asb__link--active': activeKey === g.key }"
         :title="collapsed ? g.label : undefined"
@@ -34,11 +34,13 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   LayoutDashboard, Sprout, Users, Factory, ShoppingCart,
-  CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen,
+  CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine,
 } from 'lucide-vue-next'
 import { NAV_GROUPS, detectGroup, useNavContext } from '../../composables/useNavContext.js'
+import { useClubStore } from '../../stores/club.js'
 
 const route = useRoute()
+const club = useClubStore()
 const { collapsed, toggleCollapse, refreshBadges, badgeFor } = useNavContext()
 
 const ICONS = {
@@ -47,10 +49,16 @@ const ICONS = {
   pacientes: Users,
   produccion: Factory,
   comercial: ShoppingCart,
+  salon:     Wine,
   tareas:    CheckSquare,
   reportes:  BarChart3,
   config:    Settings,
 }
+
+// Grupos visibles: oculta los que dependen de un feature flag apagado del club (ej. Salón).
+const visibleGroups = computed(() =>
+  NAV_GROUPS.filter(g => !g.feature || club.data?.features?.[g.feature])
+)
 
 const activeKey = computed(() => detectGroup(route.path).key)
 

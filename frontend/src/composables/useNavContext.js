@@ -41,11 +41,12 @@ export const NAV_GROUPS = [
       { to: '/reservas', label: 'Reservas' },
       { to: '/delivery/despachos', label: 'Despachos' },
       { to: '/contabilidad', label: 'Contabilidad' },
-      { to: '/finanzas/reporte', label: 'Reporte' },
-      { to: '/finanzas/catalogo', label: 'Categorías' },
-      { to: '/finanzas/insumos', label: 'Insumos' },
-      { to: '/bar', label: 'Bar', feature: 'bar' },
     ],
+  },
+  {
+    // Salón (bar) — grupo propio, visible solo si el club tiene el feature activado.
+    key: 'salon', label: 'Salón', to: '/bar', feature: 'bar',
+    tabs: [],
   },
   {
     key: 'tareas', label: 'Tareas', to: '/tareas',
@@ -85,9 +86,11 @@ export function detectGroup(path) {
   if (path === '/') return NAV_GROUPS[0]
   let best = null, bestLen = -1
   for (const g of NAV_GROUPS) {
-    for (const t of g.tabs) {
-      if ((path === t.to || path.startsWith(t.to + '/')) && t.to.length > bestLen) {
-        best = g; bestLen = t.to.length
+    // Candidatos: el `to` del grupo (para grupos sin tabs, ej. Salón) + los `to` de sus tabs.
+    const tos = [g.to, ...g.tabs.map(t => t.to)]
+    for (const to of tos) {
+      if (to && to !== '/' && (path === to || path.startsWith(to + '/')) && to.length > bestLen) {
+        best = g; bestLen = to.length
       }
     }
   }

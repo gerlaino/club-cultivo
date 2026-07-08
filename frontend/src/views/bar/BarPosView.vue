@@ -1,5 +1,5 @@
 <script setup>
-// POS de un bar concreto (Capa 1) — cara operativa. La usa admin/supervisor/dispensador.
+// POS de un bar concreto (Capa 1) — cara operativa. Estilo alineado a ContabilidadView.
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
@@ -35,97 +35,106 @@ async function cobrar() {
 </script>
 
 <template>
-  <div class="pos">
-    <header class="pos__head">
-      <div>
-        <h1>Vender · {{ store.barActual?.nombre || 'Bar' }}</h1>
-        <span class="pos__who">{{ auth.user?.first_name || 'Vendedor' }}</span>
+  <div class="cv">
+    <div class="cv__header">
+      <div class="cv__header-left">
+        <h1 class="cv__title">Vender · {{ store.barActual?.nombre || 'Salón' }}</h1>
+        <p class="cv__sub">{{ auth.user?.first_name || 'Vendedor' }}</p>
       </div>
-      <div class="pos__nav">
-        <RouterLink to="/bar" class="pos__link">← Bares</RouterLink>
-        <RouterLink v-if="esGestion" :to="`/bar/${barId}/panel`" class="pos__link">Panel →</RouterLink>
+      <div class="cv__header-right">
+        <RouterLink to="/bar" class="cv__btn-ghost">Salón</RouterLink>
+        <RouterLink v-if="esGestion" :to="`/bar/${barId}/panel`" class="cv__btn-ghost">Panel</RouterLink>
       </div>
-    </header>
+    </div>
 
-    <div class="pos__body">
-      <div class="pos__catalog">
-        <div class="pos__tabs">
-          <button v-for="c in CATS" :key="c.value" class="pos__tab" :class="{ 'is-on': catActiva === c.value }" @click="catActiva = c.value">{{ c.label }}</button>
+    <div class="cv__pos">
+      <div class="cv__pos-catalog">
+        <div class="cv__pos-tabs">
+          <button v-for="c in CATS" :key="c.value" class="cv__sede-btn" :class="{ 'cv__sede-btn--active': catActiva === c.value }" @click="catActiva = c.value">{{ c.label }}</button>
         </div>
-        <div v-if="store.loading" class="pos__empty">Cargando…</div>
-        <div v-else-if="!productosCat.length" class="pos__empty">Sin productos en esta categoría.</div>
-        <div v-else class="pos__grid">
-          <button v-for="p in productosCat" :key="p.id" class="prod" :class="{ 'prod--off': p.stock <= 0 }" :disabled="p.stock <= 0" @click="store.agregar(p)">
-            <span class="prod__name">{{ p.nombre }}</span>
-            <span class="prod__price">{{ fmt(p.precio_ars) }}</span>
-            <span class="prod__stock" :class="{ low: p.stock_bajo }">stock {{ p.stock }}</span>
+        <div v-if="store.loading" class="cv__empty-sm" style="padding:2rem 0;">Cargando…</div>
+        <div v-else-if="!productosCat.length" class="cv__empty-sm" style="padding:2rem 0;">Sin productos en esta categoría.</div>
+        <div v-else class="cv__prod-grid">
+          <button v-for="p in productosCat" :key="p.id" class="cv__prod" :class="{ 'cv__prod--off': p.stock <= 0 }" :disabled="p.stock <= 0" @click="store.agregar(p)">
+            <span class="cv__prod-name">{{ p.nombre }}</span>
+            <span class="cv__prod-price">{{ fmt(p.precio_ars) }}</span>
+            <span class="cv__prod-stock" :class="{ 'cv__td-red': p.stock_bajo }">stock {{ p.stock }}</span>
           </button>
         </div>
       </div>
 
-      <aside class="pos__cart">
-        <h2>Pedido</h2>
-        <div v-if="!store.carrito.length" class="pos__cart-empty">Tocá un producto para agregarlo.</div>
-        <ul v-else class="pos__cart-list">
-          <li v-for="l in store.carrito" :key="l.producto.id" class="ci">
-            <button class="ci__minus" @click="store.quitar(l.producto.id)" aria-label="Quitar uno">−</button>
-            <span class="ci__qty">{{ l.cantidad }}</span>
-            <span class="ci__name">{{ l.producto.nombre }}</span>
-            <span class="ci__sub">{{ fmt(l.producto.precio_ars * l.cantidad) }}</span>
-            <button class="ci__plus" @click="store.agregar(l.producto)" aria-label="Agregar uno">+</button>
-          </li>
-        </ul>
-        <div class="pos__total"><span>Total</span><strong>{{ fmt(store.totalCarrito) }}</strong></div>
-        <div class="pos__pay">
-          <button v-for="m in ['efectivo','transferencia','mercado_pago']" :key="m" class="pay" :class="{ 'is-on': medioPago === m }" @click="medioPago = m">
-            {{ m === 'mercado_pago' ? 'QR / MP' : (m === 'transferencia' ? 'Transfer' : 'Efectivo') }}
-          </button>
+      <aside class="cv__cart">
+        <div class="cv__card-header"><span class="cv__card-title">Pedido</span></div>
+        <div class="cv__cart-body">
+          <div v-if="!store.carrito.length" class="cv__empty-sm">Tocá un producto para agregarlo.</div>
+          <ul v-else class="cv__cart-list">
+            <li v-for="l in store.carrito" :key="l.producto.id" class="cv__ci">
+              <button class="cv__ci-btn" @click="store.quitar(l.producto.id)" aria-label="Quitar uno">−</button>
+              <span class="cv__ci-qty">{{ l.cantidad }}</span>
+              <span class="cv__ci-name">{{ l.producto.nombre }}</span>
+              <span class="cv__ci-sub cv__num">{{ fmt(l.producto.precio_ars * l.cantidad) }}</span>
+              <button class="cv__ci-btn" @click="store.agregar(l.producto)" aria-label="Agregar uno">+</button>
+            </li>
+          </ul>
+          <div class="cv__cart-total"><span>Total</span><strong class="cv__num">{{ fmt(store.totalCarrito) }}</strong></div>
+          <div class="cv__pay">
+            <button v-for="m in ['efectivo','transferencia','mercado_pago']" :key="m" class="cv__sede-btn" :class="{ 'cv__sede-btn--active': medioPago === m }" @click="medioPago = m">
+              {{ m === 'mercado_pago' ? 'QR / MP' : (m === 'transferencia' ? 'Transfer' : 'Efectivo') }}
+            </button>
+          </div>
+          <button class="cv__btn-primary cv__btn-block" :disabled="!store.carrito.length || store.saving" @click="cobrar">Cobrar {{ fmt(store.totalCarrito) }}</button>
+          <button v-if="store.carrito.length" class="cv__link cv__link--center" @click="store.vaciar()">Vaciar</button>
         </div>
-        <button class="pos__cobrar" :disabled="!store.carrito.length || store.saving" @click="cobrar">Cobrar {{ fmt(store.totalCarrito) }}</button>
-        <button v-if="store.carrito.length" class="pos__vaciar" @click="store.vaciar()">Vaciar</button>
       </aside>
     </div>
   </div>
 </template>
 
 <style scoped>
-.pos { padding: var(--sp-5, 20px); max-width: 1080px; margin: 0 auto; }
-.pos__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-4, 16px); gap: 12px; flex-wrap: wrap; }
-.pos__head h1 { font-size: var(--fs-22, 22px); font-weight: 700; color: var(--c-ink-900); margin: 0; }
-.pos__who { font-size: var(--fs-13, 13px); color: var(--c-ink-400); }
-.pos__nav { display: flex; gap: 16px; }
-.pos__link { font-size: var(--fs-14, 14px); color: var(--c-leaf-700, #2f6b3d); text-decoration: none; font-weight: 600; }
+.cv { padding: 2rem 1.75rem 3rem; max-width: 1280px; margin: 0 auto; color: #0f172a; }
+.cv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.cv__title { font-size: 1.5rem; font-weight: 800; margin: 0 0 .15rem; letter-spacing: -.03em; }
+.cv__sub { font-size: .82rem; color: #64748b; margin: 0; }
+.cv__header-right { display: flex; gap: .5rem; }
+.cv__btn-ghost { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .6rem 1rem; border-radius: 10px; font-size: .84rem; font-weight: 500; cursor: pointer; text-decoration: none; }
+.cv__btn-ghost:hover { border-color: #cbd5e1; color: #334155; }
+.cv__btn-primary { background: #1b5e20; color: #fff; border: none; padding: .75rem 1.25rem; border-radius: 10px; font-size: .95rem; font-weight: 700; cursor: pointer; }
+.cv__btn-primary:hover:not(:disabled) { background: #144a18; }
+.cv__btn-primary:disabled { opacity: .5; cursor: default; }
+.cv__btn-block { width: 100%; }
 
-.pos__body { display: grid; grid-template-columns: 1fr 300px; gap: var(--sp-4, 16px); align-items: start; }
-@media (max-width: 780px) { .pos__body { grid-template-columns: 1fr; } }
-.pos__tabs { display: flex; gap: 6px; margin-bottom: var(--sp-3, 12px); flex-wrap: wrap; }
-.pos__tab { border: 1px solid var(--c-ink-200); background: var(--c-paper, #fff); color: var(--c-ink-600); border-radius: 999px; padding: 6px 14px; font-size: var(--fs-13, 13px); font-weight: 600; cursor: pointer; }
-.pos__tab.is-on { background: var(--c-ink-900); border-color: var(--c-ink-900); color: #fff; }
-.pos__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
-.prod { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; background: var(--c-paper, #fff); border: 1px solid var(--c-ink-100); border-radius: var(--r-md, 10px); padding: 14px 13px; cursor: pointer; text-align: left; }
-.prod:hover { border-color: var(--c-leaf-700, #2f6b3d); }
-.prod--off { opacity: .45; cursor: not-allowed; }
-.prod__name { font-weight: 600; color: var(--c-ink-900); font-size: var(--fs-14, 14px); }
-.prod__price { font-weight: 700; color: var(--c-leaf-700, #2f6b3d); font-variant-numeric: tabular-nums; }
-.prod__stock { font-size: var(--fs-11, 11px); color: var(--c-ink-400); }
-.prod__stock.low { color: var(--c-rust-600, #b23b2e); }
-.pos__empty { color: var(--c-ink-400); padding: var(--sp-6, 24px); text-align: center; }
+.cv__pos { display: grid; grid-template-columns: 1fr 320px; gap: 1rem; align-items: start; }
+@media (max-width: 780px) { .cv__pos { grid-template-columns: 1fr; } }
+.cv__pos-tabs { display: flex; gap: .4rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.cv__sede-btn { padding: 7px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #fff; font-size: 13px; color: #64748b; font-weight: 500; cursor: pointer; }
+.cv__sede-btn--active { border-color: #1b5e20; background: rgba(27,94,32,.07); color: #1b5e20; }
 
-.pos__cart { background: var(--c-paper, #fff); border: 1px solid var(--c-ink-100); border-radius: var(--r-lg, 14px); padding: var(--sp-4, 16px); position: sticky; top: 16px; }
-.pos__cart h2 { font-size: var(--fs-14, 14px); text-transform: uppercase; letter-spacing: .06em; color: var(--c-ink-400); margin: 0 0 var(--sp-3, 12px); }
-.pos__cart-empty { color: var(--c-ink-400); font-size: var(--fs-13, 13px); padding: var(--sp-4, 16px) 0; }
-.pos__cart-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.ci { display: grid; grid-template-columns: 24px 20px 1fr auto 24px; align-items: center; gap: 8px; font-size: var(--fs-14, 14px); }
-.ci__minus, .ci__plus { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--c-ink-200); background: var(--c-ink-50, #f6f7f5); cursor: pointer; font-weight: 700; color: var(--c-ink-700); line-height: 1; }
-.ci__qty { font-weight: 700; text-align: center; color: var(--c-ink-900); }
-.ci__name { color: var(--c-ink-700); }
-.ci__sub { font-variant-numeric: tabular-nums; color: var(--c-ink-900); font-weight: 600; }
-.pos__total { display: flex; justify-content: space-between; align-items: baseline; margin: var(--sp-4, 16px) 0; padding-top: var(--sp-3, 12px); border-top: 1px solid var(--c-ink-100); }
-.pos__total strong { font-size: var(--fs-24, 24px); font-weight: 700; color: var(--c-ink-900); }
-.pos__pay { display: flex; gap: 6px; margin-bottom: var(--sp-3, 12px); flex-wrap: wrap; }
-.pay { flex: 1; border: 1px solid var(--c-ink-200); background: var(--c-paper, #fff); color: var(--c-ink-600); border-radius: var(--r-sm, 8px); padding: 7px 4px; font-size: var(--fs-12, 12px); font-weight: 600; cursor: pointer; }
-.pay.is-on { background: var(--c-leaf-50, #e7f0e5); border-color: var(--c-leaf-700, #2f6b3d); color: var(--c-leaf-700, #2f6b3d); }
-.pos__cobrar { width: 100%; background: var(--c-leaf-700, #2f6b3d); color: #fff; border: none; border-radius: var(--r-md, 10px); padding: 13px; font-size: var(--fs-15, 15px); font-weight: 700; cursor: pointer; }
-.pos__cobrar:disabled { opacity: .5; cursor: default; }
-.pos__vaciar { width: 100%; background: none; border: none; color: var(--c-ink-400); font-size: var(--fs-13, 13px); cursor: pointer; margin-top: 8px; }
+.cv__prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: .6rem; }
+.cv__prod { display: flex; flex-direction: column; gap: .2rem; align-items: flex-start; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: .9rem; cursor: pointer; text-align: left; transition: border-color .12s; }
+.cv__prod:hover { border-color: #1b5e20; }
+.cv__prod--off { opacity: .45; cursor: not-allowed; }
+.cv__prod-name { font-weight: 600; color: #0f172a; font-size: .9rem; }
+.cv__prod-price { font-weight: 800; color: #1b5e20; }
+.cv__prod-stock { font-size: .72rem; color: #94a3b8; }
+.cv__td-red { color: #dc2626; }
+.cv__empty-sm { color: #94a3b8; font-size: .82rem; text-align: center; padding: 1rem 0; }
+
+.cv__cart { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; position: sticky; top: 1rem; }
+.cv__card-header { padding: .9rem 1.1rem; border-bottom: 1px solid #f1f5f9; }
+.cv__card-title { font-size: .9rem; font-weight: 700; color: #0f172a; }
+.cv__cart-body { padding: 1rem 1.1rem 1.1rem; }
+.cv__cart-list { list-style: none; margin: 0 0 .5rem; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.cv__ci { display: grid; grid-template-columns: 26px 22px 1fr auto 26px; align-items: center; gap: .5rem; font-size: .86rem; }
+.cv__ci-btn { width: 26px; height: 26px; border-radius: 7px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; font-weight: 700; color: #334155; line-height: 1; }
+.cv__ci-qty { font-weight: 700; text-align: center; color: #0f172a; }
+.cv__ci-name { color: #334155; }
+.cv__ci-sub { font-weight: 600; color: #0f172a; }
+.cv__num { font-variant-numeric: tabular-nums; }
+.cv__cart-total { display: flex; justify-content: space-between; align-items: baseline; margin: 1rem 0; padding-top: .9rem; border-top: 1px solid #f1f5f9; }
+.cv__cart-total strong { font-size: 1.5rem; font-weight: 800; color: #0f172a; letter-spacing: -.03em; }
+.cv__pay { display: flex; gap: .35rem; margin-bottom: .9rem; flex-wrap: wrap; }
+.cv__pay .cv__sede-btn { flex: 1; padding: 7px 4px; font-size: 12px; text-align: center; }
+.cv__link { background: none; border: none; color: #94a3b8; font-size: .82rem; font-weight: 500; cursor: pointer; }
+.cv__link--center { display: block; width: 100%; text-align: center; margin-top: .5rem; }
+.cv__link:hover { color: #64748b; }
 </style>
