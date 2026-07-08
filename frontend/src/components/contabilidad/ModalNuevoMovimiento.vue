@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useModalEscape } from '../../composables/useModalEscape.js'
+import { listBarProductos } from '../../lib/api.js'
 
 const props = defineProps({
   modelValue:       { type: Boolean, default: false },
@@ -9,6 +10,8 @@ const props = defineProps({
   pacientes:        { type: Array,   default: () => [] },
   sedes:            { type: Array,   default: () => [] },
   unidades:         { type: Array,   default: () => [] },
+  insumos:          { type: Array,   default: () => [] },
+  bares:            { type: Array,   default: () => [] },
   movimientoEditar: { type: Object,  default: null },
 })
 const emit = defineEmits(['update:modelValue', 'guardado'])
@@ -95,6 +98,48 @@ function emptyForm() {
 const form   = ref(emptyForm())
 const errors = ref({})
 const saving = ref(false)
+
+// ── Destino del egreso: además del gasto, hace la entrada de stock en un paso ──
+const UNIDADES_INSUMO = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
+const destino = ref('general') // general | deposito | salon
+const dep = ref({ insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null })
+const sal = ref({ bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null })
+const barProductos = ref([])
+
+function resetDestino() {
+  destino.value = 'general'
+  dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null }
+  sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null }
+  barProductos.value = []
+}
+
+// Al elegir un bar, cargamos sus productos para el desplegable.
+watch(() => sal.value.bar_id, async (id) => {
+  sal.value.bar_producto_id = ''
+  barProductos.value = []
+  if (!id) return
+  try { const { data } = await listBarProductos(id, { activos: 'true' }); barProductos.value = data || [] } catch {}
+})
+
+// Construye el objeto destino para el payload (o null si es general / no aplica).
+function buildDestino() {
+  if (tipoNorm.value !== 'egreso' || esCuotas.value) return null
+  if (destino.value === 'deposito') {
+    const d = dep.value
+    if (!(d.cantidad > 0)) return null
+    return d.insumo_id
+      ? { tipo: 'deposito', insumo_id: d.insumo_id, cantidad: d.cantidad }
+      : { tipo: 'deposito', nombre: d.nombre?.trim(), unidad_medida: d.unidad_medida, cantidad: d.cantidad }
+  }
+  if (destino.value === 'salon') {
+    const s = sal.value
+    if (!s.bar_id || !(s.cantidad > 0)) return null
+    return s.bar_producto_id
+      ? { tipo: 'salon', bar_id: s.bar_id, bar_producto_id: s.bar_producto_id, cantidad: s.cantidad }
+      : { tipo: 'salon', bar_id: s.bar_id, nombre: s.nombre?.trim(), categoria: s.categoria, precio_ars: s.precio_ars, cantidad: s.cantidad }
+  }
+  return null
+}
 
 // Fallback a 'egreso' para tipos legacy (recupero_costo, ajuste) que puedan venir de datos viejos
 const tipoMeta = computed(() => TIPO_META[form.value.tipo] || TIPO_META.egreso)
@@ -293,6 +338,7 @@ watch(() => props.modelValue, (val) => {
       montoDisplay.value = ''
       acPago.value       = false
       acExtras.value     = false
+      resetDestino()
     }
     errors.value = {}
     document.addEventListener('click', onDocClick, true)
@@ -331,7 +377,10 @@ const formValid = computed(() => {
 async function submit() {
   if (!validate()) return
   saving.value = true
-  try { emit('guardado', { ...form.value }) }
+  const payload = { ...form.value }
+  const dst = buildDestino()
+  if (dst) payload.destino = dst
+  try { emit('guardado', payload) }
   finally { saving.value = false }
 }
 </script>
@@ -583,6 +632,79 @@ async function submit() {
 
             <hr class="nm-hr" />
 
+            <!-- DESTINO: además del gasto, entrada de stock (depósito / salón). Solo al crear. -->
+            <div v-if="tipoNorm === 'egreso' && !esCuotas && !movimientoEditar" class="nm-dest">
+              <label class="nm-label">¿Este gasto es una compra de stock?</label>
+              <div class="nm-dest-tabs">
+                <button type="button" class="nm-dest-tab" :class="{ 'nm-dest-tab--on': destino === 'general' }" @click="destino = 'general'">No, gasto común</button>
+                <button type="button" class="nm-dest-tab" :class="{ 'nm-dest-tab--on': destino === 'deposito' }" @click="destino = 'deposito'">📦 Depósito</button>
+                <button type="button" class="nm-dest-tab" :class="{ 'nm-dest-tab--on': destino === 'salon' }" @click="destino = 'salon'" :disabled="!bares.length">🍷 Salón</button>
+              </div>
+
+              <!-- Depósito: compra de insumo -->
+              <div v-if="destino === 'deposito'" class="nm-dest-body">
+                <div class="nm-grid2">
+                  <div class="nm-field">
+                    <label class="nm-label">Insumo</label>
+                    <select class="nm-input" v-model="dep.insumo_id">
+                      <option value="">+ Nuevo insumo…</option>
+                      <option v-for="i in insumos" :key="i.id" :value="i.id">{{ i.nombre }} ({{ i.stock_actual }} {{ i.unidad_medida }})</option>
+                    </select>
+                  </div>
+                  <div class="nm-field">
+                    <label class="nm-label">Cantidad que entra</label>
+                    <input type="number" min="0" step="any" class="nm-input" v-model.number="dep.cantidad" placeholder="Ej: 20" />
+                  </div>
+                </div>
+                <div v-if="!dep.insumo_id" class="nm-grid2">
+                  <div class="nm-field">
+                    <label class="nm-label">Nombre del insumo</label>
+                    <input type="text" class="nm-input" v-model.trim="dep.nombre" placeholder="Ej: Fertilizante base" maxlength="60" />
+                  </div>
+                  <div class="nm-field">
+                    <label class="nm-label">Unidad</label>
+                    <select class="nm-input" v-model="dep.unidad_medida"><option v-for="u in UNIDADES_INSUMO" :key="u" :value="u">{{ u }}</option></select>
+                  </div>
+                </div>
+                <p class="nm-dest-hint">El monto del gasto es el costo total. El stock del insumo sube {{ dep.cantidad || 0 }} y se recalcula su costo promedio.</p>
+              </div>
+
+              <!-- Salón: compra de mercadería del bar -->
+              <div v-if="destino === 'salon'" class="nm-dest-body">
+                <div class="nm-grid2">
+                  <div class="nm-field">
+                    <label class="nm-label">Bar</label>
+                    <select class="nm-input" v-model="sal.bar_id">
+                      <option value="">— Elegí el bar —</option>
+                      <option v-for="b in bares" :key="b.id" :value="b.id">{{ b.nombre }}</option>
+                    </select>
+                  </div>
+                  <div class="nm-field">
+                    <label class="nm-label">Cantidad que entra</label>
+                    <input type="number" min="0" step="any" class="nm-input" v-model.number="sal.cantidad" placeholder="Ej: 24" />
+                  </div>
+                </div>
+                <div v-if="sal.bar_id" class="nm-field">
+                  <label class="nm-label">Producto</label>
+                  <select class="nm-input" v-model="sal.bar_producto_id">
+                    <option value="">+ Nuevo producto…</option>
+                    <option v-for="p in barProductos" :key="p.id" :value="p.id">{{ p.nombre }} (stock {{ p.stock }})</option>
+                  </select>
+                </div>
+                <div v-if="sal.bar_id && !sal.bar_producto_id" class="nm-grid2">
+                  <div class="nm-field">
+                    <label class="nm-label">Nombre del producto</label>
+                    <input type="text" class="nm-input" v-model.trim="sal.nombre" placeholder="Ej: Cerveza IPA" maxlength="50" />
+                  </div>
+                  <div class="nm-field">
+                    <label class="nm-label">Precio de venta</label>
+                    <input type="number" min="0" step="any" class="nm-input" v-model.number="sal.precio_ars" placeholder="$" />
+                  </div>
+                </div>
+                <p class="nm-dest-hint">El gasto queda como mercadería del salón (impacta su resultado). Sube el stock del producto — no confundir con stock de flor seca.</p>
+              </div>
+            </div>
+
             <!-- ACORDEÓN: Comprobante y extras -->
             <div class="nm-ac">
               <button type="button" class="nm-ac-hdr" :aria-expanded="acExtras" @click="acExtras = !acExtras">
@@ -737,6 +859,15 @@ async function submit() {
   overflow-x: hidden;
 }
 .nm-body-end { height: 8px; }
+
+/* Destino del egreso (stock) */
+.nm-dest { margin: 4px 0 8px; }
+.nm-dest-tabs { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.nm-dest-tab { flex: 1; min-width: 110px; padding: 8px 10px; border: 1.5px solid #e2e8f0; border-radius: 9px; background: #fff; color: #64748b; font-size: 13px; font-weight: 600; cursor: pointer; }
+.nm-dest-tab--on { border-color: #1b5e20; background: rgba(27,94,32,.07); color: #1b5e20; }
+.nm-dest-tab:disabled { opacity: .45; cursor: default; }
+.nm-dest-body { margin-top: 10px; padding: 12px; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
+.nm-dest-hint { font-size: 12px; color: #64748b; margin: 0; }
 
 /* ─── TIPO TABS ──────────────────────────────────────── */
 .nm-tabs-wrap { padding: 16px 24px 0; }

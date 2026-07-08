@@ -141,15 +141,21 @@ class MovimientosContablesController < ApplicationController
   end
 
   # POST /movimientos_contables
+  # Además del asiento, un egreso puede llevar un `destino` (depósito/salón) que hace la entrada
+  # de stock correspondiente vinculada a ESTE egreso (sin generar un segundo asiento).
   def create
     movimiento = current_user.club.movimientos_contables.build(movimiento_params)
     movimiento.created_by = current_user
 
-    if movimiento.save
-      render json: serialize(movimiento), status: :created
-    else
-      render json: { errors: movimiento.errors.full_messages }, status: :unprocessable_entity
+    ActiveRecord::Base.transaction do
+      movimiento.save!
+      aplicar_destino!(movimiento)
     end
+    render json: serialize(movimiento), status: :created
+  rescue ActiveRecord::RecordInvalid
+    render json: { errors: movimiento.errors.full_messages.presence || ['No se pudo guardar'] }, status: :unprocessable_entity
+  rescue ArgumentError, ActiveRecord::RecordNotFound => e
+    render json: { errors: [e.message] }, status: :unprocessable_entity
   end
 
   # PATCH /movimientos_contables/:id
@@ -271,6 +277,56 @@ class MovimientosContablesController < ApplicationController
       :comprobante_numero, :comprobante_tipo, :proveedor,
       :pagado, :medio_pago, :notas
     )
+  end
+
+  # ── Destino del egreso (entrada de stock en un solo paso) ──────────────────────
+  # destino: { tipo: 'deposito'|'salon', ...datos }. El egreso ya está creado; acá se hace la
+  # entrada de stock vinculada a él, SIN generar otro asiento.
+  def aplicar_destino!(movimiento)
+    destino = params.dig(:movimiento_contable, :destino)
+    return if destino.blank? || movimiento.tipo != 'egreso'
+
+    case destino[:tipo]
+    when 'deposito' then aplicar_deposito!(movimiento, destino)
+    when 'salon'    then aplicar_salon!(movimiento, destino)
+    end
+  end
+
+  # Depósito: compra de insumo. Sube stock + recalcula costo promedio; el egreso es este movimiento.
+  def aplicar_deposito!(movimiento, d)
+    club   = current_user.club
+    insumo = if d[:insumo_id].present?
+               club.insumos.find(d[:insumo_id])
+             else
+               club.insumos.create!(nombre: d[:nombre].to_s.strip, unidad_medida: d[:unidad_medida].presence || 'unidad')
+             end
+    cantidad = d[:cantidad].to_d
+    raise ArgumentError, 'Indicá la cantidad de insumo' if cantidad <= 0
+
+    compra = insumo.registrar_compra!(
+      cantidad: cantidad, costo_total_ars: movimiento.monto_ars, created_by: current_user,
+      proveedor: movimiento.proveedor, fecha: movimiento.fecha, generar_egreso: false
+    )
+    compra.update!(movimiento_contable: movimiento)
+  end
+
+  # Salón: compra de mercadería del bar. Sube el stock del producto y etiqueta el egreso con la
+  # sede del bar + unidad "Bar" (para que impacte el P&L del salón). NO es stock de flor seca.
+  def aplicar_salon!(movimiento, d)
+    club = current_user.club
+    bar  = club.bares.find(d[:bar_id])
+    producto = if d[:bar_producto_id].present?
+                 bar.bar_productos.find(d[:bar_producto_id])
+               else
+                 bar.bar_productos.create!(club: club, unidad_negocio: bar.unidad_negocio_bar,
+                                           nombre: d[:nombre].to_s.strip, categoria: d[:categoria].presence || 'bebida',
+                                           precio_ars: d[:precio_ars].to_d)
+               end
+    cantidad = d[:cantidad].to_d
+    raise ArgumentError, 'Indicá la cantidad de mercadería' if cantidad <= 0
+
+    producto.update!(stock: producto.stock.to_d + cantidad)
+    movimiento.update!(sede_id: bar.sede_id, unidad_negocio: bar.unidad_negocio_bar)
   end
 
   def require_lectura
