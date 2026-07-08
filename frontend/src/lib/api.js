@@ -351,6 +351,19 @@ export const crearBarVenta      = (barId, payload) => api.post(`/bares/${barId}/
 export const listBarVentas      = (barId)          => api.get(`/bares/${barId}/ventas`)
 export const deleteBarVenta     = (barId, id)      => api.delete(`/bares/${barId}/ventas/${id}`)
 
+// ── Bar · eventos (proyecto con P&L) ───────────────────────────────────────────
+export const listEventosBar    = (barId)             => api.get(`/bares/${barId}/eventos`)
+export const getEventoBar      = (barId, id)         => api.get(`/bares/${barId}/eventos/${id}`)
+export const createEventoBar   = (barId, payload)    => api.post(`/bares/${barId}/eventos`, { evento_bar: payload })
+export const updateEventoBar   = (barId, id, payload) => api.put(`/bares/${barId}/eventos/${id}`, { evento_bar: payload })
+export const deleteEventoBar   = (barId, id)         => api.delete(`/bares/${barId}/eventos/${id}`)
+export const createEventoCosto = (barId, evId, payload) => api.post(`/bares/${barId}/eventos/${evId}/costos`, { evento_bar_costo: payload })
+export const updateEventoCosto = (barId, evId, id, payload) => api.put(`/bares/${barId}/eventos/${evId}/costos/${id}`, { evento_bar_costo: payload })
+export const deleteEventoCosto = (barId, evId, id)   => api.delete(`/bares/${barId}/eventos/${evId}/costos/${id}`)
+export const createEventoTarea = (barId, evId, payload) => api.post(`/bares/${barId}/eventos/${evId}/tareas`, { evento_bar_tarea: payload })
+export const updateEventoTarea = (barId, evId, id, payload) => api.put(`/bares/${barId}/eventos/${evId}/tareas/${id}`, { evento_bar_tarea: payload })
+export const deleteEventoTarea = (barId, evId, id)   => api.delete(`/bares/${barId}/eventos/${evId}/tareas/${id}`)
+
 // ── Finanzas · reporte consolidado ─────────────────────────────────────────────
 export const getReporteFinanzas    = (params = {}) => api.get('/finanzas/reporte', { params })
 export const exportReporteFinanzas = (params = {}) => api.get('/finanzas/reporte/export', { params, responseType: 'blob' })

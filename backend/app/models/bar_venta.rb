@@ -10,6 +10,7 @@ class BarVenta < ApplicationRecord
   belongs_to :user # vendedor
   belongs_to :unidad_negocio,      optional: true
   belongs_to :movimiento_contable, optional: true
+  belongs_to :evento_bar,          optional: true # venta atribuida a un evento (opcional)
   has_many :items, class_name: 'BarVentaItem', dependent: :destroy
 
   MEDIOS_PAGO = %w[efectivo transferencia mercado_pago].freeze
@@ -31,7 +32,7 @@ class BarVenta < ApplicationRecord
     mov = club.movimientos_contables.create!(
       created_by: user, tipo: 'ingreso',
       categoria: 'otro', categoria_contable: categoria_venta_bar(unidad),
-      unidad_negocio: unidad, sede_id: bar&.sede_id,
+      unidad_negocio: unidad, sede_id: bar&.sede_id, evento_bar_id: evento_bar_id,
       descripcion: "Venta bar ##{id}",
       monto_ars: total_ars, fecha: Date.current,
       pagado: true, medio_pago: medio_pago, comprobante_tipo: 'sin_comprobante'

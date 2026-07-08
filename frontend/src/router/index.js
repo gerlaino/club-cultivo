@@ -146,6 +146,28 @@ const routes = [
       else next("/")
     },
   },
+  {
+    path: "/bar/:barId/eventos",
+    name: "bar-eventos",
+    component: () => import("../views/bar/EventosBarView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "supervisor"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
+  {
+    path: "/bar/:barId/eventos/:eventoId",
+    name: "bar-evento-detalle",
+    component: () => import("../views/bar/EventoBarDetailView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "supervisor"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
 
   // Salas
   {

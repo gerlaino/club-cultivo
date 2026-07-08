@@ -9,6 +9,7 @@ class Bar < ApplicationRecord
   belongs_to :sede
   has_many :bar_productos, dependent: :destroy
   has_many :bar_ventas,    dependent: :destroy
+  has_many :eventos_bar,   class_name: 'EventoBar', dependent: :destroy
 
   validates :nombre, presence: true
   validate  :sede_habilitada

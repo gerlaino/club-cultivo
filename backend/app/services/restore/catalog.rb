@@ -103,6 +103,13 @@ module Restore
       # La venta re-descuenta stock y re-crea el ingreso al restaurar → compleja con restorer.
       { key: 'bar_venta',           model_name: 'BarVenta',           label: 'Venta de bar',        group: 'Bar', complex: true, restorer: 'Restore::Restorers::BarVenta', descriptor: ->(r) { "Venta ##{r.id}" } },
       { key: 'bar_venta_item',      model_name: 'BarVentaItem',       label: 'Línea de venta de bar', group: 'Bar', complex: true, top_level: false, descriptor: ->(r) { "Línea ##{r.id}" } },
+
+      # --- Eventos de bar ------------------------------------------------------
+      # El evento vuelve con sus costos/tareas y re-crea los egresos de los costos pagados.
+      { key: 'evento_bar',          model_name: 'EventoBar',          label: 'Evento de bar',       group: 'Bar', complex: true, restorer: 'Restore::Restorers::EventoBar', descriptor: ->(r) { r.try(:nombre).presence || "Evento ##{r.id}" } },
+      # El costo re-aplica su egreso si estaba pagado.
+      { key: 'evento_bar_costo',    model_name: 'EventoBarCosto',     label: 'Costo de evento',     group: 'Bar', complex: true, restorer: 'Restore::Restorers::EventoBarCosto', descriptor: ->(r) { r.try(:concepto).presence || "Costo ##{r.id}" } },
+      { key: 'evento_bar_tarea',    model_name: 'EventoBarTarea',     label: 'Tarea de evento',     group: 'Bar', descriptor: ->(r) { r.try(:titulo).presence || "Tarea ##{r.id}" } },
     ].map { |h| Entry.new(**h) }.freeze
 
     BY_KEY = ENTRIES.index_by(&:key).freeze

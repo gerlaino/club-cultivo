@@ -17,6 +17,7 @@ class MovimientoContable < ApplicationRecord
   # Ambas opcionales: los movimientos legacy siguen funcionando con el string `categoria`.
   belongs_to :categoria_contable, optional: true
   belongs_to :unidad_negocio,     optional: true
+  belongs_to :evento_bar,         optional: true # dimensión: atribuye el movimiento a un evento
 
   # Puente legacy ⇄ nuevo: si viene una categoría editable, autocompleta el string `categoria`
   # (que aún dispara aporte_socio / mapeo de costos) y hereda su unidad de negocio.

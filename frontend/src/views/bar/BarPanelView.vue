@@ -57,6 +57,7 @@ async function borrarProducto(p) {
       </div>
       <div class="bp__nav">
         <RouterLink to="/bar" class="btn">← Bares</RouterLink>
+        <RouterLink :to="`/bar/${barId}/eventos`" class="btn">🎉 Eventos</RouterLink>
         <RouterLink :to="`/bar/${barId}/vender`" class="btn btn--primary">Vender →</RouterLink>
       </div>
     </header>
