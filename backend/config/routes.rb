@@ -392,6 +392,10 @@ Rails.application.routes.draw do
           member { post :vender }
         end
         resources :entradas, controller: 'bar/entradas', only: [:index, :destroy]
+        # Puerta / check-in por QR (Capa 4)
+        get  'puerta',          controller: 'bar/puerta', action: :estado
+        post 'puerta/checkin',  controller: 'bar/puerta', action: :checkin
+        post 'puerta/revertir', controller: 'bar/puerta', action: :revertir
       end
     end
 

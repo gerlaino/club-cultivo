@@ -168,6 +168,28 @@ const routes = [
       else next("/")
     },
   },
+  {
+    path: "/bar/:barId/eventos/:eventoId/entradas",
+    name: "bar-evento-entradas",
+    component: () => import("../views/bar/EntradasView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "supervisor"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
+  {
+    path: "/bar/:barId/eventos/:eventoId/puerta",
+    name: "bar-evento-puerta",
+    component: () => import("../views/bar/PuertaView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "supervisor", "dispensador"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
 
   // Salas
   {

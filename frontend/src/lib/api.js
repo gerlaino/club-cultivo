@@ -369,6 +369,9 @@ export const deleteTipoEntrada = (barId, evId, id)            => api.delete(`/ba
 export const venderEntradas    = (barId, evId, tipoId, payload) => api.post(`/bares/${barId}/eventos/${evId}/tipos_entrada/${tipoId}/vender`, payload)
 export const listEntradas      = (barId, evId)                => api.get(`/bares/${barId}/eventos/${evId}/entradas`)
 export const anularEntrada     = (barId, evId, id)            => api.delete(`/bares/${barId}/eventos/${evId}/entradas/${id}`)
+export const getPuertaEstado   = (barId, evId)                => api.get(`/bares/${barId}/eventos/${evId}/puerta`)
+export const checkinEntrada    = (barId, evId, codigo)        => api.post(`/bares/${barId}/eventos/${evId}/puerta/checkin`, { codigo })
+export const revertirCheckin   = (barId, evId, codigo)        => api.post(`/bares/${barId}/eventos/${evId}/puerta/revertir`, { codigo })
 
 // ── Finanzas · reporte consolidado ─────────────────────────────────────────────
 export const getReporteFinanzas    = (params = {}) => api.get('/finanzas/reporte', { params })

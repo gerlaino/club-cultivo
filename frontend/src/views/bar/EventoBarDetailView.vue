@@ -106,6 +106,8 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
         <p>{{ e.fecha || 'sin fecha' }}<span v-if="e.aforo"> · aforo {{ e.aforo }}</span></p>
       </div>
       <div class="ed__head-actions">
+        <RouterLink :to="`/bar/${barId}/eventos/${evId}/entradas`" class="lnk lnk--btn">🎟️ Entradas</RouterLink>
+        <RouterLink :to="`/bar/${barId}/eventos/${evId}/puerta`" class="lnk lnk--btn">🚪 Puerta</RouterLink>
         <select :value="e.estado" class="inp" @change="cambiarEstado($event.target.value)">
           <option v-for="s in ESTADOS" :key="s.v" :value="s.v">{{ s.l }}</option>
         </select>
@@ -319,6 +321,8 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 .btn--sm { padding: 6px 11px; font-size: var(--fs-12, 12px); }
 .btn--primary { background: var(--c-leaf-700, #2f6b3d); border-color: var(--c-leaf-700, #2f6b3d); color: #fff; }
 .btn:disabled { opacity: .5; cursor: default; }
-.lnk { background: none; border: none; color: var(--c-ink-400); font-size: var(--fs-13, 13px); cursor: pointer; padding: 2px 5px; }
+.lnk { background: none; border: none; color: var(--c-ink-400); font-size: var(--fs-13, 13px); cursor: pointer; padding: 2px 5px; text-decoration: none; }
+.lnk--btn { border: 1px solid var(--c-ink-200); border-radius: var(--r-sm, 8px); padding: 6px 11px; color: var(--c-ink-700); font-weight: 600; }
+.lnk--btn:hover { border-color: var(--c-leaf-700, #2f6b3d); color: var(--c-leaf-700, #2f6b3d); }
 .lnk--danger:hover { color: var(--c-rust-600, #b23b2e); }
 </style>
