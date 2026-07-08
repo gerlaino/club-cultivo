@@ -98,7 +98,7 @@ module Restore
       { key: 'ariccame_registro',   model_name: 'AriccameRegistro',   label: 'Registro ARICCAME',   group: 'Regulatorio', complex: true, restorer: 'Restore::Restorers::AriccameRegistro', descriptor: ->(r) { "Registro ##{r.id}" } },
 
       # --- Bar -----------------------------------------------------------------
-      { key: 'bar',                 model_name: 'Bar',                label: 'Bar',                 group: 'Bar' },
+      { key: 'bar',                 model_name: 'Barra',              label: 'Bar',                 group: 'Bar' },
       { key: 'bar_producto',        model_name: 'BarProducto',        label: 'Producto de bar',     group: 'Bar' },
       # La venta re-descuenta stock y re-crea el ingreso al restaurar → compleja con restorer.
       { key: 'bar_venta',           model_name: 'BarVenta',           label: 'Venta de bar',        group: 'Bar', complex: true, restorer: 'Restore::Restorers::BarVenta', descriptor: ->(r) { "Venta ##{r.id}" } },

@@ -6,7 +6,7 @@ class BarVenta < ApplicationRecord
   acts_as_tenant(:club)
 
   belongs_to :club
-  belongs_to :bar
+  belongs_to :bar, class_name: 'Barra'
   belongs_to :user # vendedor
   belongs_to :unidad_negocio,      optional: true
   belongs_to :movimiento_contable, optional: true

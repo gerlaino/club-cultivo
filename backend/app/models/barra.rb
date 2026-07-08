@@ -1,7 +1,13 @@
 # Un bar del club, ligado a una sede social o mixta. Es una entidad independiente: sus
 # productos, ventas, caja y resultado son propios de esa sede. Un club puede tener varios
 # (uno por sede social/mixta). Recuperable desde la papelera.
-class Bar < ApplicationRecord
+#
+# Se llama `Barra` (no `Bar`) para no chocar con el namespace `Bar::` de los controllers y
+# servicios (Zeitwerk no admite una constante que sea clase y módulo a la vez). La tabla es
+# `bares` y la UI dice "bar".
+class Barra < ApplicationRecord
+  self.table_name = 'bares'
+
   include Restorable
   acts_as_tenant(:club)
 

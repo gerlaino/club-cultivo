@@ -5,7 +5,7 @@ module Restore
     class EventoBar < Restore::Base
       def conflicts
         cs = []
-        cs << conflict('bar_inexistente', 'El bar de este evento ya no existe.') if ::Bar.where(id: record.bar_id).none?
+        cs << conflict('bar_inexistente', 'El bar de este evento ya no existe.') if ::Barra.where(id: record.bar_id).none?
         cs
       end
 

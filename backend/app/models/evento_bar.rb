@@ -8,7 +8,7 @@ class EventoBar < ApplicationRecord
   self.table_name = 'eventos_bar'
 
   belongs_to :club
-  belongs_to :bar
+  belongs_to :bar, class_name: 'Barra'
   has_many :costos,        class_name: 'EventoBarCosto', foreign_key: :evento_bar_id, dependent: :destroy
   has_many :tareas,        class_name: 'EventoBarTarea', foreign_key: :evento_bar_id, dependent: :destroy
   has_many :tipos_entrada, class_name: 'EventoBarTipoEntrada', foreign_key: :evento_bar_id, dependent: :destroy

@@ -5,7 +5,7 @@ class BarProducto < ApplicationRecord
   acts_as_tenant(:club)
 
   belongs_to :club
-  belongs_to :bar
+  belongs_to :bar, class_name: 'Barra'
   belongs_to :unidad_negocio, optional: true
   has_many :bar_venta_items, dependent: :nullify
 
