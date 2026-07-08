@@ -63,24 +63,24 @@ export const useCatalogoFinanzasStore = defineStore("catalogoFinanzas", {
       }
     },
 
-    // ── Categorías ──────────────────────────────────────────────
+    // ── Categorías (árbol: madre → subcategoría) ────────────────
+    // Tras crear/editar/borrar refrescamos el árbol completo: mantenerlo local sería frágil
+    // (una subcategoría cambia dentro de su madre, se reparenta, etc.).
     async crearCategoria(payload) {
-      return this._guardar(
-        () => createCategoriaContable(payload),
-        (data) => { this.categorias = [...this.categorias, data]; },
-      );
+      const data = await this._guardar(() => createCategoriaContable(payload), () => {});
+      await this.fetchCategorias();
+      return data;
     },
 
     async actualizarCategoria(id, payload) {
-      return this._guardar(
-        () => updateCategoriaContable(id, payload),
-        (data) => { this.categorias = this.categorias.map(c => c.id === id ? data : c); },
-      );
+      const data = await this._guardar(() => updateCategoriaContable(id, payload), () => {});
+      await this.fetchCategorias();
+      return data;
     },
 
     async eliminarCategoria(id) {
       await deleteCategoriaContable(id);
-      this.categorias = this.categorias.filter(c => c.id !== id);
+      await this.fetchCategorias();
     },
 
     // ── Unidades ────────────────────────────────────────────────

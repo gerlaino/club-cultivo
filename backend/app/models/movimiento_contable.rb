@@ -129,8 +129,9 @@ class MovimientoContable < ApplicationRecord
   def sincronizar_desde_categoria_contable
     return if categoria_contable.nil?
 
-    self.categoria       = categoria_contable.clave_sistema.presence || 'otro' if categoria.blank?
-    self.unidad_negocio_id ||= categoria_contable.unidad_negocio_id
+    # Usa los valores EFECTIVOS: si es una subcategoría, hereda clave/unidad de su madre.
+    self.categoria         = categoria_contable.clave_efectiva.presence || 'otro' if categoria.blank?
+    self.unidad_negocio_id ||= categoria_contable.unidad_efectiva&.id
   end
 
   def fecha_no_futura

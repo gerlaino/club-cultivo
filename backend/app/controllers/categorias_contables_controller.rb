@@ -7,12 +7,13 @@ class CategoriasContablesController < ApplicationController
   before_action :asegurar_catalogo, only: [:index]
   before_action :set_categoria,     only: [:update, :destroy]
 
-  # GET /categorias_contables
+  # GET /categorias_contables — árbol: madres con sus subcategorías anidadas.
   def index
-    scope = current_user.club.categorias_contables.includes(:unidad_negocio).ordenadas
+    scope = current_user.club.categorias_contables.includes(:unidad_negocio, subcategorias: :unidad_negocio)
     scope = scope.where(tipo: params[:tipo]) if params[:tipo].present?
     scope = scope.activas                    if params[:activas] == 'true'
-    render json: scope.map { |c| serialize(c) }
+    madres = scope.madres.ordenadas
+    render json: madres.map { |m| serialize(m, con_subcategorias: true) }
   end
 
   # POST /categorias_contables
@@ -39,6 +40,9 @@ class CategoriasContablesController < ApplicationController
     if @categoria.es_sistema?
       return render json: { error: 'Esta categoría es del sistema y no puede eliminarse. Podés desactivarla.' }, status: :unprocessable_entity
     end
+    if @categoria.subcategorias.exists?
+      return render json: { error: 'Esta categoría tiene subcategorías. Borralas o movelas primero.' }, status: :unprocessable_entity
+    end
     if @categoria.movimientos_contables.exists?
       return render json: { error: 'La categoría tiene movimientos. Desactivala en vez de borrarla para conservar el histórico.' }, status: :unprocessable_entity
     end
@@ -55,16 +59,17 @@ class CategoriasContablesController < ApplicationController
     render json: { error: 'Categoría no encontrada' }, status: :not_found
   end
 
-  # Sistema: si el club nunca entró a Finanzas, siembra el catálogo desde los enums legacy.
+  # Siembra el catálogo la primera vez y, si el club quedó con categorías planas (siembra vieja),
+  # las reorganiza en el árbol. La siembra es idempotente: correrla de nuevo no duplica.
   def asegurar_catalogo
-    return if current_user.club.categorias_contables.exists?
+    return if current_user.club.categorias_contables.hojas.exists?
 
     Finanzas::SembrarCatalogo.new(current_user.club).call
   end
 
   def categoria_params
     params.require(:categoria_contable).permit(
-      :nombre, :tipo, :color, :unidad_negocio_id, :orden, :activa
+      :nombre, :tipo, :color, :unidad_negocio_id, :orden, :activa, :parent_id, :comportamiento
     )
   end
 
@@ -80,18 +85,23 @@ class CategoriasContablesController < ApplicationController
     end
   end
 
-  def serialize(c)
-    {
+  def serialize(c, con_subcategorias: false)
+    base = {
       id:                c.id,
       nombre:            c.nombre,
       tipo:              c.tipo,
       color:             c.color,
-      clave_sistema:     c.clave_sistema,
+      parent_id:         c.parent_id,
+      comportamiento:    c.comportamiento,
+      comportamiento_efectivo: c.comportamiento_efectivo,
+      clave_efectiva:    c.clave_efectiva,
       es_sistema:        c.es_sistema,
       activa:            c.activa,
       orden:             c.orden,
       unidad_negocio_id: c.unidad_negocio_id,
-      unidad_negocio:    c.unidad_negocio ? { id: c.unidad_negocio.id, nombre: c.unidad_negocio.nombre, tipo: c.unidad_negocio.tipo } : nil,
+      unidad_negocio:    c.unidad_efectiva ? { id: c.unidad_efectiva.id, nombre: c.unidad_efectiva.nombre, tipo: c.unidad_efectiva.tipo } : nil,
     }
+    base[:subcategorias] = c.subcategorias.ordenadas.map { |s| serialize(s) } if con_subcategorias
+    base
   end
 end

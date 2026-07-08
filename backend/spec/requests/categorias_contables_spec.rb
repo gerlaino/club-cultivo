@@ -12,15 +12,31 @@ RSpec.describe 'Categorías contables', type: :request do
   describe 'GET /categorias_contables' do
     before { sign_in_as(admin) }
 
-    it 'siembra el catálogo la primera vez y lo devuelve' do
+    it 'siembra el árbol la primera vez (madres con subcategorías)' do
       expect(club.categorias_contables.count).to eq(0)
       get '/categorias_contables', headers: auth_headers, as: :json
       expect(response).to have_http_status(:ok)
       body = JSON.parse(response.body)
       expect(body).not_to be_empty
-      # las de sistema traen clave_sistema y no son borrables
-      aporte = body.find { |c| c['clave_sistema'] == 'aporte_socio' }
+      # 'Insumos' es una madre (comportamiento insumo) con subcategorías
+      insumos = body.find { |c| c['comportamiento'] == 'insumo' }
+      expect(insumos['subcategorias'].map { |s| s['nombre'] }).to include('Fertilizante')
+      # la subcategoría hereda la clave/unidad de la madre
+      fert = insumos['subcategorias'].find { |s| s['nombre'] == 'Fertilizante' }
+      expect(fert['clave_efectiva']).to eq('insumo')
+      # aportes de socios sigue siendo ingreso, mapeado a la lógica legacy
+      aporte = body.find { |c| c['clave_efectiva'] == 'aporte_socio' }
       expect(aporte).to include('tipo' => 'ingreso', 'es_sistema' => true)
+    end
+
+    it 'una subcategoría de una madre insumo hereda el comportamiento y deriva el string legacy' do
+      get '/categorias_contables', headers: auth_headers, as: :json
+      fert = club.categorias_contables.find_by(nombre: 'Fertilizante')
+      expect(fert.comportamiento_efectivo).to eq('insumo')
+      mov = club.movimientos_contables.create!(created_by: admin, tipo: 'egreso',
+        categoria_contable: fert, descripcion: 'Test', monto_ars: 1000, fecha: Date.today)
+      expect(mov.categoria).to eq('insumo')        # string legacy heredado → mapea a costo_insumos
+      expect(mov.unidad_negocio.tipo).to eq('cultivo')
     end
 
     it 'no re-siembra si ya hay categorías (idempotente)' do
