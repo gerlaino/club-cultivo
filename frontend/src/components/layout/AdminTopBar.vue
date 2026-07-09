@@ -15,6 +15,25 @@
       </div>
       <span class="atb__club-sep" aria-hidden="true"></span>
 
+      <!-- Selector de sede actual (contexto de la UI) — solo multi-sede + admin/supervisor -->
+      <div v-if="showSedeSelector" class="atb__sede" v-click-outside="() => (sedeMenuOpen = false)">
+        <button class="atb__sede-btn" :class="{ 'atb__sede-btn--all': sede.esConsolidado }" @click="sedeMenuOpen = !sedeMenuOpen" :aria-expanded="sedeMenuOpen">
+          <span class="atb__sede-ico">📍</span>
+          <span class="atb__sede-name">{{ sede.sedeActual?.nombre || 'Todas las sedes' }}</span>
+          <i class="bi bi-chevron-down atb__sede-chev" :class="{ up: sedeMenuOpen }"></i>
+        </button>
+        <div v-if="sedeMenuOpen" class="atb__sede-menu" role="listbox">
+          <button class="atb__sede-opt" :class="{ 'is-sel': sede.esConsolidado }" @click="pickSede(null)">
+            <span>🏢 Todas las sedes</span><small>consolidado del club</small>
+          </button>
+          <div class="atb__sede-div"></div>
+          <button v-for="s in sede.sedes" :key="s.id" class="atb__sede-opt" :class="{ 'is-sel': sede.sedeId === s.id }" @click="pickSede(s.id)">
+            <span>{{ s.nombre }}</span><small>{{ s.tipo }}</small>
+          </button>
+        </div>
+      </div>
+      <span v-if="showSedeSelector" class="atb__club-sep" aria-hidden="true"></span>
+
       <!-- Sub-pestañas del grupo activo, pegadas al club (el grupo primario vive en el sidebar) -->
       <nav v-if="visibleTabs.length" class="atb__tabs" aria-label="Secciones">
         <RouterLink
@@ -105,6 +124,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
+import { useSedeStore } from '../../stores/sede.js'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
@@ -122,6 +142,12 @@ const route    = useRoute()
 const router   = useRouter()
 const auth     = useAuthStore()
 const club     = useClubStore()
+const sede     = useSedeStore()
+
+// Selector de sede actual: solo en clubes multi-sede y para admin/supervisor (los que cambian de sede).
+const showSedeSelector = computed(() => !!club.data?.features?.multi_sede && ['admin', 'supervisor'].includes(auth.user?.role))
+const sedeMenuOpen = ref(false)
+function pickSede(id) { sede.setSede(id); sedeMenuOpen.value = false }
 const ambStore = useAmbienteStore()
 
 useAlertasBell()
@@ -147,6 +173,7 @@ async function togglePush() {
 
 onMounted(() => {
   helpDot.value = !localStorage.getItem(`help_seen_${auth.user?.id || 'u'}`)
+  if (showSedeSelector.value) sede.fetchSedes()
 })
 
 function openHelp() {
@@ -232,6 +259,22 @@ async function handleLogout() {
   white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em;
 }
 .atb__club-sep { width: 1px; height: 24px; background: var(--c-ink-200); flex-shrink: 0; }
+
+/* Selector de sede actual */
+.atb__sede { position: relative; flex-shrink: 0; }
+.atb__sede-btn { display: inline-flex; align-items: center; gap: 7px; background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 6px 11px; font-size: .82rem; font-weight: 650; color: #334155; cursor: pointer; max-width: 200px; }
+.atb__sede-btn:hover { border-color: #cbd5e1; }
+.atb__sede-btn--all { color: #64748b; }
+.atb__sede-ico { font-size: .9rem; line-height: 1; }
+.atb__sede-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.atb__sede-chev { font-size: .7rem; color: #94a3b8; transition: transform .15s; }
+.atb__sede-chev.up { transform: rotate(180deg); }
+.atb__sede-menu { position: absolute; top: calc(100% + 6px); left: 0; min-width: 220px; background: #fff; border: 1px solid #e2e8f0; border-radius: 11px; box-shadow: 0 8px 28px rgb(15 23 42 / .16); padding: 5px; z-index: 60; }
+.atb__sede-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; text-align: left; background: none; border: none; border-radius: 8px; padding: 8px 10px; font-size: .84rem; font-weight: 600; color: #334155; cursor: pointer; }
+.atb__sede-opt:hover { background: #f8fafc; }
+.atb__sede-opt.is-sel { background: rgb(27 94 32 / .07); color: #1b5e20; }
+.atb__sede-opt small { font-size: .7rem; font-weight: 500; color: #94a3b8; text-transform: capitalize; }
+.atb__sede-div { height: 1px; background: #f1f5f9; margin: 4px 6px; }
 @media (max-width: 700px) { .atb__club-name { display: none; } }
 
 /* Sub-pestañas del grupo activo */
