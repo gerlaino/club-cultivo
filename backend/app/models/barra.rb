@@ -13,9 +13,11 @@ class Barra < ApplicationRecord
 
   belongs_to :club
   belongs_to :sede
-  has_many :bar_productos, dependent: :destroy
-  has_many :bar_ventas,    dependent: :destroy
-  has_many :eventos_bar,   class_name: 'EventoBar', dependent: :destroy
+  # La FK real es bar_id (el modelo se llama Barra, así que hay que declararla explícita: si no,
+  # Rails inferiría barra_id y rompería con "columna inexistente").
+  has_many :bar_productos, foreign_key: :bar_id, dependent: :destroy
+  has_many :bar_ventas,    foreign_key: :bar_id, dependent: :destroy
+  has_many :eventos_bar,   class_name: 'EventoBar', foreign_key: :bar_id, dependent: :destroy
 
   validates :nombre, presence: true
   validate  :sede_habilitada
