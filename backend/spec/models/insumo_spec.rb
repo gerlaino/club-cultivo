@@ -60,4 +60,36 @@ RSpec.describe Insumo, type: :model do
       expect(lote.reload.costo_lote.costo_insumos.to_f).to be >= 400.0
     end
   end
+
+  describe '#registrar_consumo_repartido!' do
+    let(:sala2) { create(:sala, club: club, created_by: admin) }
+    let(:lote2) { create(:lote, club: club, sala: sala2) }
+
+    it 'reparte la cantidad en partes iguales entre los lotes' do
+      i = insumo
+      i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false)
+      consumos = i.registrar_consumo_repartido!(cantidad: 3, lotes: [lote, lote2], created_by: admin)
+      expect(consumos.size).to eq(2)
+      expect(consumos.sum(&:cantidad)).to eq(3)          # suma exacta (el último absorbe redondeo)
+      expect(i.reload.stock_actual).to eq(7)
+      expect(consumos.map(&:lote_id)).to match_array([lote.id, lote2.id])
+    end
+  end
+
+  describe '#avisar_reposicion!' do
+    it 'crea una alerta stock_bajo cuando el consumo deja el stock en el mínimo' do
+      i = insumo(stock_minimo: 5)
+      i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false)
+      expect { i.registrar_consumo!(cantidad: 6, lote: lote, created_by: admin) } # queda 4 <= 5
+        .to change { club.alertas_internas.where(tipo: 'stock_bajo').count }.by(1)
+    end
+
+    it 'no duplica el aviso dentro de la ventana anti-spam' do
+      i = insumo(stock_minimo: 5)
+      i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false)
+      i.registrar_consumo!(cantidad: 6, lote: lote, created_by: admin)
+      expect { i.registrar_consumo!(cantidad: 1, lote: lote, created_by: admin) }
+        .not_to change { club.alertas_internas.where(tipo: 'stock_bajo').count }
+    end
+  end
 end

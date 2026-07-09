@@ -75,21 +75,62 @@ class Insumo < ApplicationRecord
     raise ArgumentError, 'La cantidad debe ser mayor a 0' if cantidad <= 0
     raise ArgumentError, 'Stock insuficiente'             if cantidad > stock_actual.to_d
 
-    transaction do
+    consumo = transaction do
       costo_imputado   = (cantidad * costo_promedio_ars.to_d).round(2)
       self.stock_actual = stock_actual.to_d - cantidad
       save!
 
-      consumo = insumo_consumos.create!(
+      c = insumo_consumos.create!(
         club: club, created_by: created_by,
         cantidad: cantidad, costo_imputado_ars: costo_imputado,
         lote: lote, sala: sala, fecha: fecha, notas: notas
       )
-
       # El costo del lote se recalcula para reflejar el consumo imputado.
       CostoDesdeLibroService.new(lote: lote, actualizado_por: created_by).call if lote
-
-      consumo
+      c
     end
+
+    avisar_reposicion! # best-effort, fuera de la transacción del consumo
+    consumo
+  end
+
+  # Consumo repartido en partes iguales entre varios lotes (y/o una sala). Ej: "3 L a los lotes
+  # OG-24 y GG-11" → 1,5 L a cada uno, cada uno con su costo imputado. Atómico.
+  def registrar_consumo_repartido!(cantidad:, created_by:, lotes: [], sala: nil,
+                                   fecha: Date.current, notas: nil)
+    total  = cantidad.to_d
+    lotes  = Array(lotes).compact
+    raise ArgumentError, 'La cantidad debe ser mayor a 0' if total <= 0
+    raise ArgumentError, 'Stock insuficiente'             if total > stock_actual.to_d
+
+    transaction do
+      if lotes.empty?
+        [registrar_consumo!(cantidad: total, created_by: created_by, sala: sala, fecha: fecha, notas: notas)]
+      else
+        base = (total / lotes.size).round(3)
+        lotes.each_with_index.map do |lote, i|
+          # el último absorbe el redondeo para que la suma sea exacta
+          cant = i == lotes.size - 1 ? (total - base * (lotes.size - 1)) : base
+          registrar_consumo!(cantidad: cant, created_by: created_by, lote: lote, sala: sala, fecha: fecha, notas: notas)
+        end
+      end
+    end
+  end
+
+  # Aviso activo de reposición cuando el stock llega al mínimo. Best-effort (no bloquea el consumo)
+  # y con anti-spam de 12 h por insumo. Aparece en las alertas internas del admin.
+  def avisar_reposicion!
+    return unless stock_bajo?
+    return if AlertaInterna.where(club_id: club_id, tipo: 'stock_bajo')
+                           .where("contexto ->> 'insumo_id' = ?", id.to_s)
+                           .where('created_at > ?', 12.hours.ago).exists?
+
+    club.alertas_internas.create!(
+      tipo: 'stock_bajo', severidad: 'warning', destinada_a_role: 'admin',
+      mensaje: "Reponer #{nombre}: quedan #{stock_actual.to_f.round(2)} #{unidad_medida} (mínimo #{stock_minimo.to_f.round(2)}).",
+      contexto: { 'insumo_id' => id, 'origen' => 'insumo' }
+    )
+  rescue StandardError => e
+    Rails.logger.error "[Insumo] aviso de reposición: #{e.message}"
   end
 end

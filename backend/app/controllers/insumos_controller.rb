@@ -64,19 +64,22 @@ class InsumosController < ApplicationController
     render json: { error: "Falta el parámetro #{e.param}" }, status: :unprocessable_entity
   end
 
-  # POST /insumos/:id/consumir  { cantidad, lote_id?, sala_id?, fecha?, notas? }
+  # POST /insumos/:id/consumir  { cantidad, lote_ids?: [], lote_id?, sala_id?, fecha?, notas? }
+  # Reparte la cantidad en partes iguales entre los lotes indicados (o a una sala / general).
   def consumir
-    lote = params[:lote_id].present? ? current_user.club.lotes.find_by(id: params[:lote_id]) : nil
-    sala = params[:sala_id].present? ? current_user.club.salas.find_by(id: params[:sala_id]) : nil
-    consumo = @insumo.registrar_consumo!(
+    lote_ids = Array(params[:lote_ids]).presence || Array(params[:lote_id]).reject(&:blank?)
+    lotes    = lote_ids.present? ? current_user.club.lotes.where(id: lote_ids).to_a : []
+    sala     = params[:sala_id].present? ? current_user.club.salas.find_by(id: params[:sala_id]) : nil
+
+    @insumo.registrar_consumo_repartido!(
       cantidad:   params.require(:cantidad),
-      lote:       lote,
+      lotes:      lotes,
       sala:       sala,
       fecha:      params[:fecha].presence || Date.current,
       notas:      params[:notas],
       created_by: current_user
     )
-    render json: serialize(@insumo).merge(consumo: serialize_consumo(consumo)), status: :created
+    render json: serialize(@insumo), status: :created
   rescue ArgumentError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActionController::ParameterMissing => e

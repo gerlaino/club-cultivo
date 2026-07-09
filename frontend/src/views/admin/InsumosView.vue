@@ -1,14 +1,13 @@
 <script setup>
-// Depósito de insumos (Bloque 2): stock valorizado + compra → consumo → costo por lote.
+// Depósito de insumos de cultivo (Producción): stock valorizado + compra → consumo imputado a
+// lote(s)/sala + aviso de reposición. Consumo repartible entre varios lotes en partes iguales.
 import { ref, computed, onMounted } from 'vue'
 import { useInsumosStore } from '../../stores/insumos.js'
 import { listLotes, listSalas } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
-import { useConfirm } from '../../composables/useConfirm.js'
 
 const store = useInsumosStore()
 const toast = useToast()
-const { confirm } = useConfirm()
 
 const UNIDADES = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
 const lotes = ref([])
@@ -20,91 +19,95 @@ onMounted(async () => {
   listSalas().then(r => { salas.value = r.data || [] }).catch(() => {})
 })
 
-// ── Nuevo insumo ──────────────────────────────────────────────
-const nuevoForm = ref(null)
-function nuevoInsumo() { nuevoForm.value = { nombre: '', unidad_medida: 'unidad', stock_minimo: 0 } }
-async function guardarNuevo() {
-  if (!nuevoForm.value.nombre?.trim()) { toast.warning('Poné un nombre'); return }
-  try {
-    await store.crear({ ...nuevoForm.value, nombre: nuevoForm.value.nombre.trim() })
-    toast.success('Insumo creado'); nuevoForm.value = null
-  } catch { toast.error(store.saveError) }
-}
-
-// ── Comprar ───────────────────────────────────────────────────
-const compraForm = ref(null) // { insumo, cantidad, costo_total_ars, proveedor }
-function abrirCompra(i) { compraForm.value = { insumo: i, cantidad: null, costo_total_ars: null, proveedor: '' } }
-async function confirmarCompra() {
-  const f = compraForm.value
-  if (!(f.cantidad > 0) || !(f.costo_total_ars > 0)) { toast.warning('Completá cantidad y costo'); return }
-  try {
-    await store.comprar(f.insumo.id, { cantidad: f.cantidad, costo_total_ars: f.costo_total_ars, proveedor: f.proveedor || null })
-    toast.success('Compra registrada'); compraForm.value = null
-  } catch { toast.error(store.saveError) }
-}
-
-// ── Consumir ──────────────────────────────────────────────────
-const consumoForm = ref(null) // { insumo, cantidad, lote_id, sala_id }
-function abrirConsumo(i) { consumoForm.value = { insumo: i, cantidad: null, lote_id: null, sala_id: null, notas: '' } }
-async function confirmarConsumo() {
-  const f = consumoForm.value
-  if (!(f.cantidad > 0)) { toast.warning('Poné la cantidad usada'); return }
-  if (f.cantidad > f.insumo.stock_actual) { toast.warning('No hay stock suficiente'); return }
-  try {
-    await store.consumir(f.insumo.id, { cantidad: f.cantidad, lote_id: f.lote_id, sala_id: f.sala_id, notas: f.notas || null })
-    toast.success('Consumo imputado'); consumoForm.value = null
-  } catch { toast.error(store.saveError) }
-}
-
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 function stockPct(i) {
   if (!i.stock_minimo) return i.stock_actual > 0 ? 100 : 0
   return Math.min(100, Math.round((i.stock_actual / (i.stock_minimo * 2)) * 100))
 }
+
+// ── Nuevo insumo ──────────────────────────────────────────────
+const nuevoForm = ref(null)
+function nuevoInsumo() { nuevoForm.value = { nombre: '', unidad_medida: 'unidad', stock_minimo: 0 } }
+async function guardarNuevo() {
+  if (!nuevoForm.value.nombre?.trim()) { toast.warning('Poné un nombre'); return }
+  try { await store.crear({ ...nuevoForm.value, nombre: nuevoForm.value.nombre.trim() }); toast.success('Insumo creado'); nuevoForm.value = null }
+  catch { toast.error(store.saveError) }
+}
+
+// ── Comprar ───────────────────────────────────────────────────
+const compraForm = ref(null)
+function abrirCompra(i) { compraForm.value = { insumo: i, cantidad: null, costo_total_ars: null, proveedor: '' } }
+async function confirmarCompra() {
+  const f = compraForm.value
+  if (!(f.cantidad > 0) || !(f.costo_total_ars > 0)) { toast.warning('Completá cantidad y costo'); return }
+  try { await store.comprar(f.insumo.id, { cantidad: f.cantidad, costo_total_ars: f.costo_total_ars, proveedor: f.proveedor || null }); toast.success('Compra registrada'); compraForm.value = null }
+  catch { toast.error(store.saveError) }
+}
+
+// ── Consumir (repartible entre varios lotes) ──────────────────
+const consumoForm = ref(null) // { insumo, cantidad, lote_ids:[], sala_id }
+function abrirConsumo(i) { consumoForm.value = { insumo: i, cantidad: null, lote_ids: [], sala_id: null } }
+function toggleLote(id) {
+  const arr = consumoForm.value.lote_ids
+  const idx = arr.indexOf(id)
+  if (idx === -1) arr.push(id); else arr.splice(idx, 1)
+}
+const porLote = computed(() => {
+  const f = consumoForm.value
+  if (!f?.cantidad || !f.lote_ids.length) return null
+  return (f.cantidad / f.lote_ids.length)
+})
+async function confirmarConsumo() {
+  const f = consumoForm.value
+  if (!(f.cantidad > 0)) { toast.warning('Poné la cantidad usada'); return }
+  if (f.cantidad > f.insumo.stock_actual) { toast.warning('No hay stock suficiente'); return }
+  try {
+    await store.consumir(f.insumo.id, { cantidad: f.cantidad, lote_ids: f.lote_ids, sala_id: f.sala_id })
+    toast.success('Consumo imputado'); consumoForm.value = null
+  } catch { toast.error(store.saveError) }
+}
 </script>
 
 <template>
-  <div class="ins">
-    <header class="ins__head">
+  <div class="dp">
+    <header class="dp__head">
       <div>
-        <h1>Depósito de insumos</h1>
-        <p>Comprá a granel; imputá el consumo al lote donde se usa. Así sale el costo real de producción.</p>
+        <h1 class="dp__title">Depósito de insumos</h1>
+        <p class="dp__sub">Comprá a granel; imputá el consumo al lote donde se usa. Así sale el costo real de producción.</p>
       </div>
-      <div class="ins__head-right">
-        <div class="ins__valor">
-          <span>Valorizado</span>
-          <strong>{{ fmt(store.valorizadoTotal) }}</strong>
+      <div class="dp__head-right">
+        <div class="dp__stat">
+          <span class="dp__stat-label">Valorizado</span>
+          <span class="dp__stat-val">{{ fmt(store.valorizadoTotal) }}</span>
         </div>
         <button class="btn btn--primary" @click="nuevoInsumo">+ Insumo</button>
       </div>
     </header>
 
-    <form v-if="nuevoForm" class="ins__form" @submit.prevent="guardarNuevo">
+    <form v-if="nuevoForm" class="dp__form" @submit.prevent="guardarNuevo">
       <input v-model.trim="nuevoForm.nombre" class="inp" placeholder="Nombre (ej: Fertilizante base)" maxlength="60" />
-      <select v-model="nuevoForm.unidad_medida" class="inp">
-        <option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option>
-      </select>
-      <label class="ins__min">Stock mínimo <input v-model.number="nuevoForm.stock_minimo" type="number" min="0" step="any" class="inp inp--sm" /></label>
-      <div class="ins__form-actions">
-        <button type="button" class="btn" @click="nuevoForm = null">Cancelar</button>
-        <button type="submit" class="btn btn--primary" :disabled="store.saving">Crear</button>
-      </div>
+      <select v-model="nuevoForm.unidad_medida" class="inp"><option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option></select>
+      <label class="dp__min">Stock mínimo <input v-model.number="nuevoForm.stock_minimo" type="number" min="0" step="any" class="inp inp--sm" /></label>
+      <div class="dp__form-actions"><button type="button" class="btn" @click="nuevoForm = null">Cancelar</button><button type="submit" class="btn btn--primary" :disabled="store.saving">Crear</button></div>
     </form>
 
-    <div v-if="store.loading" class="ins__loading">Cargando depósito…</div>
-    <div v-else-if="!store.items.length" class="ins__empty">Todavía no hay insumos. Creá el primero con “+ Insumo”.</div>
+    <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>
+    <div v-else-if="!store.items.length" class="dp__empty dp__empty--box">Todavía no hay insumos. Creá el primero con “+ Insumo”.</div>
 
-    <ul v-else class="ins__list">
-      <li v-for="i in store.items" :key="i.id" class="ins__item" :class="{ 'ins__item--low': i.stock_bajo }">
-        <div class="ins__item-main">
-          <span class="ins__name">{{ i.nombre }}</span>
-          <div class="ins__meter"><i :style="{ width: stockPct(i) + '%', background: i.stock_bajo ? '#dc2626' : '#1b5e20' }"></i></div>
+    <ul v-else class="dp__list">
+      <li v-for="i in store.items" :key="i.id" class="dp__item" :class="{ 'dp__item--low': i.stock_bajo }">
+        <div class="dp__item-main">
+          <div class="dp__item-top">
+            <span class="dp__name">{{ i.nombre }}</span>
+            <span v-if="i.stock_bajo" class="dp__pill">Reponer</span>
+          </div>
+          <div class="dp__meter"><i :style="{ width: stockPct(i) + '%' }" :class="i.stock_bajo ? 'is-low' : 'is-ok'"></i></div>
         </div>
-        <div class="ins__stats">
-          <span class="ins__stock" :class="{ low: i.stock_bajo }">{{ i.stock_actual }} {{ i.unidad_medida }}</span>
-          <small>{{ fmt(i.costo_promedio_ars) }}/u · {{ fmt(i.valorizado_ars) }}</small>
+        <div class="dp__stats">
+          <span class="dp__stock num" :class="{ low: i.stock_bajo }">{{ i.stock_actual }} <small>{{ i.unidad_medida }}</small></span>
+          <span class="dp__meta num">{{ fmt(i.costo_promedio_ars) }}/u · {{ fmt(i.valorizado_ars) }}</span>
         </div>
-        <div class="ins__actions">
+        <div class="dp__actions">
           <button class="btn btn--sm" @click="abrirCompra(i)">Comprar</button>
           <button class="btn btn--sm btn--primary" @click="abrirConsumo(i)" :disabled="i.stock_actual <= 0">Consumir</button>
         </div>
@@ -112,86 +115,105 @@ function stockPct(i) {
     </ul>
 
     <!-- Modal comprar -->
-    <div v-if="compraForm" class="ins__ov" @click.self="compraForm = null">
-      <div class="ins__modal">
-        <h3>Comprar — {{ compraForm.insumo.nombre }}</h3>
-        <p class="ins__modal-hint">Entra al stock y recalcula el costo promedio. Genera el egreso en el libro.</p>
+    <div v-if="compraForm" class="ov" @click.self="compraForm = null">
+      <div class="modal">
+        <h3 class="modal__title">Comprar — {{ compraForm.insumo.nombre }}</h3>
+        <p class="modal__hint">Entra al stock y recalcula el costo promedio. Genera el egreso en el libro.</p>
         <label class="fld">Cantidad ({{ compraForm.insumo.unidad_medida }})<input v-model.number="compraForm.cantidad" type="number" min="0" step="any" class="inp" /></label>
         <label class="fld">Costo total<input v-model.number="compraForm.costo_total_ars" type="number" min="0" step="any" class="inp" placeholder="$" /></label>
         <label class="fld">Proveedor (opcional)<input v-model.trim="compraForm.proveedor" class="inp" /></label>
-        <div class="ins__form-actions">
-          <button class="btn" @click="compraForm = null">Cancelar</button>
-          <button class="btn btn--primary" :disabled="store.saving" @click="confirmarCompra">Registrar compra</button>
-        </div>
+        <div class="modal__actions"><button class="btn" @click="compraForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarCompra">Registrar compra</button></div>
       </div>
     </div>
 
     <!-- Modal consumir -->
-    <div v-if="consumoForm" class="ins__ov" @click.self="consumoForm = null">
-      <div class="ins__modal">
-        <h3>Registrar consumo — {{ consumoForm.insumo.nombre }}</h3>
-        <p class="ins__modal-hint">Disponible: {{ consumoForm.insumo.stock_actual }} {{ consumoForm.insumo.unidad_medida }}. Imputa el costo al lote/sala.</p>
+    <div v-if="consumoForm" class="ov" @click.self="consumoForm = null">
+      <div class="modal modal--wide">
+        <h3 class="modal__title">Registrar consumo — {{ consumoForm.insumo.nombre }}</h3>
+        <p class="modal__hint">Disponible {{ consumoForm.insumo.stock_actual }} {{ consumoForm.insumo.unidad_medida }}. Se imputa el costo a los lotes elegidos.</p>
         <label class="fld">Cantidad usada<input v-model.number="consumoForm.cantidad" type="number" min="0" step="any" class="inp" /></label>
-        <label class="fld">Lote (opcional)
-          <select v-model="consumoForm.lote_id" class="inp">
-            <option :value="null">— Sin lote —</option>
-            <option v-for="l in lotes" :key="l.id" :value="l.id">{{ l.codigo || ('Lote ' + l.id) }}</option>
-          </select>
-        </label>
-        <label class="fld">Sala (opcional)
-          <select v-model="consumoForm.sala_id" class="inp">
-            <option :value="null">— Sin sala —</option>
-            <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-          </select>
-        </label>
-        <div class="ins__form-actions">
-          <button class="btn" @click="consumoForm = null">Cancelar</button>
-          <button class="btn btn--primary" :disabled="store.saving" @click="confirmarConsumo">Imputar consumo</button>
+
+        <div class="fld">
+          <span>Lotes <small class="mut">(se reparte en partes iguales)</small></span>
+          <div class="dp__lotes">
+            <label v-for="l in lotes" :key="l.id" class="dp__lote" :class="{ 'is-on': consumoForm.lote_ids.includes(l.id) }">
+              <input type="checkbox" :checked="consumoForm.lote_ids.includes(l.id)" @change="toggleLote(l.id)" />
+              {{ l.codigo || ('Lote ' + l.id) }}
+            </label>
+            <span v-if="!lotes.length" class="mut" style="font-size:.8rem">Sin lotes activos.</span>
+          </div>
+          <p v-if="porLote" class="dp__reparto">{{ porLote.toFixed(2) }} {{ consumoForm.insumo.unidad_medida }} a cada uno de los {{ consumoForm.lote_ids.length }} lotes.</p>
         </div>
+
+        <label class="fld">Sala (opcional)
+          <select v-model="consumoForm.sala_id" class="inp"><option :value="null">— Sin sala —</option><option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option></select>
+        </label>
+
+        <div class="modal__actions"><button class="btn" @click="consumoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarConsumo">Imputar consumo</button></div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.ins { padding: var(--sp-6, 24px); max-width: 900px; margin: 0 auto; }
-.ins__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4, 16px); flex-wrap: wrap; }
-.ins__head h1 { font-size: var(--fs-24, 24px); font-weight: 700; color: #0f172a; margin: 0; }
-.ins__head p { color: #64748b; margin: 4px 0 0; font-size: var(--fs-14, 14px); max-width: 52ch; }
-.ins__head-right { display: flex; align-items: center; gap: var(--sp-3, 12px); }
-.ins__valor { text-align: right; }
-.ins__valor span { display: block; font-size: var(--fs-12, 12px); color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
-.ins__valor strong { font-size: var(--fs-20, 20px); color: #0f172a; }
+.dp { padding: 2rem 1.75rem 3rem; max-width: 920px; margin: 0 auto; color: #0f172a; }
+.dp__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.dp__title { font-size: 1.6rem; font-weight: 800; letter-spacing: -.035em; margin: 0 0 .2rem; }
+.dp__sub { color: #64748b; font-size: .84rem; margin: 0; max-width: 52ch; line-height: 1.5; }
+.dp__head-right { display: flex; align-items: center; gap: 1.25rem; }
+.dp__stat { text-align: right; }
+.dp__stat-label { display: block; font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; font-weight: 600; }
+.dp__stat-val { display: block; font-size: 1.5rem; font-weight: 800; letter-spacing: -.03em; color: #0f172a; font-variant-numeric: tabular-nums; }
 
-.ins__form { display: flex; align-items: center; gap: var(--sp-2, 8px); background: #f8fafc; border: 1px solid #f1f5f9; border-radius: var(--r-md, 10px); padding: var(--sp-3, 12px); margin-top: var(--sp-4, 16px); flex-wrap: wrap; }
-.ins__min { display: flex; align-items: center; gap: 6px; font-size: var(--fs-13, 13px); color: #475569; }
-.ins__form-actions { display: flex; gap: var(--sp-2, 8px); margin-left: auto; }
+.dp__form { display: flex; align-items: center; gap: .6rem; background: #fbfcfd; border: 1px solid #e8edf2; border-radius: 12px; padding: .9rem 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; box-shadow: 0 1px 2px rgb(15 23 42 / .03); }
+.dp__min { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: #475569; }
+.dp__form-actions { display: flex; gap: .5rem; margin-left: auto; }
 
-.ins__loading, .ins__empty { color: #64748b; padding: var(--sp-8, 32px); text-align: center; }
+.dp__empty { color: #94a3b8; padding: 2.5rem; text-align: center; font-size: .9rem; }
+.dp__empty--box { background: #fbfcfd; border: 1px dashed #e2e8f0; border-radius: 14px; }
 
-.ins__list { list-style: none; margin: var(--sp-5, 20px) 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.ins__item { display: grid; grid-template-columns: 1fr auto auto; gap: var(--sp-4, 16px); align-items: center; background: var(--c-paper, #fff); border: 1px solid #f1f5f9; border-radius: var(--r-md, 10px); padding: var(--sp-3, 12px) var(--sp-4, 16px); }
-.ins__item--low { border-color: #fecaca; }
-.ins__item-main { min-width: 0; }
-.ins__name { font-weight: 600; color: #0f172a; font-size: var(--fs-15, 15px); }
-.ins__meter { height: 6px; background: #f1f5f9; border-radius: 4px; overflow: hidden; margin-top: 8px; }
-.ins__meter i { display: block; height: 100%; border-radius: 4px; }
-.ins__stats { text-align: right; }
-.ins__stock { font-weight: 650; color: #0f172a; font-variant-numeric: tabular-nums; }
-.ins__stock.low { color: #dc2626; }
-.ins__stats small { display: block; color: #94a3b8; font-size: var(--fs-12, 12px); }
-.ins__actions { display: flex; gap: 6px; }
+.dp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
+.dp__item { display: grid; grid-template-columns: 1fr auto auto; gap: 1.5rem; align-items: center; background: #fff; border: 1px solid #e8edf2; border-radius: 13px; padding: 1rem 1.25rem; box-shadow: 0 1px 2px rgb(15 23 42 / .04); transition: border-color .15s, box-shadow .15s; }
+.dp__item:hover { border-color: #d7dee6; box-shadow: 0 2px 8px rgb(15 23 42 / .06); }
+.dp__item--low { border-color: #f4d9b8; }
+.dp__item-main { min-width: 0; }
+.dp__item-top { display: flex; align-items: center; gap: .6rem; }
+.dp__name { font-weight: 650; color: #0f172a; font-size: .96rem; letter-spacing: -.01em; }
+.dp__pill { font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #b45309; background: #fef3c7; padding: 2px 8px; border-radius: 999px; }
+.dp__meter { height: 6px; background: #f1f5f9; border-radius: 5px; overflow: hidden; margin-top: .55rem; }
+.dp__meter i { display: block; height: 100%; border-radius: 5px; }
+.dp__meter i.is-ok { background: linear-gradient(90deg, #1b5e20, #2e7d32); }
+.dp__meter i.is-low { background: linear-gradient(90deg, #dc2626, #ef4444); }
+.dp__stats { text-align: right; }
+.num { font-variant-numeric: tabular-nums; }
+.dp__stock { font-weight: 700; color: #0f172a; font-size: 1.05rem; }
+.dp__stock small { font-weight: 500; color: #94a3b8; font-size: .78rem; }
+.dp__stock.low { color: #dc2626; }
+.dp__meta { display: block; color: #94a3b8; font-size: .76rem; margin-top: .1rem; }
+.dp__actions { display: flex; gap: .4rem; }
 
-.ins__ov { position: fixed; inset: 0; background: rgba(20,25,20,.45); display: grid; place-items: center; z-index: 1000; padding: 16px; }
-.ins__modal { background: var(--c-paper, #fff); border-radius: var(--r-lg, 14px); padding: var(--sp-5, 20px); width: 100%; max-width: 380px; box-shadow: var(--sh-3, 0 20px 50px rgba(0,0,0,.25)); }
-.ins__modal h3 { margin: 0 0 4px; font-size: var(--fs-18, 18px); color: #0f172a; }
-.ins__modal-hint { color: #64748b; font-size: var(--fs-13, 13px); margin: 0 0 var(--sp-4, 16px); }
-.fld { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-13, 13px); color: #475569; margin-bottom: var(--sp-3, 12px); }
+.ov { position: fixed; inset: 0; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1000; padding: 1rem; }
+.modal { background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 20px 50px rgb(15 23 42 / .25), 0 2px 8px rgb(15 23 42 / .1); }
+.modal--wide { max-width: 440px; }
+.modal__title { margin: 0 0 .25rem; font-size: 1.1rem; font-weight: 750; letter-spacing: -.02em; color: #0f172a; }
+.modal__hint { color: #64748b; font-size: .82rem; margin: 0 0 1.1rem; line-height: 1.45; }
+.fld { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; color: #475569; margin-bottom: .9rem; }
+.mut { color: #94a3b8; }
+.modal__actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .5rem; }
 
-.inp { padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: var(--r-sm, 8px); font-size: var(--fs-14, 14px); background: var(--c-paper, #fff); color: #0f172a; }
-.inp--sm { width: 90px; }
-.btn { border: 1px solid #e2e8f0; background: var(--c-paper, #fff); color: #1e293b; border-radius: var(--r-sm, 8px); padding: 7px 13px; font-size: var(--fs-13, 13px); font-weight: 600; cursor: pointer; }
-.btn--sm { padding: 5px 11px; font-size: var(--fs-12, 12px); }
+.dp__lotes { display: flex; flex-wrap: wrap; gap: .4rem; }
+.dp__lote { display: inline-flex; align-items: center; gap: .35rem; padding: .35rem .65rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .8rem; color: #475569; cursor: pointer; user-select: none; }
+.dp__lote.is-on { border-color: #1b5e20; background: rgb(27 94 32 / .06); color: #1b5e20; font-weight: 600; }
+.dp__lote input { accent-color: #1b5e20; }
+.dp__reparto { font-size: .78rem; color: #1b5e20; margin: .5rem 0 0; font-weight: 500; }
+
+.inp { padding: .55rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: .86rem; background: #fff; color: #0f172a; }
+.inp:focus { border-color: #1b5e20; outline: none; }
+.inp--sm { width: 92px; }
+.btn { border: 1.5px solid #e2e8f0; background: #fff; color: #334155; border-radius: 9px; padding: .55rem .95rem; font-size: .83rem; font-weight: 600; cursor: pointer; transition: border-color .12s, background .12s; }
+.btn:hover { border-color: #cbd5e1; }
+.btn--sm { padding: .45rem .8rem; font-size: .8rem; }
 .btn--primary { background: #1b5e20; border-color: #1b5e20; color: #fff; }
+.btn--primary:hover { background: #144a18; border-color: #144a18; }
 .btn:disabled { opacity: .5; cursor: default; }
 </style>
