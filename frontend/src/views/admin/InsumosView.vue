@@ -84,13 +84,6 @@ async function confirmarConsumo() {
       </div>
     </header>
 
-    <form v-if="nuevoForm" class="dp__form" @submit.prevent="guardarNuevo">
-      <input v-model.trim="nuevoForm.nombre" class="inp" placeholder="Nombre (ej: Fertilizante base)" maxlength="60" />
-      <select v-model="nuevoForm.unidad_medida" class="inp"><option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option></select>
-      <label class="dp__min">Stock mínimo <input v-model.number="nuevoForm.stock_minimo" type="number" min="0" step="any" class="inp inp--sm" /></label>
-      <div class="dp__form-actions"><button type="button" class="btn" @click="nuevoForm = null">Cancelar</button><button type="submit" class="btn btn--primary" :disabled="store.saving">Crear</button></div>
-    </form>
-
     <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>
     <div v-else-if="!store.items.length" class="dp__empty dp__empty--box">Todavía no hay insumos. Creá el primero con “+ Insumo”.</div>
 
@@ -113,6 +106,21 @@ async function confirmarConsumo() {
         </div>
       </li>
     </ul>
+
+    <!-- Modal nuevo insumo -->
+    <div v-if="nuevoForm" class="ov" @click.self="nuevoForm = null">
+      <div class="modal">
+        <h3 class="modal__title">Nuevo insumo</h3>
+        <p class="modal__hint">Un ítem del depósito (fertilizante, sustrato…). El stock lo cargás después con “Comprar”.</p>
+        <label class="fld">Nombre<input v-model.trim="nuevoForm.nombre" class="inp" placeholder="Ej: Fertilizante base" maxlength="60" /></label>
+        <div class="dp__grid2">
+          <label class="fld">Unidad de medida<select v-model="nuevoForm.unidad_medida" class="inp"><option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option></select></label>
+          <label class="fld">Stock mínimo<input v-model.number="nuevoForm.stock_minimo" type="number" min="0" step="any" class="inp" /></label>
+        </div>
+        <p class="modal__note">Cuando el stock baje del mínimo, te avisamos para reponer.</p>
+        <div class="modal__actions"><button class="btn" @click="nuevoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="guardarNuevo">Crear insumo</button></div>
+      </div>
+    </div>
 
     <!-- Modal comprar -->
     <div v-if="compraForm" class="ov" @click.self="compraForm = null">
@@ -165,10 +173,6 @@ async function confirmarConsumo() {
 .dp__stat-label { display: block; font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; font-weight: 600; }
 .dp__stat-val { display: block; font-size: 1.5rem; font-weight: 800; letter-spacing: -.03em; color: #0f172a; font-variant-numeric: tabular-nums; }
 
-.dp__form { display: flex; align-items: center; gap: .6rem; background: #fbfcfd; border: 1px solid #e8edf2; border-radius: 12px; padding: .9rem 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; box-shadow: 0 1px 2px rgb(15 23 42 / .03); }
-.dp__min { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: #475569; }
-.dp__form-actions { display: flex; gap: .5rem; margin-left: auto; }
-
 .dp__empty { color: #94a3b8; padding: 2.5rem; text-align: center; font-size: .9rem; }
 .dp__empty--box { background: #fbfcfd; border: 1px dashed #e2e8f0; border-radius: 14px; }
 
@@ -197,6 +201,8 @@ async function confirmarConsumo() {
 .modal--wide { max-width: 440px; }
 .modal__title { margin: 0 0 .25rem; font-size: 1.1rem; font-weight: 750; letter-spacing: -.02em; color: #0f172a; }
 .modal__hint { color: #64748b; font-size: .82rem; margin: 0 0 1.1rem; line-height: 1.45; }
+.modal__note { font-size: .76rem; color: #94a3b8; margin: -.3rem 0 .9rem; }
+.dp__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .fld { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; color: #475569; margin-bottom: .9rem; }
 .mut { color: #94a3b8; }
 .modal__actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .5rem; }
