@@ -1,23 +1,36 @@
 <script setup>
 // Depósito de insumos de cultivo (Producción): stock valorizado + compra → consumo imputado a
 // lote(s)/sala + aviso de reposición. Consumo repartible entre varios lotes en partes iguales.
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useInsumosStore } from '../../stores/insumos.js'
+import { useSedeStore } from '../../stores/sede.js'
 import { listLotes, listSalas } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const store = useInsumosStore()
+const sede  = useSedeStore()
 const toast = useToast()
 
 const UNIDADES = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
 const lotes = ref([])
 const salas = ref([])
 
+// El depósito vive por sede: cada ítem ocupa un espacio físico en una sede. Cuando hay ≥2 sedes
+// mostramos el contexto (badge de sede, elección de sede en el alta, y transferencia entre sedes).
+const multiSede = computed(() => sede.sedes.length > 1)
+const otrasSedes = computed(() => sede.sedes.filter(s => s.id !== sede.sedeId))
+
+async function recargar() { await store.fetch({ sede_id: sede.sedeParam }) }
+
 onMounted(async () => {
-  await store.fetch()
+  if (!sede.loaded) await sede.fetchSedes()
+  await recargar()
   listLotes({ estado: 'activos' }).then(r => { lotes.value = r.data?.lotes || r.data || [] }).catch(() => {})
   listSalas().then(r => { salas.value = r.data || [] }).catch(() => {})
 })
+
+// Al cambiar la sede actual desde el topbar, el depósito se re-filtra solo.
+watch(() => sede.sedeId, recargar)
 
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 function stockPct(i) {
@@ -27,11 +40,14 @@ function stockPct(i) {
 
 // ── Nuevo insumo ──────────────────────────────────────────────
 const nuevoForm = ref(null)
-function nuevoInsumo() { nuevoForm.value = { nombre: '', unidad_medida: 'unidad', stock_minimo: 0 } }
+function nuevoInsumo() { nuevoForm.value = { nombre: '', unidad_medida: 'unidad', stock_minimo: 0, sede_id: sede.sedeId } }
 async function guardarNuevo() {
   if (!nuevoForm.value.nombre?.trim()) { toast.warning('Poné un nombre'); return }
-  try { await store.crear({ ...nuevoForm.value, nombre: nuevoForm.value.nombre.trim() }); toast.success('Insumo creado'); nuevoForm.value = null }
-  catch { toast.error(store.saveError) }
+  try {
+    await store.crear({ ...nuevoForm.value, nombre: nuevoForm.value.nombre.trim() })
+    toast.success('Insumo creado'); nuevoForm.value = null
+    await recargar()
+  } catch { toast.error(store.saveError) }
 }
 
 // ── Comprar ───────────────────────────────────────────────────
@@ -40,8 +56,26 @@ function abrirCompra(i) { compraForm.value = { insumo: i, cantidad: null, costo_
 async function confirmarCompra() {
   const f = compraForm.value
   if (!(f.cantidad > 0) || !(f.costo_total_ars > 0)) { toast.warning('Completá cantidad y costo'); return }
-  try { await store.comprar(f.insumo.id, { cantidad: f.cantidad, costo_total_ars: f.costo_total_ars, proveedor: f.proveedor || null }); toast.success('Compra registrada'); compraForm.value = null }
-  catch { toast.error(store.saveError) }
+  try {
+    // el egreso hereda la sede del insumo (el insumo ya está localizado en su sede)
+    await store.comprar(f.insumo.id, { cantidad: f.cantidad, costo_total_ars: f.costo_total_ars, proveedor: f.proveedor || null, sede_id: f.insumo.sede_id })
+    toast.success('Compra registrada'); compraForm.value = null
+  } catch { toast.error(store.saveError) }
+}
+
+// ── Transferir a otra sede ────────────────────────────────────
+const transferForm = ref(null) // { insumo, sede_destino_id, cantidad }
+function abrirTransfer(i) { transferForm.value = { insumo: i, sede_destino_id: otrasSedes.value[0]?.id ?? null, cantidad: null } }
+async function confirmarTransfer() {
+  const f = transferForm.value
+  if (!f.sede_destino_id) { toast.warning('Elegí la sede destino'); return }
+  if (!(f.cantidad > 0)) { toast.warning('Poné la cantidad a transferir'); return }
+  if (f.cantidad > f.insumo.stock_actual) { toast.warning('No hay stock suficiente'); return }
+  try {
+    await store.transferir(f.insumo.id, { sede_destino_id: f.sede_destino_id, cantidad: f.cantidad })
+    toast.success('Transferencia registrada'); transferForm.value = null
+    await recargar()
+  } catch { toast.error(store.saveError) }
 }
 
 // ── Consumir (repartible entre varios lotes) ──────────────────
@@ -72,7 +106,10 @@ async function confirmarConsumo() {
   <div class="dp">
     <header class="dp__head">
       <div>
-        <h1 class="dp__title">Depósito de insumos</h1>
+        <h1 class="dp__title">
+          Depósito de insumos
+          <span v-if="multiSede" class="dp__ctx">{{ sede.esConsolidado ? 'Todas las sedes' : sede.sedeActual?.nombre }}</span>
+        </h1>
         <p class="dp__sub">Comprá a granel; imputá el consumo al lote donde se usa. Así sale el costo real de producción.</p>
       </div>
       <div class="dp__head-right">
@@ -92,6 +129,7 @@ async function confirmarConsumo() {
         <div class="dp__item-main">
           <div class="dp__item-top">
             <span class="dp__name">{{ i.nombre }}</span>
+            <span v-if="multiSede" class="dp__sede">{{ i.sede_nombre || 'Sin sede' }}</span>
             <span v-if="i.stock_bajo" class="dp__pill">Reponer</span>
           </div>
           <div class="dp__meter"><i :style="{ width: stockPct(i) + '%' }" :class="i.stock_bajo ? 'is-low' : 'is-ok'"></i></div>
@@ -102,6 +140,7 @@ async function confirmarConsumo() {
         </div>
         <div class="dp__actions">
           <button class="btn btn--sm" @click="abrirCompra(i)">Comprar</button>
+          <button v-if="multiSede && otrasSedes.length" class="btn btn--sm" @click="abrirTransfer(i)" :disabled="i.stock_actual <= 0" title="Transferir a otra sede">Transferir</button>
           <button class="btn btn--sm btn--primary" @click="abrirConsumo(i)" :disabled="i.stock_actual <= 0">Consumir</button>
         </div>
       </li>
@@ -113,6 +152,12 @@ async function confirmarConsumo() {
         <h3 class="modal__title">Nuevo insumo</h3>
         <p class="modal__hint">Un ítem del depósito (fertilizante, sustrato…). El stock lo cargás después con “Comprar”.</p>
         <label class="fld">Nombre<input v-model.trim="nuevoForm.nombre" class="inp" placeholder="Ej: Fertilizante base" maxlength="60" /></label>
+        <label v-if="multiSede" class="fld">Sede
+          <select v-model="nuevoForm.sede_id" class="inp">
+            <option :value="null">— Pool del club —</option>
+            <option v-for="s in sede.sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+          </select>
+        </label>
         <div class="dp__grid2">
           <label class="fld">Unidad de medida<select v-model="nuevoForm.unidad_medida" class="inp"><option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option></select></label>
           <label class="fld">Stock mínimo<input v-model.number="nuevoForm.stock_minimo" type="number" min="0" step="any" class="inp" /></label>
@@ -131,6 +176,24 @@ async function confirmarConsumo() {
         <label class="fld">Costo total<input v-model.number="compraForm.costo_total_ars" type="number" min="0" step="any" class="inp" placeholder="$" /></label>
         <label class="fld">Proveedor (opcional)<input v-model.trim="compraForm.proveedor" class="inp" /></label>
         <div class="modal__actions"><button class="btn" @click="compraForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarCompra">Registrar compra</button></div>
+      </div>
+    </div>
+
+    <!-- Modal transferir a otra sede -->
+    <div v-if="transferForm" class="ov" @click.self="transferForm = null">
+      <div class="modal">
+        <h3 class="modal__title">Transferir — {{ transferForm.insumo.nombre }}</h3>
+        <p class="modal__hint">Mueve stock desde <b>{{ transferForm.insumo.sede_nombre || 'el pool' }}</b> a otra sede. El costo viaja con la mercadería; no genera un nuevo egreso.</p>
+        <label class="fld">Sede destino
+          <select v-model="transferForm.sede_destino_id" class="inp">
+            <option v-for="s in otrasSedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+          </select>
+        </label>
+        <label class="fld">Cantidad ({{ transferForm.insumo.unidad_medida }})
+          <input v-model.number="transferForm.cantidad" type="number" min="0" :max="transferForm.insumo.stock_actual" step="any" class="inp" />
+        </label>
+        <p class="modal__note">Disponible: {{ transferForm.insumo.stock_actual }} {{ transferForm.insumo.unidad_medida }}.</p>
+        <div class="modal__actions"><button class="btn" @click="transferForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarTransfer">Transferir</button></div>
       </div>
     </div>
 
@@ -166,7 +229,9 @@ async function confirmarConsumo() {
 <style scoped>
 .dp { padding: 2rem 1.75rem 3rem; max-width: 920px; margin: 0 auto; color: #0f172a; }
 .dp__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-.dp__title { font-size: 1.6rem; font-weight: 800; letter-spacing: -.035em; margin: 0 0 .2rem; }
+.dp__title { font-size: 1.6rem; font-weight: 800; letter-spacing: -.035em; margin: 0 0 .2rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.dp__ctx { font-size: .74rem; font-weight: 600; letter-spacing: .01em; color: #1b5e20; background: rgb(27 94 32 / .08); border: 1px solid rgb(27 94 32 / .18); padding: .2rem .6rem; border-radius: 999px; }
+.dp__sede { font-size: .66rem; font-weight: 600; letter-spacing: .02em; color: #475569; background: #f1f5f9; padding: 2px 8px; border-radius: 999px; }
 .dp__sub { color: #64748b; font-size: .84rem; margin: 0; max-width: 52ch; line-height: 1.5; }
 .dp__head-right { display: flex; align-items: center; gap: 1.25rem; }
 .dp__stat { text-align: right; }

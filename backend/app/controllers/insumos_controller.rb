@@ -6,12 +6,14 @@ class InsumosController < ApplicationController
   before_action :require_lectura,  only: [:index, :show]
   before_action :require_gestion,  only: [:create, :update, :comprar]
   before_action :require_consumo,  only: [:consumir]
-  before_action :set_insumo,       only: [:show, :update, :comprar, :consumir]
+  before_action :require_gestion,  only: [:transferir]
+  before_action :set_insumo,       only: [:show, :update, :comprar, :consumir, :transferir]
 
-  # GET /insumos
+  # GET /insumos?sede_id=<id|pool>&activos=true
   def index
-    scope = current_user.club.insumos.includes(:categoria_contable)
+    scope = current_user.club.insumos.includes(:categoria_contable, :sede)
     scope = scope.activos if params[:activos] == 'true'
+    scope = scope.de_sede(params[:sede_id]) if params[:sede_id].present?
     render json: {
       insumos:         scope.order(:nombre).map { |i| serialize(i) },
       valorizado_total: scope.sum { |i| i.valorizado_ars }.round(2),
@@ -86,6 +88,24 @@ class InsumosController < ApplicationController
     render json: { error: "Falta el parámetro #{e.param}" }, status: :unprocessable_entity
   end
 
+  # POST /insumos/:id/transferir  { sede_destino_id, cantidad }
+  # Mueve una parte del insumo a otra sede (crea el insumo destino si no existe).
+  def transferir
+    destino_sede = current_user.club.sedes.find_by(id: params[:sede_destino_id])
+    return render json: { error: 'Sede destino no encontrada' }, status: :unprocessable_entity unless destino_sede
+
+    destino = @insumo.transferir_a!(
+      sede_destino: destino_sede,
+      cantidad:     params.require(:cantidad),
+      created_by:   current_user
+    )
+    render json: { origen: serialize(@insumo.reload), destino: serialize(destino) }, status: :created
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActionController::ParameterMissing => e
+    render json: { error: "Falta el parámetro #{e.param}" }, status: :unprocessable_entity
+  end
+
   private
 
   def set_insumo
@@ -111,7 +131,7 @@ class InsumosController < ApplicationController
   end
 
   def insumo_params
-    params.require(:insumo).permit(:nombre, :unidad_medida, :stock_minimo, :activo, :categoria_contable_id)
+    params.require(:insumo).permit(:nombre, :unidad_medida, :stock_minimo, :activo, :categoria_contable_id, :sede_id)
   end
 
   def serialize(i)
@@ -126,6 +146,8 @@ class InsumosController < ApplicationController
       stock_bajo:         i.stock_bajo?,
       activo:             i.activo,
       categoria_contable_id: i.categoria_contable_id,
+      sede_id:            i.sede_id,
+      sede_nombre:        i.sede&.nombre,
     }
   end
 

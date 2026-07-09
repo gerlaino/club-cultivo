@@ -76,6 +76,66 @@ RSpec.describe Insumo, type: :model do
     end
   end
 
+  describe '#transferir_a!' do
+    let(:sede_a) { create(:sede, club: club) }
+    let(:sede_b) { create(:sede, club: club) }
+
+    it 'mueve stock del origen al destino conservando el valor' do
+      i = insumo(sede: sede_a)
+      i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false) # $100/u
+      destino = i.transferir_a!(sede_destino: sede_b, cantidad: 4, created_by: admin)
+      expect(i.reload.stock_actual).to eq(6)
+      expect(i.costo_promedio_ars).to eq(100)            # el promedio del origen no cambia
+      expect(destino.sede_id).to eq(sede_b.id)
+      expect(destino.stock_actual).to eq(4)
+      expect(destino.costo_promedio_ars).to eq(100)      # el costo viaja con la mercadería
+    end
+
+    it 'recalcula el promedio ponderado del destino si ya tenía stock a otro precio' do
+      origen  = insumo(sede: sede_a)
+      origen.registrar_compra!(cantidad: 10, costo_total_ars: 2000, created_by: admin, generar_egreso: false) # $200/u
+      destino = insumo(sede: sede_b)
+      destino.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false) # $100/u
+      origen.transferir_a!(sede_destino: sede_b, cantidad: 10, created_by: admin) # entran 10 a $200
+      # (10*100 + 10*200) / 20 = 150
+      expect(destino.reload.stock_actual).to eq(20)
+      expect(destino.costo_promedio_ars).to eq(150)
+    end
+
+    it 'no genera un egreso contable (la plata ya salió al comprar)' do
+      i = insumo(sede: sede_a)
+      i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false)
+      expect { i.transferir_a!(sede_destino: sede_b, cantidad: 4, created_by: admin) }
+        .not_to change { club.movimientos_contables.count }
+    end
+
+    it 'lanza si no hay stock suficiente' do
+      i = insumo(sede: sede_a)
+      i.registrar_compra!(cantidad: 2, costo_total_ars: 100, created_by: admin, generar_egreso: false)
+      expect { i.transferir_a!(sede_destino: sede_b, cantidad: 5, created_by: admin) }
+        .to raise_error(ArgumentError, /insuficiente/)
+    end
+
+    it 'lanza si la sede destino es la misma que la de origen' do
+      i = insumo(sede: sede_a)
+      i.registrar_compra!(cantidad: 5, costo_total_ars: 500, created_by: admin, generar_egreso: false)
+      expect { i.transferir_a!(sede_destino: sede_a, cantidad: 1, created_by: admin) }
+        .to raise_error(ArgumentError, /misma/)
+    end
+  end
+
+  describe '.de_sede' do
+    let(:sede_a) { create(:sede, club: club) }
+
+    it 'filtra por sede, por pool y devuelve todo cuando no hay filtro' do
+      en_sede = insumo(nombre: 'A', sede: sede_a)
+      en_pool = insumo(nombre: 'B', sede: nil)
+      expect(club.insumos.de_sede(sede_a.id)).to contain_exactly(en_sede)
+      expect(club.insumos.de_sede('pool')).to  contain_exactly(en_pool)
+      expect(club.insumos.de_sede(nil)).to     contain_exactly(en_sede, en_pool)
+    end
+  end
+
   describe '#avisar_reposicion!' do
     it 'crea una alerta stock_bajo cuando el consumo deja el stock en el mínimo' do
       i = insumo(stock_minimo: 5)

@@ -293,13 +293,18 @@ class MovimientosContablesController < ApplicationController
   end
 
   # Depósito: compra de insumo. Sube stock + recalcula costo promedio; el egreso es este movimiento.
+  # La compra entra en una sede (la elegida en el form / la sede del movimiento); un insumo nuevo
+  # nace en esa sede. Si se elige un insumo existente, ya está localizado en su sede.
   def aplicar_deposito!(movimiento, d)
-    club   = current_user.club
-    insumo = if d[:insumo_id].present?
-               club.insumos.find(d[:insumo_id])
-             else
-               club.insumos.create!(nombre: d[:nombre].to_s.strip, unidad_medida: d[:unidad_medida].presence || 'unidad')
-             end
+    club     = current_user.club
+    sede_id  = d[:sede_id].presence || movimiento.sede_id
+    insumo   = if d[:insumo_id].present?
+                 club.insumos.find(d[:insumo_id])
+               else
+                 club.insumos.create!(nombre: d[:nombre].to_s.strip,
+                                      unidad_medida: d[:unidad_medida].presence || 'unidad',
+                                      sede_id: sede_id)
+               end
     cantidad = d[:cantidad].to_d
     raise ArgumentError, 'Indicá la cantidad de insumo' if cantidad <= 0
 

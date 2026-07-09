@@ -6,6 +6,7 @@ class Insumo < ApplicationRecord
   acts_as_tenant(:club)
 
   belongs_to :club
+  belongs_to :sede, optional: true # nil = pool del club (mismo criterio que Stock)
   belongs_to :categoria_contable, optional: true
   has_many :insumo_compras,  dependent: :destroy
   has_many :insumo_consumos, dependent: :destroy
@@ -19,6 +20,13 @@ class Insumo < ApplicationRecord
 
   scope :activos,    -> { where(activo: true) }
   scope :stock_bajo, -> { where('stock_minimo > 0 AND stock_actual <= stock_minimo') }
+  # Contexto de sede: un id filtra esa sede; 'pool' filtra el pool sin sede; nil = todas.
+  scope :de_sede,    ->(sede_id) {
+    if sede_id.to_s == 'pool' then where(sede_id: nil)
+    elsif sede_id.present?     then where(sede_id: sede_id)
+    else self
+    end
+  }
 
   def valorizado_ars
     (stock_actual.to_d * costo_promedio_ars.to_d).round(2)
@@ -114,6 +122,38 @@ class Insumo < ApplicationRecord
           registrar_consumo!(cantidad: cant, created_by: created_by, lote: lote, sala: sala, fecha: fecha, notas: notas)
         end
       end
+    end
+  end
+
+  # Transfiere una cantidad de este insumo a otra sede. Réplica del criterio de Stock ("siempre
+  # está en alguna sede, se puede mover una parte"), pero con el costeo propio del insumo:
+  # el origen descuenta stock (su promedio no cambia) y el destino recibe la cantidad valorizada
+  # al promedio del origen, recalculando SU propio promedio ponderado. Si en la sede destino no
+  # existe el mismo insumo (nombre+unidad), lo crea. No genera egreso: la plata ya salió al comprar.
+  # Devuelve el insumo destino.
+  def transferir_a!(sede_destino:, cantidad:, created_by:)
+    cantidad = cantidad.to_d
+    raise ArgumentError, 'La cantidad debe ser mayor a 0' if cantidad <= 0
+    raise ArgumentError, 'Stock insuficiente'             if cantidad > stock_actual.to_d
+    raise ArgumentError, 'Elegí una sede destino'         if sede_destino.nil?
+    raise ArgumentError, 'La sede destino es la misma'    if sede_destino.id == sede_id
+
+    valor = (cantidad * costo_promedio_ars.to_d)
+
+    transaction do
+      destino = club.insumos.where(sede_id: sede_destino.id, nombre: nombre, unidad_medida: unidad_medida)
+                    .first_or_initialize
+      if destino.new_record?
+        destino.assign_attributes(stock_minimo: stock_minimo, categoria_contable: categoria_contable,
+                                  stock_actual: 0, costo_promedio_ars: 0, activo: true)
+      end
+      nuevo_stock = destino.stock_actual.to_d + cantidad
+      destino.costo_promedio_ars = ((destino.stock_actual.to_d * destino.costo_promedio_ars.to_d) + valor) / nuevo_stock
+      destino.stock_actual = nuevo_stock
+      destino.save!
+
+      update!(stock_actual: stock_actual.to_d - cantidad) # el promedio del origen no cambia
+      destino
     end
   end
 

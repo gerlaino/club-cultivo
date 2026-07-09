@@ -371,6 +371,7 @@ Rails.application.routes.draw do
       member do
         post :comprar
         post :consumir
+        post :transferir
       end
     end
 

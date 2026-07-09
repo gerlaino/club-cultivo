@@ -2,7 +2,10 @@
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useModalEscape } from '../../composables/useModalEscape.js'
+import { useSedeStore } from '../../stores/sede.js'
 import { listBarProductos } from '../../lib/api.js'
+
+const sede = useSedeStore()
 
 const props = defineProps({
   modelValue:       { type: Boolean, default: false },
@@ -71,12 +74,13 @@ const saving = ref(false)
 
 // ── Entrada de stock (depósito/salón). La dispara el COMPORTAMIENTO de la categoría elegida. ──
 const UNIDADES_INSUMO = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
-const dep = ref({ insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null })
+const dep = ref({ insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: sede.sedeId })
 const sal = ref({ bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null })
 const barProductos = ref([])
+const multiSede = computed(() => (props.sedes?.length || 0) > 1)
 
 function resetDestino() {
-  dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null }
+  dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: sede.sedeId }
   sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null }
   barProductos.value = []
 }
@@ -97,7 +101,7 @@ function buildDestino() {
     if (!(d.cantidad > 0)) return null
     return d.insumo_id
       ? { tipo: 'deposito', insumo_id: d.insumo_id, cantidad: d.cantidad }
-      : { tipo: 'deposito', nombre: d.nombre?.trim(), unidad_medida: d.unidad_medida, cantidad: d.cantidad }
+      : { tipo: 'deposito', nombre: d.nombre?.trim(), unidad_medida: d.unidad_medida, cantidad: d.cantidad, sede_id: d.sede_id }
   }
   if (compActual.value === 'mercaderia') {
     const s = sal.value
@@ -321,9 +325,10 @@ watch(() => props.modelValue, (val) => {
       acExtras.value = !!(m.comprobante_numero || m.proveedor || m.notas || m.sede_id)
     } else {
       form.value         = emptyForm()
+      form.value.sede_id = sede.sedeId // default al contexto de sede actual (editable en "más opciones")
       montoDisplay.value = ''
       acPago.value       = false
-      acExtras.value     = false
+      acExtras.value     = !!sede.sedeId // si hay sede de contexto, mostrar el bloque para que se vea
       resetDestino()
     }
     errors.value = {}
@@ -648,6 +653,13 @@ async function submit() {
                     <label class="nm-label">Unidad</label>
                     <select class="nm-input" v-model="dep.unidad_medida"><option v-for="u in UNIDADES_INSUMO" :key="u" :value="u">{{ u }}</option></select>
                   </div>
+                </div>
+                <div v-if="!dep.insumo_id && multiSede" class="nm-field">
+                  <label class="nm-label">Sede del depósito</label>
+                  <select class="nm-input" v-model="dep.sede_id">
+                    <option :value="null">— Pool del club —</option>
+                    <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                  </select>
                 </div>
                 <p class="nm-dest-hint">El monto del gasto es el costo total. El stock del insumo sube {{ dep.cantidad || 0 }} y se recalcula su costo promedio.</p>
               </div>
