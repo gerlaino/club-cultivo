@@ -18,10 +18,19 @@ class Barra < ApplicationRecord
   has_many :bar_productos, foreign_key: :bar_id, dependent: :destroy
   has_many :bar_ventas,    foreign_key: :bar_id, dependent: :destroy
   has_many :eventos_bar,   class_name: 'EventoBar', foreign_key: :bar_id, dependent: :destroy
-  has_many :caja_turnos,   foreign_key: :bar_id, dependent: :destroy
+  has_many :caja_turnos,   foreign_key: :bar_id
+  # Las cajas se borran con el bar, pero solo si la tabla ya existe (feature nueva sin migrar
+  # no debe romper el borrado del bar).
+  before_destroy { caja_turnos.destroy_all if CajaTurno.table_exists? }
 
   # Caja de turno abierta ahora (o nil). Una sola por bar (índice único parcial).
-  def caja_abierta = caja_turnos.abiertas.first
+  # Tolerante: si la tabla caja_turnos todavía no fue migrada, devuelve nil (la caja queda
+  # inactiva) en vez de romper el panel/POS. Se activa sola al correr la migración.
+  def caja_abierta
+    return nil unless CajaTurno.table_exists?
+
+    caja_turnos.abiertas.first
+  end
 
   validates :nombre, presence: true
   validate  :sede_habilitada
