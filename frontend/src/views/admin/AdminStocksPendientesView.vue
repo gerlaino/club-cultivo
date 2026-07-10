@@ -154,16 +154,20 @@
       <!-- ── Tab: Inventario ────────────────────────────────────── -->
       <div v-if="tabActiva === 'inventario'">
 
+        <!-- Filtro por sede (tabs): todo el club o una sede puntual -->
+        <div class="stk__sede-tabs">
+          <button class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === '' }" @click="invFiltros.sede_id = ''">🏢 Todo el club</button>
+          <button v-for="s in sedes" :key="s.id" class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === String(s.id) }" @click="invFiltros.sede_id = String(s.id)">
+            {{ s.nombre }}
+          </button>
+          <button class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === 'pool' }" @click="invFiltros.sede_id = 'pool'">Sin asignar</button>
+        </div>
+
         <!-- Filtros -->
         <div class="stk__inv-filtros">
           <select v-model="invFiltros.forma_producto" class="stk__inv-select">
             <option value="">Todos los tipos</option>
             <option v-for="f in FORMAS" :key="f.value" :value="f.value">{{ f.label }}</option>
-          </select>
-          <select v-model="invFiltros.sede_id" class="stk__inv-select">
-            <option value="">Todas las sedes</option>
-            <option value="pool">Sin asignar (pool)</option>
-            <option v-for="s in sedes" :key="s.id" :value="String(s.id)">{{ s.nombre }}</option>
           </select>
           <label class="stk__inv-date">Desde<input type="date" v-model="invFiltros.fecha_desde" class="stk__inv-input"></label>
           <label class="stk__inv-date">Hasta<input type="date" v-model="invFiltros.fecha_hasta" class="stk__inv-input"></label>
@@ -1449,6 +1453,10 @@ function formatDate(dateStr) {
 .stk__inv-row--link:hover .stk__inv-arrow { color: #1b5e20; }
 
 /* ── Inventario: filtros + tabla paginada ─────────────────────────────────── */
+.stk__sede-tabs { display: flex; flex-wrap: wrap; gap: .3rem; background: #f1f5f9; border-radius: 10px; padding: .3rem; margin-bottom: .9rem; }
+.stk__sede-tab { border: none; background: transparent; color: #64748b; font-size: .82rem; font-weight: 600; padding: .45rem .9rem; border-radius: 8px; cursor: pointer; transition: background .12s, color .12s; }
+.stk__sede-tab:hover { color: #334155; }
+.stk__sede-tab.is-on { background: #fff; color: #1b5e20; box-shadow: 0 1px 2px rgb(15 23 42 / .08); }
 .stk__inv-filtros {
   display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
   margin-bottom: 1rem;
