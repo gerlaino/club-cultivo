@@ -79,7 +79,7 @@ const esMedioCredito = computed(() => ['cuenta_corriente', 'no_abona'].includes(
 const esCuentaCorriente = computed(() => form.value.medio_pago === 'cuenta_corriente')
 const esNoAbona         = computed(() => form.value.medio_pago === 'no_abona')
 // Panel de crédito: visible a quien dispensa cuando elige cuenta corriente; admin/sup siempre.
-const mostrarPanelCredito = computed(() => tieneCc.value && (esMedioCredito.value || puedeVerCredito.value))
+const mostrarPanelCredito = computed(() => !form.value.es_regalo && tieneCc.value && (esMedioCredito.value || puedeVerCredito.value))
 
 const margenPos = computed(() => Math.max(0, ccMargen.value))
 // Cuenta corriente: el crédito cubre lo que puede; la diferencia se cobra ahora.
@@ -185,7 +185,7 @@ async function cargarDeliveryUsers() {
 function emptyForm() {
   return {
     stock_id: null, cantidad: null, descuento_pct: 0, aporte_socio_ars: null,
-    fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo',
+    fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo', es_regalo: false,
     con_envio: false, delivery_id: null, direccion_envio: '',
     contacto_nombre: '', contacto_telefono: '', notas_envio: '',
     // Dirección de entrega estructurada (o usar el domicilio registrado del paciente)
@@ -210,6 +210,11 @@ watch(() => form.value.stock_id,  ()    => { precioUnitarioManual.value = null }
 // La seña de una reserva solo se cobra en efectivo o transferencia.
 watch(() => form.value.es_reserva, (val) => {
   if (val && !['efectivo', 'transferencia'].includes(form.value.medio_pago)) form.value.medio_pago = 'efectivo'
+  if (val) form.value.es_regalo = false // una reserva no puede ser regalo
+})
+// Regalo: entrega gratis. Neutraliza el medio de pago (no cobra por ninguna vía).
+watch(() => form.value.es_regalo, (val) => {
+  if (val) { form.value.medio_pago = 'efectivo'; form.value.es_reserva = false }
 })
 
 const stockSeleccionado    = computed(() => stocks.value.find(s => s.id === form.value.stock_id) || null)
@@ -372,25 +377,28 @@ async function handleSubmit() {
     return
   }
   // Aporte obligatorio para todos los medios de pago
-  if (!(Number(form.value.aporte_socio_ars) > 0)) {
-    const sinPrecio = items.value.some(it => !(precioLinea(it) > 0))
-    formError.value = sinPrecio
-      ? (puedeEditarAporte.value
-          ? 'Cargá el precio de los productos sin precio (campo $/u en el carrito).'
-          : 'Hay un producto sin precio configurado. Pedile al administrador que lo cargue.')
-      : 'El aporte del paciente debe ser mayor a $0.'
-    saving.value = false; return
-  }
-  if (!cobraDelivery.value && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
-    formError.value = 'El paciente no tiene crédito configurado para cobrar por cuenta corriente'
-    saving.value = false; return
-  }
-  if (!cobraDelivery.value && ccInsuficiente.value) {
-    const msg = puedeVerCredito.value
-      ? `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
-      : 'Crédito insuficiente. Consultá con un administrador.'
-    formError.value = msg
-    saving.value = false; return
+  // Un regalo es gratis: no valida aporte ni crédito (el stock igual se descuenta).
+  if (!form.value.es_regalo) {
+    if (!(Number(form.value.aporte_socio_ars) > 0)) {
+      const sinPrecio = items.value.some(it => !(precioLinea(it) > 0))
+      formError.value = sinPrecio
+        ? (puedeEditarAporte.value
+            ? 'Cargá el precio de los productos sin precio (campo $/u en el carrito).'
+            : 'Hay un producto sin precio configurado. Pedile al administrador que lo cargue.')
+        : 'El aporte del paciente debe ser mayor a $0.'
+      saving.value = false; return
+    }
+    if (!cobraDelivery.value && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
+      formError.value = 'El paciente no tiene crédito configurado para cobrar por cuenta corriente'
+      saving.value = false; return
+    }
+    if (!cobraDelivery.value && ccInsuficiente.value) {
+      const msg = puedeVerCredito.value
+        ? `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
+        : 'Crédito insuficiente. Consultá con un administrador.'
+      formError.value = msg
+      saving.value = false; return
+    }
   }
 
 
@@ -418,13 +426,15 @@ async function handleSubmit() {
       }),
       fecha_dispensacion: form.value.fecha_dispensacion,
       observaciones: form.value.observaciones || undefined,
-      medio_pago: cobraDelivery.value ? undefined : form.value.medio_pago, con_envio: form.value.con_envio,
+      medio_pago: (form.value.es_regalo || cobraDelivery.value) ? undefined : form.value.medio_pago, con_envio: form.value.con_envio,
       // Descuento de la dispensa (puntual). El del paciente lo aplica el server desde la ficha.
       descuento_dispensa_pct: descDispensaPct.value,
     }
+    if (form.value.es_regalo) payload.es_regalo = true
     // El total lo calcula el server (descuento paciente + dispensa). Solo admin/supervisor
     // pueden pisar el aporte a mano (sobre el total del carrito); el dispensador no manda aporte.
-    if (puedeEditarAporte.value && form.value.aporte_socio_ars != null && form.value.aporte_socio_ars !== '')
+    // En un regalo no se manda aporte (el server lo fuerza a 0).
+    else if (puedeEditarAporte.value && form.value.aporte_socio_ars != null && form.value.aporte_socio_ars !== '')
       payload.aporte_socio_ars = Number(form.value.aporte_socio_ars).toFixed(2)
     if (form.value.con_envio) {
       payload.cobrar_en_entrega = cobraDelivery.value
@@ -683,7 +693,7 @@ async function handleSubmit() {
               <AppDatePicker v-if="form.es_reserva" v-model="form.fecha_entrega_estimada" :min="tomorrow" />
               <AppDatePicker v-else v-model="form.fecha_dispensacion" :max="today" />
             </div>
-            <div class="mnd__field">
+            <div v-if="!form.es_regalo" class="mnd__field">
               <label class="mnd__label">{{ modoReserva ? 'Medio de pago del resto' : (form.es_reserva ? 'Medio de pago de la seña' : 'Medio de pago') }}</label>
               <select v-model="form.medio_pago" class="mnd__input">
                 <option value="efectivo">Efectivo</option>
@@ -694,6 +704,14 @@ async function handleSubmit() {
               </select>
             </div>
           </div>
+
+          <!-- Regalo: entrega gratis (solo admin/supervisor, dispensa inmediata) -->
+          <label v-if="puedeEditarAporte && !form.es_reserva && !modoReserva" class="mnd__regalo">
+            <input type="checkbox" v-model="form.es_regalo" />
+            <span>
+              🎁 Es un regalo <span class="mnd__opt">no cobra, no toca la cuenta corriente; el stock igual se descuenta</span>
+            </span>
+          </label>
 
           <!-- Seña (solo reserva) -->
           <div v-if="form.es_reserva" class="mnd__field">
@@ -913,6 +931,9 @@ async function handleSubmit() {
 .mnd__field-error { font-size: .72rem; color: #dc2626; font-weight: 600; }
 .mnd__field-hint  { font-size: .72rem; color: #94a3b8; }
 .mnd__textarea { resize: vertical; min-height: 58px; }
+.mnd__regalo { display: flex; align-items: flex-start; gap: .55rem; margin-top: .9rem; padding: .7rem .85rem; background: #faf5ff; border: 1.5px solid #e9d5ff; border-radius: 10px; font-size: .84rem; font-weight: 600; color: #6b21a8; cursor: pointer; }
+.mnd__regalo input { margin-top: .15rem; accent-color: #7c3aed; }
+.mnd__regalo .mnd__opt { display: block; font-weight: 400; color: #a78bca; margin-top: .1rem; }
 .mnd__input-suffix-wrap { display: flex; }
 .mnd__input--with-suffix { border-radius: 9px 0 0 9px; flex: 1; }
 .mnd__input-suffix { background: #f1f5f9; border: 1.5px solid #e2e8f0; border-left: none; border-radius: 0 9px 9px 0; padding: .6rem .7rem; font-size: .8rem; color: #64748b; white-space: nowrap; display: flex; align-items: center; }

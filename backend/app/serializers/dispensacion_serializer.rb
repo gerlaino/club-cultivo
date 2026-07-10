@@ -22,6 +22,7 @@ class DispensacionSerializer
       observaciones:       d.observaciones,
       fecha_dispensacion:  d.fecha_dispensacion,
       medio_pago:          d.medio_pago,
+      es_regalo:           d.es_regalo,
       tiene_movimiento_contable: d.movimientos_contables.any?,
       monto_credito_ars:   d.monto_credito_ars&.to_f,
       monto_efectivo_ars:  (d.aporte_socio_ars.to_d - d.monto_credito_ars.to_d).to_f,

@@ -3,7 +3,7 @@ class Dispensacion < ApplicationRecord
   self.table_name = 'dispensaciones'
 
   ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido cancelada].freeze
-  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos mixto].freeze
+  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos mixto regalo].freeze
 
   belongs_to :paciente
   belongs_to :user
@@ -119,6 +119,7 @@ class Dispensacion < ApplicationRecord
 
   scope :del_mes,        ->(fecha = Date.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
   scope :del_paciente,   ->(paciente_id)        { where(paciente_id: paciente_id) }
+  scope :regalos,        ->                     { where(es_regalo: true) }
   scope :recientes,      ->                     { order(fecha_dispensacion: :desc, created_at: :desc) }
   scope :con_envio,      ->                     { where(con_envio: true) }
   scope :del_delivery,   ->(user_id)            { where(delivery_id: user_id) }

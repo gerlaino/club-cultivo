@@ -118,8 +118,18 @@ class DispensacionesController < ApplicationController
       end
     end
 
-    @dispensacion.cobrar_en_entrega = ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :cobrar_en_entrega)) || false
-    lineas_cobro = cobros_param
+    # Regalo: la dispensa se entrega gratis. No cobra, no toca cuenta corriente ni crédito, y
+    # corta el flujo de cobros; el stock igual se descuenta (el producto sale) por el callback
+    # after_create, y crear_movimiento_contable es no-op con total 0. Queda trazada como regalo.
+    es_regalo = ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :es_regalo))
+    if es_regalo
+      @dispensacion.es_regalo        = true
+      @dispensacion.medio_pago       = 'regalo'
+      @dispensacion.aporte_socio_ars = 0
+    end
+
+    @dispensacion.cobrar_en_entrega = !es_regalo && (ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :cobrar_en_entrega)) || false)
+    lineas_cobro = es_regalo ? [] : cobros_param
     usa_cobros   = @dispensacion.cobrar_en_entrega || lineas_cobro.present?
 
     cc = @paciente.cuenta_corriente
@@ -622,7 +632,7 @@ class DispensacionesController < ApplicationController
     params.require(:dispensacion).permit(
       :indicacion_medica_id, :stock_id, :sede_id,
       :cantidad, :precio_unitario_ars, :aporte_socio_ars,
-      :descuento_dispensa_pct,
+      :descuento_dispensa_pct, :es_regalo,
       :observaciones, :fecha_dispensacion, :medio_pago,
       :con_envio, :delivery_id, :direccion_envio,
       :contacto_nombre, :contacto_telefono, :notas_envio,
@@ -654,7 +664,7 @@ class DispensacionesController < ApplicationController
   # Devuelve un string de error o nil. Compartido entre create y update.
   def validar_y_calcular_credito(dispensacion, cc)
     monto = dispensacion.aporte_socio_ars.to_d
-    if monto <= 0 && dispensacion.medio_pago != 'credito_gramos'
+    if monto <= 0 && !%w[credito_gramos regalo].include?(dispensacion.medio_pago)
       return 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.'
     end
     credito_disp = cc ? [cc.saldo_disponible.to_d + cc.limite_credito.to_d, 0].max : 0

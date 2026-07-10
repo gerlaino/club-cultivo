@@ -206,11 +206,11 @@ function formatHora(ts) {
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
 function medioPagoLabel(m) {
-  const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', no_abona: 'No abona', credito_gramos: 'Gramos', mixto: 'Mixto' }
+  const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', no_abona: 'No abona', credito_gramos: 'Gramos', mixto: 'Mixto', regalo: 'Regalo' }
   return L[m] || m || '—'
 }
 function medioPagoClass(m) {
-  const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', no_abona: 'hd__pago--gris', credito_gramos: 'hd__pago--morado', mixto: 'hd__pago--azul' }
+  const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', no_abona: 'hd__pago--gris', credito_gramos: 'hd__pago--morado', mixto: 'hd__pago--azul', regalo: 'hd__pago--morado' }
   return C[m] || 'hd__pago--gris'
 }
 function descuentoPct(d) {
@@ -255,6 +255,7 @@ const MEDIOS_PAGO = [
   { value: 'cuenta_corriente', label: 'Cta. corriente' },
   { value: 'mixto', label: 'Mixto' },
   { value: 'no_abona', label: 'No abona' },
+  { value: 'regalo', label: 'Regalo' },
 ]
 const FORMAS = [
   { value: 'flor_seca', label: 'Flor seca' }, { value: 'hash', label: 'Hash' },
