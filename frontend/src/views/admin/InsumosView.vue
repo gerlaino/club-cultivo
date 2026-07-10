@@ -4,7 +4,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useInsumosStore } from '../../stores/insumos.js'
 import { useSedeStore } from '../../stores/sede.js'
-import { listLotes, listSalas } from '../../lib/api.js'
+import { listLotes, listSalas, listCategoriasContables } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import DepositoSalon from './DepositoSalon.vue'
 
@@ -15,6 +15,33 @@ const toast = useToast()
 const UNIDADES = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
 const lotes = ref([])
 const salas = ref([])
+const categorias = ref([]) // árbol de categorías (para el alta y las etiquetas de grupo)
+
+// Comportamiento contable que alimenta cada depósito (la categoría es la que manda).
+const COMP_DE_TAB = { cultivo: ['insumo'], general: ['insumo_general'] }
+// Subcategorías (u hojas madre) elegibles al crear un insumo en la familia activa.
+const categoriasDelTab = computed(() => {
+  const comps = COMP_DE_TAB[tipoActivo.value] || []
+  const out = []
+  for (const m of categorias.value) {
+    const subs = m.subcategorias || []
+    for (const s of subs) if (comps.includes(s.comportamiento_efectivo)) out.push({ id: s.id, label: `${m.nombre} › ${s.nombre}` })
+    if (!subs.length && comps.includes(m.comportamiento_efectivo)) out.push({ id: m.id, label: m.nombre })
+  }
+  return out
+})
+// Insumos agrupados por categoría (madre › subcategoría), como el árbol contable.
+const grupos = computed(() => {
+  const map = {}
+  for (const i of store.items) {
+    const c = i.categoria
+    const label = c ? (c.sub_nombre ? `${c.madre_nombre} › ${c.sub_nombre}` : c.madre_nombre) : 'Sin categoría'
+    ;(map[label] ||= []).push(i)
+  }
+  return Object.entries(map)
+    .map(([label, items]) => ({ label, items, valorizado: items.reduce((a, i) => a + (i.valorizado_ars || 0), 0) }))
+    .sort((a, b) => (a.label === 'Sin categoría' ? 1 : b.label === 'Sin categoría' ? -1 : a.label.localeCompare(b.label)))
+})
 
 // El depósito vive por sede: cada ítem ocupa un espacio físico en una sede. Cuando hay ≥2 sedes
 // mostramos el contexto (badge de sede, elección de sede en el alta, y transferencia entre sedes).
@@ -54,6 +81,7 @@ onMounted(async () => {
   await recargar()
   listLotes({ estado: 'activos' }).then(r => { lotes.value = r.data?.lotes || r.data || [] }).catch(() => {})
   listSalas().then(r => { salas.value = r.data || [] }).catch(() => {})
+  listCategoriasContables().then(r => { categorias.value = r.data || [] }).catch(() => {})
 })
 
 // Al cambiar la sede o la familia activa, el depósito se re-filtra.
@@ -67,7 +95,12 @@ function stockPct(i) {
 
 // ── Nuevo insumo ──────────────────────────────────────────────
 const nuevoForm = ref(null)
-function nuevoInsumo() { nuevoForm.value = { nombre: '', unidad_medida: 'unidad', stock_minimo: 0, sede_id: sede.sedeId, tipo: tipoActivo.value } }
+function nuevoInsumo() {
+  nuevoForm.value = {
+    nombre: '', unidad_medida: 'unidad', stock_minimo: 0, sede_id: sede.sedeId, tipo: tipoActivo.value,
+    categoria_contable_id: categoriasDelTab.value[0]?.id ?? null,
+  }
+}
 async function guardarNuevo() {
   if (!nuevoForm.value.nombre?.trim()) { toast.warning('Poné un nombre'); return }
   try {
@@ -160,37 +193,55 @@ async function confirmarConsumo() {
 
     <template v-else>
     <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>
-    <div v-else-if="!store.items.length" class="dp__empty dp__empty--box">Todavía no hay insumos. Creá el primero con “+ Insumo”.</div>
+    <div v-else-if="!store.items.length" class="dp__empty dp__empty--box">
+      Todavía no hay insumos en esta familia. Se cargan al registrar la compra en
+      <b>Contabilidad → Nuevo movimiento</b> (elegís la categoría y el sistema lo deriva acá), o con “+ Insumo”.
+    </div>
 
-    <ul v-else class="dp__list">
-      <li v-for="i in store.items" :key="i.id" class="dp__item" :class="{ 'dp__item--low': i.stock_bajo }">
-        <div class="dp__item-main">
-          <div class="dp__item-top">
-            <span class="dp__name">{{ i.nombre }}</span>
-            <span v-if="multiSede" class="dp__sede">{{ i.sede_nombre || 'Sin sede' }}</span>
-            <span v-if="i.stock_bajo" class="dp__pill">Reponer</span>
-          </div>
-          <div class="dp__meter"><i :style="{ width: stockPct(i) + '%' }" :class="i.stock_bajo ? 'is-low' : 'is-ok'"></i></div>
+    <!-- Agrupado por categoría → subcategoría (el mismo árbol contable) -->
+    <div v-else class="dp__groups">
+      <section v-for="g in grupos" :key="g.label" class="dp__group">
+        <div class="dp__group-head">
+          <span class="dp__group-name">{{ g.label }}</span>
+          <span class="dp__group-val">{{ fmt(g.valorizado) }}</span>
         </div>
-        <div class="dp__stats">
-          <span class="dp__stock num" :class="{ low: i.stock_bajo }">{{ i.stock_actual }} <small>{{ i.unidad_medida }}</small></span>
-          <span class="dp__meta num">{{ fmt(i.costo_promedio_ars) }}/u · {{ fmt(i.valorizado_ars) }}</span>
-        </div>
-        <div class="dp__actions">
-          <button class="btn btn--sm" @click="abrirCompra(i)">Comprar</button>
-          <button v-if="multiSede && otrasSedes.length" class="btn btn--sm" @click="abrirTransfer(i)" :disabled="i.stock_actual <= 0" title="Transferir a otra sede">Transferir</button>
-          <button class="btn btn--sm btn--primary" @click="abrirConsumo(i)" :disabled="i.stock_actual <= 0">Consumir</button>
-        </div>
-      </li>
-    </ul>
+        <ul class="dp__list">
+          <li v-for="i in g.items" :key="i.id" class="dp__item" :class="{ 'dp__item--low': i.stock_bajo }">
+            <div class="dp__item-main">
+              <div class="dp__item-top">
+                <span class="dp__name">{{ i.nombre }}</span>
+                <span v-if="multiSede" class="dp__sede">{{ i.sede_nombre || 'Sin sede' }}</span>
+                <span v-if="i.stock_bajo" class="dp__pill">Reponer</span>
+              </div>
+              <div class="dp__meter"><i :style="{ width: stockPct(i) + '%' }" :class="i.stock_bajo ? 'is-low' : 'is-ok'"></i></div>
+            </div>
+            <div class="dp__stats">
+              <span class="dp__stock num" :class="{ low: i.stock_bajo }">{{ i.stock_actual }} <small>{{ i.unidad_medida }}</small></span>
+              <span class="dp__meta num">{{ fmt(i.costo_promedio_ars) }}/u · {{ fmt(i.valorizado_ars) }}</span>
+            </div>
+            <div class="dp__actions">
+              <button class="btn btn--sm" @click="abrirCompra(i)">Comprar</button>
+              <button v-if="multiSede && otrasSedes.length" class="btn btn--sm" @click="abrirTransfer(i)" :disabled="i.stock_actual <= 0" title="Transferir a otra sede">Transferir</button>
+              <button class="btn btn--sm btn--primary" @click="abrirConsumo(i)" :disabled="i.stock_actual <= 0">Consumir</button>
+            </div>
+          </li>
+        </ul>
+      </section>
+    </div>
     </template>
 
     <!-- Modal nuevo insumo -->
     <div v-if="nuevoForm" class="ov" @click.self="nuevoForm = null">
       <div class="modal">
         <h3 class="modal__title">Nuevo insumo</h3>
-        <p class="modal__hint">Un ítem del depósito (fertilizante, sustrato…). El stock lo cargás después con “Comprar”.</p>
+        <p class="modal__hint">Un ítem del depósito. Normalmente los insumos entran al registrar la compra en Nuevo movimiento; acá lo creás a mano y le cargás stock con “Comprar”.</p>
         <label class="fld">Nombre<input v-model.trim="nuevoForm.nombre" class="inp" placeholder="Ej: Fertilizante base" maxlength="60" /></label>
+        <label class="fld">Categoría
+          <select v-model="nuevoForm.categoria_contable_id" class="inp">
+            <option :value="null">— Sin categoría —</option>
+            <option v-for="c in categoriasDelTab" :key="c.id" :value="c.id">{{ c.label }}</option>
+          </select>
+        </label>
         <label v-if="multiSede" class="fld">Sede
           <select v-model="nuevoForm.sede_id" class="inp">
             <option :value="null">— Pool del club —</option>
@@ -290,6 +341,10 @@ async function confirmarConsumo() {
 .dp__empty { color: #94a3b8; padding: 2.5rem; text-align: center; font-size: .9rem; }
 .dp__empty--box { background: #fbfcfd; border: 1px dashed #e2e8f0; border-radius: 14px; }
 
+.dp__groups { display: flex; flex-direction: column; gap: 1.5rem; }
+.dp__group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0 .15rem .5rem; border-bottom: 1.5px solid #eef2f6; margin-bottom: .6rem; }
+.dp__group-name { font-size: .82rem; font-weight: 700; color: #334155; letter-spacing: -.005em; }
+.dp__group-val { font-size: .78rem; font-weight: 600; color: #94a3b8; font-variant-numeric: tabular-nums; }
 .dp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
 .dp__item { display: grid; grid-template-columns: 1fr auto auto; gap: 1.5rem; align-items: center; background: #fff; border: 1px solid #e8edf2; border-radius: 13px; padding: 1rem 1.25rem; box-shadow: 0 1px 2px rgb(15 23 42 / .04); transition: border-color .15s, box-shadow .15s; }
 .dp__item:hover { border-color: #d7dee6; box-shadow: 0 2px 8px rgb(15 23 42 / .06); }

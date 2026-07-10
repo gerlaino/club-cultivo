@@ -18,7 +18,14 @@ class CategoriaContable < ApplicationRecord
   has_many :movimientos_contables, class_name: 'MovimientoContable', foreign_key: :categoria_contable_id, dependent: :nullify
 
   TIPOS          = %w[ingreso egreso].freeze
-  COMPORTAMIENTOS = %w[general insumo mercaderia].freeze
+  # Comportamiento = a qué depósito deriva el alta de un movimiento con esta categoría:
+  #   general        → gasto/ingreso común, no mueve stock
+  #   insumo         → depósito de CULTIVO (se consume imputando al lote)
+  #   insumo_general → depósito GENERAL del club (limpieza, admin; se consume como gasto)
+  #   mercaderia     → SALÓN (producto vendible del bar)
+  COMPORTAMIENTOS = %w[general insumo insumo_general mercaderia].freeze
+  # Familia de depósito que le corresponde a cada comportamiento (nil = no stockea).
+  FAMILIA_DEPOSITO = { 'insumo' => 'cultivo', 'insumo_general' => 'general', 'mercaderia' => 'salon' }.freeze
 
   validates :nombre, presence: true
   validates :tipo,   presence: true, inclusion: { in: TIPOS }
@@ -40,6 +47,12 @@ class CategoriaContable < ApplicationRecord
   def comportamiento_efectivo
     comportamiento != 'general' ? comportamiento : (parent&.comportamiento || 'general')
   end
+
+  # Depósito destino según el comportamiento: 'cultivo' | 'general' | 'salon' | nil.
+  def familia_deposito = FAMILIA_DEPOSITO[comportamiento_efectivo]
+
+  # Tipo de insumo (cultivo/general) para las categorías que van a un depósito de insumos.
+  def tipo_insumo = { 'cultivo' => 'cultivo', 'general' => 'general' }[familia_deposito]
 
   private
 

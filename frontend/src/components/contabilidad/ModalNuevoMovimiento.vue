@@ -96,7 +96,7 @@ watch(() => sal.value.bar_id, async (id) => {
 // Construye el objeto destino para el payload según el comportamiento de la categoría.
 function buildDestino() {
   if (tipoNorm.value !== 'egreso' || esCuotas.value) return null
-  if (compActual.value === 'insumo') {
+  if (esDeposito.value) {
     const d = dep.value
     if (!(d.cantidad > 0)) return null
     return d.insumo_id
@@ -201,13 +201,17 @@ const showsPaciente = computed(() => ['aporte_socio', 'dispensacion'].includes(c
 const descPH        = computed(() => 'Describí brevemente el movimiento')
 // Comportamiento efectivo de la categoría elegida → maneja los campos de stock (depósito/salón).
 const compActual    = computed(() => catActual.value?.comportamiento || 'general')
+// insumo (cultivo) e insumo_general → ambos van al depósito de insumos; el backend decide cuál
+// según la categoría. mercaderia → salón. Es la categoría la que manda.
+const esDeposito    = computed(() => ['insumo', 'insumo_general'].includes(compActual.value))
+const mueveStock    = computed(() => esDeposito.value || compActual.value === 'mercaderia')
 
 function openCat()   { catOpen.value = true; catHL.value = -1; catQuery.value = ''; nextTick(() => catInput.value?.focus()) }
 function closeCat()  { catOpen.value = false; catQuery.value = '' }
 function pickCat(c)  {
   form.value.categoria_contable_id = c.id
   if (c.clave !== 'aporte_socio' && c.clave !== 'dispensacion') form.value.paciente_id = null
-  if (c.comportamiento !== 'insumo' && c.comportamiento !== 'mercaderia') resetDestino()
+  if (!['insumo', 'insumo_general', 'mercaderia'].includes(c.comportamiento)) resetDestino()
   delete errors.value.categoria
   closeCat()
 }
@@ -295,7 +299,7 @@ watch(() => form.value.tipo, (t) => {
 
 watch(() => form.value.categoria_contable_id, () => {
   if (!showsPaciente.value) form.value.paciente_id = null
-  if (compActual.value !== 'insumo' && compActual.value !== 'mercaderia') resetDestino()
+  if (!mueveStock.value) resetDestino()
 })
 
 watch(() => props.modelValue, (val) => {
@@ -626,11 +630,11 @@ async function submit() {
             <hr class="nm-hr" />
 
             <!-- ENTRADA DE STOCK: la dispara el comportamiento de la categoría elegida. Solo al crear. -->
-            <div v-if="(compActual === 'insumo' || compActual === 'mercaderia') && tipoNorm === 'egreso' && !esCuotas && !movimientoEditar" class="nm-dest">
-              <label class="nm-label">{{ compActual === 'insumo' ? '📦 Entra al depósito' : '🍷 Entra al salón' }}</label>
+            <div v-if="mueveStock && tipoNorm === 'egreso' && !esCuotas && !movimientoEditar" class="nm-dest">
+              <label class="nm-label">{{ esDeposito ? (compActual === 'insumo_general' ? '🧹 Entra al depósito general' : '📦 Entra al depósito de cultivo') : '🍷 Entra al salón' }}</label>
 
-              <!-- Depósito: compra de insumo -->
-              <div v-if="compActual === 'insumo'" class="nm-dest-body">
+              <!-- Depósito: compra de insumo (cultivo o general — el backend lo ubica según la categoría) -->
+              <div v-if="esDeposito" class="nm-dest-body">
                 <div class="nm-grid2">
                   <div class="nm-field">
                     <label class="nm-label">Insumo</label>

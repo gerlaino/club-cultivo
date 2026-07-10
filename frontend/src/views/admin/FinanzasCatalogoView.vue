@@ -17,14 +17,16 @@ const TIPOS_UNIDAD = [
   { value: 'administracion', label: 'Administración' }, { value: 'general', label: 'General' },
 ]
 const COMPORTAMIENTOS = [
-  { value: 'general',    label: 'General', desc: 'Gasto o ingreso común. No mueve stock.' },
-  { value: 'insumo',     label: 'Insumo → Depósito', desc: 'Al cargar la compra, el stock entra al depósito de insumos.' },
-  { value: 'mercaderia', label: 'Mercadería → Salón', desc: 'Al cargar la compra, el stock entra al salón (bar).' },
+  { value: 'general',        label: 'General', desc: 'Gasto o ingreso común. No mueve stock.' },
+  { value: 'insumo',         label: 'Insumo → Depósito cultivo', desc: 'La compra entra al depósito de cultivo (se consume imputando al lote).' },
+  { value: 'insumo_general', label: 'Insumo → Depósito general', desc: 'La compra entra al depósito general del club (limpieza, administración).' },
+  { value: 'mercaderia',     label: 'Mercadería → Salón', desc: 'La compra entra al salón (bar), como producto vendible.' },
 ]
 const COMP_META = {
-  general:    { label: 'General',    cls: 'is-gen' },
-  insumo:     { label: '→ Depósito', cls: 'is-dep' },
-  mercaderia: { label: '→ Salón',    cls: 'is-sal' },
+  general:        { label: 'General',   cls: 'is-gen' },
+  insumo:         { label: '→ Cultivo', cls: 'is-dep' },
+  insumo_general: { label: '→ General', cls: 'is-gen2' },
+  mercaderia:     { label: '→ Salón',   cls: 'is-sal' },
 }
 const COLORES = ['#1b5e20', '#15803d', '#b45309', '#8a4b2f', '#dc2626', '#3b82f6', '#64748b', '#7c3aed']
 
@@ -262,6 +264,7 @@ async function borrarUnidad(u) {
 .comp--sm { font-size: .62rem; padding: 1px 6px; margin-left: .35rem; }
 .comp.is-gen { background: #f1f5f9; color: #64748b; }
 .comp.is-dep { background: #eef6ee; color: #1b5e20; }
+.comp.is-gen2 { background: #eef2ff; color: #4338ca; }
 .comp.is-sal { background: #f6ece4; color: #8a4b2f; }
 
 .cat-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1rem; align-items: start; }

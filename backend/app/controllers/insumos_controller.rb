@@ -11,7 +11,7 @@ class InsumosController < ApplicationController
 
   # GET /insumos?sede_id=<id|pool>&tipo=<cultivo|general>&activos=true
   def index
-    scope = current_user.club.insumos.includes(:categoria_contable, :sede)
+    scope = current_user.club.insumos.includes(:sede, categoria_contable: :parent)
     scope = scope.activos if params[:activos] == 'true'
     scope = scope.por_tipo(params[:tipo]) if params[:tipo].present?
     scope = scope.de_sede(params[:sede_id]) if params[:sede_id].present?
@@ -148,9 +148,19 @@ class InsumosController < ApplicationController
       activo:             i.activo,
       tipo:               i.tipo,
       categoria_contable_id: i.categoria_contable_id,
+      categoria:          serialize_categoria(i.categoria_contable),
       sede_id:            i.sede_id,
       sede_nombre:        i.sede&.nombre,
     }
+  end
+
+  # Categoría del insumo para agrupar en el depósito: madre (grupo) → subcategoría.
+  def serialize_categoria(c)
+    return nil unless c
+
+    madre = c.parent || c
+    hija  = c.parent ? c : nil
+    { madre_id: madre.id, madre_nombre: madre.nombre, sub_nombre: hija&.nombre }
   end
 
   def serialize_compra(c)

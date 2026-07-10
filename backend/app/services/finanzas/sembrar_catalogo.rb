@@ -65,6 +65,12 @@ module Finanzas
       sub(operacion, 'Seguro',         clave: 'seguro')
       sub(operacion, 'Administrativo', clave: 'admin')
 
+      # Insumos generales del club (se stockean en el depósito general de la sede).
+      generales = madre('Insumos generales', 'egreso', admin, comportamiento: 'insumo_general')
+      sub(generales, 'Limpieza')
+      sub(generales, 'Descartables')
+      sub(generales, 'Librería / Oficina')
+
       madre('Otro', 'egreso', nil, clave: 'otro')
 
       # ── Ingresos ─────────────────────────────────────────────

@@ -298,12 +298,16 @@ class MovimientosContablesController < ApplicationController
   def aplicar_deposito!(movimiento, d)
     club     = current_user.club
     sede_id  = d[:sede_id].presence || movimiento.sede_id
+    cat      = movimiento.categoria_contable
+    # La CATEGORÍA manda: define el depósito (cultivo/general) y queda linkeada al insumo para
+    # poder agruparlo por categoría → subcategoría en la vista del depósito.
+    tipo     = cat&.tipo_insumo || 'cultivo'
     insumo   = if d[:insumo_id].present?
                  club.insumos.find(d[:insumo_id])
                else
                  club.insumos.create!(nombre: d[:nombre].to_s.strip,
                                       unidad_medida: d[:unidad_medida].presence || 'unidad',
-                                      sede_id: sede_id)
+                                      sede_id: sede_id, tipo: tipo, categoria_contable: cat)
                end
     cantidad = d[:cantidad].to_d
     raise ArgumentError, 'Indicá la cantidad de insumo' if cantidad <= 0
