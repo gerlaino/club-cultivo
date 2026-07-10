@@ -6,11 +6,13 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
+import { useSedeStore } from '../../stores/sede.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 
 const store = useBarStore()
 const auth  = useAuthStore()
+const sedeStore = useSedeStore()
 const route = useRoute()
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -25,7 +27,12 @@ const fmtK = (n) => {
   return fmt(n)
 }
 
-onMounted(() => { store.fetchDashboard(barId); store.fetchProductos(barId) })
+onMounted(async () => {
+  await store.fetchDashboard(barId)
+  // Al entrar a un salón, el contexto global de sede pasa a la sede de ese bar (no queda en "club").
+  if (store.barActual?.sede?.id) sedeStore.setSede(store.barActual.sede.id)
+  store.fetchProductos(barId)
+})
 
 const d = computed(() => store.dashboard)
 const rm = computed(() => d.value?.resultado_mes || {})

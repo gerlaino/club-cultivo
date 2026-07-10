@@ -4,6 +4,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useEventosBarStore } from '../../stores/eventosBar.js'
 import { useToast } from '../../composables/useToast.js'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 
 const store  = useEventosBarStore()
 const route  = useRoute()
@@ -55,7 +56,7 @@ function fechaTxt(f) {
 
     <form v-if="form" class="ev__form" @submit.prevent="guardar">
       <input v-model.trim="form.nombre" class="inp" placeholder="Nombre del evento" maxlength="80" />
-      <label class="fld">Fecha<input v-model="form.fecha" type="date" class="inp" /></label>
+      <label class="fld">Fecha<AppDatePicker v-model="form.fecha" /></label>
       <label class="fld">Aforo<input v-model.number="form.aforo" type="number" min="0" class="inp inp--sm" /></label>
       <label class="fld">Ingresos estimados<input v-model.number="form.presupuesto_ingresos" type="number" min="0" step="any" class="inp" /></label>
       <div class="ev__form-actions">
