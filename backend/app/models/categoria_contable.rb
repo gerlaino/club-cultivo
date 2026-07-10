@@ -15,7 +15,7 @@ class CategoriaContable < ApplicationRecord
   belongs_to :unidad_negocio, optional: true
   belongs_to :parent, class_name: 'CategoriaContable', optional: true
   has_many :subcategorias, class_name: 'CategoriaContable', foreign_key: :parent_id, dependent: :destroy
-  has_many :movimientos_contables, foreign_key: :categoria_contable_id, dependent: :nullify
+  has_many :movimientos_contables, class_name: 'MovimientoContable', foreign_key: :categoria_contable_id, dependent: :nullify
 
   TIPOS          = %w[ingreso egreso].freeze
   COMPORTAMIENTOS = %w[general insumo mercaderia].freeze

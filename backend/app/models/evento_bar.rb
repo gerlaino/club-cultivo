@@ -14,8 +14,10 @@ class EventoBar < ApplicationRecord
   has_many :tipos_entrada, class_name: 'EventoBarTipoEntrada', foreign_key: :evento_bar_id, dependent: :destroy
   has_many :entradas,      class_name: 'EventoBarEntrada', foreign_key: :evento_bar_id, dependent: :destroy
   has_many :provisiones,   class_name: 'EventoBarProvision', foreign_key: :evento_bar_id, dependent: :destroy
-  has_many :movimientos_contables, foreign_key: :evento_bar_id, dependent: :nullify
-  has_many :bar_ventas,            foreign_key: :evento_bar_id, dependent: :nullify
+  # class_name explícito: 'movimientos_contables'.classify → 'MovimientosContable' (mal, el
+  # inflector deja "movimientos" en plural). El modelo real es MovimientoContable.
+  has_many :movimientos_contables, class_name: 'MovimientoContable', foreign_key: :evento_bar_id, dependent: :nullify
+  has_many :bar_ventas,            class_name: 'BarVenta',           foreign_key: :evento_bar_id, dependent: :nullify
 
   ESTADOS = %w[planificado en_venta en_curso finalizado cancelado].freeze
 

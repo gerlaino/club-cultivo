@@ -9,7 +9,7 @@ class UnidadNegocio < ApplicationRecord
 
   belongs_to :club
   has_many :categorias_contables,  dependent: :nullify
-  has_many :movimientos_contables, dependent: :nullify
+  has_many :movimientos_contables, class_name: 'MovimientoContable', dependent: :nullify
 
   TIPOS = %w[cultivo dispensario bar social administracion general].freeze
 

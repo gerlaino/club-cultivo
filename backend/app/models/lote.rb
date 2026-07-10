@@ -14,7 +14,7 @@ class Lote < ApplicationRecord
   belongs_to :planta_madre,  class_name: 'Plant', optional: true
   has_many :plants,                dependent: :destroy
   has_one  :costo_lote,            dependent: :destroy
-  has_many :movimientos_contables, dependent: :nullify
+  has_many :movimientos_contables, class_name: 'MovimientoContable', dependent: :nullify
   has_many :registros_ambientales, class_name: 'RegistroAmbiental', dependent: :destroy
   has_many :lote_eventos,          dependent: :destroy
   has_many :pesadas,               -> { order(registrado_at: :asc) }, dependent: :destroy
