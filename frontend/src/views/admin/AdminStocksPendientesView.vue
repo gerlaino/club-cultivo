@@ -215,7 +215,11 @@
                     </span>
                   </td>
                   <td class="stk__inv-td-cepa">{{ s.lote?.genetica?.nombre || s.genetica?.nombre || '—' }}</td>
-                  <td class="stk__inv-td-mono">{{ s.lote?.codigo || '—' }}</td>
+                  <td>
+                    <span v-if="s.lote" class="stk__chip stk__chip--lote">{{ s.lote.codigo }}</span>
+                    <span v-else-if="!s.regulatorio || s.origen === 'compra_externa'" class="stk__chip stk__chip--ext">Externo</span>
+                    <span v-else class="stk__inv-td-mono">—</span>
+                  </td>
                   <td>{{ s.sede?.nombre || 'Sin asignar' }}</td>
                   <td class="stk__inv-td-fecha">{{ formatDate(s.created_at) }}</td>
                   <td class="stk__inv-num stk__inv-td-cosechado">
