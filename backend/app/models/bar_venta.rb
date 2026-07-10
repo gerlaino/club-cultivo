@@ -2,6 +2,10 @@
 # Dispensacion. El ingreso contable asociado vive en movimiento_contable. La creación con
 # descuento de stock y asiento contable la maneja Bar::RegistrarVenta.
 class BarVenta < ApplicationRecord
+  # El inflector inglés no pluraliza "venta" (BarVenta.tableize → 'bar_venta'), pero la tabla es
+  # 'bar_ventas'. Sin esto, TODA query de ventas del bar tira `relation "bar_venta" does not exist`.
+  self.table_name = 'bar_ventas'
+
   include Restorable
   acts_as_tenant(:club)
 
