@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
 import { useClubStore } from "../stores/club"
 import { useSedeStore } from "../stores/sede"
-import { getSede, listSalas, getSedeStocks, updateStock, deleteSede } from "../lib/api"
+import { getSede, listSalas, getSedeStocks, deleteSede } from "../lib/api"
 import ModalCrearSala    from '../components/salas/ModalCrearSala.vue'
 import Breadcrumb         from '../components/ui/Breadcrumb.vue'
 import EmptyState         from '../components/ui/EmptyState.vue'
@@ -55,7 +55,6 @@ const showCrearSala = ref(false)
 const canEdit        = computed(() => ["admin", "cultivador"].includes(auth.role))
 const puedeCrearSala = computed(() => ["admin", "supervisor"].includes(auth.role))
 const isAdmin        = computed(() => auth.user?.role === 'admin')
-const canEditStock   = computed(() => ["admin", "supervisor"].includes(auth.user?.role))
 
 const tieneInv   = computed(() => ['social', 'mixta'].includes(sede.value?.tipo))
 const tieneSalas = computed(() => ['produccion', 'mixta'].includes(sede.value?.tipo))
@@ -73,44 +72,9 @@ const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '
 const KIND_LABELS = { germinacion: 'Germinación', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', curado: 'Curado', manicura: 'Manicura', mixta: 'Mixta', madre: 'Madre', madres: 'Madres' }
 function kindLabel(k) { return KIND_LABELS[k] || k || '' }
 
-// ── Editar stock ─────────────────────────────────────────────────
-const showEditarStockModal = ref(false)
-const editandoStock        = ref(null)
-const editarStockForm      = ref({ cantidad: null, precio_sugerido_ars: null, costo_unitario_ars: null, descripcion: '', proveedor: '' })
-const savingEditarStock    = ref(false)
-const editarStockError     = ref(null)
-
-function abrirEditarStock(s) {
-  editandoStock.value = s
-  editarStockForm.value = {
-    cantidad:            parseFloat(s.cantidad),
-    precio_sugerido_ars: s.precio_sugerido_ars ? parseFloat(s.precio_sugerido_ars) : null,
-    costo_unitario_ars:  s.costo_unitario_ars  ? parseFloat(s.costo_unitario_ars)  : null,
-    descripcion:         s.descripcion || '',
-    proveedor:           s.proveedor   || '',
-  }
-  editarStockError.value = null
-  showEditarStockModal.value = true
-}
-
-async function confirmarEditarStock() {
-  if (!editandoStock.value) return
-  savingEditarStock.value = true; editarStockError.value = null
-  try {
-    const f = editarStockForm.value
-    const payload = { cantidad: f.cantidad }
-    if (f.precio_sugerido_ars) payload.precio_sugerido_ars = f.precio_sugerido_ars
-    if (f.costo_unitario_ars)  payload.costo_unitario_ars  = f.costo_unitario_ars
-    if (f.descripcion)         payload.descripcion         = f.descripcion
-    if (f.proveedor)           payload.proveedor           = f.proveedor
-    await updateStock(editandoStock.value.id, payload)
-    showEditarStockModal.value = false
-    await loadTiendaStocks()
-    toast.success('Stock actualizado')
-  } catch (e) {
-    editarStockError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'Error al actualizar el stock'
-  } finally { savingEditarStock.value = false }
-}
+// El stock de la sede es SOLO LECTURA acá; la gestión (editar cantidad, precio, ajustes) vive en
+// la vista de Stock. La card lleva ahí de un click (solo admin).
+function irAlStock() { router.push('/admin/stock') }
 
 async function loadTiendaStocks() {
   loadingTienda.value = true
@@ -170,7 +134,7 @@ const sedeAcciones = computed(() => {
 
 function escapeHandler(e) {
   if (e.key !== 'Escape') return
-  if (showEditarStockModal.value) showEditarStockModal.value = false
+  if (showCrearSala.value) showCrearSala.value = false
 }
 onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 onMounted(async () => {
@@ -267,10 +231,13 @@ onMounted(async () => {
               </template>
             </EmptyState>
             <div v-else class="sdv__tienda-grid">
-              <div v-for="s in tiendaStocks" :key="s.id" class="sdv__tienda-card">
+              <div v-for="s in tiendaStocks" :key="s.id" class="sdv__tienda-card"
+                   :class="{ 'sdv__tienda-card--link': isAdmin }"
+                   :title="isAdmin ? 'Ver y editar en Stock' : ''"
+                   @click="isAdmin && irAlStock()">
                 <div class="sdv__tienda-card-top">
                   <div class="sdv__tienda-forma">{{ FORMA_LABELS[s.forma_producto] || s.forma_producto }}</div>
-                  <button v-if="canEditStock" class="sdv__tienda-edit-btn" @click="abrirEditarStock(s)" title="Editar"><i class="bi bi-pencil"></i></button>
+                  <i v-if="isAdmin" class="bi bi-box-arrow-up-right sdv__tienda-link-ico"></i>
                 </div>
                 <div v-if="s.genetica" class="sdv__tienda-gen">🧬 {{ s.genetica.nombre }}</div>
                 <div v-if="s.lote_codigo" class="sdv__tienda-lote">📋 {{ s.lote_codigo }}</div>
@@ -361,62 +328,6 @@ onMounted(async () => {
     </template>
 
     <ModalCrearSala v-if="showCrearSala" :sede-id-fija="sedeId" @close="showCrearSala = false" @created="onSalaCreada" />
-
-    <!-- MODAL EDITAR STOCK -->
-    <Teleport to="body">
-      <div v-if="showEditarStockModal" class="sdv__modal-overlay" @click.self="showEditarStockModal = false">
-        <div class="sdv__modal sdv__modal--sm">
-          <div class="sdv__modal-header">
-            <div class="sdv__modal-header-icon" style="background:rgba(27,94,32,.1);color:#1b5e20"><i class="bi bi-pencil"></i></div>
-            <div>
-              <h3 class="sdv__modal-title">Editar stock</h3>
-              <p class="sdv__modal-sub">{{ FORMA_LABELS[editandoStock?.forma_producto] || editandoStock?.forma_producto }}</p>
-            </div>
-            <button class="sdv__modal-close" @click="showEditarStockModal = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="sdv__modal-body">
-            <div v-if="editarStockError" class="sdv__alert-err">{{ editarStockError }}</div>
-
-            <div class="sdv__field">
-              <label class="sdv__label">Cantidad <span style="color:#dc2626">*</span></label>
-              <div class="sdv__cant-wrap">
-                <input type="number" step="0.1" min="0" class="sdv__input sdv__input--big" v-model.number="editarStockForm.cantidad" placeholder="0" />
-                <span class="sdv__cant-suffix">{{ editandoStock?.unidad || 'g' }}</span>
-              </div>
-            </div>
-
-            <div class="sdv__grid-2">
-              <div class="sdv__field">
-                <label class="sdv__label">Costo unitario (ARS) <span class="sdv__optional">opcional</span></label>
-                <input type="number" step="0.01" min="0" class="sdv__input" v-model.number="editarStockForm.costo_unitario_ars" placeholder="ej: 1200" />
-              </div>
-              <div class="sdv__field">
-                <label class="sdv__label">Precio sugerido (ARS) <span class="sdv__optional">opcional</span></label>
-                <input type="number" step="0.01" min="0" class="sdv__input" v-model.number="editarStockForm.precio_sugerido_ars" placeholder="ej: 2500" />
-              </div>
-            </div>
-
-            <div v-if="editandoStock?.origen === 'compra_externa'" class="sdv__field">
-              <label class="sdv__label">Proveedor</label>
-              <input type="text" class="sdv__input" v-model.trim="editarStockForm.proveedor" placeholder="Nombre del proveedor" />
-            </div>
-
-            <div class="sdv__field">
-              <label class="sdv__label">Descripción <span class="sdv__optional">opcional</span></label>
-              <input type="text" class="sdv__input" v-model.trim="editarStockForm.descripcion" placeholder="Notas adicionales" />
-            </div>
-          </div>
-          <div class="sdv__modal-footer">
-            <button class="sdv__btn-ghost" :disabled="savingEditarStock" @click="showEditarStockModal = false">Cancelar</button>
-            <button class="sdv__btn-primary" :disabled="savingEditarStock || !editarStockForm.cantidad" @click="confirmarEditarStock">
-              <DsSpinner v-if="savingEditarStock" :size="14" />
-              <i v-else class="bi bi-check-lg"></i>
-              Guardar cambios
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
   </div>
 </template>
@@ -638,6 +549,9 @@ onMounted(async () => {
 .sdv__tienda-loading { display: flex; align-items: center; gap: .5rem; padding: 1rem 1.1rem; font-size: .82rem; color: #94a3b8; }
 .sdv__tienda-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .75rem; padding: .875rem 1.1rem; }
 .sdv__tienda-card { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: .875rem; display: flex; flex-direction: column; gap: .3rem; }
+.sdv__tienda-card--link { cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.sdv__tienda-card--link:hover { border-color: #1b5e20; box-shadow: 0 2px 8px rgb(15 23 42 / .06); }
+.sdv__tienda-link-ico { color: #94a3b8; font-size: .8rem; }
 .sdv__tienda-forma { font-size: .82rem; font-weight: 700; color: #0f172a; }
 .sdv__tienda-gen { font-size: .72rem; color: #64748b; }
 .sdv__tienda-lote { font-size: .68rem; color: #94a3b8; font-family: monospace; }

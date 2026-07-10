@@ -169,6 +169,14 @@ class StocksController < ApplicationController
       return render json: { error: 'La cantidad inicial de un stock de lote se edita desde el pesaje del lote, no desde acá.' }, status: :unprocessable_entity
     end
 
+    # La cantidad ACTUAL de un stock de lote se cambia con "Ajustar gramos" (deja movimiento), no
+    # editando el registro. En stock EXTERNO (prerolls, compra externa) sí se edita directo acá.
+    # Solo rechazamos si REALMENTE se intenta cambiar la cantidad de un lote (mandarla igual es no-op:
+    # el form de edición manda cantidad siempre, aunque el input no esté visible para lote).
+    if attrs.key?(:cantidad) && @stock.origen != 'compra_externa' && attrs[:cantidad].to_f != @stock.cantidad.to_f
+      return render json: { error: 'La cantidad de un stock de lote se cambia con "Ajustar gramos", no editando acá.' }, status: :unprocessable_entity
+    end
+
     # El inicial es solo el registro de lo que ingresó: editarlo NO toca el actual (que lo
     # manejan las operaciones y "Ajustar gramos"). Sin movimiento de stock.
     if @stock.update(attrs)
@@ -488,7 +496,7 @@ class StocksController < ApplicationController
 
   def stock_update_params
     params.require(:stock).permit(
-      :cantidad_inicial, :costo_unitario_ars, :precio_sugerido_ars, :descripcion, :proveedor
+      :cantidad, :cantidad_inicial, :costo_unitario_ars, :precio_sugerido_ars, :descripcion, :proveedor
     )
   end
 
