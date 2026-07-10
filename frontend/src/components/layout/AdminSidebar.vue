@@ -34,7 +34,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   LayoutDashboard, Sprout, Users, Factory, ShoppingCart,
-  CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine,
+  CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine, Building2,
 } from 'lucide-vue-next'
 import { NAV_GROUPS, detectGroup, useNavContext } from '../../composables/useNavContext.js'
 import { useClubStore } from '../../stores/club.js'
@@ -45,6 +45,7 @@ const { collapsed, toggleCollapse, refreshBadges, badgeFor } = useNavContext()
 
 const ICONS = {
   dashboard: LayoutDashboard,
+  sedes:     Building2,
   cultivo:   Sprout,
   pacientes: Users,
   produccion: Factory,
