@@ -6,6 +6,7 @@ import { useInsumosStore } from '../../stores/insumos.js'
 import { useSedeStore } from '../../stores/sede.js'
 import { listLotes, listSalas } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import DepositoSalon from './DepositoSalon.vue'
 
 const store = useInsumosStore()
 const sede  = useSedeStore()
@@ -20,16 +21,33 @@ const salas = ref([])
 const multiSede = computed(() => sede.sedes.length > 1)
 const otrasSedes = computed(() => sede.sedes.filter(s => s.id !== sede.sedeId))
 
-// Familias de depósito (consumibles). El bar (deposito_bar / vendible) es un módulo aparte.
-const TABS = [
-  { tipo: 'cultivo', label: 'Cultivo',  hint: 'Fertilizantes, sustrato… se consumen imputando el costo al lote.' },
-  { tipo: 'general', label: 'General',  hint: 'Insumos del club (limpieza, administración). Se consumen como gasto general.' },
+// Solapas de depósito por sede. Cada tipo de sede tiene distintos depósitos:
+//   producción → Cultivo + General   ·   social → General + Salón   ·   mixta → las 3
+// El Salón (deposito_bar, vendible) es un módulo aparte (DepositoSalon). Consolidado = todas.
+const currentTipo = computed(() => sede.sedeActual?.tipo) // undefined = consolidado (todas las sedes)
+const TABS_ALL = [
+  { tipo: 'cultivo', label: 'Cultivo', hint: 'Fertilizantes, sustrato… se consumen imputando el costo al lote.',       sedeTipos: ['produccion', 'mixta'] },
+  { tipo: 'general', label: 'General', hint: 'Insumos del club (limpieza, administración). Se consumen como gasto.',    sedeTipos: ['produccion', 'social', 'mixta'] },
+  { tipo: 'salon',   label: 'Salón',   hint: 'Mercadería del bar: stock con costo, valorizado y alertas de reposición.', sedeTipos: ['social', 'mixta'] },
 ]
+const TABS = computed(() => {
+  const t = currentTipo.value
+  return t ? TABS_ALL.filter(tab => tab.sedeTipos.includes(t)) : TABS_ALL
+})
 const tipoActivo = ref('cultivo')
-const tabActual  = computed(() => TABS.find(t => t.tipo === tipoActivo.value))
+const tabActual  = computed(() => TABS.value.find(t => t.tipo === tipoActivo.value) || TABS.value[0])
 const esGeneral  = computed(() => tipoActivo.value === 'general')
+const esSalon    = computed(() => tipoActivo.value === 'salon')
 
-async function recargar() { await store.fetch({ sede_id: sede.sedeParam, tipo: tipoActivo.value }) }
+// Si al cambiar de sede la solapa activa ya no existe, cae a la primera disponible.
+watch(TABS, (tabs) => {
+  if (!tabs.some(t => t.tipo === tipoActivo.value)) tipoActivo.value = tabs[0]?.tipo || 'cultivo'
+})
+
+async function recargar() {
+  if (esSalon.value) return // el depósito del salón se carga en su propio componente
+  await store.fetch({ sede_id: sede.sedeParam, tipo: tipoActivo.value })
+}
 
 onMounted(async () => {
   if (!sede.loaded) await sede.fetchSedes()
@@ -121,7 +139,7 @@ async function confirmarConsumo() {
         </h1>
         <p class="dp__sub">{{ tabActual?.hint }}</p>
       </div>
-      <div class="dp__head-right">
+      <div v-if="!esSalon" class="dp__head-right">
         <div class="dp__stat">
           <span class="dp__stat-label">Valorizado</span>
           <span class="dp__stat-val">{{ fmt(store.valorizadoTotal) }}</span>
@@ -137,6 +155,10 @@ async function confirmarConsumo() {
       </button>
     </div>
 
+    <!-- Salón: depósito del bar (componente aparte) -->
+    <DepositoSalon v-if="esSalon" :sede-id="sede.sedeId" />
+
+    <template v-else>
     <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>
     <div v-else-if="!store.items.length" class="dp__empty dp__empty--box">Todavía no hay insumos. Creá el primero con “+ Insumo”.</div>
 
@@ -161,6 +183,7 @@ async function confirmarConsumo() {
         </div>
       </li>
     </ul>
+    </template>
 
     <!-- Modal nuevo insumo -->
     <div v-if="nuevoForm" class="ov" @click.self="nuevoForm = null">

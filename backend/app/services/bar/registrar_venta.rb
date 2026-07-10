@@ -40,7 +40,12 @@ module Bar
             club: @club, bar_producto: prod, nombre: prod.nombre,
             cantidad: cant, precio_unitario_ars: prod.precio_ars, subtotal_ars: subtotal
           )
-          prod.update!(stock: prod.stock.to_d - cant)
+          # Descuenta stock dejando el movimiento en el ledger del depósito (si la tabla existe).
+          if BarStockMovimiento.table_exists?
+            prod.registrar_salida!(cantidad: cant, tipo: 'venta', created_by: @vendedor, bar_venta: venta)
+          else
+            prod.update!(stock: prod.stock.to_d - cant)
+          end
           total += subtotal
         end
 

@@ -6,9 +6,9 @@ module Bar
     before_action :authenticate_user!
     before_action :require_feature_bar!
     before_action :set_bar
-    before_action :require_operador, only: [:index, :reponer]
-    before_action :require_admin_bar, only: [:create, :update, :destroy]
-    before_action :set_producto, only: [:update, :destroy, :reponer]
+    before_action :require_operador, only: [:index, :reponer, :movimientos]
+    before_action :require_admin_bar, only: [:create, :update, :destroy, :comprar, :ajustar]
+    before_action :set_producto, only: [:update, :destroy, :reponer, :comprar, :ajustar, :movimientos]
 
     # GET /bares/:bar_id/productos
     def index
@@ -49,13 +49,59 @@ module Bar
       cant = params.require(:cantidad).to_d
       return render json: { error: 'Cantidad inválida' }, status: :unprocessable_entity if cant <= 0
 
-      @producto.update!(stock: @producto.stock.to_d + cant)
+      @producto.registrar_ingreso!(cantidad: cant, tipo: 'ajuste', created_by: current_user, motivo: 'Reposición manual')
       render json: serialize(@producto)
     rescue ActionController::ParameterMissing
       render json: { error: 'Falta la cantidad' }, status: :unprocessable_entity
     end
 
+    # POST /bares/:bar_id/productos/:id/comprar  { cantidad, costo_total_ars, proveedor? }
+    # Compra de mercadería: sube stock + costo promedio ponderado + egreso en el libro.
+    def comprar
+      compra = @producto.registrar_compra!(
+        cantidad:        params.require(:cantidad),
+        costo_total_ars: params.require(:costo_total_ars),
+        proveedor:       params[:proveedor],
+        created_by:      current_user
+      )
+      render json: serialize(@producto).merge(movimiento_id: compra.id), status: :created
+    rescue ArgumentError => e
+      render json: { error: e.message }, status: :unprocessable_entity
+    rescue ActionController::ParameterMissing => e
+      render json: { error: "Falta el parámetro #{e.param}" }, status: :unprocessable_entity
+    end
+
+    # POST /bares/:bar_id/productos/:id/ajustar  { cantidad_nueva, motivo? }
+    # Ajuste/merma: fija el stock al valor contado y registra la diferencia.
+    def ajustar
+      @producto.ajustar_stock!(
+        cantidad_nueva: params.require(:cantidad_nueva),
+        motivo:         params[:motivo],
+        created_by:     current_user
+      )
+      render json: serialize(@producto)
+    rescue ArgumentError => e
+      render json: { error: e.message }, status: :unprocessable_entity
+    rescue ActionController::ParameterMissing => e
+      render json: { error: "Falta el parámetro #{e.param}" }, status: :unprocessable_entity
+    end
+
+    # GET /bares/:bar_id/productos/:id/movimientos — historial de stock del producto
+    def movimientos
+      movs = @producto.bar_stock_movimientos.includes(:created_by).recientes.limit(80)
+      render json: movs.map { |m| serialize_movimiento(m) }
+    end
+
     private
+
+    def serialize_movimiento(m)
+      {
+        id: m.id, tipo: m.tipo, cantidad: m.cantidad.to_f, entrada: m.entrada?,
+        stock_anterior: m.stock_anterior.to_f, stock_nuevo: m.stock_nuevo.to_f,
+        costo_unitario_ars: m.costo_unitario_ars&.to_f, motivo: m.motivo,
+        creado_por: m.created_by&.nombre_completo, created_at: m.created_at,
+      }
+    end
 
     def set_bar
       @bar = current_user.club.bares.find(params[:bar_id])
@@ -102,6 +148,7 @@ module Bar
         id: p.id, nombre: p.nombre, categoria: p.categoria,
         precio_ars: p.precio_ars.to_f, costo_ars: p.costo_ars&.to_f,
         stock: p.stock.to_f, stock_minimo: p.stock_minimo.to_f, stock_bajo: p.stock_bajo?,
+        valorizado_ars: p.valorizado_ars.to_f,
         margen_pct: p.margen_pct, activo: p.activo,
       }
     end

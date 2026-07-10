@@ -383,7 +383,12 @@ Rails.application.routes.draw do
     resources :bares, only: [:index, :show, :create, :update, :destroy] do
       member { get :dashboard }
       resources :productos, controller: 'bar/productos', only: [:index, :create, :update, :destroy] do
-        member { post :reponer }
+        member do
+          post :reponer
+          post :comprar
+          post :ajustar
+          get  :movimientos
+        end
       end
       resources :ventas, controller: 'bar/ventas', only: [:index, :create, :destroy]
       # Caja de turno: apertura / cierre con arqueo / historial
