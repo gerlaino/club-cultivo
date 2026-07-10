@@ -38,7 +38,11 @@ onMounted(async () => {
     return
   }
   // Al entrar a un salón, el contexto global de sede pasa a la sede de ese bar (no queda en "club").
-  if (store.barActual?.sede?.id) sedeStore.setSede(store.barActual.sede.id)
+  // Aseguramos tener la lista de sedes cargada para que el topbar muestre bien la sede activa.
+  if (store.barActual?.sede?.id) {
+    if (!sedeStore.loaded) await sedeStore.fetchSedes()
+    sedeStore.setSede(store.barActual.sede.id)
+  }
   store.fetchProductos(barId)
 })
 

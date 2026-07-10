@@ -39,9 +39,14 @@ async function guardar() {
   if (!f.nombre?.trim()) { toast.warning('Poné un nombre'); return }
   if (!f.id && !f.sede_id) { toast.warning('Elegí la sede'); return }
   try {
-    if (f.id) await store.actualizarBar(f.id, { nombre: f.nombre.trim() })
-    else      await store.crearBar({ sede_id: f.sede_id, nombre: f.nombre.trim() })
-    toast.success('Bar guardado'); form.value = null
+    if (f.id) {
+      await store.actualizarBar(f.id, { nombre: f.nombre.trim() })
+      toast.success('Bar guardado'); form.value = null
+    } else {
+      const nuevo = await store.crearBar({ sede_id: f.sede_id, nombre: f.nombre.trim() })
+      form.value = null; toast.success('Bar creado')
+      if (nuevo?.id) entrar(nuevo) // entra directo al bar real recién creado (evita ids fantasma)
+    }
   } catch { toast.error(store.saveError) }
 }
 async function borrar(bar) {
