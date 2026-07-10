@@ -283,6 +283,7 @@ export const deleteDocumento  = (id)       => api.delete(`/documentos/${id}`)
 // -------- SEDES --------
 export const listSedes       = ()            => api.get('/sedes')
 export const getSede         = (id)          => api.get(`/sedes/${id}`)
+export const getSedesResumenFinanciero = ()  => api.get('/sedes/resumen_financiero')
 export const createSede      = (payload)     => api.post('/sedes', { sede: payload })
 export const updateSede      = (id, payload) => api.put(`/sedes/${id}`, { sede: payload })
 export const deleteSede      = (id)          => api.delete(`/sedes/${id}`)

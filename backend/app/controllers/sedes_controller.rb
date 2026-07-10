@@ -28,6 +28,16 @@ class SedesController < ApplicationController
     render json: serialize_sede_detail(@sede)
   end
 
+  # GET /sedes/resumen_financiero — rentabilidad del mes + capital inmovilizado por sede.
+  # Solo admin/supervisor (visibilidad financiera).
+  def resumen_financiero
+    unless %w[admin supervisor].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    render json: Sedes::ResumenFinanciero.new(current_user.club).call
+  end
+
   def create
     enforcer = PlanEnforcer.new(current_user.club)
     unless enforcer.puede_crear_sede?

@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listSedes, createSede, updateSede, deleteSede,
-  getSedeStocks, listStocks } from '../lib/api.js'
+  getSedeStocks, listStocks, getSedesResumenFinanciero } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import { usePermissions } from '../composables/usePermissions.js'
 import { usePlan } from '../composables/usePlan.js'
@@ -50,6 +50,23 @@ async function cargarResumenStocks() {
 
 function stockResumen(sedeId) { return stocksPorSede.value[sedeId] || null }
 
+// Resumen financiero por sede (rentabilidad del mes + capital inmovilizado). Solo finanzas.
+const canVerFinanzas = computed(() => ['admin', 'supervisor'].includes(auth.role))
+const finanzas = ref(null) // { por_sede: [], consolidado: {} }
+async function cargarFinanzas() {
+  if (!canVerFinanzas.value) return
+  try { const { data } = await getSedesResumenFinanciero(); finanzas.value = data }
+  catch { /* no crítico */ }
+}
+function finSede(sedeId) { return finanzas.value?.por_sede?.find(f => f.id === sedeId) || null }
+const fmtDinero = (n) => {
+  const v = Math.round(Number(n) || 0)
+  const abs = Math.abs(v)
+  if (abs >= 1_000_000) return `${v < 0 ? '-' : ''}$${(abs / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1).replace('.0', '')}M`
+  if (abs >= 1_000)     return `${v < 0 ? '-' : ''}$${(abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1).replace('.0', '')}K`
+  return `$${v.toLocaleString('es-AR')}`
+}
+
 const CICLO_META = {
   semilla:    { label: 'Semilla',    color: '#a16207', bg: 'rgba(161,98,7,.12)',    dot: '#ca8a04' },
   vegetativo: { label: 'Vegetativo', color: '#15803d', bg: 'rgba(21,128,61,.12)',   dot: '#16a34a' },
@@ -96,6 +113,7 @@ onMounted(async () => {
     const { data } = await listSedes()
     sedes.value = data
     cargarResumenStocks()
+    cargarFinanzas()
   } finally { loading.value = false }
 })
 
@@ -199,6 +217,25 @@ function tieneActividad(sede) {
         </div>
       </div>
 
+      <!-- Strip financiero consolidado (solo finanzas) -->
+      <div v-if="!loading && canVerFinanzas && finanzas && sedes.length" class="agri-fin-strip">
+        <div class="agri-fin-item">
+          <span class="agri-fin-lbl">Resultado del mes · todas las sedes</span>
+          <span class="agri-fin-val" :class="finanzas.consolidado.resultado_mes >= 0 ? 'pos' : 'neg'">{{ fmtDinero(finanzas.consolidado.resultado_mes) }}</span>
+          <span class="agri-fin-sub">ingresos {{ fmtDinero(finanzas.consolidado.ingresos_mes) }} · egresos {{ fmtDinero(finanzas.consolidado.egresos_mes) }}</span>
+        </div>
+        <div class="agri-fin-item">
+          <span class="agri-fin-lbl">Capital en inventario</span>
+          <span class="agri-fin-val">{{ fmtDinero(finanzas.consolidado.inventario_ars) }}</span>
+          <span v-if="finanzas.consolidado.mas_inventario" class="agri-fin-sub">más en {{ finanzas.consolidado.mas_inventario.nombre }}</span>
+        </div>
+        <div v-if="finanzas.consolidado.mejor_resultado" class="agri-fin-item">
+          <span class="agri-fin-lbl">Mejor rendimiento del mes</span>
+          <span class="agri-fin-val agri-fin-val--name">{{ finanzas.consolidado.mejor_resultado.nombre }}</span>
+          <span class="agri-fin-sub">{{ fmtDinero(finanzas.consolidado.mejor_resultado.resultado_mes) }}</span>
+        </div>
+      </div>
+
       <!-- Loading -->
       <div v-if="loading" class="agri-loading">
         <DsSpinner />
@@ -259,6 +296,23 @@ function tieneActividad(sede) {
                   <span class="agri-kpi__val">{{ sede.ops.dias_para_cosecha }}d</span>
                   <span class="agri-kpi__lbl">cosecha</span>
                 </div>
+              </div>
+            </div>
+
+            <!-- Franja financiera de la sede (solo finanzas) -->
+            <div v-if="canVerFinanzas && finSede(sede.id)" class="agri-sede__fin">
+              <div class="agri-sede__fin-item">
+                <span class="agri-sede__fin-lbl">Resultado mes</span>
+                <span class="agri-sede__fin-val" :class="finSede(sede.id).resultado_mes >= 0 ? 'pos' : 'neg'">
+                  {{ fmtDinero(finSede(sede.id).resultado_mes) }}
+                  <span v-if="finSede(sede.id).delta_pct != null" class="agri-sede__fin-delta" :class="finSede(sede.id).delta_pct >= 0 ? 'pos' : 'neg'">
+                    {{ finSede(sede.id).delta_pct >= 0 ? '▲' : '▼' }}{{ Math.abs(finSede(sede.id).delta_pct) }}%
+                  </span>
+                </span>
+              </div>
+              <div class="agri-sede__fin-item">
+                <span class="agri-sede__fin-lbl">Inventario</span>
+                <span class="agri-sede__fin-val">{{ fmtDinero(finSede(sede.id).inventario_ars) }}</span>
               </div>
             </div>
 
@@ -1206,4 +1260,23 @@ function tieneActividad(sede) {
 .stock-cantidad-input { border-radius: 9px 0 0 9px !important; }
 .stock-cantidad-suffix { background: #f1f5f9; border: 1.5px solid #e2e8f0; border-left: none; border-radius: 0 9px 9px 0; padding: .65rem .875rem; font-size: .875rem; font-weight: 700; color: #475569; white-space: nowrap; }
 .form-hint { font-size: .72rem; color: #94a3b8; margin-top: .1rem; }
+
+/* Strip financiero consolidado */
+.agri-fin-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #e6ebf1; border: 1px solid #e6ebf1; border-radius: 14px; overflow: hidden; margin-bottom: 1.25rem; }
+@media (max-width: 640px) { .agri-fin-strip { grid-template-columns: 1fr; } }
+.agri-fin-item { display: flex; flex-direction: column; gap: .15rem; background: #fff; padding: 1rem 1.25rem; }
+.agri-fin-lbl { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; font-weight: 700; }
+.agri-fin-val { font-size: 1.5rem; font-weight: 800; letter-spacing: -.03em; color: #0f172a; font-variant-numeric: tabular-nums; }
+.agri-fin-val.pos { color: #15803d; } .agri-fin-val.neg { color: #dc2626; }
+.agri-fin-val--name { font-size: 1.15rem; }
+.agri-fin-sub { font-size: .74rem; color: #94a3b8; }
+
+/* Franja financiera por sede */
+.agri-sede__fin { display: flex; gap: 1.75rem; padding: .7rem 0 .1rem; border-top: 1px solid #f1f5f9; margin-top: .25rem; }
+.agri-sede__fin-item { display: flex; flex-direction: column; gap: .1rem; }
+.agri-sede__fin-lbl { font-size: .64rem; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; font-weight: 700; }
+.agri-sede__fin-val { font-size: 1.05rem; font-weight: 750; color: #0f172a; font-variant-numeric: tabular-nums; display: inline-flex; align-items: baseline; gap: .35rem; }
+.agri-sede__fin-val.pos { color: #15803d; } .agri-sede__fin-val.neg { color: #dc2626; }
+.agri-sede__fin-delta { font-size: .7rem; font-weight: 700; }
+.agri-sede__fin-delta.pos { color: #15803d; } .agri-sede__fin-delta.neg { color: #b45309; }
 </style>

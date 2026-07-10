@@ -347,6 +347,7 @@ Rails.application.routes.draw do
     post 'papelera/restaurar',  to: 'papelera#restaurar'
 
     resources :sedes do
+      collection { get :resumen_financiero }
       resources :stocks, only: [:index]
     end
 
