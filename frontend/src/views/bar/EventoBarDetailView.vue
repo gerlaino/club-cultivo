@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useEventosBarStore } from '../../stores/eventosBar.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import EventoProvision from './EventoProvision.vue'
 
 const store  = useEventosBarStore()
 const route  = useRoute()
@@ -139,6 +140,9 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
         <span>{{ bePct }}%</span>
       </div>
     </div>
+
+    <!-- Provisión de mercadería -->
+    <EventoProvision :bar-id="barId" :ev-id="evId" :finalizado="e.estado === 'finalizado'" @cambio="store.fetchDetalle(barId, evId)" />
 
     <!-- Entradas -->
     <section class="card ed__entradas">

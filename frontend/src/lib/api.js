@@ -343,6 +343,13 @@ export const updateBarProducto  = (barId, id, payload) => api.put(`/bares/${barI
 export const deleteBarProducto  = (barId, id)      => api.delete(`/bares/${barId}/productos/${id}`)
 export const reponerBarProducto = (barId, id, cantidad) => api.post(`/bares/${barId}/productos/${id}/reponer`, { cantidad })
 export const comprarBarProducto = (barId, id, payload) => api.post(`/bares/${barId}/productos/${id}/comprar`, payload)
+// Provisión + reserva de eventos
+export const listProvisiones   = (barId, evId)             => api.get(`/bares/${barId}/eventos/${evId}/provisiones`)
+export const upsertProvision   = (barId, evId, payload)    => api.post(`/bares/${barId}/eventos/${evId}/provisiones`, payload)
+export const updateProvision   = (barId, evId, id, payload)=> api.patch(`/bares/${barId}/eventos/${evId}/provisiones/${id}`, payload)
+export const deleteProvision   = (barId, evId, id)         => api.delete(`/bares/${barId}/eventos/${evId}/provisiones/${id}`)
+export const reservarProvision = (barId, evId)             => api.post(`/bares/${barId}/eventos/${evId}/provisiones/reservar`)
+export const cerrarProvision   = (barId, evId, payload)    => api.post(`/bares/${barId}/eventos/${evId}/provisiones/cerrar`, payload)
 export const ajustarBarProducto = (barId, id, payload) => api.post(`/bares/${barId}/productos/${id}/ajustar`, payload)
 export const getBarProductoMovimientos = (barId, id)   => api.get(`/bares/${barId}/productos/${id}/movimientos`)
 export const crearBarVenta      = (barId, payload) => api.post(`/bares/${barId}/ventas`, payload)

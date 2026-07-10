@@ -13,6 +13,7 @@ class EventoBar < ApplicationRecord
   has_many :tareas,        class_name: 'EventoBarTarea', foreign_key: :evento_bar_id, dependent: :destroy
   has_many :tipos_entrada, class_name: 'EventoBarTipoEntrada', foreign_key: :evento_bar_id, dependent: :destroy
   has_many :entradas,      class_name: 'EventoBarEntrada', foreign_key: :evento_bar_id, dependent: :destroy
+  has_many :provisiones,   class_name: 'EventoBarProvision', foreign_key: :evento_bar_id, dependent: :destroy
   has_many :movimientos_contables, foreign_key: :evento_bar_id, dependent: :nullify
   has_many :bar_ventas,            foreign_key: :evento_bar_id, dependent: :nullify
 

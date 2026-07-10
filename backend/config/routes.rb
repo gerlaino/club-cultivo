@@ -403,6 +403,10 @@ Rails.application.routes.draw do
           member { post :vender }
         end
         resources :entradas, controller: 'bar/entradas', only: [:index, :destroy]
+        # Provisión + reserva de mercadería del evento
+        resources :provisiones, controller: 'bar/evento_provisiones', only: [:index, :create, :update, :destroy] do
+          collection { post :reservar; post :cerrar }
+        end
         # Puerta / check-in por QR (Capa 4)
         get  'puerta',          controller: 'bar/puerta', action: :estado
         post 'puerta/checkin',  controller: 'bar/puerta', action: :checkin
