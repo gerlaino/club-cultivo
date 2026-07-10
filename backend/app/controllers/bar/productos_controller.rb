@@ -14,7 +14,8 @@ module Bar
     def index
       scope = @bar.bar_productos
       scope = scope.activos if params[:activos] == 'true'
-      render json: scope.order(:categoria, :nombre).map { |p| serialize(p) }
+      vendidos = vendidos_mes_map
+      render json: scope.order(:categoria, :nombre).map { |p| serialize(p).merge(vendidos_mes: vendidos[p.id].to_f) }
     end
 
     # POST /bares/:bar_id/productos
@@ -86,6 +87,14 @@ module Bar
 
     def producto_params
       params.require(:bar_producto).permit(:nombre, :categoria, :precio_ars, :costo_ars, :stock, :stock_minimo, :activo)
+    end
+
+    # Unidades vendidas este mes por producto (para la columna "Vend. mes" del panel).
+    def vendidos_mes_map
+      hoy = Time.zone.today
+      ventas_mes = @bar.bar_ventas.where(created_at: hoy.beginning_of_month.beginning_of_day..hoy.end_of_day)
+      BarVentaItem.where(club_id: current_user.club_id, bar_venta_id: ventas_mes.select(:id))
+                  .group(:bar_producto_id).sum(:cantidad)
     end
 
     def serialize(p)

@@ -47,27 +47,9 @@ class BaresController < ApplicationController
     head :no_content
   end
 
-  # GET /bares/:id/dashboard — pulso del bar (resultado del mes + ventas de hoy)
+  # GET /bares/:id/dashboard — pulso del bar (resultado, caja, ventas por hora, top, lecturas)
   def dashboard
-    hoy   = Time.zone.today
-    hoyv  = @bar.bar_ventas.del_dia(hoy)
-    total = hoyv.sum(:total_ars).to_f
-    items = BarVentaItem.where(club_id: current_user.club_id, bar_venta_id: hoyv.select(:id))
-
-    render json: {
-      bar:       serialize(@bar),
-      resultado_mes: @bar.resultado_periodo(hoy.beginning_of_month, hoy),
-      hoy: {
-        total:           total,
-        tickets:         hoyv.count,
-        ticket_promedio: hoyv.count.positive? ? (total / hoyv.count).round(2) : 0,
-        por_medio_pago:  hoyv.group(:medio_pago).sum(:total_ars).transform_values(&:to_f),
-      },
-      top_productos: items.group(:nombre).sum(:cantidad).sort_by { |_n, c| -c }.first(8)
-                          .map { |nombre, cant| { nombre: nombre, cantidad: cant.to_f } },
-      reponer: @bar.bar_productos.activos.stock_bajo.order(:nombre)
-                   .map { |p| { id: p.id, nombre: p.nombre, stock: p.stock.to_f, minimo: p.stock_minimo.to_f } },
-    }
+    render json: { bar: serialize(@bar) }.merge(Bar::Pulso.new(bar: @bar).call)
   end
 
   private
