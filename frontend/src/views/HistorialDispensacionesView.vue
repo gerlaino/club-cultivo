@@ -141,7 +141,11 @@ const allDisps  = ref([])
 
 const dispensaciones = computed(() => allDisps.value)
 
-const totalRecaudado = computed(() => allDisps.value.reduce((s, d) => s + (d.aporte_socio_ars ?? 0), 0))
+// Cobrado = lo que efectivamente entró (efectivo/transfer). A crédito = lo que quedó en cuenta
+// corriente (el paciente dispensó sin pagar). No mezclarlos: el "cobrado" no incluye el fiado.
+const totalCobrado   = computed(() => allDisps.value.reduce((s, d) => s + (d.monto_efectivo_ars ?? 0), 0))
+const totalCredito   = computed(() => allDisps.value.reduce((s, d) => s + (d.monto_credito_ars ?? 0), 0))
+const totalRecaudado = computed(() => totalCobrado.value + totalCredito.value) // aporte total (informativo)
 const totalGramos    = computed(() => allDisps.value.reduce((s, d) => s + (d.cantidad ?? 0), 0))
 const totalConEnvio  = computed(() => allDisps.value.filter(d => d.con_envio).length)
 
@@ -422,8 +426,12 @@ const FORMAS = [
           <span class="hd__kpi-lbl">Total gramos</span>
         </div>
         <div class="hd__kpi hd__kpi--green">
-          <span class="hd__kpi-val">{{ formatARS(totalRecaudado) }}</span>
-          <span class="hd__kpi-lbl">Total recaudado</span>
+          <span class="hd__kpi-val">{{ formatARS(totalCobrado) }}</span>
+          <span class="hd__kpi-lbl">Cobrado</span>
+        </div>
+        <div v-if="totalCredito > 0" class="hd__kpi hd__kpi--amber">
+          <span class="hd__kpi-val">{{ formatARS(totalCredito) }}</span>
+          <span class="hd__kpi-lbl">A cuenta corriente</span>
         </div>
         <div v-if="totalConEnvio" class="hd__kpi hd__kpi--blue">
           <span class="hd__kpi-val">{{ totalConEnvio }}</span>
@@ -478,6 +486,7 @@ const FORMAS = [
                 <td class="hd__td-producto">
                   <span v-if="itemsDe(d).length <= 1" class="hd__prod-inline">
                     {{ formaLabel(itemsDe(d)[0]?.stock?.forma_producto) }}<template v-if="itemsDe(d)[0]?.genetica_nombre"> · {{ itemsDe(d)[0].genetica_nombre }}</template> · {{ itemsDe(d)[0]?.cantidad }}{{ itemsDe(d)[0]?.stock?.unidad || 'g' }}
+                    <span v-if="itemsDe(d)[0]?.stock?.externo" class="hd__ext-badge hd__ext-badge--sm" title="Stock externo (sin lote de cultivo)">externo</span>
                   </span>
                   <button v-else class="hd__prod-toggle" @click="toggleExpand(d.id)" :title="itemsTitle(d)">
                     <ChevronRight :size="13" :stroke-width="2.5" class="hd__chev" :class="{ 'hd__chev--open': expandido(d.id) }" />
@@ -514,24 +523,36 @@ const FORMAS = [
               <tr v-if="itemsDe(d).length > 1 && expandido(d.id)" class="hd__tr-detail">
                 <td></td>
                 <td colspan="8">
-                  <table class="hd__subtable">
-                    <thead>
-                      <tr>
-                        <th>Producto</th><th>Genética</th><th>Lote</th>
-                        <th class="hd__th-num">Cant.</th><th class="hd__th-num">P. unit.</th><th class="hd__th-num">Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(it, i) in itemsDe(d)" :key="i">
-                        <td>{{ formaLabel(it.stock?.forma_producto) }}</td>
-                        <td>{{ it.genetica_nombre || '—' }}</td>
-                        <td class="hd__mono">{{ it.lote_codigo || '—' }}</td>
-                        <td class="hd__td-num">{{ it.cantidad }}{{ it.stock?.unidad || 'g' }}</td>
-                        <td class="hd__td-num">{{ it.precio_unitario_ars ? formatARS(it.precio_unitario_ars) : '—' }}</td>
-                        <td class="hd__td-num">{{ formatARS(it.subtotal_ars) }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div class="hd__detail-box">
+                    <div class="hd__detail-title">Detalle de esta dispensación</div>
+                    <table class="hd__subtable">
+                      <thead>
+                        <tr>
+                          <th>Producto</th><th>Genética</th><th>Lote / origen</th>
+                          <th class="hd__th-num">Cant.</th><th class="hd__th-num">P. unit.</th><th class="hd__th-num">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(it, i) in itemsDe(d)" :key="i">
+                          <td>{{ formaLabel(it.stock?.forma_producto) }}</td>
+                          <td>{{ it.genetica_nombre || '—' }}</td>
+                          <td class="hd__mono">
+                            <span v-if="it.stock?.externo || (!it.lote_codigo && it.stock?.regulatorio === false)" class="hd__ext-badge">Externo</span>
+                            <template v-else>{{ it.lote_codigo || '—' }}</template>
+                          </td>
+                          <td class="hd__td-num">{{ it.cantidad }}{{ it.stock?.unidad || 'g' }}</td>
+                          <td class="hd__td-num">{{ it.precio_unitario_ars ? formatARS(it.precio_unitario_ars) : '—' }}</td>
+                          <td class="hd__td-num">{{ formatARS(it.subtotal_ars) }}</td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr class="hd__subtotal-row">
+                          <td colspan="5" class="hd__subtotal-lbl">Total de esta dispensación</td>
+                          <td class="hd__td-num"><strong>{{ formatARS(d.aporte_socio_ars) }}</strong></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </td>
               </tr>
             </template>
@@ -539,9 +560,10 @@ const FORMAS = [
         </table>
 
         <div class="hd__summary">
-          <span class="hd__summary-count">{{ dispensaciones.length }} dispensaciones</span>
+          <span class="hd__summary-count">{{ dispensaciones.length }} dispensaciones · {{ totalGramos.toFixed(1) }}g</span>
           <span class="hd__summary-total">
-            {{ totalGramos.toFixed(1) }}g · <strong>{{ formatARS(totalRecaudado) }}</strong>
+            Cobrado <strong>{{ formatARS(totalCobrado) }}</strong>
+            <span v-if="totalCredito > 0" class="hd__summary-credito"> · a cuenta corriente {{ formatARS(totalCredito) }}</span>
           </span>
         </div>
       </div>
@@ -719,6 +741,8 @@ const FORMAS = [
 }
 .hd__kpi--green { border-color: #bbf7d0; background: #f0fdf4; }
 .hd__kpi--blue  { border-color: #bfdbfe; background: #eff6ff; }
+.hd__kpi--amber { border-color: #fde68a; background: #fffbeb; }
+.hd__kpi--amber .hd__kpi-val { color: #b45309; }
 .hd__kpi-val {
   font-size: var(--fs-22);
   font-weight: 800;
@@ -814,11 +838,19 @@ const FORMAS = [
 .hd__prod-toggle:hover { background: var(--c-ink-100); }
 .hd__chev { transition: transform .15s; flex-shrink: 0; }
 .hd__chev--open { transform: rotate(90deg); }
-.hd__tr-detail > td { background: var(--c-ink-50); padding: 0 0 .5rem 0; }
+.hd__tr-detail > td { background: transparent; padding: .35rem .75rem .75rem; }
+/* Caja nítida para el detalle, separada visualmente de la tabla y del total general. */
+.hd__detail-box { background: #f8fafc; border: 1px solid #e6ebf1; border-radius: 10px; padding: .5rem .75rem .35rem; }
+.hd__detail-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-bottom: .1rem; }
 .hd__subtable { width: 100%; border-collapse: collapse; font-size: var(--fs-13); }
 .hd__subtable th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--c-ink-500); padding: .4rem .6rem; }
-.hd__subtable td { padding: .4rem .6rem; color: var(--c-ink-800); border-top: 1px solid var(--c-ink-100); }
+.hd__subtable td { padding: .4rem .6rem; color: var(--c-ink-800); border-top: 1px solid #eef2f6; }
+.hd__subtotal-row td { border-top: 1.5px solid #d7dee6; padding-top: .5rem; }
+.hd__subtotal-lbl { text-align: right; font-size: var(--fs-12); font-weight: 600; color: #64748b; text-transform: none; letter-spacing: 0; }
 .hd__mono { font-family: var(--font-mono, monospace); font-size: var(--fs-12); color: var(--c-ink-500); }
+.hd__ext-badge { display: inline-block; font-family: var(--font-sans, inherit); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #7c3aed; background: #f3e8ff; padding: 2px 7px; border-radius: 999px; }
+.hd__ext-badge--sm { font-size: 9px; padding: 1px 6px; margin-left: .3rem; }
+.hd__summary-credito { color: #b45309; font-weight: 500; }
 .hd__desc-badge {
   display: inline-block;
   background: #fff7ed;

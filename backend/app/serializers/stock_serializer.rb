@@ -21,6 +21,8 @@ class StockSerializer
       unidad:              stk.unidad,
       precio_sugerido_ars: stk.precio_sugerido_ars&.to_f,
       regulatorio:         stk.regulatorio?,
+      origen:              stk.origen, # lote | derivado_lote | compra_externa
+      externo:             stk.origen == 'compra_externa',
       lote:                stk.lote ? { id: stk.lote.id, codigo: stk.lote.codigo } : nil,
     }
   end
