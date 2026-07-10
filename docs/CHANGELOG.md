@@ -1,5 +1,29 @@
 # Changelog
 
+## Julio 2026 (c) — capa de sede, salón inteligente, regalo, limpieza
+
+- **Contexto de sede (UI):** store `sede` + selector en el `AdminTopBar` (gated `multi_sede`) —
+  al marcar una sede actual, los módulos de-sede se re-filtran. Cableado en Depósito de insumos
+  y en el dashboard de Contabilidad (sincronizado en ambos sentidos).
+- **Insumos por sede:** cada insumo vive en una sede (`sede_id`, nullable = pool del club);
+  **transferencia entre sedes** (origen baja stock, destino recibe valorizado al promedio del
+  origen y recalcula el suyo; crea el insumo si no existe). La compra desde Nuevo Movimiento
+  elige sede (default la actual).
+- **Salón — panel inteligente (`Bar::Pulso`):** resultado del mes + margen + tendencia,
+  ventas por hora, top con margen, "Lecturas del salón" (estrella, agotado que se vendía,
+  margen bajo, tendencia), reponer con medidores. Rediseño de `BarPanelView` (acento cobre).
+- **Salón — caja de turno:** apertura con fondo inicial y **cierre con arqueo** (efectivo
+  contado vs esperado → diferencia). Modelo `CajaTurno`; ventas se enganchan por `caja_turno_id`.
+- **Dispensación — regalo:** checkbox "es un regalo" (no cobra, no toca cuenta corriente; el
+  stock igual se descuenta; queda trazado). Short-circuit al flujo legacy con `medio_pago='regalo'`.
+- **Sedes — capa financiera (MVP):** `Sedes::ResumenFinanciero` — resultado del mes + tendencia
+  y capital inmovilizado (stock + insumos valorizados) por sede + consolidado, en el cockpit.
+- **Limpieza:** removido el subsistema muerto de inventario de sede (`SedeInventario`/
+  `InventarioMovimiento`, tablas ya dropeadas, endpoints sin rutear) y el `ManicuradorDashboard`
+  legacy (form roto contra `agregar_stock`; el manicura ya usa `/mnc` + pesaje).
+- **Auth cross-site:** verificado que ya está resuelto en código (SPA same-origin desde Rails,
+  cookie `jwt_token` first-party). Sin cambios; solo restaba confirmar config de Render.
+
 ## Julio 2026 (b) — endurecimiento para escala + pulido de manicura
 
 - **TEN-01b (jobs):** los 16 jobs con datos de club ahora fijan el tenant
