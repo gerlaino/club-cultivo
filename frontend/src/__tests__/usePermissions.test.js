@@ -69,7 +69,6 @@ describe('usePermissions — manicura', () => {
   it('can access manicura', () => {
     const { can } = withRole('manicura')
     expect(can('manicura', 'access')).toBe(true)
-    expect(can('sede_inventario', 'show')).toBe(true)
   })
 
   it('cannot access socios or dispensaciones', () => {

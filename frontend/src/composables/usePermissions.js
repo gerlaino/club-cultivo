@@ -66,15 +66,12 @@ export function usePermissions() {
     dispensador: {
       socios: ['index', 'show'],
       dispensaciones: ['index', 'show', 'create'],
-      sede_inventario: ['index', 'show'],
       sedes: ['index', 'show'],
       tareas: ['index', 'show'],
       // Sin acceso a notas, indicaciones ni documentos del paciente
     },
 
     manicura: {
-      sede_inventario: ['index', 'show'],
-      inventario_movimientos: ['index', 'show', 'create'],
       lotes: ['index', 'show'],
       plantas: ['index', 'show', 'update'],
       geneticas: ['index', 'show'],
