@@ -1,16 +1,12 @@
 # Be sure to restart your server when you modify this file.
 
-# Add new inflection rules using the following format. Inflections
-# are locale specific, and you may define rules for as many different
-# locales as you wish. All of these examples are active by default:
-# ActiveSupport::Inflector.inflections(:en) do |inflect|
-#   inflect.plural /^(ox)$/i, "\\1en"
-#   inflect.singular /^(ox)en/i, "\\1"
-#   inflect.irregular "person", "people"
-#   inflect.uncountable %w( fish sheep )
-# end
-
-# These inflection rules are supported but not enabled by default:
-# ActiveSupport::Inflector.inflections(:en) do |inflect|
-#   inflect.acronym "RESTful"
-# end
+# El inflector inglés singulariza "bares" → "bare" (le saca la 's'), no "bar". Eso hacía que las
+# rutas anidadas `resources :bares do ... end` generaran el parámetro `:bare_id`, mientras que TODOS
+# los controllers del bar leen `params[:bar_id]` → quedaba nil → find(nil) → 404 en todo lo anidado
+# (eventos, productos, ventas, cajas, provisiones). El dashboard andaba por ser ruta member (usa :id).
+#
+# Con esta regla, singular de "bares" = "bar" y el parámetro anidado pasa a ser `:bar_id`, que es lo
+# que esperan los controllers. (El modelo es `Barra` con table_name explícito, no se ve afectado.)
+ActiveSupport::Inflector.inflections(:en) do |inflect|
+  inflect.irregular "bar", "bares"
+end
