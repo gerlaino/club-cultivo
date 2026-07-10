@@ -45,7 +45,6 @@ Rails.application.routes.draw do
                controllers: { sessions: 'users/sessions' }
 
     get "/me",             to: "me#show"
-    get "/me/movimientos", to: "me#movimientos"
     get "/stats",          to: "stats#show"
     get "/stats/ambiente_salas", to: "stats#ambiente_salas"
 

@@ -2,7 +2,7 @@
 class SedesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_sedes_role!
-  before_action :set_sede, only: [:show, :update, :destroy, :inventario, :agregar_stock, :stock_pendiente, :aprobar_stock, :rechazar_stock]
+  before_action :set_sede, only: [:show, :update, :destroy]
 
   def index
     sedes = case current_user.role
@@ -57,118 +57,6 @@ class SedesController < ApplicationController
     end
     @sede.soft_delete!
     head :no_content
-  end
-
-  def inventario
-    items = @sede.inventarios.includes(:genetica).order(:producto)
-    render json: items.map { |i| serialize_inventario(i) }
-  end
-
-  def agregar_stock
-    genetica_id = params[:genetica_id].presence
-    item = if genetica_id
-             @sede.inventarios.find_or_initialize_by(genetica_id: genetica_id)
-           else
-             @sede.inventarios.find_or_initialize_by(producto: params[:producto])
-           end
-
-    cantidad       = params[:cantidad].to_f
-    stock_anterior = item.stock_gramos.to_f
-
-    item.club              = current_user.club
-    item.created_by      ||= current_user
-    item.producto          = params[:producto].presence || (genetica_id ? 'flores' : item.producto)
-    item.precio_por_unidad = params[:precio_por_unidad].presence&.to_d || item.precio_por_unidad
-    item.stock_gramos      = stock_anterior + cantidad
-
-    es_manicurador = current_user.manicura?
-
-    ActiveRecord::Base.transaction do
-      item.save!
-
-      if es_manicurador
-        # Stock NO se modifica hasta aprobación admin
-        InventarioMovimiento.create!(
-          sede:            @sede,
-          club:            current_user.club,
-          sede_inventario: item,
-          created_by:      current_user,
-          lote_id:         params[:lote_id].presence,
-          tipo:            'ingreso',
-          cantidad:        cantidad,
-          stock_anterior:  stock_anterior,
-          stock_nuevo:     stock_anterior,
-          estado:          'pendiente',
-          motivo:          params[:motivo] || 'Ingreso manicura — pendiente de aprobación'
-        )
-        item.stock_gramos = stock_anterior
-        item.save!
-      else
-        InventarioMovimiento.create!(
-          sede:            @sede,
-          club:            current_user.club,
-          sede_inventario: item,
-          created_by:      current_user,
-          lote_id:         params[:lote_id].presence,
-          tipo:            'ingreso',
-          cantidad:        cantidad,
-          stock_anterior:  stock_anterior,
-          stock_nuevo:     item.stock_gramos,
-          estado:          'aprobado',
-          motivo:          params[:motivo] || 'Ingreso manual'
-        )
-      end
-    end
-
-    render json: serialize_inventario(item).merge(pendiente_aprobacion: es_manicurador)
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-  end
-
-  def stock_pendiente
-    movimientos = @sede.club.inventario_movimientos
-                       .includes(:sede_inventario, :created_by, :lote)
-                       .where(estado: 'pendiente', sede_id: @sede.id)
-                       .order(created_at: :desc)
-    render json: movimientos.map { |m| serialize_movimiento_pendiente(m) }
-  end
-
-  def aprobar_stock
-    movimiento = @sede.club.inventario_movimientos
-                      .where(estado: 'pendiente').find(params[:movimiento_id])
-
-    ActiveRecord::Base.transaction do
-      inv = movimiento.sede_inventario
-      inv.stock_gramos += movimiento.cantidad
-      movimiento.stock_nuevo   = inv.stock_gramos
-      movimiento.estado        = 'aprobado'
-      movimiento.aprobado_por  = current_user
-      movimiento.aprobado_at   = Time.current
-      inv.save!
-      movimiento.save!
-    end
-
-    render json: { ok: true }
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Movimiento no encontrado' }, status: :not_found
-  rescue => e
-    render json: { errors: [e.message] }, status: :unprocessable_entity
-  end
-
-  def rechazar_stock
-    movimiento = @sede.club.inventario_movimientos
-                      .where(estado: 'pendiente').find(params[:movimiento_id])
-
-    movimiento.update!(
-      estado:       'rechazado',
-      aprobado_por: current_user,
-      aprobado_at:  Time.current,
-      nota_rechazo: params[:motivo].presence || 'Rechazado por administración'
-    )
-
-    render json: { ok: true }
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Movimiento no encontrado' }, status: :not_found
   end
 
   private
@@ -297,44 +185,4 @@ class SedesController < ApplicationController
     )
   end
 
-  def serialize_movimiento_pendiente(m)
-    {
-      id:             m.id,
-      tipo:           m.tipo,
-      cantidad:       m.cantidad.to_f,
-      motivo:         m.motivo,
-      created_at:     m.created_at,
-      creado_por: {
-        id:     m.created_by.id,
-        nombre: m.created_by.nombre_completo,
-      },
-      sede_inventario: {
-        id:             m.sede_inventario.id,
-        producto_label: m.sede_inventario.producto_label,
-        unidad_medida:  m.sede_inventario.unidad_medida,
-      },
-      lote: m.lote ? { id: m.lote.id, codigo: m.lote.codigo } : nil,
-    }
-  end
-
-  def serialize_inventario(i)
-    {
-      id:                i.id,
-      producto:          i.producto_efectivo,
-      producto_label:    i.producto_label,
-      unidad_medida:     i.unidad_medida,
-      stock_gramos:      i.stock_gramos.to_f.round(2),
-      stock_minimo:      i.stock_minimo&.to_f,
-      stock_bajo:        i.stock_bajo?,
-      precio_por_unidad: i.precio_por_unidad&.to_f,
-      updated_at:        i.updated_at,
-      genetica: i.genetica ? {
-        id:     i.genetica.id,
-        nombre: i.genetica.nombre,
-        tipo:   i.genetica.tipo,
-        thc:    i.genetica.thc,
-        cbd:    i.genetica.cbd,
-      } : nil,
-    }
-  end
 end

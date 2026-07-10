@@ -16,9 +16,5 @@ class MeController < ApplicationController
     end
     render json: data
   end
-
-  def movimientos
-    render json: []
-  end
 end
 

@@ -56,14 +56,11 @@ module Permissions
     dispensador: {
       socios: [:index, :show],
       dispensaciones: [:index, :show, :create],
-      sede_inventario: [:index, :show],
       socio_notas: [:index, :create],
       sedes: [:index, :show],
       tareas: [:index, :show],
     },
     manicura: {
-      sede_inventario: [:index, :show],
-      inventario_movimientos: [:index, :show, :create],
       lotes: [:index, :show],
       geneticas: [:index, :show],
       sedes: [:index, :show],

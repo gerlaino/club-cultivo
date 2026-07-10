@@ -65,7 +65,6 @@ api.interceptors.response.use(
 export const signIn  = (email, password) => api.post("/users/sign_in", { user: { email, password } });
 export const signOut = () => api.delete("/users/sign_out");
 export const me               = () => api.get("/me");
-export const getMisMovimientos = () => api.get("/me/movimientos");
 
 // -------- Salas --------
 export const listSalas   = () => api.get("/salas");
@@ -287,12 +286,6 @@ export const getSede         = (id)          => api.get(`/sedes/${id}`)
 export const createSede      = (payload)     => api.post('/sedes', { sede: payload })
 export const updateSede      = (id, payload) => api.put(`/sedes/${id}`, { sede: payload })
 export const deleteSede      = (id)          => api.delete(`/sedes/${id}`)
-export const getSedeInventario   = (id)               => api.get(`/sedes/${id}/inventario`)
-export const agregarStock        = (id, payload)       => api.post(`/sedes/${id}/agregar_stock`, payload)
-export const listStockDisponible = (sedeId)                => api.get(`/sedes/${sedeId}/inventario`)
-export const getStockPendiente   = (sedeId)                => api.get(`/sedes/${sedeId}/stock_pendiente`)
-export const aprobarStock        = (sedeId, movId)         => api.post(`/sedes/${sedeId}/aprobar_stock/${movId}`)
-export const rechazarStock       = (sedeId, movId, motivo) => api.post(`/sedes/${sedeId}/rechazar_stock/${movId}`, { motivo })
 
 // Inventario global (sin sede específica)
 export const getInventarioPendiente = ()              => api.get('/inventario/pendiente')
