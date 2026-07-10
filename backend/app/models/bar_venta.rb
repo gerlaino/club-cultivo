@@ -11,6 +11,7 @@ class BarVenta < ApplicationRecord
   belongs_to :unidad_negocio,      optional: true
   belongs_to :movimiento_contable, optional: true
   belongs_to :evento_bar,          optional: true # venta atribuida a un evento (opcional)
+  belongs_to :caja_turno,          optional: true # caja de turno abierta al momento de la venta
   has_many :items, class_name: 'BarVentaItem', dependent: :destroy
 
   MEDIOS_PAGO = %w[efectivo transferencia mercado_pago].freeze

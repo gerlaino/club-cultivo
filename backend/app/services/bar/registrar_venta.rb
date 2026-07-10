@@ -23,7 +23,8 @@ module Bar
       ActiveRecord::Base.transaction do
         venta = @bar.bar_ventas.create!(
           club: @club, user: @vendedor, unidad_negocio: @bar.unidad_negocio_bar,
-          total_ars: 0, medio_pago: @medio_pago, turno: @turno, notas: @notas
+          total_ars: 0, medio_pago: @medio_pago, turno: @turno, notas: @notas,
+          caja_turno: @bar.caja_abierta # engancha la venta a la caja abierta (si hay)
         )
 
         total = 0.to_d

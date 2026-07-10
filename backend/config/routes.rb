@@ -385,6 +385,11 @@ Rails.application.routes.draw do
         member { post :reponer }
       end
       resources :ventas, controller: 'bar/ventas', only: [:index, :create, :destroy]
+      # Caja de turno: apertura / cierre con arqueo / historial
+      resources :cajas, controller: 'bar/cajas', only: [:index] do
+        collection { get :actual; post :abrir }
+        member     { post :cerrar }
+      end
       resources :eventos, controller: 'bar/eventos', only: [:index, :show, :create, :update, :destroy] do
         resources :costos, controller: 'bar/evento_costos', only: [:create, :update, :destroy]
         resources :tareas, controller: 'bar/evento_tareas', only: [:create, :update, :destroy]

@@ -30,6 +30,34 @@ onMounted(() => { store.fetchDashboard(barId); store.fetchProductos(barId) })
 const d = computed(() => store.dashboard)
 const rm = computed(() => d.value?.resultado_mes || {})
 const hoy = computed(() => d.value?.hoy || {})
+const caja = computed(() => d.value?.caja || null)
+const esOperador = computed(() => ['admin', 'supervisor', 'dispensador'].includes(auth.user?.role))
+
+// ── Caja de turno: apertura + cierre con arqueo ────────────────
+const aperturaForm = ref(null) // { monto_inicial }
+function abrirApertura() { aperturaForm.value = { monto_inicial: null } }
+async function confirmarApertura() {
+  const m = Number(aperturaForm.value.monto_inicial) || 0
+  try { await store.abrirCaja(barId, m); toast.success('Caja abierta'); aperturaForm.value = null }
+  catch { toast.error(store.saveError) }
+}
+
+const cierreForm = ref(null) // { efectivo_declarado, notas }
+function abrirCierre() { cierreForm.value = { efectivo_declarado: null, notas: '' } }
+const diferenciaCierre = computed(() => {
+  if (!cierreForm.value || !caja.value) return null
+  const contado = Number(cierreForm.value.efectivo_declarado)
+  if (cierreForm.value.efectivo_declarado === null || cierreForm.value.efectivo_declarado === '') return null
+  return contado - caja.value.efectivo_esperado_ars
+})
+async function confirmarCierre() {
+  const f = cierreForm.value
+  if (f.efectivo_declarado === null || f.efectivo_declarado === '') { toast.warning('Ingresá el efectivo contado'); return }
+  try {
+    await store.cerrarCaja(barId, caja.value.id, { efectivo_declarado_ars: Number(f.efectivo_declarado), notas: f.notas || undefined })
+    toast.success('Caja cerrada'); cierreForm.value = null
+  } catch { toast.error(store.saveError) }
+}
 
 // ── Gráfico de ventas por hora (SVG area) ──────────────────────
 const W = 520, H = 128, PAD = 10
@@ -119,13 +147,24 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
         </div>
 
         <div class="sp__card sp__caja">
-          <span class="sp__lbl">Caja de hoy</span>
-          <span class="sp__caja-val num">{{ fmt(hoy.total) }}</span>
-          <div class="sp__caja-split">
-            <span>Efectivo <b class="num">{{ fmt(hoy.efectivo) }}</b></span>
-            <span>Digital <b class="num">{{ fmt(hoy.digital) }}</b></span>
+          <div class="sp__caja-head">
+            <span class="sp__lbl">Caja del turno</span>
+            <span v-if="caja" class="sp__caja-open">● Abierta</span>
           </div>
-          <div class="sp__caja-foot">{{ hoy.tickets || 0 }} tickets · prom. {{ fmt(hoy.ticket_promedio) }}</div>
+          <template v-if="caja">
+            <span class="sp__caja-val num">{{ fmt(caja.total_ventas_ars) }}</span>
+            <div class="sp__caja-split">
+              <span>Efectivo <b class="num">{{ fmt(caja.total_efectivo_ars) }}</b></span>
+              <span>Digital <b class="num">{{ fmt(caja.total_digital_ars) }}</b></span>
+            </div>
+            <div class="sp__caja-foot">Fondo {{ fmt(caja.monto_inicial_ars) }} · {{ caja.tickets }} tickets</div>
+            <button v-if="esOperador" class="sp__btn sp__btn--brand sp__caja-btn" @click="abrirCierre">Cerrar caja</button>
+          </template>
+          <template v-else>
+            <span class="sp__caja-val sp__caja-muted">Sin caja abierta</span>
+            <div class="sp__caja-foot">Ventas de hoy: {{ fmt(hoy.total) }} · {{ hoy.tickets || 0 }} tickets</div>
+            <button v-if="esOperador" class="sp__btn sp__btn--brand sp__caja-btn" @click="abrirApertura">Abrir caja</button>
+          </template>
         </div>
 
         <div class="sp__card sp__mini">
@@ -231,6 +270,46 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
             <tr v-if="!store.productos.length"><td colspan="8" class="sp__empty">Sin productos. Creá el primero.</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Modal abrir caja -->
+    <div v-if="aperturaForm" class="sp__ov" @click.self="aperturaForm = null">
+      <div class="sp__modal">
+        <h3 class="sp__modal-title">Abrir caja del turno</h3>
+        <p class="sp__modal-hint">El fondo inicial es el efectivo con el que arranca la caja. Al cerrar vas a contar y comparar.</p>
+        <label class="sp__fld">Fondo inicial (efectivo)
+          <input v-model.number="aperturaForm.monto_inicial" type="number" min="0" step="any" class="sp__inp" placeholder="$0" />
+        </label>
+        <div class="sp__modal-act">
+          <button class="sp__btn" @click="aperturaForm = null">Cancelar</button>
+          <button class="sp__btn sp__btn--brand" :disabled="store.saving" @click="confirmarApertura">Abrir caja</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal cerrar caja (arqueo) -->
+    <div v-if="cierreForm && caja" class="sp__ov" @click.self="cierreForm = null">
+      <div class="sp__modal">
+        <h3 class="sp__modal-title">Cerrar caja — arqueo</h3>
+        <div class="sp__arqueo">
+          <div class="sp__arqueo-row"><span>Fondo inicial</span><b class="num">{{ fmt(caja.monto_inicial_ars) }}</b></div>
+          <div class="sp__arqueo-row"><span>Ventas en efectivo</span><b class="num">{{ fmt(caja.total_efectivo_ars) }}</b></div>
+          <div class="sp__arqueo-row sp__arqueo-row--tot"><span>Efectivo esperado</span><b class="num">{{ fmt(caja.efectivo_esperado_ars) }}</b></div>
+        </div>
+        <label class="sp__fld">Efectivo contado
+          <input v-model.number="cierreForm.efectivo_declarado" type="number" min="0" step="any" class="sp__inp" placeholder="$0" />
+        </label>
+        <div v-if="diferenciaCierre !== null" class="sp__dif" :class="diferenciaCierre === 0 ? 'ok' : (diferenciaCierre > 0 ? 'sobra' : 'falta')">
+          {{ diferenciaCierre === 0 ? 'Cuadra exacto' : (diferenciaCierre > 0 ? `Sobra ${fmt(diferenciaCierre)}` : `Falta ${fmt(Math.abs(diferenciaCierre))}`) }}
+        </div>
+        <label class="sp__fld">Notas (opcional)
+          <input v-model.trim="cierreForm.notas" class="sp__inp" placeholder="Ej: diferencia por vuelto" maxlength="120" />
+        </label>
+        <div class="sp__modal-act">
+          <button class="sp__btn" @click="cierreForm = null">Cancelar</button>
+          <button class="sp__btn sp__btn--brand" :disabled="store.saving" @click="confirmarCierre">Cerrar caja</button>
+        </div>
       </div>
     </div>
   </div>
@@ -346,4 +425,28 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
 .sp__link { background: none; border: none; color: #64748b; font-size: .8rem; font-weight: 500; cursor: pointer; padding: .1rem .35rem; }
 .sp__link:hover { color: #0f172a; }
 .sp__link--danger:hover { color: #dc2626; }
+
+/* Caja del turno */
+.sp__caja-head { display: flex; align-items: center; justify-content: space-between; }
+.sp__caja-open { font-size: .68rem; font-weight: 700; color: #15803d; background: #effaf1; padding: 2px 8px; border-radius: 999px; }
+.sp__caja-muted { color: #94a3b8; font-size: 1.1rem; }
+.sp__caja-btn { margin-top: auto; justify-content: center; width: 100%; }
+
+/* Modales caja */
+.sp__ov { position: fixed; inset: 0; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1000; padding: 1rem; }
+.sp__modal { background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 400px; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
+.sp__modal-title { margin: 0 0 .3rem; font-size: 1.1rem; font-weight: 750; letter-spacing: -.02em; color: #0f172a; }
+.sp__modal-hint { color: #64748b; font-size: .82rem; margin: 0 0 1.1rem; line-height: 1.45; }
+.sp__modal-act { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .5rem; }
+.sp__fld { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; color: #475569; margin-bottom: .9rem; font-weight: 600; }
+.sp__inp { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .55rem .75rem; font-size: .9rem; color: #0f172a; outline: none; }
+.sp__inp:focus { border-color: #9a5b34; }
+.sp__arqueo { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; padding: .7rem .9rem; margin-bottom: 1rem; }
+.sp__arqueo-row { display: flex; justify-content: space-between; font-size: .84rem; color: #475569; padding: .25rem 0; }
+.sp__arqueo-row b { color: #0f172a; }
+.sp__arqueo-row--tot { border-top: 1px solid #e2e8f0; margin-top: .25rem; padding-top: .5rem; font-weight: 700; }
+.sp__dif { text-align: center; font-size: .85rem; font-weight: 700; padding: .55rem; border-radius: 9px; margin-bottom: .9rem; }
+.sp__dif.ok { background: #effaf1; color: #15803d; }
+.sp__dif.sobra { background: #eff6ff; color: #1d4ed8; }
+.sp__dif.falta { background: #fdecec; color: #dc2626; }
 </style>

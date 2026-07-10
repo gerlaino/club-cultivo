@@ -18,6 +18,10 @@ class Barra < ApplicationRecord
   has_many :bar_productos, foreign_key: :bar_id, dependent: :destroy
   has_many :bar_ventas,    foreign_key: :bar_id, dependent: :destroy
   has_many :eventos_bar,   class_name: 'EventoBar', foreign_key: :bar_id, dependent: :destroy
+  has_many :caja_turnos,   foreign_key: :bar_id, dependent: :destroy
+
+  # Caja de turno abierta ahora (o nil). Una sola por bar (índice único parcial).
+  def caja_abierta = caja_turnos.abiertas.first
 
   validates :nombre, presence: true
   validate  :sede_habilitada

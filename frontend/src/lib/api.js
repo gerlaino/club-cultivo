@@ -345,6 +345,12 @@ export const crearBarVenta      = (barId, payload) => api.post(`/bares/${barId}/
 export const listBarVentas      = (barId)          => api.get(`/bares/${barId}/ventas`)
 export const deleteBarVenta     = (barId, id)      => api.delete(`/bares/${barId}/ventas/${id}`)
 
+// ── Bar · caja de turno (apertura / cierre con arqueo) ─────────────────────────
+export const getCajaActual      = (barId)          => api.get(`/bares/${barId}/cajas/actual`)
+export const listCajas          = (barId)          => api.get(`/bares/${barId}/cajas`)
+export const abrirCaja          = (barId, payload) => api.post(`/bares/${barId}/cajas/abrir`, payload)
+export const cerrarCaja         = (barId, id, payload) => api.post(`/bares/${barId}/cajas/${id}/cerrar`, payload)
+
 // ── Bar · eventos (proyecto con P&L) ───────────────────────────────────────────
 export const listEventosBar    = (barId)             => api.get(`/bares/${barId}/eventos`)
 export const getEventoBar      = (barId, id)         => api.get(`/bares/${barId}/eventos/${id}`)

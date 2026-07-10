@@ -13,10 +13,29 @@ module Bar
       {
         resultado_mes:   resultado_mes,
         hoy:             hoy_stats,
+        caja:            caja_abierta,
         ventas_por_hora: ventas_por_hora,
         top_productos:   top_productos,
         reponer:         reponer,
         lecturas:        lecturas,
+      }
+    end
+
+    # Caja de turno abierta (o nil) con sus totales en vivo, para el panel.
+    def caja_abierta
+      c = @bar.caja_abierta
+      return nil if c.nil?
+
+      {
+        id:                    c.id,
+        monto_inicial_ars:     c.monto_inicial_ars.to_f,
+        total_ventas_ars:      c.total_ventas_ars,
+        total_efectivo_ars:    c.total_efectivo_ars,
+        total_digital_ars:     c.total_digital_ars,
+        tickets:               c.tickets,
+        efectivo_esperado_ars: c.efectivo_esperado_ars,
+        abierta_at:            c.abierta_at,
+        abierta_por:           c.abierta_por&.nombre_completo,
       }
     end
 

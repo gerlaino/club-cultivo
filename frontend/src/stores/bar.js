@@ -4,7 +4,7 @@ import { defineStore } from "pinia";
 import {
   listBares, createBar, updateBar, deleteBar, getBarDashboard,
   listBarProductos, createBarProducto, updateBarProducto, deleteBarProducto,
-  reponerBarProducto, crearBarVenta,
+  reponerBarProducto, crearBarVenta, abrirCaja, cerrarCaja,
 } from "../lib/api";
 
 export const useBarStore = defineStore("bar", {
@@ -104,6 +104,18 @@ export const useBarStore = defineStore("bar", {
       } finally {
         this.saving = false;
       }
+    },
+
+    // ── Caja de turno ────────────────────────────────────────
+    async abrirCaja(barId, monto_inicial_ars) {
+      const data = await this._guardar(() => abrirCaja(barId, { monto_inicial_ars }), () => {});
+      await this.fetchDashboard(barId);
+      return data;
+    },
+    async cerrarCaja(barId, cajaId, payload) {
+      const data = await this._guardar(() => cerrarCaja(barId, cajaId, payload), () => {});
+      await this.fetchDashboard(barId);
+      return data;
     },
 
     // ── Config de productos (admin) ──────────────────────────
