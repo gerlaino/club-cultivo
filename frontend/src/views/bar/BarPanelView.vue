@@ -3,7 +3,7 @@
 // "Lecturas del salón" (insights accionables) y rendimiento de productos. Paleta slate + verde
 // marca con acento cobre propio del salón. Datos: Bar::Pulso (backend).
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useSedeStore } from '../../stores/sede.js'
@@ -14,6 +14,7 @@ const store = useBarStore()
 const auth  = useAuthStore()
 const sedeStore = useSedeStore()
 const route = useRoute()
+const router = useRouter()
 const toast = useToast()
 const { confirm } = useConfirm()
 const barId = route.params.barId
@@ -29,6 +30,13 @@ const fmtK = (n) => {
 
 onMounted(async () => {
   await store.fetchDashboard(barId)
+  // Si el salón no cargó (fue borrado / no accesible), no dejamos al usuario en un bar fantasma:
+  // lo mandamos al listado, que re-consulta los bares reales.
+  if (!store.barActual) {
+    toast.error('Ese salón ya no existe o no está disponible.')
+    router.push('/bar')
+    return
+  }
   // Al entrar a un salón, el contexto global de sede pasa a la sede de ese bar (no queda en "club").
   if (store.barActual?.sede?.id) sedeStore.setSede(store.barActual.sede.id)
   store.fetchProductos(barId)

@@ -22,7 +22,13 @@ const ESTADOS = {
 const form = ref(null)
 
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
-onMounted(() => store.fetchLista(barId))
+const esBarInexistente = (msg) => /no encontrado|not found/i.test(msg || '')
+function irAlListado() { toast.error('Ese salón ya no existe. Elegí uno de la lista.'); router.push('/bar') }
+
+onMounted(async () => {
+  await store.fetchLista(barId)
+  if (esBarInexistente(store.error)) irAlListado()
+})
 
 function nuevo() { form.value = { nombre: '', fecha: '', aforo: null, presupuesto_ingresos: 0 } }
 async function guardar() {
@@ -31,7 +37,10 @@ async function guardar() {
     const ev = await store.crear(barId, { ...form.value, nombre: form.value.nombre.trim() })
     form.value = null
     router.push(`/bar/${barId}/eventos/${ev.id}`)
-  } catch { toast.error(store.saveError) }
+  } catch {
+    if (esBarInexistente(store.saveError)) irAlListado()
+    else toast.error(store.saveError)
+  }
 }
 function abrir(ev) { router.push(`/bar/${barId}/eventos/${ev.id}`) }
 function fechaTxt(f) {
