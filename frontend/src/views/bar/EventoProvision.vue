@@ -29,6 +29,8 @@ const disponibles  = computed(() => {
   const usados = new Set(items.value.map(p => p.bar_producto_id))
   return productos.value.filter(p => !usados.has(p.id))
 })
+// El salón no tiene productos cargados en su depósito → no hay de dónde elegir para provisionar.
+const sinProductos = computed(() => !loading.value && productos.value.length === 0)
 
 async function cargar() {
   loading.value = true
@@ -123,7 +125,10 @@ async function confirmarCierre(finalizar) {
     </div>
 
     <div v-if="loading" class="pv__empty">Cargando…</div>
-    <div v-else-if="!items.length" class="pv__empty pv__empty--box">Todavía no cargaste productos para este evento.</div>
+    <div v-else-if="sinProductos" class="pv__empty pv__empty--box">
+      El depósito del salón no tiene productos todavía. Cargalos primero (en <b>Salón → panel del bar → Productos</b>, o en el Depósito) y después vas a poder provisionarlos acá.
+    </div>
+    <div v-else-if="!items.length" class="pv__empty pv__empty--box">Todavía no cargaste productos para este evento. Tocá <b>+ Producto</b> y elegí del depósito del salón.</div>
 
     <template v-else>
       <div class="pv__table-wrap">
@@ -168,8 +173,10 @@ async function confirmarCierre(finalizar) {
     <div v-if="addForm" class="ov" @click.self="addForm = null">
       <div class="modal">
         <h3 class="modal__title">Agregar a la provisión</h3>
-        <label class="fld">Producto
-          <select v-model="addForm.bar_producto_id" class="inp"><option v-for="p in disponibles" :key="p.id" :value="p.id">{{ p.nombre }}</option></select>
+        <label class="fld">Producto <small class="mut">(del depósito del salón)</small>
+          <select v-model="addForm.bar_producto_id" class="inp">
+            <option v-for="p in disponibles" :key="p.id" :value="p.id">{{ p.nombre }} — {{ p.stock }} en depósito</option>
+          </select>
         </label>
         <label class="fld">Cantidad necesaria<input v-model.number="addForm.cantidad_prevista" type="number" min="0" step="any" class="inp" /></label>
         <div class="modal__actions"><button class="btn" @click="addForm = null">Cancelar</button><button class="btn btn--primary" :disabled="saving" @click="confirmarAdd">Agregar</button></div>
@@ -246,6 +253,7 @@ async function confirmarCierre(finalizar) {
 .modal__hint { color: #64748b; font-size: .82rem; margin: 0 0 1.1rem; }
 .modal__actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .5rem; flex-wrap: wrap; }
 .fld { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; color: #475569; margin-bottom: .9rem; }
+.mut { color: #94a3b8; font-weight: 400; }
 .inp { padding: .55rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: .86rem; background: #fff; color: #0f172a; }
 .inp:focus { border-color: #1b5e20; outline: none; }
 .btn { border: 1.5px solid #e2e8f0; background: #fff; color: #334155; border-radius: 9px; padding: .5rem .85rem; font-size: .82rem; font-weight: 600; cursor: pointer; }
