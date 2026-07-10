@@ -11,6 +11,13 @@ import { listLotes, listPesajesManicuraAdmin, getTareasDashboard } from '../lib/
 export const NAV_GROUPS = [
   { key: 'dashboard', label: 'Dashboard', to: '/', tabs: [] },
   {
+    // Sedes — sección propia, visible solo si el club tiene el plan multi-sede. El admin ve el
+    // cockpit de sedes (crear/gestionar, resumen financiero). En clubes de una sola sede queda
+    // accesible desde Configuración → Sedes.
+    key: 'sedes', label: 'Sedes', to: '/sedes', feature: 'multi_sede',
+    tabs: [],
+  },
+  {
     key: 'cultivo', label: 'Cultivo', to: '/salas',
     tabs: [
       { to: '/salas', label: 'Salas' },
