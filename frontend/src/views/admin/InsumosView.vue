@@ -20,7 +20,16 @@ const salas = ref([])
 const multiSede = computed(() => sede.sedes.length > 1)
 const otrasSedes = computed(() => sede.sedes.filter(s => s.id !== sede.sedeId))
 
-async function recargar() { await store.fetch({ sede_id: sede.sedeParam }) }
+// Familias de depósito (consumibles). El bar (deposito_bar / vendible) es un módulo aparte.
+const TABS = [
+  { tipo: 'cultivo', label: 'Cultivo',  hint: 'Fertilizantes, sustrato… se consumen imputando el costo al lote.' },
+  { tipo: 'general', label: 'General',  hint: 'Insumos del club (limpieza, administración). Se consumen como gasto general.' },
+]
+const tipoActivo = ref('cultivo')
+const tabActual  = computed(() => TABS.find(t => t.tipo === tipoActivo.value))
+const esGeneral  = computed(() => tipoActivo.value === 'general')
+
+async function recargar() { await store.fetch({ sede_id: sede.sedeParam, tipo: tipoActivo.value }) }
 
 onMounted(async () => {
   if (!sede.loaded) await sede.fetchSedes()
@@ -29,8 +38,8 @@ onMounted(async () => {
   listSalas().then(r => { salas.value = r.data || [] }).catch(() => {})
 })
 
-// Al cambiar la sede actual desde el topbar, el depósito se re-filtra solo.
-watch(() => sede.sedeId, recargar)
+// Al cambiar la sede o la familia activa, el depósito se re-filtra.
+watch([() => sede.sedeId, tipoActivo], recargar)
 
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 function stockPct(i) {
@@ -40,7 +49,7 @@ function stockPct(i) {
 
 // ── Nuevo insumo ──────────────────────────────────────────────
 const nuevoForm = ref(null)
-function nuevoInsumo() { nuevoForm.value = { nombre: '', unidad_medida: 'unidad', stock_minimo: 0, sede_id: sede.sedeId } }
+function nuevoInsumo() { nuevoForm.value = { nombre: '', unidad_medida: 'unidad', stock_minimo: 0, sede_id: sede.sedeId, tipo: tipoActivo.value } }
 async function guardarNuevo() {
   if (!nuevoForm.value.nombre?.trim()) { toast.warning('Poné un nombre'); return }
   try {
@@ -107,10 +116,10 @@ async function confirmarConsumo() {
     <header class="dp__head">
       <div>
         <h1 class="dp__title">
-          Depósito de insumos
+          Depósito
           <span v-if="multiSede" class="dp__ctx">{{ sede.esConsolidado ? 'Todas las sedes' : sede.sedeActual?.nombre }}</span>
         </h1>
-        <p class="dp__sub">Comprá a granel; imputá el consumo al lote donde se usa. Así sale el costo real de producción.</p>
+        <p class="dp__sub">{{ tabActual?.hint }}</p>
       </div>
       <div class="dp__head-right">
         <div class="dp__stat">
@@ -120,6 +129,13 @@ async function confirmarConsumo() {
         <button class="btn btn--primary" @click="nuevoInsumo">+ Insumo</button>
       </div>
     </header>
+
+    <!-- Solapas por familia de depósito -->
+    <div class="dp__tabs">
+      <button v-for="t in TABS" :key="t.tipo" class="dp__tab" :class="{ 'is-on': tipoActivo === t.tipo }" @click="tipoActivo = t.tipo">
+        {{ t.label }}
+      </button>
+    </div>
 
     <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>
     <div v-else-if="!store.items.length" class="dp__empty dp__empty--box">Todavía no hay insumos. Creá el primero con “+ Insumo”.</div>
@@ -201,26 +217,32 @@ async function confirmarConsumo() {
     <div v-if="consumoForm" class="ov" @click.self="consumoForm = null">
       <div class="modal modal--wide">
         <h3 class="modal__title">Registrar consumo — {{ consumoForm.insumo.nombre }}</h3>
-        <p class="modal__hint">Disponible {{ consumoForm.insumo.stock_actual }} {{ consumoForm.insumo.unidad_medida }}. Se imputa el costo a los lotes elegidos.</p>
+        <p class="modal__hint">
+          Disponible {{ consumoForm.insumo.stock_actual }} {{ consumoForm.insumo.unidad_medida }}.
+          {{ esGeneral ? 'Se descuenta del depósito como gasto general del club.' : 'Se imputa el costo a los lotes elegidos.' }}
+        </p>
         <label class="fld">Cantidad usada<input v-model.number="consumoForm.cantidad" type="number" min="0" step="any" class="inp" /></label>
 
-        <div class="fld">
-          <span>Lotes <small class="mut">(se reparte en partes iguales)</small></span>
-          <div class="dp__lotes">
-            <label v-for="l in lotes" :key="l.id" class="dp__lote" :class="{ 'is-on': consumoForm.lote_ids.includes(l.id) }">
-              <input type="checkbox" :checked="consumoForm.lote_ids.includes(l.id)" @change="toggleLote(l.id)" />
-              {{ l.codigo || ('Lote ' + l.id) }}
-            </label>
-            <span v-if="!lotes.length" class="mut" style="font-size:.8rem">Sin lotes activos.</span>
+        <!-- Lotes/sala solo para insumos de cultivo. Los generales se consumen como gasto. -->
+        <template v-if="!esGeneral">
+          <div class="fld">
+            <span>Lotes <small class="mut">(se reparte en partes iguales)</small></span>
+            <div class="dp__lotes">
+              <label v-for="l in lotes" :key="l.id" class="dp__lote" :class="{ 'is-on': consumoForm.lote_ids.includes(l.id) }">
+                <input type="checkbox" :checked="consumoForm.lote_ids.includes(l.id)" @change="toggleLote(l.id)" />
+                {{ l.codigo || ('Lote ' + l.id) }}
+              </label>
+              <span v-if="!lotes.length" class="mut" style="font-size:.8rem">Sin lotes activos.</span>
+            </div>
+            <p v-if="porLote" class="dp__reparto">{{ porLote.toFixed(2) }} {{ consumoForm.insumo.unidad_medida }} a cada uno de los {{ consumoForm.lote_ids.length }} lotes.</p>
           </div>
-          <p v-if="porLote" class="dp__reparto">{{ porLote.toFixed(2) }} {{ consumoForm.insumo.unidad_medida }} a cada uno de los {{ consumoForm.lote_ids.length }} lotes.</p>
-        </div>
 
-        <label class="fld">Sala (opcional)
-          <select v-model="consumoForm.sala_id" class="inp"><option :value="null">— Sin sala —</option><option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option></select>
-        </label>
+          <label class="fld">Sala (opcional)
+            <select v-model="consumoForm.sala_id" class="inp"><option :value="null">— Sin sala —</option><option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option></select>
+          </label>
+        </template>
 
-        <div class="modal__actions"><button class="btn" @click="consumoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarConsumo">Imputar consumo</button></div>
+        <div class="modal__actions"><button class="btn" @click="consumoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarConsumo">{{ esGeneral ? 'Registrar consumo' : 'Imputar consumo' }}</button></div>
       </div>
     </div>
   </div>
@@ -231,6 +253,10 @@ async function confirmarConsumo() {
 .dp__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .dp__title { font-size: 1.6rem; font-weight: 800; letter-spacing: -.035em; margin: 0 0 .2rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .dp__ctx { font-size: .74rem; font-weight: 600; letter-spacing: .01em; color: #1b5e20; background: rgb(27 94 32 / .08); border: 1px solid rgb(27 94 32 / .18); padding: .2rem .6rem; border-radius: 999px; }
+.dp__tabs { display: inline-flex; gap: .25rem; background: #f1f5f9; border-radius: 10px; padding: .25rem; margin-bottom: 1.25rem; }
+.dp__tab { border: none; background: transparent; color: #64748b; font-size: .84rem; font-weight: 600; padding: .45rem 1rem; border-radius: 8px; cursor: pointer; transition: background .12s, color .12s; }
+.dp__tab:hover { color: #334155; }
+.dp__tab.is-on { background: #fff; color: #1b5e20; box-shadow: 0 1px 2px rgb(15 23 42 / .08); }
 .dp__sede { font-size: .66rem; font-weight: 600; letter-spacing: .02em; color: #475569; background: #f1f5f9; padding: 2px 8px; border-radius: 999px; }
 .dp__sub { color: #64748b; font-size: .84rem; margin: 0; max-width: 52ch; line-height: 1.5; }
 .dp__head-right { display: flex; align-items: center; gap: 1.25rem; }

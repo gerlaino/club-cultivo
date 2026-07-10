@@ -9,10 +9,11 @@ class InsumosController < ApplicationController
   before_action :require_gestion,  only: [:transferir]
   before_action :set_insumo,       only: [:show, :update, :comprar, :consumir, :transferir]
 
-  # GET /insumos?sede_id=<id|pool>&activos=true
+  # GET /insumos?sede_id=<id|pool>&tipo=<cultivo|general>&activos=true
   def index
     scope = current_user.club.insumos.includes(:categoria_contable, :sede)
     scope = scope.activos if params[:activos] == 'true'
+    scope = scope.por_tipo(params[:tipo]) if params[:tipo].present?
     scope = scope.de_sede(params[:sede_id]) if params[:sede_id].present?
     render json: {
       insumos:         scope.order(:nombre).map { |i| serialize(i) },
@@ -131,7 +132,7 @@ class InsumosController < ApplicationController
   end
 
   def insumo_params
-    params.require(:insumo).permit(:nombre, :unidad_medida, :stock_minimo, :activo, :categoria_contable_id, :sede_id)
+    params.require(:insumo).permit(:nombre, :unidad_medida, :stock_minimo, :activo, :categoria_contable_id, :sede_id, :tipo)
   end
 
   def serialize(i)
@@ -145,6 +146,7 @@ class InsumosController < ApplicationController
       stock_minimo:       i.stock_minimo.to_f,
       stock_bajo:         i.stock_bajo?,
       activo:             i.activo,
+      tipo:               i.tipo,
       categoria_contable_id: i.categoria_contable_id,
       sede_id:            i.sede_id,
       sede_nombre:        i.sede&.nombre,

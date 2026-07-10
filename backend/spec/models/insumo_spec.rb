@@ -124,6 +124,20 @@ RSpec.describe Insumo, type: :model do
     end
   end
 
+  describe '.por_tipo' do
+    it 'filtra por familia (cultivo/general) y sin filtro devuelve todo' do
+      cultivo = insumo(nombre: 'Fertilizante', tipo: 'cultivo')
+      general = insumo(nombre: 'Lavandina', tipo: 'general')
+      expect(club.insumos.por_tipo('cultivo')).to contain_exactly(cultivo)
+      expect(club.insumos.por_tipo('general')).to contain_exactly(general)
+      expect(club.insumos.por_tipo(nil)).to contain_exactly(cultivo, general)
+    end
+
+    it 'los insumos existentes quedan como cultivo por default' do
+      expect(insumo.tipo).to eq('cultivo')
+    end
+  end
+
   describe '.de_sede' do
     let(:sede_a) { create(:sede, club: club) }
 

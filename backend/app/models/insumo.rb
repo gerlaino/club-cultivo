@@ -12,14 +12,18 @@ class Insumo < ApplicationRecord
   has_many :insumo_consumos, dependent: :destroy
 
   UNIDADES = %w[unidad litro mililitro kilogramo gramo bolsa metro otro].freeze
+  # Familia hardcodeada → define el depósito de la sede. El bar es aparte (BarProducto).
+  TIPOS = %w[cultivo general].freeze
 
   validates :nombre, presence: true
   validates :unidad_medida, inclusion: { in: UNIDADES }
+  validates :tipo, inclusion: { in: TIPOS }
   validates :stock_actual, :costo_promedio_ars, :stock_minimo,
             numericality: { greater_than_or_equal_to: 0 }
 
   scope :activos,    -> { where(activo: true) }
   scope :stock_bajo, -> { where('stock_minimo > 0 AND stock_actual <= stock_minimo') }
+  scope :por_tipo,   ->(tipo) { tipo.present? ? where(tipo: tipo) : self }
   # Contexto de sede: un id filtra esa sede; 'pool' filtra el pool sin sede; nil = todas.
   scope :de_sede,    ->(sede_id) {
     if sede_id.to_s == 'pool' then where(sede_id: nil)
