@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { getAnalyticsRendimiento, getAnalyticsProduccion, getAnalyticsCorrelacion, getAnalyticsContabilidad } from '../lib/api.js'
+import { getAnalyticsRendimiento, getAnalyticsProduccion, getAnalyticsCorrelacion, getAnalyticsContabilidad, getAnalyticsCostoPorGramoSede } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import Chart from 'chart.js/auto'
 
@@ -10,6 +10,7 @@ const dataRend   = ref(null)
 const dataProd   = ref(null)
 const dataCorr   = ref(null)
 const dataCont   = ref(null)
+const dataCpg    = ref(null)
 const añoFiltro  = ref(null)
 
 const añoActual = new Date().getFullYear()
@@ -51,6 +52,29 @@ async function goTab(t) {
       dataCont.value = data
     } catch {}
   }
+  if (t === 'costo_gramo' && !dataCpg.value) {
+    try {
+      const { data } = await getAnalyticsCostoPorGramoSede()
+      dataCpg.value = data
+    } catch {}
+  }
+}
+
+// ── Costo por gramo producido (por sede) ─────────────────────────
+const cpgSedes = computed(() => dataCpg.value?.sedes ?? [])
+const cpgTotal = computed(() => dataCpg.value?.total ?? null)
+const cpgExpandida = ref(null)
+function toggleCpg(id) { cpgExpandida.value = cpgExpandida.value === id ? null : id }
+function fmtArs(v) { return v != null ? '$' + Math.round(v).toLocaleString('es-AR') : '—' }
+function fmtG(v) { return v != null ? Math.round(v).toLocaleString('es-AR') + ' g' : '—' }
+
+function exportCsvCostoGramo() {
+  const headers = ['Sede', 'Tipo', 'Costo total', 'Gramos producidos', '$/g', 'Lotes con costo', 'Lotes sin rendimiento']
+  const rows = [headers, ...cpgSedes.value.map(s => [
+    s.sede_nombre, s.sede_tipo ?? '', s.costo_total, s.gramos_producidos,
+    s.costo_por_gramo ?? '', s.lotes_con_costo, s.lotes_sin_rendimiento,
+  ])]
+  downloadCsv(`analitica_costo_por_gramo_${fechaHoy()}.csv`, rows)
 }
 
 // ── Contabilidad computeds ─────────────────────────────────────────
@@ -320,9 +344,12 @@ function bucketColor(desv) {
         <button class="an__tab" :class="{ 'an__tab--active': tab === 'contabilidad' }" @click="goTab('contabilidad')">
           <i class="bi bi-cash-stack"></i> Contabilidad
         </button>
+        <button class="an__tab" :class="{ 'an__tab--active': tab === 'costo_gramo' }" @click="goTab('costo_gramo')">
+          <i class="bi bi-tag"></i> Costo/g
+        </button>
       </div>
       <div v-if="dataRend || dataProd" class="an__export-btns">
-        <button class="an__export-btn" @click="tab === 'geneticas' ? exportCsvGeneticas() : tab === 'ciclos' ? exportCsvCiclos() : tab === 'perdidas' ? exportCsvPerdidas() : tab === 'ambiente' ? exportCsvAmbiente() : null"
+        <button class="an__export-btn" @click="tab === 'geneticas' ? exportCsvGeneticas() : tab === 'ciclos' ? exportCsvCiclos() : tab === 'perdidas' ? exportCsvPerdidas() : tab === 'ambiente' ? exportCsvAmbiente() : tab === 'costo_gramo' ? exportCsvCostoGramo() : null"
                 :disabled="tab === 'comparativa'">
           <i class="bi bi-filetype-csv"></i> CSV
         </button>
@@ -974,6 +1001,126 @@ function bucketColor(desv) {
           </div>
         </div>
 
+      </template>
+    </template>
+
+    <!-- ══ TAB COSTO POR GRAMO ══════════════════════════════════════ -->
+    <template v-if="tab === 'costo_gramo'">
+      <div v-if="!dataCpg" class="an__empty-lg">
+        <i class="bi bi-tag"></i>
+        <p>Cargando costo por gramo…</p>
+      </div>
+
+      <template v-else>
+        <div class="an__info-box">
+          <i class="bi bi-info-circle"></i>
+          Costo real de producción dividido por los gramos efectivamente producidos (rendimiento
+          real de manicura), agregado por sede. Numerador: costo total del lote (insumos, energía,
+          mano de obra). Denominador: gramos cosechados — no dispensados. Un lote que costó y no rindió
+          suma su costo con cero gramos: es un costo real de esa sede.
+        </div>
+
+        <div v-if="!cpgSedes.length" class="an__empty-lg">
+          <i class="bi bi-tag"></i>
+          <p>Sin datos de costo por gramo aún.</p>
+          <span>Se necesitan lotes con costo calculado (Contabilidad → Costo del lote) y rendimiento real.</span>
+        </div>
+
+        <template v-else>
+          <!-- KPIs del club -->
+          <div class="an__kpis" style="margin-bottom:1.25rem">
+            <div class="an__kpi an__kpi--green">
+              <span class="an__kpi-val">{{ fmtArs(cpgTotal?.costo_por_gramo) }}<small style="font-size:.6em;font-weight:600"> /g</small></span>
+              <span class="an__kpi-lbl">Costo por gramo — club</span>
+            </div>
+            <div class="an__kpi">
+              <span class="an__kpi-val">{{ fmtG(cpgTotal?.gramos_producidos) }}</span>
+              <span class="an__kpi-lbl">Gramos producidos</span>
+            </div>
+            <div class="an__kpi">
+              <span class="an__kpi-val">{{ fmtArs(cpgTotal?.costo_total) }}</span>
+              <span class="an__kpi-lbl">Costo total</span>
+            </div>
+            <div class="an__kpi">
+              <span class="an__kpi-val">{{ cpgTotal?.lotes_con_costo ?? '—' }}</span>
+              <span class="an__kpi-lbl">Lotes con costo</span>
+            </div>
+          </div>
+
+          <!-- Tabla por sede, expandible a lotes -->
+          <div class="an__card">
+            <div class="an__card-header">
+              <span class="an__card-title">Costo por gramo por sede</span>
+              <span class="an__pill an__pill--muted">{{ cpgSedes.length }} sede{{ cpgSedes.length !== 1 ? 's' : '' }}</span>
+            </div>
+            <div class="an__table-wrap">
+              <table class="an__table">
+                <thead>
+                  <tr>
+                    <th>Sede</th>
+                    <th class="an__th-r">$/g</th>
+                    <th class="an__th-r">Gramos prod.</th>
+                    <th class="an__th-r">Costo total</th>
+                    <th class="an__th-r">Lotes</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template v-for="s in cpgSedes" :key="s.sede_id ?? 'sin'">
+                    <tr>
+                      <td class="an__td-bold">
+                        {{ s.sede_nombre }}
+                        <span v-if="s.sede_tipo" class="an__pill an__pill--muted" style="margin-left:.4rem">{{ s.sede_tipo }}</span>
+                      </td>
+                      <td class="an__td-r an__td-bold an__td-green">{{ fmtArs(s.costo_por_gramo) }}</td>
+                      <td class="an__td-r">{{ fmtG(s.gramos_producidos) }}</td>
+                      <td class="an__td-r an__td-muted">{{ fmtArs(s.costo_total) }}</td>
+                      <td class="an__td-r">
+                        {{ s.lotes_con_costo }}
+                        <span v-if="s.lotes_sin_rendimiento" class="an__desv an__desv--neg" :title="s.lotes_sin_rendimiento + ' sin rendimiento'">· {{ s.lotes_sin_rendimiento }} s/r</span>
+                      </td>
+                      <td class="an__td-r">
+                        <button v-if="s.lotes?.length" class="an__rank-toggle" style="margin:0" @click="toggleCpg(s.sede_id ?? 'sin')">
+                          {{ cpgExpandida === (s.sede_id ?? 'sin') ? 'Ocultar' : 'Ver lotes' }}
+                          <i :class="cpgExpandida === (s.sede_id ?? 'sin') ? 'bi bi-chevron-up' : 'bi bi-chevron-down'"></i>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr v-if="cpgExpandida === (s.sede_id ?? 'sin')">
+                      <td colspan="6" style="padding:0">
+                        <table class="an__table an__table--compact" style="margin:0">
+                          <thead>
+                            <tr>
+                              <th>Lote</th>
+                              <th>Genética</th>
+                              <th>Estado</th>
+                              <th class="an__th-r">Costo</th>
+                              <th class="an__th-r">Gramos</th>
+                              <th class="an__th-r">$/g</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="l in s.lotes" :key="l.id">
+                              <td><RouterLink :to="`/lotes/${l.id}`" class="an__link">{{ l.codigo }}</RouterLink></td>
+                              <td class="an__td-muted">{{ l.genetica ?? '—' }}</td>
+                              <td><span class="an__badge" :style="{ background: estadoStyle(l.estado).bg, color: estadoStyle(l.estado).color }">{{ l.estado }}</span></td>
+                              <td class="an__td-r">{{ fmtArs(l.costo_total) }}</td>
+                              <td class="an__td-r">
+                                <span v-if="l.gramos_producidos > 0">{{ fmtG(l.gramos_producidos) }}</span>
+                                <span v-else class="an__desv an__desv--neg">sin rendimiento</span>
+                              </td>
+                              <td class="an__td-r an__td-bold">{{ l.costo_por_gramo != null ? fmtArs(l.costo_por_gramo) : '—' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
       </template>
     </template>
 

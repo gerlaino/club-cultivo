@@ -626,6 +626,7 @@ export const getAnalyticsPL               = ()            => api.get('/analytics
 export const getAnalyticsEjecutivo        = ()            => api.get('/analytics/ejecutivo')
 export const getAnalyticsComparativaSalas = ()            => api.get('/analytics/comparativa_salas')
 export const getAnalyticsContabilidad     = ()            => api.get('/analytics/contabilidad')
+export const getAnalyticsCostoPorGramoSede = ()           => api.get('/analytics/costo_por_gramo_sede')
 export const getLotePL                    = (id)          => api.get(`/lotes/${id}/pl`)
 
 // ── Alertas internas ──────────────────────────────────────────────────────────

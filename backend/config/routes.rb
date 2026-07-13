@@ -57,6 +57,7 @@ Rails.application.routes.draw do
       get :ejecutivo
       get :comparativa_salas
       get :contabilidad
+      get :costo_por_gramo_sede
     end
 
     resource :benchmark, only: [:show], controller: :benchmark  # solo super_admin, uso interno de plataforma

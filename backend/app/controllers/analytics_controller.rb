@@ -725,6 +725,80 @@ class AnalyticsController < ApplicationController
     render json: { salas: filas }
   end
 
+  # GET /api/analytics/costo_por_gramo_sede
+  # $/gramo producido, agregado por SEDE. Cierra el círculo cultivo→plata:
+  #   numerador   = Σ CostoLote.costo_total   (costo real del ciclo)
+  #   denominador = Σ Lote.rendimiento_real_g  (gramos producidos, NO dispensados)
+  # Un lote que costó plata y no rindió (pérdida) suma su costo con 0 gramos: es un costo
+  # real de la producción de esa sede y así debe pesar en el $/g agregado.
+  def costo_por_gramo_sede
+    club = current_user.club
+    cache_key = "analytics/costo_por_gramo_sede/#{club.id}/#{analytics_stamp(club)}"
+    Rails.cache.delete(cache_key) if params[:bust]
+    data = Rails.cache.fetch(cache_key, expires_in: 30.minutes) do
+      calcular_costo_por_gramo_sede(club)
+    end
+    render json: data
+  end
+
+  def calcular_costo_por_gramo_sede(club)
+    # Solo lotes con costo calculado. La sede se resuelve con coalesce
+    # (post-cosecha: lote.sede_id; en cultivo: sala.sede_id). Un lote con rendimiento real
+    # ya pasó por cosecha y tiene sede_id directo; el fallback cubre lotes con costo cargado
+    # que todavía están en cultivo (sin rendimiento aún).
+    lotes = club.lotes.joins(:costo_lote).includes(:costo_lote, :sala, :genetica)
+
+    sedes = club.sedes.index_by(&:id)
+    acc = Hash.new { |h, k| h[k] = { costo_total: 0.0, gramos: 0.0, sin_rendimiento: 0, lotes: [] } }
+
+    lotes.find_each do |lote|
+      sede_id = lote.sede_id || lote.sala&.sede_id
+      costo   = lote.costo_lote.costo_total.to_f
+      gramos  = lote.rendimiento_real_g.to_f
+      b = acc[sede_id]
+      b[:costo_total]    += costo
+      b[:gramos]         += gramos
+      b[:sin_rendimiento] += 1 if gramos <= 0
+      b[:lotes] << {
+        id:                lote.id,
+        codigo:            lote.codigo,
+        genetica:          lote.genetica&.nombre,
+        estado:            lote.estado,
+        costo_total:       costo.round(2),
+        gramos_producidos: gramos.round(2),
+        costo_por_gramo:   gramos.positive? ? (costo / gramos).round(2) : nil,
+      }
+    end
+
+    filas = acc.map do |sede_id, b|
+      sede = sedes[sede_id]
+      {
+        sede_id:               sede_id,
+        sede_nombre:           sede&.nombre || (sede_id ? "Sede ##{sede_id}" : 'Sin sede'),
+        sede_tipo:             sede&.tipo,
+        costo_total:           b[:costo_total].round(2),
+        gramos_producidos:     b[:gramos].round(2),
+        costo_por_gramo:       b[:gramos].positive? ? (b[:costo_total] / b[:gramos]).round(2) : nil,
+        lotes_con_costo:       b[:lotes].size,
+        lotes_sin_rendimiento: b[:sin_rendimiento],
+        lotes:                 b[:lotes].sort_by { |l| -l[:costo_total] },
+      }
+    end.sort_by { |f| f[:sede_nombre] }
+
+    total_costo  = filas.sum { |f| f[:costo_total] }
+    total_gramos = filas.sum { |f| f[:gramos_producidos] }
+
+    {
+      sedes: filas,
+      total: {
+        costo_total:       total_costo.round(2),
+        gramos_producidos: total_gramos.round(2),
+        costo_por_gramo:   total_gramos.positive? ? (total_costo / total_gramos).round(2) : nil,
+        lotes_con_costo:   filas.sum { |f| f[:lotes_con_costo] },
+      },
+    }
+  end
+
   def require_analytics_access!
     unless %w[admin supervisor super_admin].include?(current_user.role)
       render json: { error: 'No autorizado' }, status: :forbidden

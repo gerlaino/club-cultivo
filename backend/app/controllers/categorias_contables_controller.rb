@@ -61,10 +61,19 @@ class CategoriasContablesController < ApplicationController
 
   # Siembra el catálogo la primera vez y, si el club quedó con categorías planas (siembra vieja),
   # las reorganiza en el árbol. La siembra es idempotente: correrla de nuevo no duplica.
+  # También auto-repara clubes ya sembrados a los que les falta una familia agregada DESPUÉS
+  # de su siembra original (p.ej. "Insumos generales", jul-2026): esos clubes ya tienen hojas,
+  # así que el guard viejo (solo por hojas) nunca los actualizaba.
   def asegurar_catalogo
-    return if current_user.club.categorias_contables.hojas.exists?
+    return if catalogo_al_dia?(current_user.club)
 
     Finanzas::SembrarCatalogo.new(current_user.club).call
+  end
+
+  # El catálogo está al día si ya tiene hojas Y las familias que hoy espera la app.
+  def catalogo_al_dia?(club)
+    cats = club.categorias_contables
+    cats.hojas.exists? && cats.where(comportamiento: 'insumo_general').exists?
   end
 
   def categoria_params

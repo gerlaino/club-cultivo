@@ -111,6 +111,34 @@ async function guardarNuevo() {
   } catch { toast.error(store.saveError) }
 }
 
+// ── Editar insumo (nombre, categoría, unidad, mínimo) ─────────
+// Sirve para recategorizar los "Sin categoría" viejos y corregir datos.
+// La sede no se edita acá: mover stock entre sedes es "Transferir".
+const editForm = ref(null)
+function editarInsumo(i) {
+  editForm.value = {
+    id: i.id,
+    nombre: i.nombre,
+    categoria_contable_id: i.categoria_contable_id ?? null,
+    unidad_medida: i.unidad_medida,
+    stock_minimo: i.stock_minimo ?? 0,
+  }
+}
+async function guardarEdit() {
+  const f = editForm.value
+  if (!f.nombre?.trim()) { toast.warning('Poné un nombre'); return }
+  try {
+    await store.actualizar(f.id, {
+      nombre: f.nombre.trim(),
+      categoria_contable_id: f.categoria_contable_id,
+      unidad_medida: f.unidad_medida,
+      stock_minimo: f.stock_minimo,
+    })
+    toast.success('Insumo actualizado'); editForm.value = null
+    await recargar()
+  } catch { toast.error(store.saveError) }
+}
+
 // ── Comprar ───────────────────────────────────────────────────
 const compraForm = ref(null)
 function abrirCompra(i) { compraForm.value = { insumo: i, cantidad: null, costo_total_ars: null, proveedor: '' } }
@@ -225,6 +253,7 @@ async function confirmarConsumo() {
               <span class="dp__meta num">{{ fmt(i.costo_promedio_ars) }}/u · {{ fmt(i.valorizado_ars) }}</span>
             </div>
             <div class="dp__actions">
+              <button class="btn btn--sm" @click="editarInsumo(i)" title="Editar nombre / categoría">Editar</button>
               <button class="btn btn--sm" @click="abrirCompra(i)">Comprar</button>
               <button v-if="multiSede && otrasSedes.length" class="btn btn--sm" @click="abrirTransfer(i)" :disabled="i.stock_actual <= 0" title="Transferir a otra sede">Transferir</button>
               <button class="btn btn--sm btn--primary" @click="abrirConsumo(i)" :disabled="i.stock_actual <= 0">Consumir</button>
@@ -259,6 +288,26 @@ async function confirmarConsumo() {
         </div>
         <p class="modal__note">Cuando el stock baje del mínimo, te avisamos para reponer.</p>
         <div class="modal__actions"><button class="btn" @click="nuevoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="guardarNuevo">Crear insumo</button></div>
+      </div>
+    </div>
+
+    <!-- Modal editar insumo -->
+    <div v-if="editForm" class="ov" @click.self="editForm = null">
+      <div class="modal">
+        <h3 class="modal__title">Editar insumo</h3>
+        <p class="modal__hint">Cambiá el nombre, la categoría o el mínimo. Para asignar categoría a un insumo viejo “Sin categoría”, elegila acá. El stock no se toca (para mover entre sedes usá “Transferir”).</p>
+        <label class="fld">Nombre<input v-model.trim="editForm.nombre" class="inp" maxlength="60" /></label>
+        <label class="fld">Categoría
+          <select v-model="editForm.categoria_contable_id" class="inp">
+            <option :value="null">— Sin categoría —</option>
+            <option v-for="c in categoriasDelTab" :key="c.id" :value="c.id">{{ c.label }}</option>
+          </select>
+        </label>
+        <div class="dp__grid2">
+          <label class="fld">Unidad de medida<select v-model="editForm.unidad_medida" class="inp"><option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option></select></label>
+          <label class="fld">Stock mínimo<input v-model.number="editForm.stock_minimo" type="number" min="0" step="any" class="inp" /></label>
+        </div>
+        <div class="modal__actions"><button class="btn" @click="editForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="guardarEdit">Guardar</button></div>
       </div>
     </div>
 
