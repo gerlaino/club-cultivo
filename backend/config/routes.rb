@@ -10,10 +10,10 @@ Rails.application.routes.draw do
   # QR público — sin prefijo /api para que los links de QR funcionen siempre
   get "/p/:codigo_qr",   to: "public/plantas#show_qr",   defaults: { format: :json }
   get "/s/:codigo_qr",   to: "public/stocks#show_qr",    defaults: { format: :json }
-  get "/c/:token",       to: "public/carnets#show",      defaults: { format: :json }
-  # OJO: los datos del pasaporte de dispensa van bajo /api (ver scope abajo), NO a
-  # nivel root. A nivel root colisionarían con la navegación del browser a la página
-  # /d/:token de la SPA (mismo origen → el backend interceptaría el HTML).
+  # OJO: el carnet (/c/:token) y el pasaporte de dispensa (/d/:token) son PÁGINAS del SPA.
+  # Sus DATOS se sirven bajo /api (ver scope abajo), NO a nivel root. A nivel root
+  # colisionarían con la navegación del browser a la página (mismo origen → el backend
+  # devolvería JSON en vez de servir el HTML del SPA, y la página no cargaría).
 
   # Web pública del club (accedida desde el sitio web externo del club)
   namespace :public, defaults: { format: :json } do
@@ -34,6 +34,10 @@ Rails.application.routes.draw do
   # API — todo bajo /api para evitar colisión con Vue Router
   # ══════════════════════════════════════════════════════════════
   scope '/api', defaults: { format: :json } do
+    # Carnet público (datos). La página vive en la SPA en /c/:token y consume esto.
+    # Bajo /api para no chocar con la navegación de la SPA (ídem pasaporte de dispensa).
+    get  'c/:token',     to: 'public/carnets#show'
+
     # Pasaporte público de dispensa (datos). La página vive en la SPA en /d/:token y
     # consume estos endpoints. Bajo /api para no chocar con la navegación de la SPA.
     get  'd/:token',     to: 'public/dispensas#preview'

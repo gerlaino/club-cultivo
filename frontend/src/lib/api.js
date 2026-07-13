@@ -642,7 +642,7 @@ export const analizarLote          = (lote_id) => api.post('/asistente/analizar_
 export const getHistorialAnalisis  = (lote_id) => api.get('/asistente/historial_analisis',  { params: { lote_id } })
 
 // ── Carnet público ────────────────────────────────────────────────────────────
-export const getCarnetPublico = (token) => axios.get(`/c/${token}`)
+export const getCarnetPublico = (token) => axios.get(`/api/c/${token}`)
 
 // ── Médico — Ficha clínica ────────────────────────────────────────────────────
 export const getMedicoPacientes  = ()         => api.get('/medico/pacientes')

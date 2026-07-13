@@ -131,7 +131,9 @@ async function cargar() {
   try {
     // Accept explícito: sin esto, un request con Accept text/html puede caer al SPA
     // (index.html) y devolver un string sin campos → la card salía con todo "undefined".
-    const res = await axios.get(`${BASE_URL}/c/${route.params.token}`, {
+    // Los datos van bajo /api (la página /c/:token es del SPA; a nivel root el backend
+    // no sirve JSON). Ver routes.rb.
+    const res = await axios.get(`${BASE_URL}/api/c/${route.params.token}`, {
       headers: { Accept: 'application/json' },
     })
     const d = res.data

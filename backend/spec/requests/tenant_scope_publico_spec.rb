@@ -10,13 +10,13 @@ RSpec.describe 'Blindaje de tenant — contextos públicos y cross-club', type: 
     expect(ActsAsTenant.configuration.require_tenant).to be(true)
   end
 
-  describe 'GET /c/:token (carnet público, lookup por token global)' do
+  describe 'GET /api/c/:token (carnet público, lookup por token global)' do
     it 'resuelve el paciente por su carnet_token sin importar el tenant' do
       club     = create(:club)
       admin    = create(:user, :admin, club: club)
       paciente = create(:paciente, club: club, created_by: admin)
 
-      get "/c/#{paciente.carnet_token}"
+      get "/api/c/#{paciente.carnet_token}"
 
       expect(response).to have_http_status(:ok)
       expect(JSON.parse(response.body)['numero_socio']).to eq(paciente.id)
