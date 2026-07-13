@@ -1,5 +1,7 @@
 module Public
   class PlantasController < BaseController
+    self.public_tenant_mode = :token # QR de planta es global → lookup cross-club
+
     def show_qr
       plant = Plant.joins(lote: :club)
                    .where(codigo_qr: params[:codigo_qr])

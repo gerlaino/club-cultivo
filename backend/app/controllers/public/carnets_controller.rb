@@ -1,5 +1,7 @@
 module Public
   class CarnetsController < BaseController
+    self.public_tenant_mode = :token # carnet_token es global → lookup cross-club
+
     def show
       paciente = Paciente.where(carnet_token: params[:token]).first
 

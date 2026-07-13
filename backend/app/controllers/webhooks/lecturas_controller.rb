@@ -1,5 +1,10 @@
 module Webhooks
   class LecturasController < ActionController::API
+    # Declarado ANTES del before_action para que el without_tenant envuelva también el
+    # lookup del dispositivo. El dispositivo se identifica por PK + token secreto (global,
+    # cross-club); esa es la autorización. Sin usuario → sin tenant, y con require_tenant=true
+    # (TEN-01c) buscar Dispositivo sin tenant explotaría. El WebhookJob fija su propio tenant.
+    around_action :sin_tenant_webhook
     before_action :autenticar_dispositivo
 
     def create
@@ -8,6 +13,10 @@ module Webhooks
     end
 
     private
+
+    def sin_tenant_webhook
+      ActsAsTenant.without_tenant { yield }
+    end
 
     def autenticar_dispositivo
       dispositivo_id = params[:dispositivo_id]

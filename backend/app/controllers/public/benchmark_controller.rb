@@ -1,5 +1,9 @@
 module Public
   class BenchmarkController < ActionController::API
+    # Agregación cross-club anonimizada, sin usuario → sin tenant. Con require_tenant=true
+    # (TEN-01c) los queries a modelos tenant explotarían; lo corremos explícito sin tenant.
+    around_action :sin_tenant_benchmark_publico
+
     # GET /api/public/benchmark
     # Endpoint público para investigadores — datos totalmente anonimizados y agregados
     # Solo incluye clubes con benchmark_opt_in: true
@@ -62,6 +66,10 @@ module Public
     end
 
     private
+
+    def sin_tenant_benchmark_publico
+      ActsAsTenant.without_tenant { yield }
+    end
 
     def mediana(arr)
       sorted = arr.sort

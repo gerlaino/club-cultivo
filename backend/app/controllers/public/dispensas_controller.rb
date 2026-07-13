@@ -2,6 +2,8 @@ module Public
   # Pasaporte público de una dispensa, gateado por DNI del paciente.
   # El token (no adivinable) identifica la dispensa; el DNI valida que sea el paciente.
   class DispensasController < BaseController
+    self.public_tenant_mode = :token # el token de la dispensa es global → lookup cross-club
+
     # GET /d/:token  → datos mínimos para pintar el gate (club). No expone nada sensible.
     def preview
       disp = Dispensacion.find_by(token: params[:token])

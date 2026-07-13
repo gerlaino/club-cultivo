@@ -48,7 +48,15 @@ class BenchmarkController < ApplicationController
     }
   end
 
+  # Agregado de la plataforma: cross-club a propósito. El admin tiene su tenant seteado
+  # (su club), así que SIN este without_tenant el default_scope de acts_as_tenant intersecta
+  # cada `c.pacientes`/`c.lotes`/`Dispensacion...` con el club del admin → los demás clubes
+  # cuentan 0 y el promedio sale mal. Corre sin tenant para ver realmente todos los opted-in.
   def metricas_plataforma
+    ActsAsTenant.without_tenant { metricas_plataforma_sin_tenant }
+  end
+
+  def metricas_plataforma_sin_tenant
     opted_clubs = Club.where(benchmark_opt_in: true)
     return nil if opted_clubs.empty?
 

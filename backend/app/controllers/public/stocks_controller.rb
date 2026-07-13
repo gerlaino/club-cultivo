@@ -1,5 +1,7 @@
 module Public
   class StocksController < BaseController
+    self.public_tenant_mode = :token # QR de stock es global → lookup cross-club
+
     def show_qr
       stock = Stock.joins(:club)
                    .where(codigo_qr: params[:codigo_qr])

@@ -60,9 +60,13 @@ class ApplicationController < ActionController::API
     user = current_user
     return if user.nil? || user.super_admin?
     set_current_tenant(user.club) if user.club_id
-  rescue StandardError
+  rescue StandardError => e
     # No bloquear el request si la resolución de tenant falla; el scoping manual
-    # de los controllers sigue siendo la barrera primaria.
+    # de los controllers sigue siendo la barrera primaria (require_tenant=false).
+    # Lo logueamos para que deje de ser silencioso. TEN-01c: al pasar a
+    # require_tenant=true, esta rama debe BLOQUEAR el request (un usuario de club sin
+    # tenant resuelto no debe seguir), no seguir con tenant nil.
+    Rails.logger.error("[TEN] No se pudo fijar el tenant para user##{current_user&.id}: #{e.class} #{e.message}")
     ActsAsTenant.current_tenant = nil
   end
 
