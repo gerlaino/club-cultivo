@@ -2,10 +2,7 @@
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useModalEscape } from '../../composables/useModalEscape.js'
-import { useSedeStore } from '../../stores/sede.js'
 import { listBarProductos } from '../../lib/api.js'
-
-const sede = useSedeStore()
 
 const props = defineProps({
   modelValue:       { type: Boolean, default: false },
@@ -74,13 +71,13 @@ const saving = ref(false)
 
 // ── Entrada de stock (depósito/salón). La dispara el COMPORTAMIENTO de la categoría elegida. ──
 const UNIDADES_INSUMO = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
-const dep = ref({ insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: sede.sedeId })
+const dep = ref({ insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: null })
 const sal = ref({ bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null })
 const barProductos = ref([])
 const multiSede = computed(() => (props.sedes?.length || 0) > 1)
 
 function resetDestino() {
-  dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: sede.sedeId }
+  dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: null }
   sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null }
   barProductos.value = []
 }
@@ -328,11 +325,10 @@ watch(() => props.modelValue, (val) => {
       acPago.value   = true
       acExtras.value = !!(m.comprobante_numero || m.proveedor || m.notas || m.sede_id)
     } else {
-      form.value         = emptyForm()
-      form.value.sede_id = sede.sedeId // default al contexto de sede actual (editable en "más opciones")
+      form.value         = emptyForm() // sede se elige en "más opciones" (default: sin sede)
       montoDisplay.value = ''
       acPago.value       = false
-      acExtras.value     = !!sede.sedeId // si hay sede de contexto, mostrar el bloque para que se vea
+      acExtras.value     = false
       resetDestino()
     }
     errors.value = {}

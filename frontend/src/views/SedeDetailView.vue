@@ -3,7 +3,6 @@ import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
 import { useClubStore } from "../stores/club"
-import { useSedeStore } from "../stores/sede"
 import { getSede, listSalas, getSedeStocks, deleteSede } from "../lib/api"
 import ModalCrearSala    from '../components/salas/ModalCrearSala.vue'
 import Breadcrumb         from '../components/ui/Breadcrumb.vue'
@@ -17,7 +16,6 @@ const route  = useRoute()
 const router = useRouter()
 const auth   = useAuthStore()
 const club   = useClubStore()
-const sedeStore = useSedeStore()
 const toast  = useToast()
 const { confirm } = useConfirm()
 
@@ -139,10 +137,6 @@ function escapeHandler(e) {
 onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 onMounted(async () => {
   document.addEventListener('keydown', escapeHandler, true)
-  // El contexto global de sede sigue la navegación: al entrar al detalle de una sede, el topbar
-  // pasa a esa sede (antes quedaba en la última seleccionada → mostraba "la otra").
-  if (!sedeStore.loaded) await sedeStore.fetchSedes()
-  sedeStore.setSede(sedeId)
   try {
     const [sedeRes, salasRes] = await Promise.all([getSede(sedeId), listSalas()])
     sede.value  = sedeRes.data

@@ -6,13 +6,11 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
-import { useSedeStore } from '../../stores/sede.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 
 const store = useBarStore()
 const auth  = useAuthStore()
-const sedeStore = useSedeStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -36,12 +34,6 @@ onMounted(async () => {
     toast.error('Ese salón ya no existe o no está disponible.')
     router.push('/bar')
     return
-  }
-  // Al entrar a un salón, el contexto global de sede pasa a la sede de ese bar (no queda en "club").
-  // Aseguramos tener la lista de sedes cargada para que el topbar muestre bien la sede activa.
-  if (store.barActual?.sede?.id) {
-    if (!sedeStore.loaded) await sedeStore.fetchSedes()
-    sedeStore.setSede(store.barActual.sede.id)
   }
   store.fetchProductos(barId)
 })

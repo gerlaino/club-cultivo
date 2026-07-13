@@ -43,15 +43,16 @@ const grupos = computed(() => {
     .sort((a, b) => (a.label === 'Sin categoría' ? 1 : b.label === 'Sin categoría' ? -1 : a.label.localeCompare(b.label)))
 })
 
-// El depósito vive por sede: cada ítem ocupa un espacio físico en una sede. Cuando hay ≥2 sedes
-// mostramos el contexto (badge de sede, elección de sede en el alta, y transferencia entre sedes).
+// El depósito vive por sede. Filtro LOCAL (default null = todo el club); no hay contexto global.
+const sedeFiltro = ref(null)
+const sedeActualObj = computed(() => sede.sedes.find(s => s.id === sedeFiltro.value) || null)
 const multiSede = computed(() => sede.sedes.length > 1)
-const otrasSedes = computed(() => sede.sedes.filter(s => s.id !== sede.sedeId))
+const otrasSedes = computed(() => sede.sedes.filter(s => s.id !== sedeFiltro.value))
 
-// Solapas de depósito por sede. Cada tipo de sede tiene distintos depósitos:
+// Solapas de depósito por familia. Cada tipo de sede tiene distintos depósitos:
 //   producción → Cultivo + General   ·   social → General + Salón   ·   mixta → las 3
-// El Salón (deposito_bar, vendible) es un módulo aparte (DepositoSalon). Consolidado = todas.
-const currentTipo = computed(() => sede.sedeActual?.tipo) // undefined = consolidado (todas las sedes)
+// El Salón (deposito_bar, vendible) es un módulo aparte (DepositoSalon). Todo el club = todas.
+const currentTipo = computed(() => sedeActualObj.value?.tipo) // undefined = todo el club → todas las familias
 const TABS_ALL = [
   { tipo: 'cultivo', label: 'Cultivo', hint: 'Fertilizantes, sustrato… se consumen imputando el costo al lote.',       sedeTipos: ['produccion', 'mixta'] },
   { tipo: 'general', label: 'General', hint: 'Insumos del club (limpieza, administración). Se consumen como gasto.',    sedeTipos: ['produccion', 'social', 'mixta'] },
@@ -73,7 +74,7 @@ watch(TABS, (tabs) => {
 
 async function recargar() {
   if (esSalon.value) return // el depósito del salón se carga en su propio componente
-  await store.fetch({ sede_id: sede.sedeParam, tipo: tipoActivo.value })
+  await store.fetch({ sede_id: sedeFiltro.value ?? undefined, tipo: tipoActivo.value })
 }
 
 onMounted(async () => {
@@ -84,8 +85,8 @@ onMounted(async () => {
   listCategoriasContables().then(r => { categorias.value = r.data || [] }).catch(() => {})
 })
 
-// Al cambiar la sede o la familia activa, el depósito se re-filtra.
-watch([() => sede.sedeId, tipoActivo], recargar)
+// Al cambiar el filtro de sede o la familia activa, el depósito se re-filtra.
+watch([sedeFiltro, tipoActivo], recargar)
 
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 function stockPct(i) {
@@ -97,7 +98,7 @@ function stockPct(i) {
 const nuevoForm = ref(null)
 function nuevoInsumo() {
   nuevoForm.value = {
-    nombre: '', unidad_medida: 'unidad', stock_minimo: 0, sede_id: sede.sedeId, tipo: tipoActivo.value,
+    nombre: '', unidad_medida: 'unidad', stock_minimo: 0, sede_id: sedeFiltro.value, tipo: tipoActivo.value,
     categoria_contable_id: categoriasDelTab.value[0]?.id ?? null,
   }
 }
@@ -166,18 +167,22 @@ async function confirmarConsumo() {
   <div class="dp">
     <header class="dp__head">
       <div>
-        <h1 class="dp__title">
-          Depósito
-          <span v-if="multiSede" class="dp__ctx">{{ sede.esConsolidado ? 'Todas las sedes' : sede.sedeActual?.nombre }}</span>
-        </h1>
+        <h1 class="dp__title">Depósito</h1>
         <p class="dp__sub">{{ tabActual?.hint }}</p>
       </div>
-      <div v-if="!esSalon" class="dp__head-right">
-        <div class="dp__stat">
-          <span class="dp__stat-label">Valorizado</span>
-          <span class="dp__stat-val">{{ fmt(store.valorizadoTotal) }}</span>
-        </div>
-        <button class="btn btn--primary" @click="nuevoInsumo">+ Insumo</button>
+      <div class="dp__head-right">
+        <!-- Filtro de sede local (default: todo el club) -->
+        <select v-if="multiSede" v-model="sedeFiltro" class="dp__sede-filtro">
+          <option :value="null">🏢 Todo el club</option>
+          <option v-for="s in sede.sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+        </select>
+        <template v-if="!esSalon">
+          <div class="dp__stat">
+            <span class="dp__stat-label">Valorizado</span>
+            <span class="dp__stat-val">{{ fmt(store.valorizadoTotal) }}</span>
+          </div>
+          <button class="btn btn--primary" @click="nuevoInsumo">+ Insumo</button>
+        </template>
       </div>
     </header>
 
@@ -189,7 +194,7 @@ async function confirmarConsumo() {
     </div>
 
     <!-- Salón: depósito del bar (componente aparte) -->
-    <DepositoSalon v-if="esSalon" :sede-id="sede.sedeId" />
+    <DepositoSalon v-if="esSalon" :sede-id="sedeFiltro" />
 
     <template v-else>
     <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>
@@ -327,6 +332,8 @@ async function confirmarConsumo() {
 .dp__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .dp__title { font-size: 1.6rem; font-weight: 800; letter-spacing: -.035em; margin: 0 0 .2rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .dp__ctx { font-size: .74rem; font-weight: 600; letter-spacing: .01em; color: #1b5e20; background: rgb(27 94 32 / .08); border: 1px solid rgb(27 94 32 / .18); padding: .2rem .6rem; border-radius: 999px; }
+.dp__sede-filtro { border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .5rem .7rem; font-size: .84rem; font-weight: 600; color: #334155; background: #fff; cursor: pointer; }
+.dp__sede-filtro:focus { border-color: #1b5e20; outline: none; }
 .dp__tabs { display: inline-flex; gap: .25rem; background: #f1f5f9; border-radius: 10px; padding: .25rem; margin-bottom: 1.25rem; }
 .dp__tab { border: none; background: transparent; color: #64748b; font-size: .84rem; font-weight: 600; padding: .45rem 1rem; border-radius: 8px; cursor: pointer; transition: background .12s, color .12s; }
 .dp__tab:hover { color: #334155; }

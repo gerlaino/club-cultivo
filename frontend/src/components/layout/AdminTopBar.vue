@@ -15,16 +15,6 @@
       </div>
       <span class="atb__club-sep" aria-hidden="true"></span>
 
-      <!-- Indicador de sede actual (read-only) — solo dice DÓNDE estás; lo fija la navegación, no
-           se cambia desde acá. Solo multi-sede + admin/supervisor. -->
-      <div v-if="showSedeSelector" class="atb__sede" :title="sede.esConsolidado ? 'Contexto: todas las sedes' : 'Estás en la sede ' + sede.sedeActual?.nombre">
-        <span class="atb__sede-chip" :class="{ 'atb__sede-chip--all': sede.esConsolidado }">
-          <span class="atb__sede-ico">📍</span>
-          <span class="atb__sede-name">{{ sede.sedeActual?.nombre || 'Todas las sedes' }}</span>
-        </span>
-      </div>
-      <span v-if="showSedeSelector" class="atb__club-sep" aria-hidden="true"></span>
-
       <!-- Sub-pestañas del grupo activo, pegadas al club (el grupo primario vive en el sidebar) -->
       <nav v-if="visibleTabs.length" class="atb__tabs" aria-label="Secciones">
         <RouterLink
@@ -115,7 +105,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
-import { useSedeStore } from '../../stores/sede.js'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
@@ -133,10 +122,6 @@ const route    = useRoute()
 const router   = useRouter()
 const auth     = useAuthStore()
 const club     = useClubStore()
-const sede     = useSedeStore()
-
-// Selector de sede actual: solo en clubes multi-sede y para admin/supervisor (los que cambian de sede).
-const showSedeSelector = computed(() => !!club.data?.features?.multi_sede && ['admin', 'supervisor'].includes(auth.user?.role))
 const ambStore = useAmbienteStore()
 
 useAlertasBell()
@@ -162,7 +147,6 @@ async function togglePush() {
 
 onMounted(() => {
   helpDot.value = !localStorage.getItem(`help_seen_${auth.user?.id || 'u'}`)
-  if (showSedeSelector.value) sede.fetchSedes()
 })
 
 function openHelp() {
@@ -249,12 +233,6 @@ async function handleLogout() {
 }
 .atb__club-sep { width: 1px; height: 24px; background: var(--c-ink-200); flex-shrink: 0; }
 
-/* Indicador de sede actual (read-only) */
-.atb__sede { flex-shrink: 0; }
-.atb__sede-chip { display: inline-flex; align-items: center; gap: 7px; background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 6px 11px; font-size: .82rem; font-weight: 650; color: #334155; max-width: 200px; }
-.atb__sede-chip--all { color: #64748b; }
-.atb__sede-ico { font-size: .9rem; line-height: 1; }
-.atb__sede-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 700px) { .atb__club-name { display: none; } }
 
 /* Sub-pestañas del grupo activo */

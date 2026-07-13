@@ -3,7 +3,6 @@ import { ref, computed, onMounted, nextTick, watch } from "vue"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import { useSedeStore }         from "../stores/sede"
 import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
@@ -15,7 +14,6 @@ import FinanzasCatalogoView from './admin/FinanzasCatalogoView.vue'
 
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
-const sede    = useSedeStore()
 const sedes   = ref([])
 const unidades = ref([])
 const insumos  = ref([])
@@ -87,7 +85,7 @@ const { confirm } = useConfirm()
 const toast = useToast()
 
 const vistaActiva    = ref("dashboard")
-const dashboardSede  = ref(sede.sedeId) // espejo del contexto de sede global (topbar)
+const dashboardSede  = ref(null) // filtro de sede LOCAL del dashboard (null = todo el club)
 const todosLotes     = ref([])
 const loadingLotes   = ref(false)
 const pacientes      = ref([])
@@ -161,16 +159,8 @@ async function exportarPDF() {
 
 async function cambiarSedeDashboard(sede_id) {
   dashboardSede.value = sede_id || null
-  sede.setSede(sede_id || null) // mantiene sincronizado el contexto global (topbar + resto de módulos)
   await store.fetchDashboard(sede_id || null)
 }
-
-// Si cambian la sede desde el topbar (u otro módulo), el dashboard contable se re-filtra solo.
-watch(() => sede.sedeId, (id) => {
-  if (dashboardSede.value === id) return
-  dashboardSede.value = id
-  if (vistaActiva.value === 'dashboard') store.fetchDashboard(id)
-})
 
 const fmt = (n) => new Intl.NumberFormat("es-AR", {
   style: "currency", currency: "ARS",
@@ -410,8 +400,6 @@ function irALibro() {
 }
 
 onMounted(async () => {
-  if (!sede.loaded) await sede.fetchSedes()
-  dashboardSede.value = sede.sedeId // arranca en el contexto de sede activo
   await Promise.all([
     store.fetchDashboard(dashboardSede.value),
     store.fetch(),

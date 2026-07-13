@@ -712,7 +712,6 @@ import {
 const router = useRouter()
 import { useToast } from '../../composables/useToast.js'
 import { useStockChannel } from '../../composables/useStockChannel.js'
-import { useSedeStore } from '../../stores/sede.js'
 
 const toast = useToast()
 
@@ -815,15 +814,8 @@ const invPage     = ref(1)
 const invPerPage  = ref(25)
 const invTotal    = ref(0)
 const invTotales  = ref({})
+// Filtro por sede LOCAL de esta vista (default '' = todo el club). No hay contexto global.
 const invFiltros  = ref({ forma_producto: '', sede_id: '', fecha_desde: '', fecha_hasta: '' })
-
-// El filtro de sede de esta vista ES el contexto del topbar: se sincronizan para no divergir.
-// Como el stock arranca en "Todo el club", el topbar arranca en consolidado (no una sede vieja).
-// 'pool' (sin asignar) no es una sede → contexto consolidado.
-const sedeStore = useSedeStore()
-watch(() => invFiltros.value.sede_id, (v) => {
-  sedeStore.setSede(v && v !== 'pool' ? Number(v) : null)
-}, { immediate: true })
 
 const hayFiltrosInv = computed(() => Object.values(invFiltros.value).some(v => v))
 
