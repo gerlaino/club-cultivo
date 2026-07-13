@@ -65,7 +65,7 @@ class ReprocannVencimientoJob < ApplicationJob
             paciente:       paciente,
             dias_restantes: dias,
             club:           club
-          ).deliver_later
+          ).deliver_now
         end
       end
     end
@@ -76,7 +76,7 @@ class ReprocannVencimientoJob < ApplicationJob
         club:        club,
         vencidos:    vencidos,
         por_vencer:  por_vencer
-      ).deliver_later
+      ).deliver_now
     end
   end
 

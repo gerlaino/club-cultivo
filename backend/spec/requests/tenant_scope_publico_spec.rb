@@ -6,6 +6,10 @@ require 'rails_helper'
 RSpec.describe 'Blindaje de tenant — contextos públicos y cross-club', type: :request do
   include AuthHelpers
 
+  it 'require_tenant está activo (TEN-01c) — no revertir sin migrar los contextos sin-tenant' do
+    expect(ActsAsTenant.configuration.require_tenant).to be(true)
+  end
+
   describe 'GET /c/:token (carnet público, lookup por token global)' do
     it 'resuelve el paciente por su carnet_token sin importar el tenant' do
       club     = create(:club)

@@ -16,7 +16,7 @@ class InformeSemestralJob < ApplicationJob
           modo:      modo.to_sym,
           anio:      anio,
           semestre:  semestre
-        ).deliver_later
+        ).deliver_now
       end
     rescue => e
       Rails.logger.error "InformeSemestralJob club #{club.id} (#{modo}): #{e.class}: #{e.message}"

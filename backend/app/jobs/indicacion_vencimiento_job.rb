@@ -70,7 +70,7 @@ class IndicacionVencimientoJob < ApplicationJob
         club:       club,
         vencidas:   vencidas,
         por_vencer: por_vencer
-      ).deliver_later
+      ).deliver_now
     end
   end
 

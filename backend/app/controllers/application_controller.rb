@@ -58,16 +58,23 @@ class ApplicationController < ActionController::API
   def set_tenant_from_current_user
     return unless respond_to?(:current_user, true)
     user = current_user
+    # Sin usuario (público / login) o super_admin (cross-club a propósito) → sin tenant.
+    # Esos contextos fijan el scope ellos mismos (without_tenant / with_tenant explícito).
     return if user.nil? || user.super_admin?
-    set_current_tenant(user.club) if user.club_id
+
+    club = user.club_id && user.club
+    if club
+      set_current_tenant(club)
+    else
+      # Usuario de club sin club resoluble (cuenta huérfana). Con require_tenant=true
+      # (TEN-01c) cualquier query explotaría; bloqueamos ruidoso en vez de seguir con
+      # tenant nil y arriesgar una fuga entre clubes.
+      Rails.logger.error("[TEN] user##{user.id} sin club resoluble (club_id=#{user.club_id.inspect})")
+      render json: { error: 'Tu cuenta no tiene un club asignado. Contactá al administrador.' }, status: :forbidden
+    end
   rescue StandardError => e
-    # No bloquear el request si la resolución de tenant falla; el scoping manual
-    # de los controllers sigue siendo la barrera primaria (require_tenant=false).
-    # Lo logueamos para que deje de ser silencioso. TEN-01c: al pasar a
-    # require_tenant=true, esta rama debe BLOQUEAR el request (un usuario de club sin
-    # tenant resuelto no debe seguir), no seguir con tenant nil.
-    Rails.logger.error("[TEN] No se pudo fijar el tenant para user##{current_user&.id}: #{e.class} #{e.message}")
-    ActsAsTenant.current_tenant = nil
+    Rails.logger.error("[TEN] Error fijando el tenant para user##{current_user&.id}: #{e.class} #{e.message}")
+    render json: { error: 'No se pudo resolver el club de la sesión.' }, status: :internal_server_error
   end
 
   # Expone el usuario del request a la capa de modelos (concern Auditable)
