@@ -48,6 +48,7 @@
         <template v-if="data.multi && data.items?.length">
           <div class="dqr__multi-head">Tu paquete · {{ data.items.length }} productos</div>
           <div v-for="(it, i) in data.items" :key="i" class="dqr__prod-card">
+            <img v-if="it.genetica?.fotos?.length" :src="it.genetica.fotos[0]" class="dqr__foto dqr__foto--sm" alt="" />
             <div class="dqr__prod-head">
               <span class="dqr__hero-tipo" v-if="it.genetica?.tipo">{{ it.genetica.tipo }}</span>
               <h2 class="dqr__prod-nombre">{{ it.genetica?.nombre || formaLabel(it.forma) }}</h2>
@@ -68,6 +69,11 @@
               <span class="dqr__terp-val">{{ it.genetica.terpenos }}</span>
             </div>
             <div v-if="it.lote" class="dqr__prod-lote"><span>Lote</span> <span class="dqr__mono">{{ it.lote }}</span></div>
+            <DispensaResenaForm
+              v-if="it.genetica_id"
+              :base="base" :token="token" :dni="dni"
+              :genetica-id="it.genetica_id" :genetica-nombre="it.genetica?.nombre" :mi-resena="it.mi_resena"
+            />
           </div>
           <div v-if="data.genetica?.consejos_club" class="dqr__consejos">
             <span class="dqr__consejos-lbl">💡 Consejos del club</span>
@@ -75,12 +81,12 @@
           </div>
           <dl class="dqr__rows">
             <div class="dqr__row"><dt>Fecha de dispensa</dt><dd>{{ fmtFecha(data.fecha) }}</dd></div>
-            <div class="dqr__row" v-if="data.socio_numero"><dt>Paciente</dt><dd>#{{ data.socio_numero }}</dd></div>
           </dl>
         </template>
 
         <!-- Single-stock -->
         <template v-else>
+          <img v-if="data.genetica?.fotos?.length" :src="data.genetica.fotos[0]" class="dqr__foto" alt="" />
           <div class="dqr__hero">
             <span class="dqr__hero-tipo" v-if="data.genetica?.tipo">{{ data.genetica.tipo }}</span>
             <h1 class="dqr__hero-nombre">{{ data.genetica?.nombre || 'Producto' }}</h1>
@@ -104,6 +110,17 @@
             <span class="dqr__terp-val">{{ data.genetica.terpenos }}</span>
           </div>
 
+          <!-- Descripción de la genética -->
+          <p v-if="data.genetica?.descripcion" class="dqr__desc">{{ data.genetica.descripcion }}</p>
+
+          <!-- Ficha ampliada -->
+          <dl v-if="data.genetica?.origen || data.genetica?.criador || data.genetica?.tiempo_floracion || data.genetica?.dificultad" class="dqr__rows">
+            <div class="dqr__row" v-if="data.genetica?.origen"><dt>Origen</dt><dd>{{ data.genetica.origen }}</dd></div>
+            <div class="dqr__row" v-if="data.genetica?.criador"><dt>Criador</dt><dd>{{ data.genetica.criador }}</dd></div>
+            <div class="dqr__row" v-if="data.genetica?.tiempo_floracion"><dt>Floración</dt><dd>{{ data.genetica.tiempo_floracion }} días</dd></div>
+            <div class="dqr__row" v-if="data.genetica?.dificultad"><dt>Dificultad</dt><dd>{{ data.genetica.dificultad }}</dd></div>
+          </dl>
+
           <!-- Consejos del club -->
           <div v-if="data.genetica?.consejos_club" class="dqr__consejos">
             <span class="dqr__consejos-lbl">💡 Consejos del club</span>
@@ -115,9 +132,15 @@
             <div class="dqr__row"><dt>Fecha de dispensa</dt><dd>{{ fmtFecha(data.fecha) }}</dd></div>
             <div class="dqr__row" v-if="data.lote"><dt>Lote</dt><dd class="dqr__mono">{{ data.lote }}</dd></div>
             <div class="dqr__row" v-if="data.vencimiento"><dt>Vencimiento est.</dt><dd>{{ fmtFecha(data.vencimiento) }}</dd></div>
-            <div class="dqr__row" v-if="data.socio_numero"><dt>Paciente</dt><dd>#{{ data.socio_numero }}</dd></div>
             <div class="dqr__row" v-if="data.genetica?.registrada_inase"><dt>INASE</dt><dd>{{ data.genetica.numero_registro_inase || 'Registrada' }}</dd></div>
           </dl>
+
+          <!-- Reseña del paciente -->
+          <DispensaResenaForm
+            v-if="data.genetica_id"
+            :base="base" :token="token" :dni="dni"
+            :genetica-id="data.genetica_id" :genetica-nombre="data.genetica?.nombre" :mi-resena="data.mi_resena"
+          />
         </template>
 
         <p class="dqr__foot"><i class="bi bi-shield-check"></i> {{ club?.nombre }} · Trazabilidad verificada</p>
@@ -131,6 +154,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import DispensaResenaForm from '../components/DispensaResenaForm.vue'
 
 const route = useRoute()
 const token = route.params.token
@@ -279,4 +303,10 @@ onMounted(async () => {
 .dqr__row dd { font-size: .85rem; font-weight: 600; color: var(--c-ink-900, #1a1d1f); margin: 0; }
 .dqr__mono { font-family: var(--font-mono, monospace); }
 .dqr__foot { text-align: center; font-size: .68rem; color: var(--c-ink-500, #9aa39c); margin: 1.1rem 0 0; }
+
+/* Foto de la genética */
+.dqr__foto { width: 100%; height: 180px; object-fit: cover; border-radius: 14px; margin-bottom: .9rem; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+.dqr__foto--sm { height: 120px; margin-bottom: .6rem; }
+/* Descripción */
+.dqr__desc { font-size: .84rem; line-height: 1.5; color: var(--c-ink-700, #374151); margin: .1rem 0 .2rem; }
 </style>

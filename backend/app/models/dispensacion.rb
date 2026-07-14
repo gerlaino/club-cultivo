@@ -17,6 +17,7 @@ class Dispensacion < ApplicationRecord
   # propios). Una dispensa puede abarcar varios stocks. En la transición conviven con las
   # columnas stock_id/cantidad de `dispensaciones` (mirror de la primera línea).
   has_many :items, class_name: 'DispensacionItem', dependent: :destroy
+  has_many :resenas, class_name: 'ResenaProducto', dependent: :destroy
   accepts_nested_attributes_for :items, reject_if: ->(a) { a[:stock_id].blank? && a[:cantidad].to_d <= 0 }
 
   # Los asientos contables de la dispensación viven y mueren con ella. Puede haber

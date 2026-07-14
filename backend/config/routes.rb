@@ -40,8 +40,9 @@ Rails.application.routes.draw do
 
     # Pasaporte público de dispensa (datos). La página vive en la SPA en /d/:token y
     # consume estos endpoints. Bajo /api para no chocar con la navegación de la SPA.
-    get  'd/:token',     to: 'public/dispensas#preview'
-    post 'd/:token/ver', to: 'public/dispensas#ver'
+    get  'd/:token',        to: 'public/dispensas#preview'
+    post 'd/:token/ver',    to: 'public/dispensas#ver'
+    post 'd/:token/resena', to: 'public/dispensas#resena' # reseña del paciente (gate por DNI)
 
     devise_for :users,
                path: '',
@@ -278,6 +279,7 @@ Rails.application.routes.draw do
     resources :geneticas do
       member do
         delete 'fotos/:foto_id', to: 'geneticas#destroy_foto', as: :foto
+        get 'resenas', to: 'geneticas#resenas' # feedback de pacientes (interno)
       end
     end
     resources :noticias

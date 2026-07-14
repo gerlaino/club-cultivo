@@ -109,6 +109,7 @@ export const deletePlantActivity = (plantId, activityId) => api.delete(`/plants/
 // -------- GENÉTICAS --------
 export const listGeneticas = (params = {}) => api.get('/geneticas', { params });
 export const getGenetica = (id) => api.get(`/geneticas/${id}`);
+export const getGeneticaResenas = (id) => api.get(`/geneticas/${id}/resenas`);
 export const createGenetica = (payload) => api.post('/geneticas', { genetica: payload });
 export const updateGenetica = (id, payload) => api.put(`/geneticas/${id}`, { genetica: payload });
 export const deleteGenetica = (id) => api.delete(`/geneticas/${id}`);

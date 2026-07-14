@@ -5,6 +5,7 @@ class Genetica < ApplicationRecord
   # optional: true → club_id nil es válido (genéticas globales no pertenecen a un club).
   acts_as_tenant(:club, has_global_records: true, optional: true)
   has_many :lotes, dependent: :nullify
+  has_many :resenas, class_name: 'ResenaProducto', dependent: :destroy
   has_many_attached :fotos
 
   CATEGORIAS_INASE = %w[semilla_feminizada semilla_regular material_vegetativo hibrido].freeze

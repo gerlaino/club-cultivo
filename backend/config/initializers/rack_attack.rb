@@ -17,6 +17,11 @@ unless Rails.env.test?
       req.ip if req.path.match?(%r{\A/api/d/[^/]+/ver\z}) && req.post?
     end
 
+    # Reseña del paciente (también gateada por DNI): mismo espíritu anti-fuerza-bruta.
+    throttle('dispensa_resena/ip', limit: 15, period: 1.minute) do |req|
+      req.ip if req.path.match?(%r{\A/api/d/[^/]+/resena\z}) && req.post?
+    end
+
     # Asistente IA: 30 req/min por IP (complementa el rate limit interno por tier)
     throttle('asistente/ip', limit: 30, period: 1.minute) do |req|
       req.ip if req.path.start_with?('/api/asistente')

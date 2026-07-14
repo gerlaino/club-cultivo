@@ -1,7 +1,7 @@
 class GeneticasController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_for_write!, only: [:create, :update, :destroy, :destroy_foto]
-  before_action :set_genetica, only: [:show, :update, :destroy, :destroy_foto]
+  before_action :set_genetica, only: [:show, :update, :destroy, :destroy_foto, :resenas]
 
   # GET /geneticas
   # Params opcionales:
@@ -26,6 +26,18 @@ class GeneticasController < ApplicationController
   # GET /geneticas/:id
   def show
     render json: serialize_genetica_detail(@genetica)
+  end
+
+  # GET /geneticas/:id/resenas — feedback de pacientes sobre esta genética (interno).
+  def resenas
+    unless current_user.admin? || current_user.supervisor?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    resenas = @genetica.resenas.includes(:paciente).recientes
+    render json: {
+      resumen: @genetica.resenas.resumen,
+      resenas: resenas.map { |r| serialize_resena(r) },
+    }
   end
 
   # POST /geneticas
@@ -112,6 +124,20 @@ class GeneticasController < ApplicationController
     url_for(genetica.fotos.first)
   rescue
     nil
+  end
+
+  def serialize_resena(r)
+    pac = r.paciente
+    {
+      id:         r.id,
+      estrellas:  r.estrellas,
+      sabor:      r.puntaje_sabor,
+      aroma:      r.puntaje_aroma,
+      efecto:     r.puntaje_efecto,
+      comentario: r.comentario,
+      fecha:      r.created_at,
+      paciente:   pac ? "#{pac.nombre} #{pac.apellido&.first}." : nil,
+    }
   end
 
   def genetica_params

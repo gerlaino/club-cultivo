@@ -10,6 +10,7 @@ class Paciente < ApplicationRecord
   has_many :notas, class_name: "PacienteNota", dependent: :destroy
   has_many :indicacion_medicas, dependent: :destroy
   has_many :dispensaciones, class_name: 'Dispensacion', dependent: :destroy
+  has_many :resenas, class_name: 'ResenaProducto', dependent: :destroy
   has_many :reservas, dependent: :destroy
   has_many :patient_documents, dependent: :destroy
   has_one  :cuenta_corriente, dependent: :destroy

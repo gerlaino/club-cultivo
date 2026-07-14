@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { getGenetica } from '../lib/api.js'
+import { getGenetica, getGeneticaResenas } from '../lib/api.js'
 import GeneticaEditarModal from '../components/GeneticaEditarModal.vue'
 import { em } from '../lib/loteHelpers'
 import { useAuthStore } from '../stores/auth.js'
@@ -183,7 +183,20 @@ async function cargar() {
   } finally {
     loading.value = false
   }
+  cargarResenas()
 }
+
+// Feedback de pacientes (interno). Falla en silencio si el rol no tiene acceso.
+const resenas       = ref([])
+const resumenResena = ref(null)
+async function cargarResenas() {
+  try {
+    const { data } = await getGeneticaResenas(props.id)
+    resumenResena.value = data.resumen
+    resenas.value       = data.resenas || []
+  } catch { /* sin acceso o sin reseñas */ }
+}
+const fmtFechaResena = (f) => f ? new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
 onMounted(cargar)
 
 const editModal = ref(null)
@@ -314,6 +327,43 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
             <div class="gdv__terpenos">
               <span v-for="t in terpenos" :key="t" class="terpeno-chip">{{ t }}</span>
             </div>
+          </div>
+
+          <!-- Reseñas de pacientes (feedback interno) -->
+          <div v-if="resumenResena && resumenResena.total > 0" class="gdv__card gdv__card--mb">
+            <h6 class="section-title">⭐ Reseñas de pacientes ({{ resumenResena.total }})</h6>
+            <div class="rend-stats">
+              <div class="rend-stat">
+                <div class="rend-stat__label">General</div>
+                <div class="rend-stat__value rend-stat__value--main">{{ resumenResena.avg_estrellas ?? '—' }}<span class="rend-stat__unit">/5</span></div>
+              </div>
+              <div v-if="resumenResena.avg_sabor != null" class="rend-stat">
+                <div class="rend-stat__label">Sabor</div>
+                <div class="rend-stat__value">{{ resumenResena.avg_sabor }}<span class="rend-stat__unit">/5</span></div>
+              </div>
+              <div v-if="resumenResena.avg_aroma != null" class="rend-stat">
+                <div class="rend-stat__label">Aroma</div>
+                <div class="rend-stat__value">{{ resumenResena.avg_aroma }}<span class="rend-stat__unit">/5</span></div>
+              </div>
+              <div v-if="resumenResena.avg_efecto != null" class="rend-stat">
+                <div class="rend-stat__label">Efecto</div>
+                <div class="rend-stat__value">{{ resumenResena.avg_efecto }}<span class="rend-stat__unit">/5</span></div>
+              </div>
+            </div>
+            <ul class="gdv__resenas">
+              <li v-for="r in resenas" :key="r.id" class="gdv__resena">
+                <div class="gdv__resena-top">
+                  <span class="gdv__resena-stars">{{ '★'.repeat(r.estrellas) }}<span class="gdv__resena-stars-off">{{ '★'.repeat(5 - r.estrellas) }}</span></span>
+                  <span class="gdv__resena-meta">{{ r.paciente }} · {{ fmtFechaResena(r.fecha) }}</span>
+                </div>
+                <div v-if="r.sabor || r.aroma || r.efecto" class="gdv__resena-axes">
+                  <span v-if="r.sabor">Sabor {{ r.sabor }}</span>
+                  <span v-if="r.aroma">Aroma {{ r.aroma }}</span>
+                  <span v-if="r.efecto">Efecto {{ r.efecto }}</span>
+                </div>
+                <p v-if="r.comentario" class="gdv__resena-com">“{{ r.comentario }}”</p>
+              </li>
+            </ul>
           </div>
 
           <!-- Rendimiento real -->
@@ -658,4 +708,14 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 .gdv__desv { font-size: .76rem; font-weight: 700; }
 .gdv__desv--pos { color: #15803d; }
 .gdv__desv--neg { color: #dc2626; }
+
+/* Reseñas de pacientes */
+.gdv__resenas { list-style: none; margin: 1rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .75rem; }
+.gdv__resena { border-top: 1px solid #eef2ef; padding-top: .75rem; }
+.gdv__resena-top { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; }
+.gdv__resena-stars { color: #f5a623; font-size: 1rem; letter-spacing: 1px; }
+.gdv__resena-stars-off { color: #dfe5df; }
+.gdv__resena-meta { font-size: .72rem; color: #94a3b8; font-weight: 600; }
+.gdv__resena-axes { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .3rem; font-size: .72rem; color: #56635b; font-weight: 600; }
+.gdv__resena-com { margin: .35rem 0 0; font-size: .84rem; color: #374151; font-style: italic; line-height: 1.45; }
 </style>
