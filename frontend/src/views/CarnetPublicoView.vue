@@ -169,7 +169,7 @@ async function descargarPDF() {
     filename:    `carnet-${nombre}.pdf`,
     image:       { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 3, useCORS: true, logging: false, backgroundColor: null },
-    jsPDF:       { unit: 'mm', format: [92, 150], orientation: 'portrait' },
+    jsPDF:       { unit: 'mm', format: [108, 150], orientation: 'portrait' },
   }).from(el).save()
   descargando.value = false
 }
@@ -226,7 +226,7 @@ onMounted(cargar)
 /* ── Credencial ─────────────────────────────────────────── */
 .cp__card {
   position: relative;
-  width: 100%; max-width: 360px;
+  width: 100%; max-width: 420px;
   background: #fbfbf8;
   border-radius: 22px; overflow: hidden;
   box-shadow: 0 30px 70px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.28);
@@ -334,7 +334,7 @@ onMounted(cargar)
 .cp__error-desc  { font-size: .82rem; color: #64748b; max-width: 24ch; line-height: 1.45; }
 
 /* Acciones */
-.cp__actions { display: flex; gap: .7rem; width: 100%; max-width: 360px; }
+.cp__actions { display: flex; gap: .7rem; width: 100%; max-width: 420px; }
 .cp__btn {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
   padding: .8rem; border-radius: 13px; font-size: .875rem; font-weight: 700;
