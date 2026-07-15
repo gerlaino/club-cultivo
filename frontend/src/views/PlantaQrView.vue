@@ -208,8 +208,15 @@
           </div>
         </div>
 
+        <!-- Ya pesada: lectura + Editar (no se pisa el peso sin querer) -->
+        <div v-if="pesoAnterior && !editando" class="qr__peso-done">
+          <div class="qr__peso-done-val">{{ Number(pesoAnterior).toFixed(1) }}<small>g</small></div>
+          <div class="qr__peso-done-lbl"><i class="bi bi-check-circle-fill"></i> Peso seco guardado</div>
+          <button class="qr__btn-editar" @click="editando = true"><i class="bi bi-pencil"></i> Editar</button>
+        </div>
+
         <!-- Formulario -->
-        <div class="qr__peso-form">
+        <div v-else class="qr__peso-form">
           <div class="qr__field">
             <label>Peso bruto al corte <span class="qr__field-opt">opcional</span></label>
             <div class="qr__peso-wrap">
@@ -238,6 +245,7 @@
             <i v-else class="bi bi-check2-circle"></i>
             {{ pesoAnterior ? 'Actualizar peso' : 'Registrar peso' }}
           </button>
+          <button v-if="pesoAnterior" class="qr__btn-cancelar" @click="editando = false">Cancelar</button>
         </div>
 
         <RouterLink :to="`/mnc/lotes/${plantaDetalle?.lote?.id}`" class="qr__btn-volver">
@@ -282,6 +290,7 @@ const plantaDetalle   = ref(null)
 const pesoInput       = ref('')
 const pesoHumedoInput = ref('')
 const pesoAnterior    = ref(null)
+const editando        = ref(false) // si ya hay peso, arranca en lectura; "Editar" desbloquea
 const registrando     = ref(false)
 const registroError   = ref(null)
 const registroOk      = ref(false)
@@ -384,6 +393,7 @@ async function iniciarPesaje() {
     plantaDetalle.value = data
     await cargarProgreso(data)
     estado.value = 'manicura_pesaje'
+    editando.value = false
     if (data.peso_seco && data.peso_seco > 0) {
       pesoAnterior.value = data.peso_seco
       pesoInput.value    = String(data.peso_seco)
@@ -432,6 +442,7 @@ async function registrarPeso() {
     if (!res) return // la manicura canceló
     const { data } = res
     pesoAnterior.value = peso
+    editando.value     = false
     progreso.value     = data.progreso
     registroOk.value   = true
     setTimeout(() => { registroOk.value = false }, 3000)
@@ -589,6 +600,14 @@ function irAlDashboard() { router.push('/') }
 
 /* Peso form */
 .qr__peso-form { display: flex; flex-direction: column; gap: .75rem; }
+.qr__peso-done { display: flex; flex-direction: column; align-items: center; gap: .3rem; padding: 1rem; background: #f0faf3; border: 1.5px solid #cbe8d3; border-radius: 12px; }
+.qr__peso-done-val { font-size: 2.2rem; font-weight: 800; color: #15803d; letter-spacing: -.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+.qr__peso-done-val small { font-size: 1rem; font-weight: 600; color: #4b8b5e; margin-left: 2px; }
+.qr__peso-done-lbl { font-size: .8rem; font-weight: 600; color: #15803d; display: inline-flex; align-items: center; gap: .3rem; }
+.qr__btn-editar { margin-top: .5rem; display: inline-flex; align-items: center; gap: .35rem; background: #fff; border: 1.5px solid #cbe3d1; color: #15803d; font-weight: 700; font-size: .85rem; padding: .55rem 1rem; border-radius: 10px; cursor: pointer; }
+.qr__btn-editar:hover { border-color: #16a34a; }
+.qr__btn-cancelar { background: none; border: none; color: #94a3b8; font-weight: 600; font-size: .85rem; cursor: pointer; padding: .4rem; }
+.qr__btn-cancelar:hover { color: #64748b; }
 .qr__peso-wrap { display: flex; align-items: center; gap: .4rem; }
 .qr__peso-input {
   flex: 1; background: #f4f8f4; border: 1.5px solid #d4e6d4; border-radius: 9px;
