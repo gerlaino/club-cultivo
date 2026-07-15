@@ -422,6 +422,19 @@ async function guardarTrasplante() {
 const pesoManicura    = ref(null)
 const savingManicura  = ref(false)
 const manicuraSaved   = ref(false)
+// Si la planta ya tiene peso, el campo arranca en modo lectura (evita pisar un peso sin
+// querer). "Editar" lo desbloquea.
+const editandoManicura = ref(false)
+const pesoGuardado = computed(() => parseFloat(planta.value?.peso_seco) > 0)
+
+function editarManicura() {
+  pesoManicura.value = parseFloat(planta.value?.peso_seco) || null
+  editandoManicura.value = true
+}
+function cancelarEdicionManicura() {
+  editandoManicura.value = false
+  pesoManicura.value = parseFloat(planta.value?.peso_seco) || null
+}
 
 async function saveManicura() {
   if (savingManicura.value || !pesoManicura.value) return
@@ -436,6 +449,7 @@ async function saveManicura() {
     const { data } = res
     if (plants.current) plants.current.peso_seco = data?.planta?.peso_seco ?? pesoManicura.value
     manicuraSaved.value = true
+    editandoManicura.value = false // vuelve a modo lectura con el peso ya guardado
     toast.success('Peso registrado en el pesaje del lote')
   } catch (e) {
     toast.error(e?.response?.data?.error || 'Error al guardar el peso')
@@ -595,7 +609,15 @@ onMounted(async () => {
           <i class="bi bi-scissors"></i>
           Peso de manicura
         </div>
-        <div class="pd__mnc-row">
+        <!-- Ya pesada: modo lectura + Editar (no se pisa un peso sin querer) -->
+        <div v-if="pesoGuardado && !editandoManicura" class="pd__mnc-done">
+          <span class="pd__mnc-done-val">{{ parseFloat(planta.peso_seco).toFixed(1) }}<small>g</small></span>
+          <span class="pd__mnc-done-lbl"><i class="bi bi-check-circle-fill"></i> Peso guardado</span>
+          <button class="pd__mnc-edit" @click="editarManicura"><i class="bi bi-pencil"></i> Editar</button>
+        </div>
+
+        <!-- Sin pesar o editando: input + Guardar -->
+        <div v-else class="pd__mnc-row">
           <input
             v-model.number="pesoManicura"
             type="number"
@@ -611,9 +633,7 @@ onMounted(async () => {
             <i v-else class="bi bi-check-lg"></i>
             Guardar
           </button>
-        </div>
-        <div v-if="planta.peso_seco" class="pd__mnc-saved">
-          <i class="bi bi-check-circle-fill"></i> Guardado: {{ planta.peso_seco }}g
+          <button v-if="pesoGuardado" class="pd__mnc-cancel" @click="cancelarEdicionManicura">Cancelar</button>
         </div>
       </div>
 
@@ -1332,6 +1352,21 @@ onMounted(async () => {
   font-size: .75rem; color: #15803d; font-weight: 600;
   display: flex; align-items: center; gap: .3rem;
 }
+.pd__mnc-done { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.pd__mnc-done-val { font-size: 1.4rem; font-weight: 800; color: #15803d; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.pd__mnc-done-val small { font-size: .8rem; font-weight: 600; color: #4b8b5e; margin-left: 1px; }
+.pd__mnc-done-lbl { font-size: .74rem; color: #15803d; font-weight: 600; display: inline-flex; align-items: center; gap: .3rem; }
+.pd__mnc-edit {
+  margin-left: auto; display: inline-flex; align-items: center; gap: .35rem;
+  background: #fff; border: 1.5px solid #cbe3d1; color: #15803d; font-weight: 600;
+  font-size: .8rem; padding: .4rem .75rem; border-radius: 9px; cursor: pointer;
+}
+.pd__mnc-edit:hover { border-color: #16a34a; background: #f0faf3; }
+.pd__mnc-cancel {
+  background: none; border: none; color: #94a3b8; font-weight: 600; font-size: .8rem;
+  cursor: pointer; padding: .4rem .5rem;
+}
+.pd__mnc-cancel:hover { color: #64748b; }
 
 .pd__layout { display: grid; grid-template-columns: 1fr 280px; gap: 1.25rem; align-items: start; }
 @media (max-width: 900px) { .pd__layout { grid-template-columns: 1fr; } }
