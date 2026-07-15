@@ -351,6 +351,7 @@ export const updateProvision   = (barId, evId, id, payload)=> api.patch(`/bares/
 export const deleteProvision   = (barId, evId, id)         => api.delete(`/bares/${barId}/eventos/${evId}/provisiones/${id}`)
 export const reservarProvision = (barId, evId)             => api.post(`/bares/${barId}/eventos/${evId}/provisiones/reservar`)
 export const cerrarProvision   = (barId, evId, payload)    => api.post(`/bares/${barId}/eventos/${evId}/provisiones/cerrar`, payload)
+export const buscarProvisiones = (barId, evId, q)          => api.get(`/bares/${barId}/eventos/${evId}/provisiones/buscar`, { params: { q } })
 export const ajustarBarProducto = (barId, id, payload) => api.post(`/bares/${barId}/productos/${id}/ajustar`, payload)
 export const getBarProductoMovimientos = (barId, id)   => api.get(`/bares/${barId}/productos/${id}/movimientos`)
 export const crearBarVenta      = (barId, payload) => api.post(`/bares/${barId}/ventas`, payload)
