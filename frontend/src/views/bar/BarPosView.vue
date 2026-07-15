@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
+import { listEventosBar } from '../../lib/api.js'
 
 const store  = useBarStore()
 const auth   = useAuthStore()
@@ -20,16 +21,24 @@ const CATS = [
 ]
 const catActiva = ref('bebida')
 const medioPago = ref('efectivo')
+// Atribuir la venta a un evento en curso: descuenta lo reservado y suma al P&L del evento.
+const eventos   = ref([])
+const eventoSel = ref(null)
 const esGestion = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 
-onMounted(() => store.fetchProductos(barId, { activos: 'true' }))
+onMounted(() => {
+  store.fetchProductos(barId, { activos: 'true' })
+  listEventosBar(barId)
+    .then(r => { eventos.value = (r.data || []).filter(e => ['en_venta', 'en_curso'].includes(e.estado)) })
+    .catch(() => {})
+})
 
 const productosCat = computed(() => store.activos.filter(p => p.categoria === catActiva.value))
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 
 async function cobrar() {
   if (!store.carrito.length) return
-  try { await store.cobrar(barId, medioPago.value); toast.success('Venta cobrada') }
+  try { await store.cobrar(barId, medioPago.value, eventoSel.value); toast.success('Venta cobrada') }
   catch { toast.error(store.saveError || 'No se pudo cobrar') }
 }
 </script>
@@ -77,6 +86,13 @@ async function cobrar() {
             </li>
           </ul>
           <div class="cv__cart-total"><span>Total</span><strong class="cv__num">{{ fmt(store.totalCarrito) }}</strong></div>
+          <label v-if="eventos.length" class="cv__evento">
+            <span class="cv__evento-lbl">🎉 Evento</span>
+            <select v-model="eventoSel" class="cv__evento-sel">
+              <option :value="null">Sin evento</option>
+              <option v-for="ev in eventos" :key="ev.id" :value="ev.id">{{ ev.nombre }}</option>
+            </select>
+          </label>
           <div class="cv__pay">
             <button v-for="m in ['efectivo','transferencia','mercado_pago']" :key="m" class="cv__sede-btn" :class="{ 'cv__sede-btn--active': medioPago === m }" @click="medioPago = m">
               {{ m === 'mercado_pago' ? 'QR / MP' : (m === 'transferencia' ? 'Transfer' : 'Efectivo') }}
@@ -132,6 +148,10 @@ async function cobrar() {
 .cv__num { font-variant-numeric: tabular-nums; }
 .cv__cart-total { display: flex; justify-content: space-between; align-items: baseline; margin: 1rem 0; padding-top: .9rem; border-top: 1px solid #f1f5f9; }
 .cv__cart-total strong { font-size: 1.5rem; font-weight: 800; color: #0f172a; letter-spacing: -.03em; }
+.cv__evento { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }
+.cv__evento-lbl { font-size: .74rem; font-weight: 600; color: #64748b; white-space: nowrap; }
+.cv__evento-sel { flex: 1; padding: .4rem .55rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .82rem; background: #fff; color: #0f172a; }
+.cv__evento-sel:focus { border-color: #1b5e20; outline: none; }
 .cv__pay { display: flex; gap: .35rem; margin-bottom: .9rem; flex-wrap: wrap; }
 .cv__pay .cv__sede-btn { flex: 1; padding: 7px 4px; font-size: 12px; text-align: center; }
 .cv__link { background: none; border: none; color: #94a3b8; font-size: .82rem; font-weight: 500; cursor: pointer; }

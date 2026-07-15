@@ -89,12 +89,12 @@ export const useBarStore = defineStore("bar", {
     },
     vaciar() { this.carrito = []; },
 
-    async cobrar(barId, medio_pago = 'efectivo') {
+    async cobrar(barId, medio_pago = 'efectivo', evento_bar_id = null) {
       if (!this.carrito.length) return null;
       this.saving = true; this.saveError = null;
       try {
         const lineas = this.carrito.map(l => ({ bar_producto_id: l.producto.id, cantidad: l.cantidad }));
-        const { data } = await crearBarVenta(barId, { lineas, medio_pago });
+        const { data } = await crearBarVenta(barId, { lineas, medio_pago, evento_bar_id: evento_bar_id || undefined });
         this.vaciar();
         await this.fetchProductos(barId, { activos: 'true' });
         return data;

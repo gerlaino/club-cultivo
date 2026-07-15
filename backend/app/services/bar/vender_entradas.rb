@@ -19,6 +19,12 @@ module Bar
       disp = @tipo.disponibles
       raise ArgumentError, "Solo quedan #{disp} entradas de #{@tipo.nombre}" if disp && @cantidad > disp
 
+      # Tope por AFORO del evento (además del cupo por tipo): no se venden más entradas que
+      # lugares tiene el evento.
+      evento = @tipo.evento_bar
+      aforo_disp = evento.aforo_disponible
+      raise ArgumentError, "Se alcanzó el aforo del evento (#{evento.aforo}). Quedan #{aforo_disp} lugares." if aforo_disp && @cantidad > aforo_disp
+
       ActiveRecord::Base.transaction do
         entradas = Array.new(@cantidad) do
           @tipo.entradas.create!(

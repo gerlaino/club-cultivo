@@ -39,14 +39,24 @@ class EventoBar < ApplicationRecord
   def costos_comprometidos = costos.sum(:monto_ars).to_f
   def costos_pagados       = costos.where(pagado: true).sum(:monto_ars).to_f
 
-  # Resultado proyectado: lo estimado de ingresos menos lo comprometido en costos.
+  # Resultado proyectado: ingresos estimados menos costos comprometidos. La proyección es
+  # honesta — toma el MAYOR entre el presupuesto cargado a mano y lo YA recaudado (entradas +
+  # ventas de barra del libro), para no ignorar lo vendido cuando supera la estimación.
   def resultado_proyectado
-    (presupuesto_ingresos.to_d - costos.sum(:monto_ars).to_d).to_f
+    ingreso_estimado = [presupuesto_ingresos.to_d, resultado[:ingresos].to_d].max
+    (ingreso_estimado - costos.sum(:monto_ars).to_d).to_f
   end
 
-  # ── Entradas ──────────────────────────────────────────────
+  # ── Entradas / aforo ──────────────────────────────────────
   def entradas_vendidas   = entradas.vigentes.count
   def recaudacion_entradas = entradas.vigentes.sum(:precio_ars).to_f
+
+  # Lugares que quedan según el aforo (nil = sin aforo definido = sin límite).
+  def aforo_disponible
+    return nil if aforo.to_i <= 0
+    [aforo.to_i - entradas_vendidas, 0].max
+  end
+  def aforo_completo? = aforo.to_i.positive? && entradas_vendidas >= aforo.to_i
 
   # Precio promedio de los tipos activos (para estimar el break-even en cantidad de entradas).
   def precio_entrada_promedio

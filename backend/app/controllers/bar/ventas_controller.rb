@@ -9,14 +9,16 @@ module Bar
     before_action :require_operador, only: [:create]
     before_action :require_gestion,  only: [:index, :destroy]
 
-    # POST /bares/:bar_id/ventas  { lineas: [{bar_producto_id, cantidad}], medio_pago, turno?, notas? }
+    # POST /bares/:bar_id/ventas  { lineas: [...], medio_pago, turno?, notas?, evento_bar_id? }
     def create
+      evento = params[:evento_bar_id].present? ? @bar.eventos_bar.find_by(id: params[:evento_bar_id]) : nil
       venta = ::Bar::RegistrarVenta.new(
         @bar, current_user,
         lineas:     params[:lineas],
         medio_pago: params[:medio_pago],
         turno:      params[:turno],
-        notas:      params[:notas]
+        notas:      params[:notas],
+        evento_bar: evento
       ).call
       render json: serialize(venta), status: :created
     rescue ArgumentError => e
