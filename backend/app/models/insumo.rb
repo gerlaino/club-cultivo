@@ -161,6 +161,22 @@ class Insumo < ApplicationRecord
     end
   end
 
+  # Reserva para un evento: aparta cantidad del depósito (baja stock_actual). La provisión
+  # del evento lleva el registro de lo reservado; al cerrar se devuelve el sobrante.
+  def reservar_para_evento!(cantidad:)
+    cantidad = cantidad.to_d
+    raise ArgumentError, 'Cantidad inválida'                 if cantidad <= 0
+    raise ArgumentError, "Sin stock suficiente de #{nombre}" if cantidad > stock_actual.to_d
+    update!(stock_actual: stock_actual.to_d - cantidad)
+  end
+
+  # Devuelve al depósito el sobrante reservado que no se consumió.
+  def devolver_para_evento!(cantidad:)
+    cantidad = cantidad.to_d
+    return if cantidad <= 0
+    update!(stock_actual: stock_actual.to_d + cantidad)
+  end
+
   # Aviso activo de reposición cuando el stock llega al mínimo. Best-effort (no bloquea el consumo)
   # y con anti-spam de 12 h por insumo. Aparece en las alertas internas del admin.
   def avisar_reposicion!
