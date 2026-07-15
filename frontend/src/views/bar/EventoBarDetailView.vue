@@ -30,6 +30,39 @@ const beMeta   = computed(() => e.value?.costos_comprometidos || 0)
 const beActual = computed(() => e.value?.resultado?.ingresos || 0)
 const bePct    = computed(() => beMeta.value > 0 ? Math.min(100, Math.round(beActual.value / beMeta.value * 100)) : (beActual.value > 0 ? 100 : 0))
 
+// ── Fase del evento: la pantalla se adapta al momento del ciclo ──
+// planificando (plan/en_venta) → prep · en curso → operativo · cerrado → P&L.
+const FASE = { planificado: 'plan', en_venta: 'plan', en_curso: 'curso', finalizado: 'cerrado', cancelado: 'cancelado' }
+const fase = computed(() => FASE[e.value?.estado] || 'plan')
+const esCerrado  = computed(() => fase.value === 'cerrado')
+const estadoLabel = computed(() => ESTADOS.find(s => s.v === e.value?.estado)?.l || e.value?.estado)
+const resultadoMostrar = computed(() => esCerrado.value ? (e.value?.resultado?.resultado || 0) : (e.value?.resultado_proyectado || 0))
+// Los números "se prenden" solo cuando hay algo real: no mostramos un tablero en $0.
+const tieneNumeros = computed(() => {
+  const r = e.value?.resultado || {}
+  return (r.ingresos || 0) + (r.egresos || 0) + (e.value?.presupuesto_ingresos || 0) + (e.value?.costos_comprometidos || 0) > 0
+})
+const ocupacion = computed(() => {
+  const a = e.value?.aforo, v = e.value?.entradas_vendidas || 0
+  return a > 0 ? Math.min(100, Math.round(v / a * 100)) : null
+})
+const fechaInfo = computed(() => {
+  const f = e.value?.fecha
+  if (!f) return { fecha: 'Sin fecha', rel: '' }
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+  const [y, m, d] = f.slice(0, 10).split('-').map(Number)
+  const fe = new Date(y, m - 1, d)
+  const diff = Math.round((fe - hoy) / 86400000)
+  const fecha = fe.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+  let rel = ''
+  if (diff === 0) rel = 'Hoy'
+  else if (diff === 1) rel = 'Mañana'
+  else if (diff > 1) rel = `En ${diff} días`
+  else if (diff === -1) rel = 'Ayer'
+  else if (diff < -1) rel = `Hace ${-diff} días`
+  return { fecha, rel }
+})
+
 async function cambiarEstado(v) {
   try { await store.actualizar(barId, evId, { estado: v }); toast.success('Estado actualizado') }
   catch { toast.error(store.saveError) }
@@ -101,10 +134,20 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 <template>
   <div class="ed" v-if="e">
     <header class="ed__head">
-      <div>
+      <div class="ed__head-l">
         <RouterLink :to="`/bar/${barId}/eventos`" class="ed__back">← Eventos</RouterLink>
-        <h1>{{ e.nombre }}</h1>
-        <p>{{ e.fecha || 'sin fecha' }}<span v-if="e.aforo"> · aforo {{ e.aforo }}</span></p>
+        <div class="ed__title-row">
+          <h1>{{ e.nombre }}</h1>
+          <span class="ed__estado" :class="`ed__estado--${fase}`">{{ estadoLabel }}</span>
+        </div>
+        <p class="ed__sub">
+          <span>📅 {{ fechaInfo.fecha }}<b v-if="fechaInfo.rel"> · {{ fechaInfo.rel }}</b></span>
+          <span v-if="e.aforo" class="ed__sep">·</span>
+          <span v-if="e.aforo">👥 {{ e.entradas_vendidas }} / {{ e.aforo }} lugares</span>
+        </p>
+        <div v-if="ocupacion != null" class="ed__ocup" :title="`${ocupacion}% del aforo`">
+          <i :style="{ width: ocupacion + '%' }" :class="{ full: ocupacion >= 100 }"></i>
+        </div>
       </div>
       <div class="ed__head-actions">
         <RouterLink :to="`/bar/${barId}/eventos/${evId}/entradas`" class="lnk lnk--btn">🎟️ Entradas</RouterLink>
@@ -116,26 +159,43 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
       </div>
     </header>
 
-    <!-- Resultado grande -->
-    <div class="ed__result" :class="(e.estado === 'finalizado' ? e.resultado.resultado : e.resultado_proyectado) >= 0 ? 'is-pos' : 'is-neg'">
-      <span>{{ e.estado === 'finalizado' ? 'Resultado real' : 'Resultado proyectado' }}</span>
-      <strong>{{ fmt(e.estado === 'finalizado' ? e.resultado.resultado : e.resultado_proyectado) }}</strong>
-      <small>ingresos {{ fmt(e.resultado.ingresos) }} · egresos {{ fmt(e.resultado.egresos) }}</small>
+    <!-- Cerrado → P&L completo (resultado real grande + KPIs + break-even) -->
+    <template v-if="esCerrado">
+      <div class="ed__result" :class="resultadoMostrar >= 0 ? 'is-pos' : 'is-neg'">
+        <span>Resultado real</span>
+        <strong>{{ fmt(resultadoMostrar) }}</strong>
+        <small>ingresos {{ fmt(e.resultado.ingresos) }} · egresos {{ fmt(e.resultado.egresos) }}</small>
+      </div>
+      <div class="ed__kpis">
+        <div class="kpi"><span>Ingresos estimados</span><strong>{{ fmt(e.presupuesto_ingresos) }}</strong></div>
+        <div class="kpi"><span>Comprometido</span><strong>{{ fmt(e.costos_comprometidos) }}</strong></div>
+        <div class="kpi"><span>Pagado</span><strong>{{ fmt(e.costos_pagados) }}</strong></div>
+        <div class="kpi"><span>Ingreso real</span><strong>{{ fmt(e.resultado.ingresos) }}</strong></div>
+      </div>
+    </template>
+
+    <!-- Planificando / en curso → resumen de plata COMPACTO (sin tablero en $0) -->
+    <div v-else class="ed__money">
+      <div class="ed__money-strip">
+        <div class="ed__money-item"><span>Ingresos estimados</span><b>{{ fmt(e.presupuesto_ingresos) }}</b></div>
+        <div class="ed__money-item"><span>Costos</span><b>{{ fmt(e.costos_comprometidos) }}</b></div>
+        <div class="ed__money-item"><span>Recaudado</span><b>{{ fmt(e.resultado.ingresos) }}</b></div>
+        <div class="ed__money-item ed__money-item--res">
+          <span>Proyectado</span>
+          <b :class="resultadoMostrar >= 0 ? 'pos' : 'neg'">{{ fmt(resultadoMostrar) }}</b>
+        </div>
+      </div>
+      <p v-if="!tieneNumeros" class="ed__money-hint">
+        Todavía sin números — se completan solos a medida que cargás entradas y costos. Abajo tenés lo que hace falta para dejar el evento listo. 👇
+      </p>
     </div>
 
-    <div class="ed__kpis">
-      <div class="kpi"><span>Ingresos estimados</span><strong>{{ fmt(e.presupuesto_ingresos) }}</strong></div>
-      <div class="kpi"><span>Comprometido</span><strong>{{ fmt(e.costos_comprometidos) }}</strong></div>
-      <div class="kpi"><span>Pagado</span><strong>{{ fmt(e.costos_pagados) }}</strong></div>
-      <div class="kpi"><span>Ingreso real</span><strong>{{ fmt(e.resultado.ingresos) }}</strong></div>
-    </div>
-
-    <!-- Break-even -->
-    <div class="be">
+    <!-- Break-even: solo cuando hay algo real que medir -->
+    <div v-if="tieneNumeros && beMeta > 0" class="be">
       <div class="be__head"><b>Punto de equilibrio</b><span>necesitás <b>{{ fmt(beMeta) }}</b> de ingresos para cubrir costos</span></div>
       <div class="be__track"><i :class="{ over: beActual >= beMeta && beMeta > 0 }" :style="{ width: bePct + '%' }"></i></div>
       <div class="be__legend">
-        <span>Ingreso <b>{{ fmt(beActual) }}</b></span>
+        <span>Recaudado <b>{{ fmt(beActual) }}</b></span>
         <span v-if="e.break_even_entradas">≈ <b>{{ e.break_even_entradas }}</b> entradas · vendidas <b>{{ e.entradas_vendidas }}</b></span>
         <span>{{ bePct }}%</span>
       </div>
@@ -239,6 +299,31 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 .ed__head h1 { font-size: var(--fs-24, 24px); font-weight: 700; color: #0f172a; margin: 6px 0 0; }
 .ed__head p { color: #64748b; margin: 3px 0 0; font-size: var(--fs-14, 14px); }
 .ed__head-actions { display: flex; align-items: center; gap: 12px; }
+.ed__head-l { min-width: 0; flex: 1; }
+.ed__title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.ed__title-row h1 { margin: 0; }
+.ed__estado { font-size: var(--fs-12, 12px); font-weight: 700; padding: 3px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; }
+.ed__estado--plan      { background: #eff6ff; color: #1d4ed8; }
+.ed__estado--curso     { background: #fef3c7; color: #b45309; }
+.ed__estado--cerrado   { background: #f0fdf4; color: #15803d; }
+.ed__estado--cancelado { background: #f1f5f9; color: #94a3b8; }
+.ed__sub { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: #64748b; margin: 6px 0 0; font-size: var(--fs-14, 14px); }
+.ed__sub b { color: #334155; }
+.ed__sep { color: #cbd5e1; }
+.ed__ocup { height: 6px; background: #f1f5f9; border-radius: 4px; overflow: hidden; margin-top: 8px; max-width: 340px; }
+.ed__ocup i { display: block; height: 100%; background: #1b5e20; border-radius: 4px; transition: width .3s; }
+.ed__ocup i.full { background: #b45309; }
+
+.ed__money { margin: var(--sp-5, 20px) 0; }
+.ed__money-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 640px) { .ed__money-strip { grid-template-columns: 1fr 1fr; } }
+.ed__money-item { background: var(--c-paper, #fff); border: 1px solid #f1f5f9; border-radius: var(--r-md, 10px); padding: 11px 14px; }
+.ed__money-item span { font-size: var(--fs-11, 11px); color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; }
+.ed__money-item b { display: block; font-size: var(--fs-18, 18px); font-weight: 700; color: #0f172a; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.ed__money-item--res { background: #f8fafc; }
+.ed__money-item--res b.pos { color: #15803d; }
+.ed__money-item--res b.neg { color: #dc2626; }
+.ed__money-hint { font-size: var(--fs-13, 13px); color: #64748b; margin: 10px 2px 0; line-height: 1.5; }
 
 .ed__result { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-4, 16px) var(--sp-5, 20px); border-radius: var(--r-lg, 14px); margin: var(--sp-5, 20px) 0; border: 1px solid #f1f5f9; }
 .ed__result.is-pos { background: #f0fdf4; }
