@@ -40,7 +40,7 @@ export const NAV_GROUPS = [
       { to: '/admin/stock', label: 'Stock' },
       { to: '/admin/cosechado', label: 'Cosecha' },
       { to: '/admin/pesajes-manicura', label: 'Manicura', badge: 'aprob' },
-      { to: '/insumos', label: 'Insumos' },
+      { to: '/insumos', label: 'Depósito' },
     ],
   },
   {

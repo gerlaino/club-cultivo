@@ -94,23 +94,6 @@ function stockPct(i) {
   return Math.min(100, Math.round((i.stock_actual / (i.stock_minimo * 2)) * 100))
 }
 
-// ── Nuevo insumo ──────────────────────────────────────────────
-const nuevoForm = ref(null)
-function nuevoInsumo() {
-  nuevoForm.value = {
-    nombre: '', unidad_medida: 'unidad', stock_minimo: 0, sede_id: sedeFiltro.value, tipo: tipoActivo.value,
-    categoria_contable_id: categoriasDelTab.value[0]?.id ?? null,
-  }
-}
-async function guardarNuevo() {
-  if (!nuevoForm.value.nombre?.trim()) { toast.warning('Poné un nombre'); return }
-  try {
-    await store.crear({ ...nuevoForm.value, nombre: nuevoForm.value.nombre.trim() })
-    toast.success('Insumo creado'); nuevoForm.value = null
-    await recargar()
-  } catch { toast.error(store.saveError) }
-}
-
 // ── Editar insumo (nombre, categoría, unidad, mínimo) ─────────
 // Sirve para recategorizar los "Sin categoría" viejos y corregir datos.
 // La sede no se edita acá: mover stock entre sedes es "Transferir".
@@ -136,19 +119,6 @@ async function guardarEdit() {
     })
     toast.success('Insumo actualizado'); editForm.value = null
     await recargar()
-  } catch { toast.error(store.saveError) }
-}
-
-// ── Comprar ───────────────────────────────────────────────────
-const compraForm = ref(null)
-function abrirCompra(i) { compraForm.value = { insumo: i, cantidad: null, costo_total_ars: null, proveedor: '' } }
-async function confirmarCompra() {
-  const f = compraForm.value
-  if (!(f.cantidad > 0) || !(f.costo_total_ars > 0)) { toast.warning('Completá cantidad y costo'); return }
-  try {
-    // el egreso hereda la sede del insumo (el insumo ya está localizado en su sede)
-    await store.comprar(f.insumo.id, { cantidad: f.cantidad, costo_total_ars: f.costo_total_ars, proveedor: f.proveedor || null, sede_id: f.insumo.sede_id })
-    toast.success('Compra registrada'); compraForm.value = null
   } catch { toast.error(store.saveError) }
 }
 
@@ -209,7 +179,7 @@ async function confirmarConsumo() {
             <span class="dp__stat-label">Valorizado</span>
             <span class="dp__stat-val">{{ fmt(store.valorizadoTotal) }}</span>
           </div>
-          <button class="btn btn--primary" @click="nuevoInsumo">+ Insumo</button>
+          <RouterLink :to="{ name: 'contabilidad' }" class="btn btn--primary" title="El stock entra al registrar la compra como movimiento">＋ Registrar entrada</RouterLink>
         </template>
       </div>
     </header>
@@ -227,8 +197,9 @@ async function confirmarConsumo() {
     <template v-else>
     <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>
     <div v-else-if="!store.items.length" class="dp__empty dp__empty--box">
-      Todavía no hay insumos en esta familia. Se cargan al registrar la compra en
-      <b>Contabilidad → Nuevo movimiento</b> (elegís la categoría y el sistema lo deriva acá), o con “+ Insumo”.
+      Todavía no hay insumos en esta familia. El stock entra al registrar la compra en
+      <RouterLink :to="{ name: 'contabilidad' }" class="dp__link">Contabilidad → Nuevo movimiento</RouterLink>:
+      elegís la categoría y el sistema lo deriva al depósito que corresponde.
     </div>
 
     <!-- Agrupado por categoría → subcategoría (el mismo árbol contable) -->
@@ -254,7 +225,6 @@ async function confirmarConsumo() {
             </div>
             <div class="dp__actions">
               <button class="btn btn--sm" @click="editarInsumo(i)" title="Editar nombre / categoría">Editar</button>
-              <button class="btn btn--sm" @click="abrirCompra(i)">Comprar</button>
               <button v-if="multiSede && otrasSedes.length" class="btn btn--sm" @click="abrirTransfer(i)" :disabled="i.stock_actual <= 0" title="Transferir a otra sede">Transferir</button>
               <button class="btn btn--sm btn--primary" @click="abrirConsumo(i)" :disabled="i.stock_actual <= 0">Consumir</button>
             </div>
@@ -263,33 +233,6 @@ async function confirmarConsumo() {
       </section>
     </div>
     </template>
-
-    <!-- Modal nuevo insumo -->
-    <div v-if="nuevoForm" class="ov" @click.self="nuevoForm = null">
-      <div class="modal">
-        <h3 class="modal__title">Nuevo insumo</h3>
-        <p class="modal__hint">Un ítem del depósito. Normalmente los insumos entran al registrar la compra en Nuevo movimiento; acá lo creás a mano y le cargás stock con “Comprar”.</p>
-        <label class="fld">Nombre<input v-model.trim="nuevoForm.nombre" class="inp" placeholder="Ej: Fertilizante base" maxlength="60" /></label>
-        <label class="fld">Categoría
-          <select v-model="nuevoForm.categoria_contable_id" class="inp">
-            <option :value="null">— Sin categoría —</option>
-            <option v-for="c in categoriasDelTab" :key="c.id" :value="c.id">{{ c.label }}</option>
-          </select>
-        </label>
-        <label v-if="multiSede" class="fld">Sede
-          <select v-model="nuevoForm.sede_id" class="inp">
-            <option :value="null">— Pool del club —</option>
-            <option v-for="s in sede.sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-          </select>
-        </label>
-        <div class="dp__grid2">
-          <label class="fld">Unidad de medida<select v-model="nuevoForm.unidad_medida" class="inp"><option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option></select></label>
-          <label class="fld">Stock mínimo<input v-model.number="nuevoForm.stock_minimo" type="number" min="0" step="any" class="inp" /></label>
-        </div>
-        <p class="modal__note">Cuando el stock baje del mínimo, te avisamos para reponer.</p>
-        <div class="modal__actions"><button class="btn" @click="nuevoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="guardarNuevo">Crear insumo</button></div>
-      </div>
-    </div>
 
     <!-- Modal editar insumo -->
     <div v-if="editForm" class="ov" @click.self="editForm = null">
@@ -311,17 +254,6 @@ async function confirmarConsumo() {
       </div>
     </div>
 
-    <!-- Modal comprar -->
-    <div v-if="compraForm" class="ov" @click.self="compraForm = null">
-      <div class="modal">
-        <h3 class="modal__title">Comprar — {{ compraForm.insumo.nombre }}</h3>
-        <p class="modal__hint">Entra al stock y recalcula el costo promedio. Genera el egreso en el libro.</p>
-        <label class="fld">Cantidad ({{ compraForm.insumo.unidad_medida }})<input v-model.number="compraForm.cantidad" type="number" min="0" step="any" class="inp" /></label>
-        <label class="fld">Costo total<input v-model.number="compraForm.costo_total_ars" type="number" min="0" step="any" class="inp" placeholder="$" /></label>
-        <label class="fld">Proveedor (opcional)<input v-model.trim="compraForm.proveedor" class="inp" /></label>
-        <div class="modal__actions"><button class="btn" @click="compraForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarCompra">Registrar compra</button></div>
-      </div>
-    </div>
 
     <!-- Modal transferir a otra sede -->
     <div v-if="transferForm" class="ov" @click.self="transferForm = null">
@@ -389,6 +321,8 @@ async function confirmarConsumo() {
 .dp__tab.is-on { background: #fff; color: #1b5e20; box-shadow: 0 1px 2px rgb(15 23 42 / .08); }
 .dp__sede { font-size: .66rem; font-weight: 600; letter-spacing: .02em; color: #475569; background: #f1f5f9; padding: 2px 8px; border-radius: 999px; }
 .dp__sub { color: #64748b; font-size: .84rem; margin: 0; max-width: 52ch; line-height: 1.5; }
+.dp__link { color: #1b5e20; font-weight: 600; text-decoration: none; }
+.dp__link:hover { text-decoration: underline; }
 .dp__head-right { display: flex; align-items: center; gap: 1.25rem; }
 .dp__stat { text-align: right; }
 .dp__stat-label { display: block; font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; font-weight: 600; }

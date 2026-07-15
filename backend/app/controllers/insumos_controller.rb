@@ -65,6 +65,9 @@ class InsumosController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActionController::ParameterMissing => e
     render json: { error: "Falta el parámetro #{e.param}" }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    # Que una validación fallida no explote en 500: devolvemos el motivo real.
+    render json: { error: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
   end
 
   # POST /insumos/:id/consumir  { cantidad, lote_ids?: [], lote_id?, sala_id?, fecha?, notas? }
@@ -87,6 +90,9 @@ class InsumosController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActionController::ParameterMissing => e
     render json: { error: "Falta el parámetro #{e.param}" }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    # Que una validación fallida no explote en 500: devolvemos el motivo real.
+    render json: { error: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
   end
 
   # POST /insumos/:id/transferir  { sede_destino_id, cantidad }
@@ -105,6 +111,9 @@ class InsumosController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActionController::ParameterMissing => e
     render json: { error: "Falta el parámetro #{e.param}" }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    # Que una validación fallida no explote en 500: devolvemos el motivo real.
+    render json: { error: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
   end
 
   private
