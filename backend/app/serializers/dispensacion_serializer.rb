@@ -52,6 +52,28 @@ class DispensacionSerializer
     }
   end
 
+  # Detalle (vista /dispensaciones/:id): igual que serialize + las reseñas que el paciente
+  # dejó sobre los productos de ESTA dispensa. No se incluye en el listado para no pegarle
+  # una query de reseñas por fila.
+  def self.serialize_detail(d)
+    serialize(d).merge(resenas: serialize_resenas(d))
+  end
+
+  def self.serialize_resenas(d)
+    d.resenas.includes(:genetica).order(created_at: :desc).map do |r|
+      {
+        genetica_id:     r.genetica_id,
+        genetica_nombre: r.genetica&.nombre,
+        estrellas:       r.estrellas,
+        sabor:           r.puntaje_sabor,
+        aroma:           r.puntaje_aroma,
+        efecto:          r.puntaje_efecto,
+        comentario:      r.comentario,
+        fecha:           r.created_at,
+      }
+    end
+  end
+
   def self.serialize_delivery(d)
     {
       id:                 d.id,
@@ -104,6 +126,7 @@ class DispensacionSerializer
         subtotal_ars:        subtotal,
         lote_codigo:         d.lote_codigo     || d.stock&.lote&.codigo,
         genetica_nombre:     d.genetica_nombre || d.stock&.genetica&.nombre || d.stock&.lote&.genetica&.nombre,
+        genetica_id:         d.stock&.genetica_id || d.stock&.lote&.genetica_id,
       }]
     end
 
@@ -117,6 +140,7 @@ class DispensacionSerializer
         subtotal_ars:        it.subtotal_ars.to_f,
         lote_codigo:         it.lote_codigo,
         genetica_nombre:     it.genetica_nombre,
+        genetica_id:         it.stock&.genetica_id || it.stock&.lote&.genetica_id,
       }
     end
   end

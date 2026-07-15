@@ -737,6 +737,18 @@ const routes = [
     },
   },
   {
+    path: '/dispensaciones/:id',
+    name: 'dispensacion-detalle',
+    component: () => import('../views/DispensacionDetalleView.vue'),
+    props: (r) => ({ id: Number(r.params.id) }),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (['admin', 'supervisor', 'dispensador', 'super_admin'].includes(auth.user?.role)) next()
+      else next('/')
+    },
+  },
+  {
     path: '/reservas',
     name: 'reservas',
     component: () => import('../views/ReservasView.vue'),

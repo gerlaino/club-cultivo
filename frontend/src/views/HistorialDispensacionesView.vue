@@ -3,7 +3,7 @@ import { ref, watch, computed, onMounted } from 'vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, deleteDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode, Truck, ChevronRight } from 'lucide-vue-next'
 import { useEtiquetaDispensa } from '../composables/useEtiquetaDispensa.js'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
@@ -235,17 +235,15 @@ function descuentoTitle(d) {
   if (dd > 0) parts.push(`Esta dispensa: ${dd}%${d.descuento_otorgado_por ? ` (otorgó ${d.descuento_otorgado_por})` : ''}`)
   return parts.join(' · ')
 }
-// Tooltip con el detalle de las líneas de una dispensa multi-stock.
 // Ítems de la dispensa (el serializer garantiza ≥1: legacy sintetiza uno desde el stock).
 function itemsDe(d) { return d.items?.length ? d.items : [] }
 
-// Filas desplegables (solo multi-producto).
-const expandidos = ref(new Set())
-function expandido(id) { return expandidos.value.has(id) }
-function toggleExpand(id) {
-  const s = new Set(expandidos.value)
-  s.has(id) ? s.delete(id) : s.add(id)
-  expandidos.value = s
+// Click en la fila → detalle de la dispensa. No navega si el click fue sobre un control
+// interactivo de la propia fila (links de paciente, botones de acción).
+const router = useRouter()
+function verDetalle(d, ev) {
+  if (ev?.target?.closest?.('a, button')) return
+  router.push({ name: 'dispensacion-detalle', params: { id: d.id } })
 }
 
 function itemsTitle(d) {
@@ -472,7 +470,8 @@ const FORMAS = [
           </thead>
           <tbody>
             <template v-for="d in dispensaciones" :key="d.id">
-              <tr class="hd__tr">
+              <tr class="hd__tr hd__tr--click" @click="verDetalle(d, $event)" title="Ver detalle de la dispensa">
+
                 <td class="hd__td-fecha">
                   <span class="hd__fecha-day">{{ formatFecha(d.fecha_dispensacion, false) }}</span>
                   <span class="hd__fecha-hora">{{ formatHora(d.created_at) }}</span>
@@ -488,10 +487,10 @@ const FORMAS = [
                     {{ formaLabel(itemsDe(d)[0]?.stock?.forma_producto) }}<template v-if="itemsDe(d)[0]?.genetica_nombre"> · {{ itemsDe(d)[0].genetica_nombre }}</template> · {{ itemsDe(d)[0]?.cantidad }}{{ itemsDe(d)[0]?.stock?.unidad || 'g' }}
                     <span v-if="itemsDe(d)[0]?.stock?.externo" class="hd__ext-badge hd__ext-badge--sm" title="Stock externo (sin lote de cultivo)">externo</span>
                   </span>
-                  <button v-else class="hd__prod-toggle" @click="toggleExpand(d.id)" :title="itemsTitle(d)">
-                    <ChevronRight :size="13" :stroke-width="2.5" class="hd__chev" :class="{ 'hd__chev--open': expandido(d.id) }" />
+                  <span v-else class="hd__prod-multi" :title="itemsTitle(d)">
+                    <ChevronRight :size="13" :stroke-width="2.5" class="hd__chev" />
                     {{ itemsDe(d).length }} productos
-                  </button>
+                  </span>
                 </td>
                 <td class="hd__td-num">
                   <span v-if="descuentoPct(d)" class="hd__desc-badge" :title="descuentoTitle(d)">-{{ descuentoPct(d) }}%</span>
@@ -517,42 +516,6 @@ const FORMAS = [
                   <button v-if="canDelete" class="hd__action-btn hd__action-btn--danger" @click="handleDelete(d)" title="Eliminar">
                     <Trash2 :size="13" :stroke-width="2" />
                   </button>
-                </td>
-              </tr>
-              <!-- Desglose por ítem (multi-producto) -->
-              <tr v-if="itemsDe(d).length > 1 && expandido(d.id)" class="hd__tr-detail">
-                <td></td>
-                <td colspan="8">
-                  <div class="hd__detail-box">
-                    <div class="hd__detail-title">Detalle de esta dispensación</div>
-                    <table class="hd__subtable">
-                      <thead>
-                        <tr>
-                          <th>Producto</th><th>Genética</th><th>Lote / origen</th>
-                          <th class="hd__th-num">Cant.</th><th class="hd__th-num">P. unit.</th><th class="hd__th-num">Subtotal</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(it, i) in itemsDe(d)" :key="i">
-                          <td>{{ formaLabel(it.stock?.forma_producto) }}</td>
-                          <td>{{ it.genetica_nombre || '—' }}</td>
-                          <td class="hd__mono">
-                            <span v-if="it.stock?.externo || (!it.lote_codigo && it.stock?.regulatorio === false)" class="hd__ext-badge">Externo</span>
-                            <template v-else>{{ it.lote_codigo || '—' }}</template>
-                          </td>
-                          <td class="hd__td-num">{{ it.cantidad }}{{ it.stock?.unidad || 'g' }}</td>
-                          <td class="hd__td-num">{{ it.precio_unitario_ars ? formatARS(it.precio_unitario_ars) : '—' }}</td>
-                          <td class="hd__td-num">{{ formatARS(it.subtotal_ars) }}</td>
-                        </tr>
-                      </tbody>
-                      <tfoot>
-                        <tr class="hd__subtotal-row">
-                          <td colspan="5" class="hd__subtotal-lbl">Total de esta dispensación</td>
-                          <td class="hd__td-num"><strong>{{ formatARS(d.aporte_socio_ars) }}</strong></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
                 </td>
               </tr>
             </template>
@@ -806,6 +769,9 @@ const FORMAS = [
 }
 .hd__tr:last-child td { border-bottom: none; }
 .hd__tr:hover td { background: #f8fdf8; }
+.hd__tr--click { cursor: pointer; }
+.hd__prod-multi { display: inline-flex; align-items: center; gap: .2rem; color: var(--c-ink-600, #56635b); font-size: var(--fs-13); }
+.hd__prod-multi .hd__chev { color: var(--c-ink-400, #9aa39c); }
 .hd__th-num, .hd__td-num { text-align: right; }
 .hd__td-fecha { white-space: nowrap; }
 .hd__fecha-day { display: block; font-weight: 600; font-size: var(--fs-13); color: var(--c-ink-900); }

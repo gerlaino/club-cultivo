@@ -61,7 +61,7 @@ class DispensacionesController < ApplicationController
 
   # GET /dispensaciones/:id
   def show
-    render json: serialize_dispensacion(@dispensacion)
+    render json: DispensacionSerializer.serialize_detail(@dispensacion)
   end
 
   # POST /pacientes/:paciente_id/dispensaciones
