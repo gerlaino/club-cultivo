@@ -78,6 +78,9 @@ const ccMargen = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
 const esMedioCredito = computed(() => ['cuenta_corriente', 'no_abona'].includes(form.value.medio_pago))
 const esCuentaCorriente = computed(() => form.value.medio_pago === 'cuenta_corriente')
 const esNoAbona         = computed(() => form.value.medio_pago === 'no_abona')
+// Sin cuenta corriente + pago cash: el aporte queda fijo al total (no se puede pagar de
+// más/menos porque no hay dónde acreditar/debitar la diferencia).
+const aporteBloqueado = computed(() => !tieneCc.value && !esMedioCredito.value)
 // Panel de crédito: visible a quien dispensa cuando elige cuenta corriente; admin/sup siempre.
 const mostrarPanelCredito = computed(() => !form.value.es_regalo && tieneCc.value && (esMedioCredito.value || puedeVerCredito.value))
 
@@ -251,6 +254,8 @@ const precioFinal = computed(() => {
 })
 
 watch(precioFinal, (val) => { if (val != null) form.value.aporte_socio_ars = Math.round(val) })
+// Al quedar bloqueado (socio sin CC), forzar el aporte al total exacto.
+watch(aporteBloqueado, (locked) => { if (locked && precioFinal.value != null) form.value.aporte_socio_ars = Math.round(precioFinal.value) })
 
 watch(() => props.modelValue, (open) => {
   if (open) {
@@ -398,6 +403,15 @@ async function handleSubmit() {
         ? `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
         : 'Crédito insuficiente. Consultá con un administrador.'
       formError.value = msg
+      saving.value = false; return
+    }
+    // Solo un socio con cuenta corriente puede pagar un monto ≠ al total: el excedente se le
+    // acredita, el faltante queda a cuenta. Sin CC (y pagando en efectivo/transferencia), el
+    // aporte debe ser exactamente el total.
+    if (!cobraDelivery.value && !tieneCc.value && !esMedioCredito.value &&
+        precioFinal.value != null &&
+        Math.abs((Number(form.value.aporte_socio_ars) || 0) - Math.round(precioFinal.value)) > 0.01) {
+      formError.value = 'El socio no tiene cuenta corriente: el monto debe ser igual al total. Solo con cuenta corriente se puede pagar de más (se acredita) o de menos (queda a cuenta).'
       saving.value = false; return
     }
   }
@@ -655,10 +669,13 @@ async function handleSubmit() {
             </div>
             <!-- Override del aporte: solo admin/supervisor -->
             <div v-if="puedeEditarAporte" class="mnd__field">
-              <label class="mnd__label">Aporte del paciente <span class="mnd__opt">ARS — editable</span></label>
+              <label class="mnd__label">Aporte del paciente
+                <span class="mnd__opt">{{ aporteBloqueado ? 'ARS — fijo al total (socio sin cuenta corriente)' : 'ARS — editable' }}</span>
+              </label>
               <div class="mnd__input-suffix-wrap">
                 <span class="mnd__input-prefix">$</span>
                 <input v-model.number="form.aporte_socio_ars" type="number" min="0" step="1"
+                       :readonly="aporteBloqueado"
                        class="mnd__input mnd__input--with-prefix" placeholder="0" />
               </div>
             </div>
