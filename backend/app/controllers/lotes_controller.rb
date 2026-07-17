@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :registrar_trasplante]
+  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :registrar_trasplante]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -468,6 +468,20 @@ class LotesController < ApplicationController
     render json: LoteSerializer.serialize(@lote.reload)
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Manicurador no encontrado' }, status: :not_found
+  rescue ArgumentError, RuntimeError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+
+  # POST /lotes/:id/devolver_manicura
+  # El manicura (o admin/sup) devuelve el lote a cosecha porque no está listo para
+  # manicurar (p. ej. sigue húmedo). Requiere motivo; desasigna y avisa al admin.
+  def devolver_manicura
+    authorize @lote, :devolver_manicura?
+    @lote.devolver_a_cosecha!(devuelto_por: current_user, motivo: params[:motivo])
+    render json: LoteSerializer.serialize(@lote.reload)
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e

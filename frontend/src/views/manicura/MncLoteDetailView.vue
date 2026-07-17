@@ -24,6 +24,9 @@
           <button class="mnl__btn-icon" @click="cargar" title="Actualizar">
             <RefreshCw :size="14" :stroke-width="2" />
           </button>
+          <button v-if="puedeDevolver" class="mnl__btn-ghost" @click="abrirDevolver" title="Devolver a cosecha">
+            <Undo2 :size="14" :stroke-width="2" /> Devolver a cosecha
+          </button>
           <button v-if="puedeRegistrar" class="mnl__btn-primary" @click="abrirModal">
             <Scale :size="14" :stroke-width="2" /> Registrar por lote
           </button>
@@ -280,6 +283,43 @@
       </Transition>
     </Teleport>
 
+    <!-- Modal devolver a cosecha -->
+    <Teleport to="body">
+      <Transition name="mnl-fade">
+        <div v-if="devolverOpen" class="mnl-overlay" @click.self="devolverOpen = false">
+          <div class="mnl-modal">
+            <div class="mnl-modal__hd">
+              <div class="mnl-modal__ico mnl-modal__ico--warn"><Undo2 :size="18" :stroke-width="1.75" /></div>
+              <div>
+                <h2 class="mnl-modal__title">Devolver a cosecha</h2>
+                <p class="mnl-modal__sub">{{ lote?.codigo }}<span v-if="lote?.genetica"> · {{ lote.genetica.nombre }}</span></p>
+              </div>
+              <button class="mnl-modal__close" @click="devolverOpen = false"><X :size="16" /></button>
+            </div>
+            <form class="mnl-modal__body" @submit.prevent="confirmarDevolver">
+              <p class="mnl-devolver-hint">
+                El lote vuelve a <strong>cosecha</strong> y queda sin manicura asignada. El admin recibe un aviso con el motivo y lo reasigna cuando esté pronto.
+              </p>
+              <div class="mnl-field">
+                <label class="mnl-label">¿Por qué no se puede manicurar? <span class="mnl-req">*</span></label>
+                <textarea v-model="devolverMotivo" class="mnl-textarea" rows="3"
+                  placeholder="Ej: la flor sigue húmeda, necesita más días de secado" required></textarea>
+              </div>
+              <div v-if="devolverError" class="mnl-error">{{ devolverError }}</div>
+              <div class="mnl-actions">
+                <button type="button" class="mnl-btn-cancel" @click="devolverOpen = false">Cancelar</button>
+                <button type="submit" class="mnl-btn-warn" :disabled="devolviendo || !devolverMotivo.trim()">
+                  <DsSpinner v-if="devolviendo" :size="14" />
+                  <Undo2 v-else :size="13" :stroke-width="2" />
+                  Devolver a cosecha
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -291,6 +331,7 @@ import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw, Package, Plus, 
 import {
   getLote, listPlants, createPesajeManicura, registrarDirectoManicura, listStocks, listSedes,
   listPesajesManicura, enviarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura,
+  devolverManicura,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useManicuraJornada } from '../../composables/useManicuraJornada.js'
@@ -432,6 +473,42 @@ const puedeRegistrar = computed(() =>
   lote.value?.estado === 'en_manicura' &&
   ['manicura', 'admin', 'supervisor'].includes(auth.role)
 )
+
+// Devolver a cosecha: solo mientras no haya un pesaje confirmado (un confirmado ya generó
+// stock → no se puede volver atrás). El backend valida lo mismo; esto es solo la UI.
+const hayConfirmado = computed(() => pesajes.value.some(p => p.estado === 'confirmado'))
+const puedeDevolver = computed(() =>
+  lote.value?.estado === 'en_manicura' && !hayConfirmado.value &&
+  ['manicura', 'admin', 'supervisor'].includes(auth.role)
+)
+
+const devolverOpen   = ref(false)
+const devolverMotivo = ref('')
+const devolverError  = ref('')
+const devolviendo    = ref(false)
+
+function abrirDevolver() {
+  devolverMotivo.value = ''
+  devolverError.value  = ''
+  devolverOpen.value   = true
+}
+
+async function confirmarDevolver() {
+  const motivo = devolverMotivo.value.trim()
+  if (!motivo || devolviendo.value) return
+  devolviendo.value = true
+  devolverError.value = ''
+  try {
+    await devolverManicura(id, motivo)
+    toast.success(`Lote ${lote.value.codigo} devuelto a cosecha`)
+    devolverOpen.value = false
+    router.push('/mnc/pendientes')
+  } catch (e) {
+    devolverError.value = e.response?.data?.error || e.response?.data?.errors?.[0] || 'No se pudo devolver'
+  } finally {
+    devolviendo.value = false
+  }
+}
 
 const plantasSinPesar = computed(() => plantas.value.filter(p => !(parseFloat(p.peso_seco) > 0)))
 // Plantas que quedan para el "resto conjunto" = sin pesar y sin peso individual cargado.
@@ -604,6 +681,14 @@ onActivated(cargar)
   cursor: pointer; transition: background .15s;
 }
 .mnl__btn-primary:hover { background: #4a6239; }
+
+.mnl__btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #fff; color: #b45309; border: 1.5px solid #fde68a; border-radius: 7px;
+  padding: .45rem 1rem; font-size: .82rem; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.mnl__btn-ghost:hover { background: #fffbeb; border-color: #f59e0b; }
 
 /* KPIs — mismo patrón que SalaDetailView */
 .mnl__kpis {
@@ -798,6 +883,20 @@ onActivated(cargar)
   background: rgba(92,122,74,.12); color: #5C7A4A;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
+.mnl-modal__ico--warn { background: #fffbeb; color: #b45309; }
+.mnl-devolver-hint {
+  font-size: .82rem; color: #64748b; line-height: 1.55; margin: 0;
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: .6rem .75rem;
+}
+.mnl-devolver-hint strong { color: #b45309; }
+.mnl-btn-warn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: #d97706; color: #fff; border: none; border-radius: 7px;
+  padding: .5rem 1rem; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s;
+}
+.mnl-btn-warn:hover:not(:disabled) { background: #b45309; }
+.mnl-btn-warn:disabled { opacity: .45; cursor: not-allowed; }
+
 .mnl-modal__title { font-size: .95rem; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
 .mnl-modal__sub   { font-size: .78rem; color: #64748b; margin: 0; }
 .mnl-modal__close {

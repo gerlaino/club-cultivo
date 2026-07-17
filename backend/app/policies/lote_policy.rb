@@ -12,6 +12,12 @@ class LotePolicy < ApplicationPolicy
     mismo_club? && admin?
   end
 
+  # Devolver a cosecha: el manicura asignado, o admin/supervisor.
+  def devolver_manicura?
+    return false unless mismo_club?
+    admin? || supervisor? || (manicura? && record.manicurador_id == user.id)
+  end
+
   class Scope < Scope
     def resolve
       base = scope.where(club_id: user.club_id)

@@ -234,6 +234,47 @@ class Lote < ApplicationRecord
     end
   end
 
+  # Camino inverso: el manicura (o admin/sup) devuelve el lote a cosecha porque no está
+  # listo para manicurar (típico: la flor sigue húmeda y necesita más secado). Solo es
+  # válido si todavía no hay pesaje confirmado — un confirmado ya generó stock de flor
+  # seca, así que volver atrás rompería la trazabilidad. Desasigna el manicurador: el lote
+  # vuelve a la cola de cosecha y el admin lo reasigna cuando esté pronto.
+  def devolver_a_cosecha!(devuelto_por:, motivo:)
+    raise ArgumentError, "El lote no está en manicura" unless estado == 'en_manicura'
+    motivo = motivo.to_s.strip
+    raise ArgumentError, "Contanos por qué no se puede manicurar (motivo obligatorio)" if motivo.blank?
+    if pesajes_manicura.where(estado: 'confirmado').exists?
+      raise "El lote ya tiene un pesaje confirmado: no se puede devolver a cosecha"
+    end
+
+    quien = devuelto_por.first_name.presence || devuelto_por.email
+    manicurador_previo = manicurador
+    ActiveRecord::Base.transaction do
+      # Limpiar jornadas sin confirmar (borrador/enviado): una manicura sin lote no tiene sentido.
+      pesajes_manicura.where(estado: %w[borrador enviado]).destroy_all
+      update!(estado: 'cosecha', manicurador: nil)
+      lote_eventos.create!(
+        tipo:            'cambio_estado',
+        estado_anterior: 'en_manicura',
+        estado_nuevo:    'cosecha',
+        descripcion:     "Devuelto a cosecha por #{quien}: #{motivo}",
+        user:            devuelto_por,
+        club:            club,
+        registrado_en:   Time.current,
+      )
+      AlertaInterna.create!(
+        club:             club,
+        tipo:             'manicura_devuelta',
+        mensaje:          "Lote #{codigo} devuelto a cosecha por #{quien} — #{motivo}",
+        severidad:        'warning',
+        creada_por:       devuelto_por,
+        destinada_a_role: 'admin',
+        lote:             self,
+        contexto:         { lote_id: id, lote_codigo: codigo, motivo: motivo, manicurador_previo_id: manicurador_previo&.id }
+      )
+    end
+  end
+
   # Llamado tras cada confirmación de PesajeManicura.
   # Cuando todas las plantas están procesadas, el lote pasa a 'curado' (el stock de
   # flor_seca ya lo creó PesajeManicura#confirmar — acá empieza el curado). El lote

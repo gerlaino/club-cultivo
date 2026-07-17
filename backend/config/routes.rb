@@ -131,6 +131,7 @@ Rails.application.routes.draw do
         post  :registrar_trasplante
         post  :cosechar_plantas
         post  :asignar_manicurador
+        post  :devolver_manicura
         patch :completar_datos
         get   :timeline
         get   :historial
@@ -449,7 +450,12 @@ Rails.application.routes.draw do
       member { post :cancelar }
     end
 
-    resources :jornadas, only: [:index, :create, :update, :destroy]
+    resources :jornadas, only: [:index, :create, :update, :destroy] do
+      collection do
+        post :confirmar
+        post :reabrir
+      end
+    end
 
     resources :tareas do
       collection do

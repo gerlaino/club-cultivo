@@ -297,6 +297,7 @@ export const rechazarMovimiento     = (id, motivo)    => api.post(`/inventario/r
 
 // ── Manicura ──────────────────────────────────────────────────────────────────
 export const asignarManicurador  = (loteId, manicuradorId, params = {}) => api.post(`/lotes/${loteId}/asignar_manicurador`, { manicurador_id: manicuradorId, ...params })
+export const devolverManicura    = (loteId, motivo)                     => api.post(`/lotes/${loteId}/devolver_manicura`, { motivo })
 
 // -------- PLAN --------
 export const getPlan = () => api.get('/plan')

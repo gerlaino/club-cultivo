@@ -9,7 +9,7 @@ class AlertaInterna < ApplicationRecord
   TIPOS_OPERATIVOS = %w[
     paciente_creado_por_dispensador documento_vencido reprocann_vencido reprocann_por_vencer
     indicacion_vencida indicacion_por_vencer
-    manicura_asignada manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada manicura_eliminada manicura_reabierta
+    manicura_asignada manicura_devuelta manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada manicura_eliminada manicura_reabierta
     stock_bajo stock_vencimiento saldo_cc_bajo saldo_gramos_bajo
     delivery_entregado delivery_fallido
     reserva_por_entregar reserva_vencida
@@ -51,7 +51,7 @@ class AlertaInterna < ApplicationRecord
     'sin_registro_ambiental' => 'lote', 'ph_fuera_rango' => 'lote', 'ec_fuera_rango' => 'lote',
     'temperatura_fuera_rango' => 'lote', 'humedad_fuera_rango' => 'lote',
     'tarea_vencida_cultivo' => 'tarea',
-    'manicura_asignada' => 'lote', 'manicura_aprobada' => 'lote', 'manicura_rechazada' => 'lote',
+    'manicura_asignada' => 'lote', 'manicura_devuelta' => 'lote', 'manicura_aprobada' => 'lote', 'manicura_rechazada' => 'lote',
     'manicura_eliminada' => 'lote', 'manicura_reabierta' => 'lote',
     'manicura_aprobacion_pendiente' => 'manicura',
     'stock_bajo' => 'stock', 'stock_vencimiento' => 'stock',

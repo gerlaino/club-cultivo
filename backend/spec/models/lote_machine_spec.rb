@@ -130,6 +130,77 @@ RSpec.describe Lote, type: :model do
     end
   end
 
+  # ── devolver_a_cosecha! ───────────────────────────────────────────────────
+
+  describe '#devolver_a_cosecha!' do
+    let(:manicurador) { create(:user, club: club, role: 'manicura') }
+
+    def lote_en_manicura
+      lote = lote_en('en_manicura')
+      lote.update_column(:manicurador_id, manicurador.id)
+      lote
+    end
+
+    it 'vuelve el lote a cosecha y lo desasigna' do
+      lote = lote_en_manicura
+      lote.devolver_a_cosecha!(devuelto_por: manicurador, motivo: 'sigue húmeda')
+      lote.reload
+      expect(lote.estado).to eq('cosecha')
+      expect(lote.manicurador_id).to be_nil
+    end
+
+    it 'crea una AlertaInterna manicura_devuelta dirigida al admin' do
+      lote = lote_en_manicura
+      expect {
+        lote.devolver_a_cosecha!(devuelto_por: manicurador, motivo: 'sigue húmeda')
+      }.to change { club.alertas_internas.where(tipo: 'manicura_devuelta', destinada_a_role: 'admin').count }.by(1)
+    end
+
+    it 'registra un lote_evento de cambio_estado con el motivo' do
+      lote = lote_en_manicura
+      lote.devolver_a_cosecha!(devuelto_por: manicurador, motivo: 'necesita más secado')
+      evento = lote.lote_eventos.where(tipo: 'cambio_estado', estado_nuevo: 'cosecha').last
+      expect(evento).to be_present
+      expect(evento.descripcion).to include('necesita más secado')
+    end
+
+    it 'limpia las jornadas sin confirmar (borrador/enviado)' do
+      lote = lote_en_manicura
+      lote.pesajes_manicura.create!(club: club, manicurador: manicurador, fecha_pesaje: Date.current, estado: 'borrador')
+      lote.devolver_a_cosecha!(devuelto_por: manicurador, motivo: 'sigue húmeda')
+      expect(lote.pesajes_manicura.count).to eq(0)
+    end
+
+    it 'exige motivo' do
+      lote = lote_en_manicura
+      expect {
+        lote.devolver_a_cosecha!(devuelto_por: manicurador, motivo: '  ')
+      }.to raise_error(ArgumentError, /motivo/i)
+    end
+
+    it 'lanza error si el lote no está en manicura' do
+      lote = lote_en('cosecha')
+      expect {
+        lote.devolver_a_cosecha!(devuelto_por: manicurador, motivo: 'x')
+      }.to raise_error(ArgumentError, /manicura/)
+    end
+
+    it 'no permite devolver si ya hay un pesaje confirmado' do
+      lote = lote_en_manicura
+      create(:plant, lote: lote, club: club)
+      pesaje = lote.pesajes_manicura.create!(club: club, manicurador: manicurador, fecha_pesaje: Date.current)
+      pesaje.pesadas_plantas.create!(plant: lote.plants.first, peso_seco_g: 100)
+      pesaje.enviar!
+      pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 100)
+      # confirmar! sobre todas las plantas puede pasar el lote a curado; forzamos el estado
+      # para probar la guarda de "pesaje confirmado" de devolver_a_cosecha! aisladamente.
+      lote.update_column(:estado, 'en_manicura')
+      expect {
+        lote.devolver_a_cosecha!(devuelto_por: manicurador, motivo: 'sigue húmeda')
+      }.to raise_error(RuntimeError, /confirmado/)
+    end
+  end
+
   # ── Flujo unificado de manicura (PesajeManicura → confirmar → finaliza) ──────
 
   describe 'flujo unificado de manicura' do
