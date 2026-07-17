@@ -18,12 +18,16 @@ class Stock < ApplicationRecord
   UNIDADES         = %w[g ml un].freeze
   CATEGORIAS_EXTERNA = %w[merch bebida insumo otros].freeze
   ESTADOS          = %w[pendiente_asignacion asignado agotado].freeze
+  # Para qué está habilitado el stock: dispensar a pacientes, usarse como materia prima de
+  # producción (manufacturar derivados), ambas, o ninguna (apartado / cuarentena / testeo).
+  DISPONIBILIDADES = %w[dispensa produccion ambas ninguna].freeze
 
   validates :origen,        inclusion: { in: ORIGENES }
   validates :forma_producto, inclusion: { in: FORMAS_PRODUCTO }
   validates :unidad,        inclusion: { in: UNIDADES }
   validates :cantidad,      numericality: { greater_than_or_equal_to: 0 }
   validates :estado,        inclusion: { in: ESTADOS }
+  validates :disponibilidad, inclusion: { in: DISPONIBILIDADES }
   validates :costo_unitario_ars,  numericality: { greater_than_or_equal_to: 0, allow_nil: true }
   validates :precio_sugerido_ars, numericality: { greater_than_or_equal_to: 0, allow_nil: true }
 
@@ -45,11 +49,16 @@ class Stock < ApplicationRecord
   scope :pendientes_asignacion,    -> { where(estado: 'pendiente_asignacion') }
   scope :asignados,                -> { where(estado: 'asignado') }
   scope :del_club,                 -> { where(sede_id: nil) }
+  # Habilitado para... (la disponibilidad 'ambas' entra en ambos).
+  scope :para_dispensa,            -> { where(disponibilidad: %w[dispensa ambas]) }
+  scope :para_produccion,          -> { where(disponibilidad: %w[produccion ambas]) }
 
   def pendiente_asignacion? = estado == 'pendiente_asignacion'
   def asignado?             = estado == 'asignado'
   def agotado?              = estado == 'agotado'
   def del_club?             = sede_id.nil?
+  def apto_dispensa?        = %w[dispensa ambas].include?(disponibilidad)
+  def apto_produccion?      = %w[produccion ambas].include?(disponibilidad)
 
   # Stock comprometido pero todavía no descontado: envíos de dispensaciones en curso
   # MÁS reservas pendientes de entrega. Al entregar una reserva se crea la Dispensacion

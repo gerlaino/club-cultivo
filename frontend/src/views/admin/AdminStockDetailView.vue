@@ -26,6 +26,9 @@
               <span v-if="stock.lote?.genetica" class="sd__chip sd__chip--gen">{{ stock.lote.genetica.nombre }}</span>
               <span v-else-if="stock.genetica" class="sd__chip sd__chip--gen">{{ stock.genetica.nombre }}</span>
               <span v-if="stock.origen === 'compra_externa'" class="sd__chip sd__chip--ext">Externo</span>
+              <span v-if="stock.disponibilidad && stock.disponibilidad !== 'ambas'" class="sd__chip sd__chip--disp">
+                {{ { dispensa: 'Solo dispensa', produccion: 'Solo producción', ninguna: 'No disponible' }[stock.disponibilidad] }}
+              </span>
               <span v-if="stock.estado_vencimiento && stock.estado_vencimiento !== 'ok'"
                 class="sd__badge-venc" :class="`sd__badge-venc--${stock.estado_vencimiento}`">
                 {{ badgeVencLabel(stock) }}
@@ -130,6 +133,15 @@
                   <label class="sd__label">Proveedor</label>
                   <input type="text" class="sd__input" v-model.trim="editForm.proveedor" />
                 </div>
+                <div class="sd__field">
+                  <label class="sd__label">Disponible para</label>
+                  <select class="sd__input" v-model="editForm.disponibilidad">
+                    <option value="ambas">Dispensa y producción</option>
+                    <option value="dispensa">Solo dispensa</option>
+                    <option value="produccion">Solo producción</option>
+                    <option value="ninguna">Ninguna (apartado)</option>
+                  </select>
+                </div>
                 <div class="sd__field sd__field--full">
                   <label class="sd__label">Descripción / Notas</label>
                   <textarea class="sd__input sd__textarea" rows="2" v-model.trim="editForm.descripcion" placeholder="Observaciones…"></textarea>
@@ -206,7 +218,8 @@
                 v-if="stock.forma_producto === 'flor_seca'"
                 class="sd__action sd__action--amber"
                 @click="openProcesar"
-                :disabled="stock.agotado"
+                :disabled="stock.agotado || !['produccion','ambas'].includes(stock.disponibilidad)"
+                :title="!['produccion','ambas'].includes(stock.disponibilidad) ? 'Este stock no está habilitado para producción' : ''"
               >
                 <span class="sd__action-ico sd__action-ico--amber"><i class="bi bi-arrow-right-square"></i></span>
                 <div class="sd__action-txt">
@@ -683,6 +696,7 @@ function startEdit() {
     costo_unitario_ars:  stock.value.costo_unitario_ars  ? Number(stock.value.costo_unitario_ars)  : null,
     proveedor:   stock.value.proveedor   || '',
     descripcion: stock.value.descripcion || '',
+    disponibilidad: stock.value.disponibilidad || 'ambas',
   }
   editError.value = null
   editando.value  = true
@@ -700,6 +714,7 @@ async function guardarEdit() {
     if (f.costo_unitario_ars  != null) payload.costo_unitario_ars  = f.costo_unitario_ars
     if (f.proveedor)                   payload.proveedor           = f.proveedor
     if (f.descripcion)                 payload.descripcion         = f.descripcion
+    if (f.disponibilidad)              payload.disponibilidad      = f.disponibilidad
     await updateStock(stock.value.id, payload)
     await recargar()
     editando.value = false
@@ -937,6 +952,7 @@ function badgeVencLabel(s) {
 .sd__chip { font-size: .68rem; font-weight: 600; padding: .2em .6em; border-radius: 5px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
 .sd__chip--gen { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
 .sd__chip--ext { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.sd__chip--disp { background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; }
 .sd__chip--reg { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 
 /* ── Layout ───────────────────────────────────────────────────────────────── */

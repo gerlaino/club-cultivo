@@ -179,6 +179,7 @@ class Dispensacion < ApplicationRecord
     unless stock.club_id == club_id || stock.sede&.club_id == club_id
       errors.add(:stock, 'no pertenece al club')
     end
+    errors.add(:stock, 'no está habilitado para dispensa') if stock.persisted? && !stock.apto_dispensa?
   end
 
   def stock_disponible
@@ -223,6 +224,10 @@ class Dispensacion < ApplicationRecord
       end
       unless st.club_id == paciente&.club_id || st.sede&.club_id == paciente&.club_id
         errors.add(:base, 'Una línea usa stock de otro club.')
+        next
+      end
+      unless st.apto_dispensa?
+        errors.add(:base, "El stock \"#{st.numero_lote_producto || st.forma_producto}\" no está habilitado para dispensa.")
         next
       end
       pedido = ls.sum { |l| l.cantidad.to_d }

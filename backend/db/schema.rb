@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_16_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_17_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1855,6 +1855,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_16_000001) do
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
     t.bigint "producido_desde_stock_id"
+    t.string "disponibilidad", default: "ambas", null: false
+    t.index ["club_id", "disponibilidad"], name: "index_stocks_on_club_id_and_disponibilidad"
     t.index ["club_id", "numero_lote_producto"], name: "index_stocks_on_club_id_and_numero_lote_producto", unique: true, where: "(numero_lote_producto IS NOT NULL)"
     t.index ["club_id"], name: "index_stocks_on_club_id"
     t.index ["codigo_qr"], name: "index_stocks_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"

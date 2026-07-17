@@ -52,6 +52,10 @@ class StocksController < ApplicationController
     when 'social'      then stocks = stocks.reject(&:regulatorio?)
     end
 
+    # El carrito de dispensa pide solo stock habilitado para dispensar (opt-in). Las vistas
+    # de gestión/reporte no pasan el flag y siguen viendo todo el stock.
+    stocks = stocks.select(&:apto_dispensa?) if params[:para_dispensa].present?
+
     render json: stocks.map { |s| serialize_stock(s) }
   end
 
@@ -233,6 +237,9 @@ class StocksController < ApplicationController
   def producir
     unless @stock.forma_producto == 'flor_seca'
       return render json: { error: 'Solo se puede producir desde flor seca' }, status: :unprocessable_entity
+    end
+    unless @stock.apto_produccion?
+      return render json: { error: 'Este stock no está habilitado para producción' }, status: :unprocessable_entity
     end
     gramos       = params[:gramos_usados].to_f
     cantidad_out = params[:cantidad_producida].to_f
@@ -470,6 +477,7 @@ class StocksController < ApplicationController
           genetica_id:             @stock.genetica_id,
           descripcion:             @stock.descripcion,
           proveedor:               @stock.proveedor,
+          disponibilidad:          @stock.disponibilidad,
           lote_origen_consumido_g: consumido_proporcional,
         )
         nuevo.es_split = true
@@ -496,7 +504,8 @@ class StocksController < ApplicationController
 
   def stock_update_params
     params.require(:stock).permit(
-      :cantidad, :cantidad_inicial, :costo_unitario_ars, :precio_sugerido_ars, :descripcion, :proveedor
+      :cantidad, :cantidad_inicial, :costo_unitario_ars, :precio_sugerido_ars, :descripcion, :proveedor,
+      :disponibilidad
     )
   end
 
@@ -505,7 +514,7 @@ class StocksController < ApplicationController
       :origen, :lote_id, :lote_origen_consumido_g,
       :forma_producto, :unidad, :cantidad,
       :costo_unitario_ars, :precio_sugerido_ars,
-      :proveedor, :descripcion, :genetica_id, :categoria, :sede_id, :estado
+      :proveedor, :descripcion, :genetica_id, :categoria, :sede_id, :estado, :disponibilidad
     )
   end
 
@@ -547,6 +556,7 @@ class StocksController < ApplicationController
       proveedor:               s.proveedor,
       descripcion:             s.descripcion,
       categoria:               s.categoria,
+      disponibilidad:          s.disponibilidad,
       regulatorio:             s.regulatorio?,
       del_club:                s.del_club?,
       lote: s.lote ? { id: s.lote.id, codigo: s.lote.codigo, estado: s.lote.estado,

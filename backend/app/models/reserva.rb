@@ -70,6 +70,7 @@ class Reserva < ApplicationRecord
     unless stock.club_id == paciente.club_id || stock.sede&.club_id == paciente.club_id
       errors.add(:stock, 'no pertenece al club')
     end
+    errors.add(:stock, 'no está habilitado para dispensa') if stock.persisted? && !stock.apto_dispensa?
   end
 
   # Valida contra el disponible REAL, que ya descuenta dispensaciones pendientes y otras

@@ -319,6 +319,12 @@
                     <option v-for="f in FORMAS" :key="f.value" :value="f.value">{{ f.label }}</option>
                   </select>
                 </div>
+                <div class="stk__field stk__field--full">
+                  <label class="stk__label">Disponible para</label>
+                  <select class="stk__input" v-model="crearForm.disponibilidad">
+                    <option v-for="d in DISPONIBILIDADES" :key="d.value" :value="d.value">{{ d.label }}</option>
+                  </select>
+                </div>
                 <div class="stk__field">
                   <label class="stk__label">Cantidad (g) <span class="stk__req">*</span></label>
                   <div class="stk__input-row">
@@ -408,6 +414,12 @@
                 <div v-if="editandoStock?.origen === 'compra_externa'" class="stk__field">
                   <label class="stk__label">Proveedor</label>
                   <input type="text" class="stk__input" v-model.trim="editarForm.proveedor" placeholder="Nombre del proveedor" />
+                </div>
+                <div class="stk__field stk__field--full">
+                  <label class="stk__label">Disponible para</label>
+                  <select class="stk__input" v-model="editarForm.disponibilidad">
+                    <option v-for="d in DISPONIBILIDADES" :key="d.value" :value="d.value">{{ d.label }}</option>
+                  </select>
                 </div>
                 <div class="stk__field stk__field--full">
                   <label class="stk__label">Descripción <span class="stk__opt">opcional</span></label>
@@ -903,7 +915,7 @@ async function asignar(stock) {
 // ── Editar stock ───────────────────────────────────────────────────────────────
 const showEditarModal = ref(false)
 const editandoStock   = ref(null)
-const editarForm      = ref({ cantidad: null, precio_sugerido_ars: null, costo_unitario_ars: null, descripcion: '', proveedor: '' })
+const editarForm      = ref({ cantidad: null, precio_sugerido_ars: null, costo_unitario_ars: null, descripcion: '', proveedor: '', disponibilidad: 'ambas' })
 const savingEditar    = ref(false)
 const editarError     = ref(null)
 
@@ -915,6 +927,7 @@ function abrirEditar(s) {
     costo_unitario_ars:  s.costo_unitario_ars  ? parseFloat(s.costo_unitario_ars)  : null,
     descripcion:         s.descripcion || '',
     proveedor:           s.proveedor   || '',
+    disponibilidad:      s.disponibilidad || 'ambas',
   }
   editarError.value = null
   showEditarModal.value = true
@@ -930,6 +943,7 @@ async function guardarEditar() {
     if (f.costo_unitario_ars  != null) payload.costo_unitario_ars  = f.costo_unitario_ars
     if (f.descripcion)                 payload.descripcion         = f.descripcion
     if (f.proveedor)                   payload.proveedor           = f.proveedor
+    if (f.disponibilidad)              payload.disponibilidad      = f.disponibilidad
     await updateStock(editandoStock.value.id, payload)
     showEditarModal.value = false
     await cargarInventario()
@@ -948,10 +962,17 @@ const showCrear  = ref(false)
 const creando    = ref(false)
 const crearError = ref(null)
 
+const DISPONIBILIDADES = [
+  { value: 'ambas',      label: 'Dispensa y producción' },
+  { value: 'dispensa',   label: 'Solo dispensa' },
+  { value: 'produccion', label: 'Solo producción' },
+  { value: 'ninguna',    label: 'Ninguna (apartado)' },
+]
+
 const emptyForm = () => ({
   forma_producto: 'flor_seca', cantidad: '', sede_id: '',
   genetica_id: null, precio_sugerido_ars: '', costo_unitario_ars: '',
-  proveedor: '', descripcion: '',
+  proveedor: '', descripcion: '', disponibilidad: 'ambas',
 })
 const crearForm = ref(emptyForm())
 
@@ -989,6 +1010,7 @@ async function guardarStock() {
       estado:    'asignado',
       proveedor: crearForm.value.proveedor,
       sede_id:   Number(crearForm.value.sede_id),
+      disponibilidad: crearForm.value.disponibilidad,
     }
     if (crearForm.value.precio_sugerido_ars) p.precio_sugerido_ars = Number(crearForm.value.precio_sugerido_ars)
     if (crearForm.value.costo_unitario_ars)  p.costo_unitario_ars  = Number(crearForm.value.costo_unitario_ars)

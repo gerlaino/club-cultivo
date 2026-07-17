@@ -128,7 +128,8 @@ const fmtFecha = (d) => {
 async function cargarStocks() {
   loadingStocks.value = true
   try {
-    const { data } = await listStocks()
+    // Solo stock habilitado para dispensa (el backend filtra con este flag).
+    const { data } = await listStocks({ para_dispensa: true })
     stocks.value = data || []
   } catch { stocks.value = [] }
   finally { loadingStocks.value = false }
