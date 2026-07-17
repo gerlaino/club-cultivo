@@ -88,7 +88,7 @@ RSpec.describe Paciente, type: :model do
         otro_club = create(:club)
         otro_admin = create(:user, :admin, club: otro_club)
         p_mio  = create_paciente
-        _p_otro = create(:paciente, club: otro_club, created_by: otro_admin)
+        _p_otro = ActsAsTenant.with_tenant(otro_club) { create(:paciente, club: otro_club, created_by: otro_admin) }
         expect(Paciente.for_club(club.id)).to contain_exactly(p_mio)
       end
     end

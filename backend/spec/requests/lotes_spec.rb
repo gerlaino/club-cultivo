@@ -71,7 +71,9 @@ RSpec.describe 'POST /lotes/:id/avanzar_fase', type: :request do
   context 'cultivador de otro club' do
     let(:otro_club)       { create(:club) }
     let(:otro_cultivador) { create(:user, :cultivador, club: otro_club) }
-    before { sign_in_as(otro_cultivador) }
+    # forzar la creación del lote (club principal) antes del login ajeno, si no se crearía
+    # bajo el tenant de otro_club y el test de aislamiento perdería sentido.
+    before { lote_floracion; sign_in_as(otro_cultivador) }
 
     it 'devuelve 404 (lote de otro club no existe para este usuario)' do
       post "/lotes/#{lote_floracion.id}/avanzar_fase", headers: auth_headers

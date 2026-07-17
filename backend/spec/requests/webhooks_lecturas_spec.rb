@@ -1,7 +1,9 @@
 require 'rails_helper'
 
 RSpec.describe 'Webhooks::Lecturas', type: :request do
-  let(:dispositivo) { create(:dispositivo) }
+  let(:club)        { create(:club) }
+  let(:sala)        { create(:sala, club: club) }
+  let(:dispositivo) { create(:dispositivo, sala: sala) }
   let(:valid_token) { dispositivo.regenerar_token! }
 
   describe 'POST /webhooks/lecturas' do

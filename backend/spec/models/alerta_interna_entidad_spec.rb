@@ -3,6 +3,10 @@ require 'rails_helper'
 # El deep-link del panel de notificaciones usa AlertaInterna#entidad = { tipo:, id: },
 # derivado de `tipo` + `contexto` (+ lote_id). Un caso de cada familia de entidad.
 RSpec.describe AlertaInterna, '#entidad' do
+  # require_tenant=true: instanciar el modelo necesita un tenant fijado (lo pone el hook
+  # global de spec/support/tenant.rb al ver este let). `entidad` no consulta la DB.
+  let(:club) { create(:club) }
+
   def entidad(tipo, contexto: {}, lote_id: nil)
     described_class.new(tipo: tipo, contexto: contexto, lote_id: lote_id).entidad
   end

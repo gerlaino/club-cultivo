@@ -7,10 +7,11 @@ module AuthHelpers
   def sign_in_as(user, password: DEFAULT_PASSWORD)
     post '/api/users/sign_in', params: { user: { email: user.email, password: password } }, as: :json
     expect(response).to have_http_status(:ok), "sign_in_as falló para #{user.email}: #{response.body}"
-    # El request de login fija ActsAsTenant.current_tenant; lo limpiamos para que el
-    # setup de datos posterior del example sea tenant-neutral (cada request real
-    # vuelve a fijar su propio tenant). En producción cada request arranca limpio.
-    ActsAsTenant.current_tenant = nil
+    # Con require_tenant=true (TEN-01c), el setup de fixtures y las aserciones posteriores al
+    # login necesitan un tenant. Usamos test_tenant (no current_tenant) para que sobreviva a
+    # los requests siguientes vía el TestTenantMiddleware. Cubre specs sin let(:club). Los
+    # specs cross-tenant que crean datos de OTRO club los envuelven en with_tenant(otro_club).
+    ActsAsTenant.test_tenant = user.club
   end
 
   # Mantenido por compatibilidad con specs existentes que pasan headers: auth_headers.

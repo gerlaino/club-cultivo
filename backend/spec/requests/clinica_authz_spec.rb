@@ -61,10 +61,11 @@ RSpec.describe 'Autorización de datos clínicos', type: :request do
   # Aislamiento de tenant: un médico del club B no ve datos clínicos del club A.
   describe 'aislamiento multi-tenant' do
     it 'médico de otro club recibe 404 sobre el paciente ajeno' do
+      target      = paciente # forzar creación bajo el tenant del club principal, antes del login ajeno
       otro_club   = create(:club)
       otro_medico = create(:user, :medico, club: otro_club)
       sign_in_as(otro_medico)
-      get "/api/pacientes/#{paciente.id}/indicaciones", as: :json
+      get "/api/pacientes/#{target.id}/indicaciones", as: :json
       expect(response).to have_http_status(:not_found)
     end
   end

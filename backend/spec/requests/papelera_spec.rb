@@ -11,7 +11,7 @@ RSpec.describe 'Papelera', type: :request do
   describe 'GET /papelera' do
     it 'lista borrados del club y excluye los de otro club (aislamiento)' do
       mia    = create(:genetica, club: club,      nombre: 'Mi Genética Borrada')
-      ajena  = create(:genetica, club: otro_club, nombre: 'Genética Ajena')
+      ajena  = ActsAsTenant.with_tenant(otro_club) { create(:genetica, club: otro_club, nombre: 'Genética Ajena') }
       mia.destroy
       ajena.destroy
       sign_in_as(admin)
@@ -71,7 +71,7 @@ RSpec.describe 'Papelera', type: :request do
     end
 
     it 'no restaura un registro de otro club' do
-      g = create(:genetica, club: otro_club, nombre: 'Ajena')
+      g = ActsAsTenant.with_tenant(otro_club) { create(:genetica, club: otro_club, nombre: 'Ajena') }
       g.destroy
       sign_in_as(admin)
 

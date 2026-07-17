@@ -54,9 +54,12 @@ RSpec.describe 'Analytics — costo por gramo por sede', type: :request do
     it 'no incluye lotes ni costos de otro club (aislamiento de tenant)' do
       otro_club  = create(:club)
       otro_admin = create(:user, :admin, club: otro_club)
-      otra_sede  = create(:sede, club: otro_club, created_by: otro_admin)
-      lote_otro  = create(:lote, club: otro_club, sede: otra_sede, sala: nil, estado: 'finalizado', rendimiento_real_g: 999)
-      CostoLote.create!(club: otro_club, lote: lote_otro, costo_insumos: 99_999)
+      otra_sede = lote_otro = nil
+      ActsAsTenant.with_tenant(otro_club) do
+        otra_sede  = create(:sede, club: otro_club, created_by: otro_admin)
+        lote_otro  = create(:lote, club: otro_club, sede: otra_sede, sala: nil, estado: 'finalizado', rendimiento_real_g: 999)
+        CostoLote.create!(club: otro_club, lote: lote_otro, costo_insumos: 99_999)
+      end
 
       lote_con_costo(sede: sede_a, gramos: 100, costo: 1000)
 

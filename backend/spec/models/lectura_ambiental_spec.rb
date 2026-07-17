@@ -1,7 +1,8 @@
 require 'rails_helper'
 
 RSpec.describe LecturaAmbiental, type: :model do
-  let(:sala) { create(:sala) }
+  let(:club) { create(:club) }
+  let(:sala) { create(:sala, club: club) }
 
   describe 'validations' do
     it 'is valid with valid attributes' do

@@ -23,10 +23,12 @@ RSpec.describe 'GET /api/plants/por_qr/:codigo_qr', type: :request do
   it 'no expone una planta de otro club (aislamiento de tenant)' do
     otro_club  = create(:club)
     otro_admin = create(:user, :admin, club: otro_club)
-    otra_sede  = create(:sede, club: otro_club, created_by: otro_admin)
-    otra_sala  = create(:sala, club: otro_club, sede: otra_sede, created_by: otro_admin)
-    otro_lote  = create(:lote, club: otro_club, sala: otra_sala)
-    otra_plant = create(:plant, lote: otro_lote)
+    otra_plant = ActsAsTenant.with_tenant(otro_club) do
+      otra_sede  = create(:sede, club: otro_club, created_by: otro_admin)
+      otra_sala  = create(:sala, club: otro_club, sede: otra_sede, created_by: otro_admin)
+      otro_lote  = create(:lote, club: otro_club, sala: otra_sala)
+      create(:plant, lote: otro_lote)
+    end
 
     sign_in_as(admin)
     get "/plants/por_qr/#{otra_plant.codigo_qr}", headers: auth_headers

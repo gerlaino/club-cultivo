@@ -84,9 +84,11 @@ RSpec.describe 'GET /stocks/inventario', type: :request do
 
   it 'no muestra stock de otro club (aislamiento de tenant)' do
     otro = create(:club)
-    o_sede = create(:sede, club: otro)
-    o_lote = create(:lote, club: otro, sala: create(:sala, club: otro, sede: o_sede))
-    create(:stock, club: otro, sede: o_sede, lote: o_lote, cantidad: 999)
+    ActsAsTenant.with_tenant(otro) do
+      o_sede = create(:sede, club: otro)
+      o_lote = create(:lote, club: otro, sala: create(:sala, club: otro, sede: o_sede))
+      create(:stock, club: otro, sede: o_sede, lote: o_lote, cantidad: 999)
+    end
     stock!(cantidad: 50)
     get '/stocks/inventario', headers: auth_headers
     body = JSON.parse(response.body)

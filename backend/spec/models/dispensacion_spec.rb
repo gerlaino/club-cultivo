@@ -216,11 +216,13 @@ RSpec.describe Dispensacion, type: :model do
     let(:otra_sala) { create(:sala, club: otro_club, sede: otra_sede, created_by: otro_admin) }
     let(:otro_lote) { create(:lote, club: otro_club, sala: otra_sala) }
     let!(:stock_ajeno) do
-      Stock.create!(
-        sede: otra_sede, lote: otro_lote,
-        origen: 'lote', forma_producto: 'flor_seca',
-        unidad: 'g', cantidad: 50
-      )
+      ActsAsTenant.with_tenant(otro_club) do
+        Stock.create!(
+          sede: otra_sede, lote: otro_lote,
+          origen: 'lote', forma_producto: 'flor_seca',
+          unidad: 'g', cantidad: 50
+        )
+      end
     end
 
     it 'rechaza stock de otro club' do

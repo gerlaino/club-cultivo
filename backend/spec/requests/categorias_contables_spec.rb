@@ -119,7 +119,7 @@ RSpec.describe 'Categorías contables', type: :request do
     it 'no expone categorías de otro club' do
       otro_club  = create(:club)
       otro_admin = create(:user, :admin, club: otro_club)
-      ajena = otro_club.categorias_contables.create!(nombre: 'Ajena', tipo: 'egreso')
+      ajena = ActsAsTenant.with_tenant(otro_club) { otro_club.categorias_contables.create!(nombre: 'Ajena', tipo: 'egreso') }
 
       sign_in_as(admin)
       get '/categorias_contables', headers: auth_headers, as: :json

@@ -56,15 +56,18 @@ RSpec.describe 'DELETE /api/lotes/:lote_id/lote_eventos/:id', type: :request do
     it 'no permite borrar un evento de otro club' do
       otro_club  = create(:club)
       otro_admin = create(:user, :admin, club: otro_club)
-      otra_sala  = create(:sala, club: otro_club)
-      otro_lote  = create(:lote, club: otro_club, sala: otra_sala)
-      ev = crear_evento(tipo: 'nota', lote_de: otro_lote, club_de: otro_club, user: otro_admin)
+      otro_lote = ev = nil
+      ActsAsTenant.with_tenant(otro_club) do
+        otra_sala = create(:sala, club: otro_club)
+        otro_lote = create(:lote, club: otro_club, sala: otra_sala)
+        ev = crear_evento(tipo: 'nota', lote_de: otro_lote, club_de: otro_club, user: otro_admin)
+      end
 
       sign_in_as(admin)
       delete "/api/lotes/#{otro_lote.id}/lote_eventos/#{ev.id}", as: :json
 
       expect(response).to have_http_status(:not_found)
-      expect(LoteEvento.exists?(ev.id)).to be(true)
+      expect(ActsAsTenant.without_tenant { LoteEvento.exists?(ev.id) }).to be(true)
     end
   end
 end

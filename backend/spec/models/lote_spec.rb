@@ -56,9 +56,11 @@ RSpec.describe Lote, type: :model do
       it 'permite el mismo código en clubs distintos' do
         otro_club = create(:club)
         otro_admin = create(:user, :admin, club: otro_club)
-        otra_sede  = create(:sede, club: otro_club, created_by: otro_admin)
-        otra_sala  = create(:sala, club: otro_club, sede: otra_sede, created_by: otro_admin)
-        create(:lote, club: otro_club, sala: otra_sala, codigo: 'LOTE-UNICO')
+        ActsAsTenant.with_tenant(otro_club) do
+          otra_sede  = create(:sede, club: otro_club, created_by: otro_admin)
+          otra_sala  = create(:sala, club: otro_club, sede: otra_sede, created_by: otro_admin)
+          create(:lote, club: otro_club, sala: otra_sala, codigo: 'LOTE-UNICO')
+        end
         expect(new_lote(codigo: 'LOTE-UNICO')).to be_valid
       end
 

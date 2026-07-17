@@ -62,8 +62,10 @@ RSpec.describe User, type: :model do
       it 'no retorna salas de manicura de otros clubs' do
         otro_club  = create(:club)
         otro_admin = create(:user, :admin, club: otro_club)
-        otra_sede  = create(:sede, club: otro_club, created_by: otro_admin)
-        sala_otro  = create(:sala, club: otro_club, sede: otra_sede, created_by: otro_admin, kind: 'manicura')
+        sala_otro  = ActsAsTenant.with_tenant(otro_club) do
+          otra_sede = create(:sede, club: otro_club, created_by: otro_admin)
+          create(:sala, club: otro_club, sede: otra_sede, created_by: otro_admin, kind: 'manicura')
+        end
         expect(manicurero.salas_ids_asignadas).not_to include(sala_otro.id)
       end
     end

@@ -82,7 +82,10 @@ RSpec.describe 'LecturasAmbientales', type: :request do
     end
 
     context 'wrong club sala' do
-      let(:otra_sala) { create(:sala) }
+      let(:otra_sala) do
+        otro = create(:club)
+        ActsAsTenant.with_tenant(otro) { create(:sala, club: otro) }
+      end
       before { sign_in_as(cultivador) }
       it 'returns 404' do
         post "/salas/#{otra_sala.id}/lecturas_ambientales", params: valid_params, headers: auth_headers

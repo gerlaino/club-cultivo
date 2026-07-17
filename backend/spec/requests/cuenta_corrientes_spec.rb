@@ -55,7 +55,7 @@ RSpec.describe 'CuentaCorrientes API', type: :request do
     context 'paciente de otro club' do
       it 'devuelve 404' do
         otro_club    = create(:club)
-        otro_paciente = create(:paciente, club: otro_club, created_by: create(:user, :admin, club: otro_club))
+        otro_paciente = ActsAsTenant.with_tenant(otro_club) { create(:paciente, club: otro_club, created_by: create(:user, :admin, club: otro_club)) }
         sign_in_as(admin)
         get "/pacientes/#{otro_paciente.id}/cuenta_corriente", headers: auth_headers
         expect(response).to have_http_status(:not_found)

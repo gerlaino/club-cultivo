@@ -72,7 +72,10 @@ RSpec.describe 'Dispositivos', type: :request do
     end
 
     context 'dispositivo from another club' do
-      let(:otro) { create(:dispositivo) }
+      let(:otro) do
+        otro_club = create(:club)
+        ActsAsTenant.with_tenant(otro_club) { create(:dispositivo, sala: create(:sala, club: otro_club)) }
+      end
       before { sign_in_as(admin) }
       it 'returns 404' do
         post "/dispositivos/#{otro.id}/regenerar_token", headers: auth_headers

@@ -293,8 +293,8 @@ RSpec.describe 'Reservas', type: :request do
     let(:otra_sala)        { create(:sala, club: otro_club, sede: otra_sede, created_by: otro_admin) }
     let(:otro_lote)        { create(:lote, club: otro_club, sala: otra_sala) }
     let(:otro_paciente)    { create(:paciente, club: otro_club, created_by: otro_admin) }
-    let!(:otro_stock)      { Stock.create!(sede: otra_sede, lote: otro_lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 50) }
-    let!(:reserva_ajena)   { Reserva.create!(club: otro_club, paciente: otro_paciente, user: otro_admin, stock: otro_stock, cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date) }
+    let!(:otro_stock)      { ActsAsTenant.with_tenant(otro_club) { Stock.create!(sede: otra_sede, lote: otro_lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 50) } }
+    let!(:reserva_ajena)   { ActsAsTenant.with_tenant(otro_club) { Reserva.create!(club: otro_club, paciente: otro_paciente, user: otro_admin, stock: otro_stock, cantidad: 10, fecha_entrega_estimada: 3.days.from_now.to_date) } }
 
     before { sign_in_as(dispensador) }
 

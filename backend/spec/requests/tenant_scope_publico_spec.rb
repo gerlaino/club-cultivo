@@ -14,7 +14,7 @@ RSpec.describe 'Blindaje de tenant — contextos públicos y cross-club', type: 
     it 'resuelve el paciente por su carnet_token sin importar el tenant' do
       club     = create(:club)
       admin    = create(:user, :admin, club: club)
-      paciente = create(:paciente, club: club, created_by: admin)
+      paciente = ActsAsTenant.with_tenant(club) { create(:paciente, club: club, created_by: admin) }
 
       get "/api/c/#{paciente.carnet_token}"
 
@@ -41,8 +41,8 @@ RSpec.describe 'Blindaje de tenant — contextos públicos y cross-club', type: 
       admin_a = create(:user, :admin, club: club_a)
       admin_b = create(:user, :admin, club: club_b)
 
-      create(:paciente, club: club_a, created_by: admin_a)            # 1 en A
-      create_list(:paciente, 3, club: club_b, created_by: admin_b)    # 3 en B
+      ActsAsTenant.with_tenant(club_a) { create(:paciente, club: club_a, created_by: admin_a) }            # 1 en A
+      ActsAsTenant.with_tenant(club_b) { create_list(:paciente, 3, club: club_b, created_by: admin_b) }    # 3 en B
 
       sign_in_as(admin_a) # su tenant queda fijado a club_a en el request real
       get '/api/benchmark', headers: auth_headers
@@ -61,8 +61,8 @@ RSpec.describe 'Blindaje de tenant — contextos públicos y cross-club', type: 
       admin_a = create(:user, :admin, club: club_a)
       admin_b = create(:user, :admin, club: club_b)
 
-      create(:paciente, club: club_a, created_by: admin_a)
-      create_list(:paciente, 5, club: club_b, created_by: admin_b)
+      ActsAsTenant.with_tenant(club_a) { create(:paciente, club: club_a, created_by: admin_a) }
+      ActsAsTenant.with_tenant(club_b) { create_list(:paciente, 5, club: club_b, created_by: admin_b) }
 
       sign_in_as(admin_a)
       get '/api/benchmark', headers: auth_headers

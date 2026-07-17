@@ -57,7 +57,7 @@ RSpec.describe 'Unidades de negocio', type: :request do
   describe 'aislamiento por club' do
     it 'no expone unidades de otro club' do
       otro = create(:club)
-      ajena = otro.unidades_negocio.create!(nombre: 'Ajena', tipo: 'general')
+      ajena = ActsAsTenant.with_tenant(otro) { otro.unidades_negocio.create!(nombre: 'Ajena', tipo: 'general') }
       sign_in_as(admin)
       get '/unidades_negocio', headers: auth_headers, as: :json
       ids = JSON.parse(response.body).map { |u| u['id'] }

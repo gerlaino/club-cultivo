@@ -95,10 +95,12 @@ RSpec.describe 'Compras en cuotas', type: :request do
   it 'aísla por tenant: no ve compras de otro club' do
     otro       = create(:club)
     otro_admin = create(:user, :admin, club: otro)
-    otro_sede  = create(:sede, club: otro, created_by: otro_admin)
-    CompraCuotas.create!(club: otro, sede: otro_sede, created_by: otro_admin,
-                         descripcion: 'x', categoria: 'insumo', monto_total_ars: 100,
-                         cuotas_total: 1, fecha_primera_cuota: Date.today)
+    ActsAsTenant.with_tenant(otro) do
+      otro_sede  = create(:sede, club: otro, created_by: otro_admin)
+      CompraCuotas.create!(club: otro, sede: otro_sede, created_by: otro_admin,
+                           descripcion: 'x', categoria: 'insumo', monto_total_ars: 100,
+                           cuotas_total: 1, fecha_primera_cuota: Date.today)
+    end
     get '/compras_cuotas', headers: auth_headers
     expect(JSON.parse(response.body)).to eq([])
   end

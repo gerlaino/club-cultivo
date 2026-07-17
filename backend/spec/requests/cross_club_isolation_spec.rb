@@ -3,6 +3,10 @@ require 'rails_helper'
 # Verifica que ningún usuario pueda acceder a datos de otro club.
 # Cada contexto: usuario del club_b intenta leer un recurso del club_a.
 RSpec.describe 'Cross-club isolation', type: :request do
+  # require_tenant=true: los fixtures de club_a se crean bajo su propio tenant. El request
+  # a probar corre como admin_b (sign_in_as fija test_tenant=club_b) — esa es la intrusión.
+  before { ActsAsTenant.test_tenant = club_a }
+
   let!(:club_a) { create(:club) }
   let!(:club_b) { create(:club) }
 
@@ -112,8 +116,11 @@ RSpec.describe 'Cross-club isolation', type: :request do
 
   # ── Genéticas ─────────────────────────────────────────────
   describe 'GET /geneticas' do
-    let!(:genetica_a) { Genetica.create!(nombre: 'Test A Only', tipo: 'indica', club_id: club_a.id, global: false, activa: true) }
-    let!(:genetica_global) { Genetica.where(global: true, registrada_inase: true).first || Genetica.create!(nombre: 'Global Test', tipo: 'hibrida', global: true, registrada_inase: true, club_id: nil, activa: true) }
+    # Se crean después de sign_in_as(admin_b) (hooks anidados corren tras los outer), así que
+    # el test_tenant vigente sería club_b y acts_as_tenant le pisaría el club_id. Forzamos el
+    # tenant correcto: genetica_a bajo club_a, la global sin tenant (club_id nil).
+    let!(:genetica_a) { ActsAsTenant.with_tenant(club_a) { Genetica.create!(nombre: 'Test A Only', tipo: 'indica', club_id: club_a.id, global: false, activa: true) } }
+    let!(:genetica_global) { ActsAsTenant.without_tenant { Genetica.where(global: true, registrada_inase: true).first || Genetica.create!(nombre: 'Global Test', tipo: 'hibrida', global: true, registrada_inase: true, club_id: nil, activa: true) } }
 
     it 'includes global genetics but not club_a-specific ones' do
       get '/geneticas', headers: auth_headers

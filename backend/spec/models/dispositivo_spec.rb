@@ -1,9 +1,12 @@
 require 'rails_helper'
 
 RSpec.describe Dispositivo, type: :model do
+  let(:club) { create(:club) }
+  let(:sala) { create(:sala, club: club) }
+
   describe '#regenerar_token!' do
     it 'returns a plain token and stores digest' do
-      dispositivo = create(:dispositivo)
+      dispositivo = create(:dispositivo, sala: sala)
       plain = dispositivo.regenerar_token!
 
       expect(plain).to be_present
@@ -15,13 +18,13 @@ RSpec.describe Dispositivo, type: :model do
 
   describe '#webhook_token_matches?' do
     it 'returns true with correct token' do
-      dispositivo = create(:dispositivo)
+      dispositivo = create(:dispositivo, sala: sala)
       plain = dispositivo.regenerar_token!
       expect(dispositivo.webhook_token_matches?(plain)).to be true
     end
 
     it 'returns false with wrong token' do
-      dispositivo = create(:dispositivo)
+      dispositivo = create(:dispositivo, sala: sala)
       dispositivo.regenerar_token!
       expect(dispositivo.webhook_token_matches?('wrong')).to be false
     end
@@ -34,13 +37,13 @@ RSpec.describe Dispositivo, type: :model do
 
   describe '#token_pendiente_confirmacion?' do
     it 'returns true after token rotation before next reading' do
-      dispositivo = create(:dispositivo)
+      dispositivo = create(:dispositivo, sala: sala)
       dispositivo.regenerar_token!
       expect(dispositivo.token_pendiente_confirmacion?).to be true
     end
 
     it 'returns false if no token rotation' do
-      dispositivo = create(:dispositivo)
+      dispositivo = create(:dispositivo, sala: sala)
       expect(dispositivo.token_pendiente_confirmacion?).to be false
     end
   end

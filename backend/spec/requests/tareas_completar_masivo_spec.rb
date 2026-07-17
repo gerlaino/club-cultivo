@@ -37,7 +37,7 @@ RSpec.describe 'POST /api/tareas/completar_masivo', type: :request do
     it 'no completa tareas de otro club (aislamiento de tenant)' do
       otro_club  = create(:club)
       otro_admin = create(:user, :admin, club: otro_club)
-      ajena      = crear_tarea(club_de: otro_club, creada_por: otro_admin)
+      ajena      = ActsAsTenant.with_tenant(otro_club) { crear_tarea(club_de: otro_club, creada_por: otro_admin) }
       propia     = crear_tarea
 
       post '/api/tareas/completar_masivo', params: { ids: [propia.id, ajena.id] }, as: :json

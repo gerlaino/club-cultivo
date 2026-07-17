@@ -66,11 +66,14 @@ RSpec.describe 'Rutas de entrega', type: :request do
     otro_club  = create(:club)
     otro_disp  = create(:user, :dispensador, club: otro_club)
     otro_admin = create(:user, :admin, club: otro_club)
-    otro_sede  = create(:sede, club: otro_club, created_by: otro_admin)
-    otro_sala  = create(:sala, club: otro_club, sede: otro_sede, created_by: otro_admin)
-    otro_lote  = create(:lote, club: otro_club, sala: otro_sala)
-    otro_stock = Stock.create!(sede: otro_sede, lote: otro_lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 50, precio_sugerido_ars: 100)
-    otro_pac   = create(:paciente, club: otro_club, created_by: otro_admin, domicilio_calle: 'X', domicilio_ciudad: 'Y')
+    otro_stock = otro_pac = nil
+    ActsAsTenant.with_tenant(otro_club) do
+      otro_sede  = create(:sede, club: otro_club, created_by: otro_admin)
+      otro_sala  = create(:sala, club: otro_club, sede: otro_sede, created_by: otro_admin)
+      otro_lote  = create(:lote, club: otro_club, sala: otro_sala)
+      otro_stock = Stock.create!(sede: otro_sede, lote: otro_lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 50, precio_sugerido_ars: 100)
+      otro_pac   = create(:paciente, club: otro_club, created_by: otro_admin, domicilio_calle: 'X', domicilio_ciudad: 'Y')
+    end
     otro_deliv = create(:user, club: otro_club, role: 'delivery')
 
     sign_in_as(otro_disp)

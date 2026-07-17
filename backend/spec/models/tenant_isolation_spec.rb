@@ -12,7 +12,7 @@ RSpec.describe 'Multi-tenancy (acts_as_tenant)', type: :model do
 
   describe 'auto-scoping por tenant' do
     it 'oculta registros de otro club aunque la query no scopee a mano' do
-      pac_a = create(:paciente, club: club_a, created_by: admin_a)
+      pac_a = ActsAsTenant.with_tenant(club_a) { create(:paciente, club: club_a, created_by: admin_a) }
 
       ActsAsTenant.with_tenant(club_b) do
         expect(Paciente.where(id: pac_a.id)).to be_empty
@@ -28,8 +28,8 @@ RSpec.describe 'Multi-tenancy (acts_as_tenant)', type: :model do
 
   describe 'sin tenant (jobs de Sidekiq / endpoints públicos)' do
     it 'no rompe: las queries no se scopean (require_tenant=false)' do
-      create(:paciente, club: club_a, created_by: admin_a)
-      create(:paciente, club: club_b, created_by: admin_b)
+      ActsAsTenant.with_tenant(club_a) { create(:paciente, club: club_a, created_by: admin_a) }
+      ActsAsTenant.with_tenant(club_b) { create(:paciente, club: club_b, created_by: admin_b) }
 
       ActsAsTenant.without_tenant do
         expect(Paciente.count).to be >= 2
@@ -39,7 +39,7 @@ RSpec.describe 'Multi-tenancy (acts_as_tenant)', type: :model do
 
   describe 'uniqueness GLOBAL de DNI (REPROCANN)' do
     it 'rechaza un DNI ya registrado en otro club aun con tenant fijado' do
-      create(:paciente, club: club_a, dni: '40555666', created_by: admin_a)
+      ActsAsTenant.with_tenant(club_a) { create(:paciente, club: club_a, dni: '40555666', created_by: admin_a) }
 
       ActsAsTenant.with_tenant(club_b) do
         dup = build(:paciente, club: club_b, dni: '40555666', created_by: admin_b)
@@ -51,9 +51,11 @@ RSpec.describe 'Multi-tenancy (acts_as_tenant)', type: :model do
 
   describe 'genéticas globales (has_global_records)' do
     it 'son visibles desde cualquier club además de las propias' do
-      global = Genetica.create!(nombre: 'Global Cat', tipo: 'hibrida', global: true,
-                                registrada_inase: true, club_id: nil, activa: true)
-      propia_a = Genetica.create!(nombre: 'Propia A', tipo: 'indica', club_id: club_a.id, activa: true)
+      global = ActsAsTenant.without_tenant do
+        Genetica.create!(nombre: 'Global Cat', tipo: 'hibrida', global: true,
+                         registrada_inase: true, club_id: nil, activa: true)
+      end
+      propia_a = ActsAsTenant.with_tenant(club_a) { Genetica.create!(nombre: 'Propia A', tipo: 'indica', club_id: club_a.id, activa: true) }
 
       ActsAsTenant.with_tenant(club_b) do
         ids = Genetica.all.pluck(:id)
