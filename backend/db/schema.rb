@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_16_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -189,6 +189,160 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
     t.index ["club_id", "created_at"], name: "index_auditorias_on_club_id_and_created_at"
     t.index ["club_id"], name: "index_auditorias_on_club_id"
     t.index ["user_id"], name: "index_auditorias_on_user_id"
+  end
+
+  create_table "bar_productos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "unidad_negocio_id"
+    t.string "nombre", null: false
+    t.string "categoria", default: "bebida", null: false
+    t.decimal "precio_ars", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "costo_ars", precision: 12, scale: 2
+    t.decimal "stock", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "stock_minimo", precision: 12, scale: 2, default: "0.0", null: false
+    t.boolean "activo", default: true, null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "bar_id"
+    t.bigint "deleted_by_id"
+    t.index ["bar_id"], name: "index_bar_productos_on_bar_id"
+    t.index ["club_id", "activo"], name: "index_bar_productos_on_club_id_and_activo"
+    t.index ["club_id"], name: "index_bar_productos_on_club_id"
+    t.index ["deleted_at"], name: "index_bar_productos_on_deleted_at"
+    t.index ["deleted_by_id"], name: "index_bar_productos_on_deleted_by_id"
+    t.index ["unidad_negocio_id"], name: "index_bar_productos_on_unidad_negocio_id"
+  end
+
+  create_table "bar_stock_movimientos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "bar_producto_id", null: false
+    t.bigint "created_by_id", null: false
+    t.bigint "movimiento_contable_id"
+    t.bigint "bar_venta_id"
+    t.bigint "evento_bar_id"
+    t.string "tipo", null: false
+    t.decimal "cantidad", precision: 12, scale: 2, null: false
+    t.decimal "stock_anterior", precision: 12, scale: 2, null: false
+    t.decimal "stock_nuevo", precision: 12, scale: 2, null: false
+    t.decimal "costo_unitario_ars", precision: 12, scale: 2
+    t.string "motivo"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bar_producto_id", "created_at"], name: "index_bar_stock_movimientos_on_bar_producto_id_and_created_at"
+    t.index ["bar_producto_id"], name: "index_bar_stock_movimientos_on_bar_producto_id"
+    t.index ["bar_venta_id"], name: "index_bar_stock_movimientos_on_bar_venta_id"
+    t.index ["club_id"], name: "index_bar_stock_movimientos_on_club_id"
+    t.index ["created_by_id"], name: "index_bar_stock_movimientos_on_created_by_id"
+    t.index ["evento_bar_id"], name: "index_bar_stock_movimientos_on_evento_bar_id"
+    t.index ["movimiento_contable_id"], name: "index_bar_stock_movimientos_on_movimiento_contable_id"
+    t.index ["tipo"], name: "index_bar_stock_movimientos_on_tipo"
+  end
+
+  create_table "bar_venta_items", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "bar_venta_id", null: false
+    t.bigint "bar_producto_id"
+    t.string "nombre", null: false
+    t.decimal "cantidad", precision: 12, scale: 2, null: false
+    t.decimal "precio_unitario_ars", precision: 12, scale: 2, null: false
+    t.decimal "subtotal_ars", precision: 12, scale: 2, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "deleted_at"
+    t.index ["bar_producto_id"], name: "index_bar_venta_items_on_bar_producto_id"
+    t.index ["bar_venta_id"], name: "index_bar_venta_items_on_bar_venta_id"
+    t.index ["club_id"], name: "index_bar_venta_items_on_club_id"
+    t.index ["deleted_at"], name: "index_bar_venta_items_on_deleted_at"
+  end
+
+  create_table "bar_ventas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "unidad_negocio_id"
+    t.bigint "movimiento_contable_id"
+    t.decimal "total_ars", precision: 12, scale: 2, default: "0.0", null: false
+    t.string "medio_pago", default: "efectivo", null: false
+    t.string "turno"
+    t.text "notas"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "bar_id"
+    t.bigint "deleted_by_id"
+    t.bigint "evento_bar_id"
+    t.bigint "caja_turno_id"
+    t.index ["bar_id"], name: "index_bar_ventas_on_bar_id"
+    t.index ["caja_turno_id"], name: "index_bar_ventas_on_caja_turno_id"
+    t.index ["club_id", "created_at"], name: "index_bar_ventas_on_club_id_and_created_at"
+    t.index ["club_id"], name: "index_bar_ventas_on_club_id"
+    t.index ["deleted_at"], name: "index_bar_ventas_on_deleted_at"
+    t.index ["deleted_by_id"], name: "index_bar_ventas_on_deleted_by_id"
+    t.index ["evento_bar_id"], name: "index_bar_ventas_on_evento_bar_id"
+    t.index ["movimiento_contable_id"], name: "index_bar_ventas_on_movimiento_contable_id"
+    t.index ["unidad_negocio_id"], name: "index_bar_ventas_on_unidad_negocio_id"
+    t.index ["user_id"], name: "index_bar_ventas_on_user_id"
+  end
+
+  create_table "bares", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "sede_id", null: false
+    t.bigint "deleted_by_id"
+    t.string "nombre", null: false
+    t.boolean "activo", default: true, null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "sede_id"], name: "index_bares_on_club_id_and_sede_id"
+    t.index ["club_id"], name: "index_bares_on_club_id"
+    t.index ["deleted_at"], name: "index_bares_on_deleted_at"
+    t.index ["deleted_by_id"], name: "index_bares_on_deleted_by_id"
+    t.index ["sede_id"], name: "index_bares_on_sede_id"
+  end
+
+  create_table "caja_turnos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "bar_id", null: false
+    t.bigint "sede_id", null: false
+    t.bigint "abierta_por_id", null: false
+    t.bigint "cerrada_por_id"
+    t.string "estado", default: "abierta", null: false
+    t.decimal "monto_inicial_ars", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "efectivo_declarado_ars", precision: 12, scale: 2
+    t.datetime "abierta_at", null: false
+    t.datetime "cerrada_at"
+    t.string "notas"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["abierta_por_id"], name: "index_caja_turnos_on_abierta_por_id"
+    t.index ["bar_id"], name: "index_caja_turnos_on_bar_id"
+    t.index ["bar_id"], name: "index_caja_turnos_una_abierta_por_bar", unique: true, where: "((estado)::text = 'abierta'::text)"
+    t.index ["cerrada_por_id"], name: "index_caja_turnos_on_cerrada_por_id"
+    t.index ["club_id"], name: "index_caja_turnos_on_club_id"
+    t.index ["sede_id"], name: "index_caja_turnos_on_sede_id"
+  end
+
+  create_table "categorias_contables", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "unidad_negocio_id"
+    t.string "nombre", null: false
+    t.string "tipo", null: false
+    t.string "color"
+    t.string "clave_sistema"
+    t.integer "orden", default: 0, null: false
+    t.boolean "activa", default: true, null: false
+    t.boolean "es_sistema", default: false, null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "parent_id"
+    t.string "comportamiento", default: "general", null: false
+    t.index ["club_id", "clave_sistema"], name: "index_categorias_contables_on_club_id_and_clave_sistema"
+    t.index ["club_id", "tipo"], name: "index_categorias_contables_on_club_id_and_tipo"
+    t.index ["club_id"], name: "index_categorias_contables_on_club_id"
+    t.index ["deleted_at"], name: "index_categorias_contables_on_deleted_at"
+    t.index ["parent_id"], name: "index_categorias_contables_on_parent_id"
+    t.index ["unidad_negocio_id"], name: "index_categorias_contables_on_unidad_negocio_id"
   end
 
   create_table "check_ins", force: :cascade do |t|
@@ -455,6 +609,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
     t.boolean "cobrar_en_entrega", default: false, null: false
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.boolean "es_regalo", default: false, null: false
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["deleted_at"], name: "index_dispensaciones_on_deleted_at"
@@ -564,6 +719,106 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
     t.index ["user_id"], name: "index_documentos_on_user_id"
   end
 
+  create_table "evento_bar_costos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "evento_bar_id", null: false
+    t.bigint "movimiento_contable_id"
+    t.bigint "created_by_id", null: false
+    t.bigint "deleted_by_id"
+    t.string "concepto", null: false
+    t.string "proveedor"
+    t.decimal "monto_ars", precision: 12, scale: 2, null: false
+    t.boolean "pagado", default: false, null: false
+    t.date "fecha"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_evento_bar_costos_on_club_id"
+    t.index ["created_by_id"], name: "index_evento_bar_costos_on_created_by_id"
+    t.index ["deleted_at"], name: "index_evento_bar_costos_on_deleted_at"
+    t.index ["deleted_by_id"], name: "index_evento_bar_costos_on_deleted_by_id"
+    t.index ["evento_bar_id"], name: "index_evento_bar_costos_on_evento_bar_id"
+    t.index ["movimiento_contable_id"], name: "index_evento_bar_costos_on_movimiento_contable_id"
+  end
+
+  create_table "evento_bar_entradas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "evento_bar_id", null: false
+    t.bigint "created_by_id", null: false
+    t.bigint "deleted_by_id"
+    t.bigint "evento_bar_tipo_entrada_id", null: false
+    t.string "codigo", null: false
+    t.string "comprador"
+    t.decimal "precio_ars", precision: 12, scale: 2, null: false
+    t.string "estado", default: "valida", null: false
+    t.datetime "check_in_at"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_evento_bar_entradas_on_club_id"
+    t.index ["codigo"], name: "index_evento_bar_entradas_on_codigo", unique: true
+    t.index ["created_by_id"], name: "index_evento_bar_entradas_on_created_by_id"
+    t.index ["deleted_at"], name: "index_evento_bar_entradas_on_deleted_at"
+    t.index ["deleted_by_id"], name: "index_evento_bar_entradas_on_deleted_by_id"
+    t.index ["evento_bar_id"], name: "index_evento_bar_entradas_on_evento_bar_id"
+    t.index ["evento_bar_tipo_entrada_id"], name: "idx_entradas_on_tipo"
+  end
+
+  create_table "evento_bar_provisiones", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "evento_bar_id", null: false
+    t.bigint "bar_producto_id"
+    t.decimal "cantidad_prevista", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "cantidad_reservada", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "cantidad_consumida", precision: 12, scale: 2, default: "0.0", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "provisionable_type"
+    t.bigint "provisionable_id"
+    t.index ["bar_producto_id"], name: "index_evento_bar_provisiones_on_bar_producto_id"
+    t.index ["club_id"], name: "index_evento_bar_provisiones_on_club_id"
+    t.index ["evento_bar_id", "provisionable_type", "provisionable_id"], name: "index_provisiones_evento_provisionable", unique: true
+    t.index ["evento_bar_id"], name: "index_evento_bar_provisiones_on_evento_bar_id"
+    t.index ["provisionable_type", "provisionable_id"], name: "index_provisiones_on_provisionable"
+  end
+
+  create_table "evento_bar_tareas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "evento_bar_id", null: false
+    t.bigint "deleted_by_id"
+    t.string "titulo", null: false
+    t.boolean "hecha", default: false, null: false
+    t.date "vence_el"
+    t.integer "orden", default: 0, null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_evento_bar_tareas_on_club_id"
+    t.index ["deleted_at"], name: "index_evento_bar_tareas_on_deleted_at"
+    t.index ["deleted_by_id"], name: "index_evento_bar_tareas_on_deleted_by_id"
+    t.index ["evento_bar_id"], name: "index_evento_bar_tareas_on_evento_bar_id"
+  end
+
+  create_table "evento_bar_tipos_entrada", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "evento_bar_id", null: false
+    t.bigint "movimiento_contable_id"
+    t.bigint "deleted_by_id"
+    t.string "nombre", null: false
+    t.decimal "precio_ars", precision: 12, scale: 2, default: "0.0", null: false
+    t.integer "cupo"
+    t.integer "orden", default: 0, null: false
+    t.boolean "activo", default: true, null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_evento_bar_tipos_entrada_on_club_id"
+    t.index ["deleted_at"], name: "index_evento_bar_tipos_entrada_on_deleted_at"
+    t.index ["deleted_by_id"], name: "index_evento_bar_tipos_entrada_on_deleted_by_id"
+    t.index ["evento_bar_id"], name: "index_evento_bar_tipos_entrada_on_evento_bar_id"
+    t.index ["movimiento_contable_id"], name: "index_evento_bar_tipos_entrada_on_movimiento_contable_id"
+  end
+
   create_table "eventos", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.string "titulo", null: false
@@ -581,6 +836,27 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
     t.index ["club_id"], name: "index_eventos_on_club_id"
     t.index ["deleted_at"], name: "index_eventos_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_eventos_on_deleted_by_id"
+  end
+
+  create_table "eventos_bar", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "bar_id", null: false
+    t.bigint "deleted_by_id"
+    t.string "nombre", null: false
+    t.date "fecha"
+    t.string "estado", default: "planificado", null: false
+    t.text "descripcion"
+    t.integer "aforo"
+    t.decimal "presupuesto_ingresos", precision: 12, scale: 2, default: "0.0", null: false
+    t.text "notas"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bar_id"], name: "index_eventos_bar_on_bar_id"
+    t.index ["club_id", "fecha"], name: "index_eventos_bar_on_club_id_and_fecha"
+    t.index ["club_id"], name: "index_eventos_bar_on_club_id"
+    t.index ["deleted_at"], name: "index_eventos_bar_on_deleted_at"
+    t.index ["deleted_by_id"], name: "index_eventos_bar_on_deleted_by_id"
   end
 
   create_table "geneticas", force: :cascade do |t|
@@ -645,6 +921,71 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
     t.index ["user_id"], name: "index_indicacion_medicas_on_user_id"
   end
 
+  create_table "insumo_compras", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "insumo_id", null: false
+    t.bigint "movimiento_contable_id"
+    t.bigint "created_by_id", null: false
+    t.decimal "cantidad", precision: 14, scale: 3, null: false
+    t.decimal "costo_total_ars", precision: 14, scale: 2, null: false
+    t.decimal "costo_unitario_ars", precision: 14, scale: 4, null: false
+    t.string "proveedor"
+    t.date "fecha", null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_insumo_compras_on_club_id"
+    t.index ["created_by_id"], name: "index_insumo_compras_on_created_by_id"
+    t.index ["deleted_at"], name: "index_insumo_compras_on_deleted_at"
+    t.index ["insumo_id"], name: "index_insumo_compras_on_insumo_id"
+    t.index ["movimiento_contable_id"], name: "index_insumo_compras_on_movimiento_contable_id"
+  end
+
+  create_table "insumo_consumos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "insumo_id", null: false
+    t.bigint "lote_id"
+    t.bigint "sala_id"
+    t.bigint "created_by_id", null: false
+    t.decimal "cantidad", precision: 14, scale: 3, null: false
+    t.decimal "costo_imputado_ars", precision: 14, scale: 2, null: false
+    t.date "fecha", null: false
+    t.text "notas"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "lote_id"], name: "index_insumo_consumos_on_club_id_and_lote_id"
+    t.index ["club_id"], name: "index_insumo_consumos_on_club_id"
+    t.index ["created_by_id"], name: "index_insumo_consumos_on_created_by_id"
+    t.index ["deleted_at"], name: "index_insumo_consumos_on_deleted_at"
+    t.index ["insumo_id"], name: "index_insumo_consumos_on_insumo_id"
+    t.index ["lote_id"], name: "index_insumo_consumos_on_lote_id"
+    t.index ["sala_id"], name: "index_insumo_consumos_on_sala_id"
+  end
+
+  create_table "insumos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "categoria_contable_id"
+    t.string "nombre", null: false
+    t.string "unidad_medida", default: "unidad", null: false
+    t.decimal "stock_actual", precision: 14, scale: 3, default: "0.0", null: false
+    t.decimal "costo_promedio_ars", precision: 14, scale: 4, default: "0.0", null: false
+    t.decimal "stock_minimo", precision: 14, scale: 3, default: "0.0", null: false
+    t.boolean "activo", default: true, null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "sede_id"
+    t.string "tipo", default: "cultivo", null: false
+    t.index ["categoria_contable_id"], name: "index_insumos_on_categoria_contable_id"
+    t.index ["club_id", "nombre"], name: "index_insumos_on_club_id_and_nombre"
+    t.index ["club_id", "sede_id", "nombre"], name: "index_insumos_on_club_id_and_sede_id_and_nombre"
+    t.index ["club_id", "tipo", "sede_id"], name: "index_insumos_on_club_id_and_tipo_and_sede_id"
+    t.index ["club_id"], name: "index_insumos_on_club_id"
+    t.index ["deleted_at"], name: "index_insumos_on_deleted_at"
+    t.index ["sede_id"], name: "index_insumos_on_sede_id"
+  end
+
   create_table "jornadas_laborales", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "club_id", null: false
@@ -656,8 +997,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.string "estado", default: "enviada", null: false
+    t.datetime "confirmada_at"
+    t.bigint "confirmada_por_id"
+    t.index ["club_id", "estado"], name: "index_jornadas_laborales_on_club_id_and_estado"
     t.index ["club_id", "fecha"], name: "index_jornadas_laborales_on_club_id_and_fecha"
     t.index ["club_id"], name: "index_jornadas_laborales_on_club_id"
+    t.index ["confirmada_por_id"], name: "index_jornadas_laborales_on_confirmada_por_id"
     t.index ["deleted_at"], name: "index_jornadas_laborales_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_jornadas_laborales_on_deleted_by_id"
     t.index ["user_id", "fecha"], name: "index_jornadas_laborales_on_user_id_and_fecha", unique: true
@@ -821,7 +1167,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
 
   create_table "movimientos_contables", force: :cascade do |t|
     t.bigint "club_id", null: false
-    t.bigint "sede_id", null: false
+    t.bigint "sede_id"
     t.bigint "lote_id"
     t.bigint "dispensacion_id"
     t.bigint "created_by_id", null: false
@@ -843,6 +1189,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
     t.bigint "deleted_by_id"
     t.bigint "compra_cuotas_id"
     t.integer "cuota_numero"
+    t.bigint "categoria_contable_id"
+    t.bigint "unidad_negocio_id"
+    t.bigint "evento_bar_id"
+    t.index ["categoria_contable_id"], name: "index_movimientos_contables_on_categoria_contable_id"
     t.index ["club_id", "fecha"], name: "index_movimientos_contables_on_club_id_and_fecha"
     t.index ["club_id", "tipo"], name: "index_movimientos_contables_on_club_id_and_tipo"
     t.index ["club_id"], name: "index_movimientos_contables_on_club_id"
@@ -850,11 +1200,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
     t.index ["deleted_at"], name: "index_movimientos_contables_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_movimientos_contables_on_deleted_by_id"
     t.index ["dispensacion_id"], name: "index_movimientos_contables_on_dispensacion_id"
+    t.index ["evento_bar_id"], name: "index_movimientos_contables_on_evento_bar_id"
     t.index ["fecha"], name: "index_movimientos_contables_on_fecha"
     t.index ["lote_id"], name: "index_movimientos_contables_on_lote_id"
     t.index ["paciente_id"], name: "index_movimientos_contables_on_paciente_id"
     t.index ["sede_id", "fecha"], name: "index_movimientos_contables_on_sede_id_and_fecha"
     t.index ["sede_id"], name: "index_movimientos_contables_on_sede_id"
+    t.index ["unidad_negocio_id"], name: "index_movimientos_contables_on_unidad_negocio_id"
   end
 
   create_table "notas", force: :cascade do |t|
@@ -1291,6 +1643,26 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
     t.index ["paciente_id"], name: "index_reprocann_renovaciones_on_paciente_id"
   end
 
+  create_table "resenas_producto", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "paciente_id", null: false
+    t.bigint "genetica_id", null: false
+    t.bigint "dispensacion_id", null: false
+    t.integer "estrellas", null: false
+    t.integer "puntaje_sabor"
+    t.integer "puntaje_aroma"
+    t.integer "puntaje_efecto"
+    t.text "comentario"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "genetica_id"], name: "index_resenas_producto_on_club_id_and_genetica_id"
+    t.index ["club_id"], name: "index_resenas_producto_on_club_id"
+    t.index ["dispensacion_id", "genetica_id"], name: "idx_resenas_disp_genetica", unique: true
+    t.index ["dispensacion_id"], name: "index_resenas_producto_on_dispensacion_id"
+    t.index ["genetica_id"], name: "index_resenas_producto_on_genetica_id"
+    t.index ["paciente_id"], name: "index_resenas_producto_on_paciente_id"
+  end
+
   create_table "reservas", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.bigint "paciente_id", null: false
@@ -1573,6 +1945,22 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
     t.index ["paciente_id"], name: "index_turnos_on_paciente_id"
   end
 
+  create_table "unidades_negocio", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "nombre", null: false
+    t.string "tipo", default: "general", null: false
+    t.string "color"
+    t.integer "orden", default: 0, null: false
+    t.boolean "activa", default: true, null: false
+    t.boolean "es_sistema", default: false, null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "nombre"], name: "index_unidades_negocio_on_club_id_and_nombre"
+    t.index ["club_id"], name: "index_unidades_negocio_on_club_id"
+    t.index ["deleted_at"], name: "index_unidades_negocio_on_deleted_at"
+  end
+
   create_table "user_sedes", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "sede_id", null: false
@@ -1677,6 +2065,38 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
   add_foreign_key "ariccame_registros", "users", column: "deleted_by_id"
   add_foreign_key "auditorias", "clubs"
   add_foreign_key "auditorias", "users"
+  add_foreign_key "bar_productos", "bares"
+  add_foreign_key "bar_productos", "clubs"
+  add_foreign_key "bar_productos", "unidades_negocio", column: "unidad_negocio_id"
+  add_foreign_key "bar_productos", "users", column: "deleted_by_id"
+  add_foreign_key "bar_stock_movimientos", "bar_productos"
+  add_foreign_key "bar_stock_movimientos", "bar_ventas"
+  add_foreign_key "bar_stock_movimientos", "clubs"
+  add_foreign_key "bar_stock_movimientos", "eventos_bar", column: "evento_bar_id"
+  add_foreign_key "bar_stock_movimientos", "movimientos_contables", column: "movimiento_contable_id"
+  add_foreign_key "bar_stock_movimientos", "users", column: "created_by_id"
+  add_foreign_key "bar_venta_items", "bar_productos"
+  add_foreign_key "bar_venta_items", "bar_ventas"
+  add_foreign_key "bar_venta_items", "clubs"
+  add_foreign_key "bar_ventas", "bares"
+  add_foreign_key "bar_ventas", "caja_turnos"
+  add_foreign_key "bar_ventas", "clubs"
+  add_foreign_key "bar_ventas", "eventos_bar", column: "evento_bar_id"
+  add_foreign_key "bar_ventas", "movimientos_contables", column: "movimiento_contable_id"
+  add_foreign_key "bar_ventas", "unidades_negocio", column: "unidad_negocio_id"
+  add_foreign_key "bar_ventas", "users"
+  add_foreign_key "bar_ventas", "users", column: "deleted_by_id"
+  add_foreign_key "bares", "clubs"
+  add_foreign_key "bares", "sedes"
+  add_foreign_key "bares", "users", column: "deleted_by_id"
+  add_foreign_key "caja_turnos", "bares"
+  add_foreign_key "caja_turnos", "clubs"
+  add_foreign_key "caja_turnos", "sedes"
+  add_foreign_key "caja_turnos", "users", column: "abierta_por_id"
+  add_foreign_key "caja_turnos", "users", column: "cerrada_por_id"
+  add_foreign_key "categorias_contables", "categorias_contables", column: "parent_id"
+  add_foreign_key "categorias_contables", "clubs"
+  add_foreign_key "categorias_contables", "unidades_negocio", column: "unidad_negocio_id"
   add_foreign_key "check_ins", "clubs"
   add_foreign_key "check_ins", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "check_ins", "pacientes"
@@ -1727,15 +2147,51 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
   add_foreign_key "documentos", "users"
   add_foreign_key "documentos", "users", column: "deleted_by_id"
   add_foreign_key "documentos", "users", column: "subido_por_id"
+  add_foreign_key "evento_bar_costos", "clubs"
+  add_foreign_key "evento_bar_costos", "eventos_bar", column: "evento_bar_id"
+  add_foreign_key "evento_bar_costos", "movimientos_contables", column: "movimiento_contable_id"
+  add_foreign_key "evento_bar_costos", "users", column: "created_by_id"
+  add_foreign_key "evento_bar_costos", "users", column: "deleted_by_id"
+  add_foreign_key "evento_bar_entradas", "clubs"
+  add_foreign_key "evento_bar_entradas", "evento_bar_tipos_entrada", column: "evento_bar_tipo_entrada_id"
+  add_foreign_key "evento_bar_entradas", "eventos_bar", column: "evento_bar_id"
+  add_foreign_key "evento_bar_entradas", "users", column: "created_by_id"
+  add_foreign_key "evento_bar_entradas", "users", column: "deleted_by_id"
+  add_foreign_key "evento_bar_provisiones", "bar_productos"
+  add_foreign_key "evento_bar_provisiones", "clubs"
+  add_foreign_key "evento_bar_provisiones", "eventos_bar", column: "evento_bar_id"
+  add_foreign_key "evento_bar_tareas", "clubs"
+  add_foreign_key "evento_bar_tareas", "eventos_bar", column: "evento_bar_id"
+  add_foreign_key "evento_bar_tareas", "users", column: "deleted_by_id"
+  add_foreign_key "evento_bar_tipos_entrada", "clubs"
+  add_foreign_key "evento_bar_tipos_entrada", "eventos_bar", column: "evento_bar_id"
+  add_foreign_key "evento_bar_tipos_entrada", "movimientos_contables", column: "movimiento_contable_id"
+  add_foreign_key "evento_bar_tipos_entrada", "users", column: "deleted_by_id"
   add_foreign_key "eventos", "clubs"
   add_foreign_key "eventos", "users", column: "deleted_by_id"
+  add_foreign_key "eventos_bar", "bares"
+  add_foreign_key "eventos_bar", "clubs"
+  add_foreign_key "eventos_bar", "users", column: "deleted_by_id"
   add_foreign_key "geneticas", "clubs"
   add_foreign_key "geneticas", "users", column: "deleted_by_id"
   add_foreign_key "indicacion_medicas", "pacientes"
   add_foreign_key "indicacion_medicas", "users"
   add_foreign_key "indicacion_medicas", "users", column: "deleted_by_id"
+  add_foreign_key "insumo_compras", "clubs"
+  add_foreign_key "insumo_compras", "insumos"
+  add_foreign_key "insumo_compras", "movimientos_contables", column: "movimiento_contable_id"
+  add_foreign_key "insumo_compras", "users", column: "created_by_id"
+  add_foreign_key "insumo_consumos", "clubs"
+  add_foreign_key "insumo_consumos", "insumos"
+  add_foreign_key "insumo_consumos", "lotes"
+  add_foreign_key "insumo_consumos", "salas"
+  add_foreign_key "insumo_consumos", "users", column: "created_by_id"
+  add_foreign_key "insumos", "categorias_contables", column: "categoria_contable_id"
+  add_foreign_key "insumos", "clubs"
+  add_foreign_key "insumos", "sedes"
   add_foreign_key "jornadas_laborales", "clubs"
   add_foreign_key "jornadas_laborales", "users"
+  add_foreign_key "jornadas_laborales", "users", column: "confirmada_por_id"
   add_foreign_key "jornadas_laborales", "users", column: "deleted_by_id"
   add_foreign_key "lecturas_ambientales", "dispositivos"
   add_foreign_key "lecturas_ambientales", "lotes"
@@ -1758,12 +2214,15 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
   add_foreign_key "mails_enviados", "pacientes"
   add_foreign_key "mails_enviados", "users"
   add_foreign_key "mails_enviados", "users", column: "deleted_by_id"
+  add_foreign_key "movimientos_contables", "categorias_contables", column: "categoria_contable_id"
   add_foreign_key "movimientos_contables", "clubs"
   add_foreign_key "movimientos_contables", "compras_cuotas", column: "compra_cuotas_id"
   add_foreign_key "movimientos_contables", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "movimientos_contables", "eventos_bar", column: "evento_bar_id"
   add_foreign_key "movimientos_contables", "lotes"
   add_foreign_key "movimientos_contables", "pacientes"
   add_foreign_key "movimientos_contables", "sedes"
+  add_foreign_key "movimientos_contables", "unidades_negocio", column: "unidad_negocio_id"
   add_foreign_key "movimientos_contables", "users", column: "created_by_id"
   add_foreign_key "movimientos_contables", "users", column: "deleted_by_id"
   add_foreign_key "notas", "clubs"
@@ -1825,6 +2284,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
   add_foreign_key "reprocann_renovaciones", "pacientes"
   add_foreign_key "reprocann_renovaciones", "users", column: "deleted_by_id"
   add_foreign_key "reprocann_renovaciones", "users", column: "iniciada_por_id"
+  add_foreign_key "resenas_producto", "clubs"
+  add_foreign_key "resenas_producto", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "resenas_producto", "geneticas"
+  add_foreign_key "resenas_producto", "pacientes"
   add_foreign_key "reservas", "clubs"
   add_foreign_key "reservas", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "reservas", "pacientes"
@@ -1873,6 +2336,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_05_234814) do
   add_foreign_key "turnos", "pacientes"
   add_foreign_key "turnos", "users", column: "deleted_by_id"
   add_foreign_key "turnos", "users", column: "medico_id"
+  add_foreign_key "unidades_negocio", "clubs"
   add_foreign_key "user_sedes", "sedes"
   add_foreign_key "user_sedes", "users"
   add_foreign_key "user_sedes", "users", column: "deleted_by_id"

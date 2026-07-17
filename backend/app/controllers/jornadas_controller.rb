@@ -33,6 +33,7 @@ class JornadasController < ApplicationController
 
   # PATCH /api/jornadas/:id
   def update
+    return jornada_bloqueada if @jornada.confirmada?
     if @jornada.update(jornada_params.except(:user_id))
       render json: serialize(@jornada)
     else
@@ -42,14 +43,41 @@ class JornadasController < ApplicationController
 
   # DELETE /api/jornadas/:id
   def destroy
+    return jornada_bloqueada if @jornada.confirmada?
     @jornada.destroy
     head :no_content
+  end
+
+  # POST /api/jornadas/confirmar  { ids: [...] }  — admin/supervisor.
+  # Sirve para confirmar de a una (un id) o en lote (varios / todo el mes de un usuario).
+  def confirmar
+    return no_autorizado unless admin_o_sup?
+    jornadas = current_user.club.jornadas_laborales.where(id: Array(params[:ids]))
+    jornadas.each { |j| j.confirmar!(por: current_user) }
+    render json: { confirmadas: jornadas.count, jornadas: jornadas.reload.map { |j| serialize(j) } }
+  end
+
+  # POST /api/jornadas/reabrir  { ids: [...] }  — admin/supervisor.
+  # Una jornada confirmada queda bloqueada; reabrir la vuelve a 'enviada' para corregirla.
+  def reabrir
+    return no_autorizado unless admin_o_sup?
+    jornadas = current_user.club.jornadas_laborales.where(id: Array(params[:ids]))
+    jornadas.each(&:reabrir!)
+    render json: { reabiertas: jornadas.count, jornadas: jornadas.reload.map { |j| serialize(j) } }
   end
 
   private
 
   def admin_o_sup?
     current_user.admin? || current_user.supervisor? || current_user.super_admin?
+  end
+
+  def jornada_bloqueada
+    render json: { error: 'La jornada está confirmada. Un admin debe reabrirla para editarla.' }, status: :unprocessable_entity
+  end
+
+  def no_autorizado
+    render json: { error: 'No autorizado' }, status: :forbidden
   end
 
   def check_rol!
@@ -86,14 +114,17 @@ class JornadasController < ApplicationController
 
   def serialize(j)
     {
-      id:           j.id,
-      user_id:      j.user_id,
-      user_nombre:  j.user&.nombre_completo,
-      fecha:        j.fecha,
-      hora_entrada: j.hora_entrada,
-      hora_salida:  j.hora_salida,
-      horas:        j.horas,
-      nota:         j.nota,
+      id:                 j.id,
+      user_id:            j.user_id,
+      user_nombre:        j.user&.nombre_completo,
+      fecha:              j.fecha,
+      hora_entrada:       j.hora_entrada,
+      hora_salida:        j.hora_salida,
+      horas:              j.horas,
+      nota:               j.nota,
+      estado:             j.estado,
+      confirmada_at:      j.confirmada_at,
+      confirmada_por:     j.confirmada_por&.nombre_completo,
     }
   end
 end

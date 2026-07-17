@@ -4,10 +4,16 @@ class JornadaLaboral < ApplicationRecord
 
   belongs_to :user
   belongs_to :club
+  belongs_to :confirmada_por, class_name: 'User', optional: true
   acts_as_tenant(:club)
+
+  # La jornada nace 'enviada' (se carga y ya queda pendiente de confirmar — no hay borrador).
+  # El admin/supervisor la confirma; una confirmada queda bloqueada hasta que la reabran.
+  ESTADOS = %w[enviada confirmada].freeze
 
   validates :fecha,        presence: true
   validates :hora_entrada, :hora_salida, presence: true, format: { with: /\A\d{2}:\d{2}\z/, message: 'formato HH:MM' }
+  validates :estado,       inclusion: { in: ESTADOS }
   validate  :salida_despues_de_entrada
   validate  :fecha_no_futura
 
@@ -15,7 +21,22 @@ class JornadaLaboral < ApplicationRecord
     ini = Date.new(anio, mes, 1)
     where(fecha: ini..ini.end_of_month)
   }
-  scope :recientes, -> { order(fecha: :desc) }
+  scope :recientes,            -> { order(fecha: :desc) }
+  scope :enviadas,             -> { where(estado: 'enviada') }
+  scope :confirmadas,          -> { where(estado: 'confirmada') }
+  scope :pendientes_confirmar, -> { where(estado: 'enviada') }
+
+  def confirmada? = estado == 'confirmada'
+
+  def confirmar!(por:)
+    return if confirmada?
+    update!(estado: 'confirmada', confirmada_at: Time.current, confirmada_por: por)
+  end
+
+  def reabrir!
+    return unless confirmada?
+    update!(estado: 'enviada', confirmada_at: nil, confirmada_por: nil)
+  end
 
   # Horas trabajadas (decimal). Soporta turno que cruza medianoche.
   def horas
