@@ -417,6 +417,8 @@ export const listJornadas   = (params = {})      => api.get('/jornadas', { param
 export const createJornada  = (jornada)          => api.post('/jornadas', { jornada })
 export const updateJornada  = (id, jornada)      => api.patch(`/jornadas/${id}`, { jornada })
 export const deleteJornada  = (id)               => api.delete(`/jornadas/${id}`)
+export const confirmarJornadas = (ids)           => api.post('/jornadas/confirmar', { ids })
+export const reabrirJornadas   = (ids)           => api.post('/jornadas/reabrir', { ids })
 export const getTarea          = (id)           => api.get(`/tareas/${id}`)
 export const createTarea       = (payload)      => api.post('/tareas', { tarea: payload })
 export const updateTarea       = (id, payload)  => api.patch(`/tareas/${id}`, { tarea: payload })

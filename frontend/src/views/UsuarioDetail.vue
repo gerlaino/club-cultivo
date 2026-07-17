@@ -10,7 +10,7 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import { getUsuarioStats, recibirCajaDelivery } from '../lib/api.js'
+import { getUsuarioStats, recibirCajaDelivery, listJornadas, confirmarJornadas, reabrirJornadas } from '../lib/api.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -146,6 +146,61 @@ async function cargarStats() {
   } catch { stats.value = null } finally { loadingStats.value = false }
 }
 
+// ── Horas del mes: confirmación por el admin/supervisor ────────────────────
+const puedeConfirmarHoras = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.role))
+const jornadas        = ref([])
+const loadingJornadas = ref(false)
+const selJornadas     = ref([])   // ids seleccionados
+const confirmandoHoras = ref(false)
+
+const jornadasPendientes = computed(() => jornadas.value.filter(j => j.estado !== 'confirmada'))
+const todasPendSeleccionadas = computed(() =>
+  jornadasPendientes.value.length > 0 && jornadasPendientes.value.every(j => selJornadas.value.includes(j.id)))
+
+async function cargarJornadas() {
+  if (!puedeConfirmarHoras.value) return
+  loadingJornadas.value = true
+  selJornadas.value = []
+  try {
+    const { data } = await listJornadas({ user_id: userId, anio: statsAnio.value, mes: statsMes.value })
+    jornadas.value = (data.jornadas || []).sort((a, b) => a.fecha.localeCompare(b.fecha))
+  } catch { jornadas.value = [] } finally { loadingJornadas.value = false }
+}
+
+function toggleSelJornada(id) {
+  const i = selJornadas.value.indexOf(id)
+  if (i >= 0) selJornadas.value.splice(i, 1); else selJornadas.value.push(id)
+}
+function toggleTodasPendientes() {
+  selJornadas.value = todasPendSeleccionadas.value ? [] : jornadasPendientes.value.map(j => j.id)
+}
+
+async function confirmarHoras(ids) {
+  if (!ids.length) return
+  confirmandoHoras.value = true
+  try {
+    const { data } = await confirmarJornadas(ids)
+    toast.success(`${data.confirmadas} jornada${data.confirmadas !== 1 ? 's' : ''} confirmada${data.confirmadas !== 1 ? 's' : ''}`)
+    await cargarJornadas()
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudieron confirmar')
+  } finally { confirmandoHoras.value = false }
+}
+function confirmarSeleccionadas() { confirmarHoras([...selJornadas.value]) }
+function confirmarTodoElMes()     { confirmarHoras(jornadasPendientes.value.map(j => j.id)) }
+
+async function reabrirHora(j) {
+  const ok = await confirm({ title: 'Reabrir jornada',
+    message: `Vas a reabrir la jornada del ${j.fecha}. Vuelve a estado pendiente y el usuario podrá editarla.`,
+    confirmText: 'Reabrir' })
+  if (!ok) return
+  try {
+    await reabrirJornadas([j.id])
+    toast.success('Jornada reabierta')
+    await cargarJornadas()
+  } catch (e) { toast.error(e?.response?.data?.error || 'No se pudo reabrir') }
+}
+
 // ── Caja del delivery (efectivo en mano) ──────────────────────────────────
 const recibiendoCaja = ref(false)
 const fmtARS = (n) => '$' + (Number(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
@@ -170,6 +225,7 @@ function cambiarMesStats(delta) {
   if (a > hoy.getFullYear() || (a === hoy.getFullYear() && m > hoy.getMonth()+1)) return
   statsMes.value = m; statsAnio.value = a
   cargarStats()
+  cargarJornadas()
 }
 const MEDIO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente', no_abona: 'No abona', credito_gramos: 'Crédito gramos' }
 
@@ -178,6 +234,7 @@ onMounted(async () => {
   catch { error.value = 'No se pudo cargar el usuario.' }
   finally { loading.value = false }
   cargarStats()
+  cargarJornadas()
 })
 </script>
 
@@ -331,6 +388,47 @@ onMounted(async () => {
                 </div>
               </div>
               <p v-else class="uds__empty">Sin datos para este período.</p>
+            </div>
+          </div>
+
+          <!-- Horas del mes: confirmación (admin/supervisor) -->
+          <div v-if="puedeConfirmarHoras" class="ud__card">
+            <div class="ud__card-hdr">
+              <div class="ud__card-ico" style="background:rgba(180,83,9,.1);color:#b45309">
+                <i class="bi bi-clock-history"></i>
+              </div>
+              <span class="ud__card-title">Horas de {{ statsLabelMes }}</span>
+              <span class="ud__card-hint">{{ jornadasPendientes.length }} pendiente{{ jornadasPendientes.length !== 1 ? 's' : '' }}</span>
+            </div>
+            <div class="ud__card-body">
+              <div v-if="loadingJornadas" class="uds__loading"><DsSpinner :size="22" /></div>
+              <template v-else-if="jornadas.length">
+                <div class="udh__head">
+                  <label class="udh__all">
+                    <input type="checkbox" :checked="todasPendSeleccionadas" :disabled="!jornadasPendientes.length" @change="toggleTodasPendientes" />
+                    Seleccionar pendientes
+                  </label>
+                  <span class="udh__sel">{{ selJornadas.length }} sel.</span>
+                </div>
+                <div class="udh__list">
+                  <div v-for="j in jornadas" :key="j.id" class="udh__row" :class="{ 'udh__row--conf': j.estado === 'confirmada' }">
+                    <input type="checkbox" :checked="selJornadas.includes(j.id)" :disabled="j.estado === 'confirmada'" @change="toggleSelJornada(j.id)" />
+                    <span class="udh__fecha">{{ j.fecha }}</span>
+                    <span class="udh__horario">{{ j.hora_entrada }}–{{ j.hora_salida }}</span>
+                    <span class="udh__hs">{{ j.horas }}h</span>
+                    <span class="udh__estado" :class="j.estado === 'confirmada' ? 'udh__estado--ok' : 'udh__estado--pend'">
+                      {{ j.estado === 'confirmada' ? 'Confirmada' : 'Pendiente' }}
+                    </span>
+                    <button v-if="j.estado === 'confirmada'" class="udh__reabrir" title="Reabrir" @click="reabrirHora(j)"><i class="bi bi-unlock"></i></button>
+                    <span v-else class="udh__reabrir-ph"></span>
+                  </div>
+                </div>
+                <div class="udh__actions">
+                  <button class="udh__btn" :disabled="confirmandoHoras || !selJornadas.length" @click="confirmarSeleccionadas">Confirmar seleccionadas</button>
+                  <button class="udh__btn udh__btn--primary" :disabled="confirmandoHoras || !jornadasPendientes.length" @click="confirmarTodoElMes">Confirmar todo el mes</button>
+                </div>
+              </template>
+              <p v-else class="uds__empty">Sin horas cargadas este mes.</p>
             </div>
           </div>
 
@@ -763,6 +861,31 @@ onMounted(async () => {
 .uds__month { font-size: .82rem; font-weight: 700; color: #1a2e1a; min-width: 110px; text-align: center; }
 .uds__loading { display: flex; justify-content: center; padding: 1rem; }
 .uds__empty { color: #94a3b8; font-size: .85rem; text-align: center; padding: 1rem 0; margin: 0; }
+
+/* Horas del mes — confirmación */
+.udh__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
+.udh__all { display: flex; align-items: center; gap: .4rem; font-size: .78rem; font-weight: 600; color: #475569; cursor: pointer; }
+.udh__sel { font-size: .75rem; font-weight: 700; color: #15803d; }
+.udh__list { display: flex; flex-direction: column; border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden; }
+.udh__row { display: grid; grid-template-columns: auto 1fr auto auto auto auto; align-items: center; gap: .6rem; padding: .5rem .7rem; font-size: .82rem; }
+.udh__row:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
+.udh__row--conf { background: #f8fafc; }
+.udh__row input { width: 15px; height: 15px; cursor: pointer; }
+.udh__fecha { font-weight: 600; color: #0f172a; font-variant-numeric: tabular-nums; }
+.udh__horario { color: #64748b; font-variant-numeric: tabular-nums; }
+.udh__hs { font-weight: 700; color: #2d4a3e; font-variant-numeric: tabular-nums; }
+.udh__estado { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: .12rem .5rem; border-radius: 999px; }
+.udh__estado--ok { background: #dcfce7; color: #15803d; }
+.udh__estado--pend { background: #fef3c7; color: #b45309; }
+.udh__reabrir { border: none; background: none; color: #64748b; cursor: pointer; padding: .1rem .3rem; font-size: .85rem; }
+.udh__reabrir:hover { color: #b45309; }
+.udh__reabrir-ph { width: 18px; }
+.udh__actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .7rem; flex-wrap: wrap; }
+.udh__btn { border: 1.5px solid #e2e8f0; background: #fff; color: #334155; border-radius: 8px; padding: .45rem .9rem; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.udh__btn:hover:not(:disabled) { border-color: #cbd5e1; }
+.udh__btn--primary { background: #5C7A4A; border-color: #5C7A4A; color: #fff; }
+.udh__btn--primary:hover:not(:disabled) { background: #4a6239; }
+.udh__btn:disabled { opacity: .5; cursor: not-allowed; }
 .uds__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem; }
 .uds__stat { background: #f8fafc; border: 1px solid #eef2f6; border-radius: 12px; padding: .9rem; display: flex; flex-direction: column; gap: .15rem; }
 .uds__val { font-family: var(--font-display, sans-serif); font-size: 1.6rem; font-weight: 700; color: #1a2e1a; line-height: 1; }

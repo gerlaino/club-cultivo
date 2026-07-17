@@ -57,7 +57,11 @@
             <span v-if="j.nota" class="mh__item-nota">{{ j.nota }}</span>
           </div>
           <span class="mh__item-hs">{{ j.horas }}h</span>
-          <i class="bi bi-chevron-right mh__item-arr"></i>
+          <span class="mh__estado" :class="j.estado === 'confirmada' ? 'mh__estado--ok' : 'mh__estado--pend'">
+            {{ j.estado === 'confirmada' ? 'Confirmada' : 'Pendiente' }}
+          </span>
+          <i v-if="j.estado !== 'confirmada'" class="bi bi-chevron-right mh__item-arr"></i>
+          <i v-else class="bi bi-lock mh__item-arr"></i>
         </div>
       </div>
       <p v-else-if="!loading" class="mh__empty">Tocá un día del calendario para cargar tus horas.</p>
@@ -174,6 +178,10 @@ function cambiarMes(delta) {
 }
 
 function abrir(cel) {
+  if (cel.jornada?.estado === 'confirmada') {
+    toast.info('Esta jornada ya fue confirmada por el admin — no se puede editar.')
+    return
+  }
   diaSel.value = cel
   error.value = ''
   if (cel.jornada) {
@@ -278,6 +286,9 @@ onMounted(cargar)
 .mh__item-nota { font-size: .72rem; color: var(--c-ink-500, #6b7280); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mh__item-hs { font-size: .85rem; font-weight: 700; color: var(--c-leaf-700, #2d4a3e); background: var(--c-leaf-100, #e8f0eb); border-radius: 999px; padding: .15rem .55rem; flex-shrink: 0; }
 .mh__item-arr { color: var(--c-ink-300, #d1d5db); font-size: .75rem; flex-shrink: 0; }
+.mh__estado { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: .12rem .5rem; border-radius: 999px; flex-shrink: 0; }
+.mh__estado--ok   { background: #dcfce7; color: #15803d; }
+.mh__estado--pend { background: #fef3c7; color: #b45309; }
 .mh__empty { margin-top: 1rem; text-align: center; color: var(--c-ink-500, #9aa39c); font-size: .82rem; }
 
 /* Form (sheet) */
