@@ -84,7 +84,8 @@ module Public
       gen_payload[:nombre] ||= disp.genetica_nombre # fallback histórico
 
       {
-        codigo:    disp.token,
+        codigo:       disp.token,
+        socio_numero: pac&.id, # nº de socio del paciente (su propio pasaporte, gateado por DNI)
         fecha:     disp.fecha_dispensacion,
         multi:     items_pasaporte(disp, snap).size > 1,
         cantidad:  (snap['cantidad'] || disp.cantidad)&.to_f,

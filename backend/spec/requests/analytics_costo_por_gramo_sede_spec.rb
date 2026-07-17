@@ -72,6 +72,7 @@ RSpec.describe 'Analytics — costo por gramo por sede', type: :request do
 
     it 'rechaza a un rol sin acceso a analítica' do
       dispensador = create(:user, :dispensador, club: club)
+      delete '/api/users/sign_out' # el before ya logueó al admin; cambiamos de usuario limpio
       sign_in_as(dispensador)
       get '/analytics/costo_por_gramo_sede', headers: auth_headers
       expect(response).to have_http_status(:forbidden)

@@ -47,7 +47,7 @@ RSpec.describe 'Categorías contables', type: :request do
     end
 
     it 'filtra por tipo' do
-      get '/categorias_contables', params: { tipo: 'ingreso' }, headers: auth_headers, as: :json
+      get '/categorias_contables?tipo=ingreso', headers: auth_headers
       tipos = JSON.parse(response.body).map { |c| c['tipo'] }.uniq
       expect(tipos).to eq(['ingreso'])
     end
