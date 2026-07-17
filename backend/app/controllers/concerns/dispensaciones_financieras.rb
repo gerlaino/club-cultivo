@@ -62,27 +62,31 @@ module DispensacionesFinancieras
     acreditar_excedente!(disp, excedente.round(2)) if excedente > 0.001
   end
 
-  # Excedente pagado por el socio → crédito a favor en su cuenta corriente. Reusa el
-  # asiento 'aporte_socio' (cuyo callback acredita la CC). Requiere que tenga cuenta.
+  # Excedente pagado por el socio → crédito a favor en su cuenta corriente.
+  # NO es ingreso del club: es plata del socio parkeada como crédito (un pasivo). Por eso
+  # se acredita DIRECTO en la CC, sin asiento contable 'aporte_socio' (que lo contaba como
+  # ingreso e inflaba el libro). Cuando el socio use ese crédito en una dispensa futura, esa
+  # dispensa se cobra contra la CC. Requiere que tenga cuenta corriente.
   def acreditar_excedente!(disp, monto)
-    unless disp.paciente.cuenta_corriente
+    cc = disp.paciente.cuenta_corriente
+    unless cc
       raise "El socio no tiene cuenta corriente para acreditar el excedente ($#{monto.to_f}). Ajustá el monto cobrado."
     end
-    MovimientoContable.create!(
-      club:             current_user.club,
-      sede_id:          disp.sede_id,
-      dispensacion:     disp,
-      paciente:         disp.paciente,
-      created_by:       current_user,
-      tipo:             'ingreso',
-      categoria:        'aporte_socio',
-      descripcion:      "Excedente de pago — Dispensación ##{disp.id}",
-      monto_ars:        monto,
-      fecha:            disp.fecha_dispensacion,
-      pagado:           true,
-      medio_pago:       'efectivo',
-      comprobante_tipo: 'sin_comprobante',
-    )
+    anterior = cc.saldo_disponible
+    nuevo    = anterior + monto.to_d
+    ActiveRecord::Base.transaction do
+      cc.update!(saldo_disponible: nuevo)
+      cc.movimientos.create!(
+        tipo:           'pago',
+        unidad:         'ars',
+        monto:          monto.to_d,
+        saldo_anterior: anterior,
+        saldo_nuevo:    nuevo,
+        descripcion:    "Excedente de pago — Dispensación ##{disp.id}",
+        dispensacion:   disp,
+        created_by:     current_user,
+      )
+    end
   end
 
   # medio_pago denormalizado de la dispensa: el único medio, o 'mixto' si hay varios.

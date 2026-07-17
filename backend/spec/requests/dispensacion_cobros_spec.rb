@@ -100,6 +100,24 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
       expect(d.saldo_pendiente).to eq(0)
       expect(d.cobros.sum(:monto_ars)).to eq(100_000)          # los cobros no superan el total
       expect(cc.reload.saldo_disponible).to eq(20_000)          # excedente a favor
+      # El excedente es crédito del socio, NO ingreso del club: no debe generar asiento.
+      expect(MovimientoContable.where(dispensacion: d, categoria: 'aporte_socio')).to be_empty
+      # Queda trazado como movimiento de CC ligado a la dispensa.
+      expect(cc.movimientos.where(dispensacion: d, tipo: 'pago').sum(:monto)).to eq(20_000)
+    end
+
+    it 'con cuenta corriente: al cancelar, revierte el excedente acreditado' do
+      cc = create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 80_000)
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'efectivo', monto: 120_000 }])
+      d = Dispensacion.last
+      expect(cc.reload.saldo_disponible).to eq(20_000)
+
+      delete '/api/users/sign_out'
+      sign_in_as(admin)
+      patch "/dispensaciones/#{d.id}/cancelar_entrega", params: { motivo: 'test' }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(cc.reload.saldo_disponible).to eq(0)   # el crédito de excedente se revirtió
     end
 
     it 'sin cuenta corriente: bloquea (no hay dónde acreditar el excedente)' do

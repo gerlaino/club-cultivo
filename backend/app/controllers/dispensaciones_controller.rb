@@ -709,19 +709,22 @@ class DispensacionesController < ApplicationController
     cc = dispensacion.paciente.cuenta_corriente
     return unless cc
 
-    # Usar la suma real de débitos (más robusto ante el bug de doble POST).
-    # Solo débitos en pesos: los de gramos los maneja revertir_gramos.
-    total = cc.movimientos.where(dispensacion: dispensacion, tipo: 'debito')
-              .where("unidad IS NULL OR unidad = 'ars'")
-              .sum(:monto).abs
-    return if total <= 0
+    # Revertir el neto que esta dispensa dejó en la CC (solo pesos; los gramos van por
+    # revertir_gramos). Dos efectos posibles, opuestos:
+    #   - débito  → deuda por el faltante (bajó el saldo) → al revertir SUMA.
+    #   - pago    → crédito por el excedente pagado de más (subió el saldo) → al revertir RESTA.
+    movs     = cc.movimientos.where(dispensacion: dispensacion).where("unidad IS NULL OR unidad = 'ars'")
+    debitos  = movs.where(tipo: 'debito').sum(:monto).abs
+    creditos = movs.where(tipo: 'pago').sum(:monto)
+    delta    = debitos - creditos
+    return if delta.zero?
 
     anterior = cc.saldo_disponible
-    nuevo    = anterior + total
+    nuevo    = anterior + delta
     cc.update!(saldo_disponible: nuevo)
     cc.movimientos.create!(
       tipo:           'ajuste',
-      monto:          total,
+      monto:          delta,
       saldo_anterior: anterior,
       saldo_nuevo:    nuevo,
       descripcion:    "Reversa dispensación ##{dispensacion.id}",
