@@ -200,18 +200,64 @@ class LotesController < ApplicationController
     end
 
     estado_anterior = @lote.estado
-    if @lote.update(lote_update_params)
-      # Si la edición cambió el estado del lote (corrección manual), propagamos el estado
-      # a las plantas igual que la máquina de estados — para que el listado no quede viejo.
-      sincronizar_estado_plantas!(@lote) if @lote.estado != estado_anterior
-      # Corrección de historia: reconciliar las fechas de inicio de cada fase con sus
-      # eventos de cambio de estado (fuente de verdad de la analítica de días por fase).
-      reconciliar_fechas_fase(@lote, params[:fechas_fase]) if params[:fechas_fase].present?
-      reconciliar_evento_inicio!(@lote) if params.dig(:lote, :start_date).present?
-      render json: LoteSerializer.serialize(@lote.reload)
-    else
-      render json: { errors: @lote.errors.full_messages }, status: :unprocessable_entity
+    # Reconciliar plantas cuando cambia plants_count (solo en cultivo pre-cosecha: ahí las
+    # plantas son "vivas" y sin pesadas). En vez de escribir el número suelto, creamos o
+    # quitamos plantas reales para que coincida. Fuera de cultivo, plants_count se escribe directo.
+    target_pc   = lote_update_params[:plants_count]&.to_i
+    reconciliar = target_pc.present? && Lote::CULTIVO_ESTADOS.include?(@lote.estado)
+    begin
+      ActiveRecord::Base.transaction do
+        @lote.update!(reconciliar ? lote_update_params.except(:plants_count) : lote_update_params)
+        reconciliar_plantas!(@lote, target_pc) if reconciliar
+      end
+    rescue ReconciliarError => e
+      return render json: { error: e.message }, status: :unprocessable_entity
+    rescue ActiveRecord::RecordInvalid => e
+      return render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
     end
+
+    # Si la edición cambió el estado del lote (corrección manual), propagamos el estado
+    # a las plantas igual que la máquina de estados — para que el listado no quede viejo.
+    sincronizar_estado_plantas!(@lote) if @lote.estado != estado_anterior
+    # Corrección de historia: reconciliar las fechas de inicio de cada fase con sus
+    # eventos de cambio de estado (fuente de verdad de la analítica de días por fase).
+    reconciliar_fechas_fase(@lote, params[:fechas_fase]) if params[:fechas_fase].present?
+    reconciliar_evento_inicio!(@lote) if params.dig(:lote, :start_date).present?
+    render json: LoteSerializer.serialize(@lote.reload)
+  end
+
+  ReconciliarError = Class.new(StandardError)
+
+  # Ajusta las Plant reales del lote para que sean `target`. Crea nuevas (patrón del alta) si
+  # sube; si baja, quita plantas "vacías" (sin pesadas ni peso), priorizando las más nuevas, y
+  # frena si no hay suficientes vacías (nunca borra una planta con datos por bajar un número).
+  def reconciliar_plantas!(lote, target)
+    return if target.nil? || target < 1
+    actual = lote.plants.count
+    delta  = target - actual
+    return if delta.zero?
+
+    if delta.positive?
+      state       = estado_a_state(lote.estado)
+      fecha_field = state_a_fecha_field(state)
+      delta.times do
+        numero = (lote.plants.count + 1).to_s.rjust(3, '0')
+        attrs  = { nombre: "#{lote.codigo}-P#{numero}", state: state }
+        attrs[fecha_field] = lote.start_date if fecha_field
+        lote.plants.create!(attrs)
+      end
+    else
+      quitar     = -delta
+      candidatas = lote.plants.where.not(state: 'descartada')
+                       .where(peso_seco: nil)
+                       .where.missing(:pesadas_plantas)
+                       .order(created_at: :desc).limit(quitar).to_a
+      if candidatas.size < quitar
+        raise ReconciliarError, "No se pueden quitar #{quitar} plantas: solo hay #{candidatas.size} sin pesadas ni peso. Descartá o eliminá a mano las que tengan datos."
+      end
+      candidatas.each(&:soft_delete!)
+    end
+    lote.update_column(:plants_count, lote.plants.count)
   end
 
   # Ajusta el registrado_en del evento 'cambio_estado' de cada fase (o lo crea si falta),
@@ -603,6 +649,9 @@ class LotesController < ApplicationController
         pasada_cosecha: pasada,
         fecha_cosecha:  Date.today,
       )
+      # Mantener plants_count_cosechadas al día (idempotente = conteo real de cosechadas).
+      # Antes solo se seteaba por PATCH manual → analytics caía siempre al fallback.
+      @lote.update_column(:plants_count_cosechadas, @lote.plants.where(state: 'cosechado').count)
 
       @lote.pesadas.create!(
         fase_origen:        'floracion',

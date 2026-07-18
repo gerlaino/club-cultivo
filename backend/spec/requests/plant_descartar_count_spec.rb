@@ -16,13 +16,13 @@ RSpec.describe 'Conteo de plantas vivas del lote', type: :request do
   end
 
   it 'descartar una planta decrementa plants_count' do
-    patch "/plants/#{plantas.first.id}", params: { plant: { state: 'descartada' } }, headers: auth_headers, as: :json
+    patch "/plants/#{plantas.first.id}", params: { plant: { state: 'descartada' }, motivo: 'test' }, headers: auth_headers, as: :json
     expect(response).to have_http_status(:ok)
     expect(lote.reload.plants_count).to eq(2)
   end
 
   it 'revertir el descarte vuelve a incrementar' do
-    patch "/plants/#{plantas.first.id}", params: { plant: { state: 'descartada' } }, headers: auth_headers, as: :json
+    patch "/plants/#{plantas.first.id}", params: { plant: { state: 'descartada' }, motivo: 'test' }, headers: auth_headers, as: :json
     patch "/plants/#{plantas.first.id}", params: { plant: { state: 'vegetativo' } }, headers: auth_headers, as: :json
     expect(lote.reload.plants_count).to eq(3)
   end
