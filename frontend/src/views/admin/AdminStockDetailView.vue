@@ -52,6 +52,12 @@
         </div>
       </div>
 
+      <!-- Stock finalizado: cerrado, ya no hay nada que hacer con él -->
+      <div v-if="stock.agotado" class="sd__finalizado">
+        <i class="bi bi-flag-fill"></i>
+        <span>Stock finalizado — cerrado. El sobrante quedó como merma y ya no aparece en el inventario disponible.</span>
+      </div>
+
       <!-- ── Layout ─────────────────────────────────────────────────── -->
       <div class="sd__layout">
 
@@ -953,6 +959,8 @@ function badgeVencLabel(s) {
 .sd__chip--gen { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
 .sd__chip--ext { background: #fef3c7; color: #92400e; border-color: #fde68a; }
 .sd__chip--disp { background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; }
+.sd__finalizado { display: flex; align-items: center; gap: .6rem; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; padding: .8rem 1rem; margin-bottom: 1.25rem; color: #475569; font-size: .88rem; }
+.sd__finalizado i { color: #64748b; }
 .sd__chip--reg { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 
 /* ── Layout ───────────────────────────────────────────────────────────────── */

@@ -66,7 +66,10 @@ class StocksController < ApplicationController
   def inventario
     # Base sin el filtro de forma: los KPIs en gramos se calculan sobre flor seca aunque el
     # usuario esté filtrando por otra forma.
-    base = Stock.where(club_id: current_user.club_id).where('cantidad > 0')
+    # Excluimos los 'agotado' (stock finalizado/descartado): el inventario muestra lo que HAY
+    # real para usar/dispensar. Un finalizado (cantidad 0, agotado) no va; y si por dato viejo
+    # quedó agotado con cantidad > 0, tampoco debe aparecer.
+    base = Stock.where(club_id: current_user.club_id).where('cantidad > 0').where.not(estado: 'agotado')
     if params[:sede_id].present?
       base = params[:sede_id] == 'pool' ? base.where(sede_id: nil) : base.where(sede_id: params[:sede_id])
     end

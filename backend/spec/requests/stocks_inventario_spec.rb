@@ -28,6 +28,17 @@ RSpec.describe 'GET /stocks/inventario', type: :request do
     expect(body['totales']['items']).to eq(3)
   end
 
+  it 'no incluye stock finalizado/agotado (aunque le quede cantidad por dato viejo)' do
+    activo  = stock!(cantidad: 10)
+    agotado = stock!(cantidad: 5, estado: 'agotado')
+    get '/stocks/inventario', headers: auth_headers
+    body = JSON.parse(response.body)
+    ids = body['stocks'].map { |s| s['id'] }
+    expect(ids).to include(activo.id)
+    expect(ids).not_to include(agotado.id)
+    expect(body['meta']['total']).to eq(1)
+  end
+
   it 'filtra por forma_producto' do
     stock!(forma_producto: 'flor_seca')
     create(:stock, :externo, club: club, sede: sede, forma_producto: 'aceite', cantidad: 5)
