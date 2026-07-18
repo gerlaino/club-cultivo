@@ -160,12 +160,15 @@ class LotesController < ApplicationController
       crear_lote_heredado(@lote, params) if params[:heredado].in?([true, 'true', '1'])
       if plantas_iniciales > 0
         state_inicial = estado_a_state(@lote.estado)
+        # La planta hereda la fecha de la fase de entrada = start_date del lote (no la de
+        # creación digital). Si no, un lote heredado (creado hoy pero real de hace un mes)
+        # deja las plantas con fecha de hoy → "días de fase" arranca en 0.
+        fecha_field = state_a_fecha_field(state_inicial)
         plantas_iniciales.times do |i|
           numero = (i + 1).to_s.rjust(3, '0')
-          @lote.plants.create!(
-            nombre: "#{@lote.codigo}-P#{numero}",
-            state:  state_inicial,
-          )
+          attrs = { nombre: "#{@lote.codigo}-P#{numero}", state: state_inicial }
+          attrs[fecha_field] = @lote.start_date if fecha_field
+          @lote.plants.create!(attrs)
         end
       end
     end
@@ -859,6 +862,17 @@ class LotesController < ApplicationController
       'curado'     => 'cosechado',
       'finalizado' => 'cosechado',
     }[estado] || 'vegetativo'
+  end
+
+  # Campo de fecha de la Plant que corresponde a cada state de entrada (para heredar
+  # start_date del lote). 'esqueje' no tiene campo propio (dias_en_fase cae a created_at).
+  def state_a_fecha_field(state)
+    {
+      'germinacion' => :fecha_germinacion,
+      'vegetativo'  => :fecha_vegetativo,
+      'floracion'   => :fecha_floracion,
+      'cosechado'   => :fecha_cosecha,
+    }[state]
   end
 
   def set_sala

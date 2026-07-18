@@ -33,6 +33,16 @@
         </div>
       </div>
 
+      <!-- Lote finalizado: pasó a curado, ya no hay nada que manicurar -->
+      <div v-if="loteFinalizado" class="mnl__done">
+        <CheckCircle :size="18" :stroke-width="2" />
+        <div>
+          <strong>Lote finalizado — pasó a {{ lote.estado === 'finalizado' ? 'finalizado' : 'curado' }}.</strong>
+          <template v-if="stocksResultantes.length"> El producto quedó en curado: <b>{{ stocksResultantes.join(', ') }}</b>.</template>
+          <template v-else> El producto quedó en el stock de flor seca.</template>
+        </div>
+      </div>
+
       <!-- KPIs — mismo patrón que SalaDetailView -->
       <div class="mnl__kpis">
         <div class="mnl__kpi">
@@ -523,10 +533,17 @@ const hayPesoDirecto = computed(() =>
 const kpiPorc         = computed(() => plantas.value.length ? Math.min(100, Math.round(pesadasKpi.value / plantas.value.length * 100)) : 0)
 const hasAnyHumedo    = computed(() => plantas.value.some(p => parseFloat(p.peso_humedo) > 0))
 
+const loteFinalizado = computed(() => lote.value && lote.value.estado !== 'en_manicura')
+const stocksResultantes = computed(() =>
+  [...new Set(pesajes.value.filter(p => p.estado === 'confirmado' && p.stock)
+    .map(p => p.stock.numero_lote_producto).filter(Boolean))]
+)
+const ESTADO_LABEL = { en_manicura: 'Asignado', curado: 'Curado', finalizado: 'Finalizado' }
 const estadoBadgeClass = computed(() => ({
   'mnl__estado-badge--asignado': lote.value?.estado === 'en_manicura',
+  'mnl__estado-badge--done':     loteFinalizado.value,
 }))
-const estadoLabel = computed(() => 'Asignado')
+const estadoLabel = computed(() => ESTADO_LABEL[lote.value?.estado] || lote.value?.estado || '—')
 
 async function cargar() {
   loading.value = true
@@ -665,6 +682,14 @@ onActivated(cargar)
 }
 .mnl__estado-badge--asignado  { background: #fffbeb; color: #b45309; }
 .mnl__estado-badge--pendiente { background: var(--c-leaf-100); color: var(--c-leaf-700); }
+.mnl__estado-badge--done      { background: #dcfce7; color: #15803d; }
+
+.mnl__done {
+  display: flex; align-items: center; gap: .6rem;
+  background: #f0faf3; border: 1px solid #bbf7d0; border-radius: 12px;
+  padding: .8rem 1rem; margin-bottom: 1.5rem; color: #15803d; font-size: .88rem; line-height: 1.45;
+}
+.mnl__done strong { color: #14532d; }
 
 .mnl__btn-icon {
   width: 32px; height: 32px; border-radius: 6px;

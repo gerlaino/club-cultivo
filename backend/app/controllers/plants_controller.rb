@@ -127,6 +127,9 @@ class PlantsController < ApplicationController
           @plant.lote.increment!(:plants_count) # se revierte el descarte
         end
       end
+      # Descartar plantas puede dejar el lote listo para finalizar (todo lo no-descartado ya
+      # pesado): re-evaluamos, porque el borrado/descarte no dispara el flujo de pesaje.
+      finalizar_manicura_si_corresponde(@plant.lote)
       render json: serialize_plant_detail(@plant)
     else
       render json: { errors: @plant.errors.full_messages }, status: :unprocessable_entity
@@ -136,8 +139,12 @@ class PlantsController < ApplicationController
   # DELETE /plants/:id
   def destroy
     lote = @plant.lote
+    # Si ya estaba descartada, dejó de contar como viva → no restar de nuevo (evita el doble -1
+    # cuando se descarta y después se elimina la misma planta).
+    ya_descartada = @plant.state == 'descartada'
     @plant.soft_delete!
-    lote.decrement!(:plants_count) if lote.plants_count.to_i > 0
+    lote.decrement!(:plants_count) if !ya_descartada && lote.plants_count.to_i > 0
+    finalizar_manicura_si_corresponde(lote)
     head :no_content
   end
 
@@ -234,6 +241,15 @@ class PlantsController < ApplicationController
   end
 
   private
+
+  # Tras borrar/descartar plantas de un lote en manicura, re-evaluar si ya se puede finalizar
+  # (el flujo normal solo lo dispara al confirmar un pesaje). No-op si el lote no está en_manicura.
+  def finalizar_manicura_si_corresponde(lote)
+    return unless lote&.reload&.estado == 'en_manicura'
+    lote.check_and_finalize_manicura!(finalizador: current_user)
+  rescue => e
+    Rails.logger.warn "[plants] finalizar manicura tras baja/descarte falló: #{e.message}"
+  end
 
   def set_plant
     club   = current_user.club

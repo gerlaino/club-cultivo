@@ -282,7 +282,9 @@ class Lote < ApplicationRecord
   def check_and_finalize_manicura!(finalizador: nil)
     return unless estado == 'en_manicura'
 
-    total_plantas = plants.count
+    # Las descartadas no se procesan nunca (no van a tener pesada); si contaran en el total,
+    # total_procesadas >= total_plantas jamás se cumpliría y el lote quedaría pegado en_manicura.
+    total_plantas = plants.where.not(state: 'descartada').count
     return if total_plantas == 0
 
     plantas_confirmadas = PesadaPlanta

@@ -19,6 +19,16 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
       }.to change(Lote, :count).by(1)
       expect(response).to have_http_status(:created)
     end
+
+    it 'las plantas heredan la fecha del lote (start_date), no la de hoy' do
+      fecha = Date.today - 30 # lote heredado, real de hace un mes
+      crear(estado: 'vegetativo', plants_count: 3, start_date: fecha)
+      expect(response).to have_http_status(:created)
+      lote = Lote.last
+      expect(lote.plants.count).to eq(3)
+      # entra en vegetativo → fecha_vegetativo = start_date del lote
+      expect(lote.plants.pluck(:fecha_vegetativo).uniq).to eq([fecha])
+    end
   end
 
   context 'cantidad de plantas' do

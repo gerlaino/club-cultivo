@@ -242,6 +242,18 @@ RSpec.describe Lote, type: :model do
       expect(lote.reload.estado).to eq('curado')
     end
 
+    it 'finaliza a curado aunque haya plantas descartadas (no cuentan en el total)' do
+      lote = lote_con_plantas(4)
+      # 2 descartadas (murieron): no se van a pesar nunca, no deben bloquear la finalización.
+      lote.plants.first(2).each { |p| p.update!(state: 'descartada') }
+      # Se pesan y confirman las 2 restantes.
+      vivas  = lote.plants.where.not(state: 'descartada').to_a
+      pesaje = pesaje_por_qr(lote, vivas, 100)
+      pesaje.enviar!
+      pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      expect(lote.reload.estado).to eq('curado')
+    end
+
     it 'un pesaje PARCIAL deja el lote en en_manicura' do
       lote = lote_con_plantas(4)
       pesaje = pesaje_por_qr(lote, lote.plants.first(2), 100)
