@@ -112,7 +112,10 @@ const filtered = computed(() => {
   return store.items.filter(l => {
     const esActivo     = l.estado !== "finalizado";
     const matchTab     = tab.value === "activos" ? esActivo : !esActivo;
-    const matchText    = !query || (l.codigo||"").toLowerCase().includes(query) || (l.strain||"").toLowerCase().includes(query);
+    const matchText    = !query
+      || (l.codigo||"").toLowerCase().includes(query)
+      || (l.strain||"").toLowerCase().includes(query)
+      || (l.genetica?.nombre||"").toLowerCase().includes(query); // el nombre real vive en genetica, no en strain (legacy)
     const matchEstado  = !filterEstado.value
       || (filterEstado.value === "cosechados" ? COSECHADOS.includes(l.estado)
           : filterEstado.value === "en_ciclo" ? EN_CICLO.includes(l.estado)

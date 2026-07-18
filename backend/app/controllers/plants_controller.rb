@@ -62,9 +62,11 @@ class PlantsController < ApplicationController
     elsif current_user.supervisor?
       base = base.where(lotes: { sala_id: current_user.salas_ids_en_sedes_asignadas })
     end
+    # cosechadas y en_manicura son DISJUNTAS: la planta se congela en 'cosechado', así que
+    # "en manicura" (lote en_manicura) NO se cuenta también en "cosechadas".
     render json: {
       activas:     base.where(state: %w[vegetativo floracion]).count,
-      cosechadas:  base.where(state: 'cosechado').count,
+      cosechadas:  base.where(state: 'cosechado').where.not(lotes: { estado: 'en_manicura' }).count,
       en_manicura: base.where(state: 'cosechado', lotes: { estado: 'en_manicura' }).count,
       descartadas: base.where(state: 'descartada').count,
     }

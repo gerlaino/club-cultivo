@@ -23,8 +23,8 @@ RSpec.describe 'GET /plants/kpis', type: :request do
     expect(response).to have_http_status(:ok)
     body = JSON.parse(response.body)
     expect(body['activas']).to eq(2)     # vegetativo + floración
-    expect(body['cosechadas']).to eq(2)  # ambas cosechado (total)
-    expect(body['en_manicura']).to eq(1) # solo la del lote en_manicura
+    expect(body['cosechadas']).to eq(1)  # cosechado NO en manicura (la del lote curado)
+    expect(body['en_manicura']).to eq(1) # cosechado del lote en_manicura (disjunta de cosechadas)
     expect(body['descartadas']).to eq(1)
   end
 end
