@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { logger } from '../utils/logger.js'
 import { useRouter } from 'vue-router'
-import { listPlants, listLotes } from '../lib/api.js'
+import { listPlants, listLotes, getPlantsKpis } from '../lib/api.js'
 import { em } from '../lib/loteHelpers.js'
 import { useAuthStore } from '../stores/auth.js'
 import EmptyState from '../components/ui/EmptyState.vue'
@@ -43,21 +43,12 @@ function plantaMeta(p) {
   return sm(p.state)
 }
 
-// Alineado a Plant::STATES (backend). Orden de aparición en KPIs.
-const KPI_STATES = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'secado', 'cosechado', 'descartada']
-
-const kpis = computed(() => {
-  const counts = {}
-  for (const s of KPI_STATES) {
-    counts[s] = plants.value.filter(p => p.state === s).length
-  }
-  return {
-    total: plants.value.length,
-    byState: KPI_STATES
-      .filter(s => counts[s] > 0)
-      .map(s => ({ state: s, count: counts[s], ...STATE_META[s] })),
-  }
-})
+// KPIs server-side (GET /plants/kpis): activas (veg+flor), cosechadas, en manicura, descartadas.
+const kpiData = ref({ activas: 0, cosechadas: 0, en_manicura: 0, descartadas: 0 })
+async function loadKpis() {
+  try { const { data } = await getPlantsKpis(); kpiData.value = data }
+  catch { /* deja los ceros */ }
+}
 
 const filtered = computed(() => {
   let list = [...plants.value]
@@ -144,7 +135,7 @@ async function loadLotes() {
   }
 }
 
-onMounted(() => Promise.all([loadPlants(), loadLotes()]))
+onMounted(() => Promise.all([loadPlants(), loadLotes(), loadKpis()]))
 </script>
 
 <template>
@@ -164,14 +155,24 @@ onMounted(() => Promise.all([loadPlants(), loadLotes()]))
     <!-- KPIs -->
     <div class="ptv__kpis">
       <div class="ptv__kpi ptv__kpi--total">
-        <div class="ptv__kpi-icon" style="background:rgba(27,94,32,.1)">🌿</div>
-        <div class="ptv__kpi-value">{{ kpis.total }}</div>
-        <div class="ptv__kpi-label">Total plantas</div>
+        <div class="ptv__kpi-icon" style="background:rgba(27,94,32,.1)">🌱</div>
+        <div class="ptv__kpi-value">{{ kpiData.activas }}</div>
+        <div class="ptv__kpi-label">Activas (veg + flor)</div>
       </div>
-      <div v-for="k in kpis.byState" :key="k.state" class="ptv__kpi">
-        <div class="ptv__kpi-icon" :style="{ background: k.kpiBg }">{{ k.kpiIcon }}</div>
-        <div class="ptv__kpi-value">{{ k.count }}</div>
-        <div class="ptv__kpi-label">{{ k.label }}</div>
+      <div class="ptv__kpi">
+        <div class="ptv__kpi-icon" style="background:rgba(63,100,82,.1)">🌿</div>
+        <div class="ptv__kpi-value">{{ kpiData.cosechadas }}</div>
+        <div class="ptv__kpi-label">Cosechadas</div>
+      </div>
+      <div class="ptv__kpi">
+        <div class="ptv__kpi-icon" style="background:rgba(217,119,6,.12)">✂️</div>
+        <div class="ptv__kpi-value">{{ kpiData.en_manicura }}</div>
+        <div class="ptv__kpi-label">En manicura</div>
+      </div>
+      <div class="ptv__kpi">
+        <div class="ptv__kpi-icon" style="background:rgba(185,28,28,.1)">🥀</div>
+        <div class="ptv__kpi-value">{{ kpiData.descartadas }}</div>
+        <div class="ptv__kpi-label">Descartadas</div>
       </div>
     </div>
 

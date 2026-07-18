@@ -52,6 +52,24 @@ class PlantsController < ApplicationController
     render json: plants.map { |p| serialize_plant(p) }
   end
 
+  # GET /plants/kpis — contadores por estado (server-side, sin traer todas las plantas).
+  # Activas = vegetativo + floración. Cosechadas = state cosechado (total). En manicura =
+  # cosechadas cuyo lote está en_manicura (la planta se congela en 'cosechado'). Descartadas.
+  def kpis
+    base = Plant.joins(:lote).where(lotes: { club_id: current_user.club_id })
+    if current_user.cultivador?
+      base = base.where(lotes: { sala_id: current_user.salas_ids_asignadas })
+    elsif current_user.supervisor?
+      base = base.where(lotes: { sala_id: current_user.salas_ids_en_sedes_asignadas })
+    end
+    render json: {
+      activas:     base.where(state: %w[vegetativo floracion]).count,
+      cosechadas:  base.where(state: 'cosechado').count,
+      en_manicura: base.where(state: 'cosechado', lotes: { estado: 'en_manicura' }).count,
+      descartadas: base.where(state: 'descartada').count,
+    }
+  end
+
   # GET /plants/:id
   def show
     render json: serialize_plant_detail(@plant)
@@ -94,6 +112,14 @@ class PlantsController < ApplicationController
   def update
     old_state = @plant.state
 
+    # Descartar (la planta se perdió/murió) exige motivo — se distingue de "eliminar" (error
+    # de carga, que va por DELETE sin motivo). El motivo queda en la nota de la planta y en el
+    # evento del lote para trazabilidad.
+    descartando = plant_params[:state].to_s == 'descartada' && old_state != 'descartada'
+    if descartando && params[:motivo].to_s.strip.blank?
+      return render json: { error: 'Indicá el motivo del descarte.' }, status: :unprocessable_entity
+    end
+
     # El peso de una planta en manicura se registra SOLO por el flujo de pesaje
     # (registrar_peso, del manicura asignado), nunca por el "guardar" crudo del detalle:
     # evita pesos sueltos fuera de la jornada y ediciones concurrentes que "pierden" la planta.
@@ -114,9 +140,11 @@ class PlantsController < ApplicationController
           occurred_at:   Time.current
         )
         if @plant.state == 'descartada' && old_state != 'descartada'
+          motivo = params[:motivo].to_s.strip
+          @plant.update_column(:notas, [@plant.notas.presence, "Descarte: #{motivo}"].compact.join("\n")) if motivo.present?
           @plant.lote.lote_eventos.create!(
             tipo:          'nota',
-            descripcion:   "Planta #{@plant.nombre} descartada (estaba en #{old_state})",
+            descripcion:   "Planta #{@plant.nombre} descartada (estaba en #{old_state})#{motivo.present? ? " — #{motivo}" : ''}",
             user:          current_user,
             club:          current_user.club,
             registrado_en: Time.current,

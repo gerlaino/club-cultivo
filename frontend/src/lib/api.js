@@ -96,10 +96,12 @@ export const cargarLoteEnSala = (salaId, loteId) => api.post(`/salas/${salaId}/c
 
 // -------- PLANTAS --------
 export const listPlants = (params = {}) => api.get('/plants', { params });
+export const getPlantsKpis = () => api.get('/plants/kpis');
 export const getPlant = (id) => api.get(`/plants/${id}`);
 export const createPlant = (payload) => api.post('/plants', { plant: payload });
 export const updatePlant = (id, payload) => api.put(`/plants/${id}`, { plant: payload });
 export const deletePlant = (id) => api.delete(`/plants/${id}`);
+export const descartarPlant = (id, motivo) => api.put(`/plants/${id}`, { plant: { state: 'descartada' }, motivo });
 
 // -------- PLANT ACTIVITIES --------
 export const getPlantActivities = (plantId) => api.get(`/plants/${plantId}/plant_activities`);

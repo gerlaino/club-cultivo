@@ -7,7 +7,7 @@ import { banderitaHTML, banderitaCSS } from '../lib/etiquetaPlanta.js'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
-import { getPlantActivities, createPlantActivity, updatePlant, registrarPesoPlanta, addPlantFoto, removePlantFoto } from '../lib/api'
+import { getPlantActivities, createPlantActivity, updatePlant, descartarPlant, deletePlant, registrarPesoPlanta, addPlantFoto, removePlantFoto } from '../lib/api'
 import { useManicuraJornada } from '../composables/useManicuraJornada'
 import Breadcrumb            from '../components/ui/Breadcrumb.vue'
 import EmptyState            from '../components/ui/EmptyState.vue'
@@ -486,21 +486,41 @@ async function guardarEdicion() {
   } catch { toast.error('Error al guardar') } finally { savingEditar.value = false }
 }
 
-// ── Descartar planta ───────────────────────────────────────
-async function descartarPlanta() {
+// ── Descartar planta (murió / se perdió) — pide motivo ─────
+const descartarOpen   = ref(false)
+const descartarMotivo = ref('')
+const descartando     = ref(false)
+function abrirDescartar() { descartarMotivo.value = ''; descartarOpen.value = true }
+async function confirmarDescartar() {
+  const motivo = descartarMotivo.value.trim()
+  if (!motivo || descartando.value) return
+  descartando.value = true
+  try {
+    const loteId = planta.value?.lote?.id
+    await descartarPlant(id, motivo)
+    toast.success('Planta descartada')
+    descartarOpen.value = false
+    if (loteId) router.push({ name: 'lote-detail', params: { id: loteId } })
+    else await plants.fetchOne(id)
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al descartar')
+  } finally { descartando.value = false }
+}
+
+// ── Eliminar planta (error al crear el lote) — sin motivo ──
+async function eliminarPlanta() {
   const ok = await confirm({
-    title: 'Descartar planta',
-    message: `¿Seguro que querés descartar "${planta.value?.nombre}"? Quedará marcada como descartada.`,
-    confirmText: 'Descartar',
+    title: 'Eliminar planta',
+    message: `¿Eliminar "${planta.value?.nombre}"? Usá esto solo si fue un error de carga (la planta no debería existir). Si la planta se perdió/murió, usá "Descartar".`,
+    confirmText: 'Eliminar', variant: 'danger',
   })
   if (!ok) return
   try {
     const loteId = planta.value?.lote?.id
-    await updatePlant(id, { state: 'descartada' })
-    toast.success('Planta descartada')
+    await deletePlant(id)
+    toast.success('Planta eliminada')
     if (loteId) router.push({ name: 'lote-detail', params: { id: loteId } })
-    else await plants.fetchOne(id)
-  } catch { toast.error('Error al descartar') }
+  } catch (e) { toast.error(e?.response?.data?.error || 'Error al eliminar') }
 }
 
 const registrosHoyPlanta = computed(() =>
@@ -518,7 +538,8 @@ const plantaAcciones = computed(() => {
   items.push({ emoji: '📋', label: 'Registrar planta', onClick: () => { showRegistroPlanta.value = true } })
   items.push({ emoji: '✏️', label: 'Editar planta',    onClick: abrirEditarPlanta })
   items.push({ divider: true })
-  items.push({ emoji: '🗑️', label: 'Descartar planta', danger: true, onClick: descartarPlanta })
+  items.push({ emoji: '🥀', label: 'Descartar (se perdió/murió)', danger: true, onClick: abrirDescartar })
+  items.push({ emoji: '🗑️', label: 'Eliminar (error de carga)',   danger: true, onClick: eliminarPlanta })
   return items
 })
 
@@ -1272,6 +1293,34 @@ onMounted(async () => {
             <button class="pd__btn-primary" @click="guardarEdicion" :disabled="savingEditar">
               <DsSpinner v-if="savingEditar" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Descartar planta: pide motivo (obligatorio) -->
+    <Teleport to="body">
+      <div v-if="descartarOpen" class="pd__overlay" @click.self="descartarOpen = false">
+        <div class="pd__modal" style="max-width: 440px">
+          <div class="pd__modal-header">
+            <div>
+              <h3 class="pd__modal-title">🥀 Descartar planta</h3>
+              <p class="pd__modal-sub">{{ planta?.nombre || planta?.codigo_qr }}</p>
+            </div>
+            <button class="pd__modal-close" @click="descartarOpen = false"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="pd__modal-body">
+            <div class="pd__field pd__field--full">
+              <label class="pd__label">¿Por qué se descarta? <span class="pd__req">*</span></label>
+              <textarea class="pd__input pd__textarea" rows="3" v-model.trim="descartarMotivo"
+                        placeholder="Ej: se secó / plaga / se rompió al trasplantar"></textarea>
+            </div>
+          </div>
+          <div class="pd__modal-footer">
+            <button class="pd__btn-ghost" @click="descartarOpen = false">Cancelar</button>
+            <button class="pd__btn-primary" :disabled="descartando || !descartarMotivo.trim()" @click="confirmarDescartar">
+              {{ descartando ? 'Descartando…' : 'Descartar' }}
             </button>
           </div>
         </div>

@@ -24,7 +24,7 @@ RSpec.describe 'Baja/descarte de plantas y finalización del lote', type: :reque
     expect(lote.reload.estado).to eq('en_manicura') # falta 1 sin procesar
 
     sign_in_as(admin)
-    patch "/plants/#{plantas.last.id}", params: { plant: { state: 'descartada' } }, headers: auth_headers
+    patch "/plants/#{plantas.last.id}", params: { plant: { state: 'descartada' }, motivo: 'test' }, headers: auth_headers
     expect(response).to have_http_status(:ok)
     expect(lote.reload.estado).to eq('curado')
   end
@@ -40,12 +40,26 @@ RSpec.describe 'Baja/descarte de plantas y finalización del lote', type: :reque
     expect(lote.reload.estado).to eq('curado')
   end
 
+  it 'descartar exige motivo y lo guarda en la nota de la planta' do
+    planta = create(:plant, lote: lote, club: club, state: 'cosechado')
+    sign_in_as(admin)
+
+    patch "/plants/#{planta.id}", params: { plant: { state: 'descartada' } }, headers: auth_headers
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(planta.reload.state).not_to eq('descartada')
+
+    patch "/plants/#{planta.id}", params: { plant: { state: 'descartada' }, motivo: 'se secó por plaga' }, headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    expect(planta.reload.state).to eq('descartada')
+    expect(planta.notas).to include('se secó por plaga')
+  end
+
   it 'no descuenta plants_count dos veces al descartar y luego eliminar la misma planta' do
     lote.update_column(:plants_count, 3)
     plantas = create_list(:plant, 3, lote: lote, club: club, state: 'cosechado')
     sign_in_as(admin)
 
-    patch "/plants/#{plantas.first.id}", params: { plant: { state: 'descartada' } }, headers: auth_headers
+    patch "/plants/#{plantas.first.id}", params: { plant: { state: 'descartada' }, motivo: 'test' }, headers: auth_headers
     expect(lote.reload.plants_count).to eq(2) # descartar: -1
 
     delete "/plants/#{plantas.first.id}", headers: auth_headers
