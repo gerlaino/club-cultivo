@@ -104,6 +104,7 @@
             <div class="tl__tarea-meta">
               {{ TIPO_LABELS[t.tipo] || t.tipo }}
               <span v-if="t.asignada_a"> · {{ t.asignada_a.nombre }}</span>
+              <span v-if="t.creada_por"> · creada por {{ t.creada_por.nombre }}</span>
             </div>
           </div>
           <div v-if="!modoSeleccion" class="tl__tarea-right">

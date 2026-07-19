@@ -140,6 +140,10 @@
                 <span class="tv__panel-key">Asignada a</span>
                 <span>{{ tareaDetalle.asignada_a.nombre }}</span>
               </div>
+              <div v-if="tareaDetalle.creada_por" class="tv__panel-row">
+                <span class="tv__panel-key">Creada por</span>
+                <span>{{ tareaDetalle.creada_por.nombre }}</span>
+              </div>
               <div v-if="tareaDetalle.sala" class="tv__panel-row">
                 <span class="tv__panel-key">Sala</span>
                 <span>{{ tareaDetalle.sala.nombre }}</span>
