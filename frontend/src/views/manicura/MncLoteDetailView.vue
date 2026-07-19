@@ -495,8 +495,9 @@ async function reevaluar() {
   reevaluando.value = true
   try {
     const { data } = await reevaluarManicura(id)
-    toast[data.estado === 'curado' ? 'success' : 'info'](data.mensaje)
-    if (data.estado === 'curado') router.push('/mnc/pendientes')
+    const cerrado = data.estado !== 'en_manicura'
+    toast[cerrado ? 'success' : 'info'](data.mensaje)
+    if (cerrado) router.push('/mnc/pendientes')
     else await cargar()
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo re-evaluar')

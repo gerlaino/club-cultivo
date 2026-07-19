@@ -18,6 +18,17 @@ RSpec.describe 'Baja/descarte de plantas y finalización del lote', type: :reque
     pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: peso_cu * plantas.size)
   end
 
+  it 'descartar TODAS las plantas finaliza el lote (sin producción)' do
+    plantas = create_list(:plant, 2, lote: lote, club: club, state: 'cosechado')
+    sign_in_as(admin)
+    patch "/plants/#{plantas.first.id}", params: { plant: { state: 'descartada' }, motivo: 'x' }, headers: auth_headers
+    expect(lote.reload.estado).to eq('en_manicura') # todavía queda 1 activa
+
+    patch "/plants/#{plantas.last.id}", params: { plant: { state: 'descartada' }, motivo: 'x' }, headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    expect(lote.reload.estado).to eq('finalizado')  # 0 activas → sin producción → finalizado
+  end
+
   it 'reevaluar_manicura finaliza un lote que quedó listo pero atascado' do
     plantas = create_list(:plant, 2, lote: lote, club: club, state: 'cosechado')
     confirmar_pesaje(plantas, 100)

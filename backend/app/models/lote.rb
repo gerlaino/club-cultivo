@@ -285,7 +285,21 @@ class Lote < ApplicationRecord
     # Las descartadas no se procesan nunca (no van a tener pesada); si contaran en el total,
     # total_procesadas >= total_plantas jamás se cumpliría y el lote quedaría pegado en_manicura.
     total_plantas = plants.where.not(state: 'descartada').count
-    return if total_plantas == 0
+    if total_plantas == 0
+      # Se descartaron TODAS las plantas: el lote no produjo nada (no hay stock que curar).
+      # Se finaliza directo (no pasa por curado).
+      update!(estado: 'finalizado', rendimiento_real_g: 0, manicurador: nil, sala_id: nil)
+      lote_eventos.create!(
+        tipo:            'cambio_estado',
+        estado_anterior: 'en_manicura',
+        estado_nuevo:    'finalizado',
+        descripcion:     'Todas las plantas fueron descartadas — lote finalizado sin producción.',
+        user:            finalizador,
+        club:            club,
+        registrado_en:   Time.current,
+      )
+      return
+    end
 
     plantas_confirmadas = PesadaPlanta
       .joins(:pesaje_manicura)

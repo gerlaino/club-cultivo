@@ -548,9 +548,10 @@ class LotesController < ApplicationController
     end
     @lote.check_and_finalize_manicura!(finalizador: current_user)
     lote = @lote.reload
+    cerrado = %w[curado finalizado].include?(lote.estado)
     render json: {
       estado:  lote.estado,
-      mensaje: lote.estado == 'curado' ? 'Lote finalizado — pasó a curado.' : 'Todavía hay plantas pendientes de pesar o descartar.',
+      mensaje: cerrado ? "Lote cerrado — pasó a #{lote.estado}." : 'Todavía hay plantas pendientes de pesar o descartar.',
       lote:    LoteSerializer.serialize(lote),
     }
   rescue ArgumentError, RuntimeError, ActiveRecord::RecordInvalid => e
