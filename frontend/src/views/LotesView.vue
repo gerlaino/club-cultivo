@@ -250,7 +250,7 @@ async function exportarCSV() {
     <div class="lv__header">
       <div>
         <h1 class="lv__title">Lotes de cultivo</h1>
-        <p class="lv__sub">Trazabilidad de fases productivas</p>
+        <p class="lv__sub">Trazabilidad de cultivos</p>
       </div>
       <div class="lv__header-actions">
         <button v-if="canExport" class="lv__btn-export" :disabled="exporting" @click="exportarCSV">
@@ -283,7 +283,7 @@ async function exportarCSV() {
       </button>
       <button class="lv__kpi lv__kpi--green" :class="{ 'lv__kpi--active': filterEstado === 'en_ciclo' }" @click="filterEstado = filterEstado === 'en_ciclo' ? '' : 'en_ciclo'">
         <div class="lv__kpi-val">{{ stats.enCiclo }}</div>
-        <div class="lv__kpi-lbl">En fase activa</div>
+        <div class="lv__kpi-lbl">En cultivo activo</div>
       </button>
       <button class="lv__kpi lv__kpi--neutral" :class="{ 'lv__kpi--active-neutral': filterEstado === '' }" @click="filterEstado = ''">
         <div class="lv__kpi-val">{{ stats.plantas }}</div>

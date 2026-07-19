@@ -804,7 +804,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
             <div v-if="historialKpis" class="sd__hist-kpis">
               <div class="sd__hist-kpi">
                 <div class="sd__hist-kpi-val">{{ historialKpis.total_ciclos }}</div>
-                <div class="sd__hist-kpi-lbl">Total fases</div>
+                <div class="sd__hist-kpi-lbl">Total cultivos</div>
               </div>
               <div class="sd__hist-kpi">
                 <div class="sd__hist-kpi-val">{{ historialKpis.ciclos_finalizados }}</div>

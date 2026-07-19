@@ -222,7 +222,7 @@ async function crear() {
               <i v-if="paso > 2" class="bi bi-check2"></i>
               <span v-else>2</span>
             </div>
-            <span class="clc__step-label">Historia de las fases</span>
+            <span class="clc__step-label">Historia del cultivo</span>
           </div>
           <div class="clc__step-line" :class="{ 'clc__step-line--done': paso > 2 }"></div>
           <div class="clc__step" :class="{ 'clc__step--active': paso === 3 }">
@@ -283,10 +283,10 @@ async function crear() {
             </div>
           </template>
 
-          <!-- ── Paso 2: Historia de las fases ── -->
+          <!-- ── Paso 2: Historia del cultivo ── -->
           <template v-else-if="paso === 2">
             <div class="clc__paso-title">
-              <i class="bi bi-clock-history"></i> Historia de las fases
+              <i class="bi bi-clock-history"></i> Historia del cultivo
             </div>
 
             <!-- Origen -->
@@ -326,7 +326,7 @@ async function crear() {
             </div>
 
             <p class="clc__paso-desc">
-              Ingresá los días aproximados. No hace falta ser exacto — sirve para reconstruir la trazabilidad de las fases.
+              Ingresá los días aproximados. No hace falta ser exacto — sirve para reconstruir la trazabilidad del cultivo.
             </p>
 
             <div class="clc__timeline">
@@ -378,11 +378,11 @@ async function crear() {
             <!-- Resumen fecha -->
             <div v-if="totalDias > 0" class="clc__date-summary">
               <div class="clc__date-summary-row">
-                <span class="clc__date-label"><i class="bi bi-calendar-event"></i> Inicio estimado de la fase</span>
+                <span class="clc__date-label"><i class="bi bi-calendar-event"></i> Inicio estimado del cultivo</span>
                 <span class="clc__date-value">{{ startDatePreview }}</span>
               </div>
               <div class="clc__date-summary-row">
-                <span class="clc__date-label"><i class="bi bi-hourglass-split"></i> Total de la fase</span>
+                <span class="clc__date-label"><i class="bi bi-hourglass-split"></i> Total del cultivo</span>
                 <span class="clc__date-value">{{ totalDias }} días</span>
               </div>
             </div>
@@ -582,7 +582,7 @@ async function crear() {
                   class="clc__input clc__textarea"
                   rows="3"
                   v-model.trim="form.notes"
-                  placeholder="Técnica de conducción (SCROG, SOG, LST, topping…), observaciones de la fase, incidencias, etc."
+                  placeholder="Técnica de conducción (SCROG, SOG, LST, topping…), observaciones del cultivo, incidencias, etc."
                 ></textarea>
               </div>
             </div>

@@ -225,10 +225,10 @@ async function confirmDelete(s) {
             <thead>
               <tr>
                 <th>Sala</th>
-                <th>Fases</th>
+                <th>Cultivos</th>
                 <th>Total producido</th>
                 <th>Kg / planta</th>
-                <th>Días/fase</th>
+                <th>Días/cultivo</th>
                 <th>Temp</th>
                 <th>HR%</th>
                 <th>CO₂</th>

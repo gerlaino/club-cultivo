@@ -186,7 +186,7 @@ onMounted(() => {
     <div class="ptv__hdr">
       <div>
         <h1 class="ptv__title">Planes de trabajo</h1>
-        <p class="ptv__subtitle">Plantillas reutilizables para organizar fases de cultivo</p>
+        <p class="ptv__subtitle">Plantillas reutilizables para organizar cultivos</p>
       </div>
       <div class="ptv__hdr-actions">
         <button class="ptv__btn-primary" @click="abrirEditar()">
@@ -202,7 +202,7 @@ onMounted(() => {
     <div v-else-if="!plantillas.length" class="ptv__empty">
       <div class="ptv__empty-icon"><i class="bi bi-clipboard2-check"></i></div>
       <div class="ptv__empty-title">Sin plantillas todavía</div>
-      <div class="ptv__empty-sub">Creá tu primera plantilla para organizar fases de cultivo.</div>
+      <div class="ptv__empty-sub">Creá tu primera plantilla para organizar cultivos.</div>
       <div class="ptv__empty-actions">
         <button class="ptv__btn-primary" @click="abrirEditar()">
           <i class="bi bi-plus-lg"></i> Crear plantilla

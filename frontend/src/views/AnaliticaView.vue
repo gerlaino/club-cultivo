@@ -306,7 +306,7 @@ function bucketColor(desv) {
     <div class="an__header">
       <div>
         <h1 class="an__title">Analítica de producción</h1>
-        <p class="an__sub">Rendimiento, fases y pérdidas por genética</p>
+        <p class="an__sub">Rendimiento, cultivos y pérdidas por genética</p>
       </div>
       <div class="an__header-right">
         <div class="an__year-filter">
@@ -330,7 +330,7 @@ function bucketColor(desv) {
           <i class="bi bi-graph-up-arrow"></i> Genéticas
         </button>
         <button class="an__tab" :class="{ 'an__tab--active': tab === 'ciclos' }" @click="goTab('ciclos')">
-          <i class="bi bi-clock-history"></i> Fases
+          <i class="bi bi-clock-history"></i> Cultivos
         </button>
         <button class="an__tab" :class="{ 'an__tab--active': tab === 'perdidas' }" @click="goTab('perdidas')">
           <i class="bi bi-exclamation-triangle"></i> Pérdidas
@@ -514,7 +514,7 @@ function bucketColor(desv) {
 
       <div v-if="!ciclos.length" class="an__empty-lg">
         <i class="bi bi-clock-history"></i>
-        <p>Sin datos de fases aún.</p>
+        <p>Sin datos de cultivos aún.</p>
         <span>Se registran automáticamente al avanzar fases de lotes.</span>
       </div>
 
@@ -531,7 +531,7 @@ function bucketColor(desv) {
                 <th class="an__th-r">Cosecha</th>
                 <th class="an__th-r">Manicura</th>
                 <th class="an__th-r">Curado</th>
-                <th class="an__th-r an__th-total">Total fase</th>
+                <th class="an__th-r an__th-total">Total cultivo</th>
               </tr>
             </thead>
             <tbody>
