@@ -27,7 +27,9 @@
           <button v-if="puedeDevolver" class="mnl__btn-ghost" @click="abrirDevolver" title="Devolver a cosecha">
             <Undo2 :size="14" :stroke-width="2" /> Devolver a cosecha
           </button>
-          <button v-if="puedeRegistrar" class="mnl__btn-primary" @click="abrirModal">
+          <button v-if="puedeRegistrar" class="mnl__btn-primary" @click="abrirModal"
+                  :disabled="!plantasSinPesar.length"
+                  :title="!plantasSinPesar.length ? 'Todas las plantas del lote ya fueron registradas' : ''">
             <Scale :size="14" :stroke-width="2" /> Registrar por lote
           </button>
         </div>
@@ -48,11 +50,11 @@
         <div class="mnl__kpi">
           <div class="mnl__kpi-ico">✂️</div>
           <div class="mnl__kpi-body">
-            <div class="mnl__kpi-val" :style="pesadasKpi === plantas.length && plantas.length > 0 ? 'color:#16a34a' : ''">
-              {{ pesadasKpi }}<span class="mnl__kpi-den">/{{ plantas.length }}</span>
+            <div class="mnl__kpi-val" :style="pesadasKpi === plantasActivas.length && plantasActivas.length > 0 ? 'color:#16a34a' : ''">
+              {{ pesadasKpi }}<span class="mnl__kpi-den">/{{ plantasActivas.length }}</span>
             </div>
             <div class="mnl__kpi-lbl">Pesadas</div>
-            <div class="mnl__kpi-progress" v-if="plantas.length > 0">
+            <div class="mnl__kpi-progress" v-if="plantasActivas.length > 0">
               <div class="mnl__kpi-progress-fill" :style="{ width: kpiPorc + '%', background: kpiPorc === 100 ? '#16a34a' : '#5C7A4A' }"></div>
             </div>
           </div>
@@ -114,9 +116,7 @@
                   </span>
                 </td>
                 <td class="mnl__td mnl__td--estado">
-                  <span class="mnl__chip" :class="planta.peso_es_promedio ? 'mnl__chip--prom' : (parseFloat(planta.peso_seco) > 0 ? 'mnl__chip--done' : 'mnl__chip--pending')">
-                    {{ planta.peso_es_promedio ? 'Promedio' : (parseFloat(planta.peso_seco) > 0 ? 'Pesada' : 'Sin pesar') }}
-                  </span>
+                  <span class="mnl__chip" :class="plantaChip(planta).cls">{{ plantaChip(planta).label }}</span>
                 </td>
               </tr>
             </tbody>
@@ -147,7 +147,7 @@
         </div>
         <p v-else class="mnl__pj-hint">
           <template v-if="plantasSinPesar.length">
-            <strong class="mnl__pj-faltan">Faltan {{ plantasSinPesar.length }} de {{ plantas.length }} plantas.</strong>
+            <strong class="mnl__pj-faltan">Faltan {{ plantasSinPesar.length }} de {{ plantasActivas.length }} plantas.</strong>
             Escaneá el QR de cada una, o usá "Registrar por lote" arriba.
           </template>
           <template v-else>✅ Todas las plantas del lote están pesadas.</template>
@@ -475,7 +475,7 @@ const totalGramosKpi = computed(() => {
   return v ? parseFloat(parseFloat(v).toFixed(1)) : 0
 })
 
-const sinPesar        = computed(() => Math.max(0, plantas.value.length - pesadasKpi.value))
+const sinPesar        = computed(() => Math.max(0, plantasActivas.value.length - pesadasKpi.value))
 
 // Cualquier usuario con rol manicura/admin/supervisor puede registrar en un lote en
 // manicura (trabajo de equipo; espejo del backend). El "responsable" no bloquea al resto.
@@ -520,7 +520,21 @@ async function confirmarDevolver() {
   }
 }
 
-const plantasSinPesar = computed(() => plantas.value.filter(p => !(parseFloat(p.peso_seco) > 0)))
+// Plantas "vivas" del lote (las descartadas no cuentan para pesar ni para los contadores).
+const plantasActivas = computed(() => plantas.value.filter(p => p.state !== 'descartada'))
+// Pendientes de pesar = ni descartadas ni ya registradas (peso_seco del flujo QR, o
+// tiene_pesada del flujo manual/batch que no toca peso_seco).
+const plantasSinPesar = computed(() => plantas.value.filter(p =>
+  p.state !== 'descartada' && !(parseFloat(p.peso_seco) > 0) && !p.tiene_pesada
+))
+
+// Chip de estado de la planta en la tabla.
+function plantaChip(p) {
+  if (p.state === 'descartada') return { cls: 'mnl__chip--descartada', label: 'Descartada' }
+  if (p.peso_es_promedio)       return { cls: 'mnl__chip--prom', label: 'Promedio' }
+  if (parseFloat(p.peso_seco) > 0 || p.tiene_pesada) return { cls: 'mnl__chip--done', label: 'Pesada' }
+  return { cls: 'mnl__chip--pending', label: 'Sin pesar' }
+}
 // Plantas que quedan para el "resto conjunto" = sin pesar y sin peso individual cargado.
 const restoCount = computed(() =>
   plantasSinPesar.value.length -
@@ -530,7 +544,7 @@ const hayPesoDirecto = computed(() =>
   plantasSinPesar.value.some(p => parseFloat(adminForm.value.pesos[p.id]) > 0) ||
   (parseFloat(adminForm.value.restoPeso) > 0 && restoCount.value > 0)
 )
-const kpiPorc         = computed(() => plantas.value.length ? Math.min(100, Math.round(pesadasKpi.value / plantas.value.length * 100)) : 0)
+const kpiPorc         = computed(() => plantasActivas.value.length ? Math.min(100, Math.round(pesadasKpi.value / plantasActivas.value.length * 100)) : 0)
 const hasAnyHumedo    = computed(() => plantas.value.some(p => parseFloat(p.peso_humedo) > 0))
 
 const loteFinalizado = computed(() => lote.value && lote.value.estado !== 'en_manicura')
@@ -793,6 +807,7 @@ onActivated(cargar)
 }
 .mnl__chip--done    { background: #dcfce7; color: #15803d; }
 .mnl__chip--pending { background: #f1f5f9; color: #94a3b8; }
+.mnl__chip--descartada { background: #fef2f2; color: #b91c1c; }
 .mnl__chip--prom    { background: #fef3c7; color: #b45309; }
 
 /* Footer */

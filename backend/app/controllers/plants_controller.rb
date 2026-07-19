@@ -342,6 +342,9 @@ class PlantsController < ApplicationController
       es_seleccion: plant.es_seleccion,
       peso_seco:    plant.peso_seco,
       peso_humedo:  plant.peso_humedo,
+      # ¿Ya tiene alguna pesada? Indicador confiable de "registrada" (peso_seco no se setea
+      # en la carga manual/batch, solo en el flujo QR).
+      tiene_pesada: plant.pesadas_plantas.any?,
       # El peso es estimado (promedio de una carga conjunta) si la pesada más reciente lo es.
       peso_es_promedio: (plant.pesadas_plantas.max_by(&:created_at)&.es_promedio || false),
       foto_url:     foto_url(plant),
