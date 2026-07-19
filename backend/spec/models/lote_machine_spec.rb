@@ -149,6 +149,13 @@ RSpec.describe Lote, type: :model do
       expect(lote.manicurador_id).to be_nil
     end
 
+    it 'limpia el peso_seco del intento abortado (re-manicurado arranca limpio)' do
+      lote   = lote_en_manicura
+      planta = create(:plant, lote: lote, club: club, state: 'cosechado', peso_seco: 15)
+      lote.devolver_a_cosecha!(devuelto_por: manicurador, motivo: 'sigue húmeda')
+      expect(planta.reload.peso_seco).to be_nil
+    end
+
     it 'crea una AlertaInterna manicura_devuelta dirigida al admin' do
       lote = lote_en_manicura
       expect {

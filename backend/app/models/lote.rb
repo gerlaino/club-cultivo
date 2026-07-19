@@ -252,6 +252,10 @@ class Lote < ApplicationRecord
     ActiveRecord::Base.transaction do
       # Limpiar jornadas sin confirmar (borrador/enviado): una manicura sin lote no tiene sentido.
       pesajes_manicura.where(estado: %w[borrador enviado]).destroy_all
+      # Y el peso_seco denormalizado que quedó del intento abortado (las pesadas se van con los
+      # pesajes, pero el peso en la planta persiste) → el re-manicurado arranca limpio. No se
+      # toca peso_humedo (es el peso bruto al corte, dato de la cosecha).
+      plants.where.not(peso_seco: nil).update_all(peso_seco: nil)
       update!(estado: 'cosecha', manicurador: nil)
       lote_eventos.create!(
         tipo:            'cambio_estado',
