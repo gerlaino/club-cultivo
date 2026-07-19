@@ -132,6 +132,7 @@ Rails.application.routes.draw do
         post  :cosechar_plantas
         post  :asignar_manicurador
         post  :devolver_manicura
+        post  :reevaluar_manicura
         patch :completar_datos
         get   :timeline
         get   :historial

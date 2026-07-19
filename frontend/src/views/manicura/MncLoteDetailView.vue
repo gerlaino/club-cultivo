@@ -27,6 +27,10 @@
           <button v-if="puedeDevolver" class="mnl__btn-ghost" @click="abrirDevolver" title="Devolver a cosecha">
             <Undo2 :size="14" :stroke-width="2" /> Devolver a cosecha
           </button>
+          <button v-if="puedeRegistrar" class="mnl__btn-ghost" @click="reevaluar" :disabled="reevaluando"
+                  title="Re-evaluar si el lote ya se puede finalizar (pasar a curado)">
+            <RotateCw :size="14" :stroke-width="2" /> Re-evaluar
+          </button>
           <button v-if="puedeRegistrar" class="mnl__btn-primary" @click="abrirModal"
                   :disabled="!plantasSinPesar.length"
                   :title="!plantasSinPesar.length ? 'Todas las plantas del lote ya fueron registradas' : ''">
@@ -337,11 +341,11 @@
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw, Package, Plus, CheckCircle, Undo2, Trash2 } from 'lucide-vue-next'
+import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw, RotateCw, Package, Plus, CheckCircle, Undo2, Trash2 } from 'lucide-vue-next'
 import {
   getLote, listPlants, createPesajeManicura, registrarDirectoManicura, listStocks, listSedes,
   listPesajesManicura, enviarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura,
-  devolverManicura,
+  devolverManicura, reevaluarManicura,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useManicuraJornada } from '../../composables/useManicuraJornada.js'
@@ -483,6 +487,21 @@ const puedeRegistrar = computed(() =>
   lote.value?.estado === 'en_manicura' &&
   ['manicura', 'admin', 'supervisor'].includes(auth.role)
 )
+
+// Red de seguridad: re-evaluar si el lote ya se puede finalizar (todo pesado o descartado).
+const reevaluando = ref(false)
+async function reevaluar() {
+  if (reevaluando.value) return
+  reevaluando.value = true
+  try {
+    const { data } = await reevaluarManicura(id)
+    toast[data.estado === 'curado' ? 'success' : 'info'](data.mensaje)
+    if (data.estado === 'curado') router.push('/mnc/pendientes')
+    else await cargar()
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo re-evaluar')
+  } finally { reevaluando.value = false }
+}
 
 // Devolver a cosecha: solo mientras no haya un pesaje confirmado (un confirmado ya generó
 // stock → no se puede volver atrás). El backend valida lo mismo; esto es solo la UI.

@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :registrar_trasplante]
+  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -535,6 +535,26 @@ class LotesController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+
+  # POST /lotes/:id/reevaluar_manicura
+  # Re-evalúa la finalización de un lote en manicura (red de seguridad para lotes que quedaron
+  # atascados, o para forzar el chequeo tras cambios). No-op si ya no hay nada que procesar.
+  def reevaluar_manicura
+    authorize @lote, :devolver_manicura?
+    unless @lote.estado == 'en_manicura'
+      return render json: { error: 'El lote no está en manicura.' }, status: :unprocessable_entity
+    end
+    @lote.check_and_finalize_manicura!(finalizador: current_user)
+    lote = @lote.reload
+    render json: {
+      estado:  lote.estado,
+      mensaje: lote.estado == 'curado' ? 'Lote finalizado — pasó a curado.' : 'Todavía hay plantas pendientes de pesar o descartar.',
+      lote:    LoteSerializer.serialize(lote),
+    }
+  rescue ArgumentError, RuntimeError, ActiveRecord::RecordInvalid => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
 
