@@ -219,7 +219,7 @@
               </label>
               <textarea v-if="registroForm.fertilizacion" class="tl__input tl__textarea" style="margin-top:.6rem" rows="2" v-model.trim="registroForm.notas_fertilizacion" placeholder="Ej: Base A 10ml/L + Base B 10ml/L"></textarea>
             </div>
-            <div class="tl__section-title">Ciclo <span class="tl__optional">opcional</span></div>
+            <div class="tl__section-title">Fase <span class="tl__optional">opcional</span></div>
             <div class="tl__field tl__field--full">
               <label class="tl__label">¿Avanzar a la siguiente etapa?</label>
               <div class="tl__selector">

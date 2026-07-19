@@ -64,7 +64,7 @@
       <!-- Historial de estados -->
       <div class="lcd__section">
         <h2 class="lcd__section-title">
-          Historial del ciclo
+          Historial de las fases
           <span v-if="eventos.length" class="lcd__section-count">{{ eventos.length }}</span>
         </h2>
         <div v-if="loadingEventos" class="lcd__loading-sm"><DsSpinner :size="20" /></div>
@@ -97,7 +97,7 @@
       <!-- Tareas registradas -->
       <div class="lcd__section">
         <h2 class="lcd__section-title">
-          Tareas del ciclo
+          Tareas de las fases
           <span v-if="tareas.length" class="lcd__section-count">{{ tareas.length }}</span>
         </h2>
         <div v-if="loadingTareas" class="lcd__loading-sm"><DsSpinner :size="20" /></div>

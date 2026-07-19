@@ -326,7 +326,7 @@ function tieneActividad(sede) {
             <div v-else-if="sede.ops?.ciclo_predominante" class="agri-sede__ciclo-banner"
                  :style="{ background: cicloMeta(sede.ops.ciclo_predominante).bg, borderColor: cicloMeta(sede.ops.ciclo_predominante).dot }">
               <span class="agri-sede__ciclo-dot" :style="{ background: cicloMeta(sede.ops.ciclo_predominante).dot }"></span>
-              Ciclo predominante: <strong>{{ cicloMeta(sede.ops.ciclo_predominante).label }}</strong>
+              Fase predominante: <strong>{{ cicloMeta(sede.ops.ciclo_predominante).label }}</strong>
               <span v-if="sede.ops.dias_para_cosecha" class="agri-sede__cosecha-hint">
                 — cosecha estimada en {{ sede.ops.dias_para_cosecha }} días
               </span>

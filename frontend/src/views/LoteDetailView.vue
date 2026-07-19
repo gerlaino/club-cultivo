@@ -447,7 +447,7 @@ onUnmounted(() => {
         <i class="bi bi-lock-fill"></i>
         <div>
           <strong>Lote cerrado — solo lectura.</strong>
-          Este lote completó su ciclo y sus datos son inmutables. Para correcciones contactá al soporte.
+          Este lote completó su fase y sus datos son inmutables. Para correcciones contactá al soporte.
         </div>
       </div>
 
@@ -632,7 +632,7 @@ onUnmounted(() => {
               <dt>Floración objetivo</dt><dd>{{ lote.dias_floracion_objetivo ? lote.dias_floracion_objetivo + ' días' : '—' }}</dd>
               <dt>Cosecha objetivo</dt><dd>{{ lote.dias_cosecha_objetivo ? lote.dias_cosecha_objetivo + ' días' : '—' }}</dd>
               <dt>Inicio</dt><dd>{{ formatDate(lote.start_date) }}</dd>
-              <dt>Día del ciclo</dt><dd>{{ lote.dias_desde_inicio != null ? 'día ' + lote.dias_desde_inicio : '—' }}</dd>
+              <dt>Día de la fase</dt><dd>{{ lote.dias_desde_inicio != null ? 'día ' + lote.dias_desde_inicio : '—' }}</dd>
               <dt>Día en {{ em(lote.estado).label.toLowerCase() }}</dt><dd>{{ lote.dias_en_estado != null ? 'día ' + lote.dias_en_estado : '—' }}</dd>
             </dl>
           </div>

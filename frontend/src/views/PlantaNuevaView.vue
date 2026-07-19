@@ -242,7 +242,7 @@ onMounted(async () => {
 
         <!-- Timeline -->
         <div class="pnv__card">
-          <div class="pnv__card-title">Fechas del ciclo</div>
+          <div class="pnv__card-title">Fechas de las fases</div>
           <p class="pnv__hint" style="margin-bottom:1rem">Completá solo las fechas que ya ocurrieron.</p>
           <div class="pnv__grid">
 

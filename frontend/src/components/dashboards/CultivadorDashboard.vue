@@ -51,7 +51,7 @@
       <div class="cvd__kpi-card">
         <div class="cvd__kpi-ico" :class="{ 'cvd__kpi-ico--amber': lotesListos > 0 }"><GitBranch :size="18" :stroke-width="1.75" /></div>
         <div class="cvd__kpi-val" :class="{ 'cvd__kpi-val--amber': lotesListos > 0 }">{{ lotesEnCiclo }}</div>
-        <div class="cvd__kpi-lbl">Lotes en ciclo</div>
+        <div class="cvd__kpi-lbl">Lotes en fase</div>
         <div class="cvd__kpi-sub" :class="{ 'cvd__kpi-sub--amber': lotesListos > 0 }">
           {{ lotesListos > 0 ? `${lotesListos} listo${lotesListos !== 1 ? 's' : ''} para avanzar` : 'sin cambios pendientes' }}
         </div>

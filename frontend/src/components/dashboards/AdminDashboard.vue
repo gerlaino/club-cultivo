@@ -263,7 +263,7 @@ const alertas = computed(() => {
 
 const pulseLine = computed(() => {
   const partes = []
-  if (plantasEnCiclo.value) partes.push(`${plantasEnCiclo.value} plantas en ciclo`)
+  if (plantasEnCiclo.value) partes.push(`${plantasEnCiclo.value} plantas en fase`)
   if (statsStore.totalLotes) partes.push(`${statsStore.totalLotes} lotes activos`)
   if (balanceMes.value) partes.push(`${fmtCompacto(balanceMes.value)} este mes`)
   return partes.join(' · ')
@@ -487,7 +487,7 @@ async function onOnboardingCompletado() {
           <div class="ad__kpi-grid">
 
             <div class="ad__kpi">
-              <span class="ad__kpi-label">Plantas en ciclo</span>
+              <span class="ad__kpi-label">Plantas en fase</span>
               <div class="ad__kpi-num">{{ plantasEnCiclo }}</div>
               <div class="ad__kpi-sub">
                 {{ stats?.vegetativo ?? 0 }} veg · {{ stats?.floracion ?? 0 }} flor
@@ -652,7 +652,7 @@ async function onOnboardingCompletado() {
           </div>
 
           <div class="ad__anual-kpi">
-            <span class="ad__anual-lbl">Ciclos cerrados</span>
+            <span class="ad__anual-lbl">Fases cerradas</span>
             <span class="ad__anual-val">{{ ejActual.ciclos_cerrados }}</span>
             <span v-if="ejAnterior" class="ad__anual-delta ad__anual-delta--neutral">
               {{ ejAnterior.ciclos_cerrados }} en {{ añoActual - 1 }}

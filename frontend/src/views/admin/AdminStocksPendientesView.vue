@@ -305,7 +305,7 @@
               <div class="stk__modal-ico"><i class="bi bi-box-seam"></i></div>
               <div>
                 <h2 class="stk__modal-title">Nuevo stock externo</h2>
-                <p class="stk__modal-sub">Stock adquirido fuera del ciclo de cultivo propio</p>
+                <p class="stk__modal-sub">Stock adquirido fuera del cultivo propio</p>
               </div>
               <button class="stk__modal-close" @click="closeCrear"><i class="bi bi-x-lg"></i></button>
             </div>

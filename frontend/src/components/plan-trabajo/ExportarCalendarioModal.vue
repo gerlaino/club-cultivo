@@ -113,7 +113,7 @@ async function descargar() {
               <span class="ecm__chip">prioridad</span>
             </div>
             <p class="ecm__formato-hint">
-              Abre en Excel o Google Sheets. La columna "semana" te permite agrupar las tareas por semana del ciclo.
+              Abre en Excel o Google Sheets. La columna "semana" te permite agrupar las tareas por semana de la fase.
             </p>
           </div>
 
