@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger.js'
 // frontend/src/stores/insumos.js — depósito de insumos (Bloque 2).
 import { defineStore } from "pinia";
-import { listInsumos, createInsumo, updateInsumo, comprarInsumo, consumirInsumo, transferirInsumo } from "../lib/api";
+import { listInsumos, createInsumo, updateInsumo, comprarInsumo, consumirInsumo, transferirInsumo, revertirCompraInsumo, reconteoInsumo, deleteInsumo } from "../lib/api";
 
 export const useInsumosStore = defineStore("insumos", {
   state: () => ({
@@ -59,6 +59,22 @@ export const useInsumosStore = defineStore("insumos", {
         if (origen)  this._merge(origen);
         if (destino) this._merge(destino);
       });
+    },
+
+    // Revierte una compra desde el depósito: baja stock, recalcula costo promedio y borra el
+    // asiento contable asociado. El backend devuelve el insumo actualizado.
+    async revertirCompra(id, compraId) {
+      return this._guardar(() => revertirCompraInsumo(id, compraId), (data) => { this._merge(data); });
+    },
+
+    // Reconteo de inventario (corrección de dato o merma). Devuelve el insumo actualizado.
+    async reconteo(id, payload) {
+      return this._guardar(() => reconteoInsumo(id, payload), (data) => { this._merge(data); });
+    },
+
+    // Elimina el insumo por completo. El backend lo saca (o 422 si tuvo consumos → desactivar).
+    async eliminar(id) {
+      return this._guardar(() => deleteInsumo(id), () => { this.items = this.items.filter(i => i.id !== id); });
     },
 
     _merge(data) {

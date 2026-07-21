@@ -34,7 +34,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   LayoutDashboard, Sprout, Users, Factory, ShoppingCart,
-  CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine, Building2,
+  CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine, Building2, Warehouse,
 } from 'lucide-vue-next'
 import { NAV_GROUPS, detectGroup, useNavContext } from '../../composables/useNavContext.js'
 import { useClubStore } from '../../stores/club.js'
@@ -49,6 +49,7 @@ const ICONS = {
   cultivo:   Sprout,
   pacientes: Users,
   produccion: Factory,
+  deposito:  Warehouse,
   comercial: ShoppingCart,
   salon:     Wine,
   tareas:    CheckSquare,

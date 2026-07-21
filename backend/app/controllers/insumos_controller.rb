@@ -4,10 +4,10 @@
 class InsumosController < ApplicationController
   before_action :authenticate_user!
   before_action :require_lectura,  only: [:index, :show]
-  before_action :require_gestion,  only: [:create, :update, :comprar]
+  before_action :require_gestion,  only: [:create, :update, :comprar, :revertir_compra, :reconteo, :destroy]
   before_action :require_consumo,  only: [:consumir]
   before_action :require_gestion,  only: [:transferir]
-  before_action :set_insumo,       only: [:show, :update, :comprar, :consumir, :transferir]
+  before_action :set_insumo,       only: [:show, :update, :comprar, :consumir, :transferir, :revertir_compra, :reconteo, :destroy]
 
   # GET /insumos?sede_id=<id|pool>&tipo=<cultivo|general>&activos=true
   def index
@@ -114,6 +114,58 @@ class InsumosController < ApplicationController
   rescue ActiveRecord::RecordInvalid => e
     # Que una validación fallida no explote en 500: devolvemos el motivo real.
     render json: { error: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
+  end
+
+  # POST /insumos/:id/reconteo  { nuevo_stock, motivo: 'correccion'|'merma', notas?, fecha? }
+  # Ajusta el stock al conteo físico. 'correccion' = error de carga (sin contable);
+  # 'merma' = pérdida real (baja trazable, sin duplicar el egreso de la compra).
+  def reconteo
+    @insumo.reconciliar_stock!(
+      nuevo_stock: params.require(:nuevo_stock),
+      motivo:      params.require(:motivo),
+      notas:       params[:notas],
+      fecha:       params[:fecha].presence || Date.current,
+      created_by:  current_user
+    )
+    render json: serialize(@insumo.reload)
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActionController::ParameterMissing => e
+    render json: { error: "Falta el parámetro #{e.param}" }, status: :unprocessable_entity
+  end
+
+  # DELETE /insumos/:id
+  # Elimina el insumo por completo. Bloquea si ya tuvo consumos (imputados a lotes/salas o merma):
+  # en ese caso se desactiva (PATCH activo:false), no se borra. Si solo tuvo compras, revierte sus
+  # asientos contables antes de borrar (la plata vuelve).
+  def destroy
+    if @insumo.insumo_consumos.exists?
+      return render json: {
+        error: 'Este insumo ya tiene movimientos de salida (consumos o mermas). Desactivalo para conservar el historial, o revertí esos movimientos primero.'
+      }, status: :unprocessable_entity
+    end
+    ActiveRecord::Base.transaction do
+      @insumo.insumo_compras.includes(:movimiento_contable).each { |c| c.movimiento_contable&.destroy! }
+      @insumo.destroy!
+    end
+    head :no_content
+  end
+
+  # DELETE /insumos/:id/compras/:compra_id
+  # Revierte una compra desde la ficha del depósito: baja el stock y borra el asiento contable
+  # asociado (la plata "vuelve"). Bloquea si esa mercadería ya se consumió/distribuyó.
+  def revertir_compra
+    compra = @insumo.insumo_compras.find(params[:compra_id])
+    mov    = compra.movimiento_contable
+    ActiveRecord::Base.transaction do
+      @insumo.revertir_compra!(compra)
+      mov&.destroy!
+    end
+    render json: serialize(@insumo.reload)
+  rescue Insumo::Consumido => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Compra no encontrada' }, status: :not_found
   end
 
   private

@@ -377,11 +377,13 @@ Rails.application.routes.draw do
     resources :unidades_negocio,     only: [:index, :create, :update, :destroy]
 
     # Finanzas — insumos / depósito con costo real por lote (Bloque 2)
-    resources :insumos, only: [:index, :show, :create, :update] do
+    resources :insumos, only: [:index, :show, :create, :update, :destroy] do
       member do
         post :comprar
         post :consumir
         post :transferir
+        post :reconteo
+        delete 'compras/:compra_id', action: :revertir_compra, as: :revertir_compra
       end
     end
 

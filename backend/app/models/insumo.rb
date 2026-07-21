@@ -11,6 +11,9 @@ class Insumo < ApplicationRecord
   has_many :insumo_compras,  dependent: :destroy
   has_many :insumo_consumos, dependent: :destroy
 
+  # Se levanta al querer revertir una compra que ya fue consumida/distribuida.
+  Consumido = Class.new(StandardError)
+
   UNIDADES = %w[unidad litro mililitro kilogramo gramo bolsa metro otro].freeze
   # Familia hardcodeada → define el depósito de la sede. El bar es aparte (BarProducto).
   TIPOS = %w[cultivo general].freeze
@@ -77,6 +80,60 @@ class Insumo < ApplicationRecord
 
       compra
     end
+  end
+
+  # Revierte una compra: baja el stock por la cantidad comprada y recalcula el costo promedio
+  # con las compras restantes. Bloquea si ya se consumió/distribuyó parte (no queda stock sin
+  # consumir para revertir entero). NO toca el movimiento contable asociado — eso lo hace el
+  # caller (borrar el movimiento o la compra desde el otro lado), para no recursar.
+  def revertir_compra!(compra)
+    cantidad = compra.cantidad.to_d
+    if stock_actual.to_d < cantidad
+      restante = stock_actual.to_d
+      raise Consumido, "Ya se consumió o distribuyó parte de esta compra: quedan #{restante.to_s('F')} de #{cantidad.to_s('F')} #{unidad_medida}. Desasigná el consumo o la transferencia primero."
+    end
+    transaction do
+      compra.destroy!
+      restantes = insumo_compras.reload.to_a
+      self.stock_actual = (stock_actual.to_d - cantidad)
+      self.costo_promedio_ars = if restantes.any? && restantes.sum { |c| c.cantidad.to_d } > 0
+        (restantes.sum { |c| c.costo_total_ars.to_d } / restantes.sum { |c| c.cantidad.to_d }).round(4)
+      else
+        0
+      end
+      save!
+    end
+  end
+
+  MOTIVOS_RECONTEO = %w[correccion merma].freeze
+
+  # Reconteo de inventario: lleva el stock al valor físico contado. Dos motivos, dos efectos:
+  #  - 'correccion': error humano al cargar (se tipeó mal la cantidad). Corrige el dato; puede
+  #    subir o bajar el stock. SIN impacto contable (no hubo pérdida real de plata).
+  #  - 'merma': pérdida real (rotura, vencimiento, robo). Descuenta el faltante y lo deja en el
+  #    historial como merma. NO genera un egreso nuevo: la compra ya se imputó como gasto —
+  #    duplicarlo inflaría el P&L. Solo puede bajar el stock.
+  # Devuelve self. No hace nada si el conteo coincide con el stock actual.
+  def reconciliar_stock!(nuevo_stock:, motivo:, created_by:, notas: nil, fecha: Date.current)
+    nuevo  = nuevo_stock.to_d
+    actual = stock_actual.to_d
+    raise ArgumentError, 'El stock contado no puede ser negativo' if nuevo < 0
+    raise ArgumentError, 'Motivo de reconteo inválido'           unless MOTIVOS_RECONTEO.include?(motivo.to_s)
+    return self if nuevo == actual
+
+    if motivo.to_s == 'merma'
+      raise ArgumentError, 'La merma solo baja el stock; si contaste de más es una corrección' if nuevo > actual
+      registrar_consumo!(
+        cantidad: actual - nuevo, created_by: created_by, fecha: fecha,
+        notas: "Merma — #{notas.presence || 'reconteo de inventario'}"
+      )
+    else # correccion
+      transaction do
+        self.stock_actual = nuevo
+        save!
+      end
+    end
+    self
   end
 
   # Consumo: descuenta stock e imputa el costo (al promedio actual) al lote/sala. Refleja el

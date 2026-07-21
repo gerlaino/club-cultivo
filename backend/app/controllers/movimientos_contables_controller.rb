@@ -199,10 +199,19 @@ class MovimientosContablesController < ApplicationController
       return head :no_content
     end
 
-    if @movimiento.destroy
+    # Si el asiento fue una compra de insumo, borrarlo revierte también el stock del insumo
+    # (la mercadería vuelve del depósito). Bloquea si ya se consumió/distribuyó (avisa desasignar).
+    compra_insumo = InsumoCompra.find_by(movimiento_contable_id: @movimiento.id)
+    begin
+      ActiveRecord::Base.transaction do
+        compra_insumo&.insumo&.revertir_compra!(compra_insumo)
+        @movimiento.destroy!
+      end
       head :no_content
-    else
-      render json: { error: @movimiento.errors.full_messages.join(', ') }, status: :unprocessable_entity
+    rescue Insumo::Consumido => e
+      render json: { error: e.message }, status: :unprocessable_entity
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotDestroyed => e
+      render json: { error: e.record&.errors&.full_messages&.join(', ') || e.message }, status: :unprocessable_entity
     end
   end
 

@@ -334,6 +334,9 @@ export const updateInsumo    = (id, payload) => api.put(`/insumos/${id}`, { insu
 export const comprarInsumo   = (id, payload) => api.post(`/insumos/${id}/comprar`, payload)
 export const consumirInsumo  = (id, payload) => api.post(`/insumos/${id}/consumir`, payload)
 export const transferirInsumo = (id, payload) => api.post(`/insumos/${id}/transferir`, payload)
+export const revertirCompraInsumo = (id, compraId) => api.delete(`/insumos/${id}/compras/${compraId}`)
+export const reconteoInsumo   = (id, payload) => api.post(`/insumos/${id}/reconteo`, payload)
+export const deleteInsumo     = (id)          => api.delete(`/insumos/${id}`)
 
 // ── Bar · entidad por sede + POS + dashboard ───────────────────────────────────
 export const listBares          = ()               => api.get('/bares')

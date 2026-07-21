@@ -40,8 +40,12 @@ export const NAV_GROUPS = [
       { to: '/admin/stock', label: 'Stock' },
       { to: '/admin/cosechado', label: 'Cosecha' },
       { to: '/admin/pesajes-manicura', label: 'Manicura', badge: 'aprob' },
-      { to: '/insumos', label: 'Depósito' },
     ],
+  },
+  {
+    // Depósito — sección propia: es transversal (insumos de cultivo, generales y salón) y se
+    // usa a diario, así que va de primer nivel en vez de enterrado como sub-pestaña.
+    key: 'deposito', label: 'Depósito', to: '/insumos', tabs: [],
   },
   {
     key: 'comercial', label: 'Comercial', to: '/contabilidad',

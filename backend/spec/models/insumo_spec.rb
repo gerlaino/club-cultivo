@@ -38,6 +38,84 @@ RSpec.describe Insumo, type: :model do
     end
   end
 
+  describe '#revertir_compra!' do
+    it 'baja el stock por la cantidad comprada y borra la compra' do
+      i = insumo
+      compra = i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false)
+      expect { i.revertir_compra!(compra) }.to change { i.insumo_compras.count }.by(-1)
+      expect(i.reload.stock_actual).to eq(0)
+    end
+
+    it 'recalcula el costo promedio con las compras restantes' do
+      i = insumo
+      i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false) # $100/u
+      compra2 = i.registrar_compra!(cantidad: 10, costo_total_ars: 2000, created_by: admin, generar_egreso: false) # $200/u
+      i.revertir_compra!(compra2) # vuelve a quedar solo la primera
+      expect(i.reload.stock_actual).to eq(10)
+      expect(i.costo_promedio_ars).to eq(100)
+    end
+
+    it 'deja el promedio en 0 si no quedan compras' do
+      i = insumo
+      compra = i.registrar_compra!(cantidad: 5, costo_total_ars: 500, created_by: admin, generar_egreso: false)
+      i.revertir_compra!(compra)
+      expect(i.reload.costo_promedio_ars).to eq(0)
+    end
+
+    it 'bloquea si ya se consumió parte de esa compra' do
+      i = insumo
+      compra = i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false)
+      i.registrar_consumo!(cantidad: 4, lote: lote, created_by: admin) # queda 6 < 10
+      expect { i.revertir_compra!(compra) }.to raise_error(Insumo::Consumido, /consumió/)
+      expect(i.reload.stock_actual).to eq(6) # no tocó nada
+      expect(i.insumo_compras.count).to eq(1)
+    end
+  end
+
+  describe '#reconciliar_stock!' do
+    it 'corrección: ajusta el stock al conteo sin generar movimiento contable' do
+      i = insumo
+      i.registrar_compra!(cantidad: 100, costo_total_ars: 1000, created_by: admin, generar_egreso: false) # tipeó 100
+      expect {
+        i.reconciliar_stock!(nuevo_stock: 10, motivo: 'correccion', created_by: admin)
+      }.not_to change { club.movimientos_contables.count }
+      expect(i.reload.stock_actual).to eq(10)
+    end
+
+    it 'corrección: puede subir el stock (contó de más)' do
+      i = insumo
+      i.registrar_compra!(cantidad: 5, costo_total_ars: 500, created_by: admin, generar_egreso: false)
+      i.reconciliar_stock!(nuevo_stock: 8, motivo: 'correccion', created_by: admin)
+      expect(i.reload.stock_actual).to eq(8)
+    end
+
+    it 'merma: descuenta el faltante y lo deja como consumo trazable, sin nuevo egreso' do
+      i = insumo
+      i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false)
+      expect {
+        i.reconciliar_stock!(nuevo_stock: 7, motivo: 'merma', created_by: admin, notas: 'se pudrió')
+      }.to change { i.insumo_consumos.count }.by(1)
+        .and change { club.movimientos_contables.count }.by(0) # no duplica el gasto
+      expect(i.reload.stock_actual).to eq(7)
+      expect(i.insumo_consumos.last.notas).to match(/Merma/)
+    end
+
+    it 'merma: no permite subir el stock' do
+      i = insumo
+      i.registrar_compra!(cantidad: 5, costo_total_ars: 500, created_by: admin, generar_egreso: false)
+      expect { i.reconciliar_stock!(nuevo_stock: 9, motivo: 'merma', created_by: admin) }
+        .to raise_error(ArgumentError, /merma solo baja/)
+    end
+
+    it 'no hace nada si el conteo coincide con el stock actual' do
+      i = insumo
+      i.registrar_compra!(cantidad: 6, costo_total_ars: 600, created_by: admin, generar_egreso: false)
+      expect {
+        i.reconciliar_stock!(nuevo_stock: 6, motivo: 'merma', created_by: admin)
+      }.to change { i.insumo_consumos.count }.by(0).and change { club.movimientos_contables.count }.by(0)
+    end
+  end
+
   describe '#registrar_consumo!' do
     it 'descuenta stock e imputa el costo al promedio del momento' do
       i = insumo
