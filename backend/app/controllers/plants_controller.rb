@@ -372,6 +372,7 @@ class PlantsController < ApplicationController
       codigo_qr: plant.codigo_qr,
       state:     plant.state,
       origen:    plant.origen,
+      es_seleccion: plant.es_seleccion,
       foto_url:  foto_url(plant),
       lote: {
         id:              plant.lote.id,

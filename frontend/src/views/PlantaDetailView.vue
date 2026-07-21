@@ -468,18 +468,35 @@ const showRegistroPlanta = ref(false)
 
 // ── Editar planta ──────────────────────────────────────────
 const showEditarPlanta = ref(false)
-const editForm = ref({ nombre: '', state: '' })
+// El código (codigo_qr) y el estado NO se editan acá: el código es la identidad de la planta y
+// el estado lo maneja el flujo del lote (fases/cosecha/manicura), no una edición manual. A nivel
+// planta solo tiene sentido corregir origen, marcarla como selección y sus notas. La maceta, el
+// sustrato y el tipo de cultivo son del lote (se editan ahí); la maceta puntual, con un trasplante.
+const ORIGENES = [
+  { key: 'semilla',   label: '🌱 Semilla'   },
+  { key: 'esqueje',   label: '🪴 Esqueje'   },
+  { key: 'clonacion', label: '🧬 Clonación' },
+]
+const editForm = ref({ origen: 'semilla', es_seleccion: false, notas: '' })
 const savingEditar = ref(false)
 
 function abrirEditarPlanta() {
-  editForm.value = { nombre: planta.value?.nombre || '', state: planta.value?.state || '' }
+  editForm.value = {
+    origen:       planta.value?.origen || 'semilla',
+    es_seleccion: !!planta.value?.es_seleccion,
+    notas:        planta.value?.notas || '',
+  }
   showEditarPlanta.value = true
 }
 
 async function guardarEdicion() {
   savingEditar.value = true
   try {
-    await updatePlant(id, { nombre: editForm.value.nombre, state: editForm.value.state })
+    await updatePlant(id, {
+      origen:       editForm.value.origen,
+      es_seleccion: editForm.value.es_seleccion,
+      notas:        editForm.value.notas,
+    })
     await plants.fetchOne(id)
     showEditarPlanta.value = false
     toast.success('Planta actualizada')
@@ -1262,35 +1279,40 @@ onMounted(async () => {
             <button class="pd__modal-close" @click="showEditarPlanta = false"><i class="bi bi-x-lg"></i></button>
           </div>
           <div class="pd__modal-body">
-            <div class="pd__msection">Nombre</div>
-            <div class="pd__field pd__field--full">
-              <input
-                type="text"
-                class="pd__input"
-                v-model.trim="editForm.nombre"
-                placeholder="Nombre de la planta"
-                autofocus
-                @keydown.enter.prevent="guardarEdicion"
-                @keydown.esc.prevent="showEditarPlanta = false"
-              />
-            </div>
-
-            <div class="pd__msection" style="margin-top:1rem">Estado</div>
+            <div class="pd__msection">Origen</div>
             <div class="pd__field pd__field--full">
               <div class="pd__selector">
                 <button
-                  v-for="(meta, key) in ESTADO_META"
-                  :key="key"
+                  v-for="o in ORIGENES"
+                  :key="o.key"
                   type="button"
                   class="pd__sel-btn"
-                  :class="{ 'pd__sel-btn--active': editForm.state === key }"
-                  :style="editForm.state === key ? { borderColor: meta.color, background: meta.bg, color: meta.color } : {}"
-                  @click="editForm.state = key"
+                  :class="{ 'pd__sel-btn--active': editForm.origen === o.key }"
+                  @click="editForm.origen = o.key"
                 >
-                  {{ meta.emoji }} {{ meta.label }}
+                  {{ o.label }}
                 </button>
               </div>
             </div>
+
+            <div class="pd__msection" style="margin-top:1rem">Selección</div>
+            <label class="pd__check">
+              <input type="checkbox" v-model="editForm.es_seleccion" />
+              <span>Marcar como planta de selección (madre / genética destacada)</span>
+            </label>
+
+            <div class="pd__msection" style="margin-top:1rem">Notas</div>
+            <div class="pd__field pd__field--full">
+              <textarea
+                class="pd__input pd__textarea"
+                rows="3"
+                v-model.trim="editForm.notas"
+                placeholder="Notas de la planta"
+                @keydown.esc.prevent="showEditarPlanta = false"
+              ></textarea>
+            </div>
+
+            <p class="pd__edit-hint">La maceta, el sustrato y el tipo de cultivo son del lote — se editan desde el lote. La maceta puntual de una planta se cambia con un trasplante.</p>
           </div>
           <div class="pd__modal-footer">
             <button class="pd__btn-ghost" @click="showEditarPlanta = false">Cancelar</button>
@@ -1516,6 +1538,9 @@ onMounted(async () => {
 .pd__input-group .pd__input { border-radius: 8px 0 0 8px; }
 .pd__input-suffix { background: #e8f5e9; border: 1.5px solid #d4e6d4; border-left: none; padding: .55rem .7rem; font-size: .8rem; font-weight: 600; color: #1b5e20; border-radius: 0 8px 8px 0; white-space: nowrap; }
 .pd__textarea { resize: vertical; min-height: 56px; }
+.pd__check { display: flex; align-items: flex-start; gap: .55rem; font-size: .86rem; color: #374151; cursor: pointer; line-height: 1.4; }
+.pd__check input { margin-top: .15rem; accent-color: #16a34a; width: 16px; height: 16px; flex-shrink: 0; }
+.pd__edit-hint { margin: 1rem 0 0; font-size: .78rem; color: #94a3b8; line-height: 1.5; }
 .pd__selector { display: flex; gap: .4rem; flex-wrap: wrap; }
 .pd__sel-btn { display: flex; align-items: center; gap: .3rem; padding: .38rem .75rem; border: 1.5px solid #d4e6d4; border-radius: 8px; background: #f4f8f4; font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .pd__sel-btn:hover { border-color: #1b5e20; }
