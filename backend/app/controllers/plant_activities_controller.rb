@@ -4,16 +4,18 @@ class PlantActivitiesController < ApplicationController
   skip_before_action :require_admin_o_cultivador, raise: false
 
   def index
+    # La planta hereda el CONTEXTO que vivió dentro del lote: sus propias actividades (registro,
+    # mediciones, trasplantes, descarte) + las lecturas de ambiente + las fases y actividades del
+    # lote (riego, nutrición…). Lo que NO hereda son las notas/alertas administrativas del lote
+    # (ej. "Planta X descartada"): eso es de otras plantas y se ve en la vista del lote.
     activities = @plant.activities.order(occurred_at: :desc).limit(50)
     registros  = @plant.lote.registros_ambientales
                        .order(registrado_en: :desc)
                        .limit(50)
-    # Eventos heredados del lote: la planta vivió las fases y las actividades del lote,
-    # así que su historial los refleja igual que el del lote (no solo las notas).
-    # Excluimos el trasplante a nivel lote: cada planta ya tiene su propio PlantActivity
-    # de trasplante (si no, se vería duplicado).
+    # Excluimos el trasplante a nivel lote: cada planta ya tiene su propio PlantActivity de
+    # trasplante (evita el duplicado).
     eventos    = @plant.lote.lote_eventos
-                       .where(tipo: %w[cambio_estado actividad nota alerta])
+                       .where(tipo: %w[cambio_estado actividad])
                        .where.not("tipo = 'actividad' AND categoria = 'trasplante'")
                        .order(registrado_en: :desc)
                        .limit(60)
@@ -23,9 +25,7 @@ class PlantActivitiesController < ApplicationController
              eventos.map    { |e| serialize_evento(e) }
 
     merged.sort_by! { |e| e[:occurred_at] || '' }.reverse!
-    merged = merged.first(80)
-
-    render json: merged
+    render json: merged.first(80)
   end
 
   def create
@@ -125,7 +125,7 @@ class PlantActivitiesController < ApplicationController
       atype = 'lote_actividad'
       desc  = [[cat['emoji'], cat['label']].compact.join(' '), e.descripcion].reject(&:blank?).join(' · ')
       meta  = e.metadata || {}
-    else # nota / alerta
+    else # nota / alerta (no se listan hoy en la planta, pero se serializa por robustez)
       atype = e.tipo == 'alerta' ? 'lote_alerta' : 'lote_nota'
       desc  = e.descripcion
       meta  = {}

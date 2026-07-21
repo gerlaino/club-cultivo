@@ -135,15 +135,19 @@ class PlantsController < ApplicationController
     if @plant.update(permitted)
       attach_foto(@plant) if params[:foto].present?
       if plant_params[:state].present? && @plant.state != old_state
+        descartando = @plant.state == 'descartada' && old_state != 'descartada'
+        motivo      = params[:motivo].to_s.strip
+        # Actividad propia de la planta (su historial es solo suyo). En un descarte guarda el motivo.
         @plant.activities.create!(
           user:          current_user,
           activity_type: 'state_change',
-          description:   "Estado cambiado de #{old_state} a #{@plant.state}",
+          description:   descartando ? "Descartada (estaba en #{old_state})#{motivo.present? ? " — #{motivo}" : ''}"
+                                      : "Estado cambiado de #{old_state} a #{@plant.state}",
           occurred_at:   Time.current
         )
-        if @plant.state == 'descartada' && old_state != 'descartada'
-          motivo = params[:motivo].to_s.strip
+        if descartando
           @plant.update_column(:notas, [@plant.notas.presence, "Descarte: #{motivo}"].compact.join("\n")) if motivo.present?
+          # El lote también lo registra: se ve en el historial del lote, no en el de la planta.
           @plant.lote.lote_eventos.create!(
             tipo:          'nota',
             descripcion:   "Planta #{@plant.nombre} descartada (estaba en #{old_state})#{motivo.present? ? " — #{motivo}" : ''}",

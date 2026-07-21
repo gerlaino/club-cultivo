@@ -136,7 +136,7 @@ const CICLO_PLANTA = computed(() => {
   return [...base, 'cosecha', 'manicura', 'curado']
 })
 const LOTE_A_CICLO = {
-  cosecha: 'cosecha', en_manicura: 'manicura',
+  cosecha: 'cosecha', en_manicura: 'manicura', curado: 'curado', finalizado: 'curado',
 }
 const SALUD_META = {
   excelente: { color:'#16a34a', emoji:'🟢', label:'Excelente' },
@@ -533,13 +533,17 @@ const registrosHoyPlanta = computed(() =>
     .map(a => a.activity_type)
 )
 
+// Solo mientras la planta está en cultivo se registran mediciones (altura/colas/salud): una
+// planta cosechada, en secado o descartada ya no crece, así que "Registrar planta" no aplica.
+const enCultivo = computed(() => ['germinacion', 'esqueje', 'vegetativo', 'floracion'].includes(planta.value?.state))
+
 const plantaAcciones = computed(() => {
   const items = []
-  items.push({ emoji: '📋', label: 'Registrar planta', onClick: () => { showRegistroPlanta.value = true } })
-  items.push({ emoji: '✏️', label: 'Editar planta',    onClick: abrirEditarPlanta })
+  if (enCultivo.value) items.push({ emoji: '📋', label: 'Registrar planta', onClick: () => { showRegistroPlanta.value = true } })
+  items.push({ emoji: '✏️', label: 'Editar planta', onClick: abrirEditarPlanta })
   items.push({ divider: true })
-  items.push({ emoji: '🥀', label: 'Descartar (se perdió/murió)', danger: true, onClick: abrirDescartar })
-  items.push({ emoji: '🗑️', label: 'Eliminar (error de carga)',   danger: true, onClick: eliminarPlanta })
+  if (planta.value?.state !== 'descartada') items.push({ emoji: '🥀', label: 'Descartar (se perdió/murió)', danger: true, onClick: abrirDescartar })
+  items.push({ emoji: '🗑️', label: 'Eliminar (error de carga)', danger: true, onClick: eliminarPlanta })
   return items
 })
 
