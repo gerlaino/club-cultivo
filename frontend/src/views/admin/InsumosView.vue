@@ -404,6 +404,11 @@ async function revertirCompra(compra) {
       <button class="dp__tab dp__tab--add" title="Crear un depósito" @click="abrirNuevoDeposito">＋</button>
     </div>
 
+    <!-- Área a la que pertenece este depósito (a dónde va su plata en el P&L) -->
+    <p v-if="depositoActivo && !esSalon" class="dp__area-line">
+      <span class="dp__area-chip">🏷️ Área: {{ depositoActivo.area_nombre || 'sin área' }}</span>
+    </p>
+
     <!-- Resumen en vivo del depósito activo -->
     <div v-if="!esSalon && store.items.length" class="dp__summary">
       <div class="dp__kpi">
@@ -759,6 +764,8 @@ async function revertirCompra(compra) {
 .dp__link { color: #1b5e20; font-weight: 600; text-decoration: none; }
 .dp__link:hover { text-decoration: underline; }
 .dp__head-right { display: flex; align-items: center; gap: 1rem; }
+.dp__area-line { margin: -.5rem 0 1rem; }
+.dp__area-chip { display: inline-flex; align-items: center; gap: .3rem; font-size: .76rem; font-weight: 600; color: #475569; background: #eef2f6; border: 1px solid #e2e8f0; padding: .22rem .6rem; border-radius: 999px; }
 .dp__summary { display: flex; gap: 2.5rem; background: #fff; border: 1px solid #e8edf2; border-radius: 13px; padding: 1rem 1.4rem; margin-bottom: 1.25rem; box-shadow: 0 1px 2px rgb(15 23 42 / .04); }
 .dp__kpi { display: flex; flex-direction: column; gap: .15rem; }
 .dp__kpi-label { font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; font-weight: 700; }
