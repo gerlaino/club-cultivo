@@ -20,6 +20,9 @@ module Bar
 
     def call
       raise ArgumentError, 'La venta no tiene productos' if @lineas.empty?
+      if @evento && !@evento.permite_ventas?
+        raise ArgumentError, "El evento está #{@evento.estado}: no se pueden registrar ventas."
+      end
 
       ActiveRecord::Base.transaction do
         attrs = { club: @club, user: @vendedor, unidad_negocio: @bar.unidad_negocio_bar,

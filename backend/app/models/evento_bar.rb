@@ -20,6 +20,9 @@ class EventoBar < ApplicationRecord
   has_many :bar_ventas,            class_name: 'BarVenta',           foreign_key: :evento_bar_id, dependent: :nullify
 
   ESTADOS = %w[planificado en_venta en_curso finalizado cancelado].freeze
+  # Un evento finalizado o cancelado no acepta más ventas (entradas ni barra).
+  ESTADOS_SIN_VENTA = %w[finalizado cancelado].freeze
+  def permite_ventas? = ESTADOS_SIN_VENTA.exclude?(estado)
 
   validates :nombre, presence: true
   validates :estado, inclusion: { in: ESTADOS }

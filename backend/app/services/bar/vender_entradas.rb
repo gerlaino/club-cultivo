@@ -22,6 +22,7 @@ module Bar
       # Tope por AFORO del evento (además del cupo por tipo): no se venden más entradas que
       # lugares tiene el evento.
       evento = @tipo.evento_bar
+      raise ArgumentError, "El evento está #{evento.estado}: no se pueden vender entradas." unless evento.permite_ventas?
       aforo_disp = evento.aforo_disponible
       raise ArgumentError, "Se alcanzó el aforo del evento (#{evento.aforo}). Quedan #{aforo_disp} lugares." if aforo_disp && @cantidad > aforo_disp
 

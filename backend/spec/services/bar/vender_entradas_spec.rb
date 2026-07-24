@@ -11,6 +11,12 @@ RSpec.describe Bar::VenderEntradas, type: :service do
   before { ActsAsTenant.current_tenant = club }
   after  { ActsAsTenant.current_tenant = nil }
 
+  it 'no vende entradas si el evento está finalizado o cancelado' do
+    evento.update!(estado: 'finalizado')
+    expect { described_class.new(tipo, admin, cantidad: 1).call }
+      .to raise_error(ArgumentError, /finalizado/)
+  end
+
   it 'crea las entradas con código único y descuenta del cupo' do
     entradas = described_class.new(tipo, admin, cantidad: 3, comprador: 'Rocío').call
     expect(entradas.size).to eq(3)

@@ -14,6 +14,15 @@ RSpec.describe Bar::RegistrarVenta, type: :service do
     bar.bar_productos.create!({ club: club, nombre: 'Café', categoria: 'bebida', precio_ars: 900, stock: 40 }.merge(attrs))
   end
 
+  it 'no registra la venta si el evento atribuido está finalizado/cancelado' do
+    cafe = producto
+    evento = bar.eventos_bar.create!(club: club, nombre: 'Cerrado', fecha: Date.current, estado: 'finalizado')
+    expect {
+      described_class.new(bar, vendedor, lineas: [{ bar_producto_id: cafe.id, cantidad: 1 }], evento_bar: evento).call
+    }.to raise_error(ArgumentError, /finalizado/)
+    expect(cafe.reload.stock).to eq(40) # no se tocó
+  end
+
   it 'registra la venta, descuenta stock y calcula el total' do
     cafe = producto
     cerv = producto(nombre: 'Cerveza', precio_ars: 2400, stock: 18)
