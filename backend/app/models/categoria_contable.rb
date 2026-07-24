@@ -16,6 +16,7 @@ class CategoriaContable < ApplicationRecord
   belongs_to :parent, class_name: 'CategoriaContable', optional: true
   has_many :subcategorias, class_name: 'CategoriaContable', foreign_key: :parent_id, dependent: :destroy
   has_many :movimientos_contables, class_name: 'MovimientoContable', foreign_key: :categoria_contable_id, dependent: :nullify
+  has_many :insumos, dependent: :nullify
 
   TIPOS          = %w[ingreso egreso].freeze
   # Comportamiento = a qué depósito deriva el alta de un movimiento con esta categoría:

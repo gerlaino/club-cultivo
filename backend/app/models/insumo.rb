@@ -205,8 +205,10 @@ class Insumo < ApplicationRecord
       destino = club.insumos.where(sede_id: sede_destino.id, nombre: nombre, unidad_medida: unidad_medida)
                     .first_or_initialize
       if destino.new_record?
+        # Heredar `tipo` (cultivo/general): sin esto el destino cae al default 'cultivo' y un
+        # insumo General transferido aparecía en la solapa Cultivo de la otra sede.
         destino.assign_attributes(stock_minimo: stock_minimo, categoria_contable: categoria_contable,
-                                  stock_actual: 0, costo_promedio_ars: 0, activo: true)
+                                  tipo: tipo, stock_actual: 0, costo_promedio_ars: 0, activo: true)
       end
       nuevo_stock = destino.stock_actual.to_d + cantidad
       destino.costo_promedio_ars = ((destino.stock_actual.to_d * destino.costo_promedio_ars.to_d) + valor) / nuevo_stock

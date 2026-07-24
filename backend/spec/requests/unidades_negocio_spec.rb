@@ -52,6 +52,26 @@ RSpec.describe 'Unidades de negocio', type: :request do
       delete "/unidades_negocio/#{unidad.id}", headers: auth_headers, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
     end
+
+    # Regresión del 500: borrar un área PROPIA sin movimientos llegaba a evaluar
+    # @unidad.categorias_contables (asociación con class_name mal inferido) → NameError.
+    it 'borra un área propia sin movimientos' do
+      unidad = ActsAsTenant.with_tenant(club) { club.unidades_negocio.create!(nombre: 'Prueba', tipo: 'general') }
+      expect {
+        delete "/unidades_negocio/#{unidad.id}", headers: auth_headers, as: :json
+      }.to change { club.unidades_negocio.count }.by(-1)
+      expect(response).to have_http_status(:no_content)
+    end
+
+    it 'no borra un área con categorías asociadas (avisa desactivar)' do
+      unidad = ActsAsTenant.with_tenant(club) do
+        u = club.unidades_negocio.create!(nombre: 'Con cat', tipo: 'general')
+        club.categorias_contables.create!(nombre: 'Cat', tipo: 'egreso', unidad_negocio: u)
+        u
+      end
+      delete "/unidades_negocio/#{unidad.id}", headers: auth_headers, as: :json
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
   end
 
   describe 'aislamiento por club' do

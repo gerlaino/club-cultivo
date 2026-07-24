@@ -144,6 +144,15 @@ class InsumosController < ApplicationController
         error: 'Este insumo ya tiene movimientos de salida (consumos o mermas). Desactivalo para conservar el historial, o revertí esos movimientos primero.'
       }, status: :unprocessable_entity
     end
+    # Si falta stock respecto de lo comprado, parte se transfirió a otra sede o se reservó para un
+    # evento (ninguno deja consumo). Eliminar revertiría los asientos de compra ("la plata vuelve")
+    # mientras esa mercadería sigue viva en otro lado → descuadre. En ese caso, solo desactivar.
+    comprado = @insumo.insumo_compras.sum(:cantidad).to_d
+    if @insumo.stock_actual.to_d < comprado
+      return render json: {
+        error: 'Parte del stock salió por transferencia o quedó reservado para un evento. Desactivalo en vez de eliminarlo (eliminar descuadraría la contabilidad).'
+      }, status: :unprocessable_entity
+    end
     ActiveRecord::Base.transaction do
       @insumo.insumo_compras.includes(:movimiento_contable).each { |c| c.movimiento_contable&.destroy! }
       @insumo.destroy!

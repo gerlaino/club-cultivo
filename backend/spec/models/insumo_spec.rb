@@ -187,6 +187,13 @@ RSpec.describe Insumo, type: :model do
         .not_to change { club.movimientos_contables.count }
     end
 
+    it 'el destino hereda la familia (tipo) del origen, no cae al default cultivo' do
+      i = insumo(sede: sede_a, tipo: 'general', nombre: 'Lavandina')
+      i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false)
+      destino = i.transferir_a!(sede_destino: sede_b, cantidad: 4, created_by: admin)
+      expect(destino.tipo).to eq('general')
+    end
+
     it 'lanza si no hay stock suficiente' do
       i = insumo(sede: sede_a)
       i.registrar_compra!(cantidad: 2, costo_total_ars: 100, created_by: admin, generar_egreso: false)

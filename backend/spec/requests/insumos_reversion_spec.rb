@@ -82,6 +82,17 @@ RSpec.describe 'Reversión de compras de insumo', type: :request do
       expect(JSON.parse(response.body)['error']).to match(/[Dd]esactiv/)
       expect(Insumo.exists?(insumo.id)).to be(true)
     end
+
+    it 'bloquea con 422 si parte del stock se transfirió a otra sede (evita descuadre)' do
+      sede_a = create(:sede, club: club); sede_b = create(:sede, club: club)
+      insumo = club.insumos.create!(nombre: 'Fertilizante', unidad_medida: 'litro', sede: sede_a)
+      insumo.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin)
+      insumo.transferir_a!(sede_destino: sede_b, cantidad: 4, created_by: admin) # quedan 6 de 10
+      delete "/api/insumos/#{insumo.id}", headers: auth_headers
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['error']).to match(/transferencia|reserva|descuadr/i)
+      expect(Insumo.exists?(insumo.id)).to be(true)
+    end
   end
 
   describe 'DELETE /api/movimientos_contables/:id (asiento de la compra)' do

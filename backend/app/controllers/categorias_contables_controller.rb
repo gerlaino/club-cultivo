@@ -46,6 +46,9 @@ class CategoriasContablesController < ApplicationController
     if @categoria.movimientos_contables.exists?
       return render json: { error: 'La categoría tiene movimientos. Desactivala en vez de borrarla para conservar el histórico.' }, status: :unprocessable_entity
     end
+    if @categoria.insumos.exists?
+      return render json: { error: 'La categoría está asignada a insumos del depósito. Reasignalos o desactivala en vez de borrarla.' }, status: :unprocessable_entity
+    end
 
     @categoria.destroy
     head :no_content

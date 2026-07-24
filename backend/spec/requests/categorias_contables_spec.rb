@@ -93,6 +93,13 @@ RSpec.describe 'Categorías contables', type: :request do
       delete "/categorias_contables/#{cat.id}", headers: auth_headers, as: :json
       expect(response).to have_http_status(:no_content)
     end
+
+    it 'no borra una categoría asignada a un insumo (evita dejarlo huérfano)' do
+      cat = club.categorias_contables.create!(nombre: 'Con insumo', tipo: 'egreso')
+      club.insumos.create!(nombre: 'Fertilizante', unidad_medida: 'litro', categoria_contable: cat)
+      delete "/categorias_contables/#{cat.id}", headers: auth_headers, as: :json
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
   end
 
   describe 'autorización' do

@@ -8,7 +8,10 @@ class UnidadNegocio < ApplicationRecord
   acts_as_tenant(:club)
 
   belongs_to :club
-  has_many :categorias_contables,  dependent: :nullify
+  # OJO: `class_name` explícito. Rails infiere mal el singular de "categorias_contables"
+  # (deduce "CategoriasContable", que no existe) → NameError → 500 al tocar la asociación.
+  # Mismo problema que ya se corrigió en :movimientos_contables (commit 9a7090b).
+  has_many :categorias_contables,  class_name: 'CategoriaContable', dependent: :nullify
   has_many :movimientos_contables, class_name: 'MovimientoContable', dependent: :nullify
 
   TIPOS = %w[cultivo dispensario bar social administracion general].freeze
