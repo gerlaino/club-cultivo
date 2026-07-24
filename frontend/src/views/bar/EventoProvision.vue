@@ -122,7 +122,9 @@ const cierreForm = ref(null)
 function abrirCierre() {
   cierreForm.value = items.value
     .filter(p => p.cantidad_reservada > 0)
-    .map(p => ({ id: p.id, nombre: p.nombre, reservada: p.cantidad_reservada, consumida: p.cantidad_reservada }))
+    // Default = lo YA consumido (lo que registró el POS), no "consumí todo". Así el sobrante
+    // real queda a la vista y no se te escapa devolverlo.
+    .map(p => ({ id: p.id, nombre: p.nombre, reservada: p.cantidad_reservada, consumida: p.cantidad_consumida || 0 }))
 }
 function sobranteFila(f) { return Math.max(0, f.reservada - (Number(f.consumida) || 0)) }
 async function confirmarCierre(finalizar) {

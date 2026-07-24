@@ -43,7 +43,7 @@ module Bar
     # DELETE .../provisiones/:id — solo si no tiene stock reservado sin devolver
     def destroy
       if @provision.cantidad_reservada.to_d > @provision.cantidad_consumida.to_d
-        return render json: { error: 'Tiene stock reservado. Cerrá el evento (para devolver el sobrante) o desreservá primero.' }, status: :unprocessable_entity
+        return render json: { error: 'Tiene stock reservado. Cerrá o cancelá el evento para devolver el sobrante al depósito, y después sacá la provisión.' }, status: :unprocessable_entity
       end
       @provision.destroy
       head :no_content
