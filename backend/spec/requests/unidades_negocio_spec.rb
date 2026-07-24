@@ -35,11 +35,32 @@ RSpec.describe 'Unidades de negocio', type: :request do
       expect(response).to have_http_status(:created)
     end
 
-    it 'rechaza tipo inválido' do
+    it 'acepta un tipo libre (es solo una etiqueta agrupadora)' do
       post '/unidades_negocio',
-           params: { unidad_negocio: { nombre: 'X', tipo: 'invalida' } },
+           params: { unidad_negocio: { nombre: 'Merch', tipo: 'merchandising' } },
+           headers: auth_headers, as: :json
+      expect(response).to have_http_status(:created)
+      expect(JSON.parse(response.body)['tipo']).to eq('merchandising')
+    end
+
+    it 'rechaza un área sin nombre' do
+      post '/unidades_negocio',
+           params: { unidad_negocio: { nombre: '', tipo: 'general' } },
            headers: auth_headers, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'con crear_deposito crea también un depósito para el área' do
+      expect {
+        post '/unidades_negocio',
+             params: { unidad_negocio: { nombre: 'Eventos', tipo: 'social' }, crear_deposito: true },
+             headers: auth_headers, as: :json
+      }.to change { club.depositos.count }.by(1)
+      expect(response).to have_http_status(:created)
+      area = club.unidades_negocio.find_by(nombre: 'Eventos')
+      dep  = club.depositos.find_by(unidad_negocio_id: area.id)
+      expect(dep.nombre).to eq('Eventos')
+      expect(dep.es_sistema).to be(false)
     end
   end
 

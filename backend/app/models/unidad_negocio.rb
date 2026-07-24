@@ -14,10 +14,13 @@ class UnidadNegocio < ApplicationRecord
   has_many :categorias_contables,  class_name: 'CategoriaContable', dependent: :nullify
   has_many :movimientos_contables, class_name: 'MovimientoContable', dependent: :nullify
 
+  # Tipos "conocidos" con semántica propia (bar/social gatean por feature, y los de sistema
+  # emparejan con su depósito). El club puede crear áreas con un tipo libre además de estos:
+  # es solo una etiqueta agrupadora, así que no se valida contra la lista.
   TIPOS = %w[cultivo dispensario bar social administracion general].freeze
 
   validates :nombre, presence: true
-  validates :tipo,   presence: true, inclusion: { in: TIPOS }
+  validates :tipo,   presence: true
 
   scope :activas,    -> { where(activa: true) }
   scope :ordenadas,  -> { order(:orden, :nombre) }

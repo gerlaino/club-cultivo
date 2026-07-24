@@ -15,10 +15,13 @@ class UnidadesNegocioController < ApplicationController
   end
 
   # POST /unidades_negocio
+  # Con `crear_deposito: true` (sibling del payload), además del área se crea un depósito propio
+  # para ella (mismo nombre). Después el admin puede sumarle más depósitos a esa misma área.
   def create
     unidad = current_user.club.unidades_negocio.build(unidad_params)
     if unidad.save
-      render json: serialize(unidad), status: :created
+      deposito = crear_deposito_para(unidad) if ActiveModel::Type::Boolean.new.cast(params[:crear_deposito])
+      render json: serialize(unidad).merge(deposito_creado: deposito&.nombre), status: :created
     else
       render json: { errors: unidad.errors.full_messages }, status: :unprocessable_entity
     end
@@ -52,6 +55,15 @@ class UnidadesNegocioController < ApplicationController
     @unidad = current_user.club.unidades_negocio.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Unidad no encontrada' }, status: :not_found
+  end
+
+  # Crea un depósito propio (no de sistema) para el área recién creada. Si falla (raro), no
+  # rompe el alta del área: el admin siempre puede crear el depósito a mano después.
+  def crear_deposito_para(unidad)
+    current_user.club.depositos.create!(nombre: unidad.nombre, unidad_negocio: unidad,
+                                        es_sistema: false, activo: true)
+  rescue ActiveRecord::RecordInvalid
+    nil
   end
 
   def asegurar_catalogo

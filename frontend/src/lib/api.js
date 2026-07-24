@@ -322,7 +322,7 @@ export const createCategoriaContable   = (payload)     => api.post('/categorias_
 export const updateCategoriaContable   = (id, payload) => api.put(`/categorias_contables/${id}`, { categoria_contable: payload })
 export const deleteCategoriaContable   = (id)          => api.delete(`/categorias_contables/${id}`)
 export const listUnidadesNegocio       = (params = {}) => api.get('/unidades_negocio', { params })
-export const createUnidadNegocio       = (payload)     => api.post('/unidades_negocio', { unidad_negocio: payload })
+export const createUnidadNegocio       = (payload, opts = {}) => api.post('/unidades_negocio', { unidad_negocio: payload, ...opts })
 export const updateUnidadNegocio       = (id, payload) => api.put(`/unidades_negocio/${id}`, { unidad_negocio: payload })
 export const deleteUnidadNegocio       = (id)          => api.delete(`/unidades_negocio/${id}`)
 

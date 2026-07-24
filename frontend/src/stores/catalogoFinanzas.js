@@ -84,9 +84,10 @@ export const useCatalogoFinanzasStore = defineStore("catalogoFinanzas", {
     },
 
     // ── Unidades ────────────────────────────────────────────────
-    async crearUnidad(payload) {
+    // opts.crear_deposito → el backend crea también un depósito para el área.
+    async crearUnidad(payload, opts = {}) {
       return this._guardar(
-        () => createUnidadNegocio(payload),
+        () => createUnidadNegocio(payload, opts),
         (data) => { this.unidades = [...this.unidades, data]; },
       );
     },

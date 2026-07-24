@@ -302,21 +302,22 @@ class MovimientosContablesController < ApplicationController
   end
 
   # Depósito: compra de insumo. Sube stock + recalcula costo promedio; el egreso es este movimiento.
-  # La compra entra en una sede (la elegida en el form / la sede del movimiento); un insumo nuevo
-  # nace en esa sede. Si se elige un insumo existente, ya está localizado en su sede.
+  # El DEPÓSITO lo elige el usuario (entre los del área de la categoría). Un insumo nuevo nace en ese
+  # depósito y en una sede (la elegida / la del movimiento). El `tipo` legacy (cultivo/general) se
+  # deriva del depósito para compat; la categoría queda linkeada para agrupar por rubro en la vista.
   def aplicar_deposito!(movimiento, d)
     club     = current_user.club
     sede_id  = d[:sede_id].presence || movimiento.sede_id
     cat      = movimiento.categoria_contable
-    # La CATEGORÍA manda: define el depósito (cultivo/general) y queda linkeada al insumo para
-    # poder agruparlo por categoría → subcategoría en la vista del depósito.
-    tipo     = cat&.tipo_insumo || 'cultivo'
+    deposito = club.depositos.find_by(id: d[:deposito_id])
+    tipo     = deposito&.clave_sistema == 'cultivo' ? 'cultivo' : 'general'
     insumo   = if d[:insumo_id].present?
                  club.insumos.find(d[:insumo_id])
                else
                  club.insumos.create!(nombre: d[:nombre].to_s.strip,
                                       unidad_medida: d[:unidad_medida].presence || 'unidad',
-                                      sede_id: sede_id, tipo: tipo, categoria_contable: cat)
+                                      sede_id: sede_id, tipo: tipo, deposito: deposito,
+                                      categoria_contable: cat)
                end
     cantidad = d[:cantidad].to_d
     raise ArgumentError, 'Indicá la cantidad de insumo' if cantidad <= 0

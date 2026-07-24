@@ -1,6 +1,6 @@
 <script setup>
 // Catálogo de Finanzas: unidades de negocio + categorías jerárquicas (madre → subcategoría)
-// con comportamiento y unidad. Explicado y con acciones claras: editar, desactivar/reactivar
+// dentro de un área. Explicado y con acciones claras: editar, desactivar/reactivar
 // (para las del sistema, que no se borran) y borrar (para las propias sin movimientos).
 import { ref, computed, onMounted } from 'vue'
 import { useCatalogoFinanzasStore } from '../../stores/catalogoFinanzas.js'
@@ -11,35 +11,20 @@ const store = useCatalogoFinanzasStore()
 const { confirm } = useConfirm()
 const toast = useToast()
 
-const TIPOS_UNIDAD = [
-  { value: 'cultivo', label: 'Cultivo' }, { value: 'dispensario', label: 'Dispensario' },
-  { value: 'bar', label: 'Bar' }, { value: 'social', label: 'Social' },
-  { value: 'administracion', label: 'Administración' }, { value: 'general', label: 'General' },
-]
-const COMPORTAMIENTOS = [
-  { value: 'general',        label: 'General', desc: 'Gasto o ingreso común. No mueve stock.' },
-  { value: 'insumo',         label: 'Insumo → Depósito cultivo', desc: 'La compra entra al depósito de cultivo (se consume imputando al lote).' },
-  { value: 'insumo_general', label: 'Insumo → Depósito general', desc: 'La compra entra al depósito general del club (limpieza, administración).' },
-  { value: 'mercaderia',     label: 'Mercadería → Salón', desc: 'La compra entra al salón (bar), como producto vendible.' },
-]
-const COMP_META = {
-  general:        { label: 'General',   cls: 'is-gen' },
-  insumo:         { label: '→ Cultivo', cls: 'is-dep' },
-  insumo_general: { label: '→ General', cls: 'is-gen2' },
-  mercaderia:     { label: '→ Salón',   cls: 'is-sal' },
-}
+// Tipos sugeridos para el área (el club puede escribir uno propio). Es solo una etiqueta.
+const TIPOS_SUGERIDOS = ['cultivo', 'dispensario', 'bar', 'social', 'administracion', 'general']
 const COLORES = ['#1b5e20', '#15803d', '#b45309', '#8a4b2f', '#dc2626', '#3b82f6', '#64748b', '#7c3aed']
 
 onMounted(() => store.fetchAll())
 
 // ── Categorías ────────────────────────────────────────────────
 const catForm = ref(null)
-function nuevaMadre() { catForm.value = { parent_id: null, nombre: '', tipo: 'egreso', comportamiento: 'general', unidad_negocio_id: null, color: COLORES[0] } }
+function nuevaMadre() { catForm.value = { parent_id: null, nombre: '', tipo: 'egreso', unidad_negocio_id: null, color: COLORES[0] } }
 function nuevaSub(madre) { catForm.value = { parent_id: madre.id, nombre: '', tipo: madre.tipo, madreNombre: madre.nombre } }
 function editar(c, madre = null) {
   catForm.value = {
     id: c.id, parent_id: c.parent_id, nombre: c.nombre, tipo: c.tipo,
-    comportamiento: c.comportamiento, unidad_negocio_id: c.unidad_negocio_id, color: c.color || COLORES[0],
+    unidad_negocio_id: c.unidad_negocio_id, color: c.color || COLORES[0],
     es_sistema: c.es_sistema, madreNombre: madre?.nombre,
   }
 }
@@ -49,7 +34,7 @@ async function guardarCat() {
   const f = catForm.value
   if (!f.nombre?.trim()) { toast.warning('Poné un nombre'); return }
   const payload = { nombre: f.nombre.trim(), tipo: f.tipo, parent_id: f.parent_id }
-  if (esMadreForm.value) { payload.comportamiento = f.comportamiento; payload.unidad_negocio_id = f.unidad_negocio_id; payload.color = f.color }
+  if (esMadreForm.value) { payload.unidad_negocio_id = f.unidad_negocio_id; payload.color = f.color }
   try {
     if (f.id) await store.actualizarCategoria(f.id, payload)
     else      await store.crearCategoria(payload)
@@ -84,17 +69,23 @@ const porTipo = computed(() => ({
   ingreso: store.categorias.filter(c => c.tipo === 'ingreso'),
 }))
 
-// ── Unidades ──────────────────────────────────────────────────
+// ── Unidades (áreas) ──────────────────────────────────────────
 const uniForm = ref(null)
-function nuevaUnidad()  { uniForm.value = { nombre: '', tipo: 'general', color: COLORES[0], activa: true } }
+function nuevaUnidad()  { uniForm.value = { nombre: '', tipo: '', color: COLORES[0], activa: true, crear_deposito: true } }
 function editarUnidad(u) { uniForm.value = { id: u.id, nombre: u.nombre, tipo: u.tipo, color: u.color || COLORES[0], activa: u.activa, es_sistema: u.es_sistema } }
 async function guardarUnidad() {
   const f = uniForm.value
   if (!f.nombre?.trim()) { toast.warning('Poné un nombre'); return }
+  const tipo = (f.tipo?.trim() || 'general')
   try {
-    if (f.id) await store.actualizarUnidad(f.id, { nombre: f.nombre.trim(), tipo: f.tipo, color: f.color, activa: f.activa })
-    else      await store.crearUnidad({ nombre: f.nombre.trim(), tipo: f.tipo, color: f.color, activa: f.activa })
-    toast.success('Unidad guardada'); uniForm.value = null
+    if (f.id) {
+      await store.actualizarUnidad(f.id, { nombre: f.nombre.trim(), tipo, color: f.color, activa: f.activa })
+      toast.success('Área guardada')
+    } else {
+      await store.crearUnidad({ nombre: f.nombre.trim(), tipo, color: f.color, activa: f.activa }, { crear_deposito: !!f.crear_deposito })
+      toast.success(f.crear_deposito ? 'Área y depósito creados' : 'Área creada')
+    }
+    uniForm.value = null
   } catch { toast.error(store.saveError) }
 }
 async function borrarUnidad(u) {
@@ -113,21 +104,20 @@ async function borrarUnidad(u) {
       <div class="cat-intro">
         <h2 class="cat-intro__title">Cómo funciona el catálogo</h2>
         <p class="cat-intro__lead">
-          Las categorías clasifican cada movimiento del libro. Se organizan en
-          <b>categoría madre → subcategoría</b>: la madre define el <b>área</b> y el
-          <b>comportamiento</b>; las subcategorías lo heredan.
+          Las <b>áreas</b> son las líneas de negocio del club (Cultivo, Bar, Dispensario…) y cada una
+          tiene su propio resultado. Las <b>categorías</b> clasifican cada movimiento del libro dentro
+          de un área, en <b>categoría madre → subcategoría</b> (ej: <i>Fertilizantes → Base A</i>).
         </p>
-        <div class="cat-legend">
-          <div v-for="c in COMPORTAMIENTOS" :key="c.value" class="cat-legend__item">
-            <span class="comp" :class="COMP_META[c.value].cls">{{ COMP_META[c.value].label }}</span>
-            <span class="cat-legend__desc">{{ c.desc }}</span>
-          </div>
-        </div>
         <p class="cat-intro__note">
           <i class="bi bi-info-circle"></i>
-          Las categorías del <b>sistema</b> no se borran (para no romper el histórico): se
-          <b>desactivan</b> y dejan de aparecer al cargar movimientos. Las que creás vos se
-          pueden <b>borrar</b> si no tienen movimientos.
+          Un área puede tener uno o varios <b>depósitos</b>. Al cargar un movimiento con una categoría
+          de un área con depósito, la app te pregunta si esa compra es mercadería y en qué depósito
+          guardarla — así sabés dónde vas a verla después.
+        </p>
+        <p class="cat-intro__note">
+          <i class="bi bi-info-circle"></i>
+          Las categorías y áreas del <b>sistema</b> no se borran (para no romper el histórico): se
+          <b>desactivan</b>. Las que creás vos se pueden <b>borrar</b> si no tienen movimientos.
         </p>
       </div>
 
@@ -154,17 +144,13 @@ async function borrarUnidad(u) {
                 <label class="fld">Tipo
                   <select v-model="catForm.tipo" class="inp"><option value="egreso">Egreso (gasto)</option><option value="ingreso">Ingreso</option></select>
                 </label>
-                <label class="fld">Área (unidad de negocio)
+                <label class="fld">Área
                   <select v-model="catForm.unidad_negocio_id" class="inp">
                     <option :value="null">— Sin área —</option>
                     <option v-for="u in store.unidadesActivas" :key="u.id" :value="u.id">{{ u.nombre }}</option>
                   </select>
                 </label>
               </div>
-              <label class="fld">Comportamiento
-                <select v-model="catForm.comportamiento" class="inp"><option v-for="c in COMPORTAMIENTOS" :key="c.value" :value="c.value">{{ c.label }}</option></select>
-                <small class="fld-hint">{{ COMPORTAMIENTOS.find(c => c.value === catForm.comportamiento)?.desc }}</small>
-              </label>
               <div class="fld">
                 <span>Color</span>
                 <div class="swatches"><button v-for="c in COLORES" :key="c" type="button" class="sw" :class="{ 'sw--on': catForm.color === c }" :style="{ background: c }" @click="catForm.color = c"></button></div>
@@ -182,10 +168,7 @@ async function borrarUnidad(u) {
                 <span class="dot" :style="{ background: m.color || '#cbd5e1' }"></span>
                 <span class="cat-item__name">
                   <span class="cat-item__label">{{ m.nombre }}<span v-if="!m.activa" class="off-tag">oculta</span></span>
-                  <small>
-                    {{ m.unidad_negocio?.nombre || 'sin área' }}
-                    <span class="comp comp--sm" :class="COMP_META[m.comportamiento]?.cls">{{ COMP_META[m.comportamiento]?.label }}</span>
-                  </small>
+                  <small>{{ m.unidad_negocio?.nombre || 'sin área' }}</small>
                 </span>
                 <span v-if="m.es_sistema" class="tag" title="Categoría del sistema: no se borra, se desactiva">sistema</span>
                 <div class="cat-item__actions">
@@ -223,8 +206,21 @@ async function borrarUnidad(u) {
           <p class="cat-card__hint">Unidades de negocio (Cultivo, Bar, Dispensario…). El resultado del club se desglosa por área.</p>
 
           <form v-if="uniForm" class="cat-form" @submit.prevent="guardarUnidad">
+            <div class="cat-form__title">{{ uniForm.id ? 'Editar' : 'Nueva' }} área</div>
             <label class="fld">Nombre<input v-model.trim="uniForm.nombre" class="inp" placeholder="Ej: Cultivo" maxlength="40" /></label>
-            <label class="fld">Tipo<select v-model="uniForm.tipo" class="inp" :disabled="uniForm.es_sistema"><option v-for="t in TIPOS_UNIDAD" :key="t.value" :value="t.value">{{ t.label }}</option></select></label>
+            <!-- Tipo del área: solo una etiqueta agrupadora. Libre (o elegir uno sugerido). Las de
+                 sistema no lo cambian (viene con la app). -->
+            <template v-if="uniForm.es_sistema">
+              <div class="fld">Tipo<span class="uni-tipo-ro">{{ uniForm.tipo }} <small>(del sistema, no editable)</small></span></div>
+            </template>
+            <label v-else class="fld">Tipo <small class="fld-hint">— etiqueta libre; podés elegir uno o escribir el tuyo</small>
+              <input v-model.trim="uniForm.tipo" class="inp" list="uni-tipos" placeholder="Ej: eventos, cultivo…" maxlength="30" />
+              <datalist id="uni-tipos"><option v-for="t in TIPOS_SUGERIDOS" :key="t" :value="t" /></datalist>
+            </label>
+            <label v-if="!uniForm.id" class="fld-check">
+              <input type="checkbox" v-model="uniForm.crear_deposito" />
+              <span>Crear un depósito para esta área <small>(podés sumarle más después)</small></span>
+            </label>
             <div class="cat-form__actions"><button type="button" class="btn" @click="uniForm = null">Cancelar</button><button type="submit" class="btn btn--primary" :disabled="store.saving">Guardar</button></div>
           </form>
 
@@ -253,19 +249,15 @@ async function borrarUnidad(u) {
 .cat-intro { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.25rem 1.4rem; margin-bottom: 1rem; }
 .cat-intro__title { font-size: 1rem; font-weight: 750; margin: 0 0 .4rem; }
 .cat-intro__lead { font-size: .86rem; color: #475569; margin: 0 0 .9rem; line-height: 1.5; max-width: 72ch; }
-.cat-legend { display: flex; flex-direction: column; gap: .5rem; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; padding: .8rem 1rem; margin-bottom: .9rem; }
-.cat-legend__item { display: flex; align-items: center; gap: .6rem; font-size: .82rem; color: #475569; }
-.cat-legend__desc { color: #64748b; }
-.cat-intro__note { font-size: .8rem; color: #64748b; margin: 0; line-height: 1.5; }
+.cat-intro__note { font-size: .8rem; color: #64748b; margin: .3rem 0 0; line-height: 1.5; }
 .cat-intro__note .bi { color: #b45309; margin-right: .2rem; }
 
-/* Comportamiento chips */
-.comp { display: inline-block; font-size: .68rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
-.comp--sm { font-size: .62rem; padding: 1px 6px; margin-left: .35rem; }
-.comp.is-gen { background: #f1f5f9; color: #64748b; }
-.comp.is-dep { background: #eef6ee; color: #1b5e20; }
-.comp.is-gen2 { background: #eef2ff; color: #4338ca; }
-.comp.is-sal { background: #f6ece4; color: #8a4b2f; }
+/* Tipo de área read-only (sistema) + checkbox crear depósito */
+.uni-tipo-ro { font-weight: 500; color: #334155; text-transform: capitalize; }
+.uni-tipo-ro small { color: #94a3b8; font-weight: 400; text-transform: none; }
+.fld-check { display: flex; align-items: flex-start; gap: .5rem; font-size: .82rem; color: #334155; font-weight: 600; cursor: pointer; }
+.fld-check input { margin-top: .15rem; width: 15px; height: 15px; accent-color: #1b5e20; flex-shrink: 0; }
+.fld-check small { display: block; font-weight: 400; color: #94a3b8; }
 
 .cat-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1rem; align-items: start; }
 @media (max-width: 860px) { .cat-grid { grid-template-columns: 1fr; } }

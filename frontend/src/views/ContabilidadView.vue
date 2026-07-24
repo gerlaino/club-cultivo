@@ -3,7 +3,7 @@ import { ref, computed, onMounted, nextTick, watch } from "vue"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables } from "../lib/api"
+import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
 import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
@@ -19,6 +19,7 @@ const unidades = ref([])
 const insumos  = ref([])
 const bares    = ref([])
 const categorias = ref([])
+const depositos  = ref([])
 // Solo admin: el backend rechaza escritura de cualquier otro rol (abogado incluido)
 const canEdit = computed(() => ["admin","super_admin"].includes(auth.role))
 
@@ -408,6 +409,7 @@ onMounted(async () => {
     listInsumos({ activos: 'true' }).then(r => { insumos.value = r.data?.insumos || [] }).catch(() => {}),
     listBares().then(r => { bares.value = r.data || [] }).catch(() => {}),
     listCategoriasContables().then(r => { categorias.value = r.data || [] }).catch(() => {}),
+    listDepositos().then(r => { depositos.value = r.data?.depositos || r.data || [] }).catch(() => {}),
   ])
 })
 </script>
@@ -867,6 +869,7 @@ onMounted(async () => {
       :unidades="unidades"
       :categorias="categorias"
       :insumos="insumos"
+      :depositos="depositos"
       :bares="bares"
       :movimiento-editar="editingMovimiento"
       @guardado="onMovimientoGuardado"

@@ -12,6 +12,7 @@ const props = defineProps({
   unidades:         { type: Array,   default: () => [] },
   categorias:       { type: Array,   default: () => [] }, // árbol: madres con subcategorias
   insumos:          { type: Array,   default: () => [] },
+  depositos:        { type: Array,   default: () => [] }, // depósitos del club (para elegir destino)
   bares:            { type: Array,   default: () => [] },
   movimientoEditar: { type: Object,  default: null },
 })
@@ -69,18 +70,33 @@ const form   = ref(emptyForm())
 const errors = ref({})
 const saving = ref(false)
 
-// ── Entrada de stock (depósito/salón). La dispara el COMPORTAMIENTO de la categoría elegida. ──
+// ── Entrada de stock. Si la categoría cae en un área con depósito(s), el usuario elige si esa
+// compra es mercadería y en qué depósito guardarla ('' = "solo un gasto", el default). ──
 const UNIDADES_INSUMO = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
+const depSel = ref('')  // deposito_id elegido, o '' = no va a depósito (solo gasto)
 const dep = ref({ insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: null })
 const sal = ref({ bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null })
 const barProductos = ref([])
 const multiSede = computed(() => (props.sedes?.length || 0) > 1)
 
 function resetDestino() {
+  depSel.value = ''
   dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: null }
   sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null }
   barProductos.value = []
 }
+
+// Depósitos activos del área de la categoría elegida.
+const depositosDelArea = computed(() => {
+  const area = catActual.value?.area
+  if (!area) return []
+  return props.depositos.filter(d => d.activo && d.unidad_negocio_id === area)
+})
+const ofreceDeposito = computed(() =>
+  tipoNorm.value === 'egreso' && !esCuotas.value && !props.movimientoEditar && depositosDelArea.value.length > 0)
+const depSelObj  = computed(() => depositosDelArea.value.find(d => String(d.id) === String(depSel.value)) || null)
+// El Salón guarda BarProductos (no Insumos): distinta entrada (bar + producto).
+const depEsSalon = computed(() => depSelObj.value?.clave_sistema === 'salon' || depSelObj.value?.familia === 'mercaderia')
 
 // Al elegir un bar, cargamos sus productos para el desplegable.
 watch(() => sal.value.bar_id, async (id) => {
@@ -90,24 +106,22 @@ watch(() => sal.value.bar_id, async (id) => {
   try { const { data } = await listBarProductos(id, { activos: 'true' }); barProductos.value = data || [] } catch {}
 })
 
-// Construye el objeto destino para el payload según el comportamiento de la categoría.
+// Construye el objeto destino según el depósito elegido ('' = solo gasto, no mueve stock).
 function buildDestino() {
-  if (tipoNorm.value !== 'egreso' || esCuotas.value) return null
-  if (esDeposito.value) {
-    const d = dep.value
-    if (!(d.cantidad > 0)) return null
-    return d.insumo_id
-      ? { tipo: 'deposito', insumo_id: d.insumo_id, cantidad: d.cantidad }
-      : { tipo: 'deposito', nombre: d.nombre?.trim(), unidad_medida: d.unidad_medida, cantidad: d.cantidad, sede_id: d.sede_id }
-  }
-  if (compActual.value === 'mercaderia') {
+  if (!ofreceDeposito.value || !depSelObj.value) return null
+  if (depEsSalon.value) {
     const s = sal.value
     if (!s.bar_id || !(s.cantidad > 0)) return null
     return s.bar_producto_id
       ? { tipo: 'salon', bar_id: s.bar_id, bar_producto_id: s.bar_producto_id, cantidad: s.cantidad }
       : { tipo: 'salon', bar_id: s.bar_id, nombre: s.nombre?.trim(), categoria: s.categoria, precio_ars: s.precio_ars, cantidad: s.cantidad }
   }
-  return null
+  const d = dep.value
+  if (!(d.cantidad > 0)) return null
+  const id = depSelObj.value.id
+  return d.insumo_id
+    ? { tipo: 'deposito', deposito_id: id, insumo_id: d.insumo_id, cantidad: d.cantidad }
+    : { tipo: 'deposito', deposito_id: id, nombre: d.nombre?.trim(), unidad_medida: d.unidad_medida, cantidad: d.cantidad, sede_id: d.sede_id }
 }
 
 // Fallback a 'egreso' para tipos legacy (recupero_costo, ajuste) que puedan venir de datos viejos
@@ -173,13 +187,14 @@ const catRef   = ref(null)
 const catInput = ref(null)
 
 // Lista plana de categorías elegibles desde el árbol: subcategorías (hoja) + madres sin hijas.
+// `area` = unidad de negocio efectiva (la sub hereda la de la madre) → decide los depósitos.
 const catsSelectables = computed(() => {
   const out = []
   for (const m of props.categorias) {
     if (m.subcategorias?.length) {
-      for (const s of m.subcategorias) out.push({ id: s.id, label: `${m.nombre} › ${s.nombre}`, tipo: s.tipo, comportamiento: s.comportamiento_efectivo, clave: s.clave_efectiva })
+      for (const s of m.subcategorias) out.push({ id: s.id, label: `${m.nombre} › ${s.nombre}`, tipo: s.tipo, clave: s.clave_efectiva, area: s.unidad_negocio?.id || m.unidad_negocio?.id || null })
     } else {
-      out.push({ id: m.id, label: m.nombre, tipo: m.tipo, comportamiento: m.comportamiento_efectivo, clave: m.clave_efectiva })
+      out.push({ id: m.id, label: m.nombre, tipo: m.tipo, clave: m.clave_efectiva, area: m.unidad_negocio?.id || null })
     }
   }
   return out
@@ -196,19 +211,13 @@ const needsPaciente = computed(() => catActual.value?.clave === 'aporte_socio')
 // Muestra el selector de paciente: obligatorio en aporte de socio, opcional en recupero dispensación.
 const showsPaciente = computed(() => ['aporte_socio', 'dispensacion'].includes(catActual.value?.clave))
 const descPH        = computed(() => 'Describí brevemente el movimiento')
-// Comportamiento efectivo de la categoría elegida → maneja los campos de stock (depósito/salón).
-const compActual    = computed(() => catActual.value?.comportamiento || 'general')
-// insumo (cultivo) e insumo_general → ambos van al depósito de insumos; el backend decide cuál
-// según la categoría. mercaderia → salón. Es la categoría la que manda.
-const esDeposito    = computed(() => ['insumo', 'insumo_general'].includes(compActual.value))
-const mueveStock    = computed(() => esDeposito.value || compActual.value === 'mercaderia')
 
 function openCat()   { catOpen.value = true; catHL.value = -1; catQuery.value = ''; nextTick(() => catInput.value?.focus()) }
 function closeCat()  { catOpen.value = false; catQuery.value = '' }
 function pickCat(c)  {
   form.value.categoria_contable_id = c.id
   if (c.clave !== 'aporte_socio' && c.clave !== 'dispensacion') form.value.paciente_id = null
-  if (!['insumo', 'insumo_general', 'mercaderia'].includes(c.comportamiento)) resetDestino()
+  resetDestino() // al cambiar de categoría (y de área) reseteamos el destino elegido
   delete errors.value.categoria
   closeCat()
 }
@@ -296,7 +305,11 @@ watch(() => form.value.tipo, (t) => {
 
 watch(() => form.value.categoria_contable_id, () => {
   if (!showsPaciente.value) form.value.paciente_id = null
-  if (!mueveStock.value) resetDestino()
+})
+// Al elegir "solo un gasto" (o cambiar de depósito), limpiamos los campos de la entrada anterior.
+watch(depSel, () => {
+  dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: null }
+  sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null }
 })
 
 watch(() => props.modelValue, (val) => {
@@ -625,12 +638,17 @@ async function submit() {
 
             <hr class="nm-hr" />
 
-            <!-- ENTRADA DE STOCK: la dispara el comportamiento de la categoría elegida. Solo al crear. -->
-            <div v-if="mueveStock && tipoNorm === 'egreso' && !esCuotas && !movimientoEditar" class="nm-dest">
-              <label class="nm-label">{{ esDeposito ? (compActual === 'insumo_general' ? '🧹 Entra al depósito general' : '📦 Entra al depósito de cultivo') : '🍷 Entra al salón' }}</label>
+            <!-- ENTRADA DE STOCK: si la categoría cae en un área con depósito(s), preguntamos si la
+                 compra es mercadería y en cuál guardarla. Default = solo gasto. Solo al crear. -->
+            <div v-if="ofreceDeposito" class="nm-dest">
+              <label class="nm-label">¿Esta compra es mercadería que va a un depósito?</label>
+              <select class="nm-input" v-model="depSel">
+                <option value="">No, es solo un gasto</option>
+                <option v-for="d in depositosDelArea" :key="d.id" :value="d.id">Sí, guardarla en «{{ d.nombre }}»</option>
+              </select>
 
-              <!-- Depósito: compra de insumo (cultivo o general — el backend lo ubica según la categoría) -->
-              <div v-if="esDeposito" class="nm-dest-body">
+              <!-- Depósito de insumos: nombre + cantidad, sube stock y recalcula costo promedio -->
+              <div v-if="depSelObj && !depEsSalon" class="nm-dest-body">
                 <div class="nm-grid2">
                   <div class="nm-field">
                     <label class="nm-label">Insumo</label>
@@ -664,8 +682,8 @@ async function submit() {
                 <p class="nm-dest-hint">El monto del gasto es el costo total. El stock del insumo sube {{ dep.cantidad || 0 }} y se recalcula su costo promedio.</p>
               </div>
 
-              <!-- Salón: compra de mercadería del bar -->
-              <div v-if="compActual === 'mercaderia'" class="nm-dest-body">
+              <!-- Salón: compra de mercadería del bar (el depósito Salón guarda BarProductos) -->
+              <div v-if="depSelObj && depEsSalon" class="nm-dest-body">
                 <div class="nm-grid2">
                   <div class="nm-field">
                     <label class="nm-label">Bar</label>
@@ -855,7 +873,7 @@ async function submit() {
 }
 .nm-body-end { height: 8px; }
 
-/* Entrada de stock (la dispara el comportamiento de la categoría) */
+/* Entrada de stock (según el depósito elegido para la categoría) */
 .nm-dest { margin: 4px 0 8px; }
 .nm-dest-body { margin-top: 8px; padding: 12px; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
 .nm-dest-hint { font-size: 12px; color: #64748b; margin: 0; }
