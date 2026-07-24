@@ -6,7 +6,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useInsumosStore } from '../../stores/insumos.js'
 import { useSedeStore } from '../../stores/sede.js'
-import { listLotes, listSalas, listCategoriasContables, getInsumo, listDepositos, createDeposito } from '../../lib/api.js'
+import { listLotes, listSalas, listCategoriasContables, getInsumo, listDepositos, createDeposito, updateDeposito, deleteDeposito } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import DepositoSalon from './DepositoSalon.vue'
@@ -85,6 +85,46 @@ async function confirmarNuevoDeposito() {
     depoForm.value = null
     toast.success('Depósito creado')
   } catch (e) { toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo crear') }
+  finally { savingDepo.value = false }
+}
+
+// ── Gestionar depósito (renombrar / desactivar / eliminar) ────
+const depoEdit = ref(null) // { id, nombre, es_sistema, activo }
+function abrirEditarDeposito() {
+  const d = depositoActivo.value
+  if (!d) return
+  depoEdit.value = { id: d.id, nombre: d.nombre, es_sistema: d.es_sistema, activo: d.activo }
+}
+async function guardarDeposito() {
+  const d = depoEdit.value
+  if (!d.nombre?.trim()) { toast.warning('Poné un nombre'); return }
+  savingDepo.value = true
+  try {
+    await updateDeposito(d.id, { nombre: d.nombre.trim(), activo: d.activo })
+    await cargarDepositos()
+    depoEdit.value = null
+    toast.success('Depósito actualizado')
+  } catch (e) { toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo guardar') }
+  finally { savingDepo.value = false }
+}
+async function eliminarDeposito() {
+  const d = depoEdit.value
+  const ok = await confirm({
+    title: `Eliminar depósito "${d.nombre}"`,
+    message: 'Se elimina el depósito. Solo se puede si no tiene productos; si los tiene, movelos a otro depósito o desactivalo.',
+    confirmText: 'Eliminar', variant: 'danger',
+  })
+  if (!ok) return
+  savingDepo.value = true
+  try {
+    await deleteDeposito(d.id)
+    depoEdit.value = null
+    depositoActivoId.value = null
+    await cargarDepositos()
+    depositoActivoId.value = TABS.value[0]?.id ?? null
+    await recargar()
+    toast.success('Depósito eliminado')
+  } catch (e) { toast.error(e?.response?.data?.error || 'No se pudo eliminar') }
   finally { savingDepo.value = false }
 }
 
@@ -351,6 +391,7 @@ async function revertirCompra(compra) {
       <button v-for="d in TABS" :key="d.id" class="dp__tab" :class="{ 'is-on': depositoActivo?.id === d.id }" @click="depositoActivoId = d.id">
         {{ d.nombre }}
       </button>
+      <button v-if="depositoActivo && !esSalon" class="dp__tab dp__tab--add" title="Gestionar este depósito" @click="abrirEditarDeposito">⚙</button>
       <button class="dp__tab dp__tab--add" title="Crear un depósito" @click="abrirNuevoDeposito">＋</button>
     </div>
 
@@ -650,6 +691,24 @@ async function revertirCompra(compra) {
         <p class="modal__hint">Un depósito propio para agrupar tu mercadería (ej: Merchandising, Insumos de oficina). Los productos que cargues acá se consumen como gasto general.</p>
         <label class="fld">Nombre<input v-model.trim="depoForm.nombre" class="inp" maxlength="40" placeholder="Ej: Merchandising" v-focus @keydown.enter.prevent="confirmarNuevoDeposito" /></label>
         <div class="modal__actions"><button class="btn" @click="depoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="savingDepo" @click="confirmarNuevoDeposito">Crear</button></div>
+      </div>
+    </div>
+
+    <!-- Modal GESTIONAR DEPÓSITO -->
+    <div v-if="depoEdit" class="ov" @click.self="depoEdit = null">
+      <div class="dpdlg">
+        <h3 class="modal__title">Gestionar depósito</h3>
+        <label class="fld">Nombre<input v-model.trim="depoEdit.nombre" class="inp" maxlength="40" v-focus @keydown.enter.prevent="guardarDeposito" /></label>
+        <label class="dp__chk" style="margin: .2rem 0 .4rem"><input type="checkbox" :checked="!depoEdit.activo" @change="depoEdit.activo = !depoEdit.activo" /> Desactivado (oculto del listado)</label>
+        <p v-if="depoEdit.es_sistema" class="mut" style="font-size:.8rem; margin:.3rem 0 0; line-height:1.4">Es un depósito del sistema: podés renombrarlo o desactivarlo, pero no eliminarlo.</p>
+        <div class="modal__actions" style="justify-content: space-between">
+          <button v-if="!depoEdit.es_sistema" class="btn btn--danger" :disabled="savingDepo" @click="eliminarDeposito">Eliminar</button>
+          <span v-else></span>
+          <div style="display:flex; gap:.5rem">
+            <button class="btn" @click="depoEdit = null">Cancelar</button>
+            <button class="btn btn--primary" :disabled="savingDepo" @click="guardarDeposito">Guardar</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
