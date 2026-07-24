@@ -10,6 +10,7 @@ import { listLotes, listSalas, listCategoriasContables, getInsumo, listDepositos
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import DepositoSalon from './DepositoSalon.vue'
+import DepositoDispensacion from './DepositoDispensacion.vue'
 
 const store = useInsumosStore()
 const sede  = useSedeStore()
@@ -31,17 +32,21 @@ const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 // ── Depósitos (dinámicos: sistema + los que crea el admin) ────────────────────
 const depositos = ref([])
 const depositoActivoId = ref(null)
-// La flor de Dispensación se integra en una fase posterior; por ahora no se lista como solapa.
-const TABS = computed(() => depositos.value.filter(d => d.clave_sistema !== 'dispensacion'))
+const TABS = computed(() => depositos.value)
 const depositoActivo = computed(() => depositos.value.find(d => d.id === depositoActivoId.value) || TABS.value[0] || null)
-const esSalon   = computed(() => depositoActivo.value?.clave_sistema === 'salon')
-const esCultivo = computed(() => depositoActivo.value?.familia === 'insumo')
+const esSalon        = computed(() => depositoActivo.value?.clave_sistema === 'salon')
+const esDispensacion = computed(() => depositoActivo.value?.clave_sistema === 'dispensacion')
+const esCultivo      = computed(() => depositoActivo.value?.familia === 'insumo')
+// Depósitos de solo lectura (no aceptan Entrada ni se gestionan desde acá).
+const esSoloLectura  = computed(() => esSalon.value || esDispensacion.value)
 const HINTS = {
   insumo:         'Fertilizantes, sustrato… se consumen imputando el costo al lote.',
   insumo_general: 'Insumos del club (limpieza, administración). Se consumen como gasto.',
   mercaderia:     'Mercadería vendible: stock con costo, valorizado y alertas de reposición.',
 }
-const depositoHint = computed(() => HINTS[depositoActivo.value?.familia] || '')
+const depositoHint = computed(() =>
+  esDispensacion.value ? 'Flor seca y derivados listos para dispensar. Solo lectura: entra por cosecha/manicura, sale por dispensación.'
+  : (HINTS[depositoActivo.value?.familia] || ''))
 
 // Categorías contables elegibles al dar de alta un producto en el depósito activo (según su familia).
 const categoriasDelTab = computed(() => {
@@ -156,7 +161,7 @@ const valorizadoFiltrado = computed(() => itemsFiltrados.value.reduce((a, i) => 
 watch(depositoActivoId, () => { filtroCategoria.value = null; busqueda.value = '' })
 
 async function recargar() {
-  if (esSalon.value || !depositoActivoId.value) return
+  if (esSoloLectura.value || !depositoActivoId.value) return
   await store.fetch({ sede_id: sedeFiltro.value ?? undefined, deposito_id: depositoActivoId.value })
 }
 
@@ -392,7 +397,7 @@ async function revertirCompra(compra) {
           <option :value="null">🏢 Todo el club</option>
           <option v-for="s in sede.sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
-        <button v-if="!esSalon" class="btn btn--primary" @click="abrirEntrada()">＋ Entrada</button>
+        <button v-if="!esSoloLectura" class="btn btn--primary" @click="abrirEntrada()">＋ Entrada</button>
       </div>
     </header>
 
@@ -400,17 +405,17 @@ async function revertirCompra(compra) {
       <button v-for="d in TABS" :key="d.id" class="dp__tab" :class="{ 'is-on': depositoActivo?.id === d.id }" @click="depositoActivoId = d.id">
         {{ d.nombre }}
       </button>
-      <button v-if="depositoActivo && !esSalon && !depositoActivo.es_sistema" class="dp__tab dp__tab--add" title="Gestionar este depósito" @click="abrirEditarDeposito">⚙</button>
+      <button v-if="depositoActivo && !esSoloLectura && !depositoActivo.es_sistema" class="dp__tab dp__tab--add" title="Gestionar este depósito" @click="abrirEditarDeposito">⚙</button>
       <button class="dp__tab dp__tab--add" title="Crear un depósito" @click="abrirNuevoDeposito">＋</button>
     </div>
 
     <!-- Área a la que pertenece este depósito (a dónde va su plata en el P&L) -->
-    <p v-if="depositoActivo && !esSalon" class="dp__area-line">
+    <p v-if="depositoActivo && !esSoloLectura" class="dp__area-line">
       <span class="dp__area-chip">🏷️ Área: {{ depositoActivo.area_nombre || 'sin área' }}</span>
     </p>
 
     <!-- Resumen en vivo del depósito activo -->
-    <div v-if="!esSalon && store.items.length" class="dp__summary">
+    <div v-if="!esSoloLectura && store.items.length" class="dp__summary">
       <div class="dp__kpi">
         <span class="dp__kpi-label">Valorizado</span>
         <span class="dp__kpi-val">{{ fmt(resumenDeposito.valorizado) }}</span>
@@ -426,6 +431,7 @@ async function revertirCompra(compra) {
     </div>
 
     <DepositoSalon v-if="esSalon" :sede-id="sedeFiltro" />
+    <DepositoDispensacion v-else-if="esDispensacion" :sede-id="sedeFiltro" />
 
     <template v-else>
     <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>
