@@ -52,6 +52,21 @@ class EventoBar < ApplicationRecord
     provisiones.includes(:provisionable).sum { |p| p.cantidad_consumida.to_d * p.costo_unitario }
   end
 
+  # Devuelve al depósito todo el sobrante reservado (reservado − consumido) de cada provisión.
+  # Idempotente: al hacerlo deja el sobrante en 0, así correrlo de nuevo no devuelve de más.
+  # Se llama al finalizar/cancelar por cualquier camino (así no queda stock atrapado fuera).
+  def devolver_sobrante_reservado!(usuario:)
+    transaction do
+      provisiones.includes(:provisionable).each do |p|
+        sobrante = p.sobrante
+        next if sobrante <= 0
+
+        p.aplicar_devolucion!(cantidad: sobrante, usuario: usuario)
+        p.update!(cantidad_reservada: p.cantidad_consumida) # sobrante → 0
+      end
+    end
+  end
+
   # Presupuesto: ingresos estimados y egresos comprometidos (suma de costos, pagados o no).
   def costos_comprometidos = costos.sum(:monto_ars).to_f
   def costos_pagados       = costos.where(pagado: true).sum(:monto_ars).to_f

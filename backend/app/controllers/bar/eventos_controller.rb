@@ -31,8 +31,14 @@ module Bar
 
     # PATCH /bares/:bar_id/eventos/:id
     def update
+      estado_previo = @evento.estado
       if @evento.update(evento_params)
-        render json: serialize(@evento, full: true)
+        # Al finalizar o cancelar por CUALQUIER camino (incluido el desplegable de estado),
+        # el sobrante reservado vuelve a su depósito. Evita que quede stock atrapado fuera.
+        if @evento.estado != estado_previo && EventoBar::ESTADOS_SIN_VENTA.include?(@evento.estado)
+          @evento.devolver_sobrante_reservado!(usuario: current_user)
+        end
+        render json: serialize(@evento.reload, full: true)
       else
         render json: { errors: @evento.errors.full_messages }, status: :unprocessable_entity
       end

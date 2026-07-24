@@ -70,6 +70,19 @@ RSpec.describe EventoBar, type: :model do
     end
   end
 
+  describe 'devolver el sobrante reservado al finalizar/cancelar' do
+    it 'el sobrante (reservado − consumido) vuelve al stock, y es idempotente' do
+      prod = create(:bar_producto, club: club, bar: bar, stock: 0, costo_ars: 500)
+      prov = evento.provisiones.create!(club: club, provisionable: prod,
+        cantidad_prevista: 30, cantidad_reservada: 30, cantidad_consumida: 20) # sobrante 10
+      expect { evento.devolver_sobrante_reservado!(usuario: admin) }
+        .to change { prod.reload.stock }.by(10)
+      expect(prov.reload.cantidad_reservada).to eq(20) # sobrante quedó en 0
+      expect { evento.devolver_sobrante_reservado!(usuario: admin) }
+        .not_to change { prod.reload.stock } # no devuelve de más
+    end
+  end
+
   describe 'borrar y restaurar un evento' do
     it 'al restaurar vuelve con sus costos y re-crea los egresos pagados' do
       costo(pagado: true, monto_ars: 180_000)
