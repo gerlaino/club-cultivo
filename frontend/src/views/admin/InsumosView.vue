@@ -48,15 +48,21 @@ const depositoHint = computed(() =>
   esDispensacion.value ? 'Flor seca y derivados listos para dispensar. Solo lectura: entra por cosecha/manicura, sale por dispensación.'
   : (HINTS[depositoActivo.value?.familia] || ''))
 
-// Categorías contables elegibles al dar de alta un producto en el depósito activo (según su familia).
+// Categorías (egreso) elegibles al dar de alta en el depósito activo: las del ÁREA del depósito.
+// Si el depósito no tiene área, se muestran todas (para no perder ninguna).
 const categoriasDelTab = computed(() => {
-  const fam = depositoActivo.value?.familia
-  if (!fam) return []
+  const areaId = depositoActivo.value?.unidad_negocio_id
+  const areaDe = (c) => c.unidad_negocio?.id ?? c.unidad_negocio_id ?? null
+  const coincide = (c, fallback = null) => !areaId || (areaDe(c) ?? fallback) === areaId
   const out = []
   for (const m of categorias.value) {
+    if (m.tipo !== 'egreso') continue
     const subs = m.subcategorias || []
-    for (const s of subs) if (s.comportamiento_efectivo === fam) out.push({ id: s.id, label: `${m.nombre} › ${s.nombre}` })
-    if (!subs.length && m.comportamiento_efectivo === fam) out.push({ id: m.id, label: m.nombre })
+    if (subs.length) {
+      for (const s of subs) if (coincide(s, areaDe(m))) out.push({ id: s.id, label: `${m.nombre} › ${s.nombre}` })
+    } else if (coincide(m)) {
+      out.push({ id: m.id, label: m.nombre })
+    }
   }
   return out
 })

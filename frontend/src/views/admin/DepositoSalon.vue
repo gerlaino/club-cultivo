@@ -3,16 +3,17 @@
 // valorizado, mínimo y alertas. Compra (costo promedio ponderado), ajuste/merma e historial de
 // movimientos. Solo aplica a sedes social/mixta (las que tienen bar).
 import { ref, computed, watch, onMounted } from 'vue'
-import { listBares, listBarProductos, comprarBarProducto, ajustarBarProducto, getBarProductoMovimientos } from '../../lib/api.js'
+import { listBares, listBarProductos, comprarBarProducto, ajustarBarProducto, getBarProductoMovimientos, createBarProducto, listCategoriasProducto } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({ sedeId: { type: [Number, null], default: null } })
 const toast = useToast()
 
-const bar       = ref(null)
-const productos = ref([])
-const loading   = ref(false)
-const saving    = ref(false)
+const bar          = ref(null)
+const productos    = ref([])
+const categoriasProd = ref([])
+const loading      = ref(false)
+const saving       = ref(false)
 
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 const valorizadoTotal = computed(() => productos.value.reduce((a, p) => a + (p.valorizado_ars || 0), 0))
@@ -27,8 +28,29 @@ async function cargar() {
   } catch { bar.value = null; productos.value = [] }
   finally { loading.value = false }
 }
-onMounted(cargar)
+onMounted(async () => {
+  try { categoriasProd.value = (await listCategoriasProducto()).data || [] } catch { categoriasProd.value = [] }
+  await cargar()
+})
 watch(() => props.sedeId, cargar)
+
+// ── Nuevo producto del bar (crear acá, sin ir al panel del bar) ─
+const prodForm = ref(null)
+function nuevoProducto() { prodForm.value = { nombre: '', categoria_producto_id: categoriasProd.value[0]?.id ?? null, precio_ars: null, costo_ars: null, stock: 0, stock_minimo: 0 } }
+async function guardarProducto() {
+  const f = prodForm.value
+  if (!f.nombre?.trim() || !(f.precio_ars > 0)) { toast.warning('Nombre y precio son obligatorios'); return }
+  saving.value = true
+  // categoria (enum legacy) se deriva de la editable para compat mientras conviven.
+  const cat = categoriasProd.value.find(c => c.id === f.categoria_producto_id)
+  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro',
+                    precio_ars: f.precio_ars, costo_ars: f.costo_ars || null, stock: f.stock || 0, stock_minimo: f.stock_minimo || 0 }
+  try {
+    await createBarProducto(bar.value.id, payload)
+    toast.success('Producto creado'); prodForm.value = null; await cargar()
+  } catch (e) { toast.error(e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'No se pudo crear') }
+  finally { saving.value = false }
+}
 
 function stockPct(p) {
   if (!p.stock_minimo) return p.stock > 0 ? 100 : 0
@@ -89,10 +111,16 @@ const TIPO_MOV = {
     <template v-else>
       <div class="ds__bar-head">
         <div><span class="ds__bar-name">{{ bar.nombre }}</span> <span class="ds__bar-sede">· {{ bar.sede?.nombre }}</span></div>
-        <div class="ds__stat"><span class="ds__stat-lbl">Valorizado</span><span class="ds__stat-val">{{ fmt(valorizadoTotal) }}</span></div>
+        <div class="ds__head-right">
+          <div class="ds__stat"><span class="ds__stat-lbl">Valorizado</span><span class="ds__stat-val">{{ fmt(valorizadoTotal) }}</span></div>
+          <button class="btn btn--primary" @click="nuevoProducto">＋ Producto</button>
+        </div>
       </div>
 
-      <div v-if="!productos.length" class="ds__empty ds__empty--box">Este salón todavía no tiene productos. Cargalos desde el panel del bar.</div>
+      <div v-if="!productos.length" class="ds__empty ds__empty--box">
+        Este salón todavía no tiene productos.
+        <a href="#" class="ds__link" @click.prevent="nuevoProducto">Creá el primero</a>.
+      </div>
 
       <ul v-else class="ds__list">
         <li v-for="p in productos" :key="p.id" class="ds__item" :class="{ 'ds__item--low': p.stock_bajo }">
@@ -116,6 +144,29 @@ const TIPO_MOV = {
         </li>
       </ul>
     </template>
+
+    <!-- Modal nuevo producto -->
+    <div v-if="prodForm" class="ov" @click.self="prodForm = null">
+      <div class="dpdlg dpdlg--wide">
+        <h3 class="modal__title">Nuevo producto del salón</h3>
+        <p class="modal__hint">Se crea en <b>{{ bar?.nombre }}</b> ({{ bar?.sede?.nombre }}). Después lo reponés con Comprar.</p>
+        <label class="fld">Nombre<input v-model.trim="prodForm.nombre" class="inp" maxlength="60" placeholder="Ej: Coca Cola 500ml" /></label>
+        <label class="fld">Categoría
+          <select v-model="prodForm.categoria_producto_id" class="inp">
+            <option v-for="c in categoriasProd" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+          </select>
+        </label>
+        <div class="ds__grid2">
+          <label class="fld">Precio de venta ($)<input v-model.number="prodForm.precio_ars" type="number" min="0" step="any" class="inp" /></label>
+          <label class="fld">Costo unitario ($) <small class="mut">(opcional)</small><input v-model.number="prodForm.costo_ars" type="number" min="0" step="any" class="inp" /></label>
+        </div>
+        <div class="ds__grid2">
+          <label class="fld">Stock inicial<input v-model.number="prodForm.stock" type="number" min="0" step="any" class="inp" /></label>
+          <label class="fld">Stock mínimo<input v-model.number="prodForm.stock_minimo" type="number" min="0" step="any" class="inp" /></label>
+        </div>
+        <div class="modal__actions"><button class="btn" @click="prodForm = null">Cancelar</button><button class="btn btn--primary" :disabled="saving" @click="guardarProducto">Crear producto</button></div>
+      </div>
+    </div>
 
     <!-- Modal comprar -->
     <div v-if="compraForm" class="ov" @click.self="compraForm = null">
@@ -162,7 +213,12 @@ const TIPO_MOV = {
 .ds { color: #0f172a; }
 .ds__empty { color: #94a3b8; padding: 2rem; text-align: center; font-size: .88rem; }
 .ds__empty--box { background: #fbfcfd; border: 1px dashed #e2e8f0; border-radius: 14px; }
-.ds__bar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.ds__bar-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.ds__head-right { display: flex; align-items: center; gap: 1.25rem; }
+.ds__link { color: #1b5e20; font-weight: 600; text-decoration: none; }
+.ds__link:hover { text-decoration: underline; }
+.ds__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.mut { color: #94a3b8; font-weight: 400; }
 .ds__bar-name { font-weight: 700; font-size: 1.05rem; }
 .ds__bar-sede { color: #94a3b8; font-size: .84rem; }
 .ds__stat { text-align: right; }
