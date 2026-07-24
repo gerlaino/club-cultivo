@@ -36,6 +36,14 @@ RSpec.describe Insumo, type: :model do
         i.registrar_compra!(cantidad: 5, costo_total_ars: 500, created_by: admin)
       }.to change { club.movimientos_contables.where(categoria: 'insumo', tipo: 'egreso').count }.by(1)
     end
+
+    it 'respeta medio_pago y pagado en el egreso (de acá sale el asiento)' do
+      i = insumo
+      i.registrar_compra!(cantidad: 5, costo_total_ars: 500, created_by: admin, medio_pago: 'transferencia', pagado: false)
+      mov = club.movimientos_contables.where(categoria: 'insumo', tipo: 'egreso').last
+      expect(mov.medio_pago).to eq('transferencia')
+      expect(mov.pagado).to be(false)
+    end
   end
 
   describe '#revertir_compra!' do

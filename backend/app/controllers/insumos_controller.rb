@@ -60,6 +60,8 @@ class InsumosController < ApplicationController
       fecha:           params[:fecha].presence || Date.current,
       sede:            sede,
       generar_egreso:  params.fetch(:generar_egreso, true),
+      medio_pago:      params[:medio_pago].presence || 'efectivo',
+      pagado:          params.key?(:pagado) ? ActiveModel::Type::Boolean.new.cast(params[:pagado]) : true,
       created_by:      current_user
     )
     render json: serialize(@insumo).merge(compra: serialize_compra(compra)), status: :created

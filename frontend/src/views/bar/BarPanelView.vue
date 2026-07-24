@@ -8,6 +8,7 @@ import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import { listCategoriasProducto, createCategoriaProducto, updateCategoriaProducto, deleteCategoriaProducto } from '../../lib/api.js'
 
 const store = useBarStore()
 const auth  = useAuthStore()
@@ -17,7 +18,27 @@ const toast = useToast()
 const { confirm } = useConfirm()
 const barId = route.params.barId
 
-const CATS = ['bebida', 'cocina', 'merch', 'otro']
+// Categorías de producto EDITABLES (reemplazan el enum hardcodeado bebida/cocina/merch).
+const categoriasProd = ref([])
+async function cargarCategorias() {
+  try { categoriasProd.value = (await listCategoriasProducto()).data || [] } catch { categoriasProd.value = [] }
+}
+// Gestión de categorías (crear / renombrar / eliminar).
+const catMgr = ref(null)
+function abrirCategorias() { catMgr.value = { nuevo: '' } }
+async function agregarCategoria() {
+  const n = catMgr.value.nuevo?.trim(); if (!n) return
+  try { await createCategoriaProducto({ nombre: n }); catMgr.value.nuevo = ''; await cargarCategorias() }
+  catch (e) { toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo crear') }
+}
+async function renombrarCategoria(c) {
+  const n = prompt('Nuevo nombre de la categoría', c.nombre); if (!n?.trim() || n.trim() === c.nombre) return
+  try { await updateCategoriaProducto(c.id, { nombre: n.trim() }); await cargarCategorias() } catch { toast.error('No se pudo renombrar') }
+}
+async function borrarCategoria(c) {
+  if (!(await confirm({ title: `Eliminar "${c.nombre}"`, message: 'Solo se puede si no tiene productos asignados; si los tiene, reasignalos primero.', variant: 'danger' }))) return
+  try { await deleteCategoriaProducto(c.id); await cargarCategorias() } catch (e) { toast.error(e?.response?.data?.error || 'No se pudo eliminar') }
+}
 const esAdmin = computed(() => auth.user?.role === 'admin')
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 const fmtK = (n) => {
@@ -36,6 +57,7 @@ onMounted(async () => {
     return
   }
   store.fetchProductos(barId)
+  cargarCategorias()
 })
 
 const d = computed(() => store.dashboard)
@@ -94,12 +116,14 @@ const chart = computed(() => {
 
 // ── Productos (admin) ──────────────────────────────────────────
 const prodForm = ref(null)
-function nuevoProducto() { prodForm.value = { nombre: '', categoria: 'bebida', precio_ars: null, costo_ars: null, stock: 0, stock_minimo: 0 } }
-function editarProducto(p) { prodForm.value = { id: p.id, nombre: p.nombre, categoria: p.categoria, precio_ars: p.precio_ars, costo_ars: p.costo_ars, stock: p.stock, stock_minimo: p.stock_minimo } }
+function nuevoProducto() { prodForm.value = { nombre: '', categoria_producto_id: categoriasProd.value[0]?.id ?? null, precio_ars: null, costo_ars: null, stock: 0, stock_minimo: 0 } }
+function editarProducto(p) { prodForm.value = { id: p.id, nombre: p.nombre, categoria_producto_id: p.categoria_producto_id, precio_ars: p.precio_ars, costo_ars: p.costo_ars, stock: p.stock, stock_minimo: p.stock_minimo } }
 async function guardarProducto() {
   const f = prodForm.value
   if (!f.nombre?.trim() || !(f.precio_ars > 0)) { toast.warning('Nombre y precio son obligatorios'); return }
-  const payload = { nombre: f.nombre.trim(), categoria: f.categoria, precio_ars: f.precio_ars, costo_ars: f.costo_ars || null, stock: f.stock || 0, stock_minimo: f.stock_minimo || 0 }
+  // categoria (enum) se deriva de la editable para mantener compat mientras convive.
+  const cat = categoriasProd.value.find(c => c.id === f.categoria_producto_id)
+  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro', precio_ars: f.precio_ars, costo_ars: f.costo_ars || null, stock: f.stock || 0, stock_minimo: f.stock_minimo || 0 }
   try {
     if (f.id) await store.actualizarProducto(barId, f.id, payload)
     else      await store.crearProducto(barId, payload)
@@ -244,12 +268,15 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
     <div v-if="esAdmin" class="sp__card sp__prod">
       <div class="sp__ch sp__ch--flex">
         <b>Productos <span class="sp__mut">rendimiento</span></b>
-        <button class="sp__btn sp__btn--brand sp__btn--sm" @click="nuevoProducto">+ Producto</button>
+        <div style="display:flex; gap:.5rem">
+          <button class="sp__btn sp__btn--sm" @click="abrirCategorias">Categorías</button>
+          <button class="sp__btn sp__btn--brand sp__btn--sm" @click="nuevoProducto">+ Producto</button>
+        </div>
       </div>
 
       <div v-if="prodForm" class="sp__form">
         <input v-model.trim="prodForm.nombre" class="sp__inp" placeholder="Nombre" maxlength="50" />
-        <select v-model="prodForm.categoria" class="sp__inp"><option v-for="c in CATS" :key="c" :value="c">{{ c }}</option></select>
+        <select v-model="prodForm.categoria_producto_id" class="sp__inp"><option v-for="c in categoriasProd" :key="c.id" :value="c.id">{{ c.nombre }}</option></select>
         <input v-model.number="prodForm.precio_ars" type="number" min="0" step="any" class="sp__inp sp__inp--sm" placeholder="Precio" />
         <input v-model.number="prodForm.costo_ars" type="number" min="0" step="any" class="sp__inp sp__inp--sm" placeholder="Costo" />
         <input v-model.number="prodForm.stock" type="number" min="0" step="any" class="sp__inp sp__inp--sm" placeholder="Stock" />
@@ -266,7 +293,7 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
           <tbody>
             <tr v-for="p in store.productos" :key="p.id" :class="{ 'sp__off': !p.activo }">
               <td class="sp__strong">{{ p.nombre }}</td>
-              <td class="sp__muted">{{ p.categoria }}</td>
+              <td class="sp__muted">{{ p.categoria_producto_nombre || p.categoria }}</td>
               <td class="r num">{{ fmt(p.precio_ars) }}</td>
               <td class="r num sp__muted">{{ p.costo_ars != null ? fmt(p.costo_ars) : '—' }}</td>
               <td class="r"><span v-if="p.margen_pct != null" class="sp__mg" :class="margenClase(p.margen_pct)">{{ p.margen_pct }}%</span><span v-else class="sp__muted">—</span></td>
@@ -320,6 +347,27 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
         <div class="sp__modal-act">
           <button class="sp__btn" @click="cierreForm = null">Cancelar</button>
           <button class="sp__btn sp__btn--brand" :disabled="store.saving" @click="confirmarCierre">Cerrar caja</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gestión de categorías de producto -->
+    <div v-if="catMgr" class="sp__ovl" @click.self="catMgr = null">
+      <div class="sp__dlg">
+        <div class="sp__ch sp__ch--flex"><b>Categorías de producto</b><button class="sp__btn sp__btn--sm" @click="catMgr = null">✕</button></div>
+        <p class="sp__mut" style="margin:.2rem 0 .8rem; font-size:.82rem">Con estas se agrupan y filtran los productos del salón. Editables.</p>
+        <ul class="sp__catlist">
+          <li v-for="c in categoriasProd" :key="c.id" class="sp__catrow">
+            <span>{{ c.nombre }} <small v-if="c.es_sistema" class="sp__mut">· sistema</small> <small class="sp__mut">· {{ c.productos_count }} prod.</small></span>
+            <span class="sp__catacts">
+              <button class="sp__btn sp__btn--sm" @click="renombrarCategoria(c)">Renombrar</button>
+              <button v-if="!c.es_sistema" class="sp__btn sp__btn--sm sp__btn--danger" @click="borrarCategoria(c)">Eliminar</button>
+            </span>
+          </li>
+        </ul>
+        <div class="sp__form" style="margin-top:.8rem">
+          <input v-model.trim="catMgr.nuevo" class="sp__inp" placeholder="Nueva categoría (ej: Vapes)" maxlength="30" @keydown.enter.prevent="agregarCategoria" />
+          <button class="sp__btn sp__btn--brand" @click="agregarCategoria">Agregar</button>
         </div>
       </div>
     </div>
@@ -460,4 +508,13 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
 .sp__dif.ok { background: #effaf1; color: #15803d; }
 .sp__dif.sobra { background: #eff6ff; color: #1d4ed8; }
 .sp__dif.falta { background: #fdecec; color: #dc2626; }
+
+/* Modal de gestión de categorías (NO usar .modal: choca con Bootstrap) */
+.sp__ovl { position: fixed; inset: 0; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1000; padding: 1rem; }
+.sp__dlg { position: relative; display: block; background: #fff; border-radius: 16px; padding: 1.4rem; width: 100%; max-width: 420px; box-shadow: 0 20px 50px rgb(15 23 42 / .25); max-height: 88vh; overflow-y: auto; }
+.sp__catlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+.sp__catrow { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .5rem .7rem; background: #f8fafc; border: 1px solid #eef2f6; border-radius: 9px; font-size: .88rem; }
+.sp__catacts { display: inline-flex; gap: .35rem; flex-shrink: 0; }
+.sp__btn--danger { color: #dc2626; border-color: #f4c9c9; }
+.sp__btn--danger:hover { background: #fef2f2; border-color: #dc2626; }
 </style>

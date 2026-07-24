@@ -28,7 +28,10 @@ class DepositosController < ApplicationController
 
   # PATCH /depositos/:id
   def update
-    if @deposito.update(deposito_params)
+    # Los depósitos del sistema (Cultivo/General/Salón/Dispensación) no se renombran —el nombre
+    # es parte de la identidad esperada y podría confundir/romper referencias. Solo activar/ordenar.
+    permitidos = @deposito.es_sistema ? deposito_params.except(:nombre) : deposito_params
+    if @deposito.update(permitidos)
       render json: serialize(@deposito)
     else
       render json: { errors: @deposito.errors.full_messages }, status: :unprocessable_entity

@@ -47,7 +47,8 @@ class Insumo < ApplicationRecord
   # Compra: suma stock y recalcula el costo promedio ponderado móvil. Opcionalmente genera
   # el egreso en el libro contable (la plata sale al comprar). Devuelve la InsumoCompra.
   def registrar_compra!(cantidad:, costo_total_ars:, created_by:, proveedor: nil,
-                        fecha: Date.current, sede: nil, generar_egreso: true)
+                        fecha: Date.current, sede: nil, generar_egreso: true,
+                        medio_pago: 'efectivo', pagado: true)
     cantidad    = cantidad.to_d
     costo_total = costo_total_ars.to_d
     raise ArgumentError, 'La cantidad debe ser mayor a 0' if cantidad <= 0
@@ -74,7 +75,7 @@ class Insumo < ApplicationRecord
           unidad_negocio_id: categoria_contable&.unidad_negocio_id,
           descripcion: "Compra insumo — #{nombre} (#{cantidad.to_s('F')} #{unidad_medida})",
           monto_ars: costo_total, fecha: fecha, proveedor: proveedor,
-          pagado: true, medio_pago: 'efectivo'
+          pagado: pagado, medio_pago: medio_pago
         )
         compra.update!(movimiento_contable: mov)
       end

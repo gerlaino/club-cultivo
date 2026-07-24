@@ -203,8 +203,12 @@ function abrirEntrada(insumo = null) {
     nombre: '', unidad_medida: 'unidad', categoria_contable_id: categoriasDelTab.value[0]?.id ?? null,
     cantidad: null, costo_total_ars: null, proveedor: '', fecha: hoyISO(),
     sede_id: insumo?.sede_id ?? sedeFiltro.value ?? null,
+    medio_pago: 'efectivo', pagado: true,
   }
 }
+const MEDIOS_PAGO = [
+  { v: 'efectivo', l: 'Efectivo' }, { v: 'transferencia', l: 'Transferencia' }, { v: 'mercado_pago', l: 'Mercado Pago' },
+]
 const entradaInsumoSel = computed(() => store.items.find(i => i.id === entradaForm.value?.insumo_id) || null)
 const entradaUnidad = computed(() =>
   entradaForm.value?.modo === 'existente' ? (entradaInsumoSel.value?.unidad_medida || 'u') : entradaForm.value?.unidad_medida)
@@ -233,6 +237,7 @@ async function confirmarEntrada() {
       cantidad: f.cantidad, costo_total_ars: f.costo_total_ars,
       proveedor: f.proveedor?.trim() || undefined, fecha: f.fecha,
       sede_id: f.sede_id ?? undefined, generar_egreso: true,
+      medio_pago: f.medio_pago, pagado: f.pagado,
     })
     toast.success('Entrada registrada · egreso contable generado')
     entradaForm.value = null
@@ -391,7 +396,7 @@ async function revertirCompra(compra) {
       <button v-for="d in TABS" :key="d.id" class="dp__tab" :class="{ 'is-on': depositoActivo?.id === d.id }" @click="depositoActivoId = d.id">
         {{ d.nombre }}
       </button>
-      <button v-if="depositoActivo && !esSalon" class="dp__tab dp__tab--add" title="Gestionar este depósito" @click="abrirEditarDeposito">⚙</button>
+      <button v-if="depositoActivo && !esSalon && !depositoActivo.es_sistema" class="dp__tab dp__tab--add" title="Gestionar este depósito" @click="abrirEditarDeposito">⚙</button>
       <button class="dp__tab dp__tab--add" title="Crear un depósito" @click="abrirNuevoDeposito">＋</button>
     </div>
 
@@ -537,6 +542,14 @@ async function revertirCompra(compra) {
         <div class="dp__grid2">
           <label class="fld">Proveedor (opcional)<input v-model.trim="entradaForm.proveedor" class="inp" maxlength="80" /></label>
           <label class="fld">Fecha<input v-model="entradaForm.fecha" type="date" class="inp" /></label>
+        </div>
+        <div class="dp__grid2">
+          <label class="fld">Forma de pago
+            <select v-model="entradaForm.medio_pago" class="inp"><option v-for="m in MEDIOS_PAGO" :key="m.v" :value="m.v">{{ m.l }}</option></select>
+          </label>
+          <label class="fld">Estado del pago
+            <select v-model="entradaForm.pagado" class="inp"><option :value="true">Pagado</option><option :value="false">Pendiente de pago</option></select>
+          </label>
         </div>
         <label v-if="multiSede" class="fld">Sede
           <select v-model="entradaForm.sede_id" class="inp">
