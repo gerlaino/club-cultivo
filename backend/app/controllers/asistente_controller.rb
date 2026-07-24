@@ -95,7 +95,7 @@ class AsistenteController < BaseController
     color_hojas:   verde_oscuro | verde_claro | amarillo | marron
     plagas:        ninguna | leve | moderada | severa
     prioridad:     baja | normal | media | alta | urgente
-    estado_nuevo:  semilla | esqueje | vegetativo | floracion | cosecha | secado | curado | finalizado
+    estado_nuevo:  germinacion | esqueje | vegetativo | floracion | cosecha | secado | curado | finalizado
   PROMPT
 
   LIMITE_LLAMADAS_POR_HORA = 20
@@ -297,7 +297,7 @@ class AsistenteController < BaseController
     if es_cultivador
       "\nROL: Este usuario es CULTIVADOR.\n" \
       "- NO generar acciones de tipo 'tarea'.\n" \
-      "- PUEDE generar avance_ciclo cuando lo mencione. Estados válidos para avanzar DESDE: semilla, esqueje, vegetativo, floracion, cosecha, secado.\n" \
+      "- PUEDE generar avance_ciclo cuando lo mencione. Estados válidos para avanzar DESDE: germinacion, esqueje, vegetativo, floracion, cosecha, secado.\n" \
       "- NO puede avanzar el ciclo desde 'curado' o 'finalizado' (eso lo hace el manicuro/admin).\n"
     else
       "\nROL: Este usuario es ADMIN/SUPERVISOR con permisos completos.\n" \
@@ -768,7 +768,7 @@ class AsistenteController < BaseController
     return { ok: false, error: "Estado inválido: #{estado_nuevo}" } unless Lote::ESTADOS.include?(estado_nuevo)
 
     if current_user.cultivador?
-      estados_permitidos = %w[semilla esqueje vegetativo floracion cosecha secado]
+      estados_permitidos = %w[germinacion esqueje vegetativo floracion cosecha secado]
       unless estados_permitidos.include?(lote.estado)
         return { ok: false, error: "No tenés permiso para avanzar el lote desde '#{lote.estado}'" }
       end

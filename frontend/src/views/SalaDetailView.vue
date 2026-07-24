@@ -67,7 +67,7 @@ const canCambiarFase = computed(() =>
 const lecturaOpen   = ref(false)
 const lotesExpanded = ref(true)
 
-const ESTADOS_LOTE = ["semilla","esqueje","vegetativo","floracion","cosecha","curado","finalizado"]
+const ESTADOS_LOTE = ["germinacion","esqueje","vegetativo","floracion","cosecha","curado","finalizado"]
 const DIAS_CICLO   = { semilla:7, esqueje:7, vegetativo:45, floracion:65, cosecha:10, curado:14, finalizado:0 }
 
 // ── Genéticas ──────────────────────────────────────────────
@@ -235,7 +235,7 @@ onUnmounted(() => {
 })
 
 const sala  = computed(() => salas.currentSala)
-const ESTADOS_ACTIVOS_CULTIVADOR = ['semilla', 'esqueje', 'vegetativo', 'floracion']
+const ESTADOS_ACTIVOS_CULTIVADOR = ['germinacion', 'esqueje', 'vegetativo', 'floracion']
 const items = computed(() => {
   const todos = lotes.bySala(salaId)
   return isCultivador.value
@@ -320,7 +320,7 @@ function progresoCiclo(lote) {
 }
 
 const itemsSorted = computed(() => {
-  const order = ["vegetativo","floracion","semilla","cosecha","curado","finalizado"]
+  const order = ["vegetativo","floracion","germinacion","cosecha","curado","finalizado"]
   return [...items.value].sort((a,b) => order.indexOf(a.estado) - order.indexOf(b.estado))
 })
 
@@ -389,7 +389,7 @@ const KIND_TO_ESTADO = { floracion:"floracion" }
 const KINDS_CON_ORIGEN = ['vegetativo', 'madre', 'clon', 'mixta']
 
 const ESTADOS_HEREDADO = [
-  { value: 'semilla',    label: 'Semilla / Esqueje' },
+  { value: 'germinacion', label: 'Germinación / Esqueje' },
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración' },
   { value: 'cosecha',    label: 'Cosecha' },
@@ -399,7 +399,7 @@ const estadosHeredadoPermitidos = computed(() => {
   const kind = sala.value?.kind
   if (kind === 'floracion') return ESTADOS_HEREDADO.filter(e => e.value === 'floracion')
   if (kind === 'cosecha') return ESTADOS_HEREDADO.filter(e => e.value === 'cosecha')
-  return ESTADOS_HEREDADO.filter(e => ['semilla', 'vegetativo'].includes(e.value))
+  return ESTADOS_HEREDADO.filter(e => ['germinacion', 'vegetativo'].includes(e.value))
 })
 
 const showCreate            = ref(false)
@@ -412,7 +412,7 @@ const creandoLote    = ref(false)
 const tipoCreacion   = ref('nuevo')
 const proximoCodigo  = ref('')
 const loadingCodigo  = ref(false)
-const heredadoEstado = ref('semilla')
+const heredadoEstado = ref('germinacion')
 const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 })
 const plantasMadre    = ref([])
 const loadingMadres   = ref(false)
@@ -464,7 +464,7 @@ const heredadoStartDatePreview = computed(() => {
 function emptyLoteForm() {
   const kind = sala.value?.kind
   const conOrigen = !kind || KINDS_CON_ORIGEN.includes(kind)
-  const estadoInicial = conOrigen ? 'semilla' : (KIND_TO_ESTADO[kind] || 'vegetativo')
+  const estadoInicial = conOrigen ? 'germinacion' : (KIND_TO_ESTADO[kind] || 'vegetativo')
   return {
     estado: estadoInicial,
     origen: conOrigen ? 'semilla' : null,
@@ -481,7 +481,8 @@ function emptyLoteForm() {
 
 async function setOrigen(valor) {
   loteForm.value.origen = valor
-  loteForm.value.estado = valor
+  // Estado inicial según origen: semilla → germinación, esqueje → esqueje.
+  loteForm.value.estado = valor === 'esqueje' ? 'esqueje' : 'germinacion'
   loteForm.value.planta_madre_id = null
   madreQuery.value = ''
   if (valor === 'esqueje') {
@@ -527,7 +528,7 @@ function validateLote(form) {
 
 async function createLote() {
   if (tipoCreacion.value === 'existente') {
-    const estadoReal = (heredadoEstado.value === 'semilla' && loteForm.value.origen === 'esqueje')
+    const estadoReal = (heredadoEstado.value === 'germinacion' && loteForm.value.origen === 'esqueje')
       ? 'esqueje' : heredadoEstado.value
     loteForm.value.estado = estadoReal
   }

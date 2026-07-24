@@ -291,7 +291,7 @@ function fmtG(v) { return v != null ? `${Number(v).toLocaleString('es-AR')} g` :
 // ── Lotes activos (Zona 3) ─────────────────────────────────────────────────
 
 const ESTADO_COLOR = {
-  semilla:            '#64748b',
+  germinacion:            '#64748b',
   esqueje:            '#0891b2',
   vegetativo:         '#16a34a',
   floracion:          '#9333ea',
@@ -302,7 +302,7 @@ const ESTADO_COLOR = {
 }
 
 const ESTADO_LABEL = {
-  semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
+  germinacion: 'Germinación', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
   floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'En manicura',
   curado: 'Curado',
   finalizado: 'Finalizado',

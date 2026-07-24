@@ -13,7 +13,7 @@ const toast  = useToast()
 const error = ref(null)
 
 // Estados donde el cultivador todavía opera el lote
-const ESTADOS_CULTIVADOR = ['semilla', 'esqueje', 'vegetativo', 'floracion']
+const ESTADOS_CULTIVADOR = ['germinacion', 'esqueje', 'vegetativo', 'floracion']
 // Estados donde la manicura puede actuar
 const ESTADOS_MANICURA   = ['en_manicura']
 

@@ -241,7 +241,7 @@
               <div class="lps__field">
                 <label class="lps__label">Origen</label>
                 <select class="lps__input" v-model="plantaForm.origen">
-                  <option value="semilla">🌰 Semilla</option>
+                  <option value="germinacion">🌱 Germinación</option>
                   <option value="esqueje">✂️ Esqueje</option>
                   <option value="division">🪴 División</option>
                 </select>

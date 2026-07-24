@@ -21,7 +21,7 @@ class Plant < ApplicationRecord
   default_scope { where(deleted_at: nil) }
 
   STATES   = %w[germinacion vegetativo floracion secado cosechado esqueje descartada].freeze
-  ORIGENES = %w[semilla esqueje division].freeze
+  ORIGENES = %w[semilla esqueje].freeze
 
   validates :nombre,    presence: true
   validates :state,     inclusion: { in: STATES }

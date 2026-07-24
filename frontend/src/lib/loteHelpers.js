@@ -7,14 +7,14 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 // Estados canónicos del LOTE (== Lote::ESTADOS del backend, en orden de ciclo).
-export const LOTE_ESTADOS = ['semilla', 'esqueje', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado', 'finalizado']
+export const LOTE_ESTADOS = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado', 'finalizado']
 
 // Estados canónicos de la PLANTA (== Plant::STATES del backend).
-// Ojo: la planta usa 'germinacion' (el lote usa 'semilla'); ver STATE_MAP.
+// Ojo: la planta usa 'germinacion' (el lote usa 'germinacion'); ver STATE_MAP.
 export const PLANT_STATES = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'secado', 'cosechado', 'descartada']
 
 export const ESTADO_META = {
-  semilla:            { label: 'Germinación',        color: '#64748b', bg: '#f1f5f9', emoji: '🌱' },
+  germinacion:            { label: 'Germinación',        color: '#64748b', bg: '#f1f5f9', emoji: '🌱' },
   esqueje:            { label: 'Esqueje',             color: '#0891b2', bg: '#e0f2fe', emoji: '🪴' },
   vegetativo:         { label: 'Vegetativo',          color: '#16a34a', bg: '#dcfce7', emoji: '🍃' },
   floracion:          { label: 'Floración',          color: '#d97706', bg: '#fef3c7', emoji: '🌸' },
@@ -70,12 +70,12 @@ export const TAREAS_LOTE = [
 export const CICLO_BASE = ['vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado']
 
 export const FASE_LABELS = {
-  vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', semilla: 'Germinación',
+  vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', germinacion: 'Germinación',
   manicura: 'Manicura', cerrado: 'Cerrado',
 }
 
 export const STATE_MAP = {
-  semilla: 'germinacion', esqueje: 'esqueje', vegetativo: 'vegetativo',
+  germinacion: 'germinacion', esqueje: 'esqueje', vegetativo: 'vegetativo',
   floracion: 'floracion', cosecha: 'cosechado',
   curado: 'cosechado', finalizado: 'cosechado',
 }
@@ -97,9 +97,9 @@ export const ESPINA_BIOLOGICA = [
   {
     key: 'vegetativo',
     label: 'Vegetativo',
-    estados: ['semilla', 'esqueje', 'vegetativo'],   // paraguas
+    estados: ['germinacion', 'esqueje', 'vegetativo'],   // paraguas
     subetapas: [
-      { estado: 'semilla',    label: 'Germinación' },
+      { estado: 'germinacion',    label: 'Germinación' },
       { estado: 'esqueje',    label: 'Enraizado'   },
       { estado: 'vegetativo', label: 'Vege'        },  // se subdivide por trasplantes
     ],
@@ -115,7 +115,7 @@ export const ESPINA_BIOLOGICA = [
 // Grupo paraguas por estado del lote → para consolidar KPIs/labels sin repetir
 // la lógica del agrupamiento. 'post' = todo lo post-cosecha (métrica aparte).
 export const GRUPO_FASE = {
-  semilla: 'vegetativo', esqueje: 'vegetativo', vegetativo: 'vegetativo',
+  germinacion: 'vegetativo', esqueje: 'vegetativo', vegetativo: 'vegetativo',
   floracion: 'floracion',
   cosecha: 'post', en_manicura: 'post', curado: 'post', finalizado: 'post',
 }
@@ -123,7 +123,7 @@ export function grupoFase(estado) { return GRUPO_FASE[estado] || 'otro' }
 
 // Dado un mapa { estado: dias } (que el informe deriva de los LoteEvento),
 // devuelve el desglose por espina: total por bloque + sub-etapas con días > 0.
-// Ej: desglosarCiclo({ semilla:3, vegetativo:42, floracion:63 }) →
+// Ej: desglosarCiclo({ germinacion:3, vegetativo:42, floracion:63 }) →
 //   [{ key:'vegetativo', label:'Vegetativo', total:45,
 //      subetapas:[{label:'Germinación',dias:3},{label:'Vege',dias:42}] },
 //    { key:'floracion',  label:'Floración',  total:63, subetapas:[…] }]
@@ -154,7 +154,7 @@ export function macetaLabel(m) {
 // deriva del estado: vegetativo/germinación/esqueje = 18/6, floración = 12/12.
 export function fotoperiodoLabel(estado, stored) {
   if (stored) return stored
-  if (['semilla', 'esqueje', 'vegetativo'].includes(estado)) return '18/6'
+  if (['germinacion', 'esqueje', 'vegetativo'].includes(estado)) return '18/6'
   if (estado === 'floracion') return '12/12'
   return '—'
 }
@@ -181,7 +181,7 @@ export function capitalizarFase(f) { return FASE_LABELS[f] || (f ? f.charAt(0).t
 
 export function phaseBannerMsg(estado) {
   if (estado === 'cosecha') return 'Lote cosechado. Manicura toma desde acá.'
-  if (estado === 'semilla') return 'Plantas en germinación. El sistema avanzará automáticamente cuando estén listas.'
+  if (estado === 'germinacion') return 'Plantas en germinación. El sistema avanzará automáticamente cuando estén listas.'
   if (estado === 'finalizado') return 'Lote finalizado. Stock confirmado y disponible para dispensar.'
   if (['en_manicura', 'manicura', 'curado', 'cerrado'].includes(estado)) return 'Este lote pasó tu turno. Otro rol toma desde acá.'
   return null

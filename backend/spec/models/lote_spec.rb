@@ -16,25 +16,31 @@ RSpec.describe Lote, type: :model do
 
   # ── Validaciones ──────────────────────────────────────────────────────────────
 
-  describe 'coherencia fase inicial ↔ origen' do
-    it 'un lote de semilla no puede quedar en estado esqueje (se normaliza a semilla)' do
-      lote = create_lote(origen: 'semilla', estado: 'esqueje')
-      expect(lote.reload.estado).to eq('semilla')
+  describe 'fase inicial y avance germinación → esqueje → vegetativo' do
+    it 'estado_inicial_para_origen: semilla → germinación, esqueje → esqueje' do
+      expect(create_lote(origen: 'semilla').estado_inicial_para_origen).to eq('germinacion')
+      expect(create_lote(origen: 'esqueje').estado_inicial_para_origen).to eq('esqueje')
     end
 
-    it 'un lote de esqueje arranca en estado esqueje aunque se cargue como semilla' do
-      lote = create_lote(origen: 'esqueje', estado: 'semilla')
+    it "avanzar_fase! sigue la secuencia germinación → esqueje → vegetativo" do
+      lote = create_lote(estado: 'germinacion')
+      lote.avanzar_fase!
       expect(lote.reload.estado).to eq('esqueje')
-    end
-
-    it 'no toca el estado en fases posteriores (vegetativo/floración)' do
-      lote = create_lote(origen: 'semilla', estado: 'vegetativo')
+      lote.avanzar_fase!
       expect(lote.reload.estado).to eq('vegetativo')
     end
 
-    it 'FASE_A_PLANT_STATE mapea la fase inicial al estado de planta correcto' do
-      expect(Lote::FASE_A_PLANT_STATE['semilla']).to eq('germinacion')
+    it 'un lote de semilla SÍ puede estar en estado esqueje (avanzó, no es un bug)' do
+      expect(create_lote(origen: 'semilla', estado: 'esqueje')).to be_valid
+    end
+
+    it "FASE_A_PLANT_STATE mapea germinación y esqueje al state de planta correcto" do
+      expect(Lote::FASE_A_PLANT_STATE['germinacion']).to eq('germinacion')
       expect(Lote::FASE_A_PLANT_STATE['esqueje']).to eq('esqueje')
+    end
+
+    it "'semilla' ya no es un estado válido de lote" do
+      expect(new_lote(estado: 'semilla')).not_to be_valid
     end
   end
 
@@ -137,7 +143,7 @@ RSpec.describe Lote, type: :model do
       end
 
       it 'excluye estados previos al ciclo' do
-        lote = create_lote(estado: 'semilla')
+        lote = create_lote(estado: 'germinacion')
         expect(Lote.en_ciclo).not_to include(lote)
       end
     end

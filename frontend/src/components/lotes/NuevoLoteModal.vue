@@ -251,11 +251,11 @@ const emit = defineEmits(['close', 'created'])
 
 const lotes = useLotesStore()
 
-const ESTADOS_LOTE     = ['semilla','esqueje','vegetativo','floracion','cosecha','en_manicura','curado','finalizado']
+const ESTADOS_LOTE     = ['germinacion','esqueje','vegetativo','floracion','cosecha','en_manicura','curado','finalizado']
 const KINDS_CON_ORIGEN = ['vegetativo','madre','clon','mixta']
 const KIND_TO_ESTADO   = { floracion: 'floracion' }
 const ESTADOS_HEREDADO = [
-  { value: 'semilla',    label: 'Germinación / Plántula' },
+  { value: 'germinacion', label: 'Germinación / Plántula' },
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración' },
   { value: 'cosecha',    label: 'Cosechado' },
@@ -278,7 +278,7 @@ const saving        = ref(false)
 const tipoCreacion  = ref('nuevo')
 const proximoCodigo = ref('')
 const loadingCodigo = ref(false)
-const heredadoEstado = ref('semilla')
+const heredadoEstado = ref('germinacion')
 const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 })
 const geneticas      = ref([])
 const plantasMadre   = ref([])
@@ -298,7 +298,7 @@ function toggleLoteColapso(loteId) {
 // cosechado se carga y queda pendiente de manicura). Nunca secado/finalizado.
 const estadosHeredadoPermitidos = computed(() =>
   ESTADOS_HEREDADO.map(e =>
-    e.value === 'semilla'
+    e.value === 'germinacion'
       ? { ...e, label: form.value.origen === 'esqueje' ? 'Esqueje' : 'Germinación / Plántula' }
       : e
   )
@@ -342,7 +342,7 @@ function emptyForm() {
   const kind = effectiveSala.value?.kind
   const conOrigen = !kind || KINDS_CON_ORIGEN.includes(kind)
   return {
-    estado: conOrigen ? 'semilla' : (KIND_TO_ESTADO[kind] || 'vegetativo'),
+    estado: conOrigen ? 'germinacion' : (KIND_TO_ESTADO[kind] || 'vegetativo'),
     origen: conOrigen ? 'semilla' : null,
     planta_madre_ids: [], plants_count: 1,
     start_date: localISO(),
@@ -352,7 +352,8 @@ function emptyForm() {
 
 async function setOrigen(valor) {
   form.value.origen = valor
-  form.value.estado = valor
+  // Estado inicial según el origen: semilla → germinación, esqueje → esqueje.
+  form.value.estado = valor === 'esqueje' ? 'esqueje' : 'germinacion'
   form.value.planta_madre_ids = []
   madreQuery.value = ''
   if (valor === 'esqueje') {
@@ -397,7 +398,7 @@ function validate() {
 
 async function crear() {
   if (tipoCreacion.value === 'existente') {
-    form.value.estado = (heredadoEstado.value === 'semilla' && form.value.origen === 'esqueje') ? 'esqueje' : heredadoEstado.value
+    form.value.estado = (heredadoEstado.value === 'germinacion' && form.value.origen === 'esqueje') ? 'esqueje' : heredadoEstado.value
   }
   const e = validate()
   errors.value = e; apiError.value = null
@@ -457,7 +458,7 @@ watch(() => props.show, async (open) => {
     sedes.value = (data || []).filter(s => ['produccion', 'mixta'].includes(s.tipo))
     if (sedes.value.length === 1) sedeId.value = sedes.value[0].id
   }).catch(() => { sedes.value = [] })
-  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'semilla'
+  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'germinacion'
   heredadoDias.value  = { semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 }
   plantasMadre.value  = []
   proximoCodigo.value = ''
@@ -477,7 +478,7 @@ watch(salaId, () => {
     form.value.estado = f.estado
     form.value.origen = f.origen
   }
-  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'semilla'
+  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'germinacion'
 })
 </script>
 

@@ -78,7 +78,7 @@
             <div class="ml__field">
               <label class="ml__label">Estado inicial</label>
               <select v-model="form.estado" class="ml__input">
-                <option value="semilla">Semilla</option>
+                <option value="germinacion">Germinación</option>
                 <option value="esqueje">Esqueje</option>
                 <option value="vegetativo">Vegetativo</option>
                 <option value="floracion">Floración</option>

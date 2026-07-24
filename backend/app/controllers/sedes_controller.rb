@@ -118,7 +118,7 @@ class SedesController < ApplicationController
 
   def serialize_ops(s)
     salas       = s.salas.includes(lotes: :plants)
-    lotes_vivos = salas.flat_map(&:lotes).select { |l| %w[semilla vegetativo floracion cosecha curado].include?(l.estado) }
+    lotes_vivos = salas.flat_map(&:lotes).select { |l| %w[germinacion vegetativo floracion cosecha curado].include?(l.estado) }
     plantas_count = lotes_vivos.sum { |l| l.plants.count }
 
     ciclo = lotes_vivos
@@ -163,7 +163,7 @@ class SedesController < ApplicationController
         tareas_urgentes:   tareas_urgentes,
         dias_para_cosecha: dias_para_cosecha,
         salas:             salas.map { |sala|
-          lotes_sala = sala.lotes.select { |l| %w[semilla vegetativo floracion cosecha curado].include?(l.estado) }
+          lotes_sala = sala.lotes.select { |l| %w[germinacion vegetativo floracion cosecha curado].include?(l.estado) }
           {
             id:     sala.id,
             nombre: sala.nombre,

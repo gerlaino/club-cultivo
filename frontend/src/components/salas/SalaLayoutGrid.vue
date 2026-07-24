@@ -8,7 +8,7 @@ const props = defineProps({
 })
 
 const STAGE_GRADIENT = {
-  semilla:           'linear-gradient(160deg, #166534 0%, #14532d 100%)',
+  germinacion:           'linear-gradient(160deg, #166534 0%, #14532d 100%)',
   esqueje:           'linear-gradient(160deg, #0f766e 0%, #134e4a 100%)',
   vegetativo:        'linear-gradient(160deg, #15803d 0%, #166534 100%)',
   floracion:         'linear-gradient(160deg, #b45309 0%, #92400e 100%)',
@@ -19,13 +19,13 @@ const STAGE_GRADIENT = {
 }
 
 const STAGE_LABEL = {
-  semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
+  germinacion: 'Germinación', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
   floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'En manicura',
   curado: 'Curado', finalizado: 'Finalizado',
 }
 
 const STAGE_EMOJI = {
-  semilla: '🌱', esqueje: '✂️', vegetativo: '🍃', floracion: '🌸',
+  germinacion: '🌱', esqueje: '✂️', vegetativo: '🍃', floracion: '🌸',
   cosecha: '✅', en_manicura: '✂️',
   curado: '🫙', finalizado: '📦',
 }
@@ -147,7 +147,7 @@ function stageGradient(estado) {
                   <line x1="30" y1="6" x2="30" y2="2" stroke="#fbbf24" stroke-width="1.5"/>
                 </svg>
                 <!-- Vegetativo -->
-                <svg v-else-if="['vegetativo','semilla','esqueje'].includes(slot.lote.estado)" viewBox="0 0 60 90" xmlns="http://www.w3.org/2000/svg" class="slg__plant-svg">
+                <svg v-else-if="['vegetativo','germinacion','esqueje'].includes(slot.lote.estado)" viewBox="0 0 60 90" xmlns="http://www.w3.org/2000/svg" class="slg__plant-svg">
                   <line x1="30" y1="88" x2="30" y2="18" stroke="#86efac" stroke-width="3" stroke-linecap="round"/>
                   <ellipse cx="14" cy="68" rx="16" ry="7" fill="#4ade80" opacity=".9" transform="rotate(-20 14 68)"/>
                   <ellipse cx="46" cy="68" rx="16" ry="7" fill="#4ade80" opacity=".9" transform="rotate(20 46 68)"/>

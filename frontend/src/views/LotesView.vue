@@ -32,10 +32,10 @@ const canExport = computed(() => ["admin","auditor","supervisor","cultivador"].i
 // ---------- Estado meta ----------
 // Estados canónicos del lote (Lote::ESTADOS). 'cosecha' es el estado del lote cosechado
 // (no 'cosechado', que es estado de PLANTA).
-const ESTADOS = ["semilla","esqueje","vegetativo","floracion","cosecha","en_manicura","curado","finalizado"];
+const ESTADOS = ["germinacion","esqueje","vegetativo","floracion","cosecha","en_manicura","curado","finalizado"];
 
 const ESTADO_META = {
-  semilla:     { label:"Semilla",     dot:"#64748b", bg:"#f1f5f9", text:"#475569", bar:"#64748b", icon:"🌰" },
+  germinacion:     { label:"Germinación",     dot:"#64748b", bg:"#f1f5f9", text:"#475569", bar:"#64748b", icon:"🌰" },
   esqueje:     { label:"Esqueje",     dot:"#0891b2", bg:"#e0f2fe", text:"#0369a1", bar:"#0891b2", icon:"🪴" },
   vegetativo:  { label:"Vegetativo",  dot:"#3F6452", bg:"#E8F0EB", text:"#2D4A3E", bar:"#5A8A72", icon:"🌱" },
   floracion:   { label:"Floración",   dot:"#D97706", bg:"#FEF3C7", text:"#92400e", bar:"#D97706", icon:"🌸" },
@@ -50,7 +50,7 @@ const ESTADO_META = {
 const COSECHADOS = ["cosecha","en_manicura","curado","finalizado"];
 // "En ciclo activo": el lote sigue activo hasta que pasa a curado (cuando ya se
 // transformó en stock). Cosecha y en_manicura todavía cuentan como ciclo activo.
-const EN_CICLO = ["semilla","esqueje","vegetativo","floracion","cosecha","en_manicura"];
+const EN_CICLO = ["germinacion","esqueje","vegetativo","floracion","cosecha","en_manicura"];
 
 function em(e)           { return ESTADO_META[e] || { label: e||"—", dot:"#94a3b8", bg:"#f1f5f9", text:"#64748b", bar:"#94a3b8", icon:"•" }; }
 function estadoLabel(e)  { return em(e).label; }

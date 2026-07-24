@@ -1,13 +1,9 @@
 class LoteSerializer
   def self.serialize(lote, include_plants: false, include_cycle_data: false)
-    idx_ciclo    = Lote::CICLO_FASES.index(lote.estado)
-    proxima_fase = if %w[semilla esqueje].include?(lote.estado)
-      'vegetativo'
-    elsif idx_ciclo
-      Lote::CICLO_FASES[idx_ciclo + 1]
-    end
-    puede_transicion = %w[semilla esqueje].include?(lote.estado) ||
-                       (idx_ciclo.present? && idx_ciclo < Lote::CICLO_FASES.length - 1)
+    # Próxima fase según la secuencia de avance: germinación→esqueje→vegetativo→floración→cosecha.
+    idx_avance   = Lote::AVANCE.index(lote.estado)
+    proxima_fase = (idx_avance && idx_avance < Lote::AVANCE.length - 1) ? Lote::AVANCE[idx_avance + 1] : nil
+    puede_transicion = proxima_fase.present?
 
     eventos       = lote.lote_eventos.loaded? ? lote.lote_eventos : lote.lote_eventos.to_a
     ev_vegetativo = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'vegetativo' }.min_by(&:registrado_en)

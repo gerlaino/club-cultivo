@@ -7,7 +7,7 @@ class Lote < ApplicationRecord
   belongs_to :sede, optional: true
   # La sala es solo de cultivo. Post-cosecha el lote no tiene sala (se ve por estado),
   # pero conserva su sede. Exigimos sala solo en estados de cultivo.
-  CULTIVO_ESTADOS = %w[semilla esqueje vegetativo floracion].freeze
+  CULTIVO_ESTADOS = %w[germinacion esqueje vegetativo floracion].freeze
   validates :sala_id, presence: true, if: -> { CULTIVO_ESTADOS.include?(estado) }
   belongs_to :genetica,    optional: true
   belongs_to :manicurador,   class_name: 'User',  optional: true
@@ -27,14 +27,19 @@ class Lote < ApplicationRecord
   # class_name explícito: el nombre ya es "singular", Rails no lo inferiría bien.
   has_many :analisis_laboratorio, class_name: 'AnalisisLaboratorio', dependent: :destroy
 
-  # Secuencia: semilla/esqueje → vegetativo → floración → cosecha → en_manicura
+  # Secuencia: germinación → esqueje → vegetativo → floración → cosecha → en_manicura
   # (admin asigna manicura) → curado (se confirma el pesaje + se crea el stock; acá
   # empieza el curado) → finalizado (cuando se agota el stock del lote).
+  # germinación y esqueje son las sub-fases del arranque (los primeros días antes de
+  # vegetativo); un lote de semilla entra en germinación, uno de esqueje entra en esqueje.
   # La aprobación del pesaje vive en PesajeManicura (estado enviado→confirmado), no en
   # un estado del lote: el lote sigue 'en_manicura' hasta que se confirma y pasa a 'curado'.
   # 'secado' YA NO es un estado: es una métrica (días de cosecha→stock). Ver dias_secado.
-  ESTADOS       = %w[semilla esqueje vegetativo floracion cosecha en_manicura curado finalizado].freeze
-  ORIGENES      = %w[semilla esqueje].freeze
+  ESTADOS       = %w[germinacion esqueje vegetativo floracion cosecha en_manicura curado finalizado].freeze
+  ORIGENES      = %w[semilla esqueje].freeze # de dónde viene la planta (NO es una fase)
+  # Secuencia de avance con sala (el botón "avanzar fase" va al siguiente): germinación →
+  # esqueje → vegetativo → floración → cosecha. germinación/esqueje avanzan sin pesada.
+  AVANCE        = %w[germinacion esqueje vegetativo floracion cosecha].freeze
   # Camino de cultivo con pesada/avance (con sala). Post-cosecha (en_manicura/curado)
   # se maneja por el flujo de manicura, no por avanzar_fase!.
   CICLO_FASES   = %w[vegetativo floracion cosecha].freeze
@@ -56,18 +61,15 @@ class Lote < ApplicationRecord
             numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
   validates :start_date,        presence: true
 
-  before_validation :coherer_fase_inicial_con_origen
   before_create :generar_codigo
   before_create :generar_codigo_qr
   after_commit  :dispatch_webhook_avance,  on: [:create, :update]
 
-  # La fase inicial (semilla/esqueje) es la MISMA etapa ("germinación") nombrada según el origen:
-  # un lote de semilla arranca en 'semilla', uno de esqueje en 'esqueje'. Evita que se edite el
-  # estado a 'esqueje' con origen 'semilla' (o viceversa) y queden plantas mezcladas.
-  def coherer_fase_inicial_con_origen
-    return unless %w[semilla esqueje].include?(estado) && ORIGENES.include?(origen.to_s)
-
-    self.estado = origen
+  # Estado inicial según el origen: semilla → germinación, esqueje → esqueje. Solo aplica al
+  # crear un lote nuevo sin estado explícito (las plantas siguen el estado del lote vía
+  # sincronizar_estado_plantas!, no un guard rígido — un lote de semilla SÍ puede avanzar a esqueje).
+  def estado_inicial_para_origen
+    origen.to_s == 'esqueje' ? 'esqueje' : 'germinacion'
   end
 
   default_scope { where(deleted_at: nil) }
@@ -108,7 +110,7 @@ class Lote < ApplicationRecord
 
   def progreso_ciclo
     case estado
-    when 'semilla', 'esqueje'  then 0
+    when 'germinacion', 'esqueje' then 0
     when 'vegetativo'          then 20
     when 'floracion'           then 40
     when 'cosecha'             then 60
@@ -120,24 +122,20 @@ class Lote < ApplicationRecord
   end
 
   FASE_A_PLANT_STATE = {
-    'semilla'    => 'germinacion',
-    'esqueje'    => 'esqueje',
-    'vegetativo' => 'vegetativo',
-    'floracion'  => 'floracion',
-    'cosecha'    => 'cosechado',
+    'germinacion' => 'germinacion',
+    'esqueje'     => 'esqueje',
+    'vegetativo'  => 'vegetativo',
+    'floracion'   => 'floracion',
+    'cosecha'     => 'cosechado',
   }.freeze
 
   # Avance rápido sin pesada — usado por el cultivador desde el botón "Avanzar fase".
   # Si sala_id se provee, mueve el lote a esa sala. Si no, intenta auto-detectar:
   # si existe exactamente una sala activa del tipo destino en el club, la elige.
   def avanzar_fase!(sala_id: nil, usuario: nil)
-    nueva_fase = if %w[semilla esqueje].include?(estado)
-      'vegetativo'
-    else
-      idx = CICLO_FASES.index(estado)
-      raise ArgumentError, 'Lote no puede transicionar en este estado' unless idx.present? && idx < CICLO_FASES.length - 1
-      CICLO_FASES[idx + 1]
-    end
+    idx = AVANCE.index(estado)
+    raise ArgumentError, 'Lote no puede transicionar en este estado' unless idx.present? && idx < AVANCE.length - 1
+    nueva_fase = AVANCE[idx + 1] # germinación→esqueje→vegetativo→floración→cosecha
     ActiveRecord::Base.transaction do
       attrs = { estado: nueva_fase }
       if POST_COSECHA.include?(nueva_fase)

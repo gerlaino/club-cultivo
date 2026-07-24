@@ -121,7 +121,7 @@ class AlertaDetectorService
   # semilla/esqueje son el paraguas vegetativo (comparten fotoperíodo/fisiología) →
   # usan los setpoints/rangos de 'vegetativo'. Sin esto quedaban sin chequeo de rango.
   def fase_setpoint(estado)
-    %w[semilla esqueje].include?(estado) ? 'vegetativo' : estado
+    %w[germinacion esqueje].include?(estado) ? 'vegetativo' : estado
   end
 
   def rango_para(campo, fase, genetica_id, setpoints_club)

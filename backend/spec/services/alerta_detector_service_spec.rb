@@ -242,7 +242,7 @@ RSpec.describe AlertaDetectorService do
   # ── paraguas vegetativo (semilla/esqueje usan rangos de vegetativo) ─────────
 
   describe '#detectar! — rango_ambiental para semilla/esqueje (paraguas vegetativo)' do
-    %w[semilla esqueje].each do |estado_origen|
+    %w[germinacion esqueje].each do |estado_origen|
       context "cuando el lote está en #{estado_origen}" do
         let(:lote) { create(:lote, club: club, sala: sala, estado: estado_origen, start_date: 10.days.ago) }
 
