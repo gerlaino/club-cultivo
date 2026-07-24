@@ -375,6 +375,7 @@ Rails.application.routes.draw do
     # Finanzas — catálogo editable (Bloque 1)
     resources :categorias_contables, only: [:index, :create, :update, :destroy]
     resources :unidades_negocio,     only: [:index, :create, :update, :destroy]
+    resources :categorias_producto,  only: [:index, :create, :update, :destroy]
 
     # Finanzas — insumos / depósito con costo real por lote (Bloque 2)
     resources :depositos, only: [:index, :create, :update, :destroy]

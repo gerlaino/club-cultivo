@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_24_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_24_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -206,11 +206,15 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_24_000002) do
     t.datetime "updated_at", null: false
     t.bigint "bar_id"
     t.bigint "deleted_by_id"
+    t.bigint "categoria_producto_id"
+    t.bigint "deposito_id"
     t.index ["bar_id"], name: "index_bar_productos_on_bar_id"
+    t.index ["categoria_producto_id"], name: "index_bar_productos_on_categoria_producto_id"
     t.index ["club_id", "activo"], name: "index_bar_productos_on_club_id_and_activo"
     t.index ["club_id"], name: "index_bar_productos_on_club_id"
     t.index ["deleted_at"], name: "index_bar_productos_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_bar_productos_on_deleted_by_id"
+    t.index ["deposito_id"], name: "index_bar_productos_on_deposito_id"
     t.index ["unidad_negocio_id"], name: "index_bar_productos_on_unidad_negocio_id"
   end
 
@@ -343,6 +347,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_24_000002) do
     t.index ["deleted_at"], name: "index_categorias_contables_on_deleted_at"
     t.index ["parent_id"], name: "index_categorias_contables_on_parent_id"
     t.index ["unidad_negocio_id"], name: "index_categorias_contables_on_unidad_negocio_id"
+  end
+
+  create_table "categorias_producto", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "nombre", null: false
+    t.integer "orden", default: 0, null: false
+    t.boolean "activo", default: true, null: false
+    t.boolean "es_sistema", default: false, null: false
+    t.string "clave_sistema"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "clave_sistema"], name: "index_categorias_producto_on_club_id_and_clave_sistema"
+    t.index ["club_id"], name: "index_categorias_producto_on_club_id"
+    t.index ["deleted_at"], name: "index_categorias_producto_on_deleted_at"
   end
 
   create_table "check_ins", force: :cascade do |t|
@@ -2085,7 +2104,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_24_000002) do
   add_foreign_key "auditorias", "clubs"
   add_foreign_key "auditorias", "users"
   add_foreign_key "bar_productos", "bares"
+  add_foreign_key "bar_productos", "categorias_producto", column: "categoria_producto_id"
   add_foreign_key "bar_productos", "clubs"
+  add_foreign_key "bar_productos", "depositos"
   add_foreign_key "bar_productos", "unidades_negocio", column: "unidad_negocio_id"
   add_foreign_key "bar_productos", "users", column: "deleted_by_id"
   add_foreign_key "bar_stock_movimientos", "bar_productos"
@@ -2116,6 +2137,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_24_000002) do
   add_foreign_key "categorias_contables", "categorias_contables", column: "parent_id"
   add_foreign_key "categorias_contables", "clubs"
   add_foreign_key "categorias_contables", "unidades_negocio", column: "unidad_negocio_id"
+  add_foreign_key "categorias_producto", "clubs"
   add_foreign_key "check_ins", "clubs"
   add_foreign_key "check_ins", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "check_ins", "pacientes"

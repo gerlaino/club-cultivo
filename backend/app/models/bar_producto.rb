@@ -8,6 +8,8 @@ class BarProducto < ApplicationRecord
   belongs_to :club
   belongs_to :bar, class_name: 'Barra'
   belongs_to :unidad_negocio, optional: true
+  belongs_to :categoria_producto, optional: true # taxonomía editable (reemplaza al enum `categoria`)
+  belongs_to :deposito, optional: true            # el producto del bar vive en el depósito Salón
   has_many :bar_venta_items,       dependent: :nullify
   has_many :bar_stock_movimientos, dependent: :destroy
 
