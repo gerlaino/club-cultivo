@@ -459,7 +459,7 @@ async function revertirCompra(compra) {
 
     <!-- Modal ENTRADA (compra con costo → egreso) -->
     <div v-if="entradaForm" class="ov" @click.self="entradaForm = null">
-      <div class="modal modal--wide">
+      <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Registrar entrada</h3>
         <p class="modal__hint">Cargás mercadería con su costo. Se suma al depósito y se genera el <b>egreso contable</b> automáticamente — no hace falta ir a Contabilidad.</p>
 
@@ -510,7 +510,7 @@ async function revertirCompra(compra) {
 
     <!-- Modal RECONTEO -->
     <div v-if="reconteoForm" class="ov" @click.self="reconteoForm = null">
-      <div class="modal">
+      <div class="dpdlg">
         <h3 class="modal__title">Reconteo — {{ reconteoForm.insumo.nombre }}</h3>
         <p class="modal__hint">El sistema tiene <b>{{ reconteoForm.insumo.stock_actual }} {{ reconteoForm.insumo.unidad_medida }}</b>. Poné cuánto contaste físicamente y elegí por qué no coincide.</p>
 
@@ -539,7 +539,7 @@ async function revertirCompra(compra) {
 
     <!-- Modal HISTORIAL -->
     <div v-if="hist" class="ov" @click.self="hist = null">
-      <div class="modal modal--wide">
+      <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Historial — {{ hist.insumo.nombre }}</h3>
         <p class="modal__hint">Stock actual: <b>{{ hist.insumo.stock_actual }} {{ hist.insumo.unidad_medida }}</b>. Revertir una compra descuenta su stock y borra el asiento contable (solo si no se consumió/transfirió).</p>
 
@@ -575,7 +575,7 @@ async function revertirCompra(compra) {
 
     <!-- Modal EDITAR -->
     <div v-if="editForm" class="ov" @click.self="editForm = null">
-      <div class="modal">
+      <div class="dpdlg">
         <h3 class="modal__title">Editar insumo</h3>
         <p class="modal__hint">Cambiá el nombre, la categoría o el mínimo. El stock no se toca acá (para eso está Reconteo y Transferir).</p>
         <label class="fld">Nombre<input v-model.trim="editForm.nombre" class="inp" maxlength="60" /></label>
@@ -595,7 +595,7 @@ async function revertirCompra(compra) {
 
     <!-- Modal TRANSFERIR -->
     <div v-if="transferForm" class="ov" @click.self="transferForm = null">
-      <div class="modal">
+      <div class="dpdlg">
         <h3 class="modal__title">Transferir — {{ transferForm.insumo.nombre }}</h3>
         <p class="modal__hint">Mueve stock desde <b>{{ transferForm.insumo.sede_nombre || 'el pool' }}</b> a otra sede. El costo viaja con la mercadería; no genera un nuevo egreso.</p>
         <label class="fld">Sede destino
@@ -613,7 +613,7 @@ async function revertirCompra(compra) {
 
     <!-- Modal CONSUMIR -->
     <div v-if="consumoForm" class="ov" @click.self="consumoForm = null">
-      <div class="modal modal--wide">
+      <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Registrar consumo — {{ consumoForm.insumo.nombre }}</h3>
         <p class="modal__hint">
           Disponible {{ consumoForm.insumo.stock_actual }} {{ consumoForm.insumo.unidad_medida }}.
@@ -645,7 +645,7 @@ async function revertirCompra(compra) {
 
     <!-- Modal NUEVO DEPÓSITO -->
     <div v-if="depoForm" class="ov" @click.self="depoForm = null">
-      <div class="modal">
+      <div class="dpdlg">
         <h3 class="modal__title">Nuevo depósito</h3>
         <p class="modal__hint">Un depósito propio para agrupar tu mercadería (ej: Merchandising, Insumos de oficina). Los productos que cargues acá se consumen como gasto general.</p>
         <label class="fld">Nombre<input v-model.trim="depoForm.nombre" class="inp" maxlength="40" placeholder="Ej: Merchandising" v-focus @keydown.enter.prevent="confirmarNuevoDeposito" /></label>
@@ -722,8 +722,9 @@ async function revertirCompra(compra) {
 .dp__menu-sep { height: 1px; background: #eef2f6; margin: .3rem 0; }
 
 .ov { position: fixed; inset: 0; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1000; padding: 1rem; }
-.modal { background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 20px 50px rgb(15 23 42 / .25), 0 2px 8px rgb(15 23 42 / .1); max-height: 90vh; overflow-y: auto; }
-.modal--wide { max-width: 460px; }
+/* .dpdlg — NO usar la clase `.modal`: choca con Bootstrap (display:none) y el modal no se ve. */
+.dpdlg { position: relative; display: block; background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 20px 50px rgb(15 23 42 / .25), 0 2px 8px rgb(15 23 42 / .1); max-height: 90vh; overflow-y: auto; }
+.dpdlg--wide { max-width: 460px; }
 .modal__title { margin: 0 0 .25rem; font-size: 1.1rem; font-weight: 750; letter-spacing: -.02em; color: #0f172a; }
 .modal__hint { color: #64748b; font-size: .82rem; margin: 0 0 1.1rem; line-height: 1.45; }
 .modal__note { font-size: .76rem; color: #94a3b8; margin: -.3rem 0 .9rem; }

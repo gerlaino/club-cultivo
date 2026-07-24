@@ -119,7 +119,7 @@ const TIPO_MOV = {
 
     <!-- Modal comprar -->
     <div v-if="compraForm" class="ov" @click.self="compraForm = null">
-      <div class="modal">
+      <div class="dpdlg">
         <h3 class="modal__title">Comprar — {{ compraForm.prod.nombre }}</h3>
         <p class="modal__hint">Suma stock al depósito del salón y recalcula el costo promedio. Genera el egreso en el libro.</p>
         <label class="fld">Cantidad (unidades)<input v-model.number="compraForm.cantidad" type="number" min="0" step="any" class="inp" /></label>
@@ -131,7 +131,7 @@ const TIPO_MOV = {
 
     <!-- Modal ajustar -->
     <div v-if="ajusteForm" class="ov" @click.self="ajusteForm = null">
-      <div class="modal">
+      <div class="dpdlg">
         <h3 class="modal__title">Ajustar stock — {{ ajusteForm.prod.nombre }}</h3>
         <p class="modal__hint">Fijá el stock al valor real contado. La diferencia queda registrada (merma o ajuste).</p>
         <label class="fld">Stock real (contado)<input v-model.number="ajusteForm.cantidad_nueva" type="number" min="0" step="any" class="inp" /></label>
@@ -142,7 +142,7 @@ const TIPO_MOV = {
 
     <!-- Modal movimientos -->
     <div v-if="movsForm" class="ov" @click.self="movsForm = null">
-      <div class="modal modal--wide">
+      <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Movimientos — {{ movsForm.nombre }}</h3>
         <div v-if="!movs.length" class="ds__empty">Sin movimientos todavía.</div>
         <ul v-else class="ds__movs">
@@ -198,8 +198,9 @@ const TIPO_MOV = {
 .ds__mov-saldo { color: #94a3b8; font-variant-numeric: tabular-nums; font-size: .78rem; }
 
 .ov { position: fixed; inset: 0; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1000; padding: 1rem; }
-.modal { background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
-.modal--wide { max-width: 460px; }
+/* .dpdlg — NO usar `.modal`: choca con Bootstrap (display:none) y no se ve. */
+.dpdlg { position: relative; display: block; background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
+.dpdlg--wide { max-width: 460px; }
 .modal__title { margin: 0 0 .25rem; font-size: 1.1rem; font-weight: 750; letter-spacing: -.02em; }
 .modal__hint { color: #64748b; font-size: .82rem; margin: 0 0 1.1rem; line-height: 1.45; }
 .modal__actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .5rem; }
