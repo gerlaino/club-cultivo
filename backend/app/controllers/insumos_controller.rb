@@ -187,9 +187,13 @@ class InsumosController < ApplicationController
     render json: { error: 'Insumo no encontrado' }, status: :not_found
   end
 
-  # Siembra los depósitos de sistema y backfillea los insumos la primera vez que se entra.
+  # Siembra los depósitos de sistema y reacomoda cualquier insumo que haya quedado sin depósito
+  # (ej. creado desde un movimiento contable). Barato: solo corre el servicio si hace falta.
   def asegurar_depositos
-    Finanzas::SembrarDepositos.new(current_user.club).call if current_user.club.depositos.none?
+    club = current_user.club
+    if club.depositos.none? || club.insumos.where(deposito_id: nil).exists?
+      Finanzas::SembrarDepositos.new(club).call
+    end
   end
 
   ROLES_LECTURA = %w[admin supervisor cultivador auditor].freeze

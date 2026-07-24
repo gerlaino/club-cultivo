@@ -6,7 +6,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useInsumosStore } from '../../stores/insumos.js'
 import { useSedeStore } from '../../stores/sede.js'
-import { listLotes, listSalas, listCategoriasContables, getInsumo } from '../../lib/api.js'
+import { listLotes, listSalas, listCategoriasContables, getInsumo, listDepositos, createDeposito } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import DepositoSalon from './DepositoSalon.vue'
@@ -25,43 +25,65 @@ const mostrarInactivos = ref(false)  // los insumos desactivados quedan ocultos 
 const hoyISO = () => new Date().toISOString().slice(0, 10)
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 
-// ── Familia de depósito (Cultivo / General / Salón) ───────────────────────────
-const COMP_DE_TAB = { cultivo: ['insumo'], general: ['insumo_general'] }
+// ── Depósitos (dinámicos: sistema + los que crea el admin) ────────────────────
+const depositos = ref([])
+const depositoActivoId = ref(null)
+// La flor de Dispensación se integra en una fase posterior; por ahora no se lista como solapa.
+const TABS = computed(() => depositos.value.filter(d => d.clave_sistema !== 'dispensacion'))
+const depositoActivo = computed(() => depositos.value.find(d => d.id === depositoActivoId.value) || TABS.value[0] || null)
+const esSalon   = computed(() => depositoActivo.value?.clave_sistema === 'salon')
+const esCultivo = computed(() => depositoActivo.value?.familia === 'insumo')
+const HINTS = {
+  insumo:         'Fertilizantes, sustrato… se consumen imputando el costo al lote.',
+  insumo_general: 'Insumos del club (limpieza, administración). Se consumen como gasto.',
+  mercaderia:     'Mercadería vendible: stock con costo, valorizado y alertas de reposición.',
+}
+const depositoHint = computed(() => HINTS[depositoActivo.value?.familia] || '')
+
+// Categorías contables elegibles al dar de alta un producto en el depósito activo (según su familia).
 const categoriasDelTab = computed(() => {
-  const comps = COMP_DE_TAB[tipoActivo.value] || []
+  const fam = depositoActivo.value?.familia
+  if (!fam) return []
   const out = []
   for (const m of categorias.value) {
     const subs = m.subcategorias || []
-    for (const s of subs) if (comps.includes(s.comportamiento_efectivo)) out.push({ id: s.id, label: `${m.nombre} › ${s.nombre}` })
-    if (!subs.length && comps.includes(m.comportamiento_efectivo)) out.push({ id: m.id, label: m.nombre })
+    for (const s of subs) if (s.comportamiento_efectivo === fam) out.push({ id: s.id, label: `${m.nombre} › ${s.nombre}` })
+    if (!subs.length && m.comportamiento_efectivo === fam) out.push({ id: m.id, label: m.nombre })
   }
   return out
 })
 
-// El depósito vive por sede. Filtro LOCAL (default null = todo el club).
+// El depósito es transversal a la sede. Filtro LOCAL de productos por sede (null = todo el club).
 const sedeFiltro = ref(null)
-const sedeActualObj = computed(() => sede.sedes.find(s => s.id === sedeFiltro.value) || null)
 const multiSede = computed(() => sede.sedes.length > 1)
 const otrasSedes = computed(() => sede.sedes.filter(s => s.id !== sedeFiltro.value))
 
-const currentTipo = computed(() => sedeActualObj.value?.tipo)
-const TABS_ALL = [
-  { tipo: 'cultivo', label: 'Cultivo', hint: 'Fertilizantes, sustrato… se consumen imputando el costo al lote.',       sedeTipos: ['produccion', 'mixta'] },
-  { tipo: 'general', label: 'General', hint: 'Insumos del club (limpieza, administración). Se consumen como gasto.',    sedeTipos: ['produccion', 'social', 'mixta'] },
-  { tipo: 'salon',   label: 'Salón',   hint: 'Mercadería del bar: stock con costo, valorizado y alertas de reposición.', sedeTipos: ['social', 'mixta'] },
-]
-const TABS = computed(() => {
-  const t = currentTipo.value
-  return t ? TABS_ALL.filter(tab => tab.sedeTipos.includes(t)) : TABS_ALL
-})
-const tipoActivo = ref('cultivo')
-const tabActual  = computed(() => TABS.value.find(t => t.tipo === tipoActivo.value) || TABS.value[0])
-const esGeneral  = computed(() => tipoActivo.value === 'general')
-const esSalon    = computed(() => tipoActivo.value === 'salon')
-
 watch(TABS, (tabs) => {
-  if (!tabs.some(t => t.tipo === tipoActivo.value)) tipoActivo.value = tabs[0]?.tipo || 'cultivo'
+  if (!tabs.some(d => d.id === depositoActivoId.value)) depositoActivoId.value = tabs[0]?.id ?? null
 })
+
+async function cargarDepositos() {
+  try { const { data } = await listDepositos(); depositos.value = data || [] }
+  catch { depositos.value = [] }
+  if (!depositoActivoId.value && TABS.value.length) depositoActivoId.value = TABS.value[0].id
+}
+
+// ── Crear depósito propio ─────────────────────────────────────
+const depoForm = ref(null)
+const savingDepo = ref(false)
+function abrirNuevoDeposito() { depoForm.value = { nombre: '' } }
+async function confirmarNuevoDeposito() {
+  if (!depoForm.value.nombre?.trim()) { toast.warning('Poné un nombre'); return }
+  savingDepo.value = true
+  try {
+    const { data } = await createDeposito({ nombre: depoForm.value.nombre.trim() })
+    await cargarDepositos()
+    depositoActivoId.value = data.id
+    depoForm.value = null
+    toast.success('Depósito creado')
+  } catch (e) { toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo crear') }
+  finally { savingDepo.value = false }
+}
 
 // Insumos visibles (según toggle de inactivos) agrupados por categoría, como el árbol contable.
 const itemsVisibles = computed(() => store.items.filter(i => mostrarInactivos.value || i.activo))
@@ -79,12 +101,13 @@ const grupos = computed(() => {
 })
 
 async function recargar() {
-  if (esSalon.value) return
-  await store.fetch({ sede_id: sedeFiltro.value ?? undefined, tipo: tipoActivo.value })
+  if (esSalon.value || !depositoActivoId.value) return
+  await store.fetch({ sede_id: sedeFiltro.value ?? undefined, deposito_id: depositoActivoId.value })
 }
 
 onMounted(async () => {
   if (!sede.loaded) await sede.fetchSedes()
+  await cargarDepositos()
   await recargar()
   listLotes({ estado: 'activos' }).then(r => { lotes.value = r.data?.lotes || r.data || [] }).catch(() => {})
   listSalas().then(r => { salas.value = r.data || [] }).catch(() => {})
@@ -92,7 +115,7 @@ onMounted(async () => {
   window.addEventListener('click', cerrarMenu)
 })
 onUnmounted(() => window.removeEventListener('click', cerrarMenu))
-watch([sedeFiltro, tipoActivo], recargar)
+watch([sedeFiltro, depositoActivoId], recargar)
 
 function stockPct(i) {
   if (!i.stock_minimo) return i.stock_actual > 0 ? 100 : 0
@@ -135,7 +158,9 @@ async function confirmarEntrada() {
     if (f.modo === 'nuevo') {
       const nuevo = await store.crear({
         nombre: f.nombre.trim(), unidad_medida: f.unidad_medida,
-        categoria_contable_id: f.categoria_contable_id, tipo: tipoActivo.value, sede_id: f.sede_id,
+        categoria_contable_id: f.categoria_contable_id, sede_id: f.sede_id,
+        deposito_id: depositoActivoId.value,
+        tipo: esCultivo.value ? 'cultivo' : 'general', // compat con el enum viejo hasta unificar en Producto
       })
       id = nuevo.id
     }
@@ -286,7 +311,7 @@ async function revertirCompra(compra) {
     <header class="dp__head">
       <div>
         <h1 class="dp__title">Depósito</h1>
-        <p class="dp__sub">{{ tabActual?.hint }}</p>
+        <p class="dp__sub">{{ depositoHint }}</p>
       </div>
       <div class="dp__head-right">
         <select v-if="multiSede" v-model="sedeFiltro" class="dp__sede-filtro">
@@ -304,9 +329,10 @@ async function revertirCompra(compra) {
     </header>
 
     <div class="dp__tabs">
-      <button v-for="t in TABS" :key="t.tipo" class="dp__tab" :class="{ 'is-on': tipoActivo === t.tipo }" @click="tipoActivo = t.tipo">
-        {{ t.label }}
+      <button v-for="d in TABS" :key="d.id" class="dp__tab" :class="{ 'is-on': depositoActivo?.id === d.id }" @click="depositoActivoId = d.id">
+        {{ d.nombre }}
       </button>
+      <button class="dp__tab dp__tab--add" title="Crear un depósito" @click="abrirNuevoDeposito">＋</button>
     </div>
 
     <DepositoSalon v-if="esSalon" :sede-id="sedeFiltro" />
@@ -529,11 +555,11 @@ async function revertirCompra(compra) {
         <h3 class="modal__title">Registrar consumo — {{ consumoForm.insumo.nombre }}</h3>
         <p class="modal__hint">
           Disponible {{ consumoForm.insumo.stock_actual }} {{ consumoForm.insumo.unidad_medida }}.
-          {{ esGeneral ? 'Se descuenta del depósito como gasto general del club.' : 'Se imputa el costo a los lotes elegidos.' }}
+          {{ esCultivo ? 'Se imputa el costo a los lotes elegidos.' : 'Se descuenta del depósito como gasto general del club.' }}
         </p>
         <label class="fld">Cantidad usada<input v-model.number="consumoForm.cantidad" type="number" min="0" step="any" class="inp" /></label>
 
-        <template v-if="!esGeneral">
+        <template v-if="esCultivo">
           <div class="fld">
             <span>Lotes <small class="mut">(se reparte en partes iguales)</small></span>
             <div class="dp__lotes">
@@ -551,7 +577,17 @@ async function revertirCompra(compra) {
           </label>
         </template>
 
-        <div class="modal__actions"><button class="btn" @click="consumoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarConsumo">{{ esGeneral ? 'Registrar consumo' : 'Imputar consumo' }}</button></div>
+        <div class="modal__actions"><button class="btn" @click="consumoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarConsumo">{{ esCultivo ? 'Imputar consumo' : 'Registrar consumo' }}</button></div>
+      </div>
+    </div>
+
+    <!-- Modal NUEVO DEPÓSITO -->
+    <div v-if="depoForm" class="ov" @click.self="depoForm = null">
+      <div class="modal">
+        <h3 class="modal__title">Nuevo depósito</h3>
+        <p class="modal__hint">Un depósito propio para agrupar tu mercadería (ej: Merchandising, Insumos de oficina). Los productos que cargues acá se consumen como gasto general.</p>
+        <label class="fld">Nombre<input v-model.trim="depoForm.nombre" class="inp" maxlength="40" placeholder="Ej: Merchandising" autofocus @keydown.enter.prevent="confirmarNuevoDeposito" /></label>
+        <div class="modal__actions"><button class="btn" @click="depoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="savingDepo" @click="confirmarNuevoDeposito">Crear</button></div>
       </div>
     </div>
   </div>
@@ -567,6 +603,8 @@ async function revertirCompra(compra) {
 .dp__tab { border: none; background: transparent; color: #64748b; font-size: .84rem; font-weight: 600; padding: .45rem 1rem; border-radius: 8px; cursor: pointer; transition: background .12s, color .12s; }
 .dp__tab:hover { color: #334155; }
 .dp__tab.is-on { background: #fff; color: #1b5e20; box-shadow: 0 1px 2px rgb(15 23 42 / .08); }
+.dp__tab--add { font-weight: 700; color: #94a3b8; padding-inline: .75rem; }
+.dp__tab--add:hover { color: #1b5e20; }
 .dp__sede { font-size: .66rem; font-weight: 600; letter-spacing: .02em; color: #475569; background: #f1f5f9; padding: 2px 8px; border-radius: 999px; }
 .dp__sub { color: #64748b; font-size: .84rem; margin: 0; max-width: 52ch; line-height: 1.5; }
 .dp__link { color: #1b5e20; font-weight: 600; text-decoration: none; }

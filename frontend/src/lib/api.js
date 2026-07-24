@@ -337,6 +337,10 @@ export const transferirInsumo = (id, payload) => api.post(`/insumos/${id}/transf
 export const revertirCompraInsumo = (id, compraId) => api.delete(`/insumos/${id}/compras/${compraId}`)
 export const reconteoInsumo   = (id, payload) => api.post(`/insumos/${id}/reconteo`, payload)
 export const deleteInsumo     = (id)          => api.delete(`/insumos/${id}`)
+export const listDepositos    = ()            => api.get('/depositos')
+export const createDeposito   = (payload)     => api.post('/depositos', { deposito: payload })
+export const updateDeposito   = (id, payload) => api.patch(`/depositos/${id}`, { deposito: payload })
+export const deleteDeposito   = (id)          => api.delete(`/depositos/${id}`)
 
 // ── Bar · entidad por sede + POS + dashboard ───────────────────────────────────
 export const listBares          = ()               => api.get('/bares')

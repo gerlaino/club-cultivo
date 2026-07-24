@@ -56,7 +56,10 @@ class DepositosController < ApplicationController
   end
 
   def asegurar_depositos
-    Finanzas::SembrarDepositos.new(current_user.club).call if current_user.club.depositos.none?
+    club = current_user.club
+    if club.depositos.none? || club.insumos.where(deposito_id: nil).exists?
+      Finanzas::SembrarDepositos.new(club).call
+    end
   end
 
   ROLES_LECTURA = %w[admin supervisor cultivador auditor].freeze
