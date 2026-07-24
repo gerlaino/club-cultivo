@@ -37,6 +37,16 @@ RSpec.describe Insumo, type: :model do
       }.to change { club.movimientos_contables.where(categoria: 'insumo', tipo: 'egreso').count }.by(1)
     end
 
+    it 'el egreso hereda el área del depósito del insumo' do
+      Finanzas::SembrarDepositos.new(club).call
+      dep = club.depositos.find_by(clave_sistema: 'cultivo')
+      i = insumo(deposito: dep)
+      i.registrar_compra!(cantidad: 5, costo_total_ars: 500, created_by: admin)
+      mov = club.movimientos_contables.where(categoria: 'insumo', tipo: 'egreso').last
+      expect(mov.unidad_negocio).to eq(dep.unidad_negocio)
+      expect(mov.unidad_negocio.tipo).to eq('cultivo')
+    end
+
     it 'respeta medio_pago y pagado en el egreso (de acá sale el asiento)' do
       i = insumo
       i.registrar_compra!(cantidad: 5, costo_total_ars: 500, created_by: admin, medio_pago: 'transferencia', pagado: false)

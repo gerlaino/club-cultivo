@@ -6,7 +6,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useInsumosStore } from '../../stores/insumos.js'
 import { useSedeStore } from '../../stores/sede.js'
-import { listLotes, listSalas, listCategoriasContables, getInsumo, listDepositos, createDeposito, updateDeposito, deleteDeposito } from '../../lib/api.js'
+import { listLotes, listSalas, listCategoriasContables, getInsumo, listDepositos, createDeposito, updateDeposito, deleteDeposito, listUnidadesNegocio } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import DepositoSalon from './DepositoSalon.vue'
@@ -72,14 +72,17 @@ async function cargarDepositos() {
 }
 
 // ── Crear depósito propio ─────────────────────────────────────
+// Áreas (unidades de negocio) para vincular el depósito → el movimiento hereda el área.
+const areas = ref([])
+async function cargarAreas() { try { areas.value = (await listUnidadesNegocio()).data || [] } catch { areas.value = [] } }
 const depoForm = ref(null)
 const savingDepo = ref(false)
-function abrirNuevoDeposito() { depoForm.value = { nombre: '' } }
+function abrirNuevoDeposito() { depoForm.value = { nombre: '', unidad_negocio_id: null } }
 async function confirmarNuevoDeposito() {
   if (!depoForm.value.nombre?.trim()) { toast.warning('Poné un nombre'); return }
   savingDepo.value = true
   try {
-    const { data } = await createDeposito({ nombre: depoForm.value.nombre.trim() })
+    const { data } = await createDeposito({ nombre: depoForm.value.nombre.trim(), unidad_negocio_id: depoForm.value.unidad_negocio_id })
     await cargarDepositos()
     depositoActivoId.value = data.id
     depoForm.value = null
@@ -93,14 +96,14 @@ const depoEdit = ref(null) // { id, nombre, es_sistema, activo }
 function abrirEditarDeposito() {
   const d = depositoActivo.value
   if (!d) return
-  depoEdit.value = { id: d.id, nombre: d.nombre, es_sistema: d.es_sistema, activo: d.activo }
+  depoEdit.value = { id: d.id, nombre: d.nombre, es_sistema: d.es_sistema, activo: d.activo, unidad_negocio_id: d.unidad_negocio_id }
 }
 async function guardarDeposito() {
   const d = depoEdit.value
   if (!d.nombre?.trim()) { toast.warning('Poné un nombre'); return }
   savingDepo.value = true
   try {
-    await updateDeposito(d.id, { nombre: d.nombre.trim(), activo: d.activo })
+    await updateDeposito(d.id, { nombre: d.nombre.trim(), activo: d.activo, unidad_negocio_id: d.unidad_negocio_id })
     await cargarDepositos()
     depoEdit.value = null
     toast.success('Depósito actualizado')
@@ -160,6 +163,7 @@ async function recargar() {
 onMounted(async () => {
   if (!sede.loaded) await sede.fetchSedes()
   await cargarDepositos()
+  cargarAreas()
   await recargar()
   listLotes({ estado: 'activos' }).then(r => { lotes.value = r.data?.lotes || r.data || [] }).catch(() => {})
   listSalas().then(r => { salas.value = r.data || [] }).catch(() => {})
@@ -703,6 +707,12 @@ async function revertirCompra(compra) {
         <h3 class="modal__title">Nuevo depósito</h3>
         <p class="modal__hint">Un depósito propio para agrupar tu mercadería (ej: Merchandising, Insumos de oficina). Los productos que cargues acá se consumen como gasto general.</p>
         <label class="fld">Nombre<input v-model.trim="depoForm.nombre" class="inp" maxlength="40" placeholder="Ej: Merchandising" v-focus @keydown.enter.prevent="confirmarNuevoDeposito" /></label>
+        <label class="fld">Área <small class="mut">(a qué línea de negocio pertenece, para el P&L)</small>
+          <select v-model="depoForm.unidad_negocio_id" class="inp">
+            <option :value="null">— Sin área —</option>
+            <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre }}</option>
+          </select>
+        </label>
         <div class="modal__actions"><button class="btn" @click="depoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="savingDepo" @click="confirmarNuevoDeposito">Crear</button></div>
       </div>
     </div>
@@ -712,6 +722,12 @@ async function revertirCompra(compra) {
       <div class="dpdlg">
         <h3 class="modal__title">Gestionar depósito</h3>
         <label class="fld">Nombre<input v-model.trim="depoEdit.nombre" class="inp" maxlength="40" v-focus @keydown.enter.prevent="guardarDeposito" /></label>
+        <label class="fld">Área <small class="mut">(para el P&L)</small>
+          <select v-model="depoEdit.unidad_negocio_id" class="inp">
+            <option :value="null">— Sin área —</option>
+            <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre }}</option>
+          </select>
+        </label>
         <label class="dp__chk" style="margin: .2rem 0 .4rem"><input type="checkbox" :checked="!depoEdit.activo" @change="depoEdit.activo = !depoEdit.activo" /> Desactivado (oculto del listado)</label>
         <p v-if="depoEdit.es_sistema" class="mut" style="font-size:.8rem; margin:.3rem 0 0; line-height:1.4">Es un depósito del sistema: podés renombrarlo o desactivarlo, pero no eliminarlo.</p>
         <div class="modal__actions" style="justify-content: space-between">

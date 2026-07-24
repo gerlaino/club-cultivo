@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_24_000003) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_24_000004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -575,9 +575,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_24_000003) do
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "unidad_negocio_id"
     t.index ["club_id", "clave_sistema"], name: "index_depositos_on_club_id_and_clave_sistema"
     t.index ["club_id"], name: "index_depositos_on_club_id"
     t.index ["deleted_at"], name: "index_depositos_on_deleted_at"
+    t.index ["unidad_negocio_id"], name: "index_depositos_on_unidad_negocio_id"
   end
 
   create_table "dispensacion_items", force: :cascade do |t|
@@ -2164,6 +2166,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_24_000003) do
   add_foreign_key "cuenta_corrientes", "pacientes"
   add_foreign_key "cuenta_corrientes", "users", column: "deleted_by_id"
   add_foreign_key "depositos", "clubs"
+  add_foreign_key "depositos", "unidades_negocio", column: "unidad_negocio_id"
   add_foreign_key "dispensacion_items", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "dispensacion_items", "stocks"
   add_foreign_key "dispensacion_items", "users", column: "deleted_by_id"

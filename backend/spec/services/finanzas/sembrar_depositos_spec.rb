@@ -23,6 +23,15 @@ RSpec.describe Finanzas::SembrarDepositos, type: :service do
       end
     end
 
+    it 'vincula cada depósito de sistema a su área (Cultivo→cultivo, General→administración)' do
+      described_class.new(club).call
+      con_tenant do
+        expect(club.depositos.find_by(clave_sistema: 'cultivo').unidad_negocio.tipo).to eq('cultivo')
+        expect(club.depositos.find_by(clave_sistema: 'general').unidad_negocio.tipo).to eq('administracion')
+        expect(club.depositos.find_by(clave_sistema: 'dispensacion').unidad_negocio.tipo).to eq('dispensario')
+      end
+    end
+
     it 'backfillea los insumos a su depósito según el tipo' do
       con_tenant do
         club.insumos.create!(nombre: 'Fertilizante', unidad_medida: 'litro', tipo: 'cultivo')

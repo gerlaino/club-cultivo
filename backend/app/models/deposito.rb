@@ -9,7 +9,16 @@ class Deposito < ApplicationRecord
   acts_as_tenant(:club)
 
   belongs_to :club
+  belongs_to :unidad_negocio, optional: true # el área a la que pertenece (para el P&L)
   has_many :insumos, dependent: :restrict_with_error
+
+  # Área (unidad de negocio) por defecto de cada depósito de sistema.
+  AREA_TIPO_POR_CLAVE = {
+    'cultivo'      => 'cultivo',
+    'general'      => 'administracion',
+    'salon'        => 'bar',
+    'dispensacion' => 'dispensario',
+  }.freeze
 
   # Depósitos de sistema y su nombre por defecto. Dispensación aloja la flor/derivados (fase 3).
   CLAVES_SISTEMA = {

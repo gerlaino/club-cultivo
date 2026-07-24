@@ -11,6 +11,7 @@ module Finanzas
 
     def call
       ActsAsTenant.with_tenant(@club) do
+        Finanzas::SembrarCatalogo.new(@club).call # asegura las áreas (unidades de negocio)
         sembrar
         backfill_insumos
       end
@@ -20,6 +21,7 @@ module Finanzas
     private
 
     def sembrar
+      areas = @club.unidades_negocio.index_by(&:tipo)
       orden = 0
       Deposito::CLAVES_SISTEMA.each do |clave, nombre|
         next if clave == 'salon' && !@club.feature?(:bar)
@@ -31,6 +33,8 @@ module Finanzas
         dep.es_sistema = true
         dep.activo     = true
         dep.orden      = orden if dep.orden.to_i.zero?
+        # Vincula el depósito de sistema a su área (no pisa si ya tiene una asignada).
+        dep.unidad_negocio ||= areas[Deposito::AREA_TIPO_POR_CLAVE[clave]]
         dep.save!
       end
     end

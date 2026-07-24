@@ -72,7 +72,8 @@ class Insumo < ApplicationRecord
         mov = club.movimientos_contables.create!(
           sede: sede, created_by: created_by, tipo: 'egreso',
           categoria: 'insumo', categoria_contable: categoria_contable,
-          unidad_negocio_id: categoria_contable&.unidad_negocio_id,
+          # El área la manda el depósito donde vive el insumo; la categoría queda de respaldo.
+          unidad_negocio_id: deposito&.unidad_negocio_id || categoria_contable&.unidad_negocio_id,
           descripcion: "Compra insumo — #{nombre} (#{cantidad.to_s('F')} #{unidad_medida})",
           monto_ars: costo_total, fecha: fecha, proveedor: proveedor,
           pagado: pagado, medio_pago: medio_pago
