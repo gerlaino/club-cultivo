@@ -56,9 +56,19 @@ class Lote < ApplicationRecord
             numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
   validates :start_date,        presence: true
 
+  before_validation :coherer_fase_inicial_con_origen
   before_create :generar_codigo
   before_create :generar_codigo_qr
   after_commit  :dispatch_webhook_avance,  on: [:create, :update]
+
+  # La fase inicial (semilla/esqueje) es la MISMA etapa ("germinación") nombrada según el origen:
+  # un lote de semilla arranca en 'semilla', uno de esqueje en 'esqueje'. Evita que se edite el
+  # estado a 'esqueje' con origen 'semilla' (o viceversa) y queden plantas mezcladas.
+  def coherer_fase_inicial_con_origen
+    return unless %w[semilla esqueje].include?(estado) && ORIGENES.include?(origen.to_s)
+
+    self.estado = origen
+  end
 
   default_scope { where(deleted_at: nil) }
 
@@ -110,6 +120,8 @@ class Lote < ApplicationRecord
   end
 
   FASE_A_PLANT_STATE = {
+    'semilla'    => 'germinacion',
+    'esqueje'    => 'esqueje',
     'vegetativo' => 'vegetativo',
     'floracion'  => 'floracion',
     'cosecha'    => 'cosechado',

@@ -16,6 +16,28 @@ RSpec.describe Lote, type: :model do
 
   # ── Validaciones ──────────────────────────────────────────────────────────────
 
+  describe 'coherencia fase inicial ↔ origen' do
+    it 'un lote de semilla no puede quedar en estado esqueje (se normaliza a semilla)' do
+      lote = create_lote(origen: 'semilla', estado: 'esqueje')
+      expect(lote.reload.estado).to eq('semilla')
+    end
+
+    it 'un lote de esqueje arranca en estado esqueje aunque se cargue como semilla' do
+      lote = create_lote(origen: 'esqueje', estado: 'semilla')
+      expect(lote.reload.estado).to eq('esqueje')
+    end
+
+    it 'no toca el estado en fases posteriores (vegetativo/floración)' do
+      lote = create_lote(origen: 'semilla', estado: 'vegetativo')
+      expect(lote.reload.estado).to eq('vegetativo')
+    end
+
+    it 'FASE_A_PLANT_STATE mapea la fase inicial al estado de planta correcto' do
+      expect(Lote::FASE_A_PLANT_STATE['semilla']).to eq('germinacion')
+      expect(Lote::FASE_A_PLANT_STATE['esqueje']).to eq('esqueje')
+    end
+  end
+
   describe 'validaciones' do
     it 'es válido con atributos mínimos' do
       expect(new_lote).to be_valid

@@ -24,8 +24,11 @@
             <div class="lem__field">
               <label class="lem__label">Estado</label>
               <select class="lem__input" v-model="editLoteForm.estado">
-                <option value="semilla">Germinación / Plántula</option>
-                <option value="esqueje">Esqueje</option>
+                <!-- La fase inicial se nombra según el origen del lote (semilla → Germinación,
+                     esqueje → Esqueje): no son dos fases distintas, es la misma etapa. -->
+                <option :value="props.lote?.origen === 'esqueje' ? 'esqueje' : 'semilla'">
+                  {{ props.lote?.origen === 'esqueje' ? 'Esqueje' : 'Germinación / Plántula' }}
+                </option>
                 <option value="vegetativo">Vegetativo</option>
                 <option value="floracion">Floración</option>
                 <option value="cosecha">Cosechado</option>
