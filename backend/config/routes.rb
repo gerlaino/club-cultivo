@@ -377,6 +377,7 @@ Rails.application.routes.draw do
     resources :unidades_negocio,     only: [:index, :create, :update, :destroy]
 
     # Finanzas — insumos / depósito con costo real por lote (Bloque 2)
+    resources :depositos, only: [:index, :create, :update, :destroy]
     resources :insumos, only: [:index, :show, :create, :update, :destroy] do
       member do
         post :comprar

@@ -14,7 +14,8 @@ class InsumosController < ApplicationController
   def index
     scope = current_user.club.insumos.includes(:sede, :deposito, categoria_contable: :parent)
     scope = scope.activos if params[:activos] == 'true'
-    scope = scope.por_tipo(params[:tipo]) if params[:tipo].present?
+    scope = scope.where(deposito_id: params[:deposito_id]) if params[:deposito_id].present?
+    scope = scope.por_tipo(params[:tipo]) if params[:tipo].present? # compat: se reemplaza por deposito_id
     scope = scope.de_sede(params[:sede_id]) if params[:sede_id].present?
     render json: {
       insumos:         scope.order(:nombre).map { |i| serialize(i) },
@@ -208,7 +209,7 @@ class InsumosController < ApplicationController
   end
 
   def insumo_params
-    params.require(:insumo).permit(:nombre, :unidad_medida, :stock_minimo, :activo, :categoria_contable_id, :sede_id, :tipo)
+    params.require(:insumo).permit(:nombre, :unidad_medida, :stock_minimo, :activo, :categoria_contable_id, :sede_id, :tipo, :deposito_id)
   end
 
   def serialize(i)
