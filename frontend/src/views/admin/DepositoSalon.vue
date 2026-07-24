@@ -99,7 +99,7 @@ const TIPO_MOV = {
           <div class="ds__main">
             <div class="ds__top">
               <span class="ds__name">{{ p.nombre }}</span>
-              <span class="ds__cat">{{ p.categoria }}</span>
+              <span class="ds__cat">{{ p.categoria_producto_nombre || p.categoria }}</span>
               <span v-if="p.stock_bajo" class="ds__pill">Reponer</span>
             </div>
             <div class="ds__meter"><i :style="{ width: stockPct(p) + '%' }" :class="p.stock_bajo ? 'is-low' : 'is-ok'"></i></div>
@@ -110,7 +110,7 @@ const TIPO_MOV = {
           </div>
           <div class="ds__actions">
             <button class="btn btn--sm" @click="abrirCompra(p)">Comprar</button>
-            <button class="btn btn--sm" @click="abrirAjuste(p)">Ajustar</button>
+            <button class="btn btn--sm" @click="abrirAjuste(p)">Reconteo</button>
             <button class="btn btn--sm" @click="abrirMovs(p)">Historial</button>
           </div>
         </li>
@@ -132,8 +132,8 @@ const TIPO_MOV = {
     <!-- Modal ajustar -->
     <div v-if="ajusteForm" class="ov" @click.self="ajusteForm = null">
       <div class="dpdlg">
-        <h3 class="modal__title">Ajustar stock — {{ ajusteForm.prod.nombre }}</h3>
-        <p class="modal__hint">Fijá el stock al valor real contado. La diferencia queda registrada (merma o ajuste).</p>
+        <h3 class="modal__title">Reconteo — {{ ajusteForm.prod.nombre }}</h3>
+        <p class="modal__hint">Fijá el stock al valor real contado. La diferencia queda registrada (merma si baja, ajuste si sube).</p>
         <label class="fld">Stock real (contado)<input v-model.number="ajusteForm.cantidad_nueva" type="number" min="0" step="any" class="inp" /></label>
         <label class="fld">Motivo (opcional)<input v-model.trim="ajusteForm.motivo" class="inp" placeholder="Ej: botellas rotas" maxlength="120" /></label>
         <div class="modal__actions"><button class="btn" @click="ajusteForm = null">Cancelar</button><button class="btn btn--primary" :disabled="saving" @click="confirmarAjuste">Ajustar</button></div>

@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
-import { listEventosBar } from '../../lib/api.js'
+import { listEventosBar, listCategoriasProducto } from '../../lib/api.js'
 
 const store  = useBarStore()
 const auth   = useAuthStore()
@@ -13,27 +13,27 @@ const route  = useRoute()
 const toast  = useToast()
 const barId  = route.params.barId
 
-const CATS = [
-  { value: 'bebida', label: 'Bebidas' },
-  { value: 'cocina', label: 'Cocina' },
-  { value: 'merch',  label: 'Merch' },
-  { value: 'otro',   label: 'Otros' },
-]
-const catActiva = ref('bebida')
+// Categorías editables (reemplazan el enum hardcodeado). Solo las que tienen productos.
+const categorias = ref([])
+const catActiva  = ref(null)
+const CATS = computed(() => categorias.value.filter(c => store.activos.some(p => p.categoria_producto_id === c.id)))
 const medioPago = ref('efectivo')
 // Atribuir la venta a un evento en curso: descuenta lo reservado y suma al P&L del evento.
 const eventos   = ref([])
 const eventoSel = ref(null)
 const esGestion = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 
-onMounted(() => {
-  store.fetchProductos(barId, { activos: 'true' })
+onMounted(async () => {
+  // Cargar categorías primero (siembra + backfillea el categoria_producto_id de los productos).
+  try { categorias.value = (await listCategoriasProducto()).data || [] } catch { categorias.value = [] }
+  await store.fetchProductos(barId, { activos: 'true' })
+  if (!catActiva.value && CATS.value.length) catActiva.value = CATS.value[0].id
   listEventosBar(barId)
     .then(r => { eventos.value = (r.data || []).filter(e => ['en_venta', 'en_curso'].includes(e.estado)) })
     .catch(() => {})
 })
 
-const productosCat = computed(() => store.activos.filter(p => p.categoria === catActiva.value))
+const productosCat = computed(() => store.activos.filter(p => p.categoria_producto_id === catActiva.value))
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 
 async function cobrar() {
@@ -59,7 +59,7 @@ async function cobrar() {
     <div class="cv__pos">
       <div class="cv__pos-catalog">
         <div class="cv__pos-tabs">
-          <button v-for="c in CATS" :key="c.value" class="cv__sede-btn" :class="{ 'cv__sede-btn--active': catActiva === c.value }" @click="catActiva = c.value">{{ c.label }}</button>
+          <button v-for="c in CATS" :key="c.id" class="cv__sede-btn" :class="{ 'cv__sede-btn--active': catActiva === c.id }" @click="catActiva = c.id">{{ c.nombre }}</button>
         </div>
         <div v-if="store.loading" class="cv__empty-sm" style="padding:2rem 0;">Cargando…</div>
         <div v-else-if="!productosCat.length" class="cv__empty-sm" style="padding:2rem 0;">Sin productos en esta categoría.</div>
