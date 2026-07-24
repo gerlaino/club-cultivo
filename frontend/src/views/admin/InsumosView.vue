@@ -16,6 +16,9 @@ const sede  = useSedeStore()
 const toast = useToast()
 const { confirm } = useConfirm()
 
+// Foco programático (evita el warning "Autofocus processing was blocked" del atributo autofocus).
+const vFocus = { mounted: (el) => el.focus() }
+
 const UNIDADES = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
 const lotes = ref([])
 const salas = ref([])
@@ -85,20 +88,29 @@ async function confirmarNuevoDeposito() {
   finally { savingDepo.value = false }
 }
 
-// Insumos visibles (según toggle de inactivos) agrupados por categoría, como el árbol contable.
+// ── Tabla de productos: búsqueda + filtro por categoría del depósito ──────────
+const busqueda = ref('')
+const filtroCategoria = ref(null) // null = todas
+function catLabel(i) {
+  const c = i.categoria
+  return c ? (c.sub_nombre ? `${c.madre_nombre} › ${c.sub_nombre}` : c.madre_nombre) : 'Sin categoría'
+}
 const itemsVisibles = computed(() => store.items.filter(i => mostrarInactivos.value || i.activo))
 const hayInactivos  = computed(() => store.items.some(i => !i.activo))
-const grupos = computed(() => {
-  const map = {}
-  for (const i of itemsVisibles.value) {
-    const c = i.categoria
-    const label = c ? (c.sub_nombre ? `${c.madre_nombre} › ${c.sub_nombre}` : c.madre_nombre) : 'Sin categoría'
-    ;(map[label] ||= []).push(i)
-  }
-  return Object.entries(map)
-    .map(([label, items]) => ({ label, items, valorizado: items.reduce((a, i) => a + (i.valorizado_ars || 0), 0) }))
-    .sort((a, b) => (a.label === 'Sin categoría' ? 1 : b.label === 'Sin categoría' ? -1 : a.label.localeCompare(b.label)))
+// Categorías realmente presentes en este depósito (para las chips de filtro).
+const categoriasDelDeposito = computed(() =>
+  [...new Set(itemsVisibles.value.map(catLabel))]
+    .sort((a, b) => (a === 'Sin categoría' ? 1 : b === 'Sin categoría' ? -1 : a.localeCompare(b))))
+const itemsFiltrados = computed(() => {
+  const q = busqueda.value.trim().toLowerCase()
+  return itemsVisibles.value
+    .filter(i => !filtroCategoria.value || catLabel(i) === filtroCategoria.value)
+    .filter(i => !q || i.nombre.toLowerCase().includes(q))
+    .sort((a, b) => catLabel(a).localeCompare(catLabel(b)) || a.nombre.localeCompare(b.nombre))
 })
+const valorizadoFiltrado = computed(() => itemsFiltrados.value.reduce((a, i) => a + (i.valorizado_ars || 0), 0))
+// Al cambiar de depósito, limpiar los filtros.
+watch(depositoActivoId, () => { filtroCategoria.value = null; busqueda.value = '' })
 
 async function recargar() {
   if (esSalon.value || !depositoActivoId.value) return
@@ -117,14 +129,27 @@ onMounted(async () => {
 onUnmounted(() => window.removeEventListener('click', cerrarMenu))
 watch([sedeFiltro, depositoActivoId], recargar)
 
-function stockPct(i) {
-  if (!i.stock_minimo) return i.stock_actual > 0 ? 100 : 0
-  return Math.min(100, Math.round((i.stock_actual / (i.stock_minimo * 2)) * 100))
-}
+// Resumen EN VIVO del depósito (se recalcula al consumir/eliminar, no queda pegado al fetch).
+const resumenDeposito = computed(() => {
+  const act = store.items.filter(i => i.activo)
+  return {
+    valorizado: act.reduce((a, i) => a + (i.valorizado_ars || 0), 0),
+    productos:  act.length,
+    bajoStock:  act.filter(i => i.stock_bajo).length,
+  }
+})
 
 // ── Menú de acciones por ítem (kebab) ─────────────────────────
 const menuId = ref(null)
-function toggleMenu(id, ev) { ev.stopPropagation(); menuId.value = menuId.value === id ? null : id }
+const menuPos = ref({ top: 0, left: 0 })
+function toggleMenu(id, ev) {
+  ev.stopPropagation()
+  if (menuId.value === id) { menuId.value = null; return }
+  const r = ev.currentTarget.getBoundingClientRect()
+  // Menú posicionado (fixed) para que no lo recorte el overflow de la tabla.
+  menuPos.value = { top: r.bottom + 4, left: Math.max(8, r.right - 210) }
+  menuId.value = id
+}
 function cerrarMenu() { menuId.value = null }
 
 // ── Entrada (compra con costo → genera el egreso contable) ────
@@ -318,13 +343,7 @@ async function revertirCompra(compra) {
           <option :value="null">🏢 Todo el club</option>
           <option v-for="s in sede.sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
-        <template v-if="!esSalon">
-          <div class="dp__stat">
-            <span class="dp__stat-label">Valorizado</span>
-            <span class="dp__stat-val">{{ fmt(store.valorizadoTotal) }}</span>
-          </div>
-          <button class="btn btn--primary" @click="abrirEntrada()">＋ Entrada</button>
-        </template>
+        <button v-if="!esSalon" class="btn btn--primary" @click="abrirEntrada()">＋ Entrada</button>
       </div>
     </header>
 
@@ -333,6 +352,22 @@ async function revertirCompra(compra) {
         {{ d.nombre }}
       </button>
       <button class="dp__tab dp__tab--add" title="Crear un depósito" @click="abrirNuevoDeposito">＋</button>
+    </div>
+
+    <!-- Resumen en vivo del depósito activo -->
+    <div v-if="!esSalon && store.items.length" class="dp__summary">
+      <div class="dp__kpi">
+        <span class="dp__kpi-label">Valorizado</span>
+        <span class="dp__kpi-val">{{ fmt(resumenDeposito.valorizado) }}</span>
+      </div>
+      <div class="dp__kpi">
+        <span class="dp__kpi-label">Productos</span>
+        <span class="dp__kpi-val">{{ resumenDeposito.productos }}</span>
+      </div>
+      <div class="dp__kpi" :class="{ 'dp__kpi--warn': resumenDeposito.bajoStock }">
+        <span class="dp__kpi-label">Bajo stock</span>
+        <span class="dp__kpi-val">{{ resumenDeposito.bajoStock }}</span>
+      </div>
     </div>
 
     <DepositoSalon v-if="esSalon" :sede-id="sedeFiltro" />
@@ -347,50 +382,77 @@ async function revertirCompra(compra) {
     </div>
 
     <template v-else>
-      <div v-if="hayInactivos" class="dp__toolbar">
-        <label class="dp__chk"><input type="checkbox" v-model="mostrarInactivos" /> Ver desactivados</label>
+      <!-- Toolbar: búsqueda + filtro por categoría del depósito -->
+      <div class="dp__toolbar">
+        <div class="dp__search">
+          <i class="bi bi-search"></i>
+          <input v-model.trim="busqueda" type="text" placeholder="Buscar producto…" />
+        </div>
+        <div v-if="categoriasDelDeposito.length > 1" class="dp__chips">
+          <button class="dp__chip" :class="{ 'is-on': !filtroCategoria }" @click="filtroCategoria = null">Todas</button>
+          <button v-for="c in categoriasDelDeposito" :key="c" class="dp__chip" :class="{ 'is-on': filtroCategoria === c }" @click="filtroCategoria = c">{{ c }}</button>
+        </div>
+        <label v-if="hayInactivos" class="dp__chk"><input type="checkbox" v-model="mostrarInactivos" /> Ver desactivados</label>
       </div>
 
-      <div class="dp__groups">
-        <section v-for="g in grupos" :key="g.label" class="dp__group">
-          <div class="dp__group-head">
-            <span class="dp__group-name">{{ g.label }}</span>
-            <span class="dp__group-val">{{ fmt(g.valorizado) }}</span>
-          </div>
-          <ul class="dp__list">
-            <li v-for="i in g.items" :key="i.id" class="dp__item" :class="{ 'dp__item--low': i.stock_bajo && i.activo, 'dp__item--off': !i.activo }">
-              <div class="dp__item-main">
-                <div class="dp__item-top">
-                  <span class="dp__name">{{ i.nombre }}</span>
-                  <span v-if="!i.activo" class="dp__pill dp__pill--off">Desactivado</span>
-                  <span v-if="multiSede" class="dp__sede">{{ i.sede_nombre || 'Sin sede' }}</span>
-                  <span v-if="i.stock_bajo && i.activo" class="dp__pill">Reponer</span>
-                </div>
-                <div class="dp__meter"><i :style="{ width: stockPct(i) + '%' }" :class="i.stock_bajo ? 'is-low' : 'is-ok'"></i></div>
-              </div>
-              <div class="dp__stats">
-                <span class="dp__stock num" :class="{ low: i.stock_bajo }">{{ i.stock_actual }} <small>{{ i.unidad_medida }}</small></span>
-                <span class="dp__meta num">{{ fmt(i.costo_promedio_ars) }}/u · {{ fmt(i.valorizado_ars) }}</span>
-              </div>
-              <div class="dp__actions">
-                <button class="btn btn--sm btn--primary" @click="abrirConsumo(i)" :disabled="i.stock_actual <= 0 || !i.activo">Consumir</button>
-                <div class="dp__menu-wrap">
-                  <button class="btn btn--sm btn--icon" @click="toggleMenu(i.id, $event)" title="Más acciones">⋯</button>
-                  <div v-if="menuId === i.id" class="dp__menu" @click.stop>
-                    <button class="dp__menu-item" @click="abrirEntrada(i)">Reponer (entrada)</button>
-                    <button class="dp__menu-item" @click="abrirReconteo(i)">Reconteo</button>
-                    <button v-if="multiSede && otrasSedes.length" class="dp__menu-item" @click="abrirTransfer(i)" :disabled="i.stock_actual <= 0">Transferir a otra sede</button>
-                    <button class="dp__menu-item" @click="abrirHistorial(i)">Historial</button>
-                    <button class="dp__menu-item" @click="editarInsumo(i)">Editar</button>
-                    <div class="dp__menu-sep"></div>
-                    <button class="dp__menu-item" @click="toggleActivo(i)">{{ i.activo ? 'Desactivar' : 'Reactivar' }}</button>
-                    <button class="dp__menu-item dp__menu-item--danger" @click="eliminarInsumo(i)">Eliminar</button>
+      <div v-if="!itemsFiltrados.length" class="dp__empty dp__empty--box">
+        No hay productos que coincidan con el filtro.
+      </div>
+
+      <!-- Tabla de productos -->
+      <div v-else class="dp__table-wrap">
+        <table class="dp__table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Categoría</th>
+              <th v-if="multiSede">Sede</th>
+              <th class="ta-r">Stock</th>
+              <th class="ta-r">Costo/u</th>
+              <th class="ta-r">Valorizado</th>
+              <th class="ta-r">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="i in itemsFiltrados" :key="i.id" :class="{ 'is-off': !i.activo }">
+              <td>
+                <span class="dp__name">{{ i.nombre }}</span>
+                <span v-if="!i.activo" class="dp__pill dp__pill--off">Desactivado</span>
+                <span v-if="i.stock_bajo && i.activo" class="dp__pill">Reponer</span>
+              </td>
+              <td class="dp__cat">{{ catLabel(i) }}</td>
+              <td v-if="multiSede" class="mut">{{ i.sede_nombre || '—' }}</td>
+              <td class="ta-r num"><b :class="{ low: i.stock_bajo }">{{ i.stock_actual }}</b> <small class="mut">{{ i.unidad_medida }}</small></td>
+              <td class="ta-r num mut">{{ fmt(i.costo_promedio_ars) }}</td>
+              <td class="ta-r num">{{ fmt(i.valorizado_ars) }}</td>
+              <td class="ta-r">
+                <div class="dp__row-actions">
+                  <button class="btn btn--sm btn--primary" @click="abrirConsumo(i)" :disabled="i.stock_actual <= 0 || !i.activo">Consumir</button>
+                  <div class="dp__menu-wrap">
+                    <button class="btn btn--sm btn--icon" @click="toggleMenu(i.id, $event)" title="Más acciones">⋯</button>
+                    <div v-if="menuId === i.id" class="dp__menu" :style="{ top: menuPos.top + 'px', left: menuPos.left + 'px' }" @click.stop>
+                      <button class="dp__menu-item" @click="abrirEntrada(i)">Reponer (entrada)</button>
+                      <button class="dp__menu-item" @click="abrirReconteo(i)">Reconteo</button>
+                      <button v-if="multiSede && otrasSedes.length" class="dp__menu-item" @click="abrirTransfer(i)" :disabled="i.stock_actual <= 0">Transferir a otra sede</button>
+                      <button class="dp__menu-item" @click="abrirHistorial(i)">Historial</button>
+                      <button class="dp__menu-item" @click="editarInsumo(i)">Editar</button>
+                      <div class="dp__menu-sep"></div>
+                      <button class="dp__menu-item" @click="toggleActivo(i)">{{ i.activo ? 'Desactivar' : 'Reactivar' }}</button>
+                      <button class="dp__menu-item dp__menu-item--danger" @click="eliminarInsumo(i)">Eliminar</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </li>
-          </ul>
-        </section>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td :colspan="multiSede ? 5 : 4"></td>
+              <td class="ta-r num dp__total">{{ fmt(valorizadoFiltrado) }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     </template>
     </template>
@@ -586,7 +648,7 @@ async function revertirCompra(compra) {
       <div class="modal">
         <h3 class="modal__title">Nuevo depósito</h3>
         <p class="modal__hint">Un depósito propio para agrupar tu mercadería (ej: Merchandising, Insumos de oficina). Los productos que cargues acá se consumen como gasto general.</p>
-        <label class="fld">Nombre<input v-model.trim="depoForm.nombre" class="inp" maxlength="40" placeholder="Ej: Merchandising" autofocus @keydown.enter.prevent="confirmarNuevoDeposito" /></label>
+        <label class="fld">Nombre<input v-model.trim="depoForm.nombre" class="inp" maxlength="40" placeholder="Ej: Merchandising" v-focus @keydown.enter.prevent="confirmarNuevoDeposito" /></label>
         <div class="modal__actions"><button class="btn" @click="depoForm = null">Cancelar</button><button class="btn btn--primary" :disabled="savingDepo" @click="confirmarNuevoDeposito">Crear</button></div>
       </div>
     </div>
@@ -605,50 +667,53 @@ async function revertirCompra(compra) {
 .dp__tab.is-on { background: #fff; color: #1b5e20; box-shadow: 0 1px 2px rgb(15 23 42 / .08); }
 .dp__tab--add { font-weight: 700; color: #94a3b8; padding-inline: .75rem; }
 .dp__tab--add:hover { color: #1b5e20; }
-.dp__sede { font-size: .66rem; font-weight: 600; letter-spacing: .02em; color: #475569; background: #f1f5f9; padding: 2px 8px; border-radius: 999px; }
 .dp__sub { color: #64748b; font-size: .84rem; margin: 0; max-width: 52ch; line-height: 1.5; }
 .dp__link { color: #1b5e20; font-weight: 600; text-decoration: none; }
 .dp__link:hover { text-decoration: underline; }
-.dp__head-right { display: flex; align-items: center; gap: 1.25rem; }
-.dp__stat { text-align: right; }
-.dp__stat-label { display: block; font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; font-weight: 600; }
-.dp__stat-val { display: block; font-size: 1.5rem; font-weight: 800; letter-spacing: -.03em; color: #0f172a; font-variant-numeric: tabular-nums; }
+.dp__head-right { display: flex; align-items: center; gap: 1rem; }
+.dp__summary { display: flex; gap: 2.5rem; background: #fff; border: 1px solid #e8edf2; border-radius: 13px; padding: 1rem 1.4rem; margin-bottom: 1.25rem; box-shadow: 0 1px 2px rgb(15 23 42 / .04); }
+.dp__kpi { display: flex; flex-direction: column; gap: .15rem; }
+.dp__kpi-label { font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; font-weight: 700; }
+.dp__kpi-val { font-size: 1.35rem; font-weight: 800; letter-spacing: -.03em; color: #0f172a; font-variant-numeric: tabular-nums; }
+.dp__kpi--warn .dp__kpi-val { color: #b45309; }
 
-.dp__toolbar { display: flex; justify-content: flex-end; margin-bottom: .75rem; }
-.dp__chk { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: #64748b; cursor: pointer; }
+.dp__toolbar { display: flex; align-items: center; gap: .75rem 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.dp__chk { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: #64748b; cursor: pointer; margin-left: auto; white-space: nowrap; }
 .dp__chk input { accent-color: #1b5e20; }
+.dp__search { display: inline-flex; align-items: center; gap: .5rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .45rem .7rem; color: #94a3b8; }
+.dp__search:focus-within { border-color: #1b5e20; }
+.dp__search input { border: none; outline: none; font-size: .86rem; color: #0f172a; width: 200px; background: transparent; }
+.dp__chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.dp__chip { border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; border-radius: 999px; padding: .3rem .75rem; font-size: .78rem; font-weight: 600; cursor: pointer; transition: border-color .12s, color .12s; }
+.dp__chip:hover { border-color: #cbd5e1; }
+.dp__chip.is-on { border-color: #1b5e20; background: rgb(27 94 32 / .07); color: #1b5e20; }
+
+.dp__table-wrap { overflow-x: auto; border: 1px solid #e8edf2; border-radius: 13px; box-shadow: 0 1px 2px rgb(15 23 42 / .04); }
+.dp__table { width: 100%; border-collapse: collapse; font-size: .88rem; background: #fff; }
+.dp__table thead th { text-align: left; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; font-weight: 700; padding: .7rem 1rem; border-bottom: 1.5px solid #eef2f6; white-space: nowrap; }
+.dp__table td { padding: .7rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.dp__table tbody tr:hover { background: #f8fafc; }
+.dp__table tbody tr.is-off { opacity: .55; }
+.dp__table tbody tr:last-child td { border-bottom: none; }
+.dp__table .ta-r { text-align: right; }
+.dp__table .dp__name { font-weight: 650; color: #0f172a; }
+.dp__cat { color: #64748b; font-size: .82rem; }
+.dp__table b.low { color: #dc2626; }
+.dp__table tfoot td { padding: .65rem 1rem; border-top: 1.5px solid #eef2f6; }
+.dp__total { font-weight: 800; color: #0f172a; font-size: .95rem; }
+.dp__row-actions { display: inline-flex; gap: .4rem; align-items: center; justify-content: flex-end; }
 
 .dp__empty { color: #94a3b8; padding: 2.5rem; text-align: center; font-size: .9rem; }
 .dp__empty--box { background: #fbfcfd; border: 1px dashed #e2e8f0; border-radius: 14px; }
 
-.dp__groups { display: flex; flex-direction: column; gap: 1.5rem; }
-.dp__group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0 .15rem .5rem; border-bottom: 1.5px solid #eef2f6; margin-bottom: .6rem; }
-.dp__group-name { font-size: .82rem; font-weight: 700; color: #334155; letter-spacing: -.005em; }
-.dp__group-val { font-size: .78rem; font-weight: 600; color: #94a3b8; font-variant-numeric: tabular-nums; }
-.dp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
-.dp__item { display: grid; grid-template-columns: 1fr auto auto; gap: 1.5rem; align-items: center; background: #fff; border: 1px solid #e8edf2; border-radius: 13px; padding: 1rem 1.25rem; box-shadow: 0 1px 2px rgb(15 23 42 / .04); transition: border-color .15s, box-shadow .15s; }
-.dp__item:hover { border-color: #d7dee6; box-shadow: 0 2px 8px rgb(15 23 42 / .06); }
-.dp__item--low { border-color: #f4d9b8; }
-.dp__item--off { opacity: .6; }
-.dp__item-main { min-width: 0; }
-.dp__item-top { display: flex; align-items: center; gap: .6rem; }
-.dp__name { font-weight: 650; color: #0f172a; font-size: .96rem; letter-spacing: -.01em; }
-.dp__pill { font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #b45309; background: #fef3c7; padding: 2px 8px; border-radius: 999px; }
+.dp__name { font-weight: 650; color: #0f172a; letter-spacing: -.01em; margin-right: .5rem; }
+.dp__pill { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #b45309; background: #fef3c7; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
 .dp__pill--off { color: #64748b; background: #f1f5f9; }
-.dp__meter { height: 6px; background: #f1f5f9; border-radius: 5px; overflow: hidden; margin-top: .55rem; }
-.dp__meter i { display: block; height: 100%; border-radius: 5px; }
-.dp__meter i.is-ok { background: linear-gradient(90deg, #1b5e20, #2e7d32); }
-.dp__meter i.is-low { background: linear-gradient(90deg, #dc2626, #ef4444); }
-.dp__stats { text-align: right; }
 .num { font-variant-numeric: tabular-nums; }
-.dp__stock { font-weight: 700; color: #0f172a; font-size: 1.05rem; }
-.dp__stock small { font-weight: 500; color: #94a3b8; font-size: .78rem; }
-.dp__stock.low { color: #dc2626; }
-.dp__meta { display: block; color: #94a3b8; font-size: .76rem; margin-top: .1rem; }
 .dp__actions { display: flex; gap: .4rem; align-items: center; }
 
 .dp__menu-wrap { position: relative; }
-.dp__menu { position: absolute; right: 0; top: calc(100% + .3rem); z-index: 50; min-width: 210px; background: #fff; border: 1px solid #e8edf2; border-radius: 11px; box-shadow: 0 12px 32px rgb(15 23 42 / .16); padding: .35rem; display: flex; flex-direction: column; }
+.dp__menu { position: fixed; z-index: 1200; min-width: 210px; background: #fff; border: 1px solid #e8edf2; border-radius: 11px; box-shadow: 0 12px 32px rgb(15 23 42 / .16); padding: .35rem; display: flex; flex-direction: column; }
 .dp__menu-item { text-align: left; border: none; background: transparent; color: #334155; font-size: .84rem; font-weight: 500; padding: .5rem .65rem; border-radius: 7px; cursor: pointer; }
 .dp__menu-item:hover { background: #f5f8f6; }
 .dp__menu-item:disabled { opacity: .4; cursor: default; }
