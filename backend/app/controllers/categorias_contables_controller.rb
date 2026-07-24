@@ -74,9 +74,10 @@ class CategoriasContablesController < ApplicationController
   end
 
   # El catálogo está al día si ya tiene hojas Y las familias que hoy espera la app.
+  # Solo garantizamos las ÁREAS (unidades de negocio). El árbol de categorías NO se auto-siembra:
+  # el club arranca en limpio y el usuario crea las suyas.
   def catalogo_al_dia?(club)
-    cats = club.categorias_contables
-    cats.hojas.exists? && cats.where(comportamiento: 'insumo_general').exists?
+    club.unidades_negocio.exists?
   end
 
   def categoria_params

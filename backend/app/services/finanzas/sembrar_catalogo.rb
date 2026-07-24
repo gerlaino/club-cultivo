@@ -17,10 +17,13 @@ module Finanzas
       @club = club
     end
 
-    def call
+    # Por defecto NO siembra el árbol de categorías: el club arranca en limpio y el usuario crea
+    # las suyas. Las áreas (unidades de negocio) sí se siembran porque las usa el código (ej. Bar).
+    # `con_arbol: true` queda para sembrar categorías-guía a pedido más adelante.
+    def call(con_arbol: false)
       ActsAsTenant.with_tenant(@club) do
         @unidades = sembrar_unidades
-        sembrar_arbol
+        sembrar_arbol if con_arbol
       end
       true
     end

@@ -9,44 +9,41 @@ RSpec.describe 'Categorías contables', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
 
+  def sembrar_arbol! = ActsAsTenant.with_tenant(club) { Finanzas::SembrarCatalogo.new(club).call(con_arbol: true) }
+
   describe 'GET /categorias_contables' do
     before { sign_in_as(admin) }
 
-    it 'siembra el árbol la primera vez (madres con subcategorías)' do
+    it 'NO auto-siembra el árbol: el club arranca en limpio (el usuario crea sus categorías)' do
       expect(club.categorias_contables.count).to eq(0)
       get '/categorias_contables', headers: auth_headers, as: :json
       expect(response).to have_http_status(:ok)
-      body = JSON.parse(response.body)
-      expect(body).not_to be_empty
-      # 'Insumos' es una madre (comportamiento insumo) con subcategorías
+      expect(JSON.parse(response.body)).to be_empty       # sin categorías preseteadas
+      expect(club.unidades_negocio).to exist              # pero las áreas sí (las usa el código)
+    end
+
+    it 'el árbol-guía (opt-in) tiene madres con subcategorías que heredan comportamiento' do
+      sembrar_arbol!
+      get '/categorias_contables', headers: auth_headers, as: :json
+      body   = JSON.parse(response.body)
       insumos = body.find { |c| c['comportamiento'] == 'insumo' }
-      expect(insumos['subcategorias'].map { |s| s['nombre'] }).to include('Fertilizante')
-      # la subcategoría hereda la clave/unidad de la madre
-      fert = insumos['subcategorias'].find { |s| s['nombre'] == 'Fertilizante' }
+      fert    = insumos['subcategorias'].find { |s| s['nombre'] == 'Fertilizante' }
       expect(fert['clave_efectiva']).to eq('insumo')
-      # aportes de socios sigue siendo ingreso, mapeado a la lógica legacy
       aporte = body.find { |c| c['clave_efectiva'] == 'aporte_socio' }
       expect(aporte).to include('tipo' => 'ingreso', 'es_sistema' => true)
     end
 
-    it 'una subcategoría de una madre insumo hereda el comportamiento y deriva el string legacy' do
-      get '/categorias_contables', headers: auth_headers, as: :json
+    it 'una subcategoría insumo deriva el string legacy en el movimiento' do
+      sembrar_arbol!
       fert = club.categorias_contables.find_by(nombre: 'Fertilizante')
-      expect(fert.comportamiento_efectivo).to eq('insumo')
       mov = club.movimientos_contables.create!(created_by: admin, tipo: 'egreso',
         categoria_contable: fert, descripcion: 'Test', monto_ars: 1000, fecha: Date.today)
-      expect(mov.categoria).to eq('insumo')        # string legacy heredado → mapea a costo_insumos
+      expect(mov.categoria).to eq('insumo')
       expect(mov.unidad_negocio.tipo).to eq('cultivo')
     end
 
-    it 'no re-siembra si ya hay categorías (idempotente)' do
-      get '/categorias_contables', headers: auth_headers, as: :json
-      count = club.categorias_contables.count
-      get '/categorias_contables', headers: auth_headers, as: :json
-      expect(club.categorias_contables.count).to eq(count)
-    end
-
     it 'filtra por tipo' do
+      sembrar_arbol!
       get '/categorias_contables?tipo=ingreso', headers: auth_headers
       tipos = JSON.parse(response.body).map { |c| c['tipo'] }.uniq
       expect(tipos).to eq(['ingreso'])
@@ -81,7 +78,7 @@ RSpec.describe 'Categorías contables', type: :request do
     before { sign_in_as(admin) }
 
     it 'no permite borrar una categoría de sistema' do
-      get '/categorias_contables', headers: auth_headers, as: :json # siembra
+      sembrar_arbol! # las de sistema solo existen si se siembra el árbol-guía
       cat = club.categorias_contables.find_by(clave_sistema: 'insumo')
       delete "/categorias_contables/#{cat.id}", headers: auth_headers, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
