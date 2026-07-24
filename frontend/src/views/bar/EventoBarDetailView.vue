@@ -164,13 +164,13 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
       <div class="ed__result" :class="resultadoMostrar >= 0 ? 'is-pos' : 'is-neg'">
         <span>Resultado real</span>
         <strong>{{ fmt(resultadoMostrar) }}</strong>
-        <small>ingresos {{ fmt(e.resultado.ingresos) }} · egresos {{ fmt(e.resultado.egresos) }}</small>
+        <small>ingresos {{ fmt(e.resultado.ingresos) }} − costos {{ fmt(e.resultado.egresos) }} − mercadería {{ fmt(e.resultado.cogs) }}</small>
       </div>
       <div class="ed__kpis">
-        <div class="kpi"><span>Ingresos estimados</span><strong>{{ fmt(e.presupuesto_ingresos) }}</strong></div>
-        <div class="kpi"><span>Comprometido</span><strong>{{ fmt(e.costos_comprometidos) }}</strong></div>
-        <div class="kpi"><span>Pagado</span><strong>{{ fmt(e.costos_pagados) }}</strong></div>
         <div class="kpi"><span>Ingreso real</span><strong>{{ fmt(e.resultado.ingresos) }}</strong></div>
+        <div class="kpi"><span>Costos (DJ, etc.)</span><strong>{{ fmt(e.resultado.egresos) }}</strong></div>
+        <div class="kpi"><span>Costo mercadería</span><strong>{{ fmt(e.resultado.cogs) }}</strong></div>
+        <div class="kpi"><span>Pagado</span><strong>{{ fmt(e.costos_pagados) }}</strong></div>
       </div>
     </template>
 

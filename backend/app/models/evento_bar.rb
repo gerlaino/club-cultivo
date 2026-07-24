@@ -28,11 +28,25 @@ class EventoBar < ApplicationRecord
   scope :proximos, -> { where('fecha >= ? OR fecha IS NULL', Date.current).order(Arel.sql('fecha IS NULL, fecha ASC')) }
   scope :pasados,  -> { where('fecha < ?', Date.current).order(fecha: :desc) }
 
-  # P&L real: ingresos − egresos del libro etiquetados con este evento.
+  # P&L real del evento: ingresos − costos directos (DJ/sonido) − COSTO DE LA MERCADERÍA
+  # consumida (COGS). El COGS no es un asiento nuevo (la mercadería ya se gastó al comprarla al
+  # depósito): es la atribución al evento de lo que costó lo que se vendió/consumió. Sin él, el
+  # resultado exagera la ganancia.
   def resultado
-    ingresos = movimientos_contables.where(tipo: %w[ingreso recupero_costo]).sum(:monto_ars)
-    egresos  = movimientos_contables.where(tipo: 'egreso').sum(:monto_ars)
-    { ingresos: ingresos.to_f, egresos: egresos.to_f, resultado: (ingresos - egresos).to_f }
+    ingresos = movimientos_contables.where(tipo: %w[ingreso recupero_costo]).sum(:monto_ars).to_d
+    egresos  = movimientos_contables.where(tipo: 'egreso').sum(:monto_ars).to_d
+    cogs     = costo_mercaderia.to_d
+    {
+      ingresos:  ingresos.to_f,
+      egresos:   egresos.to_f,
+      cogs:      cogs.to_f,
+      resultado: (ingresos - egresos - cogs).to_f,
+    }
+  end
+
+  # Costo de la mercadería consumida en el evento (Σ cantidad_consumida × costo unitario).
+  def costo_mercaderia
+    provisiones.includes(:provisionable).sum { |p| p.cantidad_consumida.to_d * p.costo_unitario }
   end
 
   # Presupuesto: ingresos estimados y egresos comprometidos (suma de costos, pagados o no).

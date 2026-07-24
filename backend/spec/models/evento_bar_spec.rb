@@ -56,6 +56,18 @@ RSpec.describe EventoBar, type: :model do
       costo(pagado: false, concepto: 'Seguridad', monto_ars: 92_000)
       expect(evento.reload.resultado_proyectado).to eq(500_000 - 272_000)
     end
+
+    it 'el resultado descuenta el costo de la mercadería consumida (COGS)' do
+      club.movimientos_contables.create!(created_by: admin, tipo: 'ingreso', categoria: 'otro',
+        sede: sede, evento_bar_id: evento.id, descripcion: 'Barra', monto_ars: 100_000,
+        fecha: Date.current, pagado: true)
+      prod = create(:bar_producto, club: club, bar: bar, costo_ars: 500)
+      evento.provisiones.create!(club: club, provisionable: prod,
+        cantidad_prevista: 30, cantidad_reservada: 30, cantidad_consumida: 20) # 20 × $500 = $10.000
+      r = evento.reload.resultado
+      expect(r[:cogs]).to eq(10_000)
+      expect(r[:resultado]).to eq(90_000) # 100.000 ingreso − 10.000 COGS
+    end
   end
 
   describe 'borrar y restaurar un evento' do
