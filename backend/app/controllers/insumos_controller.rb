@@ -3,6 +3,7 @@
 # Registro de consumo: admin/supervisor/cultivador (quien usa el insumo en el grow).
 class InsumosController < ApplicationController
   before_action :authenticate_user!
+  before_action :asegurar_depositos, only: [:index, :show]
   before_action :require_lectura,  only: [:index, :show]
   before_action :require_gestion,  only: [:create, :update, :comprar, :revertir_compra, :reconteo, :destroy]
   before_action :require_consumo,  only: [:consumir]
@@ -11,7 +12,7 @@ class InsumosController < ApplicationController
 
   # GET /insumos?sede_id=<id|pool>&tipo=<cultivo|general>&activos=true
   def index
-    scope = current_user.club.insumos.includes(:sede, categoria_contable: :parent)
+    scope = current_user.club.insumos.includes(:sede, :deposito, categoria_contable: :parent)
     scope = scope.activos if params[:activos] == 'true'
     scope = scope.por_tipo(params[:tipo]) if params[:tipo].present?
     scope = scope.de_sede(params[:sede_id]) if params[:sede_id].present?
@@ -185,6 +186,11 @@ class InsumosController < ApplicationController
     render json: { error: 'Insumo no encontrado' }, status: :not_found
   end
 
+  # Siembra los depósitos de sistema y backfillea los insumos la primera vez que se entra.
+  def asegurar_depositos
+    Finanzas::SembrarDepositos.new(current_user.club).call if current_user.club.depositos.none?
+  end
+
   ROLES_LECTURA = %w[admin supervisor cultivador auditor].freeze
   ROLES_GESTION = %w[admin supervisor].freeze
   ROLES_CONSUMO = %w[admin supervisor cultivador].freeze
@@ -221,6 +227,9 @@ class InsumosController < ApplicationController
       categoria:          serialize_categoria(i.categoria_contable),
       sede_id:            i.sede_id,
       sede_nombre:        i.sede&.nombre,
+      deposito_id:        i.deposito_id,
+      deposito_nombre:    i.deposito&.nombre,
+      deposito_clave:     i.deposito&.clave_sistema,
     }
   end
 

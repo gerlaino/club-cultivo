@@ -8,6 +8,7 @@ class Insumo < ApplicationRecord
   belongs_to :club
   belongs_to :sede, optional: true # nil = pool del club (mismo criterio que Stock)
   belongs_to :categoria_contable, optional: true
+  belongs_to :deposito, optional: true # dónde vive (reemplaza al enum `tipo`; se backfillea)
   has_many :insumo_compras,  dependent: :destroy
   has_many :insumo_consumos, dependent: :destroy
 

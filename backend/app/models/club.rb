@@ -14,6 +14,7 @@ class Club < ApplicationRecord
   has_many :compras_cuotas,        class_name: 'CompraCuotas',       dependent: :destroy
   has_many :unidades_negocio,      class_name: 'UnidadNegocio',      dependent: :destroy
   has_many :categorias_contables,  class_name: 'CategoriaContable',  dependent: :destroy
+  has_many :depositos,             dependent: :destroy
   has_many :insumos,               dependent: :destroy
   has_many :insumo_compras,        class_name: 'InsumoCompra',       dependent: :destroy
   has_many :insumo_consumos,       class_name: 'InsumoConsumo',      dependent: :destroy

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_17_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_24_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -546,6 +546,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_17_000001) do
     t.index ["paciente_id"], name: "index_cuenta_corrientes_on_paciente_id"
   end
 
+  create_table "depositos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "nombre", null: false
+    t.string "clave_sistema"
+    t.boolean "es_sistema", default: false, null: false
+    t.boolean "activo", default: true, null: false
+    t.integer "orden", default: 0, null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "clave_sistema"], name: "index_depositos_on_club_id_and_clave_sistema"
+    t.index ["club_id"], name: "index_depositos_on_club_id"
+    t.index ["deleted_at"], name: "index_depositos_on_deleted_at"
+  end
+
   create_table "dispensacion_items", force: :cascade do |t|
     t.bigint "dispensacion_id", null: false
     t.bigint "stock_id"
@@ -977,12 +992,14 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_17_000001) do
     t.datetime "updated_at", null: false
     t.bigint "sede_id"
     t.string "tipo", default: "cultivo", null: false
+    t.bigint "deposito_id"
     t.index ["categoria_contable_id"], name: "index_insumos_on_categoria_contable_id"
     t.index ["club_id", "nombre"], name: "index_insumos_on_club_id_and_nombre"
     t.index ["club_id", "sede_id", "nombre"], name: "index_insumos_on_club_id_and_sede_id_and_nombre"
     t.index ["club_id", "tipo", "sede_id"], name: "index_insumos_on_club_id_and_tipo_and_sede_id"
     t.index ["club_id"], name: "index_insumos_on_club_id"
     t.index ["deleted_at"], name: "index_insumos_on_deleted_at"
+    t.index ["deposito_id"], name: "index_insumos_on_deposito_id"
     t.index ["sede_id"], name: "index_insumos_on_sede_id"
   end
 
@@ -2124,6 +2141,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_17_000001) do
   add_foreign_key "cuenta_corrientes", "clubs"
   add_foreign_key "cuenta_corrientes", "pacientes"
   add_foreign_key "cuenta_corrientes", "users", column: "deleted_by_id"
+  add_foreign_key "depositos", "clubs"
   add_foreign_key "dispensacion_items", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "dispensacion_items", "stocks"
   add_foreign_key "dispensacion_items", "users", column: "deleted_by_id"
@@ -2190,6 +2208,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_17_000001) do
   add_foreign_key "insumo_consumos", "users", column: "created_by_id"
   add_foreign_key "insumos", "categorias_contables", column: "categoria_contable_id"
   add_foreign_key "insumos", "clubs"
+  add_foreign_key "insumos", "depositos"
   add_foreign_key "insumos", "sedes"
   add_foreign_key "jornadas_laborales", "clubs"
   add_foreign_key "jornadas_laborales", "users"
