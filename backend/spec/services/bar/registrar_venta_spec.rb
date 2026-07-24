@@ -14,6 +14,21 @@ RSpec.describe Bar::RegistrarVenta, type: :service do
     bar.bar_productos.create!({ club: club, nombre: 'Café', categoria: 'bebida', precio_ars: 900, stock: 40 }.merge(attrs))
   end
 
+  it 'revertir una venta de evento NO infla el stock (la reserva vuelve a la provisión)' do
+    prod   = producto(stock: 5) # tras reservar quedaron 5 en stock
+    evento = bar.eventos_bar.create!(club: club, nombre: 'Fiesta', fecha: Date.current, estado: 'en_curso')
+    prov   = evento.provisiones.create!(club: club, provisionable: prod,
+      cantidad_prevista: 10, cantidad_reservada: 10, cantidad_consumida: 0)
+    venta  = described_class.new(bar, vendedor,
+      lineas: [{ bar_producto_id: prod.id, cantidad: 12 }], evento_bar: evento).call # 10 reserva + 2 stock
+    expect(prod.reload.stock).to eq(3)                # 5 − 2 (la parte de stock)
+    expect(prov.reload.cantidad_consumida).to eq(10)  # 10 de la reserva
+
+    venta.destroy # dispara revertir_efectos (before_destroy)
+    expect(prod.reload.stock).to eq(5)                # vuelve solo la parte de stock (NO 15)
+    expect(prov.reload.cantidad_consumida).to eq(0)   # la reserva vuelve a la provisión
+  end
+
   it 'no registra la venta si el evento atribuido está finalizado/cancelado' do
     cafe = producto
     evento = bar.eventos_bar.create!(club: club, nombre: 'Cerrado', fecha: Date.current, estado: 'finalizado')

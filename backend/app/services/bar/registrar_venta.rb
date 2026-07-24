@@ -49,7 +49,8 @@ module Bar
           subtotal = (prod.precio_ars.to_d * cant).round(2)
           venta.items.create!(
             club: @club, bar_producto: prod, nombre: prod.nombre,
-            cantidad: cant, precio_unitario_ars: prod.precio_ars, subtotal_ars: subtotal
+            cantidad: cant, cantidad_desde_reserva: desde_reserva,
+            precio_unitario_ars: prod.precio_ars, subtotal_ars: subtotal
           )
 
           if desde_stock.positive?

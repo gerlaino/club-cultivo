@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_24_000004) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_24_000005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -254,6 +254,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_24_000004) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
+    t.decimal "cantidad_desde_reserva", precision: 12, scale: 2, default: "0.0", null: false
     t.index ["bar_producto_id"], name: "index_bar_venta_items_on_bar_producto_id"
     t.index ["bar_venta_id"], name: "index_bar_venta_items_on_bar_venta_id"
     t.index ["club_id"], name: "index_bar_venta_items_on_club_id"
