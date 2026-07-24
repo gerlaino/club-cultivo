@@ -232,7 +232,7 @@
               <div class="lps__field">
                 <label class="lps__label">Estado inicial</label>
                 <select class="lps__input" v-model="plantaForm.state">
-                  <option value="germinacion">🌰 Semilla/Germinación</option>
+                  <option value="germinacion">🌱 Germinación</option>
                   <option value="esqueje">✂️ Esqueje</option>
                   <option value="vegetativo">🍃 Vegetativo</option>
                   <option value="floracion">🌸 Floración</option>
