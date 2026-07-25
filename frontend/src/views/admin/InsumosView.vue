@@ -9,7 +9,6 @@ import { useSedeStore } from '../../stores/sede.js'
 import { listLotes, listSalas, listCategoriasContables, getInsumo, listDepositos, createDeposito, updateDeposito, deleteDeposito, listUnidadesNegocio } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
-import DepositoSalon from './DepositoSalon.vue'
 import DepositoDispensacion from './DepositoDispensacion.vue'
 
 const store = useInsumosStore()
@@ -32,13 +31,14 @@ const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 // ── Depósitos (dinámicos: sistema + los que crea el admin) ────────────────────
 const depositos = ref([])
 const depositoActivoId = ref(null)
-const TABS = computed(() => depositos.value)
+// El depósito del bar NO se muestra acá: es el "Stock del salón" y se opera desde el Salón.
+// (Desde Contabilidad → Nuevo Movimiento sí se puede elegir, para cargar mercadería al bar.)
+const TABS = computed(() => depositos.value.filter(d => d.clave_sistema !== 'salon'))
 const depositoActivo = computed(() => depositos.value.find(d => d.id === depositoActivoId.value) || TABS.value[0] || null)
-const esSalon        = computed(() => depositoActivo.value?.clave_sistema === 'salon')
 const esDispensacion = computed(() => depositoActivo.value?.clave_sistema === 'dispensacion')
 const esCultivo      = computed(() => depositoActivo.value?.familia === 'insumo')
 // Depósitos de solo lectura (no aceptan Entrada ni se gestionan desde acá).
-const esSoloLectura  = computed(() => esSalon.value || esDispensacion.value)
+const esSoloLectura  = computed(() => esDispensacion.value)
 const HINTS = {
   insumo:         'Fertilizantes, sustrato… se consumen imputando el costo al lote.',
   insumo_general: 'Insumos del club (limpieza, administración). Se consumen como gasto.',
@@ -436,8 +436,7 @@ async function revertirCompra(compra) {
       </div>
     </div>
 
-    <DepositoSalon v-if="esSalon" :sede-id="sedeFiltro" />
-    <DepositoDispensacion v-else-if="esDispensacion" :sede-id="sedeFiltro" />
+    <DepositoDispensacion v-if="esDispensacion" :sede-id="sedeFiltro" />
 
     <template v-else>
     <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>
