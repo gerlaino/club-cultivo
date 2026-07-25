@@ -1,5 +1,22 @@
 # Changelog
 
+## Julio 2026 (f) — código de barras en el POS del salón (lector físico + cámara)
+
+- **Infra:** columna `codigo_barras` en `bar_productos` (migración `add_codigo_barras_a_bar_productos`),
+  **única por bar** entre productos vivos (índice parcial `codigo_barras IS NOT NULL AND deleted_at IS NULL`).
+  Validación de unicidad scopeada al bar (opcional; se reutiliza si el producto se borra).
+- **Backend:** `codigo_barras` permitido y serializado en `Bar::ProductosController`.
+- **Escaneo — dos modos, mismo handler:**
+  - **Lector físico (USB/Bluetooth "keyboard wedge"):** en *Vender*, el buscador acepta el código +
+    Enter → agrega el producto al carrito. Cero librería. (Si no matchea código pero hay un único
+    resultado por nombre, también lo agrega.)
+  - **Cámara (celu/tablet/webcam de escritorio):** componente `BarcodeScanner.vue` con `@zxing/browser`
+    (1D EAN/UPC/Code-128 + 2D, cámara trasera por defecto, anti-rebote). Botón 📷 en *Vender* (escaneo
+    continuo → agrega varios seguidos) y en el form de *Stock del salón* (scan-to-fill del código).
+- **Carga del código:** en *Stock del salón*, el form de producto suma el campo "código de barras"
+  (tipeado o escaneado con 📷).
+- Spec: unicidad por bar en `bar_producto_spec`. Dep nueva: `@zxing/browser` (frontend).
+
 ## Julio 2026 (e) — historial por usuario (audit log, Fase 1)
 
 - **Rastro de actividad por usuario, read-only:** aprovechando la infra ya existente (`Auditoria`

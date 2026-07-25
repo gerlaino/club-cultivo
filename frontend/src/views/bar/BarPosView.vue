@@ -7,6 +7,7 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
 import { listEventosBar, listCategoriasProducto } from '../../lib/api.js'
 import BarNav from './BarNav.vue'
+import BarcodeScanner from '../../components/BarcodeScanner.vue'
 
 const store  = useBarStore()
 const auth   = useAuthStore()
@@ -45,6 +46,32 @@ const productosFiltrados = computed(() => {
 const catNombre = (p) => categorias.value.find(c => c.id === p.categoria_producto_id)?.nombre || '—'
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 
+// ── Código de barras: lector físico (Enter) + cámara ──────────────────────
+const escaneando = ref(false)
+// Agrega al carrito el producto cuyo código de barras coincide EXACTO con lo escaneado/tipeado.
+function agregarPorCodigo(code) {
+  const c = String(code || '').trim()
+  if (!c) return false
+  const prod = store.activos.find(p => p.codigo_barras && String(p.codigo_barras) === c)
+  if (!prod) { toast.warning(`El código ${c} no está asignado a ningún producto`); return false }
+  if (prod.stock <= 0) { toast.warning(`${prod.nombre} sin stock`); return false }
+  store.agregar(prod)
+  toast.success(`${prod.nombre} agregado`)
+  return true
+}
+// Enter en el buscador = lector físico (tipea el código + Enter). Si no matchea un código pero
+// hay un único resultado por nombre, lo agrega igual (comodidad de teclado).
+function onEnterBuscar() {
+  const term = q.value.trim()
+  if (!term) return
+  if (agregarPorCodigo(term)) { q.value = ''; return }
+  if (productosFiltrados.value.length === 1 && productosFiltrados.value[0].stock > 0) {
+    store.agregar(productosFiltrados.value[0]); q.value = ''
+  }
+}
+// Cámara: cada lectura agrega al carrito; el scanner queda abierto para escanear varios seguidos.
+function onCamaraDecoded(code) { agregarPorCodigo(code) }
+
 async function cobrar() {
   if (!store.carrito.length) return
   try { await store.cobrar(barId, medioPago.value, eventoSel.value); toast.success('Venta cobrada') }
@@ -58,12 +85,12 @@ async function cobrar() {
 
     <div class="cv__pos">
       <div class="cv__pos-catalog">
-        <!-- Buscador (vía primaria) + hueco reservado para el lector de código de barras -->
+        <!-- Buscador (por nombre o lector físico: tipea el código + Enter) + escaneo con cámara -->
         <div class="cv__search">
           <span class="cv__search-ic">🔍</span>
-          <input v-model="q" class="cv__search-inp" placeholder="Buscar producto por nombre…" autocomplete="off" />
+          <input v-model="q" class="cv__search-inp" placeholder="Buscar por nombre o escaneá el código…" autocomplete="off" @keyup.enter="onEnterBuscar" />
           <button v-if="q" class="cv__search-clear" type="button" @click="q = ''" aria-label="Limpiar">×</button>
-          <button class="cv__scan" type="button" disabled title="Lector de código de barras — próximamente">▮▮▮</button>
+          <button class="cv__scan" type="button" title="Escanear con la cámara" @click="escaneando = true">📷</button>
         </div>
         <div class="cv__pos-tabs">
           <button class="cv__sede-btn" :class="{ 'cv__sede-btn--active': catActiva == null }" @click="catActiva = null">Todas</button>
@@ -119,6 +146,8 @@ async function cobrar() {
         </div>
       </aside>
     </div>
+
+    <BarcodeScanner v-if="escaneando" titulo="Escaneá para agregar al pedido" @decoded="onCamaraDecoded" @close="escaneando = false" />
   </div>
 </template>
 
@@ -147,7 +176,8 @@ async function cobrar() {
 .cv__search-ic { font-size: .9rem; opacity: .6; }
 .cv__search-inp { flex: 1; border: none; outline: none; padding: .6rem .1rem; font-size: .92rem; color: #0f172a; background: transparent; }
 .cv__search-clear { border: none; background: #f1f5f9; color: #64748b; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 1rem; line-height: 1; }
-.cv__scan { border: 1px dashed #cbd5e1; background: #f8fafc; color: #94a3b8; border-radius: 8px; padding: .4rem .6rem; font-size: .7rem; letter-spacing: .1em; cursor: not-allowed; }
+.cv__scan { border: 1.5px solid #e2e8f0; background: #fff; border-radius: 8px; padding: .35rem .6rem; font-size: 1rem; cursor: pointer; line-height: 1; }
+.cv__scan:hover { border-color: #1b5e20; background: #f0fdf4; }
 
 /* Lista de productos (reemplaza el grid) */
 .cv__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }

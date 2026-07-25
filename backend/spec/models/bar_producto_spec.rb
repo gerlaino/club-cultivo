@@ -13,6 +13,28 @@ RSpec.describe BarProducto, type: :model do
     create(:bar_producto, { club: club, bar: bar, precio_ars: 1000, costo_ars: 0, stock: 0 }.merge(attrs))
   end
 
+  describe 'código de barras' do
+    it 'no permite el mismo código en dos productos del mismo bar' do
+      producto(nombre: 'Coca', codigo_barras: '7790895000997')
+      dup = build(:bar_producto, club: club, bar: bar, precio_ars: 500, codigo_barras: '7790895000997')
+      expect(dup).not_to be_valid
+      expect(dup.errors[:codigo_barras]).to be_present
+    end
+
+    it 'permite código en blanco en varios productos (es opcional)' do
+      producto(nombre: 'Casero 1', codigo_barras: nil)
+      expect { producto(nombre: 'Casero 2', codigo_barras: nil) }.not_to raise_error
+    end
+
+    it 'el mismo código puede existir en otro bar' do
+      otra_sede = create(:sede, club: club, tipo: 'social')
+      otro_bar  = create(:barra, club: club, sede: otra_sede, nombre: 'Barra 2')
+      producto(nombre: 'Coca', codigo_barras: '123')
+      gemelo = build(:bar_producto, club: club, bar: otro_bar, precio_ars: 500, codigo_barras: '123')
+      expect(gemelo).to be_valid
+    end
+  end
+
   describe '#registrar_compra!' do
     it 'suma stock, fija el costo promedio y deja el movimiento' do
       p = producto

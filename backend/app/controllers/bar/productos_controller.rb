@@ -132,7 +132,7 @@ module Bar
     end
 
     def producto_params
-      params.require(:bar_producto).permit(:nombre, :categoria, :categoria_producto_id, :precio_ars, :costo_ars, :stock, :stock_minimo, :activo)
+      params.require(:bar_producto).permit(:nombre, :categoria, :categoria_producto_id, :precio_ars, :costo_ars, :stock, :stock_minimo, :activo, :codigo_barras)
     end
 
     # Unidades vendidas este mes por producto (para la columna "Vend. mes" del panel).
@@ -146,6 +146,7 @@ module Bar
     def serialize(p)
       {
         id: p.id, nombre: p.nombre, categoria: p.categoria,
+        codigo_barras: p.codigo_barras,
         categoria_producto_id: p.categoria_producto_id,
         categoria_producto_nombre: p.categoria_producto&.nombre,
         precio_ars: p.precio_ars.to_f, costo_ars: p.costo_ars&.to_f,

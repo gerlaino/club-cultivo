@@ -18,6 +18,9 @@ class BarProducto < ApplicationRecord
   validates :nombre, presence: true
   validates :categoria, inclusion: { in: CATEGORIAS }
   validates :precio_ars, :stock, :stock_minimo, numericality: { greater_than_or_equal_to: 0 }
+  # Código de barras opcional; único por bar entre los productos vivos (el default_scope de
+  # Restorable excluye los borrados, así que un código liberado por borrado se puede reutilizar).
+  validates :codigo_barras, uniqueness: { scope: :bar_id, message: 'ya está asignado a otro producto de este bar' }, allow_blank: true
 
   scope :activos,    -> { where(activo: true) }
   scope :stock_bajo, -> { where('stock_minimo > 0 AND stock <= stock_minimo') }

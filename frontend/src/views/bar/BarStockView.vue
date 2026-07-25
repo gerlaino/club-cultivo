@@ -11,6 +11,7 @@ import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { listCategoriasProducto, comprarBarProducto, createCategoriaProducto, updateCategoriaProducto, deleteCategoriaProducto } from '../../lib/api.js'
 import BarNav from './BarNav.vue'
+import BarcodeScanner from '../../components/BarcodeScanner.vue'
 
 const route = useRoute()
 const barId = route.params.barId
@@ -42,13 +43,15 @@ const valorizado = computed(() => store.productos.reduce((a, p) => a + (p.stock 
 
 // ── Alta / edición de producto (sin stock inicial: el stock entra por Comprar, con costo) ──
 const prodForm = ref(null)
-function nuevo() { prodForm.value = { nombre: '', categoria_producto_id: categorias.value[0]?.id ?? null, precio_ars: null, stock_minimo: 0 } }
-function editar(p) { prodForm.value = { id: p.id, nombre: p.nombre, categoria_producto_id: p.categoria_producto_id, precio_ars: p.precio_ars, stock_minimo: p.stock_minimo ?? 0 } }
+const escaneandoProd = ref(false) // scan-to-fill del código de barras en el form
+function nuevo() { prodForm.value = { nombre: '', categoria_producto_id: categorias.value[0]?.id ?? null, precio_ars: null, stock_minimo: 0, codigo_barras: '' } }
+function editar(p) { prodForm.value = { id: p.id, nombre: p.nombre, categoria_producto_id: p.categoria_producto_id, precio_ars: p.precio_ars, stock_minimo: p.stock_minimo ?? 0, codigo_barras: p.codigo_barras || '' } }
+function onCodigoDecoded(code) { if (prodForm.value) { prodForm.value.codigo_barras = String(code || '').trim(); toast.success('Código cargado') } }
 async function guardarProd() {
   const f = prodForm.value
   if (!f.nombre?.trim() || !(f.precio_ars > 0)) { toast.warning('Nombre y precio son obligatorios'); return }
   const cat = categorias.value.find(c => c.id === f.categoria_producto_id)
-  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro', precio_ars: f.precio_ars, stock_minimo: f.stock_minimo || 0 }
+  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro', precio_ars: f.precio_ars, stock_minimo: f.stock_minimo || 0, codigo_barras: f.codigo_barras?.trim() || null }
   try {
     if (f.id) await store.actualizarProducto(barId, f.id, payload)
     else      await store.crearProducto(barId, payload)
@@ -128,6 +131,10 @@ async function borrarCat(c) {
       <select v-model="prodForm.categoria_producto_id" class="inp"><option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nombre }}</option></select>
       <input v-model.number="prodForm.precio_ars" type="number" min="0" step="any" class="inp inp--sm" placeholder="Precio" />
       <input v-model.number="prodForm.stock_minimo" type="number" min="0" step="any" class="inp inp--sm" placeholder="Mínimo" />
+      <div class="bs__code">
+        <input v-model.trim="prodForm.codigo_barras" class="inp inp--code" placeholder="Código de barras (opcional)" maxlength="60" />
+        <button class="btn btn--icon" type="button" title="Escanear con la cámara" @click="escaneandoProd = true">📷</button>
+      </div>
       <div class="bs__form-act">
         <button class="btn" @click="prodForm = null">Cancelar</button>
         <button class="btn btn--brand" :disabled="store.saving" @click="guardarProd">Guardar</button>
@@ -199,6 +206,8 @@ async function borrarCat(c) {
         <div class="dlg__act"><button class="btn" @click="catMgr = null">Cerrar</button></div>
       </div>
     </div>
+
+    <BarcodeScanner v-if="escaneandoProd" una-vez titulo="Escaneá el código del producto" @decoded="onCodigoDecoded" @close="escaneandoProd = false" />
   </div>
 </template>
 
@@ -217,6 +226,9 @@ async function borrarCat(c) {
 
 .bs__form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; background: #f8fafc; border: 1px solid #eef2f6; border-radius: 11px; padding: .8rem; margin-bottom: 1rem; }
 .bs__form-act { display: flex; gap: .5rem; margin-left: auto; }
+.bs__code { display: flex; gap: .4rem; align-items: center; }
+.inp--code { width: 220px; }
+.btn--icon { padding: .4rem .6rem; font-size: 1rem; line-height: 1; }
 
 .bs__tbl-wrap { border: 1px solid #e6ebf1; border-radius: 12px; overflow-x: auto; }
 .bs__tbl { width: 100%; border-collapse: collapse; font-size: .87rem; background: #fff; }
