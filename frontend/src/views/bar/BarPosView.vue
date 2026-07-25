@@ -8,6 +8,8 @@ import { useToast } from '../../composables/useToast.js'
 import { listEventosBar, listCategoriasProducto } from '../../lib/api.js'
 import BarNav from './BarNav.vue'
 import BarcodeScanner from '../../components/BarcodeScanner.vue'
+import TicketVenta from '../../components/bar/TicketVenta.vue'
+import { useClubStore } from '../../stores/club.js'
 
 const store  = useBarStore()
 const auth   = useAuthStore()
@@ -105,9 +107,23 @@ async function guardarNuevo() {
   } catch { toast.error(store.saveError || 'No se pudo crear el producto') }
 }
 
+// Comprobante (no fiscal) de la venta
+const clubStore = useClubStore()
+const ticketVenta = ref(null)
+const barNombre = computed(() => store.bares.find(b => String(b.id) === String(barId))?.nombre || store.barActual?.nombre || 'Salón')
+
 async function cobrar() {
   if (!store.carrito.length) return
-  try { await store.cobrar(barId, medioPago.value, eventoSel.value); toast.success('Venta cobrada') }
+  // Snapshot ANTES de cobrar (store.cobrar vacía el carrito) para poder imprimir el comprobante.
+  const snapshot = {
+    items: store.carrito.map(l => ({ nombre: l.producto.nombre, cantidad: l.cantidad, precio: l.producto.precio_ars })),
+    total: store.totalCarrito, medio: medioPago.value,
+  }
+  try {
+    const venta = await store.cobrar(barId, medioPago.value, eventoSel.value)
+    toast.success('Venta cobrada')
+    ticketVenta.value = { ...snapshot, nro: venta?.id, fecha: new Date() }
+  }
   catch { toast.error(store.saveError || 'No se pudo cobrar') }
 }
 </script>
@@ -181,6 +197,9 @@ async function cobrar() {
     </div>
 
     <BarcodeScanner v-if="escaneando" titulo="Escaneá para agregar al pedido" @decoded="onCamaraDecoded" @close="escaneando = false" />
+
+    <!-- Comprobante (no válido como factura) tras cobrar -->
+    <TicketVenta v-if="ticketVenta" :ticket="ticketVenta" :bar="barNombre" :club="clubStore.name" :logo="clubStore.logoUrl" @close="ticketVenta = null" />
 
     <!-- Scan-to-create: producto nuevo con el código ya cargado (admin) -->
     <div v-if="crearForm" class="cv__ov" @click.self="crearForm = null">

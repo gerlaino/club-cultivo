@@ -1,5 +1,13 @@
 # Changelog
 
+## Julio 2026 (j) — comprobante de venta del bar (no fiscal)
+
+- **Imprimir comprobante tras cobrar:** al cerrar una venta en *Vender*, se ofrece el ticket
+  imprimible (`TicketVenta.vue`, ancho tipo térmica) con el detalle: club/salón, fecha·hora·N°,
+  ítems (cantidad × nombre · subtotal · precio unitario), total y medio de pago. Leyenda
+  obligatoria **"COMPROBANTE NO VÁLIDO COMO FACTURA"**. Imprime con `window.print()` (un `@media
+  print` no scoped deja visible solo el ticket). Sin backend: se arma del carrito al cobrar.
+
 ## Julio 2026 (i) — stock del bar: una puerta, alta en un paso, y libros que dicen "Bar"
 
 - **Los asientos del bar se leen "Bar / Salón" (no "Otro"):** nueva categoría contable `bar`; la
