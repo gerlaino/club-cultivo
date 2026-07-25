@@ -344,7 +344,13 @@ class MovimientosContablesController < ApplicationController
     cantidad = d[:cantidad].to_d
     raise ArgumentError, 'Indicá la cantidad de mercadería' if cantidad <= 0
 
-    producto.update!(stock: producto.stock.to_d + cantidad)
+    # Compra real: sube stock Y recalcula el costo promedio (igual que "Comprar" desde el bar y
+    # que aplicar_deposito! para insumos). Este movimiento ES el egreso (generar_egreso: false para
+    # no duplicarlo); antes solo bumpeaba stock y dejaba el margen sin costo.
+    compra = producto.registrar_compra!(cantidad: cantidad, costo_total_ars: movimiento.monto_ars,
+                                        created_by: current_user, proveedor: movimiento.proveedor,
+                                        generar_egreso: false)
+    compra.update!(movimiento_contable: movimiento)
     movimiento.update!(sede_id: bar.sede_id, unidad_negocio: bar.unidad_negocio_bar)
   end
 
