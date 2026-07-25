@@ -37,7 +37,7 @@ class EventoBarCosto < ApplicationRecord
     unidad = bar&.unidad_negocio_bar
     mov = club.movimientos_contables.create!(
       created_by: created_by, tipo: 'egreso',
-      categoria: 'otro', unidad_negocio: unidad, sede_id: bar&.sede_id,
+      categoria: 'bar', unidad_negocio: unidad, sede_id: bar&.sede_id,
       evento_bar_id: evento_bar_id,
       descripcion: descripcion_egreso,
       monto_ars: monto_ars, fecha: fecha || Date.current,

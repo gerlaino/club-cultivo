@@ -1,5 +1,22 @@
 # Changelog
 
+## Julio 2026 (i) — stock del bar: una puerta, alta en un paso, y libros que dicen "Bar"
+
+- **Los asientos del bar se leen "Bar / Salón" (no "Otro"):** nueva categoría contable `bar`; la
+  compra de mercadería, la venta, y los costos/entradas de eventos ahora se categorizan como `bar`
+  (antes `otro`). El rollup "Por categoría", el libro y los reportes muestran "Bar / Salón". La
+  compra desde *Nuevo Movimiento* también (`aplicar_salon!`). Nota: los movimientos viejos siguen
+  en "Otro" (no es retroactivo).
+- **Alta unificada del producto del bar (un paso):** `POST /bares/:id/productos` acepta
+  `carga_inicial` (cantidad + costo) y crea el producto **y** registra la primera compra
+  (stock + costo promedio + egreso "Bar") en la misma transacción. Adiós al "crear en 0 y después
+  ir a Comprar". En *Stock del salón* (sección "Carga inicial") y en el *scan-to-create* de Vender.
+- **Detalle al click en el libro:** cada asiento es clickeable → modal con qué/quién/cuándo/dónde;
+  los del bar traen link **"Entrar al salón"** (`es_bar` + `bar_id` en la serialización).
+- **Una sola puerta:** cartel en Insumos → Entrada avisando que la mercadería del bar se carga
+  desde *Salón → Stock del salón* (ahí cayeron por error compras que debían ir al bar).
+- Specs: alta unificada (`bar_producto_alta_spec`), compra categorizada `bar` (`bar_producto_spec`).
+
 ## Julio 2026 (h) — se guarda el Layout de slots de sala (para retomarlo con 3D)
 
 - **Sacado el Layout de slots por sala:** la asignación a slots era ficticia (el grid metía los

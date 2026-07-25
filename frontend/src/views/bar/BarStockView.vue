@@ -44,18 +44,29 @@ const valorizado = computed(() => store.productos.reduce((a, p) => a + (p.stock 
 // ── Alta / edición de producto (sin stock inicial: el stock entra por Comprar, con costo) ──
 const prodForm = ref(null)
 const escaneandoProd = ref(false) // scan-to-fill del código de barras en el form
-function nuevo() { prodForm.value = { nombre: '', categoria_producto_id: categorias.value[0]?.id ?? null, precio_ars: null, stock_minimo: 0, codigo_barras: '' } }
+// carga: primera carga opcional (cantidad + costo → sube stock con costo y genera el egreso "Bar").
+function nuevo() { prodForm.value = { nombre: '', categoria_producto_id: categorias.value[0]?.id ?? null, precio_ars: null, stock_minimo: 0, codigo_barras: '', carga: { cantidad: null, costo_total: null, proveedor: '' } } }
 function editar(p) { prodForm.value = { id: p.id, nombre: p.nombre, categoria_producto_id: p.categoria_producto_id, precio_ars: p.precio_ars, stock_minimo: p.stock_minimo ?? 0, codigo_barras: p.codigo_barras || '' } }
 function onCodigoDecoded(code) { if (prodForm.value) { prodForm.value.codigo_barras = String(code || '').trim(); toast.success('Código cargado') } }
+const cargaCostoUnit = computed(() => {
+  const c = prodForm.value?.carga
+  return c?.cantidad > 0 && c?.costo_total > 0 ? c.costo_total / c.cantidad : null
+})
 async function guardarProd() {
   const f = prodForm.value
   if (!f.nombre?.trim() || !(f.precio_ars > 0)) { toast.warning('Nombre y precio son obligatorios'); return }
   const cat = categorias.value.find(c => c.id === f.categoria_producto_id)
   const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro', precio_ars: f.precio_ars, stock_minimo: f.stock_minimo || 0, codigo_barras: f.codigo_barras?.trim() || null }
+  // Carga inicial: si pusiste cantidad, exige costo (no hay stock sin costo).
+  let carga = null
+  if (!f.id && f.carga?.cantidad > 0) {
+    if (!(f.carga.costo_total > 0)) { toast.warning('Poné el costo total de la carga inicial (o dejá la cantidad vacía)'); return }
+    carga = { cantidad: f.carga.cantidad, costo_total_ars: f.carga.costo_total, proveedor: f.carga.proveedor || null }
+  }
   try {
     if (f.id) await store.actualizarProducto(barId, f.id, payload)
-    else      await store.crearProducto(barId, payload)
-    toast.success('Producto guardado'); prodForm.value = null
+    else      await store.crearProducto(barId, payload, carga)
+    toast.success(carga ? 'Producto creado con su carga inicial' : 'Producto guardado'); prodForm.value = null
     await store.fetchProductos(barId)
   } catch { toast.error(store.saveError) }
 }
@@ -134,6 +145,16 @@ async function borrarCat(c) {
       <div class="bs__code">
         <input v-model.trim="prodForm.codigo_barras" class="inp inp--code" placeholder="Código de barras (opcional)" maxlength="60" />
         <button class="btn btn--icon" type="button" title="Escanear con la cámara" @click="escaneandoProd = true">📷</button>
+      </div>
+      <!-- Carga inicial (solo al crear): un paso de la nada a producto listo para vender -->
+      <div v-if="!prodForm.id" class="bs__carga">
+        <span class="bs__carga-lbl">Carga inicial <small>(opcional — entra con costo, genera el egreso)</small></span>
+        <div class="bs__carga-row">
+          <input v-model.number="prodForm.carga.cantidad" type="number" min="0" step="any" class="inp inp--sm" placeholder="Cantidad" />
+          <input v-model.number="prodForm.carga.costo_total" type="number" min="0" step="any" class="inp inp--sm" placeholder="Costo total" />
+          <input v-model.trim="prodForm.carga.proveedor" class="inp" placeholder="Proveedor (opcional)" maxlength="60" />
+          <span v-if="cargaCostoUnit != null" class="bs__carga-unit">{{ fmt(cargaCostoUnit) }}/u</span>
+        </div>
       </div>
       <div class="bs__form-act">
         <button class="btn" @click="prodForm = null">Cancelar</button>
@@ -225,6 +246,12 @@ async function borrarCat(c) {
 .bs__scan { font-size: .7rem; font-weight: 600; color: #94a3b8; background: #f7f9fb; border: 1px solid #e2e8f0; border-radius: 7px; padding: .25rem .5rem; white-space: nowrap; }
 
 .bs__form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; background: #f8fafc; border: 1px solid #eef2f6; border-radius: 11px; padding: .8rem; margin-bottom: 1rem; }
+.bs__code { display: flex; gap: .4rem; align-items: center; }
+.bs__carga { flex: 1 1 100%; border-top: 1px dashed #e2e8f0; padding-top: .7rem; margin-top: .2rem; }
+.bs__carga-lbl { display: block; font-size: .78rem; font-weight: 700; color: #64748b; margin-bottom: .45rem; }
+.bs__carga-lbl small { font-weight: 400; color: #94a3b8; }
+.bs__carga-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.bs__carga-unit { font-size: .78rem; color: #15803d; font-weight: 600; font-variant-numeric: tabular-nums; }
 .bs__form-act { display: flex; gap: .5rem; margin-left: auto; }
 .bs__code { display: flex; gap: .4rem; align-items: center; }
 .inp--code { width: 220px; }

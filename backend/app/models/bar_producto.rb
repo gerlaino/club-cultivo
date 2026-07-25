@@ -58,7 +58,7 @@ class BarProducto < ApplicationRecord
       if generar_egreso
         egr = club.movimientos_contables.create!(
           sede_id: bar.sede_id, created_by: created_by, tipo: 'egreso',
-          categoria: 'otro', unidad_negocio: bar.unidad_negocio_bar,
+          categoria: 'bar', unidad_negocio: bar.unidad_negocio_bar,
           descripcion: "Compra mercadería salón — #{nombre} (#{cantidad.to_s('F')})",
           monto_ars: costo_total, fecha: Date.current, pagado: true, medio_pago: 'efectivo'
         )

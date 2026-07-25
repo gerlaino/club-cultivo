@@ -13,6 +13,17 @@ RSpec.describe BarProducto, type: :model do
     create(:bar_producto, { club: club, bar: bar, precio_ars: 1000, costo_ars: 0, stock: 0 }.merge(attrs))
   end
 
+  describe 'asiento contable de la compra' do
+    it 'genera el egreso categorizado como "bar" (no "otro") y con la sede del bar' do
+      p = producto
+      p.registrar_compra!(cantidad: 10, costo_total_ars: 4000, created_by: admin)
+      egr = club.movimientos_contables.egresos.order(:created_at).last
+      expect(egr.categoria).to eq('bar')
+      expect(egr.sede_id).to eq(bar.sede_id)
+      expect(egr.unidad_negocio_id).to eq(bar.unidad_negocio_bar.id)
+    end
+  end
+
   describe 'código de barras' do
     it 'no permite el mismo código en dos productos del mismo bar' do
       producto(nombre: 'Coca', codigo_barras: '7790895000997')

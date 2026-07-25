@@ -84,17 +84,23 @@ function onCamaraDecoded(code) { procesarCodigo(code) }
 const crearForm = ref(null)
 function abrirCrear(code) {
   escaneando.value = false // cerramos la cámara si estaba abierta
-  crearForm.value = { nombre: '', categoria_producto_id: categorias.value[0]?.id ?? null, precio_ars: null, stock: 0, codigo_barras: code }
+  crearForm.value = { nombre: '', categoria_producto_id: categorias.value[0]?.id ?? null, precio_ars: null, cantidad: null, costo_total: null, codigo_barras: code }
 }
 async function guardarNuevo() {
   const f = crearForm.value
   if (!f.nombre?.trim() || !(f.precio_ars > 0)) { toast.warning('Nombre y precio son obligatorios'); return }
   const cat = categorias.value.find(c => c.id === f.categoria_producto_id)
-  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro', precio_ars: f.precio_ars, stock: f.stock || 0, codigo_barras: f.codigo_barras }
+  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro', precio_ars: f.precio_ars, codigo_barras: f.codigo_barras }
+  // Carga inicial: si ponés cantidad, exige costo (entra con costo → genera el egreso del bar).
+  let carga = null
+  if (f.cantidad > 0) {
+    if (!(f.costo_total > 0)) { toast.warning('Poné el costo total (o dejá la cantidad vacía)'); return }
+    carga = { cantidad: f.cantidad, costo_total_ars: f.costo_total, proveedor: null }
+  }
   try {
-    const prod = await store.crearProducto(barId, payload)
+    const prod = await store.crearProducto(barId, payload, carga)
     toast.success(`${prod.nombre} creado`)
-    if (prod.stock > 0) store.agregar(prod) // si cargaste stock inicial, va directo al carrito
+    if (prod.stock > 0) store.agregar(prod) // si cargaste stock, va directo al carrito
     crearForm.value = null; q.value = ''
   } catch { toast.error(store.saveError || 'No se pudo crear el producto') }
 }
@@ -188,9 +194,10 @@ async function cobrar() {
             <option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nombre }}</option>
           </select>
         </label>
+        <label class="cv__fld">Precio de venta<input v-model.number="crearForm.precio_ars" type="number" min="0" step="any" class="cv__inp" placeholder="$" /></label>
         <div class="cv__grid2">
-          <label class="cv__fld">Precio de venta<input v-model.number="crearForm.precio_ars" type="number" min="0" step="any" class="cv__inp" placeholder="$" /></label>
-          <label class="cv__fld">Stock inicial <small>(opcional)</small><input v-model.number="crearForm.stock" type="number" min="0" step="any" class="cv__inp" placeholder="0" /></label>
+          <label class="cv__fld">Cantidad <small>(opcional)</small><input v-model.number="crearForm.cantidad" type="number" min="0" step="any" class="cv__inp" placeholder="0" /></label>
+          <label class="cv__fld">Costo total<input v-model.number="crearForm.costo_total" type="number" min="0" step="any" class="cv__inp" placeholder="$" /></label>
         </div>
         <div class="cv__modal-act">
           <button class="cv__btn-ghost2" @click="crearForm = null">Cancelar</button>

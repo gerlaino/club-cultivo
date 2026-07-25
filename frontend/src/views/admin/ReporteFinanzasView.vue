@@ -98,7 +98,7 @@ const maxSerie = computed(() => {
           <div v-if="!data.gastos_por_categoria?.length" class="empty">Sin egresos en el período.</div>
           <ul v-else class="brk">
             <li v-for="g in data.gastos_por_categoria" :key="g.categoria">
-              <span>{{ g.categoria }}</span><span class="num">{{ fmt(g.total) }}</span>
+              <span>{{ g.categoria_label || g.categoria }}</span><span class="num">{{ fmt(g.total) }}</span>
             </li>
           </ul>
         </section>

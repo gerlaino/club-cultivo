@@ -218,9 +218,15 @@ const CATEGORIAS = [
   { value: "aporte_socio",  label: "Aporte socio",             tipo: "ingreso" },
   { value: "dispensacion",  label: "Recupero dispensación",    tipo: "ingreso" },
   { value: "subvencion",    label: "Subvención / Donación",    tipo: "ingreso" },
+  { value: "bar",           label: "Bar / Salón",              tipo: "ambos"   },
   { value: "otro",          label: "Otro",                     tipo: "ambos"   },
 ]
 function catLabel(cat) { return CATEGORIAS.find(c => c.value === cat)?.label || cat || "—" }
+
+// Detalle de un movimiento (modal informativo): qué, quién, cuándo, dónde, y link al bar si aplica.
+const detalleMov = ref(null)
+function abrirDetalle(m) { detalleMov.value = m }
+// (estilos del modal: ver bloque cv__dlg en <style>)
 
 const ESTADO_COLORS = {
   germinacion:       { color: '#7c3aed', bg: 'rgba(124,58,237,.1)'  },
@@ -717,7 +723,7 @@ onMounted(async () => {
                   {{ tipoMeta(m.tipo).label }}
                 </span>
               </div>
-              <div class="cv__mov-desc">{{ m.descripcion }}</div>
+              <div class="cv__mov-desc cv__mov-desc--link" @click="abrirDetalle(m)" title="Ver detalle">{{ m.descripcion }}<i class="bi bi-info-circle cv__mov-info"></i></div>
               <div class="cv__mov-cat">{{ catLabel(m.categoria) }}</div>
               <div class="cv__mov-monto" :style="{ color: tipoMeta(m.tipo).color }">{{ fmt(m.monto_ars) }}</div>
               <div class="cv__mov-actions">
@@ -881,6 +887,30 @@ onMounted(async () => {
       :sedes="sedes"
       @saved="onCompraCuotasEditada"
     />
+
+    <!-- Detalle informativo de un movimiento -->
+    <div v-if="detalleMov" class="cv__ov" @click.self="detalleMov = null">
+      <div class="cv__dlg">
+        <div class="cv__dlg-head">
+          <span class="cv__tipo-pill" :style="{ background: tipoMeta(detalleMov.tipo).bg, color: tipoMeta(detalleMov.tipo).color }">{{ tipoMeta(detalleMov.tipo).label }}</span>
+          <span class="cv__dlg-monto" :style="{ color: tipoMeta(detalleMov.tipo).color }">{{ fmt(detalleMov.monto_ars) }}</span>
+          <button class="cv__dlg-x" @click="detalleMov = null" aria-label="Cerrar">×</button>
+        </div>
+        <p class="cv__dlg-desc">{{ detalleMov.descripcion }}</p>
+        <dl class="cv__dlg-dl">
+          <dt>Categoría</dt><dd>{{ detalleMov.categoria_label || catLabel(detalleMov.categoria) }}</dd>
+          <dt v-if="detalleMov.unidad_negocio">Unidad</dt><dd v-if="detalleMov.unidad_negocio">{{ detalleMov.unidad_negocio.nombre }}</dd>
+          <dt v-if="detalleMov.sede">Sede</dt><dd v-if="detalleMov.sede">{{ detalleMov.sede.nombre }}</dd>
+          <dt>Fecha</dt><dd>{{ detalleMov.fecha }}</dd>
+          <dt v-if="detalleMov.proveedor">Proveedor</dt><dd v-if="detalleMov.proveedor">{{ detalleMov.proveedor }}</dd>
+          <dt v-if="detalleMov.medio_pago">Medio de pago</dt><dd v-if="detalleMov.medio_pago">{{ detalleMov.medio_pago }}</dd>
+          <dt v-if="detalleMov.created_by">Cargado por</dt><dd v-if="detalleMov.created_by">{{ detalleMov.created_by }}</dd>
+        </dl>
+        <RouterLink v-if="detalleMov.es_bar && detalleMov.bar_id" :to="`/bar/${detalleMov.bar_id}/panel`" class="cv__dlg-link" @click="detalleMov = null">
+          <i class="bi bi-box-arrow-up-right"></i> Entrar al salón
+        </RouterLink>
+      </div>
+    </div>
 
     <!-- ══════════════ P&L POR LOTE ══════════════ -->
     <div v-if="vistaActiva === 'pl'" ref="plContainerRef">
@@ -1073,6 +1103,24 @@ onMounted(async () => {
 @media (max-width: 900px) { .cv__mov { grid-template-columns: 1fr; } }
 .cv__mov-fecha { font-size: .72rem; color: #94a3b8; font-family: monospace; }
 .cv__mov-desc { font-size: .82rem; color: #0f172a; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cv__mov-desc--link { cursor: pointer; }
+.cv__mov-desc--link:hover { color: #1b5e20; text-decoration: underline; }
+.cv__mov-info { margin-left: .35rem; color: #cbd5e1; font-size: .78rem; }
+.cv__mov-desc--link:hover .cv__mov-info { color: #1b5e20; }
+
+/* Modal detalle de movimiento */
+.cv__ov { position: fixed; inset: 0; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1100; padding: 1rem; }
+.cv__dlg { background: #fff; border-radius: 16px; padding: 1.4rem 1.5rem; width: 100%; max-width: 420px; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
+.cv__dlg-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .8rem; }
+.cv__dlg-monto { font-size: 1.3rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.cv__dlg-x { margin-left: auto; background: none; border: none; font-size: 1.5rem; line-height: 1; color: #94a3b8; cursor: pointer; }
+.cv__dlg-x:hover { color: #334155; }
+.cv__dlg-desc { font-size: .95rem; font-weight: 650; color: #0f172a; margin: 0 0 1rem; line-height: 1.4; }
+.cv__dlg-dl { display: grid; grid-template-columns: auto 1fr; gap: .45rem .9rem; margin: 0 0 1rem; }
+.cv__dlg-dl dt { font-size: .72rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.cv__dlg-dl dd { font-size: .84rem; color: #0f172a; font-weight: 600; margin: 0; text-align: right; text-transform: capitalize; }
+.cv__dlg-link { display: inline-flex; align-items: center; gap: .4rem; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 9px; padding: .55rem .9rem; font-size: .84rem; font-weight: 700; text-decoration: none; }
+.cv__dlg-link:hover { background: #dcfce7; }
 .cv__mov-cat { font-size: .75rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cv__mov-monto { font-size: .875rem; font-weight: 700; text-align: right; letter-spacing: -.02em; }
 .cv__mov-actions { display: flex; justify-content: flex-end; }

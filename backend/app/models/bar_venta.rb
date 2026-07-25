@@ -36,7 +36,7 @@ class BarVenta < ApplicationRecord
     unidad = bar&.unidad_negocio_bar
     mov = club.movimientos_contables.create!(
       created_by: user, tipo: 'ingreso',
-      categoria: 'otro', categoria_contable: categoria_venta_bar(unidad),
+      categoria: 'bar', categoria_contable: categoria_venta_bar(unidad),
       unidad_negocio: unidad, sede_id: bar&.sede_id, evento_bar_id: evento_bar_id,
       descripcion: "Venta bar ##{id}",
       monto_ars: total_ars, fecha: Date.current,

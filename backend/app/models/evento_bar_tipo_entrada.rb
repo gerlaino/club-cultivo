@@ -31,7 +31,7 @@ class EventoBarTipoEntrada < ApplicationRecord
       if movimiento_contable.nil?
         bar = evento_bar.bar
         mov = club.movimientos_contables.create!(
-          created_by: actor, tipo: 'ingreso', categoria: 'otro',
+          created_by: actor, tipo: 'ingreso', categoria: 'bar',
           unidad_negocio: bar&.unidad_negocio_bar, sede_id: bar&.sede_id, evento_bar_id: evento_bar_id,
           descripcion: "Entradas #{nombre} — #{evento_bar.nombre}", monto_ars: monto,
           fecha: Date.current, pagado: true, medio_pago: 'efectivo'

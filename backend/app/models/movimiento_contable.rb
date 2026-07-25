@@ -33,10 +33,11 @@ class MovimientoContable < ApplicationRecord
 
   CATEGORIAS = %w[
     insumo electricidad agua alquiler sueldo mantenimiento
-    honorario seguro admin aporte_socio dispensacion subvencion otro
+    honorario seguro admin aporte_socio dispensacion subvencion bar otro
   ].freeze
 
   CATEGORIA_LABELS = {
+    "bar"           => "Bar / Salón",
     "insumo"        => "Insumo / Materia prima",
     "electricidad"  => "Electricidad",
     "agua"          => "Agua",

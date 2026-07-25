@@ -19,13 +19,23 @@ module Bar
     end
 
     # POST /bares/:bar_id/productos
+    # Alta unificada: crea el producto y, si viene `carga_inicial` (cantidad + costo), registra la
+    # primera compra en la misma transacción (sube stock + costo promedio + egreso "Bar / Salón").
+    # Así el alta es un solo paso: de la nada a producto listo para vender, sin ir a Comprar.
     def create
-      prod = @bar.bar_productos.build(producto_params.merge(club: current_user.club, unidad_negocio: @bar.unidad_negocio_bar))
-      if prod.save
-        render json: serialize(prod), status: :created
-      else
-        render json: { errors: prod.errors.full_messages }, status: :unprocessable_entity
+      carga = params[:carga_inicial]
+      ActiveRecord::Base.transaction do
+        prod = @bar.bar_productos.create!(producto_params.merge(club: current_user.club, unidad_negocio: @bar.unidad_negocio_bar))
+        if carga.present? && carga[:cantidad].to_d.positive?
+          prod.registrar_compra!(cantidad: carga[:cantidad], costo_total_ars: carga[:costo_total_ars],
+                                 proveedor: carga[:proveedor].presence, created_by: current_user)
+        end
+        render json: serialize(prod.reload), status: :created
       end
+    rescue ActiveRecord::RecordInvalid => e
+      render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+    rescue ArgumentError => e
+      render json: { error: e.message }, status: :unprocessable_entity
     end
 
     # PATCH /bares/:bar_id/productos/:id

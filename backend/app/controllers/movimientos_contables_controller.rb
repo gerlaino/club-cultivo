@@ -351,7 +351,9 @@ class MovimientosContablesController < ApplicationController
                                         created_by: current_user, proveedor: movimiento.proveedor,
                                         generar_egreso: false)
     compra.update!(movimiento_contable: movimiento)
-    movimiento.update!(sede_id: bar.sede_id, unidad_negocio: bar.unidad_negocio_bar)
+    # El egreso es del salón: sede del bar + unidad "Bar" + categoría "Bar / Salón" (para que
+    # el rollup por categoría no lo mezcle en "Otro" y el P&L del salón lo tome).
+    movimiento.update!(sede_id: bar.sede_id, unidad_negocio: bar.unidad_negocio_bar, categoria: 'bar')
   end
 
   def require_lectura
@@ -366,6 +368,13 @@ class MovimientosContablesController < ApplicationController
     end
   end
 
+  # Mapa sede_id → bar_id (memoizado por request) para linkear un asiento del bar a su salón.
+  def bar_id_por_sede(sede_id)
+    return nil if sede_id.nil?
+
+    (@bares_por_sede ||= current_user.club.bares.pluck(:sede_id, :id).to_h)[sede_id]
+  end
+
   def serialize(m)
     {
       id:                   m.id,
@@ -374,6 +383,8 @@ class MovimientosContablesController < ApplicationController
       categoria:            m.categoria,
       categoria_label:      m.categoria_contable&.nombre || m.categoria_label,
       categoria_contable_id: m.categoria_contable_id,
+      es_bar:               m.categoria == 'bar',
+      bar_id:               m.categoria == 'bar' ? bar_id_por_sede(m.sede_id) : nil,
       unidad_negocio_id:    m.unidad_negocio_id,
       unidad_negocio:       m.unidad_negocio ? { id: m.unidad_negocio.id, nombre: m.unidad_negocio.nombre, tipo: m.unidad_negocio.tipo } : nil,
       descripcion:          m.descripcion,

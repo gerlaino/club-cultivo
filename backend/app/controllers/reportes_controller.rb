@@ -61,7 +61,7 @@ class ReportesController < ApplicationController
 
   def gastos_por_categoria(movs)
     movs.egresos.group(:categoria).sum(:monto_ars)
-        .map { |cat, total| { categoria: cat, total: total.to_f } }
+        .map { |cat, total| { categoria: cat, categoria_label: MovimientoContable::CATEGORIA_LABELS[cat] || cat, total: total.to_f } }
         .sort_by { |r| -r[:total] }
   end
 

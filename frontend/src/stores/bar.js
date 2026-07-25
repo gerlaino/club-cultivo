@@ -155,8 +155,8 @@ export const useBarStore = defineStore("bar", {
     },
 
     // ── Config de productos (admin) ──────────────────────────
-    async crearProducto(barId, payload) {
-      return this._guardar(() => createBarProducto(barId, payload), (d) => { this.productos = [...this.productos, d]; });
+    async crearProducto(barId, payload, carga = null) {
+      return this._guardar(() => createBarProducto(barId, payload, carga), (d) => { this.productos = [...this.productos, d]; });
     },
     async actualizarProducto(barId, id, payload) {
       return this._guardar(() => updateBarProducto(barId, id, payload), (d) => { this._merge(d); });

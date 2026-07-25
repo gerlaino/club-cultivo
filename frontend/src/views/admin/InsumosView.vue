@@ -529,6 +529,7 @@ async function revertirCompra(compra) {
       <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Registrar entrada</h3>
         <p class="modal__hint">Cargás mercadería con su costo. Se suma al depósito y se genera el <b>egreso contable</b> automáticamente — no hace falta ir a Contabilidad.</p>
+        <p class="modal__hint modal__hint--warn">🍸 ¿Es mercadería para <b>vender en el bar/salón</b> (bebidas, snacks)? No la cargues acá: entrá al <b>Salón → Stock del salón</b> y usá <b>＋ Producto</b> (con su código de barras y carga inicial). Acá van los <b>insumos</b> (cultivo/generales).</p>
 
         <div class="dp__seg">
           <button class="dp__seg-btn" :class="{ 'is-on': entradaForm.modo === 'existente' }" :disabled="!store.items.length" @click="entradaForm.modo = 'existente'">Reponer existente</button>
@@ -834,6 +835,8 @@ async function revertirCompra(compra) {
 .dpdlg--wide { max-width: 460px; }
 .modal__title { margin: 0 0 .25rem; font-size: 1.1rem; font-weight: 750; letter-spacing: -.02em; color: #0f172a; }
 .modal__hint { color: #64748b; font-size: .82rem; margin: 0 0 1.1rem; line-height: 1.45; }
+.modal__hint--warn { background: #fdf6ec; border: 1px solid #f4e0c3; border-radius: 9px; padding: .6rem .8rem; color: #92400e; }
+.modal__hint--warn b { color: #7c2d12; }
 .modal__note { font-size: .76rem; color: #94a3b8; margin: -.3rem 0 .9rem; }
 .dp__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .dp__hintline { font-size: .78rem; color: #1b5e20; margin: -.4rem 0 .9rem; font-weight: 600; }
