@@ -1,6 +1,11 @@
 class Dispensacion < ApplicationRecord
   include Restorable
+  include Auditable
   self.table_name = 'dispensaciones'
+
+  # dispensaciones no tiene columna club_id (no es acts_as_tenant): lo deriva del paciente
+  # (paciente_id es NOT NULL). Lo necesita el concern Auditable para el rastro.
+  def club_id = paciente&.club_id
 
   ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido cancelada].freeze
   MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos mixto regalo].freeze

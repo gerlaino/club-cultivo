@@ -1,5 +1,10 @@
 class Stock < ApplicationRecord
   include Restorable
+  include Auditable
+  # La cantidad ya se rastrea en stock_movimientos (con usuario y motivo): auditarla acá sería
+  # duplicar y generar ruido en cada venta/dispensa. Auditamos solo las ediciones reales
+  # (precio, costo, descripción, categoría, estado, etc.).
+  no_auditar :cantidad, :lote_origen_consumido_g
   belongs_to :sede,     optional: true
   belongs_to :lote,     optional: true
   belongs_to :pesada,   optional: true

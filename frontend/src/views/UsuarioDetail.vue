@@ -7,10 +7,11 @@ import UsuarioSalasManager  from '../components/UsuarioSalasManager.vue'
 import UsuarioSedesManager  from '../components/UsuarioSedesManager.vue'
 import MedicoCalendarioWidget from '../components/medico/MedicoCalendarioWidget.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
+import Paginator from '../components/ui/Paginator.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import { getUsuarioStats, recibirCajaDelivery, listJornadas, confirmarJornadas, reabrirJornadas } from '../lib/api.js'
+import { getUsuarioStats, getUsuarioAuditorias, recibirCajaDelivery, listJornadas, confirmarJornadas, reabrirJornadas } from '../lib/api.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -229,12 +230,76 @@ function cambiarMesStats(delta) {
 }
 const MEDIO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente', no_abona: 'No abona', credito_gramos: 'Crédito gramos' }
 
+// ── Historial de actividad (audit log, read-only) ─────────────────────────
+// Solo admin: el endpoint es admin-only (require_admin!). No es editable ni borrable.
+const esAdmin = computed(() => auth.role === 'admin')
+const audits        = ref([])
+const auditsPage    = ref(1)
+const auditsPerPage = ref(10)
+const auditsTotal   = ref(0)
+const loadingAudits = ref(false)
+const auditsFiltro  = ref({ desde: '', hasta: '', tipo: '' })
+const hayFiltro     = computed(() => !!(auditsFiltro.value.desde || auditsFiltro.value.hasta || auditsFiltro.value.tipo))
+const TIPO_OPCIONES = [
+  { v: '', l: 'Todos los tipos' }, { v: 'Lote', l: 'Lote' }, { v: 'Plant', l: 'Planta' },
+  { v: 'Stock', l: 'Stock' }, { v: 'Dispensacion', l: 'Dispensación' },
+]
+
+const ACCION_INFO = {
+  crear:      { label: 'Creó',    icon: 'bi-plus-circle-fill',   cls: 'act--new' },
+  actualizar: { label: 'Editó',   icon: 'bi-pencil-fill',        cls: 'act--edit' },
+  eliminar:   { label: 'Eliminó', icon: 'bi-trash-fill',         cls: 'act--del' },
+}
+// Nombres lindos para los campos más habituales; el resto se humaniza (guiones bajos → espacios).
+const CAMPO_LABEL = {
+  tamano_maceta: 'tamaño de maceta', tamaño_maceta: 'tamaño de maceta',
+  precio_sugerido_ars: 'precio sugerido', costo_unitario_ars: 'costo unitario',
+  sala_id: 'sala', sede_id: 'sede', genetica_id: 'genética', estado: 'estado',
+  codigo: 'código', descripcion: 'descripción', categoria: 'categoría',
+  medio_pago: 'medio de pago', cantidad: 'cantidad', notas: 'notas', nombre: 'nombre',
+}
+function labelCampo(c) { return CAMPO_LABEL[c] || String(c).replace(/_/g, ' ') }
+function formatVal(v) {
+  if (v === null || v === undefined || v === '') return '—'
+  if (v === true) return 'Sí'
+  if (v === false) return 'No'
+  return String(v)
+}
+function fechaAudit(d) {
+  const dt = new Date(d)
+  return dt.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) + ' · ' +
+         dt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+}
+
+async function cargarAudits() {
+  if (!esAdmin.value) return
+  loadingAudits.value = true
+  try {
+    const { data } = await getUsuarioAuditorias(userId, {
+      page:     auditsPage.value,
+      per_page: auditsPerPage.value,
+      tipo:     auditsFiltro.value.tipo || undefined,
+      desde:    auditsFiltro.value.desde || undefined,
+      hasta:    auditsFiltro.value.hasta || undefined,
+    })
+    audits.value        = data.data || []
+    auditsTotal.value   = data.total || 0
+    auditsPerPage.value = data.per_page || auditsPerPage.value
+  } catch { audits.value = []; auditsTotal.value = 0 }
+  finally { loadingAudits.value = false }
+}
+function aplicarFiltro()   { auditsPage.value = 1; cargarAudits() }
+function limpiarFiltro()   { auditsFiltro.value = { desde: '', hasta: '', tipo: '' }; aplicarFiltro() }
+function irAPagina(p)      { auditsPage.value = p; cargarAudits() }
+function cambiarPerPage(pp){ auditsPerPage.value = pp; auditsPage.value = 1; cargarAudits() }
+
 onMounted(async () => {
   try { await store.fetchOne(userId) }
   catch { error.value = 'No se pudo cargar el usuario.' }
   finally { loading.value = false }
   cargarStats()
   cargarJornadas()
+  cargarAudits()
 })
 </script>
 
@@ -429,6 +494,83 @@ onMounted(async () => {
                 </div>
               </template>
               <p v-else class="uds__empty">Sin horas cargadas este mes.</p>
+            </div>
+          </div>
+
+          <!-- Historial de actividad (audit log, read-only, solo admin) -->
+          <div v-if="esAdmin" class="ud__card ud__card--mt">
+            <div class="ud__card-hdr">
+              <div class="ud__card-ico" style="background:rgba(71,85,105,.1);color:#475569">
+                <i class="bi bi-clock-history"></i>
+              </div>
+              <span class="ud__card-title">Historial de actividad</span>
+              <span class="ud__card-hint">{{ auditsTotal }} acción{{ auditsTotal !== 1 ? 'es' : '' }} · solo lectura</span>
+            </div>
+            <div class="ud__card-body">
+              <!-- Filtros -->
+              <div class="uda__filtros">
+                <label class="uda__f">
+                  <span>Desde</span>
+                  <input type="date" v-model="auditsFiltro.desde" class="uda__inp" @change="aplicarFiltro" />
+                </label>
+                <label class="uda__f">
+                  <span>Hasta</span>
+                  <input type="date" v-model="auditsFiltro.hasta" class="uda__inp" @change="aplicarFiltro" />
+                </label>
+                <label class="uda__f">
+                  <span>Tipo</span>
+                  <select v-model="auditsFiltro.tipo" class="uda__inp" @change="aplicarFiltro">
+                    <option v-for="o in TIPO_OPCIONES" :key="o.v" :value="o.v">{{ o.l }}</option>
+                  </select>
+                </label>
+                <button v-if="hayFiltro" class="uda__clear" @click="limpiarFiltro">
+                  <i class="bi bi-x-lg"></i> Limpiar
+                </button>
+              </div>
+
+              <div v-if="loadingAudits" class="uds__loading"><DsSpinner :size="22" /></div>
+              <p v-else-if="!audits.length" class="uds__empty">
+                {{ hayFiltro ? 'Sin actividad para estos filtros.' : 'Sin actividad registrada todavía.' }}
+              </p>
+              <template v-else>
+                <div class="uda__table-wrap">
+                  <table class="uda__table">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th><th>Acción</th><th>Tipo</th><th>Registro</th><th>Cambios</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="a in audits" :key="a.id">
+                        <td class="uda__td-fecha">{{ fechaAudit(a.fecha) }}</td>
+                        <td>
+                          <span class="uda__chip" :class="(ACCION_INFO[a.accion] || {}).cls">
+                            <i :class="['bi', (ACCION_INFO[a.accion] || {}).icon]"></i>
+                            {{ (ACCION_INFO[a.accion] || {}).label || a.accion }}
+                          </span>
+                        </td>
+                        <td>{{ a.tipo }}</td>
+                        <td class="uda__ref">#{{ a.registro_id }}</td>
+                        <td>
+                          <ul v-if="a.cambios && a.cambios.length" class="uda__diffs">
+                            <li v-for="(c, i) in a.cambios" :key="i" class="uda__diff">
+                              <span class="uda__campo">{{ labelCampo(c.campo) }}:</span>
+                              <span class="uda__de">{{ formatVal(c.de) }}</span>
+                              <i class="bi bi-arrow-right"></i>
+                              <span class="uda__a">{{ formatVal(c.a) }}</span>
+                            </li>
+                          </ul>
+                          <span v-else class="uda__nodiff">—</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <Paginator
+                  :page="auditsPage" :per-page="auditsPerPage" :total="auditsTotal"
+                  @update:page="irAPagina" @update:perPage="cambiarPerPage"
+                />
+              </template>
             </div>
           </div>
 
@@ -896,4 +1038,31 @@ onMounted(async () => {
 .uds__medios-title { font-size: .7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
 .uds__medios-list { display: flex; flex-wrap: wrap; gap: .4rem .9rem; margin-top: .4rem; }
 .uds__medio { font-size: .8rem; color: #475569; }
+
+/* Historial de actividad (audit log) — filtros + tabla */
+.uda__filtros { display: flex; align-items: flex-end; gap: .6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.uda__f { display: flex; flex-direction: column; gap: .25rem; font-size: .68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+.uda__inp { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .4rem .6rem; font-size: .82rem; color: #0f172a; outline: none; }
+.uda__inp:focus { border-color: #1b5e20; background: #fff; }
+.uda__clear { display: inline-flex; align-items: center; gap: .3rem; background: none; border: 1px solid #e2e8f0; color: #64748b; border-radius: 8px; padding: .45rem .7rem; font-size: .75rem; font-weight: 600; cursor: pointer; }
+.uda__clear:hover { background: #f1f5f9; color: #dc2626; }
+
+.uda__table-wrap { overflow-x: auto; }
+.uda__table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.uda__table th { text-align: left; font-size: .66rem; text-transform: uppercase; letter-spacing: .04em; color: #94a3b8; font-weight: 700; padding: .5rem .6rem; border-bottom: 1.5px solid #f1f5f9; white-space: nowrap; }
+.uda__table td { padding: .6rem .6rem; border-bottom: 1px solid #f5f7fa; color: #475569; vertical-align: top; }
+.uda__table tbody tr:hover td { background: #fafbfc; }
+.uda__td-fecha { white-space: nowrap; color: #64748b; font-variant-numeric: tabular-nums; }
+.uda__ref { color: #94a3b8; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.uda__chip { display: inline-flex; align-items: center; gap: .3rem; font-size: .7rem; font-weight: 700; padding: .18rem .55rem; border-radius: 999px; white-space: nowrap; background: #f1f5f9; color: #64748b; }
+.uda__chip.act--new { background: rgba(21,128,61,.1); color: #15803d; }
+.uda__chip.act--edit { background: rgba(180,83,9,.1); color: #b45309; }
+.uda__chip.act--del { background: rgba(220,38,38,.1); color: #dc2626; }
+.uda__diffs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .2rem; }
+.uda__diff { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+.uda__campo { font-weight: 600; color: #64748b; }
+.uda__de { color: #94a3b8; text-decoration: line-through; }
+.uda__diff i { font-size: .68rem; color: #cbd5e1; }
+.uda__a { color: #15803d; font-weight: 600; }
+.uda__nodiff { color: #cbd5e1; }
 </style>

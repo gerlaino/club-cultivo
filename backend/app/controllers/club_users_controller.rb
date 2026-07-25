@@ -1,7 +1,7 @@
 class ClubUsersController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!
-  before_action :set_user, only: [:show, :update, :destroy, :reset_password, :salas_asignadas, :asignar_sala, :desasignar_sala, :sedes_asignadas, :asignar_sede, :desasignar_sede, :stats, :recibir_caja]
+  before_action :set_user, only: [:show, :update, :destroy, :reset_password, :salas_asignadas, :asignar_sala, :desasignar_sala, :sedes_asignadas, :asignar_sede, :desasignar_sede, :stats, :auditorias, :recibir_caja]
 
   # GET /usuarios
   def index
@@ -217,6 +217,37 @@ class ClubUsersController < ApplicationController
     }
   end
 
+  # GET /usuarios/:id/auditorias?page=&per_page=&tipo=&desde=&hasta=
+  # Rastro read-only de lo que hizo el usuario (crear/editar/eliminar) sobre registros
+  # auditados. Filtrable por tipo y rango de fechas; paginado, más recientes primero.
+  # Solo admin (require_admin!).
+  def auditorias
+    page     = [params[:page].to_i, 1].max
+    per_page = [10, 25, 50].include?(params[:per_page].to_i) ? params[:per_page].to_i : 10
+
+    scope = Auditoria.where(user_id: @user.id, club_id: current_user.club_id)
+    scope = scope.where(auditable_type: params[:tipo]) if params[:tipo].present?
+    if (desde = fecha_param(params[:desde]))
+      scope = scope.where('auditorias.created_at >= ?', desde.beginning_of_day)
+    end
+    if (hasta = fecha_param(params[:hasta]))
+      scope = scope.where('auditorias.created_at <= ?', hasta.end_of_day)
+    end
+    scope = scope.recientes
+
+    total     = scope.count
+    registros = scope.offset((page - 1) * per_page).limit(per_page)
+
+    render json: {
+      data:        registros.map { |a| serialize_auditoria(a) },
+      page:        page,
+      per_page:    per_page,
+      total:       total,
+      total_pages: (total.to_f / per_page).ceil,
+      has_more:    page * per_page < total,
+    }
+  end
+
   # POST /usuarios/:id/recibir_caja
   # El admin recibe el efectivo en tránsito del delivery: asienta los ingresos y
   # marca los cobros como rendidos.
@@ -234,6 +265,41 @@ class ClubUsersController < ApplicationController
 
   def set_user
     @user = User.where(club_id: current_user.club_id).find(params[:id])
+  end
+
+  # ── Auditoría (rastro read-only) ──────────────────────────────
+  TIPOS_AUDITABLE = { 'Lote' => 'Lote', 'Plant' => 'Planta', 'Stock' => 'Stock', 'Dispensacion' => 'Dispensación' }.freeze
+  # Campos internos que no tiene sentido mostrar en el diff.
+  CAMPOS_OCULTOS  = %w[id created_at updated_at deleted_at club_id].freeze
+
+  def serialize_auditoria(a)
+    {
+      id:          a.id,
+      accion:      a.accion, # crear | actualizar | eliminar
+      tipo:        TIPOS_AUDITABLE[a.auditable_type] || a.auditable_type,
+      registro_id: a.auditable_id,
+      fecha:       a.created_at,
+      # Solo en "actualizar" mostramos el antes→después; crear/eliminar se explican solos.
+      cambios:     a.accion == 'actualizar' ? formato_cambios(a.cambios) : [],
+    }
+  end
+
+  # Parsea "YYYY-MM-DD" a Date; nil si viene vacío o inválido (no rompe el filtro).
+  def fecha_param(valor)
+    return nil if valor.blank?
+
+    Date.parse(valor.to_s)
+  rescue ArgumentError
+    nil
+  end
+
+  # {"campo" => [de, a]} (saved_changes) → [{campo, de, a}], salteando internos.
+  def formato_cambios(cambios)
+    (cambios || {}).except(*CAMPOS_OCULTOS).filter_map do |campo, valores|
+      next unless valores.is_a?(Array) && valores.size == 2
+
+      { campo: campo, de: valores[0], a: valores[1] }
+    end
   end
 
   def require_admin!

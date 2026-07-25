@@ -1,5 +1,7 @@
 class Lote < ApplicationRecord
   include RestorableInterface
+  include Auditable
+  no_auditar :plants_count # contador de cache: cambia solo al agregar/quitar plantas (ruido)
   belongs_to :deleted_by, class_name: "User", optional: true
   belongs_to :club
   acts_as_tenant(:club)

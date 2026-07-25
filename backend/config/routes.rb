@@ -314,6 +314,7 @@ Rails.application.routes.draw do
         post   :asignar_sede
         delete :desasignar_sede
         get    :stats
+        get    :auditorias
         post   :recibir_caja
       end
     end

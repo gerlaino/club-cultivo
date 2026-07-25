@@ -243,6 +243,7 @@ export const reasignarDelivery = (id, deliveryId)  => api.patch(`/dispensaciones
 export const listUsers         = (params = {}) => api.get('/usuarios', { params });
 export const getUser           = (id) => api.get(`/usuarios/${id}`);
 export const getUsuarioStats   = (id, params = {}) => api.get(`/usuarios/${id}/stats`, { params });
+export const getUsuarioAuditorias = (id, params = {}) => api.get(`/usuarios/${id}/auditorias`, { params });
 export const recibirCajaDelivery = (id) => api.post(`/usuarios/${id}/recibir_caja`);
 
 // Convierte un path relativo de ActiveStorage (/rails/active_storage/...) en URL

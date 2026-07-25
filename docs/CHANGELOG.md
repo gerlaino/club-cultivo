@@ -1,5 +1,23 @@
 # Changelog
 
+## Julio 2026 (e) — historial por usuario (audit log, Fase 1)
+
+- **Rastro de actividad por usuario, read-only:** aprovechando la infra ya existente (`Auditoria`
+  inmutable + concern `Auditable`), se activó el registro en **Lote, Plant, Stock y Dispensación**
+  (`include Auditable`). Cada create/update/delete queda con quién (`Current.user`), qué cambió
+  (diff `campo: antes → después`) y cuándo.
+- **Señal sobre ruido:** el concern ahora admite `no_auditar :campo`. Se excluyen contadores/derivados:
+  `plants_count` en Lote; `cantidad` y `lote_origen_consumido_g` en Stock (los cambios de cantidad
+  ya viven en `stock_movimientos` con usuario). Dispensación deriva `club_id` del paciente.
+- **Endpoint:** `GET /usuarios/:id/auditorias` (admin-only, tenant-scoped, más recientes primero).
+  Filtrable por **rango de fechas** (`desde`/`hasta`) y **tipo**; paginado (`per_page` 10/25/50,
+  `total_pages`). Devuelve el diff formateado solo en ediciones.
+- **UI:** tab **"Historial de actividad"** en el detalle de usuario (`UsuarioDetail`), read-only:
+  **tabla** (Fecha · Acción · Tipo · Registro · Cambios) con **filtros** (desde/hasta/tipo) y
+  **paginador**. Muestra antes→después con nombres de campo legibles.
+- **Sin migración** (la tabla `auditorias` ya existía). No es retroactivo: registra desde ahora.
+- Spec: `usuario_auditorias_spec` (endpoint, paginación, aislamiento de tenant, exclusiones, 403 no-admin).
+
 ## Julio 2026 (d) — rediseño del Salón COMPLETO (B3–B6)
 
 - **B3 · Vender = lista + buscador:** `BarPosView` pasó del grid con tabs de categoría a una
