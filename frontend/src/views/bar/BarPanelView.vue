@@ -8,7 +8,7 @@ import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
-import { listCategoriasProducto, createCategoriaProducto, updateCategoriaProducto, deleteCategoriaProducto } from '../../lib/api.js'
+import BarNav from './BarNav.vue'
 
 const store = useBarStore()
 const auth  = useAuthStore()
@@ -18,27 +18,6 @@ const toast = useToast()
 const { confirm } = useConfirm()
 const barId = route.params.barId
 
-// Categorías de producto EDITABLES (reemplazan el enum hardcodeado bebida/cocina/merch).
-const categoriasProd = ref([])
-async function cargarCategorias() {
-  try { categoriasProd.value = (await listCategoriasProducto()).data || [] } catch { categoriasProd.value = [] }
-}
-// Gestión de categorías (crear / renombrar / eliminar).
-const catMgr = ref(null)
-function abrirCategorias() { catMgr.value = { nuevo: '' } }
-async function agregarCategoria() {
-  const n = catMgr.value.nuevo?.trim(); if (!n) return
-  try { await createCategoriaProducto({ nombre: n }); catMgr.value.nuevo = ''; await cargarCategorias() }
-  catch (e) { toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo crear') }
-}
-async function renombrarCategoria(c) {
-  const n = prompt('Nuevo nombre de la categoría', c.nombre); if (!n?.trim() || n.trim() === c.nombre) return
-  try { await updateCategoriaProducto(c.id, { nombre: n.trim() }); await cargarCategorias() } catch { toast.error('No se pudo renombrar') }
-}
-async function borrarCategoria(c) {
-  if (!(await confirm({ title: `Eliminar "${c.nombre}"`, message: 'Solo se puede si no tiene productos asignados; si los tiene, reasignalos primero.', variant: 'danger' }))) return
-  try { await deleteCategoriaProducto(c.id); await cargarCategorias() } catch (e) { toast.error(e?.response?.data?.error || 'No se pudo eliminar') }
-}
 const esAdmin = computed(() => auth.user?.role === 'admin')
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 const fmtK = (n) => {
@@ -56,8 +35,6 @@ onMounted(async () => {
     router.push('/bar')
     return
   }
-  store.fetchProductos(barId)
-  cargarCategorias()
 })
 
 const d = computed(() => store.dashboard)
@@ -114,57 +91,13 @@ const chart = computed(() => {
   return { line, area, pico, minH, maxH }
 })
 
-// ── Productos (admin) ──────────────────────────────────────────
-const prodForm = ref(null)
-function nuevoProducto() { prodForm.value = { nombre: '', categoria_producto_id: categoriasProd.value[0]?.id ?? null, precio_ars: null, costo_ars: null, stock: 0, stock_minimo: 0 } }
-function editarProducto(p) { prodForm.value = { id: p.id, nombre: p.nombre, categoria_producto_id: p.categoria_producto_id, precio_ars: p.precio_ars, costo_ars: p.costo_ars, stock: p.stock, stock_minimo: p.stock_minimo } }
-async function guardarProducto() {
-  const f = prodForm.value
-  if (!f.nombre?.trim() || !(f.precio_ars > 0)) { toast.warning('Nombre y precio son obligatorios'); return }
-  // categoria (enum) se deriva de la editable para mantener compat mientras convive.
-  const cat = categoriasProd.value.find(c => c.id === f.categoria_producto_id)
-  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro', precio_ars: f.precio_ars, costo_ars: f.costo_ars || null, stock: f.stock || 0, stock_minimo: f.stock_minimo || 0 }
-  try {
-    if (f.id) await store.actualizarProducto(barId, f.id, payload)
-    else      await store.crearProducto(barId, payload)
-    toast.success('Producto guardado'); prodForm.value = null
-    store.fetchDashboard(barId)
-  } catch { toast.error(store.saveError) }
-}
-async function reponer(p) {
-  const cant = Number(prompt(`¿Cuántas unidades de "${p.nombre}" ingresan?`, '1'))
-  if (!cant || cant <= 0) return
-  try { await store.reponer(barId, p.id, cant); toast.success('Stock repuesto'); store.fetchDashboard(barId) }
-  catch { toast.error(store.saveError) }
-}
-async function borrarProducto(p) {
-  if (!(await confirm({ title: 'Eliminar producto', message: `¿Eliminar "${p.nombre}"? Se recupera desde la papelera.`, variant: 'danger' }))) return
-  try { await store.eliminarProducto(barId, p.id); toast.success('Producto eliminado') }
-  catch { toast.error('No se pudo eliminar') }
-}
-
-const margenClase = (m) => (m == null ? '' : m >= 60 ? 'hi' : m >= 50 ? 'mid' : 'lo')
 const insigniaClase = (t) => ({ good: 'good', bad: 'bad', warn: 'warn' }[t] || 'warn')
 const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•')
 </script>
 
 <template>
   <div class="sp">
-    <!-- Header -->
-    <div class="sp__head">
-      <div>
-        <h1 class="sp__title">{{ store.barActual?.nombre || 'Salón' }}</h1>
-        <p class="sp__loc">
-          <span v-if="store.barActual?.sede">{{ store.barActual.sede.nombre }} · {{ store.barActual.sede.tipo }}</span>
-          <span v-else>Salón del club</span>
-        </p>
-      </div>
-      <div class="sp__actions">
-        <RouterLink to="/bar" class="sp__btn">Bares</RouterLink>
-        <RouterLink :to="`/bar/${barId}/eventos`" class="sp__btn">🎉 Eventos</RouterLink>
-        <RouterLink :to="`/bar/${barId}/vender`" class="sp__btn sp__btn--copper">Vender →</RouterLink>
-      </div>
-    </div>
+    <BarNav :bar-id="barId" active="resumen" />
 
     <template v-if="d">
       <!-- Row 1: resultado + caja + miniK -->
@@ -256,60 +189,13 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
               <span class="sp__rn">{{ r.nombre }}</span>
               <span class="sp__meter"><i :class="{ mid: r.pct >= 30 }" :style="{ width: Math.max(6, r.pct) + '%' }"></i></span>
               <span class="sp__rq num">{{ r.stock }} u</span>
-              <button v-if="esAdmin" class="sp__rbtn" @click="reponer(r)">Reponer</button>
+              <RouterLink v-if="esAdmin" :to="`/bar/${barId}/stock`" class="sp__rbtn">Reponer</RouterLink>
             </li>
           </ul>
         </div>
       </div>
     </template>
     <div v-else class="sp__empty" style="padding:3rem 0;">Cargando el salón…</div>
-
-    <!-- Productos (admin) -->
-    <div v-if="esAdmin" class="sp__card sp__prod">
-      <div class="sp__ch sp__ch--flex">
-        <b>Productos <span class="sp__mut">rendimiento</span></b>
-        <div style="display:flex; gap:.5rem">
-          <button class="sp__btn sp__btn--sm" @click="abrirCategorias">Categorías</button>
-          <button class="sp__btn sp__btn--brand sp__btn--sm" @click="nuevoProducto">+ Producto</button>
-        </div>
-      </div>
-
-      <div v-if="prodForm" class="sp__form">
-        <input v-model.trim="prodForm.nombre" class="sp__inp" placeholder="Nombre" maxlength="50" />
-        <select v-model="prodForm.categoria_producto_id" class="sp__inp"><option v-for="c in categoriasProd" :key="c.id" :value="c.id">{{ c.nombre }}</option></select>
-        <input v-model.number="prodForm.precio_ars" type="number" min="0" step="any" class="sp__inp sp__inp--sm" placeholder="Precio" />
-        <input v-model.number="prodForm.costo_ars" type="number" min="0" step="any" class="sp__inp sp__inp--sm" placeholder="Costo" />
-        <input v-model.number="prodForm.stock" type="number" min="0" step="any" class="sp__inp sp__inp--sm" placeholder="Stock" />
-        <input v-model.number="prodForm.stock_minimo" type="number" min="0" step="any" class="sp__inp sp__inp--sm" placeholder="Mín" />
-        <div class="sp__form-act">
-          <button class="sp__btn" @click="prodForm = null">Cancelar</button>
-          <button class="sp__btn sp__btn--brand" :disabled="store.saving" @click="guardarProducto">Guardar</button>
-        </div>
-      </div>
-
-      <div class="sp__table-wrap">
-        <table class="sp__table">
-          <thead><tr><th>Producto</th><th>Cat.</th><th class="r">Precio</th><th class="r">Costo</th><th class="r">Margen</th><th class="r">Vend. mes</th><th class="r">Stock</th><th></th></tr></thead>
-          <tbody>
-            <tr v-for="p in store.productos" :key="p.id" :class="{ 'sp__off': !p.activo }">
-              <td class="sp__strong">{{ p.nombre }}</td>
-              <td class="sp__muted">{{ p.categoria_producto_nombre || p.categoria }}</td>
-              <td class="r num">{{ fmt(p.precio_ars) }}</td>
-              <td class="r num sp__muted">{{ p.costo_ars != null ? fmt(p.costo_ars) : '—' }}</td>
-              <td class="r"><span v-if="p.margen_pct != null" class="sp__mg" :class="margenClase(p.margen_pct)">{{ p.margen_pct }}%</span><span v-else class="sp__muted">—</span></td>
-              <td class="r num">{{ p.vendidos_mes ? Math.round(p.vendidos_mes) : 0 }}</td>
-              <td class="r num" :class="{ 'sp__red': p.stock_bajo }">{{ p.stock }}</td>
-              <td class="r sp__acts">
-                <button class="sp__link" @click="reponer(p)">Reponer</button>
-                <button class="sp__link" @click="editarProducto(p)">Editar</button>
-                <button class="sp__link sp__link--danger" @click="borrarProducto(p)">Borrar</button>
-              </td>
-            </tr>
-            <tr v-if="!store.productos.length"><td colspan="8" class="sp__empty">Sin productos. Creá el primero.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
 
     <!-- Modal abrir caja -->
     <div v-if="aperturaForm" class="sp__ov" @click.self="aperturaForm = null">
@@ -351,26 +237,6 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
       </div>
     </div>
 
-    <!-- Gestión de categorías de producto -->
-    <div v-if="catMgr" class="sp__ovl" @click.self="catMgr = null">
-      <div class="sp__dlg">
-        <div class="sp__ch sp__ch--flex"><b>Categorías de producto</b><button class="sp__btn sp__btn--sm" @click="catMgr = null">✕</button></div>
-        <p class="sp__mut" style="margin:.2rem 0 .8rem; font-size:.82rem">Con estas se agrupan y filtran los productos del salón. Editables.</p>
-        <ul class="sp__catlist">
-          <li v-for="c in categoriasProd" :key="c.id" class="sp__catrow">
-            <span>{{ c.nombre }} <small v-if="c.es_sistema" class="sp__mut">· sistema</small> <small class="sp__mut">· {{ c.productos_count }} prod.</small></span>
-            <span class="sp__catacts">
-              <button class="sp__btn sp__btn--sm" @click="renombrarCategoria(c)">Renombrar</button>
-              <button v-if="!c.es_sistema" class="sp__btn sp__btn--sm sp__btn--danger" @click="borrarCategoria(c)">Eliminar</button>
-            </span>
-          </li>
-        </ul>
-        <div class="sp__form" style="margin-top:.8rem">
-          <input v-model.trim="catMgr.nuevo" class="sp__inp" placeholder="Nueva categoría (ej: Vapes)" maxlength="30" @keydown.enter.prevent="agregarCategoria" />
-          <button class="sp__btn sp__btn--brand" @click="agregarCategoria">Agregar</button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useEventosBarStore } from '../../stores/eventosBar.js'
 import { useToast } from '../../composables/useToast.js'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
+import BarNav from './BarNav.vue'
 
 const store  = useEventosBarStore()
 const route  = useRoute()
@@ -52,13 +53,13 @@ function fechaTxt(f) {
 
 <template>
   <div class="ev">
+    <BarNav :bar-id="barId" active="eventos" />
     <header class="ev__head">
       <div>
         <h1>Eventos</h1>
-        <p>{{ store.actual?.bar?.nombre }} Cada evento, un proyecto con su resultado.</p>
+        <p>Cada evento, un proyecto con su resultado.</p>
       </div>
       <div class="ev__nav">
-        <RouterLink :to="`/bar/${barId}/panel`" class="btn">← Panel</RouterLink>
         <button class="btn btn--primary" @click="nuevo">+ Nuevo evento</button>
       </div>
     </header>

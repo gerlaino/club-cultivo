@@ -6,6 +6,7 @@ import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
 import { listEventosBar, listCategoriasProducto } from '../../lib/api.js'
+import BarNav from './BarNav.vue'
 
 const store  = useBarStore()
 const auth   = useAuthStore()
@@ -45,16 +46,7 @@ async function cobrar() {
 
 <template>
   <div class="cv">
-    <div class="cv__header">
-      <div class="cv__header-left">
-        <h1 class="cv__title">Vender · {{ store.barActual?.nombre || 'Salón' }}</h1>
-        <p class="cv__sub">{{ auth.user?.first_name || 'Vendedor' }}</p>
-      </div>
-      <div class="cv__header-right">
-        <RouterLink to="/bar" class="cv__btn-ghost">Salón</RouterLink>
-        <RouterLink v-if="esGestion" :to="`/bar/${barId}/panel`" class="cv__btn-ghost">Panel</RouterLink>
-      </div>
-    </div>
+    <BarNav :bar-id="barId" active="vender" />
 
     <div class="cv__pos">
       <div class="cv__pos-catalog">

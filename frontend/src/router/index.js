@@ -147,6 +147,17 @@ const routes = [
     },
   },
   {
+    path: "/bar/:barId/stock",
+    name: "bar-stock",
+    component: () => import("../views/bar/BarStockView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "supervisor", "dispensador"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
+  {
     path: "/bar/:barId/eventos",
     name: "bar-eventos",
     component: () => import("../views/bar/EventosBarView.vue"),
