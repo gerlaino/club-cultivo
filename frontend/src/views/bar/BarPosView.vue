@@ -46,31 +46,58 @@ const productosFiltrados = computed(() => {
 const catNombre = (p) => categorias.value.find(c => c.id === p.categoria_producto_id)?.nombre || '—'
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 
-// ── Código de barras: lector físico (Enter) + cámara ──────────────────────
+// ── Código de barras: lector físico (Enter) + cámara + scan-to-create ─────
 const escaneando = ref(false)
-// Agrega al carrito el producto cuyo código de barras coincide EXACTO con lo escaneado/tipeado.
-function agregarPorCodigo(code) {
+const esAdmin = computed(() => auth.user?.role === 'admin') // crear productos es solo admin
+const pareceCodigo = (s) => /^\d{8,}$/.test(String(s || '').trim()) // EAN/UPC: 8+ dígitos
+const buscarPorCodigo = (code) => {
+  const c = String(code || '').trim()
+  return c ? (store.activos.find(p => p.codigo_barras && String(p.codigo_barras) === c) || null) : null
+}
+// Agrega el producto del código; si no existe y sos admin, ofrece crearlo (scan-to-create).
+function procesarCodigo(code, { ofrecerCrear = true } = {}) {
   const c = String(code || '').trim()
   if (!c) return false
-  const prod = store.activos.find(p => p.codigo_barras && String(p.codigo_barras) === c)
-  if (!prod) { toast.warning(`El código ${c} no está asignado a ningún producto`); return false }
-  if (prod.stock <= 0) { toast.warning(`${prod.nombre} sin stock`); return false }
-  store.agregar(prod)
-  toast.success(`${prod.nombre} agregado`)
-  return true
+  const prod = buscarPorCodigo(c)
+  if (prod) {
+    if (prod.stock <= 0) { toast.warning(`${prod.nombre} sin stock`); return false }
+    store.agregar(prod); toast.success(`${prod.nombre} agregado`); return true
+  }
+  if (ofrecerCrear && esAdmin.value) { abrirCrear(c); return false }
+  toast.warning(`El código ${c} no está asignado a ningún producto`)
+  return false
 }
-// Enter en el buscador = lector físico (tipea el código + Enter). Si no matchea un código pero
-// hay un único resultado por nombre, lo agrega igual (comodidad de teclado).
+// Enter en el buscador = lector físico (tipea el código + Enter). Distingue código de nombre:
+// un término todo-dígitos se trata como código (agrega o, si no existe, ofrece crear).
 function onEnterBuscar() {
   const term = q.value.trim()
   if (!term) return
-  if (agregarPorCodigo(term)) { q.value = ''; return }
+  if (buscarPorCodigo(term) || pareceCodigo(term)) { procesarCodigo(term); q.value = ''; return }
   if (productosFiltrados.value.length === 1 && productosFiltrados.value[0].stock > 0) {
     store.agregar(productosFiltrados.value[0]); q.value = ''
   }
 }
-// Cámara: cada lectura agrega al carrito; el scanner queda abierto para escanear varios seguidos.
-function onCamaraDecoded(code) { agregarPorCodigo(code) }
+// Cámara: cada lectura agrega (o, si el código no existe, ofrece crear el producto).
+function onCamaraDecoded(code) { procesarCodigo(code) }
+
+// ── Scan-to-create: alta rápida del producto con el código ya cargado (admin) ──
+const crearForm = ref(null)
+function abrirCrear(code) {
+  escaneando.value = false // cerramos la cámara si estaba abierta
+  crearForm.value = { nombre: '', categoria_producto_id: categorias.value[0]?.id ?? null, precio_ars: null, stock: 0, codigo_barras: code }
+}
+async function guardarNuevo() {
+  const f = crearForm.value
+  if (!f.nombre?.trim() || !(f.precio_ars > 0)) { toast.warning('Nombre y precio son obligatorios'); return }
+  const cat = categorias.value.find(c => c.id === f.categoria_producto_id)
+  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro', precio_ars: f.precio_ars, stock: f.stock || 0, codigo_barras: f.codigo_barras }
+  try {
+    const prod = await store.crearProducto(barId, payload)
+    toast.success(`${prod.nombre} creado`)
+    if (prod.stock > 0) store.agregar(prod) // si cargaste stock inicial, va directo al carrito
+    crearForm.value = null; q.value = ''
+  } catch { toast.error(store.saveError || 'No se pudo crear el producto') }
+}
 
 async function cobrar() {
   if (!store.carrito.length) return
@@ -148,6 +175,29 @@ async function cobrar() {
     </div>
 
     <BarcodeScanner v-if="escaneando" titulo="Escaneá para agregar al pedido" @decoded="onCamaraDecoded" @close="escaneando = false" />
+
+    <!-- Scan-to-create: producto nuevo con el código ya cargado (admin) -->
+    <div v-if="crearForm" class="cv__ov" @click.self="crearForm = null">
+      <div class="cv__modal">
+        <h3 class="cv__modal-title">Producto nuevo</h3>
+        <p class="cv__modal-hint">Ese código no estaba registrado. Cargalo una vez y queda para escanear siempre.</p>
+        <div class="cv__code-tag">🏷️ {{ crearForm.codigo_barras }}</div>
+        <label class="cv__fld">Nombre<input v-model.trim="crearForm.nombre" class="cv__inp" maxlength="60" placeholder="Ej: Coca Cola 500ml" autofocus /></label>
+        <label class="cv__fld">Categoría
+          <select v-model="crearForm.categoria_producto_id" class="cv__inp">
+            <option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+          </select>
+        </label>
+        <div class="cv__grid2">
+          <label class="cv__fld">Precio de venta<input v-model.number="crearForm.precio_ars" type="number" min="0" step="any" class="cv__inp" placeholder="$" /></label>
+          <label class="cv__fld">Stock inicial <small>(opcional)</small><input v-model.number="crearForm.stock" type="number" min="0" step="any" class="cv__inp" placeholder="0" /></label>
+        </div>
+        <div class="cv__modal-act">
+          <button class="cv__btn-ghost2" @click="crearForm = null">Cancelar</button>
+          <button class="cv__btn-primary" :disabled="store.saving" @click="guardarNuevo">Crear producto</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -216,4 +266,19 @@ async function cobrar() {
 .cv__link { background: none; border: none; color: #94a3b8; font-size: .82rem; font-weight: 500; cursor: pointer; }
 .cv__link--center { display: block; width: 100%; text-align: center; margin-top: .5rem; }
 .cv__link:hover { color: #64748b; }
+
+/* Modal scan-to-create */
+.cv__ov { position: fixed; inset: 0; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1100; padding: 1rem; }
+.cv__modal { background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 400px; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
+.cv__modal-title { margin: 0 0 .25rem; font-size: 1.1rem; font-weight: 750; letter-spacing: -.02em; color: #0f172a; }
+.cv__modal-hint { color: #64748b; font-size: .82rem; margin: 0 0 .9rem; line-height: 1.45; }
+.cv__code-tag { display: inline-block; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 8px; padding: .3rem .7rem; font-size: .82rem; font-weight: 700; font-variant-numeric: tabular-nums; margin-bottom: 1rem; }
+.cv__fld { display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; color: #475569; font-weight: 600; margin-bottom: .8rem; }
+.cv__fld small { color: #94a3b8; font-weight: 400; }
+.cv__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+.cv__inp { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .55rem .75rem; font-size: .9rem; color: #0f172a; outline: none; }
+.cv__inp:focus { border-color: #1b5e20; }
+.cv__modal-act { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .5rem; }
+.cv__btn-ghost2 { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .55rem 1rem; border-radius: 9px; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.cv__btn-ghost2:hover { background: #f8fafc; }
 </style>

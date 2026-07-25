@@ -243,6 +243,7 @@ const hayFiltro     = computed(() => !!(auditsFiltro.value.desde || auditsFiltro
 const TIPO_OPCIONES = [
   { v: '', l: 'Todos los tipos' }, { v: 'Lote', l: 'Lote' }, { v: 'Plant', l: 'Planta' },
   { v: 'Stock', l: 'Stock' }, { v: 'Dispensacion', l: 'Dispensación' },
+  { v: 'Paciente', l: 'Paciente' }, { v: 'User', l: 'Usuario' }, { v: 'Reserva', l: 'Reserva' },
 ]
 
 const ACCION_INFO = {
@@ -257,6 +258,13 @@ const CAMPO_LABEL = {
   sala_id: 'sala', sede_id: 'sede', genetica_id: 'genética', estado: 'estado',
   codigo: 'código', descripcion: 'descripción', categoria: 'categoría',
   medio_pago: 'medio de pago', cantidad: 'cantidad', notas: 'notas', nombre: 'nombre',
+  // Fase 2: paciente / usuario / reserva
+  apellido: 'apellido', fecha_nacimiento: 'fecha de nacimiento',
+  reprocann_vencimiento: 'venc. REPROCANN', reprocann_estado: 'estado REPROCANN',
+  role: 'rol', first_name: 'nombre', last_name: 'apellido', email_personal: 'email personal',
+  fecha_entrega_estimada: 'fecha de entrega', sena_ars: 'seña', aporte_estimado_ars: 'aporte estimado',
+  con_envio: 'con envío', direccion_envio: 'dirección de envío', contacto_nombre: 'contacto',
+  contacto_telefono: 'tel. de contacto',
 }
 function labelCampo(c) { return CAMPO_LABEL[c] || String(c).replace(/_/g, ' ') }
 function formatVal(v) {

@@ -1,5 +1,23 @@
 # Changelog
 
+## Julio 2026 (g) — audit log Fase 2 (Paciente/User/Reserva) + scan-to-create
+
+- **Audit log Fase 2:** `include Auditable` en **Paciente, User y Reserva**.
+  - **Privacidad primero (allowlist):** el concern suma `auditar_solo :campos` — audita SOLO lo
+    listado, así una columna nueva no se filtra por olvido. **Paciente** audita solo `nombre`,
+    `apellido`, `fecha_nacimiento`, `reprocann_vencimiento`, `reprocann_estado` — **nunca** los
+    campos cifrados at-rest (dni, reprocann_numero, email, teléfono) ni los clínicos (anamnesis,
+    diagnósticos, etc.), que descifrados romperían ENC-01 + la privacidad clínica.
+  - **User** audita solo `role` (evento de seguridad clave) + nombre/apellido/emails — excluye
+    automáticamente el ruido de Devise (login/sign_in tracking, tokens, password) y los cifrados
+    (dni, phone). **Reserva** se audita completa (no cifra nada).
+  - Endpoint y UI ya soportan los tipos nuevos (Paciente/Usuario/Reserva en el filtro del historial).
+  - Specs: `auditable_fase2_spec` (allowlists + wiring: un campo clínico nunca llega al rastro).
+- **Scan-to-create (código de barras):** en *Vender*, si un admin escanea (cámara o lector) un
+  código **no registrado**, se abre el alta rápida del producto con el código ya cargado
+  (nombre/categoría/precio/stock inicial). Así nunca hay que pre-cargar a mano: la primera vez que
+  ves un producto, lo escaneás y lo creás. (No-admin: aviso de "código no asignado".)
+
 ## Julio 2026 (f) — código de barras en el POS del salón (lector físico + cámara)
 
 - **Infra:** columna `codigo_barras` en `bar_productos` (migración `add_codigo_barras_a_bar_productos`),

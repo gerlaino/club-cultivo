@@ -1,5 +1,11 @@
 class Paciente < ApplicationRecord
   include RestorableInterface
+  include Auditable
+  # ALLOWLIST estricto: solo campos NO cifrados y no clínicos. Auditar dni/email/telefono/
+  # reprocann_numero o cualquier campo clínico escribiría el valor DESCIFRADO en el rastro y
+  # rompería el cifrado at-rest (ENC-01) + la privacidad de la historia clínica (fix AZ).
+  # Lo valioso y seguro: identidad básica + vencimiento/estado REPROCANN (los críticos del club).
+  auditar_solo :nombre, :apellido, :fecha_nacimiento, :reprocann_vencimiento, :reprocann_estado
   acts_as_paranoid
   belongs_to :club
   acts_as_tenant(:club)

@@ -1,6 +1,11 @@
 class User < ApplicationRecord
   include Restorable
   include Permissions
+  include Auditable
+  # ALLOWLIST: solo lo relevante y NO cifrado. `role` es el evento de seguridad clave. Excluye
+  # automáticamente el ruido de Devise (login/sign_in tracking, tokens, password) y los campos
+  # cifrados at-rest (dni, phone) — que descifrados no deben quedar en el rastro.
+  auditar_solo :role, :first_name, :last_name, :email, :email_personal
   belongs_to :club, optional: true
 
   # Cifrado at-rest del DNI y teléfono del operador (Ley 25.326 art. 9).

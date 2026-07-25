@@ -268,7 +268,10 @@ class ClubUsersController < ApplicationController
   end
 
   # ── Auditoría (rastro read-only) ──────────────────────────────
-  TIPOS_AUDITABLE = { 'Lote' => 'Lote', 'Plant' => 'Planta', 'Stock' => 'Stock', 'Dispensacion' => 'Dispensación' }.freeze
+  TIPOS_AUDITABLE = {
+    'Lote' => 'Lote', 'Plant' => 'Planta', 'Stock' => 'Stock', 'Dispensacion' => 'Dispensación',
+    'Paciente' => 'Paciente', 'User' => 'Usuario', 'Reserva' => 'Reserva',
+  }.freeze
   # Campos internos que no tiene sentido mostrar en el diff.
   CAMPOS_OCULTOS  = %w[id created_at updated_at deleted_at club_id].freeze
 

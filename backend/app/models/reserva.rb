@@ -6,6 +6,7 @@
 # corre todas sus validaciones (REPROCANN/crédito/stock) y callbacks financieros.
 class Reserva < ApplicationRecord
   include Restorable
+  include Auditable # sin campos cifrados → se audita completa (crear/editar/entregar/cancelar)
   ESTADOS          = %w[pendiente entregada cancelada vencida].freeze
   DIAS_VENCIMIENTO = 7 # días posteriores a la fecha de entrega estimada sin retirar → vencida
 
