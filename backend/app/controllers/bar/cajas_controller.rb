@@ -6,12 +6,12 @@ module Bar
     before_action :authenticate_user!
     before_action :require_feature_bar!
     before_action :set_bar
-    before_action :require_operador, only: [:actual, :abrir, :cerrar]
-    before_action :require_gestion,  only: [:index]
+    before_action :require_operador, only: [:actual, :confirmar_apertura, :solicitar_cierre]
+    before_action :require_gestion,  only: [:index, :abrir, :cerrar, :confirmar_cierre]
 
-    # GET /bares/:bar_id/cajas/actual — la caja abierta (o null)
+    # GET /bares/:bar_id/cajas/actual — la caja activa (abierta o pendiente de cierre), o null
     def actual
-      render json: { caja: serialize(@bar.caja_abierta) }
+      render json: { caja: serialize(@bar.caja_turnos.activas.first) }
     end
 
     # GET /bares/:bar_id/cajas — historial de cierres
@@ -20,9 +20,9 @@ module Bar
       render json: cajas.map { |c| serialize(c) }
     end
 
-    # POST /bares/:bar_id/cajas/abrir  { monto_inicial_ars }
+    # POST /bares/:bar_id/cajas/abrir  { monto_inicial_ars } — admin/supervisor
     def abrir
-      return render json: { error: 'Ya hay una caja abierta' }, status: :unprocessable_entity if @bar.caja_abierta
+      return render json: { error: 'Ya hay una caja activa para este bar' }, status: :unprocessable_entity if @bar.caja_turnos.activas.exists?
 
       caja = @bar.caja_turnos.build(
         club: current_user.club, sede: @bar.sede, abierta_por: current_user,
@@ -35,22 +35,38 @@ module Bar
       end
     end
 
-    # POST /bares/:bar_id/cajas/:id/cerrar  { efectivo_declarado_ars, notas? }
+    # POST /bares/:bar_id/cajas/:id/confirmar_apertura — el operador confirma que está el fondo
+    def confirmar_apertura
+      con_caja { |caja| caja.confirmar_apertura!(usuario: current_user) }
+    end
+
+    # POST /bares/:bar_id/cajas/:id/solicitar_cierre { efectivo_declarado_ars, notas? }
+    # El dispensador cuenta y envía: queda pendiente de confirmación del admin/supervisor.
+    def solicitar_cierre
+      con_caja { |caja| caja.solicitar_cierre!(efectivo_declarado: params[:efectivo_declarado_ars].to_d, solicitada_por: current_user, notas: params[:notas]) }
+    end
+
+    # POST /bares/:bar_id/cajas/:id/confirmar_cierre — admin/supervisor confirma el cierre enviado
+    def confirmar_cierre
+      con_caja { |caja| caja.cerrar!(cerrada_por: current_user) }
+    end
+
+    # POST /bares/:bar_id/cajas/:id/cerrar { efectivo_declarado_ars, notas? } — cierre directo (gestión)
     def cerrar
+      con_caja { |caja| caja.cerrar!(efectivo_declarado: params[:efectivo_declarado_ars].to_d, cerrada_por: current_user, notas: params[:notas]) }
+    end
+
+    private
+
+    def con_caja
       caja = @bar.caja_turnos.find(params[:id])
-      caja.cerrar!(
-        efectivo_declarado: params[:efectivo_declarado_ars].to_d,
-        cerrada_por:        current_user,
-        notas:              params[:notas]
-      )
+      yield caja
       render json: serialize(caja)
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Caja no encontrada' }, status: :not_found
     rescue ArgumentError => e
       render json: { error: e.message }, status: :unprocessable_entity
     end
-
-    private
 
     def set_bar
       @bar = current_user.club.bares.find(params[:bar_id])
@@ -89,9 +105,13 @@ module Bar
         efectivo_esperado_ars:  c.efectivo_esperado_ars,
         efectivo_declarado_ars: c.efectivo_declarado_ars&.to_f,
         diferencia_ars:         c.diferencia_ars,
+        apertura_confirmada:    c.apertura_confirmada?,
         abierta_at:             c.abierta_at,
         cerrada_at:             c.cerrada_at,
+        cierre_solicitado_at:   c.cierre_solicitado_at,
         abierta_por:            c.abierta_por&.nombre_completo,
+        apertura_confirmada_por: c.apertura_confirmada_por&.nombre_completo,
+        cierre_solicitado_por:  c.cierre_solicitado_por&.nombre_completo,
         cerrada_por:            c.cerrada_por&.nombre_completo,
         notas:                  c.notas,
       }

@@ -32,6 +32,14 @@ class Barra < ApplicationRecord
     caja_turnos.abiertas.first
   end
 
+  # Caja que "ocupa" el bar: abierta o pendiente de cierre (esperando el visto del admin).
+  # Es la que ve el panel/chip; las ventas siguen enganchándose solo a caja_abierta.
+  def caja_activa
+    return nil unless CajaTurno.table_exists?
+
+    caja_turnos.activas.first
+  end
+
   validates :nombre, presence: true
   validate  :sede_habilitada
   validate  :una_por_sede, on: :create

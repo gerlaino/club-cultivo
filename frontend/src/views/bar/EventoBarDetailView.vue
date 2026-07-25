@@ -6,7 +6,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useEventosBarStore } from '../../stores/eventosBar.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import EventoProvision from './EventoProvision.vue'
+import EventoStepper from './EventoStepper.vue'
 
 const store  = useEventosBarStore()
 const route  = useRoute()
@@ -66,6 +68,36 @@ const fechaInfo = computed(() => {
 async function cambiarEstado(v) {
   try { await store.actualizar(barId, evId, { estado: v }); toast.success('Estado actualizado') }
   catch { toast.error(store.saveError) }
+}
+async function cancelarEvento() {
+  if (!(await confirm({ title: 'Cancelar evento', message: '¿Cancelar el evento? Se libera el stock reservado. No se puede reabrir.', variant: 'danger' }))) return
+  cambiarEstado('cancelado')
+}
+
+// ── Editar los datos básicos del evento (nombre/fecha/horario/aforo/ingresos) ──
+const editForm = ref(null)
+function abrirEdicion() {
+  editForm.value = {
+    nombre: e.value.nombre,
+    fecha: e.value.fecha ? e.value.fecha.slice(0, 10) : '',
+    horario: e.value.horario || '',
+    aforo: e.value.aforo,
+    presupuesto_ingresos: e.value.presupuesto_ingresos,
+  }
+}
+async function guardarEdicion() {
+  const f = editForm.value
+  if (!f.nombre?.trim()) { toast.warning('El nombre no puede quedar vacío'); return }
+  try {
+    await store.actualizar(barId, evId, {
+      nombre: f.nombre.trim(),
+      fecha: f.fecha || null,
+      horario: f.horario?.trim() || null,
+      aforo: f.aforo || null,
+      presupuesto_ingresos: f.presupuesto_ingresos || 0,
+    })
+    toast.success('Evento actualizado'); editForm.value = null
+  } catch { toast.error(store.saveError) }
 }
 async function borrarEvento() {
   if (!(await confirm({ title: 'Eliminar evento', message: '¿Eliminar el evento? Se recupera desde la papelera.', variant: 'danger' }))) return
@@ -142,6 +174,8 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
         </div>
         <p class="ed__sub">
           <span>📅 {{ fechaInfo.fecha }}<b v-if="fechaInfo.rel"> · {{ fechaInfo.rel }}</b></span>
+          <span v-if="e.horario" class="ed__sep">·</span>
+          <span v-if="e.horario">🕒 {{ e.horario }}</span>
           <span v-if="e.aforo" class="ed__sep">·</span>
           <span v-if="e.aforo">👥 {{ e.entradas_vendidas }} / {{ e.aforo }} lugares</span>
         </p>
@@ -152,12 +186,14 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
       <div class="ed__head-actions">
         <RouterLink :to="`/bar/${barId}/eventos/${evId}/entradas`" class="lnk lnk--btn">🎟️ Entradas</RouterLink>
         <RouterLink :to="`/bar/${barId}/eventos/${evId}/puerta`" class="lnk lnk--btn">🚪 Puerta</RouterLink>
-        <select :value="e.estado" class="inp" @change="cambiarEstado($event.target.value)">
-          <option v-for="s in ESTADOS" :key="s.v" :value="s.v">{{ s.l }}</option>
-        </select>
+        <button class="lnk lnk--btn" @click="abrirEdicion">✏️ Editar</button>
         <button class="lnk lnk--danger" @click="borrarEvento">Eliminar</button>
       </div>
     </header>
+
+    <!-- Fases del evento: el carril de estado (B6) -->
+    <EventoStepper class="ed__stepper" :estado="e.estado" :transiciones="e.transiciones || []" :saving="store.saving"
+                   @cambiar="cambiarEstado" @cancelar="cancelarEvento" />
 
     <!-- Cerrado → P&L completo (resultado real grande + KPIs + break-even) -->
     <template v-if="esCerrado">
@@ -230,6 +266,23 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
       </ul>
     </section>
 
+    <!-- Modal editar datos básicos -->
+    <div v-if="editForm" class="ov" @click.self="editForm = null">
+      <div class="modal modal--wide">
+        <h3>Editar evento</h3>
+        <label class="fld2">Nombre<input v-model.trim="editForm.nombre" class="inp" maxlength="80" /></label>
+        <div class="ed__edit-grid">
+          <label class="fld2">Fecha<AppDatePicker v-model="editForm.fecha" /></label>
+          <label class="fld2">Horario<input v-model.trim="editForm.horario" class="inp" placeholder="Ej: 22:00 a 05:00" maxlength="40" /></label>
+        </div>
+        <div class="ed__edit-grid">
+          <label class="fld2">Aforo<input v-model.number="editForm.aforo" type="number" min="0" class="inp" placeholder="—" /></label>
+          <label class="fld2">Ingresos estimados<input v-model.number="editForm.presupuesto_ingresos" type="number" min="0" step="any" class="inp" placeholder="$0" /></label>
+        </div>
+        <div class="cform__actions"><button class="btn" @click="editForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="guardarEdicion">Guardar</button></div>
+      </div>
+    </div>
+
     <!-- Modal vender -->
     <div v-if="venderPara" class="ov" @click.self="venderPara = null">
       <div class="modal">
@@ -298,6 +351,7 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 .ed__back { font-size: var(--fs-13, 13px); color: #1b5e20; text-decoration: none; font-weight: 600; }
 .ed__head h1 { font-size: var(--fs-24, 24px); font-weight: 700; color: #0f172a; margin: 6px 0 0; }
 .ed__head p { color: #64748b; margin: 3px 0 0; font-size: var(--fs-14, 14px); }
+.ed__stepper { margin: var(--sp-5, 20px) 0; }
 .ed__head-actions { display: flex; align-items: center; gap: 12px; }
 .ed__head-l { min-width: 0; flex: 1; }
 .ed__title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
@@ -395,6 +449,8 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 
 .ov { position: fixed; inset: 0; background: rgba(20,20,20,.45); display: grid; place-items: center; z-index: 1000; padding: 16px; }
 .modal { background: var(--c-paper, #fff); border-radius: var(--r-lg, 14px); padding: var(--sp-5, 20px); width: 100%; max-width: 360px; box-shadow: var(--sh-3, 0 20px 50px rgba(0,0,0,.25)); }
+.modal--wide { max-width: 440px; }
+.ed__edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .modal h3 { margin: 0 0 4px; font-size: var(--fs-18, 18px); color: #0f172a; }
 .modal__hint { color: #64748b; font-size: var(--fs-13, 13px); margin: 0 0 var(--sp-3, 12px); }
 .fld2 { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-13, 13px); color: #475569; margin-bottom: var(--sp-3, 12px); }

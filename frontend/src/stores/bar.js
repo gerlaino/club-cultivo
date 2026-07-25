@@ -5,6 +5,7 @@ import {
   listBares, createBar, updateBar, deleteBar, getBarDashboard,
   listBarProductos, createBarProducto, updateBarProducto, deleteBarProducto,
   reponerBarProducto, crearBarVenta, abrirCaja, cerrarCaja,
+  getCajaActual, confirmarAperturaCaja, solicitarCierreCaja, confirmarCierreCaja,
 } from "../lib/api";
 
 export const useBarStore = defineStore("bar", {
@@ -13,6 +14,8 @@ export const useBarStore = defineStore("bar", {
     barActual: null,      // objeto bar seleccionado
     productos: [],
     dashboard: null,
+    cajaActiva: null,     // caja del turno activa (abierta/pendiente_cierre) — chip + CajaSheet
+    cajaLoading: false,
     loading:   false,
     error:     null,
     saving:    false,
@@ -106,15 +109,48 @@ export const useBarStore = defineStore("bar", {
       }
     },
 
-    // ── Caja de turno ────────────────────────────────────────
+    // ── Caja de turno (con confirmación entre roles) ─────────
+    // Fuente única del estado de la caja para el chip + CajaSheet, en cualquier pantalla del bar
+    // (el dispensador no carga el dashboard, así que no puede depender de él).
+    async fetchCajaActual(barId) {
+      this.cajaLoading = true;
+      try {
+        const { data } = await getCajaActual(barId);
+        this.cajaActiva = data?.caja || null;
+      } catch (e) {
+        logger.error("Bar.fetchCajaActual", e);
+      } finally {
+        this.cajaLoading = false;
+      }
+    },
+    // Tras cualquier transición: refrescamos la caja siempre, y el dashboard solo si ya estaba cargado.
+    async _trasCaja(barId) {
+      await this.fetchCajaActual(barId);
+      if (this.dashboard?.bar && String(this.dashboard.bar.id) === String(barId)) await this.fetchDashboard(barId);
+    },
     async abrirCaja(barId, monto_inicial_ars) {
       const data = await this._guardar(() => abrirCaja(barId, { monto_inicial_ars }), () => {});
-      await this.fetchDashboard(barId);
+      await this._trasCaja(barId);
+      return data;
+    },
+    async confirmarApertura(barId, cajaId) {
+      const data = await this._guardar(() => confirmarAperturaCaja(barId, cajaId), () => {});
+      await this._trasCaja(barId);
+      return data;
+    },
+    async solicitarCierre(barId, cajaId, payload) {
+      const data = await this._guardar(() => solicitarCierreCaja(barId, cajaId, payload), () => {});
+      await this._trasCaja(barId);
+      return data;
+    },
+    async confirmarCierre(barId, cajaId) {
+      const data = await this._guardar(() => confirmarCierreCaja(barId, cajaId), () => {});
+      await this._trasCaja(barId);
       return data;
     },
     async cerrarCaja(barId, cajaId, payload) {
       const data = await this._guardar(() => cerrarCaja(barId, cajaId, payload), () => {});
-      await this.fetchDashboard(barId);
+      await this._trasCaja(barId);
       return data;
     },
 

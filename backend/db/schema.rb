@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_24_000005) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_25_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -319,10 +319,16 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_24_000005) do
     t.string "notas"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "apertura_confirmada_por_id"
+    t.datetime "apertura_confirmada_at"
+    t.bigint "cierre_solicitado_por_id"
+    t.datetime "cierre_solicitado_at"
     t.index ["abierta_por_id"], name: "index_caja_turnos_on_abierta_por_id"
+    t.index ["apertura_confirmada_por_id"], name: "index_caja_turnos_on_apertura_confirmada_por_id"
+    t.index ["bar_id"], name: "index_caja_turnos_activa_por_bar", unique: true, where: "((estado)::text = ANY (ARRAY['abierta'::text, 'pendiente_cierre'::text]))"
     t.index ["bar_id"], name: "index_caja_turnos_on_bar_id"
-    t.index ["bar_id"], name: "index_caja_turnos_una_abierta_por_bar", unique: true, where: "((estado)::text = 'abierta'::text)"
     t.index ["cerrada_por_id"], name: "index_caja_turnos_on_cerrada_por_id"
+    t.index ["cierre_solicitado_por_id"], name: "index_caja_turnos_on_cierre_solicitado_por_id"
     t.index ["club_id"], name: "index_caja_turnos_on_club_id"
     t.index ["sede_id"], name: "index_caja_turnos_on_sede_id"
   end
@@ -889,6 +895,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_24_000005) do
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "horario"
     t.index ["bar_id"], name: "index_eventos_bar_on_bar_id"
     t.index ["club_id", "fecha"], name: "index_eventos_bar_on_club_id_and_fecha"
     t.index ["club_id"], name: "index_eventos_bar_on_club_id"
@@ -2136,7 +2143,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_24_000005) do
   add_foreign_key "caja_turnos", "clubs"
   add_foreign_key "caja_turnos", "sedes"
   add_foreign_key "caja_turnos", "users", column: "abierta_por_id"
+  add_foreign_key "caja_turnos", "users", column: "apertura_confirmada_por_id"
   add_foreign_key "caja_turnos", "users", column: "cerrada_por_id"
+  add_foreign_key "caja_turnos", "users", column: "cierre_solicitado_por_id"
   add_foreign_key "categorias_contables", "categorias_contables", column: "parent_id"
   add_foreign_key "categorias_contables", "clubs"
   add_foreign_key "categorias_contables", "unidades_negocio", column: "unidad_negocio_id"

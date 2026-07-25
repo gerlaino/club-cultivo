@@ -7,18 +7,20 @@ import { useRoute, useRouter } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
-import { useConfirm } from '../../composables/useConfirm.js'
 import BarNav from './BarNav.vue'
+import CajaSheet from './CajaSheet.vue'
 
 const store = useBarStore()
 const auth  = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const { confirm } = useConfirm()
 const barId = route.params.barId
 
 const esAdmin = computed(() => auth.user?.role === 'admin')
+// Resumen liviano (B4): lo glanceable siempre a la vista; el análisis (ventas por hora, top,
+// lecturas) va plegado y se abre bajo demanda.
+const showAnalisis = ref(false)
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 const fmtK = (n) => {
   const v = Math.abs(n || 0)
@@ -43,31 +45,16 @@ const hoy = computed(() => d.value?.hoy || {})
 const caja = computed(() => d.value?.caja || null)
 const esOperador = computed(() => ['admin', 'supervisor', 'dispensador'].includes(auth.user?.role))
 
-// ── Caja de turno: apertura + cierre con arqueo ────────────────
-const aperturaForm = ref(null) // { monto_inicial }
-function abrirApertura() { aperturaForm.value = { monto_inicial: null } }
-async function confirmarApertura() {
-  const m = Number(aperturaForm.value.monto_inicial) || 0
-  try { await store.abrirCaja(barId, m); toast.success('Caja abierta'); aperturaForm.value = null }
-  catch { toast.error(store.saveError) }
-}
-
-const cierreForm = ref(null) // { efectivo_declarado, notas }
-function abrirCierre() { cierreForm.value = { efectivo_declarado: null, notas: '' } }
-const diferenciaCierre = computed(() => {
-  if (!cierreForm.value || !caja.value) return null
-  const contado = Number(cierreForm.value.efectivo_declarado)
-  if (cierreForm.value.efectivo_declarado === null || cierreForm.value.efectivo_declarado === '') return null
-  return contado - caja.value.efectivo_esperado_ars
+// ── Caja de turno: toda la operación (abrir/confirmar/cerrar según rol) vive en CajaSheet ──
+const showCaja = ref(false)
+// El estado que muestra el card: la caja del Pulso ahora trae estado + apertura_confirmada.
+const cajaBadge = computed(() => {
+  const c = caja.value
+  if (!c) return null
+  if (c.estado === 'pendiente_cierre') return { txt: 'Cierre pendiente', cls: 'pend' }
+  if (c.estado === 'abierta' && !c.apertura_confirmada) return { txt: 'Falta confirmar', cls: 'warn' }
+  return { txt: 'Abierta', cls: 'open' }
 })
-async function confirmarCierre() {
-  const f = cierreForm.value
-  if (f.efectivo_declarado === null || f.efectivo_declarado === '') { toast.warning('Ingresá el efectivo contado'); return }
-  try {
-    await store.cerrarCaja(barId, caja.value.id, { efectivo_declarado_ars: Number(f.efectivo_declarado), notas: f.notas || undefined })
-    toast.success('Caja cerrada'); cierreForm.value = null
-  } catch { toast.error(store.saveError) }
-}
 
 // ── Gráfico de ventas por hora (SVG area) ──────────────────────
 const W = 520, H = 128, PAD = 10
@@ -117,7 +104,7 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
         <div class="sp__card sp__caja">
           <div class="sp__caja-head">
             <span class="sp__lbl">Caja del turno</span>
-            <span v-if="caja" class="sp__caja-open">● Abierta</span>
+            <span v-if="cajaBadge" class="sp__caja-open" :class="`sp__caja-open--${cajaBadge.cls}`">● {{ cajaBadge.txt }}</span>
           </div>
           <template v-if="caja">
             <span class="sp__caja-val num">{{ fmt(caja.total_ventas_ars) }}</span>
@@ -126,12 +113,12 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
               <span>Digital <b class="num">{{ fmt(caja.total_digital_ars) }}</b></span>
             </div>
             <div class="sp__caja-foot">Fondo {{ fmt(caja.monto_inicial_ars) }} · {{ caja.tickets }} tickets</div>
-            <button v-if="esOperador" class="sp__btn sp__btn--brand sp__caja-btn" @click="abrirCierre">Cerrar caja</button>
+            <button v-if="esOperador" class="sp__btn sp__btn--brand sp__caja-btn" @click="showCaja = true">Gestionar caja</button>
           </template>
           <template v-else>
             <span class="sp__caja-val sp__caja-muted">Sin caja abierta</span>
             <div class="sp__caja-foot">Ventas de hoy: {{ fmt(hoy.total) }} · {{ hoy.tickets || 0 }} tickets</div>
-            <button v-if="esOperador" class="sp__btn sp__btn--brand sp__caja-btn" @click="abrirApertura">Abrir caja</button>
+            <button v-if="esOperador" class="sp__btn sp__btn--brand sp__caja-btn" @click="showCaja = true">Abrir caja</button>
           </template>
         </div>
 
@@ -142,36 +129,55 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
         </div>
       </div>
 
-      <!-- Row 2: ventas por hora + top -->
-      <div class="sp__row2">
-        <div class="sp__card">
-          <div class="sp__ch"><b>Ventas por hora</b><span class="sp__mut" v-if="chart">pico {{ chart.pico.hora }}h</span></div>
-          <svg v-if="chart" class="sp__chart" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
-            <defs><linearGradient id="spg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a5b34" stop-opacity=".26" /><stop offset="1" stop-color="#9a5b34" stop-opacity="0" /></linearGradient></defs>
-            <line :x1="0" :y1="H - 2" :x2="W" :y2="H - 2" stroke="#e6ebf1" />
-            <polygon :points="chart.area" fill="url(#spg)" />
-            <polyline :points="chart.line" fill="none" stroke="#9a5b34" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-            <circle :cx="chart.pico.x" :cy="chart.pico.y" r="4" fill="#9a5b34" />
-          </svg>
-          <div v-if="chart" class="sp__legend"><span>{{ chart.minH }}h apertura</span><span>{{ chart.maxH }}h</span></div>
-          <div v-else class="sp__empty">Sin ventas hoy todavía.</div>
-        </div>
-
-        <div class="sp__card">
-          <div class="sp__ch"><b>Top de hoy</b><span class="sp__mut">unidades · margen</span></div>
-          <div v-if="!d.top_productos?.length" class="sp__empty">Todavía no hubo ventas hoy.</div>
-          <ul v-else class="sp__rank">
-            <li v-for="(t, i) in d.top_productos" :key="t.nombre + i">
-              <span class="sp__n">{{ i + 1 }}</span>
-              <span class="sp__nm">{{ t.nombre }}<small>{{ t.categoria || '—' }}</small></span>
-              <span class="sp__q num">{{ Math.round(t.cantidad) }}<small v-if="t.margen_pct != null">{{ t.margen_pct }}%</small></span>
-            </li>
-          </ul>
-        </div>
+      <!-- Reponer: glanceable y accionable, siempre a la vista -->
+      <div class="sp__card sp__repo-card">
+        <div class="sp__ch"><b>Reponer pronto</b><span class="sp__mut">bajo mínimo</span></div>
+        <div v-if="!d.reponer?.length" class="sp__empty">Todo con stock suficiente. 👌</div>
+        <ul v-else class="sp__repo">
+          <li v-for="r in d.reponer" :key="r.id">
+            <span class="sp__rn">{{ r.nombre }}</span>
+            <span class="sp__meter"><i :class="{ mid: r.pct >= 30 }" :style="{ width: Math.max(6, r.pct) + '%' }"></i></span>
+            <span class="sp__rq num">{{ r.stock }} u</span>
+            <RouterLink v-if="esAdmin" :to="`/bar/${barId}/stock`" class="sp__rbtn">Reponer</RouterLink>
+          </li>
+        </ul>
       </div>
 
-      <!-- Row 3: lecturas + reponer -->
-      <div class="sp__row3">
+      <!-- Análisis del salón: plegado por defecto (ventas por hora, top, lecturas) -->
+      <button class="sp__fold" :class="{ 'is-open': showAnalisis }" @click="showAnalisis = !showAnalisis">
+        <span>Análisis del salón</span>
+        <span class="sp__fold-sub">ventas por hora · top de hoy · lecturas</span>
+        <span class="sp__fold-caret">{{ showAnalisis ? '▴' : '▾' }}</span>
+      </button>
+
+      <template v-if="showAnalisis">
+        <div class="sp__row2">
+          <div class="sp__card">
+            <div class="sp__ch"><b>Ventas por hora</b><span class="sp__mut" v-if="chart">pico {{ chart.pico.hora }}h</span></div>
+            <svg v-if="chart" class="sp__chart" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="spg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a5b34" stop-opacity=".26" /><stop offset="1" stop-color="#9a5b34" stop-opacity="0" /></linearGradient></defs>
+              <line :x1="0" :y1="H - 2" :x2="W" :y2="H - 2" stroke="#e6ebf1" />
+              <polygon :points="chart.area" fill="url(#spg)" />
+              <polyline :points="chart.line" fill="none" stroke="#9a5b34" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+              <circle :cx="chart.pico.x" :cy="chart.pico.y" r="4" fill="#9a5b34" />
+            </svg>
+            <div v-if="chart" class="sp__legend"><span>{{ chart.minH }}h apertura</span><span>{{ chart.maxH }}h</span></div>
+            <div v-else class="sp__empty">Sin ventas hoy todavía.</div>
+          </div>
+
+          <div class="sp__card">
+            <div class="sp__ch"><b>Top de hoy</b><span class="sp__mut">unidades · margen</span></div>
+            <div v-if="!d.top_productos?.length" class="sp__empty">Todavía no hubo ventas hoy.</div>
+            <ul v-else class="sp__rank">
+              <li v-for="(t, i) in d.top_productos" :key="t.nombre + i">
+                <span class="sp__n">{{ i + 1 }}</span>
+                <span class="sp__nm">{{ t.nombre }}<small>{{ t.categoria || '—' }}</small></span>
+                <span class="sp__q num">{{ Math.round(t.cantidad) }}<small v-if="t.margen_pct != null">{{ t.margen_pct }}%</small></span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
         <div class="sp__card">
           <div class="sp__ai-head"><span class="sp__ai-badge">Lecturas del salón</span></div>
           <div v-if="!d.lecturas?.length" class="sp__empty">Sin lecturas por ahora. Cargá ventas y volvé.</div>
@@ -180,62 +186,12 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
             <p>{{ l.texto }}</p>
           </div>
         </div>
-
-        <div class="sp__card">
-          <div class="sp__ch"><b>Reponer pronto</b><span class="sp__mut">bajo mínimo</span></div>
-          <div v-if="!d.reponer?.length" class="sp__empty">Todo con stock suficiente.</div>
-          <ul v-else class="sp__repo">
-            <li v-for="r in d.reponer" :key="r.id">
-              <span class="sp__rn">{{ r.nombre }}</span>
-              <span class="sp__meter"><i :class="{ mid: r.pct >= 30 }" :style="{ width: Math.max(6, r.pct) + '%' }"></i></span>
-              <span class="sp__rq num">{{ r.stock }} u</span>
-              <RouterLink v-if="esAdmin" :to="`/bar/${barId}/stock`" class="sp__rbtn">Reponer</RouterLink>
-            </li>
-          </ul>
-        </div>
-      </div>
+      </template>
     </template>
     <div v-else class="sp__empty" style="padding:3rem 0;">Cargando el salón…</div>
 
-    <!-- Modal abrir caja -->
-    <div v-if="aperturaForm" class="sp__ov" @click.self="aperturaForm = null">
-      <div class="sp__modal">
-        <h3 class="sp__modal-title">Abrir caja del turno</h3>
-        <p class="sp__modal-hint">El fondo inicial es el efectivo con el que arranca la caja. Al cerrar vas a contar y comparar.</p>
-        <label class="sp__fld">Fondo inicial (efectivo)
-          <input v-model.number="aperturaForm.monto_inicial" type="number" min="0" step="any" class="sp__inp" placeholder="$0" />
-        </label>
-        <div class="sp__modal-act">
-          <button class="sp__btn" @click="aperturaForm = null">Cancelar</button>
-          <button class="sp__btn sp__btn--brand" :disabled="store.saving" @click="confirmarApertura">Abrir caja</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal cerrar caja (arqueo) -->
-    <div v-if="cierreForm && caja" class="sp__ov" @click.self="cierreForm = null">
-      <div class="sp__modal">
-        <h3 class="sp__modal-title">Cerrar caja — arqueo</h3>
-        <div class="sp__arqueo">
-          <div class="sp__arqueo-row"><span>Fondo inicial</span><b class="num">{{ fmt(caja.monto_inicial_ars) }}</b></div>
-          <div class="sp__arqueo-row"><span>Ventas en efectivo</span><b class="num">{{ fmt(caja.total_efectivo_ars) }}</b></div>
-          <div class="sp__arqueo-row sp__arqueo-row--tot"><span>Efectivo esperado</span><b class="num">{{ fmt(caja.efectivo_esperado_ars) }}</b></div>
-        </div>
-        <label class="sp__fld">Efectivo contado
-          <input v-model.number="cierreForm.efectivo_declarado" type="number" min="0" step="any" class="sp__inp" placeholder="$0" />
-        </label>
-        <div v-if="diferenciaCierre !== null" class="sp__dif" :class="diferenciaCierre === 0 ? 'ok' : (diferenciaCierre > 0 ? 'sobra' : 'falta')">
-          {{ diferenciaCierre === 0 ? 'Cuadra exacto' : (diferenciaCierre > 0 ? `Sobra ${fmt(diferenciaCierre)}` : `Falta ${fmt(Math.abs(diferenciaCierre))}`) }}
-        </div>
-        <label class="sp__fld">Notas (opcional)
-          <input v-model.trim="cierreForm.notas" class="sp__inp" placeholder="Ej: diferencia por vuelto" maxlength="120" />
-        </label>
-        <div class="sp__modal-act">
-          <button class="sp__btn" @click="cierreForm = null">Cancelar</button>
-          <button class="sp__btn sp__btn--brand" :disabled="store.saving" @click="confirmarCierre">Cerrar caja</button>
-        </div>
-      </div>
-    </div>
+    <!-- Caja del turno: apertura / confirmación / cierre según rol y estado -->
+    <CajaSheet v-if="showCaja" :bar-id="barId" @close="showCaja = false" />
 
   </div>
 </template>
@@ -302,6 +258,14 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
 .sp__q { text-align: right; font-weight: 750; }
 .sp__q small { display: block; color: #15803d; font-weight: 600; font-size: .7rem; }
 
+/* Reponer glanceable + toggle de análisis (B4) */
+.sp__repo-card { margin-bottom: .9rem; }
+.sp__fold { display: flex; align-items: center; gap: .6rem; width: 100%; background: #fff; border: 1px solid #e6ebf1; border-radius: 12px; padding: .9rem 1.1rem; cursor: pointer; margin-bottom: .9rem; font-weight: 700; color: #334155; font-size: .9rem; }
+.sp__fold:hover { border-color: #cbd5e1; }
+.sp__fold.is-open { border-color: #9a5b34; }
+.sp__fold-sub { font-size: .74rem; font-weight: 500; color: #94a3b8; }
+.sp__fold-caret { margin-left: auto; color: #9a5b34; font-size: .9rem; }
+
 /* Row 3 */
 .sp__row3 { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin-bottom: .9rem; }
 @media (max-width: 760px) { .sp__row3 { grid-template-columns: 1fr; } }
@@ -354,6 +318,8 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
 /* Caja del turno */
 .sp__caja-head { display: flex; align-items: center; justify-content: space-between; }
 .sp__caja-open { font-size: .68rem; font-weight: 700; color: #15803d; background: #effaf1; padding: 2px 8px; border-radius: 999px; }
+.sp__caja-open--warn { color: #b45309; background: #fef3c7; }
+.sp__caja-open--pend { color: #1d4ed8; background: #eff6ff; }
 .sp__caja-muted { color: #94a3b8; font-size: 1.1rem; }
 .sp__caja-btn { margin-top: auto; justify-content: center; width: 100%; }
 

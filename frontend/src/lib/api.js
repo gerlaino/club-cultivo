@@ -378,6 +378,10 @@ export const getCajaActual      = (barId)          => api.get(`/bares/${barId}/c
 export const listCajas          = (barId)          => api.get(`/bares/${barId}/cajas`)
 export const abrirCaja          = (barId, payload) => api.post(`/bares/${barId}/cajas/abrir`, payload)
 export const cerrarCaja         = (barId, id, payload) => api.post(`/bares/${barId}/cajas/${id}/cerrar`, payload)
+// Confirmación entre roles: el operador confirma el fondo y envía el cierre; gestión confirma el cierre.
+export const confirmarAperturaCaja = (barId, id)          => api.post(`/bares/${barId}/cajas/${id}/confirmar_apertura`)
+export const solicitarCierreCaja   = (barId, id, payload) => api.post(`/bares/${barId}/cajas/${id}/solicitar_cierre`, payload)
+export const confirmarCierreCaja   = (barId, id)          => api.post(`/bares/${barId}/cajas/${id}/confirmar_cierre`)
 
 // ── Bar · eventos (proyecto con P&L) ───────────────────────────────────────────
 export const listEventosBar    = (barId)             => api.get(`/bares/${barId}/eventos`)

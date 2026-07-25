@@ -31,7 +31,7 @@ onMounted(async () => {
   if (esBarInexistente(store.error)) irAlListado()
 })
 
-function nuevo() { form.value = { nombre: '', fecha: '', aforo: null, presupuesto_ingresos: 0 } }
+function nuevo() { form.value = { nombre: '', fecha: '', horario: '', aforo: null, presupuesto_ingresos: 0 } }
 async function guardar() {
   if (!form.value.nombre?.trim()) { toast.warning('Poné un nombre'); return }
   try {
@@ -64,16 +64,28 @@ function fechaTxt(f) {
       </div>
     </header>
 
-    <form v-if="form" class="ev__form" @submit.prevent="guardar">
-      <input v-model.trim="form.nombre" class="inp" placeholder="Nombre del evento" maxlength="80" />
-      <label class="fld">Fecha<AppDatePicker v-model="form.fecha" /></label>
-      <label class="fld">Aforo<input v-model.number="form.aforo" type="number" min="0" class="inp inp--sm" /></label>
-      <label class="fld">Ingresos estimados<input v-model.number="form.presupuesto_ingresos" type="number" min="0" step="any" class="inp" /></label>
-      <div class="ev__form-actions">
-        <button type="button" class="btn" @click="form = null">Cancelar</button>
-        <button type="submit" class="btn btn--primary" :disabled="store.saving">Crear</button>
-      </div>
-    </form>
+    <!-- Alta mínima por modal: lo esencial para crear el evento; el resto se completa adentro. -->
+    <div v-if="form" class="ev__ov" @click.self="form = null">
+      <form class="ev__modal" @submit.prevent="guardar">
+        <h3 class="ev__modal-title">Nuevo evento</h3>
+        <p class="ev__modal-hint">Con esto alcanza para arrancar. Entradas, costos y provisión se cargan dentro del evento.</p>
+        <label class="fld ev__fld">Nombre
+          <input v-model.trim="form.nombre" class="inp" placeholder="Ej: Fiesta de apertura" maxlength="80" autofocus />
+        </label>
+        <div class="ev__grid2">
+          <label class="fld">Fecha<AppDatePicker v-model="form.fecha" /></label>
+          <label class="fld">Horario (opcional)<input v-model.trim="form.horario" class="inp" placeholder="Ej: 22:00 a 05:00" maxlength="40" /></label>
+        </div>
+        <div class="ev__grid2">
+          <label class="fld">Aforo (opcional)<input v-model.number="form.aforo" type="number" min="0" class="inp" placeholder="—" /></label>
+          <label class="fld">Ingresos estimados (opcional)<input v-model.number="form.presupuesto_ingresos" type="number" min="0" step="any" class="inp" placeholder="$0" /></label>
+        </div>
+        <div class="ev__modal-actions">
+          <button type="button" class="btn" @click="form = null">Cancelar</button>
+          <button type="submit" class="btn btn--primary" :disabled="store.saving">Crear evento</button>
+        </div>
+      </form>
+    </div>
 
     <div v-if="store.loading" class="ev__loading">Cargando…</div>
     <div v-else-if="!store.eventos.length" class="ev__empty">Todavía no hay eventos. Creá el primero.</div>
@@ -84,6 +96,7 @@ function fechaTxt(f) {
         <div class="evrow__main">
           <div class="evrow__name">{{ e.nombre }} <span class="chip" :class="ESTADOS[e.estado]?.cls">{{ ESTADOS[e.estado]?.label }}</span></div>
           <div class="evrow__meta">
+            <span v-if="e.horario">🕒 {{ e.horario }}</span>
             <span v-if="e.aforo">aforo {{ e.aforo }}</span>
             <span>comprometido {{ fmt(e.costos_comprometidos) }}</span>
           </div>
@@ -105,9 +118,17 @@ function fechaTxt(f) {
 .ev__head h1 { font-size: var(--fs-24, 24px); font-weight: 700; color: #0f172a; margin: 0; }
 .ev__head p { color: #64748b; margin: 4px 0 0; font-size: var(--fs-14, 14px); }
 .ev__nav { display: flex; gap: 10px; }
-.ev__form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: var(--r-md, 10px); padding: var(--sp-3, 12px); margin-top: var(--sp-4, 16px); }
 .fld { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-12, 12px); color: #64748b; }
-.ev__form-actions { display: flex; gap: 8px; margin-left: auto; }
+
+/* Modal de alta mínima */
+.ev__ov { position: fixed; inset: 0; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1000; padding: 16px; }
+.ev__modal { background: var(--c-paper, #fff); border-radius: var(--r-lg, 14px); padding: var(--sp-5, 20px); width: 100%; max-width: 420px; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
+.ev__modal-title { margin: 0 0 4px; font-size: var(--fs-18, 18px); font-weight: 700; color: #0f172a; }
+.ev__modal-hint { margin: 0 0 var(--sp-4, 16px); font-size: var(--fs-13, 13px); color: #64748b; line-height: 1.45; }
+.ev__fld { margin-bottom: var(--sp-3, 12px); }
+.ev__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: var(--sp-3, 12px); }
+.ev__modal .inp { width: 100%; }
+.ev__modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: var(--sp-4, 16px); }
 .ev__loading, .ev__empty { color: #64748b; padding: var(--sp-8, 32px); text-align: center; }
 
 .ev__list { display: flex; flex-direction: column; gap: 10px; margin-top: var(--sp-5, 20px); }

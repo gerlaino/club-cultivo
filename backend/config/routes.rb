@@ -408,7 +408,7 @@ Rails.application.routes.draw do
       # Caja de turno: apertura / cierre con arqueo / historial
       resources :cajas, controller: 'bar/cajas', only: [:index] do
         collection { get :actual; post :abrir }
-        member     { post :cerrar }
+        member     { post :cerrar; post :confirmar_apertura; post :solicitar_cierre; post :confirmar_cierre }
       end
       resources :eventos, controller: 'bar/eventos', only: [:index, :show, :create, :update, :destroy] do
         resources :costos, controller: 'bar/evento_costos', only: [:create, :update, :destroy]

@@ -76,12 +76,12 @@ module Bar
     end
 
     def evento_params
-      params.require(:evento_bar).permit(:nombre, :fecha, :estado, :descripcion, :aforo, :presupuesto_ingresos, :notas)
+      params.require(:evento_bar).permit(:nombre, :fecha, :horario, :estado, :descripcion, :aforo, :presupuesto_ingresos, :notas)
     end
 
     def serialize(e, full: false)
       base = {
-        id: e.id, nombre: e.nombre, fecha: e.fecha, estado: e.estado,
+        id: e.id, nombre: e.nombre, fecha: e.fecha, horario: e.horario, estado: e.estado,
         aforo: e.aforo, presupuesto_ingresos: e.presupuesto_ingresos.to_f,
         resultado: e.resultado, resultado_proyectado: e.resultado_proyectado,
         costos_comprometidos: e.costos_comprometidos, costos_pagados: e.costos_pagados,
@@ -90,6 +90,7 @@ module Bar
 
       base.merge(
         descripcion: e.descripcion, notas: e.notas,
+        transiciones: e.transiciones_validas,
         costos: e.costos.order(:created_at).map { |c| serialize_costo(c) },
         tareas: e.tareas.ordenadas.map { |t| serialize_tarea(t) },
         tipos_entrada: e.tipos_entrada.ordenados.map { |t| serialize_tipo(t) },

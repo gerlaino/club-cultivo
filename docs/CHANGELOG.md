@@ -1,5 +1,44 @@
 # Changelog
 
+## Julio 2026 (d) — rediseño del Salón COMPLETO (B3–B6)
+
+- **B3 · Vender = lista + buscador:** `BarPosView` pasó del grid con tabs de categoría a una
+  **lista buscable por nombre** (chips de categoría como filtro secundario, "Todas" por defecto) +
+  **hueco reservado para el lector de código de barras**. Cada fila: nombre, categoría, precio,
+  stock y "+". Carrito igual, a la derecha.
+- **B4 · Resumen liviano:** el Panel muestra glanceable lo accionable (resultado del mes, caja del
+  turno, KPIs de hoy, **reponer**) y **pliega el análisis** (ventas por hora, top de hoy, lecturas)
+  detrás de un toggle "Análisis del salón", cerrado por defecto.
+- **Horario del evento:** columna `horario` (texto libre, ej. "22:00 a 05:00", migración
+  `add_horario_a_eventos_bar`). Se pide en el modal de alta y se muestra en el listado y la ficha.
+- **Cierre — Depósito→solapa Salón read-only:** `DepositoSalon.vue` dejó de duplicar la gestión del
+  stock del bar (sacados Comprar / Reconteo / +Producto). Ahora es una **vista de solo lectura**
+  (lista valorizada + historial de movimientos) con CTA a **Stock del salón**, único lugar de gestión.
+- **Cierre — editar evento desde la ficha:** botón **✏️ Editar** en `EventoBarDetailView` (modal
+  nombre/fecha/horario/aforo/ingresos estimados). Antes esos campos solo se seteaban al crear.
+
+## Julio 2026 (d.1) — rediseño del Salón: caja con confirmación (B5) + eventos por fases (B6)
+
+- **B5 · Caja de turno con confirmación entre roles:** el ciclo de la caja ahora reparte
+  responsabilidades — admin/supervisor **abre** (fondo) → el dispensador **confirma** que la plata
+  está → el dispensador **envía el cierre** (cuenta el efectivo, ve el esperado) → admin/supervisor
+  **confirma el cierre** (o cierra directo). Estado intermedio `pendiente_cierre` (migración
+  `add_confirmacion_a_caja_turnos`, índice único de "caja activa" que incluye el pendiente).
+  `Bar::Pulso`/`Barra#caja_activa` exponen la caja pendiente para que gestión la vea; las ventas
+  siguen enganchándose solo a `caja_abierta`. Frontend: `CajaSheet.vue` (una pantalla, acción según
+  rol+estado) reachable desde el **chip de `BarNav`** en cualquier vista del bar (así el dispensador
+  la opera desde Vender/Stock, sin ver el Panel). El chip refleja el estado (Sin caja / Falta
+  confirmar / Caja abierta / Cierre pendiente).
+- **B6 · Eventos por fases:** el `<select>` de estado se reemplazó por un **stepper**
+  (`EventoStepper.vue`: planificado → en venta → en curso → cerrado, con cancelar fuera del carril).
+  Backend: guard de transiciones (`EventoBar.transiciones_desde`, validación `transicion_valida`) —
+  un evento terminal (finalizado/cancelado) **no se reabre**; el detalle expone `transiciones`. Alta
+  de evento pasó a **modal mínimo** (nombre/fecha/aforo/ingresos estimados); el resto se completa
+  dentro. Specs: `caja_confirmacion_spec` y `evento_bar_fases_spec` (71 ejemplos del bar en verde).
+- **Pendiente del rediseño del Salón:** B3 (Vender lista+buscador) y B4 (Resumen liviano) siguen
+  sin hacer. Idea de diseño sin cerrar: un campo `horario` en el evento (requiere migración) —
+  el modal de alta hoy no lo pide.
+
 ## Julio 2026 (c) — capa de sede, salón inteligente, regalo, limpieza
 
 - **Contexto de sede (UI):** store `sede` + selector en el `AdminTopBar` (gated `multi_sede`) —

@@ -20,13 +20,27 @@ class EventoBar < ApplicationRecord
   has_many :bar_ventas,            class_name: 'BarVenta',           foreign_key: :evento_bar_id, dependent: :nullify
 
   ESTADOS = %w[planificado en_venta en_curso finalizado cancelado].freeze
-  # Un evento finalizado o cancelado no acepta más ventas (entradas ni barra).
+  # El "carril" del evento por fases (el stepper de la UI). cancelado vive fuera del carril.
+  CARRIL = %w[planificado en_venta en_curso finalizado].freeze
+  # Un evento finalizado o cancelado no acepta más ventas (entradas ni barra) y es TERMINAL:
+  # no se reabre (una vez que se devolvió el sobrante y se asentó el P&L, es un hecho consumado).
   ESTADOS_SIN_VENTA = %w[finalizado cancelado].freeze
   def permite_ventas? = ESTADOS_SIN_VENTA.exclude?(estado)
+  def terminal? = ESTADOS_SIN_VENTA.include?(estado)
+
+  # Estados a los que se puede pasar desde `desde`: cualquier punto del carril (avanzar o corregir
+  # hacia atrás) + cancelar. Desde un estado terminal no se puede salir.
+  def self.transiciones_desde(desde)
+    return [] if ESTADOS_SIN_VENTA.include?(desde)
+
+    (CARRIL - [desde] + ['cancelado']).uniq
+  end
+  def transiciones_validas = self.class.transiciones_desde(estado)
 
   validates :nombre, presence: true
   validates :estado, inclusion: { in: ESTADOS }
   validates :presupuesto_ingresos, numericality: { greater_than_or_equal_to: 0 }
+  validate  :transicion_valida, on: :update
 
   scope :proximos, -> { where('fecha >= ? OR fecha IS NULL', Date.current).order(Arel.sql('fecha IS NULL, fecha ASC')) }
   scope :pasados,  -> { where('fecha < ?', Date.current).order(fecha: :desc) }
@@ -104,5 +118,16 @@ class EventoBar < ApplicationRecord
     return nil if prom <= 0
 
     (costos.sum(:monto_ars).to_d / prom).ceil
+  end
+
+  private
+
+  # Bloquea reabrir un evento terminal (y cualquier transición no contemplada). No aplica en
+  # :create ni cuando el estado no cambia. `estado_was` nil (registros viejos) → no valida.
+  def transicion_valida
+    return unless estado_changed? && estado_was.present?
+    return if self.class.transiciones_desde(estado_was).include?(estado)
+
+    errors.add(:estado, "no se puede pasar de #{estado_was} a #{estado}")
   end
 end

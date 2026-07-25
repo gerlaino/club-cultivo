@@ -1,19 +1,16 @@
 <script setup>
-// Depósito del salón (deposito_bar) de una sede: los productos del bar como stock con costo,
-// valorizado, mínimo y alertas. Compra (costo promedio ponderado), ajuste/merma e historial de
-// movimientos. Solo aplica a sedes social/mixta (las que tienen bar).
+// Depósito del salón (deposito_bar) de una sede — VISTA READ-ONLY dentro de Insumos.
+// Muestra los productos del bar como stock valorizado (costo, mínimo, alertas) + su historial de
+// movimientos, pero NO se gestiona acá: la compra/reconteo/alta viven en un solo lugar,
+// "Stock del salón" (BarStockView). Antes esto duplicaba esa gestión (rediseño del Salón, B2).
 import { ref, computed, watch, onMounted } from 'vue'
-import { listBares, listBarProductos, comprarBarProducto, ajustarBarProducto, getBarProductoMovimientos, createBarProducto, listCategoriasProducto } from '../../lib/api.js'
-import { useToast } from '../../composables/useToast.js'
+import { listBares, listBarProductos, getBarProductoMovimientos } from '../../lib/api.js'
 
 const props = defineProps({ sedeId: { type: [Number, null], default: null } })
-const toast = useToast()
 
-const bar          = ref(null)
-const productos    = ref([])
-const categoriasProd = ref([])
-const loading      = ref(false)
-const saving       = ref(false)
+const bar       = ref(null)
+const productos  = ref([])
+const loading    = ref(false)
 
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 const valorizadoTotal = computed(() => productos.value.reduce((a, p) => a + (p.valorizado_ars || 0), 0))
@@ -28,64 +25,15 @@ async function cargar() {
   } catch { bar.value = null; productos.value = [] }
   finally { loading.value = false }
 }
-onMounted(async () => {
-  try { categoriasProd.value = (await listCategoriasProducto()).data || [] } catch { categoriasProd.value = [] }
-  await cargar()
-})
+onMounted(cargar)
 watch(() => props.sedeId, cargar)
-
-// ── Nuevo producto del bar (crear acá, sin ir al panel del bar) ─
-const prodForm = ref(null)
-function nuevoProducto() { prodForm.value = { nombre: '', categoria_producto_id: categoriasProd.value[0]?.id ?? null, precio_ars: null, costo_ars: null, stock: 0, stock_minimo: 0 } }
-async function guardarProducto() {
-  const f = prodForm.value
-  if (!f.nombre?.trim() || !(f.precio_ars > 0)) { toast.warning('Nombre y precio son obligatorios'); return }
-  saving.value = true
-  // categoria (enum legacy) se deriva de la editable para compat mientras conviven.
-  const cat = categoriasProd.value.find(c => c.id === f.categoria_producto_id)
-  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro',
-                    precio_ars: f.precio_ars, costo_ars: f.costo_ars || null, stock: f.stock || 0, stock_minimo: f.stock_minimo || 0 }
-  try {
-    await createBarProducto(bar.value.id, payload)
-    toast.success('Producto creado'); prodForm.value = null; await cargar()
-  } catch (e) { toast.error(e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'No se pudo crear') }
-  finally { saving.value = false }
-}
 
 function stockPct(p) {
   if (!p.stock_minimo) return p.stock > 0 ? 100 : 0
   return Math.min(100, Math.round((p.stock / (p.stock_minimo * 2)) * 100))
 }
 
-// ── Comprar ───────────────────────────────────────────────────
-const compraForm = ref(null)
-function abrirCompra(p) { compraForm.value = { prod: p, cantidad: null, costo_total_ars: null, proveedor: '' } }
-async function confirmarCompra() {
-  const f = compraForm.value
-  if (!(f.cantidad > 0) || !(f.costo_total_ars > 0)) { toast.warning('Completá cantidad y costo'); return }
-  saving.value = true
-  try {
-    await comprarBarProducto(bar.value.id, f.prod.id, { cantidad: f.cantidad, costo_total_ars: f.costo_total_ars, proveedor: f.proveedor || null })
-    toast.success('Compra registrada'); compraForm.value = null; await cargar()
-  } catch (e) { toast.error(e?.response?.data?.error || 'No se pudo comprar') }
-  finally { saving.value = false }
-}
-
-// ── Ajustar / merma ───────────────────────────────────────────
-const ajusteForm = ref(null)
-function abrirAjuste(p) { ajusteForm.value = { prod: p, cantidad_nueva: p.stock, motivo: '' } }
-async function confirmarAjuste() {
-  const f = ajusteForm.value
-  if (f.cantidad_nueva < 0) { toast.warning('El stock no puede ser negativo'); return }
-  saving.value = true
-  try {
-    await ajustarBarProducto(bar.value.id, f.prod.id, { cantidad_nueva: f.cantidad_nueva, motivo: f.motivo || null })
-    toast.success('Stock ajustado'); ajusteForm.value = null; await cargar()
-  } catch (e) { toast.error(e?.response?.data?.error || 'No se pudo ajustar') }
-  finally { saving.value = false }
-}
-
-// ── Movimientos ───────────────────────────────────────────────
+// ── Historial de movimientos (solo lectura) ───────────────────
 const movsForm = ref(null)
 const movs = ref([])
 async function abrirMovs(p) {
@@ -113,13 +61,14 @@ const TIPO_MOV = {
         <div><span class="ds__bar-name">{{ bar.nombre }}</span> <span class="ds__bar-sede">· {{ bar.sede?.nombre }}</span></div>
         <div class="ds__head-right">
           <div class="ds__stat"><span class="ds__stat-lbl">Valorizado</span><span class="ds__stat-val">{{ fmt(valorizadoTotal) }}</span></div>
-          <button class="btn btn--primary" @click="nuevoProducto">＋ Producto</button>
+          <RouterLink :to="`/bar/${bar.id}/stock`" class="btn btn--primary">Gestionar en Stock del salón →</RouterLink>
         </div>
       </div>
 
+      <p class="ds__ro">👁️ Vista de solo lectura. El stock del salón (comprar, recontar, crear productos) se gestiona en <RouterLink :to="`/bar/${bar.id}/stock`" class="ds__link">Stock del salón</RouterLink>.</p>
+
       <div v-if="!productos.length" class="ds__empty ds__empty--box">
-        Este salón todavía no tiene productos.
-        <a href="#" class="ds__link" @click.prevent="nuevoProducto">Creá el primero</a>.
+        Este salón todavía no tiene productos. Cargalos desde <RouterLink :to="`/bar/${bar.id}/stock`" class="ds__link">Stock del salón</RouterLink>.
       </div>
 
       <ul v-else class="ds__list">
@@ -137,61 +86,13 @@ const TIPO_MOV = {
             <span class="ds__meta">{{ fmt(p.costo_ars) }}/u · {{ fmt(p.valorizado_ars) }}</span>
           </div>
           <div class="ds__actions">
-            <button class="btn btn--sm" @click="abrirCompra(p)">Comprar</button>
-            <button class="btn btn--sm" @click="abrirAjuste(p)">Reconteo</button>
             <button class="btn btn--sm" @click="abrirMovs(p)">Historial</button>
           </div>
         </li>
       </ul>
     </template>
 
-    <!-- Modal nuevo producto -->
-    <div v-if="prodForm" class="ov" @click.self="prodForm = null">
-      <div class="dpdlg dpdlg--wide">
-        <h3 class="modal__title">Nuevo producto del salón</h3>
-        <p class="modal__hint">Se crea en <b>{{ bar?.nombre }}</b> ({{ bar?.sede?.nombre }}). Después lo reponés con Comprar.</p>
-        <label class="fld">Nombre<input v-model.trim="prodForm.nombre" class="inp" maxlength="60" placeholder="Ej: Coca Cola 500ml" /></label>
-        <label class="fld">Categoría
-          <select v-model="prodForm.categoria_producto_id" class="inp">
-            <option v-for="c in categoriasProd" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-          </select>
-        </label>
-        <div class="ds__grid2">
-          <label class="fld">Precio de venta ($)<input v-model.number="prodForm.precio_ars" type="number" min="0" step="any" class="inp" /></label>
-          <label class="fld">Costo unitario ($) <small class="mut">(opcional)</small><input v-model.number="prodForm.costo_ars" type="number" min="0" step="any" class="inp" /></label>
-        </div>
-        <div class="ds__grid2">
-          <label class="fld">Stock inicial<input v-model.number="prodForm.stock" type="number" min="0" step="any" class="inp" /></label>
-          <label class="fld">Stock mínimo<input v-model.number="prodForm.stock_minimo" type="number" min="0" step="any" class="inp" /></label>
-        </div>
-        <div class="modal__actions"><button class="btn" @click="prodForm = null">Cancelar</button><button class="btn btn--primary" :disabled="saving" @click="guardarProducto">Crear producto</button></div>
-      </div>
-    </div>
-
-    <!-- Modal comprar -->
-    <div v-if="compraForm" class="ov" @click.self="compraForm = null">
-      <div class="dpdlg">
-        <h3 class="modal__title">Comprar — {{ compraForm.prod.nombre }}</h3>
-        <p class="modal__hint">Suma stock al depósito del salón y recalcula el costo promedio. Genera el egreso en el libro.</p>
-        <label class="fld">Cantidad (unidades)<input v-model.number="compraForm.cantidad" type="number" min="0" step="any" class="inp" /></label>
-        <label class="fld">Costo total<input v-model.number="compraForm.costo_total_ars" type="number" min="0" step="any" class="inp" placeholder="$" /></label>
-        <label class="fld">Proveedor (opcional)<input v-model.trim="compraForm.proveedor" class="inp" /></label>
-        <div class="modal__actions"><button class="btn" @click="compraForm = null">Cancelar</button><button class="btn btn--primary" :disabled="saving" @click="confirmarCompra">Registrar compra</button></div>
-      </div>
-    </div>
-
-    <!-- Modal ajustar -->
-    <div v-if="ajusteForm" class="ov" @click.self="ajusteForm = null">
-      <div class="dpdlg">
-        <h3 class="modal__title">Reconteo — {{ ajusteForm.prod.nombre }}</h3>
-        <p class="modal__hint">Fijá el stock al valor real contado. La diferencia queda registrada (merma si baja, ajuste si sube).</p>
-        <label class="fld">Stock real (contado)<input v-model.number="ajusteForm.cantidad_nueva" type="number" min="0" step="any" class="inp" /></label>
-        <label class="fld">Motivo (opcional)<input v-model.trim="ajusteForm.motivo" class="inp" placeholder="Ej: botellas rotas" maxlength="120" /></label>
-        <div class="modal__actions"><button class="btn" @click="ajusteForm = null">Cancelar</button><button class="btn btn--primary" :disabled="saving" @click="confirmarAjuste">Ajustar</button></div>
-      </div>
-    </div>
-
-    <!-- Modal movimientos -->
+    <!-- Modal movimientos (solo lectura) -->
     <div v-if="movsForm" class="ov" @click.self="movsForm = null">
       <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Movimientos — {{ movsForm.nombre }}</h3>
@@ -217,8 +118,7 @@ const TIPO_MOV = {
 .ds__head-right { display: flex; align-items: center; gap: 1.25rem; }
 .ds__link { color: #1b5e20; font-weight: 600; text-decoration: none; }
 .ds__link:hover { text-decoration: underline; }
-.ds__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
-.mut { color: #94a3b8; font-weight: 400; }
+.ds__ro { font-size: .82rem; color: #64748b; background: #f8fafc; border: 1px solid #eef2f6; border-radius: 10px; padding: .6rem .85rem; margin: 0 0 1rem; }
 .ds__bar-name { font-weight: 700; font-size: 1.05rem; }
 .ds__bar-sede { color: #94a3b8; font-size: .84rem; }
 .ds__stat { text-align: right; }
@@ -258,15 +158,11 @@ const TIPO_MOV = {
 .dpdlg { position: relative; display: block; background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
 .dpdlg--wide { max-width: 460px; }
 .modal__title { margin: 0 0 .25rem; font-size: 1.1rem; font-weight: 750; letter-spacing: -.02em; }
-.modal__hint { color: #64748b; font-size: .82rem; margin: 0 0 1.1rem; line-height: 1.45; }
 .modal__actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .5rem; }
-.fld { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; color: #475569; margin-bottom: .9rem; }
-.inp { padding: .55rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: .86rem; background: #fff; color: #0f172a; }
-.inp:focus { border-color: #1b5e20; outline: none; }
-.btn { border: 1.5px solid #e2e8f0; background: #fff; color: #334155; border-radius: 9px; padding: .55rem .95rem; font-size: .83rem; font-weight: 600; cursor: pointer; }
+.btn { border: 1.5px solid #e2e8f0; background: #fff; color: #334155; border-radius: 9px; padding: .55rem .95rem; font-size: .83rem; font-weight: 600; cursor: pointer; text-decoration: none; }
 .btn:hover { border-color: #cbd5e1; }
 .btn--sm { padding: .45rem .8rem; font-size: .8rem; }
 .btn--primary { background: #1b5e20; border-color: #1b5e20; color: #fff; }
-.btn--primary:hover { background: #144a18; }
+.btn--primary:hover { background: #144a18; color: #fff; }
 .btn:disabled { opacity: .5; cursor: default; }
 </style>

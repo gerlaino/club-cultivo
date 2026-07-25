@@ -13,7 +13,7 @@ module Bar
       {
         resultado_mes:   resultado_mes,
         hoy:             hoy_stats,
-        caja:            caja_abierta,
+        caja:            caja_activa,
         ventas_por_hora: ventas_por_hora,
         top_productos:   top_productos,
         reponer:         reponer,
@@ -21,21 +21,27 @@ module Bar
       }
     end
 
-    # Caja de turno abierta (o nil) con sus totales en vivo, para el panel.
-    def caja_abierta
-      c = @bar.caja_abierta
+    # Caja de turno activa (abierta o pendiente de cierre, o nil) con sus totales en vivo.
+    # Incluye pendiente_cierre para que el panel de gestión vea el cierre esperando confirmación.
+    def caja_activa
+      c = @bar.caja_activa
       return nil if c.nil?
 
       {
         id:                    c.id,
+        estado:                c.estado,
+        apertura_confirmada:   c.apertura_confirmada?,
         monto_inicial_ars:     c.monto_inicial_ars.to_f,
         total_ventas_ars:      c.total_ventas_ars,
         total_efectivo_ars:    c.total_efectivo_ars,
         total_digital_ars:     c.total_digital_ars,
         tickets:               c.tickets,
         efectivo_esperado_ars: c.efectivo_esperado_ars,
+        efectivo_declarado_ars: c.efectivo_declarado_ars&.to_f,
         abierta_at:            c.abierta_at,
         abierta_por:           c.abierta_por&.nombre_completo,
+        cierre_solicitado_at:  c.cierre_solicitado_at,
+        cierre_solicitado_por: c.cierre_solicitado_por&.nombre_completo,
       }
     end
 
