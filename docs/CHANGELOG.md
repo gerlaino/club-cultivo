@@ -2,6 +2,9 @@
 
 ## Julio 2026 (j) — comprobante de venta del bar (no fiscal)
 
+- **Reimprimir comprobante de una venta pasada:** botón **"🧾 Ventas"** en Vender → lista de últimas
+  ventas (`listBarVentas`, ya trae ítems/total/medio/fecha) con **🖨️ reimprimir** por fila, que
+  reabre el mismo ticket. Frontend puro, sin backend nuevo.
 - **Imprimir comprobante tras cobrar:** al cerrar una venta en *Vender*, se ofrece el ticket
   imprimible (`TicketVenta.vue`, ancho tipo térmica) con el detalle: club/salón, fecha·hora·N°,
   ítems (cantidad × nombre · subtotal · precio unitario), total y medio de pago. Leyenda

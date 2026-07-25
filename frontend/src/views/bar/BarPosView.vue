@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
-import { listEventosBar, listCategoriasProducto } from '../../lib/api.js'
+import { listEventosBar, listCategoriasProducto, listBarVentas } from '../../lib/api.js'
 import BarNav from './BarNav.vue'
 import BarcodeScanner from '../../components/BarcodeScanner.vue'
 import TicketVenta from '../../components/bar/TicketVenta.vue'
@@ -126,6 +126,30 @@ async function cobrar() {
   }
   catch { toast.error(store.saveError || 'No se pudo cobrar') }
 }
+
+// ── Historial de ventas: reimprimir el comprobante de una venta pasada ──────
+const showHistorial = ref(false)
+const ventas = ref([])
+const loadingVentas = ref(false)
+async function abrirHistorial() {
+  showHistorial.value = true
+  loadingVentas.value = true
+  try { ventas.value = (await listBarVentas(barId)).data || [] }
+  catch { ventas.value = [] }
+  finally { loadingVentas.value = false }
+}
+function reimprimir(v) {
+  ticketVenta.value = {
+    nro: v.id,
+    items: (v.items || []).map(it => ({ nombre: it.nombre, cantidad: it.cantidad, precio: it.precio_unitario_ars })),
+    total: v.total_ars, medio: v.medio_pago, fecha: v.created_at,
+  }
+  showHistorial.value = false
+}
+const fechaHora = (d) => {
+  const dt = new Date(d)
+  return dt.toLocaleDateString('es-AR') + ' ' + dt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+}
 </script>
 
 <template>
@@ -165,7 +189,10 @@ async function cobrar() {
       </div>
 
       <aside class="cv__cart">
-        <div class="cv__card-header"><span class="cv__card-title">Pedido</span></div>
+        <div class="cv__card-header">
+          <span class="cv__card-title">Pedido</span>
+          <button class="cv__hist-btn" type="button" title="Ver últimas ventas y reimprimir" @click="abrirHistorial">🧾 Ventas</button>
+        </div>
         <div class="cv__cart-body">
           <div v-if="!store.carrito.length" class="cv__empty-sm">Tocá un producto para agregarlo.</div>
           <ul v-else class="cv__cart-list">
@@ -200,6 +227,28 @@ async function cobrar() {
 
     <!-- Comprobante (no válido como factura) tras cobrar -->
     <TicketVenta v-if="ticketVenta" :ticket="ticketVenta" :bar="barNombre" :club="clubStore.name" :logo="clubStore.logoUrl" @close="ticketVenta = null" />
+
+    <!-- Historial de ventas: reimprimir comprobante -->
+    <div v-if="showHistorial" class="cv__ov" @click.self="showHistorial = false">
+      <div class="cv__hist">
+        <div class="cv__hist-head">
+          <h3>Últimas ventas</h3>
+          <button class="cv__hist-x" @click="showHistorial = false" aria-label="Cerrar">×</button>
+        </div>
+        <div v-if="loadingVentas" class="cv__empty-sm" style="padding:2rem 0;">Cargando…</div>
+        <div v-else-if="!ventas.length" class="cv__empty-sm" style="padding:2rem 0;">Todavía no hay ventas.</div>
+        <ul v-else class="cv__hist-list">
+          <li v-for="v in ventas" :key="v.id" class="cv__hist-row">
+            <div class="cv__hist-main">
+              <span class="cv__hist-fecha">{{ fechaHora(v.created_at) }}</span>
+              <span class="cv__hist-items">{{ (v.items || []).length }} ítem{{ (v.items || []).length !== 1 ? 's' : '' }} · {{ v.medio_pago }}</span>
+            </div>
+            <span class="cv__hist-total cv__num">{{ fmt(v.total_ars) }}</span>
+            <button class="cv__hist-print" @click="reimprimir(v)" title="Reimprimir comprobante">🖨️</button>
+          </li>
+        </ul>
+      </div>
+    </div>
 
     <!-- Scan-to-create: producto nuevo con el código ya cargado (admin) -->
     <div v-if="crearForm" class="cv__ov" @click.self="crearForm = null">
@@ -307,4 +356,23 @@ async function cobrar() {
 .cv__modal-act { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .5rem; }
 .cv__btn-ghost2 { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .55rem 1rem; border-radius: 9px; font-size: .85rem; font-weight: 600; cursor: pointer; }
 .cv__btn-ghost2:hover { background: #f8fafc; }
+
+/* Botón "Ventas" + historial */
+.cv__card-header { display: flex; align-items: center; justify-content: space-between; }
+.cv__hist-btn { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .3rem .6rem; font-size: .76rem; font-weight: 600; color: #64748b; cursor: pointer; }
+.cv__hist-btn:hover { border-color: #1b5e20; color: #1b5e20; }
+.cv__hist { background: #fff; border-radius: 16px; padding: 1.2rem 1.3rem 1.3rem; width: 100%; max-width: 420px; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
+.cv__hist-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .8rem; }
+.cv__hist-head h3 { margin: 0; font-size: 1.05rem; font-weight: 750; color: #0f172a; }
+.cv__hist-x { background: none; border: none; font-size: 1.5rem; line-height: 1; color: #94a3b8; cursor: pointer; }
+.cv__hist-x:hover { color: #334155; }
+.cv__hist-list { list-style: none; margin: 0; padding: 0; }
+.cv__hist-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: .7rem; padding: .6rem 0; border-bottom: 1px solid #f1f5f9; }
+.cv__hist-row:last-child { border-bottom: none; }
+.cv__hist-main { display: flex; flex-direction: column; min-width: 0; }
+.cv__hist-fecha { font-size: .84rem; color: #0f172a; font-weight: 550; }
+.cv__hist-items { font-size: .72rem; color: #94a3b8; text-transform: capitalize; }
+.cv__hist-total { font-weight: 700; color: #0f172a; }
+.cv__hist-print { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: .35rem .55rem; font-size: 1rem; cursor: pointer; line-height: 1; }
+.cv__hist-print:hover { background: #dcfce7; }
 </style>
