@@ -19,7 +19,6 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import SemaforoAmbiente from '../components/ambiente/SemaforoAmbiente.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import SalaLayoutGrid from '../components/salas/SalaLayoutGrid.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -627,12 +626,6 @@ const canSeeAmbiente = computed(() =>
 const tabActiva = ref('lotes')
 
 // Slots ocupados de la sala = solo lotes realmente en cultivo. Los estados de
-// post-cosecha (cosecha/en_manicura/curado) ya no viven en una sala de cultivo
-// (van a su sala de proceso), así que no deben ocupar el layout de esta sala.
-const ESTADOS_POST_COSECHA = ['cosecha', 'curado', 'en_manicura', 'finalizado']
-const lotesActivos = computed(() =>
-  (sala.value?.lotes_historial || []).filter(l => !ESTADOS_POST_COSECHA.includes(l.estado))
-)
 const historialLotes = computed(() => sala.value?.lotes_historial || [])
 const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 </script>
@@ -726,7 +719,6 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
       <!-- Tabs -->
       <div class="sd__tabs">
         <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'lotes' }" @click="tabActiva = 'lotes'">🌿 Lotes</button>
-        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'layout' }" @click="tabActiva = 'layout'">🗺 Layout</button>
         <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'historial' }" @click="tabActiva = 'historial'">📋 Historial</button>
       </div>
 
@@ -793,11 +785,6 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                 </div>
               </div>
             </div>
-          </div>
-
-          <!-- Tab: Layout -->
-          <div v-show="tabActiva === 'layout'" class="sd__tab-panel">
-            <SalaLayoutGrid :sala="sala" :lotes-activos="lotesActivos" />
           </div>
 
           <!-- Tab: Historial -->
@@ -1130,16 +1117,6 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                   <option value="mantenimiento">En mantenimiento</option>
                   <option value="cerrada">Cerrada</option>
                 </select>
-              </div>
-              <div class="sd__field">
-                <label class="sd__label">Slots para lotes</label>
-                <input
-                  type="number" min="0" step="1"
-                  class="sd__input"
-                  v-model.number="editSalaForm.pots_count"
-                  placeholder="Ej: 6"
-                />
-                <span class="sd__hint">Cantidad de lotes que pueden estar simultáneamente en esta sala. Define el layout visual.</span>
               </div>
               <div class="sd__field sd__field--full">
                 <label class="sd__label">Notas</label>

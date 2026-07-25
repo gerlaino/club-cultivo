@@ -1,5 +1,15 @@
 # Changelog
 
+## Julio 2026 (h) — se guarda el Layout de slots de sala (para retomarlo con 3D)
+
+- **Sacado el Layout de slots por sala:** la asignación a slots era ficticia (el grid metía los
+  lotes activos por orden de id en `pots_count` posiciones; no había campo de slot real por lote),
+  y con varios lotes por sala mostraba algo engañoso. Se removió la **tab "Layout"** de la ficha de
+  sala y el campo **"Slots para lotes"** (`pots_count`) del alta/edición de sala.
+- **Shelving reversible:** el componente `SalaLayoutGrid.vue` y la columna `pots_count` quedan
+  **dormidos** (sin uso, sin borrar) para retomar la feature bien con la simulación de cultivo 3D.
+  Sin migración.
+
 ## Julio 2026 (g) — audit log Fase 2 (Paciente/User/Reserva) + scan-to-create
 
 - **Audit log Fase 2:** `include Auditable` en **Paciente, User y Reserva**.

@@ -30,7 +30,6 @@ const form = ref({
   state:      'activa',
   kind:       'vegetativo',
   sede_id:    props.sedeIdFija || null,
-  pots_count: null,
   notes:      '',
 })
 
@@ -137,16 +136,6 @@ onMounted(async () => {
                 <option value="mantenimiento">En mantenimiento</option>
                 <option value="cerrada">Cerrada</option>
               </select>
-            </div>
-            <div class="mcr__field">
-              <label class="mcr__label">Slots para lotes</label>
-              <input
-                type="number" min="0" step="1"
-                class="mcr__input"
-                v-model.number="form.pots_count"
-                placeholder="Ej: 6"
-              />
-              <span class="mcr__hint">Posiciones para el layout visual (opcional, no es un límite)</span>
             </div>
           </div>
 
