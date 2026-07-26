@@ -1,5 +1,13 @@
 # Changelog
 
+## Julio 2026 (m) — el área "Administración" pasa a llamarse "General"
+
+- **Área del sistema "Administración" → "General"** (nombre visible más claro; el `tipo` interno
+  sigue siendo `administracion`). Es el área transversal/administrativa del club — el catch-all para
+  categorías genéricas (evita crear un "Sin área" real). Seed actualizado (`SembrarCatalogo`) para
+  clubes nuevos + migración de datos `renombrar_administracion_a_general` para los existentes (solo
+  renombra las que conservan el nombre por defecto, no pisa nombres personalizados).
+
 ## Julio 2026 (l) — Catálogo de Finanzas como mapa por área (acordeón)
 
 - **Rediseño de la tab "Categorías" (Contabilidad → `FinanzasCatalogoView`):** de dos columnas

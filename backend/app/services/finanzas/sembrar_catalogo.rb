@@ -9,7 +9,7 @@ module Finanzas
     UNIDADES = {
       'cultivo'        => 'Cultivo',
       'dispensario'    => 'Dispensario',
-      'administracion' => 'Administración',
+      'administracion' => 'General', # área transversal/administrativa del club (nombre visible "General")
     }.freeze
     UNIDADES_BAR = { 'bar' => 'Bar' }.freeze
 
