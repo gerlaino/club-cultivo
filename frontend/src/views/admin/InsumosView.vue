@@ -10,6 +10,7 @@ import { listLotes, listSalas, listCategoriasContables, getInsumo, listDepositos
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import DepositoDispensacion from './DepositoDispensacion.vue'
+import DepositoSalon from './DepositoSalon.vue'
 
 const store = useInsumosStore()
 const sede  = useSedeStore()
@@ -31,14 +32,15 @@ const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 // ── Depósitos (dinámicos: sistema + los que crea el admin) ────────────────────
 const depositos = ref([])
 const depositoActivoId = ref(null)
-// El depósito del bar NO se muestra acá: es el "Stock del salón" y se opera desde el Salón.
-// (Desde Contabilidad → Nuevo Movimiento sí se puede elegir, para cargar mercadería al bar.)
-const TABS = computed(() => depositos.value.filter(d => d.clave_sistema !== 'salon'))
+// El hub muestra TODOS los depósitos (panorama). Los que tienen otro dueño se ven read-only:
+// Salón (se opera desde el bar) y Dispensación (su stock viene de cosecha/manicura).
+const TABS = computed(() => depositos.value)
 const depositoActivo = computed(() => depositos.value.find(d => d.id === depositoActivoId.value) || TABS.value[0] || null)
+const esSalon        = computed(() => depositoActivo.value?.clave_sistema === 'salon')
 const esDispensacion = computed(() => depositoActivo.value?.clave_sistema === 'dispensacion')
 const esCultivo      = computed(() => depositoActivo.value?.familia === 'insumo')
-// Depósitos de solo lectura (no aceptan Entrada ni se gestionan desde acá).
-const esSoloLectura  = computed(() => esDispensacion.value)
+// Read-only: se ven pero no se gestionan acá (tienen otro dueño en la app).
+const esSoloLectura  = computed(() => esSalon.value || esDispensacion.value)
 const HINTS = {
   insumo:         'Fertilizantes, sustrato… se consumen imputando el costo al lote.',
   insumo_general: 'Insumos del club (limpieza, administración). Se consumen como gasto.',
@@ -403,7 +405,9 @@ async function revertirCompra(compra) {
           <option :value="null">🏢 Todo el club</option>
           <option v-for="s in sede.sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
-        <button v-if="!esSoloLectura" class="btn btn--primary" @click="abrirEntrada()">＋ Entrada</button>
+        <!-- Los productos NUEVOS entran por Contabilidad → Nuevo Movimiento (ahí elegís el depósito).
+             Acá solo se gestiona lo que ya existe (reponer/editar/merma/eliminar). -->
+        <RouterLink v-if="!esSoloLectura" :to="{ name: 'contabilidad' }" class="btn btn--primary" title="Comprar un producto nuevo y elegir su depósito">＋ Comprar (Nuevo movimiento)</RouterLink>
       </div>
     </header>
 
@@ -436,15 +440,15 @@ async function revertirCompra(compra) {
       </div>
     </div>
 
-    <DepositoDispensacion v-if="esDispensacion" :sede-id="sedeFiltro" />
+    <DepositoSalon v-if="esSalon" :sede-id="sedeFiltro" />
+    <DepositoDispensacion v-else-if="esDispensacion" :sede-id="sedeFiltro" />
 
     <template v-else>
     <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>
     <div v-else-if="!store.items.length" class="dp__empty dp__empty--box">
-      Todavía no hay insumos en esta familia. Cargalos con
-      <a href="#" class="dp__link" @click.prevent="abrirEntrada()">＋ Entrada</a>
-      (poniendo su costo, se genera el egreso contable), o desde
-      <RouterLink :to="{ name: 'contabilidad' }" class="dp__link">Contabilidad → Nuevo movimiento</RouterLink>.
+      Todavía no hay productos en este depósito. Se cargan comprándolos desde
+      <RouterLink :to="{ name: 'contabilidad' }" class="dp__link">Contabilidad → Nuevo movimiento</RouterLink>
+      (ahí elegís el depósito destino y se genera el egreso). Después, acá los reponés y gestionás.
     </div>
 
     <template v-else>
@@ -497,8 +501,8 @@ async function revertirCompra(compra) {
                   <div class="dp__menu-wrap">
                     <button class="btn btn--sm btn--icon" @click="toggleMenu(i.id, $event)" title="Más acciones">⋯</button>
                     <div v-if="menuId === i.id" class="dp__menu" :style="{ top: menuPos.top + 'px', left: menuPos.left + 'px' }" @click.stop>
-                      <button class="dp__menu-item" @click="abrirEntrada(i)">Reponer (entrada)</button>
-                      <button class="dp__menu-item" @click="abrirReconteo(i)">Reconteo</button>
+                      <button class="dp__menu-item" @click="abrirEntrada(i)">Reponer</button>
+                      <button class="dp__menu-item" @click="abrirReconteo(i)">Reconteo / Merma</button>
                       <button v-if="multiSede && otrasSedes.length" class="dp__menu-item" @click="abrirTransfer(i)" :disabled="i.stock_actual <= 0">Transferir a otra sede</button>
                       <button class="dp__menu-item" @click="abrirHistorial(i)">Historial</button>
                       <button class="dp__menu-item" @click="editarInsumo(i)">Editar</button>
@@ -526,14 +530,8 @@ async function revertirCompra(compra) {
     <!-- Modal ENTRADA (compra con costo → egreso) -->
     <div v-if="entradaForm" class="ov" @click.self="entradaForm = null">
       <div class="dpdlg dpdlg--wide">
-        <h3 class="modal__title">Registrar entrada</h3>
-        <p class="modal__hint">Cargás mercadería con su costo. Se suma al depósito y se genera el <b>egreso contable</b> automáticamente — no hace falta ir a Contabilidad.</p>
-        <p class="modal__hint modal__hint--warn">🍸 ¿Es mercadería para <b>vender en el bar/salón</b> (bebidas, snacks)? No la cargues acá: entrá al <b>Salón → Stock del salón</b> y usá <b>＋ Producto</b> (con su código de barras y carga inicial). Acá van los <b>insumos</b> (cultivo/generales).</p>
-
-        <div class="dp__seg">
-          <button class="dp__seg-btn" :class="{ 'is-on': entradaForm.modo === 'existente' }" :disabled="!store.items.length" @click="entradaForm.modo = 'existente'">Reponer existente</button>
-          <button class="dp__seg-btn" :class="{ 'is-on': entradaForm.modo === 'nuevo' }" @click="entradaForm.modo = 'nuevo'">Insumo nuevo</button>
-        </div>
+        <h3 class="modal__title">Reponer stock</h3>
+        <p class="modal__hint">Registrás una reposición con su costo. Se suma al depósito y genera el <b>egreso contable</b>. Para un producto <b>nuevo</b>, compralo desde Contabilidad → Nuevo movimiento.</p>
 
         <template v-if="entradaForm.modo === 'existente'">
           <label class="fld">Insumo

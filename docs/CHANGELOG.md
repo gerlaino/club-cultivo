@@ -1,5 +1,17 @@
 # Changelog
 
+## Julio 2026 (k) — "Depósito" como hub de inventario (gestión, no creación)
+
+- **La sección "Depósito" (`/insumos`) es un hub de solo-gestión, no de creación:**
+  - Muestra **todos los depósitos** (Cultivo, General, custom, + Salón y Dispensación read-only).
+  - **Se quitó el "＋ Entrada" que creaba productos nuevos.** Los productos **nuevos se compran
+    desde Contabilidad → Nuevo Movimiento** (ahí se elige el depósito destino; ya funcionaba).
+  - Por producto: **Reponer** (→ genera el egreso), **Reconteo / Merma**, **Editar**, **Desactivar**,
+    **Eliminar** (ya existían). El modal de entrada quedó como "Reponer stock" (sin modo "nuevo").
+  - **Read-only** (se ven pero se operan desde su lugar): **Salón** (desde el bar) y **Dispensación**
+    (su stock viene de cosecha/manicura).
+- El tab de Producción vuelve a llamarse **"Stock"** (para que "Depósito" sea solo el hub del sidebar).
+
 ## Julio 2026 (j) — comprobante de venta del bar (no fiscal)
 
 - **Reimprimir comprobante de una venta pasada:** botón **"🧾 Ventas"** en Vender → lista de últimas
