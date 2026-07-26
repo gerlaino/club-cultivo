@@ -1,5 +1,16 @@
 # Changelog
 
+## Julio 2026 (l) — Catálogo de Finanzas como mapa por área (acordeón)
+
+- **Rediseño de la tab "Categorías" (Contabilidad → `FinanzasCatalogoView`):** de dos columnas
+  paralelas (Categorías | Áreas) a un **acordeón por área**. Cada área del club se despliega y
+  muestra **todo lo suyo junto**: sus categorías (madre → subcategoría, con las mismas acciones) y
+  sus **depósitos** (read-only; se gestionan en el hub *Depósito*). El área es el eje — tanto las
+  categorías como los depósitos responden a un área.
+- **Bucket "Sin área":** las categorías sin área asignada caen en un desplegable "Sin área" al final,
+  así ninguna queda huérfana. Cada área muestra un resumen ("X categorías · Y depósitos").
+- Frontend puro (carga `listDepositos` para el mapa). Build + 58 vitest verdes.
+
 ## Julio 2026 (k) — "Depósito" como hub de inventario (gestión, no creación)
 
 - **La sección "Depósito" (`/insumos`) es un hub de solo-gestión, no de creación:**
