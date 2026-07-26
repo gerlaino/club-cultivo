@@ -5,7 +5,7 @@
     <div class="stk__header">
       <div>
         <div class="stk__header-row">
-          <h1 class="stk__title">Stock</h1>
+          <h1 class="stk__title">Depósito</h1>
           <span v-if="liveConectado" class="stk__live-dot">● en vivo</span>
         </div>
         <p class="stk__sub">Inventario del club · asignación de sedes · stock externo</p>

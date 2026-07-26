@@ -37,7 +37,7 @@ export const NAV_GROUPS = [
   {
     key: 'produccion', label: 'Producción', to: '/admin/stock',
     tabs: [
-      { to: '/admin/stock', label: 'Stock' },
+      { to: '/admin/stock', label: 'Depósito' },
       { to: '/admin/cosechado', label: 'Cosecha' },
       { to: '/admin/pesajes-manicura', label: 'Manicura', badge: 'aprob' },
     ],
