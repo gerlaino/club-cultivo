@@ -1,5 +1,14 @@
 # Changelog
 
+## Julio 2026 (o) — la sede del movimiento la fija el depósito (no se puede divergir)
+
+- **Guard de integridad multi-sede:** al cargar un movimiento con destino a un depósito, la **sede
+  del asiento (y del insumo) la manda el depósito** — ya no se puede quedar en una sede distinta.
+  - Backend (`aplicar_deposito!`): `sede_id = deposito.sede_id` (prioritario); actualiza el movimiento
+    a esa sede aunque el form haya mandado otra. Spec en `movimiento_deposito_spec`.
+  - Frontend (`ModalNuevoMovimiento`): al elegir un depósito, el selector de "Sede" del movimiento
+    queda **bloqueado** en la sede del depósito, y el alta de insumo nuevo muestra "va a 📍 {sede}".
+
 ## Julio 2026 (ñ) — Depósitos por sede — Fase 2 (frontend sede-aware)
 
 - **Hub Depósito (`InsumosView`):** los tabs se filtran por la **sede elegida** (selector que ya

@@ -307,9 +307,11 @@ class MovimientosContablesController < ApplicationController
   # deriva del depósito para compat; la categoría queda linkeada para agrupar por rubro en la vista.
   def aplicar_deposito!(movimiento, d)
     club     = current_user.club
-    sede_id  = d[:sede_id].presence || movimiento.sede_id
-    cat      = movimiento.categoria_contable
     deposito = club.depositos.find_by(id: d[:deposito_id])
+    # El depósito es de una SEDE: esa sede manda. No se puede divergir la sede del movimiento de la
+    # del depósito (si no, el insumo cae en una sede y el asiento queda en otra).
+    sede_id  = deposito&.sede_id || d[:sede_id].presence || movimiento.sede_id
+    cat      = movimiento.categoria_contable
     tipo     = deposito&.clave_sistema == 'cultivo' ? 'cultivo' : 'general'
     insumo   = if d[:insumo_id].present?
                  club.insumos.find(d[:insumo_id])
@@ -327,6 +329,8 @@ class MovimientosContablesController < ApplicationController
       proveedor: movimiento.proveedor, fecha: movimiento.fecha, generar_egreso: false
     )
     compra.update!(movimiento_contable: movimiento)
+    # El asiento queda en la sede del depósito (aunque el form haya mandado otra).
+    movimiento.update!(sede_id: sede_id) if sede_id.present? && movimiento.sede_id != sede_id
   end
 
   # Salón: compra de mercadería del bar. Sube el stock del producto y etiqueta el egreso con la

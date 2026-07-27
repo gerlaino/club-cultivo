@@ -674,13 +674,9 @@ async function submit() {
                     <select class="nm-input" v-model="dep.unidad_medida"><option v-for="u in UNIDADES_INSUMO" :key="u" :value="u">{{ u }}</option></select>
                   </div>
                 </div>
-                <div v-if="!dep.insumo_id && multiSede" class="nm-field">
-                  <label class="nm-label">Sede del depósito</label>
-                  <select class="nm-input" v-model="dep.sede_id">
-                    <option :value="null">— Pool del club —</option>
-                    <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-                  </select>
-                </div>
+                <p v-if="!dep.insumo_id && multiSede && depSelObj?.sede_nombre" class="nm-dest-hint">
+                  📍 Va a la sede del depósito: <b>{{ depSelObj.sede_nombre }}</b>.
+                </p>
                 <p class="nm-dest-hint">El monto del gasto es el costo total. El stock del insumo sube {{ dep.cantidad || 0 }} y se recalcula su costo promedio.</p>
               </div>
 
@@ -730,8 +726,8 @@ async function submit() {
                 <div v-if="acExtras" class="nm-ac-body">
                   <div class="nm-grid2">
                     <div class="nm-field">
-                      <label class="nm-label">Sede <span class="nm-opt">(opcional)</span></label>
-                      <select class="nm-input" v-model="form.sede_id">
+                      <label class="nm-label">Sede <span class="nm-opt">{{ depSelObj?.sede_id ? '(la fija el depósito)' : '(opcional)' }}</span></label>
+                      <select class="nm-input" v-model="form.sede_id" :disabled="!!depSelObj?.sede_id" :title="depSelObj?.sede_id ? 'La define el depósito elegido' : ''">
                         <option :value="null">— Sin sede —</option>
                         <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
                       </select>

@@ -38,6 +38,26 @@ RSpec.describe 'Movimiento contable con destino a depósito', type: :request do
     expect(InsumoCompra.find_by(movimiento_contable_id: mov.id)).to be_present
   end
 
+  it 'el asiento queda en la SEDE del depósito, aunque el form mande otra' do
+    sede_a = ActsAsTenant.with_tenant(club) { create(:sede, club: club, created_by: admin, tipo: 'produccion') }
+    sede_b = ActsAsTenant.with_tenant(club) { create(:sede, club: club, created_by: admin, tipo: 'produccion') }
+    dep_a  = ActsAsTenant.with_tenant(club) do
+      club.depositos.create!(nombre: 'Cultivo A', unidad_negocio: area, clave_sistema: 'cultivo', sede: sede_a, es_sistema: true)
+    end
+
+    post '/movimientos_contables', params: { movimiento_contable: {
+      tipo: 'egreso', categoria_contable_id: categoria.id, descripcion: 'Fert A',
+      monto_ars: 5_000, fecha: Date.current.to_s,
+      sede_id: sede_b.id, # el form manda la sede equivocada
+      destino: { tipo: 'deposito', deposito_id: dep_a.id, nombre: 'Base X', unidad_medida: 'litro', cantidad: 5 },
+    } }, headers: auth_headers, as: :json
+
+    expect(response).to have_http_status(:created)
+    mov = club.movimientos_contables.find_by(descripcion: 'Fert A')
+    expect(mov.sede_id).to eq(sede_a.id) # forzado a la sede del depósito, no la del form
+    expect(club.insumos.find_by(nombre: 'Base X').sede_id).to eq(sede_a.id)
+  end
+
   it 'sin destino (solo gasto) no crea ningún insumo' do
     deposito
     expect {
