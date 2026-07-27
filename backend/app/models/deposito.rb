@@ -1,6 +1,6 @@
-# Depósito: contenedor lógico de mercadería del club (Cultivo, General, Salón, Dispensación, y
-# los que cree el admin). Reemplaza al enum `tipo` de Insumo. Es transversal a la sede: un mismo
-# depósito puede tener stock en varias sedes (la sede vive en el producto, no en el depósito).
+# Depósito: contenedor de mercadería de una SEDE (Cultivo, General, Salón, Dispensación, y los que
+# cree el admin). Reemplaza al enum `tipo` de Insumo. Multi-sede: cada sede tiene sus depósitos
+# (la sede vive en el depósito). Los legacy sin sede (`sede_id` nil) los sede-ifica SembrarDepositos.
 #
 # Los de sistema (`clave_sistema` presente, `es_sistema: true`) se siembran y no se borran ni se
 # renombran a una clave distinta; el admin puede crear los propios (clave nil).
@@ -9,6 +9,7 @@ class Deposito < ApplicationRecord
   acts_as_tenant(:club)
 
   belongs_to :club
+  belongs_to :sede, optional: true # la sede a la que pertenece (nil = legacy club-wide, pre multi-sede)
   belongs_to :unidad_negocio, optional: true # el área a la que pertenece (para el P&L)
   has_many :insumos, dependent: :restrict_with_error
 
@@ -39,7 +40,8 @@ class Deposito < ApplicationRecord
 
   validates :nombre, presence: true
   validates :clave_sistema, inclusion: { in: CLAVES_SISTEMA.keys }, allow_nil: true
-  validates :clave_sistema, uniqueness: { scope: :club_id }, allow_nil: true
+  # Un depósito de sistema por (club, sede, clave): cada sede tiene su Cultivo, General, etc.
+  validates :clave_sistema, uniqueness: { scope: %i[club_id sede_id] }, allow_nil: true
 
   scope :activos,   -> { where(activo: true) }
   scope :ordenados, -> { order(:orden, :nombre) }

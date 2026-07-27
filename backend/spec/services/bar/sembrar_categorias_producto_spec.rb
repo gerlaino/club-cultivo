@@ -23,6 +23,7 @@ RSpec.describe Bar::SembrarCategoriasProducto, type: :service do
 
   it 'cuelga el producto del bar del depósito Salón si existe' do
     club.update!(features: club.features.merge('bar' => true))
+    con_tenant { create(:sede, club: club, created_by: create(:user, :admin, club: club), tipo: 'mixta') } # el Salón vive en una sede social/mixta
     Finanzas::SembrarDepositos.new(club).call # crea el depósito Salón
     prod = con_tenant { create(:bar_producto, club: club) }
     described_class.new(club).call

@@ -1,5 +1,21 @@
 # Changelog
 
+## Julio 2026 (n) — Depósitos por SEDE (multi-sede) — Fase 1 (backend)
+
+- **Cambio foundational:** el depósito pasa de ser del CLUB a ser de una **SEDE**. Antes la sede
+  vivía en el ítem (`insumo.sede_id`); ahora vive en el depósito. Cada sede tiene sus depósitos.
+  - `Deposito.sede_id` (migración `add_sede_a_depositos`); unicidad de sistema por `(club, sede, clave)`.
+  - **`SembrarDepositos` por sede:** General en todas; **Cultivo** en producción/mixta; **Salón**
+    (con bar) y **Dispensario** en social/mixta. Al crear una sede, estrena sus depósitos.
+  - **Sede-ificación de lo legacy (idempotente):** reasigna los insumos de los depósitos club-wide
+    (sede_id nil) a su depósito por-sede (por la sede del insumo; los "pool" sin sede → la sede
+    principal, la más antigua) y retira los viejos. Corre lazy en el primer acceso a Depósito/Insumos.
+  - Specs de `sembrar_depositos` (per-sede por tipo, sede-ificación, migración legacy, idempotencia).
+    Suite backend 1193 verde.
+- **Pendiente Fase 2 (frontend sede-aware):** el hub Depósito, el catálogo por área y el Nuevo
+  Movimiento deben **agrupar/mostrar por sede** (si no, un club multi-sede vería depósitos con nombre
+  repetido). Para un club de **una sede** ya se ve igual que antes.
+
 ## Julio 2026 (m) — el área "Administración" pasa a llamarse "General"
 
 - **Área del sistema "Administración" → "General"** (nombre visible más claro; el `tipo` interno

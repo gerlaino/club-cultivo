@@ -1,7 +1,8 @@
 module Finanzas
-  # Siembra los depósitos de sistema del club (Cultivo, General, Salón si tiene bar, Dispensación)
-  # y backfillea los insumos existentes a su depósito según el viejo `tipo`. Idempotente:
-  # correrla de nuevo no duplica ni pisa nombres editados por el admin.
+  # Siembra los depósitos de sistema del club POR SEDE (General en todas; Cultivo en producción;
+  # Salón/Dispensario en social/mixta con bar) y sede-ifica lo legacy: reasigna los insumos de los
+  # depósitos club-wide (sede_id nil) a su depósito por-sede y retira los viejos. Idempotente:
+  # correrla de nuevo no duplica, no pisa nombres editados, ni re-migra.
   #
   #   Finanzas::SembrarDepositos.new(club).call
   class SembrarDepositos
@@ -12,40 +13,76 @@ module Finanzas
     def call
       ActsAsTenant.with_tenant(@club) do
         Finanzas::SembrarCatalogo.new(@club).call # asegura las áreas (unidades de negocio)
-        sembrar
-        backfill_insumos
+        return true if @club.sedes.empty?         # sin sedes no hay dónde ubicar depósitos
+
+        sembrar_por_sede
+        sedeificar_legacy # reasigna insumos de los club-wide y los retira
+        backfill_insumos  # cualquier insumo sin depósito → el de su sede
       end
       true
     end
 
     private
 
-    def sembrar
-      areas = @club.unidades_negocio.index_by(&:tipo)
-      orden = 0
-      Deposito::CLAVES_SISTEMA.each do |clave, nombre|
-        next if clave == 'salon' && !@club.feature?(:bar)
+    # Sede "principal" para lo que no tiene sede (insumos pool): la más antigua.
+    def principal
+      @principal ||= @club.sedes.order(:id).first
+    end
 
-        orden += 1
-        dep = @club.depositos.with_deleted.find_or_initialize_by(clave_sistema: clave)
-        dep.restore if dep.persisted? && dep.deleted?
-        dep.nombre     = nombre if dep.nombre.blank?
-        dep.es_sistema = true
-        dep.activo     = true
-        dep.orden      = orden if dep.orden.to_i.zero?
-        # Vincula el depósito de sistema a su área (no pisa si ya tiene una asignada).
-        dep.unidad_negocio ||= areas[Deposito::AREA_TIPO_POR_CLAVE[clave]]
-        dep.save!
+    # Qué depósitos del sistema le tocan a cada sede según su tipo.
+    def claves_de(sede)
+      claves = ['general']                                # todas las sedes
+      claves << 'cultivo'      if sede.es_produccion?     # producción / mixta
+      claves << 'dispensacion' if sede.es_social?         # social / mixta
+      claves << 'salon'        if sede.es_social? && @club.feature?(:bar)
+      claves
+    end
+
+    def sembrar_por_sede
+      areas = @club.unidades_negocio.index_by(&:tipo)
+      @club.sedes.order(:id).each do |sede|
+        claves_de(sede).each_with_index do |clave, i|
+          dep = @club.depositos.with_deleted.find_or_initialize_by(clave_sistema: clave, sede_id: sede.id)
+          dep.restore if dep.persisted? && dep.deleted?
+          dep.nombre        = Deposito::CLAVES_SISTEMA[clave] if dep.nombre.blank?
+          dep.es_sistema    = true
+          dep.activo        = true
+          dep.orden         = i if dep.orden.to_i.zero?
+          dep.unidad_negocio ||= areas[Deposito::AREA_TIPO_POR_CLAVE[clave]]
+          dep.save!
+        end
       end
     end
 
-    # Cada insumo cae en su depósito según el tipo legacy. No pisa los que ya tengan depósito.
-    def backfill_insumos
-      cultivo = @club.depositos.find_by(clave_sistema: 'cultivo')
-      general = @club.depositos.find_by(clave_sistema: 'general')
-      @club.insumos.where(deposito_id: nil).find_each do |i|
-        i.update_column(:deposito_id, i.tipo == 'general' ? general&.id : cultivo&.id)
+    # Migra los depósitos legacy (sede_id nil): reasigna sus insumos al depósito por-sede que
+    # corresponde (por la sede del insumo, o la principal si es pool) y retira el viejo (soft-delete).
+    def sedeificar_legacy
+      @club.depositos.where(sede_id: nil).where.not(clave_sistema: nil).find_each do |old|
+        clave = old.clave_sistema
+        old.insumos.find_each do |ins|
+          sede_id = ins.sede_id || principal&.id
+          dep = deposito_de(clave, sede_id) || deposito_de('general', sede_id)
+          ins.update_columns(deposito_id: dep.id, sede_id: sede_id) if dep
+        end
+        old.reload
+        old.destroy if old.insumos.count.zero? # restrict_with_error protege si quedó algún insumo
       end
+    end
+
+    # Insumos sin depósito (nuevos o pre-siembra) → el de su tipo + su sede (o la principal).
+    def backfill_insumos
+      @club.insumos.where(deposito_id: nil).find_each do |i|
+        sede_id = i.sede_id || principal&.id
+        clave   = i.tipo == 'general' ? 'general' : 'cultivo'
+        dep = deposito_de(clave, sede_id) || deposito_de('general', sede_id)
+        i.update_columns(deposito_id: dep.id, sede_id: sede_id) if dep
+      end
+    end
+
+    def deposito_de(clave, sede_id)
+      return nil if sede_id.nil?
+
+      @club.depositos.find_by(clave_sistema: clave, sede_id: sede_id)
     end
   end
 end

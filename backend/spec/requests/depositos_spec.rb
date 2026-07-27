@@ -4,8 +4,13 @@ RSpec.describe 'Depósitos', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
 
+  # Multi-sede: los depósitos ahora viven en una sede. Una sede mixta = Cultivo + General + Dispensario.
+  def sembrar_sede!
+    ActsAsTenant.with_tenant(club) { club.sedes.exists? || create(:sede, club: club, created_by: admin, tipo: 'mixta') }
+  end
+
   describe 'GET /api/depositos' do
-    before { sign_in_as(admin) }
+    before { sign_in_as(admin); sembrar_sede! }
 
     it 'siembra los depósitos de sistema la primera vez' do
       get '/api/depositos', headers: auth_headers
@@ -16,7 +21,7 @@ RSpec.describe 'Depósitos', type: :request do
   end
 
   describe 'POST /api/depositos' do
-    before { sign_in_as(admin) }
+    before { sign_in_as(admin); sembrar_sede! }
 
     it 'el admin crea un depósito propio (no de sistema)' do
       expect {
@@ -28,7 +33,7 @@ RSpec.describe 'Depósitos', type: :request do
   end
 
   describe 'DELETE /api/depositos/:id' do
-    before { sign_in_as(admin) }
+    before { sign_in_as(admin); sembrar_sede! }
 
     it 'no borra un depósito de sistema (sugiere desactivar)' do
       get '/api/depositos', headers: auth_headers # siembra

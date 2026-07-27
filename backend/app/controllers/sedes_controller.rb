@@ -47,6 +47,9 @@ class SedesController < ApplicationController
     sede = current_user.club.sedes.build(sede_params)
     sede.created_by = current_user
     if sede.save
+      # Multi-sede: la sede nueva estrena sus depósitos del sistema (General, y Cultivo/Salón/
+      # Dispensario según su tipo). Idempotente.
+      Finanzas::SembrarDepositos.new(current_user.club).call
       render json: serialize_sede(sede), status: :created
     else
       render json: { errors: sede.errors.full_messages }, status: :unprocessable_entity

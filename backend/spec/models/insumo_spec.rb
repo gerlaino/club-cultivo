@@ -38,6 +38,7 @@ RSpec.describe Insumo, type: :model do
     end
 
     it 'el egreso hereda el área del depósito del insumo' do
+      create(:sede, club: club, created_by: admin, tipo: 'produccion') # multi-sede: el depósito vive en una sede
       Finanzas::SembrarDepositos.new(club).call
       dep = club.depositos.find_by(clave_sistema: 'cultivo')
       i = insumo(deposito: dep)

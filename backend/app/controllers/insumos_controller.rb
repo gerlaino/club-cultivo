@@ -193,9 +193,12 @@ class InsumosController < ApplicationController
   # (ej. creado desde un movimiento contable). Barato: solo corre el servicio si hace falta.
   def asegurar_depositos
     club = current_user.club
-    if club.depositos.none? || club.insumos.where(deposito_id: nil).exists?
-      Finanzas::SembrarDepositos.new(club).call
-    end
+    # También sede-ifica lo legacy: si quedan depósitos de sistema club-wide (sede_id nil), la
+    # siembra los migra a por-sede en el primer acceso (multi-sede).
+    faltan = club.depositos.none? ||
+             club.insumos.where(deposito_id: nil).exists? ||
+             club.depositos.where(sede_id: nil).where.not(clave_sistema: nil).exists?
+    Finanzas::SembrarDepositos.new(club).call if faltan
   end
 
   ROLES_LECTURA = %w[admin supervisor cultivador auditor].freeze
