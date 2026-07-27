@@ -7,9 +7,18 @@ import { em } from '../lib/loteHelpers.js'
 import { useAuthStore } from '../stores/auth.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import BloqueoProgreso from '../components/ui/BloqueoProgreso.vue'
+import { useSeleccion } from '../composables/useSeleccion.js'
+import { useEtiquetasQR } from '../composables/useEtiquetasQR.js'
+import { useClubStore } from '../stores/club.js'
+import { useToast } from '../composables/useToast.js'
+import { banderitaHTML, banderitaCSS } from '../lib/etiquetaPlanta.js'
+import { logoDataUrl } from '../lib/logoEmbed.js'
 
 const router = useRouter()
 const auth   = useAuthStore()
+const club   = useClubStore()
+const toast  = useToast()
 
 const plants  = ref([])
 const lotes   = ref([])
@@ -101,6 +110,59 @@ const paginated  = computed(() => filtered.value.slice((page.value - 1) * perPag
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / perPage)))
 
 watch(filtered, () => { page.value = 1 })
+
+// ---------- Etiquetas QR en tanda ----------
+// La misma banderita plegable que imprime el lote (lib/etiquetaPlanta.js): la etiqueta no cambia
+// según de dónde la imprimís. "Seleccionar todo" toma todo lo FILTRADO: filtrás esqueje y salen
+// solo los esquejes, aunque la tabla muestre 10 por página.
+const sel = useSeleccion(computed(() => plants.value), filtered)
+const etiquetas = useEtiquetasQR()
+
+const seleccionSinQR = computed(() => sel.seleccionados.value.filter(p => !p.codigo_qr).length)
+
+async function configEtiquetas() {
+  if (!club.data) { try { await club.fetch() } catch { /* el club es opcional en la etiqueta */ } }
+  const clubLogo = await logoDataUrl(club.logoUrl)
+  const clubName = club.name || ''
+  return {
+    items:  sel.seleccionados.value.filter(p => p.codigo_qr),
+    urlDe:  (p) => `${window.location.origin}/p/${p.codigo_qr}`,
+    htmlDe: (p, qr) => banderitaHTML({
+      qrDataUrl: qr,
+      nombre:    p.nombre || p.codigo_qr,
+      genetica:  p.genetica?.nombre,
+      lote:      p.lote?.codigo,
+      inicio:    _fechaCortaEt(p.lote?.start_date),
+      clubName, clubLogo,
+    }),
+    css: `@page { size: A4; margin: 8mm; }
+          body { font-family: -apple-system, sans-serif; background: #fff; }
+          .hoja { display: flex; flex-direction: column; gap: 3mm; align-items: center; }
+          ${banderitaCSS}`,
+    nombre:  `Etiquetas de plantas (${sel.cantidad.value})`,
+    archivo: `etiquetas-plantas-${sel.cantidad.value}`,
+  }
+}
+
+function _fechaCortaEt(d) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d ?? ''))
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null
+}
+
+// Se pasa la FUNCIÓN (no el config resuelto): el composable abre la ventana de impresión antes de
+// cualquier await, o el bloqueador de popups se la come.
+async function imprimirEtiquetas() {
+  const r = await etiquetas.imprimir(configEtiquetas)
+  if (r.vacio) toast.warning('Ninguna planta seleccionada tiene código QR')
+  else if (!r.ok && r.error) toast.error('No se pudieron generar las etiquetas')
+  else if (r.viaDescarga) toast.warning('El navegador bloqueó la ventana: se descargó el archivo')
+}
+async function descargarEtiquetas() {
+  const r = await etiquetas.descargar(configEtiquetas)
+  if (r.vacio) toast.warning('Ninguna planta seleccionada tiene código QR')
+  else if (!r.ok && r.error) toast.error('No se pudieron generar las etiquetas')
+  else if (r.ok) toast.success('Etiquetas descargadas')
+}
 
 function onSort(col) {
   if (sortBy.value === col + '_asc') sortBy.value = col + '_desc'
@@ -243,6 +305,16 @@ onMounted(() => Promise.all([loadPlants(), loadLotes(), loadKpis()]))
       <table class="pt-table">
         <thead>
           <tr>
+            <th class="pt-th--cb">
+              <input
+                type="checkbox" class="pt-cb"
+                :checked="sel.todoFiltradoElegido.value"
+                :indeterminate.prop="sel.algoFiltradoElegido.value"
+                :disabled="etiquetas.ocupado.value"
+                :title="sel.todoFiltradoElegido.value ? 'Deseleccionar' : `Seleccionar las ${filtered.length} plantas filtradas`"
+                @change="sel.alternarTodoFiltrado()"
+              />
+            </th>
             <th>Estado</th>
             <th class="pt-table__sortable" @click="onSort('nombre')">
               Nombre <span class="pt-sort-icon">{{ sortIcon('nombre') }}</span>
@@ -269,6 +341,15 @@ onMounted(() => Promise.all([loadPlants(), loadLotes(), loadKpis()]))
             class="pt-table__row"
             @click="router.push('/plantas/' + plant.id)"
           >
+            <td class="pt-td--cb" @click.stop>
+              <input
+                type="checkbox" class="pt-cb"
+                :checked="sel.esta(plant.id)"
+                :disabled="etiquetas.ocupado.value"
+                :aria-label="`Seleccionar ${plant.nombre || plant.codigo_qr}`"
+                @change="sel.alternar(plant.id)"
+              />
+            </td>
             <td>
               <span class="pt-badge" :style="{ background: plantaMeta(plant).bg, color: plantaMeta(plant).color }">
                 {{ plantaMeta(plant).icon }} {{ plantaMeta(plant).label }}
@@ -310,10 +391,65 @@ onMounted(() => Promise.all([loadPlants(), loadLotes(), loadKpis()]))
       <div class="ptv__count">{{ paginated.length }} de {{ filtered.length }} plantas</div>
     </div>
 
+    <!-- Barra de acción de la selección -->
+    <Teleport to="body">
+      <div v-if="sel.cantidad.value" class="pt-selbar">
+        <span class="pt-selbar__txt">
+          {{ sel.cantidad.value }} {{ sel.cantidad.value === 1 ? 'planta' : 'plantas' }}
+          <small v-if="sel.fueraDelFiltro.value">({{ sel.fueraDelFiltro.value }} fuera del filtro actual)</small>
+        </span>
+        <span v-if="seleccionSinQR" class="pt-selbar__warn" :title="`${seleccionSinQR} sin código QR: no se pueden etiquetar`">
+          <i class="bi bi-exclamation-triangle-fill"></i> {{ seleccionSinQR }} sin QR
+        </span>
+        <button class="pt-selbar__ghost" :disabled="etiquetas.ocupado.value" @click="sel.limpiar()">Limpiar</button>
+        <button class="pt-selbar__btn" :disabled="etiquetas.ocupado.value" @click="descargarEtiquetas">
+          <i class="bi bi-download"></i> Descargar
+        </button>
+        <button class="pt-selbar__btn pt-selbar__btn--main" :disabled="etiquetas.ocupado.value" @click="imprimirEtiquetas">
+          <i class="bi bi-printer"></i> Imprimir etiquetas
+        </button>
+      </div>
+    </Teleport>
+
+    <!-- Mientras genera no se puede tocar nada -->
+    <BloqueoProgreso
+      :visible="etiquetas.ocupado.value"
+      :titulo="etiquetas.titulo.value"
+      :hechas="etiquetas.hechas.value"
+      :total="etiquetas.total.value"
+    />
+
   </div>
 </template>
 
 <style scoped>
+/* Selección para etiquetas en tanda */
+.pt-th--cb, .pt-td--cb { width: 34px; padding-right: 0; }
+.pt-cb { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; margin: 0; }
+.pt-cb:disabled { cursor: default; opacity: .5; }
+
+.pt-selbar {
+  position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); z-index: 1035;
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; justify-content: center;
+  max-width: calc(100vw - 2rem);
+  background: #0f172a; color: #fff; padding: .6rem .75rem .6rem 1.1rem;
+  border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.25); font-size: .82rem;
+}
+.pt-selbar__txt { font-weight: 600; white-space: nowrap; }
+.pt-selbar__txt small { font-weight: 400; color: #94a3b8; }
+.pt-selbar__warn { color: #fbbf24; font-weight: 600; white-space: nowrap; }
+.pt-selbar__ghost { background: none; border: none; color: #94a3b8; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.pt-selbar__ghost:hover:not(:disabled) { color: #fff; }
+.pt-selbar__btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: rgba(255,255,255,.1); color: #fff; border: none;
+  padding: .45rem .85rem; border-radius: 9px; font-size: .8rem; font-weight: 600; cursor: pointer;
+}
+.pt-selbar__btn:hover:not(:disabled) { background: rgba(255,255,255,.2); }
+.pt-selbar__btn--main { background: #22c55e; color: #052e16; }
+.pt-selbar__btn--main:hover:not(:disabled) { background: #16a34a; color: #fff; }
+.pt-selbar__btn:disabled, .pt-selbar__ghost:disabled { opacity: .5; cursor: default; }
+
 .ptv { padding: 2rem 1.75rem 3rem; max-width: 1200px; margin: 0 auto; }
 @media (max-width: 768px) { .ptv { padding: 1.25rem 1rem 2rem; } }
 

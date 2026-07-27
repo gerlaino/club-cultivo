@@ -27,21 +27,19 @@
         <template v-if="plantList.length > 0">
           <button
             class="lps__btn-sm lps__btn-sm--qr"
-            :disabled="printingLabels || downloadingLabels"
+            :disabled="etiquetas.ocupado.value"
             title="Imprimir etiquetas QR"
             @click="imprimirEtiquetas"
           >
-            <i class="bi" :class="printingLabels ? 'bi-hourglass-split' : 'bi-printer'"></i>
-            {{ printingLabels ? 'Generando…' : 'Imprimir' }}
+            <i class="bi bi-printer"></i> Imprimir
           </button>
           <button
             class="lps__btn-sm lps__btn-sm--dl"
-            :disabled="printingLabels || downloadingLabels"
+            :disabled="etiquetas.ocupado.value"
             title="Descargar etiquetas QR como archivo HTML"
             @click="descargarEtiquetas"
           >
-            <i class="bi" :class="downloadingLabels ? 'bi-hourglass-split' : 'bi-download'"></i>
-            {{ downloadingLabels ? 'Generando…' : 'Descargar' }}
+            <i class="bi bi-download"></i> Descargar
           </button>
         </template>
         <button v-if="canEdit || isCultivador" class="lps__btn-sm" @click="openAddPlanta">
@@ -258,6 +256,13 @@
         </div>
       </div>
     </Teleport>
+
+    <BloqueoProgreso
+      :visible="etiquetas.ocupado.value"
+      :titulo="etiquetas.titulo.value"
+      :hechas="etiquetas.hechas.value"
+      :total="etiquetas.total.value"
+    />
   </div>
 </template>
 
@@ -267,7 +272,8 @@ import { RouterLink } from 'vue-router'
 import { usePlantsStore } from '../../stores/plants'
 import { useClubStore }   from '../../stores/club'
 import { createPlant } from '../../lib/api'
-import { useQRCode } from '../../composables/useQRCode.js'
+import { useEtiquetasQR } from '../../composables/useEtiquetasQR.js'
+import BloqueoProgreso from '../ui/BloqueoProgreso.vue'
 import { useToast } from '../../composables/useToast.js'
 import { pm, em, STATE_MAP } from '../../lib/loteHelpers.js'
 import { logoDataUrl } from '../../lib/logoEmbed.js'
@@ -287,7 +293,6 @@ const emit = defineEmits(['cosechar'])
 const plantsStore  = usePlantsStore()
 const clubStore    = useClubStore()
 const toast        = useToast()
-const { generatePNG } = useQRCode()
 
 const PLANT_STAGE_GRADIENT = {
   semilla:    'linear-gradient(160deg, #166534 0%, #14532d 100%)',
@@ -385,85 +390,53 @@ async function guardarPlanta() {
   }
 }
 
-const printingLabels    = ref(false)
-const downloadingLabels = ref(false)
+const etiquetas = useEtiquetasQR()
 
-function _esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
 function _fechaCorta(d) {
   if (!d) return null
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d))
   return m ? `${m[3]}/${m[2]}/${m[1]}` : null
 }
 
-async function generarHTMLEtiquetas() {
-  const origen   = window.location.origin
-  const clubName = clubStore.data?.name || ''
+// Imprimir/descargar las etiquetas de TODAS las plantas del lote. Usa el mismo composable que la
+// impresión en tanda desde /plantas: abre la ventana antes de generar (si no, el bloqueador de
+// popups la mataba) y tapa la pantalla con progreso mientras trabaja.
+async function configEtiquetas() {
   const clubLogo = await logoDataUrl(clubStore.data?.logo_url)
+  const clubName = clubStore.data?.name || ''
   const loteCode = props.lote?.codigo || 'lote'
   const genetica = props.lote?.genetica?.nombre || props.lote?.strain || '—'
   const inicio   = _fechaCorta(props.lote?.start_date)
 
-  const etiquetas = await Promise.all(
-    plantList.value
-      .filter(p => p.codigo_qr)
-      .map(async p => {
-        const qrDataUrl = await generatePNG(`${origen}/p/${p.codigo_qr}`, {
-          width: 200, margin: 2, color: { dark: '#1b5e20', light: '#ffffff' },
-        })
-        return banderitaHTML({
-          qrDataUrl, nombre: p.nombre || p.codigo_qr, genetica,
-          lote: loteCode, inicio, clubName, clubLogo,
-        })
-      })
-  )
-
-  return { html: `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>Etiquetas — ${_esc(loteCode)}</title>
-<style>
-  @page { size: A4; margin: 8mm; }
-  body { font-family: -apple-system, sans-serif; background: #fff; }
-  .lista { display: flex; flex-direction: column; gap: 3mm; align-items: center; }
-  ${banderitaCSS}
-</style></head>
-<body><div class="lista">${etiquetas.join('')}</div></body></html>`, loteCode }
+  return {
+    items:  plantList.value.filter(p => p.codigo_qr),
+    urlDe:  (p) => `${window.location.origin}/p/${p.codigo_qr}`,
+    htmlDe: (p, qr) => banderitaHTML({
+      qrDataUrl: qr, nombre: p.nombre || p.codigo_qr, genetica,
+      lote: loteCode, inicio, clubName, clubLogo,
+    }),
+    css: `@page { size: A4; margin: 8mm; }
+          body { font-family: -apple-system, sans-serif; background: #fff; }
+          .hoja { display: flex; flex-direction: column; gap: 3mm; align-items: center; }
+          ${banderitaCSS}`,
+    nombre:  `Etiquetas — ${loteCode}`,
+    archivo: `etiquetas-${loteCode}`,
+  }
 }
 
 async function imprimirEtiquetas() {
-  if (!plantList.value.length || printingLabels.value) return
-  printingLabels.value = true
-  try {
-    const { html } = await generarHTMLEtiquetas()
-    const win = window.open('', '_blank', 'width=800,height=900')
-    if (!win) { toast.error('Permitir ventanas emergentes para imprimir'); return }
-    win.document.write(html)
-    win.document.close()
-    setTimeout(() => { win.print() }, 600)
-  } catch {
-    toast.error('Error al generar etiquetas')
-  } finally {
-    printingLabels.value = false
-  }
+  if (!plantList.value.length) return
+  const r = await etiquetas.imprimir(configEtiquetas)
+  if (r.vacio) toast.warning('Ninguna planta del lote tiene código QR')
+  else if (!r.ok && r.error) toast.error('Error al generar etiquetas')
+  else if (r.viaDescarga) toast.warning('El navegador bloqueó la ventana: se descargó el archivo')
 }
 
 async function descargarEtiquetas() {
-  if (!plantList.value.length || downloadingLabels.value) return
-  downloadingLabels.value = true
-  try {
-    const { html, loteCode } = await generarHTMLEtiquetas()
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `etiquetas-${loteCode}.html`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  } catch {
-    toast.error('Error al descargar etiquetas')
-  } finally {
-    downloadingLabels.value = false
-  }
+  if (!plantList.value.length) return
+  const r = await etiquetas.descargar(configEtiquetas)
+  if (r.vacio) toast.warning('Ninguna planta del lote tiene código QR')
+  else if (!r.ok && r.error) toast.error('Error al generar etiquetas')
 }
 
 defineExpose({ closeAddPlanta: () => { showAddPlanta.value = false } })

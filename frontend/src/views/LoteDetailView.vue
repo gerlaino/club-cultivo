@@ -8,6 +8,7 @@ import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
 import { getLoteHistorial, registrarTrasplante, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, createLoteEvento, updateLoteEvento, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
 import { useQRCode } from '../composables/useQRCode.js'
+import { etiquetaLoteHTML, hojaUnaEtiquetaCSS } from '../lib/etiquetaLote.js'
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
 import GraficosLote from '../components/GraficosLote.vue'
@@ -57,36 +58,28 @@ const isCultivador = computed(() => auth.role === 'cultivador')
 
 const { downloadPNG, generatePNG } = useQRCode()
 function _escQr(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
+
+// La etiqueta del lote vive en lib/etiquetaLote.js: misma pieza que usa la impresión en tanda desde
+// /lotes. Antes el HTML estaba acá inline y cualquier ajuste dejaba las dos versiones distintas.
 async function descargarQR() {
   const l = lote.value
   if (!l?.codigo_qr) return
-  const dataUrl = await generatePNG(`${window.location.origin}/l/${l.codigo_qr}`, { width: 260, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' } })
-  const genetica = l.genetica?.nombre || l.strain || '—'
-  const estado   = em(l.estado).label
-  const inicio   = l.start_date ? formatDate(l.start_date) : '—'
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Etiqueta lote ${_escQr(l.codigo)}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0} @page{size:80mm 50mm;margin:0}
-  body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
-  .et{display:flex;align-items:center;gap:5mm;border:0.4px solid #bbb;border-radius:3mm;padding:5mm}
-  .et img{width:30mm;height:30mm;display:block}
-  .et-d{display:flex;flex-direction:column;gap:1mm}
-  .et-code{font-size:15pt;font-weight:800;font-family:monospace;color:#0f172a}
-  .et-gen{font-size:11pt;font-weight:700;color:#15803d}
-  .et-meta{font-size:9pt;color:#475569}
-  .et-club{font-size:8pt;color:#94a3b8;margin-top:1mm}
-</style></head><body>
-  <div class="et">
-    <img src="${dataUrl}" alt="${_escQr(l.codigo)}" />
-    <div class="et-d">
-      <div class="et-code">${_escQr(l.codigo)}</div>
-      <div class="et-gen">🌿 ${_escQr(genetica)}</div>
-      <div class="et-meta">${_escQr(estado)} · inicio ${_escQr(inicio)}</div>
-      <div class="et-meta">${l.plants_count ?? 0} plantas</div>
-      <div class="et-club">${_escQr(club.data?.name || '')}</div>
-    </div>
-  </div>
-</body></html>`
+  const dataUrl = await generatePNG(`${window.location.origin}/l/${l.codigo_qr}`, {
+    width: 300, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' },
+  })
+  const etiqueta = etiquetaLoteHTML({
+    qrDataUrl: dataUrl,
+    codigo:    l.codigo,
+    genetica:  l.genetica?.nombre || l.strain,
+    estado:    em(l.estado).label,
+    inicio:    l.start_date,
+    plantas:   l.plants_count ?? 0,
+    clubName:  club.data?.name || '',
+  })
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Etiqueta lote ${_escQr(l.codigo)}</title><style>${hojaUnaEtiquetaCSS}</style></head>
+<body><div class="hoja">${etiqueta}</div></body></html>`
+
   const win = window.open('', '_blank', 'width=700,height=500')
   if (!win) { await downloadPNG(`${window.location.origin}/l/${l.codigo_qr}`, `qr-lote-${l.codigo}.png`); return }
   win.document.write(html); win.document.close()

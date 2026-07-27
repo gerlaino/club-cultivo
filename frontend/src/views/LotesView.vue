@@ -10,10 +10,18 @@ import { useConfirm } from '../composables/useConfirm.js';
 import { exportLotesCSV } from '../lib/api.js';
 import DsSpinner from '../design-system/components/Spinner.vue'
 import NuevoLoteModal from '../components/lotes/NuevoLoteModal.vue'
+import BloqueoProgreso from '../components/ui/BloqueoProgreso.vue'
+import { useSeleccion } from '../composables/useSeleccion.js'
+import { useEtiquetasQR } from '../composables/useEtiquetasQR.js'
+import { useClubStore } from '../stores/club.js'
+import { useToast } from '../composables/useToast.js'
+import { etiquetaLoteHTML, hojaTandaCSS } from '../lib/etiquetaLote.js'
 
 const store = useLotesStore();
 const salas = useSalasStore();
 const auth  = useAuthStore();
+const club  = useClubStore();
+const toast = useToast();
 const { confirm } = useConfirm();
 
 function lotesEscapeHandler(e) {
@@ -147,6 +155,51 @@ const totalItems = computed(() => sorted.value.length);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalItems.value / perPage.value)));
 const paginated  = computed(() => sorted.value.slice((page.value-1)*perPage.value, page.value*perPage.value));
 watch([sorted, perPage], () => { if (page.value > totalPages.value) page.value = 1; });
+
+// ---------- Etiquetas QR en tanda ----------
+// Se etiqueta lo SELECCIONADO, y "seleccionar todo" toma todo lo filtrado (no la página): recién
+// creaste 12 lotes, filtrás y los imprimís de una en vez de entrar a cada uno.
+const sel = useSeleccion(computed(() => store.items), sorted);
+const etiquetas = useEtiquetasQR();
+
+async function configEtiquetas() {
+  if (!club.data) { try { await club.fetch() } catch { /* el club es opcional en la etiqueta */ } }
+  return {
+    items:  sel.seleccionados.value.filter(l => l.codigo_qr),
+    urlDe:  (l) => `${window.location.origin}/l/${l.codigo_qr}`,
+    htmlDe: (l, qr) => etiquetaLoteHTML({
+      qrDataUrl: qr,
+      codigo:    l.codigo,
+      genetica:  l.genetica?.nombre || l.strain,
+      estado:    estadoLabel(l.estado),
+      inicio:    l.start_date,
+      plantas:   l.plants_count ?? 0,
+      clubName:  club.data?.name || '',
+    }),
+    css:     hojaTandaCSS,
+    nombre:  `Etiquetas de lotes (${sel.cantidad.value})`,
+    archivo: `etiquetas-lotes-${sel.cantidad.value}`,
+    qrOpts:  { width: 300 },
+  };
+}
+
+// Los lotes sin codigo_qr no pueden etiquetarse (no hay a dónde apuntar el QR).
+const seleccionSinQR = computed(() => sel.seleccionados.value.filter(l => !l.codigo_qr).length);
+
+// Se pasa la FUNCIÓN (no el config resuelto) para que el composable abra la ventana de impresión
+// antes de cualquier await; si no, el bloqueador de popups se la come.
+async function imprimirEtiquetas() {
+  const r = await etiquetas.imprimir(configEtiquetas);
+  if (r.vacio) toast.warning('Ningún lote seleccionado tiene código QR');
+  else if (!r.ok && r.error) toast.error('No se pudieron generar las etiquetas');
+  else if (r.viaDescarga) toast.warning('El navegador bloqueó la ventana: se descargó el archivo');
+}
+async function descargarEtiquetas() {
+  const r = await etiquetas.descargar(configEtiquetas);
+  if (r.vacio) toast.warning('Ningún lote seleccionado tiene código QR');
+  else if (!r.ok && r.error) toast.error('No se pudieron generar las etiquetas');
+  else if (r.ok) toast.success('Etiquetas descargadas');
+}
 
 // ---------- Form ----------
 function emptyForm() {
@@ -342,6 +395,16 @@ async function exportarCSV() {
       <table class="lv-table">
         <thead>
           <tr>
+            <th class="lv-th--cb">
+              <input
+                type="checkbox" class="lv-cb"
+                :checked="sel.todoFiltradoElegido.value"
+                :indeterminate.prop="sel.algoFiltradoElegido.value"
+                :disabled="etiquetas.ocupado.value"
+                :title="sel.todoFiltradoElegido.value ? 'Deseleccionar' : `Seleccionar los ${sorted.length} lotes filtrados`"
+                @change="sel.alternarTodoFiltrado()"
+              />
+            </th>
             <th>Estado</th>
             <th class="lv-th--sort" @click="sortBy = sortBy === 'codigo_asc' ? 'fecha_desc' : 'codigo_asc'">
               Código <span class="lv-sort-icon">{{ sortBy === 'codigo_asc' ? '↑' : '↕' }}</span>
@@ -365,6 +428,15 @@ async function exportarCSV() {
             class="lv-table__row"
             @click="$router.push({ name: 'lote-detail', params: { id: l.id } })"
           >
+            <td class="lv-td--cb" @click.stop>
+              <input
+                type="checkbox" class="lv-cb"
+                :checked="sel.esta(l.id)"
+                :disabled="etiquetas.ocupado.value"
+                :aria-label="`Seleccionar ${l.codigo}`"
+                @change="sel.alternar(l.id)"
+              />
+            </td>
             <td data-label="Estado">
               <span class="lv-badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }">
                 {{ em(l.estado).icon }} {{ estadoLabel(l.estado) }}
@@ -505,10 +577,65 @@ async function exportarCSV() {
       </div>
     </Teleport>
 
+    <!-- Barra de acción de la selección -->
+    <Teleport to="body">
+      <div v-if="sel.cantidad.value" class="lv-selbar">
+        <span class="lv-selbar__txt">
+          {{ sel.cantidad.value }} {{ sel.cantidad.value === 1 ? 'lote' : 'lotes' }}
+          <small v-if="sel.fueraDelFiltro.value">({{ sel.fueraDelFiltro.value }} fuera del filtro actual)</small>
+        </span>
+        <span v-if="seleccionSinQR" class="lv-selbar__warn" :title="`${seleccionSinQR} sin código QR: no se pueden etiquetar`">
+          <i class="bi bi-exclamation-triangle-fill"></i> {{ seleccionSinQR }} sin QR
+        </span>
+        <button class="lv-selbar__ghost" :disabled="etiquetas.ocupado.value" @click="sel.limpiar()">Limpiar</button>
+        <button class="lv-selbar__btn" :disabled="etiquetas.ocupado.value" @click="descargarEtiquetas">
+          <i class="bi bi-download"></i> Descargar
+        </button>
+        <button class="lv-selbar__btn lv-selbar__btn--main" :disabled="etiquetas.ocupado.value" @click="imprimirEtiquetas">
+          <i class="bi bi-printer"></i> Imprimir etiquetas
+        </button>
+      </div>
+    </Teleport>
+
+    <!-- Mientras genera no se puede tocar nada (ni cambiar el filtro a mitad de camino) -->
+    <BloqueoProgreso
+      :visible="etiquetas.ocupado.value"
+      :titulo="etiquetas.titulo.value"
+      :hechas="etiquetas.hechas.value"
+      :total="etiquetas.total.value"
+    />
+
   </div>
 </template>
 
 <style scoped>
+/* Selección para etiquetas en tanda */
+.lv-th--cb, .lv-td--cb { width: 34px; padding-right: 0; }
+.lv-cb { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; margin: 0; }
+.lv-cb:disabled { cursor: default; opacity: .5; }
+
+.lv-selbar {
+  position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); z-index: 1035;
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; justify-content: center;
+  max-width: calc(100vw - 2rem);
+  background: #0f172a; color: #fff; padding: .6rem .75rem .6rem 1.1rem;
+  border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.25); font-size: .82rem;
+}
+.lv-selbar__txt { font-weight: 600; white-space: nowrap; }
+.lv-selbar__txt small { font-weight: 400; color: #94a3b8; }
+.lv-selbar__warn { color: #fbbf24; font-weight: 600; white-space: nowrap; }
+.lv-selbar__ghost { background: none; border: none; color: #94a3b8; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.lv-selbar__ghost:hover:not(:disabled) { color: #fff; }
+.lv-selbar__btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: rgba(255,255,255,.1); color: #fff; border: none;
+  padding: .45rem .85rem; border-radius: 9px; font-size: .8rem; font-weight: 600; cursor: pointer;
+}
+.lv-selbar__btn:hover:not(:disabled) { background: rgba(255,255,255,.2); }
+.lv-selbar__btn--main { background: #22c55e; color: #052e16; }
+.lv-selbar__btn--main:hover:not(:disabled) { background: #16a34a; color: #fff; }
+.lv-selbar__btn:disabled, .lv-selbar__ghost:disabled { opacity: .5; cursor: default; }
+
 /* ── Layout ──────────────────────────────────────────── */
 .lv { padding: 2rem 1.5rem; max-width: 1100px; margin: 0 auto; }
 @media (max-width: 768px) { .lv { padding: 1.25rem 1rem; overflow-x: hidden; } }
