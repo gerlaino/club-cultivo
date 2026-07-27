@@ -307,9 +307,11 @@ watch(() => form.value.categoria_contable_id, () => {
   if (!showsPaciente.value) form.value.paciente_id = null
 })
 // Al elegir "solo un gasto" (o cambiar de depósito), limpiamos los campos de la entrada anterior.
+// Multi-sede: el depósito elegido fija la sede del movimiento (cada depósito es de una sede).
 watch(depSel, () => {
   dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: null }
   sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null }
+  if (depSelObj.value?.sede_id) form.value.sede_id = depSelObj.value.sede_id
 })
 
 watch(() => props.modelValue, (val) => {
@@ -644,7 +646,7 @@ async function submit() {
               <label class="nm-label">¿Esta compra es mercadería que va a un depósito?</label>
               <select class="nm-input" v-model="depSel">
                 <option value="">No, es solo un gasto</option>
-                <option v-for="d in depositosDelArea" :key="d.id" :value="d.id">Sí, guardarla en «{{ d.nombre }}»</option>
+                <option v-for="d in depositosDelArea" :key="d.id" :value="d.id">Sí, guardarla en «{{ d.nombre }}»{{ d.sede_nombre ? ` — 📍 ${d.sede_nombre}` : '' }}</option>
               </select>
 
               <!-- Depósito de insumos: nombre + cantidad, sube stock y recalcula costo promedio -->

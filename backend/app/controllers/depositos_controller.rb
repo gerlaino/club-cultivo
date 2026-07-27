@@ -10,7 +10,7 @@ class DepositosController < ApplicationController
 
   # GET /depositos
   def index
-    depos = current_user.club.depositos.ordenados.includes(:unidad_negocio).to_a
+    depos = current_user.club.depositos.ordenados.includes(:unidad_negocio, :sede).to_a
                         .select { |d| d.disponible_para?(current_user.club) }
     render json: depos.map { |d| serialize(d) }
   end
@@ -60,9 +60,10 @@ class DepositosController < ApplicationController
 
   def asegurar_depositos
     club = current_user.club
-    if club.depositos.none? || club.insumos.where(deposito_id: nil).exists?
-      Finanzas::SembrarDepositos.new(club).call
-    end
+    faltan = club.depositos.none? ||
+             club.insumos.where(deposito_id: nil).exists? ||
+             club.depositos.where(sede_id: nil).where.not(clave_sistema: nil).exists? # sede-ifica lo legacy
+    Finanzas::SembrarDepositos.new(club).call if faltan
   end
 
   ROLES_LECTURA = %w[admin supervisor cultivador auditor].freeze
@@ -78,7 +79,7 @@ class DepositosController < ApplicationController
 
   def deposito_params
     # La clave_sistema no se edita desde la API (la fija la siembra).
-    params.require(:deposito).permit(:nombre, :activo, :orden, :unidad_negocio_id)
+    params.require(:deposito).permit(:nombre, :activo, :orden, :unidad_negocio_id, :sede_id)
   end
 
   def serialize(d)
@@ -92,6 +93,8 @@ class DepositosController < ApplicationController
       familia:             d.familia,
       unidad_negocio_id:   d.unidad_negocio_id,
       area_nombre:         d.unidad_negocio&.nombre,
+      sede_id:             d.sede_id,
+      sede_nombre:         d.sede&.nombre,
       insumos_count:       d.insumos.count,
     }
   end

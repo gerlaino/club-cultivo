@@ -1,5 +1,16 @@
 # Changelog
 
+## Julio 2026 (ñ) — Depósitos por sede — Fase 2 (frontend sede-aware)
+
+- **Hub Depósito (`InsumosView`):** los tabs se filtran por la **sede elegida** (selector que ya
+  existía); con "Todo el club" se ven todos con la **sede en la etiqueta** (`Cultivo · Sede Centro`).
+  Las vistas read-only (Salón/Dispensario) reciben la sede del depósito activo.
+- **Catálogo por área (`FinanzasCatalogoView`):** cada depósito muestra su **📍 sede**.
+- **Nuevo Movimiento (`ModalNuevoMovimiento`):** la opción de depósito muestra su sede, y **elegir un
+  depósito fija la sede del movimiento** (cada depósito es de una sede).
+- Backend: la serialización del depósito suma `sede_id`/`sede_nombre`; `asegurar_depositos` (también
+  en `depositos_controller`) dispara la sede-ificación en el primer acceso. Build + 58 vitest verdes.
+
 ## Julio 2026 (n) — Depósitos por SEDE (multi-sede) — Fase 1 (backend)
 
 - **Cambio foundational:** el depósito pasa de ser del CLUB a ser de una **SEDE**. Antes la sede

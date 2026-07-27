@@ -34,8 +34,14 @@ const depositos = ref([])
 const depositoActivoId = ref(null)
 // El hub muestra TODOS los depósitos (panorama). Los que tienen otro dueño se ven read-only:
 // Salón (se opera desde el bar) y Dispensación (su stock viene de cosecha/manicura).
-const TABS = computed(() => depositos.value)
-const depositoActivo = computed(() => depositos.value.find(d => d.id === depositoActivoId.value) || TABS.value[0] || null)
+// Multi-sede: los depósitos son por sede. Si hay una sede elegida, mostramos solo los suyos
+// (+ los custom club-wide sin sede); con "Todo el club" se ven todos, con la sede en la etiqueta.
+const TABS = computed(() => {
+  if (sedeFiltro.value == null) return depositos.value
+  return depositos.value.filter(d => d.sede_id === sedeFiltro.value || d.sede_id == null)
+})
+const tabLabel = (d) => (sedeFiltro.value == null && multiSede.value && d.sede_nombre) ? `${d.nombre} · ${d.sede_nombre}` : d.nombre
+const depositoActivo = computed(() => TABS.value.find(d => d.id === depositoActivoId.value) || TABS.value[0] || null)
 const esSalon        = computed(() => depositoActivo.value?.clave_sistema === 'salon')
 const esDispensacion = computed(() => depositoActivo.value?.clave_sistema === 'dispensacion')
 const esCultivo      = computed(() => depositoActivo.value?.familia === 'insumo')
@@ -413,7 +419,7 @@ async function revertirCompra(compra) {
 
     <div class="dp__tabs">
       <button v-for="d in TABS" :key="d.id" class="dp__tab" :class="{ 'is-on': depositoActivo?.id === d.id }" @click="depositoActivoId = d.id">
-        {{ d.nombre }}
+        {{ tabLabel(d) }}
       </button>
       <button v-if="depositoActivo && !esSoloLectura && !depositoActivo.es_sistema" class="dp__tab dp__tab--add" title="Gestionar este depósito" @click="abrirEditarDeposito">⚙</button>
       <button class="dp__tab dp__tab--add" title="Crear un depósito" @click="abrirNuevoDeposito">＋</button>
@@ -440,8 +446,8 @@ async function revertirCompra(compra) {
       </div>
     </div>
 
-    <DepositoSalon v-if="esSalon" :sede-id="sedeFiltro" />
-    <DepositoDispensacion v-else-if="esDispensacion" :sede-id="sedeFiltro" />
+    <DepositoSalon v-if="esSalon" :sede-id="depositoActivo?.sede_id ?? sedeFiltro" />
+    <DepositoDispensacion v-else-if="esDispensacion" :sede-id="depositoActivo?.sede_id ?? sedeFiltro" />
 
     <template v-else>
     <div v-if="store.loading" class="dp__empty">Cargando depósito…</div>

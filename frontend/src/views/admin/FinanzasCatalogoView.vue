@@ -233,7 +233,9 @@ async function borrarUnidad(u) {
             <div class="acc-sub acc-sub--mt"><span class="acc-sub__title">Depósitos</span><small class="acc-sub__hint">se gestionan en Depósito</small></div>
             <div v-if="depsDe(area.id).length" class="dep-list">
               <div v-for="d in depsDe(area.id)" :key="d.id" class="dep-item">
-                <i class="bi bi-box-seam"></i> <b>{{ d.nombre }}</b> <small>· {{ familiaLabel(d) }}</small>
+                <i class="bi bi-box-seam"></i> <b>{{ d.nombre }}</b>
+                <small v-if="d.sede_nombre"> · 📍 {{ d.sede_nombre }}</small>
+                <small> · {{ familiaLabel(d) }}</small>
               </div>
             </div>
             <div v-else class="cat-empty">Esta área no tiene depósitos.</div>
