@@ -18,6 +18,7 @@ module Finanzas
         sembrar_por_sede
         sedeificar_legacy # reasigna insumos de los club-wide y los retira
         backfill_insumos  # cualquier insumo sin depósito → el de su sede
+        linkear_bar_productos # los productos del bar cuelgan del depósito Salón de su sede
       end
       true
     end
@@ -83,6 +84,19 @@ module Finanzas
       return nil if sede_id.nil?
 
       @club.depositos.find_by(clave_sistema: clave, sede_id: sede_id)
+    end
+
+    # Cuelga los productos del bar del depósito Salón de la sede de su bar (multi-sede). Solo los
+    # que no tienen depósito (no pisa). Idempotente.
+    def linkear_bar_productos
+      return unless @club.feature?(:bar) && defined?(BarProducto)
+
+      @club.bares.find_each do |bar|
+        dep = deposito_de('salon', bar.sede_id)
+        next unless dep
+
+        bar.bar_productos.where(deposito_id: nil).update_all(deposito_id: dep.id)
+      end
     end
   end
 end

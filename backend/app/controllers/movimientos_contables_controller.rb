@@ -342,6 +342,8 @@ class MovimientosContablesController < ApplicationController
                  bar.bar_productos.find(d[:bar_producto_id])
                else
                  bar.bar_productos.create!(club: club, unidad_negocio: bar.unidad_negocio_bar,
+                                           deposito: bar.deposito_salon, # lo linkeamos al depósito Salón de su sede
+                                           vendible: !ActiveModel::Type::Boolean.new.cast(d[:no_vender]), # "no vender" → fuera del catálogo POS
                                            nombre: d[:nombre].to_s.strip, categoria: d[:categoria].presence || 'bebida',
                                            precio_ars: d[:precio_ars].to_d)
                end
@@ -426,20 +428,29 @@ class MovimientosContablesController < ApplicationController
 
   # Ingresos/egresos/resultado agrupados por unidad de negocio. Los movimientos sin unidad
   # asignada caen en un grupo "Sin unidad" (id nil), para que el total siempre cuadre.
+  # P&L por unidad de negocio (área), con el desglose por sede adentro de cada una (matriz área × sede).
+  # `sedes:` permite ver, para un mismo área, cuánto aporta cada sede sin perder el total agregado.
   def resumen_por_unidad(scope)
     unidades = current_user.club.unidades_negocio.index_by(&:id)
-    scope.group(:unidad_negocio_id, :tipo).sum(:monto_ars).each_with_object({}) do |((uid, tipo), total), acc|
-      row = acc[uid] ||= begin
-        u = uid && unidades[uid]
-        { id: uid, nombre: u&.nombre || 'Sin unidad', tipo: u&.tipo, ingresos: 0.0, egresos: 0.0, balance: 0.0 }
-      end
+    sedes    = current_user.club.sedes.index_by(&:id)
+    acc = {}
+    scope.group(:unidad_negocio_id, :sede_id, :tipo).sum(:monto_ars).each do |(uid, sede_id, tipo), total|
+      u   = uid && unidades[uid]
+      row = acc[uid] ||= { id: uid, nombre: u&.nombre || 'Sin unidad', tipo: u&.tipo,
+                           ingresos: 0.0, egresos: 0.0, balance: 0.0, sedes: {} }
+      s    = sede_id && sedes[sede_id]
+      srow = row[:sedes][sede_id || 0] ||= { id: sede_id, nombre: s&.nombre || 'Sin sede',
+                                             ingresos: 0.0, egresos: 0.0, balance: 0.0 }
       if %w[ingreso recupero_costo].include?(tipo)
-        row[:ingresos] += total.to_f
+        row[:ingresos] += total.to_f; srow[:ingresos] += total.to_f
       elsif tipo == 'egreso'
-        row[:egresos] += total.to_f
+        row[:egresos] += total.to_f; srow[:egresos] += total.to_f
       end
-      row[:balance] = (row[:ingresos] - row[:egresos]).round(2)
-    end.values.sort_by { |r| -r[:balance] }
+      row[:balance]  = (row[:ingresos] - row[:egresos]).round(2)
+      srow[:balance] = (srow[:ingresos] - srow[:egresos]).round(2)
+    end
+    acc.values.each { |r| r[:sedes] = r[:sedes].values.sort_by { |x| -x[:balance] } }
+        .sort_by { |r| -r[:balance] }
   end
 
   def resumen_por_categoria(scope)

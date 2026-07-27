@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_27_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_27_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -209,6 +209,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_27_000001) do
     t.bigint "categoria_producto_id"
     t.bigint "deposito_id"
     t.string "codigo_barras"
+    t.boolean "vendible", default: true, null: false
     t.index ["bar_id", "codigo_barras"], name: "index_bar_productos_codigo_barras_por_bar", unique: true, where: "((codigo_barras IS NOT NULL) AND (deleted_at IS NULL))"
     t.index ["bar_id"], name: "index_bar_productos_on_bar_id"
     t.index ["categoria_producto_id"], name: "index_bar_productos_on_categoria_producto_id"

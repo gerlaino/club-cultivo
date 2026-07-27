@@ -14,6 +14,8 @@ module Bar
     def index
       scope = @bar.bar_productos.includes(:categoria_producto)
       scope = scope.activos if params[:activos] == 'true'
+      # El dispensador solo ve lo VENDIBLE: si no lo puede vender, no es su responsabilidad verlo.
+      scope = scope.where(vendible: true) unless gestion?
       vendidos = vendidos_mes_map
       render json: scope.order(:categoria, :nombre).map { |p| serialize(p).merge(vendidos_mes: vendidos[p.id].to_f) }
     end
@@ -25,7 +27,7 @@ module Bar
     def create
       carga = params[:carga_inicial]
       ActiveRecord::Base.transaction do
-        prod = @bar.bar_productos.create!(producto_params.merge(club: current_user.club, unidad_negocio: @bar.unidad_negocio_bar))
+        prod = @bar.bar_productos.create!(producto_params.merge(club: current_user.club, unidad_negocio: @bar.unidad_negocio_bar, deposito: @bar.deposito_salon))
         if carga.present? && carga[:cantidad].to_d.positive?
           prod.registrar_compra!(cantidad: carga[:cantidad], costo_total_ars: carga[:costo_total_ars],
                                  proveedor: carga[:proveedor].presence, created_by: current_user)
@@ -141,8 +143,10 @@ module Bar
       render json: { error: 'Solo el admin configura los productos del bar' }, status: :forbidden unless current_user.admin?
     end
 
+    def gestion? = %w[admin supervisor].include?(current_user&.role)
+
     def producto_params
-      params.require(:bar_producto).permit(:nombre, :categoria, :categoria_producto_id, :precio_ars, :costo_ars, :stock, :stock_minimo, :activo, :codigo_barras)
+      params.require(:bar_producto).permit(:nombre, :categoria, :categoria_producto_id, :precio_ars, :costo_ars, :stock, :stock_minimo, :activo, :codigo_barras, :vendible)
     end
 
     # Unidades vendidas este mes por producto (para la columna "Vend. mes" del panel).
@@ -162,7 +166,7 @@ module Bar
         precio_ars: p.precio_ars.to_f, costo_ars: p.costo_ars&.to_f,
         stock: p.stock.to_f, stock_minimo: p.stock_minimo.to_f, stock_bajo: p.stock_bajo?,
         valorizado_ars: p.valorizado_ars.to_f,
-        margen_pct: p.margen_pct, activo: p.activo,
+        margen_pct: p.margen_pct, activo: p.activo, vendible: p.vendible,
       }
     end
   end

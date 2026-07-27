@@ -75,14 +75,14 @@ const saving = ref(false)
 const UNIDADES_INSUMO = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
 const depSel = ref('')  // deposito_id elegido, o '' = no va a depósito (solo gasto)
 const dep = ref({ insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: null })
-const sal = ref({ bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null })
+const sal = ref({ bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null, no_vender: false })
 const barProductos = ref([])
 const multiSede = computed(() => (props.sedes?.length || 0) > 1)
 
 function resetDestino() {
   depSel.value = ''
   dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: null }
-  sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null }
+  sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null, no_vender: false }
   barProductos.value = []
 }
 
@@ -114,7 +114,7 @@ function buildDestino() {
     if (!s.bar_id || !(s.cantidad > 0)) return null
     return s.bar_producto_id
       ? { tipo: 'salon', bar_id: s.bar_id, bar_producto_id: s.bar_producto_id, cantidad: s.cantidad }
-      : { tipo: 'salon', bar_id: s.bar_id, nombre: s.nombre?.trim(), categoria: s.categoria, precio_ars: s.precio_ars, cantidad: s.cantidad }
+      : { tipo: 'salon', bar_id: s.bar_id, nombre: s.nombre?.trim(), categoria: s.categoria, precio_ars: s.precio_ars, cantidad: s.cantidad, no_vender: s.no_vender }
   }
   const d = dep.value
   if (!(d.cantidad > 0)) return null
@@ -310,7 +310,7 @@ watch(() => form.value.categoria_contable_id, () => {
 // Multi-sede: el depósito elegido fija la sede del movimiento (cada depósito es de una sede).
 watch(depSel, () => {
   dep.value = { insumo_id: '', nombre: '', unidad_medida: 'unidad', cantidad: null, sede_id: null }
-  sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null }
+  sal.value = { bar_id: '', bar_producto_id: '', nombre: '', categoria: 'bebida', precio_ars: null, cantidad: null, no_vender: false }
   if (depSelObj.value?.sede_id) form.value.sede_id = depSelObj.value.sede_id
 })
 
@@ -711,6 +711,10 @@ async function submit() {
                     <label class="nm-label">Precio de venta</label>
                     <input type="number" min="0" step="any" class="nm-input" v-model.number="sal.precio_ars" placeholder="$" />
                   </div>
+                  <label class="nm-chk" style="grid-column:1/-1">
+                    <input type="checkbox" v-model="sal.no_vender" />
+                    <span>No vender <small>— se guarda en el salón pero no aparece en el POS (uso interno, insumos del bar).</small></span>
+                  </label>
                 </div>
                 <p class="nm-dest-hint">El gasto queda como mercadería del salón (impacta su resultado). Sube el stock del producto — no confundir con stock de flor seca.</p>
               </div>
@@ -875,6 +879,9 @@ async function submit() {
 .nm-dest { margin: 4px 0 8px; }
 .nm-dest-body { margin-top: 8px; padding: 12px; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
 .nm-dest-hint { font-size: 12px; color: #64748b; margin: 0; }
+.nm-chk { display: flex; align-items: flex-start; gap: .5rem; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; margin-top: .2rem; }
+.nm-chk small { font-weight: 400; color: #94a3b8; }
+.nm-chk input { margin-top: 2px; }
 
 /* ─── TIPO TABS ──────────────────────────────────────── */
 .nm-tabs-wrap { padding: 16px 24px 0; }

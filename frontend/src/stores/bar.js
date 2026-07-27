@@ -24,7 +24,7 @@ export const useBarStore = defineStore("bar", {
   }),
 
   getters: {
-    activos:      (s) => s.productos.filter(p => p.activo),
+    activos:      (s) => s.productos.filter(p => p.activo && p.vendible !== false), // POS: solo lo vendible
     totalCarrito: (s) => s.carrito.reduce((a, l) => a + l.producto.precio_ars * l.cantidad, 0),
     cantItems:    (s) => s.carrito.reduce((a, l) => a + l.cantidad, 0),
   },

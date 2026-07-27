@@ -87,6 +87,13 @@ const toast = useToast()
 
 const vistaActiva    = ref("dashboard")
 const dashboardSede  = ref(null) // filtro de sede LOCAL del dashboard (null = todo el club)
+const unidadAbierta  = ref(new Set()) // áreas expandidas para ver su desglose por sede
+function toggleUnidad(id) {
+  const k = id ?? 'sin'
+  const s = new Set(unidadAbierta.value)
+  s.has(k) ? s.delete(k) : s.add(k)
+  unidadAbierta.value = s
+}
 const todosLotes     = ref([])
 const loadingLotes   = ref(false)
 const pacientes      = ref([])
@@ -617,14 +624,38 @@ onMounted(async () => {
             </span>
           </div>
           <div class="cv__unidad-list">
-            <div v-for="u in store.dashboard.por_unidad" :key="u.id ?? 'sin-unidad'" class="cv__unidad-row">
-              <span class="cv__unidad-name">{{ u.nombre }}</span>
-              <span class="cv__unidad-nums">
-                <span class="cv__unidad-in">+{{ fmt(u.ingresos) }}</span>
-                <span class="cv__unidad-out">−{{ fmt(u.egresos) }}</span>
-                <strong class="cv__unidad-bal" :class="u.balance >= 0 ? 'is-pos' : 'is-neg'">{{ fmt(u.balance) }}</strong>
-              </span>
-            </div>
+            <template v-for="u in store.dashboard.por_unidad" :key="u.id ?? 'sin-unidad'">
+              <div
+                class="cv__unidad-row"
+                :class="{ 'cv__unidad-row--exp': !dashboardSede && u.sedes?.length > 1 }"
+                @click="!dashboardSede && u.sedes?.length > 1 && toggleUnidad(u.id)"
+              >
+                <span class="cv__unidad-name">
+                  <i
+                    v-if="!dashboardSede && u.sedes?.length > 1"
+                    class="bi cv__unidad-caret"
+                    :class="unidadAbierta.has(u.id ?? 'sin') ? 'bi-caret-down-fill' : 'bi-caret-right-fill'"
+                  ></i>
+                  {{ u.nombre }}
+                  <span v-if="!dashboardSede && u.sedes?.length > 1" class="cv__unidad-sedes-badge">{{ u.sedes.length }} sedes</span>
+                </span>
+                <span class="cv__unidad-nums">
+                  <span class="cv__unidad-in">+{{ fmt(u.ingresos) }}</span>
+                  <span class="cv__unidad-out">−{{ fmt(u.egresos) }}</span>
+                  <strong class="cv__unidad-bal" :class="u.balance >= 0 ? 'is-pos' : 'is-neg'">{{ fmt(u.balance) }}</strong>
+                </span>
+              </div>
+              <div v-if="!dashboardSede && u.sedes?.length > 1 && unidadAbierta.has(u.id ?? 'sin')" class="cv__unidad-sedes">
+                <div v-for="s in u.sedes" :key="s.id ?? 'sin-sede'" class="cv__unidad-subrow">
+                  <span class="cv__unidad-subname"><i class="bi bi-geo-alt-fill"></i> {{ s.nombre }}</span>
+                  <span class="cv__unidad-nums">
+                    <span class="cv__unidad-in">+{{ fmt(s.ingresos) }}</span>
+                    <span class="cv__unidad-out">−{{ fmt(s.egresos) }}</span>
+                    <strong class="cv__unidad-bal" :class="s.balance >= 0 ? 'is-pos' : 'is-neg'">{{ fmt(s.balance) }}</strong>
+                  </span>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -1396,4 +1427,13 @@ onMounted(async () => {
 .cv__unidad-bal { font-size: .95rem; min-width: 90px; text-align: right; }
 .cv__unidad-bal.is-pos { color: #2f6b3d; }
 .cv__unidad-bal.is-neg { color: #b23b2e; }
+.cv__unidad-row--exp { cursor: pointer; }
+.cv__unidad-row--exp:hover { background: #f6f8f5; }
+.cv__unidad-caret { font-size: .7rem; color: #94a3b8; margin-right: 5px; }
+.cv__unidad-sedes-badge { margin-left: 8px; font-size: .68rem; font-weight: 600; color: #64748b; background: #eef1ec; border-radius: 6px; padding: 1px 7px; }
+.cv__unidad-sedes { display: flex; flex-direction: column; background: #fafbf9; border-bottom: 1px solid #eef1ec; }
+.cv__unidad-subrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 2px 7px 22px; }
+.cv__unidad-subrow + .cv__unidad-subrow { border-top: 1px dashed #eef1ec; }
+.cv__unidad-subname { font-size: .82rem; color: #5b6b60; display: flex; align-items: center; gap: 5px; }
+.cv__unidad-subname .bi { font-size: .72rem; color: #94a3b8; }
 </style>

@@ -32,6 +32,14 @@ class Barra < ApplicationRecord
     caja_turnos.abiertas.first
   end
 
+  # El depósito "Salón" de la SEDE de este bar (multi-sede). Es el contenedor contable/lógico al
+  # que se linkean los productos del bar. nil si todavía no se sembró.
+  def deposito_salon
+    return nil unless defined?(Deposito) && Deposito.table_exists?
+
+    club.depositos.find_by(clave_sistema: 'salon', sede_id: sede_id)
+  end
+
   # Caja que "ocupa" el bar: abierta o pendiente de cierre (esperando el visto del admin).
   # Es la que ve el panel/chip; las ventas siguen enganchándose solo a caja_abierta.
   def caja_activa

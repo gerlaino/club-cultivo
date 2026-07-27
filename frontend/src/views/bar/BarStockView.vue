@@ -44,29 +44,17 @@ const valorizado = computed(() => store.productos.reduce((a, p) => a + (p.stock 
 // ── Alta / edición de producto (sin stock inicial: el stock entra por Comprar, con costo) ──
 const prodForm = ref(null)
 const escaneandoProd = ref(false) // scan-to-fill del código de barras en el form
-// carga: primera carga opcional (cantidad + costo → sube stock con costo y genera el egreso "Bar").
-function nuevo() { prodForm.value = { nombre: '', categoria_producto_id: categorias.value[0]?.id ?? null, precio_ars: null, stock_minimo: 0, codigo_barras: '', carga: { cantidad: null, costo_total: null, proveedor: '' } } }
-function editar(p) { prodForm.value = { id: p.id, nombre: p.nombre, categoria_producto_id: p.categoria_producto_id, precio_ars: p.precio_ars, stock_minimo: p.stock_minimo ?? 0, codigo_barras: p.codigo_barras || '' } }
+// Los productos nuevos se compran desde Nuevo Movimiento; acá solo se EDITAN los existentes.
+function editar(p) { prodForm.value = { id: p.id, nombre: p.nombre, categoria_producto_id: p.categoria_producto_id, precio_ars: p.precio_ars, stock_minimo: p.stock_minimo ?? 0, codigo_barras: p.codigo_barras || '', vendible: p.vendible } }
 function onCodigoDecoded(code) { if (prodForm.value) { prodForm.value.codigo_barras = String(code || '').trim(); toast.success('Código cargado') } }
-const cargaCostoUnit = computed(() => {
-  const c = prodForm.value?.carga
-  return c?.cantidad > 0 && c?.costo_total > 0 ? c.costo_total / c.cantidad : null
-})
 async function guardarProd() {
   const f = prodForm.value
   if (!f.nombre?.trim() || !(f.precio_ars > 0)) { toast.warning('Nombre y precio son obligatorios'); return }
   const cat = categorias.value.find(c => c.id === f.categoria_producto_id)
-  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro', precio_ars: f.precio_ars, stock_minimo: f.stock_minimo || 0, codigo_barras: f.codigo_barras?.trim() || null }
-  // Carga inicial: si pusiste cantidad, exige costo (no hay stock sin costo).
-  let carga = null
-  if (!f.id && f.carga?.cantidad > 0) {
-    if (!(f.carga.costo_total > 0)) { toast.warning('Poné el costo total de la carga inicial (o dejá la cantidad vacía)'); return }
-    carga = { cantidad: f.carga.cantidad, costo_total_ars: f.carga.costo_total, proveedor: f.carga.proveedor || null }
-  }
+  const payload = { nombre: f.nombre.trim(), categoria_producto_id: f.categoria_producto_id, categoria: cat?.clave_sistema || 'otro', precio_ars: f.precio_ars, stock_minimo: f.stock_minimo || 0, codigo_barras: f.codigo_barras?.trim() || null, vendible: f.vendible !== false }
   try {
-    if (f.id) await store.actualizarProducto(barId, f.id, payload)
-    else      await store.crearProducto(barId, payload, carga)
-    toast.success(carga ? 'Producto creado con su carga inicial' : 'Producto guardado'); prodForm.value = null
+    await store.actualizarProducto(barId, f.id, payload)
+    toast.success('Producto guardado'); prodForm.value = null
     await store.fetchProductos(barId)
   } catch { toast.error(store.saveError) }
 }
@@ -124,11 +112,11 @@ async function borrarCat(c) {
       <div v-if="esGestion" class="bs__actions">
         <span class="bs__val">Valorizado <b>{{ fmt(valorizado) }}</b></span>
         <button class="btn" @click="abrirCategorias">Categorías</button>
-        <button class="btn btn--brand" @click="nuevo">＋ Producto</button>
+        <RouterLink :to="{ name: 'contabilidad' }" class="btn btn--brand">＋ Comprar producto</RouterLink>
       </div>
     </div>
 
-    <div v-if="esGestion" class="bs__note">🧾 Todo el stock entra con su <b>costo</b> (botón Comprar) → impacta el resultado y calcula el margen solo.</div>
+    <div v-if="esGestion" class="bs__note">🧾 Los <b>productos nuevos se compran</b> desde <b>Contabilidad → Nuevo movimiento</b> (elegís el depósito del bar). Acá los reponés, editás y das de baja. Todo entra con su costo.</div>
 
     <div class="bs__search">
       <i class="bi bi-search"></i>
@@ -146,16 +134,7 @@ async function borrarCat(c) {
         <input v-model.trim="prodForm.codigo_barras" class="inp inp--code" placeholder="Código de barras (opcional)" maxlength="60" />
         <button class="btn btn--icon" type="button" title="Escanear con la cámara" @click="escaneandoProd = true">📷</button>
       </div>
-      <!-- Carga inicial (solo al crear): un paso de la nada a producto listo para vender -->
-      <div v-if="!prodForm.id" class="bs__carga">
-        <span class="bs__carga-lbl">Carga inicial <small>(opcional — entra con costo, genera el egreso)</small></span>
-        <div class="bs__carga-row">
-          <input v-model.number="prodForm.carga.cantidad" type="number" min="0" step="any" class="inp inp--sm" placeholder="Cantidad" />
-          <input v-model.number="prodForm.carga.costo_total" type="number" min="0" step="any" class="inp inp--sm" placeholder="Costo total" />
-          <input v-model.trim="prodForm.carga.proveedor" class="inp" placeholder="Proveedor (opcional)" maxlength="60" />
-          <span v-if="cargaCostoUnit != null" class="bs__carga-unit">{{ fmt(cargaCostoUnit) }}/u</span>
-        </div>
-      </div>
+      <label class="bs__chk"><input type="checkbox" :checked="prodForm.vendible === false" @change="prodForm.vendible = !$event.target.checked" /> No vender <small>(se guarda en el salón pero no aparece en el POS)</small></label>
       <div class="bs__form-act">
         <button class="btn" @click="prodForm = null">Cancelar</button>
         <button class="btn btn--brand" :disabled="store.saving" @click="guardarProd">Guardar</button>
@@ -174,7 +153,7 @@ async function borrarCat(c) {
         </thead>
         <tbody>
           <tr v-for="p in productos" :key="p.id" :class="{ off: !p.activo }">
-            <td class="pname">{{ p.nombre }}</td>
+            <td class="pname">{{ p.nombre }}<span v-if="p.vendible === false" class="bs__tag-no" title="No se ofrece en el POS">no vender</span></td>
             <td><span class="chip-cat">{{ p.categoria_producto_nombre || p.categoria }}</span></td>
             <td class="r num">{{ fmt(p.precio_ars) }}</td>
             <template v-if="esGestion">
@@ -188,7 +167,7 @@ async function borrarCat(c) {
               <button class="lnk lnk--danger" @click="borrar(p)">Borrar</button>
             </td>
           </tr>
-          <tr v-if="!productos.length"><td :colspan="esGestion ? 7 : 4" class="bs__empty">{{ busqueda ? 'Sin resultados.' : 'Sin productos. Creá el primero.' }}</td></tr>
+          <tr v-if="!productos.length"><td :colspan="esGestion ? 7 : 4" class="bs__empty">{{ busqueda ? 'Sin resultados.' : 'Sin productos. Se compran desde Contabilidad → Nuevo movimiento.' }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -247,11 +226,9 @@ async function borrarCat(c) {
 
 .bs__form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; background: #f8fafc; border: 1px solid #eef2f6; border-radius: 11px; padding: .8rem; margin-bottom: 1rem; }
 .bs__code { display: flex; gap: .4rem; align-items: center; }
-.bs__carga { flex: 1 1 100%; border-top: 1px dashed #e2e8f0; padding-top: .7rem; margin-top: .2rem; }
-.bs__carga-lbl { display: block; font-size: .78rem; font-weight: 700; color: #64748b; margin-bottom: .45rem; }
-.bs__carga-lbl small { font-weight: 400; color: #94a3b8; }
-.bs__carga-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
-.bs__carga-unit { font-size: .78rem; color: #15803d; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bs__chk { display: flex; align-items: center; gap: .4rem; font-size: .82rem; font-weight: 600; color: #475569; cursor: pointer; }
+.bs__chk small { font-weight: 400; color: #94a3b8; }
+.bs__tag-no { display: inline-block; margin-left: .45rem; font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; padding: .05rem .35rem; vertical-align: middle; }
 .bs__form-act { display: flex; gap: .5rem; margin-left: auto; }
 .bs__code { display: flex; gap: .4rem; align-items: center; }
 .inp--code { width: 220px; }
