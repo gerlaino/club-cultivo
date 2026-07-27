@@ -1,5 +1,57 @@
 # Changelog
 
+## Julio 2026 (t) — tareas pendientes accionables + tres bugs de producción
+
+**Tareas: el listado que faltaba.** El calendario semanal era la única vista, así que las tareas
+**sin fecha no se veían en ninguna pantalla** y las vencidas solo navegando a la semana pasada: el
+KPI decía "tenés 7 pendientes" y no había forma de saber cuáles. Ahora `tareas#dashboard` devuelve
+`pendientes` (el mismo scope `pendientes_al_dia` que el KPI, ordenado por fecha más vieja primero y
+las sin fecha al final, tope 100), y `/tareas` lo muestra debajo del calendario agrupado en
+**Vencidas / Hoy / Sin fecha**. El ✓ de cada fila la cierra sin pedir horas; con checkboxes aparece
+la barra **"N seleccionadas → Completar"** (reusa `completar_masivo`, pensado justo para registrar
+retroactivo). Click en la fila abre el panel de detalle de siempre, que es donde se cargan horas y
+notas. El KPI Pendientes ahora hace scroll al bloque.
+
+De paso, dos bugs de fecha en esa vista: `toISOString()` es UTC, así que **pasadas las 21hs (AR) las
+tareas de hoy se veían como vencidas** y la navegación semanal arrancaba un día corrido. Y a
+`TIPO_EMOJI`/`TIPO_META` les faltaban 5 tipos (`nutricion`, `defoliacion`, `scrog_lst`,
+`ajuste_luz`, `revision_plagas`): salían con el pill vacío en el detalle.
+
+**Borrar una venta del salón: había una sola puerta y era la equivocada.** `deleteBarVenta` no
+estaba conectado a ninguna UI, así que la única forma aparente de deshacer una venta era borrar su
+asiento "Venta bar #N" desde Contabilidad — y eso **se llevaba el ingreso del libro sin devolver el
+stock** (la mercadería ya había salido al cobrar). `movimientos_contables#destroy` guardaba contra
+dispensaciones y compras de insumo, pero no contra ventas del bar. Ahora lo bloquea con el mismo
+criterio y explica dónde borrarla, y hay botón 🗑️ en **Salón → Vender → 🧾 Ventas**
+(admin/supervisor) que revierte las dos cosas vía `BarVenta#revertir_efectos`.
+
+**Depósitos duplicados: una race condition en la siembra.** En prod aparecían dos "General" y dos
+"Cultivo" de la MISMA sede, creados con 1-2 ms de diferencia. La siembra corre desde un
+`before_action` (`asegurar_depositos`) que tienen **dos** controllers (`depositos#index` e
+`insumos#index`), y el frontend los pide en paralelo desde el mismo `onMounted`: los dos vieron que
+faltaba sembrar y los dos sembraron. La unicidad era solo validación de modelo, que no protege de
+una race. Cerrado por los dos lados:
+
+- **Lock** de la fila del club en `Finanzas::SembrarDepositos` → el segundo request encuentra lo que
+  sembró el primero (más un rescue de `RecordNotUnique` como red).
+- **Índice único parcial** `index_depositos_sistema_unico` sobre
+  `(club_id, COALESCE(sede_id, 0), clave_sistema)` con `WHERE clave_sistema IS NOT NULL AND
+  deleted_at IS NULL`. El `COALESCE` importa: en un índice único los NULL son distintos entre sí, y
+  sin eso dos legacy club-wide seguirían pudiendo duplicarse. La migración **deduplica antes** de
+  crear el índice (SQL propio: una migración no debe depender de los modelos).
+- **`rake depositos:deduplicar`** (con `DRY_RUN=1`) para inspeccionar/limpiar a mano: se queda con
+  el id más bajo, le mueve insumos y productos del bar, y retira el resto (soft-delete).
+
+Además, dos cosas que hacían ilegible el caso multi-sede: los tabs del Depósito ahora se
+desambiguan con la sede cuando un nombre aparece repetido, y las opciones del filtro de sede se
+derivan de los propios depósitos si el store de sedes no cargó (el club se veía como mono-sede: sin
+filtro y con los tabs sin etiqueta). Y `Finanzas::SembrarDepositos` tenía un bug que dejaba la
+sede-ificación trabada **para siempre**: `Sede` es soft-delete, y un insumo apuntando a una sede
+borrada no tenía depósito destino → no se migraba → el depósito club-wide legacy no se podía retirar
+nunca. Ahora cae en la sede principal.
+
+**`＋ Comprar`** del Depósito abre el modal de Nuevo movimiento directo (`/contabilidad?nuevo=1`).
+
 ## Julio 2026 (s) — dispensar desde lo apartado para un evento + consumo interno
 
 Cierra el ciclo de lo apartado (jul-27 «p»). Antes quedaba un agujero: se apartaba stock para un

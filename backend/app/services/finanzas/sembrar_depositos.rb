@@ -12,13 +12,20 @@ module Finanzas
 
     def call
       ActsAsTenant.with_tenant(@club) do
-        Finanzas::SembrarCatalogo.new(@club).call # asegura las áreas (unidades de negocio)
-        return true if @club.sedes.empty?         # sin sedes no hay dónde ubicar depósitos
+        # Lock de la fila del club: la siembra se dispara desde un before_action, así que dos
+        # requests simultáneos del mismo club entraban a la vez, los dos veían que faltaba sembrar
+        # y creaban los dos depósitos. Serializado, el segundo encuentra lo que sembró el primero.
+        # (La validación de unicidad no alcanza: no protege de una race. Ver el índice único de
+        # depositos y Finanzas::DeduplicarDepositos.)
+        @club.with_lock do
+          Finanzas::SembrarCatalogo.new(@club).call # asegura las áreas (unidades de negocio)
+          next if @club.sedes.empty?                # sin sedes no hay dónde ubicar depósitos
 
-        sembrar_por_sede
-        sedeificar_legacy # reasigna insumos de los club-wide y los retira
-        backfill_insumos  # cualquier insumo sin depósito → el de su sede
-        linkear_bar_productos # los productos del bar cuelgan del depósito Salón de su sede
+          sembrar_por_sede
+          sedeificar_legacy # reasigna insumos de los club-wide y los retira
+          backfill_insumos  # cualquier insumo sin depósito → el de su sede
+          linkear_bar_productos # los productos del bar cuelgan del depósito Salón de su sede
+        end
       end
       true
     end
@@ -65,7 +72,13 @@ module Finanzas
           dep.activo        = true
           dep.orden         = i if dep.orden.to_i.zero?
           dep.unidad_negocio ||= areas[Deposito::AREA_TIPO_POR_CLAVE[clave]]
-          dep.save!
+          begin
+            dep.save!
+          rescue ActiveRecord::RecordNotUnique
+            # Red de seguridad si algo siembra sin pasar por el lock: el índice único rechaza el
+            # duplicado y nos quedamos con el que ya está, en vez de tirarle un 500 al usuario.
+            next
+          end
         end
       end
     end

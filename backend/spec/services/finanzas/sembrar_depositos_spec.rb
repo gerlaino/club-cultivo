@@ -102,6 +102,33 @@ RSpec.describe Finanzas::SembrarDepositos, type: :service do
     end
   end
 
+  # La validación de unicidad no protege de una race (la siembra corre desde un before_action y dos
+  # requests simultáneos creaban dos "General" para la misma sede). Lo garantiza la tabla.
+  describe 'unicidad a nivel base' do
+    before { described_class.new(club).call }
+
+    it 'la base rechaza un segundo depósito con la misma clave y sede, aun saltando validaciones' do
+      dup = { club_id: club.id, sede_id: prod.id, clave_sistema: 'general', nombre: 'General',
+              es_sistema: true, activo: true, orden: 0, created_at: Time.current, updated_at: Time.current }
+
+      expect { Deposito.insert_all!([dup]) }.to raise_error(ActiveRecord::RecordNotUnique)
+    end
+
+    it 'permite el mismo nombre en OTRA sede' do
+      con_tenant do
+        expect(club.depositos.where(clave_sistema: 'general').pluck(:sede_id))
+          .to contain_exactly(prod.id, social.id)
+      end
+    end
+
+    it 'no se cae si otro proceso ya sembró el depósito (la siembra absorbe el duplicado)' do
+      con_tenant do
+        expect { described_class.new(club).call }.not_to raise_error
+        expect(club.depositos.where(clave_sistema: 'general', sede_id: prod.id).count).to eq(1)
+      end
+    end
+  end
+
   describe 'idempotencia' do
     it 'no duplica ni pisa el nombre editado por el admin' do
       described_class.new(club).call

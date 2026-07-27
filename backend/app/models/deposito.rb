@@ -41,6 +41,9 @@ class Deposito < ApplicationRecord
   validates :nombre, presence: true
   validates :clave_sistema, inclusion: { in: CLAVES_SISTEMA.keys }, allow_nil: true
   # Un depósito de sistema por (club, sede, clave): cada sede tiene su Cultivo, General, etc.
+  # La validación da el mensaje lindo; la garantía real la da el índice único parcial
+  # `index_depositos_sistema_unico` (una validación no protege de una race, y la siembra corre
+  # desde un before_action: dos requests simultáneos duplicaban los depósitos del club).
   validates :clave_sistema, uniqueness: { scope: %i[club_id sede_id] }, allow_nil: true
 
   scope :activos,   -> { where(activo: true) }
