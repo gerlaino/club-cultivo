@@ -1,5 +1,27 @@
 # Changelog
 
+## Julio 2026 (u) — etiquetas QR en tanda
+
+Etiquetar los lotes recién creados obligaba a entrar a cada uno y disparar una impresión por lote.
+Ahora en **Plantas** y en **Lotes** se seleccionan filas y sale **una sola hoja**.
+
+- **"Seleccionar todo" = todo lo FILTRADO, no la página visible** (`useSeleccion`): filtrás esqueje y
+  entran los 47 esquejes aunque la tabla muestre 10. La selección **sobrevive al cambio de filtro y
+  de página**, así se arma una tanda mixta en dos pasadas; la barra avisa cuántos quedaron fuera del
+  filtro actual para que "25 seleccionadas" con 12 filas a la vista no parezca un bug.
+- **Mientras genera, la pantalla se bloquea** (`BloqueoProgreso`): clicks, teclas —incluido Escape— y
+  el scroll del fondo. Cambiar el filtro a mitad de camino imprimía una hoja que no era la pedida, y
+  el botón se podía apretar dos veces.
+- **`lib/etiquetaLote.js` es fuente única** de la etiqueta de lote (80×50mm): el HTML estaba inline en
+  `LoteDetailView`, así que la tanda habría divergido a la primera corrección. Hoja A4 de 2×5 por
+  página, sin partir etiquetas. Las plantas reusan la banderita plegable de `lib/etiquetaPlanta.js`:
+  la etiqueta no cambia según de dónde se imprima.
+- **Fix del bloqueador de popups:** `window.open()` se disparaba *después* del await de generación, y
+  ahí ya no cuenta como gesto del usuario (le pasaba a las etiquetas de plantas de un lote). Ahora la
+  ventana se abre en el mismo tick del click con un cartel de "generando" y recibe el HTML al final —
+  por eso `useEtiquetasQR` recibe la **función** de config y no el config resuelto: resolverlo antes
+  gastaba el gesto. Si igual la bloquean, cae en descarga y no se pierde el trabajo.
+
 ## Julio 2026 (t) — tareas pendientes accionables + tres bugs de producción
 
 **Tareas: el listado que faltaba.** El calendario semanal era la única vista, así que las tareas
