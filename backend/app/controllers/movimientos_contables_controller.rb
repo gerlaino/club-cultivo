@@ -1,7 +1,7 @@
 # backend/app/controllers/movimientos_contables_controller.rb
 class MovimientosContablesController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_lectura,   only: [:index, :show, :dashboard, :export_csv]
+  before_action :require_lectura,   only: [:index, :show, :dashboard, :export_csv, :recurrentes]
   before_action :require_escritura, only: [:create, :update, :destroy, :cerrar_periodo, :reabrir_periodo]
   before_action :set_movimiento,    only: [:show, :update, :destroy]
 
@@ -133,6 +133,47 @@ class MovimientosContablesController < ApplicationController
       contabilidad_cerrada_hasta: club.contabilidad_cerrada_hasta,
       ultimos_movimientos: scope.sin_cuotas_futuras.recientes.limit(10).map { |m| serialize(m) },
     }
+  end
+
+  # GET /movimientos_contables/recurrentes?mes=YYYY-MM
+  #
+  # Los movimientos FIJOS del club (alquiler, impuestos, servicios, sueldos): los mismos, todos los
+  # meses, cargados a mano de cero cada vez. No hay una tabla de "gastos fijos" y a propósito: con
+  # inflación el monto cambia casi siempre, así que generarlos solos sería cargar datos falsos. En
+  # vez de eso los DETECTAMOS del historial y los ofrecemos prellenados para confirmar.
+  #
+  # Detección: últimos 6 meses, agrupando por (tipo, categoría, sede, descripción normalizada) y
+  # quedándonos con los grupos que aparecen en 2+ meses distintos. Se excluye todo lo que ya tiene
+  # automatismo propio (dispensación, ventas del salón, cuotas de una compra financiada): eso no se
+  # carga a mano y no es un gasto fijo.
+  def recurrentes
+    mes   = mes_param
+    desde = (mes - 6.months).beginning_of_month
+
+    candidatos = current_user.club.movimientos_contables
+                             .includes(:categoria_contable, :sede)
+                             .where(fecha: desde...(mes + 1.month).beginning_of_month)
+                             .where(dispensacion_id: nil, compra_cuotas_id: nil)
+                             .where.not(categoria: 'bar')
+
+    grupos = candidatos.group_by { |m| clave_recurrente(m) }
+
+    fijos = grupos.filter_map do |_clave, movs|
+      meses = movs.map { |m| m.fecha.beginning_of_month }.uniq
+      next if meses.size < 2 # una sola vez no es un fijo
+
+      del_mes  = movs.find { |m| m.fecha.beginning_of_month == mes }
+      previos  = movs.reject { |m| m.fecha.beginning_of_month == mes }
+      next if previos.empty? # solo existe el de este mes: todavía no hay historia
+
+      ultimo = previos.max_by(&:fecha)
+      serialize_recurrente(ultimo, previos: previos, meses: meses, mes: mes, ya_cargado: del_mes)
+    end
+
+    # Primero lo que falta cargar, y dentro de eso lo más caro (que es lo que no se puede olvidar).
+    fijos.sort_by! { |f| [f[:ya_cargado] ? 1 : 0, -f[:monto_sugerido]] }
+
+    render json: { mes: mes.strftime('%Y-%m'), fijos: fijos }
   end
 
   # GET /movimientos_contables/:id
@@ -305,6 +346,73 @@ class MovimientosContablesController < ApplicationController
     )
   end
 
+  # ── Movimientos fijos (detección de recurrentes) ───────────────────────────────
+
+  MESES_ES = %w[enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre
+                diciembre].freeze
+
+  def mes_param
+    Date.parse("#{params[:mes]}-01")
+  rescue ArgumentError, TypeError
+    Date.current.beginning_of_month
+  end
+
+  # Agrupa por el movimiento "conceptual", no por el texto exacto: "Alquiler julio 2026" y
+  # "Alquiler agosto 2026" son el MISMO gasto fijo. Por eso la descripción se normaliza sacándole
+  # números y nombres de mes — sin esto justo el naming más común (incluir el mes) no agrupaba nada.
+  def clave_recurrente(mov)
+    [mov.tipo, mov.categoria_contable_id, mov.categoria, mov.sede_id, descripcion_normalizada(mov.descripcion)]
+  end
+
+  def descripcion_normalizada(texto)
+    t = I18n.transliterate(texto.to_s.downcase).gsub(/\d+/, ' ')
+    MESES_ES.each { |m| t = t.gsub(m, ' ') }
+    t.squish
+  end
+
+  # Reescribe la descripción del último al mes destino: "Alquiler julio 2026" → "Alquiler agosto 2026".
+  # Si no menciona ningún mes, se deja tal cual.
+  def descripcion_para_mes(texto, mes)
+    nombre_nuevo = MESES_ES[mes.month - 1]
+    salida = texto.to_s.gsub(/#{Regexp.union(MESES_ES)}/i) { nombre_nuevo }
+    salida = salida.gsub(/\b(20\d{2})\b/, mes.year.to_s) if salida != texto.to_s
+    salida
+  end
+
+  # Mismo día del mes que la última vez (el alquiler se paga siempre el 5), acotado al largo del mes.
+  def fecha_para_mes(fecha_anterior, mes)
+    mes.change(day: [fecha_anterior.day, mes.end_of_month.day].min)
+  end
+
+  def serialize_recurrente(ultimo, previos:, meses:, mes:, ya_cargado:)
+    montos = previos.map { |m| m.monto_ars.to_d }
+    {
+      # Identidad del grupo (para la key del front): el id del último movimiento del grupo.
+      id:                    ultimo.id,
+      tipo:                  ultimo.tipo,
+      descripcion:           descripcion_para_mes(ultimo.descripcion, mes),
+      descripcion_anterior:  ultimo.descripcion,
+      monto_sugerido:        montos.last.to_f,
+      monto_promedio:        (montos.sum / montos.size).round(2).to_f,
+      monto_min:             montos.min.to_f,
+      monto_max:             montos.max.to_f,
+      fecha_sugerida:        fecha_para_mes(ultimo.fecha, mes),
+      ultima_fecha:          ultimo.fecha,
+      veces:                 meses.size,
+      categoria:             ultimo.categoria,
+      categoria_contable_id: ultimo.categoria_contable_id,
+      categoria_label:       ultimo.categoria_contable&.nombre || ultimo.categoria_label,
+      unidad_negocio_id:     ultimo.unidad_negocio_id,
+      sede_id:               ultimo.sede_id,
+      sede_nombre:           ultimo.sede&.nombre,
+      proveedor:             ultimo.proveedor,
+      medio_pago:            ultimo.medio_pago,
+      comprobante_tipo:      ultimo.comprobante_tipo,
+      ya_cargado:            ya_cargado.present?,
+      ya_cargado_id:         ya_cargado&.id,
+    }
+  end
+
   # ── Destino del egreso (entrada de stock en un solo paso) ──────────────────────
   # destino: { tipo: 'deposito'|'salon', ...datos }. El egreso ya está creado; acá se hace la
   # entrada de stock vinculada a él, SIN generar otro asiento.
@@ -325,13 +433,25 @@ class MovimientosContablesController < ApplicationController
   def aplicar_deposito!(movimiento, d)
     club     = current_user.club
     deposito = club.depositos.find_by(id: d[:deposito_id])
+    raise ArgumentError, 'El depósito elegido no existe' if deposito.nil?
+
     # El depósito es de una SEDE: esa sede manda. No se puede divergir la sede del movimiento de la
     # del depósito (si no, el insumo cae en una sede y el asiento queda en otra).
-    sede_id  = deposito&.sede_id || d[:sede_id].presence || movimiento.sede_id
+    sede_id  = deposito.sede_id || d[:sede_id].presence || movimiento.sede_id
     cat      = movimiento.categoria_contable
-    tipo     = deposito&.clave_sistema == 'cultivo' ? 'cultivo' : 'general'
+    tipo     = deposito.clave_sistema == 'cultivo' ? 'cultivo' : 'general'
+
     insumo   = if d[:insumo_id].present?
-                 club.insumos.find(d[:insumo_id])
+                 ins = club.insumos.find(d[:insumo_id])
+                 # El insumo vive en UN depósito. Reponer desde otro dejaba el stock en un depósito
+                 # (el del insumo) y el asiento en la sede de otro: la plata en una sede y la
+                 # mercadería en la otra. El form ya filtra por depósito; esto lo hace cumplir.
+                 if ins.deposito_id.present? && ins.deposito_id != deposito.id
+                   raise ArgumentError,
+                         "«#{ins.nombre}» está en el depósito «#{ins.deposito&.nombre}». " \
+                         'Elegí ese depósito, o transferí el insumo antes de reponerlo.'
+                 end
+                 ins
                else
                  club.insumos.create!(nombre: d[:nombre].to_s.strip,
                                       unidad_medida: d[:unidad_medida].presence || 'unidad',
@@ -355,6 +475,14 @@ class MovimientosContablesController < ApplicationController
   def aplicar_salon!(movimiento, d)
     club = current_user.club
     bar  = club.bares.find(d[:bar_id])
+    # Si vino el depósito Salón, su sede y la del bar tienen que ser la misma: si no, había dos
+    # autoridades sobre la sede del asiento (el depósito la fijaba y después el bar la pisaba).
+    if d[:deposito_id].present?
+      dep = club.depositos.find_by(id: d[:deposito_id])
+      if dep&.sede_id.present? && bar.sede_id != dep.sede_id
+        raise ArgumentError, "El bar «#{bar.nombre}» no es de la sede del depósito «#{dep.nombre}»."
+      end
+    end
     producto = if d[:bar_producto_id].present?
                  bar.bar_productos.find(d[:bar_producto_id])
                else

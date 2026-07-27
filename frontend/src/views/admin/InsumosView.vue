@@ -434,7 +434,7 @@ async function revertirCompra(compra) {
         </select>
         <!-- Los productos NUEVOS entran por Contabilidad → Nuevo Movimiento (ahí elegís el depósito).
              Acá solo se gestiona lo que ya existe (reponer/editar/merma/eliminar). -->
-        <RouterLink v-if="!esSoloLectura" :to="{ name: 'contabilidad', query: { nuevo: 1 } }" class="btn btn--primary" title="Comprar un producto nuevo y elegir su depósito">＋ Comprar (Nuevo movimiento)</RouterLink>
+        <RouterLink v-if="!esSoloLectura" :to="{ name: 'contabilidad', query: { nuevo: 'compra', deposito: depositoActivo?.id } }" class="btn btn--primary" title="Registrar la compra: el gasto y la entrada al depósito en un paso">＋ Comprar</RouterLink>
       </div>
     </header>
 

@@ -314,6 +314,8 @@ export const createMovimiento       = (payload)      => api.post('/movimientos_c
 export const updateMovimiento       = (id, payload)  => api.put(`/movimientos_contables/${id}`, { movimiento_contable: payload })
 export const deleteMovimiento       = (id)           => api.delete(`/movimientos_contables/${id}`)
 export const exportMovimientosCSV   = (params = {})  => api.get('/movimientos_contables/export_csv', { params, responseType: 'blob' })
+// Gastos fijos del mes: los recurrentes detectados del historial (alquiler, impuestos, servicios)
+export const listMovimientosRecurrentes = (params = {}) => api.get('/movimientos_contables/recurrentes', { params })
 export const cerrarPeriodoContable  = (hasta)        => api.post('/movimientos_contables/cerrar_periodo', { hasta })
 export const reabrirPeriodoContable = (hasta = null) => api.post('/movimientos_contables/reabrir_periodo', { hasta })
 

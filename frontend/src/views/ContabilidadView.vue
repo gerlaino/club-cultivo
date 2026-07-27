@@ -7,7 +7,7 @@ import { useAuthStore }         from "../stores/auth"
 import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
-import ModalNuevoMovimiento from "../components/contabilidad/ModalNuevoMovimiento.vue"
+import ModalMovimiento from "../components/contabilidad/ModalMovimiento.vue"
 import EditarCompraCuotasModal from "../components/contabilidad/EditarCompraCuotasModal.vue"
 import DsSpinner from '../design-system/components/Spinner.vue'
 // Categorías integradas como sección de Contabilidad (config del hub contable)
@@ -304,6 +304,12 @@ const router = useRouter()
 
 const showModal        = ref(false)
 const editingMovimiento = ref(null)
+// El modal delega el guardado: el padre await-ea la API y le devuelve el estado. Sin esto el botón
+// se re-habilitaba al instante y un doble click cargaba el movimiento dos veces.
+const guardandoMov     = ref(false)
+const errorGuardadoMov = ref('')
+const flujoInicial     = ref('')
+const depositoInicial  = ref(null)
 const showEditarCuotas = ref(false)
 const compraEditar     = ref(null)
 
@@ -312,8 +318,11 @@ async function onCompraCuotasEditada() {
   else await store.fetch()
 }
 
-async function openCreate() {
+async function openCreate({ flujo = '', deposito = null } = {}) {
   editingMovimiento.value = null
+  errorGuardadoMov.value  = ''
+  flujoInicial.value      = flujo
+  depositoInicial.value   = deposito
   showModal.value = true
   if (!pacientes.value.length) {
     const { data } = await listPacientes({ per_page: 500 })
@@ -341,6 +350,9 @@ async function openEdit(m) {
     return
   }
   editingMovimiento.value = m
+  errorGuardadoMov.value  = ''
+  flujoInicial.value      = ''
+  depositoInicial.value   = null
   showModal.value = true
   if (!pacientes.value.length) {
     const { data } = await listPacientes({ per_page: 500 })
@@ -353,6 +365,8 @@ async function openEdit(m) {
 }
 
 async function onMovimientoGuardado(payload) {
+  guardandoMov.value = true
+  errorGuardadoMov.value = ''
   try {
     if (payload.medio_pago === 'en_cuotas') {
       // Compra financiada: genera N egresos mensuales (una por cuota).
@@ -374,8 +388,42 @@ async function onMovimientoGuardado(payload) {
       await store.create(payload)
     }
     showModal.value = false
+    toast.success(editingMovimiento.value ? 'Movimiento actualizado' : 'Movimiento registrado')
     if (vistaActiva.value === "dashboard") await store.fetchDashboard(dashboardSede.value)
-  } catch { /* el store ya expone el error; no rompemos el flujo del modal */ }
+  } catch (e) {
+    // Antes esto era un catch vacío: el guardado fallaba y no pasaba NADA en pantalla.
+    errorGuardadoMov.value = e?.response?.data?.errors?.join(' · ')
+      || e?.response?.data?.error || store.saveError || 'No se pudo guardar el movimiento'
+    toast.error(errorGuardadoMov.value)
+  } finally {
+    guardandoMov.value = false
+  }
+}
+
+// Fijos del mes: se cargan de a uno para poder marcar fila por fila qué entró y qué falló (una
+// tanda a medias con un error global no le sirve a nadie).
+async function onFijosGuardados({ items, marcar }) {
+  guardandoMov.value = true
+  errorGuardadoMov.value = ''
+  let ok = 0, fallaron = 0
+  for (const { fila, payload } of items) {
+    try {
+      await store.create(payload)
+      marcar(fila.id, 'ok')
+      ok++
+    } catch {
+      marcar(fila.id, 'error')
+      fallaron++
+    }
+  }
+  guardandoMov.value = false
+  if (ok)       toast.success(`${ok} ${ok === 1 ? 'movimiento cargado' : 'movimientos cargados'}`)
+  if (fallaron) toast.error(`${fallaron} no se pudieron cargar`)
+  if (ok) {
+    await store.fetch()
+    if (vistaActiva.value === "dashboard") await store.fetchDashboard(dashboardSede.value)
+  }
+  if (ok && !fallaron) showModal.value = false
 }
 
 async function confirmDelete(m) {
@@ -429,13 +477,16 @@ onMounted(async () => {
     listDepositos().then(r => { depositos.value = r.data?.depositos || r.data || [] }).catch(() => {}),
   ])
 
-  // ?nuevo=1 → abre el alta directo. Lo usa el botón "＋ Comprar" del Depósito: comprar arranca
-  // acá (el egreso genera la entrada al depósito), y mandarte a la pantalla sin abrir el modal
-  // dejaba el paso a mano. Se limpia el query para que un refresh no lo reabra.
+  // ?nuevo=<flujo>&deposito=<id> → abre el alta directo en ese flujo. Lo usa "＋ Comprar" del
+  // Depósito: comprar arranca acá (el egreso genera la entrada al depósito) y llega con el depósito
+  // ya elegido. Se limpia el query para que un refresh no lo reabra.
   if (route.query.nuevo) {
-    const { nuevo, ...resto } = route.query
+    const { nuevo, deposito, ...resto } = route.query
     router.replace({ query: resto })
-    openCreate()
+    openCreate({
+      flujo: typeof nuevo === 'string' && nuevo !== '1' ? nuevo : '',
+      deposito: deposito || null,
+    })
   }
 })
 </script>
@@ -911,9 +962,8 @@ onMounted(async () => {
     </div>
 
     <!-- ══════════════ MODAL CREAR/EDITAR ══════════════ -->
-    <ModalNuevoMovimiento
+    <ModalMovimiento
       v-model="showModal"
-      :balance-actual="store.dashboard?.mes_actual?.balance || 0"
       :pacientes="pacientes"
       :sedes="sedes"
       :unidades="unidades"
@@ -922,7 +972,12 @@ onMounted(async () => {
       :depositos="depositos"
       :bares="bares"
       :movimiento-editar="editingMovimiento"
+      :flujo-inicial="flujoInicial"
+      :deposito-inicial="depositoInicial"
+      :guardando="guardandoMov"
+      :error-guardado="errorGuardadoMov"
       @guardado="onMovimientoGuardado"
+      @guardado-varios="onFijosGuardados"
     />
 
     <EditarCompraCuotasModal
