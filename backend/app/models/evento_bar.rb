@@ -61,9 +61,11 @@ class EventoBar < ApplicationRecord
     }
   end
 
-  # Costo de la mercadería consumida en el evento (Σ cantidad_consumida × costo unitario).
+  # Costo de la mercadería que le costó al evento (Σ cantidad × costo unitario). De lo apartado
+  # (Stock) solo cuenta el CONSUMO INTERNO: lo dispensado tiene su propio costo e ingreso en la
+  # dispensación, sumarlo acá sería contarlo dos veces.
   def costo_mercaderia
-    provisiones.includes(:provisionable).sum { |p| p.cantidad_consumida.to_d * p.costo_unitario }
+    provisiones.includes(:provisionable).sum { |p| p.cantidad_para_cogs * p.costo_unitario }
   end
 
   # Devuelve al depósito todo el sobrante reservado (reservado − consumido) de cada provisión.

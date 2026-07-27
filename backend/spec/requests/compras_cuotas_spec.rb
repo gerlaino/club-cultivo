@@ -83,9 +83,12 @@ RSpec.describe 'Compras en cuotas', type: :request do
   end
 
   it 'NO edita si alguna cuota está en un período contable cerrado' do
-    post '/compras_cuotas', params: payload(cuotas_total: 3, fecha_primera_cuota: Date.current), headers: auth_headers
+    # La primera cuota queda dentro del período que se cierra (el cierre nunca alcanza al día
+    # en curso: se cierra hasta ayer).
+    post '/compras_cuotas', params: payload(cuotas_total: 3, fecha_primera_cuota: Date.current - 10), headers: auth_headers
     compra = CompraCuotas.last
-    post '/movimientos_contables/cerrar_periodo', params: { hasta: Date.current.to_s }, headers: auth_headers
+    post '/movimientos_contables/cerrar_periodo', params: { hasta: (Date.current - 1).to_s }, headers: auth_headers
+    expect(response).to have_http_status(:ok)
 
     patch "/compras_cuotas/#{compra.id}", params: payload(monto_total_ars: 100_000, cuotas_total: 4), headers: auth_headers
     expect(response).to have_http_status(:unprocessable_entity)

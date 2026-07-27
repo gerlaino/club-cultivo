@@ -1,6 +1,8 @@
 <script setup>
-// Provisión de mercadería de un evento. Buscás entre los 3 depósitos (salón/cultivo/general),
-// el sistema te dice qué falta comprar, reservás (sale del depósito) y al cerrar el sobrante vuelve.
+// Provisión de mercadería de un evento. Buscás entre todos los depósitos (salón, cultivo,
+// general y dispensario), el sistema te dice qué falta comprar, reservás y al cerrar el sobrante
+// vuelve. Lo del dispensario (flor, derivados y stock externo) NO se descuenta al reservarlo:
+// queda APARTADO (nadie más lo puede dispensar) y sale del inventario recién al dispensarse.
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { listProvisiones, buscarProvisiones, upsertProvision, updateProvision, deleteProvision,
@@ -26,8 +28,9 @@ const totalComprar = computed(() => items.value.reduce((a, p) => a + (p.faltante
 const hayFaltante  = computed(() => items.value.some(p => p.faltante > 0))
 const hayReservado = computed(() => items.value.some(p => p.cantidad_reservada > p.cantidad_consumida))
 
-const DEP = { salon: 'Salón', cultivo: 'Cultivo', general: 'General' }
+const DEP = { salon: 'Salón', cultivo: 'Cultivo', general: 'General', dispensacion: 'Dispensario', externo: 'Externo' }
 const depLabel = (d) => DEP[d] || d
+const advertencias = ref([])
 
 async function cargar() {
   loading.value = true
@@ -107,12 +110,17 @@ async function confirmarCompra() {
 }
 
 // ── Reservar ──────────────────────────────────────────────────
+// Reserva PARCIAL: aparta de cada ítem lo que haya. Lo que no alcanzó vuelve como advertencia
+// (comprás el faltante y volvés a tocar Reservar; lo ya reservado no se duplica).
 async function reservar() {
   saving.value = true
   try {
     const { data } = await reservarProvision(props.barId, props.evId)
     items.value = data.provisiones || items.value
-    toast.success('Stock reservado para el evento'); emit('cambio')
+    advertencias.value = data.advertencias || []
+    if (advertencias.value.length) toast.warning('Se reservó lo disponible: quedó faltante')
+    else toast.success('Stock reservado para el evento')
+    emit('cambio')
   } catch (e) { toast.error(e?.response?.data?.error || 'No se pudo reservar') }
   finally { saving.value = false }
 }
@@ -124,13 +132,31 @@ function abrirCierre() {
     .filter(p => p.cantidad_reservada > 0)
     // Default = lo YA consumido (lo que registró el POS), no "consumí todo". Así el sobrante
     // real queda a la vista y no se te escapa devolverlo.
-    .map(p => ({ id: p.id, nombre: p.nombre, reservada: p.cantidad_reservada, consumida: p.cantidad_consumida || 0 }))
+    // En lo APARTADO (dispensario) lo dispensado durante el evento ya vino imputado solo: acá
+    // solo se declara lo que se consumió SIN dispensar (degustación, muestra).
+    .map(p => ({
+      id: p.id, nombre: p.nombre, apartado: p.apartado,
+      reservada: p.cantidad_reservada, unidad: p.unidad,
+      dispensada: p.cantidad_consumida || 0,
+      consumida: p.cantidad_consumida || 0,
+      consumoInterno: 0,
+    }))
 }
-function sobranteFila(f) { return Math.max(0, f.reservada - (Number(f.consumida) || 0)) }
+// Lo que vuelve al depósito / se libera: lo reservado menos lo que ya salió.
+function sobranteFila(f) {
+  const salido = f.apartado
+    ? f.dispensada + (Number(f.consumoInterno) || 0)
+    : (Number(f.consumida) || 0)
+  return Math.max(0, f.reservada - salido)
+}
 async function confirmarCierre(finalizar) {
   saving.value = true
   try {
-    const consumos = cierreForm.value.map(f => ({ id: f.id, cantidad_consumida: Number(f.consumida) || 0 }))
+    const consumos = cierreForm.value.map(f => ({
+      id: f.id,
+      cantidad_consumida: Number(f.consumida) || 0,
+      consumo_interno:    Number(f.consumoInterno) || 0,
+    }))
     await cerrarProvision(props.barId, props.evId, { consumos, finalizar })
     cierreForm.value = null; await cargar(); emit('cambio')
     toast.success(finalizar ? 'Evento cerrado, sobrante devuelto al depósito' : 'Sobrante devuelto al depósito')
@@ -144,7 +170,7 @@ async function confirmarCierre(finalizar) {
     <div class="pv__head">
       <div>
         <h3 class="pv__title">¿Qué necesitás para el evento?</h3>
-        <p class="pv__sub">Buscá entre los depósitos (salón, cultivo, general). El sistema compara con el stock y te dice qué falta comprar; después lo reservás y al cerrar el sobrante vuelve.</p>
+        <p class="pv__sub">Buscá entre los depósitos (salón, cultivo, general y dispensario). El sistema compara con el stock y te dice qué falta comprar; después lo reservás y al cerrar el sobrante vuelve. Lo del dispensario no se descuenta: queda <b>apartado</b> hasta que se dispensa.</p>
       </div>
       <button v-if="!finalizado" class="btn btn--sm btn--primary" @click="abrirAdd">+ Producto</button>
     </div>
@@ -160,7 +186,10 @@ async function confirmarCierre(finalizar) {
           <thead><tr><th>Producto</th><th>Depósito</th><th class="r">Necesitás</th><th class="r">En depósito</th><th class="r">A comprar</th><th class="r">Reservado</th><th></th></tr></thead>
           <tbody>
             <tr v-for="p in items" :key="p.id">
-              <td class="strong">{{ p.nombre }}</td>
+              <td class="strong">
+                {{ p.nombre }}
+                <span v-if="p.apartado" class="pv__tag" title="Se bloquea la cantidad para el evento, pero no sale del inventario: el stock del dispensario sale recién al dispensarse.">apartado</span>
+              </td>
               <td><span class="pv__dep" :class="`pv__dep--${p.deposito}`">{{ depLabel(p.deposito) }}</span></td>
               <td class="r">
                 <input v-if="!finalizado" type="number" min="0" class="pv__inp-sm" :value="p.cantidad_prevista" @change="editarPrevista(p, $event.target.value)" />
@@ -172,10 +201,14 @@ async function confirmarCierre(finalizar) {
                 <span v-if="p.faltante > 0" class="pv__falta">{{ p.faltante }}</span>
                 <span v-else class="pv__ok">✓</span>
               </td>
-              <td class="r num">{{ p.cantidad_reservada || '—' }}</td>
+              <td class="r num">
+                {{ p.cantidad_reservada || '—' }}
+                <small v-if="p.apartado && p.cantidad_consumida > 0" class="pv__disp" title="Ya dispensado a socios desde lo apartado">−{{ p.cantidad_consumida }} disp.</small>
+              </td>
               <td class="r acts">
                 <template v-if="!finalizado && p.faltante > 0">
                   <button v-if="p.deposito === 'salon'" class="lnk" @click="abrirCompra(p)">Comprar</button>
+                  <RouterLink v-else-if="p.deposito === 'dispensacion' || p.deposito === 'externo'" :to="{ name: 'admin-stock' }" class="lnk" title="El stock del dispensario se repone desde el inventario">Ver stock</RouterLink>
                   <RouterLink v-else :to="{ name: 'contabilidad' }" class="lnk" title="El stock de insumos entra al registrar la compra como movimiento">Registrar</RouterLink>
                 </template>
                 <button v-if="!finalizado && p.cantidad_reservada <= p.cantidad_consumida" class="lnk lnk--danger" @click="quitar(p)">Quitar</button>
@@ -185,6 +218,10 @@ async function confirmarCierre(finalizar) {
         </table>
       </div>
 
+      <ul v-if="advertencias.length" class="pv__warn">
+        <li v-for="(a, i) in advertencias" :key="i">{{ a }}</li>
+      </ul>
+
       <div class="pv__foot">
         <div class="pv__summary">
           <template v-if="hayFaltante">Faltante a comprar: <b>{{ fmt(totalComprar) }}</b> estimado</template>
@@ -192,7 +229,10 @@ async function confirmarCierre(finalizar) {
           <template v-else>Todo lo necesario está en depósito. Podés reservar.</template>
         </div>
         <div class="pv__actions" v-if="!finalizado">
-          <button class="btn btn--sm" :disabled="saving || hayFaltante" @click="reservar" :title="hayFaltante ? 'Conseguí el faltante primero' : ''">Reservar</button>
+          <button class="btn btn--sm" :disabled="saving" @click="reservar"
+                  :title="hayFaltante ? 'Aparta lo que hay ahora; el faltante lo reservás después de comprarlo' : ''">
+            {{ hayFaltante ? 'Reservar lo disponible' : 'Reservar' }}
+          </button>
           <button class="btn btn--sm btn--primary" :disabled="saving || !hayReservado" @click="abrirCierre">Cerrar / devolver sobrante</button>
         </div>
       </div>
@@ -202,8 +242,8 @@ async function confirmarCierre(finalizar) {
     <div v-if="addOpen" class="ov" @click.self="cerrarAdd">
       <div class="modal">
         <h3 class="modal__title">Agregar a la provisión</h3>
-        <p class="modal__hint">Buscá entre los tres depósitos: salón, cultivo y general.</p>
-        <input v-model="buscarQ" @input="onBuscar" class="inp" placeholder="Buscar producto o insumo…" />
+        <p class="modal__hint">Buscá en todos los depósitos: salón, cultivo, general y dispensario.</p>
+        <input v-model="buscarQ" @input="onBuscar" class="inp" placeholder="Buscar producto, insumo o stock…" />
         <div class="pv__res">
           <div v-if="buscando" class="pv__res-empty">Buscando…</div>
           <button
@@ -211,7 +251,10 @@ async function confirmarCierre(finalizar) {
             class="pv__res-row" :class="{ sel: seleccionado && claveUsada(seleccionado) === claveUsada(r) }"
             @click="seleccionar(r)"
           >
-            <span class="pv__res-name">{{ r.nombre }}</span>
+            <span class="pv__res-name">
+              {{ r.nombre }}
+              <span v-if="r.apartado" class="pv__tag">apartado</span>
+            </span>
             <span class="pv__dep" :class="`pv__dep--${r.deposito}`">{{ depLabel(r.deposito) }}</span>
             <span class="pv__res-stock">{{ r.en_deposito }} {{ r.unidad }}</span>
           </button>
@@ -245,13 +288,27 @@ async function confirmarCierre(finalizar) {
         <h3 class="modal__title">Cerrar provisión — reconciliar</h3>
         <p class="modal__hint">¿Cuánto se usó de lo reservado? El sobrante vuelve a su depósito.</p>
         <div class="pv__rec">
-          <div v-for="f in cierreForm" :key="f.id" class="pv__rec-row">
+          <div v-for="f in cierreForm" :key="f.id" class="pv__rec-row" :class="{ 'pv__rec-row--ap': f.apartado }">
             <span class="pv__rec-name">{{ f.nombre }}</span>
-            <span class="pv__rec-res">reservado {{ f.reservada }}</span>
-            <input v-model.number="f.consumida" type="number" min="0" :max="f.reservada" class="pv__inp-sm" />
-            <span class="pv__rec-sob">sobra <b>{{ sobranteFila(f) }}</b></span>
+            <span class="pv__rec-res">reservado {{ f.reservada }} {{ f.unidad }}</span>
+            <!-- Apartado: lo dispensado ya salió por su canal; acá solo se declara lo consumido
+                 sin dispensar (degustación, muestra), que descuenta al cerrar. -->
+            <template v-if="f.apartado">
+              <span class="pv__rec-disp" title="Ya dispensado a socios durante el evento">dispensado {{ f.dispensada }}</span>
+              <input v-model.number="f.consumoInterno" type="number" min="0" :max="f.reservada - f.dispensada" class="pv__inp-sm" placeholder="0" />
+            </template>
+            <template v-else>
+              <span></span>
+              <input v-model.number="f.consumida" type="number" min="0" :max="f.reservada" class="pv__inp-sm" />
+            </template>
+            <span class="pv__rec-sob">{{ f.apartado ? 'libera' : 'sobra' }} <b>{{ sobranteFila(f) }}</b></span>
           </div>
         </div>
+        <p v-if="cierreForm.some(f => f.apartado)" class="pv__rec-nota">
+          En lo del <b>dispensario</b>, el campo editable es lo que se <b>consumió sin dispensar</b> (degustación,
+          muestra): eso descuenta del inventario al cerrar y es costo del evento. Lo dispensado a socios ya salió
+          por su canal, con su trazabilidad.
+        </p>
         <div class="modal__actions">
           <button class="btn" @click="cierreForm = null">Cancelar</button>
           <button class="btn" :disabled="saving" @click="confirmarCierre(false)">Solo devolver</button>
@@ -281,6 +338,11 @@ async function confirmarCierre(finalizar) {
 .pv__dep--salon   { background: #fce7f3; color: #be185d; }
 .pv__dep--cultivo { background: #dcfce7; color: #15803d; }
 .pv__dep--general { background: #dbeafe; color: #1d4ed8; }
+.pv__dep--dispensacion { background: #ede9fe; color: #6d28d9; }
+.pv__dep--externo { background: #f1f5f9; color: #475569; }
+.pv__disp { display: block; font-size: .66rem; color: #6d28d9; font-weight: 600; }
+.pv__tag { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #6d28d9; background: #ede9fe; padding: 1px 7px; border-radius: 999px; margin-left: .4rem; cursor: help; }
+.pv__warn { list-style: none; margin: .7rem 0 0; padding: .6rem .8rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; color: #92400e; font-size: .78rem; display: flex; flex-direction: column; gap: .25rem; }
 .pv__falta { color: #b45309; font-weight: 700; background: #fef3c7; padding: 1px 8px; border-radius: 999px; }
 .pv__ok { color: #15803d; font-weight: 700; }
 .acts { white-space: nowrap; }
@@ -301,7 +363,9 @@ async function confirmarCierre(finalizar) {
 .pv__res-empty { padding: 1rem; text-align: center; color: #94a3b8; font-size: .82rem; }
 
 .pv__rec { display: flex; flex-direction: column; gap: .5rem; margin-bottom: .5rem; }
-.pv__rec-row { display: grid; grid-template-columns: 1fr auto 70px auto; gap: .6rem; align-items: center; font-size: .84rem; }
+.pv__rec-row { display: grid; grid-template-columns: 1fr auto auto 70px auto; gap: .6rem; align-items: center; font-size: .84rem; }
+.pv__rec-disp { font-size: .72rem; color: #6d28d9; background: #ede9fe; border-radius: 999px; padding: 1px 8px; white-space: nowrap; font-weight: 600; }
+.pv__rec-nota { font-size: .74rem; color: #64748b; line-height: 1.5; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 9px; padding: .55rem .7rem; margin: .2rem 0 0; }
 .pv__rec-name { font-weight: 600; color: #0f172a; }
 .pv__rec-res { color: #94a3b8; font-size: .76rem; }
 .pv__rec-sob { color: #15803d; font-size: .78rem; text-align: right; }

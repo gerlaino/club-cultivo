@@ -373,6 +373,8 @@ export const ajustarBarProducto = (barId, id, payload) => api.post(`/bares/${bar
 export const getBarProductoMovimientos = (barId, id)   => api.get(`/bares/${barId}/productos/${id}/movimientos`)
 export const crearBarVenta      = (barId, payload) => api.post(`/bares/${barId}/ventas`, payload)
 export const listBarVentas      = (barId)          => api.get(`/bares/${barId}/ventas`)
+// Mercadería vendible de CUALQUIER depósito (salón, insumos, stock externo) para el POS
+export const listVendiblesBar   = (barId, params = {}) => api.get(`/bares/${barId}/vendibles`, { params })
 export const deleteBarVenta     = (barId, id)      => api.delete(`/bares/${barId}/ventas/${id}`)
 
 // ── Bar · caja de turno (apertura / cierre con arqueo) ─────────────────────────

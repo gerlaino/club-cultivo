@@ -881,7 +881,7 @@ const FORMA_ICO = {
 }
 const ORIGEN_MAP = { lote: 'Producción propia', derivado_lote: 'Derivado de lote', compra_externa: 'Compra externa' }
 const ESTADO_MAP = { pendiente_asignacion: 'Por asignar', asignado: 'Asignado', agotado: 'Agotado' }
-const MOV_TIPO_MAP = { produccion: 'Producción', transferencia: 'Transferencia', dispensacion: 'Dispensación', ajuste: 'Ajuste', merma: 'Merma' }
+const MOV_TIPO_MAP = { produccion: 'Producción', transferencia: 'Transferencia', dispensacion: 'Dispensación', ajuste: 'Ajuste', merma: 'Merma', consumo_evento: 'Consumo en evento' }
 
 function formaLabel(f)    { return FORMA_MAP[f]  || f || 'Stock' }
 function formaIco(f)      { return FORMA_ICO[f]  || '📦' }

@@ -23,11 +23,33 @@ RSpec.describe 'Provisión + reserva de eventos', type: :request do
     expect(fila['faltante']).to eq(18.0)
   end
 
-  it 'no deja reservar si falta stock' do
-    proveer(48)
+  # Reserva PARCIAL: si falta stock, aparta lo que hay y avisa el faltante (antes abortaba todo).
+  it 'reserva lo disponible y avisa el faltante' do
+    proveer(48) # hay 30 en depósito → faltan 18
     post path('/reservar'), headers: auth_headers, as: :json
-    expect(response).to have_http_status(:unprocessable_entity)
-    expect(cerveza.reload.stock).to eq(30) # no tocó el depósito
+    expect(response).to have_http_status(:ok)
+    expect(cerveza.reload.stock).to eq(0) # se apartaron los 30 que había
+
+    body = JSON.parse(response.body)
+    expect(body['advertencias'].first).to include('Cerveza', '30', '48')
+    prov = evento.provisiones.first
+    expect(prov.cantidad_reservada).to eq(30)
+    expect(prov.faltante).to eq(18) # sigue faltando comprar 18
+  end
+
+  it 'no reserva nada del ítem sin stock, pero sí de los que tienen' do
+    otro = create(:bar_producto, club: club, bar: bar, nombre: 'Agua', stock: 0, costo_ars: 100)
+    proveer(10)
+    post path, params: { bar_producto_id: otro.id, cantidad_prevista: 5 }, headers: auth_headers, as: :json
+
+    post path('/reservar'), headers: auth_headers, as: :json
+    expect(response).to have_http_status(:ok)
+    expect(cerveza.reload.stock).to eq(20) # el que tenía stock se reservó igual
+    expect(otro.reload.stock).to eq(0)
+
+    body = JSON.parse(response.body)
+    expect(body['advertencias'].join).to include('Agua', 'sin stock disponible')
+    expect(evento.provisiones.find_by(provisionable: otro).cantidad_reservada).to eq(0)
   end
 
   it 'reserva descontando del depósito cuando alcanza' do

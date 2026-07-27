@@ -592,13 +592,28 @@ class DispensacionesController < ApplicationController
                     else
                       0.to_d
                     end
-      disp.items.build(stock: st, cantidad: cant, precio_unitario_ars: precio_desc)
+      disp.items.build(stock: st, cantidad: cant, precio_unitario_ars: precio_desc,
+                       evento_bar_id: evento_apartado_id(ln, st))
       total += precio_desc * cant
     end
 
     disp.sede_id            ||= disp.items.first&.stock&.sede_id
     disp.precio_unitario_ars  = disp.items.first&.precio_unitario_ars
     disp.aporte_socio_ars     = override_admin ? disp.aporte_socio_ars : total.round(2)
+  end
+
+  # Evento del que sale la línea, cuando el dispensador marcó "dispensar desde lo reservado".
+  # Solo vale si el evento es del club, está EN CURSO y tiene apartado de ese stock: así una
+  # línea no puede reclamar un apartado que no existe (o de un evento que todavía no empezó).
+  def evento_apartado_id(linea, stock)
+    id = linea[:evento_bar_id].presence
+    return nil if id.blank?
+
+    evento = current_user.club.eventos_bar.find_by(id: id)
+    return nil unless evento&.estado == 'en_curso'
+    return nil unless stock.apartado_en_evento(evento.id).positive?
+
+    evento.id
   end
 
   # Valida que las líneas no excedan el stock disponible (acumulado por stock, por si dos

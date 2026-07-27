@@ -8,6 +8,26 @@ import {
   getCajaActual, confirmarAperturaCaja, solicitarCierreCaja, confirmarCierreCaja,
 } from "../lib/api";
 
+// Convierte lo que sea vendible a la línea del carrito. Dos formas de entrada:
+//   • producto del bar (del listado del POS): { id, nombre, precio_ars, stock }
+//   • vendible de otro depósito (buscador /vendibles): { vendible_type, vendible_id, disponible… }
+function normalizarVendible(x, precioManual = null) {
+  if (!x) return null;
+  const esOtroDeposito = !!x.vendible_type;
+  const tipo = esOtroDeposito ? x.vendible_type : 'BarProducto';
+  const id   = esOtroDeposito ? x.vendible_id   : x.id;
+  const precio = precioManual != null ? Number(precioManual) : Number(x.precio_ars) || 0;
+  return {
+    key: `${tipo}-${id}`, tipo, id,
+    nombre: x.nombre,
+    precio,
+    precio_manual: precioManual != null,
+    disponible: Number(esOtroDeposito ? x.disponible : x.stock) || 0,
+    deposito: esOtroDeposito ? x.deposito : 'salon',
+    unidad: x.unidad || 'u',
+  };
+}
+
 export const useBarStore = defineStore("bar", {
   state: () => ({
     bares:     [],
@@ -25,7 +45,7 @@ export const useBarStore = defineStore("bar", {
 
   getters: {
     activos:      (s) => s.productos.filter(p => p.activo && p.vendible !== false), // POS: solo lo vendible
-    totalCarrito: (s) => s.carrito.reduce((a, l) => a + l.producto.precio_ars * l.cantidad, 0),
+    totalCarrito: (s) => s.carrito.reduce((a, l) => a + l.precio * l.cantidad, 0),
     cantItems:    (s) => s.carrito.reduce((a, l) => a + l.cantidad, 0),
   },
 
@@ -76,16 +96,25 @@ export const useBarStore = defineStore("bar", {
     },
 
     // ── Carrito (POS) ────────────────────────────────────────
-    agregar(producto) {
-      if (producto.stock <= 0) return;
-      const linea = this.carrito.find(l => l.producto.id === producto.id);
+    // El mostrador vende de cualquier depósito: la línea del carrito es genérica
+    // ({ tipo, id, nombre, precio, disponible, deposito }), no un BarProducto.
+    // `agregar` acepta las dos formas: un producto del bar (uso histórico) o un vendible
+    // del buscador cross-depósito ({ vendible_type, vendible_id, ... }).
+    agregar(x, { precio = null } = {}) {
+      const it = normalizarVendible(x, precio);
+      if (!it || it.disponible <= 0) return;
+      const linea = this.carrito.find(l => l.key === it.key);
       const enCarrito = linea ? linea.cantidad : 0;
-      if (enCarrito + 1 > producto.stock) return;
+      if (enCarrito + 1 > it.disponible) return;
       if (linea) linea.cantidad++;
-      else this.carrito.push({ producto, cantidad: 1 });
+      else this.carrito.push({ ...it, cantidad: 1 });
     },
-    quitar(productoId) {
-      const i = this.carrito.findIndex(l => l.producto.id === productoId);
+    sumar(key) {
+      const linea = this.carrito.find(l => l.key === key);
+      if (linea && linea.cantidad + 1 <= linea.disponible) linea.cantidad++;
+    },
+    quitar(key) {
+      const i = this.carrito.findIndex(l => l.key === key);
       if (i === -1) return;
       if (this.carrito[i].cantidad > 1) this.carrito[i].cantidad--;
       else this.carrito.splice(i, 1);
@@ -96,7 +125,12 @@ export const useBarStore = defineStore("bar", {
       if (!this.carrito.length) return null;
       this.saving = true; this.saveError = null;
       try {
-        const lineas = this.carrito.map(l => ({ bar_producto_id: l.producto.id, cantidad: l.cantidad }));
+        // El precio solo viaja cuando es manual (ítem sin precio propio): el backend lo acepta
+        // únicamente de admin/supervisor.
+        const lineas = this.carrito.map(l => ({
+          vendible_type: l.tipo, vendible_id: l.id, cantidad: l.cantidad,
+          ...(l.precio_manual ? { precio_unitario_ars: l.precio } : {}),
+        }));
         const { data } = await crearBarVenta(barId, { lineas, medio_pago, evento_bar_id: evento_bar_id || undefined });
         this.vaciar();
         await this.fetchProductos(barId, { activos: 'true' });

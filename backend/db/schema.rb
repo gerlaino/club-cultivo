@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_27_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_27_000004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -258,10 +258,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_27_000002) do
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
     t.decimal "cantidad_desde_reserva", precision: 12, scale: 2, default: "0.0", null: false
+    t.string "vendible_type"
+    t.bigint "vendible_id"
     t.index ["bar_producto_id"], name: "index_bar_venta_items_on_bar_producto_id"
     t.index ["bar_venta_id"], name: "index_bar_venta_items_on_bar_venta_id"
     t.index ["club_id"], name: "index_bar_venta_items_on_club_id"
     t.index ["deleted_at"], name: "index_bar_venta_items_on_deleted_at"
+    t.index ["vendible_type", "vendible_id"], name: "index_bar_venta_items_on_vendible"
   end
 
   create_table "bar_ventas", force: :cascade do |t|
@@ -607,8 +610,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_27_000002) do
     t.bigint "deleted_by_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "evento_bar_id"
     t.index ["deleted_at"], name: "index_dispensacion_items_on_deleted_at"
     t.index ["dispensacion_id"], name: "index_dispensacion_items_on_dispensacion_id"
+    t.index ["evento_bar_id"], name: "index_dispensacion_items_on_evento_bar_id"
     t.index ["stock_id"], name: "index_dispensacion_items_on_stock_id"
   end
 
@@ -824,6 +829,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_27_000002) do
     t.datetime "updated_at", null: false
     t.string "provisionable_type"
     t.bigint "provisionable_id"
+    t.decimal "cantidad_consumo_interno", precision: 12, scale: 2, default: "0.0", null: false
     t.index ["bar_producto_id"], name: "index_evento_bar_provisiones_on_bar_producto_id"
     t.index ["club_id"], name: "index_evento_bar_provisiones_on_club_id"
     t.index ["evento_bar_id", "provisionable_type", "provisionable_id"], name: "index_provisiones_evento_provisionable", unique: true
@@ -2185,6 +2191,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_27_000002) do
   add_foreign_key "depositos", "sedes"
   add_foreign_key "depositos", "unidades_negocio", column: "unidad_negocio_id"
   add_foreign_key "dispensacion_items", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "dispensacion_items", "eventos_bar", column: "evento_bar_id"
   add_foreign_key "dispensacion_items", "stocks"
   add_foreign_key "dispensacion_items", "users", column: "deleted_by_id"
   add_foreign_key "dispensaciones", "indicacion_medicas"

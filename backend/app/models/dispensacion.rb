@@ -236,7 +236,10 @@ class Dispensacion < ApplicationRecord
         next
       end
       pedido = ls.sum { |l| l.cantidad.to_d }
-      disp   = st.cantidad_disponible_real.to_d
+      # Las líneas marcadas "desde el evento" pueden usar, además del disponible libre, lo que
+      # ese evento tiene APARTADO de este stock (el apartado bloquea al resto, no al evento).
+      eventos = ls.map(&:evento_bar_id).compact.uniq
+      disp    = st.cantidad_disponible_real.to_d + eventos.sum { |ev| st.apartado_en_evento(ev) }
       if pedido > disp
         nombre = st.forma_producto.to_s.humanize
         errors.add(:base, "Stock insuficiente (#{nombre}): hay #{disp.round(2)}#{st.unidad || 'g'} y se piden #{pedido.to_f}#{st.unidad || 'g'}.")
@@ -312,10 +315,25 @@ class Dispensacion < ApplicationRecord
           gramos:         -it.cantidad,
           usuario:        user,
           dispensacion_id: id,
-          notas:          "Dispensación ##{id} — #{paciente&.nombre_completo}",
+          notas:          [
+            "Dispensación ##{id} — #{paciente&.nombre_completo}",
+            it.evento_bar && "desde lo apartado para «#{it.evento_bar.nombre}»",
+          ].compact.join(' · '),
         )
+        imputar_a_apartado_evento(it)
       end
     end
+  end
+
+  # Si la línea salió de lo apartado para un evento, se imputa a esa provisión: el bloqueo se
+  # libera en la misma medida en que acá se descontó el stock real. Sin esto habría doble
+  # descuento (baja `cantidad` Y sigue apartado), y el disponible caería el doble.
+  def imputar_a_apartado_evento(item)
+    return unless item.evento_bar_id && item.stock
+
+    prov = EventoBarProvision.find_by(evento_bar_id: item.evento_bar_id,
+                                      provisionable_type: 'Stock', provisionable_id: item.stock_id)
+    prov&.imputar_dispensa!(item.cantidad)
   end
 
   # Revierte el stock de cada línea. Se llama en after_destroy: para entonces las líneas ya

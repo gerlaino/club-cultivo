@@ -407,6 +407,8 @@ Rails.application.routes.draw do
         end
       end
       resources :ventas, controller: 'bar/ventas', only: [:index, :create, :destroy]
+      # Buscador de mercadería vendible de CUALQUIER depósito (salón, insumos, stock externo)
+      resources :vendibles, controller: 'bar/vendibles', only: [:index]
       # Caja de turno: apertura / cierre con arqueo / historial
       resources :cajas, controller: 'bar/cajas', only: [:index] do
         collection { get :actual; post :abrir }

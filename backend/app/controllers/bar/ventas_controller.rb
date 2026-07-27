@@ -10,6 +10,9 @@ module Bar
     before_action :require_gestion,  only: [:index, :destroy]
 
     # POST /bares/:bar_id/ventas  { lineas: [...], medio_pago, turno?, notas?, evento_bar_id? }
+    # Las líneas pueden ser de cualquier depósito: { vendible_type, vendible_id, cantidad,
+    # precio_unitario_ars? }. El precio a mano (ítems sin precio propio, como un insumo) queda
+    # reservado a la gestión — el dispensador solo cobra lo que tiene precio cargado.
     def create
       evento = params[:evento_bar_id].present? ? @bar.eventos_bar.find_by(id: params[:evento_bar_id]) : nil
       venta = ::Bar::RegistrarVenta.new(
@@ -18,13 +21,19 @@ module Bar
         medio_pago: params[:medio_pago],
         turno:      params[:turno],
         notas:      params[:notas],
-        evento_bar: evento
+        evento_bar: evento,
+        permite_precio_manual: ROLES_GESTION.include?(current_user&.role)
       ).call
       render json: serialize(venta), status: :created
     rescue ArgumentError => e
       render json: { error: e.message }, status: :unprocessable_entity
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Producto inexistente en la venta' }, status: :unprocessable_entity
+    rescue ActiveRecord::RecordInvalid => e
+      # Caso típico: el club tiene el período contable cerrado hasta hoy y el asiento de la venta
+      # queda rechazado. Sin esto el mostrador devolvía un 500 sin explicación.
+      render json: { error: "No se pudo registrar la venta: #{e.record.errors.full_messages.to_sentence}" },
+             status: :unprocessable_entity
     end
 
     # GET /bares/:bar_id/ventas

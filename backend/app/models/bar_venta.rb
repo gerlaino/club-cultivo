@@ -55,17 +55,19 @@ class BarVenta < ApplicationRecord
 
   def revertir_efectos
     items.each do |it|
-      prod = it.bar_producto
-      next unless prod
+      objeto = it.vendible_real
+      next unless objeto
 
-      # Solo vuelve al stock la parte que salió del stock; la que salió de la RESERVA del evento
-      # vuelve a la provisión (baja lo consumido), no al stock. Si no, se infla el stock.
+      item = ::Bar::ItemVendible.new(objeto)
+
+      # Solo vuelve al depósito la parte que salió del stock; la que salió de la RESERVA del
+      # evento vuelve a la provisión (baja lo consumido), no al stock. Si no, se infla el stock.
       desde_reserva = it.cantidad_desde_reserva.to_d
       parte_stock   = it.cantidad.to_d - desde_reserva
-      prod.increment!(:stock, parte_stock) if parte_stock.positive?
+      item.reponer!(cantidad: parte_stock, usuario: user, motivo: "Venta bar ##{id} eliminada") if parte_stock.positive?
 
       if desde_reserva.positive? && evento_bar_id
-        prov = evento_bar&.provisiones&.find_by(provisionable_type: 'BarProducto', provisionable_id: prod.id)
+        prov = evento_bar&.provisiones&.find_by(provisionable_type: item.tipo, provisionable_id: item.id)
         prov&.update!(cantidad_consumida: [prov.cantidad_consumida.to_d - desde_reserva, 0].max)
       end
     end

@@ -21,13 +21,25 @@ RSpec.describe 'Cierre contable, auditoría y costos por lote', type: :request d
 
   describe 'cierre de período' do
     it 'cierra hasta una fecha y lo informa en el dashboard' do
+      ayer = Date.today - 1
       post '/movimientos_contables/cerrar_periodo',
-           params: { hasta: Date.today.to_s }, headers: auth_headers, as: :json
+           params: { hasta: ayer.to_s }, headers: auth_headers, as: :json
       expect(response).to have_http_status(:ok)
-      expect(club.reload.contabilidad_cerrada_hasta).to eq(Date.today)
+      expect(club.reload.contabilidad_cerrada_hasta).to eq(ayer)
 
       get '/movimientos_contables/dashboard', headers: auth_headers
-      expect(response.parsed_body['contabilidad_cerrada_hasta']).to eq(Date.today.to_s)
+      expect(response.parsed_body['contabilidad_cerrada_hasta']).to eq(ayer.to_s)
+    end
+
+    # Si se pudiera cerrar el día en curso, todo asiento automático (venta del salón,
+    # dispensación, compra) nacería con fecha de hoy y sería rechazado: el mostrador quedaría
+    # sin poder cobrar.
+    it 'no deja cerrar el día en curso' do
+      post '/movimientos_contables/cerrar_periodo',
+           params: { hasta: Date.today.to_s }, headers: auth_headers, as: :json
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body['error']).to include('hasta ayer')
+      expect(club.reload.contabilidad_cerrada_hasta).to be_nil
     end
 
     it 'rechaza crear movimientos con fecha dentro del período cerrado' do

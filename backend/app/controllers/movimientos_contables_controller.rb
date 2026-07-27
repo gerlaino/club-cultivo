@@ -220,7 +220,13 @@ class MovimientosContablesController < ApplicationController
   # crear, editar ni borrar. Correcciones = contra-asiento o reapertura.
   def cerrar_periodo
     hasta = Date.parse(params.require(:hasta).to_s)
-    return render json: { error: 'La fecha de cierre no puede ser futura' }, status: :unprocessable_entity if hasta > Date.today
+    # El día en curso NO se puede cerrar: todo asiento automático (venta del salón, dispensación,
+    # compra) nace con fecha de hoy y quedaría rechazado por la validación de período cerrado,
+    # dejando el mostrador sin poder cobrar. Un período se cierra cuando ya terminó.
+    if hasta >= Date.today
+      return render json: { error: 'Solo se cierra hasta ayer: el día en curso sigue operando (ventas, dispensaciones y compras se asientan con fecha de hoy).' },
+                    status: :unprocessable_entity
+    end
 
     club   = current_user.club
     previo = club.contabilidad_cerrada_hasta

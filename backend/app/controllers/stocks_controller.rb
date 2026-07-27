@@ -575,6 +575,11 @@ class StocksController < ApplicationController
                          logo_url: s.club.logo.attached? ? url_for(s.club.logo) : nil } : nil,
       gramos_reservados:        s.gramos_reservados,
       cantidad_disponible_real: s.cantidad_disponible_real,
+      # Lo apartado por eventos EN CURSO: el carrito lo ofrece además del disponible libre, para
+      # que el dispensador pueda entregar desde lo reservado del evento que está sucediendo.
+      apartados_evento: s.apartados_en_curso.map { |p|
+        { evento_id: p.evento_bar_id, evento_nombre: p.evento_bar&.nombre, cantidad: p.saldo_apartado.to_f }
+      },
       dias_para_vencimiento:    s.dias_para_vencimiento,
       estado_vencimiento:       s.estado_vencimiento,
       created_at:               s.created_at,

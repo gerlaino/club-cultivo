@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
-import { listEventosBar, listCategoriasProducto, listBarVentas } from '../../lib/api.js'
+import { listEventosBar, listCategoriasProducto, listBarVentas, listVendiblesBar } from '../../lib/api.js'
 import BarNav from './BarNav.vue'
 import BarcodeScanner from '../../components/BarcodeScanner.vue'
 import TicketVenta from '../../components/bar/TicketVenta.vue'
@@ -47,6 +47,44 @@ const productosFiltrados = computed(() => {
 })
 const catNombre = (p) => categorias.value.find(c => c.id === p.categoria_producto_id)?.nombre || '—'
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
+
+// ── Otros depósitos: vender algo que no vive en el salón ──────────────────
+// El mostrador puede cobrar un insumo (una remera del depósito General) sin duplicarlo como
+// producto del bar: la línea descuenta de SU depósito. Lo del dispensario (flor, derivados y
+// stock externo) NO se vende acá — sale por dispensación, que es lo que deja la trazabilidad.
+const DEP_LBL = { salon: 'Salón', cultivo: 'Cultivo', general: 'General' }
+const otros = ref([])
+const buscandoOtros = ref(false)
+let otrosTimer = null
+async function buscarOtros() {
+  const term = q.value.trim()
+  if (term.length < 2) { otros.value = []; return }
+  buscandoOtros.value = true
+  try {
+    const { data } = await listVendiblesBar(barId, { q: term, otros_depositos: 1 })
+    otros.value = data?.resultados || []
+  } catch { otros.value = [] }
+  finally { buscandoOtros.value = false }
+}
+function onBuscarInput() { clearTimeout(otrosTimer); otrosTimer = setTimeout(buscarOtros, 300) }
+
+// Un ítem sin precio propio (un insumo) necesita precio a mano — solo gestión.
+const precioForm = ref(null)
+function agregarOtro(v) {
+  if (v.disponible <= 0) { toast.warning(`${v.nombre} sin stock`); return }
+  if (v.requiere_precio) {
+    if (!esGestion.value) { toast.warning('Ese ítem no tiene precio cargado'); return }
+    precioForm.value = { v, precio: null }
+    return
+  }
+  store.agregar(v); toast.success(`${v.nombre} agregado`)
+}
+function confirmarPrecio() {
+  const f = precioForm.value
+  if (!(f.precio > 0)) { toast.warning('Poné el precio de venta'); return }
+  store.agregar(f.v, { precio: f.precio })
+  precioForm.value = null
+}
 
 // ── Código de barras: lector físico (Enter) + cámara + scan-to-create ─────
 const escaneando = ref(false)
@@ -116,7 +154,7 @@ async function cobrar() {
   if (!store.carrito.length) return
   // Snapshot ANTES de cobrar (store.cobrar vacía el carrito) para poder imprimir el comprobante.
   const snapshot = {
-    items: store.carrito.map(l => ({ nombre: l.producto.nombre, cantidad: l.cantidad, precio: l.producto.precio_ars })),
+    items: store.carrito.map(l => ({ nombre: l.nombre, cantidad: l.cantidad, precio: l.precio })),
     total: store.totalCarrito, medio: medioPago.value,
   }
   try {
@@ -161,7 +199,7 @@ const fechaHora = (d) => {
         <!-- Buscador (por nombre o lector físico: tipea el código + Enter) + escaneo con cámara -->
         <div class="cv__search">
           <span class="cv__search-ic">🔍</span>
-          <input v-model="q" class="cv__search-inp" placeholder="Buscar por nombre o escaneá el código…" autocomplete="off" @keyup.enter="onEnterBuscar" />
+          <input v-model="q" class="cv__search-inp" placeholder="Buscar por nombre o escaneá el código…" autocomplete="off" @input="onBuscarInput" @keyup.enter="onEnterBuscar" />
           <button v-if="q" class="cv__search-clear" type="button" @click="q = ''" aria-label="Limpiar">×</button>
           <button class="cv__scan" type="button" title="Escanear con la cámara" @click="escaneando = true">📷</button>
         </div>
@@ -186,6 +224,27 @@ const fechaHora = (d) => {
             </button>
           </li>
         </ul>
+
+        <!-- Mercadería que no vive en el salón: se vende igual y descuenta de su depósito -->
+        <template v-if="q.trim().length >= 2">
+          <div v-if="buscandoOtros" class="cv__otros-head">Buscando en otros depósitos…</div>
+          <template v-else-if="otros.length">
+            <div class="cv__otros-head">En otros depósitos</div>
+            <ul class="cv__list">
+              <li v-for="v in otros" :key="`${v.vendible_type}-${v.vendible_id}`">
+                <button class="cv__row" :class="{ 'cv__row--off': v.disponible <= 0 }" :disabled="v.disponible <= 0" @click="agregarOtro(v)">
+                  <span class="cv__row-main">
+                    <span class="cv__row-name">{{ v.nombre }}</span>
+                    <span class="cv__row-cat">{{ DEP_LBL[v.deposito] || v.deposito }}</span>
+                  </span>
+                  <span class="cv__row-price cv__num">{{ v.requiere_precio ? 'a definir' : fmt(v.precio_ars) }}</span>
+                  <span class="cv__row-stock">{{ v.disponible <= 0 ? 'sin stock' : `stock ${v.disponible} ${v.unidad}` }}</span>
+                  <span class="cv__row-add">+</span>
+                </button>
+              </li>
+            </ul>
+          </template>
+        </template>
       </div>
 
       <aside class="cv__cart">
@@ -196,12 +255,15 @@ const fechaHora = (d) => {
         <div class="cv__cart-body">
           <div v-if="!store.carrito.length" class="cv__empty-sm">Tocá un producto para agregarlo.</div>
           <ul v-else class="cv__cart-list">
-            <li v-for="l in store.carrito" :key="l.producto.id" class="cv__ci">
-              <button class="cv__ci-btn" @click="store.quitar(l.producto.id)" aria-label="Quitar uno">−</button>
+            <li v-for="l in store.carrito" :key="l.key" class="cv__ci">
+              <button class="cv__ci-btn" @click="store.quitar(l.key)" aria-label="Quitar uno">−</button>
               <span class="cv__ci-qty">{{ l.cantidad }}</span>
-              <span class="cv__ci-name">{{ l.producto.nombre }}</span>
-              <span class="cv__ci-sub cv__num">{{ fmt(l.producto.precio_ars * l.cantidad) }}</span>
-              <button class="cv__ci-btn" @click="store.agregar(l.producto)" aria-label="Agregar uno">+</button>
+              <span class="cv__ci-name">
+                {{ l.nombre }}
+                <small v-if="l.deposito !== 'salon'" class="cv__ci-dep">{{ DEP_LBL[l.deposito] || l.deposito }}</small>
+              </span>
+              <span class="cv__ci-sub cv__num">{{ fmt(l.precio * l.cantidad) }}</span>
+              <button class="cv__ci-btn" @click="store.sumar(l.key)" aria-label="Agregar uno">+</button>
             </li>
           </ul>
           <div class="cv__cart-total"><span>Total</span><strong class="cv__num">{{ fmt(store.totalCarrito) }}</strong></div>
@@ -273,6 +335,22 @@ const fechaHora = (d) => {
         </div>
       </div>
     </div>
+
+    <!-- Precio de venta de un ítem de otro depósito que no lo tiene cargado (solo gestión) -->
+    <div v-if="precioForm" class="cv__ov" @click.self="precioForm = null">
+      <div class="cv__modal">
+        <h3 class="cv__modal-title">Precio de venta</h3>
+        <p class="cv__modal-hint">
+          <b>{{ precioForm.v.nombre }}</b> está en el depósito {{ DEP_LBL[precioForm.v.deposito] || precioForm.v.deposito }}
+          y no tiene precio cargado. Poné a cuánto se vende esta vez.
+        </p>
+        <label class="cv__fld">Precio por {{ precioForm.v.unidad }}<input v-model.number="precioForm.precio" type="number" min="0" step="any" class="cv__inp" placeholder="$" autofocus @keyup.enter="confirmarPrecio" /></label>
+        <div class="cv__modal-act">
+          <button class="cv__btn-ghost2" @click="precioForm = null">Cancelar</button>
+          <button class="cv__btn-primary" @click="confirmarPrecio">Agregar al pedido</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -312,6 +390,8 @@ const fechaHora = (d) => {
 .cv__row-main { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 .cv__row-name { font-weight: 600; color: #0f172a; font-size: .92rem; }
 .cv__row-cat { font-size: .72rem; color: #94a3b8; text-transform: capitalize; }
+.cv__otros-head { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: #9a5b34; font-weight: 700; margin: 1rem 0 .35rem; padding-top: .8rem; border-top: 1px dashed #e2e8f0; }
+.cv__ci-dep { display: block; font-size: .66rem; color: #9a5b34; font-weight: 600; }
 .cv__row-price { font-weight: 800; color: #1b5e20; font-size: .95rem; }
 .cv__row-stock { font-size: .74rem; color: #94a3b8; white-space: nowrap; min-width: 62px; text-align: right; }
 .cv__row-add { width: 30px; height: 30px; border-radius: 8px; background: #f0fdf4; color: #1b5e20; font-size: 1.2rem; font-weight: 700; display: grid; place-items: center; }

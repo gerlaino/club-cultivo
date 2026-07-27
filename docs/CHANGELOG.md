@@ -1,5 +1,90 @@
 # Changelog
 
+## Julio 2026 (s) — dispensar desde lo apartado para un evento + consumo interno
+
+Cierra el ciclo de lo apartado (jul-27 «p»). Antes quedaba un agujero: se apartaba stock para un
+evento pero el dispensador **no podía dispensarlo** (el propio apartado lo bloqueaba), y lo
+consumido al cerrar no descontaba nada — el inventario quedaba inflado.
+
+**El apartado se reparte en tres destinos, y dos se llenan solos:**
+
+- **DISPENSADO — durante el evento.** El carrito de dispensa muestra lo apartado por eventos
+  **en curso** (`stocks#index` expone `apartados_evento`) y el dispensador tilda *«dispensar desde
+  lo reservado para Evento X»*. La línea guarda `dispensacion_items.evento_bar_id` (trazabilidad:
+  qué evento consumió qué gramos, con su paciente) y la cantidad se **imputa a la provisión**
+  (`cantidad_consumida`), liberando el bloqueo en la misma medida — sin doble descuento.
+  Es explícito a propósito: **sin tildar, la dispensa sale del stock libre** y no se come lo
+  apartado. Solo vale con el evento `en_curso` y con apartado real de ese stock.
+- **CONSUMO INTERNO — al cerrar.** Lo que se consumió sin dispensar a nadie identificable
+  (degustación, muestra) se declara en el cierre: descuenta de verdad con `StockMovimiento` tipo
+  **`consumo_evento`** (tipo propio, no `merma`: no es lo mismo «se consumió en el aniversario»
+  que «se pudrió») y es **COGS del evento**. Se recorta al saldo apartado: nunca descuenta de más.
+- **LIBERADO.** El resto suelta el bloqueo y vuelve al pozo disponible.
+
+**Contabilidad:** al evento le cuesta **solo el consumo interno**, no lo dispensado — eso tiene su
+propio costo e ingreso en la dispensación y contarlo acá sería duplicarlo. Sin asientos nuevos:
+es atribución calculada, el criterio que ya usa el módulo.
+
+Migración `add_consumo_evento_a_provisiones_y_dispensas`
+(`evento_bar_provisiones.cantidad_consumo_interno` + `dispensacion_items.evento_bar_id`).
+Spec `evento_dispensa_apartado_spec` cubre el ciclo completo con el caso real (apartar 250 g,
+dispensar 100 durante el evento, consumir 25, liberar 125).
+
+## Julio 2026 (r) — el cierre de período nunca alcanza al día en curso
+
+- **Guard:** `cerrar_periodo` ahora exige `hasta < hoy`. Si se pudiera cerrar el día en curso,
+  todo asiento automático (venta del salón, dispensación, compra) nace con fecha de hoy y sería
+  rechazado por la validación de período cerrado: el mostrador quedaría sin poder cobrar. La UI ya
+  cerraba solo hasta fin del mes anterior; esto lo hace cumplir del lado del servidor.
+- **Mensaje claro en vez de 500:** `bar/ventas#create` rescata `RecordInvalid` y explica el motivo
+  (antes, con un cierre heredado que incluyera hoy, el POS devolvía un 500 sin explicación).
+- Specs: cierre del día en curso rechazado, venta OK con cierre hasta ayer, venta bloqueada con
+  mensaje si el cierre incluye hoy.
+
+## Julio 2026 (q) — el mostrador del salón vende de otros depósitos (F4)
+
+- **Antes:** el POS solo vendía `BarProducto` (depósito Salón). Vender una remera del depósito
+  General obligaba a recargarla como producto del bar → el mismo ítem en dos lados y el stock
+  descuadrado.
+- **Ahora:** la línea de venta es **polimórfica** (`bar_venta_items.vendible_type/vendible_id`,
+  migración `add_vendible_a_bar_venta_items` con backfill; `bar_producto_id` se conserva por
+  compatibilidad). Una venta puede mezclar producto del bar + insumo, y **cada línea descuenta de
+  SU depósito**. Borrar la venta repone en cada depósito de origen.
+- **REGLA: ningún `Stock` se vende por el mostrador** — ni el propio, ni los derivados, ni el
+  externo (merch/bebida). Todo lo trazable sale por **dispensación**, que ya es su canal (el
+  carrito de dispensa lista el externo igual que la flor). Dos puertas de salida para el mismo
+  ítem = descuadre y confusión sobre qué se maneja dónde.
+- **`Bar::ItemVendible`** (nuevo): envoltorio único de "algo vendible/proveíble" — nombre, unidad,
+  depósito, disponible, costo, precio, `descontar!`/`reponer!`. El `case` por tipo vive **una sola
+  vez** y lo comparten el POS, la provisión de eventos (`EventoBarProvision` ahora delega en él) y
+  la reversión de una venta.
+- **Precio:** el ítem usa su precio propio (`precio_ars` / `precio_sugerido_ars`); un insumo no
+  tiene precio de venta, así que exige **precio a mano — solo admin/supervisor**. El dispensador
+  solo ve y cobra lo que ya tiene precio cargado.
+- **Regla dura:** el stock **regulatorio** (flor y derivados) **no se vende por el mostrador** —
+  sale por dispensación. El buscador nunca lo ofrece y el service lo rechaza.
+- Endpoint nuevo `GET /bares/:id/vendibles?q=` (buscador cross-depósito, sin plata para el
+  dispensador). Frontend: el buscador del POS suma la sección **“En otros depósitos”**; el carrito
+  pasó a líneas genéricas (`{tipo, id, nombre, precio, disponible, deposito}`) con modal de precio
+  para los ítems sin precio.
+
+## Julio 2026 (p) — la flor se puede apartar para un evento del salón (F3b) + reserva parcial
+
+- **`Stock` provisionable en eventos, SIEMPRE como APARTADO** (propio, derivados y externo por
+  igual). Es **la misma mecánica que una reserva de paciente, con otro destinatario**: reservar
+  **no descuenta** el inventario, bloquea la cantidad (`Stock#apartado_para_eventos`, que entra en
+  `gramos_reservados` y `cantidad_disponible_real`) para que ninguna dispensa ni reserva de
+  paciente la pise, y al cerrar el evento se libera. El stock sale del inventario **solo al
+  dispensarse** — no se agregaron tipos de `StockMovimiento`: no hay salida sin dispensación.
+- **No suma COGS al evento:** su costo e ingreso viven en la dispensación; contarlos también acá
+  inflaría el resultado del evento.
+- **Reserva PARCIAL:** `provisiones/reservar` aparta de cada ítem lo que haya y devuelve
+  `advertencias` con el faltante (antes era todo-o-nada: un solo faltante bloqueaba la reserva
+  entera del evento). Fix de paso: `faltante` ahora descuenta lo ya reservado (antes seguía
+  marcando faltante después de reservar).
+- Buscador de provisión y UI: el dispensario aparece junto al salón/cultivo/general, con chip
+  **apartado** y el aviso de reserva parcial. Sin migración (el polimórfico ya existía).
+
 ## Julio 2026 (o) — la sede del movimiento la fija el depósito (no se puede divergir)
 
 - **Guard de integridad multi-sede:** al cargar un movimiento con destino a un depósito, la **sede

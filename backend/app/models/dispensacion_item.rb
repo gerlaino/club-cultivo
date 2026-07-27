@@ -3,6 +3,9 @@ class DispensacionItem < ApplicationRecord
 
   belongs_to :dispensacion
   belongs_to :stock, optional: true   # nullify si se borra el stock (igual que la dispensa legacy)
+  # Si la línea salió de lo APARTADO para un evento del salón (el dispensador lo marcó al
+  # dispensar durante el evento). Deja el rastro de qué evento consumió estos gramos.
+  belongs_to :evento_bar, optional: true
 
   validates :cantidad, numericality: { greater_than: 0 }
 

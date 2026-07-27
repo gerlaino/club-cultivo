@@ -16,6 +16,8 @@ class Stock < ApplicationRecord
   has_many :stock_movimientos, dependent: :destroy
   has_many :dispensaciones, class_name: 'Dispensacion', dependent: :nullify
   has_many :reservas, dependent: :nullify
+  # Provisiones de eventos del salón que apartan este stock (ver EventoBarProvision).
+  has_many :provisiones_evento, class_name: 'EventoBarProvision', as: :provisionable, dependent: :destroy
   has_many :derivados, class_name: 'Stock', foreign_key: :producido_desde_stock_id, dependent: :nullify
 
   ORIGENES         = %w[lote derivado_lote compra_externa].freeze
@@ -72,15 +74,60 @@ class Stock < ApplicationRecord
   def gramos_reservados
     envios   = dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
     apartado = reservas.pendientes.sum(:cantidad).to_f
-    envios + apartado
+    envios + apartado + apartado_para_eventos.to_f
+  end
+
+  # Cantidad apartada por eventos del salón que todavía no se liberó (reservado − consumido).
+  # TODO el stock (propio, externo y derivados) se APARTA para un evento, nunca se descuenta:
+  # su única salida del inventario es la dispensación, que es la que deja la trazabilidad. El
+  # apartado bloquea la cantidad para que ninguna dispensa ni reserva de paciente la pise —
+  # misma mecánica que una Reserva de paciente, con otro destinatario.
+  def apartado_para_eventos
+    provisiones_evento.sum(&:saldo_apartado)
+  end
+
+  # Provisiones vivas de eventos EN CURSO (los que están sucediendo ahora). Son las únicas de las
+  # que el dispensador puede dispensar: durante el evento, lo apartado deja de ser un bloqueo y
+  # pasa a ser el stock del evento. Antes (planificado / en venta) sigue reservado a futuro.
+  def apartados_en_curso
+    provisiones_evento.select { |p| p.saldo_apartado.positive? && p.evento_bar&.estado == 'en_curso' }
+  end
+
+  def apartado_en_evento(evento_bar_id)
+    apartados_en_curso.select { |p| p.evento_bar_id == evento_bar_id.to_i }.sum(&:saldo_apartado)
+  end
+
+  # Techo para dispensar: lo libre, más lo apartado del evento del que se está dispensando.
+  # Sin `desde_evento` es el disponible de siempre — una dispensa de mostrador no se come lo
+  # apartado, y una reserva de paciente a futuro tampoco (usa cantidad_disponible_real).
+  def disponible_para_dispensa(desde_evento: nil)
+    libre = cantidad_disponible_real.to_d
+    return libre if desde_evento.blank?
+
+    libre + apartado_en_evento(desde_evento)
+  end
+
+  # Salida de lo consumido en un evento sin dispensar a nadie identificable (degustación,
+  # muestra). Descuenta de verdad y deja el rastro con el evento.
+  def consumo_interno_evento!(cantidad:, usuario:, evento:)
+    cantidad = cantidad.to_d
+    return if cantidad <= 0
+    raise ArgumentError, "Sin stock suficiente de #{etiqueta}" if cantidad > self.cantidad.to_d
+
+    transaction do
+      update!(cantidad: self.cantidad.to_d - cantidad)
+      stock_movimientos.create!(tipo: 'consumo_evento', gramos: -cantidad, usuario: usuario,
+                                notas: "Consumo en el evento «#{evento&.nombre}»")
+    end
   end
 
   def cantidad_disponible_real
     # OJO: los envíos pendientes/en viaje YA se descontaron de `cantidad` al crearse la
     # dispensación (after_create :decrementar_stock). NO se vuelven a restar acá (eso era un
     # doble descuento que dejaba el disponible en ~0 tras una entrega grande). Solo restamos las
-    # reservas (apartado), que comprometen stock SIN descontar el real.
-    [cantidad.to_f - reservas.pendientes.sum(:cantidad).to_f, 0].max
+    # reservas (apartado), que comprometen stock SIN descontar el real, y lo apartado por eventos.
+    comprometido = reservas.pendientes.sum(:cantidad).to_f + apartado_para_eventos.to_f
+    [cantidad.to_f - comprometido, 0].max
   end
 
   def dias_para_vencimiento
@@ -117,6 +164,15 @@ class Stock < ApplicationRecord
 
   def regulatorio?
     origen.in?(%w[lote derivado_lote])
+  end
+
+  # ── Provisión de eventos del salón ─────────────────────────────────────────
+  # Nombre legible para listados donde el stock convive con productos del bar e insumos
+  # (buscador de provisión, POS). Genética + forma, o la descripción si es externo.
+  def etiqueta
+    base = descripcion.presence || (genetica || lote&.genetica)&.nombre
+    forma = forma_producto.to_s.tr('_', ' ')
+    [base, base.present? ? "(#{forma})" : forma.capitalize].compact.join(' ')
   end
 
   private

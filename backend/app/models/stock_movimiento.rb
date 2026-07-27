@@ -7,7 +7,12 @@ class StockMovimiento < ApplicationRecord
   belongs_to :sede_origen,  class_name: 'Sede', optional: true
   belongs_to :sede_destino, class_name: 'Sede', optional: true
 
-  TIPOS = %w[produccion transferencia dispensacion ajuste merma].freeze
+  # El stock sale del inventario por `dispensacion` (entrega a un socio, con su trazabilidad) o,
+  # cuando se consumió en un evento del salón sin dispensar a nadie identificable (degustación,
+  # muestra), por `consumo_evento`. Tipo propio y no `merma` a propósito: no es lo mismo
+  # «se consumió en el aniversario» que «se pudrió», y en un informe hay que poder distinguirlo.
+  # El apartado para un evento NO genera movimiento: bloquea sin descontar.
+  TIPOS = %w[produccion transferencia dispensacion ajuste merma consumo_evento].freeze
 
   validates :tipo,   inclusion: { in: TIPOS }
   validates :gramos, numericality: { other_than: 0 }

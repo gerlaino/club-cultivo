@@ -166,9 +166,11 @@ function agregarItem() {
     formError.value = 'Ese stock no tiene precio configurado. Pedile al administrador que lo cargue.'
     return
   }
-  const existente = items.value.find(it => it.stock.id === s.id)
+  // Las líneas del mismo stock solo se fusionan si salen del mismo lado (libre o evento):
+  // si no, se perdería de qué evento salió cada parte.
+  const existente = items.value.find(it => it.stock.id === s.id && (it.desdeEvento || null) === desdeEvento.value)
   if (existente) existente.cantidad = Number((existente.cantidad + cant).toFixed(3))
-  else items.value.push({ stock: s, cantidad: cant, precioManual: null, guardarPrecio: false })
+  else items.value.push({ stock: s, cantidad: cant, precioManual: null, guardarPrecio: false, desdeEvento: desdeEvento.value })
   form.value.stock_id = null
   form.value.cantidad = null
   formError.value = null
@@ -222,6 +224,14 @@ watch(() => form.value.es_regalo, (val) => {
 })
 
 const stockSeleccionado    = computed(() => stocks.value.find(s => s.id === form.value.stock_id) || null)
+
+// ── Apartado de eventos en curso ────────────────────────────────────────────────
+// Lo apartado para un evento que está sucediendo se puede dispensar, pero solo si el
+// dispensador lo marca: así una dispensa de mostrador no se come lo reservado del evento.
+const apartadosDelStock = computed(() => stockSeleccionado.value?.apartados_evento || [])
+const desdeEvento = ref(null) // evento_bar_id del que sale la línea, o null = del stock libre
+watch(() => form.value.stock_id, () => { desdeEvento.value = null })
+const eventoDe = (id) => apartadosDelStock.value.find(a => a.evento_id === id) || null
 const necesitaPrecioManual = computed(() => stockSeleccionado.value != null && !stockSeleccionado.value.precio_sugerido_ars)
 
 const precioBase = computed(() => {
@@ -432,6 +442,9 @@ async function handleSubmit() {
       // línea (con el descuento del socio) y suma el total.
       items: items.value.map(it => {
         const l = { stock_id: it.stock.id, cantidad: it.cantidad }
+        // La línea sale de lo apartado para un evento en curso (el backend imputa la cantidad
+        // a la provisión, así el apartado se libera y no hay doble descuento).
+        if (it.desdeEvento) l.evento_bar_id = it.desdeEvento
         // Precio manual solo cuando el stock no tiene precio configurado.
         if (!(Number(it.stock.precio_sugerido_ars) > 0) && Number(it.precioManual) > 0) {
           l.precio_manual_ars = Number(it.precioManual)
@@ -554,12 +567,34 @@ async function handleSubmit() {
               </span>
               <span class="mnd__stock-right">
                 <span class="mnd__stock-disp">{{ s.cantidad }}{{ s.unidad }}</span>
+                <span v-for="a in (s.apartados_evento || [])" :key="a.evento_id" class="mnd__stock-evento" :title="`Apartado para el evento ${a.evento_nombre}`">
+                  🎉 {{ a.cantidad }}{{ s.unidad }}
+                </span>
                 <span v-if="s.precio_sugerido_ars" class="mnd__stock-precio">
                   {{ fmt(s.precio_sugerido_ars) }}/{{ s.unidad || 'g' }}
                 </span>
               </span>
               <span class="mnd__stock-check" v-if="form.stock_id === s.id"><i class="bi bi-check-circle-fill"></i></span>
             </button>
+          </div>
+
+          <!-- Origen: stock libre o lo apartado para un evento EN CURSO -->
+          <div v-if="!modoReserva && apartadosDelStock.length" class="mnd__evento-box">
+            <div class="mnd__evento-title">
+              <i class="bi bi-calendar-event"></i>
+              Hay stock reservado para un evento en curso
+            </div>
+            <label v-for="a in apartadosDelStock" :key="a.evento_id" class="mnd__evento-opt">
+              <input type="checkbox" :checked="desdeEvento === a.evento_id"
+                     @change="desdeEvento = desdeEvento === a.evento_id ? null : a.evento_id" />
+              <span>
+                Dispensar desde lo reservado para <b>{{ a.evento_nombre }}</b>
+                <small>{{ a.cantidad }}{{ stockSeleccionado?.unidad || 'g' }} apartados</small>
+              </span>
+            </label>
+            <p class="mnd__evento-hint">
+              Sin tildar, la entrega sale del stock libre y lo apartado del evento queda intacto.
+            </p>
           </div>
 
           <!-- Precio manual (solo al reservar un stock sin precio) -->
@@ -620,7 +655,12 @@ async function handleSubmit() {
             <div v-for="(it, i) in items" :key="i" class="mnd__cart-item">
               <span class="mnd__cart-emoji">{{ FORMA_EMOJI[it.stock.forma_producto] || '📦' }}</span>
               <span class="mnd__cart-info">
-                <span class="mnd__cart-nombre">{{ FORMA_LABEL[it.stock.forma_producto] || it.stock.forma_producto }}</span>
+                <span class="mnd__cart-nombre">
+                  {{ FORMA_LABEL[it.stock.forma_producto] || it.stock.forma_producto }}
+                  <span v-if="it.desdeEvento" class="mnd__cart-evento" :title="`Sale de lo reservado para ${eventoDe(it.desdeEvento)?.evento_nombre || 'el evento'}`">
+                    🎉 {{ eventoDe(it.desdeEvento)?.evento_nombre || 'evento' }}
+                  </span>
+                </span>
                 <span class="mnd__cart-qty">{{ it.cantidad }}{{ it.stock.unidad || 'g' }}</span>
               </span>
               <span
@@ -909,6 +949,13 @@ async function handleSubmit() {
 .mnd__stock-right { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; flex-shrink: 0; }
 .mnd__stock-disp  { font-size: .8rem; font-weight: 700; color: #1b5e20; font-family: monospace; }
 .mnd__stock-precio { font-size: .7rem; color: #64748b; font-family: monospace; white-space: nowrap; }
+.mnd__stock-evento { font-size: .66rem; color: #6d28d9; background: #ede9fe; border-radius: 999px; padding: 1px 7px; white-space: nowrap; font-weight: 700; }
+.mnd__cart-evento { font-size: .62rem; color: #6d28d9; background: #ede9fe; border-radius: 999px; padding: 1px 6px; margin-left: .35rem; font-weight: 700; }
+.mnd__evento-box { background: #faf5ff; border: 1.5px solid #e9d5ff; border-radius: 10px; padding: .7rem .85rem; margin: .7rem 0; }
+.mnd__evento-title { font-size: .78rem; font-weight: 700; color: #6d28d9; display: flex; align-items: center; gap: .4rem; margin-bottom: .45rem; }
+.mnd__evento-opt { display: flex; align-items: flex-start; gap: .5rem; font-size: .8rem; color: #334155; cursor: pointer; padding: .2rem 0; }
+.mnd__evento-opt small { display: block; color: #7c3aed; font-size: .7rem; }
+.mnd__evento-hint { font-size: .72rem; color: #7c6f8a; margin: .4rem 0 0; }
 .mnd__stock-check { color: #1b5e20; font-size: .9rem; flex-shrink: 0; }
 .mnd__warn-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; color: #92400e; display: flex; align-items: center; gap: .4rem; }
 
