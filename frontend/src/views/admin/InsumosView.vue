@@ -357,16 +357,19 @@ async function eliminarInsumo(i) {
   } catch { toast.error(store.saveError) }
 }
 
-// ── Transferir a otra sede ────────────────────────────────────
+// ── Transferir a otro depósito (reclasificación de stock, sin egreso) ─────────
+// Destinos válidos: cualquier otro depósito de insumos (no flor/salón, familia 'mercaderia').
+const depositosDestino = computed(() => depositos.value.filter(d => d.id !== depositoActivo.value?.id && d.familia !== 'mercaderia' && d.activo))
+const depLabel = (d) => d.sede_nombre ? `${d.nombre} · 📍 ${d.sede_nombre}` : d.nombre
 const transferForm = ref(null)
-function abrirTransfer(i) { cerrarMenu(); transferForm.value = { insumo: i, sede_destino_id: otrasSedes.value[0]?.id ?? null, cantidad: null } }
+function abrirTransfer(i) { cerrarMenu(); transferForm.value = { insumo: i, deposito_destino_id: depositosDestino.value[0]?.id ?? null, cantidad: null } }
 async function confirmarTransfer() {
   const f = transferForm.value
-  if (!f.sede_destino_id) { toast.warning('Elegí la sede destino'); return }
+  if (!f.deposito_destino_id) { toast.warning('Elegí el depósito destino'); return }
   if (!(f.cantidad > 0)) { toast.warning('Poné la cantidad a transferir'); return }
   if (f.cantidad > f.insumo.stock_actual) { toast.warning('No hay stock suficiente'); return }
   try {
-    await store.transferir(f.insumo.id, { sede_destino_id: f.sede_destino_id, cantidad: f.cantidad })
+    await store.transferirDeposito(f.insumo.id, { deposito_destino_id: f.deposito_destino_id, cantidad: f.cantidad })
     toast.success('Transferencia registrada'); transferForm.value = null
     await recargar()
   } catch { toast.error(store.saveError) }
@@ -509,7 +512,7 @@ async function revertirCompra(compra) {
                     <div v-if="menuId === i.id" class="dp__menu" :style="{ top: menuPos.top + 'px', left: menuPos.left + 'px' }" @click.stop>
                       <button class="dp__menu-item" @click="abrirEntrada(i)">Reponer</button>
                       <button class="dp__menu-item" @click="abrirReconteo(i)">Reconteo / Merma</button>
-                      <button v-if="multiSede && otrasSedes.length" class="dp__menu-item" @click="abrirTransfer(i)" :disabled="i.stock_actual <= 0">Transferir a otra sede</button>
+                      <button v-if="depositosDestino.length" class="dp__menu-item" @click="abrirTransfer(i)" :disabled="i.stock_actual <= 0">Transferir a otro depósito</button>
                       <button class="dp__menu-item" @click="abrirHistorial(i)">Historial</button>
                       <button class="dp__menu-item" @click="editarInsumo(i)">Editar</button>
                       <div class="dp__menu-sep"></div>
@@ -676,10 +679,10 @@ async function revertirCompra(compra) {
     <div v-if="transferForm" class="ov" @click.self="transferForm = null">
       <div class="dpdlg">
         <h3 class="modal__title">Transferir — {{ transferForm.insumo.nombre }}</h3>
-        <p class="modal__hint">Mueve stock desde <b>{{ transferForm.insumo.sede_nombre || 'el pool' }}</b> a otra sede. El costo viaja con la mercadería; no genera un nuevo egreso.</p>
-        <label class="fld">Sede destino
-          <select v-model="transferForm.sede_destino_id" class="inp">
-            <option v-for="s in otrasSedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+        <p class="modal__hint">Reclasifica stock a otro depósito. El costo viaja con la mercadería; <b>no genera un nuevo egreso</b> (la plata ya salió al comprar).</p>
+        <label class="fld">Depósito destino
+          <select v-model="transferForm.deposito_destino_id" class="inp">
+            <option v-for="d in depositosDestino" :key="d.id" :value="d.id">{{ depLabel(d) }}</option>
           </select>
         </label>
         <label class="fld">Cantidad ({{ transferForm.insumo.unidad_medida }})

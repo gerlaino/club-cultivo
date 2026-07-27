@@ -223,6 +223,39 @@ class Insumo < ApplicationRecord
     end
   end
 
+  # Transferencia a OTRO depósito (mismo club). Reclasifica stock: baja del origen y sube al mismo
+  # insumo (nombre+unidad) del depósito destino — lo crea si no existe, heredando su sede y tipo.
+  # NO genera egreso (la plata ya salió al comprar); el costo se mueve con la mercadería. La flor y
+  # el salón (familia 'mercaderia') quedan afuera: su stock se genera/opera en otro lado.
+  def transferir_a_deposito!(deposito_destino:, cantidad:, created_by:)
+    cantidad = cantidad.to_d
+    raise ArgumentError, 'La cantidad debe ser mayor a 0'  if cantidad <= 0
+    raise ArgumentError, 'Stock insuficiente'              if cantidad > stock_actual.to_d
+    raise ArgumentError, 'Elegí un depósito destino'       if deposito_destino.nil?
+    raise ArgumentError, 'El depósito destino es el mismo' if deposito_destino.id == deposito_id
+    raise ArgumentError, 'Ese depósito no admite insumos (flor/salón se manejan en su módulo)' if deposito_destino.familia == 'mercaderia'
+
+    valor = cantidad * costo_promedio_ars.to_d
+    transaction do
+      destino = club.insumos.where(deposito_id: deposito_destino.id, nombre: nombre, unidad_medida: unidad_medida).first_or_initialize
+      if destino.new_record?
+        destino.assign_attributes(
+          sede_id: deposito_destino.sede_id, deposito: deposito_destino,
+          tipo: deposito_destino.clave_sistema == 'cultivo' ? 'cultivo' : 'general',
+          stock_minimo: stock_minimo, categoria_contable: categoria_contable,
+          stock_actual: 0, costo_promedio_ars: 0, activo: true
+        )
+      end
+      nuevo_stock = destino.stock_actual.to_d + cantidad
+      destino.costo_promedio_ars = ((destino.stock_actual.to_d * destino.costo_promedio_ars.to_d) + valor) / nuevo_stock
+      destino.stock_actual = nuevo_stock
+      destino.save!
+
+      update!(stock_actual: stock_actual.to_d - cantidad) # el promedio del origen no cambia
+      destino
+    end
+  end
+
   # Reserva para un evento: aparta cantidad del depósito (baja stock_actual). La provisión
   # del evento lleva el registro de lo reservado; al cerrar se devuelve el sobrante.
   def reservar_para_evento!(cantidad:)

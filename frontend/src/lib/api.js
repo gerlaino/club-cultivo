@@ -335,6 +335,7 @@ export const updateInsumo    = (id, payload) => api.put(`/insumos/${id}`, { insu
 export const comprarInsumo   = (id, payload) => api.post(`/insumos/${id}/comprar`, payload)
 export const consumirInsumo  = (id, payload) => api.post(`/insumos/${id}/consumir`, payload)
 export const transferirInsumo = (id, payload) => api.post(`/insumos/${id}/transferir`, payload)
+export const transferirInsumoDeposito = (id, payload) => api.post(`/insumos/${id}/transferir_deposito`, payload)
 export const revertirCompraInsumo = (id, compraId) => api.delete(`/insumos/${id}/compras/${compraId}`)
 export const listCategoriasProducto   = ()            => api.get('/categorias_producto')
 export const createCategoriaProducto  = (payload)     => api.post('/categorias_producto', { categoria_producto: payload })

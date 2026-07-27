@@ -270,4 +270,34 @@ RSpec.describe Insumo, type: :model do
         .not_to change { club.alertas_internas.where(tipo: 'stock_bajo').count }
     end
   end
+
+  describe '#transferir_a_deposito!' do
+    let(:club) { create(:club, features: { 'bar' => true }) }
+    let(:sede) { create(:sede, club: club, created_by: admin, tipo: 'mixta') } # cultivo + general + salón + dispensario
+
+    before { sede; Finanzas::SembrarDepositos.new(club).call } # crea la sede antes de sembrar
+    let(:cultivo) { club.depositos.find_by(clave_sistema: 'cultivo', sede_id: sede.id) }
+    let(:general) { club.depositos.find_by(clave_sistema: 'general', sede_id: sede.id) }
+
+    it 'mueve stock y costo al depósito destino, sin generar egreso' do
+      i = insumo(deposito: cultivo, sede_id: sede.id)
+      i.registrar_compra!(cantidad: 10, costo_total_ars: 1000, created_by: admin, generar_egreso: false) # $100/u
+      expect {
+        i.transferir_a_deposito!(deposito_destino: general, cantidad: 4, created_by: admin)
+      }.not_to change { club.movimientos_contables.count } # reclasificación, no egreso
+      expect(i.reload.stock_actual).to eq(6)
+      destino = club.insumos.find_by(deposito_id: general.id, nombre: i.nombre)
+      expect(destino.stock_actual).to eq(4)
+      expect(destino.costo_promedio_ars).to eq(100) # el costo viaja con la mercadería
+    end
+
+    it 'bloquea transferir a un depósito de mercadería (flor / dispensario)' do
+      i = insumo(deposito: cultivo, sede_id: sede.id)
+      i.registrar_compra!(cantidad: 5, costo_total_ars: 500, created_by: admin, generar_egreso: false)
+      dispensario = club.depositos.find_by(clave_sistema: 'dispensacion', sede_id: sede.id)
+      expect {
+        i.transferir_a_deposito!(deposito_destino: dispensario, cantidad: 1, created_by: admin)
+      }.to raise_error(ArgumentError, /no admite insumos/)
+    end
+  end
 end

@@ -7,8 +7,8 @@ class InsumosController < ApplicationController
   before_action :require_lectura,  only: [:index, :show]
   before_action :require_gestion,  only: [:create, :update, :comprar, :revertir_compra, :reconteo, :destroy]
   before_action :require_consumo,  only: [:consumir]
-  before_action :require_gestion,  only: [:transferir]
-  before_action :set_insumo,       only: [:show, :update, :comprar, :consumir, :transferir, :revertir_compra, :reconteo, :destroy]
+  before_action :require_gestion,  only: [:transferir, :transferir_deposito]
+  before_action :set_insumo,       only: [:show, :update, :comprar, :consumir, :transferir, :transferir_deposito, :revertir_compra, :reconteo, :destroy]
 
   # GET /insumos?sede_id=<id|pool>&tipo=<cultivo|general>&activos=true
   def index
@@ -118,6 +118,22 @@ class InsumosController < ApplicationController
   rescue ActiveRecord::RecordInvalid => e
     # Que una validación fallida no explote en 500: devolvemos el motivo real.
     render json: { error: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
+  end
+
+  # POST /insumos/:id/transferir_deposito  { deposito_destino_id, cantidad }
+  # Reclasifica stock de un depósito a otro (no genera egreso). Flor/salón quedan afuera.
+  def transferir_deposito
+    destino_dep = current_user.club.depositos.find_by(id: params[:deposito_destino_id])
+    return render json: { error: 'Depósito destino no encontrado' }, status: :unprocessable_entity unless destino_dep
+
+    destino = @insumo.transferir_a_deposito!(
+      deposito_destino: destino_dep, cantidad: params.require(:cantidad), created_by: current_user
+    )
+    render json: { origen: serialize(@insumo.reload), destino: serialize(destino) }, status: :created
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActionController::ParameterMissing => e
+    render json: { error: "Falta el parámetro #{e.param}" }, status: :unprocessable_entity
   end
 
   # POST /insumos/:id/reconteo  { nuevo_stock, motivo: 'correccion'|'merma', notas?, fecha? }

@@ -385,6 +385,7 @@ Rails.application.routes.draw do
         post :comprar
         post :consumir
         post :transferir
+        post :transferir_deposito
         post :reconteo
         delete 'compras/:compra_id', action: :revertir_compra, as: :revertir_compra
       end

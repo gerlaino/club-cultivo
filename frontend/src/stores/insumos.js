@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger.js'
 // frontend/src/stores/insumos.js — depósito de insumos (Bloque 2).
 import { defineStore } from "pinia";
-import { listInsumos, createInsumo, updateInsumo, comprarInsumo, consumirInsumo, transferirInsumo, revertirCompraInsumo, reconteoInsumo, deleteInsumo } from "../lib/api";
+import { listInsumos, createInsumo, updateInsumo, comprarInsumo, consumirInsumo, transferirInsumo, transferirInsumoDeposito, revertirCompraInsumo, reconteoInsumo, deleteInsumo } from "../lib/api";
 
 export const useInsumosStore = defineStore("insumos", {
   state: () => ({
@@ -56,6 +56,13 @@ export const useInsumosStore = defineStore("insumos", {
     // igual queda cacheado (el refetch por sede lo ordena).
     async transferir(id, payload) {
       return this._guardar(() => transferirInsumo(id, payload), ({ origen, destino }) => {
+        if (origen)  this._merge(origen);
+        if (destino) this._merge(destino);
+      });
+    },
+    // Transferencia a OTRO depósito (reclasificación de stock, sin egreso).
+    async transferirDeposito(id, payload) {
+      return this._guardar(() => transferirInsumoDeposito(id, payload), ({ origen, destino }) => {
         if (origen)  this._merge(origen);
         if (destino) this._merge(destino);
       });
