@@ -40,7 +40,14 @@ const TABS = computed(() => {
   if (sedeFiltro.value == null) return depositos.value
   return depositos.value.filter(d => d.sede_id === sedeFiltro.value || d.sede_id == null)
 })
-const tabLabel = (d) => (sedeFiltro.value == null && multiSede.value && d.sede_nombre) ? `${d.nombre} · ${d.sede_nombre}` : d.nombre
+// Dos tabs no pueden leerse igual: si el mismo nombre aparece más de una vez (dos sedes, o un
+// legacy sin sede que quedó sin migrar), se desambigua siempre con la sede. Sin esto los depósitos
+// por sede se leían como duplicados sin explicación.
+const nombreRepetido = (d) => TABS.value.filter(x => x.nombre === d.nombre).length > 1
+const tabLabel = (d) => {
+  const mostrarSede = nombreRepetido(d) || (sedeFiltro.value == null && multiSede.value && d.sede_nombre)
+  return mostrarSede ? `${d.nombre} · ${d.sede_nombre || 'sin sede'}` : d.nombre
+}
 const depositoActivo = computed(() => TABS.value.find(d => d.id === depositoActivoId.value) || TABS.value[0] || null)
 const esSalon        = computed(() => depositoActivo.value?.clave_sistema === 'salon')
 const esDispensacion = computed(() => depositoActivo.value?.clave_sistema === 'dispensacion')
@@ -77,8 +84,19 @@ const categoriasDelTab = computed(() => {
 
 // El depósito es transversal a la sede. Filtro LOCAL de productos por sede (null = todo el club).
 const sedeFiltro = ref(null)
-const multiSede = computed(() => sede.sedes.length > 1)
-const otrasSedes = computed(() => sede.sedes.filter(s => s.id !== sedeFiltro.value))
+// Las sedes salen del store; si no llegaron (falló listSedes o el rol no las lista), se derivan de
+// los propios depósitos. Sin esto el club se veía como mono-sede: sin filtro y con los tabs por
+// sede sin etiqueta, o sea "duplicados".
+const sedesOpciones = computed(() => {
+  if (sede.sedes.length) return sede.sedes
+  const m = new Map()
+  for (const d of depositos.value) {
+    if (d.sede_id && !m.has(d.sede_id)) m.set(d.sede_id, { id: d.sede_id, nombre: d.sede_nombre || `Sede ${d.sede_id}` })
+  }
+  return [...m.values()]
+})
+const multiSede = computed(() => sedesOpciones.value.length > 1)
+const otrasSedes = computed(() => sedesOpciones.value.filter(s => s.id !== sedeFiltro.value))
 
 watch(TABS, (tabs) => {
   if (!tabs.some(d => d.id === depositoActivoId.value)) depositoActivoId.value = tabs[0]?.id ?? null
@@ -412,11 +430,11 @@ async function revertirCompra(compra) {
       <div class="dp__head-right">
         <select v-if="multiSede" v-model="sedeFiltro" class="dp__sede-filtro">
           <option :value="null">🏢 Todo el club</option>
-          <option v-for="s in sede.sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+          <option v-for="s in sedesOpciones" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
         <!-- Los productos NUEVOS entran por Contabilidad → Nuevo Movimiento (ahí elegís el depósito).
              Acá solo se gestiona lo que ya existe (reponer/editar/merma/eliminar). -->
-        <RouterLink v-if="!esSoloLectura" :to="{ name: 'contabilidad' }" class="btn btn--primary" title="Comprar un producto nuevo y elegir su depósito">＋ Comprar (Nuevo movimiento)</RouterLink>
+        <RouterLink v-if="!esSoloLectura" :to="{ name: 'contabilidad', query: { nuevo: 1 } }" class="btn btn--primary" title="Comprar un producto nuevo y elegir su depósito">＋ Comprar (Nuevo movimiento)</RouterLink>
       </div>
     </header>
 
@@ -582,7 +600,7 @@ async function revertirCompra(compra) {
         <label v-if="multiSede" class="fld">Sede
           <select v-model="entradaForm.sede_id" class="inp">
             <option :value="null">🏢 Pool del club</option>
-            <option v-for="s in sede.sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+            <option v-for="s in sedesOpciones" :key="s.id" :value="s.id">{{ s.nombre }}</option>
           </select>
         </label>
 

@@ -5,7 +5,8 @@ import { useRoute } from 'vue-router'
 import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
-import { listEventosBar, listCategoriasProducto, listBarVentas, listVendiblesBar } from '../../lib/api.js'
+import { listEventosBar, listCategoriasProducto, listBarVentas, listVendiblesBar, deleteBarVenta } from '../../lib/api.js'
+import { useConfirm } from '../../composables/useConfirm.js'
 import BarNav from './BarNav.vue'
 import BarcodeScanner from '../../components/BarcodeScanner.vue'
 import TicketVenta from '../../components/bar/TicketVenta.vue'
@@ -15,6 +16,7 @@ const store  = useBarStore()
 const auth   = useAuthStore()
 const route  = useRoute()
 const toast  = useToast()
+const { confirm } = useConfirm()
 const barId  = route.params.barId
 
 // Categorías editables (reemplazan el enum hardcodeado). Solo las que tienen productos.
@@ -176,6 +178,31 @@ async function abrirHistorial() {
   catch { ventas.value = [] }
   finally { loadingVentas.value = false }
 }
+// Eliminar una venta mal cargada. Es LA forma de deshacerla: devuelve la mercadería al depósito
+// y saca el ingreso del libro (BarVenta#revertir_efectos). Borrar el asiento desde Contabilidad
+// no devuelve el stock — por eso ese camino está bloqueado del lado del backend.
+const borrandoVenta = ref(null)
+async function eliminarVenta(v) {
+  const ok = await confirm({
+    title: `¿Eliminar la venta #${v.id}?`,
+    message: `Vuelve el stock al depósito y se saca del libro el ingreso de ${fmt(v.total_ars)}. La venta queda en la papelera.`,
+    confirmText: 'Eliminar venta',
+  })
+  if (!ok) return
+
+  borrandoVenta.value = v.id
+  try {
+    await deleteBarVenta(barId, v.id)
+    ventas.value = ventas.value.filter(x => x.id !== v.id)
+    await store.fetchProductos(barId, { activos: 'true' })  // stock repuesto
+    toast.success('Venta eliminada · stock devuelto')
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo eliminar la venta')
+  } finally {
+    borrandoVenta.value = null
+  }
+}
+
 function reimprimir(v) {
   ticketVenta.value = {
     nro: v.id,
@@ -307,6 +334,13 @@ const fechaHora = (d) => {
             </div>
             <span class="cv__hist-total cv__num">{{ fmt(v.total_ars) }}</span>
             <button class="cv__hist-print" @click="reimprimir(v)" title="Reimprimir comprobante">🖨️</button>
+            <button
+              v-if="esGestion"
+              class="cv__hist-del"
+              :disabled="borrandoVenta === v.id"
+              title="Eliminar venta (devuelve el stock)"
+              @click="eliminarVenta(v)"
+            >{{ borrandoVenta === v.id ? '⏳' : '🗑️' }}</button>
           </li>
         </ul>
       </div>
@@ -455,4 +489,7 @@ const fechaHora = (d) => {
 .cv__hist-total { font-weight: 700; color: #0f172a; }
 .cv__hist-print { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: .35rem .55rem; font-size: 1rem; cursor: pointer; line-height: 1; }
 .cv__hist-print:hover { background: #dcfce7; }
+.cv__hist-del { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: .35rem .55rem; font-size: 1rem; cursor: pointer; line-height: 1; }
+.cv__hist-del:hover:not(:disabled) { background: #fee2e2; }
+.cv__hist-del:disabled { opacity: .6; cursor: default; }
 </style>

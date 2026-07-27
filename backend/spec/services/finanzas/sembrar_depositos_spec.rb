@@ -81,6 +81,25 @@ RSpec.describe Finanzas::SembrarDepositos, type: :service do
       expect(trapos.deposito.id).not_to eq(old_id)
       expect(club.depositos.find_by(id: old_id)).to be_nil # el club-wide viejo, retirado
     end
+
+    # Sede es soft-delete: un insumo puede apuntar a una sede que ya no existe. Antes no había
+    # depósito destino, el insumo no se movía y el legacy no se podía retirar NUNCA: el club veía
+    # "General"/"Cultivo" duplicados (el legacy + el de cada sede) para siempre.
+    it 'migra igual los insumos de una sede borrada (caen en la sede principal)' do
+      borrada = create(:sede, club: club, created_by: admin, tipo: 'social')
+      old = club.depositos.create!(clave_sistema: 'general', sede_id: nil, nombre: 'General', es_sistema: true, activo: true)
+      old_id = old.id
+      club.insumos.create!(nombre: 'Lampazo', unidad_medida: 'unidad', tipo: 'general', sede_id: borrada.id, deposito: old)
+      borrada.soft_delete!
+
+      described_class.new(club).call
+
+      lampazo = club.insumos.find_by(nombre: 'Lampazo')
+      expect(lampazo.deposito_id).not_to eq(old_id)
+      expect(lampazo.deposito.sede_id).to eq(club.sedes.order(:id).first.id) # principal
+      expect(club.depositos.find_by(id: old_id)).to be_nil                   # ya se puede retirar
+      expect(club.depositos.where(clave_sistema: 'general').count).to eq(club.sedes.count) # sin duplicados
+    end
   end
 
   describe 'idempotencia' do

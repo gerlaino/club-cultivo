@@ -28,6 +28,47 @@ RSpec.describe 'KPI de tareas pendientes (vencidas + hoy, no futuras)', type: :r
     get '/api/tareas/dashboard', as: :json
     expect(JSON.parse(response.body).dig('stats', 'pendientes')).to eq(1)
   end
+
+  # El listado accionable de /tareas: el KPI y la lista tienen que hablar del mismo conjunto.
+  it 'devuelve el listado de pendientes con el mismo scope que el KPI' do
+    venc = tarea(fecha: Date.current - 2)
+    hoy  = tarea(fecha: Date.current)
+    sin  = tarea(fecha: nil)
+    futura = tarea(fecha: Date.current + 3)
+    hecha  = tarea(fecha: Date.current, estado: 'completada')
+
+    get '/api/tareas/dashboard', as: :json
+    body = JSON.parse(response.body)
+    ids  = body['pendientes'].map { |t| t['id'] }
+
+    expect(ids).to contain_exactly(venc.id, hoy.id, sin.id)
+    expect(ids).not_to include(futura.id, hecha.id)
+    expect(ids.length).to eq(body.dig('stats', 'pendientes'))
+  end
+
+  it 'ordena el listado por fecha (lo más viejo primero) y deja las sin fecha al final' do
+    vieja  = tarea(fecha: Date.current - 5)
+    ayer   = tarea(fecha: Date.current - 1)
+    de_hoy = tarea(fecha: Date.current)
+    sin    = tarea(fecha: nil)
+
+    get '/api/tareas/dashboard', as: :json
+
+    expect(JSON.parse(response.body)['pendientes'].map { |t| t['id'] })
+      .to eq([vieja.id, ayer.id, de_hoy.id, sin.id])
+  end
+
+  it 'un no-admin solo ve sus pendientes' do
+    cult = create(:user, :cultivador, club: club)
+    mia  = Tarea.create!(club: club, creada_por: admin, titulo: 'mía', fecha_programada: Date.current,
+                         asignada_a: cult)
+    tarea(fecha: Date.current) # sin asignar → no es suya
+
+    sign_in_as(cult)
+    get '/api/tareas/dashboard', as: :json
+
+    expect(JSON.parse(response.body)['pendientes'].map { |t| t['id'] }).to eq([mia.id])
+  end
 end
 
 RSpec.describe 'DELETE /api/tareas/:id (tareas completadas)', type: :request do

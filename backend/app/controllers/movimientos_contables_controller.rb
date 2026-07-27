@@ -189,6 +189,17 @@ class MovimientosContablesController < ApplicationController
       return render json: { error: 'Este movimiento fue generado por una dispensación. Eliminá la dispensación para que el libro y el stock queden consistentes.' }, status: :unprocessable_entity
     end
 
+    # Mismo criterio que la dispensación: el ingreso de una venta del salón NO se borra por el
+    # libro. Si se borrara solo el asiento, la venta seguiría existiendo y la mercadería NO
+    # volvería al depósito (el stock ya salió al cobrar). Se borra la venta, que revierte las dos
+    # cosas (BarVenta#revertir_efectos).
+    if (venta = current_user.club.bar_ventas.find_by(movimiento_contable_id: @movimiento.id))
+      return render json: {
+        error: "Este ingreso lo generó la venta ##{venta.id} del salón. Eliminá la venta desde " \
+               'Salón → Vender → 🧾 Ventas: así vuelve el stock al depósito y se saca el ingreso del libro.'
+      }, status: :unprocessable_entity
+    end
+
     # Una cuota no se borra sola: es parte de una compra financiada. Borrar cualquiera de sus
     # cuotas elimina la COMPRA ENTERA (todas las cuotas), respetando el guard de período cerrado.
     if (compra = @movimiento.compra_cuotas)

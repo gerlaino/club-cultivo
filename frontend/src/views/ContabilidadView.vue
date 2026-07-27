@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
@@ -298,6 +299,9 @@ const hayFiltros = computed(() =>
   filtroTipo.value || filtroCategoria.value || filtroSede.value || filtroDesde.value || filtroHasta.value
 )
 
+const route  = useRoute()
+const router = useRouter()
+
 const showModal        = ref(false)
 const editingMovimiento = ref(null)
 const showEditarCuotas = ref(false)
@@ -424,6 +428,15 @@ onMounted(async () => {
     listCategoriasContables().then(r => { categorias.value = r.data || [] }).catch(() => {}),
     listDepositos().then(r => { depositos.value = r.data?.depositos || r.data || [] }).catch(() => {}),
   ])
+
+  // ?nuevo=1 → abre el alta directo. Lo usa el botón "＋ Comprar" del Depósito: comprar arranca
+  // acá (el egreso genera la entrada al depósito), y mandarte a la pantalla sin abrir el modal
+  // dejaba el paso a mano. Se limpia el query para que un refresh no lo reabra.
+  if (route.query.nuevo) {
+    const { nuevo, ...resto } = route.query
+    router.replace({ query: resto })
+    openCreate()
+  }
 })
 </script>
 

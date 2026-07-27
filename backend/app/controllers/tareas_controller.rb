@@ -1,4 +1,6 @@
 class TareasController < ApplicationController
+  PENDIENTES_LIMIT = 100
+
   before_action :authenticate_user!
   before_action :check_tareas_role!
   before_action :set_club
@@ -54,8 +56,18 @@ class TareasController < ApplicationController
       @club.tareas.asignadas_a(current_user.id)
     end
 
+    # Listado accionable de /tareas: lo que hay para hacer HOY (vencidas + de hoy +
+    # sin fecha). Mismo scope que stats.pendientes, así el KPI y la lista coinciden.
+    # Acotado a 100 — con stats.pendientes el front avisa si se truncó.
+    pendientes = base.pendientes_al_dia
+                     .includes(:asignada_a, :sala, :lote, :origen_plan)
+                     .order(Arel.sql('fecha_programada ASC NULLS LAST'))
+                     .por_prioridad
+                     .limit(PENDIENTES_LIMIT)
+
     render json: {
       hoy: base.de_hoy.order(created_at: :desc).map { |t| serialize_tarea(t) },
+      pendientes: pendientes.map { |t| serialize_tarea(t) },
       vencidas: base.vencidas.por_prioridad.limit(5).map { |t| serialize_tarea(t) },
       proximas: base.proximas.where.not(fecha_programada: Time.zone.today)
                     .por_prioridad.limit(10).map { |t| serialize_tarea(t) },

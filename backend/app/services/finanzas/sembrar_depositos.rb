@@ -30,6 +30,21 @@ module Finanzas
       @principal ||= @club.sedes.order(:id).first
     end
 
+    # Sedes que EXISTEN hoy (Sede es soft-delete): son las únicas que tienen depósitos sembrados.
+    def sedes_vigentes
+      @sedes_vigentes ||= @club.sedes.pluck(:id).to_set
+    end
+
+    # Un insumo puede apuntar a una sede borrada (o de otro club, en data vieja). En ese caso no hay
+    # depósito destino y el legacy quedaba sin migrar PARA SIEMPRE: los insumos nunca se movían, el
+    # depósito club-wide no se podía retirar y el club veía "General" y "Cultivo" duplicados.
+    # Ante una sede que ya no existe, cae en la principal.
+    def sede_destino(sede_id)
+      return principal&.id if sede_id.nil? || !sedes_vigentes.include?(sede_id)
+
+      sede_id
+    end
+
     # Qué depósitos del sistema le tocan a cada sede según su tipo.
     def claves_de(sede)
       claves = ['general']                                # todas las sedes
@@ -61,7 +76,7 @@ module Finanzas
       @club.depositos.where(sede_id: nil).where.not(clave_sistema: nil).find_each do |old|
         clave = old.clave_sistema
         old.insumos.find_each do |ins|
-          sede_id = ins.sede_id || principal&.id
+          sede_id = sede_destino(ins.sede_id)
           dep = deposito_de(clave, sede_id) || deposito_de('general', sede_id)
           ins.update_columns(deposito_id: dep.id, sede_id: sede_id) if dep
         end
@@ -73,7 +88,7 @@ module Finanzas
     # Insumos sin depósito (nuevos o pre-siembra) → el de su tipo + su sede (o la principal).
     def backfill_insumos
       @club.insumos.where(deposito_id: nil).find_each do |i|
-        sede_id = i.sede_id || principal&.id
+        sede_id = sede_destino(i.sede_id)
         clave   = i.tipo == 'general' ? 'general' : 'cultivo'
         dep = deposito_de(clave, sede_id) || deposito_de('general', sede_id)
         i.update_columns(deposito_id: dep.id, sede_id: sede_id) if dep

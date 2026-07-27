@@ -17,11 +17,11 @@
 
     <!-- KPIs -->
     <div class="tv__kpis">
-      <div class="tv__kpi">
+      <button type="button" class="tv__kpi tv__kpi--link" @click="irAPendientes" title="Ver el listado de pendientes">
         <div class="tv__kpi-val" style="color:#64748b">{{ stats.pendientes || 0 }}</div>
-        <div class="tv__kpi-label">Pendientes</div>
+        <div class="tv__kpi-label">Pendientes <i class="bi bi-arrow-down-short"></i></div>
         <div class="tv__kpi-bar" style="background:#64748b"></div>
-      </div>
+      </button>
       <div class="tv__kpi">
         <div class="tv__kpi-val" style="color:#d97706">{{ stats.en_progreso || 0 }}</div>
         <div class="tv__kpi-label">En progreso</div>
@@ -109,7 +109,101 @@
         </div>
       </div>
 
+      <!-- Pendientes: lo accionable de hoy (vencidas + hoy + sin fecha) -->
+      <section ref="pendientesEl" class="pend" :class="{ 'pend--flash': flashPendientes }">
+        <div class="pend__head">
+          <h2 class="pend__title">Pendientes</h2>
+          <span class="pend__count">{{ pendientesActivas.length }}</span>
+          <span v-if="hayTruncadas" class="pend__trunc">
+            mostrando {{ pendientesActivas.length }} de {{ stats.pendientes }}
+          </span>
+          <button v-if="seleccion.size" class="pend__limpiar" @click="limpiarSeleccion">
+            Deseleccionar
+          </button>
+        </div>
+
+        <EmptyState
+          v-if="!pendientesActivas.length"
+          icon="bi-check2-circle"
+          title="Todo al día"
+          message="No hay tareas vencidas, de hoy ni sin fecha."
+          compact
+        />
+
+        <div v-else class="pend__grupos">
+          <div v-for="g in grupos" :key="g.key" class="pend__grupo">
+            <div class="pend__grupo-head">
+              <input
+                type="checkbox"
+                class="pend__cb"
+                :checked="grupoEntero(g)"
+                :indeterminate.prop="grupoParcial(g)"
+                :aria-label="`Seleccionar todas las de ${g.label}`"
+                @change="toggleGrupo(g, $event.target.checked)"
+              />
+              <span class="pend__grupo-label" :class="`pend__grupo-label--${g.key}`">{{ g.label }}</span>
+              <span class="pend__grupo-count">{{ g.tareas.length }}</span>
+            </div>
+
+            <div
+              v-for="t in g.tareas"
+              :key="t.id"
+              class="pend__row"
+              :class="[`pend__row--${t.prioridad}`, { 'pend__row--sel': seleccion.has(t.id), 'pend__row--busy': enCurso.has(t.id) }]"
+            >
+              <input
+                type="checkbox"
+                class="pend__cb"
+                :checked="seleccion.has(t.id)"
+                :disabled="enCurso.has(t.id)"
+                :aria-label="`Seleccionar ${t.titulo}`"
+                @change="toggleSeleccion(t.id)"
+              />
+
+              <button class="pend__main" @click="abrirDetalle(t)">
+                <span class="pend__emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
+                <span class="pend__titulo">{{ t.titulo }}</span>
+                <span class="pend__chips">
+                  <span class="pend__chip" :class="`pend__chip--${g.key}`">{{ etiquetaFecha(t, g.key) }}</span>
+                  <span v-if="t.estado === 'en_progreso'" class="pend__chip pend__chip--prog">en progreso</span>
+                  <span v-if="t.sala" class="pend__chip">{{ t.sala.nombre }}</span>
+                  <span v-if="t.lote" class="pend__chip">{{ t.lote.codigo }}</span>
+                  <span v-if="t.origen_plan_id" class="pend__chip pend__chip--plan">Plan</span>
+                </span>
+                <span v-if="t.asignada_a" class="pend__asig" :title="t.asignada_a.nombre">
+                  {{ iniciales(t.asignada_a.nombre) }}
+                </span>
+                <i class="bi bi-chevron-right pend__chev"></i>
+              </button>
+
+              <button
+                class="pend__done"
+                :disabled="enCurso.has(t.id)"
+                title="Marcar como hecha"
+                @click="completarUna(t)"
+              >
+                <i class="bi" :class="enCurso.has(t.id) ? 'bi-hourglass' : 'bi-check-lg'"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </template>
+
+    <!-- Barra de acción masiva -->
+    <Teleport to="body">
+      <div v-if="seleccion.size" class="pend__bulk">
+        <span class="pend__bulk-txt">
+          {{ seleccion.size }} {{ seleccion.size === 1 ? 'tarea seleccionada' : 'tareas seleccionadas' }}
+        </span>
+        <button class="pend__bulk-ghost" @click="limpiarSeleccion">Cancelar</button>
+        <button class="pend__bulk-primary" :disabled="bulkEnCurso" @click="completarSeleccionadas">
+          <i class="bi" :class="bulkEnCurso ? 'bi-hourglass' : 'bi-check2-all'"></i>
+          Completar
+        </button>
+      </div>
+    </Teleport>
 
     <!-- Panel detalle -->
     <Teleport to="body">
@@ -241,7 +335,7 @@ const usuarios          = ref([])
 const toast             = useToast()
 const { confirm }       = useConfirm()
 
-const { loading, dashboard, stats, hayVencidas, hoyPendientes, hoyEnProgreso, hoyCompletadas } = storeToRefs(tareasStore)
+const { loading, dashboard, stats, hayVencidas, pendientes, hoyPendientes, hoyEnProgreso, hoyCompletadas } = storeToRefs(tareasStore)
 
 const esAdmin    = computed(() => authStore.user?.role === 'admin')
 const puedeCrear = computed(() => authStore.user?.role === 'admin')
@@ -267,6 +361,11 @@ const TIPO_META = {
   trasplante: { label: 'Trasplante', emoji: '🪴' },
   inspeccion:  { label: 'Inspección', emoji: '🔍' },
   otro:        { label: 'Otro',       emoji: '📋' },
+  nutricion:       { label: 'Nutrición',       emoji: '🧪' },
+  defoliacion:     { label: 'Defoliación',     emoji: '🍂' },
+  scrog_lst:       { label: 'SCROG / LST',     emoji: '🕸️' },
+  ajuste_luz:      { label: 'Ajuste de luz',   emoji: '💡' },
+  revision_plagas: { label: 'Revisión plagas', emoji: '🐛' },
 }
 
 function estadoMeta(estado) {
@@ -281,13 +380,18 @@ function estadoMeta(estado) {
 const semana       = ref({ desde: null, hasta: null, dias: [] })
 const loadingSem   = ref(false)
 
+// ISO local de un Date (ver hoyLocal: toISOString desfasa el día por UTC)
+function isoLocal(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function lunasActual() {
   const hoy = new Date()
   const dow  = hoy.getDay()
   const diff = dow === 0 ? -6 : 1 - dow
   const d = new Date(hoy)
   d.setDate(hoy.getDate() + diff)
-  return d.toISOString().slice(0, 10)
+  return isoLocal(d)
 }
 const desdeRef = ref(lunasActual())
 
@@ -304,14 +408,14 @@ async function cargarSemana() {
 function semAnterior() {
   const d = new Date(desdeRef.value + 'T00:00:00')
   d.setDate(d.getDate() - 7)
-  desdeRef.value = d.toISOString().slice(0, 10)
+  desdeRef.value = isoLocal(d)
   cargarSemana()
 }
 
 function semSiguiente() {
   const d = new Date(desdeRef.value + 'T00:00:00')
   d.setDate(d.getDate() + 7)
-  desdeRef.value = d.toISOString().slice(0, 10)
+  desdeRef.value = isoLocal(d)
   cargarSemana()
 }
 
@@ -327,17 +431,139 @@ const labelSemana = computed(() => {
   return `${d.getDate()} — ${h.getDate()} ${h.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}`
 })
 
+// Hoy en horario LOCAL. toISOString() es UTC: en Argentina (UTC-3), pasadas las 21hs
+// devuelve el día siguiente y las tareas de hoy se veían como vencidas.
+function hoyLocal() {
+  return isoLocal(new Date())
+}
+
 function esDiaHoy(fechaStr) {
-  return fechaStr === new Date().toISOString().slice(0, 10)
+  return fechaStr === hoyLocal()
 }
 function esPasado(fechaStr) {
-  return fechaStr < new Date().toISOString().slice(0, 10)
+  return fechaStr < hoyLocal()
 }
 
 const TIPO_EMOJI = {
   riego: '💧', poda: '✂️', medicion: '📏', limpieza: '🧹',
   cosecha: '🌿', trasplante: '🪴', inspeccion: '🔍', otro: '📋',
+  nutricion: '🧪', defoliacion: '🍂', scrog_lst: '🕸️', ajuste_luz: '💡',
+  revision_plagas: '🐛',
 }
+
+// ── Pendientes (vencidas + hoy + sin fecha) ──────────────────────
+const LIMITE_PENDIENTES = 100        // igual al PENDIENTES_LIMIT del backend
+
+const pendientesEl    = ref(null)
+const flashPendientes = ref(false)
+const seleccion       = ref(new Set())
+const enCurso         = ref(new Set())   // ids completándose (individual)
+const bulkEnCurso     = ref(false)
+
+// La lista viene del backend con el scope pendientes_al_dia; al completar una tarea
+// queda con estado 'completada' en memoria → se filtra y desaparece del listado.
+const pendientesActivas = computed(() =>
+  pendientes.value.filter(t => ['pendiente', 'en_progreso'].includes(t.estado))
+)
+
+const grupos = computed(() => {
+  const hoy = hoyLocal()
+  const g = { vencidas: [], hoy: [], sin_fecha: [] }
+  for (const t of pendientesActivas.value) {
+    if (!t.fecha_programada) g.sin_fecha.push(t)
+    else if (t.fecha_programada < hoy) g.vencidas.push(t)
+    else g.hoy.push(t)
+  }
+  return [
+    { key: 'vencidas',  label: 'Vencidas',  tareas: g.vencidas },
+    { key: 'hoy',       label: 'Hoy',       tareas: g.hoy },
+    { key: 'sin_fecha', label: 'Sin fecha', tareas: g.sin_fecha },
+  ].filter(x => x.tareas.length)
+})
+
+const hayTruncadas = computed(() =>
+  pendientes.value.length >= LIMITE_PENDIENTES &&
+  (stats.value.pendientes || 0) > pendientesActivas.value.length
+)
+
+function etiquetaFecha(t, grupo) {
+  if (grupo === 'sin_fecha') return 'sin fecha'
+  if (grupo === 'hoy')       return 'hoy'
+  const dias = Math.round((new Date(hoyLocal() + 'T00:00:00') - new Date(t.fecha_programada + 'T00:00:00')) / 86400000)
+  if (dias === 1) return 'ayer'
+  return `hace ${dias} días`
+}
+
+function iniciales(nombre) {
+  return nombre.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function toggleSeleccion(id) {
+  const s = seleccion.value
+  s.has(id) ? s.delete(id) : s.add(id)
+}
+
+function grupoEntero(g)  { return g.tareas.every(t => seleccion.value.has(t.id)) }
+function grupoParcial(g) { return !grupoEntero(g) && g.tareas.some(t => seleccion.value.has(t.id)) }
+
+function toggleGrupo(g, marcar) {
+  g.tareas.forEach(t => marcar ? seleccion.value.add(t.id) : seleccion.value.delete(t.id))
+}
+
+function limpiarSeleccion() { seleccion.value.clear() }
+
+// ✓ de la fila: cierra la tarea sin pedir horas ni notas. Para registrar horas hay
+// que entrar al detalle y usar el modal de completar.
+async function completarUna(t) {
+  if (enCurso.value.has(t.id)) return
+  enCurso.value.add(t.id)
+  try {
+    await tareasStore.completar(t.id, null)
+    seleccion.value.delete(t.id)
+    toast.success('Tarea completada ✓')
+    cargarSemana()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo completar la tarea')
+  } finally {
+    enCurso.value.delete(t.id)
+  }
+}
+
+async function completarSeleccionadas() {
+  const ids = [...seleccion.value]
+  if (!ids.length) return
+  const ok = await confirm({
+    title: `¿Completar ${ids.length} ${ids.length === 1 ? 'tarea' : 'tareas'}?`,
+    message: 'Se marcan como hechas sin registrar horas ni notas.',
+    variant: 'success',
+    confirmText: 'Completar',
+  })
+  if (!ok) return
+
+  bulkEnCurso.value = true
+  try {
+    const n = await tareasStore.completarMasivo(ids)
+    limpiarSeleccion()
+    toast.success(`${n} ${n === 1 ? 'tarea completada' : 'tareas completadas'} ✓`)
+    cargarSemana()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudieron completar las tareas')
+  } finally {
+    bulkEnCurso.value = false
+  }
+}
+
+function irAPendientes() {
+  pendientesEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  flashPendientes.value = true
+  setTimeout(() => { flashPendientes.value = false }, 1200)
+}
+
+// La selección no debe sobrevivir a tareas que ya no están en el listado
+watch(pendientesActivas, (lista) => {
+  const vivos = new Set(lista.map(t => t.id))
+  seleccion.value.forEach(id => { if (!vivos.has(id)) seleccion.value.delete(id) })
+})
 
 function nuevaTareaEnDia(fecha) {
   tareaEditando.value = null
@@ -441,6 +667,62 @@ function mostrarToast(mensaje, tipo = 'success') {
 .tv__kpi-val { font-size: 1.75rem; font-weight: 900; letter-spacing: -.04em; margin-bottom: .15rem; }
 .tv__kpi-label { font-size: .7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .05em; }
 .tv__kpi-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; }
+.tv__kpi--link { font: inherit; text-align: left; cursor: pointer; color: inherit; }
+.tv__kpi--link .tv__kpi-label i { opacity: .5; }
+.tv__kpi--link:hover .tv__kpi-label i { opacity: 1; }
+
+/* Pendientes */
+.pend { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; margin-top: 1.5rem; overflow: hidden; transition: box-shadow .3s, border-color .3s; }
+.pend--flash { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+.pend__head { display: flex; align-items: center; gap: .6rem; padding: .9rem 1.15rem; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
+.pend__title { font-size: .9rem; font-weight: 700; margin: 0; }
+.pend__count { background: #e2e8f0; color: #475569; font-size: .68rem; font-weight: 700; padding: .15em .55em; border-radius: 6px; }
+.pend__trunc { font-size: .72rem; color: #94a3b8; }
+.pend__limpiar { margin-left: auto; background: none; border: none; color: #64748b; font-size: .75rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.pend__grupos { padding: .35rem .5rem .6rem; }
+.pend__grupo + .pend__grupo { margin-top: .5rem; }
+.pend__grupo-head { display: flex; align-items: center; gap: .5rem; padding: .5rem .5rem .35rem; }
+.pend__grupo-label { font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: #94a3b8; }
+.pend__grupo-label--vencidas { color: #dc2626; }
+.pend__grupo-label--hoy      { color: #2563eb; }
+.pend__grupo-count { font-size: .66rem; font-weight: 700; color: #94a3b8; }
+.pend__cb { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; flex-shrink: 0; margin: 0; }
+.pend__cb:disabled { cursor: default; opacity: .5; }
+.pend__row { display: flex; align-items: center; gap: .6rem; padding: .1rem .5rem .1rem .5rem; border-radius: 9px; border-left: 3px solid transparent; transition: background .12s; }
+.pend__row:hover { background: #f8fafc; }
+.pend__row--sel { background: #f0f7f1; }
+.pend__row--busy { opacity: .55; }
+.pend__row--urgente { border-left-color: #dc2626; }
+.pend__row--alta    { border-left-color: #f97316; }
+.pend__row--normal  { border-left-color: #3b82f6; }
+.pend__row--baja    { border-left-color: #9ca3af; }
+.pend__main { flex: 1; min-width: 0; display: flex; align-items: center; gap: .5rem; background: none; border: none; padding: .55rem .25rem; font: inherit; text-align: left; cursor: pointer; color: inherit; }
+.pend__emoji { flex-shrink: 0; font-size: .95rem; }
+.pend__titulo { font-size: .85rem; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22rem; }
+.pend__chips { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; min-width: 0; }
+.pend__chip { font-size: .68rem; font-weight: 600; color: #64748b; background: #f1f5f9; padding: .12em .5em; border-radius: 5px; white-space: nowrap; }
+.pend__chip--vencidas { background: #fef2f2; color: #dc2626; }
+.pend__chip--hoy      { background: #eff6ff; color: #2563eb; }
+.pend__chip--prog     { background: #fffbeb; color: #b45309; }
+.pend__chip--plan     { background: #7c3aed; color: #fff; }
+.pend__asig { width: 20px; height: 20px; border-radius: 50%; background: #e0e7ff; color: #4338ca; font-size: .6rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: auto; }
+.pend__chev { color: #cbd5e1; font-size: .85rem; flex-shrink: 0; }
+.pend__done { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid #d1d5db; background: #fff; color: #9ca3af; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
+.pend__done:hover:not(:disabled) { border-color: #1b5e20; background: #1b5e20; color: #fff; }
+.pend__done:disabled { cursor: default; }
+@media (max-width: 640px) {
+  .pend__chips { display: none; }
+  .pend__titulo { max-width: none; white-space: normal; }
+}
+
+/* Barra masiva */
+.pend__bulk { position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); z-index: 1035; display: flex; align-items: center; gap: .75rem; background: #0f172a; color: #fff; padding: .6rem .75rem .6rem 1.1rem; border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.25); font-size: .82rem; }
+.pend__bulk-txt { font-weight: 600; white-space: nowrap; }
+.pend__bulk-ghost { background: none; border: none; color: #94a3b8; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.pend__bulk-ghost:hover { color: #fff; }
+.pend__bulk-primary { display: inline-flex; align-items: center; gap: .4rem; background: #22c55e; color: #052e16; border: none; padding: .45rem .9rem; border-radius: 9px; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.pend__bulk-primary:hover:not(:disabled) { background: #16a34a; color: #fff; }
+.pend__bulk-primary:disabled { opacity: .6; cursor: default; }
 
 /* Loading */
 .tv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
