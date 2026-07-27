@@ -127,6 +127,23 @@ RSpec.describe Finanzas::SembrarDepositos, type: :service do
         expect(club.depositos.where(clave_sistema: 'general', sede_id: prod.id).count).to eq(1)
       end
     end
+
+    # Post-deduplicación queda un duplicado RETIRADO al lado del vivo. Si la siembra agarraba el
+    # retirado, el restore chocaba contra el índice único (dos vivos con la misma clave) → 500.
+    it 'con un duplicado ya retirado, no lo revive: se queda con el vivo' do
+      con_tenant do
+        vivo = club.depositos.find_by(clave_sistema: 'general', sede_id: prod.id)
+        retirado = club.depositos.create!(clave_sistema: nil, sede_id: prod.id, nombre: 'General',
+                                         es_sistema: true, activo: true)
+        # Simula el duplicado que dejó la deduplicación: misma clave, retirado.
+        retirado.update_column(:clave_sistema, 'general')
+        retirado.destroy!
+
+        expect { described_class.new(club).call }.not_to raise_error
+        expect(club.depositos.where(clave_sistema: 'general', sede_id: prod.id).pluck(:id)).to eq([vivo.id])
+        expect(Deposito.unscoped.find(retirado.id).deleted_at).to be_present
+      end
+    end
   end
 
   describe 'idempotencia' do

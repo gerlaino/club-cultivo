@@ -65,7 +65,7 @@ module Finanzas
       areas = @club.unidades_negocio.index_by(&:tipo)
       @club.sedes.order(:id).each do |sede|
         claves_de(sede).each_with_index do |clave, i|
-          dep = @club.depositos.with_deleted.find_or_initialize_by(clave_sistema: clave, sede_id: sede.id)
+          dep = deposito_para(clave, sede.id)
           dep.restore if dep.persisted? && dep.deleted?
           dep.nombre        = Deposito::CLAVES_SISTEMA[clave] if dep.nombre.blank?
           dep.es_sistema    = true
@@ -81,6 +81,20 @@ module Finanzas
           end
         end
       end
+    end
+
+    # El depósito de esa (clave, sede): el VIVO si existe; si no, el retirado más viejo (para
+    # revivirlo con su historia); si no, uno nuevo.
+    #
+    # El orden importa. Con `with_deleted.find_or_initialize_by` podía tocarle un duplicado
+    # retirado por la deduplicación teniendo uno vivo al lado, y el `restore` chocaba contra el
+    # índice único (dos vivos con la misma clave) → 500 en la próxima siembra. Y sin `order(:id)`,
+    # cuál de varios retirados revive queda a criterio del planner.
+    def deposito_para(clave, sede_id)
+      vivos = @club.depositos.where(clave_sistema: clave, sede_id: sede_id)
+      vivos.order(:id).first ||
+        @club.depositos.with_deleted.where(clave_sistema: clave, sede_id: sede_id).order(:id).first ||
+        @club.depositos.new(clave_sistema: clave, sede_id: sede_id)
     end
 
     # Migra los depósitos legacy (sede_id nil): reasigna sus insumos al depósito por-sede que
