@@ -24,6 +24,15 @@ const depositos  = ref([])
 // Solo admin: el backend rechaza escritura de cualquier otro rol (abogado incluido)
 const canEdit = computed(() => ["admin","super_admin"].includes(auth.role))
 
+// El modal puede crear categorías y áreas sin salir (mismo permiso que crear el movimiento).
+// Cuando lo hace refrescamos el catálogo acá, que es de donde salen los props.
+async function recargarCatalogo() {
+  await Promise.all([
+    listCategoriasContables().then(r => { categorias.value = r.data || [] }).catch(() => {}),
+    listUnidadesNegocio().then(r => { unidades.value = r.data || [] }).catch(() => {}),
+  ])
+}
+
 // Los movimientos generados por dispensaciones no se editan ni borran a mano:
 // se corrigen desde la dispensación para que libro, stock y CC queden consistentes
 const esAutomatico = (m) => !!m.dispensacion_id
@@ -978,6 +987,7 @@ onMounted(async () => {
       :error-guardado="errorGuardadoMov"
       @guardado="onMovimientoGuardado"
       @guardado-varios="onFijosGuardados"
+      @catalogo-actualizado="recargarCatalogo"
     />
 
     <EditarCompraCuotasModal

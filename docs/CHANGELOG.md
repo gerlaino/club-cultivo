@@ -1,5 +1,31 @@
 # Changelog
 
+## Julio 2026 (w) — alta de movimientos: dos columnas y catálogo editable ahí mismo
+
+Si registrabas un gasto de algo cuya categoría o área no existía, tenías que salir a Configuración,
+crearla y volver a empezar la carga. **Crear un movimiento y crear una categoría o un área piden el
+mismo permiso (admin)**, así que la app te mandaba a otra pantalla a hacer algo que ya podías hacer
+desde donde estabas: puro costo de navegación.
+
+- **El modal pasa a dos columnas (940px)**: a la izquierda **el hecho** (qué pasó, cuánto, cuándo,
+  destino del stock), a la derecha **su consecuencia contable** —categoría, sede, área, comprobante—
+  visible pero en tono secundario. Se mantiene el orden del rediseño anterior (primero el hecho), y
+  se corrige lo que estaba mal: la clasificación vivía detrás de un chevron, así que para darte
+  cuenta de que la categoría sugerida estaba equivocada había que abrir un acordeón. La pantalla de
+  intención sigue angosta: a 940px los cinco accesos quedaban desparramados.
+- **Crear categoría sin salir**: si el buscador no encuentra lo que escribiste, aparece
+  "Crear «Bebidas»" con las familias del tipo del movimiento para elegir dónde va. Queda seleccionada
+  en el acto, sin esperar el refetch del padre.
+- **Solo se crean SUBcategorías, a propósito.** Una sub hereda de su madre el área, la clave de
+  sistema y el `comportamiento` — el que decide si la compra entra al depósito, al salón o a ningún
+  inventario. Una **familia nueva define esa plomería**, y decidirla en el pie de un dropdown mientras
+  cargás un gasto es la clase de error que se descubre tarde (compras que dejan de entrar al
+  depósito). Eso sigue en Configuración.
+- **Crear área sin salir** también, con su tipo (el back lo valida como obligatorio).
+- Se borró `ComboboxCategorias.vue` (11 KB), que había quedado sin uso desde el rediseño de julio.
+- Mobile queda como fallback de una columna, sin invertir ahí: la PWA se rediseña aparte, después de
+  decidir qué módulos tiene sentido que entren y para qué roles.
+
 ## Julio 2026 (v) — las etiquetas pasan a PDF (medidas reales)
 
 Las etiquetas se imprimían desde una hoja HTML, y ahí **los milímetros son una sugerencia**: el

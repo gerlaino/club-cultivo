@@ -10,6 +10,7 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import DestinoStock from './DestinoStock.vue'
 import MovimientosFijos from './MovimientosFijos.vue'
 import { useModalEscape } from '../../composables/useModalEscape.js'
+import { createCategoriaContable, createUnidadNegocio } from '../../lib/api.js'
 import {
   FLOWS, FLOWS_ORDEN, flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto,
   destinoVacio, destinoEstado, destinoPayload, esDepositoSalon,
@@ -31,7 +32,7 @@ const props = defineProps({
   guardando:        { type: Boolean, default: false },     // lo maneja el padre: es él quien await-ea
   errorGuardado:    { type: String, default: '' },
 })
-const emit = defineEmits(['update:modelValue', 'guardado', 'guardado-varios'])
+const emit = defineEmits(['update:modelValue', 'guardado', 'guardado-varios', 'catalogo-actualizado'])
 
 const MEDIOS_PAGO = [
   { value: 'efectivo',      label: 'Efectivo' },
@@ -52,8 +53,6 @@ const flujo   = ref(null)          // objeto de FLOWS
 const destino = ref(destinoVacio())
 const montoTexto = ref('')
 const errores = ref({})
-const verAsiento  = ref(false)     // categoría + sede + unidad (colapsado: es consecuencia)
-const verExtras   = ref(false)     // comprobante, proveedor, notas
 const fijosRef = ref(null)
 
 function formVacio(tipo = 'egreso') {
@@ -99,6 +98,9 @@ const catsSelectables = computed(() => {
                  area: m.unidad_negocio?.id || null })
     }
   }
+  // Las creadas recién, acá adentro: viven en local hasta que el padre refresque el catálogo, así
+  // la que acabás de crear se puede elegir en el acto sin esperar el refetch.
+  for (const n of catsNuevas.value) if (!out.some(c => c.id === n.id)) out.push(n)
   return out
 })
 const catsDelTipo = computed(() => catsSelectables.value.filter(c => c.tipo === form.value.tipo))
@@ -112,12 +114,79 @@ const catsFiltradas = computed(() => {
   const q = catQuery.value.trim().toLowerCase()
   return q ? catsDelTipo.value.filter(c => c.label.toLowerCase().includes(q)) : catsDelTipo.value
 })
-function abrirCat()  { catOpen.value = true; catQuery.value = ''; nextTick(() => catInput.value?.focus()) }
+function abrirCat()  { catOpen.value = true; catQuery.value = ''; crearCat.value = null; nextTick(() => catInput.value?.focus()) }
 function elegirCat(c) {
   form.value.categoria_contable_id = c.id
   if (!['aporte_socio', 'dispensacion'].includes(c.clave)) form.value.paciente_id = null
   catOpen.value = false
   delete errores.value.categoria
+}
+
+// ─── Crear categoría y área sin salir del modal ──────────────────────────────────
+// Crear un movimiento y crear una categoría o un área piden el MISMO permiso (admin), así que
+// mandar a Configuración a mitad de carga era puro costo de navegación.
+//
+// Solo se crean SUBcategorías, a propósito: una sub hereda de su madre el área, la clave de sistema
+// y el `comportamiento` —el que decide si la compra entra al depósito, al salón o a ningún
+// inventario—. Una familia nueva DEFINE esa plomería, y decidirla en el pie de un dropdown mientras
+// cargás un gasto es la clase de error que se descubre tarde: eso sigue en Configuración.
+const catsNuevas  = ref([])
+const areasNuevas = ref([])
+const crearCat    = ref(null)   // { nombre, parent_id } mientras se está creando
+const crearArea   = ref(null)   // { nombre, tipo }
+const creando     = ref(false)
+const errorCrear  = ref('')
+
+const AREA_TIPOS = ['cultivo', 'dispensario', 'bar', 'social', 'administracion', 'general']
+const madresDelTipo = computed(() => props.categorias.filter(m => m.tipo === form.value.tipo))
+
+function abrirCrearCat() {
+  errorCrear.value = ''
+  crearCat.value = { nombre: catQuery.value.trim(), parent_id: madresDelTipo.value[0]?.id ?? null }
+}
+async function confirmarCrearCat() {
+  const f = crearCat.value
+  if (!f?.nombre?.trim() || !f.parent_id) { errorCrear.value = 'Poné un nombre y elegí dónde va'; return }
+  creando.value = true; errorCrear.value = ''
+  try {
+    const { data } = await createCategoriaContable({
+      nombre: f.nombre.trim(), tipo: form.value.tipo, parent_id: f.parent_id,
+    })
+    const madre = madresDelTipo.value.find(m => m.id === f.parent_id)
+    catsNuevas.value.push({
+      id: data.id,
+      label: `${madre?.nombre || '—'} › ${data.nombre}`,
+      tipo: data.tipo,
+      clave: data.clave_efectiva,
+      area: data.unidad_negocio?.id || madre?.unidad_negocio?.id || null,
+    })
+    crearCat.value = null
+    elegirCat(catsSelectables.value.find(c => c.id === data.id))
+    emit('catalogo-actualizado')
+  } catch (e) {
+    errorCrear.value = e?.response?.data?.errors?.join(', ') || 'No se pudo crear la categoría'
+  } finally { creando.value = false }
+}
+
+const areasDisponibles = computed(() => {
+  const out = [...props.unidades]
+  for (const n of areasNuevas.value) if (!out.some(u => u.id === n.id)) out.push(n)
+  return out
+})
+function abrirCrearArea() { errorCrear.value = ''; crearArea.value = { nombre: '', tipo: 'general' } }
+async function confirmarCrearArea() {
+  const f = crearArea.value
+  if (!f?.nombre?.trim()) { errorCrear.value = 'Poné un nombre'; return }
+  creando.value = true; errorCrear.value = ''
+  try {
+    const { data } = await createUnidadNegocio({ nombre: f.nombre.trim(), tipo: f.tipo })
+    areasNuevas.value.push({ id: data.id, nombre: data.nombre, tipo: data.tipo })
+    form.value.unidad_negocio_id = data.id
+    crearArea.value = null
+    emit('catalogo-actualizado')
+  } catch (e) {
+    errorCrear.value = e?.response?.data?.errors?.join(', ') || 'No se pudo crear el área'
+  } finally { creando.value = false }
 }
 
 // El paciente aparece cuando la categoría lo pide, o cuando el flujo es un aporte.
@@ -175,8 +244,7 @@ function elegirFlujo(key) {
   montoTexto.value = ''
   destino.value = destinoVacio()
   errores.value = {}
-  verAsiento.value = false
-  verExtras.value  = false
+  crearCat.value = null; crearArea.value = null; errorCrear.value = ''
 
   // Categoría sugerida por el flujo (el aporte de socio tiene clave propia).
   if (f.clavePreferida) {
@@ -229,6 +297,8 @@ function cargarFijos(items) {
 watch(() => props.modelValue, (abierto) => {
   if (!abierto) return
   errores.value = {}
+  catsNuevas.value = []; areasNuevas.value = []
+  crearCat.value = null; crearArea.value = null; errorCrear.value = ''
 
   if (props.movimientoEditar) {
     const m = props.movimientoEditar
@@ -250,8 +320,6 @@ watch(() => props.modelValue, (abierto) => {
       notas:       m.notas || '',
     }
     montoTexto.value = fmtMiles(m.monto_ars)
-    verAsiento.value = true   // al editar, el asiento SÍ es lo que se viene a tocar
-    verExtras.value  = !!(m.comprobante_numero || m.proveedor || m.notas)
     paso.value = 'form'
     return
   }
@@ -292,7 +360,7 @@ const titulo = computed(() => {
     <Transition name="mv-fade">
       <div v-if="modelValue" class="mv-ov">
         <div class="mv-dlg" role="dialog" aria-modal="true" aria-labelledby="mv-title"
-             :class="{ 'mv-dlg--out': esEgreso, 'mv-dlg--in': !esEgreso }">
+             :class="{ 'mv-dlg--out': esEgreso, 'mv-dlg--in': !esEgreso, 'mv-dlg--wide': paso === 'form' }">
 
           <!-- Header -->
           <header class="mv-hdr">
@@ -328,8 +396,12 @@ const titulo = computed(() => {
             <MovimientosFijos ref="fijosRef" @cargar="cargarFijos" @volver="volver" />
           </div>
 
-          <!-- ③ Form del flujo -->
-          <div v-else class="mv-body">
+          <!-- ③ Form del flujo. Dos columnas: a la izquierda EL HECHO (lo que pasó), a la derecha
+               su CONSECUENCIA contable —visible pero en tono secundario—. Antes la clasificación
+               vivía detrás de un chevron y para darte cuenta de que la categoría sugerida estaba
+               mal tenías que abrir un acordeón. -->
+          <div v-else class="mv-body mv-body--split">
+            <div class="mv-col mv-col--hecho">
 
             <!-- Qué / cuánto: la línea principal -->
             <div class="mv-main">
@@ -447,89 +519,126 @@ const titulo = computed(() => {
               </div>
             </div>
 
-            <!-- El asiento: consecuencia del hecho, no la puerta de entrada -->
-            <div class="mv-acc">
-              <button type="button" class="mv-acc-hdr" @click="verAsiento = !verAsiento" :aria-expanded="verAsiento">
-                <i class="bi" :class="verAsiento ? 'bi-chevron-down' : 'bi-chevron-right'"></i>
-                <span class="mv-acc-tit">Clasificación contable</span>
-                <span class="mv-acc-sum" :class="{ 'mv-acc-sum--err': errores.categoria }">
-                  {{ catActual?.label || 'elegir categoría' }}<template v-if="sedeNombre"> · {{ sedeNombre }}</template>
-                </span>
-              </button>
-              <div v-if="verAsiento" class="mv-acc-body">
-                <div class="mv-fld mv-combo-wrap">
-                  <span class="mv-lbl">Categoría <span class="mv-req">*</span></span>
-                  <button type="button" class="mv-combo" :class="{ 'mv-combo--err': errores.categoria }"
-                          @click="catOpen ? catOpen = false : abrirCat()">
-                    <span v-if="catActual" class="mv-combo-val">{{ catActual.label }}</span>
-                    <span v-else class="mv-combo-ph">Elegí una categoría</span>
-                    <i class="bi bi-chevron-down"></i>
-                  </button>
-                  <div v-if="catOpen" class="mv-drop">
-                    <input ref="catInput" v-model="catQuery" type="text" class="mv-drop-inp"
-                           placeholder="Buscar…" autocomplete="off" />
-                    <div class="mv-drop-list">
-                      <button v-for="c in catsFiltradas" :key="c.id" type="button" class="mv-drop-opt"
-                              :class="{ 'mv-drop-opt--on': form.categoria_contable_id === c.id }"
-                              @click="elegirCat(c)">{{ c.label }}</button>
-                      <p v-if="!catsFiltradas.length" class="mv-drop-empty">Sin resultados</p>
+            </div><!-- /mv-col--hecho -->
+
+            <!-- Columna derecha: la consecuencia del hecho -->
+            <aside class="mv-col mv-col--asiento">
+              <p class="mv-rail-tit">Se registra así</p>
+
+              <div class="mv-fld mv-combo-wrap">
+                <span class="mv-lbl">Categoría <span class="mv-req">*</span></span>
+                <button type="button" class="mv-combo" :class="{ 'mv-combo--err': errores.categoria }"
+                        @click="catOpen ? catOpen = false : abrirCat()">
+                  <span v-if="catActual" class="mv-combo-val">{{ catActual.label }}</span>
+                  <span v-else class="mv-combo-ph">Elegí una categoría</span>
+                  <i class="bi bi-chevron-down"></i>
+                </button>
+                <div v-if="catOpen" class="mv-drop">
+                  <input ref="catInput" v-model="catQuery" type="text" class="mv-drop-inp"
+                         placeholder="Buscar…" autocomplete="off" />
+                  <div class="mv-drop-list">
+                    <button v-for="c in catsFiltradas" :key="c.id" type="button" class="mv-drop-opt"
+                            :class="{ 'mv-drop-opt--on': form.categoria_contable_id === c.id }"
+                            @click="elegirCat(c)">{{ c.label }}</button>
+                    <p v-if="!catsFiltradas.length" class="mv-drop-empty">Sin resultados</p>
+                  </div>
+
+                  <!-- Crear sin salir. Solo subcategorías: heredan de la madre el área, la clave y
+                       el comportamiento (si la compra entra al depósito o al salón). -->
+                  <div v-if="!crearCat" class="mv-drop-foot">
+                    <button type="button" class="mv-drop-new" :disabled="!madresDelTipo.length" @click="abrirCrearCat">
+                      <i class="bi bi-plus-lg"></i>
+                      <span v-if="catQuery.trim()">Crear «{{ catQuery.trim() }}»</span>
+                      <span v-else>Crear una categoría</span>
+                    </button>
+                  </div>
+                  <div v-else class="mv-newbox">
+                    <label class="mv-fld">
+                      <span class="mv-lbl">Nombre</span>
+                      <input v-model.trim="crearCat.nombre" type="text" class="mv-inp" placeholder="Ej: Bebidas" />
+                    </label>
+                    <label class="mv-fld">
+                      <span class="mv-lbl">¿Dentro de cuál?</span>
+                      <select class="mv-inp" v-model.number="crearCat.parent_id">
+                        <option v-for="m in madresDelTipo" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+                      </select>
+                    </label>
+                    <p class="mv-newbox-hint">Hereda el área y el destino de stock de la que elijas.</p>
+                    <p v-if="errorCrear" class="mv-err">{{ errorCrear }}</p>
+                    <div class="mv-newbox-acts">
+                      <button type="button" class="mv-btn-ghost mv-btn-ghost--sm" @click="crearCat = null">Cancelar</button>
+                      <button type="button" class="mv-btn mv-btn--sm" :disabled="creando" @click="confirmarCrearCat">
+                        {{ creando ? 'Creando…' : 'Crear y usar' }}
+                      </button>
                     </div>
                   </div>
-                  <span v-if="errores.categoria" class="mv-err">{{ errores.categoria }}</span>
                 </div>
+                <span v-if="errores.categoria" class="mv-err">{{ errores.categoria }}</span>
+              </div>
 
-                <div class="mv-row">
-                  <label v-if="multiSede" class="mv-fld mv-fld--grow">
-                    <span class="mv-lbl">
-                      Sede
-                      <span v-if="depositoSel?.sede_id" class="mv-opt">(la fija el depósito)</span>
-                    </span>
-                    <select class="mv-inp" v-model="form.sede_id" :disabled="!!depositoSel?.sede_id">
-                      <option :value="null">— Sin sede —</option>
-                      <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              <label v-if="multiSede" class="mv-fld">
+                <span class="mv-lbl">
+                  Sede <span v-if="depositoSel?.sede_id" class="mv-opt">(la fija el depósito)</span>
+                </span>
+                <select class="mv-inp" v-model="form.sede_id" :disabled="!!depositoSel?.sede_id">
+                  <option :value="null">— Sin sede —</option>
+                  <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                </select>
+              </label>
+
+              <div class="mv-fld">
+                <span class="mv-lbl">Área <span class="mv-opt">(opcional)</span></span>
+                <select v-if="!crearArea" class="mv-inp" v-model="form.unidad_negocio_id">
+                  <option :value="null">— Sin área —</option>
+                  <option v-for="u in areasDisponibles" :key="u.id" :value="u.id">{{ u.nombre }}</option>
+                </select>
+                <button v-if="!crearArea" type="button" class="mv-inline-new" @click="abrirCrearArea">
+                  <i class="bi bi-plus-lg"></i> Crear un área
+                </button>
+                <div v-else class="mv-newbox mv-newbox--flat">
+                  <label class="mv-fld">
+                    <span class="mv-lbl">Nombre</span>
+                    <input v-model.trim="crearArea.nombre" type="text" class="mv-inp" placeholder="Ej: Eventos" />
+                  </label>
+                  <label class="mv-fld">
+                    <span class="mv-lbl">Tipo</span>
+                    <select class="mv-inp" v-model="crearArea.tipo">
+                      <option v-for="t in AREA_TIPOS" :key="t" :value="t">{{ t }}</option>
                     </select>
                   </label>
-                  <label v-if="unidades.length" class="mv-fld mv-fld--grow">
-                    <span class="mv-lbl">Área <span class="mv-opt">(opcional)</span></span>
-                    <select class="mv-inp" v-model="form.unidad_negocio_id">
-                      <option :value="null">— Sin área —</option>
-                      <option v-for="u in unidades" :key="u.id" :value="u.id">{{ u.nombre }}</option>
-                    </select>
-                  </label>
+                  <p v-if="errorCrear" class="mv-err">{{ errorCrear }}</p>
+                  <div class="mv-newbox-acts">
+                    <button type="button" class="mv-btn-ghost mv-btn-ghost--sm" @click="crearArea = null">Cancelar</button>
+                    <button type="button" class="mv-btn mv-btn--sm" :disabled="creando" @click="confirmarCrearArea">
+                      {{ creando ? 'Creando…' : 'Crear y usar' }}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Comprobante y extras -->
-            <div class="mv-acc">
-              <button type="button" class="mv-acc-hdr" @click="verExtras = !verExtras" :aria-expanded="verExtras">
-                <i class="bi" :class="verExtras ? 'bi-chevron-down' : 'bi-chevron-right'"></i>
-                <span class="mv-acc-tit">Comprobante y notas</span>
-                <span class="mv-acc-sum">{{ form.proveedor || 'opcional' }}</span>
-              </button>
-              <div v-if="verExtras" class="mv-acc-body">
-                <div class="mv-row">
-                  <label class="mv-fld mv-fld--grow">
-                    <span class="mv-lbl">Proveedor / origen</span>
-                    <input type="text" class="mv-inp" v-model.trim="form.proveedor" placeholder="Edenor, farmacia…" />
-                  </label>
-                  <label class="mv-fld mv-fld--sm2">
-                    <span class="mv-lbl">Comprobante</span>
-                    <select class="mv-inp" v-model="form.comprobante_tipo">
-                      <option v-for="c in COMPROBANTE_TIPOS" :key="c.value" :value="c.value">{{ c.label }}</option>
-                    </select>
-                  </label>
-                  <label class="mv-fld mv-fld--sm2">
-                    <span class="mv-lbl">N°</span>
-                    <input type="text" class="mv-inp" v-model.trim="form.comprobante_numero" placeholder="0001-00001234" />
-                  </label>
-                </div>
-                <label class="mv-fld">
-                  <span class="mv-lbl">Notas</span>
-                  <textarea class="mv-inp mv-ta" v-model.trim="form.notas" rows="2" placeholder="Notas internas…"></textarea>
+              <hr class="mv-rail-sep" />
+
+              <label class="mv-fld">
+                <span class="mv-lbl">Proveedor / origen</span>
+                <input type="text" class="mv-inp" v-model.trim="form.proveedor" placeholder="Edenor, farmacia…" />
+              </label>
+              <div class="mv-row">
+                <label class="mv-fld mv-fld--grow">
+                  <span class="mv-lbl">Comprobante</span>
+                  <select class="mv-inp" v-model="form.comprobante_tipo">
+                    <option v-for="c in COMPROBANTE_TIPOS" :key="c.value" :value="c.value">{{ c.label }}</option>
+                  </select>
+                </label>
+                <label class="mv-fld mv-fld--sm2">
+                  <span class="mv-lbl">N°</span>
+                  <input type="text" class="mv-inp" v-model.trim="form.comprobante_numero" placeholder="0001-00001234" />
                 </label>
               </div>
-            </div>
+              <label class="mv-fld">
+                <span class="mv-lbl">Notas</span>
+                <textarea class="mv-inp mv-ta" v-model.trim="form.notas" rows="2" placeholder="Notas internas…"></textarea>
+              </label>
+            </aside>
           </div>
 
           <!-- Footer -->
@@ -569,6 +678,9 @@ const titulo = computed(() => {
 }
 .mv-dlg--out { --acc: var(--c-rust-600); }
 .mv-dlg--in  { --acc: var(--c-leaf-600); }
+/* Solo el formulario necesita las dos columnas: la pantalla de intención (5 accesos) a 940px
+   quedaría desparramada. */
+.mv-dlg--wide { width: 940px; }
 
 /* Header */
 .mv-hdr {
@@ -592,6 +704,24 @@ const titulo = computed(() => {
 
 /* Body */
 .mv-body { flex: 1; overflow-y: auto; padding: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-4); }
+
+/* Dos columnas: el hecho y su consecuencia contable, las dos a la vista. */
+.mv-body--split {
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 0; padding: 0; align-items: start;
+}
+.mv-col { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.mv-col--hecho { padding: var(--sp-5); }
+.mv-col--asiento {
+  padding: var(--sp-5); gap: var(--sp-3);
+  border-left: 1px solid var(--c-ink-100); background: var(--c-ink-50, #f8fafc);
+  align-self: stretch;
+}
+.mv-rail-tit {
+  margin: 0; font-size: var(--fs-12); font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--c-ink-500);
+}
+.mv-rail-sep { border: none; border-top: 1px solid var(--c-ink-100); margin: var(--sp-2) 0 0; }
 
 /* ① Intención */
 .mv-ask { margin: 0; font-size: var(--fs-18); font-weight: 600; color: var(--c-ink-900); font-family: var(--font-display); }
@@ -691,20 +821,28 @@ const titulo = computed(() => {
 .mv-drop-opt--on { background: var(--c-leaf-100); color: var(--c-leaf-900); font-weight: 600; }
 .mv-drop-empty { margin: 0; padding: 12px; font-size: var(--fs-13); color: var(--c-ink-500); text-align: center; }
 
-/* Acordeones */
-.mv-acc { border-top: 1px solid var(--c-ink-100); padding-top: var(--sp-3); }
-.mv-acc-hdr {
-  display: flex; align-items: center; gap: var(--sp-2); width: 100%;
-  background: none; border: none; padding: 2px 0; cursor: pointer; color: var(--c-ink-700);
+/* Crear categoría / área sin salir del modal */
+.mv-drop-foot { border-top: 1px solid var(--c-ink-100); }
+.mv-drop-new {
+  display: flex; align-items: center; gap: 6px; width: 100%; padding: 10px 12px;
+  border: none; background: none; text-align: left; cursor: pointer;
+  font-size: var(--fs-13); font-weight: 600; color: var(--c-leaf-700);
 }
-.mv-acc-hdr i { font-size: var(--fs-12); color: var(--c-ink-500); }
-.mv-acc-tit { font-size: var(--fs-13); font-weight: 600; }
-.mv-acc-sum {
-  margin-left: auto; font-size: var(--fs-12); color: var(--c-ink-500);
-  max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.mv-drop-new:hover:not(:disabled) { background: var(--c-leaf-50); }
+.mv-drop-new:disabled { color: var(--c-ink-300); cursor: default; }
+.mv-newbox {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-3); border-top: 1px solid var(--c-ink-100); background: var(--c-leaf-50);
 }
-.mv-acc-sum--err { color: var(--c-rust-600); font-weight: 600; }
-.mv-acc-body { display: flex; flex-direction: column; gap: var(--sp-3); padding-top: var(--sp-3); }
+.mv-newbox--flat { border-top: none; border-radius: var(--r-md); margin-top: 4px; }
+.mv-newbox-hint { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); line-height: var(--lh-base); }
+.mv-newbox-acts { display: flex; gap: var(--sp-2); justify-content: flex-end; align-items: center; }
+.mv-inline-new {
+  align-self: flex-start; margin-top: 4px; padding: 2px 0;
+  background: none; border: none; cursor: pointer;
+  font-size: var(--fs-12); font-weight: 600; color: var(--c-leaf-700);
+}
+.mv-inline-new:hover { text-decoration: underline; }
 
 .mv-hint { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); line-height: var(--lh-base); }
 .mv-hint--full { flex: 1 1 100%; }
@@ -729,7 +867,18 @@ const titulo = computed(() => {
 }
 .mv-btn:hover:not(:disabled) { background: var(--c-leaf-900); }
 .mv-btn:disabled { background: var(--c-ink-300); cursor: default; }
+.mv-btn--sm { height: 32px; padding: 0 14px; font-size: var(--fs-13); }
+.mv-btn-ghost--sm { margin-left: 0; font-size: var(--fs-13); padding: 6px 4px; }
 
+/* Mobile: el modal vuelve a una columna. Es un fallback para que no se rompa, no un diseño —
+   la PWA se rediseña aparte y hay tareas (como cargar contabilidad) que no se hacen del celular. */
+@media (max-width: 900px) {
+  .mv-body--split { grid-template-columns: 1fr; }
+  .mv-col--asiento {
+    border-left: none; border-top: 1px solid var(--c-ink-100);
+    background: none; padding: var(--sp-4) 0 0;
+  }
+}
 @media (max-width: 620px) {
   .mv-ov { padding: 0; }
   .mv-dlg { width: 100%; max-height: 100vh; height: 100%; border-radius: 0; }
