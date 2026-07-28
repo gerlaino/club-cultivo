@@ -1,5 +1,34 @@
 # Changelog
 
+## Julio 2026 (v) — las etiquetas pasan a PDF (medidas reales)
+
+Las etiquetas se imprimían desde una hoja HTML, y ahí **los milímetros son una sugerencia**: el
+diálogo de Chrome aplica su "ajustar a la página" y encoge todo un 3-5%. Con planchas autoadhesivas
+eso arruina el calce, y el tamaño cambiaba de máquina en máquina. Ahora se genera un **PDF** con la
+geometría clavada.
+
+- **`lib/pdfEtiquetas.js` reemplaza a `etiquetaLote.js` + `etiquetaPlanta.js`** (y deja sin uso a
+  `logoEmbed.js`, borrado). Sigue siendo **fuente única**: la misma pieza dibuja la etiqueta suelta
+  de `LoteDetailView` / `PlantaDetailView` y la tanda de `/lotes`, `/plantas` y las plantas de un lote.
+- **Se dibuja con primitivas de jsPDF, no rasterizando el HTML** (html2pdf/html2canvas): el texto
+  queda vectorial, el archivo pesa una fracción y con 800 etiquetas html2canvas se arrastra. jsPDF
+  entra por `import()` dinámico, así que es un chunk aparte y no pesa en las demás rutas.
+- **Etiqueta de lote 93×60mm** — A4 **apaisada**, 3 por fila, 9 por página. En vertical solo entran 2,
+  y achicarla para meter 3 deja el nombre de la genética ilegible, que es justo lo que hay que poder
+  leer en el pasillo. **Banderita de planta 160×26mm** — dos mitades idénticas con línea de plegado
+  punteada al medio (se pliega sobre el tronco y se lee de los dos lados), 10 por página en vertical.
+- **Sin emoji en el PDF**: las fuentes estándar (helvetica/courier) no los traen y salen como basura
+  impresa; el 🌿 se reemplazó por tipografía. Acentos y ñ sí funcionan (WinAnsi). Hay un test que
+  falla si alguien vuelve a colar un emoji.
+- La etiqueta suelta ahora **descarga un PDF del tamaño exacto** (93×60 / 160×26mm) en vez de abrir
+  una ventana de impresión; el botón se deshabilita y dice "Generando…" mientras trabaja.
+- Al terminar la tanda **se limpia la selección** (y con ella la barra): el trabajo ya está hecho.
+
+`useEtiquetasQR` conserva lo de la (u) —ventana abierta antes del await por el bloqueador de popups,
+`BloqueoProgreso` mientras genera— y ahora recibe `layout` + `dibujar` + `datosDe` en vez de `htmlDe`
++ `css`. Tests: `pdfEtiquetas.test.js` cubre grilla por página, contenido, recorte a 2 líneas de la
+genética, doble faz de la banderita y el desplazamiento de celda.
+
 ## Julio 2026 (u) — etiquetas QR en tanda
 
 Etiquetar los lotes recién creados obligaba a entrar a cada uno y disparar una impresión por lote.

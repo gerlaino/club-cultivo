@@ -2,8 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
-import { logoDataUrl } from '../lib/logoEmbed.js'
-import { banderitaHTML, banderitaCSS } from '../lib/etiquetaPlanta.js'
+import { LAYOUT_PLANTA, dibujarBanderitaPlanta } from '../lib/pdfEtiquetas.js'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
@@ -71,29 +70,36 @@ async function generarQR() {
 async function descargarQRpng() { await downloadPNG(qrPlantaUrl(), qrFilename('png')) }
 async function descargarQRsvg() { await downloadSVG(qrPlantaUrl(), qrFilename('svg')) }
 
-// Banderita plegable (doble faz) de 140×25mm — se pliega en el medio sobre el tronco.
-function _fechaEt(d) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : null }
+// Banderita plegable (doble faz) — se pliega en el medio sobre el tronco.
+// Se dibuja en lib/pdfEtiquetas.js: misma pieza que la impresión en tanda. PDF del
+// tamaño exacto de la tira (160×26mm), así el plegado cae donde tiene que caer — en HTML el diálogo
+// de impresión le aplicaba su "ajustar a la página".
+const generandoEtiqueta = ref(false)
 async function imprimirEtiqueta() {
   const p = planta.value
-  if (!p?.codigo_qr) return
-  if (!club.data) { try { await club.fetch() } catch { /* club opcional en la etiqueta */ } }
-  const qrDataUrl = await generatePNG(qrPlantaUrl(), { width: 220, margin: 2, color: { dark: '#1b5e20', light: '#ffffff' } })
-  const etiqueta = banderitaHTML({
-    qrDataUrl,
-    nombre:    p.nombre || p.codigo_qr,
-    genetica:  p.genetica?.nombre,
-    lote:      p.lote?.codigo,
-    inicio:    _fechaEt(p.lote?.start_date),
-    clubName:  club.name,
-    clubLogo:  await logoDataUrl(club.logoUrl),
-  })
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Etiqueta ${p.codigo_qr}</title>
-<style>@page{size:160mm 26mm;margin:0} body{font-family:-apple-system,sans-serif} ${banderitaCSS}</style>
-</head><body>${etiqueta}</body></html>`
-  const win = window.open('', '_blank', 'width=800,height=400')
-  if (!win) { toast.error('Permitir ventanas emergentes para imprimir'); return }
-  win.document.write(html); win.document.close()
-  setTimeout(() => win.print(), 700)
+  if (!p?.codigo_qr || generandoEtiqueta.value) return
+  generandoEtiqueta.value = true
+  try {
+    if (!club.data) { try { await club.fetch() } catch { /* el club es opcional en la etiqueta */ } }
+    const { jsPDF } = await import('jspdf')
+    const qr = await generatePNG(qrPlantaUrl(), {
+      width: LAYOUT_PLANTA.qrPx, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' },
+    })
+    const doc = new jsPDF({ unit: 'mm', format: [LAYOUT_PLANTA.ancho, LAYOUT_PLANTA.alto], orientation: 'landscape' })
+    dibujarBanderitaPlanta(doc, 0, 0, {
+      qrDataUrl: qr,
+      nombre:    p.nombre || p.codigo_qr,
+      genetica:  p.genetica?.nombre,
+      lote:      p.lote?.codigo,
+      inicio:    p.lote?.start_date,
+      clubName:  club.name,
+    })
+    doc.save(`etiqueta-${p.nombre || p.codigo_qr}.pdf`)
+  } catch {
+    toast.error('No se pudo generar la etiqueta')
+  } finally {
+    generandoEtiqueta.value = false
+  }
 }
 
 // Modal registro
@@ -926,8 +932,10 @@ onMounted(async () => {
                     <i class="bi bi-file-earmark-image"></i> PNG (digital)
                   </button>
                   <div class="pd__qr-dd-sep"></div>
-                  <button class="pd__qr-dd-item" @click="imprimirEtiqueta(); qrDropdownOpen = false">
-                    <i class="bi bi-printer"></i> Imprimir banderita
+                  <button class="pd__qr-dd-item" :disabled="generandoEtiqueta"
+                          @click="imprimirEtiqueta(); qrDropdownOpen = false">
+                    <i class="bi" :class="generandoEtiqueta ? 'bi-hourglass' : 'bi-printer'"></i>
+                    {{ generandoEtiqueta ? 'Generando…' : 'Banderita PDF' }}
                   </button>
                 </div>
               </div>

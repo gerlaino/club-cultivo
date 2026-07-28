@@ -276,8 +276,7 @@ import { useEtiquetasQR } from '../../composables/useEtiquetasQR.js'
 import BloqueoProgreso from '../ui/BloqueoProgreso.vue'
 import { useToast } from '../../composables/useToast.js'
 import { pm, em, STATE_MAP } from '../../lib/loteHelpers.js'
-import { logoDataUrl } from '../../lib/logoEmbed.js'
-import { banderitaHTML, banderitaCSS } from '../../lib/etiquetaPlanta.js'
+import { LAYOUT_PLANTA, dibujarBanderitaPlanta } from '../../lib/pdfEtiquetas.js'
 import EmptyState from '../ui/EmptyState.vue'
 import Paginator  from '../ui/Paginator.vue'
 import DsSpinner  from '../../design-system/components/Spinner.vue'
@@ -392,34 +391,24 @@ async function guardarPlanta() {
 
 const etiquetas = useEtiquetasQR()
 
-function _fechaCorta(d) {
-  if (!d) return null
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d))
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : null
-}
-
 // Imprimir/descargar las etiquetas de TODAS las plantas del lote. Usa el mismo composable que la
 // impresión en tanda desde /plantas: abre la ventana antes de generar (si no, el bloqueador de
 // popups la mataba) y tapa la pantalla con progreso mientras trabaja.
-async function configEtiquetas() {
-  const clubLogo = await logoDataUrl(clubStore.data?.logo_url)
+function configEtiquetas() {
   const clubName = clubStore.data?.name || ''
   const loteCode = props.lote?.codigo || 'lote'
   const genetica = props.lote?.genetica?.nombre || props.lote?.strain || '—'
-  const inicio   = _fechaCorta(props.lote?.start_date)
+  const inicio   = props.lote?.start_date
 
   return {
-    items:  plantList.value.filter(p => p.codigo_qr),
-    urlDe:  (p) => `${window.location.origin}/p/${p.codigo_qr}`,
-    htmlDe: (p, qr) => banderitaHTML({
+    items:   plantList.value.filter(p => p.codigo_qr),
+    urlDe:   (p) => `${window.location.origin}/p/${p.codigo_qr}`,
+    layout:  LAYOUT_PLANTA,
+    dibujar: dibujarBanderitaPlanta,
+    datosDe: (p, qr) => ({
       qrDataUrl: qr, nombre: p.nombre || p.codigo_qr, genetica,
-      lote: loteCode, inicio, clubName, clubLogo,
+      lote: loteCode, inicio, clubName,
     }),
-    css: `@page { size: A4; margin: 8mm; }
-          body { font-family: -apple-system, sans-serif; background: #fff; }
-          .hoja { display: flex; flex-direction: column; gap: 3mm; align-items: center; }
-          ${banderitaCSS}`,
-    nombre:  `Etiquetas — ${loteCode}`,
     archivo: `etiquetas-${loteCode}`,
   }
 }
@@ -429,7 +418,7 @@ async function imprimirEtiquetas() {
   const r = await etiquetas.imprimir(configEtiquetas)
   if (r.vacio) toast.warning('Ninguna planta del lote tiene código QR')
   else if (!r.ok && r.error) toast.error('Error al generar etiquetas')
-  else if (r.viaDescarga) toast.warning('El navegador bloqueó la ventana: se descargó el archivo')
+  else if (r.viaDescarga) toast.warning('El navegador bloqueó la ventana: se descargó el PDF')
 }
 
 async function descargarEtiquetas() {
@@ -437,6 +426,7 @@ async function descargarEtiquetas() {
   const r = await etiquetas.descargar(configEtiquetas)
   if (r.vacio) toast.warning('Ninguna planta del lote tiene código QR')
   else if (!r.ok && r.error) toast.error('Error al generar etiquetas')
+  else if (r.ok) toast.success('PDF descargado')
 }
 
 defineExpose({ closeAddPlanta: () => { showAddPlanta.value = false } })

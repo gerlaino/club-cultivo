@@ -12,8 +12,7 @@ import { useSeleccion } from '../composables/useSeleccion.js'
 import { useEtiquetasQR } from '../composables/useEtiquetasQR.js'
 import { useClubStore } from '../stores/club.js'
 import { useToast } from '../composables/useToast.js'
-import { banderitaHTML, banderitaCSS } from '../lib/etiquetaPlanta.js'
-import { logoDataUrl } from '../lib/logoEmbed.js'
+import { LAYOUT_PLANTA, dibujarBanderitaPlanta } from '../lib/pdfEtiquetas.js'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -112,7 +111,7 @@ const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / 
 watch(filtered, () => { page.value = 1 })
 
 // ---------- Etiquetas QR en tanda ----------
-// La misma banderita plegable que imprime el lote (lib/etiquetaPlanta.js): la etiqueta no cambia
+// La misma banderita plegable que imprime el lote (lib/pdfEtiquetas.js): la etiqueta no cambia
 // según de dónde la imprimís. "Seleccionar todo" toma todo lo FILTRADO: filtrás esqueje y salen
 // solo los esquejes, aunque la tabla muestre 10 por página.
 const sel = useSeleccion(computed(() => plants.value), filtered)
@@ -122,31 +121,22 @@ const seleccionSinQR = computed(() => sel.seleccionados.value.filter(p => !p.cod
 
 async function configEtiquetas() {
   if (!club.data) { try { await club.fetch() } catch { /* el club es opcional en la etiqueta */ } }
-  const clubLogo = await logoDataUrl(club.logoUrl)
   const clubName = club.name || ''
   return {
-    items:  sel.seleccionados.value.filter(p => p.codigo_qr),
-    urlDe:  (p) => `${window.location.origin}/p/${p.codigo_qr}`,
-    htmlDe: (p, qr) => banderitaHTML({
+    items:   sel.seleccionados.value.filter(p => p.codigo_qr),
+    urlDe:   (p) => `${window.location.origin}/p/${p.codigo_qr}`,
+    layout:  LAYOUT_PLANTA,
+    dibujar: dibujarBanderitaPlanta,
+    datosDe: (p, qr) => ({
       qrDataUrl: qr,
       nombre:    p.nombre || p.codigo_qr,
       genetica:  p.genetica?.nombre,
       lote:      p.lote?.codigo,
-      inicio:    _fechaCortaEt(p.lote?.start_date),
-      clubName, clubLogo,
+      inicio:    p.lote?.start_date,
+      clubName,
     }),
-    css: `@page { size: A4; margin: 8mm; }
-          body { font-family: -apple-system, sans-serif; background: #fff; }
-          .hoja { display: flex; flex-direction: column; gap: 3mm; align-items: center; }
-          ${banderitaCSS}`,
-    nombre:  `Etiquetas de plantas (${sel.cantidad.value})`,
     archivo: `etiquetas-plantas-${sel.cantidad.value}`,
   }
-}
-
-function _fechaCortaEt(d) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d ?? ''))
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : null
 }
 
 // Se pasa la FUNCIÓN (no el config resuelto): el composable abre la ventana de impresión antes de
@@ -155,13 +145,14 @@ async function imprimirEtiquetas() {
   const r = await etiquetas.imprimir(configEtiquetas)
   if (r.vacio) toast.warning('Ninguna planta seleccionada tiene código QR')
   else if (!r.ok && r.error) toast.error('No se pudieron generar las etiquetas')
-  else if (r.viaDescarga) toast.warning('El navegador bloqueó la ventana: se descargó el archivo')
+  else if (r.viaDescarga) toast.warning('El navegador bloqueó la ventana: se descargó el PDF')
+  if (r.ok) sel.limpiar()   // terminó el trabajo: la selección (y su barra) ya no tienen razón de estar
 }
 async function descargarEtiquetas() {
   const r = await etiquetas.descargar(configEtiquetas)
   if (r.vacio) toast.warning('Ninguna planta seleccionada tiene código QR')
   else if (!r.ok && r.error) toast.error('No se pudieron generar las etiquetas')
-  else if (r.ok) toast.success('Etiquetas descargadas')
+  else if (r.ok) { toast.success('PDF descargado'); sel.limpiar() }
 }
 
 function onSort(col) {

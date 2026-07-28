@@ -15,7 +15,7 @@ import { useSeleccion } from '../composables/useSeleccion.js'
 import { useEtiquetasQR } from '../composables/useEtiquetasQR.js'
 import { useClubStore } from '../stores/club.js'
 import { useToast } from '../composables/useToast.js'
-import { etiquetaLoteHTML, hojaTandaCSS } from '../lib/etiquetaLote.js'
+import { LAYOUT_LOTE, dibujarEtiquetaLote } from '../lib/pdfEtiquetas.js'
 
 const store = useLotesStore();
 const salas = useSalasStore();
@@ -165,9 +165,11 @@ const etiquetas = useEtiquetasQR();
 async function configEtiquetas() {
   if (!club.data) { try { await club.fetch() } catch { /* el club es opcional en la etiqueta */ } }
   return {
-    items:  sel.seleccionados.value.filter(l => l.codigo_qr),
-    urlDe:  (l) => `${window.location.origin}/l/${l.codigo_qr}`,
-    htmlDe: (l, qr) => etiquetaLoteHTML({
+    items:   sel.seleccionados.value.filter(l => l.codigo_qr),
+    urlDe:   (l) => `${window.location.origin}/l/${l.codigo_qr}`,
+    layout:  LAYOUT_LOTE,
+    dibujar: dibujarEtiquetaLote,
+    datosDe: (l, qr) => ({
       qrDataUrl: qr,
       codigo:    l.codigo,
       genetica:  l.genetica?.nombre || l.strain,
@@ -176,10 +178,7 @@ async function configEtiquetas() {
       plantas:   l.plants_count ?? 0,
       clubName:  club.data?.name || '',
     }),
-    css:     hojaTandaCSS,
-    nombre:  `Etiquetas de lotes (${sel.cantidad.value})`,
     archivo: `etiquetas-lotes-${sel.cantidad.value}`,
-    qrOpts:  { width: 300 },
   };
 }
 
@@ -192,13 +191,14 @@ async function imprimirEtiquetas() {
   const r = await etiquetas.imprimir(configEtiquetas);
   if (r.vacio) toast.warning('Ningún lote seleccionado tiene código QR');
   else if (!r.ok && r.error) toast.error('No se pudieron generar las etiquetas');
-  else if (r.viaDescarga) toast.warning('El navegador bloqueó la ventana: se descargó el archivo');
+  else if (r.viaDescarga) toast.warning('El navegador bloqueó la ventana: se descargó el PDF');
+  if (r.ok) sel.limpiar();   // el trabajo terminó: la selección (y su barra) no tienen más razón de estar
 }
 async function descargarEtiquetas() {
   const r = await etiquetas.descargar(configEtiquetas);
   if (r.vacio) toast.warning('Ningún lote seleccionado tiene código QR');
   else if (!r.ok && r.error) toast.error('No se pudieron generar las etiquetas');
-  else if (r.ok) toast.success('Etiquetas descargadas');
+  else if (r.ok) { toast.success('PDF descargado'); sel.limpiar(); }
 }
 
 // ---------- Form ----------

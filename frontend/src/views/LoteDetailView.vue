@@ -8,7 +8,7 @@ import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
 import { getLoteHistorial, registrarTrasplante, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, createLoteEvento, updateLoteEvento, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
 import { useQRCode } from '../composables/useQRCode.js'
-import { etiquetaLoteHTML, hojaUnaEtiquetaCSS } from '../lib/etiquetaLote.js'
+import { LAYOUT_LOTE, dibujarEtiquetaLote } from '../lib/pdfEtiquetas.js'
 import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
 import GraficosLote from '../components/GraficosLote.vue'
@@ -56,34 +56,37 @@ const canAdmin = computed(() => ['admin', 'supervisor'].includes(auth.role))
 const esAdmin  = computed(() => auth.role === 'admin')
 const isCultivador = computed(() => auth.role === 'cultivador')
 
-const { downloadPNG, generatePNG } = useQRCode()
-function _escQr(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
+const { generatePNG } = useQRCode()
+const generandoQR = ref(false)
 
-// La etiqueta del lote vive en lib/etiquetaLote.js: misma pieza que usa la impresión en tanda desde
-// /lotes. Antes el HTML estaba acá inline y cualquier ajuste dejaba las dos versiones distintas.
+// La etiqueta del lote se dibuja en lib/pdfEtiquetas.js: misma pieza que la impresión en tanda desde
+// /lotes. Sale en PDF del tamaño exacto de la etiqueta (93×60mm) — en HTML el diálogo de impresión
+// le aplicaba su "ajustar a la página" y la encogía.
 async function descargarQR() {
   const l = lote.value
-  if (!l?.codigo_qr) return
-  const dataUrl = await generatePNG(`${window.location.origin}/l/${l.codigo_qr}`, {
-    width: 300, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' },
-  })
-  const etiqueta = etiquetaLoteHTML({
-    qrDataUrl: dataUrl,
-    codigo:    l.codigo,
-    genetica:  l.genetica?.nombre || l.strain,
-    estado:    em(l.estado).label,
-    inicio:    l.start_date,
-    plantas:   l.plants_count ?? 0,
-    clubName:  club.data?.name || '',
-  })
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Etiqueta lote ${_escQr(l.codigo)}</title><style>${hojaUnaEtiquetaCSS}</style></head>
-<body><div class="hoja">${etiqueta}</div></body></html>`
-
-  const win = window.open('', '_blank', 'width=700,height=500')
-  if (!win) { await downloadPNG(`${window.location.origin}/l/${l.codigo_qr}`, `qr-lote-${l.codigo}.png`); return }
-  win.document.write(html); win.document.close()
-  setTimeout(() => win.print(), 500)
+  if (!l?.codigo_qr || generandoQR.value) return
+  generandoQR.value = true
+  try {
+    const { jsPDF } = await import('jspdf')
+    const qr = await generatePNG(`${window.location.origin}/l/${l.codigo_qr}`, {
+      width: LAYOUT_LOTE.qrPx, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' },
+    })
+    const doc = new jsPDF({ unit: 'mm', format: [LAYOUT_LOTE.ancho, LAYOUT_LOTE.alto], orientation: 'landscape' })
+    dibujarEtiquetaLote(doc, 0, 0, {
+      qrDataUrl: qr,
+      codigo:    l.codigo,
+      genetica:  l.genetica?.nombre || l.strain,
+      estado:    em(l.estado).label,
+      inicio:    l.start_date,
+      plantas:   l.plants_count ?? 0,
+      clubName:  club.data?.name || '',
+    })
+    doc.save(`etiqueta-${l.codigo}.pdf`)
+  } catch {
+    toast.error('No se pudo generar la etiqueta')
+  } finally {
+    generandoQR.value = false
+  }
 }
 
 const deletingLote = ref(false)
@@ -427,10 +430,12 @@ onUnmounted(() => {
           <button
             v-if="lote.codigo_qr"
             class="ld__btn-sm ld__btn-sm--qr"
+            :disabled="generandoQR"
             @click="descargarQR"
-            title="Descargar QR del lote"
+            title="Descargar la etiqueta del lote en PDF"
           >
-            <i class="bi bi-qr-code"></i> QR lote
+            <i class="bi" :class="generandoQR ? 'bi-hourglass' : 'bi-qr-code'"></i>
+            {{ generandoQR ? 'Generando…' : 'Etiqueta PDF' }}
           </button>
           <ActionsDropdown v-if="canEdit || isCultivador" :items="loteAcciones" />
         </div>
