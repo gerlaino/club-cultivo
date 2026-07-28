@@ -86,9 +86,9 @@ export function useEtiquetasQR() {
       const x = layout.margen + col * (layout.ancho + layout.gap)
       const y = layout.margen + fila * (layout.alto + layout.gap)
 
-      const qr = await generatePNG(urlDe(items[i]), {
-        width: layout.qrPx, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' },
-      })
+      // Las opciones del QR (corrección de error, zona muda, color) viven en el layout: cambian
+      // según dónde va a vivir la pieza. Ver el comentario en pdfEtiquetas.js.
+      const qr = await generatePNG(urlDe(items[i]), layout.qr)
       dibujar(doc, x, y, datosDe(items[i], qr))
       hechas.value++
     }

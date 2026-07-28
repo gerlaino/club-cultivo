@@ -82,9 +82,7 @@ async function imprimirEtiqueta() {
   try {
     if (!club.data) { try { await club.fetch() } catch { /* el club es opcional en la etiqueta */ } }
     const { jsPDF } = await import('jspdf')
-    const qr = await generatePNG(qrPlantaUrl(), {
-      width: LAYOUT_PLANTA.qrPx, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' },
-    })
+    const qr = await generatePNG(qrPlantaUrl(), LAYOUT_PLANTA.qr)
     const doc = new jsPDF({ unit: 'mm', format: [LAYOUT_PLANTA.ancho, LAYOUT_PLANTA.alto], orientation: 'landscape' })
     dibujarBanderitaPlanta(doc, 0, 0, {
       qrDataUrl: qr,

@@ -106,6 +106,9 @@ async function borrarEvento() {
 }
 
 // ── Entradas ──────────────────────────────────────────────────
+// Arranca en "no cobro": en un club la cata gratis para socios es el caso normal, y recibir al
+// usuario con "Sin tipos de entrada, creá el primero" le sugiere que le falta hacer algo.
+const cobraEntrada = ref(false)
 const tipoForm = ref(null)
 function nuevoTipo() { tipoForm.value = { nombre: '', precio_ars: null, cupo: null } }
 async function guardarTipo() {
@@ -130,12 +133,10 @@ async function confirmarVender() {
 function cupoPct(t) { return t.cupo ? Math.min(100, Math.round(t.vendidas / t.cupo * 100)) : (t.vendidas > 0 ? 100 : 0) }
 
 // ── Costos ────────────────────────────────────────────────────
-const costoForm = ref(null)
-function nuevoCosto() { costoForm.value = { concepto: '', proveedor: '', monto_ars: null, pagado: false } }
-async function guardarCosto() {
-  const f = costoForm.value
-  if (!f.concepto?.trim() || !(f.monto_ars > 0)) { toast.warning('Concepto y monto son obligatorios'); return }
-  try { await store.crearCosto(barId, evId, { ...f, concepto: f.concepto.trim() }); costoForm.value = null; toast.success('Costo agregado') }
+// El alta de servicios la dispara ahora la lista unificada (EventoProvision); el guardado sigue acá
+// porque un costo pagado asienta el egreso en el libro contable del club.
+async function onCrearCosto(payload) {
+  try { await store.crearCosto(barId, evId, payload); toast.success('Agregado a la lista') }
   catch { toast.error(store.saveError) }
 }
 async function togglePagado(c) {
@@ -210,8 +211,9 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
       </div>
     </template>
 
-    <!-- Planificando / en curso → resumen de plata COMPACTO (sin tablero en $0) -->
-    <div v-else class="ed__money">
+    <!-- Planificando / en curso → resumen de plata COMPACTO, y SOLO si hay números. Un evento
+         recién creado no muestra ningún tablero: cuatro tarjetas en $0 se leen como un error. -->
+    <div v-else-if="tieneNumeros" class="ed__money">
       <div class="ed__money-strip">
         <div class="ed__money-item"><span>Ingresos estimados</span><b>{{ fmt(e.presupuesto_ingresos) }}</b></div>
         <div class="ed__money-item"><span>Costos</span><b>{{ fmt(e.costos_comprometidos) }}</b></div>
@@ -221,13 +223,10 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
           <b :class="resultadoMostrar >= 0 ? 'pos' : 'neg'">{{ fmt(resultadoMostrar) }}</b>
         </div>
       </div>
-      <p v-if="!tieneNumeros" class="ed__money-hint">
-        Todavía sin números — se completan solos a medida que cargás entradas y costos. Abajo tenés lo que hace falta para dejar el evento listo. 👇
-      </p>
     </div>
 
     <!-- Break-even: solo cuando hay algo real que medir -->
-    <div v-if="tieneNumeros && beMeta > 0" class="be">
+    <div v-if="!esCerrado && tieneNumeros && beMeta > 0" class="be">
       <div class="be__head"><b>Punto de equilibrio</b><span>necesitás <b>{{ fmt(beMeta) }}</b> de ingresos para cubrir costos</span></div>
       <div class="be__track"><i :class="{ over: beActual >= beMeta && beMeta > 0 }" :style="{ width: bePct + '%' }"></i></div>
       <div class="be__legend">
@@ -237,8 +236,19 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
       </div>
     </div>
 
-    <!-- Provisión de mercadería -->
-    <EventoProvision :bar-id="barId" :ev-id="evId" :finalizado="e.estado === 'finalizado'" @cambio="store.fetchDetalle(barId, evId)" />
+    <!-- Qué necesito: mercadería y servicios en UNA sola lista. Los costos viven acá (asientan en
+         el libro al marcarse pagados) pero se muestran allá: para quien arma el evento es una sola
+         cosa, y tenerlos en dos cajas separadas era el nudo del diseño viejo. -->
+    <EventoProvision
+      :bar-id="barId" :ev-id="evId"
+      :finalizado="e.estado === 'finalizado'"
+      :costos="e.costos || []"
+      :fase="fase"
+      @cambio="store.fetchDetalle(barId, evId)"
+      @crear-costo="onCrearCosto"
+      @toggle-pagado="togglePagado"
+      @borrar-costo="borrarCosto"
+    />
 
     <!-- Entradas -->
     <section class="card ed__entradas">
@@ -252,8 +262,14 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
         <input v-model.number="tipoForm.cupo" type="number" min="1" class="inp inp--sm" placeholder="Cupo" />
         <div class="cform__actions"><button type="button" class="btn btn--sm" @click="tipoForm = null">Cancelar</button><button type="submit" class="btn btn--sm btn--primary" :disabled="store.saving">Guardar</button></div>
       </form>
-      <div v-if="!e.tipos_entrada?.length" class="empty">Sin tipos de entrada. Creá el primero.</div>
-      <ul class="tt" v-else>
+      <!-- Sin entradas cargadas, una pregunta en vez de un vacío. En un club lo normal es que la
+           cata sea gratis para socios: no tiene por qué recibirte "Creá el primero". -->
+      <div v-if="!e.tipos_entrada?.length && !tipoForm" class="ed__cobra">
+        <span>¿Cobrás entrada?</span>
+        <button class="btn btn--sm" :class="{ 'btn--on': !cobraEntrada }" @click="cobraEntrada = false">No</button>
+        <button class="btn btn--sm" :class="{ 'btn--on': cobraEntrada }" @click="cobraEntrada = true; nuevoTipo()">Sí</button>
+      </div>
+      <ul class="tt" v-else-if="e.tipos_entrada?.length">
         <li v-for="t in e.tipos_entrada" :key="t.id" class="ttrow" :class="{ sold: t.agotado }">
           <div class="ttrow__main">
             <div class="ttrow__top"><span class="ttrow__n">{{ t.nombre }}</span><span class="ttrow__p">{{ fmt(t.precio_ars) }}</span></div>
@@ -266,6 +282,8 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
       </ul>
     </section>
 
+    <!-- Teleportados a body, como el resto de la app -->
+    <Teleport to="body">
     <!-- Modal editar datos básicos -->
     <div v-if="editForm" class="ov" @click.self="editForm = null">
       <div class="modal modal--wide">
@@ -294,32 +312,16 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
         <div class="cform__actions"><button class="btn" @click="venderPara = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarVender">Confirmar venta</button></div>
       </div>
     </div>
+    </Teleport>
 
-    <div class="ed__cols">
-      <!-- Costos -->
+    <div class="ed__cols ed__cols--una">
+      <!-- Los costos ya no tienen caja propia: viven en la lista "Qué necesito", junto a la
+           mercadería. Acá queda solo el to-do del evento. -->
       <section class="card">
-        <div class="card__head"><h2>Costos / proveedores</h2><button class="btn btn--sm btn--primary" @click="nuevoCosto">+ Costo</button></div>
-        <form v-if="costoForm" class="cform" @submit.prevent="guardarCosto">
-          <input v-model.trim="costoForm.concepto" class="inp" placeholder="Concepto (ej: DJ)" maxlength="60" />
-          <input v-model.trim="costoForm.proveedor" class="inp" placeholder="Proveedor (opcional)" maxlength="60" />
-          <input v-model.number="costoForm.monto_ars" type="number" min="0" step="any" class="inp inp--sm" placeholder="Monto" />
-          <label class="chk"><input type="checkbox" v-model="costoForm.pagado" /> Pagado</label>
-          <div class="cform__actions"><button type="button" class="btn btn--sm" @click="costoForm = null">Cancelar</button><button type="submit" class="btn btn--sm btn--primary" :disabled="store.saving">Guardar</button></div>
-        </form>
-        <ul class="clist">
-          <li v-for="c in e.costos" :key="c.id">
-            <div class="clist__main"><span class="clist__c">{{ c.concepto }}</span><small v-if="c.proveedor">{{ c.proveedor }}</small></div>
-            <span class="clist__m">{{ fmt(c.monto_ars) }}</span>
-            <button class="st-pill" :class="c.pagado ? 'pag' : 'pend'" @click="togglePagado(c)">{{ c.pagado ? 'pagado' : 'pendiente' }}</button>
-            <button class="lnk lnk--danger" @click="borrarCosto(c)">✕</button>
-          </li>
-          <li v-if="!e.costos?.length" class="empty">Sin costos cargados.</li>
-        </ul>
-      </section>
-
-      <!-- Tareas -->
-      <section class="card">
-        <div class="card__head"><h2>Cuenta regresiva</h2><span class="mut">{{ tareasPendientes }} pendientes</span></div>
+        <div class="card__head">
+          <h2>Pendientes del evento</h2>
+          <span class="mut">{{ tareasPendientes ? `${tareasPendientes} sin hacer` : 'todo listo' }}</span>
+        </div>
         <form class="tform" @submit.prevent="agregarTarea">
           <input v-model="tareaForm" class="inp" placeholder="Agregar tarea…" maxlength="100" />
           <button type="submit" class="btn btn--sm btn--primary">+</button>
@@ -404,6 +406,10 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 .be__legend b { color: #0f172a; }
 
 .ed__cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; }
+/* Los costos se fueron a la lista unificada: lo que queda va a lo ancho. */
+.ed__cols--una { grid-template-columns: 1fr; }
+.ed__cobra { display: flex; align-items: center; gap: 10px; padding: 14px 4px; font-size: var(--fs-14, 14px); color: #475569; }
+.btn--on { background: #1b5e20; border-color: #1b5e20; color: #fff; }
 @media (max-width: 720px) { .ed__cols { grid-template-columns: 1fr; } }
 .card { background: var(--c-paper, #fff); border: 1px solid #f1f5f9; border-radius: var(--r-lg, 14px); padding: var(--sp-4, 16px); }
 .card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-3, 12px); }
@@ -417,16 +423,8 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 .tform { flex-wrap: nowrap; }
 .tform .inp { flex: 1; }
 
-.clist, .tlist { list-style: none; margin: 0; padding: 0; }
-.clist li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f1f5f9; font-size: var(--fs-14, 14px); }
-.clist li:last-child, .tlist li:last-child { border-bottom: none; }
-.clist__main { flex: 1; display: flex; flex-direction: column; }
-.clist__c { color: #1e293b; font-weight: 550; }
-.clist__main small { color: #94a3b8; font-size: var(--fs-12, 12px); }
-.clist__m { font-variant-numeric: tabular-nums; font-weight: 600; color: #0f172a; }
-.st-pill { font-size: .66rem; font-weight: 640; padding: 3px 9px; border-radius: 999px; border: none; cursor: pointer; }
-.st-pill.pag { background: #f0fdf4; color: #1b5e20; }
-.st-pill.pend { background: #fee2e2; color: #dc2626; }
+.tlist { list-style: none; margin: 0; padding: 0; }
+.tlist li:last-child { border-bottom: none; }
 
 .tlist li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: var(--fs-14, 14px); }
 .tlist li.done .tlist__t { text-decoration: line-through; color: #94a3b8; }

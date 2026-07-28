@@ -1,5 +1,54 @@
 # Changelog
 
+## Julio 2026 (x) — el evento se arma como se piensa, y las entradas se imprimen
+
+La ficha del evento estaba organizada según el modelo de datos (una caja por entidad: provisión,
+entradas, costos, tareas) y no según lo que la persona tiene que hacer. Germán lo describió al
+revés y mucho mejor: *"un listado de cosas necesarias así como servicios que se contraten, y después
+lo que se consume durante el evento, entradas vendidas si es que hay, y luego la rendición del
+evento con los sobrantes de mercadería para ver en términos contables cómo terminó"*.
+
+- **Una sola lista "Qué necesito"**: mercadería y servicios contratados juntos, con un único
+  `+ Agregar` que pregunta qué estás sumando. Antes eran dos cajas separadas, con dos vocabularios y
+  dos UIs, para algo que el usuario piensa como una sola cosa. Los costos siguen viviendo en el
+  padre (asientan el egreso en el libro al marcarse pagados) pero se muestran en la lista.
+- **Los cuatro KPIs en $0 desaparecen** mientras se planifica: un evento recién creado no muestra
+  ningún tablero, porque cuatro tarjetas en cero se leen como un error. En su lugar, una línea:
+  *comprometido $X · N por comprar · N pagos pendientes*, que solo aparece cuando hay algo.
+- **Entradas: una pregunta en vez de un vacío.** *¿Cobrás entrada? No / Sí* — en un club la cata
+  gratis para socios es el caso normal, y "Sin tipos de entrada, creá el primero" sugería que
+  faltaba hacer algo.
+- **Rendición** en vez de "cerrar provisión — reconciliar": los tres destinos a la vista (vendido,
+  consumido, sobra) pero **un solo número para cargar**. Lo vendido/dispensado lo acumula el sistema
+  durante el evento y el sobrante se deriva. Marca en rojo y bloquea el cierre si lo declarado supera
+  lo reservado. Ojo con la asimetría del back, que se respetó: la mercadería que descuenta usa
+  `cantidad_consumida` como total absoluto (reemplaza), mientras que lo apartado usa
+  `consumo_interno` y lo SUMA a lo ya dispensado.
+- **"Cuenta regresiva" → "Pendientes del evento"**, que es lo que es: un to-do checkeable.
+- **Entradas imprimibles (PDF)**: ticket de 180×70mm, 3 por A4, con **talón troquelado** — línea
+  punteada y muescas en los cantos — que lleva el QR y el código para cortar en la puerta. Genérico
+  a propósito: lo único que lo marca es el nombre del club y la franja de color. Una entrada gratis
+  dice "Sin cargo", no "$0". Se imprimen de a una o todas juntas, reusando la misma máquina que las
+  etiquetas de cultivo (medidas reales, progreso, arreglo del bloqueador de popups). Las anuladas no
+  se imprimen.
+- **Fix del modal invisible**: toda la carpeta `bar/` renderizaba sus overlays inline y era la única
+  zona de la app que no usaba `<Teleport to="body">` — por eso `+ Producto` mostraba el velo pero no
+  la caja. Los nueve overlays de los cuatro archivos ahora teleportan.
+
+Backend sin cambios. Se confirmó con Germán que todo servicio se conoce con su valor de antemano, así
+que `monto_ars` obligatorio se queda.
+
+**QR resistente al maltrato** (las etiquetas se estaban humedeciendo en la sala): corrección de error
+**H** (tolera 30% del código dañado, contra el 15% del default `M`), zona muda de 2, y **negro puro en
+la banderita de planta**, que es la que se moja — el verde tiene menos contraste sobre material húmedo
+o tóner rayado. Lote y entrada siguen en verde: viven protegidas. Las opciones del QR se consolidaron
+en el layout (`layout.qr`), que estaban duplicadas en cuatro archivos. La banderita pasó de 20 a
+**21mm de QR**: con H el código va a 41×41 módulos y en 20mm cada módulo quedaba en 0,44mm, al borde
+de lo que resuelve una cámara de celular; con 21 vuelve a ~0,47mm.
+
+*El arreglo de fondo, igual, es el material: papel sintético (BOPP/vinilo A4) en impresora **láser**.
+Nunca inkjet —la tinta se corre— ni térmica directa, que se borra con el calor de la sala.*
+
 ## Julio 2026 (w) — alta de movimientos: dos columnas y catálogo editable ahí mismo
 
 Si registrabas un gasto de algo cuya categoría o área no existía, tenías que salir a Configuración,

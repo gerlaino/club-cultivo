@@ -172,6 +172,9 @@ async function borrarCat(c) {
       </table>
     </div>
 
+    <!-- Los modales van teleportados a body, como el resto de la app: renderizados inline quedaban
+         a merced del contexto de apilamiento del contenedor. -->
+    <Teleport to="body">
     <!-- Modal Comprar -->
     <div v-if="compraForm" class="ov" @click.self="compraForm = null">
       <div class="dlg">
@@ -206,6 +209,7 @@ async function borrarCat(c) {
         <div class="dlg__act"><button class="btn" @click="catMgr = null">Cerrar</button></div>
       </div>
     </div>
+    </Teleport>
 
     <BarcodeScanner v-if="escaneandoProd" una-vez titulo="Escaneá el código del producto" @decoded="onCodigoDecoded" @close="escaneandoProd = false" />
   </div>

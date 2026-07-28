@@ -68,9 +68,7 @@ async function descargarQR() {
   generandoQR.value = true
   try {
     const { jsPDF } = await import('jspdf')
-    const qr = await generatePNG(`${window.location.origin}/l/${l.codigo_qr}`, {
-      width: LAYOUT_LOTE.qrPx, margin: 1, color: { dark: '#1b5e20', light: '#ffffff' },
-    })
+    const qr = await generatePNG(`${window.location.origin}/l/${l.codigo_qr}`, LAYOUT_LOTE.qr)
     const doc = new jsPDF({ unit: 'mm', format: [LAYOUT_LOTE.ancho, LAYOUT_LOTE.alto], orientation: 'landscape' })
     dibujarEtiquetaLote(doc, 0, 0, {
       qrDataUrl: qr,
