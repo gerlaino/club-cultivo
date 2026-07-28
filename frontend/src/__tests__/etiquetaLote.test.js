@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { etiquetaLoteHTML, hojaTandaCSS, hojaUnaEtiquetaCSS } from '../lib/etiquetaLote.js'
+import {
+  etiquetaLoteHTML, etiquetaLoteCSS, hojaTandaCSS, hojaUnaEtiquetaCSS, ET_ANCHO_MM, ET_ALTO_MM,
+} from '../lib/etiquetaLote.js'
 
 const BASE = {
   qrDataUrl: 'data:image/png;base64,AAAA',
@@ -42,12 +44,25 @@ describe('etiquetaLoteHTML', () => {
     expect(html).toContain('&lt;script&gt;')
   })
 
-  it('la hoja en tanda es A4 y no parte etiquetas entre páginas', () => {
-    expect(hojaTandaCSS).toContain('size: A4')
+  it('la hoja en tanda es A4 apaisada y no parte etiquetas entre páginas', () => {
+    expect(hojaTandaCSS).toContain('size: A4 landscape')
     expect(hojaTandaCSS).toContain('page-break-inside: avoid')
   })
 
+  // El ancho fijo de la hoja es lo que hace que el HTML descargado se vea igual que impreso: sin
+  // eso el flex-wrap usaba el ancho de la ventana y mostraba 6 por fila en vez de 3.
+  it('la hoja en tanda fija el ancho de la página para que entren 3 por fila', () => {
+    expect(hojaTandaCSS).toContain('width: 287mm')
+    expect(3 * ET_ANCHO_MM + 2 * 2).toBeLessThanOrEqual(287)
+    expect(4 * ET_ANCHO_MM).toBeGreaterThan(287)   // 4 no entran: son exactamente 3
+  })
+
   it('la hoja individual usa el tamaño de la etiqueta', () => {
-    expect(hojaUnaEtiquetaCSS).toContain('size: 80mm 50mm')
+    expect(hojaUnaEtiquetaCSS).toContain(`size: ${ET_ANCHO_MM}mm ${ET_ALTO_MM}mm`)
+  })
+
+  it('el nombre de la genética envuelve en 2 líneas en vez de cortarse', () => {
+    expect(etiquetaLoteCSS).toContain('-webkit-line-clamp: 2')
+    expect(etiquetaLoteCSS).not.toContain('white-space: nowrap')
   })
 })
