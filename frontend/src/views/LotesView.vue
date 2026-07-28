@@ -169,6 +169,7 @@ async function configEtiquetas() {
     urlDe:   (l) => `${window.location.origin}/l/${l.codigo_qr}`,
     layout:  LAYOUT_LOTE,
     dibujar: dibujarEtiquetaLote,
+    ordenPor: (l) => [l.codigo ?? ''],
     datosDe: (l, qr) => ({
       qrDataUrl: qr,
       codigo:    l.codigo,

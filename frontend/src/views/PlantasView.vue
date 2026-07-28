@@ -127,6 +127,9 @@ async function configEtiquetas() {
     urlDe:   (p) => `${window.location.origin}/p/${p.codigo_qr}`,
     layout:  LAYOUT_PLANTA,
     dibujar: dibujarBanderitaPlanta,
+    // Un lote, todas sus plantas en orden, después el siguiente — sin importar cómo esté ordenada
+    // la tabla ni en cuántas pasadas se armó la selección.
+    ordenPor: (p) => [p.lote?.codigo ?? '', p.nombre ?? ''],
     datosDe: (p, qr) => ({
       qrDataUrl: qr,
       nombre:    p.nombre || p.codigo_qr,

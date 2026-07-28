@@ -405,6 +405,9 @@ function configEtiquetas() {
     urlDe:   (p) => `${window.location.origin}/p/${p.codigo_qr}`,
     layout:  LAYOUT_PLANTA,
     dibujar: dibujarBanderitaPlanta,
+    // Numeradas P001→P0NN, no por fecha de alta: un lote ampliado más tarde tiene las plantas
+    // viejas y las nuevas con fechas muy distintas y la plancha salía partida.
+    ordenPor: (p) => [p.lote?.codigo ?? '', p.nombre ?? ''],
     datosDe: (p, qr) => ({
       qrDataUrl: qr, nombre: p.nombre || p.codigo_qr, genetica,
       lote: loteCode, inicio, clubName,

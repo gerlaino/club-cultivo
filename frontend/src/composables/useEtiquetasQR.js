@@ -16,7 +16,32 @@ import { grillaDe, A4 } from '../lib/pdfEtiquetas.js'
  *    FUNCIÓN (resolverlo antes —traer el club, el logo— ya gastaría el gesto).
  * 3. **Mientras genera, `ocupado` = true** y la vista tapa todo con BloqueoProgreso: no se puede
  *    cambiar el filtro ni volver a disparar la tanda a mitad de camino.
+ * 4. **El PDF se ordena solo** (`ordenPor`), sin importar cómo esté ordenada la tabla — ver abajo.
  */
+
+// El orden de la plancha NO es el de la tabla. La tabla ordena por fecha de creación, y eso parte
+// un lote ampliado más tarde en dos bloques lejanos: si cargaste 3 plantas y 20 minutos después le
+// sumaste 9, las P001-P003 caen decenas de etiquetas más abajo, entre plantas de otros lotes. Se
+// etiqueta recorriendo el lote, no la línea de tiempo del alta: un lote, todas sus plantas en orden,
+// después el siguiente.
+//
+// `numeric: true` es lo que hace que P002 vaya antes que P010; un localeCompare pelado ordena por
+// caracter y pone P10 antes que P2 en cuanto el número deje de tener padding.
+const COLLATOR = new Intl.Collator('es', { numeric: true, sensitivity: 'base' })
+
+/** Ordena una copia por la clave compuesta que devuelve `ordenPor` (ej: [lote, nombre]). */
+function ordenarItems(items, ordenPor) {
+  if (typeof ordenPor !== 'function') return items
+  return [...items].sort((a, b) => {
+    const ka = ordenPor(a) || [], kb = ordenPor(b) || []
+    for (let i = 0; i < Math.max(ka.length, kb.length); i++) {
+      const c = COLLATOR.compare(String(ka[i] ?? ''), String(kb[i] ?? ''))
+      if (c !== 0) return c
+    }
+    return 0
+  })
+}
+
 export function useEtiquetasQR() {
   const { generatePNG } = useQRCode()
 
@@ -34,15 +59,17 @@ export function useEtiquetasQR() {
 
   /**
    * Arma el PDF etiqueta por etiqueta.
-   * @param {Array}    items   ítems a etiquetar
-   * @param {Function} urlDe   (item) => URL que codifica el QR
-   * @param {Object}   layout  LAYOUT_LOTE | LAYOUT_PLANTA (medidas en mm)
-   * @param {Function} dibujar (doc, x, y, datos) => void
-   * @param {Function} datosDe (item, qrDataUrl) => datos para dibujar
+   * @param {Array}    items    ítems a etiquetar
+   * @param {Function} urlDe    (item) => URL que codifica el QR
+   * @param {Object}   layout   LAYOUT_LOTE | LAYOUT_PLANTA (medidas en mm)
+   * @param {Function} dibujar  (doc, x, y, datos) => void
+   * @param {Function} datosDe  (item, qrDataUrl) => datos para dibujar
+   * @param {Function} [ordenPor] (item) => clave compuesta con la que se ordena la plancha
    */
-  async function construirPdf({ items, urlDe, layout, dibujar, datosDe }) {
+  async function construirPdf({ items: sinOrdenar, urlDe, layout, dibujar, datosDe, ordenPor }) {
     const { jsPDF } = await import('jspdf')
 
+    const items  = ordenarItems(sinOrdenar, ordenPor)
     hechas.value = 0
     total.value  = items.length
 

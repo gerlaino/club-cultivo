@@ -23,6 +23,12 @@ geometría clavada.
 - La etiqueta suelta ahora **descarga un PDF del tamaño exacto** (93×60 / 160×26mm) en vez de abrir
   una ventana de impresión; el botón se deshabilita y dice "Generando…" mientras trabaja.
 - Al terminar la tanda **se limpia la selección** (y con ella la barra): el trabajo ya está hecho.
+- **La plancha sale ordenada por lote y número** (`ordenPor` en `useEtiquetasQR`), no en el orden de
+  la tabla: un lote entero y en orden P001→P0NN, después el siguiente. La tabla de `/plantas` ordena
+  por fecha de creación, y eso partía en dos un lote ampliado más tarde — con 3 plantas cargadas y 9
+  agregadas 20 minutos después, las P001-P003 caían decenas de etiquetas más abajo, entre plantas de
+  otros lotes, y parecían faltar. Se etiqueta recorriendo el lote, no la línea de tiempo del alta.
+  Comparación con `Intl.Collator(numeric: true)`: sin eso, `P10` va antes que `P2`.
 
 `useEtiquetasQR` conserva lo de la (u) —ventana abierta antes del await por el bloqueador de popups,
 `BloqueoProgreso` mientras genera— y ahora recibe `layout` + `dibujar` + `datosDe` en vez de `htmlDe`
