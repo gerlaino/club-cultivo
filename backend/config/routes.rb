@@ -102,6 +102,7 @@ Rails.application.routes.draw do
         get :export_csv
         get :proximo_codigo
         get 'por_qr/:codigo_qr', action: :por_qr
+        post :mover   # mover uno o varios lotes a otra sala (incluso de otra sede)
       end
       resource :costo, controller: :costo_lotes, only: [:show, :create, :update] do
         post :recalcular   # recalcula insumos/energía/mano de obra desde el libro contable

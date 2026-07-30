@@ -11,7 +11,7 @@ import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vu
 import NuevoLoteModal         from '../components/lotes/NuevoLoteModal.vue'
 import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
-import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala } from '../lib/api.js'
+import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala, moverLotes } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { Gauge } from 'lucide-vue-next'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
@@ -226,6 +226,9 @@ onMounted(async () => {
     geneticas.value = res.data || []
   } catch { /* genéticas no críticas */ }
 
+  // Todas las salas del club: son los destinos posibles para mover lotes (incluso de otra sede).
+  if (!salas.items.length) { try { await salas.fetch() } catch { /* destino opcional */ } }
+
   if (canSeeAmbiente.value) cargarAmbienteMini()
 })
 
@@ -281,6 +284,112 @@ const kpis = computed(() => {
     totalPlantas: ls.reduce((a,l) => a + Number(l.plants_count||0), 0),
     enCiclo:      ls.filter(l => ["vegetativo","floracion"].includes(l.estado)).length,
     cosechados:   ls.filter(l => ["cosecha","en_manicura","curado","finalizado"].includes(l.estado)).length,
+  }
+})
+
+// ── Mover lotes a otra sala ───────────────────────────────────────────────────
+// Hasta ahora la única forma de que un lote cambiara de sala era avanzando de fase, así que
+// rebalancear salas o corregir un alta obligaba a fingir un avance y ensuciaba la historia.
+//
+// La regla que hay que dejar clarísima ANTES de confirmar: **el lote toma la fase de la sala
+// destino**. Una sala en floración da 12/12, así que lo que entre ahí pasa a florecer. Es
+// irreversible en el sentido de que no se "des-florece" una planta, por eso el diálogo enumera
+// lote por lote qué va a cambiar, en vez de un "¿estás seguro?" genérico.
+const selMover  = ref(new Set())
+const moviendo  = ref(false)
+const salaDestinoId = ref(null)
+const showMover = ref(false)
+
+const puedeMover = computed(() => canEdit.value || isCultivador.value)
+const esMovible  = (l) => ESTADOS_ACTIVOS_CULTIVADOR.includes(l.estado)
+function alternarMover(id) {
+  const s = new Set(selMover.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  selMover.value = s
+}
+const lotesAMover = computed(() => items.value.filter(l => selMover.value.has(l.id)))
+
+const salasDestino = computed(() =>
+  (salas.items || []).filter(s => s.id !== sala.value?.id && s.state === 'activa'))
+const salaDestino  = computed(() => salasDestino.value.find(s => s.id === Number(salaDestinoId.value)) || null)
+
+// Qué va a pasar con cada lote si se confirma. Es el contenido de la alerta.
+const efectosMover = computed(() => {
+  const d = salaDestino.value
+  if (!d) return { cambian: [], cambiaSede: false }
+  const faseDestino = ['vegetativo', 'floracion'].includes(d.kind) ? d.kind : null
+  return {
+    faseDestino,
+    cambian: faseDestino ? lotesAMover.value.filter(l => l.estado !== faseDestino) : [],
+    cambiaSede: !!(d.sede?.id && sala.value?.sede?.id && d.sede.id !== sala.value.sede.id),
+  }
+})
+
+async function confirmarMover() {
+  const d = salaDestino.value
+  if (!d || !lotesAMover.value.length) return
+
+  const ef = efectosMover.value
+  const lineas = [`Vas a mover ${lotesAMover.value.length} lote(s) a "${d.nombre}".`]
+  if (ef.cambiaSede) lineas.push(`⚠️ Es de OTRA SEDE: los lotes pasan a ${d.sede?.nombre || 'esa sede'} y sus costos se imputan ahí.`)
+  if (ef.cambian.length) {
+    lineas.push(`⚠️ La sala está en ${ef.faseDestino === 'floracion' ? 'FLORACIÓN' : 'VEGETATIVO'}, así que estos lotes cambian de fase:`)
+    lineas.push(...ef.cambian.map(l => `   · ${l.codigo}: ${estadoMeta(l.estado).label} → ${estadoMeta(ef.faseDestino).label}`))
+    if (ef.faseDestino === 'floracion') lineas.push('Pasar a floración no se deshace: la planta ya recibió 12/12.')
+  }
+
+  if (!(await confirm({
+    title: 'Mover lotes de sala',
+    message: lineas.join('\n'),
+    variant: ef.cambian.length ? 'danger' : 'warning',   // el diálogo no conoce 'primary'
+    confirmText: 'Mover',
+  }))) return
+
+  moviendo.value = true
+  try {
+    const { data } = await moverLotes([...selMover.value], d.id)
+    const extra = data.cambios_de_fase?.length ? ` · ${data.cambios_de_fase.length} cambiaron de fase` : ''
+    toast.success(`${data.movidos} lote(s) movidos a ${d.nombre}${extra}`)
+    selMover.value = new Set(); showMover.value = false; salaDestinoId.value = null
+    await Promise.all([salas.fetchSala(salaId), lotes.fetchBySala(salaId)])
+  } catch (e) {
+    toast.error(e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'No se pudieron mover')
+  } finally { moviendo.value = false }
+}
+
+// ── Ambiente actual de la sala ────────────────────────────────────────────────
+// Sin sensores conectados, "actual" es el último registro manual cargado en cualquier lote de la
+// sala. Por eso el dato viaja siempre con su antigüedad y con el lote del que salió.
+//
+// El VPD lo calcula el backend (con temperatura de hoja estimada). Acá solo lo interpretamos: es la
+// métrica que de verdad dice si el cuarto está bien — 25° con 40% y 25° con 70% son dos mundos, y
+// mirar temperatura y humedad por separado no los distingue.
+function nivelVpd(v) {
+  if (v < 0.4)  return { cls: 'bajo',  ayuda: 'Muy bajo: el aire está saturado, la planta casi no transpira. Riesgo de hongos.' }
+  if (v < 0.8)  return { cls: 'ok',    ayuda: 'Bajo: propio de esquejes y vegetativo temprano.' }
+  if (v <= 1.2) return { cls: 'ok',    ayuda: 'En rango: transpiración cómoda para vegetativo y floración.' }
+  if (v <= 1.6) return { cls: 'alto',  ayuda: 'Alto: propio de floración tardía; vigilá que no se estrese.' }
+  return { cls: 'malo', ayuda: 'Muy alto: el aire tira demasiado, la planta cierra estomas y frena.' }
+}
+function haceCuanto(iso) {
+  const t = new Date(iso)
+  if (isNaN(t)) return ''
+  const min = Math.round((Date.now() - t.getTime()) / 60000)
+  if (min < 60)   return min <= 1 ? 'recién' : `hace ${min} min`
+  const h = Math.round(min / 60)
+  if (h < 24)     return `hace ${h} h`
+  const d = Math.round(h / 24)
+  return d === 1 ? 'ayer' : `hace ${d} días`
+}
+const amb = computed(() => {
+  const a = sala.value?.ambiente_actual
+  if (!a || (a.temperatura == null && a.humedad == null)) return null
+  const horas = (Date.now() - new Date(a.registrado_en).getTime()) / 3600000
+  return {
+    ...a,
+    hace:  haceCuanto(a.registrado_en),
+    viejo: horas > 24,                       // más de un día: se marca, no es "el ambiente de ahora"
+    vpdNivel: a.vpd != null ? nivelVpd(a.vpd) : null,
   }
 })
 
@@ -714,6 +823,25 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
             <div class="sd__kpi-sub">{{ kpis.cosechados }} cosechados</div>
           </div>
         </div>
+
+        <!-- Ambiente. Mientras no haya sensores es el último registro manual, así que la
+             ANTIGÜEDAD va siempre: un dato de hace una semana mostrado como si fuera de ahora es
+             peor que no tener dato. -->
+        <div v-if="amb" class="sd__kpi sd__kpi--amb" :class="{ 'sd__kpi--viejo': amb.viejo }">
+          <div class="sd__kpi-icon">🌡️</div>
+          <div class="sd__kpi-body">
+            <div class="sd__kpi-value">
+              <span v-if="amb.temperatura != null">{{ amb.temperatura }}°</span>
+              <span v-if="amb.humedad != null" class="sd__amb-hum">{{ amb.humedad }}%</span>
+            </div>
+            <div class="sd__kpi-label">
+              Ambiente
+              <span v-if="amb.vpd != null" class="sd__amb-vpd" :class="`sd__amb-vpd--${amb.vpdNivel.cls}`"
+                    :title="amb.vpdNivel.ayuda">VPD {{ amb.vpd }} kPa</span>
+            </div>
+            <div class="sd__kpi-sub">{{ amb.hace }}<span v-if="amb.lote_codigo"> · {{ amb.lote_codigo }}</span></div>
+          </div>
+        </div>
       </div>
 
       <!-- Tabs -->
@@ -747,7 +875,11 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                 </template>
               </EmptyState>
               <div v-else class="sd__lotes">
-                <RouterLink v-for="l in itemsPaginados" :key="l.id" :to="{ name:'lote-detail', params:{ id:l.id } }" class="sd__lote">
+                <div v-for="l in itemsPaginados" :key="l.id" class="sd__lote-wrap">
+                <label v-if="puedeMover && esMovible(l)" class="sd__lote-cb" @click.stop>
+                  <input type="checkbox" :checked="selMover.has(l.id)" @change="alternarMover(l.id)" />
+                </label>
+                <RouterLink :to="{ name:'lote-detail', params:{ id:l.id } }" class="sd__lote">
                   <div class="sd__lote-stripe" :style="{ background: estadoMeta(l.estado).color }"></div>
                   <div class="sd__lote-content">
                     <div class="sd__lote-head">
@@ -778,6 +910,24 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                   </div>
                   <i class="bi bi-chevron-right sd__lote-arrow"></i>
                 </RouterLink>
+                </div>
+                <!-- Barra de mover: aparece solo con algo seleccionado -->
+                <Teleport to="body">
+                  <div v-if="selMover.size" class="sd__movbar">
+                    <span class="sd__movbar-txt">{{ selMover.size }} lote{{ selMover.size === 1 ? '' : 's' }}</span>
+                    <select v-model="salaDestinoId" class="sd__movbar-sel">
+                      <option :value="null">Mover a…</option>
+                      <option v-for="s in salasDestino" :key="s.id" :value="s.id">
+                        {{ s.nombre }}<template v-if="s.kind"> ({{ kindLabel(s.kind) }})</template><template v-if="s.sede?.nombre"> · {{ s.sede.nombre }}</template>
+                      </option>
+                    </select>
+                    <button class="sd__movbar-ghost" @click="selMover = new Set()">Cancelar</button>
+                    <button class="sd__movbar-btn" :disabled="!salaDestino || moviendo" @click="confirmarMover">
+                      {{ moviendo ? 'Moviendo…' : 'Mover' }}
+                    </button>
+                  </div>
+                </Teleport>
+
                 <div v-if="sdTotalPages > 1" class="sd__lotes-pager">
                   <button class="sd__pager-btn" :disabled="sdPage <= 1" @click="sdPage--">«</button>
                   <span class="sd__pager-info">{{ sdPage }} / {{ sdTotalPages }}</span>
@@ -1218,6 +1368,37 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__section-body--flush { padding: 0; border-top: 1px solid #e8f0e9; }
 
 .sd__lotes { display: flex; flex-direction: column; }
+
+/* Selección para mover lotes */
+.sd__lote-wrap { display: flex; align-items: center; gap: 8px; }
+.sd__lote-wrap > .sd__lote { flex: 1; min-width: 0; }
+.sd__lote-cb { display: flex; align-items: center; padding: 0 2px 0 6px; cursor: pointer; }
+.sd__lote-cb input { width: 16px; height: 16px; cursor: pointer; accent-color: #1b5e20; }
+.sd__movbar {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 900;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #0f172a; color: #fff; padding: 10px 14px; border-radius: 999px;
+  box-shadow: 0 12px 32px rgb(15 23 42 / .3); font-size: 13px;
+}
+.sd__movbar-txt { font-weight: 700; }
+.sd__movbar-sel { border: none; border-radius: 999px; padding: 6px 12px; font-size: 13px; max-width: 260px; }
+.sd__movbar-ghost { background: none; border: none; color: #94a3b8; font-size: 13px; font-weight: 600; cursor: pointer; }
+.sd__movbar-ghost:hover { color: #fff; }
+.sd__movbar-btn {
+  background: #16a34a; border: none; color: #fff; border-radius: 999px;
+  padding: 7px 18px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.sd__movbar-btn:disabled { background: #475569; cursor: default; }
+
+/* Ambiente actual */
+.sd__kpi--amb .sd__kpi-value { display: flex; align-items: baseline; gap: 8px; }
+.sd__amb-hum { font-size: .62em; color: #64748b; font-weight: 600; }
+.sd__kpi--viejo .sd__kpi-value { color: #94a3b8; }
+.sd__amb-vpd { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 6px; cursor: help; }
+.sd__amb-vpd--ok   { background: #f0fdf4; color: #15803d; }
+.sd__amb-vpd--bajo { background: #dbeafe; color: #1d4ed8; }
+.sd__amb-vpd--alto { background: #fef3c7; color: #b45309; }
+.sd__amb-vpd--malo { background: #fee2e2; color: #dc2626; }
 .sd__lote { display: flex; align-items: stretch; text-decoration: none; color: inherit; border-bottom: 1px solid #f0fdf4; transition: background .15s; }
 .sd__lote:last-child { border-bottom: none; }
 .sd__lote:hover { background: #f9fdf9; }

@@ -1,5 +1,39 @@
 # Changelog
 
+## Julio 2026 (y) — mover lotes de sala, ambiente de la sala y el esqueje que no existía
+
+**El bug: el registro ambiental de una sala se salteaba los esquejes.** `salas#registrar_sala` tenía
+la lista de estados escrita a mano (`%w[vegetativo floracion]`) y se olvidaba de `esqueje` y
+`germinacion` — justo las fases donde el ambiente más importa, porque un esqueje sin raíz depende del
+aire para no deshidratarse. No era una decisión: el propio modelo **exige sala** para esos estados
+(`validates :sala_id, presence: true, if: CULTIVO_ESTADOS.include?(estado)`), o sea que están en el
+cuarto respirando el mismo aire. Ahora usa `Lote::CULTIVO_ESTADOS`, la fuente única. El mismo olvido
+estaba en el dashboard de sede (`sedes#serialize_ops`), donde un lote en esqueje no contaba como vivo.
+
+**Mover lotes de sala (nuevo).** Hasta ahora la única forma de que un lote cambiara de sala era
+avanzando de fase, así que rebalancear salas, vaciar una para limpieza o corregir un alta obligaba a
+fingir un avance y ensuciaba la historia. Nuevo `POST /lotes/mover`, en tanda y **entre sedes**:
+- **El lote toma la fase de la sala destino.** Una sala en floración da 12/12: lo que entra ahí pasa a
+  florecer, y sus plantas con él. El cuarto define el fotoperiodo, no el papel. Una sala **mixta** no
+  impone nada — ahí conviven fases distintas a propósito.
+- Mover a otra sede **cambia la sede del lote**, y con eso a dónde imputan sus costos.
+- Deja `LoteEvento` con `sala_origen`/`sala_destino` (los campos ya existían para esto).
+- En la UI: checkbox por lote y barra flotante. El diálogo **enumera lote por lote qué va a cambiar**
+  antes de confirmar, en vez de un "¿estás seguro?" genérico, y avisa que pasar a floración no se
+  deshace. `ConfirmDialog` pasó a `white-space: pre-line` para poder mostrar esa lista.
+
+**Ambiente actual en la ficha de sala.** Los `RegistroAmbiental` cuelgan del lote, no de la sala, así
+que "el ambiente de la sala" es el registro más reciente entre sus lotes. Se muestra temperatura,
+humedad y **VPD calculado** (con temperatura de hoja estimada 2 °C por debajo del aire), con su nivel
+en color. Siempre **con la antigüedad y el lote del que salió**: sin sensores el dato puede ser de
+hace una semana, y mostrarlo pelado te haría creer que es de ahora.
+
+**Dashboard de sede: plantas por fase en vez de un total.** "800 plantas" no dice nada: es un número
+muy distinto si son 700 esquejes o 700 en floración — cambia el consumo, el riego, el espacio y lo que
+vas a cosechar. Ahora germinación · esquejes · vegetativo · floración · cosechadas, contando por el
+estado de la **planta** (dentro de un lote conviven estados por cosecha parcial), y mostrando solo las
+fases que tienen algo.
+
 ## Julio 2026 (x) — el evento se arma como se piensa, y las entradas se imprimen
 
 La ficha del evento estaba organizada según el modelo de datos (una caja por entidad: provisión,

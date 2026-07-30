@@ -97,6 +97,20 @@ function emptyForm() {
 const form       = ref(emptyForm())
 const formErrors = ref({})
 
+// Las fases, en el orden del ciclo. "Cosechadas" cierra la fila porque ya no ocupan sala.
+const FASES_PLANTA = [
+  { clave: 'germinacion', label: 'germinación' },
+  { clave: 'esqueje',     label: 'esquejes' },
+  { clave: 'vegetativo',  label: 'vegetativo' },
+  { clave: 'floracion',   label: 'floración' },
+  { clave: 'cosechadas',  label: 'cosechadas' },
+]
+// Solo las fases que tienen plantas: una sede sin esquejes no gana nada mostrando "0 esquejes".
+function fasesConPlantas(sede) {
+  const f = sede.ops?.plantas_por_fase || {}
+  return FASES_PLANTA.map(x => ({ ...x, n: f[x.clave] || 0 })).filter(x => x.n > 0)
+}
+
 const kpis = computed(() => ({
   total:          sedes.value.length,
   produccion:     sedes.value.filter(s => ['produccion','mixta'].includes(s.tipo)).length,
@@ -278,10 +292,16 @@ function tieneActividad(sede) {
                 </div>
               </div>
 
-              <!-- KPIs compactos -->
+              <!-- KPIs compactos. El total de plantas no dice nada: 800 plantas es un número muy
+                   distinto si son 700 esquejes que si son 700 en floración. Va el desglose por fase,
+                   y solo las fases que tienen algo (una sede sin esquejes no muestra "0 esquejes"). -->
               <div class="agri-sede__kpis" v-if="sede.ops">
-                <div class="agri-kpi">
-                  <span class="agri-kpi__val">{{ sede.ops.plantas_activas }}</span>
+                <div v-for="f in fasesConPlantas(sede)" :key="f.clave" class="agri-kpi agri-kpi--fase">
+                  <span class="agri-kpi__val">{{ f.n }}</span>
+                  <span class="agri-kpi__lbl">{{ f.label }}</span>
+                </div>
+                <div v-if="!fasesConPlantas(sede).length" class="agri-kpi">
+                  <span class="agri-kpi__val">0</span>
                   <span class="agri-kpi__lbl">plantas</span>
                 </div>
                 <div class="agri-kpi">

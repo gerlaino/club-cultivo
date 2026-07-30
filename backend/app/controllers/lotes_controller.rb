@@ -270,6 +270,94 @@ class LotesController < ApplicationController
     lote.plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state)
   end
 
+  # POST /lotes/mover  { lote_ids: [], sala_id: }
+  #
+  # Mueve uno o varios lotes a otra sala, INCLUSO de otra sede. Hasta ahora la única forma de que un
+  # lote cambiara de sala era avanzando de fase, así que rebalancear salas, vaciar una para limpieza
+  # o corregir un alta obligaba a fingir un avance y ensuciaba la historia del lote.
+  #
+  # REGLA CENTRAL: **el lote toma la fase de la sala a la que va**. Si una sala está en floración,
+  # está dando 12/12: una planta que entra ahí pasa a florecer le guste a quien le guste. El cuarto
+  # define el fotoperiodo, no el papel. Por eso el cambio de estado se propaga también a las plantas,
+  # igual que lo hace `salas#cambiar_fase`.
+  #
+  # La sede va con la sala: al mover a otra sede, el lote cambia de sede, y eso arrastra a dónde
+  # imputan sus costos.
+  def mover
+    unless %w[admin supervisor cultivador].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    destino = current_user.club.salas.activas.find_by(id: params[:sala_id])
+    return render json: { error: 'Sala destino no encontrada o inactiva' }, status: :not_found unless destino
+
+    ids = Array(params[:lote_ids]).map(&:to_i).uniq
+    return render json: { error: 'Elegí al menos un lote' }, status: :unprocessable_entity if ids.empty?
+
+    lotes = current_user.club.lotes.where(id: ids, estado: Lote::CULTIVO_ESTADOS).includes(:sala, :plants)
+    if lotes.empty?
+      return render json: { error: 'Ninguno de los lotes elegidos está en una sala de cultivo' },
+                    status: :unprocessable_entity
+    end
+
+    # Solo las salas de fase definida imponen fase. Una sala mixta/madre/clon no reescribe nada:
+    # ahí conviven fases distintas a propósito.
+    fase_destino = destino.kind if %w[vegetativo floracion].include?(destino.kind)
+
+    movidos, cambiaron_fase, plantas = 0, [], 0
+
+    ActiveRecord::Base.transaction do
+      lotes.each do |lote|
+        sala_anterior   = lote.sala
+        estado_anterior = lote.estado
+        next if sala_anterior&.id == destino.id   # ya está ahí: no ensuciamos la historia
+
+        attrs = { sala_id: destino.id, sede_id: destino.sede_id }
+        cambia = fase_destino.present? && fase_destino != estado_anterior
+        attrs[:estado] = fase_destino if cambia
+        lote.update!(attrs)
+
+        if cambia
+          plant_state = Lote::FASE_A_PLANT_STATE[fase_destino]
+          if plant_state
+            plantas += lote.plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state)
+          end
+          cambiaron_fase << { codigo: lote.codigo, de: estado_anterior, a: fase_destino }
+        end
+
+        lote.lote_eventos.create!(
+          tipo:            cambia ? 'cambio_estado' : 'actividad',
+          # Una actividad DEBE declarar categoría (lo valida el modelo). No hay una de "mudanza",
+          # así que va 'otro'; lo que cuenta la historia son sala_origen/sala_destino, que existen
+          # en el modelo justo para esto.
+          categoria:       cambia ? nil : 'otro',
+          sala_origen:     sala_anterior,
+          sala_destino:    destino,
+          estado_anterior: cambia ? estado_anterior : nil,
+          estado_nuevo:    cambia ? fase_destino : nil,
+          descripcion:     [
+            "Movido de #{sala_anterior&.nombre || 'sin sala'} a #{destino.nombre}",
+            (sala_anterior&.sede_id != destino.sede_id ? "(cambio de sede)" : nil),
+            (cambia ? "· #{estado_anterior} → #{fase_destino}" : nil),
+          ].compact.join(' '),
+          user:            current_user,
+          club:            current_user.club,
+          registrado_en:   Time.current,
+        )
+        movidos += 1
+      end
+    end
+
+    render json: {
+      movidos:            movidos,
+      sala_destino:       { id: destino.id, nombre: destino.nombre, kind: destino.kind },
+      cambios_de_fase:    cambiaron_fase,
+      plantas_afectadas:  plantas,
+    }
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
   # POST /lotes/:id/registrar_trasplante  { fecha, maceta_origen_l, maceta_destino_l }
   # Registra un trasplante del lote (se puede backdatear): crea un PlantActivity
   # 'transplant' por planta activa con la maceta origen→destino (lo que muestra la

@@ -119,10 +119,30 @@ class SedesController < ApplicationController
     base
   end
 
+  # Estados de LOTE que cuentan como "vivo" en la sede. Incluye `esqueje`, que faltaba: un lote de
+  # esquejes está en una sala (el modelo se lo exige) y sus plantas existen — no contarlas hacía
+  # desaparecer del tablero justo la fase más frágil del ciclo.
+  LOTE_ESTADOS_VIVOS = %w[germinacion esqueje vegetativo floracion cosecha curado].freeze
+
   def serialize_ops(s)
     salas       = s.salas.includes(lotes: :plants)
-    lotes_vivos = salas.flat_map(&:lotes).select { |l| %w[germinacion vegetativo floracion cosecha curado].include?(l.estado) }
+    lotes_vivos = salas.flat_map(&:lotes).select { |l| LOTE_ESTADOS_VIVOS.include?(l.estado) }
     plantas_count = lotes_vivos.sum { |l| l.plants.count }
+
+    # Desglose de plantas POR FASE. Un total de plantas no dice nada: 800 plantas es un número muy
+    # distinto si son 700 esquejes que si son 700 en floración —cambia el consumo, el riego, el
+    # espacio y lo que vas a cosechar—. Se cuenta por el estado de la PLANTA, no del lote, porque
+    # dentro de un lote conviven plantas en distinto estado (cosecha parcial, descartes).
+    plantas_por_fase = Plant.where(lote_id: lotes_vivos.map(&:id))
+                            .where.not(state: 'descartada')
+                            .group(:state).count
+    fases = {
+      germinacion: plantas_por_fase['germinacion'].to_i,
+      esqueje:     plantas_por_fase['esqueje'].to_i,
+      vegetativo:  plantas_por_fase['vegetativo'].to_i,
+      floracion:   plantas_por_fase['floracion'].to_i,
+      cosechadas:  plantas_por_fase['cosechado'].to_i + plantas_por_fase['secado'].to_i,
+    }
 
     ciclo = lotes_vivos
               .group_by(&:estado)
@@ -160,13 +180,14 @@ class SedesController < ApplicationController
     {
       ops: {
         plantas_activas:   plantas_count,
+        plantas_por_fase:  fases,
         lotes_activos:     lotes_vivos.count,
         ciclo_predominante: ciclo,
         tareas_pendientes: tareas_pendientes,
         tareas_urgentes:   tareas_urgentes,
         dias_para_cosecha: dias_para_cosecha,
         salas:             salas.map { |sala|
-          lotes_sala = sala.lotes.select { |l| %w[germinacion vegetativo floracion cosecha curado].include?(l.estado) }
+          lotes_sala = sala.lotes.select { |l| LOTE_ESTADOS_VIVOS.include?(l.estado) }
           {
             id:     sala.id,
             nombre: sala.nombre,

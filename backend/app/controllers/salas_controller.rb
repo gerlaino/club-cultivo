@@ -112,7 +112,12 @@ class SalasController < ApplicationController
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 
-    lotes_activos = @sala.lotes.where(estado: %w[vegetativo floracion])
+    # TODO lo que está físicamente en la sala respira el mismo aire, así que recibe el registro.
+    # La lista estaba escrita a mano y se olvidaba de `esqueje` y `germinacion` — justo las fases
+    # donde el ambiente más importa, porque un esqueje sin raíz depende del aire para no
+    # deshidratarse. `CULTIVO_ESTADOS` es la fuente única: son exactamente los estados para los que
+    # el modelo EXIGE sala (ver la validación de sala_id en Lote).
+    lotes_activos = @sala.lotes.where(estado: Lote::CULTIVO_ESTADOS)
 
     if lotes_activos.empty?
       return render json: { error: 'No hay lotes activos en esta sala' }, status: :unprocessable_entity
@@ -360,6 +365,48 @@ class SalasController < ApplicationController
       },
       lotes_historial:,
       historial_kpis:,
+      ambiente_actual: ambiente_actual(lote_ids),
     )
+  end
+
+  # Último ambiente conocido de la sala. Los RegistroAmbiental cuelgan del LOTE, no de la sala, así
+  # que "el ambiente de la sala" es el registro más reciente entre sus lotes.
+  #
+  # Va siempre con `registrado_en` y de qué lote salió: sin sensores conectados este dato puede ser
+  # de hace una semana, y mostrarlo pelado te haría creer que es de ahora. Un dato ambiental viejo
+  # sin fecha es peor que no tener dato.
+  def ambiente_actual(lote_ids)
+    return nil if lote_ids.empty?
+
+    r = RegistroAmbiental.where(lote_id: lote_ids)
+                         .where('temperatura IS NOT NULL OR humedad IS NOT NULL')
+                         .order(registrado_en: :desc).first
+    return nil unless r
+
+    temp = r.temperatura&.to_f
+    hum  = r.humedad&.to_f
+    {
+      temperatura:   temp,
+      humedad:       hum,
+      vpd:           vpd_kpa(temp, hum),
+      co2:           r.co2,
+      registrado_en: r.registrado_en,
+      lote_codigo:   r.lote&.codigo,
+      fuente:        r.fuente,
+    }
+  end
+
+  # VPD (déficit de presión de vapor) en kPa, con la temperatura de HOJA estimada 2 °C por debajo
+  # de la del aire —la hoja transpira y se enfría—. Es la métrica que de verdad dice si el cuarto
+  # está bien: 25 °C con 40% y 25 °C con 70% son dos mundos distintos y el promedio de temperatura
+  # solo no los distingue. Fórmula de Tetens para la presión de vapor de saturación.
+  def vpd_kpa(temp_aire, humedad)
+    return nil if temp_aire.nil? || humedad.nil?
+
+    t_hoja = temp_aire - 2.0
+    svp_hoja = 0.61078 * Math.exp((17.27 * t_hoja) / (t_hoja + 237.3))
+    svp_aire = 0.61078 * Math.exp((17.27 * temp_aire) / (temp_aire + 237.3))
+    avp = svp_aire * (humedad / 100.0)
+    [(svp_hoja - avp).round(2), 0.0].max
   end
 end

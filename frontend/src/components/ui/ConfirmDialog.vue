@@ -64,6 +64,9 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   margin-bottom: .5rem;
 }
 .cd-msg {
+  /* pre-line: los mensajes que enumeran consecuencias (ej. mover lotes, que lista lote por lote
+     qué va a cambiar) traen saltos de línea y sin esto se leían como un párrafo apelmazado. */
+  white-space: pre-line;
   font-size: .875rem;
   color: #64748b;
   margin: 0 0 1.25rem;

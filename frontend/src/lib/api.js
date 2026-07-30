@@ -84,6 +84,9 @@ export const getLote      = (id)         => api.get(`/lotes/${id}`)
 export const getLotePorQR = (codigoQr)   => api.get(`/lotes/por_qr/${codigoQr}`)
 export const createLote = (salaId, payload) => api.post(`/salas/${salaId}/lotes`, { lote: payload });
 export const updateLote         = (id, payload, extra = {}) => api.put(`/lotes/${id}`, { lote: payload, ...extra });
+// Mueve uno o varios lotes a otra sala (incluso de otra sede). El lote TOMA LA FASE de la sala
+// destino: si va a una sala de floración, pasa a floración, y sus plantas con él.
+export const moverLotes         = (loteIds, salaId) => api.post('/lotes/mover', { lote_ids: loteIds, sala_id: salaId });
 export const registrarTrasplante = (id, payload) => api.post(`/lotes/${id}/registrar_trasplante`, payload);
 export const deleteLote = (id) => api.delete(`/lotes/${id}`);
 export const getLoteProximoCodigo = () => api.get('/lotes/proximo_codigo')

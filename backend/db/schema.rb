@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_27_000004) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_27_000005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -590,6 +590,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_27_000004) do
     t.datetime "updated_at", null: false
     t.bigint "unidad_negocio_id"
     t.bigint "sede_id"
+    t.index "club_id, COALESCE(sede_id, (0)::bigint), clave_sistema", name: "index_depositos_sistema_unico", unique: true, where: "((clave_sistema IS NOT NULL) AND (deleted_at IS NULL))"
     t.index ["club_id", "clave_sistema"], name: "index_depositos_on_club_id_and_clave_sistema"
     t.index ["club_id", "sede_id", "clave_sistema"], name: "index_depositos_on_club_sede_clave"
     t.index ["club_id"], name: "index_depositos_on_club_id"
