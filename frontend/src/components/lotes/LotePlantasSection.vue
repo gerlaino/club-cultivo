@@ -230,8 +230,8 @@
               <div class="lps__field">
                 <label class="lps__label">Estado inicial</label>
                 <select class="lps__input" v-model="plantaForm.state">
-                  <option value="germinacion">🌱 Germinación</option>
-                  <option value="esqueje">✂️ Esqueje</option>
+                  <option value="germinacion">🌱 Enraizado (semilla)</option>
+                  <option value="esqueje">🌱 Enraizado (esqueje)</option>
                   <option value="vegetativo">🍃 Vegetativo</option>
                   <option value="floracion">🌸 Floración</option>
                 </select>
@@ -239,8 +239,8 @@
               <div class="lps__field">
                 <label class="lps__label">Origen</label>
                 <select class="lps__input" v-model="plantaForm.origen">
-                  <option value="germinacion">🌱 Germinación</option>
-                  <option value="esqueje">✂️ Esqueje</option>
+                  <option value="germinacion">🌱 Enraizado (semilla)</option>
+                  <option value="esqueje">🌱 Enraizado (esqueje)</option>
                   <option value="division">🪴 División</option>
                 </select>
               </div>

@@ -33,7 +33,7 @@ function docFalso() {
 
 const LOTE = {
   qrDataUrl: 'data:image/png;base64,AAAA',
-  codigo: 'L-26-061', genetica: 'ZKKW - Tropicanna', estado: 'Esqueje',
+  codigo: 'L-26-061', genetica: 'ZKKW - Tropicanna', estado: 'Enraizado',
   inicio: '2026-07-22', plantas: 12, clubName: 'Mitocondria_TEST',
 }
 
@@ -70,7 +70,7 @@ describe('dibujarEtiquetaLote', () => {
 
     const texto = doc.textos.map(t => t.t).join(' | ')
     expect(texto).toContain('L-26-061')
-    expect(texto).toContain('Esqueje')
+    expect(texto).toContain('Enraizado')
     expect(texto).toContain('inicio 22/07/2026')   // fecha en formato argentino
     expect(texto).toContain('12 plantas')
     expect(texto).toContain('Mitocondria_TEST')

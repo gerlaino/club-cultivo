@@ -22,8 +22,8 @@ const today = new Date().toISOString().split('T')[0]
 
 // Estados correctos según el modelo
 const STATE_META = {
-  esqueje:    { label: 'Esqueje',    icon: '✂️',  color: '#7c3aed' },
-  germinacion:{ label: 'Semilla',    icon: '🌰',  color: '#92400e' },
+  esqueje:    { label: 'Enraizado',  icon: '🌱',  color: '#0891b2' },
+  germinacion:{ label: 'Enraizado',  icon: '🌱',  color: '#0891b2' },
   vegetativo: { label: 'Vegetativo', icon: '🌱',  color: '#15803d' },
   floracion:  { label: 'Floración',  icon: '🌸',  color: '#b45309' },
   cosechado:  { label: 'Cosechado',  icon: '✅',  color: '#0369a1' },

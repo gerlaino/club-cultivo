@@ -14,8 +14,8 @@ export const LOTE_ESTADOS = ['germinacion', 'esqueje', 'vegetativo', 'floracion'
 export const PLANT_STATES = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'secado', 'cosechado', 'descartada']
 
 export const ESTADO_META = {
-  germinacion:            { label: 'Germinación',        color: '#64748b', bg: '#f1f5f9', emoji: '🌱' },
-  esqueje:            { label: 'Esqueje',             color: '#0891b2', bg: '#e0f2fe', emoji: '🪴' },
+  germinacion:            { label: 'Enraizado',          color: '#0891b2', bg: '#e0f2fe', emoji: '🌱' },
+  esqueje:            { label: 'Enraizado',           color: '#0891b2', bg: '#e0f2fe', emoji: '🌱' },
   vegetativo:         { label: 'Vegetativo',          color: '#16a34a', bg: '#dcfce7', emoji: '🍃' },
   floracion:          { label: 'Floración',          color: '#d97706', bg: '#fef3c7', emoji: '🌸' },
   cosecha:            { label: 'Cosecha',            color: '#059669', bg: '#d1fae5', emoji: '🌿' },
@@ -26,8 +26,8 @@ export const ESTADO_META = {
 
 // Meta de los estados de PLANTA. Claves == PLANT_STATES (canónico backend).
 export const PLANT_STATE_META = {
-  germinacion:{ label: 'Germinación',color: '#16a34a', emoji: '🌱' },
-  esqueje:    { label: 'Esqueje',    color: '#0891b2', emoji: '🌿' },
+  germinacion:{ label: 'Enraizado',  color: '#0891b2', emoji: '🌱' },
+  esqueje:    { label: 'Enraizado',  color: '#0891b2', emoji: '🌱' },
   vegetativo: { label: 'Vegetativo', color: '#16a34a', emoji: '🍃' },
   floracion:  { label: 'Floración',  color: '#d97706', emoji: '🌸' },
   secado:     { label: 'Secado',     color: '#c2410c', emoji: '🍂' },
@@ -70,7 +70,7 @@ export const TAREAS_LOTE = [
 export const CICLO_BASE = ['vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado']
 
 export const FASE_LABELS = {
-  vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', germinacion: 'Germinación',
+  vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', germinacion: 'Enraizado',
   manicura: 'Manicura', cerrado: 'Cerrado',
 }
 
@@ -99,7 +99,7 @@ export const ESPINA_BIOLOGICA = [
     label: 'Vegetativo',
     estados: ['germinacion', 'esqueje', 'vegetativo'],   // paraguas
     subetapas: [
-      { estado: 'germinacion',    label: 'Germinación' },
+      { estado: 'germinacion',    label: 'Enraizado' },
       { estado: 'esqueje',    label: 'Enraizado'   },
       { estado: 'vegetativo', label: 'Vege'        },  // se subdivide por trasplantes
     ],

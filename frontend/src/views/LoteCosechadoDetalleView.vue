@@ -171,7 +171,7 @@ const eventos       = ref([])
 const tareas        = ref([])
 
 const ESTADO_LABEL = {
-  germinacion: 'Germinación', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
+  germinacion: 'Enraizado', esqueje: 'Enraizado', vegetativo: 'Vegetativo',
   floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'En manicura',
   curado: 'Curado', finalizado: 'Finalizado',
 }

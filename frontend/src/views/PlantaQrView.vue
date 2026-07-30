@@ -304,7 +304,7 @@ const progresoPorc = computed(() => {
 
 
 const ESTADO_LABELS = {
-  semilla: 'Semilla', esqueje: 'Esqueje', vegetativo: 'Vegetativo',
+  semilla: 'Enraizado', esqueje: 'Enraizado', vegetativo: 'Vegetativo',
   floracion: 'Floración', cosecha: 'Cosecha', en_manicura: 'Manicura', curado: 'Curado', finalizado: 'Finalizado',
 }
 function estadoPlantaLabel(e) { return ESTADO_LABELS[e] || e || '—' }

@@ -255,7 +255,7 @@ const ESTADOS_LOTE     = ['germinacion','esqueje','vegetativo','floracion','cose
 const KINDS_CON_ORIGEN = ['vegetativo','madre','clon','mixta']
 const KIND_TO_ESTADO   = { floracion: 'floracion' }
 const ESTADOS_HEREDADO = [
-  { value: 'germinacion', label: 'Germinación / Plántula' },
+  { value: 'germinacion', label: 'Enraizado' },
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración' },
   { value: 'cosecha',    label: 'Cosechado' },
@@ -299,7 +299,7 @@ function toggleLoteColapso(loteId) {
 const estadosHeredadoPermitidos = computed(() =>
   ESTADOS_HEREDADO.map(e =>
     e.value === 'germinacion'
-      ? { ...e, label: form.value.origen === 'esqueje' ? 'Esqueje' : 'Germinación / Plántula' }
+      ? { ...e, label: 'Enraizado' }
       : e
   )
 )

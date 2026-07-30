@@ -43,8 +43,8 @@ const canExport = computed(() => ["admin","auditor","supervisor","cultivador"].i
 const ESTADOS = ["germinacion","esqueje","vegetativo","floracion","cosecha","en_manicura","curado","finalizado"];
 
 const ESTADO_META = {
-  germinacion:     { label:"Germinación",     dot:"#64748b", bg:"#f1f5f9", text:"#475569", bar:"#64748b", icon:"🌰" },
-  esqueje:     { label:"Esqueje",     dot:"#0891b2", bg:"#e0f2fe", text:"#0369a1", bar:"#0891b2", icon:"🪴" },
+  germinacion:     { label:"Enraizado",       dot:"#0891b2", bg:"#e0f2fe", text:"#0369a1", bar:"#0891b2", icon:"🌱" },
+  esqueje:     { label:"Enraizado",   dot:"#0891b2", bg:"#e0f2fe", text:"#0369a1", bar:"#0891b2", icon:"🌱" },
   vegetativo:  { label:"Vegetativo",  dot:"#3F6452", bg:"#E8F0EB", text:"#2D4A3E", bar:"#5A8A72", icon:"🌱" },
   floracion:   { label:"Floración",   dot:"#D97706", bg:"#FEF3C7", text:"#92400e", bar:"#D97706", icon:"🌸" },
   cosecha:     { label:"Cosecha",     dot:"#5A8A72", bg:"#F4F8F5", text:"#1A3D2E", bar:"#3F6452", icon:"✂️" },

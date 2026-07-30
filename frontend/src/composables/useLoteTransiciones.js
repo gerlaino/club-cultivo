@@ -6,8 +6,8 @@ import { useAuthStore } from '../stores/auth'
 import { transicionarLote, avanzarFaseLote } from '../lib/api'
 
 const ESTADO_META = {
-  germinacion:            { label: 'Germinación',        emoji: '🌱' },
-  esqueje:            { label: 'Esqueje',            emoji: '🪴' },
+  germinacion:            { label: 'Enraizado',          emoji: '🌱' },
+  esqueje:            { label: 'Enraizado',          emoji: '🌱' },
   vegetativo:         { label: 'Vegetativo',         emoji: '🍃' },
   floracion:          { label: 'Floración',          emoji: '🌸' },
   cosecha:            { label: 'Cosecha',            emoji: '🌿' },
@@ -54,7 +54,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
 
   // ── Helpers ───────────────────────────────────────────────
   function capitalizarFase(f) {
-    const LABELS = { vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', germinacion: 'Germinación', manicura: 'Manicura', cerrado: 'Cerrado' }
+    const LABELS = { vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', germinacion: 'Enraizado', manicura: 'Manicura', cerrado: 'Cerrado' }
     return LABELS[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : '')
   }
 

@@ -99,8 +99,8 @@ const alertaMax = computed(() => {
 
 // Fase dominante según lotes
 const FASE_BADGE = {
-  semilla:      { variant: 'leaf', label: 'Germinación' },
-  esqueje:      { variant: 'sky',  label: 'Esqueje' },
+  semilla:      { variant: 'sky',  label: 'Enraizado' },
+  esqueje:      { variant: 'sky',  label: 'Enraizado' },
   vegetativo:   { variant: 'leaf', label: 'Vegetativo' },
   floracion:    { variant: 'gold', label: 'Floración' },
   cosecha:      { variant: 'ink',  label: 'Cosecha' },

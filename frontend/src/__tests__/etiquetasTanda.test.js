@@ -96,7 +96,7 @@ describe('la tanda no pierde etiquetas', () => {
       urlDe:   (l) => `https://x/l/${l.codigo_qr}`,
       layout:  LAYOUT_LOTE,
       dibujar: dibujarEtiquetaLote,
-      datosDe: (l, qr) => ({ qrDataUrl: qr, codigo: l.codigo, genetica: 'G', estado: 'Esqueje', plantas: 1 }),
+      datosDe: (l, qr) => ({ qrDataUrl: qr, codigo: l.codigo, genetica: 'G', estado: 'Enraizado', plantas: 1 }),
     }))
     expect(imagenes).toHaveLength(11)           // la etiqueta de lote lleva UN QR
     expect(paginas.n).toBe(2)

@@ -26,8 +26,8 @@
               <select class="lem__input" v-model="editLoteForm.estado">
                 <!-- Fase inicial: germinación (solo lotes de semilla) → esqueje → vegetativo.
                      Un lote de esqueje arranca en esqueje (se saltea germinación). -->
-                <option v-if="props.lote?.origen !== 'esqueje'" value="germinacion">Germinación / Plántula</option>
-                <option value="esqueje">Esqueje</option>
+                <option v-if="props.lote?.origen !== 'esqueje'" value="germinacion">Enraizado (semilla)</option>
+                <option value="esqueje">Enraizado (esqueje)</option>
                 <option value="vegetativo">Vegetativo</option>
                 <option value="floracion">Floración</option>
                 <option value="cosecha">Cosechado</option>

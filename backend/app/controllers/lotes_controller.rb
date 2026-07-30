@@ -854,7 +854,7 @@ class LotesController < ApplicationController
   end
 
   FASE_LABELS = {
-    'semilla' => 'Semilla', 'esqueje' => 'Esqueje', 'germinacion' => 'Germinación',
+    'semilla' => 'Enraizado', 'esqueje' => 'Enraizado', 'germinacion' => 'Enraizado',
     'vegetativo' => 'Vegetativo', 'floracion' => 'Floración', 'cosecha' => 'Cosecha',
     'secado' => 'Secado', 'curado' => 'Curado', 'finalizado' => 'Finalizado',
     'en_manicura' => 'En manicura',

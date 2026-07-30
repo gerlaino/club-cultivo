@@ -395,7 +395,7 @@ const amb = computed(() => {
 
 const ESTADO_META = {
   semilla:    { label:"Semilla",  color:"#64748b", emoji:"🌱" },
-  esqueje:    { label:"Esqueje",  color:"#16a34a", emoji:"🪴" },
+  esqueje:    { label:"Enraizado",color:"#0891b2", emoji:"🌱" },
   vegetativo: { label:"Vegetativo",      color:"#16a34a", emoji:"🌱" },
   floracion:  { label:"Floración",       color:"#d97706", emoji:"🌸" },
   cosecha:     { label:"Cosecha",     color:"#92400e", emoji:"✂️" },
@@ -497,7 +497,7 @@ const KIND_TO_ESTADO = { floracion:"floracion" }
 const KINDS_CON_ORIGEN = ['vegetativo', 'madre', 'clon', 'mixta']
 
 const ESTADOS_HEREDADO = [
-  { value: 'germinacion', label: 'Germinación / Esqueje' },
+  { value: 'germinacion', label: 'Enraizado' },
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración' },
   { value: 'cosecha',    label: 'Cosecha' },

@@ -211,8 +211,8 @@ const TIPOS = [
 ]
 
 const ESTADOS = [
-  { value: 'germinacion', emoji: '🌰', label: 'Germinación' },
-  { value: 'esqueje',     emoji: '🌿', label: 'Esqueje' },
+  { value: 'germinacion', emoji: '🌱', label: 'Enraizado (desde semilla)' },
+  { value: 'esqueje',     emoji: '🌱', label: 'Enraizado (desde esqueje)' },
   { value: 'vegetativo',  emoji: '🌱', label: 'Vegetativo' },
   { value: 'floracion',   emoji: '🌸', label: 'Floración' },
   { value: 'secado',      emoji: '🍂', label: 'Secado' },

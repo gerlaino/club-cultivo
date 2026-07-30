@@ -583,8 +583,8 @@ const PLAGAS_META = {
 // orígenes alternativos que caen en el mismo punto del ciclo). Ver loteHelpers.
 const CICLO = ["germinacion","vegetativo","floracion","cosecha","en_manicura","curado","finalizado"]
 const ESTADO_META = {
-  germinacion:     {label:"Germinación", color:"#64748b",bg:"#f1f5f9",emoji:"🌱"},
-  esqueje:     {label:"Esqueje",     color:"#0891b2",bg:"#e0f2fe",emoji:"🪴"},
+  germinacion:     {label:"Enraizado",   color:"#0891b2",bg:"#e0f2fe",emoji:"🌱"},
+  esqueje:     {label:"Enraizado",   color:"#0891b2",bg:"#e0f2fe",emoji:"🌱"},
   vegetativo:  {label:"Vegetativo",  color:"#16a34a",bg:"#dcfce7",emoji:"🍃"},
   floracion:   {label:"Floración",   color:"#d97706",bg:"#fef3c7",emoji:"🌸"},
   cosecha:     {label:"Cosecha",     color:"#92400e",bg:"#fff7ed",emoji:"✂️"},

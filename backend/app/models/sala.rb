@@ -62,7 +62,7 @@ class Sala < ApplicationRecord
   end
 
   NOMBRES_TIPO = {
-    'germinacion' => 'Germinación', 'vegetativo' => 'Vegetativo',
+    'germinacion' => 'Enraizado', 'vegetativo' => 'Vegetativo',
     'floracion'   => 'Floración',   'cosecha'    => 'Cosecha',
     'curado'      => 'Curado',      'manicura'   => 'Manicura',
   }.freeze

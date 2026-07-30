@@ -45,8 +45,8 @@ function formatDateShort(d) { return formatFechaCorta(d) }
 
 function estadoMeta(estado) {
   return {
-    semilla:     { label: "Germinación", color: "#64748b", bg: "rgba(100,116,139,.1)" },
-    esqueje:     { label: "Esqueje",     color: "#0891b2", bg: "rgba(8,145,178,.1)"   },
+    semilla:     { label: "Enraizado",   color: "#0891b2", bg: "rgba(8,145,178,.1)"   },
+    esqueje:     { label: "Enraizado",   color: "#0891b2", bg: "rgba(8,145,178,.1)"   },
     vegetativo:  { label: "Vegetativo",  color: "#15803d", bg: "rgba(21,128,61,.1)"  },
     floracion:   { label: "Floración",   color: "#d97706", bg: "rgba(217,119,6,.1)"  },
     cosecha:     { label: "Cosecha",     color: "#059669", bg: "rgba(5,150,105,.1)"  },

@@ -28,8 +28,8 @@ const filters = ref({ state: '', lote_id: '', search: '' })
 const sortBy  = ref('created_at_desc')
 
 const STATE_META = {
-  germinacion:{ label: 'Germinación', icon: '🌰', bg: '#E0F2FE', color: '#0369a1', bar: '#0284C7', kpiIcon: '🌰', kpiBg: 'rgba(3,105,161,.1)' },
-  esqueje:    { label: 'Esqueje',     icon: '✂️',  bg: '#F3E8FF', color: '#7c3aed', bar: '#8b5cf6', kpiIcon: '✂️',  kpiBg: 'rgba(124,58,237,.1)' },
+  germinacion:{ label: 'Enraizado',   icon: '🌱', bg: '#E0F2FE', color: '#0369a1', bar: '#0284C7', kpiIcon: '🌱', kpiBg: 'rgba(3,105,161,.1)' },
+  esqueje:    { label: 'Enraizado',   icon: '🌱', bg: '#E0F2FE', color: '#0369a1', bar: '#0284C7', kpiIcon: '🌱', kpiBg: 'rgba(3,105,161,.1)' },
   vegetativo: { label: 'Vegetativo',  icon: '🌱', bg: '#E8F0EB', color: '#1A3D2E', bar: '#1b5e20', kpiIcon: '🌱', kpiBg: 'rgba(27,94,32,.1)'   },
   floracion:  { label: 'Floración',   icon: '🌸', bg: '#FEF3C7', color: '#92400e', bar: '#D97706', kpiIcon: '🌸', kpiBg: 'rgba(217,119,6,.12)'  },
   secado:     { label: 'Secado',      icon: '🍂', bg: '#FFF7ED', color: '#c2410c', bar: '#ea580c', kpiIcon: '🍂', kpiBg: 'rgba(194,65,12,.1)'   },
