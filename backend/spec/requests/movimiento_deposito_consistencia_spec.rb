@@ -21,7 +21,7 @@ RSpec.describe 'Compra con destino a depósito — consistencia', type: :request
   def comprar(destino:, monto: 80_000)
     post '/api/movimientos_contables', params: {
       movimiento_contable: {
-        tipo: 'egreso', categoria: 'insumos', descripcion: 'Compra de prueba',
+        tipo: 'egreso', categoria: 'insumo', descripcion: 'Compra de prueba',
         monto_ars: monto, fecha: Date.current, destino: destino
       }
     }, as: :json

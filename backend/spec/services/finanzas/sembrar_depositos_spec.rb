@@ -135,9 +135,11 @@ RSpec.describe Finanzas::SembrarDepositos, type: :service do
         vivo = club.depositos.find_by(clave_sistema: 'general', sede_id: prod.id)
         retirado = club.depositos.create!(clave_sistema: nil, sede_id: prod.id, nombre: 'General',
                                          es_sistema: true, activo: true)
-        # Simula el duplicado que dejó la deduplicación: misma clave, retirado.
-        retirado.update_column(:clave_sistema, 'general')
+        # Simula el duplicado que dejó la deduplicación: misma clave, retirado. El orden importa:
+        # el índice único es parcial (clave_sistema NOT NULL AND deleted_at IS NULL), así que hay
+        # que retirarlo PRIMERO; ponerle la clave estando vivo choca contra el índice en el acto.
         retirado.destroy!
+        retirado.update_column(:clave_sistema, 'general')
 
         expect { described_class.new(club).call }.not_to raise_error
         expect(club.depositos.where(clave_sistema: 'general', sede_id: prod.id).pluck(:id)).to eq([vivo.id])

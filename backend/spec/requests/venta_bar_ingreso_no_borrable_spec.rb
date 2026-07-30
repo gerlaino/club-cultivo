@@ -38,7 +38,7 @@ RSpec.describe 'Ingreso de venta del bar — solo se borra por la venta', type: 
     venta = cobrar_una
     mov_id = venta.movimiento_contable_id
 
-    delete "/bares/#{bar.id}/ventas/#{venta.id}", as: :json
+    delete "/api/bares/#{bar.id}/ventas/#{venta.id}", as: :json
 
     expect(response).to have_http_status(:no_content)
     expect(cerveza.reload.stock.to_d).to eq(20)
@@ -49,7 +49,7 @@ RSpec.describe 'Ingreso de venta del bar — solo se borra por la venta', type: 
     venta = cobrar_una
     sign_in_as(create(:user, :dispensador, club: club))
 
-    delete "/bares/#{bar.id}/ventas/#{venta.id}", as: :json
+    delete "/api/bares/#{bar.id}/ventas/#{venta.id}", as: :json
 
     expect(response).to have_http_status(:forbidden)
     expect(cerveza.reload.stock.to_d).to eq(18)

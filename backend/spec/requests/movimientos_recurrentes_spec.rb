@@ -11,7 +11,7 @@ RSpec.describe 'GET /movimientos_contables/recurrentes', type: :request do
   # previos al mes pedido, así que con `mes` fijo el spec no depende de cuándo se corra.
   let(:mes)   { '2026-06' }
 
-  def egreso(descripcion:, monto:, fecha:, categoria: 'servicios', sede_id: nil, **extra)
+  def egreso(descripcion:, monto:, fecha:, categoria: 'alquiler', sede_id: nil, **extra)
     club.movimientos_contables.create!(
       created_by: admin, tipo: 'egreso', categoria: categoria, descripcion: descripcion,
       monto_ars: monto, fecha: fecha, sede_id: sede_id, **extra
@@ -21,7 +21,9 @@ RSpec.describe 'GET /movimientos_contables/recurrentes', type: :request do
   before { sign_in_as(admin) }
 
   def fijos(params = {})
-    get '/api/movimientos_contables/recurrentes', params: { mes: mes }.merge(params), as: :json
+    # Sin `as: :json`: en un GET con params, Rails codifica el body y la request deja de matchear
+    # la ruta (404). La cookie de sesión ya viaja sola y la ruta default-ea a JSON.
+    get '/api/movimientos_contables/recurrentes', params: { mes: mes }.merge(params)
     expect(response).to have_http_status(:ok)
     JSON.parse(response.body)['fijos']
   end
@@ -109,7 +111,7 @@ RSpec.describe 'GET /movimientos_contables/recurrentes', type: :request do
     ActsAsTenant.with_tenant(otro_club) do
       2.times do |i|
         otro_club.movimientos_contables.create!(
-          created_by: otro_admin, tipo: 'egreso', categoria: 'servicios',
+          created_by: otro_admin, tipo: 'egreso', categoria: 'alquiler',
           descripcion: 'Alquiler ajeno', monto_ars: 1, fecha: Date.new(2026, 5 + i, 5)
         )
       end
