@@ -1,5 +1,30 @@
 # Changelog
 
+## Julio 2026 (aa) — % de prendimiento: la métrica que se perdía
+
+Los esquejes que no agarraban caían en `descartada` mezclados con plagas, machos y roturas. El
+motivo del descarte existía solo como **texto libre** (iba a las notas y al evento del lote): sirve
+para leer una planta, no para preguntar *"¿cuántos esquejes no prendieron?"*.
+
+- **`plants.motivo_descarte`** (estructurado) convive con el texto libre, que se queda para el
+  detalle. Motivos: `no_prendio`, `plaga`, `enfermedad`, `macho`, `hermafrodita`, `estres`, `rotura`,
+  `otro`.
+- **Sin fricción nueva:** descartar una planta que estaba **enraizando** se clasifica sola como
+  `no_prendio` —descartar algo que todavía no tiene raíz *es* que no prendió— y fuera del enraizado
+  el default es `otro`, que no ensucia la métrica. Un motivo explícito le gana al default.
+- **Revertir un descarte borra el motivo**: si no, seguiría contando como "no prendió" una planta
+  que está viva.
+- **`GET /analytics/prendimiento`** — global y **por genética**, que es donde el dato sirve: hay
+  cepas que prenden al 95% y otras al 60%, y eso cambia cuántos cortes hay que hacer. `intentos`
+  incluye a las descartadas (si salieran del denominador el % daría siempre 100), y todo lo que no
+  falló al enraizar cuenta como prendido — una planta perdida por plaga en floración igual había
+  enraizado bien. **Un lote que está enraizando ahora no se mide**: todavía no tiene resultado, e
+  incluirlo daría un prendimiento falsamente alto.
+- Sin datos devuelve porcentaje **nulo**, no 0: "0% de prendimiento" donde no hay dato es peor que
+  no mostrar nada.
+- Tab **Prendimiento** en Analítica, con el % en color (≥85 verde, ≥70 amarillo) y la nota de qué
+  revisar cuando baja del 70%.
+
 ## Julio 2026 (z) — el enraizado deja de medirse con la vara del vegetativo
 
 `AlertaDetectorService` mandaba germinación y esqueje a los setpoints de **vegetativo**, con un

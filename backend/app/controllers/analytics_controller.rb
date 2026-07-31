@@ -3,6 +3,52 @@ class AnalyticsController < ApplicationController
   before_action :require_analytics_access!, except: [:dispensador]
   before_action :require_dispensador_access!, only: [:dispensador]
 
+  # GET /api/analytics/prendimiento
+  # % de prendimiento del enraizado, global y por genética. Es la métrica que hasta ahora se perdía:
+  # los esquejes que no agarraban caían en "descartada" mezclados con plagas, machos y roturas.
+  #
+  # CÓMO SE CUENTA. `intentos` son TODAS las plantas que alguna vez tuvo el lote (las descartadas
+  # incluidas: si no, el que no prende desaparece del denominador y el % siempre da 100). De ahí,
+  # las que NO prendieron son las que tienen el motivo estructurado; todo el resto prendió —una
+  # planta que después se perdió por plaga en floración igual había enraizado bien—.
+  #
+  # Solo entran lotes con al menos un descarte clasificado o que ya pasaron el enraizado: un lote
+  # que está enraizando AHORA todavía no tiene un resultado que medir.
+  def prendimiento
+    club = current_user.club
+    lotes = club.lotes.includes(:genetica)
+    lotes = lotes.where('start_date >= ?', Date.parse(params[:desde])) if params[:desde].present?
+    lotes = lotes.where('start_date <= ?', Date.parse(params[:hasta])) if params[:hasta].present?
+
+    en_curso = lotes.select { |l| Plant::ESTADOS_ENRAIZANDO.include?(l.estado) }.map(&:id)
+    ids      = lotes.map(&:id) - en_curso
+    return render json: vacio_prendimiento if ids.empty?
+
+    # Una sola query por métrica, agrupada por lote: nada de N+1.
+    totales   = Plant.unscoped.where(lote_id: ids, deleted_at: nil).group(:lote_id).count
+    fallados  = Plant.unscoped.where(lote_id: ids, deleted_at: nil, motivo_descarte: 'no_prendio')
+                     .group(:lote_id).count
+
+    por_gen = Hash.new { |h, k| h[k] = { intentos: 0, no_prendieron: 0 } }
+    lotes.each do |l|
+      next unless totales[l.id].to_i.positive?
+      k = [l.genetica_id, l.genetica&.nombre || l.strain || 'Sin genética']
+      por_gen[k][:intentos]      += totales[l.id].to_i
+      por_gen[k][:no_prendieron] += fallados[l.id].to_i
+    end
+
+    intentos = por_gen.values.sum { |v| v[:intentos] }
+    fallos   = por_gen.values.sum { |v| v[:no_prendieron] }
+
+    render json: {
+      global: serializar_prendimiento(intentos, fallos),
+      por_genetica: por_gen.map { |(gid, nombre), v|
+        serializar_prendimiento(v[:intentos], v[:no_prendieron])
+          .merge(genetica_id: gid, genetica: nombre)
+      }.sort_by { |g| [-g[:intentos], g[:genetica].to_s] },
+    }
+  end
+
   # GET /api/analytics/rendimiento_genetica
   # Para: admin, supervisor, super_admin
   def rendimiento_genetica
@@ -14,6 +60,22 @@ class AnalyticsController < ApplicationController
       calcular_rendimiento_genetica(club, año: año)
     end
     render json: data
+  end
+
+  def vacio_prendimiento
+    { global: serializar_prendimiento(0, 0), por_genetica: [] }
+  end
+
+  def serializar_prendimiento(intentos, fallos)
+    prendidas = [intentos - fallos, 0].max
+    {
+      intentos:      intentos,
+      prendidas:     prendidas,
+      no_prendieron: fallos,
+      # Sin intentos no hay porcentaje: devolver 0 haría leer "0% de prendimiento" donde en realidad
+      # no hay dato, que es peor que no mostrar nada.
+      porcentaje:    intentos.positive? ? (prendidas * 100.0 / intentos).round(1) : nil,
+    }
   end
 
   def calcular_rendimiento_genetica(club, año: nil)

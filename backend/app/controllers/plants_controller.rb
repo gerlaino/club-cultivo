@@ -146,6 +146,15 @@ class PlantsController < ApplicationController
           occurred_at:   Time.current
         )
         if descartando
+          # Motivo ESTRUCTURADO, además del texto libre. Si no viene y la planta estaba enraizando,
+          # el default es `no_prendio`: descartar algo que todavía no tiene raíz ES que no prendió, y
+          # obligar a elegirlo agregaría fricción sin agregar información. Fuera del enraizado el
+          # default es 'otro', que no ensucia la métrica de prendimiento.
+          motivo_cod = params[:motivo_descarte].to_s.strip.presence
+          motivo_cod = nil unless Plant::MOTIVOS_DESCARTE.include?(motivo_cod)
+          motivo_cod ||= Plant::ESTADOS_ENRAIZANDO.include?(old_state) ? 'no_prendio' : 'otro'
+          @plant.update_column(:motivo_descarte, motivo_cod)
+
           @plant.update_column(:notas, [@plant.notas.presence, "Descarte: #{motivo}"].compact.join("\n")) if motivo.present?
           # El lote también lo registra: se ve en el historial del lote, no en el de la planta.
           @plant.lote.lote_eventos.create!(
@@ -158,6 +167,7 @@ class PlantsController < ApplicationController
           # Una planta descartada deja de contar como planta viva del lote.
           @plant.lote.decrement!(:plants_count) if @plant.lote.plants_count.to_i > 0
         elsif old_state == 'descartada' && @plant.state != 'descartada'
+          @plant.update_column(:motivo_descarte, nil)   # revertir el descarte borra su motivo
           @plant.lote.increment!(:plants_count) # se revierte el descarte
         end
       end

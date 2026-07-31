@@ -55,6 +55,7 @@ Rails.application.routes.draw do
 
     scope '/analytics', controller: :analytics do
       get :rendimiento_genetica
+      get :prendimiento          # % de esquejes/plántulas que enraizaron, global y por genética
       get :dispensador
       get :produccion
       get :correlacion_ambiental

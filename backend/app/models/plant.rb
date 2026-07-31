@@ -24,11 +24,20 @@ class Plant < ApplicationRecord
   STATES   = %w[germinacion vegetativo floracion secado cosechado esqueje descartada].freeze
   ORIGENES = %w[semilla esqueje].freeze
 
+  # Estados en los que la planta todavía no tiene raíz funcional. Un descarte acá es, por defecto,
+  # un esqueje/plántula que NO PRENDIÓ — que es justo lo que hay que poder medir.
+  ESTADOS_ENRAIZANDO = %w[germinacion esqueje].freeze
+
+  # Motivo estructurado del descarte. Convive con el texto libre (que va a notas): el texto explica
+  # el caso, este permite contarlo.
+  MOTIVOS_DESCARTE = %w[no_prendio plaga enfermedad macho hermafrodita estres rotura otro].freeze
+
   validates :nombre,    presence: true
   validates :state,     inclusion: { in: STATES }
   validates :codigo_qr, uniqueness: true, allow_nil: true
   validates :peso_seco, numericality: { greater_than: 0 }, allow_nil: true
   validates :origen,    inclusion: { in: ORIGENES }, allow_nil: true
+  validates :motivo_descarte, inclusion: { in: MOTIVOS_DESCARTE }, allow_nil: true
 
   scope :por_estado,     ->(estado) { where(state: estado) }
   scope :seleccion,      -> { where(es_seleccion: true) }
@@ -39,6 +48,8 @@ class Plant < ApplicationRecord
   scope :cosechadas,     -> { where(state: 'cosechado') }
   scope :esqueje,        -> { where(state: 'esqueje') }
   scope :descartadas,    -> { where(state: 'descartada') }
+  scope :no_prendieron,  -> { where(motivo_descarte: 'no_prendio') }
+  scope :enraizando,     -> { where(state: ESTADOS_ENRAIZANDO) }
 
   def soft_delete!
     update_column(:deleted_at, Time.current)

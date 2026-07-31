@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_30_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_31_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1591,6 +1591,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_30_000001) do
     t.datetime "deleted_at"
     t.decimal "peso_humedo", precision: 8, scale: 2
     t.bigint "deleted_by_id"
+    t.string "motivo_descarte"
     t.index ["club_id"], name: "index_plants_on_club_id"
     t.index ["codigo_qr"], name: "index_plants_on_codigo_qr", unique: true
     t.index ["deleted_at"], name: "index_plants_on_deleted_at"
@@ -1598,6 +1599,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_30_000001) do
     t.index ["lote_id", "es_seleccion"], name: "index_plants_on_lote_id_and_es_seleccion"
     t.index ["lote_id", "pasada_cosecha"], name: "idx_plants_lote_pasada"
     t.index ["lote_id"], name: "index_plants_on_lote_id"
+    t.index ["motivo_descarte"], name: "index_plants_on_motivo_descarte", where: "(motivo_descarte IS NOT NULL)"
     t.index ["origen"], name: "index_plants_on_origen"
     t.index ["planta_madre_id"], name: "index_plants_on_planta_madre_id"
   end

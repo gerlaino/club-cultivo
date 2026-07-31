@@ -651,6 +651,9 @@ export const getStockByQR     = (codigoQr) => api.get(`/stocks/qr/${codigoQr}`)
 
 // ── Analytics ─────────────────────────────────────────────────────────────────
 export const getAnalyticsRendimiento      = (params = {}) => api.get('/analytics/rendimiento_genetica',   { params })
+// % de esquejes/plántulas que enraizaron, global y por genética. Hasta ahora los que no prendían
+// se perdían mezclados con cualquier otro descarte.
+export const getAnalyticsPrendimiento     = (params = {}) => api.get('/analytics/prendimiento',           { params })
 export const getAnalyticsDispensador      = ()            => api.get('/analytics/dispensador')
 export const getAnalyticsProduccion       = (params = {}) => api.get('/analytics/produccion',              { params })
 export const getAnalyticsCorrelacion      = (params = {}) => api.get('/analytics/correlacion_ambiental',   { params })

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { getAnalyticsRendimiento, getAnalyticsProduccion, getAnalyticsCorrelacion, getAnalyticsContabilidad, getAnalyticsCostoPorGramoSede } from '../lib/api.js'
+import { getAnalyticsRendimiento, getAnalyticsProduccion, getAnalyticsCorrelacion, getAnalyticsContabilidad, getAnalyticsCostoPorGramoSede, getAnalyticsPrendimiento } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import Chart from 'chart.js/auto'
 
@@ -11,6 +11,7 @@ const dataProd   = ref(null)
 const dataCorr   = ref(null)
 const dataCont   = ref(null)
 const dataCpg    = ref(null)
+const dataPrend  = ref(null)
 const añoFiltro  = ref(null)
 
 const añoActual = new Date().getFullYear()
@@ -22,14 +23,16 @@ async function cargar(bust = false) {
   if (añoFiltro.value) params.año = añoFiltro.value
   if (bust) params.bust = true
   try {
-    const [r, p, c] = await Promise.all([
+    const [r, p, c, pr] = await Promise.all([
       getAnalyticsRendimiento(params),
       getAnalyticsProduccion(params),
       getAnalyticsCorrelacion(params),
+      getAnalyticsPrendimiento(params.año ? { desde: `${params.año}-01-01`, hasta: `${params.año}-12-31` } : {}),
     ])
     dataRend.value = r.data
     dataProd.value = p.data
     dataCorr.value = c.data
+    dataPrend.value = pr.data
   } catch {
     // silent
   } finally {
@@ -335,6 +338,9 @@ function bucketColor(desv) {
         <button class="an__tab" :class="{ 'an__tab--active': tab === 'perdidas' }" @click="goTab('perdidas')">
           <i class="bi bi-exclamation-triangle"></i> Pérdidas
         </button>
+        <button class="an__tab" :class="{ 'an__tab--active': tab === 'prendimiento' }" @click="goTab('prendimiento')">
+          <i class="bi bi-droplet-half"></i> Prendimiento
+        </button>
         <button class="an__tab" :class="{ 'an__tab--active': tab === 'comparativa' }" @click="goTab('comparativa')">
           <i class="bi bi-bar-chart-steps"></i> Comparativa
         </button>
@@ -558,6 +564,54 @@ function bucketColor(desv) {
     </template>
 
     <!-- ══ TAB PÉRDIDAS ═════════════════════════════════════════════ -->
+    <!-- Prendimiento: el % de esquejes/plántulas que enraizaron. La lectura útil es POR GENÉTICA:
+         hay cepas que prenden al 95% y otras al 60%, y eso cambia cuántos cortes hay que hacer. -->
+    <template v-if="tab === 'prendimiento'">
+      <div v-if="!dataPrend || dataPrend.global.porcentaje === null" class="an__empty">
+        Todavía no hay enraizados terminados para medir. El porcentaje aparece cuando un lote pasa
+        del enraizado a vegetativo.
+      </div>
+      <template v-else>
+        <div class="an__kpis">
+          <div class="an__kpi">
+            <span class="an__kpi-val">{{ dataPrend.global.porcentaje }}%</span>
+            <span class="an__kpi-lbl">Prendimiento</span>
+          </div>
+          <div class="an__kpi">
+            <span class="an__kpi-val">{{ dataPrend.global.intentos }}</span>
+            <span class="an__kpi-lbl">Intentos</span>
+          </div>
+          <div class="an__kpi">
+            <span class="an__kpi-val">{{ dataPrend.global.no_prendieron }}</span>
+            <span class="an__kpi-lbl">No prendieron</span>
+          </div>
+        </div>
+
+        <div class="an__card">
+          <h3 class="an__card-title">Por genética</h3>
+          <table class="an__table">
+            <thead><tr><th>Genética</th><th class="an__th-r">Intentos</th><th class="an__th-r">Prendieron</th><th class="an__th-r">%</th></tr></thead>
+            <tbody>
+              <tr v-for="g in dataPrend.por_genetica" :key="g.genetica">
+                <td>{{ g.genetica }}</td>
+                <td class="an__td-r">{{ g.intentos }}</td>
+                <td class="an__td-r">{{ g.prendidas }}</td>
+                <td class="an__td-r">
+                  <span class="an__pct" :class="g.porcentaje >= 85 ? 'ok' : g.porcentaje >= 70 ? 'medio' : 'mal'">
+                    {{ g.porcentaje }}%
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="an__nota">
+            Por debajo del 70% hay algo que revisar: sustrato frío (lo más común), aire demasiado
+            seco, corte muy leñoso o una madre agotada.
+          </p>
+        </div>
+      </template>
+    </template>
+
     <template v-if="tab === 'perdidas' && dataProd">
       <div class="an__info-box">
         <i class="bi bi-info-circle"></i>
@@ -1182,6 +1236,11 @@ function bucketColor(desv) {
 
 /* KPIs */
 .an__kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.75rem; }
+.an__pct { font-weight: 700; padding: 2px 9px; border-radius: 999px; font-size: .78rem; }
+.an__pct.ok    { background: #f0fdf4; color: #15803d; }
+.an__pct.medio { background: #fef3c7; color: #b45309; }
+.an__pct.mal   { background: #fee2e2; color: #dc2626; }
+.an__nota { margin: 0; padding: .7rem 1.1rem; font-size: .76rem; color: #64748b; line-height: 1.55; background: #fafbfc; border-top: 1px solid #f1f5f9; }
 .an__kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.1rem; text-align: center; }
 .an__kpi-val { display: block; font-size: 1.8rem; font-weight: 800; color: #0f172a; line-height: 1; letter-spacing: -.04em; }
 .an__kpi-lbl { display: block; font-size: .7rem; color: #94a3b8; margin-top: .35rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
