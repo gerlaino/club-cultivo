@@ -1,5 +1,27 @@
 # Changelog
 
+## Julio 2026 (ac) — la maceta, con su número, y la alerta de raíz enrollada
+
+El período del vasito **sí** es distinto del vegetativo pleno —el pan de raíz se seca rapidísimo, la
+EC recién arranca, y si te pasás de tiempo la raíz se enrolla y la planta se achaparra—, pero **no es
+otra fase fisiológica: es vegetativo en maceta chica**. Modelarlo como estado hubiera repetido el
+error que veníamos de sacar: un estado que en realidad es "la misma etapa con un modificador".
+
+Y "esqueje" no era el nombre: un esqueje es el **corte**, o sea el origen. La prueba es que un lote
+de semilla tendría que pasar por "esqueje", y una plántula nunca fue un corte.
+
+- **El badge muestra la maceta real**: `Vegetativo · 0,5L`, no una etiqueta tipo "en vaso". 0,33L y
+  0,5L no son lo mismo.
+- **Alerta `maceta_chica` escalada por volumen.** El tiempo hasta que la raíz se enrolla no es un
+  número fijo de días: depende de los litros (≤0,4L → 12d; ≤0,6L → 18d; ≤1,5L → 25d; ≤4L → 35d;
+  arriba de 4L se asume maceta final y no se avisa). **Guardar el número real es justamente lo que
+  hace posible la alerta**: con una etiqueta difusa no se podría calcular.
+- Se cuenta desde el **último trasplante** (o el inicio del lote si nunca se trasplantó), y solo en
+  vegetativo: en enraizado la planta está en taco y el reloj que corre es el del prendimiento.
+
+*Se asume que dentro de un lote todas las plantas están igual (decisión de Germán: varios lotes antes
+que macetas mixtas). Si eso cambia, el dato hay que bajarlo a la planta.*
+
 ## Julio 2026 (ab) — el modelo se colapsa: germinación + esqueje → enraizado
 
 Eran **dos estados para una sola etapa**: la planta sin raíz funcional. Lo que de verdad las separaba

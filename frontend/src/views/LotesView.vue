@@ -16,6 +16,7 @@ import { useEtiquetasQR } from '../composables/useEtiquetasQR.js'
 import { useClubStore } from '../stores/club.js'
 import { useToast } from '../composables/useToast.js'
 import { LAYOUT_LOTE, dibujarEtiquetaLote } from '../lib/pdfEtiquetas.js'
+import { estadoConMaceta } from '../lib/loteHelpers.js'
 
 const store = useLotesStore();
 const salas = useSalasStore();
@@ -439,7 +440,7 @@ async function exportarCSV() {
             </td>
             <td data-label="Estado">
               <span class="lv-badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }">
-                {{ em(l.estado).icon }} {{ estadoLabel(l.estado) }}
+                {{ em(l.estado).icon }} {{ estadoConMaceta(l.estado, l.tamanio_maceta) }}
               </span>
             </td>
             <td data-label="Código">
