@@ -123,6 +123,10 @@ class ClonadoresController < ApplicationController
     {
       id: c.id, nombre: c.nombre, capacidad: c.capacidad, activo: c.activo,
       sala: { id: c.sala_id, nombre: c.sala&.nombre, kind: c.sala&.kind },
+      # `libre` es lo que mira la UI para ofrecerlo al crear un lote: un clonador aloja uno solo a
+      # la vez. `lotes_count` son TODOS los que pasaron por él (su historia), no los de adentro.
+      libre: !c.ocupado?,
+      lote_adentro: (l = c.lote_adentro) && { id: l.id, codigo: l.codigo, plants_count: l.plants_count },
       lotes_count: c.lotes.size, ocupados: c.ocupados, disponibles: c.disponibles,
       ambiente_actual: ambiente_actual(c),
     }

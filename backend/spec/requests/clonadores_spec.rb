@@ -101,6 +101,20 @@ RSpec.describe 'Clonadores', type: :request do
   describe 'entrar y salir del domo' do
     let(:clonador) { create(:clonador, club: club, sala: vege, nombre: 'C1', capacidad: 100) }
 
+    # El lote puede nacer ya metido en el domo: es el caso normal —se hacen los esquejes y van
+    # directo al clonador—, así que no hay que crearlo y después asignarlo en dos pasos.
+    it 'un lote puede nacer adentro del domo' do
+      post "/api/salas/#{vege.id}/lotes",
+           params: { lote: { start_date: Date.today.to_s, estado: 'enraizado', origen: 'esqueje',
+                             plants_count: 10, clonador_id: clonador.id } }
+
+      expect(response).to have_http_status(:created)
+      lote = Lote.find(JSON.parse(response.body)['id'])
+      expect(lote.estado).to eq('enraizado')
+      expect(lote.clonador_id).to eq(clonador.id)
+      expect(lote.en_clonador?).to be true
+    end
+
     it 'asigna un lote que está enraizando en la misma sala' do
       lote = create(:lote, club: club, sala: vege, estado: 'enraizado')
 

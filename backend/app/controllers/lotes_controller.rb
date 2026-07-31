@@ -1096,6 +1096,8 @@ class LotesController < ApplicationController
 
   def lote_params
     params.require(:lote).permit(
+      # El lote puede nacer YA metido en un domo (nace enraizando, que es cuando corresponde).
+      :clonador_id,
       :start_date, :estado, :origen, :planta_madre_id, :plants_count, :strain, :notes,
       :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,

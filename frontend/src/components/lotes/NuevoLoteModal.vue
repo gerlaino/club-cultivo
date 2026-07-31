@@ -111,6 +111,46 @@
                 <label class="nlm__label">Fecha de inicio</label>
                 <AppDatePicker v-model="form.start_date" />
               </div>
+
+              <!-- Clonador: el domo donde va a enraizar. Solo tiene sentido acá —el lote nace
+                   enraizando— y solo si la sala elegida tiene alguno (nunca en floración). -->
+              <div v-if="mostrarClonador" class="nlm__field nlm__field--full">
+                <label class="nlm__label">
+                  Clonador <span class="nlm__label-opt">(opcional · el domo donde enraíza)</span>
+                </label>
+                <div v-if="loadingClonadores" class="nlm__input nlm__input--ro">Cargando clonadores…</div>
+                <template v-else>
+                  <select v-if="!crearClonadorOpen" class="nlm__input" v-model="form.clonador_id">
+                    <option :value="null">— Sin clonador (enraíza suelto en la sala) —</option>
+                    <option v-for="c in clonadoresLibres" :key="c.id" :value="c.id">
+                      {{ c.nombre }}{{ c.capacidad ? ` · ${c.capacidad} alvéolos` : '' }}
+                    </option>
+                  </select>
+                  <div v-if="!crearClonadorOpen" class="nlm__clon-actions">
+                    <button type="button" class="nlm__link-btn" @click="abrirCrearClonador">
+                      <i class="bi bi-plus-circle"></i> Crear clonador
+                    </button>
+                    <span v-if="clonadoresOcupados" class="nlm__hint">
+                      {{ clonadoresOcupados }} ocupado{{ clonadoresOcupados === 1 ? '' : 's' }} (cada domo aloja un lote)
+                    </span>
+                  </div>
+                  <!-- Alta inline: sin esto no se puede empezar, porque no hay ninguno todavía. -->
+                  <div v-else class="nlm__clon-form">
+                    <input v-model.trim="nuevoClonadorNombre" type="text" class="nlm__input"
+                           placeholder="Nombre (ej. Domo 1)" @keydown.enter.prevent="guardarClonador" />
+                    <input v-model.number="nuevoClonadorCapacidad" type="number" min="1" class="nlm__input nlm__input--sm"
+                           placeholder="Alvéolos (opc.)" />
+                    <div class="nlm__clon-btns">
+                      <button type="button" class="nlm__clon-ok" :disabled="savingClonador || !nuevoClonadorNombre"
+                              @click="guardarClonador">
+                        {{ savingClonador ? 'Creando…' : 'Crear' }}
+                      </button>
+                      <button type="button" class="nlm__link-btn" @click="crearClonadorOpen = false">Cancelar</button>
+                    </div>
+                  </div>
+                  <span v-if="clonadorError" class="nlm__err">{{ clonadorError }}</span>
+                </template>
+              </div>
             </template>
 
             <!-- Planta madre (solo esqueje) -->
@@ -229,7 +269,8 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useLotesStore } from '../../stores/lotes'
-import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado, createLoteCosechadoEnSede, listSedes } from '../../lib/api.js'
+import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado, createLoteCosechadoEnSede, listSedes,
+         listClonadores, createClonador } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 
@@ -286,6 +327,64 @@ const loadingMadres  = ref(false)
 const madreQuery     = ref('')
 const madreFocused   = ref(false)
 const madreColapsados = ref(new Set())   // lote_id colapsados en el dropdown de planta madre
+
+// ── Clonador (domo de enraizado) ───────────────────────────────────────────
+// Solo se ofrece si el lote nace ENRAIZANDO: es la única etapa que vive en un domo. La sala de
+// floración nunca tiene (12/12 no deja prender un esqueje), así que ahí la lista viene vacía.
+const clonadores          = ref([])
+const loadingClonadores   = ref(false)
+const crearClonadorOpen   = ref(false)
+const nuevoClonadorNombre = ref('')
+const nuevoClonadorCapacidad = ref(null)
+const savingClonador      = ref(false)
+const clonadorError       = ref(null)
+
+const mostrarClonador   = computed(() =>
+  tipoCreacion.value === 'nuevo' && form.value.estado === 'enraizado' && !!effectiveSala.value)
+// Un clonador aloja un lote a la vez: los ocupados no se ofrecen.
+const clonadoresLibres  = computed(() => clonadores.value.filter(c => c.libre && c.activo))
+const clonadoresOcupados = computed(() => clonadores.value.filter(c => !c.libre).length)
+
+async function cargarClonadores() {
+  const sala = effectiveSala.value
+  if (!sala || !mostrarClonador.value) { clonadores.value = []; return }
+  loadingClonadores.value = true
+  try {
+    const { data } = await listClonadores(sala.id)
+    clonadores.value = data || []
+  } catch { clonadores.value = [] } finally { loadingClonadores.value = false }
+}
+
+function abrirCrearClonador() {
+  crearClonadorOpen.value = true
+  nuevoClonadorNombre.value = `Domo ${clonadores.value.length + 1}`
+  nuevoClonadorCapacidad.value = null
+  clonadorError.value = null
+}
+
+async function guardarClonador() {
+  const sala = effectiveSala.value
+  if (!sala || !nuevoClonadorNombre.value) return
+  savingClonador.value = true
+  clonadorError.value  = null
+  try {
+    const payload = { nombre: nuevoClonadorNombre.value }
+    if (nuevoClonadorCapacidad.value) payload.capacidad = nuevoClonadorCapacidad.value
+    const { data } = await createClonador(sala.id, payload)
+    clonadores.value = [...clonadores.value, data]
+    form.value.clonador_id = data.id      // recién creado: queda elegido
+    crearClonadorOpen.value = false
+  } catch (e) {
+    clonadorError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'No se pudo crear el clonador'
+  } finally { savingClonador.value = false }
+}
+
+watch(mostrarClonador, (v) => { if (v) cargarClonadores() }, { immediate: true })
+watch(() => effectiveSala.value?.id, () => {
+  form.value.clonador_id = null
+  crearClonadorOpen.value = false
+  cargarClonadores()
+})
 
 function toggleLoteColapso(loteId) {
   const s = new Set(madreColapsados.value)
@@ -347,6 +446,7 @@ function emptyForm() {
     planta_madre_ids: [], plants_count: 1,
     start_date: localISO(),
     genetica_id: '', grow_type: 'sustrato', light_type: '', tamanio_maceta: '', notes: '',
+    clonador_id: null,
   }
 }
 
@@ -410,6 +510,7 @@ async function crear() {
   saving.value = true
   try {
     const payload = { ...form.value }
+    if (!payload.clonador_id)     delete payload.clonador_id
     if (!payload.genetica_id)     delete payload.genetica_id
     if (!payload.light_type)      delete payload.light_type
     if (!payload.tamanio_maceta)  delete payload.tamanio_maceta
@@ -509,6 +610,24 @@ watch(salaId, () => {
 .nlm__input--ro { opacity: .75; cursor: default; background: #f8fafc; }
 .nlm__textarea { resize: vertical; }
 .nlm__hint { font-size: .72rem; color: #94a3b8; }
+
+/* Clonador: selector + alta inline (sin alta inline no se puede empezar, porque al principio
+   no hay ningún domo creado). */
+.nlm__clon-actions { display: flex; align-items: center; gap: .75rem; margin-top: .4rem; flex-wrap: wrap; }
+.nlm__link-btn {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-size: .78rem; color: #16a34a; display: inline-flex; align-items: center; gap: .3rem;
+}
+.nlm__link-btn:hover { text-decoration: underline; }
+.nlm__clon-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.nlm__clon-form .nlm__input { flex: 1 1 12rem; }
+.nlm__input--sm { flex: 0 1 9rem !important; }
+.nlm__clon-btns { display: flex; align-items: center; gap: .6rem; }
+.nlm__clon-ok {
+  border: none; border-radius: 8px; padding: .45rem .85rem; cursor: pointer;
+  background: #16a34a; color: #fff; font-size: .78rem; font-weight: 600;
+}
+.nlm__clon-ok:disabled { opacity: .55; cursor: not-allowed; }
 .nlm__link { color: #15803d; font-weight: 600; }
 .nlm__err { font-size: .72rem; color: #dc2626; }
 .nlm__pills { display: flex; gap: .5rem; }
