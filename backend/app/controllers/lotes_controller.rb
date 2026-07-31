@@ -276,10 +276,15 @@ class LotesController < ApplicationController
   # lote cambiara de sala era avanzando de fase, así que rebalancear salas, vaciar una para limpieza
   # o corregir un alta obligaba a fingir un avance y ensuciaba la historia del lote.
   #
-  # REGLA CENTRAL: **el lote toma la fase de la sala a la que va**. Si una sala está en floración,
-  # está dando 12/12: una planta que entra ahí pasa a florecer le guste a quien le guste. El cuarto
-  # define el fotoperiodo, no el papel. Por eso el cambio de estado se propaga también a las plantas,
-  # igual que lo hace `salas#cambiar_fase`.
+  # REGLA CENTRAL: lo que la sala impone es el **FOTOPERÍODO**, no la etapa. Una sala en floración
+  # está dando 12/12: la planta que entra ahí va a florecer le guste a quien le guste, así que el
+  # estado la sigue (y las plantas con él, igual que en `salas#cambiar_fase`).
+  #
+  # PERO el ENRAIZADO no se toca. Enraizado y vegetativo comparten fotoperíodo —los dos son 18/6—,
+  # así que meter un clonador en una sala de vegetativo no le cambia nada: recibe la misma luz. Lo
+  # que lo tiene enraizando es que TODAVÍA NO TIENE RAÍZ, un estado de la planta y no algo que el
+  # cuarto le haga. Por eso el clonador puede convivir en la sala de vegetativo, y por eso de
+  # enraizado se sale cuando prende, no cuando lo cambiás de cuarto.
   #
   # La sede va con la sala: al mover a otra sede, el lote cambia de sede, y eso arrastra a dónde
   # imputan sus costos.
@@ -313,7 +318,8 @@ class LotesController < ApplicationController
         next if sala_anterior&.id == destino.id   # ya está ahí: no ensuciamos la historia
 
         attrs = { sala_id: destino.id, sede_id: destino.sede_id }
-        cambia = fase_destino.present? && fase_destino != estado_anterior
+        enraizando = Plant::ESTADOS_ENRAIZANDO.include?(estado_anterior)
+        cambia = fase_destino.present? && fase_destino != estado_anterior && !enraizando
         attrs[:estado] = fase_destino if cambia
         lote.update!(attrs)
 

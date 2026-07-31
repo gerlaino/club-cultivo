@@ -320,7 +320,9 @@ const efectosMover = computed(() => {
   const faseDestino = ['vegetativo', 'floracion'].includes(d.kind) ? d.kind : null
   return {
     faseDestino,
-    cambian: faseDestino ? lotesAMover.value.filter(l => l.estado !== faseDestino) : [],
+    // El enraizado no lo cambia ninguna sala: comparte fotoperíodo con vegetativo y lo que lo
+    // tiene ahí es no tener raíz, no el cuarto. Sale cuando prende.
+    cambian: faseDestino ? lotesAMover.value.filter(l => l.estado !== faseDestino && l.estado !== 'enraizado') : [],
     cambiaSede: !!(d.sede?.id && sala.value?.sede?.id && d.sede.id !== sala.value.sede.id),
   }
 })

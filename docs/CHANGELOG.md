@@ -1,5 +1,20 @@
 # Changelog
 
+## Julio 2026 (ae) — mover un lote NO lo saca del enraizado
+
+La regla de "el lote toma la fase de la sala destino" estaba mal enunciada. Lo que una sala impone no
+es la etapa: es el **fotoperíodo**. Vegetativo y floración se diferencian por eso (18/6 vs 12/12) y
+una sala solo puede correr uno, así que la planta que entra a un cuarto de 12/12 va a florecer.
+
+Pero **enraizado y vegetativo comparten fotoperíodo**: los dos son 18/6. Meter un clonador en una
+sala de vegetativo no le cambia nada — recibe la misma luz. Lo que lo tiene enraizando es que
+**todavía no tiene raíz**, un estado de la planta y no algo que el cuarto le haga. Por eso el
+clonador puede convivir en la sala de vegetativo, y por eso **de enraizado se sale cuando prende, no
+cuando cambia de cuarto**. Ni siquiera una sala de floración lo saca: un esqueje sin raíz no florece.
+
+El preview del diálogo también se corrigió en las dos pantallas: si el enraizado no va a cambiar, no
+lo anuncia.
+
 ## Julio 2026 (ad) — mover lotes desde /lotes, y buscar/filtrar dentro de la sala
 
 Mover lotes solo estaba en la ficha de la sala, y ese es el lugar equivocado para la mitad de los

@@ -204,7 +204,8 @@ async function confirmarMover() {
   if (!d || !elegidos.length) { toast.warning('Ninguno de los lotes elegidos está en una sala de cultivo'); return }
 
   const fase   = ['vegetativo', 'floracion'].includes(d.kind) ? d.kind : null
-  const cambian = fase ? elegidos.filter(l => l.estado !== fase) : []
+  // El enraizado no lo cambia ninguna sala: sale cuando prende, no al cambiar de cuarto.
+  const cambian = fase ? elegidos.filter(l => l.estado !== fase && l.estado !== 'enraizado') : []
   const lineas = [`Vas a mover ${elegidos.length} lote(s) a "${d.nombre}".`]
   if (cambian.length) {
     lineas.push(`⚠️ La sala está en ${fase === 'floracion' ? 'FLORACIÓN' : 'VEGETATIVO'}, así que estos cambian de fase:`)
