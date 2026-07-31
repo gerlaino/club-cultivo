@@ -1,5 +1,29 @@
 # Changelog
 
+## Julio 2026 (z) — el enraizado deja de medirse con la vara del vegetativo
+
+`AlertaDetectorService` mandaba germinación y esqueje a los setpoints de **vegetativo**, con un
+comentario que dejaba escrita la suposición equivocada ("comparten fisiología"). Es al revés: son
+opuestas. Con los rangos de vegetativo (`humedad 50-70%`, `EC 0.8-1.4`) el sistema quedaba **ciego
+para el problema real y gritando por el que no existe**:
+
+- un clonador a **60% de humedad** —donde los esquejes se deshidratan y no prenden— **no disparaba
+  ninguna alerta**, porque 60 cae cómodo dentro de 50-70;
+- un clonador con **EC casi nula** —que es lo correcto, un esqueje sin raíz no absorbe— disparaba
+  una **falsa alarma de EC baja** todos los días.
+
+- **Rangos propios de enraizado**: humedad 85-95%, temperatura 22-26 °C, EC 0-0.6, pH 5.5-6.0.
+- **Temperatura de sustrato al monitoreo** (24-26 °C). Es la variable que decide si prende, más que
+  la del aire: por debajo de 22 °C el enraizado se frena aunque el cuarto esté perfecto. La columna
+  existía en `RegistroAmbiental` y nadie la miraba. Las fases que no declaran rango de sustrato lo
+  saltean, así que no aparecen falsos positivos en vegetativo ni floración.
+- **Chequeo diario**: `DIAS_SIN_REGISTRO` no tenía entrada para enraizado y caía al default de 3
+  días. Es la etapa más frágil del ciclo; va en 1.
+- **`SetpointFase`: la fase `clon` pasa a `enraizado`** (migración incluida). "Clon" dejaba afuera a
+  las plántulas de semilla, que están en la misma etapa. La fase existía desde siempre y **nunca se
+  había usado**, porque el detector desviaba el enraizado antes de consultarla.
+- `AlertaInterna::TIPOS_CULTIVO` suma `temperatura_sustrato_fuera_rango`.
+
 ## Julio 2026 (y) — mover lotes de sala, ambiente de la sala y el esqueje que no existía
 
 **El bug: el registro ambiental de una sala se salteaba los esquejes.** `salas#registrar_sala` tenía

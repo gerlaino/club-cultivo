@@ -4,7 +4,10 @@ class SetpointFase < ApplicationRecord
 
   belongs_to :genetica, optional: true
 
-  FASES = %w[clon madre vegetativo floracion lavado secado curado].freeze
+  # 'enraizado' reemplaza a 'clon': es el mismo momento —planta sin raíz funcional— pero 'clon'
+  # dejaba afuera a las plántulas de semilla, que están en la misma etapa. La fase existía y nunca
+  # se usaba, porque el detector de alertas desviaba el enraizado a los setpoints de vegetativo.
+  FASES = %w[enraizado madre vegetativo floracion lavado secado curado].freeze
 
   validates :fase,          inclusion: { in: FASES }
   validates :club_id,       presence: true

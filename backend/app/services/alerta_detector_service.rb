@@ -1,13 +1,23 @@
 class AlertaDetectorService
   # Rangos de fallback cuando el club no tiene setpoints configurados
   RANGOS = {
+    # El ENRAIZADO es el opuesto del vegetativo, no una versión temprana. La planta todavía no
+    # tiene raíz funcional: no absorbe (por eso EC ~0 — darle nutrientes le quema el callo) y no
+    # puede reponer lo que transpira (por eso humedad altísima; a 60% se deshidrata y no prende).
+    # La temperatura de SUSTRATO es la variable que decide si prende, más que la del aire: por
+    # debajo de 22 °C el enraizado se frena aunque el cuarto esté perfecto.
+    'enraizado'  => { ph: (5.5..6.0), ec: (0.0..0.6), temperatura: (22..26), humedad: (85..95),
+                      temperatura_sustrato: (24..26) },
     'vegetativo' => { ph: (5.8..6.2), ec: (0.8..1.4), temperatura: (20..28), humedad: (50..70) },
     'floracion'  => { ph: (6.0..6.5), ec: (1.4..2.2), temperatura: (20..26), humedad: (40..55) },
   }.freeze
 
-  CAMPOS_MONITOREADOS = %i[ph ec temperatura humedad].freeze
+  # temperatura_sustrato entra al monitoreo por el enraizado. Para las fases que no declaran rango
+  # (vegetativo, floración) `rango_para` devuelve nil y el campo se saltea: no hay falsas alarmas.
+  CAMPOS_MONITOREADOS = %i[ph ec temperatura humedad temperatura_sustrato].freeze
 
   DIAS_SIN_REGISTRO = {
+    'enraizado'  => 1,   # la etapa más frágil del ciclo: se mira todos los días
     'vegetativo' => 3,
     'floracion'  => 2,
     'cosecha'    => 1,
@@ -114,14 +124,21 @@ class AlertaDetectorService
   # Devuelve el rango a usar para un campo/fase dado: prioriza setpoints del club,
   # cae a RANGOS (defaults) si no hay configuración.
   def dias_sin_registro_para(estado)
-    cfg = @club.alertas_config || {}
-    (cfg.dig('dias_sin_registro', estado) || DIAS_SIN_REGISTRO[estado] || 3).to_i
+    cfg  = @club.alertas_config || {}
+    fase = fase_setpoint(estado)
+    # Se mira la config por el estado crudo primero (para no romper lo que un club ya haya
+    # configurado) y después por la fase efectiva.
+    (cfg.dig('dias_sin_registro', estado) || cfg.dig('dias_sin_registro', fase) ||
+     DIAS_SIN_REGISTRO[fase] || 3).to_i
   end
 
-  # semilla/esqueje son el paraguas vegetativo (comparten fotoperíodo/fisiología) →
-  # usan los setpoints/rangos de 'vegetativo'. Sin esto quedaban sin chequeo de rango.
+  # germinación y esqueje son el mismo estadío —ENRAIZADO—, con dos orígenes. Antes se los mandaba
+  # a los setpoints de 'vegetativo' con el argumento de que "comparten fisiología", y es al revés:
+  # con el rango de vegetativo (humedad 50-70%) un clonador a 60% —donde los esquejes se
+  # deshidratan— no disparaba NADA, y su EC casi nula disparaba una falsa alarma de EC baja.
+  # Ciego para el problema real y gritando por el que no existe.
   def fase_setpoint(estado)
-    %w[germinacion esqueje].include?(estado) ? 'vegetativo' : estado
+    %w[germinacion esqueje enraizado].include?(estado) ? 'enraizado' : estado
   end
 
   def rango_para(campo, fase, genetica_id, setpoints_club)

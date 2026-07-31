@@ -232,9 +232,11 @@ const TABS = [
 const tabActivo = ref('setpoints')
 
 const FASES_LABELS = {
+  // El enraizado va PRIMERO: es la fase donde los setpoints más importan (humedad altísima, EC ~0,
+  // temperatura de sustrato) y la que estuvo sin configuración propia todo este tiempo.
+  enraizado:  'Enraizado',
   vegetativo: 'Vegetativo',
   floracion:  'Floración',
-  clon:       'Clones',
   madre:      'Madres',
   lavado:     'Lavado',
   curado:     'Curado',
