@@ -227,6 +227,9 @@ class LotesController < ApplicationController
   end
 
   ReconciliarError = Class.new(StandardError)
+  # Movimiento imposible por una regla de cultivo (típico: el domo no puede entrar a una sala de
+  # floración). Se rescata en `mover` para responder el motivo, no un 500.
+  MoverError = Class.new(StandardError)
 
   # Ajusta las Plant reales del lote para que sean `target`. Crea nuevas (patrón del alta) si
   # sube; si baja, quita plantas "vacías" (sin pesadas ni peso), priorizando las más nuevas, y
@@ -310,6 +313,7 @@ class LotesController < ApplicationController
     fase_destino = destino.kind if %w[vegetativo floracion].include?(destino.kind)
 
     movidos, cambiaron_fase, plantas = 0, [], 0
+    clonadores_mudados = []
 
     ActiveRecord::Base.transaction do
       lotes.each do |lote|
@@ -318,6 +322,22 @@ class LotesController < ApplicationController
         next if sala_anterior&.id == destino.id   # ya está ahí: no ensuciamos la historia
 
         attrs = { sala_id: destino.id, sede_id: destino.sede_id }
+        # Si estaba en un domo, mudarlo de cuarto lo saca: el clonador no viaja con el lote. Se
+        # limpia (y no queda como historia) porque ese domo no llegó a hacerlo prender.
+        # EL DOMO VIAJA CON EL LOTE. Un esqueje sin raíz no puede vivir fuera del domo, así que
+        # mudarlo de cuarto no lo saca: lo que se muda es el clonador entero (que aloja un solo
+        # lote). Del domo se sale al prender, no al cambiar de sala.
+        clonador_mudado = nil
+        if lote.en_clonador? && lote.clonador.sala_id != destino.id
+          clonador_mudado = lote.clonador
+          clonador_mudado.sala = destino
+          unless clonador_mudado.save
+            raise MoverError, "#{lote.codigo}: no se puede llevar su clonador " \
+                              "#{clonador_mudado.nombre} a #{destino.nombre} — " \
+                              "#{clonador_mudado.errors.full_messages.join(', ')}"
+          end
+          clonadores_mudados << clonador_mudado.nombre
+        end
         enraizando = Plant::ESTADOS_ENRAIZANDO.include?(estado_anterior)
         cambia = fase_destino.present? && fase_destino != estado_anterior && !enraizando
         attrs[:estado] = fase_destino if cambia
@@ -344,6 +364,7 @@ class LotesController < ApplicationController
           descripcion:     [
             "Movido de #{sala_anterior&.nombre || 'sin sala'} a #{destino.nombre}",
             (sala_anterior&.sede_id != destino.sede_id ? "(cambio de sede)" : nil),
+            (clonador_mudado ? "· con su clonador #{clonador_mudado.nombre}" : nil),
             (cambia ? "· #{estado_anterior} → #{fase_destino}" : nil),
           ].compact.join(' '),
           user:            current_user,
@@ -359,7 +380,10 @@ class LotesController < ApplicationController
       sala_destino:       { id: destino.id, nombre: destino.nombre, kind: destino.kind },
       cambios_de_fase:    cambiaron_fase,
       plantas_afectadas:  plantas,
+      clonadores_mudados: clonadores_mudados,
     }
+  rescue MoverError => e
+    render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
@@ -573,7 +597,8 @@ class LotesController < ApplicationController
 
     # semilla/esqueje → vegetativo: no generan pesada, usan avanzar_fase!
     if @lote.estado == 'enraizado'
-      @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user)
+      @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user,
+                          tamanio_maceta: params[:tamanio_maceta])
     else
       @lote.transicionar!(
         nueva_fase,
@@ -719,12 +744,15 @@ class LotesController < ApplicationController
     end
     estado_anterior  = @lote.estado
     sala_anterior_id = @lote.sala_id
-    @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user)
+    # tamanio_maceta: obligatorio al prender (enraizado → vegetativo). Lo valida el modelo.
+    @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user,
+                        tamanio_maceta: params[:tamanio_maceta])
     @lote.lote_eventos.create!(
       tipo:            'cambio_estado',
       estado_anterior: estado_anterior,
       estado_nuevo:    @lote.estado,
-      descripcion:     "Avance de fase: #{estado_anterior} → #{@lote.estado}",
+      descripcion:     "Avance de fase: #{estado_anterior} → #{@lote.estado}" +
+                       (estado_anterior == 'enraizado' && @lote.tamanio_maceta ? " · a maceta de #{@lote.tamanio_maceta.to_f.round(1)}L" : ''),
       user:            current_user,
       club:            current_user.club,
       registrado_en:   Time.current,
@@ -1081,6 +1109,9 @@ class LotesController < ApplicationController
 
   def lote_update_params
     params.require(:lote).permit(
+      # clonador_id: para sacar un lote del domo a mano (nil) o corregir en cuál está. Que sea de
+      # la misma sala y esté enraizando lo valida el modelo, no acá.
+      :clonador_id,
       :estado, :start_date, :origen, :planta_madre_id, :plants_count, :strain, :notes,
       :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,

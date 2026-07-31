@@ -43,6 +43,7 @@ module Restore
       { key: 'lote',                model_name: 'Lote',               label: 'Lote',                group: 'Cultivo', descriptor: ->(r) { r.try(:codigo).presence || "Lote ##{r.id}" } },
       { key: 'plant',               model_name: 'Plant',              label: 'Planta',              group: 'Cultivo', descriptor: ->(r) { r.try(:codigo).presence || r.try(:qr_token).presence || "Planta ##{r.id}" } },
       { key: 'sala',                model_name: 'Sala',               label: 'Sala',                group: 'Cultivo' },
+      { key: 'clonador',            model_name: 'Clonador',           label: 'Clonador',            group: 'Cultivo' },
       { key: 'plan_trabajo',        model_name: 'PlanTrabajo',        label: 'Plan de trabajo',     group: 'Cultivo' },
       { key: 'tarea',               model_name: 'Tarea',              label: 'Tarea',               group: 'Cultivo' },
       { key: 'analisis_laboratorio',model_name: 'AnalisisLaboratorio',label: 'Análisis de laboratorio', group: 'Cultivo' },

@@ -4,6 +4,7 @@ class RegistroAmbiental < ApplicationRecord
   belongs_to :lote
   belongs_to :user
   belongs_to :club
+  belongs_to :clonador, optional: true   # si el registro es del domo y no de la sala
   acts_as_tenant(:club)
 
   has_one_attached :archivo_csv
@@ -12,12 +13,16 @@ class RegistroAmbiental < ApplicationRecord
   ESPECTROS = %w[veg bloom auto mixto].freeze
   FASES     = %w[crecimiento floracion engorde lavado].freeze
   FUENTES   = %w[manual csv_bluelab sensor_mqtt asistente_voz].freeze
+  # Producto enraizante, ESTRUCTURADO: distintos geles/polvos tienen tasas de prendimiento
+  # distintas, y así se puede cruzar con el % de prendimiento que ya medimos.
+  ENRAIZANTES = %w[gel polvo liquido miel_canela ninguno otro].freeze
   PLAGAS    = %w[ninguna leve moderada severa].freeze
   TAREAS    = %w[riego nutricion poda defoliacion scrog_lst revision_plagas limpieza_sala ajuste_luz registro_ambiental].freeze
 
   validates :registrado_en,  presence: true
   validates :estado_general, inclusion: { in: ESTADOS }, allow_blank: true
   validates :fuente,         inclusion: { in: FUENTES }, allow_blank: true
+  validates :producto_enraizante, inclusion: { in: ENRAIZANTES }, allow_blank: true
   validates :temperatura,    numericality: { greater_than: 0, less_than: 60 }, allow_nil: true
   validates :temperatura_sustrato, numericality: { greater_than: 0, less_than: 60 }, allow_nil: true
   validates :humedad,        numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 100 }, allow_nil: true

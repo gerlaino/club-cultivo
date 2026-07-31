@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_31_000002) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_31_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -395,6 +395,22 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_000002) do
     t.index ["dispensacion_id"], name: "index_check_ins_on_dispensacion_id", unique: true
     t.index ["paciente_id", "created_at"], name: "index_check_ins_on_paciente_id_and_created_at"
     t.index ["paciente_id"], name: "index_check_ins_on_paciente_id"
+  end
+
+  create_table "clonadores", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "sala_id", null: false
+    t.string "nombre", null: false
+    t.integer "capacidad"
+    t.boolean "activo", default: true, null: false
+    t.datetime "deleted_at"
+    t.bigint "deleted_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_clonadores_on_club_id"
+    t.index ["deleted_at"], name: "index_clonadores_on_deleted_at"
+    t.index ["deleted_by_id"], name: "index_clonadores_on_deleted_by_id"
+    t.index ["sala_id"], name: "index_clonadores_on_sala_id"
   end
 
   create_table "clubs", force: :cascade do |t|
@@ -1189,6 +1205,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_000002) do
     t.bigint "sede_id"
     t.bigint "deleted_by_id"
     t.bigint "foto_portada_blob_id"
+    t.bigint "clonador_id"
+    t.index ["clonador_id"], name: "index_lotes_on_clonador_id"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"
@@ -1649,6 +1667,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_000002) do
     t.boolean "fertilizacion", default: false
     t.text "notas_fertilizacion"
     t.jsonb "tareas_realizadas", default: [], null: false
+    t.bigint "clonador_id"
+    t.string "producto_enraizante"
+    t.index ["clonador_id"], name: "index_registros_ambientales_on_clonador_id"
     t.index ["club_id"], name: "index_registros_ambientales_on_club_id"
     t.index ["lote_id"], name: "index_registros_ambientales_on_lote_id"
     t.index ["registrado_en"], name: "index_registros_ambientales_on_registrado_en"
@@ -2169,6 +2190,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_000002) do
   add_foreign_key "check_ins", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "check_ins", "pacientes"
   add_foreign_key "check_ins", "users", column: "deleted_by_id"
+  add_foreign_key "clonadores", "clubs"
+  add_foreign_key "clonadores", "salas"
+  add_foreign_key "clonadores", "users", column: "deleted_by_id"
   add_foreign_key "clubs", "users", column: "deleted_by_id"
   add_foreign_key "cobros", "clubs"
   add_foreign_key "cobros", "dispensaciones", column: "dispensacion_id"
@@ -2276,6 +2300,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_000002) do
   add_foreign_key "lote_eventos", "salas", column: "sala_origen_id"
   add_foreign_key "lote_eventos", "users"
   add_foreign_key "lote_eventos", "users", column: "deleted_by_id"
+  add_foreign_key "lotes", "clonadores"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "geneticas", on_delete: :nullify
   add_foreign_key "lotes", "plants", column: "planta_madre_id"
@@ -2348,6 +2373,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_000002) do
   add_foreign_key "plants", "users", column: "deleted_by_id"
   add_foreign_key "push_subscriptions", "clubs"
   add_foreign_key "push_subscriptions", "users"
+  add_foreign_key "registros_ambientales", "clonadores"
   add_foreign_key "registros_ambientales", "clubs"
   add_foreign_key "registros_ambientales", "lotes"
   add_foreign_key "registros_ambientales", "users"

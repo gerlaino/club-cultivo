@@ -27,7 +27,7 @@ RSpec.describe Lote, type: :model do
 
     it "avanzar_fase! sigue la secuencia enraizado → vegetativo → floración" do
       lote = create_lote(estado: 'enraizado')
-      lote.avanzar_fase!
+      lote.avanzar_fase!(tamanio_maceta: 3)   # al prender va a maceta: el dato es obligatorio
       expect(lote.reload.estado).to eq('vegetativo')
       lote.avanzar_fase!
       expect(lote.reload.estado).to eq('floracion')

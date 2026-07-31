@@ -96,6 +96,14 @@ Rails.application.routes.draw do
         post :cambiar_fase
         post :registrar_sala
       end
+      resources :clonadores, only: [:index, :create]
+    end
+
+    resources :clonadores, only: [:index, :update, :destroy] do
+      member do
+        post :registrar   # ambiente del domo: temp, humedad, sustrato, enraizante
+        post :asignar     # meter lotes enraizando al domo
+      end
     end
 
     resources :lotes, only: [:index, :show, :update, :destroy, :create] do

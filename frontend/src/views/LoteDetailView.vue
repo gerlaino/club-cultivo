@@ -314,6 +314,7 @@ async function onLoteEditado() {
 const {
   showTransicionModal, savingTransicion, transicionError, transicionForm, transicionSalaId,
   showAvanzarSalaModal, avanzarSalaId, transicionandoRapido,
+  avanzarMaceta, faltaMaceta, MACETAS,
   showIniciarManicuraModal, showCompletarManicuraModal,
   showCosechaModal, cosechaSalaId, savingCosecha, cosechaError, cosechaForm,
   showCosechaPartialModal,
@@ -702,6 +703,16 @@ onUnmounted(() => {
           <div class="ld__modal-body">
             <div v-if="transicionError" class="ld__alert">{{ transicionError }}</div>
 
+            <!-- Mismo pedido que en el avance del cultivador: el esqueje que prendió va a maceta. -->
+            <div v-if="lote?.estado === 'enraizado'" class="ld__field">
+              <label class="ld__label">Maceta a la que va <span style="color:#dc2626">*</span></label>
+              <select v-model="avanzarMaceta" class="ld__input">
+                <option value="">— Elegí el tamaño —</option>
+                <option v-for="m in MACETAS" :key="m.v" :value="m.v">{{ m.l }}</option>
+              </select>
+              <span class="ld__optional">Define el riego, la frecuencia y cuándo toca el próximo trasplante.</span>
+            </div>
+
             <div class="ld__field">
               <label class="ld__label">Notas <span class="ld__optional">opcional</span></label>
               <textarea class="ld__input ld__textarea" rows="2" v-model="transicionForm.notas" placeholder="Observaciones del cambio de fase…"></textarea>
@@ -735,7 +746,7 @@ onUnmounted(() => {
           </div>
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" :disabled="savingTransicion" @click="showTransicionModal = false">Cancelar</button>
-            <button class="ld__btn-primary" :disabled="savingTransicion" @click="ejecutarTransicion">
+            <button class="ld__btn-primary" :disabled="savingTransicion || faltaMaceta" @click="ejecutarTransicion">
               <DsSpinner v-if="savingTransicion" :size="14" />
               <i v-else class="bi bi-arrow-right-circle"></i>Avanzar fase
             </button>
@@ -823,6 +834,16 @@ onUnmounted(() => {
             <button class="ld__modal-close" @click="showAvanzarSalaModal = false"><i class="bi bi-x-lg"></i></button>
           </div>
           <div class="ld__modal-body">
+            <!-- El esqueje que prendió va a maceta. Solo se pide en este salto (enraizado →
+                 vegetativo): más adelante la maceta ya está puesta. -->
+            <div v-if="lote?.estado === 'enraizado'" class="ld__field">
+              <label class="ld__label">Maceta a la que va <span style="color:#dc2626">*</span></label>
+              <select v-model="avanzarMaceta" class="ld__input">
+                <option value="">— Elegí el tamaño —</option>
+                <option v-for="m in MACETAS" :key="m.v" :value="m.v">{{ m.l }}</option>
+              </select>
+              <span class="ld__optional">Define el riego, la frecuencia y cuándo toca el próximo trasplante.</span>
+            </div>
             <div class="ld__field">
               <label class="ld__label">Sala destino</label>
               <select v-model="avanzarSalaId" class="ld__input">
@@ -851,7 +872,7 @@ onUnmounted(() => {
           </div>
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" @click="showAvanzarSalaModal = false">Cancelar</button>
-            <button class="ld__btn-primary" :disabled="transicionandoRapido" @click="avanzarFaseRapido(avanzarSalaId)">
+            <button class="ld__btn-primary" :disabled="transicionandoRapido || faltaMaceta" @click="avanzarFaseRapido(avanzarSalaId, avanzarMaceta)">
               <DsSpinner v-if="transicionandoRapido" :size="14" />
               <i v-else class="bi bi-arrow-right-circle"></i>Confirmar avance
             </button>

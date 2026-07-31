@@ -36,6 +36,16 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
   const showAvanzarSalaModal  = ref(false)
   const avanzarSalaId         = ref(null)
   const transicionandoRapido  = ref(false)
+  // Maceta a la que va el esqueje que prendió. Solo se pide en enraizado → vegetativo: es el
+  // trasplante que define riego, frecuencia y cuándo toca el próximo cambio de maceta.
+  const avanzarMaceta = ref('')
+  const MACETAS = [
+    { v: '0.5', l: 'Vaso (0.5 L)' }, { v: '1', l: '1 litro' },  { v: '3', l: '3 litros' },
+    { v: '5',   l: '5 litros' },     { v: '7', l: '7 litros' },  { v: '10', l: '10 litros' },
+    { v: '12',  l: '12 litros' },    { v: '15', l: '15 litros' },{ v: '20', l: '20 litros' },
+  ]
+  const faltaMaceta = computed(() =>
+    lotes.current?.estado === 'enraizado' && !avanzarMaceta.value)
 
   // ── Manicura (admin/supervisor) ───────────────────────────
   const showIniciarManicuraModal   = ref(false)
@@ -106,8 +116,11 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
       const { data } = await transicionarLote(loteId, {
         nueva_fase: faseSig, pesada,
         sala_id: transicionSalaId.value || undefined,
+        // Solo viaja al prender: es el trasplante del esqueje a su primera maceta.
+        tamanio_maceta: avanzarMaceta.value || undefined,
       })
       lotes.current = data
+      avanzarMaceta.value = ''
       showTransicionModal.value = false
       toast.success(`Lote avanzado a ${em(faseSig).label}`)
       onPhaseChange?.()
@@ -120,13 +133,16 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
   }
 
   // ── Avanzar rápido (cultivador) ───────────────────────────
-  async function avanzarFaseRapido(salaId = null) {
+  async function avanzarFaseRapido(salaId = null, maceta = null) {
     transicionandoRapido.value = true
     showAvanzarSalaModal.value = false
     try {
-      const payload = salaId ? { sala_id: salaId } : {}
+      const payload = {}
+      if (salaId) payload.sala_id = salaId
+      if (maceta) payload.tamanio_maceta = maceta
       const { data } = await avanzarFaseLote(lotes.current.id, payload)
       lotes.current = data
+      avanzarMaceta.value = ''
       toast.success(`Lote avanzado a ${capitalizarFase(data.estado)}`)
       onPhaseChange?.()
       await plants.fetchByLote(loteId)
@@ -201,6 +217,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     showTransicionModal, savingTransicion, transicionError, transicionForm, transicionSalaId,
     // Avanzar sala
     showAvanzarSalaModal, avanzarSalaId, transicionandoRapido,
+    avanzarMaceta, faltaMaceta, MACETAS,
     // Manicura
     showIniciarManicuraModal, showCompletarManicuraModal,
     // Cosecha

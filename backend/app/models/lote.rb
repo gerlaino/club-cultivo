@@ -6,6 +6,10 @@ class Lote < ApplicationRecord
   belongs_to :club
   acts_as_tenant(:club)
   belongs_to :sala, optional: true
+  # En qué clonador enraizó. NO se limpia al prender: es dónde pasó la etapa, no dónde está parado
+  # (igual que la sala no se borra del historial al avanzar). Estar ADENTRO se deriva del estado
+  # —ver `en_clonador?`—, así que no hay un flag que se pueda desincronizar.
+  belongs_to :clonador, optional: true
   belongs_to :sede, optional: true
   # La sala es solo de cultivo. Post-cosecha el lote no tiene sala (se ve por estado),
   # pero conserva su sede. Exigimos sala solo en estados de cultivo.
@@ -63,6 +67,14 @@ class Lote < ApplicationRecord
   validates :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo,
             numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
   validates :start_date,        presence: true
+  # Un domo está adentro de UN cuarto: no se puede estar en un clonador de una sala donde el lote
+  # no está. Solo se exige mientras enraíza —después el clonador es historia y el lote se mueve
+  # libremente sin arrastrar la restricción—.
+  validate :clonador_de_la_misma_sala, if: -> { clonador_id.present? && estado == 'enraizado' }
+  validate :clonador_libre,            if: -> { clonador_id.present? && estado == 'enraizado' && clonador_id_changed? }
+  # Al prender, el esqueje va a maceta: sin ese dato el lote entra a vegetativo sin saber en qué
+  # volumen crece, que es lo que gobierna riego, frecuencia y cuándo toca trasplante.
+  validate :maceta_al_prender, if: -> { estado_changed? && estado_was == 'enraizado' && estado == 'vegetativo' }
 
   before_create :generar_codigo
   before_create :generar_codigo_qr
@@ -77,6 +89,11 @@ class Lote < ApplicationRecord
 
   default_scope { where(deleted_at: nil) }
 
+  # ¿Está FÍSICAMENTE dentro del domo ahora? Solo mientras enraíza: cuando prende sale al cuarto,
+  # y desde ahí respira el aire de la sala aunque su clonador de origen quede registrado.
+  def en_clonador? = clonador_id.present? && estado == 'enraizado'
+
+  scope :adentro_de_un_clonador, -> { where.not(clonador_id: nil).where(estado: 'enraizado') }
   scope :activos,     -> { where.not(estado: 'finalizado') }
   scope :en_ciclo,    -> { where(estado: CICLO_FASES + ['finalizado']) }
   scope :finalizados, -> { where(estado: 'finalizado') }
@@ -134,12 +151,18 @@ class Lote < ApplicationRecord
   # Avance rápido sin pesada — usado por el cultivador desde el botón "Avanzar fase".
   # Si sala_id se provee, mueve el lote a esa sala. Si no, intenta auto-detectar:
   # si existe exactamente una sala activa del tipo destino en el club, la elige.
-  def avanzar_fase!(sala_id: nil, usuario: nil)
+  def avanzar_fase!(sala_id: nil, usuario: nil, tamanio_maceta: nil)
     idx = AVANCE.index(estado)
     raise ArgumentError, 'Lote no puede transicionar en este estado' unless idx.present? && idx < AVANCE.length - 1
     nueva_fase = AVANCE[idx + 1] # enraizado→vegetativo→floración→cosecha
     ActiveRecord::Base.transaction do
       attrs = { estado: nueva_fase }
+      # La maceta del trasplante al prender. Si es la primera que tiene, también queda como la
+      # INICIAL: es la que después deja reconstruir el historial de trasplantes.
+      if tamanio_maceta.present?
+        attrs[:tamanio_maceta] = tamanio_maceta
+        attrs[:tamanio_maceta_inicial] = tamanio_maceta if tamanio_maceta_inicial.blank?
+      end
       if POST_COSECHA.include?(nueva_fase)
         # Cosecha: el lote sale de la sala de cultivo (libera el slot) y conserva la sede.
         attrs[:sede]    = sede || sala&.sede
@@ -373,6 +396,24 @@ class Lote < ApplicationRecord
   end
 
   private
+
+  def clonador_de_la_misma_sala
+    return if clonador.blank? || clonador.sala_id == sala_id
+    errors.add(:clonador, "está en otra sala (#{clonador.sala&.nombre}): un lote no puede estar " \
+                          'en un domo de un cuarto donde no está')
+  end
+
+  def clonador_libre
+    ocupante = clonador&.lotes_adentro&.where&.not(id: id)&.first
+    return if ocupante.blank?
+    errors.add(:clonador, "ya tiene el lote #{ocupante.codigo} adentro: un clonador aloja un solo " \
+                          'lote a la vez (creá otro clonador)')
+  end
+
+  def maceta_al_prender
+    return if tamanio_maceta.present?
+    errors.add(:tamanio_maceta, 'es obligatorio al pasar a vegetativo: el esqueje que prendió va a maceta')
+  end
 
   def generar_codigo_qr
     self.codigo_qr = "L-#{club_id}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"

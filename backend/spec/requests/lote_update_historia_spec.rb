@@ -68,14 +68,14 @@ RSpec.describe 'PATCH /lotes/:id — corrección de estado e historia', type: :r
     let!(:descartada) { create(:plant, lote: lote, club: club, state: 'descartada') }
 
     it 'al cambiar esqueje → vegetativo pasa las plantas a vegetativo' do
-      patch "/lotes/#{lote.id}", params: { lote: { estado: 'vegetativo' } }, headers: auth_headers, as: :json
+      patch "/lotes/#{lote.id}", params: { lote: { estado: 'vegetativo', tamanio_maceta: 3 } }, headers: auth_headers, as: :json
       expect(response).to have_http_status(:ok)
       expect(p1.reload.state).to eq('vegetativo')
       expect(p2.reload.state).to eq('vegetativo')
     end
 
     it 'no toca plantas descartadas' do
-      patch "/lotes/#{lote.id}", params: { lote: { estado: 'vegetativo' } }, headers: auth_headers, as: :json
+      patch "/lotes/#{lote.id}", params: { lote: { estado: 'vegetativo', tamanio_maceta: 3 } }, headers: auth_headers, as: :json
       expect(descartada.reload.state).to eq('descartada')
     end
 

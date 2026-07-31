@@ -117,7 +117,12 @@ class SalasController < ApplicationController
     # donde el ambiente más importa, porque un esqueje sin raíz depende del aire para no
     # deshidratarse. `CULTIVO_ESTADOS` es la fuente única: son exactamente los estados para los que
     # el modelo EXIGE sala (ver la validación de sala_id en Lote).
+    # ...MENOS los que están dentro de un clonador: el domo tiene su propio microclima (la sala
+    # marca 60% de humedad y adentro hay 90%), y su registro entra por `clonadores#registrar`. Sin
+    # esta exclusión el lote enraizando acumula dos lecturas contradictorias del mismo momento y
+    # las alertas y la analítica promedian un ambiente que no existió.
     lotes_activos = @sala.lotes.where(estado: Lote::CULTIVO_ESTADOS)
+                          .where("clonador_id IS NULL OR estado <> 'enraizado'")
 
     if lotes_activos.empty?
       return render json: { error: 'No hay lotes activos en esta sala' }, status: :unprocessable_entity
@@ -153,6 +158,15 @@ class SalasController < ApplicationController
     end
 
     nueva_fase        = @sala.kind == 'vegetativo' ? 'floracion' : 'vegetativo'
+
+    # El guard de creación del clonador no alcanza: la sala puede darse vuelta DEBAJO de él. Pasar a
+    # floración le daría 12 horas de oscuridad a esquejes que necesitan luz casi continua.
+    if nueva_fase == 'floracion' && @sala.clonadores.activos.exists?
+      return render json: {
+        error: 'Esta sala tiene clonadores adentro. En floración (12/12) los esquejes no prenden: ' \
+               'movelos a otra sala antes de cambiar la fase.'
+      }, status: :unprocessable_entity
+    end
     plant_state_orig  = @sala.kind   # 'vegetativo' | 'floracion'
     plant_state_dest  = nueva_fase
 

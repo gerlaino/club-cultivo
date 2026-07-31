@@ -9,6 +9,7 @@ class Sala < ApplicationRecord
   belongs_to :responsable, class_name: "User", optional: true
 
   has_many :lotes, dependent: :destroy
+  has_many :clonadores, dependent: :destroy
   has_many :sala_cultivadores, class_name: 'SalaCultivador', foreign_key: 'sala_id', dependent: :destroy
   has_many :cultivadores, through: :sala_cultivadores, source: :user
   has_many :notas, as: :noteable, dependent: :destroy
