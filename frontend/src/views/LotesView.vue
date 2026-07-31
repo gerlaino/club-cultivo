@@ -17,6 +17,7 @@ import { useClubStore } from '../stores/club.js'
 import { useToast } from '../composables/useToast.js'
 import { LAYOUT_LOTE, dibujarEtiquetaLote } from '../lib/pdfEtiquetas.js'
 import { estadoConMaceta } from '../lib/loteHelpers.js'
+import { moverLotes } from '../lib/api.js'
 
 const store = useLotesStore();
 const salas = useSalasStore();
@@ -185,6 +186,45 @@ async function configEtiquetas() {
 
 // Los lotes sin codigo_qr no pueden etiquetarse (no hay a dónde apuntar el QR).
 const seleccionSinQR = computed(() => sel.seleccionados.value.filter(l => !l.codigo_qr).length);
+
+// ── Mover lotes de sala, desde acá ────────────────────────────────────────────
+// El lote TOMA LA FASE de la sala destino: una sala en floración da 12/12, así que lo que entra ahí
+// pasa a florecer. Por eso el diálogo enumera lote por lote qué va a cambiar antes de confirmar.
+const salaDestinoId = ref(null)
+const moviendo      = ref(false)
+const puedeMover    = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.role))
+const MOVIBLES      = ['enraizado', 'vegetativo', 'floracion']
+const salasDestino  = computed(() => salas.items.filter(s => s.state === 'activa'))
+const salaDestino   = computed(() => salasDestino.value.find(s => s.id === Number(salaDestinoId.value)) || null)
+
+async function confirmarMover() {
+  const d = salaDestino.value
+  // Post-cosecha el lote ya no vive en una sala: no se mueve.
+  const elegidos = sel.seleccionados.value.filter(l => MOVIBLES.includes(l.estado))
+  if (!d || !elegidos.length) { toast.warning('Ninguno de los lotes elegidos está en una sala de cultivo'); return }
+
+  const fase   = ['vegetativo', 'floracion'].includes(d.kind) ? d.kind : null
+  const cambian = fase ? elegidos.filter(l => l.estado !== fase) : []
+  const lineas = [`Vas a mover ${elegidos.length} lote(s) a "${d.nombre}".`]
+  if (cambian.length) {
+    lineas.push(`⚠️ La sala está en ${fase === 'floracion' ? 'FLORACIÓN' : 'VEGETATIVO'}, así que estos cambian de fase:`)
+    lineas.push(...cambian.map(l => `   · ${l.codigo}: ${estadoLabel(l.estado)} → ${estadoLabel(fase)}`))
+    if (fase === 'floracion') lineas.push('Pasar a floración no se deshace: la planta ya recibió 12/12.')
+  }
+  if (!(await confirm({ title: 'Mover lotes de sala', message: lineas.join('\n'),
+                        variant: cambian.length ? 'danger' : 'warning', confirmText: 'Mover' }))) return
+
+  moviendo.value = true
+  try {
+    const { data } = await moverLotes(elegidos.map(l => l.id), d.id)
+    const extra = data.cambios_de_fase?.length ? ` · ${data.cambios_de_fase.length} cambiaron de fase` : ''
+    toast.success(`${data.movidos} lote(s) movidos a ${d.nombre}${extra}`)
+    sel.limpiar(); salaDestinoId.value = null
+    await store.fetch()
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudieron mover')
+  } finally { moviendo.value = false }
+}
 
 // Se pasa la FUNCIÓN (no el config resuelto) para que el composable abra la ventana de impresión
 // antes de cualquier await; si no, el bloqueador de popups se la come.
@@ -589,6 +629,18 @@ async function exportarCSV() {
           <i class="bi bi-exclamation-triangle-fill"></i> {{ seleccionSinQR }} sin QR
         </span>
         <button class="lv-selbar__ghost" :disabled="etiquetas.ocupado.value" @click="sel.limpiar()">Limpiar</button>
+        <!-- Mover también acá, y no solo desde la ficha de la sala: /lotes es donde se ven TODOS
+             juntos, y es el único lugar desde el que se puede agarrar lotes de salas distintas y
+             mandarlos a la misma. Desde la sala solo se pueden mover los de esa sala. -->
+        <select v-if="puedeMover" v-model="salaDestinoId" class="lv-selbar__sel" :disabled="moviendo">
+          <option :value="null">Mover a…</option>
+          <option v-for="sa in salasDestino" :key="sa.id" :value="sa.id">
+            {{ sa.nombre }}<template v-if="sa.kind"> ({{ kindLabel(sa.kind) }})</template><template v-if="sa.sede?.nombre"> · {{ sa.sede.nombre }}</template>
+          </option>
+        </select>
+        <button v-if="puedeMover && salaDestino" class="lv-selbar__btn" :disabled="moviendo" @click="confirmarMover">
+          {{ moviendo ? 'Moviendo…' : 'Mover' }}
+        </button>
         <button class="lv-selbar__btn" :disabled="etiquetas.ocupado.value" @click="descargarEtiquetas">
           <i class="bi bi-download"></i> Descargar
         </button>
@@ -625,6 +677,7 @@ async function exportarCSV() {
 .lv-selbar__txt { font-weight: 600; white-space: nowrap; }
 .lv-selbar__txt small { font-weight: 400; color: #94a3b8; }
 .lv-selbar__warn { color: #fbbf24; font-weight: 600; white-space: nowrap; }
+.lv-selbar__sel { border: none; border-radius: 999px; padding: 6px 12px; font-size: 13px; max-width: 240px; }
 .lv-selbar__ghost { background: none; border: none; color: #94a3b8; font-size: .8rem; font-weight: 600; cursor: pointer; }
 .lv-selbar__ghost:hover:not(:disabled) { color: #fff; }
 .lv-selbar__btn {

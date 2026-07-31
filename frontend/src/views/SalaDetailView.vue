@@ -427,10 +427,40 @@ function progresoCiclo(lote) {
   return Math.min(Math.round((dias / total) * 100), 99)
 }
 
+// Buscar por código y filtrar por estado. Con una sala de 30 lotes, tildar de a uno para mover
+// media sala no es una opción.
+const sdQuery  = ref('')
+const sdEstado = ref('')
+const itemsFiltrados = computed(() => {
+  const q = sdQuery.value.trim().toLowerCase()
+  return items.value.filter(l =>
+    (!q || (l.codigo || '').toLowerCase().includes(q) ||
+           (l.genetica?.nombre || l.strain || '').toLowerCase().includes(q)) &&
+    (!sdEstado.value || l.estado === sdEstado.value))
+})
 const itemsSorted = computed(() => {
   const order = ["vegetativo","floracion","enraizado","cosecha","curado","finalizado"]
-  return [...items.value].sort((a,b) => order.indexOf(a.estado) - order.indexOf(b.estado))
+  return [...itemsFiltrados.value].sort((a,b) => order.indexOf(a.estado) - order.indexOf(b.estado))
 })
+
+// "Seleccionar todo" toma lo FILTRADO, no la página: filtrás enraizado y entran todos, aunque la
+// lista muestre 10. Misma regla que la selección de etiquetas.
+const movibles = computed(() => itemsSorted.value.filter(esMovible))
+const todosElegidos = computed(() =>
+  movibles.value.length > 0 && movibles.value.every(l => selMover.value.has(l.id)))
+function alternarTodos() {
+  const s = new Set(selMover.value)
+  todosElegidos.value ? movibles.value.forEach(l => s.delete(l.id))
+                      : movibles.value.forEach(l => s.add(l.id))
+  selMover.value = s
+}
+// Fases de LOTE para el filtro. Ojo: ESTADOS_SALA (más arriba) es otra cosa — el estado de la sala
+// misma (activa/mantenimiento/cerrada).
+const FASES_FILTRO = [
+  { v: 'enraizado',  l: 'Enraizado' },
+  { v: 'vegetativo', l: 'Vegetativo' },
+  { v: 'floracion',  l: 'Floración' },
+]
 
 const SD_PER_PAGE    = 10
 const sdPage         = ref(1)
@@ -874,6 +904,19 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                   </button>
                 </template>
               </EmptyState>
+              <!-- Buscar / filtrar / seleccionar todo -->
+              <div v-if="items.length > 3 || sdQuery || sdEstado" class="sd__lotes-tools">
+                <label v-if="puedeMover && movibles.length" class="sd__selall">
+                  <input type="checkbox" :checked="todosElegidos" @change="alternarTodos" />
+                  Todos<span v-if="sdEstado || sdQuery"> los filtrados</span> ({{ movibles.length }})
+                </label>
+                <input v-model="sdQuery" class="sd__lotes-search" placeholder="Buscar por código o genética…" />
+                <select v-model="sdEstado" class="sd__lotes-filter">
+                  <option value="">Todos los estados</option>
+                  <option v-for="e in FASES_FILTRO" :key="e.v" :value="e.v">{{ e.l }}</option>
+                </select>
+              </div>
+
               <div v-else class="sd__lotes">
                 <div v-for="l in itemsPaginados" :key="l.id" class="sd__lote-wrap">
                 <label v-if="puedeMover && esMovible(l)" class="sd__lote-cb" @click.stop>
@@ -892,6 +935,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                     </div>
                     <div class="sd__lote-meta">
                       <span v-if="l.plants_count">🪴 {{ l.plants_count }} plantas</span>
+                      <span v-if="l.tamanio_maceta">🪣 {{ l.tamanio_maceta }}L</span>
                       <span v-if="l.estado === 'floracion' && l.plantas_cosechadas_count > 0"
                             class="sd__cosecha-parcial">
                         🌸 {{ (l.plants_count || 0) - l.plantas_cosechadas_count }} en floración · ✅ {{ l.plantas_cosechadas_count }} cosechadas
@@ -1370,6 +1414,11 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__lotes { display: flex; flex-direction: column; }
 
 /* Selección para mover lotes */
+.sd__lotes-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 0 10px; }
+.sd__selall { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #475569; cursor: pointer; white-space: nowrap; }
+.sd__selall input { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; }
+.sd__lotes-search { flex: 1; min-width: 160px; padding: 7px 11px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; }
+.sd__lotes-filter { padding: 7px 11px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; background: #fff; }
 .sd__lote-wrap { display: flex; align-items: center; gap: 8px; }
 .sd__lote-wrap > .sd__lote { flex: 1; min-width: 0; }
 .sd__lote-cb { display: flex; align-items: center; padding: 0 2px 0 6px; cursor: pointer; }

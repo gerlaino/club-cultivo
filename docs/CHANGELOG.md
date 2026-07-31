@@ -1,5 +1,21 @@
 # Changelog
 
+## Julio 2026 (ad) — mover lotes desde /lotes, y buscar/filtrar dentro de la sala
+
+Mover lotes solo estaba en la ficha de la sala, y ese es el lugar equivocado para la mitad de los
+casos: desde ahí solo se pueden mover los lotes **de esa sala**. `/lotes` es donde se ven todos
+juntos y es el único lugar desde el que se puede agarrar lotes de salas distintas y mandarlos a la
+misma.
+
+- **"Mover a…" en la barra de selección de `/lotes`**, al lado de las etiquetas. Mismo diálogo que
+  enumera lote por lote qué va a cambiar de fase antes de confirmar. Los lotes post-cosecha se
+  ignoran: ya no viven en una sala.
+- **Dentro de la sala: buscar por código o genética, filtrar por fase y seleccionar todo.** Con 30
+  lotes, tildar de a uno para mover media sala no era una opción. "Seleccionar todo" toma lo
+  **filtrado**, no la página — misma regla que la selección de etiquetas.
+- **La maceta también en las tarjetas de lote de la sala** (`🪣 0,5L`), para que sea coherente con el
+  badge y con la columna que ya estaba en la tabla de `/lotes`.
+
 ## Julio 2026 (ac) — la maceta, con su número, y la alerta de raíz enrollada
 
 El período del vasito **sí** es distinto del vegetativo pleno —el pan de raíz se seca rapidísimo, la
