@@ -27,7 +27,7 @@ const TIPO_SALA_LABEL = {
   madre:       'Madre',
   clones:      'Clones',
   manicura:    'Manicura',
-  germinacion: 'Enraizado',
+  enraizado: 'Enraizado',
 }
 
 function isoHoy() { return new Date().toISOString().slice(0, 10) }

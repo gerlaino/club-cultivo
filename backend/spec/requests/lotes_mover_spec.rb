@@ -34,11 +34,10 @@ RSpec.describe 'POST /lotes/mover', type: :request do
       expect(p1.reload.state).to eq('floracion')
     end
 
-    # El caso que motivó todo: un lote de ESQUEJES movido a una sala de vegetativo. Es la fase que
-    # el resto del sistema se venía olvidando.
-    it 'un lote en esqueje movido a una sala de vegetativo pasa a vegetativo' do
-      lote = create(:lote, club: club, sala: sala_flora, estado: 'esqueje')
-      create(:plant, lote: lote, state: 'esqueje')
+    # El caso que motivó todo: un lote ENRAIZANDO movido a una sala de vegetativo.
+    it 'un lote enraizando movido a una sala de vegetativo pasa a vegetativo' do
+      lote = create(:lote, club: club, sala: sala_flora, estado: 'enraizado')
+      create(:plant, lote: lote, state: 'enraizado')
       sign_in_as(admin)
 
       mover(lote.id, sala_vege)
@@ -48,12 +47,12 @@ RSpec.describe 'POST /lotes/mover', type: :request do
     end
 
     it 'a una sala mixta NO le impone fase: ahí conviven fases distintas a propósito' do
-      lote = create(:lote, club: club, sala: sala_vege, estado: 'esqueje')
+      lote = create(:lote, club: club, sala: sala_vege, estado: 'enraizado')
       sign_in_as(admin)
 
       mover(lote.id, sala_mixta)
 
-      expect(lote.reload.estado).to eq('esqueje')
+      expect(lote.reload.estado).to eq('enraizado')
       expect(lote.sala_id).to eq(sala_mixta.id)
       expect(JSON.parse(response.body)['cambios_de_fase']).to be_empty
     end
@@ -85,7 +84,7 @@ RSpec.describe 'POST /lotes/mover', type: :request do
   describe 'en tanda' do
     it 'mueve varios lotes de una y devuelve solo los que cambiaron de fase' do
       en_vege  = create(:lote, club: club, sala: sala_vege, estado: 'vegetativo')
-      en_esq   = create(:lote, club: club, sala: sala_vege, estado: 'esqueje')
+      en_esq   = create(:lote, club: club, sala: sala_vege, estado: 'enraizado')
       sign_in_as(admin)
 
       mover([en_vege.id, en_esq.id], sala_flora)

@@ -79,7 +79,7 @@ class AnalyticsController < ApplicationController
   end
 
   def calcular_rendimiento_genetica(club, año: nil)
-    lotes = club.lotes.where.not(estado: 'germinacion').includes(:genetica)
+    lotes = club.lotes.where.not(estado: 'enraizado').includes(:genetica)
     lotes = lotes.where('EXTRACT(YEAR FROM COALESCE(start_date, created_at)) = ?', año) if año
 
     # Rendimiento por genética (solo lotes con datos reales)
@@ -116,14 +116,14 @@ class AnalyticsController < ApplicationController
         desviacion_promedio:  rendimiento_avg && objetivo_avg ? ((rendimiento_avg - objetivo_avg) / objetivo_avg * 100).round(1) : nil,
         merma_promedio_pct:   merma_avg,
         g_por_planta:         g_por_planta,
-        lotes_activos:        ls.count { |l| !%w[germinacion finalizado].include?(l.estado) },
+        lotes_activos:        ls.count { |l| !%w[enraizado finalizado].include?(l.estado) },
       }
     end.sort_by { |r| [-(r[:rendimiento_promedio] || 0)] }
 
     # Top lotes recientes
     lotes_recientes = club.lotes
                           .includes(:genetica)
-                          .where.not(estado: %w[germinacion])
+                          .where.not(estado: %w[enraizado])
                           .order(created_at: :desc)
                           .limit(20)
                           .map do |l|
@@ -389,7 +389,7 @@ class AnalyticsController < ApplicationController
   end
 
   def calcular_produccion(club, año: nil)
-    lotes = club.lotes.includes(:genetica, :plants).where.not(estado: 'germinacion')
+    lotes = club.lotes.includes(:genetica, :plants).where.not(estado: 'enraizado')
     lotes = lotes.where('EXTRACT(YEAR FROM COALESCE(start_date, created_at)) = ?', año) if año
 
     # ── 1. PÉRDIDAS por cepa ───────────────────────────────────────

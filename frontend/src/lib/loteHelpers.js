@@ -7,15 +7,14 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 // Estados canónicos del LOTE (== Lote::ESTADOS del backend, en orden de ciclo).
-export const LOTE_ESTADOS = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado', 'finalizado']
+export const LOTE_ESTADOS = ['enraizado', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado', 'finalizado']
 
 // Estados canónicos de la PLANTA (== Plant::STATES del backend).
-// Ojo: la planta usa 'germinacion' (el lote usa 'germinacion'); ver STATE_MAP.
-export const PLANT_STATES = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'secado', 'cosechado', 'descartada']
+// Lote y planta comparten el mismo vocabulario de fases desde el colapso a 'enraizado'.
+export const PLANT_STATES = ['enraizado', 'vegetativo', 'floracion', 'secado', 'cosechado', 'descartada']
 
 export const ESTADO_META = {
-  germinacion:            { label: 'Enraizado',          color: '#0891b2', bg: '#e0f2fe', emoji: '🌱' },
-  esqueje:            { label: 'Enraizado',           color: '#0891b2', bg: '#e0f2fe', emoji: '🌱' },
+  enraizado:            { label: 'Enraizado',          color: '#0891b2', bg: '#e0f2fe', emoji: '🌱' },
   vegetativo:         { label: 'Vegetativo',          color: '#16a34a', bg: '#dcfce7', emoji: '🍃' },
   floracion:          { label: 'Floración',          color: '#d97706', bg: '#fef3c7', emoji: '🌸' },
   cosecha:            { label: 'Cosecha',            color: '#059669', bg: '#d1fae5', emoji: '🌿' },
@@ -26,8 +25,7 @@ export const ESTADO_META = {
 
 // Meta de los estados de PLANTA. Claves == PLANT_STATES (canónico backend).
 export const PLANT_STATE_META = {
-  germinacion:{ label: 'Enraizado',  color: '#0891b2', emoji: '🌱' },
-  esqueje:    { label: 'Enraizado',  color: '#0891b2', emoji: '🌱' },
+  enraizado:{ label: 'Enraizado',  color: '#0891b2', emoji: '🌱' },
   vegetativo: { label: 'Vegetativo', color: '#16a34a', emoji: '🍃' },
   floracion:  { label: 'Floración',  color: '#d97706', emoji: '🌸' },
   secado:     { label: 'Secado',     color: '#c2410c', emoji: '🍂' },
@@ -70,12 +68,12 @@ export const TAREAS_LOTE = [
 export const CICLO_BASE = ['vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado']
 
 export const FASE_LABELS = {
-  vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', germinacion: 'Enraizado',
+  vegetativo: 'Vegetativo', floracion: 'Floración', curado: 'Curado', cosecha: 'Cosecha', enraizado: 'Enraizado',
   manicura: 'Manicura', cerrado: 'Cerrado',
 }
 
 export const STATE_MAP = {
-  germinacion: 'germinacion', esqueje: 'esqueje', vegetativo: 'vegetativo',
+  enraizado: 'enraizado', vegetativo: 'vegetativo',
   floracion: 'floracion', cosecha: 'cosechado',
   curado: 'cosechado', finalizado: 'cosechado',
 }
@@ -97,10 +95,9 @@ export const ESPINA_BIOLOGICA = [
   {
     key: 'vegetativo',
     label: 'Vegetativo',
-    estados: ['germinacion', 'esqueje', 'vegetativo'],   // paraguas
+    estados: ['enraizado', 'vegetativo'],   // paraguas
     subetapas: [
-      { estado: 'germinacion',    label: 'Enraizado' },
-      { estado: 'esqueje',    label: 'Enraizado'   },
+      { estado: 'enraizado',      label: 'Enraizado' },
       { estado: 'vegetativo', label: 'Vege'        },  // se subdivide por trasplantes
     ],
   },
@@ -154,7 +151,7 @@ export function macetaLabel(m) {
 // deriva del estado: vegetativo/germinación/esqueje = 18/6, floración = 12/12.
 export function fotoperiodoLabel(estado, stored) {
   if (stored) return stored
-  if (['germinacion', 'esqueje', 'vegetativo'].includes(estado)) return '18/6'
+  if (['enraizado', 'vegetativo'].includes(estado)) return '18/6'
   if (estado === 'floracion') return '12/12'
   return '—'
 }
@@ -181,7 +178,7 @@ export function capitalizarFase(f) { return FASE_LABELS[f] || (f ? f.charAt(0).t
 
 export function phaseBannerMsg(estado) {
   if (estado === 'cosecha') return 'Lote cosechado. Manicura toma desde acá.'
-  if (estado === 'germinacion') return 'Plantas en germinación. El sistema avanzará automáticamente cuando estén listas.'
+  if (estado === 'enraizado') return 'Plantas enraizando: todavía sin raíz funcional. Humedad alta, sin nutrientes.'
   if (estado === 'finalizado') return 'Lote finalizado. Stock confirmado y disponible para dispensar.'
   if (['en_manicura', 'manicura', 'curado', 'cerrado'].includes(estado)) return 'Este lote pasó tu turno. Otro rol toma desde acá.'
   return null

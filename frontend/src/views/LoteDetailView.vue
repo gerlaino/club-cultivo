@@ -291,9 +291,9 @@ const loteAcciones = computed(() => {
 const cicloPasos = computed(() => {
   const origen = lote.value?.origen
   // Un lote de semilla pasa por germinación → esqueje → vegetativo; uno de esqueje arranca en esqueje.
-  if (origen === 'semilla') return ['germinacion', 'esqueje', ...CICLO_BASE]
+  if (origen === 'semilla') return ['enraizado', ...CICLO_BASE]
   if (origen === 'esqueje') return ['esqueje', ...CICLO_BASE]
-  return ['germinacion', ...CICLO_BASE]
+  return ['enraizado', ...CICLO_BASE]
 })
 const cicloIndex = computed(() => lote.value ? cicloPasos.value.indexOf(lote.value.estado) : -1)
 

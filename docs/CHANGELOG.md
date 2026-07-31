@@ -1,5 +1,30 @@
 # Changelog
 
+## Julio 2026 (ab) — el modelo se colapsa: germinación + esqueje → enraizado
+
+Eran **dos estados para una sola etapa**: la planta sin raíz funcional. Lo que de verdad las separaba
+no es la etapa sino el **origen** —de dónde viene la planta—, que ya vivía en su propia columna.
+Tenerlos como estados obligaba a duplicar setpoints, reglas y líneas de informe para algo idéntico, y
+era la razón de que un admin cargara los clonadores como "esqueje" cuando estaban enraizando.
+
+**Dos ejes independientes:** `estado` (enraizado → vegetativo → floración → cosecha…) y `origen`
+(semilla | esqueje). El origen **ya no define la fase inicial**: los dos arrancan enraizando.
+
+- `Lote::ESTADOS`, `AVANCE`, `CULTIVO_ESTADOS`, `FASE_A_PLANT_STATE`, `estado_inicial_para_origen`,
+  `progreso_ciclo`; `Plant::STATES`; `LotePolicy`; y las listas de estados de lotes, sedes, stats,
+  analytics, asistente y benchmark.
+- **El avance del ciclo tiene un paso menos**: antes germinación→esqueje→vegetativo, ahora
+  enraizado→vegetativo.
+- `fase_setpoint` del detector de alertas queda sin traducción: el estado ya *es* la fase.
+- **Migración de datos** (`lotes.estado`, `plants.state` y el historial en `lote_eventos`, que guarda
+  los estados como texto y si no se migra deja la timeline mostrando fases que ya no existen).
+
+**Ambigüedad histórica que hay que revisar a mano:** `esqueje` se usó con dos sentidos según quién
+cargó —"está en el clonador" y "esqueje ya prendido en vaso"—. Los dos caen en `enraizado`; los que
+ya habían prendido hay que promoverlos a vegetativo (se ven por sus días en fase). La migración es
+irreversible por diseño: al colapsar se pierde cuál era, y reconstruirlo desde `origen` inventaría
+datos.
+
 ## Julio 2026 (aa) — % de prendimiento: la métrica que se perdía
 
 Los esquejes que no agarraban caían en `descartada` mezclados con plagas, machos y roturas. El

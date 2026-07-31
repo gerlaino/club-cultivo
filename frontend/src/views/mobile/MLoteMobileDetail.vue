@@ -142,8 +142,7 @@
         <div class="mlot__field">
           <label class="mlot__label">Estado inicial</label>
           <select v-model="plantaForm.state" class="mlot__input">
-            <option value="germinacion">🌱 Enraizado (semilla)</option>
-            <option value="esqueje">🌱 Enraizado (esqueje)</option>
+            <option value="enraizado">🌱 Enraizado</option>
             <option value="vegetativo">🍃 Vegetativo</option>
             <option value="floracion">🌸 Floración</option>
           </select>
@@ -151,8 +150,7 @@
         <div class="mlot__field">
           <label class="mlot__label">Origen</label>
           <select v-model="plantaForm.origen" class="mlot__input">
-            <option value="germinacion">🌱 Enraizado (semilla)</option>
-            <option value="esqueje">🌱 Enraizado (esqueje)</option>
+            <option value="enraizado">🌱 Enraizado</option>
             <option value="division">🪴 División</option>
           </select>
         </div>
@@ -238,7 +236,7 @@ const POR_PAG         = 12
 const fotoInput       = ref(null)
 const nuevaFase       = ref('')
 
-const STATE_FROM_LOTE = { germinacion:'germinacion', esqueje:'esqueje', vegetativo:'vegetativo', floracion:'floracion', cosecha:'cosecha' }
+const STATE_FROM_LOTE = { germinacion:'enraizado', esqueje:'esqueje', vegetativo:'vegetativo', floracion:'floracion', cosecha:'cosecha' }
 const plantaForm = ref({ state: 'vegetativo', origen: 'semilla' })
 const editForm   = ref({ codigo: '', descripcion: '' })
 
@@ -250,11 +248,11 @@ const EG = {
   curado:     'linear-gradient(150deg,#0c1a33,#1d4ed8)',
 }
 const EE = { germinacion:'🌱', esqueje:'🪴', vegetativo:'🍃', floracion:'🌸', cosecha:'✂️', en_manicura:'✂️', curado:'🫙' }
-const EL = { germinacion:'Enraizado', esqueje:'Enraizado', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado' }
+const EL = { enraizado: 'Enraizado', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado' }
 const PC = { germinacion:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', curado:'#2563eb', cosechado:'#dc2626', descartada:'#94a3b8' }
-const PL = { germinacion:'Enraiz.', esqueje:'Enraiz.', vegetativo:'Veget.', floracion:'Florac.', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado', cosechado:'Cosechado', descartada:'Descartada' }
+const PL = { enraizado:'Enraiz.', vegetativo:'Veget.', floracion:'Florac.', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado', cosechado:'Cosechado', descartada:'Descartada' }
 
-const FASES_ORDEN = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado']
+const FASES_ORDEN = ['enraizado', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado']
 const FASES_META  = [
   { value:'vegetativo',  label:'Vegetativo',  emoji:'🍃' },
   { value:'floracion',   label:'Floración',   emoji:'🌸' },

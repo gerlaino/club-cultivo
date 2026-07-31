@@ -143,14 +143,14 @@ RSpec.describe Plant, type: :model do
   describe 'planta_madre / esquejes' do
     it 'permite asociar una planta madre' do
       madre   = create_plant
-      esqueje = create_plant(planta_madre: madre, state: 'esqueje', origen: 'esqueje')
+      esqueje = create_plant(planta_madre: madre, state: 'enraizado', origen: 'esqueje')
       expect(esqueje.planta_madre).to eq(madre)
       expect(madre.esquejes).to include(esqueje)
     end
 
     it 'nullifica planta_madre_id en esquejes al hacer soft delete de la madre' do
       madre   = create_plant
-      esqueje = create_plant(planta_madre: madre, state: 'esqueje', origen: 'esqueje')
+      esqueje = create_plant(planta_madre: madre, state: 'enraizado', origen: 'esqueje')
       madre.soft_delete!
       # la asociación dependent: :nullify aplica solo en destroy; el vínculo persiste tras soft_delete
       expect(esqueje.reload.planta_madre_id).to eq(madre.id)

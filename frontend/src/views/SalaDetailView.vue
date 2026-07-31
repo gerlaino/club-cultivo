@@ -66,7 +66,7 @@ const canCambiarFase = computed(() =>
 const lecturaOpen   = ref(false)
 const lotesExpanded = ref(true)
 
-const ESTADOS_LOTE = ["germinacion","esqueje","vegetativo","floracion","cosecha","curado","finalizado"]
+const ESTADOS_LOTE = ["enraizado","vegetativo","floracion","cosecha","curado","finalizado"]
 const DIAS_CICLO   = { semilla:7, esqueje:7, vegetativo:45, floracion:65, cosecha:10, curado:14, finalizado:0 }
 
 // ── Genéticas ──────────────────────────────────────────────
@@ -237,7 +237,7 @@ onUnmounted(() => {
 })
 
 const sala  = computed(() => salas.currentSala)
-const ESTADOS_ACTIVOS_CULTIVADOR = ['germinacion', 'esqueje', 'vegetativo', 'floracion']
+const ESTADOS_ACTIVOS_CULTIVADOR = ['enraizado', 'vegetativo', 'floracion']
 const items = computed(() => {
   const todos = lotes.bySala(salaId)
   return isCultivador.value
@@ -428,7 +428,7 @@ function progresoCiclo(lote) {
 }
 
 const itemsSorted = computed(() => {
-  const order = ["vegetativo","floracion","germinacion","cosecha","curado","finalizado"]
+  const order = ["vegetativo","floracion","enraizado","cosecha","curado","finalizado"]
   return [...items.value].sort((a,b) => order.indexOf(a.estado) - order.indexOf(b.estado))
 })
 
@@ -497,7 +497,7 @@ const KIND_TO_ESTADO = { floracion:"floracion" }
 const KINDS_CON_ORIGEN = ['vegetativo', 'madre', 'clon', 'mixta']
 
 const ESTADOS_HEREDADO = [
-  { value: 'germinacion', label: 'Enraizado' },
+  { value: 'enraizado', label: 'Enraizado' },
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración' },
   { value: 'cosecha',    label: 'Cosecha' },
@@ -507,7 +507,7 @@ const estadosHeredadoPermitidos = computed(() => {
   const kind = sala.value?.kind
   if (kind === 'floracion') return ESTADOS_HEREDADO.filter(e => e.value === 'floracion')
   if (kind === 'cosecha') return ESTADOS_HEREDADO.filter(e => e.value === 'cosecha')
-  return ESTADOS_HEREDADO.filter(e => ['germinacion', 'vegetativo'].includes(e.value))
+  return ESTADOS_HEREDADO.filter(e => ['enraizado', 'vegetativo'].includes(e.value))
 })
 
 const showCreate            = ref(false)

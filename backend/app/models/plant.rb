@@ -21,12 +21,12 @@ class Plant < ApplicationRecord
 
   default_scope { where(deleted_at: nil) }
 
-  STATES   = %w[germinacion vegetativo floracion secado cosechado esqueje descartada].freeze
+  STATES   = %w[enraizado vegetativo floracion secado cosechado descartada].freeze
   ORIGENES = %w[semilla esqueje].freeze
 
-  # Estados en los que la planta todavía no tiene raíz funcional. Un descarte acá es, por defecto,
-  # un esqueje/plántula que NO PRENDIÓ — que es justo lo que hay que poder medir.
-  ESTADOS_ENRAIZANDO = %w[germinacion esqueje].freeze
+  # La planta todavía no tiene raíz funcional. Un descarte acá es, por defecto, un esqueje o una
+  # plántula que NO PRENDIÓ — que es justo lo que hay que poder medir.
+  ESTADOS_ENRAIZANDO = %w[enraizado].freeze
 
   # Motivo estructurado del descarte. Convive con el texto libre (que va a notas): el texto explica
   # el caso, este permite contarlo.
@@ -41,12 +41,12 @@ class Plant < ApplicationRecord
 
   scope :por_estado,     ->(estado) { where(state: estado) }
   scope :seleccion,      -> { where(es_seleccion: true) }
-  scope :en_germinacion, -> { where(state: 'germinacion') }
+  scope :enraizadas,     -> { where(state: 'enraizado') }
   scope :en_vegetativo,  -> { where(state: 'vegetativo') }
   scope :en_floracion,   -> { where(state: 'floracion') }
   scope :en_secado,      -> { where(state: 'secado') }
   scope :cosechadas,     -> { where(state: 'cosechado') }
-  scope :esqueje,        -> { where(state: 'esqueje') }
+
   scope :descartadas,    -> { where(state: 'descartada') }
   scope :no_prendieron,  -> { where(motivo_descarte: 'no_prendio') }
   scope :enraizando,     -> { where(state: ESTADOS_ENRAIZANDO) }

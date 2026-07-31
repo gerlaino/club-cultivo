@@ -24,7 +24,7 @@ class LotesController < ApplicationController
         # El cultivador ve solo lotes EN CULTIVO. Aunque por datos viejos un lote en
         # manicura conserve una sala de veg/flor, se filtra por estado para no colarse.
         lotes = lotes.where(sala_id: salas_ids)
-                     .where(estado: %w[germinacion esqueje vegetativo floracion])
+                     .where(estado: Lote::CULTIVO_ESTADOS)
       end
     elsif current_user.supervisor?
       salas_ids = current_user.salas_ids_en_sedes_asignadas
@@ -131,7 +131,7 @@ class LotesController < ApplicationController
       dias_flora   = params[:dias_floracion].to_i
       dias_cos     = params[:dias_cosecha].to_i
       total_dias   = case estado
-                     when 'germinacion', 'esqueje' then dias_semilla
+                     when 'enraizado' then dias_semilla
                      when 'vegetativo'         then dias_semilla + dias_vege
                      when 'floracion'          then dias_semilla + dias_vege + dias_flora
                      when 'cosecha'            then dias_semilla + dias_vege + dias_flora + dias_cos
@@ -377,7 +377,7 @@ class LotesController < ApplicationController
   # un evento de la fase de origen a la start_date del lote.
   def reconciliar_evento_inicio!(lote)
     return unless lote.start_date
-    fase = lote.origen == 'esqueje' ? 'esqueje' : 'germinacion'
+    fase = 'enraizado'
     ts   = lote.start_date.in_time_zone.change(hour: 12)
     ev   = lote.lote_eventos.where(tipo: 'cambio_estado', estado_nuevo: fase).order(:registrado_en).first
     if ev
@@ -566,7 +566,7 @@ class LotesController < ApplicationController
     sala_anterior_id = @lote.sala_id
 
     # semilla/esqueje → vegetativo: no generan pesada, usan avanzar_fase!
-    if %w[germinacion esqueje].include?(@lote.estado)
+    if @lote.estado == 'enraizado'
       @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user)
     else
       @lote.transicionar!(
@@ -1012,8 +1012,7 @@ class LotesController < ApplicationController
 
   def estado_a_state(estado)
     {
-      'germinacion' => 'germinacion',
-      'esqueje'    => 'esqueje',
+      'enraizado'  => 'enraizado',
       'vegetativo' => 'vegetativo',
       'floracion'  => 'floracion',
       'cosecha'    => 'cosechado',
@@ -1026,7 +1025,7 @@ class LotesController < ApplicationController
   # start_date del lote). 'esqueje' no tiene campo propio (dias_en_fase cae a created_at).
   def state_a_fecha_field(state)
     {
-      'germinacion' => :fecha_germinacion,
+      'enraizado'   => :fecha_germinacion,
       'vegetativo'  => :fecha_vegetativo,
       'floracion'   => :fecha_floracion,
       'cosechado'   => :fecha_cosecha,
@@ -1102,7 +1101,7 @@ class LotesController < ApplicationController
     dias_cos       = params[:dias_cosecha].to_i
 
     total_dias = case estado
-                 when 'germinacion', 'esqueje' then dias_semilla
+                 when 'enraizado' then dias_semilla
                  when 'vegetativo'         then dias_semilla + dias_vege
                  when 'floracion'          then dias_semilla + dias_vege + dias_flora
                  when 'cosecha'            then dias_semilla + dias_vege + dias_flora + dias_cos
@@ -1114,7 +1113,7 @@ class LotesController < ApplicationController
     fecha_inicio = total_dias.days.ago.to_date
     lote.update_column(:start_date, fecha_inicio)
 
-    estado_inicial = origen == 'esqueje' ? 'esqueje' : 'germinacion'
+    estado_inicial = 'enraizado'
 
     if %w[vegetativo floracion cosecha].include?(estado)
       fecha_vege = fecha_inicio + dias_semilla

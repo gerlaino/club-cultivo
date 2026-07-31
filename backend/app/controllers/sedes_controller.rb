@@ -119,10 +119,9 @@ class SedesController < ApplicationController
     base
   end
 
-  # Estados de LOTE que cuentan como "vivo" en la sede. Incluye `esqueje`, que faltaba: un lote de
-  # esquejes está en una sala (el modelo se lo exige) y sus plantas existen — no contarlas hacía
-  # desaparecer del tablero justo la fase más frágil del ciclo.
-  LOTE_ESTADOS_VIVOS = %w[germinacion esqueje vegetativo floracion cosecha curado].freeze
+  # Estados de LOTE que cuentan como "vivo" en la sede: los de cultivo más los post-cosecha que
+  # todavía tienen material. El enraizado cuenta — es la fase más frágil, no la que hay que ocultar.
+  LOTE_ESTADOS_VIVOS = (Lote::CULTIVO_ESTADOS + %w[cosecha curado]).freeze
 
   def serialize_ops(s)
     salas       = s.salas.includes(lotes: :plants)
@@ -137,8 +136,7 @@ class SedesController < ApplicationController
                             .where.not(state: 'descartada')
                             .group(:state).count
     fases = {
-      germinacion: plantas_por_fase['germinacion'].to_i,
-      esqueje:     plantas_por_fase['esqueje'].to_i,
+      enraizado:   plantas_por_fase['enraizado'].to_i,
       vegetativo:  plantas_por_fase['vegetativo'].to_i,
       floracion:   plantas_por_fase['floracion'].to_i,
       cosechadas:  plantas_por_fase['cosechado'].to_i + plantas_por_fase['secado'].to_i,

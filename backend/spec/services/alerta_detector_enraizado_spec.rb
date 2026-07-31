@@ -33,17 +33,15 @@ RSpec.describe AlertaDetectorService do
   describe 'humedad: el caso que motivó el cambio' do
     # 60% es cómodo para vegetativo y letal para un clonador: el esqueje transpira sin poder
     # reponer. Con el rango de vegetativo (50-70) esto no disparaba absolutamente nada.
-    [%w[germinacion desde\ semilla], %w[esqueje desde\ esqueje]].each do |estado, desc|
-      it "avisa por aire seco en un lote en #{estado} (#{desc})" do
-        lote = create(:lote, club: club, sala: sala, estado: estado)
-        registrar(lote, humedad: 60, temperatura: 24)
+    it 'avisa por aire seco en un lote enraizando' do
+      lote = create(:lote, club: club, sala: sala, estado: 'enraizado')
+      registrar(lote, humedad: 60, temperatura: 24)
 
-        expect(alertas(tipo: 'humedad_fuera_rango').count).to eq(1)
-      end
+      expect(alertas(tipo: 'humedad_fuera_rango').count).to eq(1)
     end
 
     it 'con la humedad que corresponde al enraizado no avisa' do
-      lote = create(:lote, club: club, sala: sala, estado: 'esqueje')
+      lote = create(:lote, club: club, sala: sala, estado: 'enraizado')
       registrar(lote, humedad: 90, temperatura: 24)
 
       expect(alertas(tipo: 'humedad_fuera_rango')).to be_empty
@@ -61,14 +59,14 @@ RSpec.describe AlertaDetectorService do
     # Un esqueje sin raíz no absorbe: EC casi nula es lo CORRECTO. Con el rango de vegetativo
     # (0.8-1.4) esto disparaba alerta de EC baja todos los días.
     it 'EC casi nula en enraizado no dispara alerta' do
-      lote = create(:lote, club: club, sala: sala, estado: 'esqueje')
+      lote = create(:lote, club: club, sala: sala, estado: 'enraizado')
       registrar(lote, ec: 0.2, humedad: 90, temperatura: 24)
 
       expect(alertas(tipo: 'ec_fuera_rango')).to be_empty
     end
 
     it 'pero una EC de vegetativo en un clonador sí avisa: eso quema el callo' do
-      lote = create(:lote, club: club, sala: sala, estado: 'esqueje')
+      lote = create(:lote, club: club, sala: sala, estado: 'enraizado')
       registrar(lote, ec: 1.4, humedad: 90, temperatura: 24)
 
       expect(alertas(tipo: 'ec_fuera_rango').count).to eq(1)
@@ -79,14 +77,14 @@ RSpec.describe AlertaDetectorService do
   # existía en RegistroAmbiental y nadie lo miraba.
   describe 'temperatura de sustrato' do
     it 'avisa con el sustrato frío aunque el aire esté perfecto' do
-      lote = create(:lote, club: club, sala: sala, estado: 'esqueje')
+      lote = create(:lote, club: club, sala: sala, estado: 'enraizado')
       registrar(lote, temperatura: 24, humedad: 90, temperatura_sustrato: 18)
 
       expect(alertas(tipo: 'temperatura_sustrato_fuera_rango').count).to eq(1)
     end
 
     it 'con el sustrato en rango no avisa' do
-      lote = create(:lote, club: club, sala: sala, estado: 'esqueje')
+      lote = create(:lote, club: club, sala: sala, estado: 'enraizado')
       registrar(lote, temperatura: 24, humedad: 90, temperatura_sustrato: 25)
 
       expect(alertas(tipo: 'temperatura_sustrato_fuera_rango')).to be_empty
@@ -104,7 +102,7 @@ RSpec.describe AlertaDetectorService do
 
   describe 'días sin registro' do
     it 'el enraizado se mira todos los días, no cada tres' do
-      lote = create(:lote, club: club, sala: sala, estado: 'esqueje')
+      lote = create(:lote, club: club, sala: sala, estado: 'enraizado')
       create(:registro_ambiental, lote: lote, club: club, user: admin,
                                   registrado_en: 2.days.ago, humedad: 90, temperatura: 24)
 
@@ -124,7 +122,7 @@ RSpec.describe AlertaDetectorService do
     it 'un setpoint propio de enraizado le gana al rango por defecto' do
       SetpointFase.create!(club_id: club.id, fase: 'enraizado', tipo_lectura: 'humedad',
                            valor_min: 70, valor_max: 99, unidad: '%')
-      lote = create(:lote, club: club, sala: sala, estado: 'esqueje')
+      lote = create(:lote, club: club, sala: sala, estado: 'enraizado')
       registrar(lote, humedad: 75, temperatura: 24)
 
       # 75 está fuera del default (85-95) pero dentro de lo que configuró el club.

@@ -23,7 +23,7 @@ module Public
       inicio_mes = hoy.beginning_of_month
 
       rendimientos = opted.flat_map do |c|
-        c.lotes.where.not(estado: 'germinacion')
+        c.lotes.where.not(estado: 'enraizado')
          .select { |l| l.rendimiento_real_g.present? }
          .map { |l| l.rendimiento_real_g.to_f }
       end
@@ -44,7 +44,7 @@ module Public
       dispens_count = dispens_mes_total.count
 
       geneticas_distintas = opted.flat_map { |c|
-        c.lotes.where.not(estado: 'germinacion').pluck(:genetica_id)
+        c.lotes.where.not(estado: 'enraizado').pluck(:genetica_id)
       }.uniq.size
 
       render json: {

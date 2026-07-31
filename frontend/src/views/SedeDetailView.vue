@@ -67,7 +67,7 @@ const tiendaStocks  = ref([])
 const loadingTienda = ref(false)
 
 const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '🫙 Aceite', tintura: '💧 Tintura', topico: '🧴 Tópico', otro: '📦 Otro' }
-const KIND_LABELS = { germinacion: 'Enraizado', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', curado: 'Curado', manicura: 'Manicura', mixta: 'Mixta', madre: 'Madre', madres: 'Madres' }
+const KIND_LABELS = { enraizado: 'Enraizado', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', curado: 'Curado', manicura: 'Manicura', mixta: 'Mixta', madre: 'Madre', madres: 'Madres' }
 function kindLabel(k) { return KIND_LABELS[k] || k || '' }
 
 // El stock de la sede es SOLO LECTURA acá; la gestión (editar cantidad, precio, ajustes) vive en

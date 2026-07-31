@@ -20,10 +20,10 @@ RSpec.describe 'POST /salas/:id/registrar_sala', type: :request do
          headers: auth_headers
   end
 
-  # El caso que reportó Germán: una sala donde SOLO hay esquejes. Si el test mezclara estados, el
-  # bug pasaba desapercibido porque los de vegetativo sí recibían el registro.
-  it 'registra en un lote en ESQUEJE aunque sea el único de la sala' do
-    lote = create(:lote, club: club, sala: sala, estado: 'esqueje')
+  # El caso que reportó Germán: una sala donde SOLO hay lotes enraizando. Si el test mezclara
+  # estados, el bug pasaba desapercibido porque los de vegetativo sí recibían el registro.
+  it 'registra en un lote ENRAIZANDO aunque sea el único de la sala' do
+    lote = create(:lote, club: club, sala: sala, estado: 'enraizado')
     sign_in_as(admin)
 
     expect { registrar }.to change { lote.registros_ambientales.count }.by(1)
@@ -31,24 +31,16 @@ RSpec.describe 'POST /salas/:id/registrar_sala', type: :request do
     expect(JSON.parse(response.body)['lotes_afectados']).to eq(1)
   end
 
-  it 'registra en un lote en GERMINACIÓN aunque sea el único de la sala' do
-    lote = create(:lote, club: club, sala: sala, estado: 'germinacion')
-    sign_in_as(admin)
-
-    expect { registrar }.to change { lote.registros_ambientales.count }.by(1)
-  end
-
   it 'alcanza a todas las fases que están en la sala, no solo a vegetativo' do
-    esq   = create(:lote, club: club, sala: sala, estado: 'esqueje')
-    germ  = create(:lote, club: club, sala: sala, estado: 'germinacion')
+    enr   = create(:lote, club: club, sala: sala, estado: 'enraizado')
     vege  = create(:lote, club: club, sala: sala, estado: 'vegetativo')
     flor  = create(:lote, club: club, sala: sala, estado: 'floracion')
     sign_in_as(admin)
 
     registrar
 
-    expect(JSON.parse(response.body)['lotes_afectados']).to eq(4)
-    [esq, germ, vege, flor].each do |l|
+    expect(JSON.parse(response.body)['lotes_afectados']).to eq(3)
+    [enr, vege, flor].each do |l|
       expect(l.registros_ambientales.count).to eq(1), "#{l.estado} no recibió el registro"
     end
   end
@@ -76,6 +68,6 @@ RSpec.describe 'POST /salas/:id/registrar_sala', type: :request do
 
   # Los estados que reciben registro son, por definición, los que obligan a tener sala.
   it 'la lista usada es la fuente única del modelo, no una copia a mano' do
-    expect(Lote::CULTIVO_ESTADOS).to match_array(%w[germinacion esqueje vegetativo floracion])
+    expect(Lote::CULTIVO_ESTADOS).to match_array(%w[enraizado vegetativo floracion])
   end
 end

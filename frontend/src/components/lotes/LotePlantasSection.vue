@@ -98,7 +98,7 @@
                 <line x1="18" y1="10" x2="16" y2="6" stroke="#fbbf24" stroke-width="1.5"/>
                 <line x1="22" y1="9"  x2="24" y2="5" stroke="#fbbf24" stroke-width="1.5"/>
               </svg>
-              <svg v-else-if="['semilla','germinacion','esqueje'].includes(p.state)" viewBox="0 0 40 70" xmlns="http://www.w3.org/2000/svg" class="lps__psvg">
+              <svg v-else-if="['enraizado'].includes(p.state)" viewBox="0 0 40 70" xmlns="http://www.w3.org/2000/svg" class="lps__psvg">
                 <line x1="20" y1="68" x2="20" y2="42" stroke="#86efac" stroke-width="2.5" stroke-linecap="round"/>
                 <ellipse cx="13" cy="48" rx="9" ry="5" fill="#4ade80" opacity=".9" transform="rotate(-30 13 48)"/>
                 <ellipse cx="27" cy="48" rx="9" ry="5" fill="#4ade80" opacity=".9" transform="rotate(30 27 48)"/>
@@ -230,8 +230,7 @@
               <div class="lps__field">
                 <label class="lps__label">Estado inicial</label>
                 <select class="lps__input" v-model="plantaForm.state">
-                  <option value="germinacion">🌱 Enraizado (semilla)</option>
-                  <option value="esqueje">🌱 Enraizado (esqueje)</option>
+                  <option value="enraizado">🌱 Enraizado</option>
                   <option value="vegetativo">🍃 Vegetativo</option>
                   <option value="floracion">🌸 Floración</option>
                 </select>
@@ -239,8 +238,7 @@
               <div class="lps__field">
                 <label class="lps__label">Origen</label>
                 <select class="lps__input" v-model="plantaForm.origen">
-                  <option value="germinacion">🌱 Enraizado (semilla)</option>
-                  <option value="esqueje">🌱 Enraizado (esqueje)</option>
+                  <option value="enraizado">🌱 Enraizado</option>
                   <option value="division">🪴 División</option>
                 </select>
               </div>
@@ -295,7 +293,7 @@ const toast        = useToast()
 
 const PLANT_STAGE_GRADIENT = {
   semilla:    'linear-gradient(160deg, #166534 0%, #14532d 100%)',
-  germinacion:'linear-gradient(160deg, #166534 0%, #064e3b 100%)',
+  enraizado:'linear-gradient(160deg, #166534 0%, #064e3b 100%)',
   esqueje:    'linear-gradient(160deg, #0f766e 0%, #134e4a 100%)',
   vegetativo: 'linear-gradient(160deg, #15803d 0%, #166534 100%)',
   floracion:  'linear-gradient(160deg, #92400e 0%, #78350f 100%)',

@@ -190,7 +190,7 @@ const KIND_GRADIENT = {
 const KIND_EMOJI = { vegetativo:'🍃', floracion:'🌸', cosecha:'🌾', cosechado:'🌾', manicura:'✂️', curado:'💊', madre:'🌱', mixta:'🏠' }
 const KIND_LABEL = { vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', cosechado:'Cosecha', manicura:'Manicura', curado:'Curado', madre:'Madres', mixta:'Mixta' }
 const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', curado:'#2563eb' }
-const EL = { semilla:'Enraizado', esqueje:'Enraizado', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado' }
+const EL = { enraizado: 'Enraizado', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado' }
 
 const kindGradient = k => KIND_GRADIENT[k] || 'linear-gradient(135deg,#0f172a,#1e293b)'
 const kindEmoji    = k => KIND_EMOJI[k] || '🏠'

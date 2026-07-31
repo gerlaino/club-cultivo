@@ -26,8 +26,7 @@
               <select class="lem__input" v-model="editLoteForm.estado">
                 <!-- Fase inicial: germinación (solo lotes de semilla) → esqueje → vegetativo.
                      Un lote de esqueje arranca en esqueje (se saltea germinación). -->
-                <option v-if="props.lote?.origen !== 'esqueje'" value="germinacion">Enraizado (semilla)</option>
-                <option value="esqueje">Enraizado (esqueje)</option>
+                <option v-if="props.lote?.origen !== 'esqueje'" value="enraizado">Enraizado</option>
                 <option value="vegetativo">Vegetativo</option>
                 <option value="floracion">Floración</option>
                 <option value="cosecha">Cosechado</option>
@@ -179,7 +178,7 @@ const cantidadCambiada = computed(() =>
 // Si el lote ya está en un estado post-cosecha, lo mostramos para no perderlo
 // (pero las opciones editables son las fases de cultivo).
 const ESTADOS_EXTRA = computed(() => {
-  const base = ['germinacion', 'esqueje', 'vegetativo', 'floracion', 'cosecha']
+  const base = ['enraizado', 'vegetativo', 'floracion', 'cosecha']
   const cur = editLoteForm.value.estado
   const labels = { en_manicura: 'En manicura', curado: 'Curado', finalizado: 'Finalizado' }
   return (cur && !base.includes(cur)) ? [{ v: cur, l: labels[cur] || cur }] : []

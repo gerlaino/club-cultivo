@@ -22,8 +22,7 @@ const today = new Date().toISOString().split('T')[0]
 
 // Estados correctos según el modelo
 const STATE_META = {
-  esqueje:    { label: 'Enraizado',  icon: '🌱',  color: '#0891b2' },
-  germinacion:{ label: 'Enraizado',  icon: '🌱',  color: '#0891b2' },
+  enraizado:  { label: 'Enraizado',  icon: '🌱',  color: '#0891b2' },
   vegetativo: { label: 'Vegetativo', icon: '🌱',  color: '#15803d' },
   floracion:  { label: 'Floración',  icon: '🌸',  color: '#b45309' },
   cosechado:  { label: 'Cosechado',  icon: '✅',  color: '#0369a1' },
@@ -254,7 +253,7 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div class="pnv__field" v-if="!['esqueje','germinacion'].includes(form.state)">
+            <div class="pnv__field" v-if="form.state !== 'enraizado'">
               <label class="pnv__label">🌱 Inicio vegetativo</label>
               <AppDatePicker v-model="form.fecha_vegetativo" :max="today" />
             </div>

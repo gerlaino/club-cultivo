@@ -138,7 +138,7 @@ class AlertaDetectorService
   # deshidratan— no disparaba NADA, y su EC casi nula disparaba una falsa alarma de EC baja.
   # Ciego para el problema real y gritando por el que no existe.
   def fase_setpoint(estado)
-    %w[germinacion esqueje enraizado].include?(estado) ? 'enraizado' : estado
+    estado
   end
 
   def rango_para(campo, fase, genetica_id, setpoints_club)

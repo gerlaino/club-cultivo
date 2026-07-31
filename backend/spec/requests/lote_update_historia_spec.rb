@@ -62,9 +62,9 @@ RSpec.describe 'PATCH /lotes/:id — corrección de estado e historia', type: :r
   end
 
   context 'propagación del estado a las plantas' do
-    let(:lote) { create(:lote, club: club, sala: sala, estado: 'esqueje', start_date: 60.days.ago.to_date) }
-    let!(:p1)  { create(:plant, lote: lote, club: club, state: 'esqueje') }
-    let!(:p2)  { create(:plant, lote: lote, club: club, state: 'esqueje') }
+    let(:lote) { create(:lote, club: club, sala: sala, estado: 'enraizado', start_date: 60.days.ago.to_date) }
+    let!(:p1)  { create(:plant, lote: lote, club: club, state: 'enraizado') }
+    let!(:p2)  { create(:plant, lote: lote, club: club, state: 'enraizado') }
     let!(:descartada) { create(:plant, lote: lote, club: club, state: 'descartada') }
 
     it 'al cambiar esqueje → vegetativo pasa las plantas a vegetativo' do
@@ -80,8 +80,8 @@ RSpec.describe 'PATCH /lotes/:id — corrección de estado e historia', type: :r
     end
 
     it 'no toca plantas si el estado no cambió' do
-      patch "/lotes/#{lote.id}", params: { lote: { estado: 'esqueje', notes: 'solo nota' } }, headers: auth_headers, as: :json
-      expect(p1.reload.state).to eq('esqueje')
+      patch "/lotes/#{lote.id}", params: { lote: { estado: 'enraizado', notes: 'solo nota' } }, headers: auth_headers, as: :json
+      expect(p1.reload.state).to eq('enraizado')
     end
   end
 

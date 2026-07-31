@@ -251,11 +251,11 @@ const emit = defineEmits(['close', 'created'])
 
 const lotes = useLotesStore()
 
-const ESTADOS_LOTE     = ['germinacion','esqueje','vegetativo','floracion','cosecha','en_manicura','curado','finalizado']
+const ESTADOS_LOTE     = ['enraizado','vegetativo','floracion','cosecha','en_manicura','curado','finalizado']
 const KINDS_CON_ORIGEN = ['vegetativo','madre','clon','mixta']
 const KIND_TO_ESTADO   = { floracion: 'floracion' }
 const ESTADOS_HEREDADO = [
-  { value: 'germinacion', label: 'Enraizado' },
+  { value: 'enraizado', label: 'Enraizado' },
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración' },
   { value: 'cosecha',    label: 'Cosechado' },
@@ -278,7 +278,7 @@ const saving        = ref(false)
 const tipoCreacion  = ref('nuevo')
 const proximoCodigo = ref('')
 const loadingCodigo = ref(false)
-const heredadoEstado = ref('germinacion')
+const heredadoEstado = ref('enraizado')
 const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 })
 const geneticas      = ref([])
 const plantasMadre   = ref([])
@@ -298,7 +298,7 @@ function toggleLoteColapso(loteId) {
 // cosechado se carga y queda pendiente de manicura). Nunca secado/finalizado.
 const estadosHeredadoPermitidos = computed(() =>
   ESTADOS_HEREDADO.map(e =>
-    e.value === 'germinacion'
+    e.value === 'enraizado'
       ? { ...e, label: 'Enraizado' }
       : e
   )
@@ -342,7 +342,7 @@ function emptyForm() {
   const kind = effectiveSala.value?.kind
   const conOrigen = !kind || KINDS_CON_ORIGEN.includes(kind)
   return {
-    estado: conOrigen ? 'germinacion' : (KIND_TO_ESTADO[kind] || 'vegetativo'),
+    estado: conOrigen ? 'enraizado' : (KIND_TO_ESTADO[kind] || 'vegetativo'),
     origen: conOrigen ? 'semilla' : null,
     planta_madre_ids: [], plants_count: 1,
     start_date: localISO(),
@@ -353,7 +353,7 @@ function emptyForm() {
 async function setOrigen(valor) {
   form.value.origen = valor
   // Estado inicial según el origen: semilla → germinación, esqueje → esqueje.
-  form.value.estado = valor === 'esqueje' ? 'esqueje' : 'germinacion'
+  form.value.estado = 'enraizado'   // el origen ya no define la fase: los dos arrancan enraizando
   form.value.planta_madre_ids = []
   madreQuery.value = ''
   if (valor === 'esqueje') {

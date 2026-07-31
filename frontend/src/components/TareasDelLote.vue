@@ -581,10 +581,9 @@ const PLAGAS_META = {
 }
 // 'germinacion' es el ancla de origen; 'esqueje' se normaliza a esa posición (son
 // orígenes alternativos que caen en el mismo punto del ciclo). Ver loteHelpers.
-const CICLO = ["germinacion","vegetativo","floracion","cosecha","en_manicura","curado","finalizado"]
+const CICLO = ["enraizado","vegetativo","floracion","cosecha","en_manicura","curado","finalizado"]
 const ESTADO_META = {
-  germinacion:     {label:"Enraizado",   color:"#0891b2",bg:"#e0f2fe",emoji:"🌱"},
-  esqueje:     {label:"Enraizado",   color:"#0891b2",bg:"#e0f2fe",emoji:"🌱"},
+  enraizado:     {label:"Enraizado",   color:"#0891b2",bg:"#e0f2fe",emoji:"🌱"},
   vegetativo:  {label:"Vegetativo",  color:"#16a34a",bg:"#dcfce7",emoji:"🍃"},
   floracion:   {label:"Floración",   color:"#d97706",bg:"#fef3c7",emoji:"🌸"},
   cosecha:     {label:"Cosecha",     color:"#92400e",bg:"#fff7ed",emoji:"✂️"},
@@ -594,7 +593,7 @@ const ESTADO_META = {
 }
 function em(e) { return ESTADO_META[e] || {label:e,color:"#64748b",bg:"#f1f5f9",emoji:"•"} }
 const estadosSiguientes = computed(() => {
-  const actual = props.lote?.estado === 'esqueje' ? 'germinacion' : props.lote?.estado
+  const actual = props.lote?.estado
   const idx = CICLO.indexOf(actual)
   return CICLO.filter((_,i) => i > idx)
 })

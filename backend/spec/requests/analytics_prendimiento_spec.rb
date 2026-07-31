@@ -72,7 +72,7 @@ RSpec.describe 'GET /api/analytics/prendimiento', type: :request do
   # Un lote que está enraizando AHORA todavía no tiene resultado: incluirlo daría un prendimiento
   # falsamente alto (nadie falló todavía) y movería el promedio.
   it 'no mide un lote que todavía está enraizando' do
-    lote_con(plantas: 20, estado: 'esqueje')
+    lote_con(plantas: 20, estado: 'enraizado')
 
     expect(pedir['global']['intentos']).to eq(0)
     expect(pedir['global']['porcentaje']).to be_nil
@@ -114,7 +114,7 @@ RSpec.describe 'PATCH /api/plants/:id — motivo estructurado del descarte', typ
   let(:admin) { create(:user, :admin, club: club) }
   let(:sede)  { create(:sede, club: club, created_by: admin) }
   let(:sala)  { create(:sala, club: club, sede: sede, created_by: admin) }
-  let(:lote)  { create(:lote, club: club, sala: sala, estado: 'esqueje') }
+  let(:lote)  { create(:lote, club: club, sala: sala, estado: 'enraizado') }
 
   def descartar(planta, extra = {})
     patch "/api/plants/#{planta.id}",
@@ -124,7 +124,7 @@ RSpec.describe 'PATCH /api/plants/:id — motivo estructurado del descarte', typ
   before { sign_in_as(admin) }
 
   it 'descartar algo que estaba enraizando se clasifica como no_prendio' do
-    p = create(:plant, lote: lote, state: 'esqueje')
+    p = create(:plant, lote: lote, state: 'enraizado')
     descartar(p)
     expect(p.reload.motivo_descarte).to eq('no_prendio')
   end
@@ -136,22 +136,22 @@ RSpec.describe 'PATCH /api/plants/:id — motivo estructurado del descarte', typ
   end
 
   it 'un motivo explícito le gana al default' do
-    p = create(:plant, lote: lote, state: 'esqueje')
+    p = create(:plant, lote: lote, state: 'enraizado')
     descartar(p, motivo_descarte: 'plaga')
     expect(p.reload.motivo_descarte).to eq('plaga')
   end
 
   it 'un motivo inventado cae al default en vez de guardarse' do
-    p = create(:plant, lote: lote, state: 'esqueje')
+    p = create(:plant, lote: lote, state: 'enraizado')
     descartar(p, motivo_descarte: 'cualquier_cosa')
     expect(p.reload.motivo_descarte).to eq('no_prendio')
   end
 
   # Si al revivir la planta quedara el motivo, seguiría contando como "no prendió" una que está viva.
   it 'revertir el descarte borra el motivo' do
-    p = create(:plant, lote: lote, state: 'esqueje')
+    p = create(:plant, lote: lote, state: 'enraizado')
     descartar(p)
-    patch "/api/plants/#{p.id}", params: { plant: { state: 'esqueje' } }
+    patch "/api/plants/#{p.id}", params: { plant: { state: 'enraizado' } }
     expect(p.reload.motivo_descarte).to be_nil
   end
 end

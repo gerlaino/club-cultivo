@@ -20,7 +20,7 @@ class StatsController < ApplicationController
         vencimientos:         vencidos_count,
         reprocann_vencidos:   vencidos_count,
         reprocann_por_vencer: por_vencer_count,
-        germinacion:          plantas_act.where(state: 'germinacion').count,
+        enraizado:            plantas_act.where(state: 'enraizado').count,
         vegetativo:           plantas_act.where(state: 'vegetativo').count,
         floracion:            plantas_act.where(state: 'floracion').count,
         secado:               plantas_act.where(state: 'secado').count,

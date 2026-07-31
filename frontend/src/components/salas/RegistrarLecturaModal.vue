@@ -139,7 +139,7 @@ const toast    = useToast()
 const saving   = ref(false)
 const errorMsg = ref(null)
 
-const ESTADOS_ACTIVOS = ['germinacion', 'vegetativo', 'floracion', 'cosecha']
+const ESTADOS_ACTIVOS = ['enraizado', 'vegetativo', 'floracion', 'cosecha']
 const lotesActivos = computed(() =>
   props.lotes.filter(l => ESTADOS_ACTIVOS.includes(l.estado))
 )

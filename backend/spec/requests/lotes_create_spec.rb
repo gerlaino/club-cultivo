@@ -86,7 +86,7 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
 
     it 'guarda el array de madres y deja planta_madre_id = la primera' do
       ids = madres.map(&:id)
-      crear(estado: 'esqueje', origen: 'esqueje', plants_count: 8, start_date: Date.today, planta_madre_ids: ids)
+      crear(estado: 'enraizado', origen: 'esqueje', plants_count: 8, start_date: Date.today, planta_madre_ids: ids)
       expect(response).to have_http_status(:created)
       lote = Lote.last
       expect(lote.planta_madre_ids).to eq(ids)

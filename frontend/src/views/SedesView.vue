@@ -99,13 +99,12 @@ const formErrors = ref({})
 
 // Las fases, en el orden del ciclo. "Cosechadas" cierra la fila porque ya no ocupan sala.
 const FASES_PLANTA = [
-  { clave: 'germinacion', label: 'germinación' },
-  { clave: 'esqueje',     label: 'esquejes' },
+  { clave: 'enraizado',   label: 'enraizando' },
   { clave: 'vegetativo',  label: 'vegetativo' },
   { clave: 'floracion',   label: 'floración' },
   { clave: 'cosechadas',  label: 'cosechadas' },
 ]
-// Solo las fases que tienen plantas: una sede sin esquejes no gana nada mostrando "0 esquejes".
+// Solo las fases que tienen plantas: una sede sin nada enraizando no gana mostrando "0 enraizando".
 function fasesConPlantas(sede) {
   const f = sede.ops?.plantas_por_fase || {}
   return FASES_PLANTA.map(x => ({ ...x, n: f[x.clave] || 0 })).filter(x => x.n > 0)

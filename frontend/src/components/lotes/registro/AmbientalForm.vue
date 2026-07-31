@@ -72,7 +72,7 @@ const vpdStatus = computed(() => {
 
   const estado = props.estadoLote
   // Rango óptimo según estadío
-  if (['semilla', 'esqueje', 'germinacion'].includes(estado)) {
+  if (estado === 'enraizado') {
     if (v < 0.8) return '✅ Ideal para clones/semillas'
     if (v < 1.2) return '⚠️ Algo alto para esta etapa'
     return '🚨 Muy alto para esta etapa'
