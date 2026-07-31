@@ -404,8 +404,14 @@ onUnmounted(() => {
             <span v-if="lote.sala">📍 {{ lote.sala.nombre }}</span>
             <span v-if="lote.start_date" class="ld__subtitle-sep">·</span>
             <span v-if="lote.start_date">📅 inicio {{ formatDate(lote.start_date) }}</span>
-            <span v-if="lote.dias_desde_inicio != null" class="ld__subtitle-sep">·</span>
-            <span v-if="lote.dias_desde_inicio != null" class="ld__dias-badge">Día {{ lote.dias_desde_inicio }}</span>
+            <!-- El ciclo arranca en vegetativo; el enraizado se muestra al lado para no perder el
+                 panorama ("día 28 de ciclo + 12 enraizando"). -->
+            <span v-if="lote.dias_ciclo != null || lote.dias_enraizado != null" class="ld__subtitle-sep">·</span>
+            <span v-if="lote.dias_ciclo != null" class="ld__dias-badge">Día {{ lote.dias_ciclo }} de ciclo</span>
+            <span v-else-if="lote.dias_enraizado != null" class="ld__dias-badge">Enraizando · día {{ lote.dias_enraizado }}</span>
+            <span v-if="lote.dias_ciclo != null && lote.dias_enraizado" class="ld__dias-extra">
+              + {{ lote.dias_enraizado }}d enraizando
+            </span>
           </p>
         </div>
         <div class="ld__hero-actions">
@@ -630,7 +636,12 @@ onUnmounted(() => {
               <dt>Floración objetivo</dt><dd>{{ lote.dias_floracion_objetivo ? lote.dias_floracion_objetivo + ' días' : '—' }}</dd>
               <dt>Cosecha objetivo</dt><dd>{{ lote.dias_cosecha_objetivo ? lote.dias_cosecha_objetivo + ' días' : '—' }}</dd>
               <dt>Inicio</dt><dd>{{ formatDate(lote.start_date) }}</dd>
-              <dt>Día del cultivo</dt><dd>{{ lote.dias_desde_inicio != null ? 'día ' + lote.dias_desde_inicio : '—' }}</dd>
+              <dt>Día del ciclo</dt>
+              <dd>
+                {{ lote.dias_ciclo != null ? 'día ' + lote.dias_ciclo : 'todavía enraizando' }}
+                <small v-if="lote.dias_enraizado" class="ld__dd-nota">+ {{ lote.dias_enraizado }}d enraizando</small>
+              </dd>
+              <dt>Edad de la planta</dt><dd>{{ lote.dias_desde_inicio != null ? 'día ' + lote.dias_desde_inicio : '—' }}</dd>
               <dt>Día en {{ em(lote.estado).label.toLowerCase() }}</dt><dd>{{ lote.dias_en_estado != null ? 'día ' + lote.dias_en_estado : '—' }}</dd>
             </dl>
           </div>
@@ -927,6 +938,9 @@ onUnmounted(() => {
 .ld__subtitle-sep { color: #cbd5e1; }
 .ld__strain-fallback { font-style: italic; color: #94a3b8; }
 .ld__dias-badge { background: #e8f5e9; color: #1b5e20; font-size: .75rem; font-weight: 700; padding: .2em .6em; border-radius: 6px; }
+/* El enraizado va al lado del ciclo, en tono menor: es contexto, no el número que se compara. */
+.ld__dias-extra { font-size: .72rem; color: #94a3b8; }
+.ld__dd-nota    { display: block; font-size: .7rem; color: #94a3b8; font-weight: 400; }
 .ld__hero-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .ld__ciclo { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; padding: 1.25rem 1.5rem 1rem; margin-bottom: 1.5rem; overflow-x: auto; }
 .ld__ciclo-track { display: flex; align-items: flex-start; position: relative; min-width: 480px; }

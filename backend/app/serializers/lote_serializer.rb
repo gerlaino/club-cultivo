@@ -14,7 +14,14 @@ class LoteSerializer
     fecha_inicio_floracion  = ev_floracion&.registrado_en&.to_date
     fecha_cosechado         = ev_cosecha&.registrado_en&.to_date
 
-    dias_vegetacion = (lote.start_date && fecha_inicio_floracion) ? (fecha_inicio_floracion - lote.start_date).to_i : nil
+    # El vegetativo arranca cuando la planta entra a maceta, NO en el esqueje: en el domo no crece,
+    # emite raíz. Fallback a start_date para los lotes viejos/heredados que no tienen el evento.
+    ancla_vegetativo = fecha_inicio_vegetativo || lote.start_date
+    dias_vegetacion  = (ancla_vegetativo && fecha_inicio_floracion) ? (fecha_inicio_floracion - ancla_vegetativo).to_i : nil
+    # Días enraizando: del inicio hasta que prendió (o hasta hoy si sigue adentro del domo).
+    dias_enraizado   = lote.start_date ? [((fecha_inicio_vegetativo || Date.current) - lote.start_date).to_i, 0].max : nil
+    # El ciclo productivo. nil mientras enraíza: todavía no arrancó.
+    dias_ciclo       = fecha_inicio_vegetativo ? (Date.current - fecha_inicio_vegetativo).to_i : nil
     dias_floracion  = (fecha_inicio_floracion && fecha_cosechado)  ? (fecha_cosechado - fecha_inicio_floracion).to_i   : nil
 
     # Días en cosecha: desde que se cosechó hasta que el lote se transforma en stock o
@@ -69,6 +76,9 @@ class LoteSerializer
       genetica:           lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, tipo: lote.genetica.tipo, registrada_inase: lote.genetica.registrada_inase } : nil,
       dias_desde_inicio:  lote.dias_desde_inicio,
       dias_en_estado:     dias_en_estado,
+      # Panorama completo: "45 días de ciclo + 12 enraizando". Las métricas usan dias_ciclo.
+      dias_enraizado:     dias_enraizado,
+      dias_ciclo:         dias_ciclo,
       progreso_ciclo:     lote.progreso_ciclo,
       costo_por_gramo:    lote.costo_lote&.costo_por_gramo&.to_f,
       costo_total:        lote.costo_lote&.costo_total&.to_f,

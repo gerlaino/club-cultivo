@@ -205,9 +205,14 @@ class AlertaDetectorService
 
   def detectar_cosecha_pendiente(lote)
     dias_obj = lote.dias_floracion_objetivo || (lote.semanas_floracion && lote.semanas_floracion * 7)
-    return unless lote.estado == 'floracion' && lote.start_date.present? && dias_obj.present?
+    return unless lote.estado == 'floracion' && dias_obj.present?
 
-    fecha_est    = lote.start_date + dias_obj.days
+    # La floración se cuenta DESDE EL FLIP a 12/12, no desde el esqueje. Anclado en start_date, a
+    # los días de floración se les descontaba todo el vegetativo y la alerta saltaba ~un mes antes.
+    inicio_flora = lote.fecha_inicio_floracion
+    return if inicio_flora.blank?
+
+    fecha_est    = inicio_flora + dias_obj.days
     dias_pasados = (Date.current - fecha_est).to_i
     umbral_cosecha = (@club.alertas_config&.dig('cosecha_pendiente_umbral_dias') || 0).to_i
     return unless dias_pasados > umbral_cosecha

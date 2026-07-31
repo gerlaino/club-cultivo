@@ -439,15 +439,16 @@ class AnalyticsController < ApplicationController
       evs = eventos_por_lote[l.id] || []
       next if evs.empty? && l.start_date.nil?
 
-      # start_date es siempre el ancla del período vegetativo total (incluye propagación)
+      # El vegetativo arranca cuando la planta entra a maceta, no en el esqueje: en el domo emite
+      # raíz, no crece. El enraizado se mide aparte (abajo) para poder comparar clonadores.
+      # Fallback a start_date solo para los lotes viejos/heredados sin evento de vegetativo.
+      ev_veg = evs.find { |e| e.estado_nuevo == 'vegetativo' }
       fase_inicio = {}
-      fase_inicio['vegetativo'] = l.start_date&.to_time
+      fase_inicio['vegetativo'] = ev_veg&.registrado_en || l.start_date&.to_time
 
       evs.each do |ev|
         next unless ev.estado_nuevo.present?
-        # No sobreescribir 'vegetativo' — start_date es el inicio real del período completo.
-        # Los eventos esqueje/semilla se guardan como sub-fases de propagación.
-        next if ev.estado_nuevo == 'vegetativo'
+        next if ev.estado_nuevo == 'vegetativo'   # ya resuelto arriba
         fase_inicio[ev.estado_nuevo] = ev.registrado_en
       end
 
@@ -463,19 +464,14 @@ class AnalyticsController < ApplicationController
 
       next if dias.values.all?(&:nil?)
 
-      # ── Sub-fases de propagación (detalle dentro del período vegetativo) ──
-      # propagacion = días desde start_date hasta transición a vegetativo pleno
-      # vegetativo_puro = días desde vegetativo pleno hasta floracion
-      ev_vegetativo = evs.find { |e| e.estado_nuevo == 'vegetativo' }
-      if ev_vegetativo && l.start_date
-        propagacion_dias = ((ev_vegetativo.registrado_en - l.start_date.to_time) / 86400.0).round(1)
-        veg_puro_fin     = fase_inicio['floracion']
-        veg_puro_fin   ||= Time.current if l.estado == 'vegetativo'
-        veg_puro_dias    = veg_puro_fin ? ((veg_puro_fin - ev_vegetativo.registrado_en) / 86400.0).round(1) : nil
-      else
-        propagacion_dias = nil
-        veg_puro_dias    = nil
+      # ── Enraizado: etapa PREVIA al ciclo, no una sub-fase del vegetativo ──
+      # Días desde el esqueje/semilla hasta que prendió. Es lo que le pone nota al clonador: si se
+      # muere una manta térmica, este número se estira antes de que caiga el prendimiento.
+      # `vegetativo` (arriba) ya es el vegetativo puro, así que no hace falta desglosarlo.
+      propagacion_dias = if ev_veg && l.start_date
+        ((ev_veg.registrado_en - l.start_date.to_time) / 86400.0).round(1)
       end
+      veg_puro_dias = dias['vegetativo']
 
       {
         lote_id:        l.id,

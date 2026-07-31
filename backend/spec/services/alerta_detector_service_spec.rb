@@ -83,11 +83,18 @@ RSpec.describe AlertaDetectorService do
 
   describe '#detectar! — cosecha_pendiente' do
     context 'cuando el lote de floración ya superó sus semanas estimadas' do
+      # La floración se cuenta DESDE EL FLIP a 12/12, no desde el esqueje: el lote arrancó hace 100
+      # días pero lleva 70 floreciendo, que es lo que se compara contra las 8 semanas objetivo.
       let(:lote) do
-        create(:lote, club: club, sala: sala,
-               estado: 'floracion',
-               start_date: 70.days.ago,
-               semanas_floracion: 8)
+        l = create(:lote, club: club, sala: sala,
+                   estado: 'floracion',
+                   start_date: 100.days.ago,
+                   semanas_floracion: 8)
+        l.lote_eventos.create!(
+          tipo: 'cambio_estado', estado_anterior: 'vegetativo', estado_nuevo: 'floracion',
+          registrado_en: 70.days.ago, club: club, user: user,
+        )
+        l
       end
       before { lote }
 

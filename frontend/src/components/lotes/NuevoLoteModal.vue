@@ -294,7 +294,6 @@ const lotes = useLotesStore()
 
 const ESTADOS_LOTE     = ['enraizado','vegetativo','floracion','cosecha','en_manicura','curado','finalizado']
 const KINDS_CON_ORIGEN = ['vegetativo','madre','clon','mixta']
-const KIND_TO_ESTADO   = { floracion: 'floracion' }
 const ESTADOS_HEREDADO = [
   { value: 'enraizado', label: 'Enraizado' },
   { value: 'vegetativo', label: 'Vegetativo' },
@@ -438,11 +437,12 @@ const heredadoStartDatePreview = computed(() => {
 })
 
 function emptyForm() {
-  const kind = effectiveSala.value?.kind
-  const conOrigen = !kind || KINDS_CON_ORIGEN.includes(kind)
+  // Un lote NUEVO siempre nace ENRAIZANDO, venga de semilla o de esqueje: los dos empiezan sin
+  // raíz funcional y pasan por el propagador. El origen es un eje aparte del estado. (En salas de
+  // floración/cosecha no se puede crear "nuevo" — ahí el lote viene de antes y se carga heredado.)
   return {
-    estado: conOrigen ? 'enraizado' : (KIND_TO_ESTADO[kind] || 'vegetativo'),
-    origen: conOrigen ? 'semilla' : null,
+    estado: 'enraizado',
+    origen: 'semilla',
     planta_madre_ids: [], plants_count: 1,
     start_date: localISO(),
     genetica_id: '', grow_type: 'sustrato', light_type: '', tamanio_maceta: '', notes: '',

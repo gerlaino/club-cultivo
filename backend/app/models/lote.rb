@@ -119,6 +119,39 @@ class Lote < ApplicationRecord
     (Date.today - start_date).to_i
   end
 
+  # ── Los tres relojes del lote ──────────────────────────────────────────────
+  # El ciclo se cuenta DESDE QUE ENTRA A VEGETATIVO, no desde el esqueje. En el domo la planta no
+  # crece: gasta reservas en emitir raíz y ni siquiera come (por eso su registro no tiene EC ni pH).
+  # Contar el enraizado como vegetativo hace que un lote que tardó 20 días en prender aparente 20
+  # días más de vege sin haber hecho un nudo más, y ahí se pierde toda comparación entre lotes.
+  # El enraizado se informa aparte —"45 días de ciclo + 12 enraizando"— para no perder el panorama.
+
+  # Fallback a start_date: los lotes viejos y los heredados no tienen el evento de vegetativo, y sin
+  # esto sus métricas históricas se vaciarían de golpe.
+  def fecha_inicio_vegetativo
+    ev = lote_eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'vegetativo' }
+                     .min_by(&:registrado_en)
+    ev&.registrado_en&.to_date || (estado == 'enraizado' ? nil : start_date)
+  end
+
+  def fecha_inicio_floracion
+    lote_eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'floracion' }
+                .min_by(&:registrado_en)&.registrado_en&.to_date
+  end
+
+  # Cuánto tardó en prender. Si todavía enraíza, va corriendo: es el dato que mira al clonador.
+  def dias_enraizado
+    return nil unless start_date
+    hasta = fecha_inicio_vegetativo || Date.current
+    [(hasta - start_date).to_i, 0].max
+  end
+
+  # El ciclo productivo. nil mientras enraíza: todavía no arrancó.
+  def dias_ciclo
+    f = fecha_inicio_vegetativo
+    f ? (Date.current - f).to_i : nil
+  end
+
   # Foto de portada del lote (para el slot del layout de la sala): la marcada como portada si
   # sigue adjunta, o la última subida si no hay marcada. nil si el lote no tiene fotos.
   def foto_portada_attachment

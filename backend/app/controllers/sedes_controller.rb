@@ -163,15 +163,20 @@ class SedesController < ApplicationController
     # Próxima cosecha: lote en floracion con más días acumulados
     proximo_lote = lotes_vivos
                      .select { |l| l.estado == 'floracion' }
-                     .min_by { |l| l.start_date }
+                     # El más avanzado del ciclo, que arranca en vegetativo (un lote que tardó en
+                     # enraizar tiene start_date viejo pero ciclo corto).
+                     .min_by { |l| l.fecha_inicio_vegetativo || l.start_date || Date.current }
 
-    dias_para_cosecha = if proximo_lote&.start_date
+    # El ciclo objetivo es vege + floración, así que se cuenta desde que ENTRÓ A VEGETATIVO. Medido
+    # desde start_date se le sumaban los días de enraizado, que no son parte del ciclo.
+    inicio_ciclo = proximo_lote&.fecha_inicio_vegetativo
+    dias_para_cosecha = if inicio_ciclo
                           # Ciclo objetivo del lote (vege + floración), heredado de la genética al
                           # crear el lote. Fallback ~77d (≈21 vege + 56 flora) si el lote no tiene
                           # objetivos cargados. Restantes = ciclo objetivo − días transcurridos.
                           ciclo_objetivo = proximo_lote.dias_vegetativo_objetivo.to_i + proximo_lote.dias_floracion_objetivo.to_i
                           ciclo_objetivo = 77 if ciclo_objetivo <= 0
-                          restantes = ciclo_objetivo - (Date.today - proximo_lote.start_date).to_i
+                          restantes = ciclo_objetivo - (Date.today - inicio_ciclo).to_i
                           restantes.positive? ? restantes : nil
                         end
 

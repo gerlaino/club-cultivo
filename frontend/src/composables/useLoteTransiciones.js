@@ -40,7 +40,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
   // trasplante que define riego, frecuencia y cuándo toca el próximo cambio de maceta.
   const avanzarMaceta = ref('')
   const MACETAS = [
-    { v: '0.5', l: 'Vaso (0.5 L)' }, { v: '1', l: '1 litro' },  { v: '3', l: '3 litros' },
+    { v: '0.335', l: 'Maceta 0,335 L' }, { v: '0.5', l: 'Vaso (0,5 L)' }, { v: '1', l: '1 litro' }, { v: '3', l: '3 litros' },
     { v: '5',   l: '5 litros' },     { v: '7', l: '7 litros' },  { v: '10', l: '10 litros' },
     { v: '12',  l: '12 litros' },    { v: '15', l: '15 litros' },{ v: '20', l: '20 litros' },
   ]
