@@ -196,6 +196,10 @@ const puedeMover    = computed(() => ['admin', 'supervisor', 'cultivador'].inclu
 const MOVIBLES      = ['enraizado', 'vegetativo', 'floracion']
 const salasDestino  = computed(() => salas.items.filter(s => s.state === 'activa'))
 const salaDestino   = computed(() => salasDestino.value.find(s => s.id === Number(salaDestinoId.value)) || null)
+// El tipo de sala en castellano, para que el desplegable diga "Sala 2 (Floración)" y se vea a qué
+// fotoperíodo va el lote. Sin esto el `kindLabel(...)` del template rompía el render de la vista.
+const KIND_LABEL = { vegetativo:'Vegetativo', floracion:'Floración', mixta:'Mixta', madre:'Madres', clon:'Clones', manicura:'Manicura' }
+const kindLabel = k => KIND_LABEL[k] || k || '—'
 
 async function confirmarMover() {
   const d = salaDestino.value

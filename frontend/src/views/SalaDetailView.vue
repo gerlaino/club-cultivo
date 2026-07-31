@@ -906,6 +906,10 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                   </button>
                 </template>
               </EmptyState>
+              <!-- Hay lotes: buscador (si vale la pena) + lista. Van juntos bajo el mismo v-else:
+                   con el buscador como un v-if suelto, el v-else de la lista se enganchaba a ÉL y
+                   la lista desaparecía apenas había más de 3 lotes. -->
+              <template v-else>
               <!-- Buscar / filtrar / seleccionar todo -->
               <div v-if="items.length > 3 || sdQuery || sdEstado" class="sd__lotes-tools">
                 <label v-if="puedeMover && movibles.length" class="sd__selall">
@@ -917,6 +921,12 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                   <option value="">Todos los estados</option>
                   <option v-for="e in FASES_FILTRO" :key="e.v" :value="e.v">{{ e.l }}</option>
                 </select>
+              </div>
+
+              <!-- El filtro no encontró nada: hay lotes, pero ninguno matchea. Sin esto la lista
+                   quedaba en blanco y parecía que la sala se había vaciado. -->
+              <div v-if="!itemsSorted.length" class="sd__placeholder">
+                Ningún lote coincide con la búsqueda.
               </div>
 
               <div v-else class="sd__lotes">
@@ -980,6 +990,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                   <button class="sd__pager-btn" :disabled="sdPage >= sdTotalPages" @click="sdPage++">»</button>
                 </div>
               </div>
+              </template>
             </div>
           </div>
 
