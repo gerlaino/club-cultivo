@@ -10,7 +10,7 @@ import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
 import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vue'
 import NuevoLoteModal         from '../components/lotes/NuevoLoteModal.vue'
 import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
-import ClonadoresPanel        from '../components/salas/ClonadoresPanel.vue'
+import RegistroEnraizadoModal from '../components/salas/RegistroEnraizadoModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
 import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala, moverLotes } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
@@ -65,11 +65,10 @@ const canCambiarFase = computed(() =>
 )
 
 const lecturaOpen   = ref(false)
+// Registro del propagador: aparte del de la sala, porque adentro del domo hay otro ambiente.
+const enraizadoOpen = ref(false)
+const hayEnraizando = computed(() => items.value.some(l => l.estado === 'enraizado'))
 const lotesExpanded = ref(true)
-// Clonadores: solo en salas de fotoperíodo 18/6. En floración (12/12) un esqueje no prende, así
-// que el backend ni siquiera deja crearlos ahí — no tiene sentido mostrar la sección.
-const clonadoresExpanded = ref(true)
-const mostrarClonadores  = computed(() => !['floracion', 'manicura'].includes(sala.value?.kind))
 
 const ESTADOS_LOTE = ["enraizado","vegetativo","floracion","cosecha","curado","finalizado"]
 const DIAS_CICLO   = { semilla:7, esqueje:7, vegetativo:45, floracion:65, cosecha:10, curado:14, finalizado:0 }
@@ -190,6 +189,11 @@ const salaAcciones = computed(() => {
   const items = []
   if (canEdit.value || isCultivador.value) {
     items.push({ emoji: '🌿', label: 'Registrar sala', onClick: () => { lecturaOpen.value = true } })
+    // Los lotes que enraízan viven en un propagador con otro clima —la sala marca 60% de humedad y
+    // adentro hay 90%—, así que su registro va aparte y solo aparece si hay alguno.
+    if (hayEnraizando.value) {
+      items.push({ emoji: '🌱', label: 'Registrar enraizado', onClick: () => { enraizadoOpen.value = true } })
+    }
   }
   if (puedeCargarLote.value) {
     const lbl = 'Cargar lote de cosecha'
@@ -890,21 +894,6 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
       <div class="sd__layout">
         <div class="sd__main">
 
-          <!-- Clonadores: los domos de enraizado que viven dentro de esta sala -->
-          <div v-if="mostrarClonadores" v-show="tabActiva === 'lotes'" class="sd__section">
-            <button class="sd__section-toggle" @click="clonadoresExpanded = !clonadoresExpanded">
-              <div class="sd__section-toggle-left">
-                <span class="sd__section-emoji">🌱</span>
-                <span class="sd__section-title">Clonadores</span>
-              </div>
-              <i class="bi sd__chevron" :class="clonadoresExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-            </button>
-            <div v-show="clonadoresExpanded" class="sd__section-body sd__section-body--flush">
-              <ClonadoresPanel :sala-id="salaId" :puede-editar="canEdit || isCultivador"
-                               @changed="lotes.fetchBySala(salaId)" />
-            </div>
-          </div>
-
           <!-- Lotes -->
           <div v-show="tabActiva === 'lotes'" class="sd__section">
             <button class="sd__section-toggle" @click="lotesExpanded = !lotesExpanded">
@@ -1300,6 +1289,16 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
       :sala="sala"
       @loaded="onLoteCargado"
       @close="showCargarLote = false"
+    />
+
+    <!-- El clima del propagador: va aparte del de la sala porque adentro del domo hay otro
+         ambiente (60% en el cuarto, 90% adentro). -->
+    <RegistroEnraizadoModal
+      v-model="enraizadoOpen"
+      :sala-id="salaId"
+      :sala-nombre="sala?.nombre || ''"
+      :lotes-count="items.filter(l => l.estado === 'enraizado').length"
+      @registrado="lotes.fetchBySala(salaId)"
     />
 
     <RegistroSalaModal

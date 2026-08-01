@@ -440,7 +440,7 @@ class AnalyticsController < ApplicationController
       next if evs.empty? && l.start_date.nil?
 
       # El vegetativo arranca cuando la planta entra a maceta, no en el esqueje: en el domo emite
-      # raíz, no crece. El enraizado se mide aparte (abajo) para poder comparar clonadores.
+      # raíz, no crece. El enraizado se mide aparte (abajo): es su propia etapa, no parte del vege.
       # Fallback a start_date solo para los lotes viejos/heredados sin evento de vegetativo.
       ev_veg = evs.find { |e| e.estado_nuevo == 'vegetativo' }
       fase_inicio = {}
@@ -465,8 +465,8 @@ class AnalyticsController < ApplicationController
       next if dias.values.all?(&:nil?)
 
       # ── Enraizado: etapa PREVIA al ciclo, no una sub-fase del vegetativo ──
-      # Días desde el esqueje/semilla hasta que prendió. Es lo que le pone nota al clonador: si se
-      # muere una manta térmica, este número se estira antes de que caiga el prendimiento.
+      # Días desde el esqueje/semilla hasta que prendió. Es lo que delata un propagador con
+      # problemas: si se muere una manta térmica, este número se estira antes de caer el prendimiento.
       # `vegetativo` (arriba) ya es el vegetativo puro, así que no hace falta desglosarlo.
       propagacion_dias = if ev_veg && l.start_date
         ((ev_veg.registrado_en - l.start_date.to_time) / 86400.0).round(1)

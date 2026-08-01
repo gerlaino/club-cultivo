@@ -95,14 +95,9 @@ Rails.application.routes.draw do
         post :cargar_lote
         post :cambiar_fase
         post :registrar_sala
-      end
-      resources :clonadores, only: [:index, :create]
-    end
-
-    resources :clonadores, only: [:index, :update, :destroy] do
-      member do
-        post :registrar   # ambiente del domo: temp, humedad, sustrato, enraizante
-        post :asignar     # meter lotes enraizando al domo
+        # El clima del propagador, para los lotes que enraízan en esta sala: temperatura, humedad,
+        # temperatura de sustrato y enraizante. Va aparte porque adentro del domo hay otro ambiente.
+        post :registrar_enraizado
       end
     end
 

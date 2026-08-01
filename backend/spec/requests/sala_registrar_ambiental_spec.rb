@@ -1,11 +1,11 @@
 require 'rails_helper'
 
-# El registro ambiental de una sala se reparte a sus lotes. La lista de estados estaba escrita a
-# mano y se olvidaba de `esqueje` y `germinacion` — justo las fases donde el ambiente más importa,
-# porque un esqueje sin raíz depende del aire para no deshidratarse.
+# El registro ambiental de una sala se reparte a sus lotes: todo lo que respira el aire del cuarto.
 #
-# La regla que fijan estos specs: TODO lo que está físicamente en la sala recibe el registro. Y son
-# exactamente los estados para los que el modelo EXIGE sala (`Lote::CULTIVO_ESTADOS`).
+# MENOS los que están ENRAIZANDO. Antes sí los alcanzaba —se los había olvidado y se arregló—, pero
+# resultó ser media verdad: el esqueje depende del aire, sí, pero del aire del PROPAGADOR, no del
+# cuarto (la sala marca 60% de humedad y adentro del domo hay 90%). Grabarles el clima de la sala
+# les inventaba un ambiente que no vivieron, así que tienen su propia puerta: `registrar_enraizado`.
 RSpec.describe 'POST /salas/:id/registrar_sala', type: :request do
   include AuthHelpers
 
@@ -20,18 +20,18 @@ RSpec.describe 'POST /salas/:id/registrar_sala', type: :request do
          headers: auth_headers
   end
 
-  # El caso que reportó Germán: una sala donde SOLO hay lotes enraizando. Si el test mezclara
-  # estados, el bug pasaba desapercibido porque los de vegetativo sí recibían el registro.
-  it 'registra en un lote ENRAIZANDO aunque sea el único de la sala' do
+  # Si los únicos lotes de la sala están enraizando, no se les graba el clima del cuarto. Y el aviso
+  # tiene que decir POR QUÉ: "no hay lotes activos" haría pensar que la sala está vacía.
+  it 'no registra en un lote ENRAIZANDO, y explica dónde va su ambiente' do
     lote = create(:lote, club: club, sala: sala, estado: 'enraizado')
     sign_in_as(admin)
 
-    expect { registrar }.to change { lote.registros_ambientales.count }.by(1)
-    expect(response).to have_http_status(:created)
-    expect(JSON.parse(response.body)['lotes_afectados']).to eq(1)
+    expect { registrar }.not_to change { lote.registros_ambientales.count }
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(JSON.parse(response.body)['error']).to match(/enraizando/i)
   end
 
-  it 'alcanza a todas las fases que están en la sala, no solo a vegetativo' do
+  it 'alcanza a las fases que respiran el aire de la sala, y saltea a las que enraízan' do
     enr   = create(:lote, club: club, sala: sala, estado: 'enraizado')
     vege  = create(:lote, club: club, sala: sala, estado: 'vegetativo')
     flor  = create(:lote, club: club, sala: sala, estado: 'floracion')
@@ -39,10 +39,11 @@ RSpec.describe 'POST /salas/:id/registrar_sala', type: :request do
 
     registrar
 
-    expect(JSON.parse(response.body)['lotes_afectados']).to eq(3)
-    [enr, vege, flor].each do |l|
+    expect(JSON.parse(response.body)['lotes_afectados']).to eq(2)
+    [vege, flor].each do |l|
       expect(l.registros_ambientales.count).to eq(1), "#{l.estado} no recibió el registro"
     end
+    expect(enr.registros_ambientales.count).to eq(0)
   end
 
   it 'no registra en lotes que ya no están en la sala' do

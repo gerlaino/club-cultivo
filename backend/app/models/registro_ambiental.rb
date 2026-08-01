@@ -4,7 +4,6 @@ class RegistroAmbiental < ApplicationRecord
   belongs_to :lote
   belongs_to :user
   belongs_to :club
-  belongs_to :clonador, optional: true   # si el registro es del domo y no de la sala
   acts_as_tenant(:club)
 
   has_one_attached :archivo_csv

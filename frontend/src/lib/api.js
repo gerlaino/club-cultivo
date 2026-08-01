@@ -75,17 +75,9 @@ export const deleteSala      = (id)              => api.delete(`/salas/${id}`);
 export const cambiarFaseSala  = (id)              => api.post(`/salas/${id}/cambiar_fase`);
 export const registrarSala    = (id, payload)     => api.post(`/salas/${id}/registrar_sala`, { registro_ambiental: payload });
 
-// -------- CLONADORES (domos de enraizado, dentro de una sala) --------
-// El domo tiene su propio microclima: la sala marca 60% de humedad y adentro hay 90%. Aloja UN
-// lote a la vez, y el lote sale cuando prende.
-export const listClonadores    = (salaId = null) => salaId ? api.get(`/salas/${salaId}/clonadores`) : api.get('/clonadores');
-export const createClonador    = (salaId, payload) => api.post(`/salas/${salaId}/clonadores`, { clonador: payload });
-export const updateClonador    = (id, payload)   => api.patch(`/clonadores/${id}`, { clonador: payload });
-export const deleteClonador    = (id)            => api.delete(`/clonadores/${id}`);
-export const asignarAClonador  = (id, loteId)    => api.post(`/clonadores/${id}/asignar`, { lote_id: loteId });
-// Registro reducido a propósito: temperatura, humedad, temperatura de sustrato y enraizante. No
-// hay riego, EC ni pH — un esqueje sin raíz no absorbe.
-export const registrarClonador = (id, payload)   => api.post(`/clonadores/${id}/registrar`, { registro_ambiental: payload });
+// El clima del PROPAGADOR: los lotes que enraízan tienen su propio microclima (la sala marca 60%
+// de humedad y adentro hay 90%). Va aparte de registrarSala y alcanza a todos los que enraízan.
+export const registrarEnraizado = (salaId, payload) => api.post(`/salas/${salaId}/registrar_enraizado`, { registro_ambiental: payload });
 
 // -------- LOTES --------
 export const listLotes = (params = null) => {

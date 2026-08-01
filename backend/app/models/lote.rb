@@ -6,10 +6,6 @@ class Lote < ApplicationRecord
   belongs_to :club
   acts_as_tenant(:club)
   belongs_to :sala, optional: true
-  # En qué clonador enraizó. NO se limpia al prender: es dónde pasó la etapa, no dónde está parado
-  # (igual que la sala no se borra del historial al avanzar). Estar ADENTRO se deriva del estado
-  # —ver `en_clonador?`—, así que no hay un flag que se pueda desincronizar.
-  belongs_to :clonador, optional: true
   belongs_to :sede, optional: true
   # La sala es solo de cultivo. Post-cosecha el lote no tiene sala (se ve por estado),
   # pero conserva su sede. Exigimos sala solo en estados de cultivo.
@@ -67,11 +63,6 @@ class Lote < ApplicationRecord
   validates :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo,
             numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
   validates :start_date,        presence: true
-  # Un domo está adentro de UN cuarto: no se puede estar en un clonador de una sala donde el lote
-  # no está. Solo se exige mientras enraíza —después el clonador es historia y el lote se mueve
-  # libremente sin arrastrar la restricción—.
-  validate :clonador_de_la_misma_sala, if: -> { clonador_id.present? && estado == 'enraizado' }
-  validate :clonador_libre,            if: -> { clonador_id.present? && estado == 'enraizado' && clonador_id_changed? }
   # Al prender, el esqueje va a maceta: sin ese dato el lote entra a vegetativo sin saber en qué
   # volumen crece, que es lo que gobierna riego, frecuencia y cuándo toca trasplante.
   validate :maceta_al_prender, if: -> { estado_changed? && estado_was == 'enraizado' && estado == 'vegetativo' }
@@ -89,11 +80,9 @@ class Lote < ApplicationRecord
 
   default_scope { where(deleted_at: nil) }
 
-  # ¿Está FÍSICAMENTE dentro del domo ahora? Solo mientras enraíza: cuando prende sale al cuarto,
-  # y desde ahí respira el aire de la sala aunque su clonador de origen quede registrado.
-  def en_clonador? = clonador_id.present? && estado == 'enraizado'
-
-  scope :adentro_de_un_clonador, -> { where.not(clonador_id: nil).where(estado: 'enraizado') }
+  # Los que están enraizando: viven en un propagador con su propio clima (la sala marca 60% de
+  # humedad y adentro hay 90%), así que el registro de la sala no les corresponde.
+  scope :enraizando, -> { where(estado: 'enraizado') }
   scope :activos,     -> { where.not(estado: 'finalizado') }
   scope :en_ciclo,    -> { where(estado: CICLO_FASES + ['finalizado']) }
   scope :finalizados, -> { where(estado: 'finalizado') }
@@ -139,7 +128,8 @@ class Lote < ApplicationRecord
                 .min_by(&:registrado_en)&.registrado_en&.to_date
   end
 
-  # Cuánto tardó en prender. Si todavía enraíza, va corriendo: es el dato que mira al clonador.
+  # Cuánto tardó en prender. Si todavía enraíza, va corriendo: es lo que delata un propagador
+  # con problemas (manta térmica muerta, humedad baja) antes de que caiga el prendimiento.
   def dias_enraizado
     return nil unless start_date
     hasta = fecha_inicio_vegetativo || Date.current
@@ -429,19 +419,6 @@ class Lote < ApplicationRecord
   end
 
   private
-
-  def clonador_de_la_misma_sala
-    return if clonador.blank? || clonador.sala_id == sala_id
-    errors.add(:clonador, "está en otra sala (#{clonador.sala&.nombre}): un lote no puede estar " \
-                          'en un domo de un cuarto donde no está')
-  end
-
-  def clonador_libre
-    ocupante = clonador&.lotes_adentro&.where&.not(id: id)&.first
-    return if ocupante.blank?
-    errors.add(:clonador, "ya tiene el lote #{ocupante.codigo} adentro: un clonador aloja un solo " \
-                          'lote a la vez (creá otro clonador)')
-  end
 
   def maceta_al_prender
     return if tamanio_maceta.present?

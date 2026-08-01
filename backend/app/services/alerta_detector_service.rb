@@ -174,7 +174,7 @@ class AlertaDetectorService
 
   # germinación y esqueje son el mismo estadío —ENRAIZADO—, con dos orígenes. Antes se los mandaba
   # a los setpoints de 'vegetativo' con el argumento de que "comparten fisiología", y es al revés:
-  # con el rango de vegetativo (humedad 50-70%) un clonador a 60% —donde los esquejes se
+  # con el rango de vegetativo (humedad 50-70%) un propagador a 60% —donde los esquejes se
   # deshidratan— no disparaba NADA, y su EC casi nula disparaba una falsa alarma de EC baja.
   # Ciego para el problema real y gritando por el que no existe.
   def fase_setpoint(estado)

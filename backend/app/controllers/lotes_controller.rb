@@ -227,9 +227,6 @@ class LotesController < ApplicationController
   end
 
   ReconciliarError = Class.new(StandardError)
-  # Movimiento imposible por una regla de cultivo (típico: el domo no puede entrar a una sala de
-  # floración). Se rescata en `mover` para responder el motivo, no un 500.
-  MoverError = Class.new(StandardError)
 
   # Ajusta las Plant reales del lote para que sean `target`. Crea nuevas (patrón del alta) si
   # sube; si baja, quita plantas "vacías" (sin pesadas ni peso), priorizando las más nuevas, y
@@ -284,9 +281,9 @@ class LotesController < ApplicationController
   # estado la sigue (y las plantas con él, igual que en `salas#cambiar_fase`).
   #
   # PERO el ENRAIZADO no se toca. Enraizado y vegetativo comparten fotoperíodo —los dos son 18/6—,
-  # así que meter un clonador en una sala de vegetativo no le cambia nada: recibe la misma luz. Lo
-  # que lo tiene enraizando es que TODAVÍA NO TIENE RAÍZ, un estado de la planta y no algo que el
-  # cuarto le haga. Por eso el clonador puede convivir en la sala de vegetativo, y por eso de
+  # así que un propagador en una sala de vegetativo no le cambia nada a lo que ya está ahí: reciben
+  # la misma luz. Lo que lo tiene enraizando es que TODAVÍA NO TIENE RAÍZ, un estado de la planta y
+  # no algo que el cuarto le haga. Por eso el que enraíza convive con el vegetativo, y por eso de
   # enraizado se sale cuando prende, no cuando lo cambiás de cuarto.
   #
   # La sede va con la sala: al mover a otra sede, el lote cambia de sede, y eso arrastra a dónde
@@ -313,7 +310,6 @@ class LotesController < ApplicationController
     fase_destino = destino.kind if %w[vegetativo floracion].include?(destino.kind)
 
     movidos, cambiaron_fase, plantas = 0, [], 0
-    clonadores_mudados = []
 
     ActiveRecord::Base.transaction do
       lotes.each do |lote|
@@ -322,22 +318,6 @@ class LotesController < ApplicationController
         next if sala_anterior&.id == destino.id   # ya está ahí: no ensuciamos la historia
 
         attrs = { sala_id: destino.id, sede_id: destino.sede_id }
-        # Si estaba en un domo, mudarlo de cuarto lo saca: el clonador no viaja con el lote. Se
-        # limpia (y no queda como historia) porque ese domo no llegó a hacerlo prender.
-        # EL DOMO VIAJA CON EL LOTE. Un esqueje sin raíz no puede vivir fuera del domo, así que
-        # mudarlo de cuarto no lo saca: lo que se muda es el clonador entero (que aloja un solo
-        # lote). Del domo se sale al prender, no al cambiar de sala.
-        clonador_mudado = nil
-        if lote.en_clonador? && lote.clonador.sala_id != destino.id
-          clonador_mudado = lote.clonador
-          clonador_mudado.sala = destino
-          unless clonador_mudado.save
-            raise MoverError, "#{lote.codigo}: no se puede llevar su clonador " \
-                              "#{clonador_mudado.nombre} a #{destino.nombre} — " \
-                              "#{clonador_mudado.errors.full_messages.join(', ')}"
-          end
-          clonadores_mudados << clonador_mudado.nombre
-        end
         enraizando = Plant::ESTADOS_ENRAIZANDO.include?(estado_anterior)
         cambia = fase_destino.present? && fase_destino != estado_anterior && !enraizando
         attrs[:estado] = fase_destino if cambia
@@ -364,7 +344,6 @@ class LotesController < ApplicationController
           descripcion:     [
             "Movido de #{sala_anterior&.nombre || 'sin sala'} a #{destino.nombre}",
             (sala_anterior&.sede_id != destino.sede_id ? "(cambio de sede)" : nil),
-            (clonador_mudado ? "· con su clonador #{clonador_mudado.nombre}" : nil),
             (cambia ? "· #{estado_anterior} → #{fase_destino}" : nil),
           ].compact.join(' '),
           user:            current_user,
@@ -380,10 +359,7 @@ class LotesController < ApplicationController
       sala_destino:       { id: destino.id, nombre: destino.nombre, kind: destino.kind },
       cambios_de_fase:    cambiaron_fase,
       plantas_afectadas:  plantas,
-      clonadores_mudados: clonadores_mudados,
     }
-  rescue MoverError => e
-    render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
@@ -1096,8 +1072,6 @@ class LotesController < ApplicationController
 
   def lote_params
     params.require(:lote).permit(
-      # El lote puede nacer YA metido en un domo (nace enraizando, que es cuando corresponde).
-      :clonador_id,
       :start_date, :estado, :origen, :planta_madre_id, :plants_count, :strain, :notes,
       :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
@@ -1111,9 +1085,6 @@ class LotesController < ApplicationController
 
   def lote_update_params
     params.require(:lote).permit(
-      # clonador_id: para sacar un lote del domo a mano (nil) o corregir en cuál está. Que sea de
-      # la misma sala y esté enraizando lo valida el modelo, no acá.
-      :clonador_id,
       :estado, :start_date, :origen, :planta_madre_id, :plants_count, :strain, :notes,
       :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,

@@ -10,10 +10,3 @@
 ActiveSupport::Inflector.inflections(:en) do |inflect|
   inflect.irregular "bar", "bares"
 end
-
-# Rails pluraliza en inglés: "clonador" → "clonadors", y singulariza "clonadores" → "Clonadore".
-# Enseñarle la regla UNA vez arregla el nombre de tabla, las asociaciones y las rutas de una, en vez
-# de parchar cada lugar con table_name/class_name/to_table.
-ActiveSupport::Inflector.inflections(:en) do |inflect|
-  inflect.irregular 'clonador', 'clonadores'
-end

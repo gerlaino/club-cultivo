@@ -2,7 +2,7 @@
 class SalasController < ApplicationController
   before_action :authenticate_user!
   before_action :require_salas_role!
-  before_action :set_sala, only: [:show, :update, :destroy, :cargar_lote, :cambiar_fase, :registrar_sala]
+  before_action :set_sala, only: [:show, :update, :destroy, :cargar_lote, :cambiar_fase, :registrar_sala, :registrar_enraizado]
 
   # Las salas son solo de cultivo (vegetativo/floración). Post-cosecha el lote no usa
   # sala (se ve por estado en Cosecha/Manicura), así que ya no hay transiciones por kind.
@@ -117,15 +117,21 @@ class SalasController < ApplicationController
     # donde el ambiente más importa, porque un esqueje sin raíz depende del aire para no
     # deshidratarse. `CULTIVO_ESTADOS` es la fuente única: son exactamente los estados para los que
     # el modelo EXIGE sala (ver la validación de sala_id en Lote).
-    # ...MENOS los que están dentro de un clonador: el domo tiene su propio microclima (la sala
-    # marca 60% de humedad y adentro hay 90%), y su registro entra por `clonadores#registrar`. Sin
+    # ...MENOS los que están ENRAIZANDO: viven en un propagador con su propio microclima (la sala
+    # marca 60% de humedad y adentro hay 90%) y su registro entra por `registrar_enraizado`. Sin
     # esta exclusión el lote enraizando acumula dos lecturas contradictorias del mismo momento y
     # las alertas y la analítica promedian un ambiente que no existió.
-    lotes_activos = @sala.lotes.where(estado: Lote::CULTIVO_ESTADOS)
-                          .where("clonador_id IS NULL OR estado <> 'enraizado'")
+    lotes_activos = @sala.lotes.where(estado: Lote::CULTIVO_ESTADOS).where.not(estado: 'enraizado')
 
     if lotes_activos.empty?
-      return render json: { error: 'No hay lotes activos en esta sala' }, status: :unprocessable_entity
+      # Si los únicos lotes de la sala están enraizando, decirlo: "no hay lotes activos" haría
+      # pensar que la sala está vacía cuando en realidad su registro entra por la otra puerta.
+      msg = if @sala.lotes.enraizando.exists?
+              'Los lotes de esta sala están enraizando: registrá su ambiente con "Registrar enraizado".'
+            else
+              'No hay lotes activos en esta sala'
+            end
+      return render json: { error: msg }, status: :unprocessable_entity
     end
 
     count = 0
@@ -136,6 +142,41 @@ class SalasController < ApplicationController
         registro.club          = current_user.club
         registro.registrado_en = Time.current
         registro.save!
+        count += 1
+      end
+    end
+
+    render json: { lotes_afectados: count }, status: :created
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /salas/:id/registrar_enraizado
+  # El clima del PROPAGADOR, para todos los lotes que están enraizando en esta sala. Va aparte del
+  # registro de la sala porque adentro del domo hay otro ambiente: el cuarto marca 60% de humedad y
+  # adentro hay 90%. Sin esto se les grababa el clima del cuarto, que no es el suyo.
+  #
+  # Es UN registro para todos los que enraízan en la sala: la app no modela cada domo como espacio
+  # físico (ver la migración `EliminarClonadores`), así que se asume que todos comparten condiciones.
+  def registrar_enraizado
+    unless %w[admin supervisor cultivador].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    lotes = @sala.lotes.enraizando
+    if lotes.empty?
+      return render json: { error: 'No hay lotes enraizando en esta sala' }, status: :unprocessable_entity
+    end
+
+    count = 0
+    ActiveRecord::Base.transaction do
+      lotes.each do |lote|
+        r = lote.registros_ambientales.build(enraizado_registro_params)
+        r.user          = current_user
+        r.club          = current_user.club
+        r.registrado_en = Time.current
+        r.fuente        = 'manual'
+        r.save!
         count += 1
       end
     end
@@ -159,13 +200,18 @@ class SalasController < ApplicationController
 
     nueva_fase        = @sala.kind == 'vegetativo' ? 'floracion' : 'vegetativo'
 
-    # El guard de creación del clonador no alcanza: la sala puede darse vuelta DEBAJO de él. Pasar a
-    # floración le daría 12 horas de oscuridad a esquejes que necesitan luz casi continua.
-    if nueva_fase == 'floracion' && @sala.clonadores.activos.exists?
-      return render json: {
-        error: 'Esta sala tiene clonadores adentro. En floración (12/12) los esquejes no prenden: ' \
-               'movelos a otra sala antes de cambiar la fase.'
-      }, status: :unprocessable_entity
+    # La sala no se da vuelta con lotes enraizando adentro: 12/12 le daría 12 horas de oscuridad a
+    # esquejes que necesitan luz casi continua. La regla protege A LA PLANTA, así que mira el estado
+    # del lote y no el equipamiento —un esqueje sin domo corre el mismo riesgo—.
+    if nueva_fase == 'floracion'
+      enraizando = @sala.lotes.enraizando
+      if enraizando.exists?
+        codigos = enraizando.limit(5).pluck(:codigo).join(', ')
+        return render json: {
+          error: "Esta sala tiene lotes enraizando (#{codigos}). En floración (12/12) los esquejes " \
+                 'no prenden: movelos a otra sala antes de cambiar la fase.'
+        }, status: :unprocessable_entity
+      end
     end
     plant_state_orig  = @sala.kind   # 'vegetativo' | 'floracion'
     plant_state_dest  = nueva_fase
@@ -275,6 +321,13 @@ class SalasController < ApplicationController
         )
       end
     end
+  end
+
+  # Solo lo que existe en un propagador: aire, sustrato y el producto usado para enraizar. No hay
+  # riego, ni EC, ni pH — un esqueje sin raíz no absorbe, y pedirlo sería inventar el dato.
+  def enraizado_registro_params
+    params.require(:registro_ambiental)
+          .permit(:temperatura, :humedad, :temperatura_sustrato, :producto_enraizante, :notas)
   end
 
   def sala_registro_params
