@@ -47,6 +47,15 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
   const faltaMaceta = computed(() =>
     lotes.current?.estado === 'enraizado' && !avanzarMaceta.value)
 
+  // Si el lote YA tiene maceta declarada —típico: se la pusiste al separarlo del lote original—,
+  // el modal la trae puesta en vez de volver a preguntar algo que ya dijiste. Se compara por valor
+  // numérico porque el backend devuelve "3.0" y las opciones son "3".
+  function macetaPrecargada(lote) {
+    const v = parseFloat(lote?.tamanio_maceta)
+    if (!v) return ''
+    return MACETAS.find(m => parseFloat(m.v) === v)?.v || ''
+  }
+
   // ── Manicura (admin/supervisor) ───────────────────────────
   const showIniciarManicuraModal   = ref(false)
   const showCompletarManicuraModal = ref(false)
@@ -72,6 +81,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     transicionForm.value   = { peso_humedo_g: null, peso_seco_g: null, manicurado: false, notas: '' }
     transicionError.value  = null
     transicionSalaId.value = lotes.current?.sala_id ?? null
+    avanzarMaceta.value    = macetaPrecargada(lotes.current)
     showTransicionModal.value = true
   }
 
@@ -96,6 +106,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
       showIniciarManicuraModal.value = true
     } else if (isCultivador.value) {
       avanzarSalaId.value = lote?.sala_id ?? null
+      avanzarMaceta.value = macetaPrecargada(lote)
       showAvanzarSalaModal.value = true
     } else {
       openTransicionModal()

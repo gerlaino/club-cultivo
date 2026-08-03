@@ -17,10 +17,11 @@
           </p>
           <div v-if="error" class="dsp__alert">{{ error }}</div>
 
-          <!-- Por cantidad alcanza cuando las plantas son intercambiables. Con etiquetas pegadas hay
-               que poder decir CUÁLES: si el sistema elige solo, el QR de la maceta deja de coincidir
-               con el lote que figura en la app. -->
-          <div class="dsp__modos">
+          <!-- ENRAIZANDO SE SEPARA POR CANTIDAD, y no hay opción de elegir: en la clonadora la
+               etiqueta es del LOTE, las plántulas no tienen QR propio todavía. Recién cuando pasan a
+               maceta individual tiene sentido decir CUÁLES —ahí sí, si el sistema las elige solo, el
+               QR de la maceta deja de coincidir con el lote que figura en la app—. -->
+          <div v-if="puedeElegir" class="dsp__modos">
             <button type="button" class="dsp__modo" :class="{ 'dsp__modo--on': modo === 'cantidad' }"
                     @click="modo = 'cantidad'">Por cantidad</button>
             <button type="button" class="dsp__modo" :class="{ 'dsp__modo--on': modo === 'elegir' }"
@@ -155,6 +156,10 @@ function marcarPrimera() {
   scanInput.value?.focus()
 }
 
+// En el enraizado la etiqueta es del lote —las plántulas comparten bandeja y no tienen QR propio—,
+// así que ahí solo se separa por cantidad.
+const puedeElegir = computed(() => props.lote?.estado !== 'enraizado')
+
 const vivas = computed(() => props.lote?.plants_count || 0)
 const cuantas = computed(() => modo.value === 'elegir' ? elegidas.value.size : (cantidad.value || 0))
 // Desprender el lote entero lo dejaría vacío: para cambiarle la maceta a todo se edita el lote.
@@ -165,6 +170,7 @@ const codigoPrevisto = computed(() => `${(props.lote?.codigo || '').replace(/-[B
 watch(() => props.modelValue, (v) => {
   if (v) {
     cantidad.value = null; maceta.value = ''; motivo.value = ''; error.value = null
+    // Siempre arranca por cantidad: es el caso normal, y en enraizado es el único posible.
     modo.value = 'cantidad'; elegidas.value = new Set(); busqueda.value = ''; plantas.value = []
   }
 })
