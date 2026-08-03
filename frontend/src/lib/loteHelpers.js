@@ -137,8 +137,8 @@ export function desglosarCiclo(diasPorEstado = {}) {
 export function em(e)  { return ESTADO_META[e]       || { label: e || '—', color: '#64748b', bg: '#f1f5f9', emoji: '•' } }
 
 // Estado + MACETA, que es como se lee un lote en el pasillo: "Vegetativo · 0,5L". Va el número real
-// y no una etiqueta tipo "en vaso": 0,33L y 0,5L no son lo mismo, y el volumen es justo lo que
-// define cuántos días aguanta antes de que la raíz se enrolle (ver la alerta `maceta_chica`).
+// y no una etiqueta tipo "en vaso": 0,33L y 0,5L no son lo mismo, y el volumen cambia el riego, la
+// frecuencia y cuándo toca trasplantar.
 // Reusa macetaLabel, que ya existe más abajo en este archivo.
 export function estadoConMaceta(estado, litros) {
   const base = em(estado).label

@@ -55,6 +55,31 @@ RSpec.describe Lote, 'los relojes del ciclo' do
     end
   end
 
+  # Los lotes viejos pasaron a vegetativo sin dejar el evento. Sin fallback, la ficha los mostraba
+  # como "Enraizando · día 25" estando en VEGETATIVO, porque `dias_ciclo` venía nil.
+  describe 'un lote viejo, sin evento de vegetativo' do
+    it 'cuenta su ciclo desde el inicio y no aparece como enraizando' do
+      viejo = create(:lote, club: club, sala: sala, estado: 'vegetativo',
+                            start_date: 25.days.ago.to_date, tamanio_maceta: 3)
+
+      data = LoteSerializer.serialize(viejo)
+
+      expect(data[:dias_ciclo]).to eq(25)
+      expect(data[:dias_enraizado]).to eq(0)
+    end
+
+    # Y el que SIGUE enraizando no debe caer en el fallback: su ciclo todavía no arrancó.
+    it 'pero el que enraíza sigue sin ciclo' do
+      enraizando = create(:lote, club: club, sala: sala, estado: 'enraizado',
+                                 start_date: 9.days.ago.to_date)
+
+      data = LoteSerializer.serialize(enraizando)
+
+      expect(data[:dias_ciclo]).to be_nil
+      expect(data[:dias_enraizado]).to eq(9)
+    end
+  end
+
   describe 'los días de vegetación que ve la UI' do
     it 'no incluyen el enraizado' do
       lote = lote_que_prendio(dias_total: 40, dias_enraizando: 12, estado: 'floracion')

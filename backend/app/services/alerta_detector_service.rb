@@ -23,18 +23,6 @@ class AlertaDetectorService
     'cosecha'    => 1,
   }.freeze
 
-  # Días que una planta aguanta en una maceta antes de que la raíz empiece a dar vueltas contra la
-  # pared (root-bound) y la planta se achaparre. NO es un número fijo: depende del volumen. En 0,33L
-  # tenés menos de dos semanas; en 3L, más de un mes. Por eso guardar el tamaño real de la maceta
-  # —y no una etiqueta tipo "en vaso"— es lo que hace posible esta alerta.
-  # Arriba de 4L se asume maceta final: ya no se trasplanta, no hay nada que avisar.
-  DIAS_MAX_EN_MACETA = [
-    [0.4,  12],
-    [0.6,  18],
-    [1.5,  25],
-    [4.0,  35],
-  ].freeze
-
   VENTANA_DEDUP_HORAS = 20
 
   def initialize(club)
@@ -53,7 +41,6 @@ class AlertaDetectorService
       detectar_sin_registro(lote)
       detectar_rango_ambiental(lote, setpoints_club)
       detectar_cosecha_pendiente(lote)
-      detectar_maceta_chica(lote)
       detectar_tareas_vencidas(lote)
     end
 
@@ -104,33 +91,6 @@ class AlertaDetectorService
       severidad: sev,
       mensaje:   "#{lote.codigo} lleva #{dias} días sin registro ambiental (máx. recomendado: #{umbral}d en #{lote.estado})",
       contexto:  { dias: dias, umbral: umbral, estado: lote.estado }
-    )
-  end
-
-  # Raíz enrollada: la planta lleva demasiado tiempo en una maceta chica. Se mide desde el último
-  # trasplante (o desde el inicio del lote si nunca se trasplantó), y solo en vegetativo: en
-  # enraizado todavía está en taco/plug y el reloj que corre es otro.
-  def detectar_maceta_chica(lote)
-    return unless lote.estado == 'vegetativo'
-    litros = lote.tamanio_maceta.to_f
-    return unless litros.positive?
-
-    umbral = DIAS_MAX_EN_MACETA.find { |max_l, _| litros <= max_l }&.last
-    return unless umbral   # maceta final: no hay trasplante pendiente
-
-    desde = lote.fecha_trasplante || lote.start_date
-    return unless desde
-
-    dias = (Date.current - desde.to_date).to_i
-    return unless dias > umbral
-
-    crear_alerta(
-      tipo:      'maceta_chica',
-      lote:      lote,
-      severidad: dias > umbral * 1.5 ? 'error' : 'warning',
-      mensaje:   "#{lote.codigo} lleva #{dias} días en maceta de #{litros}L (máx. recomendado: #{umbral}d). " \
-                 "La raíz empieza a enrollarse y la planta se achaparra: toca trasplantar.",
-      contexto:  { dias: dias, umbral: umbral, litros: litros }
     )
   end
 
