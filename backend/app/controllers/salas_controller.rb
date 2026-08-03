@@ -397,9 +397,18 @@ class SalasController < ApplicationController
              .maximum(:fecha_cosecha)
       : {}
 
+    # Cuándo entró cada lote a su estado ACTUAL, en una sola query (nada de N+1). Es lo que permite
+    # que la columna de días diga algo en los lotes en curso: `duracion` solo existe cuando ya
+    # cosecharon, y hasta entonces la tabla mostraba "—" en todo.
+    ultimo_cambio = LoteEvento.where(lote_id: lote_ids, tipo: 'cambio_estado')
+                              .group(:lote_id, :estado_nuevo).maximum(:registrado_en)
+
     lotes_historial = lotes_all.map do |l|
       fecha_cosecha = fecha_cosecha_por_lote[l.id]
       duracion = l.start_date && fecha_cosecha ? (fecha_cosecha.to_date - l.start_date).to_i : nil
+      # Fallback a start_date: un lote que nunca cambió de estado lleva en él desde que arrancó.
+      desde_estado   = ultimo_cambio[[l.id, l.estado]]&.to_date || l.start_date
+      dias_en_estado = desde_estado ? (Date.current - desde_estado).to_i : nil
       {
         id:                 l.id,
         codigo:             l.codigo,
@@ -409,7 +418,12 @@ class SalasController < ApplicationController
         genetica_nombre:    l.genetica&.nombre,
         rendimiento_real_g: l.rendimiento_real_g&.to_f,
         fecha_cosecha:      fecha_cosecha,
+        # `duracion_dias` es el ciclo CERRADO (solo si cosechó) y es lo único comparable entre
+        # cultivos. `dias_transcurridos` corre siempre, y `dias_en_estado` dice hace cuánto que el
+        # lote no se mueve —que en un enraizado estancado es la señal a mirar—.
         duracion_dias:      duracion,
+        dias_transcurridos: l.start_date ? (Date.current - l.start_date).to_i : nil,
+        dias_en_estado:     dias_en_estado,
         # Foto de portada del lote para el slot del layout (portada marcada → última subida).
         foto_url:           (att = l.foto_portada_attachment) ? url_for(att) : nil,
       }
@@ -432,35 +446,44 @@ class SalasController < ApplicationController
       },
       lotes_historial:,
       historial_kpis:,
-      ambiente_actual: ambiente_actual(lote_ids),
+      ambiente_actual: ambiente_actual(s),
     )
   end
 
-  # Último ambiente conocido de la sala. Los RegistroAmbiental cuelgan del LOTE, no de la sala, así
-  # que "el ambiente de la sala" es el registro más reciente entre sus lotes.
+  # Último ambiente conocido DE ESTA SALA.
   #
   # Va siempre con `registrado_en` y de qué lote salió: sin sensores conectados este dato puede ser
   # de hace una semana, y mostrarlo pelado te haría creer que es de ahora. Un dato ambiental viejo
   # sin fecha es peor que no tener dato.
-  def ambiente_actual(lote_ids)
-    return nil if lote_ids.empty?
+  def ambiente_actual(sala)
+    # FUENTE PRIMARIA: `LecturaAmbiental`, que guarda `sala_id` AL MOMENTO de medir. `RegistroAmbiental`
+    # cuelga del lote y no sabe dónde se midió: al mover un lote de cuarto, sus registros viejos se le
+    # atribuían a la sala NUEVA. Una sala sin actividad terminaba mostrando el aire de otra.
+    ult = LecturaAmbiental.where(sala_id: sala.id, tipo: %w[temperatura humedad])
+                          .order(medido_at: :desc).first
 
-    r = RegistroAmbiental.where(lote_id: lote_ids)
-                         .where('temperatura IS NOT NULL OR humedad IS NOT NULL')
-                         .order(registrado_en: :desc).first
-    return nil unless r
+    if ult
+      # Los valores del MISMO momento: una temperatura de hoy con una humedad de anteayer no
+      # describen el mismo aire, y el VPD que sale de mezclarlas es inventado.
+      hermanas = LecturaAmbiental.where(sala_id: sala.id, medido_at: ult.medido_at)
+      temp = hermanas.find { |l| l.tipo == 'temperatura' }&.valor&.to_f
+      hum  = hermanas.find { |l| l.tipo == 'humedad' }&.valor&.to_f
+      return {
+        temperatura:   temp,
+        humedad:       hum,
+        vpd:           vpd_kpa(temp, hum),
+        co2:           hermanas.find { |l| l.tipo == 'co2' }&.valor&.to_f,
+        registrado_en: ult.medido_at,
+        lote_codigo:   Lote.find_by(id: ult.lote_id)&.codigo,
+        fuente:        ult.fuente,
+      }
+    end
 
-    temp = r.temperatura&.to_f
-    hum  = r.humedad&.to_f
-    {
-      temperatura:   temp,
-      humedad:       hum,
-      vpd:           vpd_kpa(temp, hum),
-      co2:           r.co2,
-      registrado_en: r.registrado_en,
-      lote_codigo:   r.lote&.codigo,
-      fuente:        r.fuente,
-    }
+    # Sin lecturas no hay dato ATRIBUIBLE a esta sala. Antes se caía al último RegistroAmbiental de
+    # cualquier lote de la sala, y como el registro no sabe dónde se midió, eso era adivinar: es
+    # justo lo que hacía que una sala mostrara el aire de otra. Mejor "sin datos" que un dato de
+    # otro cuarto.
+    nil
   end
 
   # VPD (déficit de presión de vapor) en kPa, con la temperatura de HOJA estimada 2 °C por debajo

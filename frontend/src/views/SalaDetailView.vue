@@ -1035,7 +1035,10 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                     <th>Código</th>
                     <th>Genética</th>
                     <th>Inicio</th>
+                    <!-- Días: el ciclo cerrado si ya cosechó, o los que lleva si sigue en curso.
+                         Antes solo mostraba el cerrado, así que todo lote vivo decía "—". -->
                     <th>Días</th>
+                    <th>En estado</th>
                     <th>Rendimiento</th>
                     <th>Estado</th>
                   </tr>
@@ -1047,7 +1050,14 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                     </td>
                     <td>{{ l.genetica_nombre || '—' }}</td>
                     <td>{{ l.start_date || '—' }}</td>
-                    <td>{{ l.duracion_dias ?? '—' }}</td>
+                    <td>
+                      <template v-if="l.duracion_dias != null">{{ l.duracion_dias }}</template>
+                      <template v-else-if="l.dias_transcurridos != null">
+                        {{ l.dias_transcurridos }}<span class="sd__hist-encurso" title="Ciclo en curso: el número sigue corriendo">·</span>
+                      </template>
+                      <template v-else>—</template>
+                    </td>
+                    <td>{{ l.dias_en_estado != null ? l.dias_en_estado + ' d' : '—' }}</td>
                     <td>{{ l.rendimiento_real_g != null ? l.rendimiento_real_g + ' g' : '—' }}</td>
                     <td>
                       <span class="sd__lote-badge" :style="{ background: estadoMeta(l.estado).color + '18', color: estadoMeta(l.estado).color }">
@@ -1719,6 +1729,9 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__hist-link { color: #1b5e20; font-weight: 700; text-decoration: none; }
 .sd__hist-link:hover { text-decoration: underline; }
 .sd__hist-empty { font-size: .82rem; color: #94a3b8; text-align: center; padding: 1.5rem 0; }
+/* Marca discreta de "sigue corriendo": distingue un ciclo cerrado de uno en curso sin meter otra
+   columna ni repetir la palabra en cada fila. */
+.sd__hist-encurso { color: #86efac; font-weight: 700; margin-left: .2em; }
 
 @media (max-width: 600px) {
   .sd__hist-kpis { grid-template-columns: repeat(2, 1fr); }

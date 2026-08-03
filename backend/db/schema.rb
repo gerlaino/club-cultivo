@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_31_000005) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_03_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1189,6 +1189,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_000005) do
     t.bigint "sede_id"
     t.bigint "deleted_by_id"
     t.bigint "foto_portada_blob_id"
+    t.bigint "lote_origen_id"
+    t.datetime "split_at"
+    t.decimal "costo_heredado_ars", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "costo_cedido_ars", precision: 12, scale: 2, default: "0.0", null: false
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"
@@ -1197,6 +1201,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_000005) do
     t.index ["deleted_by_id"], name: "index_lotes_on_deleted_by_id"
     t.index ["estado"], name: "index_lotes_on_estado"
     t.index ["genetica_id"], name: "index_lotes_on_genetica_id"
+    t.index ["lote_origen_id"], name: "index_lotes_on_lote_origen_id"
     t.index ["manicurador_id"], name: "index_lotes_on_manicurador_id"
     t.index ["planta_madre_id"], name: "index_lotes_on_planta_madre_id"
     t.index ["sala_id"], name: "index_lotes_on_sala_id"
@@ -2279,6 +2284,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_000005) do
   add_foreign_key "lote_eventos", "users", column: "deleted_by_id"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "geneticas", on_delete: :nullify
+  add_foreign_key "lotes", "lotes", column: "lote_origen_id"
   add_foreign_key "lotes", "plants", column: "planta_madre_id"
   add_foreign_key "lotes", "salas"
   add_foreign_key "lotes", "sedes"

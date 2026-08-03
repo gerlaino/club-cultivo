@@ -32,6 +32,9 @@ class CostoDesdeLibroService
     consumos = InsumoConsumo.where(club_id: @lote.club_id, lote_id: @lote.id).sum(:costo_imputado_ars)
     costo.costo_insumos = costo.costo_insumos.to_d + consumos
 
+    # (Los desprendimientos —lo heredado y lo cedido— los suma `CostoLote#calcular_costo_total`, para
+    # no pisar `costo_prorrateado`, que es del usuario.)
+
     # Si el lote ya tiene rendimiento real y nadie cargó gramos, usarlo
     if costo.gramos_producidos.blank? && @lote.rendimiento_real_g.to_d > 0
       costo.gramos_producidos = @lote.rendimiento_real_g

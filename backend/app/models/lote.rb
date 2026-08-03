@@ -7,6 +7,9 @@ class Lote < ApplicationRecord
   acts_as_tenant(:club)
   belongs_to :sala, optional: true
   belongs_to :sede, optional: true
+  # De qué lote se desprendió, si nació separándose de otro (ver `Lotes::Desprender`).
+  belongs_to :lote_origen, class_name: 'Lote', optional: true
+  has_many   :desprendidos, class_name: 'Lote', foreign_key: :lote_origen_id, dependent: :nullify
   # La sala es solo de cultivo. Post-cosecha el lote no tiene sala (se ve por estado),
   # pero conserva su sede. Exigimos sala solo en estados de cultivo.
   CULTIVO_ESTADOS = %w[enraizado vegetativo floracion].freeze

@@ -1,7 +1,7 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante]
+  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante, :desprender]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -360,6 +360,29 @@ class LotesController < ApplicationController
       cambios_de_fase:    cambiaron_fase,
       plantas_afectadas:  plantas,
     }
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /lotes/:id/desprender  { plant_ids: [] | cantidad, tamanio_maceta, motivo }
+  # Separa parte del lote a uno nuevo: de 20 que prendieron, 10 a maceta de 3 L y 10 a 5 L. Desde
+  # ahí no son el mismo grupo (riego y trasplante distintos), y un lote tiene UNA maceta.
+  def desprender
+    unless %w[admin supervisor cultivador].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+
+    res = Lotes::Desprender.call(
+      lote: @lote, usuario: current_user,
+      plant_ids: params[:plant_ids], cantidad: params[:cantidad],
+      tamanio_maceta: params[:tamanio_maceta], motivo: params[:motivo],
+    )
+    return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
+
+    render json: {
+      lote_origen: LoteSerializer.serialize(@lote.reload),
+      lote_nuevo:  LoteSerializer.serialize(res.lote_nuevo.reload),
+    }, status: :created
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end

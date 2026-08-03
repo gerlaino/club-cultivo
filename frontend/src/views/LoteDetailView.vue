@@ -19,6 +19,7 @@ import { useConfirm } from '../composables/useConfirm.js'
 import { ArrowRight, ChevronRight } from 'lucide-vue-next'
 import { em, sm, pgm, growLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate, formatDateTime,
   capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS } from '../lib/loteHelpers.js'
+import DesprenderLoteModal  from '../components/lotes/DesprenderLoteModal.vue'
 import LoteHistorialSection from '../components/lotes/LoteHistorialSection.vue'
 import LoteHistorialModal   from '../components/lotes/LoteHistorialModal.vue'
 import LotePlantasSection   from '../components/lotes/LotePlantasSection.vue'
@@ -279,6 +280,11 @@ const showRegistroModalNew = ref(false)
 const loteAcciones = computed(() => {
   const items = []
   items.push({ emoji: '📋', label: 'Registrar lote', onClick: () => { showRegistroModalNew.value = true } })
+  // Separar parte del lote: típicamente al prender, cuando la mitad va a una maceta y la mitad a
+  // otra. Solo en cultivo y con más de una planta (desprender el lote entero lo dejaría vacío).
+  if (puedeDesprender.value) {
+    items.push({ emoji: '🪴', label: 'Separar plantas a otro lote', onClick: () => { desprenderOpen.value = true } })
+  }
   if (canEdit.value) {
     items.push({ emoji: '✏️', label: 'Editar lote', onClick: () => editarOpen.value = true })
     items.push({ divider: true })
@@ -299,6 +305,14 @@ const cicloIndex = computed(() => lote.value ? cicloPasos.value.indexOf(lote.val
 
 // ── Composables ────────────────────────────────────────────
 const editarOpen = ref(false)
+
+// ── Desprender (separar parte del lote) ────────────────────
+const desprenderOpen = ref(false)
+const CULTIVO = ['enraizado', 'vegetativo', 'floracion']
+const puedeDesprender = computed(() =>
+  (canEdit.value || isCultivador.value) &&
+  CULTIVO.includes(lote.value?.estado) &&
+  (lote.value?.plants_count || 0) > 1)
 
 // Tras editar el lote (puede cambiar estado/fechas): refrescamos lote, historial,
 // plantas y gráficos — antes solo se refrescaba el lote y quedaban viejos.
@@ -893,6 +907,12 @@ onUnmounted(() => {
     </Teleport>
 
     <!-- ══ Modal Cosecha Parcial ══ -->
+    <DesprenderLoteModal
+      v-model="desprenderOpen"
+      :lote="lote"
+      @desprendido="onLoteEditado"
+    />
+
     <ModalCosechaPartial
       v-if="showCosechaPartialModal && lote"
       :lote="lote"

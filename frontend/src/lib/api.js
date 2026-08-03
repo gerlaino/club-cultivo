@@ -92,6 +92,9 @@ export const updateLote         = (id, payload, extra = {}) => api.put(`/lotes/$
 // destino: si va a una sala de floración, pasa a floración, y sus plantas con él.
 export const moverLotes         = (loteIds, salaId) => api.post('/lotes/mover', { lote_ids: loteIds, sala_id: salaId });
 export const registrarTrasplante = (id, payload) => api.post(`/lotes/${id}/registrar_trasplante`, payload);
+// Separa parte de un lote a uno nuevo (típico: al prender, la mitad a 3L y la mitad a 5L). Desde
+// ahí no son el mismo grupo: cambia el riego, la frecuencia y el próximo trasplante.
+export const desprenderLote = (id, payload) => api.post(`/lotes/${id}/desprender`, payload);
 export const deleteLote = (id) => api.delete(`/lotes/${id}`);
 export const getLoteProximoCodigo = () => api.get('/lotes/proximo_codigo')
 export const createLoteHeredado = (salaId, lotePayload, diasParams) =>
