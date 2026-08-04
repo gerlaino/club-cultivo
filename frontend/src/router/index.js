@@ -922,7 +922,7 @@ const routes = [
 
       // ── Delivery ── (el repartidor ve SU dashboard, no la vista admin de despachos)
       { path: 'delivery/despachos', component: () => import('../views/delivery/DeliveryDashboard.vue') },
-      { path: 'delivery/historial', component: () => import('../views/delivery/DeliveryDashboard.vue') },
+      { path: 'delivery/historial', component: () => import('../views/mobile/MDeliveryHistorialView.vue') },
     ],
   },
 

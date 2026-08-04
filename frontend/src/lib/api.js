@@ -224,6 +224,9 @@ export const deleteReserva   = (id)                  => api.delete(`/reservas/${
 // ── Delivery ──────────────────────────────────────────────────────────────────
 export const exportDispensacionesCSV = (params = {}) => api.get('/dispensaciones/export_csv', { params, responseType: 'blob' })
 export const getMisPaquetes   = ()                  => api.get('/dispensaciones/mis_paquetes')
+// Lo que el repartidor YA cerró (entregado/fallido). Va aparte de mis_paquetes: ese trae el trabajo
+// pendiente del día, y mezclarlos escondería lo que falta hacer detrás de semanas de entregas.
+export const getMiHistorialDelivery = (dias = 30)   => api.get('/dispensaciones/mi_historial', { params: { dias } })
 export const iniciarViaje     = (ids)               => api.patch('/dispensaciones/iniciar_viaje', { ids })
 // Entrega + cobros del delivery. Si hay fotos (comprobante de pago/entrega), va multipart.
 export const entregarPaquete  = (id, { notasEntrega, firmaData, cobros = [], comprobante = null, comprobanteEntrega = null } = {}) => {

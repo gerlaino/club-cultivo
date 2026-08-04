@@ -267,6 +267,7 @@ Rails.application.routes.draw do
     resources :dispensaciones, only: [:index, :show, :update, :destroy] do
       collection do
         get  :mis_paquetes
+        get  :mi_historial   # lo que el repartidor ya cerró (entregado/fallido)
         get  :export_csv
         patch :iniciar_viaje
       end

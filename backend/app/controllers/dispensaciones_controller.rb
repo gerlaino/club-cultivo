@@ -3,7 +3,7 @@ class DispensacionesController < ApplicationController
 
   before_action :authenticate_user!
   before_action :require_dispensaciones_role!
-  before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :export_csv]
+  before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :mi_historial, :export_csv]
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
   before_action :set_dispensacion, only: [:show, :update, :destroy, :entregar, :reportar_fallo, :reprogramar, :cancelar_entrega]
@@ -266,6 +266,33 @@ class DispensacionesController < ApplicationController
       .includes(:paciente, :sede, :ruta_entrega, { stock: :lote }, { items: { stock: :lote } })
       .order(Arel.sql('orden_entrega NULLS LAST, created_at ASC'))
     render json: { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion_delivery(d) } }
+  end
+
+  # GET /dispensaciones/mi_historial?dias=30
+  # Lo que este repartidor YA cerró: entregado o fallido. `mis_paquetes` trae el trabajo del día
+  # —lo que todavía hay que hacer—, así que mezclarlos escondería lo pendiente detrás de semanas de
+  # entregas viejas.
+  def mi_historial
+    dias  = (params[:dias] || 30).to_i.clamp(1, 180)
+    desde = dias.days.ago
+
+    cerradas = Dispensacion
+      .del_delivery(current_user.id)
+      .joins(stock: :sede)
+      .where(sedes: { club_id: current_user.club_id })
+      .where(estado_envio: %w[entregado fallido])
+      .where('dispensaciones.updated_at >= ?', desde)
+      .includes(:paciente, :sede, { stock: :lote }, { items: { stock: :lote } })
+      .order(updated_at: :desc)
+
+    render json: {
+      dispensaciones: cerradas.map { |d| serialize_dispensacion_delivery(d) },
+      resumen: {
+        entregados: cerradas.count { |d| d.estado_envio == 'entregado' },
+        fallidos:   cerradas.count { |d| d.estado_envio == 'fallido' },
+        dias:       dias,
+      },
+    }
   end
 
   # PATCH /dispensaciones/iniciar_viaje  { ids: [1,2,3] }
