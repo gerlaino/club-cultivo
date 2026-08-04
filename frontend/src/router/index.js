@@ -898,6 +898,14 @@ const routes = [
       { path: 'reservas',  component: () => import('../views/mobile/MReservasView.vue') },
       { path: 'stock',     component: () => import('../views/StockDispensadorView.vue') },
 
+      // Las MISMAS vistas de la web, montadas dentro del shell. La PWA no recorta lo que el rol
+      // puede hacer: cambia el envoltorio (bottom nav, tablas como tarjetas), no el contenido.
+      // Van bajo /m porque el guard de PWA rebota cualquier ruta fuera de ese prefijo.
+      { path: 'plantas',   component: () => import('../views/PlantasView.vue') },
+      { path: 'geneticas', component: () => import('../views/GeneticasView.vue') },
+      { path: 'historial', component: () => import('../views/HistorialDispensacionesView.vue') },
+      { path: 'pacientes', component: () => import('../views/PacientesDispatch.vue') },
+
       // ── Escaneo QR (cualquier rol con shell mobile) ──
       { path: 'scan', component: () => import('../views/mobile/MScanView.vue') },
 

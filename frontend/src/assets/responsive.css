@@ -251,3 +251,74 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TABLA → TARJETAS EN MOBILE
+
+   Una tabla de 8 columnas no se lee en un teléfono: se sufre con scroll
+   horizontal. Cada fila pasa a ser una tarjeta, con la etiqueta de la columna
+   delante del dato (sale del atributo `data-col` de cada celda).
+
+   Se aplica poniendo `.tabla-cards` en el <table>. Sin ese atributo la celda
+   se muestra igual, solo que sin etiqueta — así una tabla a medio migrar no
+   se rompe.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  table.tabla-cards,
+  table.tabla-cards tbody,
+  table.tabla-cards tr,
+  table.tabla-cards td { display: block; width: 100%; }
+
+  table.tabla-cards thead { display: none; }
+
+  table.tabla-cards tr {
+    background: #fff;
+    border: 1px solid var(--c-ink-100, #f1f5f9);
+    border-radius: 12px;
+    padding: .7rem .85rem;
+    margin-bottom: .5rem;
+    box-sizing: border-box;
+  }
+
+  table.tabla-cards td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .22rem 0;
+    border: none;
+    text-align: right;
+  }
+
+  table.tabla-cards td[data-col]::before {
+    content: attr(data-col);
+    flex-shrink: 0;
+    font-size: .7rem;
+    font-weight: 600;
+    color: var(--c-ink-400, #94a3b8);
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    text-align: left;
+  }
+
+  /* La primera celda es el identificador: va sola arriba, más grande y sin
+     etiqueta, como el título de la tarjeta. */
+  table.tabla-cards td:first-child {
+    display: block;
+    text-align: left;
+    font-weight: 700;
+    font-size: .95rem;
+    padding-bottom: .35rem;
+    margin-bottom: .3rem;
+    border-bottom: 1px solid var(--c-ink-50, #f8fafc);
+  }
+  table.tabla-cards td:first-child::before { content: none; }
+
+  /* Celdas vacías: no dejan una fila con la etiqueta y nada al lado. */
+  table.tabla-cards td:empty { display: none; }
+
+  /* La fila de detalle desplegado ocupa la tarjeta entera. */
+  table.tabla-cards tr[class*="detalle"] { padding: 0; }
+
+  table.tabla-cards + .tabla-scroll-hint { display: none; }
+}

@@ -75,14 +75,31 @@
 
       <template v-else>
         <RouterLink
-          v-for="item in navItems" :key="item.to"
+          v-for="item in navVisibles" :key="item.to"
           :to="item.to" class="msh__tab" :class="{ 'msh__tab--active': isActive(item) }"
         >
           <i class="bi msh__tab-icon" :class="item.icon"></i>
           <span class="msh__tab-label">{{ item.label }}</span>
         </RouterLink>
       </template>
+
+      <!-- Lo que no entra en la barra. No se pierde: se llega en dos toques. -->
+      <button v-if="navOverflow.length" class="msh__tab" :class="{ 'msh__tab--active': masActivo }"
+              @click="masOpen = true">
+        <i class="bi msh__tab-icon bi-three-dots"></i>
+        <span class="msh__tab-label">Más</span>
+      </button>
     </nav>
+
+    <MobileSheet v-model="masOpen" title="Más secciones">
+      <div class="msh__mas">
+        <button v-for="item in navOverflow" :key="item.to" class="msh__mas-item" @click="irA(item)">
+          <i class="bi" :class="item.icon"></i>
+          <span>{{ item.label }}</span>
+          <i class="bi bi-chevron-right msh__mas-arr"></i>
+        </button>
+      </div>
+    </MobileSheet>
 
     <!-- FAB → hoja de acciones rápidas -->
     <MobileSheet v-model="fabOpen" title="Crear">
@@ -137,15 +154,24 @@ const NAV = {
   // botón vivía solo en el FAB de admin y en el detalle de un lote: no tenía cómo llegar.
   cultivador: { fab: true, items: [
     { to: '/m/cultivador/sedes',  icon: 'bi-diagram-3',     label: 'Cultivo' },
-    { to: '/m/cultivador/tareas', icon: 'bi-check2-square', label: 'Tareas' },
     { to: '/m/scan',              icon: 'bi-qr-code-scan',  label: 'Escanear' },
+    { to: '/m/cultivador/tareas', icon: 'bi-check2-square', label: 'Tareas' },
+    // Lo que también tiene en la web: la PWA no recorta lo que el rol puede hacer.
+    { to: '/m/plantas',             icon: 'bi-flower1',       label: 'Plantas' },
+    { to: '/m/geneticas',           icon: 'bi-diagram-2',     label: 'Genéticas' },
     { to: '/m/horas',             icon: 'bi-clock-history', label: 'Mis horas' },
   ] },
+  // El admin en el celular NO administra: mira cómo va el día y desbloquea lo que traba a otros.
+  // Lo de escritorio —contabilidad, informes, configuración— no se bloquea (si lo necesita abre
+  // Chrome y tiene la app entera), simplemente no ocupa la barra.
   admin: { fab: true, items: [
-    { to: '/m/admin/home',    icon: 'bi-grid-1x2',     label: 'Inicio'  },
-    { to: '/m/admin/sedes',   icon: 'bi-diagram-3',    label: 'Cultivo' },
-    { to: '/m/admin/tareas',  icon: 'bi-check2-square', label: 'Tareas' },
-    { to: '/m/admin/aprobar', icon: 'bi-patch-check',  label: 'Aprobar' },
+    { to: '/m/admin/home',    icon: 'bi-grid-1x2',      label: 'Inicio'  },
+    { to: '/m/admin/sedes',   icon: 'bi-diagram-3',     label: 'Cultivo' },
+    { to: '/m/admin/aprobar', icon: 'bi-patch-check',   label: 'Aprobar' },
+    { to: '/m/admin/tareas',  icon: 'bi-check2-square', label: 'Tareas'  },
+    { to: '/m/historial',     icon: 'bi-clock-history', label: 'Dispensas' },
+    { to: '/m/pacientes',     icon: 'bi-people',        label: 'Pacientes' },
+    { to: '/m/plantas',       icon: 'bi-flower1',       label: 'Plantas' },
   ] },
   manicura: { items: [
     { to: '/m/manicura/pesar',      icon: 'bi-scissors',        label: 'Por pesar'  },
@@ -162,9 +188,11 @@ const NAV = {
   // no un dashboard. El Salón aparece solo si el club tiene el módulo activo — es el mismo puesto
   // físico, así que no tiene sentido mandarlo al escritorio para cobrar un café.
   dispensador: { items: [
-    { to: '/m/dispensar',        icon: 'bi-bag-plus',      label: 'Dispensar' },
+    { to: '/m/dispensar',        icon: 'bi-bag-plus',       label: 'Dispensar' },
     { to: '/m/reservas',         icon: 'bi-bookmark-check', label: 'Reservas' },
-    { to: '/m/stock',            icon: 'bi-boxes',         label: 'Stock' },
+    { to: '/m/stock',            icon: 'bi-boxes',          label: 'Stock' },
+    { to: '/m/historial',          icon: 'bi-clock-history',  label: 'Historial' },
+    { to: '/m/pacientes',          icon: 'bi-people',         label: 'Pacientes' },
   ] },
 }
 NAV.supervisor = NAV.admin
@@ -176,10 +204,28 @@ const navItems = computed(() => {
   }
   return base
 })
+
+// La barra inferior aguanta 4 destinos legibles; con más, las etiquetas se cortan y se pierde el
+// pulgar. Los primeros van a la barra y el resto a un sheet "Más" — accesible, fuera del camino.
+// Es el mismo mecanismo para todos los roles: no hay una lista aparte que se desincronice.
+const MAX_TABS = 4
+const navVisibles = computed(() => {
+  const items = navItems.value
+  const tope  = showFab.value ? MAX_TABS : MAX_TABS + 1
+  return items.length > tope ? items.slice(0, tope - 1) : items
+})
+const navOverflow = computed(() => {
+  const items = navItems.value
+  const tope  = showFab.value ? MAX_TABS : MAX_TABS + 1
+  return items.length > tope ? items.slice(tope - 1) : []
+})
+const masOpen = ref(false)
+const masActivo = computed(() => navOverflow.value.some(i => isActive(i)))
+function irA(item) { masOpen.value = false; router.push(item.to) }
 const showFab  = computed(() => !!NAV[role.value]?.fab)
 // Con FAB, repartimos las tabs a cada lado del botón central.
-const navLeft  = computed(() => navItems.value.slice(0, 2))
-const navRight = computed(() => navItems.value.slice(2))
+const navLeft  = computed(() => navVisibles.value.slice(0, 2))
+const navRight = computed(() => navVisibles.value.slice(2))
 
 watch(() => route.path, () => { menuOpen.value = false })
 
@@ -294,6 +340,17 @@ onMounted(() => {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .msh__role { font-size: .66rem; font-weight: 600; color: rgba(255,255,255,.55); letter-spacing: .03em; }
+.msh__mas { display: flex; flex-direction: column; }
+.msh__mas-item {
+  display: flex; align-items: center; gap: .7rem; width: 100%;
+  background: none; border: none; border-bottom: 1px solid #f1f5f9;
+  padding: .85rem .25rem; cursor: pointer; font: inherit; font-size: .9rem;
+  color: #334155; text-align: left;
+}
+.msh__mas-item:last-child { border-bottom: none; }
+.msh__mas-item > span { flex: 1; }
+.msh__mas-arr { color: #cbd5e1; }
+
 .msh__menu {
   position: fixed; inset: 0; z-index: 60; background: rgba(15,23,42,.35);
   display: flex; justify-content: flex-end; align-items: flex-start;

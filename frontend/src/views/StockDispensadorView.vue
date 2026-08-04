@@ -20,7 +20,7 @@
     <div v-else-if="!stocksFiltrados.length" class="sdv__empty">Sin stock disponible.</div>
 
     <div v-else class="sdv__table-wrap">
-      <table class="sdv__table">
+      <table class="sdv__table tabla-cards">
         <thead>
           <tr>
             <th>Producto</th>
@@ -37,7 +37,7 @@
         </thead>
         <tbody>
           <tr v-for="s in stocksFiltrados" :key="s.id" :class="{ 'sdv__tr--flash': flashIds.has(s.id) }">
-            <td class="sdv__td-forma">
+            <td class="sdv__td-forma" data-col="Producto">
               <div class="sdv__forma-main">
                 {{ formaLabel(s.forma_producto) }}
                 <span class="sdv__chip" :class="s.regulatorio ? 'sdv__chip--propio' : 'sdv__chip--externo'">
@@ -46,29 +46,29 @@
               </div>
               <span v-if="s.numero_lote_producto" class="sdv__forma-sub">{{ s.numero_lote_producto }}</span>
             </td>
-            <td class="sdv__td-cepa">{{ s.genetica?.nombre ?? s.lote?.genetica?.nombre ?? '—' }}</td>
-            <td class="sdv__td-mono">{{ s.lote_codigo ?? s.lote?.codigo ?? '—' }}</td>
-            <td>{{ s.sede?.nombre ?? '—' }}</td>
-            <td class="sdv__td-ing">{{ fmtIngreso(s.created_at) }}</td>
-            <td class="sdv__td-num" :class="{ 'sdv__td-bajo': s.cantidad_disponible_real < 5 }">
+            <td class="sdv__td-cepa" data-col="Genética">{{ s.genetica?.nombre ?? s.lote?.genetica?.nombre ?? '—' }}</td>
+            <td class="sdv__td-mono" data-col="Lote">{{ s.lote_codigo ?? s.lote?.codigo ?? '—' }}</td>
+            <td data-col="Sede">{{ s.sede?.nombre ?? '—' }}</td>
+            <td class="sdv__td-ing" data-col="Ingresó">{{ fmtIngreso(s.created_at) }}</td>
+            <td class="sdv__td-num" data-col="Disponible" :class="{ 'sdv__td-bajo': s.cantidad_disponible_real < 5 }">
               <div>{{ s.cantidad_disponible_real?.toFixed(1) ?? s.cantidad }}{{ s.unidad }}</div>
               <span v-if="mostrarInicial(s)" class="sdv__td-inicial">de {{ s.cantidad_inicial?.toFixed(1) }}{{ s.unidad }}</span>
             </td>
-            <td class="sdv__td-num">
+            <td class="sdv__td-num" data-col="Comprometido">
               <span v-if="s.gramos_reservados > 0" class="sdv__badge-reservado" :title="`${s.gramos_reservados}g comprometidos en delivery`">
                 −{{ s.gramos_reservados?.toFixed(1) }}g
               </span>
               <span v-else class="sdv__none">—</span>
             </td>
-            <td class="sdv__td-num">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad }}</td>
-            <td>
+            <td class="sdv__td-num" data-col="P. sugerido">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad }}</td>
+            <td data-col="Vencimiento">
               <span v-if="s.estado_vencimiento && s.estado_vencimiento !== 'ok'" class="sdv__badge-venc" :class="`sdv__badge-venc--${s.estado_vencimiento}`">
                 {{ badgeVencimiento(s) }}
               </span>
               <span v-else-if="s.fecha_vencimiento_est" class="sdv__none">{{ fmtFecha(s.fecha_vencimiento_est) }}</span>
               <span v-else class="sdv__none">—</span>
             </td>
-            <td class="sdv__td-etiqueta">
+            <td class="sdv__td-etiqueta" data-col="Etiqueta">
               <RouterLink :to="{ name: 'stock-etiqueta', params: { id: s.id } }" class="sdv__etiqueta-link" title="Ver etiqueta">🏷️</RouterLink>
             </td>
           </tr>

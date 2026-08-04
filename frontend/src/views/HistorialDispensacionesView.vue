@@ -454,7 +454,7 @@ const FORMAS = [
         Sin resultados para los filtros aplicados.
       </div>
       <div v-else class="hd__table-wrap">
-        <table class="hd__table">
+        <table class="hd__table tabla-cards">
           <thead>
             <tr>
               <th>Fecha</th>
@@ -472,17 +472,17 @@ const FORMAS = [
             <template v-for="d in dispensaciones" :key="d.id">
               <tr class="hd__tr hd__tr--click" @click="verDetalle(d, $event)" title="Ver detalle de la dispensa">
 
-                <td class="hd__td-fecha">
+                <td class="hd__td-fecha" data-col="Fecha">
                   <span class="hd__fecha-day">{{ formatFecha(d.fecha_dispensacion, false) }}</span>
                   <span class="hd__fecha-hora">{{ formatHora(d.created_at) }}</span>
                 </td>
-                <td class="hd__td-paciente">
+                <td class="hd__td-paciente" data-col="Paciente">
                   <RouterLink :to="{ name: 'paciente-detail', params: { id: d.paciente_id } }" class="hd__link-paciente">{{ d.paciente_nombre }}</RouterLink>
                   <button class="hd__btn-filter-socio" @click="filtrarPorSocio(d)" title="Ver solo este paciente">
                     <Filter :size="11" :stroke-width="2" />
                   </button>
                 </td>
-                <td class="hd__td-producto">
+                <td class="hd__td-producto" data-col="Producto">
                   <span v-if="itemsDe(d).length <= 1" class="hd__prod-inline">
                     {{ formaLabel(itemsDe(d)[0]?.stock?.forma_producto) }}<template v-if="itemsDe(d)[0]?.genetica_nombre"> · {{ itemsDe(d)[0].genetica_nombre }}</template> · {{ itemsDe(d)[0]?.cantidad }}{{ itemsDe(d)[0]?.stock?.unidad || 'g' }}
                     <span v-if="itemsDe(d)[0]?.stock?.externo" class="hd__ext-badge hd__ext-badge--sm" title="Stock externo (sin lote de cultivo)">externo</span>
@@ -495,12 +495,12 @@ const FORMAS = [
                     {{ itemsDe(d).length }} productos
                   </button>
                 </td>
-                <td class="hd__td-num">
+                <td class="hd__td-num" data-col="Desc.">
                   <span v-if="descuentoPct(d)" class="hd__desc-badge" :title="descuentoTitle(d)">-{{ descuentoPct(d) }}%</span>
                   <span v-else class="hd__dash">—</span>
                 </td>
-                <td class="hd__td-num hd__td-monto">{{ formatARS(d.aporte_socio_ars) }}</td>
-                <td class="hd__td-pago">
+                <td class="hd__td-num hd__td-monto" data-col="Monto">{{ formatARS(d.aporte_socio_ars) }}</td>
+                <td class="hd__td-pago" data-col="Pago">
                   <span class="hd__pago-badge" :class="medioPagoClass(d.medio_pago)">{{ medioPagoLabel(d.medio_pago) }}</span>
                 </td>
                 <td class="hd__td-user">{{ d.usuario?.nombre ?? '—' }}</td>
