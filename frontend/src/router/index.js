@@ -4,13 +4,14 @@ import { usePermissions } from "../composables/usePermissions";
 import { useToast }       from "../composables/useToast";
 import { usePWA }         from "../composables/usePWA";
 
-const MOBILE_ROLES = ['admin', 'supervisor', 'cultivador', 'manicura', 'delivery']
+const MOBILE_ROLES = ['admin', 'supervisor', 'cultivador', 'manicura', 'delivery', 'dispensador']
 const MOBILE_HOME  = {
   admin:      '/m/admin/sedes',
   supervisor: '/m/admin/sedes',
   cultivador: '/m/cultivador/sedes',
   manicura:   '/m/manicura/pesar',
   delivery:   '/m/delivery/despachos',
+  dispensador:'/m/dispensar',
 }
 
 const requiresPermission = (resource, action) => {
@@ -879,6 +880,7 @@ const routes = [
             cultivador: '/m/cultivador/sedes',
             manicura:   '/m/manicura/pesar',
             delivery:   '/m/delivery/despachos',
+            dispensador:'/m/dispensar',
           }
           return homes[role] || '/'
         }
@@ -890,6 +892,11 @@ const routes = [
       // ── Cultivador ──
       { path: 'cultivador/sedes',  component: () => import('../views/mobile/MSedesView.vue') },
       { path: 'cultivador/tareas', component: () => import('../views/mobile/MTareasView.vue') },
+
+      // ── Dispensador ──
+      { path: 'dispensar', component: () => import('../views/mobile/MDispensarView.vue') },
+      { path: 'reservas',  component: () => import('../views/mobile/MReservasView.vue') },
+      { path: 'stock',     component: () => import('../views/StockDispensadorView.vue') },
 
       // ── Escaneo QR (cualquier rol con shell mobile) ──
       { path: 'scan', component: () => import('../views/mobile/MScanView.vue') },

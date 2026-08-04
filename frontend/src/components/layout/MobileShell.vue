@@ -99,7 +99,7 @@ const role = computed(() => auth.user?.role || '')
 
 const ROLE_LABELS = {
   admin: 'Administración', supervisor: 'Supervisión', cultivador: 'Cultivo',
-  manicura: 'Manicura', delivery: 'Delivery',
+  manicura: 'Manicura', delivery: 'Delivery', dispensador: 'Dispensa',
 }
 const roleLabel = computed(() => ROLE_LABELS[role.value] || '')
 
@@ -136,10 +136,24 @@ const NAV = {
     { to: '/m/delivery/despachos', icon: 'bi-truck',         label: 'Despachos' },
     { to: '/m/delivery/historial', icon: 'bi-clock-history', label: 'Historial' },
   ] },
+  // El dispensador trabaja de pie con alguien enfrente: la primera pantalla es buscar y dispensar,
+  // no un dashboard. El Salón aparece solo si el club tiene el módulo activo — es el mismo puesto
+  // físico, así que no tiene sentido mandarlo al escritorio para cobrar un café.
+  dispensador: { items: [
+    { to: '/m/dispensar',        icon: 'bi-bag-plus',      label: 'Dispensar' },
+    { to: '/m/reservas',         icon: 'bi-bookmark-check', label: 'Reservas' },
+    { to: '/m/stock',            icon: 'bi-boxes',         label: 'Stock' },
+  ] },
 }
 NAV.supervisor = NAV.admin
 
-const navItems = computed(() => NAV[role.value]?.items || [])
+const navItems = computed(() => {
+  const base = NAV[role.value]?.items || []
+  if (role.value === 'dispensador' && club.data?.features?.bar) {
+    return [...base, { to: '/bar', icon: 'bi-cup-hot', label: 'Salón' }]
+  }
+  return base
+})
 const showFab  = computed(() => !!NAV[role.value]?.fab)
 // Con FAB, repartimos las tabs a cada lado del botón central.
 const navLeft  = computed(() => navItems.value.slice(0, 2))
