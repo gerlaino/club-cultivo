@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_03_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_04_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -448,9 +448,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_03_000001) do
     t.date "contabilidad_cerrada_hasta"
     t.bigint "deleted_by_id"
     t.string "whatsapp_numero"
+    t.boolean "demo", default: false, null: false
     t.index ["benchmark_opt_in"], name: "index_clubs_on_benchmark_opt_in"
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_clubs_on_deleted_by_id"
+    t.index ["demo"], name: "index_clubs_on_demo", where: "(demo = true)"
     t.index ["features"], name: "index_clubs_on_features", using: :gin
     t.index ["plan"], name: "index_clubs_on_plan"
     t.index ["slug"], name: "index_clubs_on_slug", unique: true

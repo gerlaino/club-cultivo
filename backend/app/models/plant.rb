@@ -9,7 +9,11 @@ class Plant < ApplicationRecord
 
   has_many   :esquejes, class_name: 'Plant', foreign_key: :planta_madre_id, dependent: :nullify
   has_many :activities, class_name: 'PlantActivity', dependent: :destroy
-  has_many :observaciones, as: :noteable, dependent: :destroy
+  # Las notas de la planta, el mismo `Nota` polimórfico que usan Sala y Lote. La asociación NO puede
+  # llamarse `notas`: `plants.notas` ya es una columna de texto y la taparía. Pero le faltaba el
+  # `class_name`, así que Rails buscaba un modelo `Observacione` inexistente y cualquier nota sobre
+  # una planta reventaba con un 500 (y el borrado de una planta también, al intentar cascadear).
+  has_many :observaciones, class_name: 'Nota', as: :noteable, dependent: :destroy
   has_many :pesadas_plantas, class_name: 'PesadaPlanta', dependent: :destroy
 
   # set_club_id corre en before_validation (no before_create): acts_as_tenant exige

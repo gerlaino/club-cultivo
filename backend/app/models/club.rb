@@ -54,6 +54,10 @@ class Club < ApplicationRecord
 
   scope :activos,    -> { where(deleted_at: nil) }
   scope :eliminados, -> { where.not(deleted_at: nil) }
+  # Clubes de verdad: los que operan. Excluye los demo (club modelo, copias de prueba), cuyos datos
+  # son inventados y no deben entrar en métricas agregadas ni en benchmarking.
+  scope :reales,     -> { where(demo: false) }
+  scope :demo,       -> { where(demo: true) }
 
   before_validation :generar_slug, on: :create
   after_create :crear_geneticas_default!
