@@ -114,9 +114,12 @@ const clubInitials = computed(() => {
 
 // ── Navegación por rol ──────────────────────────────────────────
 const NAV = {
-  cultivador: { items: [
-    { to: '/m/cultivador/sedes',  icon: 'bi-diagram-3',  label: 'Cultivo' },
+  // El cultivador es el que MÁS escanea —es lo primero que hace al entrar a una sala—, pero el
+  // botón vivía solo en el FAB de admin y en el detalle de un lote: no tenía cómo llegar.
+  cultivador: { fab: true, items: [
+    { to: '/m/cultivador/sedes',  icon: 'bi-diagram-3',     label: 'Cultivo' },
     { to: '/m/cultivador/tareas', icon: 'bi-check2-square', label: 'Tareas' },
+    { to: '/m/scan',              icon: 'bi-qr-code-scan',  label: 'Escanear' },
     { to: '/m/horas',             icon: 'bi-clock-history', label: 'Mis horas' },
   ] },
   admin: { fab: true, items: [
@@ -169,14 +172,21 @@ const showNuevoLote = ref(false)
 const showNuevaSala = ref(false)
 const salas        = ref([])
 
-const fabActions = computed(() => [
-  { key: 'lote', label: 'Registrar lote', icon: 'bi-box-seam',
-    tint: 'var(--c-leaf-100)', color: 'var(--c-leaf-700)', onClick: abrirNuevoLote },
-  { key: 'sala', label: 'Registrar sala', icon: 'bi-grid-3x3-gap',
-    tint: 'var(--c-sky-100)', color: 'var(--c-sky-600)', onClick: abrirNuevaSala },
-  { key: 'scan', label: 'Escanear QR', icon: 'bi-qr-code-scan',
-    tint: '#ede9fe', color: '#7c3aed', onClick: irEscanear },
-])
+// Crear una SALA es decisión de infraestructura, no del que está en el pasillo: el cultivador crea
+// lotes, no cuartos.
+const fabActions = computed(() => {
+  const acciones = [
+    { key: 'lote', label: 'Registrar lote', icon: 'bi-box-seam',
+      tint: 'var(--c-leaf-100)', color: 'var(--c-leaf-700)', onClick: abrirNuevoLote },
+  ]
+  if (role.value !== 'cultivador') {
+    acciones.push({ key: 'sala', label: 'Registrar sala', icon: 'bi-grid-3x3-gap',
+                    tint: 'var(--c-sky-100)', color: 'var(--c-sky-600)', onClick: abrirNuevaSala })
+  }
+  acciones.push({ key: 'scan', label: 'Escanear QR', icon: 'bi-qr-code-scan',
+                  tint: '#ede9fe', color: '#7c3aed', onClick: irEscanear })
+  return acciones
+})
 
 function irEscanear() {
   fabOpen.value = false
