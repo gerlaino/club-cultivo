@@ -65,6 +65,10 @@ module Clubs
           crear_stocks(club)
           crear_dispensaciones(club)
           crear_contabilidad(club)
+          crear_infraestructura_finanzas(club)
+          crear_insumos(club)
+          crear_salon(club)
+          crear_turnos(club)
         end
       ensure
         ActsAsTenant.current_tenant = tenant_previo
@@ -86,6 +90,9 @@ module Clubs
           city: 'Ciudad Autónoma de Buenos Aires', state: 'CABA', country: 'Argentina',
           timezone: 'America/Argentina/Buenos_Aires',
           plan: 'arbol', plan_trial: false,
+          # TODAS las features prendidas: es una vidriera, tiene que poder mostrarse entero.
+          features: Club::AVAILABLE_FEATURES.index_with(true),
+          web_activa: true,
         )
       end
     end
@@ -107,9 +114,15 @@ module Clubs
     end
 
     def crear_estructura(club)
+      # MIXTA: produce y además tiene salón. Es lo que habilita el módulo de bar/eventos, que sin
+      # una sede social no se puede mostrar.
       @sede = Sede.create!(club: club, nombre: 'Sede Central', direccion: 'Av. Siempreviva 742',
-                           ciudad: 'CABA', created_by: @admin)
-      @resumen[:sedes] += 1
+                           ciudad: 'CABA', tipo: 'mixta', created_by: @admin)
+      # Una segunda sede, solo de producción: sin dos, el selector de sede y el desglose por sede
+      # del dashboard no tienen nada que mostrar.
+      @sede2 = Sede.create!(club: club, nombre: 'Finca Norte', direccion: 'Ruta 8 km 42',
+                            ciudad: 'Pilar', tipo: 'produccion', created_by: @admin)
+      @resumen[:sedes] += 2
 
       @salas = {
         vegetativo: Sala.create!(club: club, sede: @sede, nombre: 'Vegetativo', kind: 'vegetativo',
@@ -265,6 +278,128 @@ module Clubs
       lote.update_columns(rendimiento_real_g: gramos, plants_count_cosechadas: vivas)
       @lotes_finalizados << [lote, gramos]
     end
+
+
+    # Áreas, categorías contables y depósitos por sede. Se reusan los servicios de siembra del
+    # producto en vez de inventar datos: así el club demo queda igual que uno recién creado.
+    def crear_infraestructura_finanzas(club)
+      Finanzas::SembrarCatalogo.new(club).call(con_arbol: true)
+      Finanzas::SembrarDepositos.new(club).call
+      Bar::SembrarCategoriasProducto.new(club).call if defined?(Bar::SembrarCategoriasProducto)
+      @resumen[:depositos] += Deposito.where(club_id: club.id).count
+    end
+
+    INSUMOS = [
+      ['Sustrato coco 50L',      'bolsa',    'cultivo', 12_000, 40],
+      ['Perlita 100L',           'bolsa',    'cultivo',  9_500, 15],
+      ['Fertilizante base A 5L', 'litro',    'cultivo', 28_000, 24],
+      ['Fertilizante base B 5L', 'litro',    'cultivo', 28_000, 22],
+      ['Corrector de pH 1L',     'litro',    'cultivo',  8_900, 10],
+      ['Maceta 7L',              'unidad',   'cultivo',    900, 300],
+      ['Guantes de nitrilo',     'unidad',   'general',    350, 500],
+      ['Bolsas de curado 1kg',   'unidad',   'general',  1_800, 120],
+      ['Etiquetas QR',           'unidad',   'general',    120, 1_000],
+    ].freeze
+
+    def crear_insumos(club)
+      deposito = Deposito.where(club_id: club.id, sede_id: @sede.id).first
+      INSUMOS.each do |nombre, unidad, tipo, costo, stock|
+        Insumo.create!(
+          club: club, sede: @sede, deposito: deposito, nombre: nombre,
+          unidad_medida: unidad, tipo: tipo,
+          costo_promedio_ars: costo, stock_actual: stock,
+          stock_minimo: (stock * 0.2).round,
+        )
+        @resumen[:insumos] += 1
+      end
+    end
+
+    PRODUCTOS_BAR = [
+      ['Café',                 'bebida',  2_500, 60],
+      ['Agua saborizada 500ml','bebida',  2_000, 80],
+      ['Cerveza artesanal',    'bebida',  5_500, 45],
+      ['Sándwich veggie',      'cocina',  7_800, 20],
+      ['Brownie',              'cocina',  4_200, 25],
+      ['Papas rústicas',       'cocina',  6_000, 30],
+      ['Remera del club',      'merch',  22_000, 15],
+      ['Gorra',                'merch',  16_000, 12],
+      ['Encendedor',           'otro',    1_500, 90],
+    ].freeze
+
+    # El salón: la barra, su mercadería y un año de ventas. Sin esto el módulo se ve vacío, que es
+    # justo lo que no se quiere mostrar.
+    def crear_salon(club)
+      bar = Barra.create!(club: club, sede: @sede, nombre: 'Salón Central', activo: true)
+      @resumen[:bares] += 1
+
+      unidad   = UnidadNegocio.where(club_id: club.id, tipo: 'bar').first
+      deposito = Deposito.where(club_id: club.id, sede_id: @sede.id, clave_sistema: 'salon').first
+
+      productos = PRODUCTOS_BAR.map do |nombre, categoria, precio, stock|
+        BarProducto.create!(
+          club: club, bar: bar, nombre: nombre, categoria: categoria,
+          precio_ars: precio, stock: stock, stock_minimo: 5,
+          unidad_negocio: unidad, deposito: deposito, vendible: true,
+        ).tap { @resumen[:productos_bar] += 1 }
+      end
+
+      vendedor = User.where(club_id: club.id, role: 'dispensador').first || @admin
+      # Mismo criterio que las dispensaciones: las ventas siguen una curva, no son parejas.
+      12.times do |idx|
+        mes = hoy - (MESES_HISTORIA - 1 - idx).months
+        (8 + idx * 2).times do
+          fecha = mes.beginning_of_month + @rng.rand(0..27)
+          next if fecha > hoy
+
+          elegidos = productos.sample(@rng.rand(1..3), random: @rng)
+          total = 0
+          venta = BarVenta.new(
+            club: club, bar: bar, user: vendedor, unidad_negocio: unidad,
+            medio_pago: %w[efectivo transferencia mercado_pago].sample(random: @rng),
+            total_ars: 0,
+          )
+          venta.save!(validate: false)
+          # BarVenta no tiene columna de fecha: se ubica en el tiempo por created_at, así que hay
+          # que backdatearlo para que el histórico del salón tenga un año de movimiento.
+          BarVenta.unscoped.where(id: venta.id)
+                  .update_all(created_at: fecha.in_time_zone.change(hour: @rng.rand(11..22)))
+          elegidos.each do |prod|
+            cant = @rng.rand(1..3)
+            sub  = prod.precio_ars.to_d * cant
+            total += sub
+            BarVentaItem.new(
+              club: club, bar_venta: venta, bar_producto: prod, vendible: prod,
+              nombre: prod.nombre, cantidad: cant,
+              precio_unitario_ars: prod.precio_ars, subtotal_ars: sub,
+            ).save!(validate: false)
+          end
+          venta.update_columns(total_ars: total)
+          @resumen[:ventas_bar] += 1
+        end
+      end
+    end
+
+    # Turnos médicos repartidos entre pasados (realizados) y próximos: la agenda vacía no muestra
+    # nada, y una llena solo de futuros no deja ver el historial clínico.
+    def crear_turnos(club)
+      medico = User.where(club_id: club.id, role: 'medico').first || @admin
+      40.times do |i|
+        paciente = @pacientes[i % @pacientes.size]
+        pasado   = i < 28
+        fecha    = pasado ? hoy - @rng.rand(1..180) : hoy + @rng.rand(1..25)
+        estado   = if !pasado then %w[programado confirmado].sample(random: @rng)
+                   else %w[realizado realizado realizado cancelado ausente].sample(random: @rng)
+                   end
+        Turno.create!(
+          club: club, paciente: paciente, medico: medico,
+          fecha_hora: fecha.in_time_zone.change(hour: @rng.rand(9..18)),
+          duracion_minutos: 30, tipo: TIPOS_TURNO.sample(random: @rng), estado: estado,
+        )
+        @resumen[:turnos] += 1
+      end
+    end
+
+    TIPOS_TURNO = %w[primera_vez seguimiento seguimiento revision].freeze
 
     def crear_pacientes(club)
       @pacientes = @n_pacientes.times.map do |i|
