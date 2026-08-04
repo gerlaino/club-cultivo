@@ -187,12 +187,14 @@ const NAV = {
   // El dispensador trabaja de pie con alguien enfrente: la primera pantalla es buscar y dispensar,
   // no un dashboard. El Salón aparece solo si el club tiene el módulo activo — es el mismo puesto
   // físico, así que no tiene sentido mandarlo al escritorio para cobrar un café.
+  // NO hay tab "Pacientes": la lista completa ya está en Dispensar, con buscador y escaneo del
+  // carnet. Tenerla dos veces obligaba a decidir por cuál entrar para hacer lo mismo.
   dispensador: { items: [
-    { to: '/m/dispensar',        icon: 'bi-bag-plus',       label: 'Dispensar' },
-    { to: '/m/reservas',         icon: 'bi-bookmark-check', label: 'Reservas' },
-    { to: '/m/stock',            icon: 'bi-boxes',          label: 'Stock' },
-    { to: '/m/historial',          icon: 'bi-clock-history',  label: 'Historial' },
-    { to: '/m/pacientes',          icon: 'bi-people',         label: 'Pacientes' },
+    { to: '/m/dispensar', icon: 'bi-bag-plus',       label: 'Dispensar' },
+    { to: '/m/reservas',  icon: 'bi-bookmark-check', label: 'Reservas' },
+    { to: '/m/stock',     icon: 'bi-boxes',          label: 'Stock' },
+    { to: '/m/historial', icon: 'bi-clock-history',  label: 'Historial' },
+    { to: '/m/horas',     icon: 'bi-stopwatch',      label: 'Mis horas' },
   ] },
 }
 NAV.supervisor = NAV.admin

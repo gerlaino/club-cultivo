@@ -54,18 +54,12 @@
         <span class="mlot__qa-ico" style="background:#ede9fe;color:#7c3aed"><i class="bi bi-camera"></i></span>
         <span class="mlot__qa-lbl">Foto</span>
       </button>
-      <button class="mlot__qa" v-if="fasesSiguientes.length" @click="abrirAvanzarFase">
+      <button class="mlot__qa" v-if="faseSiguiente" @click="abrirAvanzarFase">
         <span class="mlot__qa-ico" style="background:var(--c-leaf-100);color:var(--c-leaf-700)"><i class="bi bi-arrow-up-circle"></i></span>
         <span class="mlot__qa-lbl">Avanzar fase</span>
       </button>
-      <button class="mlot__qa" @click="abrirNuevaPlanta">
-        <span class="mlot__qa-ico" style="background:#dcfce7;color:#16a34a"><i class="bi bi-flower1"></i></span>
-        <span class="mlot__qa-lbl">+ Planta</span>
-      </button>
-      <button class="mlot__qa" @click="router.push('/m/scan')">
-        <span class="mlot__qa-ico" style="background:#e0f2fe;color:var(--c-sky-600)"><i class="bi bi-qr-code-scan"></i></span>
-        <span class="mlot__qa-lbl">Escanear</span>
-      </button>
+      <!-- Escanear vive en el botón "+" de la barra: repetirlo acá era una segunda puerta al mismo
+           lugar. Y las plantas se dan de alta con el lote, no de a una desde su ficha. -->
     </div>
 
     <!-- Plantas -->
@@ -120,11 +114,10 @@
     <SheetBottom v-model="showAvanzarFase" title="Avanzar fase">
       <div class="mlot__sheet-body">
         <p class="mlot__sheet-desc">Fase actual: <strong>{{ estadoLabel(lote.estado) }}</strong></p>
-        <div class="mlot__field">
-          <label class="mlot__label">Nueva fase</label>
-          <select v-model="nuevaFase" class="mlot__input">
-            <option v-for="f in fasesSiguientes" :key="f.value" :value="f.value">{{ f.emoji }} {{ f.label }}</option>
-          </select>
+        <div class="mlot__destino" v-if="faseSiguiente">
+          <span class="mlot__destino-de">{{ estadoEmoji(lote.estado) }} {{ estadoLabel(lote.estado) }}</span>
+          <i class="bi bi-arrow-right"></i>
+          <span class="mlot__destino-a">{{ faseSiguiente.emoji }} {{ faseSiguiente.label }}</span>
         </div>
         <!-- Cuántas prendieron: sin este número el % de prendimiento da 100% siempre. -->
         <div v-if="lote.estado === 'enraizado'" class="mlot__field">
@@ -148,32 +141,6 @@
     </SheetBottom>
 
     <!-- Sheet: Nueva planta -->
-    <SheetBottom v-model="showNuevaPlanta" title="Nueva planta">
-      <div class="mlot__sheet-body">
-        <div class="mlot__info-box" v-if="lote">
-          Nombre: <strong>{{ lote.codigo }}-P{{ String(plantas.length + 1).padStart(3, '0') }}</strong>
-        </div>
-        <div class="mlot__field">
-          <label class="mlot__label">Estado inicial</label>
-          <select v-model="plantaForm.state" class="mlot__input">
-            <option value="enraizado">🌱 Enraizado</option>
-            <option value="vegetativo">🍃 Vegetativo</option>
-            <option value="floracion">🌸 Floración</option>
-          </select>
-        </div>
-        <div class="mlot__field">
-          <label class="mlot__label">Origen</label>
-          <select v-model="plantaForm.origen" class="mlot__input">
-            <option value="enraizado">🌱 Enraizado</option>
-            <option value="division">🪴 División</option>
-          </select>
-        </div>
-        <div v-if="plantaError" class="mlot__error">{{ plantaError }}</div>
-        <button class="mlot__btn-confirmar" :disabled="savingPlanta" @click="guardarNuevaPlanta">
-          {{ savingPlanta ? 'Creando…' : 'Crear planta' }}
-        </button>
-      </div>
-    </SheetBottom>
 
     <!-- Sheet: Editar lote -->
     <SheetBottom v-model="showEditarLote" title="Editar lote">
@@ -216,7 +183,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   getLote, listPlants,
-  avanzarFaseLote, updateLote, deleteLote, createPlant, uploadFotoLote,
+  avanzarFaseLote, updateLote, deleteLote, uploadFotoLote,
 } from '../../lib/api'
 import { useToast }        from '../../composables/useToast'
 import SheetBottom         from '../../components/cultivador/SheetBottom.vue'
@@ -234,15 +201,12 @@ const loadingPlantas  = ref(false)
 const showRegistrar   = ref(false)
 const showAcciones    = ref(false)
 const showAvanzarFase = ref(false)
-const showNuevaPlanta = ref(false)
 const showEditarLote  = ref(false)
 const showEliminar    = ref(false)
 const savingFase      = ref(false)
-const savingPlanta    = ref(false)
 const savingEdit      = ref(false)
 const eliminando      = ref(false)
 const faseError       = ref(null)
-const plantaError     = ref(null)
 const editError       = ref(null)
 const eliminarError   = ref(null)
 const pagina          = ref(1)
@@ -260,8 +224,6 @@ const MACETAS = [
 const faltaMaceta = computed(() =>
   lote.value?.estado === 'enraizado' && (!faseMaceta.value || fasePrendieron.value === ''))
 
-const STATE_FROM_LOTE = { germinacion:'enraizado', esqueje:'esqueje', vegetativo:'vegetativo', floracion:'floracion', cosecha:'cosecha' }
-const plantaForm = ref({ state: 'vegetativo', origen: 'semilla' })
 const editForm   = ref({ codigo: '', descripcion: '' })
 
 const EG = {
@@ -285,10 +247,14 @@ const FASES_META  = [
     { value:'curado',      label:'Curado',      emoji:'🫙' },
 ]
 
-const fasesSiguientes = computed(() => {
-  if (!lote.value) return []
+// Avanzar es SIEMPRE a la fase siguiente, no a una elegida de una lista. Ofrecer todas las
+// posteriores dejaba saltear etapas —de vegetativo directo a curado— y eso rompe la historia del
+// lote: se pierden los días de floración y de cosecha, que después no hay de dónde sacar.
+const faseSiguiente = computed(() => {
+  if (!lote.value) return null
   const idx = FASES_ORDEN.indexOf(lote.value.estado)
-  return FASES_META.filter(f => FASES_ORDEN.indexOf(f.value) > idx)
+  if (idx < 0 || idx >= FASES_ORDEN.length - 1) return null
+  return FASES_META.find(f => f.value === FASES_ORDEN[idx + 1]) || null
 })
 
 const estadoGradient = e => EG[e] || 'linear-gradient(150deg,#0f172a,#1e293b)'
@@ -308,7 +274,7 @@ async function recargarLote() {
 }
 
 function abrirAvanzarFase() {
-  nuevaFase.value  = fasesSiguientes.value[0]?.value || ''
+  nuevaFase.value  = faseSiguiente.value?.value || ''
   faseMaceta.value = ''
   fasePrendieron.value = ''
   faseError.value  = null
@@ -329,27 +295,6 @@ async function guardarAvanzarFase() {
   } catch (e) {
     faseError.value = e?.response?.data?.error || 'Error al avanzar fase'
   } finally { savingFase.value = false }
-}
-
-function abrirNuevaPlanta() {
-  plantaForm.value  = { state: STATE_FROM_LOTE[lote.value?.estado] || 'vegetativo', origen: 'semilla' }
-  plantaError.value = null
-  showAcciones.value = false
-  showNuevaPlanta.value = true
-}
-async function guardarNuevaPlanta() {
-  savingPlanta.value = true; plantaError.value = null
-  try {
-    const count  = plantas.value.length + 1
-    const nombre = `${lote.value.codigo}-P${String(count).padStart(3, '0')}`
-    const { data } = await createPlant({ lote_id: id, nombre, state: plantaForm.value.state, origen: plantaForm.value.origen })
-    plantas.value.unshift(data)
-    lote.value = { ...lote.value, plants_count: (lote.value.plants_count || 0) + 1 }
-    toast.success('Planta creada')
-    showNuevaPlanta.value = false
-  } catch (e) {
-    plantaError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'Error al crear la planta'
-  } finally { savingPlanta.value = false }
 }
 
 function abrirEditarLote() {
@@ -519,4 +464,15 @@ onMounted(async () => {
 .mlot__btn-danger { flex: 1; background: #dc2626; color: #fff; border: none; padding: .75rem; border-radius: 10px; font-size: .875rem; font-weight: 700; cursor: pointer; }
 .mlot__btn-danger:disabled { opacity: .6; }
 .mlot__info-box { background: var(--c-leaf-50, #f0fdf4); border: 1px solid var(--c-leaf-100, #bbf7d0); border-radius: 10px; padding: .6rem .875rem; font-size: .8rem; color: var(--c-leaf-700, #15803d); }
+</style>
+
+<style scoped>
+.mlot__destino {
+  display: flex; align-items: center; justify-content: center; gap: .6rem;
+  background: var(--c-leaf-50, #F4F8F5); border: 1px solid var(--c-leaf-100, #E8F0EB);
+  border-radius: 10px; padding: .8rem; font-size: .95rem; font-weight: 600;
+}
+.mlot__destino i { color: var(--c-leaf-500, #5A8A72); }
+.mlot__destino-de { color: var(--c-ink-500, #6B7280); }
+.mlot__destino-a  { color: var(--c-leaf-800, #1A3D2E); }
 </style>

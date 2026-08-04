@@ -81,7 +81,8 @@ class JornadasController < ApplicationController
   end
 
   def check_rol!
-    permitidos = %w[manicura cultivador admin supervisor super_admin]
+    # El dispensador también cumple horario: quedaba afuera y no tenía cómo cargarlas.
+    permitidos = %w[manicura cultivador dispensador admin supervisor super_admin]
     render json: { error: 'No autorizado' }, status: :forbidden unless permitidos.include?(current_user.role)
   end
 

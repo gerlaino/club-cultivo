@@ -6,8 +6,10 @@ import { usePWA }         from "../composables/usePWA";
 
 const MOBILE_ROLES = ['admin', 'supervisor', 'cultivador', 'manicura', 'delivery', 'dispensador']
 const MOBILE_HOME  = {
-  admin:      '/m/admin/sedes',
-  supervisor: '/m/admin/sedes',
+  // Inicio, que es la primera tab de su barra: entrar directo a Cultivo dejaba al admin en una
+  // pantalla intermedia sin el pulso del día.
+  admin:      '/m/admin/home',
+  supervisor: '/m/admin/home',
   cultivador: '/m/cultivador/sedes',
   manicura:   '/m/manicura/pesar',
   delivery:   '/m/delivery/despachos',

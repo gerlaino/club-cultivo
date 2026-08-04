@@ -7,9 +7,9 @@
           <h1 class="msd__title">{{ sede.nombre }}</h1>
           <span class="msd__tipo">{{ sede.tipo }}</span>
         </div>
-        <button class="msd__add" @click="showNuevaSala = true">
-          <i class="bi bi-plus-lg"></i> Sala
-        </button>
+        <!-- Crear sala vive en el botón "+" de la barra: acá era una segunda puerta al mismo
+             lugar. Se conserva el CTA del estado vacío, que es otra cosa —cuando no hay ninguna,
+             el "+" no se lee como el camino—. -->
       </header>
 
       <div v-if="!salas.length" class="msd__empty">

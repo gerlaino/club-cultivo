@@ -52,9 +52,10 @@ RSpec.describe 'Jornadas laborales', type: :request do
   end
 
   describe 'permisos' do
-    it 'un dispensador no accede' do
-      disp = create(:user, :dispensador, club: club)
-      sign_in_as(disp)
+    # El dispensador SÍ accede: también cumple horario. Antes estaba fuera de la lista y su
+    # pantalla de "Mis horas" existía pero el backend la rechazaba con 403.
+    it 'un rol sin horario (médico) no accede' do
+      sign_in_as(create(:user, club: club, role: 'medico'))
       get '/api/jornadas'
       expect(response).to have_http_status(:forbidden)
     end
@@ -68,4 +69,20 @@ RSpec.describe 'Jornadas laborales', type: :request do
       expect(JSON.parse(response.body)['jornadas']).to eq([])
     end
   end
+  # El dispensador también cumple horario. Quedaba afuera de los roles permitidos, así que su
+  # pantalla de "Mis horas" existía pero el backend la rechazaba con 403.
+  describe 'el dispensador' do
+    let(:dispensador) { create(:user, club: club, role: 'dispensador') }
+
+    it 'puede cargar y ver sus horas' do
+      sign_in_as(dispensador)
+
+      post '/api/jornadas', params: { jornada: { fecha: Date.current, hora_entrada: '09:00', hora_salida: '17:00' } }
+      expect(response).to have_http_status(:success)
+
+      get '/api/jornadas'
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
 end

@@ -135,6 +135,17 @@ function filtrarPorSocio(d) {
 }
 
 // ── Data ───────────────────────────────────────────────────────────────────────
+// Qué dispensas están desplegadas en el listado (las de varios productos). El template las usaba
+// sin que estuvieran definidas: la vista entera reventaba y quedaba en blanco.
+const abiertos = ref(new Set())
+function alternarDetalle(id) {
+  const s = new Set(abiertos.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  abiertos.value = s
+}
+// El detalle ocupa el ancho de la tabla; se calcula para no desalinearse si cambian las columnas.
+const colspanDetalle = computed(() => 8)
+
 const loading   = ref(false)
 const exporting = ref(false)
 const allDisps  = ref([])
