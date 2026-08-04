@@ -57,7 +57,9 @@ class BenchmarkController < ApplicationController
   end
 
   def metricas_plataforma_sin_tenant
-    opted_clubs = Club.where(benchmark_opt_in: true)
+    # `reales` además del opt-in: un club demo con datos inventados no puede entrar al promedio
+    # del sector ni aunque tenga el flag prendido.
+    opted_clubs = Club.reales.where(benchmark_opt_in: true)
     return nil if opted_clubs.empty?
 
     total_clubes = opted_clubs.count

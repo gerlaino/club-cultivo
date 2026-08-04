@@ -8,7 +8,9 @@ module Public
     # Endpoint público para investigadores — datos totalmente anonimizados y agregados
     # Solo incluye clubes con benchmark_opt_in: true
     def show
-      opted = Club.where(benchmark_opt_in: true)
+      # `reales`: los clubes demo tienen datos inventados y no pueden entrar en un endpoint
+      # público para investigadores.
+      opted = Club.reales.where(benchmark_opt_in: true)
       total_clubes = opted.count
 
       unless total_clubes >= 3
@@ -31,12 +33,12 @@ module Public
       dispens_mes_total = Dispensacion
         .joins(stock: :sede)
         .joins("INNER JOIN clubs ON sedes.club_id = clubs.id")
-        .where(clubs: { benchmark_opt_in: true })
+        .where(clubs: { benchmark_opt_in: true, demo: false })
         .where(fecha_dispensacion: inicio_mes..hoy)
 
       pacientes_total = Paciente
         .joins(:club)
-        .where(clubs: { benchmark_opt_in: true })
+        .where(clubs: { benchmark_opt_in: true, demo: false })
         .where(deleted_at: nil)
         .count
 
