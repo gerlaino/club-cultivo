@@ -98,7 +98,8 @@
           class="dd__stock-card"
           :class="{ 'dd__stock-card--warn': s.alerta }"
         >
-          <div class="dd__stock-forma">{{ s.forma }}</div>
+          <!-- El backend manda el enum crudo (`flor_seca`): se muestra con su etiqueta humana. -->
+          <div class="dd__stock-forma">{{ formaLabel(s.forma) }}</div>
           <div class="dd__stock-cantidad">{{ formatG(s.cantidad_g) }}</div>
           <div v-if="s.alerta" class="dd__stock-alerta">⚠ Stock bajo</div>
         </div>

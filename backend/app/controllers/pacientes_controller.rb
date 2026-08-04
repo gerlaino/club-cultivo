@@ -18,6 +18,12 @@ class PacientesController < ApplicationController
     created_at updated_at
   ].freeze
 
+  # El REPROCANN no es asunto del dispensador. Su regla es más simple y no admite criterio: si el
+  # paciente está en la lista, dispensa; si no está, avisa al admin. Mostrarle vencimientos lo pone
+  # a decidir sobre un caso que no le toca —y a discutirlo en el mostrador con el paciente
+  # enfrente—. Los casos especiales los mira admin/supervisor, que tienen la ficha completa.
+  CAMPOS_REPROCANN = %w[reprocann_numero reprocann_vencimiento reprocann_estado].freeze
+
   # Campos CLÍNICOS / de salud: SÓLO se agregan si el rol puede ver la historia clínica
   # (allowlist medico/admin/supervisor, via PacientePolicy#ver_notas_clinicas?).
   CAMPOS_CLINICOS = %w[
@@ -64,7 +70,7 @@ class PacientesController < ApplicationController
 
     # La LISTA nunca expone datos clínicos: allowlist estricta de campos no clínicos.
     data = pacientes.map do |p|
-      p.as_json(only: CAMPOS_NO_CLINICOS, methods: [:nombre_completo, :reprocann_estado_efectivo])
+      p.as_json(only: campos_visibles, methods: metodos_lista)
        .merge('ultima_dispensacion' => ultimas[p.id])
     end
 
@@ -78,10 +84,10 @@ class PacientesController < ApplicationController
     authorize @paciente
 
     # Base: SÓLO campos no clínicos (allowlist), para cualquier rol con lectura.
-    json = @paciente.as_json(
-      only:    CAMPOS_NO_CLINICOS,
-      methods: [:nombre_completo, :dispensado_mes_actual_g, :porcentaje_limite_mensual, :saldo_cc, :limite_cc, :saldo_cc_g, :limite_cc_g, :cc_gramos_activo, :reprocann_estado_efectivo]
-    )
+    metodos = [:nombre_completo, :dispensado_mes_actual_g, :porcentaje_limite_mensual, :saldo_cc,
+               :limite_cc, :saldo_cc_g, :limite_cc_g, :cc_gramos_activo]
+    metodos << :reprocann_estado_efectivo unless current_user.dispensador?
+    json = @paciente.as_json(only: campos_visibles, methods: metodos)
 
     # Historia clínica: se agrega SÓLO si el rol puede verla (medico/admin/supervisor).
     if policy(@paciente).ver_notas_clinicas?
@@ -387,6 +393,17 @@ class PacientesController < ApplicationController
   end
 
   private
+
+  def campos_visibles
+    return CAMPOS_NO_CLINICOS - CAMPOS_REPROCANN if current_user.dispensador?
+    CAMPOS_NO_CLINICOS
+  end
+
+  def metodos_lista
+    return [:nombre_completo] if current_user.dispensador?
+    [:nombre_completo, :reprocann_estado_efectivo]
+  end
+
 
   def serialize_mail(m)
     {

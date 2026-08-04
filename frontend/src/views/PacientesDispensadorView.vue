@@ -1,7 +1,10 @@
 <template>
   <div class="pdv">
     <div class="pdv__toolbar">
-      <h1 class="pdv__title">Pacientes del club</h1>
+      <h1 class="pdv__title">
+        Pacientes del club
+        <span v-if="total" class="pdv__count">{{ total }}</span>
+      </h1>
       <div class="pdv__search-wrap">
         <Search :size="16" :stroke-width="1.75" class="pdv__search-ico" />
         <input
@@ -18,8 +21,12 @@
       <div class="pdv__skel" v-for="n in 6" :key="n" />
     </div>
 
-    <div v-else-if="!pacientes.length && query" class="pdv__empty">Sin resultados.</div>
-    <div v-else-if="!pacientes.length" class="pdv__empty">Buscá un paciente para comenzar.</div>
+    <div v-else-if="!pacientes.length && query" class="pdv__empty">
+      Ningún paciente coincide con «{{ query }}».
+    </div>
+    <div v-else-if="!pacientes.length" class="pdv__empty">
+      Todavía no hay pacientes cargados.
+    </div>
 
     <ul v-else class="pdv__list">
       <li
@@ -32,7 +39,9 @@
           <div class="pdv__item-name">{{ p.nombre }} {{ p.apellido }}</div>
           <div class="pdv__item-meta">
             <span class="pdv__dni">{{ p.dni ?? p.numero_documento ?? '—' }}</span>
-            <span class="pdv__reprocann" :class="reprocannClass(p)">{{ reprocannLabel(p) }}</span>
+            <span v-if="p.ultima_dispensacion" class="pdv__ultima">
+              última: {{ formatFecha(p.ultima_dispensacion) }}
+            </span>
           </div>
         </div>
         <ChevronRight :size="16" :stroke-width="1.75" class="pdv__item-arrow" />
@@ -56,10 +65,6 @@
               <div class="pdv__drawer-row">
                 <span class="pdv__drawer-label">DNI</span>
                 <span class="pdv__drawer-value">{{ selected?.dni ?? selected?.numero_documento ?? '—' }}</span>
-              </div>
-              <div class="pdv__drawer-row">
-                <span class="pdv__drawer-label">REPROCANN</span>
-                <span class="pdv__reprocann" :class="reprocannClass(selected)">{{ reprocannLabel(selected) }}</span>
               </div>
               <div class="pdv__drawer-row">
                 <span class="pdv__drawer-label">Teléfono</span>
@@ -96,31 +101,38 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { listPacientes, listDispensaciones } from '../lib/api.js'
 import { Search, ChevronRight, X } from 'lucide-vue-next'
 
 const query   = ref('')
 const loading  = ref(false)
 const pacientes = ref([])
+const total     = ref(0)
 
 const drawerOpen      = ref(false)
 const selected        = ref(null)
 const historial       = ref([])
 const loadingHistorial = ref(false)
 
+// El listado se carga SOLO, sin pedir que busques primero. El dispensador no siempre sabe cómo se
+// escribe el apellido, y una pantalla que arranca vacía lo obliga a adivinar antes de ver nada.
 let searchTimeout = null
 watch(query, (val) => {
   clearTimeout(searchTimeout)
-  if (!val.trim()) { pacientes.value = []; return }
   searchTimeout = setTimeout(() => buscar(val.trim()), 300)
 })
+
+onMounted(() => buscar(''))
 
 async function buscar(q) {
   loading.value = true
   try {
-    const { data } = await listPacientes({ query: q, limite: 30 })
+    const params = { limite: 100, orden: 'apellido', dir: 'asc' }
+    if (q) params.query = q
+    const { data } = await listPacientes(params)
     pacientes.value = data.data ?? []
+    total.value     = data.meta?.total ?? pacientes.value.length
   } catch {
     pacientes.value = []
   } finally {
@@ -146,22 +158,6 @@ async function abrirDrawer(p) {
 function parseDate(d) {
   if (!d) return null
   return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : new Date(d)
-}
-function reprocannStatus(p) {
-  if (!p?.reprocann_vencimiento) return 'sin'
-  return parseDate(p.reprocann_vencimiento) >= new Date() ? 'vigente' : 'vencido'
-}
-function reprocannClass(p) {
-  const s = reprocannStatus(p)
-  if (s === 'vigente') return 'pdv__reprocann--green'
-  if (s === 'vencido') return 'pdv__reprocann--amber'
-  return 'pdv__reprocann--gray'
-}
-function reprocannLabel(p) {
-  const s = reprocannStatus(p)
-  if (s === 'vigente') return 'REPROCANN ✓'
-  if (s === 'vencido') return 'REPROCANN venc.'
-  return 'Sin REPROCANN'
 }
 function formatFecha(f) {
   if (!f) return '—'
@@ -219,17 +215,15 @@ function formaLabel(f) {
 .pdv__item-main { flex: 1; }
 .pdv__item-name { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
 .pdv__item-meta { display: flex; align-items: center; gap: var(--sp-2); margin-top: 2px; }
+.pdv__ultima { font-size: .72rem; color: var(--c-ink-400, #94a3b8); }
+.pdv__count {
+  font-size: .78rem; font-weight: 600; color: var(--c-ink-500, #64748b);
+  background: var(--c-ink-100, #f1f5f9); padding: .1em .5em; border-radius: 999px; margin-left: .4em;
+}
 .pdv__dni { font-family: var(--font-mono); font-size: var(--fs-12); color: var(--c-ink-500); }
 .pdv__item-arrow { color: var(--c-ink-300); flex-shrink: 0; }
 
 /* REPROCANN badges */
-.pdv__reprocann {
-  font-size: 10px; font-weight: 700;
-  padding: 1px 6px; border-radius: var(--r-pill);
-  text-transform: uppercase; letter-spacing: .03em;
-}
-.pdv__reprocann--green { background: #d1fae5; color: #065f46; }
-.pdv__reprocann--amber { background: var(--c-amber-100); color: var(--c-amber-500); }
 .pdv__reprocann--gray  { background: var(--c-ink-100); color: var(--c-ink-500); }
 
 /* Drawer */

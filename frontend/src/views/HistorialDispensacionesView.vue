@@ -487,10 +487,13 @@ const FORMAS = [
                     {{ formaLabel(itemsDe(d)[0]?.stock?.forma_producto) }}<template v-if="itemsDe(d)[0]?.genetica_nombre"> · {{ itemsDe(d)[0].genetica_nombre }}</template> · {{ itemsDe(d)[0]?.cantidad }}{{ itemsDe(d)[0]?.stock?.unidad || 'g' }}
                     <span v-if="itemsDe(d)[0]?.stock?.externo" class="hd__ext-badge hd__ext-badge--sm" title="Stock externo (sin lote de cultivo)">externo</span>
                   </span>
-                  <span v-else class="hd__prod-multi" :title="itemsTitle(d)">
+                  <!-- La flecha DESPLIEGA el detalle acá mismo. Antes era decorativa y la fila
+                       entera abría la dispensa: el gesto de "ver más" disparaba una navegación. -->
+                  <button v-else class="hd__prod-multi" :class="{ 'hd__prod-multi--open': abiertos.has(d.id) }"
+                          :title="itemsTitle(d)" @click.stop="alternarDetalle(d.id)">
                     <ChevronRight :size="13" :stroke-width="2.5" class="hd__chev" />
                     {{ itemsDe(d).length }} productos
-                  </span>
+                  </button>
                 </td>
                 <td class="hd__td-num">
                   <span v-if="descuentoPct(d)" class="hd__desc-badge" :title="descuentoTitle(d)">-{{ descuentoPct(d) }}%</span>
@@ -516,6 +519,22 @@ const FORMAS = [
                   <button v-if="canDelete" class="hd__action-btn hd__action-btn--danger" @click="handleDelete(d)" title="Eliminar">
                     <Trash2 :size="13" :stroke-width="2" />
                   </button>
+                </td>
+              </tr>
+
+              <!-- Detalle desplegado: el desglose línea por línea, sin salir del listado. -->
+              <tr v-if="abiertos.has(d.id)" class="hd__tr-detalle">
+                <td :colspan="colspanDetalle">
+                  <div class="hd__detalle">
+                    <div v-for="(it, i) in itemsDe(d)" :key="i" class="hd__detalle-item">
+                      <span class="hd__detalle-prod">
+                        {{ formaLabel(it.stock?.forma_producto) }}
+                        <template v-if="it.genetica_nombre"> · {{ it.genetica_nombre }}</template>
+                      </span>
+                      <span class="hd__detalle-cant">{{ it.cantidad }}{{ it.stock?.unidad || 'g' }}</span>
+                      <span class="hd__detalle-monto">{{ formatARS(it.subtotal_ars ?? it.precio_unitario_ars) }}</span>
+                    </div>
+                  </div>
                 </td>
               </tr>
             </template>
@@ -939,4 +958,22 @@ const FORMAS = [
 }
 .hd__table tr:hover .hd__btn-filter-socio { opacity: 1; }
 .hd__btn-filter-socio:hover { color: #1b5e20; }
+</style>
+
+<style scoped>
+.hd__prod-multi {
+  background: none; border: none; padding: 0; cursor: pointer; font: inherit;
+  color: inherit; display: inline-flex; align-items: center; gap: .25rem;
+}
+.hd__prod-multi:hover { color: var(--c-leaf-700, #15803d); }
+.hd__prod-multi--open .hd__chev { transform: rotate(90deg); }
+.hd__chev { transition: transform .15s; }
+.hd__tr-detalle > td { background: var(--c-ink-50, #f8fafc); padding: 0; }
+.hd__detalle { padding: .5rem .9rem; display: flex; flex-direction: column; gap: .3rem; }
+.hd__detalle-item {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 1rem;
+  font-size: .8rem; color: var(--c-ink-600, #475569);
+}
+.hd__detalle-cant  { font-variant-numeric: tabular-nums; }
+.hd__detalle-monto { font-variant-numeric: tabular-nums; font-weight: 600; }
 </style>

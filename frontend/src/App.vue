@@ -777,6 +777,13 @@ onMounted(async () => {
 }
 .dpv-main {
   flex: 1;
+  min-width: 0;
+}
+/* Centrado a nivel layout, igual que .med-main y .mnc-main. El dispensador era el único rol con
+   sidebar que no lo tenía: en pantalla ancha su contenido quedaba pegado al borde izquierdo. */
+.dpv-main > * {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 /* Drawer overlay (mobile <1024px) */
