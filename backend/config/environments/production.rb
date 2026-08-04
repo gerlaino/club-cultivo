@@ -39,10 +39,16 @@ Rails.application.configure do
   # Mount Action Cable outside main process or domain.
   # config.action_cable.mount_path = nil
   # config.action_cable.url = "wss://example.com/cable"
+  # El host de Render se SUMA, no se reemplaza. Con `ENV.fetch(..., default)` el default solo
+  # aplicaba si FRONTEND_URL estaba vacío: al configurar el dominio propio, el host viejo dejaba de
+  # estar permitido y el tiempo real (stock, ambiente, alertas) se caía en silencio para quien
+  # todavía entrara por ahí — justo durante la transición, que es cuando conviven los dos.
   config.action_cable.allowed_request_origins = [
-    ENV.fetch('FRONTEND_URL', 'https://club-cultivo-1.onrender.com'),
+    'https://club-cultivo-1.onrender.com',
+    ENV['FRONTEND_URL'],
+    *ENV['EXTRA_CORS_ORIGINS'].to_s.split(',').map(&:strip),
     /https?:\/\/localhost(:\d+)?/,
-  ]
+  ].compact.reject { |o| o.respond_to?(:blank?) && o.blank? }
 
   # Assume all access to the app is happening through a SSL-terminating reverse proxy.
   # Can be used together with config.force_ssl for Strict-Transport-Security and secure cookies.
