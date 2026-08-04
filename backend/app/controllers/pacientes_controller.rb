@@ -80,6 +80,16 @@ class PacientesController < ApplicationController
     }
   end
 
+  # GET /pacientes/por_carnet/:token
+  # Escanear el carnet del paciente en el mostrador: devuelve a quién pertenece, dentro del club.
+  # Un token de otro club no resuelve — el scope ya lo impide.
+  def por_carnet
+    paciente = policy_scope(Paciente).find_by(carnet_token: params[:token])
+    return render json: { error: 'Carnet no encontrado' }, status: :not_found unless paciente
+
+    render json: { data: paciente.as_json(only: campos_visibles, methods: [:nombre_completo]) }
+  end
+
   def show
     authorize @paciente
 

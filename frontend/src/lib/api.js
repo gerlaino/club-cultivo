@@ -153,6 +153,8 @@ export const uploadClubLogo    = (file) => {
 };
 
 // -------- PACIENTES --------
+// Resolver el carnet escaneado a su paciente (autenticado, dentro del club).
+export const getPacientePorCarnet = (token) => api.get(`/pacientes/por_carnet/${token}`)
 export const listPacientes         = (params = {}) => api.get("/pacientes", { params });
 export const getPacientesCriticos  = () => api.get("/pacientes/criticos");
 export const getPaciente           = (id) => api.get(`/pacientes/${id}`);

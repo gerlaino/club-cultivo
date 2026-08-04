@@ -80,6 +80,14 @@ function navegarA(texto) {
   if (!destino) { mensaje.value = 'QR no reconocido'; estado.value = 'error'; return }
   navegado = true
   detener()
+
+  // Un CARNET escaneado desde el mostrador no lleva a la página pública del carnet: lleva al
+  // paciente, listo para dispensarle. La página pública es para el socio, no para quien atiende.
+  const carnet = destino.match(/^\/c\/(.+)$/)
+  if (carnet && useAuthStore().user?.role === 'dispensador') {
+    router.replace(`/m/dispensar?carnet=${encodeURIComponent(carnet[1])}`)
+    return
+  }
   router.push(destino)
 }
 

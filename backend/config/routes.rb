@@ -192,6 +192,9 @@ Rails.application.routes.draw do
       collection do
         get :export_csv
         get :criticos
+        # Resolver el carnet escaneado a su paciente. El endpoint público (/c/:token) devuelve el
+        # carnet anonimizado a propósito; el dispensador está autenticado y necesita la ficha.
+        get 'por_carnet/:token', action: :por_carnet
       end
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]

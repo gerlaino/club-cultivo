@@ -56,4 +56,38 @@ RSpec.describe 'Pacientes — lo que ve el dispensador', type: :request do
       expect(fila['reprocann_estado_efectivo']).to be_present
     end
   end
+  # Escanear el carnet en el mostrador tiene que traer AL PACIENTE, no la página pública del
+  # carnet: esa es para el socio, no para quien atiende.
+  describe 'escanear el carnet' do
+    before { sign_in_as(create(:user, club: club, role: 'dispensador')) }
+
+    it 'resuelve el token a su paciente' do
+      get "/api/pacientes/por_carnet/#{paciente.carnet_token}"
+
+      expect(response).to have_http_status(:ok)
+      data = JSON.parse(response.body)['data']
+      expect(data['id']).to eq(paciente.id)
+      expect(data['nombre']).to eq('Ana')
+      # Sigue sin ver REPROCANN: escanear no es una puerta de atrás a lo que no le corresponde.
+      expect(data).not_to have_key('reprocann_estado')
+    end
+
+    it 'no resuelve el carnet de un paciente de otro club' do
+      ajeno = ActsAsTenant.without_tenant do
+        otro = create(:club)
+        ActsAsTenant.with_tenant(otro) do
+          create(:paciente, club: otro, created_by: create(:user, :admin, club: otro))
+        end
+      end
+
+      get "/api/pacientes/por_carnet/#{ajeno.carnet_token}"
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it 'avisa si el token no existe' do
+      get '/api/pacientes/por_carnet/inventado-123'
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
 end

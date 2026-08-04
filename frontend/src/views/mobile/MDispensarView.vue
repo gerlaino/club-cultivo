@@ -10,7 +10,7 @@
         placeholder="Nombre o DNI…"
         autocomplete="off"
       />
-      <button class="mdis__scan" title="Escanear carnet" @click="router.push('/m/scan')">
+      <button class="mdis__scan" title="Escanear el carnet del paciente" @click="router.push('/m/scan')">
         <i class="bi bi-qr-code-scan"></i>
       </button>
     </div>
@@ -92,14 +92,15 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { listPacientes, getPaciente, listDispensaciones } from '../../lib/api.js'
+import { useRouter, useRoute } from 'vue-router'
+import { listPacientes, getPaciente, listDispensaciones, getPacientePorCarnet } from '../../lib/api.js'
 import { formaLabel, formatARS } from '../../lib/formatters.js'
 import SheetBottom from '../../components/cultivador/SheetBottom.vue'
 import ModalNuevaDispensacion from '../../components/pacientes/ModalNuevaDispensacion.vue'
 import { useToast } from '../../composables/useToast.js'
 
 const router = useRouter()
+const route  = useRoute()
 const toast  = useToast()
 
 const query     = ref('')
@@ -117,7 +118,25 @@ const saldoNegativo = computed(() => Number(ficha.value?.saldo_cc ?? 0) < 0)
 
 let t = null
 watch(query, () => { clearTimeout(t); t = setTimeout(buscar, 300) })
-onMounted(() => { buscar(); inputBuscar.value?.focus() })
+onMounted(() => {
+  buscar()
+  // Si se llegó escaneando un carnet, se abre esa ficha directo: el que escanea ya tiene a la
+  // persona enfrente y no debería volver a buscarla en la lista.
+  if (route.query.carnet) abrirPorCarnet(String(route.query.carnet))
+  else inputBuscar.value?.focus()
+})
+
+async function abrirPorCarnet(token) {
+  try {
+    const { data } = await getPacientePorCarnet(token)
+    const p = data.data ?? data
+    if (p?.id) { await abrir(p); return }
+  } catch {
+    toast.error('Ese carnet no es de este club')
+  }
+  // La URL se limpia igual: si se recarga la pantalla, no vuelve a abrir la misma ficha sola.
+  router.replace('/m/dispensar')
+}
 
 async function buscar() {
   loading.value = true
