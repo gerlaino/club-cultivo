@@ -177,9 +177,16 @@ module Clubs
 
     def copiar_plants(club, datos)
       datos[:plants].each do |p|
+        lote_destino = @map[:lotes][p.lote_id]
+        next unless lote_destino   # planta de un lote que no viajó: no se copia huérfana
+
         attrs = clonar_attrs(p, salvo: %w[club_id lote_id codigo_qr qr_token])
-        nueva = Plant.new(attrs.merge('club_id' => club.id, 'lote_id' => @map[:lotes][p.lote_id],
-                                      'codigo_qr' => nil))
+        nueva = Plant.new(attrs.merge('club_id' => club.id, 'lote_id' => lote_destino))
+        # El QR se arma acá y NO se deja al callback del modelo. `Plant#generate_codigo_qr` hace
+        # `lote.club_id`, y el `default_scope` de Lote esconde los soft-deleted: para las plantas de
+        # un lote borrado la asociación devuelve nil y el callback explota. Además, generarlo acá
+        # evita depender de que la asociación esté cargada.
+        nueva.codigo_qr = "#{club.id}-#{lote_destino}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"
         nueva.qr_token = nil if nueva.respond_to?(:qr_token=)
         nueva.save!(validate: false)
         @map[:plants][p.id] = nueva.id
@@ -213,8 +220,9 @@ module Clubs
 
     def copiar_plant_activities(datos)
       datos[:activities].each do |a|
-        attrs = clonar_attrs(a, salvo: %w[plant_id user_id])
-                  .merge('plant_id' => @map[:plants][a.plant_id])
+        destino = @map[:plants][a.plant_id]
+        next unless destino
+        attrs = clonar_attrs(a, salvo: %w[plant_id user_id]).merge('plant_id' => destino)
         attrs['user_id'] = @admin.id if a.respond_to?(:user_id)
         PlantActivity.new(attrs).save!(validate: false)
         @resumen[:actividades] += 1
@@ -223,9 +231,11 @@ module Clubs
 
     def copiar_registros_ambientales(club, datos)
       datos[:registros].each do |r|
+        destino = @map[:lotes][r.lote_id]
+        next unless destino
         nuevo = RegistroAmbiental.new(clonar_attrs(r, salvo: %w[club_id lote_id user_id])
                                         .merge('club_id' => club.id,
-                                               'lote_id' => @map[:lotes][r.lote_id],
+                                               'lote_id' => destino,
                                                'user_id' => @admin.id))
         # Sin el callback: las lecturas se copian tal cual del origen, con su sala y su fecha. Si se
         # dejara propagar, se generarían de nuevo con la fecha de hoy y la sala actual.
@@ -252,8 +262,10 @@ module Clubs
 
     def copiar_pesadas(datos)
       datos[:pesadas].each do |p|
+        destino = @map[:lotes][p.lote_id]
+        next unless destino
         nueva = Pesada.new(clonar_attrs(p, salvo: %w[lote_id registrado_por_id])
-                             .merge('lote_id' => @map[:lotes][p.lote_id],
+                             .merge('lote_id' => destino,
                                     'registrado_por_id' => @admin.id))
         nueva.save!(validate: false)
         @map[:pesadas][p.id] = nueva.id
@@ -263,9 +275,11 @@ module Clubs
 
     def copiar_pesajes_manicura(club, datos)
       datos[:pesajes].each do |p|
+        destino = @map[:lotes][p.lote_id]
+        next unless destino
         nuevo = PesajeManicura.new(clonar_attrs(p, salvo: %w[club_id lote_id manicurador_id confirmado_por_id])
                                      .merge('club_id' => club.id,
-                                            'lote_id' => @map[:lotes][p.lote_id],
+                                            'lote_id' => destino,
                                             'manicurador_id' => @admin.id,
                                             'confirmado_por_id' => @admin.id))
         nuevo.save!(validate: false)
@@ -275,6 +289,9 @@ module Clubs
 
     def copiar_stocks(club, datos)
       datos[:stocks].each do |s|
+        # `lote_id` puede ser nil de verdad (stock de compra externa); lo que se saltea es el que
+        # apuntaba a un lote que no viajó.
+        next if s.lote_id.present? && @map[:lotes][s.lote_id].blank?
         attrs = clonar_attrs(s, salvo: %w[club_id lote_id sede_id codigo_qr])
                   .merge('club_id' => club.id,
                          'lote_id' => @map[:lotes][s.lote_id],

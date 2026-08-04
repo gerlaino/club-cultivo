@@ -90,6 +90,29 @@ RSpec.describe Clubs::Clonar do
     end
   end
 
+  # Reventó en producción: `Plant#generate_codigo_qr` hace `lote.club_id`, y el `default_scope` de
+  # Lote esconde los soft-deleted, así que para las plantas de un lote borrado la asociación devuelve
+  # nil y el callback explota. El clon arma el QR él mismo en vez de depender de ese callback.
+  it 'copia también las plantas de un lote borrado' do
+    ActsAsTenant.with_tenant(origen) do
+      borrado = create(:lote, club: origen, sala: sala, estado: 'vegetativo',
+                              codigo: 'L-26-099', tamanio_maceta: 3, start_date: 20.days.ago.to_date)
+      create(:plant, lote: borrado, club: origen, state: 'vegetativo', nombre: 'PB1')
+      borrado.update_column(:deleted_at, Time.current)
+    end
+
+    nuevo = clonar.club
+
+    ActsAsTenant.with_tenant(nuevo) do
+      # El lote borrado viaja borrado, con su planta y con QR propio.
+      copia = Lote.unscoped.where(club_id: nuevo.id).where.not(deleted_at: nil).first
+      expect(copia).to be_present
+      planta = Plant.unscoped.where(lote_id: copia.id).first
+      expect(planta).to be_present
+      expect(planta.codigo_qr).to be_present
+    end
+  end
+
   it 'no se lleva lo que no es cultivo' do
     ActsAsTenant.with_tenant(origen) do
       create(:paciente, club: origen)

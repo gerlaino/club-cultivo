@@ -65,7 +65,15 @@ class Plant < ApplicationRecord
     self.club_id ||= lote&.club_id
   end
 
+  # Dos guardas que faltaban:
+  #
+  # - Si ya viene un código, se respeta. Antes lo pisaba siempre, así que quien necesitara asignarlo
+  #   a mano (una copia entre clubes, una importación) no podía.
+  # - `lote` puede ser nil aunque `lote_id` esté puesto: el `default_scope` de Lote esconde los
+  #   soft-deleted, y para una planta de un lote borrado la asociación devuelve nil. Se usan las
+  #   columnas propias, que siempre están.
   def generate_codigo_qr
-    self.codigo_qr = "#{lote.club_id}-#{lote.id}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"
+    return if codigo_qr.present?
+    self.codigo_qr = "#{club_id || lote&.club_id}-#{lote_id}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"
   end
 end
