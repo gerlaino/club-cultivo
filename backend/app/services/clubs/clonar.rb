@@ -117,34 +117,56 @@ module Clubs
       registro.attributes.except('id', 'created_at', 'updated_at', 'deleted_by_id', *salvo)
     end
 
+    # Escribe la fila SIN CALLBACKS ni validaciones, y devuelve el id nuevo.
+    #
+    # Es la pieza central de este service, y no es una optimización: los callbacks de estos modelos
+    # están hechos para datos NUEVOS —propagar una lectura ambiental, generar un QR, disparar un
+    # webhook de avance de fase— y acá se está copiando HISTORIA, donde ninguno corresponde. Peor:
+    # varios resuelven el club o la sala a través de una asociación (`lote.sala_id`), y el
+    # `default_scope` de Lote/Plant/Sala esconde los soft-deleted, así que para cualquier hijo de un
+    # padre borrado la asociación devuelve nil y el callback explota. Un solo lote borrado con
+    # plantas tumbaba la copia entera.
+    #
+    # Las validaciones tampoco aplican: son datos que ya existen y las reglas de hoy no son
+    # necesariamente las de cuando se crearon.
+    def insertar(modelo, attrs)
+      ahora = Time.current
+      fila  = attrs.merge('created_at' => ahora, 'updated_at' => ahora)
+      # Solo columnas reales: un atributo de más hace fallar el INSERT.
+      fila  = fila.slice(*modelo.column_names)
+      id    = modelo.insert!(fila, returning: %w[id]).first['id']
+
+      # `insert!` aplica el `default_scope` del modelo COMO VALOR por defecto, así que en los que
+      # tienen `default_scope { where(deleted_at: nil) }` (Lote, Plant, Sala, Sede, Genetica) pisa el
+      # `deleted_at` con nil y un registro borrado revivía en la copia. Se repone aparte.
+      borrado = fila['deleted_at']
+      modelo.unscoped.where(id: id).update_all(deleted_at: borrado) if borrado.present?
+      id
+    end
+
     def copiar_sedes(club, datos)
       datos[:sedes].each do |s|
-        nueva = Sede.new(clonar_attrs(s, salvo: %w[club_id created_by_id])
-                           .merge('club_id' => club.id, 'created_by_id' => @admin.id))
-        nueva.save!(validate: false)
-        @map[:sedes][s.id] = nueva.id
+        @map[:sedes][s.id] = insertar(Sede, clonar_attrs(s, salvo: %w[club_id created_by_id])
+                                              .merge('club_id' => club.id, 'created_by_id' => @admin.id))
         @resumen[:sedes] += 1
       end
     end
 
     def copiar_salas(club, datos)
       datos[:salas].each do |s|
-        nueva = Sala.new(clonar_attrs(s, salvo: %w[club_id sede_id created_by_id responsable_id])
-                           .merge('club_id' => club.id,
-                                  'sede_id' => @map[:sedes][s.sede_id],
-                                  'created_by_id' => @admin.id,
-                                  'responsable_id' => nil))
-        nueva.save!(validate: false)
-        @map[:salas][s.id] = nueva.id
+        @map[:salas][s.id] = insertar(Sala, clonar_attrs(s, salvo: %w[club_id sede_id created_by_id responsable_id])
+                                              .merge('club_id' => club.id,
+                                                     'sede_id' => @map[:sedes][s.sede_id],
+                                                     'created_by_id' => @admin.id,
+                                                     'responsable_id' => nil))
         @resumen[:salas] += 1
       end
     end
 
     def copiar_geneticas(club, datos)
       datos[:geneticas].each do |g|
-        nueva = Genetica.new(clonar_attrs(g, salvo: %w[club_id]).merge('club_id' => club.id))
-        nueva.save!(validate: false)
-        @map[:geneticas][g.id] = nueva.id
+        @map[:geneticas][g.id] = insertar(Genetica, clonar_attrs(g, salvo: %w[club_id])
+                                                      .merge('club_id' => club.id))
         @resumen[:geneticas] += 1
       end
     end
@@ -153,7 +175,7 @@ module Clubs
       datos[:lotes].each do |l|
         attrs = clonar_attrs(l, salvo: %w[club_id sala_id sede_id genetica_id manicurador_id
                                           planta_madre_id lote_origen_id codigo_qr codigo_qr_cosecha])
-        nuevo = Lote.new(attrs.merge(
+        nuevo = attrs.merge(
           'club_id'     => club.id,
           'sala_id'     => @map[:salas][l.sala_id],
           'sede_id'     => @map[:sedes][l.sede_id],
@@ -163,10 +185,11 @@ module Clubs
           'manicurador_id'  => nil,
           'planta_madre_id' => nil,
           'lote_origen_id'  => nil,
-        ))
-        # codigo_qr: los genera el before_create al estar en blanco. Son únicos a nivel base.
-        nuevo.save!(validate: false)   # los lotes viejos pueden no cumplir validaciones de hoy
-        @map[:lotes][l.id] = nuevo.id
+        )
+        # Los QR se arman acá: sin callbacks nadie los genera, y son únicos A NIVEL BASE.
+        nuevo['codigo_qr'] = "L-#{club.id}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"
+        nuevo['codigo_qr_cosecha'] = l.codigo_qr_cosecha.present? ? "C-#{club.id}-#{SecureRandom.hex(6)}" : nil
+        @map[:lotes][l.id] = insertar(Lote, nuevo)
         @resumen[:lotes] += 1
       end
       # `lote_origen_id` (desprendimientos) recién se puede resolver con todos los lotes creados.
@@ -181,15 +204,10 @@ module Clubs
         next unless lote_destino   # planta de un lote que no viajó: no se copia huérfana
 
         attrs = clonar_attrs(p, salvo: %w[club_id lote_id codigo_qr qr_token])
-        nueva = Plant.new(attrs.merge('club_id' => club.id, 'lote_id' => lote_destino))
-        # El QR se arma acá y NO se deja al callback del modelo. `Plant#generate_codigo_qr` hace
-        # `lote.club_id`, y el `default_scope` de Lote esconde los soft-deleted: para las plantas de
-        # un lote borrado la asociación devuelve nil y el callback explota. Además, generarlo acá
-        # evita depender de que la asociación esté cargada.
-        nueva.codigo_qr = "#{club.id}-#{lote_destino}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"
-        nueva.qr_token = nil if nueva.respond_to?(:qr_token=)
-        nueva.save!(validate: false)
-        @map[:plants][p.id] = nueva.id
+                  .merge('club_id' => club.id, 'lote_id' => lote_destino,
+                         'codigo_qr' => "#{club.id}-#{lote_destino}-#{Time.now.to_i}-#{SecureRandom.hex(4)}")
+        attrs['qr_token'] = nil if Plant.column_names.include?('qr_token')
+        @map[:plants][p.id] = insertar(Plant, attrs)
         @resumen[:plantas] += 1
       end
     end
@@ -207,13 +225,12 @@ module Clubs
       datos[:eventos].each do |e|
         destino = @map[:lotes][e.lote_id]
         next unless destino
-        ev = LoteEvento.new(clonar_attrs(e, salvo: %w[club_id lote_id user_id sala_origen_id sala_destino_id])
-                              .merge('club_id' => club.id,
-                                     'lote_id' => destino,
-                                     'user_id' => @admin.id,
-                                     'sala_origen_id'  => @map[:salas][e.sala_origen_id],
-                                     'sala_destino_id' => @map[:salas][e.sala_destino_id]))
-        ev.save!(validate: false)
+        insertar(LoteEvento, clonar_attrs(e, salvo: %w[club_id lote_id user_id sala_origen_id sala_destino_id])
+                               .merge('club_id' => club.id,
+                                      'lote_id' => destino,
+                                      'user_id' => @admin.id,
+                                      'sala_origen_id'  => @map[:salas][e.sala_origen_id],
+                                      'sala_destino_id' => @map[:salas][e.sala_destino_id]))
         @resumen[:eventos] += 1
       end
     end
@@ -223,8 +240,8 @@ module Clubs
         destino = @map[:plants][a.plant_id]
         next unless destino
         attrs = clonar_attrs(a, salvo: %w[plant_id user_id]).merge('plant_id' => destino)
-        attrs['user_id'] = @admin.id if a.respond_to?(:user_id)
-        PlantActivity.new(attrs).save!(validate: false)
+        attrs['user_id'] = @admin.id if PlantActivity.column_names.include?('user_id')
+        insertar(PlantActivity, attrs)
         @resumen[:actividades] += 1
       end
     end
@@ -233,13 +250,12 @@ module Clubs
       datos[:registros].each do |r|
         destino = @map[:lotes][r.lote_id]
         next unless destino
-        nuevo = RegistroAmbiental.new(clonar_attrs(r, salvo: %w[club_id lote_id user_id])
-                                        .merge('club_id' => club.id,
-                                               'lote_id' => destino,
-                                               'user_id' => @admin.id))
-        # Sin el callback: las lecturas se copian tal cual del origen, con su sala y su fecha. Si se
-        # dejara propagar, se generarían de nuevo con la fecha de hoy y la sala actual.
-        nuevo.save!(validate: false)
+        # Sin el callback de propagación: las lecturas ambientales se copian aparte, tal cual del
+        # origen, con su sala y su fecha. Propagando se regenerarían con la sala de HOY.
+        insertar(RegistroAmbiental, clonar_attrs(r, salvo: %w[club_id lote_id user_id])
+                                      .merge('club_id' => club.id,
+                                             'lote_id' => destino,
+                                             'user_id' => @admin.id))
         @resumen[:registros_ambientales] += 1
       end
     end
@@ -255,7 +271,7 @@ module Clubs
                          # de apuntar a un id ajeno.
                          'origen_record_id' => nil)
         next unless attrs['sala_id']
-        LecturaAmbiental.new(attrs).save!(validate: false)
+        insertar(LecturaAmbiental, attrs)
         @resumen[:lecturas] += 1
       end
     end
@@ -264,11 +280,9 @@ module Clubs
       datos[:pesadas].each do |p|
         destino = @map[:lotes][p.lote_id]
         next unless destino
-        nueva = Pesada.new(clonar_attrs(p, salvo: %w[lote_id registrado_por_id])
-                             .merge('lote_id' => destino,
-                                    'registrado_por_id' => @admin.id))
-        nueva.save!(validate: false)
-        @map[:pesadas][p.id] = nueva.id
+        @map[:pesadas][p.id] = insertar(Pesada, clonar_attrs(p, salvo: %w[lote_id registrado_por_id])
+                                                  .merge('lote_id' => destino,
+                                                         'registrado_por_id' => @admin.id))
         @resumen[:pesadas] += 1
       end
     end
@@ -277,12 +291,11 @@ module Clubs
       datos[:pesajes].each do |p|
         destino = @map[:lotes][p.lote_id]
         next unless destino
-        nuevo = PesajeManicura.new(clonar_attrs(p, salvo: %w[club_id lote_id manicurador_id confirmado_por_id])
-                                     .merge('club_id' => club.id,
-                                            'lote_id' => destino,
-                                            'manicurador_id' => @admin.id,
-                                            'confirmado_por_id' => @admin.id))
-        nuevo.save!(validate: false)
+        insertar(PesajeManicura, clonar_attrs(p, salvo: %w[club_id lote_id manicurador_id confirmado_por_id])
+                                   .merge('club_id' => club.id,
+                                          'lote_id' => destino,
+                                          'manicurador_id' => @admin.id,
+                                          'confirmado_por_id' => @admin.id))
         @resumen[:pesajes_manicura] += 1
       end
     end
@@ -296,9 +309,8 @@ module Clubs
                   .merge('club_id' => club.id,
                          'lote_id' => @map[:lotes][s.lote_id],
                          'sede_id' => @map[:sedes][s.sede_id],
-                         'codigo_qr' => nil)
-        nuevo = Stock.new(attrs)
-        nuevo.save!(validate: false)
+                         'codigo_qr' => "S-#{club.id}-#{Time.now.to_i}-#{SecureRandom.hex(4)}")
+        insertar(Stock, attrs)
         @resumen[:stocks] += 1
       end
     end

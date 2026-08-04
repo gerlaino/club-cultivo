@@ -136,7 +136,7 @@ RSpec.describe Clubs::Clonar do
   end
 
   it 'si algo falla no deja un club a medio copiar' do
-    allow(Plant).to receive(:new).and_raise(ActiveRecord::StatementInvalid, 'boom')
+    allow(Plant).to receive(:insert!).and_raise(ActiveRecord::StatementInvalid, 'boom')
 
     expect { clonar }.to raise_error(ActiveRecord::StatementInvalid)
     expect(Club.unscoped.where(name: 'Mitocondria 2')).to be_empty
