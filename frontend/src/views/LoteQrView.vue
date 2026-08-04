@@ -7,6 +7,11 @@ import { getLotePorQR } from '../lib/api.js'
 
 const route  = useRoute()
 const router = useRouter()
+
+// Dentro de la PWA el destino es la ficha MOBILE: `/lotes/:id` está fuera del prefijo /m y el guard
+// lo rebota al home del rol, así que escanear un lote terminaba en la lista de sedes.
+const { isPWA } = usePWA()
+const rutaLote = (id) => (isPWA() ? `/m/lote-m/${id}` : `/lotes/${id}`)
 const auth   = useAuthStore()
 const toast  = useToast()
 
@@ -25,7 +30,7 @@ onMounted(async () => {
 
     if (role === 'cultivador') {
       if (ESTADOS_CULTIVADOR.includes(estado)) {
-        router.replace(`/lotes/${id}`)
+        router.replace(rutaLote(id))
       } else {
         error.value = {
           icon: '🌿',
@@ -38,7 +43,7 @@ onMounted(async () => {
 
     if (role === 'manicura') {
       if (ESTADOS_MANICURA.includes(estado)) {
-        router.replace(`/lotes/${id}`)
+        router.replace(rutaLote(id))
       } else {
         error.value = {
           icon: '✂️',
@@ -50,7 +55,7 @@ onMounted(async () => {
     }
 
     // Admin, supervisor: acceso libre
-    router.replace(`/lotes/${id}`)
+    router.replace(rutaLote(id))
 
   } catch (e) {
     if (e?.response?.status === 404) {

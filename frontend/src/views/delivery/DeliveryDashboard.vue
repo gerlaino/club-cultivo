@@ -2,11 +2,14 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send, Route, Navigation, PenLine, Trash2, Lock } from 'lucide-vue-next'
-import { getMisPaquetes, iniciarViaje, entregarPaquete, reportarFallo, ordenarRuta } from '../../lib/api.js'
+import { getMisPaquetes, iniciarViaje, ordenarRuta } from '../../lib/api.js'
+import { useEntregasOffline } from '../../composables/useEntregasOffline.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 
 const toast    = useToast()
+// Cola offline: la entrega se guarda en el dispositivo si no hay señal y se manda sola después.
+const { pendientes: entregasPendientes, entregarConReintento, fallaConReintento } = useEntregasOffline()
 const auth     = useAuthStore()
 const paquetes = ref([])
 const loading  = ref(true)
@@ -253,23 +256,30 @@ function abrirFallo(p) {
   motivoFallo.value = ''
 }
 
+let entregaEncolada = false
 async function confirmarEntrega() {
   saving.value = true
+  entregaEncolada = false
   try {
-    await entregarPaquete(modalEntregar.value.id, {
+    // Con reintento: el repartidor entrega en sótanos y ascensores. Si el POST falla por red, la
+    // entrega —con su firma— queda guardada en el dispositivo y se manda sola al volver la señal.
+    // Volver a pedir la firma no es opción: la persona ya se fue.
+    const res = await entregarConReintento(modalEntregar.value.id, {
       notasEntrega:       notasEntrega.value,
       firmaData:          firmaData.value,
       cobros:             lineasCobroEntrega(),
       comprobante:        comprobanteFile.value,
       comprobanteEntrega: comprobanteEntregaFile.value,
     })
+    entregaEncolada = res.encolado
     modalEntregar.value = null
     firmaData.value     = null
     firmaActiva.value   = false
     clearComprobante()
     clearComprobanteEntrega()
     await load()
-    toast.success('Entrega registrada')
+    if (entregaEncolada) toast.warning('Entrega guardada sin señal — se envía sola al recuperar conexión')
+    else                 toast.success('Entrega registrada')
   } catch (e) {
     toast.error(e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al registrar entrega')
   }
@@ -283,10 +293,11 @@ async function confirmarFallo() {
   }
   saving.value = true
   try {
-    await reportarFallo(modalFallo.value.id, motivoFallo.value.trim())
+    const res = await fallaConReintento(modalFallo.value.id, motivoFallo.value.trim())
     modalFallo.value = null
     await load()
-    toast.success('Problema reportado')
+    if (res.encolado) toast.warning('Guardado sin señal — se envía solo al recuperar conexión')
+    else              toast.success('Problema reportado')
   } catch { toast.error('Error al reportar') }
   finally { saving.value = false }
 }
@@ -300,6 +311,17 @@ onMounted(load)
 
 <template>
   <div class="dlv">
+
+    <!-- Entregas guardadas sin señal. Se muestra para que el repartidor SEPA que algo todavía no
+         llegó al servidor: en silencio parecería que se perdió. -->
+    <div v-if="entregasPendientes.length" class="dlv__offline">
+      <i class="bi bi-cloud-arrow-up"></i>
+      <span>
+        {{ entregasPendientes.length }}
+        {{ entregasPendientes.length === 1 ? 'entrega guardada' : 'entregas guardadas' }}
+        sin señal · se envían solas
+      </span>
+    </div>
 
     <!-- Header -->
     <div class="dlv__header">
@@ -848,5 +870,13 @@ onMounted(load)
   .dlv__stop-btn { flex: 1; justify-content: center; min-height: 42px; font-size: var(--fs-13, 13px); }
   .dlv__orden-btn { width: 34px; height: 28px; }
   .dlv__check { width: 22px; height: 22px; }
+}
+</style>
+
+<style scoped>
+.dlv__offline {
+  display: flex; align-items: center; gap: .5rem;
+  background: #fef3c7; color: #92400e; border: 1px solid #fde68a;
+  border-radius: 10px; padding: .55rem .8rem; margin-bottom: .6rem; font-size: .82rem;
 }
 </style>

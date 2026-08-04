@@ -273,6 +273,7 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 const route  = useRoute()
 const { registrarConJornada } = useManicuraJornada()
 const router = useRouter()
+const { isPWA } = usePWA()
 const auth   = useAuthStore()
 const club   = useClubStore()
 
@@ -383,7 +384,10 @@ async function resolverEstado() {
 }
 
 function irADetalle() {
-  router.replace({ name: 'planta-detalle', params: { id: plantaInfo.value.id } })
+  // En la PWA la ficha de planta vive bajo /m: la ruta nombrada apunta a la de escritorio y el
+  // guard la rebota al home del rol.
+  router.replace(isPWA() ? `/m/planta/${plantaInfo.value.id}`
+                         : { name: 'planta-detalle', params: { id: plantaInfo.value.id } })
 }
 
 // Carga el detalle completo de la planta para el flujo de pesaje de manicura.
