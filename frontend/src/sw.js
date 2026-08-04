@@ -14,7 +14,12 @@ self.addEventListener('message', (event) => {
 })
 clientsClaim()
 
-precacheAndRoute(self.__WB_MANIFEST)
+// El MANIFEST de la PWA NO se precachea. Con `registerType: 'prompt'` el service worker nuevo queda
+// esperando a que el usuario acepte actualizar, así que el viejo sigue sirviendo lo que tiene
+// guardado —incluido el manifest—. Consecuencia: se cambia el nombre de la app, se deploya, y
+// Chrome sigue proponiendo el anterior al instalar, a veces por días. Dejándolo afuera, el
+// navegador siempre lo pide a la red y el nombre cambia en el mismo deploy.
+precacheAndRoute(self.__WB_MANIFEST.filter((e) => !/manifest\.webmanifest$/.test(e.url)))
 cleanupOutdatedCaches()
 
 // Network-first para la API.
