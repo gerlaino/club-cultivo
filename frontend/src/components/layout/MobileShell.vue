@@ -16,9 +16,28 @@
           </div>
         </template>
       </div>
-      <button class="msh__icon-btn" @click="doLogout" aria-label="Cerrar sesión">
-        <i class="bi bi-box-arrow-right"></i>
+      <button class="msh__icon-btn" aria-label="Cuenta" @click="menuOpen = !menuOpen">
+        <i class="bi bi-person-circle"></i>
       </button>
+
+      <!-- El ícono suelto de salir no se encontraba: ahora hay un menú con el nombre del usuario y
+           la acción escrita. -->
+      <Transition name="msh-menu">
+        <div v-if="menuOpen" class="msh__menu" @click.self="menuOpen = false">
+          <div class="msh__menu-card">
+            <div class="msh__menu-user">
+              <strong>{{ auth.displayName || auth.user?.email }}</strong>
+              <span>{{ roleLabel }}</span>
+            </div>
+            <button class="msh__menu-item" @click="irPerfil">
+              <i class="bi bi-person"></i> Mi perfil
+            </button>
+            <button class="msh__menu-item msh__menu-item--danger" @click="doLogout">
+              <i class="bi bi-box-arrow-right"></i> Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </Transition>
     </header>
 
     <!-- Contenido -->
@@ -77,7 +96,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useClubStore }  from '../../stores/club'
@@ -162,11 +181,16 @@ const showFab  = computed(() => !!NAV[role.value]?.fab)
 const navLeft  = computed(() => navItems.value.slice(0, 2))
 const navRight = computed(() => navItems.value.slice(2))
 
+watch(() => route.path, () => { menuOpen.value = false })
+
 function isActive(item) {
   return route.path === item.to || route.path.startsWith(item.to + '/')
 }
 
 // ── FAB: acciones de creación ───────────────────────────────────
+const menuOpen = ref(false)
+function irPerfil() { menuOpen.value = false; router.push('/perfil') }
+
 const fabOpen      = ref(false)
 const showNuevoLote = ref(false)
 const showNuevaSala = ref(false)
@@ -233,6 +257,10 @@ onMounted(() => {
 .msh--supervisor  { --msh-accent: #2D7D46; --msh-top-bg: #0F2A1E; }
 .msh--manicura    { --msh-accent: #8b5cf6; --msh-top-bg: #1c1028; }
 .msh--delivery    { --msh-accent: #ea580c; --msh-top-bg: #1c0a00; }
+.msh--dispensador { --msh-accent: #0ea5e9; --msh-top-bg: #072a3d; }
+/* Red de seguridad: un rol sin acento propio dejaba el header SIN FONDO, y el botón de cerrar
+   sesión —blanco— quedaba invisible sobre claro. Le pasó al dispensador al sumarlo al shell. */
+.msh { --msh-accent: #2D7D46; --msh-top-bg: #0F2A1E; }
 
 .msh {
   display: flex; flex-direction: column;
@@ -266,6 +294,31 @@ onMounted(() => {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .msh__role { font-size: .66rem; font-weight: 600; color: rgba(255,255,255,.55); letter-spacing: .03em; }
+.msh__menu {
+  position: fixed; inset: 0; z-index: 60; background: rgba(15,23,42,.35);
+  display: flex; justify-content: flex-end; align-items: flex-start;
+  padding: calc(3.4rem + env(safe-area-inset-top)) .75rem 0;
+}
+.msh__menu-card {
+  background: #fff; border-radius: 14px; min-width: 210px; overflow: hidden;
+  box-shadow: 0 12px 32px rgba(15,23,42,.24);
+}
+.msh__menu-user {
+  display: flex; flex-direction: column; gap: .1rem;
+  padding: .75rem .9rem; border-bottom: 1px solid #f1f5f9;
+}
+.msh__menu-user strong { font-size: .88rem; color: #1e293b; }
+.msh__menu-user span   { font-size: .72rem; color: #94a3b8; }
+.msh__menu-item {
+  display: flex; align-items: center; gap: .55rem; width: 100%;
+  background: none; border: none; padding: .7rem .9rem; cursor: pointer;
+  font: inherit; font-size: .85rem; color: #475569; text-align: left;
+}
+.msh__menu-item:active { background: #f8fafc; }
+.msh__menu-item--danger { color: #dc2626; border-top: 1px solid #f1f5f9; }
+.msh-menu-enter-active, .msh-menu-leave-active { transition: opacity .15s; }
+.msh-menu-enter-from, .msh-menu-leave-to { opacity: 0; }
+
 .msh__icon-btn {
   flex-shrink: 0;
   width: 38px; height: 38px; border-radius: 11px;

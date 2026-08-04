@@ -19,16 +19,16 @@
     <div v-else class="mres__list">
       <div v-for="r in visibles" :key="r.id" class="mres__card" :class="{ 'mres__card--vencida': esVencida(r) }">
         <div class="mres__card-head">
-          <span class="mres__paciente">{{ r.paciente_nombre || r.paciente?.nombre_completo || '—' }}</span>
+          <span class="mres__paciente">{{ r.paciente?.nombre || '—' }}</span>
           <span class="mres__fecha" :class="{ 'mres__fecha--vencida': esVencida(r) }">
-            {{ esVencida(r) ? 'Venció ' : '' }}{{ fechaCorta(r.fecha_retiro) }}
+            {{ esVencida(r) ? 'Venció ' : '' }}{{ fechaCorta(r.fecha_entrega_estimada) }}
           </span>
         </div>
         <div class="mres__prod">
           {{ r.cantidad }}{{ r.stock?.unidad || 'g' }} · {{ formaLabel(r.stock?.forma_producto) }}
         </div>
         <div class="mres__pie">
-          <span v-if="Number(r.resta_ars) > 0" class="mres__resta">Resta {{ formatARS(r.resta_ars) }}</span>
+          <span v-if="Number(r.aporte_restante_ars) > 0" class="mres__resta">Resta {{ formatARS(r.aporte_restante_ars) }}</span>
           <span v-else class="mres__senada">Señada ✓</span>
           <button class="mres__btn" :disabled="entregando === r.id" @click="entregar(r)">
             {{ entregando === r.id ? 'Entregando…' : 'Entregar' }}
@@ -59,9 +59,9 @@ const hoyISO = new Date().toISOString().slice(0, 10)
 const visibles = computed(() =>
   filtro.value === 'todas'
     ? reservas.value
-    : reservas.value.filter(r => (r.fecha_retiro || '') <= hoyISO))
+    : reservas.value.filter(r => (r.fecha_entrega_estimada || '') <= hoyISO))
 
-const cuentaHoy = computed(() => reservas.value.filter(r => (r.fecha_retiro || '') <= hoyISO).length)
+const cuentaHoy = computed(() => reservas.value.filter(r => (r.fecha_entrega_estimada || '') <= hoyISO).length)
 
 onMounted(cargar)
 
@@ -69,11 +69,13 @@ async function cargar() {
   loading.value = true
   try {
     const { data } = await listReservas({ estado: 'pendiente' })
-    reservas.value = data.data ?? data ?? []
+    // El endpoint devuelve { reservas: [...] }. El `?? data` de antes dejaba pasar el objeto entero
+    // cuando la forma no coincidía, y la vista reventaba al filtrar algo que no era un array.
+    reservas.value = Array.isArray(data?.reservas) ? data.reservas : []
   } catch { reservas.value = [] } finally { loading.value = false }
 }
 
-function esVencida(r) { return (r.fecha_retiro || '') < hoyISO }
+function esVencida(r) { return (r.fecha_entrega_estimada || '') < hoyISO }
 
 async function entregar(r) {
   entregando.value = r.id

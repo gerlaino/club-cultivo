@@ -69,6 +69,7 @@ module Clubs
           crear_insumos(club)
           crear_salon(club)
           crear_turnos(club)
+          crear_reparto(club)
         end
       ensure
         ActsAsTenant.current_tenant = tenant_previo
@@ -100,8 +101,12 @@ module Clubs
     # Un usuario por rol: es lo que deja mostrar que la app se ve distinta según quién entra.
     def crear_equipo(club)
       admin = nil
+      # Los roles OPERATIVOS: los que se muestran trabajando. Si falta uno, ese módulo no se puede
+      # enseñar y quien intenta entrar recibe "credenciales inválidas" sin saber por qué.
+      # Abogado y auditor quedan afuera a propósito: son de consulta, no hacen a la demo.
       { 'admin' => 'Admin', 'cultivador' => 'Cultivo', 'dispensador' => 'Dispensa',
-        'supervisor' => 'Supervisión', 'medico' => 'Médico', 'manicura' => 'Manicura' }.each do |rol, nom|
+        'supervisor' => 'Supervisión', 'medico' => 'Médico', 'manicura' => 'Manicura',
+        'delivery' => 'Reparto' }.each do |rol, nom|
         u = User.create!(
           email: rol == 'admin' ? @admin_email : "#{rol}@club-modelo.example.com",
           password: @admin_password, password_confirmation: @admin_password,
@@ -379,6 +384,31 @@ module Clubs
       end
     end
 
+    # Reparto: una parte de las dispensaciones sale con envío asignado al repartidor. Sin esto su
+    # PWA arranca vacía y no se puede mostrar ni la ruta ni el historial.
+    def crear_reparto(club)
+      repartidor = User.where(club_id: club.id, role: 'delivery').first
+      return unless repartidor
+
+      disps = Dispensacion.joins(:paciente).where(pacientes: { club_id: club.id })
+                          .order(fecha_dispensacion: :desc).limit(28).to_a
+      disps.each_with_index do |d, i|
+        # Las más recientes quedan por despachar; las viejas, cerradas.
+        estado = if    i < 5  then 'pendiente'
+                 elsif i < 8  then 'en_viaje'
+                 elsif i < 25 then 'entregado'
+                 else              'fallido'
+                 end
+        d.update_columns(
+          con_envio: true, delivery_id: repartidor.id, estado_envio: estado,
+          direccion_envio: "#{%w[Av. Rivadavia Corrientes Cabildo Scalabrini\ Ortiz].sample(random: @rng)} #{@rng.rand(100..8000)}",
+          entregado_at: estado == 'entregado' ? d.fecha_dispensacion.in_time_zone.change(hour: 18) : nil,
+          motivo_fallo: estado == 'fallido' ? ['Nadie en el domicilio', 'Dirección inexistente'].sample(random: @rng) : nil,
+        )
+        @resumen[:envios] += 1
+      end
+    end
+
     # Turnos médicos repartidos entre pasados (realizados) y próximos: la agenda vacía no muestra
     # nada, y una llena solo de futuros no deja ver el historial clínico.
     def crear_turnos(club)
@@ -412,7 +442,10 @@ module Clubs
                         end
         Paciente.create!(
           club: club, created_by: @admin,
-          nombre: NOMBRES[i % NOMBRES.size], apellido: APELLIDOS[(i * 7) % APELLIDOS.size],
+          # El apellido rota con una vuelta extra cada ciclo de nombres: con `i * 7` a secas, el
+          # paciente 0 y el 20 caían en la MISMA combinación y la lista parecía tener duplicados.
+          nombre:   NOMBRES[i % NOMBRES.size],
+          apellido: APELLIDOS[((i * 7) + (i / NOMBRES.size)) % APELLIDOS.size],
           dni: (20_000_000 + i * 137_411).to_s,
           fecha_nacimiento: hoy - @rng.rand(21..65).years - @rng.rand(0..364).days,
           # example.com es un dominio reservado: ningún mailer que se dispare le escribe a una
