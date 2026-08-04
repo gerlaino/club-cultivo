@@ -70,6 +70,11 @@ module Clubs
           crear_salon(club)
           crear_turnos(club)
           crear_reparto(club)
+          crear_tareas(club)
+          crear_reservas(club)
+          crear_manicura(club)
+          crear_jornadas(club)
+          crear_setpoints(club)
         end
       ensure
         ActsAsTenant.current_tenant = tenant_previo
@@ -406,6 +411,140 @@ module Clubs
           motivo_fallo: estado == 'fallido' ? ['Nadie en el domicilio', 'Dirección inexistente'].sample(random: @rng) : nil,
         )
         @resumen[:envios] += 1
+      end
+    end
+
+
+    TAREAS_TIPO = {
+      'riego'           => 'Riego de la sala',
+      'nutricion'       => 'Nutrición semanal',
+      'revision_plagas' => 'Revisión de plagas',
+      'poda'            => 'Poda de bajos',
+      'limpieza'        => 'Limpieza del cuarto',
+      'medicion'        => 'Medición de pH y EC',
+      'defoliacion'     => 'Defoliación',
+      'trasplante'      => 'Trasplante a maceta final',
+    }.freeze
+
+    # Sin tareas, la tab del cultivador y el "tareas hoy" del admin salen en cero — dos de las
+    # primeras pantallas que ve alguien a quien se le muestra la app.
+    def crear_tareas(club)
+      cultivador = User.where(club_id: club.id, role: 'cultivador').first || @admin
+      salas = Sala.where(club_id: club.id).to_a
+      lotes = Lote.where(club_id: club.id, estado: %w[vegetativo floracion]).to_a
+      return if salas.empty?
+
+      45.times do |i|
+        tipo, titulo = TAREAS_TIPO.to_a.sample(random: @rng)
+        # Un tercio vencidas o de hoy (lo que hay que hacer AHORA), el resto repartido: una lista
+        # solo de futuro no muestra que la app sirve para no olvidarse nada.
+        dias = case i % 3
+               when 0 then -@rng.rand(0..4)
+               when 1 then 0
+               else        @rng.rand(1..12)
+               end
+        completada = dias < 0 && @rng.rand < 0.6
+        Tarea.create!(
+          club: club, creada_por: @admin, asignada_a: cultivador,
+          sala: salas.sample(random: @rng), lote: lotes.sample(random: @rng),
+          titulo: titulo, tipo: tipo,
+          estado: completada ? 'completada' : 'pendiente',
+          prioridad: %w[baja normal normal alta].sample(random: @rng),
+          fecha_programada: hoy + dias,
+        )
+        @resumen[:tareas] += 1
+      end
+    end
+
+    # Reservas: es la tab entera del dispensador. Vacía, no se puede mostrar para qué sirve apartar
+    # stock a futuro.
+    def crear_reservas(club)
+      dispensador = User.where(club_id: club.id, role: 'dispensador').first || @admin
+      return if @stocks.empty? || @pacientes.empty?
+
+      # Releídos de la base: los de @stocks quedaron desactualizados cuando las 176 dispensaciones
+      # les descontaron cantidad. Y se filtra por lo REALMENTE disponible —la reserva aparta, y el
+      # modelo no deja prometer algo que el club no tiene—.
+      disponibles = Stock.where(club_id: club.id)
+                         .select { |st| st.cantidad_disponible_real.to_d >= 40 }
+      return if disponibles.empty?
+
+      12.times do |i|
+        stock  = disponibles.sample(random: @rng)
+        precio = stock.precio_sugerido_ars.to_d
+        cant   = [5, 10, 15].sample(random: @rng)
+        total  = (precio * cant).round(2)
+        sena = i.even? ? (total * 0.5).round(2) : total
+        r = Reserva.new(
+          club: club, paciente: @pacientes.sample(random: @rng), stock: stock, user: dispensador,
+          cantidad: cant, fecha_entrega_estimada: hoy + @rng.rand(1..10), estado: 'pendiente',
+          sena_ars: sena, aporte_estimado_ars: total, medio_pago: 'efectivo',
+        )
+        r.save!
+        # Algunas VENCIDAS: el aviso de "esto quedó de ayer" es justo lo que hay que poder mostrar.
+        # Se retrasa después de crear porque el modelo exige fecha futura al dar de alta —una
+        # reserva para hoy ya es una dispensación— y esa regla no se saltea, se respeta y se
+        # envejece el registro, que es lo que pasa en la vida real.
+        r.update_column(:fecha_entrega_estimada, hoy - @rng.rand(1..5)) if i < 3
+        @resumen[:reservas] += 1
+      end
+    end
+
+    # Manicura: sin pesajes, ese rol entra y no tiene absolutamente nada que ver.
+    def crear_manicura(club)
+      manicura = User.where(club_id: club.id, role: 'manicura').first || @admin
+      lotes    = Lote.where(club_id: club.id, estado: %w[en_manicura curado finalizado]).limit(8).to_a
+      return if lotes.empty?
+
+      lotes.each_with_index do |lote, i|
+        # Los dos primeros quedan ENVIADOS a propósito: son los que le dan trabajo a la tab
+        # "Aprobar" del admin. Si todos salen confirmados, esa pantalla se ve vacía.
+        confirmado = i >= 2 && lote.estado != 'en_manicura'
+        PesajeManicura.create!(
+          club: club, lote: lote, manicurador: manicura,
+          fecha_pesaje: hoy - @rng.rand(1..90),
+          estado: confirmado ? 'confirmado' : %w[borrador enviado].sample(random: @rng),
+          peso_total_g: (lote.rendimiento_real_g || @rng.rand(400..1400)).to_d,
+          peso_confirmado_g: confirmado ? (lote.rendimiento_real_g || @rng.rand(400..1400)).to_d : nil,
+          confirmado_por: confirmado ? @admin : nil,
+          plantas_count: lote.plants_count,
+        )
+        @resumen[:pesajes_manicura] += 1
+      end
+    end
+
+    # "Mis horas" del cultivador y de manicura.
+    def crear_jornadas(club)
+      User.where(club_id: club.id, role: %w[cultivador manicura]).each do |u|
+        20.times do |i|
+          fecha = hoy - i
+          next if fecha.saturday? || fecha.sunday?
+          JornadaLaboral.create!(
+            club: club, user: u, fecha: fecha,
+            hora_entrada: '09:00', hora_salida: %w[17:00 17:30 18:00].sample(random: @rng),
+            estado: i < 3 ? 'enviada' : 'confirmada',
+            confirmada_por: i < 3 ? nil : @admin,
+          )
+          @resumen[:jornadas] += 1
+        end
+      end
+    end
+
+    # Los rangos de ambiente por fase: es lo que hace que las alertas y el semáforo tengan contra
+    # qué comparar. Sin esto el módulo de IoT se ve sin configurar.
+    SETPOINTS = {
+      'enraizado'  => { 'temperatura' => [22, 26], 'humedad' => [85, 95], 'ph' => [5.5, 6.0] },
+      'vegetativo' => { 'temperatura' => [20, 28], 'humedad' => [50, 70], 'ph' => [5.8, 6.2], 'ec' => [0.8, 1.4] },
+      'floracion'  => { 'temperatura' => [20, 26], 'humedad' => [40, 55], 'ph' => [6.0, 6.5], 'ec' => [1.4, 2.2] },
+    }.freeze
+
+    def crear_setpoints(club)
+      SETPOINTS.each do |fase, tipos|
+        tipos.each do |tipo, (min, max)|
+          SetpointFase.create!(club_id: club.id, fase: fase, tipo_lectura: tipo,
+                               valor_min: min, valor_max: max)
+          @resumen[:setpoints] += 1
+        end
       end
     end
 
