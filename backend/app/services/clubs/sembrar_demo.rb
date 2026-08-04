@@ -495,17 +495,31 @@ module Clubs
           fecha    = mes_base.beginning_of_month + @rng.rand(0..27)
           next if fecha > hoy
 
-          medio = %w[efectivo efectivo transferencia cuenta_corriente no_abona].sample(random: @rng)
+          medio  = %w[efectivo efectivo transferencia cuenta_corriente no_abona].sample(random: @rng)
           precio = stock.precio_sugerido_ars.to_d
+          total  = (precio * cantidad).round(2)
           # Dispensacion NO tiene club_id: el tenant se resuelve por el paciente.
           disp = Dispensacion.new(
             paciente: paciente, user: dispensador, stock: stock, sede: @sede,
             cantidad: cantidad, fecha_dispensacion: fecha, medio_pago: medio,
             precio_unitario_ars: precio,
+            # `aporte_socio_ars` es lo que COBRA la dispensa: sin esto el asiento contable sale en
+            # cero y la contabilidad del club demo mostraba solo egresos.
+            aporte_socio_ars: total,
+            monto_credito_ars: %w[cuenta_corriente no_abona].include?(medio) ? total : 0,
           )
           disp.save!(validate: false)
           DispensacionItem.new(dispensacion: disp, stock: stock, cantidad: cantidad,
                                precio_unitario_ars: precio).save!(validate: false)
+
+          # El asiento contable lo crea este service, no un callback del modelo: guardando con
+          # `validate: false` no corre nada, así que hay que invocarlo. Es el MISMO camino que usa
+          # la app al dispensar, así que los datos del demo salen como los reales.
+          begin
+            Dispensaciones::AplicarEfectos.financiero!(dispensacion: disp, usuario: dispensador)
+          rescue => e
+            Rails.logger.warn "[SembrarDemo] asiento de dispensación: #{e.message}"
+          end
           @resumen[:dispensaciones] += 1
         end
       end
