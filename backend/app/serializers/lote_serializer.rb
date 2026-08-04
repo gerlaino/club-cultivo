@@ -48,6 +48,10 @@ class LoteSerializer
       club_id:              lote.club_id,
       sala_id:              lote.sala_id,
       codigo:               lote.codigo,
+      # De qué lote se desprendió, si nació separándose de otro. Sin esto el sufijo del código
+      # (L-26-043-B) no dice de dónde salió y hay que adivinarlo.
+      lote_origen:          (o = lote.lote_origen) && { id: o.id, codigo: o.codigo },
+      desprendidos_count:   lote.desprendidos.size,
       codigo_qr:            lote.codigo_qr,
       origen:               lote.origen,
       planta_madre:         lote.planta_madre ? { id: lote.planta_madre.id, nombre: lote.planta_madre.nombre, codigo_qr: lote.planta_madre.codigo_qr } : nil,

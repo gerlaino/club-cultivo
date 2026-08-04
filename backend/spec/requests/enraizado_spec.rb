@@ -101,6 +101,85 @@ RSpec.describe 'Lotes enraizando', type: :request do
     end
   end
 
+  # CUÁNTAS PRENDIERON, declarado como número al salir del enraizado. Es la única forma en que el
+  # dato va a existir: nadie descarta 18 esquejes de 128 uno por uno, y sin esto el % de
+  # prendimiento da 100% siempre — una métrica que miente es peor que una que falta.
+  describe 'el prendimiento' do
+    def lote_con(plantas)
+      lote = create(:lote, club: club, sala: vege, estado: 'enraizado')
+      plantas.times { |i| create(:plant, lote: lote, club: club, state: 'enraizado', nombre: "P#{i}") }
+      lote.update_column(:plants_count, plantas)
+      lote
+    end
+
+    it 'descarta como "no prendió" las que faltan' do
+      lote = lote_con(20)
+
+      post "/api/lotes/#{lote.id}/avanzar_fase", params: { tamanio_maceta: 3, prendieron: 17 }
+
+      expect(response).to have_http_status(:success)
+      expect(lote.reload.plants.where.not(state: 'descartada').count).to eq(17)
+      expect(lote.plants.where(motivo_descarte: 'no_prendio').count).to eq(3)
+      expect(lote.plants_count).to eq(17)
+    end
+
+    # Descartadas, NO borradas: si se borraran saldrían del denominador además del numerador y el
+    # porcentaje volvería a dar 100%.
+    it 'las que no prendieron siguen contando en el total' do
+      lote = lote_con(20)
+
+      post "/api/lotes/#{lote.id}/avanzar_fase", params: { tamanio_maceta: 3, prendieron: 17 }
+
+      expect(lote.plants.count).to eq(20)   # las 20 siguen existiendo
+
+      get '/api/analytics/prendimiento'
+      global = JSON.parse(response.body)['global']
+      expect(global['intentos']).to eq(20)
+      expect(global['prendidas']).to eq(17)
+      expect(global['porcentaje']).to eq(85.0)
+    end
+
+    it 'si prendieron todas no descarta ninguna' do
+      lote = lote_con(10)
+
+      post "/api/lotes/#{lote.id}/avanzar_fase", params: { tamanio_maceta: 3, prendieron: 10 }
+
+      expect(lote.reload.plants.where(state: 'descartada').count).to eq(0)
+    end
+
+    # Si ya se descartaron algunas a mano por QR, el número viene contra las VIVAS: no las pisa ni
+    # las cuenta dos veces.
+    it 'no vuelve a descartar las que ya se habían marcado a mano' do
+      lote = lote_con(20)
+      lote.plants.limit(4).each { |p| p.update_columns(state: 'descartada', motivo_descarte: 'no_prendio') }
+      lote.update_column(:plants_count, 16)
+
+      post "/api/lotes/#{lote.id}/avanzar_fase", params: { tamanio_maceta: 3, prendieron: 14 }
+
+      # 16 vivas − 14 que prendieron = 2 nuevas descartadas, no 6.
+      expect(lote.reload.plants.where(state: 'descartada').count).to eq(6)
+      expect(lote.plants.where.not(state: 'descartada').count).to eq(14)
+    end
+
+    it 'no acepta que prendan más de las que hay' do
+      lote = lote_con(10)
+
+      post "/api/lotes/#{lote.id}/avanzar_fase", params: { tamanio_maceta: 3, prendieron: 15 }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(lote.reload.estado).to eq('enraizado')
+    end
+
+    it 'deja el dato en el historial del lote' do
+      lote = lote_con(20)
+
+      post "/api/lotes/#{lote.id}/avanzar_fase", params: { tamanio_maceta: 3, prendieron: 17 }
+
+      evento = lote.lote_eventos.where(tipo: 'actividad').last
+      expect(evento.descripcion).to match(/17 de 20.*85\.0%/)
+    end
+  end
+
   # El esqueje que prendió va a maceta. Sin ese dato el lote entra a vegetativo sin saber en qué
   # volumen crece, que es lo que gobierna riego, frecuencia y cuándo toca el próximo trasplante.
   describe 'la maceta al prender' do

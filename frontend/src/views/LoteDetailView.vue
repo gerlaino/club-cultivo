@@ -329,6 +329,8 @@ const {
   showTransicionModal, savingTransicion, transicionError, transicionForm, transicionSalaId,
   showAvanzarSalaModal, avanzarSalaId, transicionandoRapido,
   avanzarMaceta, faltaMaceta, MACETAS,
+  avanzarPrendieron, prendieronInvalido, noPrendieron, plantasDelLote,
+  prendieronTodas, bloqueaAvance,
   showIniciarManicuraModal, showCompletarManicuraModal,
   showCosechaModal, cosechaSalaId, savingCosecha, cosechaError, cosechaForm,
   showCosechaPartialModal,
@@ -418,6 +420,20 @@ onUnmounted(() => {
             <span v-if="lote.sala">📍 {{ lote.sala.nombre }}</span>
             <span v-if="lote.start_date" class="ld__subtitle-sep">·</span>
             <span v-if="lote.start_date">📅 inicio {{ formatDate(lote.start_date) }}</span>
+            <!-- De dónde salió, si nació desprendiéndose de otro lote. Sin esto el sufijo del
+                 código (-B) no dice nada. -->
+            <template v-if="lote.lote_origen">
+              <span class="ld__subtitle-sep">·</span>
+              <RouterLink :to="{ name: 'lote-detail', params: { id: lote.lote_origen.id } }" class="ld__origen">
+                🪴 desprendido de {{ lote.lote_origen.codigo }}
+              </RouterLink>
+            </template>
+            <template v-if="lote.desprendidos_count > 0">
+              <span class="ld__subtitle-sep">·</span>
+              <span class="ld__origen-txt">
+                {{ lote.desprendidos_count }} lote{{ lote.desprendidos_count === 1 ? '' : 's' }} desprendido{{ lote.desprendidos_count === 1 ? '' : 's' }}
+              </span>
+            </template>
             <!-- El ciclo arranca en vegetativo; el enraizado se muestra al lado para no perder el
                  panorama ("día 28 de ciclo + 12 enraizando"). -->
             <span v-if="lote.dias_ciclo != null || lote.dias_enraizado != null" class="ld__subtitle-sep">·</span>
@@ -728,7 +744,43 @@ onUnmounted(() => {
           <div class="ld__modal-body">
             <div v-if="transicionError" class="ld__alert">{{ transicionError }}</div>
 
-            <!-- Mismo pedido que en el avance del cultivador: el esqueje que prendió va a maceta. -->
+                        <!-- Cuántas prendieron. Va vacío a propósito, con "prendieron todas" al lado: si
+                 viniera prellenado con el total, el que va rápido confirma sin mirar y el club
+                 queda con 100% de prendimiento falso para siempre. -->
+            <div v-if="lote?.estado === 'enraizado'" class="ld__field">
+              <label class="ld__label">¿Cuántas prendieron? <span style="color:#dc2626">*</span></label>
+              <div class="ld__prend-row">
+                <input v-model="avanzarPrendieron" type="number" min="0" :max="plantasDelLote"
+                       class="ld__input" :placeholder="`de ${plantasDelLote}`" />
+                <button type="button" class="ld__prend-btn" @click="prendieronTodas">Prendieron todas</button>
+              </div>
+              <span v-if="prendieronInvalido" class="ld__prend-err">
+                El lote tiene {{ plantasDelLote }} plantas.
+              </span>
+              <span v-else-if="noPrendieron > 0" class="ld__optional">
+                {{ noPrendieron }} se descartan como "no prendió" — es lo que mide el % de prendimiento.
+              </span>
+            </div>
+
+<!-- Mismo pedido que en el avance del cultivador: el esqueje que prendió va a maceta. -->
+            <!-- Cuántas prendieron. Va vacío a propósito, con "prendieron todas" al lado: si
+                 viniera prellenado con el total, el que va rápido confirma sin mirar y el club
+                 queda con 100% de prendimiento falso para siempre. -->
+            <div v-if="lote?.estado === 'enraizado'" class="ld__field">
+              <label class="ld__label">¿Cuántas prendieron? <span style="color:#dc2626">*</span></label>
+              <div class="ld__prend-row">
+                <input v-model="avanzarPrendieron" type="number" min="0" :max="plantasDelLote"
+                       class="ld__input" :placeholder="`de ${plantasDelLote}`" />
+                <button type="button" class="ld__prend-btn" @click="prendieronTodas">Prendieron todas</button>
+              </div>
+              <span v-if="prendieronInvalido" class="ld__prend-err">
+                El lote tiene {{ plantasDelLote }} plantas.
+              </span>
+              <span v-else-if="noPrendieron > 0" class="ld__optional">
+                {{ noPrendieron }} se descartan como "no prendió" — es lo que mide el % de prendimiento.
+              </span>
+            </div>
+
             <div v-if="lote?.estado === 'enraizado'" class="ld__field">
               <label class="ld__label">Maceta a la que va <span style="color:#dc2626">*</span></label>
               <select v-model="avanzarMaceta" class="ld__input">
@@ -771,7 +823,7 @@ onUnmounted(() => {
           </div>
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" :disabled="savingTransicion" @click="showTransicionModal = false">Cancelar</button>
-            <button class="ld__btn-primary" :disabled="savingTransicion || faltaMaceta" @click="ejecutarTransicion">
+            <button class="ld__btn-primary" :disabled="savingTransicion || bloqueaAvance" @click="ejecutarTransicion">
               <DsSpinner v-if="savingTransicion" :size="14" />
               <i v-else class="bi bi-arrow-right-circle"></i>Avanzar fase
             </button>
@@ -897,7 +949,7 @@ onUnmounted(() => {
           </div>
           <div class="ld__modal-footer">
             <button class="ld__btn-ghost" @click="showAvanzarSalaModal = false">Cancelar</button>
-            <button class="ld__btn-primary" :disabled="transicionandoRapido || faltaMaceta" @click="avanzarFaseRapido(avanzarSalaId, avanzarMaceta)">
+            <button class="ld__btn-primary" :disabled="transicionandoRapido || bloqueaAvance" @click="avanzarFaseRapido(avanzarSalaId, avanzarMaceta)">
               <DsSpinner v-if="transicionandoRapido" :size="14" />
               <i v-else class="bi bi-arrow-right-circle"></i>Confirmar avance
             </button>
@@ -960,6 +1012,17 @@ onUnmounted(() => {
 .ld__dias-badge { background: #e8f5e9; color: #1b5e20; font-size: .75rem; font-weight: 700; padding: .2em .6em; border-radius: 6px; }
 /* El enraizado va al lado del ciclo, en tono menor: es contexto, no el número que se compara. */
 .ld__dias-extra { font-size: .72rem; color: #94a3b8; }
+.ld__prend-row { display: flex; gap: .4rem; align-items: center; }
+.ld__prend-row .ld__input { flex: 1; }
+.ld__prend-btn {
+  border: 1px solid #e2e8f0; background: none; border-radius: 8px; cursor: pointer;
+  padding: .45rem .7rem; font-size: .75rem; color: #16a34a; white-space: nowrap;
+}
+.ld__prend-btn:hover { background: #f0fdf4; border-color: #86efac; }
+.ld__prend-err { font-size: .72rem; color: #dc2626; }
+.ld__origen { color: #16a34a; text-decoration: none; }
+.ld__origen:hover { text-decoration: underline; }
+.ld__origen-txt { color: #94a3b8; }
 .ld__dd-nota    { display: block; font-size: .7rem; color: #94a3b8; font-weight: 400; }
 .ld__hero-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .ld__ciclo { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; padding: 1.25rem 1.5rem 1rem; margin-bottom: 1.5rem; overflow-x: auto; }

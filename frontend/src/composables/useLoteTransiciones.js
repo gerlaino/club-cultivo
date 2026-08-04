@@ -47,6 +47,24 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
   const faltaMaceta = computed(() =>
     lotes.current?.estado === 'enraizado' && !avanzarMaceta.value)
 
+  // Cuántas prendieron, al salir del enraizado. Se pide como NÚMERO porque nadie descarta 18
+  // esquejes de 128 uno por uno: sin este dato el % de prendimiento da 100% siempre.
+  //
+  // Arranca VACÍO a propósito, con un botón "prendieron todas" al lado. Si viniera prellenado con
+  // el total, el que va rápido confirma sin mirar y el club queda con 100% de prendimiento falso
+  // para siempre — peor que no tener el dato.
+  const avanzarPrendieron = ref('')
+  const plantasDelLote = computed(() => lotes.current?.plants_count || 0)
+  const faltaPrendieron = computed(() =>
+    lotes.current?.estado === 'enraizado' &&
+    (avanzarPrendieron.value === '' || avanzarPrendieron.value === null))
+  const prendieronInvalido = computed(() =>
+    avanzarPrendieron.value !== '' && Number(avanzarPrendieron.value) > plantasDelLote.value)
+  const noPrendieron = computed(() =>
+    avanzarPrendieron.value === '' ? 0 : Math.max(plantasDelLote.value - Number(avanzarPrendieron.value), 0))
+  function prendieronTodas() { avanzarPrendieron.value = plantasDelLote.value }
+  const bloqueaAvance = computed(() => faltaMaceta.value || faltaPrendieron.value || prendieronInvalido.value)
+
   // Si el lote YA tiene maceta declarada —típico: se la pusiste al separarlo del lote original—,
   // el modal la trae puesta en vez de volver a preguntar algo que ya dijiste. Se compara por valor
   // numérico porque el backend devuelve "3.0" y las opciones son "3".
@@ -81,7 +99,8 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     transicionForm.value   = { peso_humedo_g: null, peso_seco_g: null, manicurado: false, notas: '' }
     transicionError.value  = null
     transicionSalaId.value = lotes.current?.sala_id ?? null
-    avanzarMaceta.value    = macetaPrecargada(lotes.current)
+    avanzarMaceta.value     = macetaPrecargada(lotes.current)
+    avanzarPrendieron.value = ''
     showTransicionModal.value = true
   }
 
@@ -107,6 +126,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     } else if (isCultivador.value) {
       avanzarSalaId.value = lote?.sala_id ?? null
       avanzarMaceta.value = macetaPrecargada(lote)
+      avanzarPrendieron.value = ''
       showAvanzarSalaModal.value = true
     } else {
       openTransicionModal()
@@ -129,9 +149,11 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
         sala_id: transicionSalaId.value || undefined,
         // Solo viaja al prender: es el trasplante del esqueje a su primera maceta.
         tamanio_maceta: avanzarMaceta.value || undefined,
+        prendieron: avanzarPrendieron.value === '' ? undefined : avanzarPrendieron.value,
       })
       lotes.current = data
       avanzarMaceta.value = ''
+      avanzarPrendieron.value = ''
       showTransicionModal.value = false
       toast.success(`Lote avanzado a ${em(faseSig).label}`)
       onPhaseChange?.()
@@ -151,9 +173,11 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
       const payload = {}
       if (salaId) payload.sala_id = salaId
       if (maceta) payload.tamanio_maceta = maceta
+      if (avanzarPrendieron.value !== '') payload.prendieron = avanzarPrendieron.value
       const { data } = await avanzarFaseLote(lotes.current.id, payload)
       lotes.current = data
       avanzarMaceta.value = ''
+      avanzarPrendieron.value = ''
       toast.success(`Lote avanzado a ${capitalizarFase(data.estado)}`)
       onPhaseChange?.()
       await plants.fetchByLote(loteId)
@@ -229,6 +253,8 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     // Avanzar sala
     showAvanzarSalaModal, avanzarSalaId, transicionandoRapido,
     avanzarMaceta, faltaMaceta, MACETAS,
+    avanzarPrendieron, faltaPrendieron, prendieronInvalido, noPrendieron, plantasDelLote,
+    prendieronTodas, bloqueaAvance,
     // Manicura
     showIniciarManicuraModal, showCompletarManicuraModal,
     // Cosecha

@@ -126,6 +126,12 @@
             <option v-for="f in fasesSiguientes" :key="f.value" :value="f.value">{{ f.emoji }} {{ f.label }}</option>
           </select>
         </div>
+        <!-- Cuántas prendieron: sin este número el % de prendimiento da 100% siempre. -->
+        <div v-if="lote.estado === 'enraizado'" class="mlot__field">
+          <label class="mlot__label">¿Cuántas prendieron? *</label>
+          <input v-model="fasePrendieron" type="number" min="0" :max="lote.plants_count"
+                 class="mlot__input" :placeholder="`de ${lote.plants_count || 0}`" />
+        </div>
         <!-- El esqueje que prendió va a maceta: sin ese dato el lote no puede pasar a vegetativo. -->
         <div v-if="lote.estado === 'enraizado'" class="mlot__field">
           <label class="mlot__label">Maceta a la que va *</label>
@@ -245,12 +251,14 @@ const fotoInput       = ref(null)
 const nuevaFase       = ref('')
 // Maceta del trasplante al prender (enraizado → vegetativo). Ver LoteDetailView: misma regla.
 const faseMaceta      = ref('')
+const fasePrendieron  = ref('')
 const MACETAS = [
   { v: '0.335', l: 'Maceta 0,335 L' }, { v: '0.5', l: 'Vaso (0,5 L)' }, { v: '1', l: '1 litro' }, { v: '3', l: '3 litros' },
   { v: '5',   l: '5 litros' },     { v: '7', l: '7 litros' },   { v: '10', l: '10 litros' },
   { v: '12',  l: '12 litros' },    { v: '15', l: '15 litros' }, { v: '20', l: '20 litros' },
 ]
-const faltaMaceta = computed(() => lote.value?.estado === 'enraizado' && !faseMaceta.value)
+const faltaMaceta = computed(() =>
+  lote.value?.estado === 'enraizado' && (!faseMaceta.value || fasePrendieron.value === ''))
 
 const STATE_FROM_LOTE = { germinacion:'enraizado', esqueje:'esqueje', vegetativo:'vegetativo', floracion:'floracion', cosecha:'cosecha' }
 const plantaForm = ref({ state: 'vegetativo', origen: 'semilla' })
@@ -302,6 +310,7 @@ async function recargarLote() {
 function abrirAvanzarFase() {
   nuevaFase.value  = fasesSiguientes.value[0]?.value || ''
   faseMaceta.value = ''
+  fasePrendieron.value = ''
   faseError.value  = null
   showAcciones.value = false
   showAvanzarFase.value = true
@@ -312,6 +321,7 @@ async function guardarAvanzarFase() {
   try {
     const payload = { estado: nuevaFase.value }
     if (faseMaceta.value) payload.tamanio_maceta = faseMaceta.value
+    if (fasePrendieron.value !== '') payload.prendieron = fasePrendieron.value
     const { data } = await avanzarFaseLote(id, payload)
     lote.value = { ...lote.value, estado: data.estado || nuevaFase.value, dias_en_estado: 0 }
     toast.success('Fase actualizada')

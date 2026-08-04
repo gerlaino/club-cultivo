@@ -597,7 +597,8 @@ class LotesController < ApplicationController
     # semilla/esqueje → vegetativo: no generan pesada, usan avanzar_fase!
     if @lote.estado == 'enraizado'
       @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user,
-                          tamanio_maceta: params[:tamanio_maceta])
+                          tamanio_maceta: params[:tamanio_maceta],
+                          prendieron: params[:prendieron])
     else
       @lote.transicionar!(
         nueva_fase,
@@ -743,9 +744,12 @@ class LotesController < ApplicationController
     end
     estado_anterior  = @lote.estado
     sala_anterior_id = @lote.sala_id
-    # tamanio_maceta: obligatorio al prender (enraizado → vegetativo). Lo valida el modelo.
+    # tamanio_maceta y prendieron: solo aplican al prender (enraizado → vegetativo). La maceta la
+    # exige el modelo; el prendimiento es opcional en la API —quien no lo declara asume que
+    # prendieron todas— y lo pide el frontend.
     @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user,
-                        tamanio_maceta: params[:tamanio_maceta])
+                        tamanio_maceta: params[:tamanio_maceta],
+                        prendieron: params[:prendieron])
     @lote.lote_eventos.create!(
       tipo:            'cambio_estado',
       estado_anterior: estado_anterior,

@@ -177,11 +177,15 @@ class Lote < ApplicationRecord
   # Avance rápido sin pesada — usado por el cultivador desde el botón "Avanzar fase".
   # Si sala_id se provee, mueve el lote a esa sala. Si no, intenta auto-detectar:
   # si existe exactamente una sala activa del tipo destino en el club, la elige.
-  def avanzar_fase!(sala_id: nil, usuario: nil, tamanio_maceta: nil)
+  def avanzar_fase!(sala_id: nil, usuario: nil, tamanio_maceta: nil, prendieron: nil)
     idx = AVANCE.index(estado)
     raise ArgumentError, 'Lote no puede transicionar en este estado' unless idx.present? && idx < AVANCE.length - 1
     nueva_fase = AVANCE[idx + 1] # enraizado→vegetativo→floración→cosecha
     ActiveRecord::Base.transaction do
+      # El prendimiento se declara al salir del enraizado: es el único momento en que el dato existe
+      # y se sabe con certeza, mirando la bandeja.
+      descartar_las_que_no_prendieron!(prendieron, usuario) if estado == 'enraizado' && prendieron.present?
+
       attrs = { estado: nueva_fase }
       # La maceta del trasplante al prender. Si es la primera que tiene, también queda como la
       # INICIAL: es la que después deja reconstruir el historial de trasplantes.
@@ -262,6 +266,42 @@ class Lote < ApplicationRecord
       plant_state = FASE_A_PLANT_STATE[nueva_fase]
       plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state) if plant_state
     end
+  end
+
+  # Cuántas prendieron, declarado como NÚMERO al salir del enraizado. Es la única forma en que el
+  # dato va a existir: nadie descarta 18 esquejes de 128 uno por uno, así que sin carga agregada el
+  # % de prendimiento daría 100% siempre y la métrica mentiría en vez de faltar.
+  #
+  # Las que no prendieron se marcan `descartada` + `no_prendio`: NO se borran. Borrarlas las sacaría
+  # del denominador además del numerador, y el porcentaje volvería a dar 100%.
+  #
+  # Se cuenta contra las VIVAS, no contra el total original: si ya descartaste algunas a mano por QR
+  # a medida que las viste morir, esto no las pisa ni las cuenta dos veces.
+  def descartar_las_que_no_prendieron!(prendieron, usuario = nil)
+    prendieron = prendieron.to_i
+    vivas      = plants.where.not(state: 'descartada')
+    total      = vivas.count
+    raise ArgumentError, "El lote tiene #{total} plantas: no pueden prender #{prendieron}" if prendieron > total
+    raise ArgumentError, 'La cantidad que prendió no puede ser negativa' if prendieron.negative?
+
+    faltan = total - prendieron
+    return if faltan.zero?
+
+    # Se descartan las últimas creadas y sin rastro individual: las de numeración más alta son las
+    # que menos probablemente tengan una etiqueta ya pegada y anotada.
+    a_descartar = vivas.where(peso_seco: nil).where.missing(:pesadas_plantas)
+                       .order(created_at: :desc, id: :desc).limit(faltan).pluck(:id)
+    Plant.where(id: a_descartar).update_all(
+      state: 'descartada', motivo_descarte: 'no_prendio', updated_at: Time.current,
+    )
+    update_column(:plants_count, plants.where.not(state: 'descartada').count)
+
+    pct = total.positive? ? (prendieron * 100.0 / total).round(1) : nil
+    lote_eventos.create!(
+      tipo: 'actividad', categoria: 'otro', club: club, user: usuario, registrado_en: Time.current,
+      descripcion: "Prendimiento: #{prendieron} de #{total}#{pct ? " (#{pct}%)" : ''} · " \
+                   "#{a_descartar.size} no prendieron",
+    )
   end
 
   # Admin asigna un manicurador → cosecha → en_manicura (nuevo flujo).
