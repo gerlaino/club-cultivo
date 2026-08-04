@@ -83,7 +83,8 @@ export const NAV_GROUPS = [
       { to: '/configuracion', label: 'General' },
       { to: '/configuracion/suscripcion', label: 'Suscripción' },
       { to: '/usuarios', label: 'Equipo' },
-      { to: '/sedes', label: 'Sedes' },
+      // Sedes NO va acá: tiene su propia entrada en el menú lateral (es un cockpit operativo, no
+      // una pantalla de ajustes). Duplicarla hacía que el mismo destino se viera en dos lugares.
       { to: '/alertas-configuracion', label: 'Configuración de alertas' },
       { to: '/web', label: 'Sitio web' },
       { to: '/integraciones', label: 'Integraciones' },

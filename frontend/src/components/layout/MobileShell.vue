@@ -244,17 +244,22 @@ const salas        = ref([])
 
 // Crear una SALA es decisión de infraestructura, no del que está en el pasillo: el cultivador crea
 // lotes, no cuartos.
+// "Registrar" se leía como "anotar algo de un lote que ya existe", cuando en realidad ABRE EL ALTA.
+// Y escanear no va acá para el cultivador: ya tiene su propia tab, repetirlo en el botón de crear
+// mezcla dos cosas distintas (crear vs. buscar).
 const fabActions = computed(() => {
+  const esCultivador = role.value === 'cultivador'
   const acciones = [
-    { key: 'lote', label: 'Registrar lote', icon: 'bi-box-seam',
+    { key: 'lote', label: 'Crear lote', icon: 'bi-box-seam',
       tint: 'var(--c-leaf-100)', color: 'var(--c-leaf-700)', onClick: abrirNuevoLote },
   ]
-  if (role.value !== 'cultivador') {
-    acciones.push({ key: 'sala', label: 'Registrar sala', icon: 'bi-grid-3x3-gap',
+  // Crear una SALA es decisión de infraestructura, no del que está en el pasillo.
+  if (!esCultivador) {
+    acciones.push({ key: 'sala', label: 'Crear sala', icon: 'bi-grid-3x3-gap',
                     tint: 'var(--c-sky-100)', color: 'var(--c-sky-600)', onClick: abrirNuevaSala })
+    acciones.push({ key: 'scan', label: 'Escanear QR', icon: 'bi-qr-code-scan',
+                    tint: '#ede9fe', color: '#7c3aed', onClick: irEscanear })
   }
-  acciones.push({ key: 'scan', label: 'Escanear QR', icon: 'bi-qr-code-scan',
-                  tint: '#ede9fe', color: '#7c3aed', onClick: irEscanear })
   return acciones
 })
 

@@ -124,6 +124,17 @@
       </div>
     </SheetBottom>
 
+    <!-- Fotos del cuarto -->
+    <template v-if="fotos.length">
+      <div class="msal__section-title">Fotos <span class="msal__count">{{ fotos.length }}</span></div>
+      <div class="msal__fotos">
+        <a v-for="f in fotos" :key="f.id" :href="f.url" target="_blank" class="msal__foto">
+          <img :src="f.url" :alt="f.filename" loading="lazy" />
+          <span class="msal__foto-fecha">{{ f.created_at_label }}</span>
+        </a>
+      </div>
+    </template>
+
     <!-- Input foto oculto -->
     <input ref="fotoInput" type="file" accept="image/*" capture="environment" style="display:none" @change="subirFoto" />
   </div>
@@ -133,7 +144,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getSala, listLotes, createSalaNota, createLote, listGeneticas } from '../../lib/api'
+import { getSala, listLotes, createSalaNota, createLote, listGeneticas,
+         listFotosSala, uploadFotoSala } from '../../lib/api'
 import { useToast }       from '../../composables/useToast'
 import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 import RegistroSalaModal  from '../../components/salas/RegistroSalaModal.vue'
@@ -224,9 +236,29 @@ function abrirFoto() {
   fotoInput.value?.click()
 }
 
+// Antes esto era un placeholder VACÍO: el botón abría la cámara, sacabas la foto y no pasaba nada
+// —ni se guardaba ni avisaba—. Ahora sube de verdad.
 async function subirFoto(e) {
+  const file = e.target.files?.[0]
   e.target.value = ''
-  // Placeholder — se puede extender con uploadFotoSala si el backend lo soporta
+  if (!file) return
+
+  subiendoFoto.value = true
+  try {
+    const fd = new FormData()
+    fd.append('foto', file)
+    await uploadFotoSala(id, fd)
+    toast.success('Foto guardada')
+    await cargarFotos()
+  } catch (err) {
+    toast.error(err?.response?.data?.error || 'No se pudo subir la foto')
+  } finally { subiendoFoto.value = false }
+}
+
+const fotos        = ref([])
+const subiendoFoto = ref(false)
+async function cargarFotos() {
+  try { const { data } = await listFotosSala(id); fotos.value = data || [] } catch { fotos.value = [] }
 }
 
 function abrirNota() {
@@ -255,6 +287,7 @@ onMounted(async () => {
       lotes.value = (lotesRes.value.data || []).filter(l => l.estado !== 'finalizado')
     if (geneticasRes.status === 'fulfilled') geneticas.value = geneticasRes.value.data || []
   } catch {} finally { loading.value = false }
+  cargarFotos()
 })
 </script>
 
@@ -345,4 +378,18 @@ onMounted(async () => {
 }
 .msal__btn-confirmar:disabled { opacity: .6; }
 .msal__info-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 9px; padding: .6rem .875rem; font-size: .8rem; color: #15803d; }
+</style>
+
+<style scoped>
+.msal__fotos {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: .45rem; padding: 0 .75rem .75rem;
+}
+.msal__foto { position: relative; display: block; border-radius: 10px; overflow: hidden; }
+.msal__foto img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.msal__foto-fecha {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,.65));
+  color: #fff; font-size: .6rem; padding: .5rem .35rem .2rem;
+}
 </style>

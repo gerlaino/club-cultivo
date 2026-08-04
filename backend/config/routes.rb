@@ -86,6 +86,7 @@ Rails.application.routes.draw do
       resources :lotes, only: [:index, :create]
       resources :cultivadores, controller: 'sala_cultivadores', only: [:index, :create, :destroy]
       resources :notas, only: [:index, :create]
+      resources :fotos, only: [:index, :create, :destroy], controller: 'fotos_sala'
       resources :lecturas_ambientales, only: [:index, :create, :destroy]
       get  :ambiente,    to: 'lecturas_ambientales#ambiente'
       get  :historico,   to: 'lecturas_ambientales#historico'

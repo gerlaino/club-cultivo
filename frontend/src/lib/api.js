@@ -540,6 +540,10 @@ export const cosecharPlantas   = (loteId, payload)  => api.post(`/lotes/${loteId
 
 export const getLoteFotos    = (loteId)          => api.get(`/lotes/${loteId}/fotos`)
 export const uploadFotoLote  = (loteId, formData) => api.post(`/lotes/${loteId}/fotos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+// Fotos de la SALA: el estado del cuarto, el montaje, un problema para mostrar.
+export const listFotosSala   = (salaId)           => api.get(`/salas/${salaId}/fotos`)
+export const uploadFotoSala  = (salaId, formData) => api.post(`/salas/${salaId}/fotos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const deleteFotoSala  = (salaId, fotoId)   => api.delete(`/salas/${salaId}/fotos/${fotoId}`)
 export const deleteFotoLote  = (loteId, fotoId)   => api.delete(`/lotes/${loteId}/fotos/${fotoId}`)
 export const setFotoPortadaLote = (loteId, fotoId) => api.patch(`/lotes/${loteId}/fotos/${fotoId}/portada`)
 

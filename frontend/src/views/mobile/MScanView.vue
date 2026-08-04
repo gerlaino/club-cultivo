@@ -21,6 +21,17 @@
           <div v-if="estado === 'activo'" class="msc__scanline"></div>
         </div>
         <p class="msc__hint">{{ estado === 'error' ? mensaje : 'Centrá el QR dentro del recuadro' }}</p>
+
+        <!-- Con un QR que no es de la app, el cartel quedaba solo y sin salida: la cámara seguía
+             encendida y no había cómo volver. -->
+        <div v-if="estado === 'error'" class="msc__recovery">
+          <button class="msc__btn msc__btn--ghost" @click="reintentar">
+            <i class="bi bi-arrow-clockwise"></i> Reintentar
+          </button>
+          <button class="msc__btn" @click="irAlInicio">
+            <i class="bi bi-house"></i> Volver al inicio
+          </button>
+        </div>
       </div>
 
       <footer class="msc__bottom">
@@ -83,7 +94,28 @@ function detener() {
   try { scanner?.stop(); scanner?.destroy() } catch {}
   scanner = null
 }
-function salir() { detener(); router.back() }
+// `router.back()` no sirve si se entró directo (tab "Escanear", link, PWA recién abierta): no hay
+// atrás y la pantalla queda trabada. Se cae al home del rol.
+function salir() {
+  detener()
+  if (window.history.length > 1) router.back()
+  else irAlInicio()
+}
+
+const HOME_POR_ROL = {
+  admin: '/m/admin/home', supervisor: '/m/admin/home', cultivador: '/m/cultivador/sedes',
+  manicura: '/m/manicura/pesar', delivery: '/m/delivery/despachos', dispensador: '/m/dispensar',
+}
+function irAlInicio() {
+  detener()
+  router.replace(HOME_POR_ROL[useAuthStore().user?.role] || '/')
+}
+
+function reintentar() {
+  mensaje.value = ''
+  estado.value  = 'activo'
+  navegado      = false
+}
 
 onMounted(async () => {
   try {
@@ -168,4 +200,14 @@ onBeforeUnmount(detener)
 .msc__input { flex: 1; padding: .7rem .9rem; border-radius: 12px; border: none; font-size: .9rem; background: #fff; color: #1a1d1f; }
 .msc__go { width: 48px; border-radius: 12px; border: none; background: #2D7D46; color: #fff; font-size: 1.1rem; cursor: pointer; }
 .msc__go:disabled { opacity: .5; }
+</style>
+
+<style scoped>
+.msc__recovery { display: flex; gap: .5rem; justify-content: center; margin-top: .75rem; }
+.msc__btn {
+  border: none; border-radius: 10px; padding: .6rem 1rem; cursor: pointer;
+  background: #fff; color: #0f172a; font-size: .85rem; font-weight: 600;
+  display: inline-flex; align-items: center; gap: .4rem;
+}
+.msc__btn--ghost { background: rgba(255,255,255,.15); color: #fff; }
 </style>

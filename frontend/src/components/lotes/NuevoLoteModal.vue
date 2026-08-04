@@ -188,15 +188,20 @@
                 <option value="hidroponia">Hidroponia</option>
               </select>
             </div>
-            <div class="nlm__field">
-              <label class="nlm__label">Tamaño de maceta</label>
+            <!-- La maceta NO se pide acá: un lote nuevo nace ENRAIZANDO, en taco o bandeja, y no
+                 tiene maceta todavía. Se elige al prender, en el avance a vegetativo, que es cuando
+                 la planta va a maceta de verdad. Pedirla al crear invitaba a cargar un dato que no
+                 existe. (Un lote HEREDADO ya viene de una fase avanzada: ahí sí se puede indicar.) -->
+            <div v-if="tipoCreacion === 'existente'" class="nlm__field">
+              <label class="nlm__label">Tamaño de maceta <span class="nlm__label-opt">(actual)</span></label>
               <select class="nlm__input" v-model="form.tamanio_maceta">
                 <option value="">Sin especificar</option>
-                <option value="0.5">Vaso (0.5L)</option>
+                <option value="0.335">Maceta 0,335 L</option>
+                <option value="0.5">Vaso (0,5 L)</option>
                 <option value="1">1 litro</option><option value="3">3 litros</option>
                 <option value="5">5 litros</option><option value="7">7 litros</option>
                 <option value="10">10 litros</option><option value="12">12 litros</option>
-                <option value="15">15 litros</option>
+                <option value="15">15 litros</option><option value="20">20 litros</option>
               </select>
             </div>
             <div class="nlm__field">

@@ -12,6 +12,9 @@ class Sala < ApplicationRecord
   has_many :sala_cultivadores, class_name: 'SalaCultivador', foreign_key: 'sala_id', dependent: :destroy
   has_many :cultivadores, through: :sala_cultivadores, source: :user
   has_many :notas, as: :noteable, dependent: :destroy
+  # Fotos del cuarto (estado general, montaje, problemas). No requiere migración: las tablas de
+  # ActiveStorage ya existen. El botón "Tomar foto" de la PWA existía pero no guardaba nada.
+  has_many_attached :fotos
 
   ESTADOS = %w[activa mantenimiento cerrada].freeze
   KINDS   = %w[vegetativo floracion manicura cosecha mixta madre clon].freeze

@@ -12,7 +12,7 @@ import NuevoLoteModal         from '../components/lotes/NuevoLoteModal.vue'
 import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
 import RegistroEnraizadoModal from '../components/salas/RegistroEnraizadoModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
-import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala, moverLotes } from '../lib/api.js'
+import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala, moverLotes, listFotosSala, deleteFotoSala } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { Gauge } from 'lucide-vue-next'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
@@ -69,6 +69,15 @@ const lecturaOpen   = ref(false)
 const enraizadoOpen = ref(false)
 const hayEnraizando = computed(() => items.value.some(l => l.estado === 'enraizado'))
 const lotesExpanded = ref(true)
+// Fotos del cuarto
+const fotosExpanded = ref(true)
+const fotosSala     = ref([])
+async function cargarFotosSala() {
+  try { const { data } = await listFotosSala(salaId); fotosSala.value = data || [] } catch { fotosSala.value = [] }
+}
+async function borrarFoto(f) {
+  try { await deleteFotoSala(salaId, f.id); await cargarFotosSala() } catch {}
+}
 
 const ESTADOS_LOTE = ["enraizado","vegetativo","floracion","cosecha","curado","finalizado"]
 const DIAS_CICLO   = { semilla:7, esqueje:7, vegetativo:45, floracion:65, cosecha:10, curado:14, finalizado:0 }
@@ -363,6 +372,7 @@ async function confirmarMover() {
     toast.success(`${data.movidos} lote(s) movidos a ${d.nombre}${extra}`)
     selMover.value = new Set(); showMover.value = false; salaDestinoId.value = null
     await Promise.all([salas.fetchSala(salaId), lotes.fetchBySala(salaId)])
+    cargarFotosSala()
   } catch (e) {
     toast.error(e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'No se pudieron mover')
   } finally { moviendo.value = false }
@@ -1000,6 +1010,37 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                 </div>
               </div>
               </template>
+            </div>
+          </div>
+
+          <!-- Fotos del cuarto. Las sube el cultivador desde la PWA; antes se guardaban en la nada
+               (el handler era un placeholder vacío) y acá no había dónde verlas. -->
+          <div v-show="tabActiva === 'lotes'" class="sd__section">
+            <button class="sd__section-toggle" @click="fotosExpanded = !fotosExpanded">
+              <div class="sd__section-toggle-left">
+                <span class="sd__section-emoji">📷</span>
+                <span class="sd__section-title">Fotos</span>
+                <span v-if="fotosSala.length" class="sd__pill">{{ fotosSala.length }}</span>
+              </div>
+              <i class="bi sd__chevron" :class="fotosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </button>
+            <div v-show="fotosExpanded" class="sd__section-body">
+              <div v-if="!fotosSala.length" class="sd__placeholder">
+                Sin fotos todavía. El cultivador las saca desde la app del celular.
+              </div>
+              <div v-else class="sd__fotos">
+                <div v-for="f in fotosSala" :key="f.id" class="sd__foto">
+                  <a :href="f.url" target="_blank" rel="noopener">
+                    <img :src="f.url" :alt="f.filename" loading="lazy" />
+                  </a>
+                  <div class="sd__foto-pie">
+                    <span>{{ f.created_at_label }}</span>
+                    <button v-if="canEdit" class="sd__foto-del" title="Eliminar" @click="borrarFoto(f)">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1732,6 +1773,15 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 /* Marca discreta de "sigue corriendo": distingue un ciclo cerrado de uno en curso sin meter otra
    columna ni repetir la palabra en cada fila. */
 .sd__hist-encurso { color: #86efac; font-weight: 700; margin-left: .2em; }
+.sd__fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .6rem; }
+.sd__foto { border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #fff; }
+.sd__foto img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+.sd__foto-pie {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .3rem .5rem; font-size: .7rem; color: #94a3b8;
+}
+.sd__foto-del { border: none; background: none; cursor: pointer; color: #cbd5e1; }
+.sd__foto-del:hover { color: #dc2626; }
 
 @media (max-width: 600px) {
   .sd__hist-kpis { grid-template-columns: repeat(2, 1fr); }
