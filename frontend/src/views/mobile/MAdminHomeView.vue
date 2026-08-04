@@ -46,6 +46,32 @@
       </div>
     </section>
 
+    <!-- El día comercial: lo que hay que despachar y lo que espera a alguien. El admin en el
+         celular no administra —mira cómo va el día y desbloquea lo que traba a otros—. -->
+    <section v-if="reservasHoy || entregasHoy || dispensasHoy" class="mah__section">
+      <h2 class="mah__section-title">Hoy</h2>
+      <div class="mah__pulse">
+        <RouterLink to="/reservas" class="mah__stat" :class="{ 'mah__stat--warn': reservasVencidas > 0 }">
+          <span class="mah__stat-ico" style="background:#ede9fe;color:#7c3aed"><i class="bi bi-bookmark-check"></i></span>
+          <span class="mah__stat-num">{{ reservasHoy }}</span>
+          <span class="mah__stat-lbl">
+            Reservas
+            <template v-if="reservasVencidas > 0">· {{ reservasVencidas }} vencida{{ reservasVencidas === 1 ? '' : 's' }}</template>
+          </span>
+        </RouterLink>
+        <RouterLink to="/delivery" class="mah__stat">
+          <span class="mah__stat-ico" style="background:#dbeafe;color:#1d4ed8"><i class="bi bi-truck"></i></span>
+          <span class="mah__stat-num">{{ entregasHoy }}</span>
+          <span class="mah__stat-lbl">Entregas</span>
+        </RouterLink>
+        <RouterLink to="/historial" class="mah__stat">
+          <span class="mah__stat-ico" style="background:#dcfce7;color:#15803d"><i class="bi bi-bag-check"></i></span>
+          <span class="mah__stat-num">{{ dispensasHoy }}</span>
+          <span class="mah__stat-lbl">Dispensado hoy</span>
+        </RouterLink>
+      </div>
+    </section>
+
   </div>
 </template>
 
@@ -53,7 +79,8 @@
 import { computed, ref, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { useStatsStore } from '../../stores/stats.js'
-import { getTareasDashboard, listPesajesManicuraAdmin, listStocksPendientes } from '../../lib/api.js'
+import { getTareasDashboard, listPesajesManicuraAdmin, listStocksPendientes,
+         getAnalyticsDispensador } from '../../lib/api.js'
 
 const auth  = useAuthStore()
 const stats = useStatsStore()
@@ -79,6 +106,10 @@ const reprocannPorVencer = computed(() => stats.reprocannPorVencer)
 const loading      = ref(true)
 const tareasHoy    = ref(0)
 const aprobaciones = ref(0)
+const reservasHoy      = ref(0)
+const reservasVencidas = ref(0)
+const entregasHoy      = ref(0)
+const dispensasHoy     = ref(0)
 
 onMounted(async () => {
   if (!stats.data) stats.fetchAll()
@@ -92,7 +123,23 @@ onMounted(async () => {
   const stockP   = stockRes.status === 'fulfilled' ? (stockRes.value.data?.length || 0) : 0
   aprobaciones.value = manicura + stockP
   loading.value = false
+
+  cargarDiaComercial()
 })
+
+// Va aparte y sin bloquear: si el club no usa dispensación o delivery, la sección directamente no
+// aparece en vez de mostrar ceros.
+async function cargarDiaComercial() {
+  // Una sola llamada: /analytics/dispensador ya trae el resumen del día y las reservas por
+  // preparar, así que no hace falta pedir la lista entera de reservas para contarlas acá.
+  try {
+    const { data } = await getAnalyticsDispensador()
+    dispensasHoy.value     = data?.resumen?.dispensaciones_hoy ?? 0
+    reservasHoy.value      = data?.reservas?.hoy ?? 0
+    reservasVencidas.value = data?.reservas?.vencidas ?? 0
+    entregasHoy.value      = data?.entregas_hoy ?? 0
+  } catch {}
+}
 </script>
 
 <style scoped>

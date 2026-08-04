@@ -255,6 +255,11 @@ class AnalyticsController < ApplicationController
       stocks:        stocks_data,
       top_pacientes: top_pacientes,
       por_dia:       por_dia,
+      # Entregas de delivery abiertas HOY: lo que el admin mira desde el celular para saber si el
+      # día se está despachando o si algo quedó trabado.
+      entregas_hoy: Dispensacion.no_canceladas.joins(stock: :sede)
+                                .where(sedes: { club_id: club.id })
+                                .where(estado_envio: %w[pendiente en_viaje]).count,
       reservas: {
         hoy:      reservas_por_preparar.where(fecha_entrega_estimada: hoy).count,
         vencidas: reservas_por_preparar.where('fecha_entrega_estimada < ?', hoy).count,

@@ -38,8 +38,11 @@ RSpec.describe 'Pacientes — no filtrar historia clínica a roles no clínicos'
       expect(response).to have_http_status(:ok)
       data = JSON.parse(response.body)['data']
       CAMPOS_CLINICOS.each { |campo| expect(data).not_to have_key(campo), "filtró el campo clínico #{campo}" }
-      expect(data['nombre']).to be_present         # no clínico: sí lo ve
-      expect(data).to have_key('reprocann_estado') # no clínico: sí lo ve
+      expect(data['nombre']).to be_present  # no clínico: sí lo ve
+      # El REPROCANN tampoco: no es clínico, pero no es asunto suyo. Su regla es "está en la lista →
+      # dispensa"; los casos especiales los mira admin/supervisor.
+      # Ver spec/requests/pacientes_dispensador_spec.rb.
+      expect(data).not_to have_key('reprocann_estado')
     end
 
     %i[admin medico supervisor].each do |rol|
