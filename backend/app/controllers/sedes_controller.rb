@@ -5,20 +5,24 @@ class SedesController < ApplicationController
   before_action :set_sede, only: [:show, :update, :destroy]
 
   def index
+    # SIN ASIGNACIÓN = VE TODO. La asignación de sedes es un recorte opcional: un club chico no
+    # asigna nada y su cultivador tiene que ver el club entero. Antes, cultivador y supervisor sin
+    # sedes veían una pantalla vacía con "Sin sedes asignadas" —parecía un problema de permisos
+    # cuando en realidad nadie había recortado nada—. El dispensador ya tenía este fallback.
+    todas     = current_user.club.sedes.activas
+    asignadas = current_user.sedes_asignadas.activas
+
     sedes = case current_user.role
-            when 'cultivador'
-              current_user.sedes_asignadas.activas
+            when 'cultivador', 'supervisor'
+              asignadas.any? ? asignadas : todas
             when 'manicura'
               salas_ids = current_user.salas_ids_asignadas
               sede_ids  = Sala.where(id: salas_ids).pluck(:sede_id).compact.uniq
-              current_user.club.sedes.activas.where(id: sede_ids)
-            when 'supervisor'
-              current_user.sedes_asignadas.activas
+              sede_ids.any? ? todas.where(id: sede_ids) : todas
             when 'dispensador'
-              asignadas = current_user.sedes_asignadas.activas
-              asignadas.any? ? asignadas : current_user.club.sedes.activas.where(tipo: %w[social mixta])
+              asignadas.any? ? asignadas : todas.where(tipo: %w[social mixta])
             else
-              current_user.club.sedes.activas
+              todas
             end
 
     render json: sedes.order(:nombre).map { |s| serialize_sede(s) }

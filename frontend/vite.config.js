@@ -12,8 +12,10 @@ export default defineConfig({
       registerType:  'prompt',
       includeAssets: ['favicon.ico', 'logo-ce-redondo.png'],
       manifest: {
-        name:             'Club Cultivo',
-        short_name:       'Club Cultivo',
+        // El producto se llama Cultivo Espacial. "Club Cultivo" es el nombre del REPOSITORIO, y se
+        // había colado acá: al instalar la PWA, el celular sugería ese nombre para el ícono.
+        name:             'Cultivo Espacial',
+        short_name:       'Cultivo Espacial',
         description:      'Gestión integral de clubes de cannabis — REPROCANN',
         lang:             'es',
         theme_color:      '#0F2A1E',
