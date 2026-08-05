@@ -129,6 +129,26 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
         </div>
       </div>
 
+      <!-- Vendido fuera del catálogo: el mostrador hizo lo correcto (cobrar y dejar registro),
+           pero son productos que nadie cargó — no entran al inventario ni tienen margen. -->
+      <div v-if="d.sueltas_mes?.cantidad" class="sp__card sp__sueltas">
+        <div class="sp__ch">
+          <b>Vendido fuera del catálogo</b>
+          <span class="sp__mut">este mes</span>
+        </div>
+        <div class="sp__sueltas-nums">
+          <span class="sp__sueltas-n num">{{ d.sueltas_mes.cantidad }}</span>
+          <span class="sp__sueltas-lbl">venta{{ d.sueltas_mes.cantidad === 1 ? '' : 's' }} · {{ fmt(d.sueltas_mes.total_ars) }}</span>
+        </div>
+        <ul class="sp__sueltas-top">
+          <li v-for="t in d.sueltas_mes.top" :key="t.nombre">
+            <span class="sp__rn">{{ t.nombre }}</span>
+            <span class="sp__rq num">{{ fmt(t.total_ars) }}</span>
+          </li>
+        </ul>
+        <p class="sp__sueltas-hint">Cargalos al catálogo para que entren al inventario y tengan margen.</p>
+      </div>
+
       <!-- Reponer: glanceable y accionable, siempre a la vista -->
       <div class="sp__card sp__repo-card">
         <div class="sp__ch"><b>Reponer pronto</b><span class="sp__mut">bajo mínimo</span></div>
@@ -259,6 +279,12 @@ const insigniaIcono = (t) => ({ good: '★', bad: '!', warn: '↓' }[t] || '•'
 .sp__q small { display: block; color: #15803d; font-weight: 600; font-size: .7rem; }
 
 /* Reponer glanceable + toggle de análisis (B4) */
+.sp__sueltas-nums { display: flex; align-items: baseline; gap: 8px; margin: 6px 0; }
+.sp__sueltas-n { font-size: 22px; font-weight: 800; color: var(--c-amber-500, #D97706); }
+.sp__sueltas-lbl { font-size: 13px; color: #64748b; }
+.sp__sueltas-top { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.sp__sueltas-top li { display: flex; justify-content: space-between; font-size: 13px; }
+.sp__sueltas-hint { margin: 8px 0 0; font-size: 12px; color: #94a3b8; }
 .sp__repo-card { margin-bottom: .9rem; }
 .sp__fold { display: flex; align-items: center; gap: .6rem; width: 100%; background: #fff; border: 1px solid #e6ebf1; border-radius: 12px; padding: .9rem 1.1rem; cursor: pointer; margin-bottom: .9rem; font-weight: 700; color: #334155; font-size: .9rem; }
 .sp__fold:hover { border-color: #cbd5e1; }

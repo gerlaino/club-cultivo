@@ -17,6 +17,7 @@ module Bar
         ventas_por_hora: ventas_por_hora,
         top_productos:   top_productos,
         reponer:         reponer,
+        sueltas_mes:     sueltas_mes,
         lecturas:        lecturas,
       }
     end
@@ -105,6 +106,27 @@ module Bar
       end
     end
 
+    # Ventas de cosas que NO están en el catálogo (líneas sueltas del POS). Son legítimas —el
+    # mostrador cobra igual y queda registrado— pero si se repiten significa que hay productos
+    # sin cargar: el inventario no las ve y no tienen costo, así que no aportan margen real.
+    # Se muestra para que la gestión las cargue, no para prohibirlas.
+    def sueltas_mes
+      items = BarVentaItem
+              .joins(:bar_venta)
+              .where(bar_ventas: { unidad_negocio_id: @bar.unidad_negocio_bar&.id })
+              .where(bar_ventas: { created_at: Time.zone.now.all_month })
+              .where(vendible_id: nil, bar_producto_id: nil)
+
+      total = items.sum(:subtotal_ars).to_f
+      nombres = items.group(:nombre).order(Arel.sql('SUM(subtotal_ars) DESC')).limit(5).sum(:subtotal_ars)
+
+      {
+        cantidad: items.count,
+        total_ars: total,
+        top: nombres.map { |nombre, monto| { nombre: nombre, total_ars: monto.to_f } },
+      }
+    end
+
     # ── Lecturas del salón: insights accionables (tono good/warn/bad) desde datos reales ──
     def lecturas
       out = []
@@ -128,6 +150,17 @@ module Bar
                  .min_by(&:margen_pct)
       out << { tono: 'warn', texto: "El margen de #{bajo.nombre} es bajo (#{bajo.margen_pct}%). Revisá el precio o el costo de la mercadería." } if bajo
 
+      # Ventas sueltas repetidas = hay productos que nadie cargó al catálogo. No es un reto al
+      # mostrador (hizo lo correcto: cobrar y dejar registro), es trabajo pendiente de gestión.
+      sueltas = sueltas_mes
+      if sueltas[:cantidad] >= 3
+        nombres = sueltas[:top].first(2).map { |x| x[:nombre] }.join(', ')
+        out << { tono: 'warn',
+                 texto: "#{sueltas[:cantidad]} ventas sueltas este mes por #{fmt_ars(sueltas[:total_ars])} " \
+                        "(#{nombres}…). Cargá esos productos al catálogo: así entran al inventario y " \
+                        'tenés su margen.' }
+      end
+
       # Tendencia del mes vs mes pasado.
       d = resultado_mes[:delta_pct]
       if d && d.abs >= 5
@@ -136,6 +169,10 @@ module Bar
       end
 
       out
+    end
+
+    def fmt_ars(n)
+      "$#{n.to_i.to_s.reverse.scan(/\d{1,3}/).join('.').reverse}"
     end
 
     # ── helpers cacheados ──

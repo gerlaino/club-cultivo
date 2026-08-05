@@ -110,6 +110,22 @@ RSpec.describe 'Stock del Buffet desde el mostrador', type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
     end
 
+    it 'el panel del Buffet las cuenta para que la gestión cargue esos productos' do
+      sign_in_as(dispensador)
+      2.times do
+        post "/api/bares/#{bar.id}/ventas",
+             params: { lineas: [{ nombre: 'Alfajor', cantidad: 1, precio_unitario_ars: 900 }] }, as: :json
+      end
+
+      sign_in_as(admin)
+      get "/api/bares/#{bar.id}/dashboard"
+
+      sueltas = JSON.parse(response.body)['sueltas_mes']
+      expect(sueltas['cantidad']).to eq(2)
+      expect(sueltas['total_ars']).to eq(1800)
+      expect(sueltas['top'].first['nombre']).to eq('Alfajor')
+    end
+
     it 'convive con una línea normal en la misma venta', :aggregate_failures do
       sign_in_as(dispensador)
 

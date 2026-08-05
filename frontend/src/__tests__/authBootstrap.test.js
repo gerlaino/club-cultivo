@@ -10,9 +10,11 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../lib/api', () => mocks)
-vi.mock('../stores/club.js', () => ({ useClubStore: () => ({ fetch: vi.fn() }) }))
+const clubFetch  = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const routerPush = vi.hoisted(() => vi.fn())
+vi.mock('../stores/club.js', () => ({ useClubStore: () => ({ fetch: clubFetch }) }))
 vi.mock('../composables/usePlan.js', () => ({ usePlan: () => ({ planData: { value: null } }) }))
-vi.mock('../router', () => ({ default: { push: vi.fn() } }))
+vi.mock('../router', () => ({ default: { push: routerPush } }))
 
 const { useAuthStore } = await import('../stores/auth')
 
@@ -102,6 +104,24 @@ describe('bootstrap de sesión', () => {
 
     expect(auth.isAuthenticated).toBe(true)
     expect(auth.user.id).toBe(7)
+  })
+
+  // EL bug que trababa a dispensador, cultivador, manicura, admin y supervisor: login()
+  // esperaba /preferences ANTES de navegar, así que si eso colgaba el botón quedaba con el
+  // spinner para siempre. Los roles con home propia (médico, auditor…) se lo salteaban, y por
+  // eso a ellos el login les funcionaba.
+  it('no espera al club para entrar', async () => {
+    const clubColgado = diferido()
+    clubFetch.mockReturnValue(clubColgado.promesa)   // /preferences no responde nunca
+    mocks.signIn.mockResolvedValue({})
+    mocks.me.mockResolvedValue({ data: { id: 3, role: 'dispensador' } })
+    const auth = useAuthStore()
+
+    await auth.login('a@b.com', 'x')
+
+    expect(auth.isAuthenticated).toBe(true)
+    expect(auth.loading).toBe(false)   // el botón queda libre aunque el club siga cargando
+    expect(routerPush).toHaveBeenCalled()
   })
 
   it('el login sí bloquea su propio botón mientras corre', async () => {

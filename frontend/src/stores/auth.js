@@ -11,6 +11,10 @@ let bootstrapPromise = null;
 // más vale mostrar el login que dejar la pantalla colgada.
 const BOOTSTRAP_TIMEOUT_MS = 8000;
 
+// Techo duro del login: pasado esto, el botón vuelve a estar disponible aunque la request
+// siga en vuelo. Un spinner que no termina nunca es peor que un reintento.
+const LOGIN_TIMEOUT_MS = 15000;
+
 // Generación de la sesión. Login y logout la incrementan. Un /me que salió ANTES de ese
 // cambio ya no puede escribir el estado cuando vuelve: si no, el 401 tardío del arranque
 // (que no llevaba cookie) pisaba con `user = null` un login que ya había funcionado, y la app
@@ -91,6 +95,9 @@ export const useAuthStore = defineStore("auth", {
       authEpoch++;           // invalida cualquier /me en vuelo del arranque
       bootstrapPromise = null;
       this.loading = true;
+      // Red de seguridad: si algo se cuelga, el botón se libera igual. Preferimos que el
+      // usuario pueda reintentar antes que dejarlo mirando un spinner eterno.
+      const destrabar = setTimeout(() => { this.loading = false; }, LOGIN_TIMEOUT_MS);
       this.error = null;
       this.loggingOut = false;
       try {
@@ -111,11 +118,13 @@ export const useAuthStore = defineStore("auth", {
           delivery:    '/delivery',
         }
         const roleHome = ROLE_HOME[this.user?.role]
-        // Los roles "normales" (admin, dispensador, etc.) necesitan el club cargado.
-        if (!roleHome) {
-          const club = useClubStore();
-          await club.fetch();
-        }
+        // El club (logo, nombre, preferencias) se carga en SEGUNDO PLANO. Antes se esperaba
+        // acá con await, ANTES de navegar: si /preferences colgaba —backend despertando—, el
+        // botón se quedaba con el spinner y no entrabas nunca. Y solo pasaba con los roles sin
+        // home propia (admin, dispensador, cultivador, manicura, supervisor), que son
+        // justamente los que fallaban. Ninguna vista necesita el club para pintar: usan
+        // `club.data?.…` y App.vue lo recarga si falta.
+        if (!roleHome) useClubStore().fetch().catch(() => {});
         // Si veníamos de un deep-link / QR (?redirect=…), volvemos ahí. PERO nunca a la
         // home de OTRO rol (un redirect viejo del usuario anterior no debe ganar): los
         // deep-links normales (QR, fichas, etc.) sí se respetan.
@@ -135,6 +144,7 @@ export const useAuthStore = defineStore("auth", {
         }
         throw e;
       } finally {
+        clearTimeout(destrabar);
         this.loading = false;
       }
     },
