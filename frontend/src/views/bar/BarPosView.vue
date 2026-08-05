@@ -152,6 +152,19 @@ const clubStore = useClubStore()
 const ticketVenta = ref(null)
 const barNombre = computed(() => store.bares.find(b => String(b.id) === String(barId))?.nombre || store.barActual?.nombre || 'Buffet')
 
+// ── Venta suelta (producto fuera del listado) ─────────────────────────────
+const sueltoOpen = ref(false)
+const suelto     = ref({ nombre: '', precio: null })
+
+function confirmarSuelto() {
+  if (!store.agregarSuelto(suelto.value)) {
+    toast.error('Poné nombre y precio')
+    return
+  }
+  suelto.value = { nombre: '', precio: null }
+  sueltoOpen.value = false
+}
+
 async function cobrar() {
   if (!store.carrito.length) return
   // Snapshot ANTES de cobrar (store.cobrar vacía el carrito) para poder imprimir el comprobante.
@@ -287,12 +300,29 @@ const fechaHora = (d) => {
               <span class="cv__ci-qty">{{ l.cantidad }}</span>
               <span class="cv__ci-name">
                 {{ l.nombre }}
-                <small v-if="l.deposito !== 'salon'" class="cv__ci-dep">{{ DEP_LBL[l.deposito] || l.deposito }}</small>
+                <small v-if="l.suelto" class="cv__ci-dep cv__ci-dep--suelto">suelto</small>
+                <small v-else-if="l.deposito !== 'salon'" class="cv__ci-dep">{{ DEP_LBL[l.deposito] || l.deposito }}</small>
               </span>
               <span class="cv__ci-sub cv__num">{{ fmt(l.precio * l.cantidad) }}</span>
               <button class="cv__ci-btn" @click="store.sumar(l.key)" aria-label="Agregar uno">+</button>
             </li>
           </ul>
+          <!-- Vender algo que no está en el catálogo: se cobra igual y queda registrado, en vez
+               de que el mostrador lo cobre por fuera del sistema. No toca inventario. -->
+          <div class="cv__suelto">
+            <button v-if="!sueltoOpen" class="cv__suelto-toggle" type="button" @click="sueltoOpen = true">
+              ⊕ Otro / Varios
+            </button>
+            <div v-else class="cv__suelto-form">
+              <input v-model.trim="suelto.nombre" class="cv__suelto-inp" placeholder="Qué vendés"
+                     maxlength="60" @keyup.enter="confirmarSuelto" />
+              <input v-model.number="suelto.precio" type="number" min="0" step="any"
+                     class="cv__suelto-inp cv__suelto-inp--precio" placeholder="$" @keyup.enter="confirmarSuelto" />
+              <button class="cv__suelto-ok" type="button" @click="confirmarSuelto">Agregar</button>
+              <button class="cv__suelto-x" type="button" @click="sueltoOpen = false">✕</button>
+            </div>
+          </div>
+
           <div class="cv__cart-total"><span>Total</span><strong class="cv__num">{{ fmt(store.totalCarrito) }}</strong></div>
           <label v-if="eventos.length" class="cv__evento">
             <span class="cv__evento-lbl">🎉 Evento</span>
@@ -444,6 +474,18 @@ const fechaHora = (d) => {
 .cv__ci-name { color: #334155; }
 .cv__ci-sub { font-weight: 600; color: #0f172a; }
 .cv__num { font-variant-numeric: tabular-nums; }
+.cv__ci-dep--suelto { background: var(--c-amber-100, #FEF3C7); color: var(--c-amber-500, #D97706); border-radius: 4px; padding: 0 4px; }
+.cv__suelto { margin: 8px 0; }
+.cv__suelto-toggle {
+  width: 100%; background: none; border: 1px dashed var(--c-ink-300, #D1D5DB); border-radius: 8px;
+  padding: 8px; font-size: 13px; font-weight: 600; color: var(--c-ink-500, #6B7280); cursor: pointer;
+}
+.cv__suelto-toggle:hover { border-color: var(--c-leaf-500, #5A8A72); color: var(--c-leaf-800, #1A3D2E); }
+.cv__suelto-form { display: flex; gap: 6px; align-items: center; }
+.cv__suelto-inp { flex: 1; min-width: 0; border: 1px solid var(--c-ink-300, #D1D5DB); border-radius: 8px; padding: 8px; font-size: 13px; }
+.cv__suelto-inp--precio { flex: 0 0 74px; }
+.cv__suelto-ok { background: var(--c-leaf-800, #1A3D2E); color: #fff; border: none; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.cv__suelto-x { background: none; border: none; color: var(--c-ink-500, #6B7280); cursor: pointer; padding: 4px; }
 .cv__cart-total { display: flex; justify-content: space-between; align-items: baseline; margin: 1rem 0; padding-top: .9rem; border-top: 1px solid #f1f5f9; }
 .cv__cart-total strong { font-size: 1.5rem; font-weight: 800; color: #0f172a; letter-spacing: -.03em; }
 .cv__evento { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }

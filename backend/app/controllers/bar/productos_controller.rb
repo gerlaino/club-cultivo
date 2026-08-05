@@ -6,8 +6,14 @@ module Bar
     before_action :authenticate_user!
     before_action :require_feature_bar!
     before_action :set_bar
-    before_action :require_operador, only: [:index, :reponer, :movimientos, :codigo_barras]
-    before_action :require_admin_bar, only: [:create, :update, :destroy, :comprar, :ajustar]
+    # `comprar` (con costo) SÍ es del mostrador: si entró mercadería, la carga quien la recibió.
+    # Deja stock, costo promedio y su egreso contable con `created_by`, así que hay registro de
+    # quién y cuánto. `reponer` en cambio subía cantidad SIN costo y SIN asiento —mercadería que
+    # aparece de la nada, con el margen mintiendo—: eso queda para la gestión, y para corregir
+    # un conteo está `ajustar`.
+    before_action :require_operador,  only: [:index, :movimientos, :codigo_barras, :comprar]
+    before_action :require_gestion,   only: [:reponer]
+    before_action :require_admin_bar, only: [:create, :update, :destroy, :ajustar]
     before_action :set_producto, only: [:update, :destroy, :reponer, :comprar, :ajustar, :movimientos, :codigo_barras]
 
     # GET /bares/:bar_id/productos
@@ -151,6 +157,10 @@ module Bar
 
     def require_operador
       render json: { error: 'No autorizado' }, status: :forbidden unless ROLES_OPERADOR.include?(current_user&.role)
+    end
+
+    def require_gestion
+      render json: { error: 'No autorizado' }, status: :forbidden unless gestion?
     end
 
     def require_admin_bar

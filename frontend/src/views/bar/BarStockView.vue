@@ -191,8 +191,8 @@ async function borrarCat(c) {
               <button class="lnk" :title="p.codigo_barras || 'Sin código'" @click="abrirCodigo(p)">
                 ⌗ {{ p.codigo_barras ? 'Código' : 'Sin código' }}
               </button>
+              <button class="lnk" @click="abrirCompra(p)">Comprar</button>
               <template v-if="esGestion">
-                <button class="lnk" @click="abrirCompra(p)">Comprar</button>
                 <button class="lnk" @click="editar(p)">Editar</button>
                 <button class="lnk lnk--danger" @click="borrar(p)">Borrar</button>
               </template>

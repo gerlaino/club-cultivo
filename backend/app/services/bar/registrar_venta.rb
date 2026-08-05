@@ -38,6 +38,15 @@ module Bar
         total = 0.to_d
 
         @lineas.each do |ln|
+          # Línea SUELTA: se vende algo que no está en el inventario (el admin todavía no lo
+          # cargó). Registra la venta y su ingreso, pero no toca stock ni pretende ser
+          # inventario — no hay de qué descontar. Es la alternativa a que el mostrador frene
+          # la venta o, peor, la haga por fuera del sistema y no quede registro.
+          if linea_suelta?(ln)
+            total += registrar_linea_suelta(venta, ln)
+            next
+          end
+
           item = resolver(ln)
           cant = ln[:cantidad].to_d
           raise ArgumentError, "Cantidad inválida para #{item.nombre}" if cant <= 0
@@ -83,6 +92,31 @@ module Bar
       # nueva); si no se migró todavía, la venta se registra igual sin caja.
       attrs[:caja_turno] = @bar.caja_abierta if BarVenta.column_names.include?('caja_turno_id')
       @bar.bar_ventas.create!(attrs)
+    end
+
+    # Sin vendible y con nombre propio: es una venta suelta. El shape viejo del POS mandaba
+    # `bar_producto_id` sin `vendible_type`, así que exigimos el nombre para no confundirlos.
+    def linea_suelta?(ln)
+      ln[:vendible_type].blank? && ln[:bar_producto_id].blank? && ln[:nombre].present?
+    end
+
+    def registrar_linea_suelta(venta, ln)
+      nombre = ln[:nombre].to_s.strip
+      cant   = ln[:cantidad].to_d
+      precio = ln[:precio_unitario_ars].to_d
+
+      raise ArgumentError, 'La venta suelta necesita un nombre' if nombre.blank?
+      raise ArgumentError, "Cantidad inválida para #{nombre}"   if cant <= 0
+      raise ArgumentError, "Poné el precio de #{nombre}"        if precio <= 0
+
+      subtotal = (precio * cant).round(2)
+      # Sin `vendible`: el modelo ya lo admite (es opcional) y así queda claro en el ticket y
+      # en los informes que esta línea no salió del inventario.
+      venta.items.create!(
+        club: @club, nombre: nombre, cantidad: cant,
+        precio_unitario_ars: precio, subtotal_ars: subtotal
+      )
+      subtotal
     end
 
     # Compat: una línea sin vendible_type es un producto del bar (shape viejo del POS).

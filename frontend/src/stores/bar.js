@@ -121,16 +121,36 @@ export const useBarStore = defineStore("bar", {
     },
     vaciar() { this.carrito = []; },
 
+    // Línea SUELTA: algo que no está en el catálogo (el admin todavía no lo cargó). Se vende
+    // con nombre y precio a mano; no descuenta stock porque no hay de qué descontarlo. La venta
+    // y su ingreso quedan registrados igual — que es el punto: que no se cobre por fuera.
+    agregarSuelto({ nombre, precio }) {
+      const n = String(nombre || '').trim();
+      const p = Number(precio) || 0;
+      if (!n || p <= 0) return false;
+      this.carrito.push({
+        key: `suelto-${Date.now()}`, suelto: true,
+        nombre: n, precio: p, cantidad: 1,
+        disponible: Infinity, deposito: null, unidad: 'u',
+      });
+      return true;
+    },
+
     async cobrar(barId, medio_pago = 'efectivo', evento_bar_id = null) {
       if (!this.carrito.length) return null;
       this.saving = true; this.saveError = null;
       try {
         // El precio solo viaja cuando es manual (ítem sin precio propio): el backend lo acepta
         // únicamente de admin/supervisor.
-        const lineas = this.carrito.map(l => ({
-          vendible_type: l.tipo, vendible_id: l.id, cantidad: l.cantidad,
-          ...(l.precio_manual ? { precio_unitario_ars: l.precio } : {}),
-        }));
+        const lineas = this.carrito.map(l => (
+          l.suelto
+            // Sin vendible: el backend la registra como venta suelta.
+            ? { nombre: l.nombre, cantidad: l.cantidad, precio_unitario_ars: l.precio }
+            : {
+                vendible_type: l.tipo, vendible_id: l.id, cantidad: l.cantidad,
+                ...(l.precio_manual ? { precio_unitario_ars: l.precio } : {}),
+              }
+        ));
         const { data } = await crearBarVenta(barId, { lineas, medio_pago, evento_bar_id: evento_bar_id || undefined });
         this.vaciar();
         await this.fetchProductos(barId, { activos: 'true' });
