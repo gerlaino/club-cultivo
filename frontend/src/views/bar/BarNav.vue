@@ -54,7 +54,7 @@ const TABS = computed(() => {
   <div class="bn">
     <div class="bn__top">
       <div class="bn__id">
-        <h1 class="bn__name"><span class="bn__glass">🍸</span> {{ bar?.nombre || 'Salón' }}</h1>
+        <h1 class="bn__name"><span class="bn__glass">🍸</span> {{ bar?.nombre || 'Buffet' }}</h1>
         <p class="bn__sede" v-if="bar?.sede">{{ bar.sede.nombre }} · {{ bar.sede.tipo }}</p>
       </div>
       <div class="bn__right">

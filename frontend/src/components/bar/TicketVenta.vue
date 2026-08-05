@@ -6,7 +6,7 @@ import { computed } from 'vue'
 
 const props = defineProps({
   ticket: { type: Object, required: true }, // { nro, items:[{nombre,cantidad,precio}], total, medio, fecha }
-  bar:    { type: String, default: 'Salón' },
+  bar:    { type: String, default: 'Buffet' },
   club:   { type: String, default: '' },
   logo:   { type: String, default: '' },
 })

@@ -144,7 +144,7 @@ function alternarDetalle(id) {
   abiertos.value = s
 }
 // El detalle ocupa el ancho de la tabla; se calcula para no desalinearse si cambian las columnas.
-const colspanDetalle = computed(() => 8)
+const colspanDetalle = 99   // el navegador lo clampa a la cantidad real de columnas
 
 const loading   = ref(false)
 const exporting = ref(false)
@@ -980,7 +980,12 @@ const FORMAS = [
 .hd__prod-multi--open .hd__chev { transform: rotate(90deg); }
 .hd__chev { transition: transform .15s; }
 .hd__tr-detalle > td { background: var(--c-ink-50, #f8fafc); padding: 0; }
-.hd__detalle { padding: .5rem .9rem; display: flex; flex-direction: column; gap: .3rem; }
+.hd__detalle {
+  padding: .5rem .9rem; display: flex; flex-direction: column; gap: .3rem;
+  position: sticky; left: 0;
+  width: min(100%, calc(100vw - var(--sp-8, 32px)));
+  box-sizing: border-box;
+}
 .hd__detalle-item {
   display: grid; grid-template-columns: 1fr auto auto; gap: 1rem;
   font-size: .8rem; color: var(--c-ink-600, #475569);

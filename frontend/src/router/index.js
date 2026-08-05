@@ -987,8 +987,15 @@ router.beforeEach(async (to) => {
   // que fetchMe trajera el usuario → can()/role daban vacío y redirigían a dashboard.
   // Las páginas públicas por token (carnet, dispensa, genética) NO se bloquean — así
   // renderizan al instante aunque el backend esté despertando (free tier).
-  const esPublicaToken = /^\/(c|d|g)\//.test(to.path) || to.path === '/bienvenida';
-  if (esPublicaToken) {
+  // El LOGIN nunca espera el bootstrap. Es la pantalla a la que caés cuando algo salió mal
+  // (sesión vencida, logout, backend dormido): si para mostrarla hay que esperar un /me que
+  // puede colgarse, el usuario se queda mirando una pantalla muerta sin poder hacer nada.
+  // El formulario no necesita saber si había sesión previa — necesita dejarte entrar.
+  // Las públicas por token (carnet, dispensa, genética) y la landing, por lo mismo: rendir ya.
+  const noEsperaBootstrap =
+    /^\/(c|d|g)\//.test(to.path) || to.path === '/bienvenida' || to.path === '/login';
+
+  if (noEsperaBootstrap) {
     auth.ensureBootstrapped();
   } else {
     await auth.ensureBootstrapped();
@@ -1028,6 +1035,9 @@ router.beforeEach(async (to) => {
     !to.path.startsWith('/c/') &&
     !to.path.startsWith('/d/') &&
     !to.path.startsWith('/l/') &&
+    // El Buffet es responsive y el dispensador lo abre desde su propia barra: sin esta
+    // excepción el guard lo rebotaba a /m/dispensar y el botón parecía no hacer nada.
+    !to.path.startsWith('/bar') &&
     !to.path.endsWith('/etiqueta') &&
     !to.path.startsWith('/login')
   ) {

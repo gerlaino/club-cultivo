@@ -11,6 +11,13 @@ let bootstrapPromise = null;
 // más vale mostrar el login que dejar la pantalla colgada.
 const BOOTSTRAP_TIMEOUT_MS = 8000;
 
+// Generación de la sesión. Login y logout la incrementan. Un /me que salió ANTES de ese
+// cambio ya no puede escribir el estado cuando vuelve: si no, el 401 tardío del arranque
+// (que no llevaba cookie) pisaba con `user = null` un login que ya había funcionado, y la app
+// te devolvía al formulario. Es la carrera que hacía que "iniciar sesión con otro usuario"
+// se trabara de forma intermitente.
+let authEpoch = 0;
+
 export const useAuthStore = defineStore("auth", {
   state: () => ({
     user: null,
@@ -49,13 +56,15 @@ export const useAuthStore = defineStore("auth", {
     // lento dejaba el botón de "Ingresar" deshabilitado con spinner sin que el usuario hubiera
     // apretado nada — parecía que el login estaba colgado.
     async fetchMe({ silent = false } = {}) {
+      const epoch = authEpoch;
       if (!silent) this.loading = true;
       this.error = null;
       try {
         const { data } = await me();
-        this.user = data;
+        if (epoch === authEpoch) this.user = data;
       } catch {
-        this.user = null;
+        // Una respuesta vieja no borra una sesión nueva.
+        if (epoch === authEpoch) this.user = null;
       } finally {
         if (!silent) this.loading = false;
         this.bootstrapped = true;
@@ -80,6 +89,8 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async login(email, password, redirect = null) {
+      authEpoch++;           // invalida cualquier /me en vuelo del arranque
+      bootstrapPromise = null;
       this.loading = true;
       this.error = null;
       this.loggingOut = false;
@@ -130,6 +141,8 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async logOut() {
+      authEpoch++;
+      bootstrapPromise = null;
       this.loading = true;
       this.error = null;
       this.loggingOut = true;   // los 401 en vuelo no deben setear ?redirect

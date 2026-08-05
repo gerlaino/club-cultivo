@@ -53,7 +53,7 @@ const FEATURE_META = {
   analytics:        { label: 'Analytics',         desc: 'Dashboard analítico avanzado',    icon: '📊' },
   multi_sede:       { label: 'Multi-sede',        desc: 'Múltiples sedes/ubicaciones',     icon: '🏢' },
   insumos:          { label: 'Insumos',           desc: 'Depósito + costo real por lote',  icon: '🧪' },
-  bar:              { label: 'Bar',               desc: 'POS y tablero del bar',           icon: '🍺' },
+  bar:              { label: 'Buffet',            desc: 'POS y tablero del buffet',        icon: '🍺' },
 }
 const FEATURES_ORDER = Object.keys(FEATURE_META)
 

@@ -45,7 +45,7 @@ const comprometido = computed(() => totalCostos.value + totalComprar.value)
 const porComprar   = computed(() => items.value.filter(p => p.faltante > 0).length)
 const pagosPendientes = computed(() => props.costos.filter(c => !c.pagado).length)
 
-const DEP = { salon: 'Salón', cultivo: 'Cultivo', general: 'General', dispensacion: 'Dispensario', externo: 'Externo' }
+const DEP = { salon: 'Buffet', cultivo: 'Cultivo', general: 'General', dispensacion: 'Dispensario', externo: 'Externo' }
 const depLabel = (d) => DEP[d] || d
 const advertencias = ref([])
 

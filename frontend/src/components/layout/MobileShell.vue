@@ -202,7 +202,7 @@ NAV.supervisor = NAV.admin
 const navItems = computed(() => {
   const base = NAV[role.value]?.items || []
   if (role.value === 'dispensador' && club.data?.features?.bar) {
-    return [...base, { to: '/bar', icon: 'bi-cup-hot', label: 'Salón' }]
+    return [...base, { to: '/bar', icon: 'bi-cup-hot', label: 'Buffet' }]
   }
   return base
 })

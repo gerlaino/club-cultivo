@@ -235,7 +235,7 @@ const CATEGORIAS = [
   { value: "aporte_socio",  label: "Aporte socio",             tipo: "ingreso" },
   { value: "dispensacion",  label: "Recupero dispensación",    tipo: "ingreso" },
   { value: "subvencion",    label: "Subvención / Donación",    tipo: "ingreso" },
-  { value: "bar",           label: "Bar / Salón",              tipo: "ambos"   },
+  { value: "bar",           label: "Buffet",              tipo: "ambos"   },
   { value: "otro",          label: "Otro",                     tipo: "ambos"   },
 ]
 function catLabel(cat) { return CATEGORIAS.find(c => c.value === cat)?.label || cat || "—" }

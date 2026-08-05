@@ -54,7 +54,7 @@ const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 // El mostrador puede cobrar un insumo (una remera del depósito General) sin duplicarlo como
 // producto del bar: la línea descuenta de SU depósito. Lo del dispensario (flor, derivados y
 // stock externo) NO se vende acá — sale por dispensación, que es lo que deja la trazabilidad.
-const DEP_LBL = { salon: 'Salón', cultivo: 'Cultivo', general: 'General' }
+const DEP_LBL = { salon: 'Buffet', cultivo: 'Cultivo', general: 'General' }
 const otros = ref([])
 const buscandoOtros = ref(false)
 let otrosTimer = null
@@ -150,7 +150,7 @@ async function guardarNuevo() {
 // Comprobante (no fiscal) de la venta
 const clubStore = useClubStore()
 const ticketVenta = ref(null)
-const barNombre = computed(() => store.bares.find(b => String(b.id) === String(barId))?.nombre || store.barActual?.nombre || 'Salón')
+const barNombre = computed(() => store.bares.find(b => String(b.id) === String(barId))?.nombre || store.barActual?.nombre || 'Buffet')
 
 async function cobrar() {
   if (!store.carrito.length) return

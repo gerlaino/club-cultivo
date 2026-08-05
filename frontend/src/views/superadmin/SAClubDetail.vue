@@ -91,7 +91,7 @@ const FEATURE_META = {
   analytics:        { label: 'Analytics',         desc: 'Dashboard de analítica avanzada',              icon: '📊' },
   multi_sede:       { label: 'Multi-sede',        desc: 'Múltiples sedes/ubicaciones',                  icon: '🏢' },
   insumos:          { label: 'Insumos',           desc: 'Depósito de insumos y costo real por lote',    icon: '🧪' },
-  bar:              { label: 'Bar',               desc: 'Punto de venta y tablero del bar',             icon: '🍺' },
+  bar:              { label: 'Buffet',            desc: 'Punto de venta y tablero del buffet',          icon: '🍺' },
 }
 const FEATURES_ORDER = Object.keys(FEATURE_META)
 const iaActiva = computed(() => featuresForm.value.ia_analisis || featuresForm.value.ia_voz)

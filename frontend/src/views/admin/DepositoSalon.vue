@@ -53,7 +53,7 @@ const TIPO_MOV = {
     </div>
     <div v-else-if="loading" class="ds__empty">Cargando depósito del salón…</div>
     <div v-else-if="!bar" class="ds__empty ds__empty--box">
-      Esta sede todavía no tiene salón. Creá el bar desde la sección <b>Salón</b>.
+      Esta sede todavía no tiene buffet. Creá el buffet desde la sección <b>Buffet</b>.
     </div>
 
     <template v-else>

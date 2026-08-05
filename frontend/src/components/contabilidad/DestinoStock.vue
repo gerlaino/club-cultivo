@@ -133,7 +133,7 @@ const unidadItem = computed(() => {
       <template v-else>
         <div class="dst__row">
           <label class="dst__fld dst__fld--grow">
-            <span class="dst__lbl">Bar</span>
+            <span class="dst__lbl">Buffet</span>
             <select class="dst__inp" :class="{ 'dst__inp--err': errores.destino_item }"
                     :value="d.bar_id" @change="set({ bar_id: $event.target.value, bar_producto_id: '', nombre: '' })">
               <option value="">— Elegí el bar —</option>
