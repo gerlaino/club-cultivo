@@ -38,14 +38,30 @@
           </div>
 
           <!-- Selector de sala (solo cuando no viene fija y no es cosechado) -->
-          <div v-else-if="!sala" class="nlm__field">
-            <label class="nlm__label">Sala <span class="nlm__req">*</span></label>
-            <select class="nlm__input" :class="{ 'nlm__input--err': errors.sala_id }" v-model="salaId">
-              <option value="" disabled>Seleccioná una sala…</option>
-              <option v-for="s in (salas || [])" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-            </select>
-            <span v-if="errors.sala_id" class="nlm__err">{{ errors.sala_id }}</span>
-          </div>
+          <template v-else-if="!sala">
+            <div v-if="sedes.length > 1" class="nlm__field">
+              <label class="nlm__label">Sede</label>
+              <select class="nlm__input" v-model="sedeFiltro">
+                <option value="">Todas las sedes</option>
+                <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              </select>
+            </div>
+            <div class="nlm__field">
+              <label class="nlm__label">Sala <span class="nlm__req">*</span></label>
+              <select class="nlm__input" :class="{ 'nlm__input--err': errors.sala_id }" v-model="salaId">
+                <option value="" disabled>Seleccioná una sala…</option>
+                <option v-for="s in salasOfrecidas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              </select>
+              <span v-if="!salasOfrecidas.length" class="nlm__hint">
+                No hay salas de {{ estadoObjetivo === 'floracion' ? 'floración' : 'vegetativo' }}
+                {{ sedeFiltro ? 'en esa sede' : 'disponibles' }}.
+              </span>
+              <span v-else class="nlm__hint">
+                Sólo salas donde un lote en {{ estadoObjetivo === 'floracion' ? 'floración' : 'vegetativo' }} puede estar.
+              </span>
+              <span v-if="errors.sala_id" class="nlm__err">{{ errors.sala_id }}</span>
+            </div>
+          </template>
 
           <!-- Código (readonly) -->
           <div class="nlm__field">
@@ -274,6 +290,35 @@ const esCosechado = computed(() => tipoCreacion.value === 'existente' && heredad
 // En salas de floración/cosecha un lote NO puede ser "nuevo" (no se germina ahí): siempre
 // viene de una fase previa, así que se carga como existente (heredado) y se piden los días.
 const salaVieneDeAntes = computed(() => ['floracion', 'cosecha'].includes(effectiveSala.value?.kind))
+
+// Qué salas se le pueden ofrecer a este lote. Un lote NUEVO arranca enraizando y va a una sala
+// de vegetativo: en floración (12/12) no germina ni prende nada, así que esa sala no es una
+// opción. Un lote existente sólo puede entrar donde su fase actual pueda vivir. Las salas
+// "mixta" corren las dos, así que entran siempre.
+const KINDS_POR_ESTADO = {
+  enraizado:  ['vegetativo', 'mixta', 'clon'],
+  vegetativo: ['vegetativo', 'mixta'],
+  floracion:  ['floracion',  'mixta'],
+}
+
+const estadoObjetivo = computed(() =>
+  tipoCreacion.value === 'existente' ? heredadoEstado.value : 'enraizado')
+
+const salasOfrecidas = computed(() => {
+  const permitidos = KINDS_POR_ESTADO[estadoObjetivo.value] || []
+  return (props.salas || []).filter(s => {
+    const okKind = permitidos.includes(s.kind)
+    const okSede = !sedeFiltro.value || String(s.sede?.id ?? s.sede_id) === String(sedeFiltro.value)
+    return okKind && okSede
+  })
+})
+
+// Filtro por sede del selector de salas: en un club con varias sedes, la lista completa de
+// salas no dice nada hasta que sabés de qué sede es cada una.
+const sedeFiltro = ref('')
+watch([estadoObjetivo, sedeFiltro], () => {
+  if (salaId.value && !salasOfrecidas.value.some(s => s.id === salaId.value)) salaId.value = ''
+})
 
 const form          = ref(emptyForm())
 const errors        = ref({})

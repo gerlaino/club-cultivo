@@ -48,14 +48,20 @@
         <div class="cvd__kpi-lbl">Salas activas</div>
         <div class="cvd__kpi-sub">de {{ salas.length }} en total</div>
       </div>
-      <div class="cvd__kpi-card">
+      <!-- El "N listos para avanzar" era un número muerto: ahora abre cuáles son. -->
+      <component
+        :is="lotesListosItems.length ? 'button' : 'div'"
+        class="cvd__kpi-card"
+        :class="{ 'cvd__kpi-card--clickable': lotesListosItems.length }"
+        @click="lotesListosItems.length && (showListosModal = true)"
+      >
         <div class="cvd__kpi-ico" :class="{ 'cvd__kpi-ico--amber': lotesListos > 0 }"><GitBranch :size="18" :stroke-width="1.75" /></div>
         <div class="cvd__kpi-val" :class="{ 'cvd__kpi-val--amber': lotesListos > 0 }">{{ lotesEnCiclo }}</div>
         <div class="cvd__kpi-lbl">Lotes en cultivo</div>
         <div class="cvd__kpi-sub" :class="{ 'cvd__kpi-sub--amber': lotesListos > 0 }">
-          {{ lotesListos > 0 ? `${lotesListos} listo${lotesListos !== 1 ? 's' : ''} para avanzar` : 'sin cambios pendientes' }}
+          {{ lotesListos > 0 ? `${lotesListos} listo${lotesListos !== 1 ? 's' : ''} para avanzar →` : 'sin cambios pendientes' }}
         </div>
-      </div>
+      </component>
       <div class="cvd__kpi-card">
         <div class="cvd__kpi-ico" :class="{ 'cvd__kpi-ico--rust': notifCount > 0 }"><AlertTriangle :size="18" :stroke-width="1.75" /></div>
         <div class="cvd__kpi-val" :class="{ 'cvd__kpi-val--rust': notifCount > 0 }">{{ notifCount }}</div>
@@ -125,7 +131,7 @@
             </div>
             <div class="cvd__sem-tareas">
               <div
-                v-for="t in dia.tareas"
+                v-for="t in tareasVisibles(dia)"
                 :key="t.id + (t._atrasada ? '-a' : '')"
                 class="cvd__sem-tarea"
                 :class="[
@@ -139,6 +145,16 @@
                 <span class="cvd__sem-titulo">{{ t.titulo }}</span>
                 <span v-if="t._atrasada" class="cvd__sem-late" title="Atrasada">⏰</span>
               </div>
+              <!-- A partir de la quinta se pliega: el orden ya deja arriba lo atrasado y lo
+                   urgente, así que lo que se esconde es lo menos importante. El contador del
+                   encabezado sigue mostrando el total real. -->
+              <button
+                v-if="dia.tareas.length > TOPE_DIA"
+                class="cvd__sem-mas"
+                @click.stop="alternarDia(dia.fecha)"
+              >
+                {{ diasExpandidos.has(dia.fecha) ? 'Ver menos' : `+${dia.tareas.length - TOPE_DIA} más` }}
+              </button>
               <div v-if="!dia.tareas.length && dia.fecha === hoyISO" class="cvd__sem-vacio-hoy">
                 Sin tareas hoy
               </div>
@@ -310,10 +326,41 @@
   </Teleport>
 
   <RegistrarLecturaSheet v-model="lecturaOpen" :sala-id-inicial="lecturaSalaId" />
+
+  <!-- Qué lotes están listos para avanzar, y a cuál ir -->
+  <Teleport to="body">
+    <div v-if="showListosModal" class="cvd__ov" @click.self="showListosModal = false">
+      <div class="cvd__listos">
+        <div class="cvd__listos-head">
+          <h3 class="cvd__listos-title">Listos para avanzar</h3>
+          <button class="cvd__listos-close" @click="showListosModal = false">✕</button>
+        </div>
+        <button
+          v-for="l in lotesListosItems"
+          :key="l.id"
+          class="cvd__listo"
+          @click="irAlLote(l.id)"
+        >
+          <div class="cvd__listo-main">
+            <span class="cvd__listo-cod">{{ l.codigo }}</span>
+            <span class="cvd__listo-gen">{{ l.genetica?.nombre || l.strain || 'Sin genética' }}</span>
+          </div>
+          <div class="cvd__listo-fase">
+            {{ l.estado }} <span class="cvd__listo-arrow">→</span> {{ l.proxima_fase_posible || '—' }}
+          </div>
+          <div class="cvd__listo-meta">
+            {{ l.plants_count ?? 0 }} plantas
+            <span v-if="l.dias_en_estado != null"> · {{ l.dias_en_estado }}d en fase</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter }        from 'vue-router'
 import { useAuthStore }     from '../../stores/auth'
 import { useClubStore }     from '../../stores/club'
 import { useTareasStore }   from '../../stores/tareas'
@@ -322,6 +369,7 @@ import { useLotesStore }    from '../../stores/lotes'
 import { useAmbienteStore } from '../../stores/ambiente'
 import { useAlertasBell }   from '../../composables/useAlertasBell.js'
 import { useToast }         from '../../composables/useToast.js'
+import { useSemanaTareas }  from '../../composables/useSemanaTareas.js'
 import { formatFechaLarga } from '../../utils/fecha.js'
 import { getTareasSemana }  from '../../lib/api'
 
@@ -334,6 +382,7 @@ import LeafHerbarium from '../../design-system/icons/LeafHerbarium.vue'
 import RegistrarLecturaSheet from '../cultivador/RegistrarLecturaSheet.vue'
 import { LayoutGrid, Sprout, GitBranch, AlertTriangle, ChevronRight } from 'lucide-vue-next'
 
+const router        = useRouter()
 const auth          = useAuthStore()
 const club          = useClubStore()
 const tareasStore   = useTareasStore()
@@ -421,24 +470,9 @@ const labelSemana = computed(() => {
   return `${d.getDate()} — ${h.getDate()} ${h.toLocaleDateString('es-AR', { month: 'short' })}`
 })
 
-const semanaProcessed = computed(() => {
-  if (!semana.value.dias?.length) return semana.value
-  const dias = semana.value.dias.map(d => ({ ...d, tareas: [...d.tareas] }))
-  const hoyIdx = dias.findIndex(d => d.fecha === hoyISO)
-  if (hoyIdx > 0) {
-    for (let i = 0; i < hoyIdx; i++) {
-      const overdue = dias[i].tareas.filter(t => t.estado !== 'completada' && t.estado !== 'cancelada')
-      overdue.forEach(t => dias[hoyIdx].tareas.unshift({ ...t, _atrasada: true }))
-      dias[i] = { ...dias[i], tareas: dias[i].tareas.filter(t => t.estado === 'completada' || t.estado === 'cancelada') }
-    }
-  }
-  return { ...semana.value, dias }
-})
-
-const totalTareasSemana = computed(() =>
-  semanaProcessed.value.dias?.reduce((acc, d) =>
-    acc + d.tareas.filter(t => t.estado !== 'completada' && t.estado !== 'cancelada').length, 0) || 0
-)
+// La misma lógica que usa la vista mobile: lo vencido y pendiente se arrastra a hoy.
+const { dias: diasSemana, totalPendientes: totalTareasSemana } = useSemanaTareas(semana)
+const semanaProcessed = computed(() => ({ ...semana.value, dias: diasSemana.value }))
 
 function esTareaFutura(t) {
   if (!t?.fecha_programada) return false
@@ -498,7 +532,29 @@ const totalPlantas    = computed(() => salas.value.reduce((acc, s) => acc + (s.p
 const plantasVeg      = computed(() => lotesStore.items.filter(l => l.estado === 'vegetativo').reduce((a, l) => a + (l.plants_count || 0), 0))
 const plantasFlor     = computed(() => lotesStore.items.filter(l => l.estado === 'floracion').reduce((a, l) => a + (l.plants_count || 0), 0))
 const lotesEnCiclo    = computed(() => lotesStore.items.filter(l => ['vegetativo', 'floracion'].includes(l.estado)).length)
-const lotesListos     = computed(() => lotesStore.items.filter(l => l.puede_transicionar === true).length)
+const lotesListosItems = computed(() => lotesStore.items.filter(l => l.puede_transicionar === true))
+const lotesListos      = computed(() => lotesListosItems.value.length)
+const showListosModal  = ref(false)
+
+// Cuántas tareas se ven por día antes de plegar.
+const TOPE_DIA = 5
+const diasExpandidos = ref(new Set())
+
+function tareasVisibles(dia) {
+  if (dia.tareas.length <= TOPE_DIA || diasExpandidos.value.has(dia.fecha)) return dia.tareas
+  return dia.tareas.slice(0, TOPE_DIA)
+}
+
+function alternarDia(fecha) {
+  const s = new Set(diasExpandidos.value)
+  s.has(fecha) ? s.delete(fecha) : s.add(fecha)
+  diasExpandidos.value = s
+}
+
+function irAlLote(id) {
+  showListosModal.value = false
+  router.push({ name: 'lote-detail', params: { id } })
+}
 const notifCount      = computed(() => ambienteStore.alertasCount)
 const alertasCriticas = computed(() => ambienteStore.alertasActivas.filter(a => ['temperatura', 'co2'].includes(a.tipo)))
 
@@ -682,6 +738,45 @@ onMounted(async () => {
 .cvd__sem-titulo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f2611; font-weight: 500; }
 .cvd__sem-late   { flex-shrink: 0; font-size: .7rem; }
 .cvd__sem-vacio-hoy { font-size: 11px; color: #9ca3af; text-align: center; padding: 8px 4px; align-self: center; margin: auto 0; }
+
+/* Plegado por día */
+.cvd__sem-mas {
+  width: 100%; margin-top: 2px; padding: var(--sp-1) var(--sp-2);
+  background: none; border: 1px dashed var(--c-ink-300); border-radius: var(--r-md);
+  font-family: var(--font-ui); font-size: 11px; font-weight: 600; color: var(--c-ink-500);
+  cursor: pointer; transition: all var(--t-base);
+}
+.cvd__sem-mas:hover { border-color: var(--c-leaf-500); color: var(--c-leaf-800); background: var(--c-leaf-50); }
+
+/* KPI que abre el detalle */
+.cvd__kpi-card--clickable { cursor: pointer; text-align: left; font: inherit; width: 100%; }
+.cvd__kpi-card--clickable:hover { border-color: var(--c-leaf-300); box-shadow: var(--sh-2); }
+
+/* Modal de lotes listos para avanzar */
+.cvd__ov {
+  position: fixed; inset: 0; z-index: 1200; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center; padding: var(--sp-4);
+}
+.cvd__listos {
+  background: #fff; border-radius: var(--r-xl); width: 100%; max-width: 440px;
+  max-height: 80vh; overflow-y: auto; padding: var(--sp-5);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.cvd__listos-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-2); }
+.cvd__listos-title { font-family: var(--font-display); font-size: var(--fs-18); font-weight: 700; margin: 0; color: var(--c-ink-950); }
+.cvd__listos-close { background: none; border: none; font-size: var(--fs-16); color: var(--c-ink-500); cursor: pointer; padding: var(--sp-1); }
+.cvd__listo {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  background: var(--c-leaf-50); border: 1px solid var(--c-leaf-100); border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4); cursor: pointer; transition: all var(--t-base); font: inherit;
+}
+.cvd__listo:hover { border-color: var(--c-leaf-500); background: var(--c-leaf-100); }
+.cvd__listo-main { display: flex; align-items: baseline; gap: var(--sp-2); }
+.cvd__listo-cod { font-weight: 700; font-size: var(--fs-14); color: var(--c-ink-950); }
+.cvd__listo-gen { font-size: var(--fs-12); color: var(--c-ink-500); }
+.cvd__listo-fase { font-size: var(--fs-13); font-weight: 600; color: var(--c-leaf-800); text-transform: capitalize; }
+.cvd__listo-arrow { color: var(--c-leaf-500); }
+.cvd__listo-meta { font-size: var(--fs-12); color: var(--c-ink-500); }
 
 /* Footer */
 .cvd__footer { display: flex; align-items: center; gap: .5rem; font-size: .78rem; color: #60725d; padding-top: .75rem; border-top: 1px solid #e8f0e9; }

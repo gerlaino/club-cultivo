@@ -1,5 +1,26 @@
 # Changelog
 
+## Agosto 2026 (d) — la PWA del cultivador es la sala, no la app entera
+
+- **Las tareas atrasadas se arrastran a hoy también en el teléfono.** El escritorio ya lo hacía;
+  mobile mostraba el día literal, así que 19 tareas vencidas quedaban escondidas en su día original
+  y "hoy" aparecía vacío. La lógica salió a `useSemanaTareas` y ahora la comparten las dos vistas —
+  una tarea que venció y sigue pendiente no es historia del martes, es trabajo de hoy.
+- **La barra del cultivador queda en Cultivo · Escanear · + · Tareas · Mis horas.** A una planta se
+  llega escaneando su QR o desde su lote, que es como se trabaja parado en la sala; una lista de
+  todas las plantas en el celular no se usa, y Genéticas es material de consulta de escritorio.
+- **El cultivador no crea salas**: el backend ya devolvía 403, pero la UI seguía ofreciendo el botón
+  en el estado vacío de la sede — un camino que sólo llevaba a un error.
+- **Al crear un lote sólo se ofrecen salas donde ese lote puede estar.** Un lote nuevo arranca
+  enraizando y va a vegetativo: en 12/12 no germina ni prende nada, así que las salas de floración
+  dejan de ser opción. Un lote existente sólo ve salas compatibles con la fase que declara. Y con
+  varias sedes, se filtra por sede antes de elegir.
+- **El KPI "N listos para avanzar" abre cuáles son**, con la fase actual, la siguiente y los días en
+  fase, y cada uno navega a su lote. Era un número que no llevaba a ningún lado.
+- **La semana de trabajo se pliega a partir de la quinta tarea por día.** Con 19 tareas la columna
+  era ilegible. Lo atrasado y lo urgente quedan arriba —así lo que se esconde es lo menos
+  importante— y el contador del encabezado sigue mostrando el total real.
+
 ## Agosto 2026 (c) — el cultivador veía lotes pero ninguna planta
 
 El síntoma era ese, y la causa una asimetría: `lotes#index` tenía una red de seguridad para el

@@ -156,9 +156,9 @@ const NAV = {
     { to: '/m/cultivador/sedes',  icon: 'bi-diagram-3',     label: 'Cultivo' },
     { to: '/m/scan',              icon: 'bi-qr-code-scan',  label: 'Escanear' },
     { to: '/m/cultivador/tareas', icon: 'bi-check2-square', label: 'Tareas' },
-    // Lo que también tiene en la web: la PWA no recorta lo que el rol puede hacer.
-    { to: '/m/plantas',             icon: 'bi-flower1',       label: 'Plantas' },
-    { to: '/m/geneticas',           icon: 'bi-diagram-2',     label: 'Genéticas' },
+    // A la planta suelta se llega escaneando su QR o desde su lote, que es como se trabaja en la
+    // sala; una lista de todas las plantas en el teléfono no se usa. Genéticas es material de
+    // consulta de escritorio. Queda "Mis horas", que sí se marca de pie.
     { to: '/m/horas',             icon: 'bi-clock-history', label: 'Mis horas' },
   ] },
   // El admin en el celular NO administra: mira cómo va el día y desbloquea lo que traba a otros.

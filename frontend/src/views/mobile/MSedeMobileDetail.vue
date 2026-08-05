@@ -15,7 +15,8 @@
       <div v-if="!salas.length" class="msd__empty">
         <i class="bi bi-grid-3x3-gap msd__empty-icon"></i>
         <p>Sin salas en esta sede</p>
-        <button class="msd__empty-cta" @click="showNuevaSala = true"><i class="bi bi-plus-lg"></i> Crear primera sala</button>
+        <button v-if="puedeCrearSalas" class="msd__empty-cta" @click="showNuevaSala = true"><i class="bi bi-plus-lg"></i> Crear primera sala</button>
+        <p v-else class="msd__empty-hint">Las salas las crea un administrador.</p>
       </div>
 
       <div v-else class="msd__list">
@@ -45,13 +46,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getSede, listSalas } from '../../lib/api'
+import { useAuthStore } from '../../stores/auth'
 import { useToast } from '../../composables/useToast.js'
 import ModalCrearSala from '../../components/salas/ModalCrearSala.vue'
 
 const route = useRoute()
+const auth  = useAuthStore()
+const puedeCrearSalas = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 const id    = Number(route.params.id)
 const toast = useToast()
 
@@ -105,6 +109,7 @@ async function onSalaCreada() {
 
 .msd__empty  { display: flex; flex-direction: column; align-items: center; gap: .6rem; padding: 3rem 1rem; color: var(--c-ink-500, #6b7280); font-size: .875rem; }
 .msd__empty-icon { font-size: 2.5rem; color: var(--c-leaf-300, #a8c9b5); }
+.msd__empty-hint { font-size: 13px; color: #94a3b8; margin: 0; }
 .msd__empty-cta {
   margin-top: .4rem; display: inline-flex; align-items: center; gap: .4rem;
   background: var(--c-leaf-100, #e8f0eb); color: var(--c-leaf-700, #2d4a3e); border: none;

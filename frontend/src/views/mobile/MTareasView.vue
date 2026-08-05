@@ -34,9 +34,12 @@
     <div v-else class="mta__list">
       <div
         v-for="t in tareasDelDia"
-        :key="t.id"
+        :key="t.id + (t._atrasada ? '-a' : '')"
         class="mta__card"
-        :class="[`mta__card--${t.prioridad}`, { 'mta__card--futura': esFutura(t) && t.estado !== 'completada' }]"
+        :class="[`mta__card--${t.prioridad}`, {
+          'mta__card--futura': esFutura(t) && t.estado !== 'completada',
+          'mta__card--atrasada': t._atrasada,
+        }]"
         @click="abrirCompletarSheet(t)"
       >
         <div class="mta__card-left">
@@ -45,6 +48,7 @@
         <div class="mta__card-body">
           <div class="mta__card-titulo">{{ t.titulo }}</div>
           <div class="mta__card-meta">
+            <span v-if="t._atrasada" class="mta__atrasada">⏰ Atrasada</span>
             <span v-if="t.sala?.nombre" class="mta__sala">{{ t.sala.nombre }}</span>
             <span v-if="t.estado === 'completada'" class="mta__completada-badge">✓ Completada</span>
             <span v-else-if="esFutura(t)" class="mta__prog-badge"><i class="bi bi-clock"></i> Programada</span>
@@ -147,6 +151,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
+import { useSemanaTareas } from '../../composables/useSemanaTareas.js'
 import { useTareasStore } from '../../stores/tareas'
 import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 
@@ -169,11 +174,16 @@ hoy.setHours(0, 0, 0, 0)
 
 const NOMBRES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
+// Misma lectura que el escritorio: la tarea vencida y pendiente se arrastra a HOY.
+// Antes cada día mostraba sólo lo programado ese día, así que 19 atrasadas quedaban
+// escondidas en su día original y hoy aparecía vacío.
+const { dias: diasProcesados } = useSemanaTareas(computed(() => tareasStore.semana))
+
 const dias = computed(() => {
   return Array.from({ length: 7 }, (_, i) => {
     const d     = addDays(hoy, i - 3)
     const fecha = toISO(d)
-    const diaData = tareasStore.semana.dias?.find(x => x.fecha === fecha)
+    const diaData = diasProcesados.value.find(x => x.fecha === fecha)
     return {
       fecha,
       esHoy:       i === 3,
@@ -190,7 +200,7 @@ const hoyISO = toISO(hoy)
 const esFutura = (t) => !!t.fecha_programada && t.fecha_programada > hoyISO
 
 const tareasDelDia = computed(() => {
-  const diaData = tareasStore.semana.dias?.find(x => x.fecha === diaSeleccionado.value)
+  const diaData = diasProcesados.value.find(x => x.fecha === diaSeleccionado.value)
   const tareas  = diaData?.tareas || []
   return [...tareas].sort((a, b) => {
     const P = { urgente: 0, alta: 1, media: 2, baja: 3 }
@@ -227,7 +237,7 @@ async function confirmarCompletar() {
       completarForm.value.notas_completado || '',
     )
     // Actualizar optimisticamente en semana.dias
-    const diaData = tareasStore.semana.dias?.find(x => x.fecha === diaSeleccionado.value)
+    const diaData = diasProcesados.value.find(x => x.fecha === diaSeleccionado.value)
     if (diaData) {
       const idx = diaData.tareas.findIndex(t => t.id === tareaActiva.value.id)
       if (idx !== -1) diaData.tareas[idx] = { ...diaData.tareas[idx], estado: 'completada' }
