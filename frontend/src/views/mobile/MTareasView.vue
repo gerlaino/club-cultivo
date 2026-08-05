@@ -2,9 +2,14 @@
   <div class="mta">
     <div class="mta__topbar">
       <h1 class="mta__title">Tareas</h1>
-      <button class="mta__fab" @click="showCreate = true">
-        <i class="bi bi-plus-lg"></i>
-      </button>
+      <div class="mta__topbar-acciones">
+        <button v-if="hayCompletables" class="mta__sel-toggle" @click="alternarModoSeleccion">
+          {{ modoSeleccion ? 'Cancelar' : 'Seleccionar' }}
+        </button>
+        <button v-if="!modoSeleccion" class="mta__fab" @click="showCreate = true">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
     </div>
 
     <!-- Strip 7 días -->
@@ -25,6 +30,16 @@
       </button>
     </div>
 
+    <!-- Barra de acción del modo selección -->
+    <div v-if="modoSeleccion" class="mta__bulk">
+      <button class="mta__bulk-todas" @click="alternarTodas">
+        {{ seleccionadas.size === completablesDelDia.length ? 'Ninguna' : 'Todas' }}
+      </button>
+      <button class="mta__bulk-ok" :disabled="!seleccionadas.size || bulkEnCurso" @click="completarSeleccionadas">
+        {{ bulkEnCurso ? 'Guardando…' : `Marcar ${seleccionadas.size} como hecha${seleccionadas.size === 1 ? '' : 's'}` }}
+      </button>
+    </div>
+
     <!-- Tareas del día seleccionado -->
     <div v-if="tareasStore.loading" class="mta__loading">Cargando…</div>
     <div v-else-if="!tareasDelDia.length" class="mta__empty">
@@ -40,10 +55,13 @@
           'mta__card--futura': esFutura(t) && t.estado !== 'completada',
           'mta__card--atrasada': t._atrasada,
         }]"
-        @click="abrirCompletarSheet(t)"
+        @click="modoSeleccion ? alternarTarea(t) : abrirCompletarSheet(t)"
       >
         <div class="mta__card-left">
-          <span class="mta__tipo-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
+          <span v-if="modoSeleccion && completable(t)" class="mta__sel-box" :class="{ 'mta__sel-box--on': seleccionadas.has(t.id) }">
+            <i v-if="seleccionadas.has(t.id)" class="bi bi-check-lg"></i>
+          </span>
+          <span v-else class="mta__tipo-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
         </div>
         <div class="mta__card-body">
           <div class="mta__card-titulo">{{ t.titulo }}</div>
@@ -152,10 +170,12 @@
 import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useSemanaTareas } from '../../composables/useSemanaTareas.js'
+import { useToast } from '../../composables/useToast.js'
 import { useTareasStore } from '../../stores/tareas'
 import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 
 const tareasStore = useTareasStore()
+const toast = useToast()
 
 // ── Calendario ────────────────────────────────────────────────────
 
@@ -198,6 +218,52 @@ const diaSeleccionado = ref(toISO(hoy))
 const hoyISO = toISO(hoy)
 // Una tarea programada a futuro no se puede completar todavía (mismo criterio que el desktop).
 const esFutura = (t) => !!t.fecha_programada && t.fecha_programada > hoyISO
+
+// ── Marcar varias como hechas ────────────────────────────────────────────────
+// Pasa que no se marcaron en el momento y hay que ponerse al día. Se registra con la fecha de
+// HOY (es cuando realmente se anotó): el backend ya lo hace así en completar_masivo, y la tarea
+// queda marcada como atrasada si venía de antes, en vez de fingir que se hizo el martes.
+const modoSeleccion = ref(false)
+const seleccionadas = ref(new Set())
+const bulkEnCurso   = ref(false)
+
+const completable = (t) => t.estado !== 'completada' && t.estado !== 'cancelada' && !esFutura(t)
+const completablesDelDia = computed(() => tareasDelDia.value.filter(completable))
+const hayCompletables    = computed(() => completablesDelDia.value.length > 1)
+
+function alternarModoSeleccion() {
+  modoSeleccion.value = !modoSeleccion.value
+  seleccionadas.value = new Set()
+}
+
+function alternarTarea(t) {
+  if (!completable(t)) return
+  const s = new Set(seleccionadas.value)
+  s.has(t.id) ? s.delete(t.id) : s.add(t.id)
+  seleccionadas.value = s
+}
+
+function alternarTodas() {
+  seleccionadas.value = seleccionadas.value.size === completablesDelDia.value.length
+    ? new Set()
+    : new Set(completablesDelDia.value.map(t => t.id))
+}
+
+async function completarSeleccionadas() {
+  if (!seleccionadas.value.size) return
+  bulkEnCurso.value = true
+  try {
+    const n = await tareasStore.completarMasivo(Array.from(seleccionadas.value))
+    modoSeleccion.value = false
+    seleccionadas.value = new Set()
+    toast.success(`${n} ${n === 1 ? 'tarea completada' : 'tareas completadas'} ✓`)
+    await tareasStore.fetchSemana(toISO(addDays(hoy, -3)))
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudieron completar las tareas')
+  } finally {
+    bulkEnCurso.value = false
+  }
+}
 
 const tareasDelDia = computed(() => {
   const diaData = diasProcesados.value.find(x => x.fecha === diaSeleccionado.value)
