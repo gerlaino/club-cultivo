@@ -41,6 +41,16 @@ const routes = [
     meta: { guestOnly: true, fullscreen: true },
   },
 
+  // Landing pública de la plataforma. Es lo que ve quien entra al dominio sin sesión:
+  // antes caía directo en el formulario de login, que no le cuenta a nadie qué es esto.
+  // El dashboard sigue viviendo en "/" para los usuarios logueados (ver el guard global).
+  {
+    path: "/bienvenida",
+    name: "landing",
+    component: () => import("../views/LandingView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
+
   // Dashboard
   {
     path: "/",
@@ -972,11 +982,18 @@ router.beforeEach(async (to) => {
   // que fetchMe trajera el usuario → can()/role daban vacío y redirigían a dashboard.
   // Las páginas públicas por token (carnet, dispensa, genética) NO se bloquean — así
   // renderizan al instante aunque el backend esté despertando (free tier).
-  const esPublicaToken = /^\/(c|d|g)\//.test(to.path);
+  const esPublicaToken = /^\/(c|d|g)\//.test(to.path) || to.path === '/bienvenida';
   if (esPublicaToken) {
     auth.ensureBootstrapped();
   } else {
     await auth.ensureBootstrapped();
+  }
+
+  // La raíz hace de puerta comercial: sin sesión muestra la landing en vez de mandar a
+  // un formulario de login, que no le dice nada a quien llega por primera vez.
+  // Con sesión, "/" sigue siendo el dashboard de siempre.
+  if (to.path === '/' && !auth.isAuthenticated) {
+    return { name: "landing" };
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
@@ -1019,7 +1036,10 @@ router.beforeEach(async (to) => {
     return MOBILE_HOME[role]
   }
 
-  if (auth.isAuthenticated && ROLE_ALLOWED_PREFIX[role]) {
+  // Las páginas públicas (landing, carnet, pasaporte de dispensa, genética) no entran en la
+  // matriz de prefijos: cualquiera las ve sin sesión, así que bloquearlas a un rol logueado
+  // solo produce un "Sin permisos" que no viene al caso.
+  if (auth.isAuthenticated && !to.meta.public && ROLE_ALLOWED_PREFIX[role]) {
     const allowed = ROLE_ALLOWED_PREFIX[role].some(p => to.path === p || to.path.startsWith(p + '/'))
     if (!allowed) {
       useToast().warning('Sin permisos para acceder a esa sección')

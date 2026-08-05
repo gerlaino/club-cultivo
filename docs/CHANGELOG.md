@@ -1,5 +1,31 @@
 # Changelog
 
+## Agosto 2026 (a) — la raíz deja de ser un formulario de login
+
+Quien entraba al dominio sin sesión caía directo en el login: una pantalla que pide usuario y
+contraseña sin explicar antes qué es esto. Ahora **`/` sin sesión muestra `/bienvenida`**, una
+landing pública. Con sesión, `/` sigue siendo el dashboard de siempre — el dashboard **no se movió**,
+así que los ~17 "Inicio" de sidebars, topbars y breadcrumbs siguen apuntando donde apuntaban.
+
+El otro problema era de posicionamiento: el login se presentaba como **"Plataforma REPROCANN"**, con
+REPROCANN también entre las tres métricas y como la primera de las tres features. Eso encajona el
+producto en un registro y en un país, y deja afuera a cualquier organización que cultive por
+investigación o para producir.
+
+- **Landing (`LandingView.vue`)** con el eje corrido a lo que el producto realmente hace: *"Una
+  plataforma para toda organización que cultiva: clubes, investigación y producción."* La cadena
+  genética → lote → planta → cosecha → stock → entrega como columna vertebral, tres públicos
+  explícitos y la grilla de módulos.
+- **REPROCANN y ARICCAME siguen estando, pero como consecuencia y no como identidad**: son una salida
+  de la data que ya se carga operando, tercera de las cuatro capacidades.
+- **El login quedó sobrio**: se le sacó la columna de marketing (la veían operadores que entran a
+  trabajar todos los días, no prospectos) y quedó el card centrado en cualquier tamaño de pantalla,
+  con un enlace a la landing. De paso **se alineó al design system**: era la única vista con paleta
+  propia, con verdes Material hardcodeados en vez de los tokens `leaf`.
+- **Las rutas públicas ya no chocan contra la matriz de roles**: un `medico`/`auditor`/`delivery`
+  logueado que abría un carnet o un pasaporte de dispensa recibía "Sin permisos" y era expulsado a su
+  home. Ahora `meta.public` queda fuera de ese chequeo.
+
 ## Julio 2026 (ae) — mover un lote NO lo saca del enraizado
 
 La regla de "el lote toma la fase de la sala destino" estaba mal enunciada. Lo que una sala impone no
