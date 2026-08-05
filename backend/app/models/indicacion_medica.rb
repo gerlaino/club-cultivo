@@ -34,7 +34,15 @@ class IndicacionMedica < ApplicationRecord
   }
 
   before_validation :set_fecha_emision, on: :create
-  before_validation :calculate_fecha_vencimiento, if: :duracion_dias?
+  before_validation :derivar_fecha_vencimiento
+
+  # ¿El vencimiento sale del cálculo o lo escribió el médico? Se deriva comparando en vez de
+  # guardarlo en una columna: el dato ya está, y así no hay un flag que pueda quedar mintiendo.
+  def vencimiento_calculado?
+    return false if fecha_vencimiento.blank? || duracion_dias.blank? || fecha_emision.blank?
+
+    fecha_vencimiento == fecha_emision + duracion_dias.days
+  end
 
   def dias_hasta_vencimiento
     return nil unless fecha_vencimiento
@@ -57,7 +65,15 @@ class IndicacionMedica < ApplicationRecord
     self.fecha_emision ||= Date.today
   end
 
-  def calculate_fecha_vencimiento
-    self.fecha_vencimiento = fecha_emision + duracion_dias.days if fecha_emision
+  # La duración del tratamiento y la validez de la indicación son cosas distintas: un tratamiento
+  # de 90 días puede vivir dentro de una indicación que vale hasta que venza el REPROCANN. En la
+  # práctica coinciden casi siempre, así que la duración **propone** el vencimiento — pero si el
+  # médico escribe una fecha a mano, gana la fecha. Antes el cálculo pisaba siempre y en silencio.
+  def derivar_fecha_vencimiento
+    return if duracion_dias.blank? || fecha_emision.blank?
+    return if fecha_vencimiento_changed?                          # lo escrito a mano manda
+    return if fecha_vencimiento.present? && !duracion_dias_changed? # ya hay fecha y nadie tocó la duración
+
+    self.fecha_vencimiento = fecha_emision + duracion_dias.days
   end
 end

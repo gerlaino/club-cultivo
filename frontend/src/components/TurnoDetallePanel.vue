@@ -108,7 +108,7 @@ function irFicha() {
   if (props.adminMode) {
     router.push(`/socios/${props.turno.paciente_id}`)
   } else {
-    router.push(`/medico/pacientes/${props.turno.paciente_id}/ficha`)
+    router.push(`/medico/pacientes/${props.turno.paciente_id}`)
   }
 }
 </script>

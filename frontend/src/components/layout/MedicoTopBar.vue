@@ -81,11 +81,9 @@ const LABELS = {
   '/medico':             'Inicio',
   '/medico/turnos':      'Turnera',
   '/medico/pacientes':   'Mis Pacientes',
-  '/medico/indicaciones':'Indicaciones',
-  '/medico/documentos':  'Documentos',
 }
 const pageTitle = computed(() => {
-  if (route.path.includes('/ficha')) return 'Ficha Clínica'
+  if (/^\/medico\/pacientes\/\d+/.test(route.path)) return 'Ficha Clínica'
   return LABELS[route.path] || 'Panel Médico'
 })
 

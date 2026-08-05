@@ -7,6 +7,30 @@
       </button>
     </div>
 
+    <!-- Consumo dispensado: el contexto con el que se lee (y se escribe) una indicación -->
+    <div v-if="resumenConsumo && !loading" class="im__consumo">
+      <div class="im__consumo-stat">
+        <span class="im__consumo-val">{{ resumenConsumo.total_g_90d }} g</span>
+        <span class="im__consumo-lbl">últimos 90 días</span>
+      </div>
+      <span class="im__consumo-sep"></span>
+      <div class="im__consumo-stat">
+        <span class="im__consumo-val">{{ resumenConsumo.promedio_mensual_g }} g</span>
+        <span class="im__consumo-lbl">promedio mensual</span>
+      </div>
+      <span class="im__consumo-sep"></span>
+      <div class="im__consumo-stat">
+        <span class="im__consumo-val">{{ resumenConsumo.total_dispensaciones }}</span>
+        <span class="im__consumo-lbl">dispensaciones</span>
+      </div>
+      <div v-if="sparkline" class="im__sparkline" aria-hidden="true">
+        <svg viewBox="0 0 120 32" preserveAspectRatio="none">
+          <polyline :points="sparkline" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </div>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="im__loading">
       <DsSpinner :size="18" />
@@ -66,7 +90,16 @@
           </div>
           <div v-if="ind.fecha_vencimiento" class="im__meta-item">
             <span class="im__meta-label">Vence</span>
-            <span class="im__meta-val">{{ formatDate(ind.fecha_vencimiento) }}</span>
+            <span class="im__meta-val">
+              {{ formatDate(ind.fecha_vencimiento) }}
+              <span v-if="ind.vencimiento_calculado" class="im__meta-nota">
+                · {{ ind.duracion_dias }} días de tratamiento
+              </span>
+            </span>
+          </div>
+          <div v-else class="im__meta-item">
+            <span class="im__meta-label">Vence</span>
+            <span class="im__meta-val im__meta-val--muted">Sin fecha — no genera alertas</span>
           </div>
         </div>
 
@@ -109,8 +142,8 @@
               </div>
               <div class="im__form-field">
                 <label>DURACIÓN (días)</label>
-                <input v-model.number="form.duracion_dias" type="number" placeholder="Ej: 90, 180…" />
-                <span class="im__hint">Se calculará la fecha de vencimiento automáticamente</span>
+                <input v-model.number="form.duracion_dias" type="number" min="1" placeholder="Ej: 90, 180…" />
+                <span class="im__hint">Cuánto dura el tratamiento</span>
               </div>
               <div class="im__form-field">
                 <label>FECHA DE EMISIÓN <span class="im__req">*</span></label>
@@ -119,7 +152,7 @@
               <div class="im__form-field">
                 <label>FECHA DE VENCIMIENTO</label>
                 <AppDatePicker v-model="form.fecha_vencimiento" />
-                <span class="im__hint">Dejar vacío si no vence</span>
+                <span class="im__hint">{{ hintVencimiento }}</span>
               </div>
               <div class="im__form-field im__form-field--full">
                 <label>OBSERVACIONES</label>
@@ -187,6 +220,7 @@ const props = defineProps({
 const auth = useAuthStore()
 const toast = useToast()
 const indicaciones = ref([])
+const resumenConsumo = ref(null)
 const loading = ref(true)
 const showModal = ref(false)
 const editingId = ref(null)
@@ -214,11 +248,43 @@ const formatDate = (date) => {
   return new Date(date).toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+// Sparkline del consumo: normalizado contra el mes más alto de la serie.
+const sparkline = computed(() => {
+  const serie = resumenConsumo.value?.serie_mensual || []
+  if (serie.length < 2) return null
+  const max = Math.max(...serie.map(m => m.gramos), 1)
+  return serie
+    .map((m, i) => `${(i / (serie.length - 1)) * 120},${32 - (m.gramos / max) * 28}`)
+    .join(' ')
+})
+
+// La duración PROPONE el vencimiento; una fecha escrita a mano gana. El form tiene que
+// decir cuál de las dos está mandando, porque antes el cálculo pisaba en silencio.
+const vencimientoCalculado = computed(() => {
+  const dias = Number(form.value.duracion_dias)
+  if (!dias || !form.value.fecha_emision) return null
+  const d = new Date(form.value.fecha_emision)
+  if (Number.isNaN(d.getTime())) return null
+  d.setDate(d.getDate() + dias)
+  return d.toISOString().split('T')[0]
+})
+
+const hintVencimiento = computed(() => {
+  const calc = vencimientoCalculado.value
+  const actual = form.value.fecha_vencimiento
+  if (!actual && calc)          return `Se va a calcular por la duración: ${formatDate(calc)}`
+  if (!actual)                  return 'Dejar vacío si no vence — sin fecha no llegan alertas'
+  if (calc && actual === calc)  return `Calculado por la duración (${form.value.duracion_dias} días)`
+  if (calc)                     return 'Fijado a mano: la duración no lo va a modificar'
+  return 'Fijado a mano'
+})
+
 const loadIndicaciones = async () => {
   try {
     loading.value = true
     const { data } = await listIndicaciones(props.socioId)
-    indicaciones.value = data
+    indicaciones.value  = data.indicaciones || []
+    resumenConsumo.value = data.resumen_consumo || null
   } catch (error) {
     logger.error('Error cargando indicaciones:', error)
   } finally {
@@ -335,6 +401,26 @@ onMounted(loadIndicaciones)
 .im__meta-item { display: flex; flex-direction: column; gap: .1rem; }
 .im__meta-label { font-size: .68rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; }
 .im__meta-val { font-size: .8rem; color: #334155; }
+.im__meta-val--muted { color: #94a3b8; font-style: italic; }
+.im__meta-nota { color: #94a3b8; font-size: .72rem; }
+
+/* Consumo dispensado */
+.im__consumo {
+  display: flex; align-items: center; gap: var(--sp-4, 16px);
+  background: var(--c-leaf-50, #F4F8F5); border: 1px solid var(--c-leaf-100, #E8F0EB);
+  border-radius: var(--r-lg, 8px); padding: var(--sp-3, 12px) var(--sp-4, 16px);
+  margin-bottom: var(--sp-4, 16px);
+}
+.im__consumo-stat { display: flex; flex-direction: column; gap: .1rem; }
+.im__consumo-val { font-size: var(--fs-16, 16px); font-weight: 700; color: var(--c-leaf-800, #1A3D2E); letter-spacing: -.02em; }
+.im__consumo-lbl { font-size: var(--fs-12, 12px); color: var(--c-ink-500, #6B7280); }
+.im__consumo-sep { width: 1px; height: 26px; background: var(--c-leaf-100, #E8F0EB); }
+.im__sparkline { margin-left: auto; width: 120px; height: 32px; color: var(--c-leaf-500, #5A8A72); }
+.im__sparkline svg { width: 100%; height: 100%; overflow: visible; }
+@media (max-width: 640px) {
+  .im__consumo { flex-wrap: wrap; gap: var(--sp-3, 12px); }
+  .im__sparkline { margin-left: 0; width: 100%; }
+}
 .im__card-actions { display: flex; gap: .5rem; padding-top: .6rem; border-top: 1px solid #f1f5f9; }
 .im__action-btn {
   font-size: .75rem; font-weight: 600; padding: .3rem .7rem; border-radius: 6px;

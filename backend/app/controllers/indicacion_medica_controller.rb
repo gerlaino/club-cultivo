@@ -4,7 +4,9 @@ class IndicacionMedicaController < ApplicationController
   before_action :set_paciente, only: [:index, :create]
   before_action :set_indicacion, only: [:show, :update, :destroy, :prescripcion_pdf]
 
-  # GET /indicaciones_medicas — standalone, scoped to medico's club patients
+  # GET /indicaciones_medicas — indicaciones de todos los pacientes con seguimiento.
+  # Queda solo para el dashboard del médico ("por vencer"): la lista global como pantalla se
+  # eliminó, porque una indicación se consulta desde su paciente, no desde un padrón de todas.
   def index_medico
     unless current_user.medico? || current_user.admin?
       return render json: { error: 'No autorizado' }, status: :forbidden
@@ -17,9 +19,14 @@ class IndicacionMedicaController < ApplicationController
   end
 
   # GET /pacientes/:paciente_id/indicaciones
+  # Devuelve también el consumo del paciente: el médico prescribe mirando cuánto viene
+  # dispensando, así que el dato tiene que estar donde se escribe la indicación.
   def index
     indicaciones = @paciente.indicacion_medicas.order(fecha_emision: :desc)
-    render json: indicaciones.map { |i| serialize_indicacion(i) }
+    render json: {
+      indicaciones:    indicaciones.map { |i| serialize_indicacion(i) },
+      resumen_consumo: resumen_consumo(@paciente),
+    }
   end
 
   # GET /indicaciones/:id
@@ -102,6 +109,31 @@ class IndicacionMedicaController < ApplicationController
     )
   end
 
+  # Consumo dispensado del paciente, para leer la indicación en contexto.
+  # `serie_mensual` son los últimos 6 meses cerrados + el corriente, para el sparkline.
+  def resumen_consumo(paciente)
+    disp = paciente.dispensaciones.no_canceladas
+
+    total_90d = disp.where('fecha_dispensacion >= ?', 90.days.ago).sum(:cantidad).to_f
+    desde     = 5.months.ago.beginning_of_month.to_date
+
+    por_mes = disp.where('fecha_dispensacion >= ?', desde)
+                  .group("DATE_TRUNC('month', fecha_dispensacion)")
+                  .sum(:cantidad)
+
+    serie = (0..5).map do |i|
+      mes = (desde + i.months).beginning_of_month
+      { mes: mes.strftime('%Y-%m'), gramos: por_mes.find { |k, _| k.to_date == mes }&.last.to_f.round(1) }
+    end
+
+    {
+      total_g_90d:         total_90d.round(1),
+      promedio_mensual_g:  (total_90d / 3.0).round(1),
+      total_dispensaciones: disp.count,
+      serie_mensual:       serie,
+    }
+  end
+
   def serialize_indicacion(indicacion)
     {
       id: indicacion.id,
@@ -115,6 +147,7 @@ class IndicacionMedicaController < ApplicationController
       dias_hasta_vencimiento: indicacion.dias_hasta_vencimiento,
       vencida: indicacion.vencida?,
       por_vencer: indicacion.por_vencer?,
+      vencimiento_calculado: indicacion.vencimiento_calculado?,
       medico: {
         id: indicacion.user.id,
         nombre: "#{indicacion.user.first_name} #{indicacion.user.last_name}".strip

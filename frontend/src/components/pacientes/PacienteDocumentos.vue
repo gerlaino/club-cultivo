@@ -42,13 +42,21 @@ const uploadError = ref(null)
 const templateForm = ref({ template_id: null, nombre: '' })
 const templateError = ref(null)
 
+// Todo lo del paciente entra por acá. Antes lo clínico estaba partido en dos: el médico subía
+// desde una pantalla propia (modelo `Documento`, sin cifrado) y esos archivos no aparecían nunca
+// en la ficha del paciente, que lee `PatientDocument`. Los tipos que faltaban se sumaron acá.
+// Nada de tipos institucionales del club (estatuto, actas, reglamento): eso no es del paciente.
 const TIPOS = [
-  { value: 'reprocann',             label: 'Autorización REPROCANN',         icon: 'bi-patch-check-fill',     color: '#15803d' },
+  { value: 'reprocann',             label: 'Autorización REPROCANN',          icon: 'bi-patch-check-fill',     color: '#15803d' },
+  { value: 'receta',                label: 'Receta',                          icon: 'bi-prescription2',        color: '#15803d' },
+  { value: 'certificado_medico',    label: 'Certificado médico',              icon: 'bi-file-earmark-medical', color: '#0369a1' },
+  { value: 'estudio_clinico',       label: 'Estudio clínico',                 icon: 'bi-clipboard2-pulse',     color: '#0891b2' },
   { value: 'consentimiento',        label: 'Consentimiento informado',        icon: 'bi-file-earmark-check',   color: '#0369a1' },
   { value: 'indicacion',            label: 'Indicación médica',               icon: 'bi-file-earmark-medical', color: '#7c3aed' },
   { value: 'declaracion_jurada',    label: 'Declaración jurada',              icon: 'bi-file-earmark-text',    color: '#b45309' },
   { value: 'historia_clinica',      label: 'Historia clínica',                icon: 'bi-journal-medical',      color: '#0891b2' },
-  { value: 'otro',                  label: 'Otro',                             icon: 'bi-file-earmark',         color: '#64748b' },
+  { value: 'dni',                   label: 'DNI',                             icon: 'bi-person-vcard',         color: '#64748b' },
+  { value: 'otro',                  label: 'Otro',                            icon: 'bi-file-earmark',         color: '#64748b' },
 ]
 
 const ESTADOS = {

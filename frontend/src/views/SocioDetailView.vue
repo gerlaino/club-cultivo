@@ -14,7 +14,7 @@ import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTu
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
-  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal
+  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal, FileHeart
 } from 'lucide-vue-next'
 import DsDropdown from '../design-system/components/Dropdown.vue'
 import { REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
@@ -243,6 +243,7 @@ const ALL_TABS = [
   { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin', 'dispensador'], primary: true },
   { key: 'turnos',           label: 'Turnos',            icon: CalendarDays,  roles: ['admin', 'medico'] },
   { key: 'historia',         label: 'Historia clínica',  icon: ClipboardList, roles: ['admin', 'medico'] },
+  { key: 'indicaciones',     label: 'Indicaciones',      icon: FileHeart,     roles: ['admin', 'medico', 'supervisor'] },
   { key: 'notas',            label: 'Notas',             icon: BookOpen,      roles: ['admin', 'medico'] },
   { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
   { key: 'timeline',         label: 'Timeline',          icon: Clock,         roles: ['admin', 'medico'] },
@@ -504,11 +505,11 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             Vigencia del certificado: 3 años (Res. 1780/2025). Las ONG deben renovar anualmente.
           </div>
         </div>
-        <div class="sd__card" style="margin-top:1rem">
-          <div class="sd__card-header">
-            <div class="sd__card-icon sd__card-icon--green"><FileText :size="15" /></div>
-            <span class="sd__card-title">Indicaciones médicas</span>
-          </div>
+      </div>
+
+      <!-- ── Tab: Indicaciones ── -->
+      <div v-show="activeTab === 'indicaciones'" class="sd__tab-content">
+        <div class="sd__card">
           <IndicacionesMedicas :socio-id="socioId" />
         </div>
       </div>

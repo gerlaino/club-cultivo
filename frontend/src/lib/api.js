@@ -696,8 +696,7 @@ export const getHistorialAnalisis  = (lote_id) => api.get('/asistente/historial_
 export const getCarnetPublico = (token) => axios.get(`/api/c/${token}`)
 
 // ── Médico — Ficha clínica ────────────────────────────────────────────────────
-export const getMedicoPacientes  = ()         => api.get('/medico/pacientes')
-export const getMedicoFicha      = (id)        => api.get(`/medico/pacientes/${id}/ficha`)
+export const getMedicoPacientes  = (params = {}) => api.get('/medico/pacientes', { params })
 export const getMedicoTurnos     = ()          => api.get('/medico/turnos')
 export const createMedicoTurno   = (payload)   => api.post('/medico/turnos',      { turno: payload })
 export const updateMedicoTurno   = (id, payload) => api.patch(`/medico/turnos/${id}`, { turno: payload })

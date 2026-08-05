@@ -247,9 +247,9 @@ Rails.application.routes.draw do
 
     # Médico — ficha clínica + turnos
     namespace :medico do
-      resources :pacientes, only: [:index] do
-        member { get :ficha }
-      end
+      # La ficha del paciente es SocioDetailView, que se sirve de /pacientes/:id: no hay una
+      # segunda ficha "del médico" con su propio endpoint.
+      resources :pacientes, only: [:index]
       resources :turnos, only: [:index, :create, :update, :destroy]
       resources :check_ins, only: [:create]
       resource  :disponibilidad, only: [:index, :update], controller: 'disponibilidad'

@@ -14,24 +14,24 @@
 
     <!-- KPI filtros -->
     <div class="mpv__kpis">
-      <button class="mpv__kpi" :class="{ 'mpv__kpi--active': filtro === 'todos' }" @click="filtro = 'todos'">
+      <button class="mpv__kpi" :class="{ 'mpv__kpi--active': filtro === 'todos' }" @click="cambiarFiltro('todos')">
         <div class="mpv__kpi-val">{{ kpis.total }}</div>
         <div class="mpv__kpi-lbl">Total</div>
       </button>
-      <button class="mpv__kpi mpv__kpi--ok" :class="{ 'mpv__kpi--active': filtro === 'activos' }" @click="filtro = 'activos'">
+      <button class="mpv__kpi mpv__kpi--ok" :class="{ 'mpv__kpi--active': filtro === 'activos' }" @click="cambiarFiltro('activos')">
         <div class="mpv__kpi-val">{{ kpis.activos }}</div>
         <div class="mpv__kpi-lbl">En tratamiento</div>
       </button>
-      <button class="mpv__kpi mpv__kpi--warn" :class="{ 'mpv__kpi--active': filtro === 'proximos' }" @click="filtro = 'proximos'">
+      <button class="mpv__kpi mpv__kpi--warn" :class="{ 'mpv__kpi--active': filtro === 'proximos' }" @click="cambiarFiltro('proximos')">
         <div class="mpv__kpi-val">{{ kpis.proximos }}</div>
         <div class="mpv__kpi-lbl">REPROCANN ≤30d</div>
       </button>
-      <button class="mpv__kpi mpv__kpi--danger" :class="{ 'mpv__kpi--active': filtro === 'vencidos' }" @click="filtro = 'vencidos'">
+      <button class="mpv__kpi mpv__kpi--danger" :class="{ 'mpv__kpi--active': filtro === 'vencidos' }" @click="cambiarFiltro('vencidos')">
         <div class="mpv__kpi-val">{{ kpis.vencidos }}</div>
         <div class="mpv__kpi-lbl">REPROCANN vencido</div>
       </button>
-      <button class="mpv__kpi mpv__kpi--gray" :class="{ 'mpv__kpi--active': filtro === 'sin_rep' }" @click="filtro = 'sin_rep'">
-        <div class="mpv__kpi-val">{{ kpis.sinRep }}</div>
+      <button class="mpv__kpi mpv__kpi--gray" :class="{ 'mpv__kpi--active': filtro === 'sin_rep' }" @click="cambiarFiltro('sin_rep')">
+        <div class="mpv__kpi-val">{{ kpis.sin_rep }}</div>
         <div class="mpv__kpi-lbl">Sin REPROCANN</div>
       </button>
     </div>
@@ -46,17 +46,17 @@
           class="mpv__search"
           placeholder="Buscar por nombre, apellido o DNI…"
         />
-        <span v-if="search" class="mpv__search-count">{{ filtrados.length }}</span>
+        <span v-if="meta" class="mpv__search-count">{{ meta.total }}</span>
       </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="store.loading" class="mpv__loading">
+    <div v-if="loading && !pacientes.length" class="mpv__loading">
       <DsSpinner :size="20" /> Cargando pacientes…
     </div>
 
     <!-- Empty -->
-    <div v-else-if="!filtrados.length" class="mpv__empty">
+    <div v-else-if="!pacientes.length" class="mpv__empty">
       <Users :size="40" :stroke-width="1" />
       <p>{{ search ? 'Sin resultados para tu búsqueda' : filtro !== 'todos' ? 'No hay pacientes en este filtro' : 'No tenés pacientes cargados todavía' }}</p>
       <button v-if="!search && filtro === 'todos'" class="mpv__btn-primary" @click="openNew">
@@ -67,7 +67,7 @@
     <!-- Lista -->
     <div v-else class="mpv__list">
       <RouterLink
-        v-for="p in filtrados"
+        v-for="p in pacientes"
         :key="p.id"
         :to="`/medico/pacientes/${p.id}`"
         class="mpv__row"
@@ -96,6 +96,9 @@
             <span v-if="edad(p.fecha_nacimiento)" class="mpv__edad">{{ edad(p.fecha_nacimiento) }} años</span>
             <span v-if="p.email" class="mpv__email">{{ p.email }}</span>
           </div>
+          <div v-if="motivo(p)" class="mpv__motivo" :class="`mpv__motivo--${motivo(p).tipo}`">
+            {{ motivo(p).texto }}
+          </div>
         </div>
 
         <div class="mpv__repro">
@@ -113,14 +116,8 @@
           <span v-else class="mpv__rep-none">Sin REPROCANN</span>
         </div>
 
+        <!-- La fila entera ya abre la ficha: no hace falta un botón que lleve al mismo lado. -->
         <div class="mpv__actions" @click.prevent>
-          <button
-            class="mpv__action-btn mpv__action-btn--ficha"
-            @click.prevent="router.push(`/medico/pacientes/${p.id}/ficha`)"
-            title="Ficha clínica"
-          >
-            <FileText :size="14" />
-          </button>
           <button
             class="mpv__action-btn mpv__action-btn--danger"
             @click.prevent="openDelete(p)"
@@ -130,6 +127,13 @@
           </button>
         </div>
       </RouterLink>
+
+      <div v-if="hayMas" class="mpv__mas">
+        <button class="mpv__btn-mas" :disabled="loading" @click="cargarMas">
+          <DsSpinner v-if="loading" :size="14" />
+          <template v-else>Cargar más ({{ pacientes.length }} de {{ meta.total }})</template>
+        </button>
+      </div>
     </div>
 
     <!-- Modal: Nuevo Paciente -->
@@ -207,17 +211,25 @@
 import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRouter } from 'vue-router'
-import { Search, UserPlus, Users, Trash2, X, FileText } from 'lucide-vue-next'
+import { Search, UserPlus, Users, Trash2, X } from 'lucide-vue-next'
 import { usePacientesStore } from '../../stores/pacientes.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
+import { getMedicoPacientes } from '../../lib/api.js'
+import { logger } from '../../utils/logger.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+
+const LIMITE = 30
 
 const store  = usePacientesStore()
 const router = useRouter()
 const { confirm } = useConfirm()
 const { success: toastOk, error: toastErr } = useToast()
 
+const pacientes = ref([])
+const meta      = ref(null)
+const pagina    = ref(1)
+const loading   = ref(false)
 const search    = ref('')
 const filtro    = ref('todos')
 const showModal = ref(false)
@@ -258,6 +270,7 @@ async function save() {
   Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k] })
   try {
     await store.create(payload)
+    await cargar({ reset: true })
     showModal.value = false
     toastOk('Paciente creado correctamente')
   } catch {
@@ -275,6 +288,7 @@ async function openDelete(p) {
   if (!ok) return
   try {
     await store.remove(p.id)
+    await cargar({ reset: true })
     toastOk('Paciente eliminado')
   } catch {
     toastErr('No se pudo eliminar el paciente')
@@ -284,7 +298,41 @@ async function openDelete(p) {
 let searchTimer = null
 function onSearch() {
   clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => store.fetch({ query: search.value.trim() }), 400)
+  searchTimer = setTimeout(() => cargar({ reset: true }), 400)
+}
+
+// Una sola fuente de verdad: el backend filtra, ordena, cuenta y pagina. Antes la lista se
+// filtraba dos veces (server-side con ?query y otra vez en el cliente) sobre un JSON que traía
+// TODOS los pacientes del club.
+async function cargar({ reset = false } = {}) {
+  if (reset) pagina.value = 1
+  loading.value = true
+  try {
+    const { data } = await getMedicoPacientes({
+      pagina: pagina.value,
+      limite: LIMITE,
+      query:  search.value.trim() || undefined,
+      filtro: filtro.value,
+    })
+    const nuevos = data.data || []
+    pacientes.value = reset ? nuevos : [...pacientes.value, ...nuevos]
+    meta.value = data.meta || null
+  } catch (e) {
+    logger.error('MedicoPacientes:', e)
+    toastErr('No se pudieron cargar los pacientes')
+  } finally {
+    loading.value = false
+  }
+}
+
+function cambiarFiltro(f) {
+  filtro.value = f
+  cargar({ reset: true })
+}
+
+function cargarMas() {
+  pagina.value += 1
+  cargar()
 }
 
 function safeDate(d) {
@@ -315,35 +363,22 @@ function iniciales(p) {
   return ((p.nombre?.[0] || '') + (p.apellido?.[0] || '')).toUpperCase()
 }
 
-const kpis = computed(() => {
-  const hoy  = new Date()
-  const en30 = new Date(hoy.getTime() + 30 * 86400000)
-  return {
-    total:    store.items.length,
-    activos:  store.items.filter(p => p.es_paciente !== false).length,
-    vencidos: store.items.filter(p => reproDias(p) !== null && reproDias(p) < 0).length,
-    proximos: store.items.filter(p => { const d = reproDias(p); return d !== null && d >= 0 && d <= 30 }).length,
-    sinRep:   store.items.filter(p => !p.reprocann_vencimiento).length,
-  }
-})
+const kpis = computed(() => meta.value?.kpis || { total: 0, activos: 0, proximos: 0, vencidos: 0, sin_rep: 0 })
+const hayMas = computed(() => !!meta.value && pacientes.value.length < meta.value.total)
 
-const filtrados = computed(() => {
-  let list = store.items
-  if (search.value.trim()) {
-    const q = search.value.toLowerCase()
-    list = list.filter(p =>
-      `${p.nombre} ${p.apellido}`.toLowerCase().includes(q) ||
-      (p.dni || '').includes(q)
-    )
+// Lo que puso a este paciente arriba en la lista, dicho en la fila.
+function motivo(p) {
+  if (p.proximo_turno_at) {
+    return { texto: `Turno ${formatDate(p.proximo_turno_at)}`, tipo: 'turno' }
   }
-  if (filtro.value === 'activos')  list = list.filter(p => p.es_paciente !== false)
-  if (filtro.value === 'vencidos') list = list.filter(p => reproDias(p) !== null && reproDias(p) < 0)
-  if (filtro.value === 'proximos') list = list.filter(p => { const d = reproDias(p); return d !== null && d >= 0 && d <= 30 })
-  if (filtro.value === 'sin_rep')  list = list.filter(p => !p.reprocann_vencimiento)
-  return list
-})
+  if (p.indicacion_vence_at) {
+    const d = Math.floor((safeDate(p.indicacion_vence_at) - new Date()) / 86400000)
+    if (d <= 30) return { texto: `Indicación vence en ${d}d`, tipo: 'indicacion' }
+  }
+  return null
+}
 
-onMounted(() => store.fetch())
+onMounted(() => cargar({ reset: true }))
 </script>
 
 <style scoped>
@@ -450,7 +485,7 @@ onMounted(() => store.fetch())
 .mpv__ind--danger  { background: #dc2626; }
 
 .mpv__avatar {
-  width: 40px; height: 40px; border-radius: 50%; background: #1b5e20; color: #fff;
+  width: 40px; height: 40px; border-radius: 50%; background: var(--c-leaf-800); color: #fff;
   display: flex; align-items: center; justify-content: center;
   font-size: var(--fs-13); font-weight: 700; flex-shrink: 0;
 }
@@ -462,6 +497,27 @@ onMounted(() => store.fetch())
 .mpv__dni    { font-size: var(--fs-12); color: var(--c-ink-500); font-variant-numeric: tabular-nums; }
 .mpv__edad   { font-size: var(--fs-12); color: var(--c-ink-400); }
 .mpv__email  { font-size: var(--fs-12); color: var(--c-ink-400); }
+
+/* Por qué este paciente está arriba en la lista */
+.mpv__motivo {
+  display: inline-block; margin-top: var(--sp-1);
+  font-size: var(--fs-12); font-weight: 600;
+  padding: .1em .6em; border-radius: var(--r-pill);
+}
+.mpv__motivo--turno      { background: var(--c-sky-100);  color: var(--c-sky-600); }
+.mpv__motivo--indicacion { background: var(--c-amber-100); color: var(--c-amber-500); }
+
+/* Paginación */
+.mpv__mas { display: flex; justify-content: center; padding: var(--sp-5) 0 var(--sp-2); }
+.mpv__btn-mas {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-5);
+  background: #fff; border: 1px solid var(--c-ink-300); border-radius: var(--r-lg);
+  font-family: var(--font-ui); font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700);
+  cursor: pointer; transition: all var(--t-base);
+}
+.mpv__btn-mas:hover:not(:disabled) { border-color: var(--c-leaf-500); color: var(--c-leaf-800); background: var(--c-leaf-50); }
+.mpv__btn-mas:disabled { opacity: .55; cursor: not-allowed; }
 
 .mpv__repro { text-align: right; flex-shrink: 0; min-width: 90px; }
 .mpv__rep-badge {
@@ -483,7 +539,6 @@ onMounted(() => store.fetch())
   background: transparent; color: var(--c-ink-400);
 }
 .mpv__action-btn:hover            { background: var(--c-ink-50); color: var(--c-ink-700); }
-.mpv__action-btn--ficha:hover     { background: rgba(27,94,32,.1);  color: #1b5e20; }
 .mpv__action-btn--danger:hover    { background: rgba(220,38,38,.1); color: #dc2626; }
 
 /* Modal */

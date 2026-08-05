@@ -26,7 +26,7 @@ const DIAS_LABEL = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
 const TIPO_CFG = {
   primera_vez: { label: 'Primera vez', color: '#7c3aed', bg: '#f5f3ff' },
-  seguimiento: { label: 'Seguimiento', color: '#1b5e20', bg: '#f0fdf4' },
+  seguimiento: { label: 'Seguimiento', color: 'var(--c-leaf-800)', bg: 'var(--c-leaf-50)' },
   revision:    { label: 'Revisión',    color: '#1d4ed8', bg: '#eff6ff' },
   urgencia:    { label: 'Urgencia',    color: '#dc2626', bg: '#fff5f5' },
 }
@@ -274,7 +274,8 @@ onMounted(async () => {
   try {
     const [tRes, pRes] = await Promise.all([
       getMedicoTurnos(),
-      getMedicoPacientes(),
+      // El selector de pacientes del turno necesita la lista entera, no la primera página.
+      getMedicoPacientes({ limite: 500 }),
     ])
     turnos.value    = tRes.data || []
     pacientes.value = pRes.data?.data ?? pRes.data ?? []
@@ -582,18 +583,18 @@ onUnmounted(() => clearInterval(tickInterval))
 .tv__nav-btn:hover { background: #f8fafc; border-color: #94a3b8; }
 .tv__week-label { font-size: .85rem; font-weight: 700; color: #0f172a; min-width: 150px; text-align: center; }
 .tv__hoy-btn {
-  font-size: .75rem; font-weight: 700; color: #1b5e20;
-  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px;
+  font-size: .75rem; font-weight: 700; color: var(--c-leaf-800);
+  background: var(--c-leaf-50); border: 1px solid #bbf7d0; border-radius: 6px;
   padding: .2rem .6rem; cursor: pointer; transition: all .12s;
 }
 .tv__hoy-btn:hover { background: #dcfce7; }
 .tv__new-btn {
   display: flex; align-items: center; gap: .4rem;
-  background: #1b5e20; color: #fff; border: none; border-radius: 8px;
+  background: var(--c-leaf-800); color: #fff; border: none; border-radius: 8px;
   padding: .45rem .9rem; font-size: .82rem; font-weight: 700; cursor: pointer;
   transition: background .15s;
 }
-.tv__new-btn:hover { background: #14532d; }
+.tv__new-btn:hover { background: var(--c-leaf-900); }
 
 /* ── KPIs ────────────────────────────────────────────────────────────────────── */
 .tv__kpis {
@@ -605,7 +606,7 @@ onUnmounted(() => clearInterval(tickInterval))
   padding: .3rem .75rem; border-radius: 8px;
   background: #f8fafc; border: 1px solid #f1f5f9;
 }
-.tv__kpi--ok     { background: #f0fdf4; border-color: #bbf7d0; }
+.tv__kpi--ok     { background: var(--c-leaf-50); border-color: #bbf7d0; }
 .tv__kpi--warn   { background: #fefce8; border-color: #fde68a; }
 .tv__kpi--danger { background: #fff5f5; border-color: #fecaca; }
 .tv__kpi-val { font-size: .95rem; font-weight: 800; color: #0f172a; line-height: 1; }
@@ -645,18 +646,18 @@ onUnmounted(() => clearInterval(tickInterval))
   border-bottom: 2px solid #d1d5db;
   position: sticky; top: 0; background: #fff; z-index: 2;
 }
-.tv__day--hoy .tv__day-header { background: #f0fdf4; border-bottom-color: #a7f3d0; }
+.tv__day--hoy .tv__day-header { background: var(--c-leaf-50); border-bottom-color: #a7f3d0; }
 .tv__day-name { font-size: .65rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
 .tv__day-num { font-size: .82rem; font-weight: 700; color: #334155; }
 .tv__day-num--hoy {
-  background: #1b5e20; color: #fff; width: 22px; height: 22px;
+  background: var(--c-leaf-800); color: #fff; width: 22px; height: 22px;
   border-radius: 50%; display: flex; align-items: center; justify-content: center;
   font-size: .75rem;
 }
 
 .tv__day-body {
   position: relative; cursor: crosshair;
-  background: #f0fdf4;   /* verde suave = disponible */
+  background: var(--c-leaf-50);   /* verde suave = disponible */
 }
 .tv__day-body--past { cursor: default; background: #f8fafc; }
 
@@ -711,7 +712,7 @@ onUnmounted(() => clearInterval(tickInterval))
 }
 .tv__turno:hover { box-shadow: 0 2px 8px rgba(0,0,0,.15); opacity: .95; }
 .tv__turno--primera_vez { background: #f5f3ff; border-left-color: #7c3aed; }
-.tv__turno--seguimiento { background: #f0fdf4; border-left-color: #1b5e20; }
+.tv__turno--seguimiento { background: var(--c-leaf-50); border-left-color: var(--c-leaf-800); }
 .tv__turno--revision    { background: #eff6ff; border-left-color: #1d4ed8; }
 .tv__turno--urgencia    { background: #fff5f5; border-left-color: #dc2626; }
 .tv__turno--cancelado   { opacity: .4; text-decoration: line-through; }
@@ -749,14 +750,14 @@ onUnmounted(() => clearInterval(tickInterval))
   border-radius: 8px; font-size: .83rem; color: #0f172a; background: #fff;
   transition: border-color .15s; outline: none;
 }
-.tv__input:focus { border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.08); }
+.tv__input:focus { border-color: var(--c-leaf-800); box-shadow: 0 0 0 3px rgba(26,61,46,.1); }
 .tv__select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .6rem center; padding-right: 2rem; }
 .tv__textarea { resize: vertical; min-height: 60px; }
 
 /* Patient search */
 .tv__pac-selected {
   display: flex; align-items: center; gap: .5rem;
-  padding: .45rem .75rem; background: #f0fdf4; border: 1.5px solid #bbf7d0;
+  padding: .45rem .75rem; background: var(--c-leaf-50); border: 1.5px solid #bbf7d0;
   border-radius: 8px; font-size: .83rem; color: #166534; font-weight: 600;
 }
 .tv__pac-selected span { flex: 1; }
@@ -775,7 +776,7 @@ onUnmounted(() => clearInterval(tickInterval))
 }
 .tv__pac-opt:hover { background: #f8fafc; }
 .tv__pac-opt-av {
-  width: 28px; height: 28px; border-radius: 50%; background: #1b5e20; color: #fff;
+  width: 28px; height: 28px; border-radius: 50%; background: var(--c-leaf-800); color: #fff;
   font-size: .65rem; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .tv__pac-opt-info { display: flex; flex-direction: column; gap: 1px; }
@@ -785,11 +786,11 @@ onUnmounted(() => clearInterval(tickInterval))
 /* Buttons */
 .tv__btn-primary {
   display: inline-flex; align-items: center; gap: .35rem;
-  background: #1b5e20; color: #fff; border: none; border-radius: 8px;
+  background: var(--c-leaf-800); color: #fff; border: none; border-radius: 8px;
   padding: .5rem 1rem; font-size: .83rem; font-weight: 700; cursor: pointer;
   transition: background .15s;
 }
-.tv__btn-primary:hover:not(:disabled) { background: #14532d; }
+.tv__btn-primary:hover:not(:disabled) { background: var(--c-leaf-900); }
 .tv__btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 .tv__btn-ghost {
   background: none; border: 1.5px solid #e2e8f0; border-radius: 8px;
@@ -824,17 +825,17 @@ onUnmounted(() => clearInterval(tickInterval))
 }
 .tv__detail-av {
   width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
-  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  background: linear-gradient(135deg, var(--c-leaf-800), var(--c-leaf-600));
   color: #fff; font-size: .8rem; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
 }
 .tv__detail-pac-info { display: flex; flex-direction: column; gap: .15rem; }
 .tv__detail-pac-nombre { font-size: .9rem; font-weight: 800; color: #0f172a; }
 .tv__detail-ficha-link {
-  font-size: .75rem; font-weight: 600; color: #1b5e20; background: none; border: none;
+  font-size: .75rem; font-weight: 600; color: var(--c-leaf-800); background: none; border: none;
   cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 2px;
 }
-.tv__detail-ficha-link:hover { color: #14532d; }
+.tv__detail-ficha-link:hover { color: var(--c-leaf-900); }
 
 .tv__detail-info-grid {
   display: flex; flex-direction: column; gap: .65rem;
@@ -867,10 +868,10 @@ onUnmounted(() => clearInterval(tickInterval))
   padding: .4rem .8rem; border-radius: 8px; font-size: .78rem; font-weight: 700;
   cursor: pointer; border: 1.5px solid; transition: all .15s;
 }
-.tv__accion--ok      { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+.tv__accion--ok      { background: var(--c-leaf-50); color: #166534; border-color: #bbf7d0; }
 .tv__accion--ok:hover { background: #dcfce7; }
-.tv__accion--primary { background: #f0fdf4; color: #1b5e20; border-color: #1b5e20; }
-.tv__accion--primary:hover { background: #1b5e20; color: #fff; }
+.tv__accion--primary { background: var(--c-leaf-50); color: var(--c-leaf-800); border-color: var(--c-leaf-800); }
+.tv__accion--primary:hover { background: var(--c-leaf-800); color: #fff; }
 .tv__accion--warn    { background: #fefce8; color: #92400e; border-color: #fde68a; }
 .tv__accion--warn:hover { background: #fef3c7; }
 .tv__accion--danger  { background: #fff5f5; color: #dc2626; border-color: #fecaca; }
@@ -895,7 +896,7 @@ onUnmounted(() => clearInterval(tickInterval))
   color: #64748b; background: none; border: 1px solid #e2e8f0; border-radius: 6px;
   padding: .15rem .5rem; cursor: pointer; transition: all .12s;
 }
-.tv__notas-edit:hover { color: #1b5e20; border-color: #1b5e20; }
+.tv__notas-edit:hover { color: var(--c-leaf-800); border-color: var(--c-leaf-800); }
 .tv__notas-actions { display: flex; gap: .5rem; margin-top: .5rem; }
 .tv__detail-notas-text { font-size: .82rem; color: #475569; white-space: pre-wrap; line-height: 1.6; margin: 0; }
 .tv__detail-notas-empty { font-size: .8rem; color: #94a3b8; font-style: italic; margin: 0; }

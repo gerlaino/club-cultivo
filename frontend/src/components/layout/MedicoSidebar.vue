@@ -5,7 +5,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import AppSidebar from './AppSidebar.vue'
-import { LayoutDashboard, CalendarDays, Users, FileHeart, FolderOpen, Settings2 } from 'lucide-vue-next'
+import { LayoutDashboard, CalendarDays, Users, Settings2 } from 'lucide-vue-next'
 import { getMedicoTurnos } from '../../lib/api.js'
 
 const turnosHoy = ref(0)
@@ -13,9 +13,8 @@ const turnosHoy = ref(0)
 const navLinks = computed(() => [
   { to: '/medico',                icon: LayoutDashboard, label: 'Inicio', exact: true },
   { to: '/medico/turnos',         icon: CalendarDays,    label: 'Turnera', badge: turnosHoy.value },
+  // Indicaciones y Documentos no son secciones: son tabs del paciente al que pertenecen.
   { to: '/medico/pacientes',      icon: Users,           label: 'Mis Pacientes' },
-  { to: '/medico/indicaciones',   icon: FileHeart,       label: 'Indicaciones' },
-  { to: '/medico/documentos',     icon: FolderOpen,      label: 'Documentos' },
   { to: '/medico/disponibilidad', icon: Settings2,       label: 'Mi disponibilidad' },
 ])
 

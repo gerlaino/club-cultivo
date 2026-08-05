@@ -102,7 +102,7 @@
             <RouterLink
               v-for="p in alertas"
               :key="p.id"
-              :to="`/medico/pacientes/${p.id}/ficha`"
+              :to="`/medico/pacientes/${p.id}`"
               class="mpd__alert-row"
               :class="diasHasta(p.reprocann_vencimiento) < 0 ? 'mpd__alert-row--danger' : 'mpd__alert-row--warn'"
             >
@@ -124,7 +124,7 @@
             <RouterLink
               v-for="ind in indPorVencer"
               :key="ind.id"
-              :to="`/medico/pacientes/${ind.paciente?.id}/ficha`"
+              :to="`/medico/pacientes/${ind.paciente?.id}`"
               class="mpd__alert-row mpd__alert-row--warn"
             >
               <div class="mpd__alert-av mpd__alert-av--purple">{{ iniciales(ind.paciente || {}) }}</div>
@@ -283,18 +283,18 @@ onMounted(cargar)
 
 .mpd__btn-primary {
   display: inline-flex; align-items: center; gap: var(--sp-2);
-  background: #1b5e20; color: #fff; border: none; border-radius: var(--r-md);
+  background: var(--c-leaf-800); color: #fff; border: none; border-radius: var(--r-md);
   padding: var(--sp-2) var(--sp-4); font-size: var(--fs-13); font-weight: 600;
   text-decoration: none; cursor: pointer; transition: background .15s;
 }
-.mpd__btn-primary:hover { background: #14532d; }
+.mpd__btn-primary:hover { background: var(--c-leaf-900); }
 .mpd__btn-secondary {
   display: inline-flex; align-items: center; gap: var(--sp-2);
-  background: none; color: #1b5e20; border: 1.5px solid #1b5e20; border-radius: var(--r-md);
+  background: none; color: var(--c-leaf-800); border: 1.5px solid var(--c-leaf-800); border-radius: var(--r-md);
   padding: var(--sp-2) var(--sp-4); font-size: var(--fs-13); font-weight: 600;
   text-decoration: none; cursor: pointer; transition: all .15s;
 }
-.mpd__btn-secondary:hover { background: #f0fdf4; }
+.mpd__btn-secondary:hover { background: var(--c-leaf-50); }
 .mpd__btn-ghost {
   background: none; border: 1px solid var(--c-ink-200); color: var(--c-ink-600);
   border-radius: var(--r-md); font-size: var(--fs-13); cursor: pointer;
@@ -329,7 +329,7 @@ onMounted(cargar)
   background: var(--c-paper); border-radius: var(--r-lg);
   padding: var(--sp-5); border: 1px solid var(--c-ink-100);
 }
-.mpd__col--turnos { border-top: 3px solid #1b5e20; }
+.mpd__col--turnos { border-top: 3px solid var(--c-leaf-800); }
 .mpd__col--alertas { border-top: 3px solid #d97706; }
 
 .mpd__section-head {
@@ -341,7 +341,7 @@ onMounted(cargar)
   letter-spacing: .05em; display: flex; align-items: center; gap: var(--sp-2); margin: 0;
 }
 .mpd__section-link {
-  font-size: var(--fs-12); font-weight: 600; color: #1b5e20; text-decoration: none;
+  font-size: var(--fs-12); font-weight: 600; color: var(--c-leaf-800); text-decoration: none;
 }
 .mpd__section-link:hover { text-decoration: underline; }
 
@@ -360,7 +360,7 @@ onMounted(cargar)
   padding: .55rem var(--sp-3); border-left: 3px solid transparent;
 }
 .mpd__turno--primera_vez { border-left-color: #7c3aed; }
-.mpd__turno--seguimiento { border-left-color: #1b5e20; }
+.mpd__turno--seguimiento { border-left-color: var(--c-leaf-800); }
 .mpd__turno--revision    { border-left-color: #1d4ed8; }
 .mpd__turno--urgencia    { border-left-color: #dc2626; }
 .mpd__turno--clickable { cursor: pointer; }
@@ -394,7 +394,7 @@ onMounted(cargar)
 .mpd__alert-row--warn   { border-left-color: #d97706; }
 .mpd__alert-row:hover { border-color: #2D8A6B; }
 .mpd__alert-av {
-  width: 26px; height: 26px; border-radius: 50%; background: #1b5e20;
+  width: 26px; height: 26px; border-radius: 50%; background: var(--c-leaf-800);
   color: #fff; display: flex; align-items: center; justify-content: center;
   font-size: 10px; font-weight: 700; flex-shrink: 0;
 }

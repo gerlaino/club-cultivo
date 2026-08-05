@@ -1,5 +1,40 @@
 # Changelog
 
+## Agosto 2026 (b) — el médico tenía tres puertas para lo mismo
+
+Testeando el rol médico apareció que había **dos fichas del mismo paciente** (`/medico/pacientes/:id`,
+que es `SocioDetailView`, y `/medico/pacientes/:id/ficha`, con Timeline y Notas repetidos), más
+pantallas propias de Indicaciones y Documentos que listaban las de **todos** los pacientes mezclados.
+Y un tercer dashboard médico muerto en `components/dashboards/`, que además hacía una request por
+paciente. **La ficha ahora es una sola**, y lo que era una pantalla pasó a ser una tab de su paciente.
+
+- **Indicaciones es una tab del paciente.** Ya existían por paciente, pero escondidas dentro de la
+  tab REPROCANN. Ahora tienen tab propia (admin y médico editan, supervisor lee) y arriba muestran
+  el **consumo dispensado** (90 días, promedio mensual, sparkline) — que es el contexto con el que
+  se prescribe, y era lo único que valía la pena rescatar de la ficha eliminada.
+- **Documentos: lo clínico entra por un solo lado.** Había **dos modelos** conviviendo: la pantalla
+  del médico escribía `Documento` (sin cifrado) y la ficha del paciente lee `PatientDocument` (con
+  cifrado, firma y hash) — un PDF subido por una puerta no aparecía nunca por la otra. Los tipos que
+  faltaban (receta, certificado médico, estudio clínico, DNI) se sumaron a `PatientDocument`. Los
+  tipos institucionales del club dejaron de ofrecérsele al médico: no es él quien sube el estatuto.
+- **Duración y vencimiento dejan de pisarse.** `calculate_fecha_vencimiento` sobrescribía el
+  vencimiento **siempre** que hubiera `duracion_dias`, en alta y en edición, sin avisar: el médico
+  escribía una fecha y el sistema la cambiaba. Ahora la duración **propone** (un tratamiento de 90
+  días puede vivir dentro de una indicación válida hasta que venza el REPROCANN) y la fecha escrita
+  a mano **gana**. El form dice cuál de las dos está mandando, y la lista marca la indicación sin
+  fecha con "no genera alertas" — que era un agujero silencioso.
+- **"Mis Pacientes" se pagina en el servidor** (antes: todos los pacientes del club en un JSON sin
+  techo, y filtrado dos veces —server-side y otra vez en el cliente—). Filtros y KPIs pasan a ser
+  server-side: contando en el cliente, "3 vencidos" podía significar 40. El **orden ya no es
+  alfabético sino de agenda**: primero quien tiene turno con ese médico, después quien tiene una
+  indicación por vencer, y la fila dice por qué está arriba.
+- **Design system**: las vistas del médico usaban verdes Material hardcodeados (`#1b5e20`,
+  `#14532d`, `#2e7d32`, `#f0fdf4`) en vez de los tokens `leaf`. Reemplazados.
+
+**Nota:** la campana de alertas del médico **ya existía y funcionaba** (`MedicoTopBar`, con el
+backend filtrando por `destinada_a_role`); el `NotificationBell` de `App.vue` que solo ve admin y
+cultivador pertenece al layout viejo.
+
 ## Agosto 2026 (a) — la raíz deja de ser un formulario de login
 
 Quien entraba al dominio sin sesión caía directo en el login: una pantalla que pide usuario y

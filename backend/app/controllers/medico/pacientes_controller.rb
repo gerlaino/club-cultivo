@@ -1,187 +1,146 @@
 module Medico
   class PacientesController < BaseController
-    before_action :set_paciente, only: [:ficha]
+    PER_PAGE_DEFAULT = 30
+    # El tope es alto porque la turnera pide la lista entera para su selector de pacientes.
+    PER_PAGE_MAX     = 500
+
+    FILTROS = %w[todos activos proximos vencidos sin_rep].freeze
 
     # GET /api/medico/pacientes
+    #
+    # Paginado: antes devolvía TODOS los pacientes del club en un solo JSON, sin techo.
+    #
+    # El orden por defecto no es alfabético sino "de agenda": primero quien tiene turno con este
+    # médico, después quien tiene una indicación por vencer, y recién al final el resto por
+    # apellido. Un médico no navega el padrón del club, navega a quién tiene que ver.
     def index
-      pacientes = club.pacientes
-                      .where(deleted_at: nil)
-                      .order(:apellido, :nombre)
-                      .select(:id, :nombre, :apellido, :dni, :fecha_nacimiento,
-                              :reprocann_numero, :reprocann_vencimiento, :reprocann_estado,
-                              :diagnostico_principal, :diagnostico_secundario,
-                              :con_seguimiento_medico)
+      page   = [params[:pagina].to_i, 1].max
+      limit  = (params[:limite].presence || PER_PAGE_DEFAULT).to_i.clamp(1, PER_PAGE_MAX)
+      query  = params[:query].to_s.strip
+      filtro = params[:filtro].presence_in(FILTROS) || 'todos'
 
-      render json: pacientes.map { |p| serialize_paciente_resumen(p) }
-    end
+      base  = club.pacientes.where(deleted_at: nil)
+      base  = filtrar_por_texto(base, query) if query.present?
+      scope = filtrar_por_estado(base, filtro)
 
-    # GET /api/medico/pacientes/:id/ficha
-    def ficha
-      indicacion = @paciente.indicacion_medicas
-                             .where(activa: true)
-                             .order(fecha_emision: :desc)
-                             .first
+      total = scope.count
 
-      proximo_turno = club.turnos
-                          .del_medico(current_user.id)
-                          .where(paciente_id: @paciente.id)
-                          .proximos
-                          .first
-
-      dispensaciones = @paciente.dispensaciones
-                                .includes(stock: :genetica)
-                                .order(fecha_dispensacion: :desc)
-                                .limit(20)
-
-      check_ins_map = @paciente.check_ins
-                               .where.not(dispensacion_id: nil)
-                               .index_by(&:dispensacion_id)
-
-      disp_serialized = dispensaciones.map do |d|
-        genetica = d.stock&.genetica
-        {
-          id:              d.id,
-          fecha:           d.fecha_dispensacion,
-          cantidad_g:      d.cantidad.to_f,
-          forma_producto:  d.stock&.forma_producto,
-          genetica:        genetica ? serialize_genetica(genetica) : nil,
-          check_in:        check_ins_map[d.id] ? serialize_check_in(check_ins_map[d.id]) : nil,
-        }
-      end
-
-      # Resumen consumo últimos 90 días
-      disp_90d = @paciente.dispensaciones.no_canceladas
-                          .where('fecha_dispensacion >= ?', 90.days.ago)
-      total_90d  = disp_90d.sum(:cantidad).to_f
-      prom_mens  = (total_90d / 3.0).round(1)
+      pacientes = scope
+                  .joins(sql_proximo_turno)
+                  .joins(sql_indicacion_por_vencer)
+                  .select('pacientes.*, t.proximo AS proximo_turno_at, i.vence AS indicacion_vence_at')
+                  .order(Arel.sql(<<~SQL))
+                    t.proximo ASC NULLS LAST,
+                    i.vence   ASC NULLS LAST,
+                    pacientes.apellido ASC, pacientes.nombre ASC
+                  SQL
+                  .offset((page - 1) * limit)
+                  .limit(limit)
+                  .to_a
 
       render json: {
-        paciente:           serialize_paciente_ficha(@paciente),
-        indicacion_activa:  indicacion ? serialize_indicacion(indicacion) : nil,
-        proximo_turno:      proximo_turno ? serialize_turno(proximo_turno) : nil,
-        dispensaciones:     disp_serialized,
-        total_dispensaciones: @paciente.dispensaciones.no_canceladas.count,
-        resumen_consumo: {
-          total_g_90d:          total_90d,
-          promedio_mensual_g:   prom_mens,
-          total_dispensaciones: disp_90d.count,
-        },
+        data: pacientes.map { |p| serialize_paciente_resumen(p) },
+        meta: { pagina: page, limite: limit, total: total, kpis: kpis(base) },
       }
     end
 
     private
 
-    def set_paciente
-      @paciente = club.pacientes.find(params[:id])
-    rescue ActiveRecord::RecordNotFound
-      render json: { error: 'Paciente no encontrado' }, status: :not_found
+    # Los contadores de la cabecera se cuentan sobre TODO lo que matchea la búsqueda, no sobre la
+    # página: paginando, contar en el cliente daría "3 vencidos" cuando hay 40.
+    def kpis(base)
+      hoy = Date.today
+
+      {
+        total:    base.count,
+        activos:  base.where(es_paciente: true).count,
+        proximos: base.where(reprocann_vencimiento: hoy..(hoy + 30)).count,
+        vencidos: base.where(reprocann_vencimiento: ...hoy).count,
+        sin_rep:  base.where(reprocann_vencimiento: nil).count,
+      }
+    end
+
+    def filtrar_por_estado(scope, filtro)
+      hoy = Date.today
+
+      case filtro
+      when 'activos'  then scope.where(es_paciente: true)
+      when 'proximos' then scope.where(reprocann_vencimiento: hoy..(hoy + 30))
+      when 'vencidos' then scope.where(reprocann_vencimiento: ...hoy)
+      when 'sin_rep'  then scope.where(reprocann_vencimiento: nil)
+      else scope
+      end
+    end
+
+    # El DNI va cifrado determinístico: admite igualdad exacta, no LIKE. Mismo criterio que
+    # PacientesController#index, para que buscar signifique lo mismo en las dos pantallas.
+    def filtrar_por_texto(scope, query)
+      q        = "%#{query.downcase}%"
+      by_name  = scope.where('lower(pacientes.nombre) LIKE :q OR lower(pacientes.apellido) LIKE :q', q: q)
+      dni_term = query.gsub(/\D/, '')
+
+      dni_term.present? ? by_name.or(scope.where(dni_normalizado: dni_term)) : by_name
+    end
+
+    def sql_proximo_turno
+      sanitize_sql([<<~SQL, medico_id: current_user.id, ahora: Time.current])
+        LEFT JOIN (
+          SELECT paciente_id, MIN(fecha_hora) AS proximo
+          FROM turnos
+          WHERE medico_id = :medico_id
+            AND fecha_hora >= :ahora
+            AND estado IN ('programado', 'confirmado')
+          GROUP BY paciente_id
+        ) t ON t.paciente_id = pacientes.id
+      SQL
+    end
+
+    def sql_indicacion_por_vencer
+      sanitize_sql([<<~SQL, hoy: Date.today])
+        LEFT JOIN (
+          SELECT paciente_id, MIN(fecha_vencimiento) AS vence
+          FROM indicacion_medicas
+          WHERE activa = TRUE
+            AND fecha_vencimiento IS NOT NULL
+            AND fecha_vencimiento >= :hoy
+          GROUP BY paciente_id
+        ) i ON i.paciente_id = pacientes.id
+      SQL
+    end
+
+    def sanitize_sql(statement)
+      ActiveRecord::Base.sanitize_sql_array(statement)
     end
 
     def serialize_paciente_resumen(p)
-      hoy = Date.today
+      hoy  = Date.today
       venc = p.reprocann_vencimiento
-      dias = venc ? (venc - hoy).to_i : nil
+
       {
-        id:                   p.id,
-        nombre:               p.nombre,
-        apellido:             p.apellido,
-        nombre_completo:      "#{p.nombre} #{p.apellido}",
-        dni:                  p.dni,
-        edad:                 hoy.year - p.fecha_nacimiento.year - (hoy < p.fecha_nacimiento + (hoy.year - p.fecha_nacimiento.year).years ? 1 : 0),
-        diagnostico_principal: p.diagnostico_principal,
-        reprocann_estado:     p.reprocann_estado,
-        reprocann_vencimiento: venc,
-        dias_hasta_vencimiento: dias,
-        con_seguimiento:      p.con_seguimiento_medico,
+        id:                     p.id,
+        nombre:                 p.nombre,
+        apellido:               p.apellido,
+        nombre_completo:        "#{p.nombre} #{p.apellido}",
+        dni:                    p.dni,
+        email:                  p.email,
+        edad:                   edad(p.fecha_nacimiento, hoy),
+        diagnostico_principal:  p.diagnostico_principal,
+        reprocann_estado:       p.reprocann_estado,
+        reprocann_vencimiento:  venc,
+        dias_hasta_vencimiento: venc ? (venc - hoy).to_i : nil,
+        con_seguimiento:        p.con_seguimiento_medico,
+        es_paciente:            p.es_paciente,
+        # Lo que pone al paciente arriba en la lista, para poder mostrarlo en la fila.
+        proximo_turno_at:       p.try(:proximo_turno_at),
+        indicacion_vence_at:    p.try(:indicacion_vence_at),
       }
     end
 
-    def serialize_paciente_ficha(p)
-      hoy = Date.today
-      venc = p.reprocann_vencimiento
-      dias = venc ? (venc - hoy).to_i : nil
-      {
-        id:                       p.id,
-        nombre:                   p.nombre,
-        apellido:                 p.apellido,
-        nombre_completo:          "#{p.nombre} #{p.apellido}",
-        dni:                      p.dni,
-        email:                    p.email,
-        telefono:                 p.telefono,
-        fecha_nacimiento:         p.fecha_nacimiento,
-        edad:                     hoy.year - p.fecha_nacimiento.year,
-        reprocann_numero:         p.reprocann_numero,
-        reprocann_vencimiento:    venc,
-        reprocann_estado:         p.reprocann_estado,
-        dias_hasta_vencimiento:   dias,
-        diagnostico_principal:    p.diagnostico_principal,
-        diagnostico_secundario:   p.diagnostico_secundario,
-        motivo_consulta:          p.motivo_consulta,
-        anamnesis:                p.anamnesis,
-        antecedentes_personales:  p.antecedentes_personales,
-        antecedentes_familiares:  p.antecedentes_familiares,
-        medicacion_habitual:      p.medicacion_habitual,
-        alergias:                 p.alergias,
-        notas_clinicas:           p.notas_clinicas,
-        grupo_sanguineo:          p.grupo_sanguineo,
-        con_seguimiento:          p.con_seguimiento_medico,
-      }
-    end
+    def edad(fecha_nacimiento, hoy)
+      return nil unless fecha_nacimiento
 
-    def serialize_genetica(g)
-      quimiotipo = calcular_quimiotipo(g.thc, g.cbd)
-      {
-        id:         g.id,
-        nombre:     g.nombre,
-        thc:        g.thc&.to_f,
-        cbd:        g.cbd&.to_f,
-        tipo:       g.tipo,
-        terpenos:   g.terpenos,
-        quimiotipo: quimiotipo,
-      }
-    end
-
-    def calcular_quimiotipo(thc, cbd)
-      return nil unless thc && cbd
-      thc_f = thc.to_f
-      cbd_f = cbd.to_f
-      return 'III' if thc_f < 1.0 && cbd_f >= 1.0
-      return 'I'   if thc_f >= 1.0 && cbd_f < 1.0
-      return 'II'  if thc_f >= 1.0 && cbd_f >= 1.0
-      nil
-    end
-
-    def serialize_check_in(ci)
-      {
-        id:               ci.id,
-        escala_bienestar: ci.escala_bienestar,
-        sintomas:         ci.sintomas,
-        notas:            ci.notas,
-        via_registro:     ci.via_registro,
-        fecha:            ci.created_at.to_date,
-      }
-    end
-
-    def serialize_indicacion(ind)
-      {
-        id:                  ind.id,
-        patologia:           ind.patologia,
-        dosificacion:        ind.dosificacion,
-        via_administracion:  ind.via_administracion,
-        fecha_emision:       ind.fecha_emision,
-        fecha_vencimiento:   ind.fecha_vencimiento,
-        observaciones:       ind.observaciones,
-      }
-    end
-
-    def serialize_turno(t)
-      {
-        id:          t.id,
-        fecha_hora:  t.fecha_hora,
-        tipo:        t.tipo,
-        estado:      t.estado,
-        motivo:      t.motivo,
-      }
+      hoy.year - fecha_nacimiento.year -
+        (hoy < fecha_nacimiento + (hoy.year - fecha_nacimiento.year).years ? 1 : 0)
     end
   end
 end

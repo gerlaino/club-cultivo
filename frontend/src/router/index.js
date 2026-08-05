@@ -808,11 +808,16 @@ const routes = [
       { path: '', name: 'medico-dashboard', component: () => import('../views/medico/MedicoDashboard.vue') },
       { path: 'pacientes', name: 'medico-pacientes', component: () => import('../views/medico/MedicoPacientesView.vue') },
       { path: 'pacientes/:id', name: 'medico-paciente-detail', component: () => import('../views/SocioDetailView.vue'), props: () => ({ backPath: '/medico/pacientes' }) },
-      { path: 'pacientes/:id/ficha', name: 'medico-ficha-paciente', component: () => import('../views/medico/MedicoFichaPacienteView.vue') },
       { path: 'turnos', name: 'medico-turnos', component: () => import('../views/medico/MedicoTurnosView.vue') },
       { path: 'disponibilidad', name: 'medico-disponibilidad', component: () => import('../views/medico/MedicoDisponibilidadView.vue') },
-      { path: 'indicaciones', name: 'medico-indicaciones', component: () => import('../views/medico/MedicoIndicacionesView.vue') },
-      { path: 'documentos', name: 'medico-documentos', component: () => import('../views/medico/MedicoDocumentosView.vue') },
+
+      // La ficha del paciente es UNA: SocioDetailView. Antes había una segunda vista en
+      // /ficha con timeline y notas repetidos, y las indicaciones y los documentos vivían en
+      // pantallas propias que listaban los de TODOS los pacientes mezclados. Ahora son tabs de
+      // su paciente. Los redirects quedan por los enlaces viejos (mails, bookmarks, QR).
+      { path: 'pacientes/:id/ficha', redirect: to => `/medico/pacientes/${to.params.id}` },
+      { path: 'indicaciones', redirect: '/medico/pacientes' },
+      { path: 'documentos',   redirect: '/medico/pacientes' },
     ],
   },
 
