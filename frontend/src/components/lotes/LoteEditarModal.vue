@@ -74,7 +74,7 @@
               <label class="lem__label">Tamaño de maceta</label>
               <select class="lem__input" v-model="editLoteForm.tamanio_maceta">
                 <option value="">Sin especificar</option>
-                <option value="0.5">Vaso (0.5L)</option>
+                <option value="0.5">0,5 L</option>
                 <option value="1">1 litro</option><option value="3">3 litros</option>
                 <option value="5">5 litros</option><option value="7">7 litros</option>
                 <option value="10">10 litros</option><option value="12">12 litros</option>

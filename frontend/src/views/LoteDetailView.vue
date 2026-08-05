@@ -634,6 +634,9 @@ onUnmounted(() => {
                       <input v-model="labForm.terpenos_principales" type="text" class="ld__lab-input" placeholder="Myrcene, Limonene…" />
                     </div>
                     <div class="ld__lab-form-actions">
+                      <button class="ld__lab-cancel" :disabled="guardandoLab" @click="labFormOpen = false">
+                        Cancelar
+                      </button>
                       <button class="ld__lab-save" :disabled="guardandoLab" @click="guardarAnalisis">
                         {{ guardandoLab ? 'Guardando…' : 'Guardar análisis' }}
                       </button>
@@ -762,25 +765,7 @@ onUnmounted(() => {
               </span>
             </div>
 
-<!-- Mismo pedido que en el avance del cultivador: el esqueje que prendió va a maceta. -->
-            <!-- Cuántas prendieron. Va vacío a propósito, con "prendieron todas" al lado: si
-                 viniera prellenado con el total, el que va rápido confirma sin mirar y el club
-                 queda con 100% de prendimiento falso para siempre. -->
-            <div v-if="lote?.estado === 'enraizado'" class="ld__field">
-              <label class="ld__label">¿Cuántas prendieron? <span style="color:#dc2626">*</span></label>
-              <div class="ld__prend-row">
-                <input v-model="avanzarPrendieron" type="number" min="0" :max="plantasDelLote"
-                       class="ld__input" :placeholder="`de ${plantasDelLote}`" />
-                <button type="button" class="ld__prend-btn" @click="prendieronTodas">Prendieron todas</button>
-              </div>
-              <span v-if="prendieronInvalido" class="ld__prend-err">
-                El lote tiene {{ plantasDelLote }} plantas.
-              </span>
-              <span v-else-if="noPrendieron > 0" class="ld__optional">
-                {{ noPrendieron }} se descartan como "no prendió" — es lo que mide el % de prendimiento.
-              </span>
-            </div>
-
+            <!-- Mismo pedido que en el avance del cultivador: el esqueje que prendió va a maceta. -->
             <div v-if="lote?.estado === 'enraizado'" class="ld__field">
               <label class="ld__label">Maceta a la que va <span style="color:#dc2626">*</span></label>
               <select v-model="avanzarMaceta" class="ld__input">
@@ -1221,16 +1206,19 @@ onUnmounted(() => {
 .ld__lab-del:hover { opacity: 1; background: #fef2f2; }
 .ld__lab-empty { font-size: .82rem; color: #94a3b8; font-style: italic; padding: .5rem 0; }
 .ld__lab-add-wrap { margin-top: .75rem; }
-.ld__lab-toggle-form { display: inline-flex; align-items: center; gap: .3rem; background: #e8f5e9; color: #15803d; border: 1px solid #d4e6d4; padding: .4rem .85rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; }
-.ld__lab-toggle-form:hover { background: #dcfce7; border-color: #86efac; }
-.ld__lab-form { margin-top: .75rem; background: #f8fdf8; border: 1.5px solid #d4e6d4; border-radius: 10px; padding: .875rem 1rem; display: flex; flex-direction: column; gap: .65rem; }
-.ld__lab-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .65rem; }
+.ld__lab-toggle-form { display: inline-flex; align-items: center; gap: var(--sp-2); background: var(--c-leaf-100); color: var(--c-leaf-800); border: 1px solid var(--c-leaf-100); padding: var(--sp-2) var(--sp-4); border-radius: var(--r-lg); font-size: var(--fs-13); font-weight: 600; cursor: pointer; transition: all var(--t-base); }
+.ld__lab-toggle-form:hover { background: var(--c-leaf-50); border-color: var(--c-leaf-300); }
+.ld__lab-form { margin-top: var(--sp-3); background: var(--c-leaf-50); border: 1.5px solid var(--c-leaf-100); border-radius: var(--r-xl); padding: var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-4); }
+.ld__lab-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--sp-4); }
 .ld__lab-field { display: flex; flex-direction: column; gap: .25rem; }
 .ld__lab-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
-.ld__lab-input { background: #fff; border: 1.5px solid #d4e6d4; border-radius: 7px; padding: .45rem .65rem; font-size: .85rem; color: #1a1a1a; width: 100%; box-sizing: border-box; transition: border .15s; }
-.ld__lab-input:focus { outline: none; border-color: #1b5e20; }
-.ld__lab-form-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .25rem; }
-.ld__lab-save { display: inline-flex; align-items: center; gap: .35rem; background: #1b5e20; color: #fff; border: none; padding: .5rem 1.1rem; border-radius: 8px; font-size: .85rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+.ld__lab-input { background: #fff; border: 1.5px solid var(--c-leaf-100); border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); font-size: .85rem; color: #1a1a1a; width: 100%; box-sizing: border-box; transition: border .15s; }
+.ld__lab-input:focus { outline: none; border-color: var(--c-leaf-500); box-shadow: 0 0 0 3px rgba(26,61,46,.08); }
+.ld__lab-form-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
+.ld__lab-cancel { background: none; border: 1px solid var(--c-ink-300); color: var(--c-ink-700); padding: var(--sp-2) var(--sp-4); border-radius: var(--r-lg); font-size: var(--fs-13); font-weight: 600; cursor: pointer; }
+.ld__lab-cancel:hover:not(:disabled) { background: var(--c-ink-100); }
+.ld__lab-cancel:disabled { opacity: .5; cursor: not-allowed; }
+.ld__lab-save { display: inline-flex; align-items: center; gap: var(--sp-2); background: var(--c-leaf-800); color: #fff; border: none; padding: var(--sp-2) var(--sp-5); border-radius: var(--r-lg); font-size: var(--fs-13); font-weight: 600; cursor: pointer; transition: opacity var(--t-base); }
 .ld__lab-save:hover:not(:disabled) { opacity: .88; }
 .ld__lab-save:disabled { opacity: .5; cursor: not-allowed; }
 </style>

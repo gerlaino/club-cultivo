@@ -498,7 +498,7 @@ async function crear() {
                   <label class="clc__label">Maceta inicial <span class="clc__label-opt">(opc.)</span></label>
                   <select class="clc__input" v-model="form.tamanio_maceta_inicial">
                     <option value="">Sin especificar</option>
-                    <option value="0.5">Vaso (0.5 L)</option>
+                    <option value="0.5">0,5 L</option>
                     <option value="1">1 litro</option>
                     <option value="3">3 litros</option>
                     <option value="5">5 litros</option>
@@ -514,7 +514,7 @@ async function crear() {
                   <label class="clc__label">Maceta final <span class="clc__label-opt">(opc.)</span></label>
                   <select class="clc__input" v-model="form.tamanio_maceta">
                     <option value="">Sin especificar</option>
-                    <option value="0.5">Vaso (0.5 L)</option>
+                    <option value="0.5">0,5 L</option>
                     <option value="1">1 litro</option>
                     <option value="3">3 litros</option>
                     <option value="5">5 litros</option>

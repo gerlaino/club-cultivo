@@ -1,5 +1,44 @@
 # Changelog
 
+## Agosto 2026 (c) — el cultivador veía lotes pero ninguna planta
+
+El síntoma era ese, y la causa una asimetría: `lotes#index` tenía una red de seguridad para el
+cultivador **sin sedes asignadas** (le muestra todo el cultivo del club) que `plants#index` y
+`plants#kpis` no tenían — `where(sala_id: [])` devuelve cero filas, sin error ni aviso. Ese fallback
+estaba escrito a mano en **cuatro** controllers y faltaba justo en los dos de plantas. Ahora vive
+dentro de `User#salas_ids_asignadas` y los cuatro lo consumen.
+
+De paso apareció el mismo agujero por otro lado: al cosechar, el lote **suelta la sala** para liberar
+el slot (`avanzar_fase!` deja `sala_id = nil`), así que filtrando sólo por sala **las plantas de un
+lote cosechado o en manicura no le aparecían nunca** al cultivador, ni en la lista ni en los KPIs.
+El scope nuevo `Lote.al_alcance_de` resuelve el post-cosecha por **sede**.
+
+- **Cambiar la fase de una sala ya no revegeta lotes en silencio.** Mover lotes a otra sala pedía
+  confirmación lote por lote; editar el `kind` de la sala hacía lo mismo por la puerta de atrás, sin
+  preguntar nada: un lote en día 45 de floración volvía a vegetativo y perdía el contador de días.
+  Ahora el backend **frena** y devuelve qué lotes se verían afectados, con cuántos días de fase
+  pierde cada uno; recién con el sí explícito se guarda. Y se le aplicó la misma guarda que ya tenía
+  la acción "Cambiar fase": con esquejes enraizando adentro, la sala no pasa a 12/12.
+- **Cosecha: un solo formulario.** El modal que se abría dependía de si el lote tenía plantas
+  individuales cargadas — un dato que el cultivador no eligió ni ve. Ahora es el mismo, con un
+  contador en lugar de la grilla cuando el lote sólo lleva el total. La **letra de corte** se pide
+  únicamente cuando aporta (cosecha parcial o ya hay cortes previos). Y el cultivador que tocaba
+  "avanzar fase" con el lote ya cosechado recibía *"Lote no puede transicionar en este estado"*:
+  ahora se le dice que la asignación a manicura la hace el admin.
+- **Días: dos columnas.** El número decía días **totales** y el semáforo de al lado medía días **en
+  la fase** contra su objetivo. Ahora son "En fase" (con el semáforo) y "Total", como ya lo mostraba
+  el historial de la sala.
+- **La maceta aparecía dos veces** (columna y badge de estado): queda en su columna, que además sirve
+  post-cosecha, donde el badge no la mostraba.
+- **"Vaso" fuera**: el envase no es el dato, los litros sí — y 0,335 L y 0,5 L son los dos "un vaso".
+  La lista de tamaños estaba copiada en **cinco** archivos, dos con valores distintos; ahora sale de
+  `MACETA_OPCIONES`.
+- **Bug del formulario de avanzar fase**: el campo "¿cuántas prendieron?" estaba **duplicado literal**,
+  con el mismo `v-model`.
+- **Análisis de laboratorio**: botón Cancelar (antes había que crear y borrar), aire y tokens del DS.
+- **Historial del cultivador**: el código de lote se partía en dos líneas — columna de 110px y un pill
+  sin `nowrap`.
+
 ## Agosto 2026 (b) — el médico tenía tres puertas para lo mismo
 
 Testeando el rol médico apareció que había **dos fichas del mismo paciente** (`/medico/pacientes/:id`,

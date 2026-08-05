@@ -28,9 +28,28 @@ RSpec.describe User, type: :model do
         expect(cultivador.salas_ids_asignadas).not_to include(sala_man.id)
       end
 
-      it 'no retorna salas de sedes no asignadas' do
-        _sede, sala_otra = sede_con_sala(kind: 'vegetativo')
-        expect(cultivador.salas_ids_asignadas).not_to include(sala_otra.id)
+      it 'no retorna salas de OTRAS sedes cuando tiene alguna asignada' do
+        sede_propia, sala_propia = sede_con_sala(kind: 'vegetativo')
+        _sede_ajena, sala_ajena  = sede_con_sala(kind: 'vegetativo')
+        cultivador.sedes_asignadas << sede_propia
+
+        ids = cultivador.salas_ids_asignadas
+
+        expect(ids).to     include(sala_propia.id)
+        expect(ids).not_to include(sala_ajena.id)
+      end
+
+      # Sin ninguna sede asignada el cultivador ve todo el cultivo del club. Es la regla que ya
+      # aplicaban a mano salas#index, salas#set_sala, lotes#index y lotes#set_lote; faltaba en
+      # plants#index y plants#kpis, y por eso se veían lotes pero ninguna planta.
+      it 'sin sedes asignadas retorna todas las salas de cultivo del club' do
+        _sede, sala_veg = sede_con_sala(kind: 'vegetativo')
+        _sede2, sala_man = sede_con_sala(kind: 'manicura')
+
+        ids = cultivador.salas_ids_asignadas
+
+        expect(ids).to     include(sala_veg.id)
+        expect(ids).not_to include(sala_man.id)
       end
 
       it 'retorna salas de todos los kinds permitidos' do

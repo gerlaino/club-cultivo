@@ -38,13 +38,9 @@ class PlantsController < ApplicationController
       return render json: [] unless current_user.club.lotes.exists?(id: params[:lote_id])
       plants = plants.where(lote_id: params[:lote_id])
     else
-      if current_user.cultivador?
-        salas_ids = current_user.salas_ids_asignadas
-        plants = plants.where(lotes: { sala_id: salas_ids })
-      elsif current_user.supervisor?
-        salas_ids = current_user.salas_ids_en_sedes_asignadas
-        plants = plants.where(lotes: { sala_id: salas_ids })
-      end
+      # Mismo criterio que la lista de lotes: sin él, un cultivador sin sedes asignadas veía
+      # todos los lotes y ninguna planta.
+      plants = plants.merge(Lote.al_alcance_de(current_user))
     end
     plants = plants.where(state: params[:state])                if params[:state].present?
     plants = plants.where(lotes: { estado: params[:lote_estado] }) if params[:lote_estado].present?
@@ -57,11 +53,7 @@ class PlantsController < ApplicationController
   # cosechadas cuyo lote está en_manicura (la planta se congela en 'cosechado'). Descartadas.
   def kpis
     base = Plant.joins(:lote).where(lotes: { club_id: current_user.club_id })
-    if current_user.cultivador?
-      base = base.where(lotes: { sala_id: current_user.salas_ids_asignadas })
-    elsif current_user.supervisor?
-      base = base.where(lotes: { sala_id: current_user.salas_ids_en_sedes_asignadas })
-    end
+                .merge(Lote.al_alcance_de(current_user))
     # cosechadas y en_manicura son DISJUNTAS: la planta se congela en 'cosechado', así que
     # "en manicura" (lote en_manicura) NO se cuenta también en "cosechadas".
     render json: {

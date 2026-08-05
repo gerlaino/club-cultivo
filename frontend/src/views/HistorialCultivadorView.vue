@@ -323,7 +323,7 @@ onMounted(fetch)
   text-align: left; border-bottom: 1px solid #e8f0e9; font-size: .78rem; white-space: nowrap;
 }
 .hcv__th--tipo   { width: 140px; }
-.hcv__th--lote   { width: 110px; }
+.hcv__th--lote   { width: 150px; }
 .hcv__th--sala   { width: 130px; }
 .hcv__th--estado { width: 110px; }
 .hcv__th--fecha  { width: 130px; }
@@ -347,7 +347,7 @@ onMounted(fetch)
 .hcv__desc-sub { display: block; font-size: .75rem; color: #60725d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 
 /* Lote pill */
-.hcv__lote-pill { display: inline-flex; align-items: center; height: 22px; background: #f0fdf4; border: 1px solid #c8e6c9; color: #1b5e20; font-size: .75rem; font-weight: 700; border-radius: 999px; padding: 0 .5rem; font-variant-numeric: tabular-nums; }
+.hcv__lote-pill { display: inline-flex; align-items: center; height: 22px; white-space: nowrap; background: var(--c-leaf-50); border: 1px solid var(--c-leaf-100); color: var(--c-leaf-800); font-size: var(--fs-12); font-weight: 700; border-radius: var(--r-pill); padding: 0 var(--sp-3); font-variant-numeric: tabular-nums; }
 
 /* Sala */
 .hcv__sala { color: #60725d; font-size: .82rem; }

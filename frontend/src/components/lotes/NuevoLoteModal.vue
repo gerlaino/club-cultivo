@@ -197,7 +197,7 @@
               <select class="nlm__input" v-model="form.tamanio_maceta">
                 <option value="">Sin especificar</option>
                 <option value="0.335">Maceta 0,335 L</option>
-                <option value="0.5">Vaso (0,5 L)</option>
+                <option value="0.5">0,5 L</option>
                 <option value="1">1 litro</option><option value="3">3 litros</option>
                 <option value="5">5 litros</option><option value="7">7 litros</option>
                 <option value="10">10 litros</option><option value="12">12 litros</option>

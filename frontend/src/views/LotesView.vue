@@ -16,7 +16,7 @@ import { useEtiquetasQR } from '../composables/useEtiquetasQR.js'
 import { useClubStore } from '../stores/club.js'
 import { useToast } from '../composables/useToast.js'
 import { LAYOUT_LOTE, dibujarEtiquetaLote } from '../lib/pdfEtiquetas.js'
-import { estadoConMaceta } from '../lib/loteHelpers.js'
+
 import { moverLotes } from '../lib/api.js'
 
 const store = useLotesStore();
@@ -461,8 +461,10 @@ async function exportarCSV() {
               Plantas <span class="lv-sort-icon">{{ sortBy === 'plantas_desc' ? '↓' : '↕' }}</span>
             </th>
             <th>Maceta</th>
-            <th class="lv-th--sort" @click="sortBy = sortBy === 'fecha_asc' ? 'fecha_desc' : 'fecha_asc'">
-              Días <span class="lv-sort-icon">{{ sortBy.startsWith('fecha') ? (sortBy === 'fecha_asc' ? '↑' : '↓') : '↕' }}</span>
+            <th title="Días en la fase actual">En fase</th>
+            <th class="lv-th--sort" @click="sortBy = sortBy === 'fecha_asc' ? 'fecha_desc' : 'fecha_asc'"
+                title="Días totales desde el inicio del lote">
+              Total <span class="lv-sort-icon">{{ sortBy.startsWith('fecha') ? (sortBy === 'fecha_asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
             <th v-if="canEdit"></th>
           </tr>
@@ -485,7 +487,7 @@ async function exportarCSV() {
             </td>
             <td data-label="Estado">
               <span class="lv-badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }">
-                {{ em(l.estado).icon }} {{ estadoConMaceta(l.estado, l.tamanio_maceta) }}
+                {{ em(l.estado).icon }} {{ em(l.estado).label }}
               </span>
             </td>
             <td data-label="Código">
@@ -507,9 +509,18 @@ async function exportarCSV() {
               <span v-if="l.tamanio_maceta" class="lv-num">{{ l.tamanio_maceta }}L</span>
               <span v-else class="lv-empty">—</span>
             </td>
-            <td data-label="Días">
-              <span v-if="diasDesdeInicio(l.start_date) !== null" class="lv-num">
+            <!-- El semáforo cuelga de los días EN FASE (que es contra lo que hay objetivo), no de
+                 los totales. Antes el punto y el número estaban en la misma celda midiendo cosas
+                 distintas: el color decía "fase" y el número decía "ciclo". -->
+            <td data-label="En fase">
+              <span v-if="l.dias_en_estado != null" class="lv-num">
                 <span v-if="diasNivel(l)" class="lv-dias-dot" :class="`lv-dias-dot--${diasNivel(l)}`" :title="diasTitle(l)"></span>
+                {{ l.dias_en_estado }}d
+              </span>
+              <span v-else class="lv-empty">—</span>
+            </td>
+            <td data-label="Total">
+              <span v-if="diasDesdeInicio(l.start_date) !== null" class="lv-num lv-num--muted">
                 {{ diasDesdeInicio(l.start_date) }}d
               </span>
               <span v-else class="lv-empty">—</span>

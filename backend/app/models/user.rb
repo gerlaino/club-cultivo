@@ -58,12 +58,16 @@ class User < ApplicationRecord
   KINDS_CULTIVADOR = %w[vegetativo floracion mixta madre clon].freeze
   KINDS_MANICURA   = %w[manicura].freeze
 
+  # Sin sedes asignadas = acceso a todas las salas de su oficio, igual que el supervisor.
+  # El fallback estaba repetido a mano en salas#index, salas#set_sala, lotes#index y lotes#set_lote,
+  # y faltaba en plants#index y plants#kpis: el cultivador sin sedes veía todos los lotes y CERO
+  # plantas. Vive acá para que no vuelva a divergir.
   def salas_ids_asignadas
     if cultivador?
       sedes = sedes_ids_asignadas
-      return [] if sedes.empty?
       scope = Sala.where(club_id: club_id).where(kind: KINDS_CULTIVADOR)
-      scope.where(sede_id: sedes).pluck(:id)
+      scope = scope.where(sede_id: sedes) if sedes.any?
+      scope.pluck(:id)
     elsif manicura?
       Sala.where(club_id: club_id).where(kind: KINDS_MANICURA).pluck(:id)
     else

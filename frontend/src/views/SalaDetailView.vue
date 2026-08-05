@@ -178,20 +178,58 @@ function openEditSala() {
   showEditSala.value  = true
 }
 
-async function saveEditSala() {
+async function saveEditSala(confirmado = false) {
   if (!editSalaForm.value.nombre?.trim()) { editSalaError.value = 'El nombre es obligatorio'; return }
   savingEditSala.value = true
   editSalaError.value  = null
   try {
-    await updateSala(salaId, editSalaForm.value)
+    const payload = { ...editSalaForm.value }
+    if (confirmado) payload.confirmar_cambio_fase = true
+    await updateSala(salaId, payload)
     await salas.fetchSala(salaId)
+    await lotes.fetchBySala(salaId)
     showEditSala.value = false
     toast.success('Sala actualizada')
   } catch (e) {
-    editSalaError.value = e?.response?.data?.error || 'Error al guardar'
+    // Cambiar el kind de la sala ARRASTRA a los lotes de adentro. El backend frena y devuelve
+    // cuáles son; recién con el sí explícito se guarda. Mismo criterio que mover lotes de sala.
+    const data = e?.response?.data
+    if (data?.requiere_confirmacion) {
+      savingEditSala.value = false
+      if (await confirmarCambioDeFaseDeSala(data)) return saveEditSala(true)
+      return
+    }
+    editSalaError.value = data?.error || 'Error al guardar'
   } finally {
     savingEditSala.value = false
   }
+}
+
+async function confirmarCambioDeFaseDeSala(data) {
+  const lotes = data.lotes_afectados || []
+  const aFloracion = lotes[0]?.estado_nuevo === 'floracion'
+
+  const lineas = [
+    `Cambiar la fase de la sala arrastra a ${lotes.length} lote(s) que están adentro:`,
+    '',
+    ...lotes.map(l => {
+      const dias = l.dias_en_fase != null ? ` · lleva ${l.dias_en_fase} día${l.dias_en_fase === 1 ? '' : 's'}` : ''
+      return `   · ${l.codigo}: ${estadoMeta(l.estado_actual).label} → ${estadoMeta(l.estado_nuevo).label}${dias} · ${l.plantas} plantas`
+    }),
+    '',
+    aFloracion
+      ? 'Pasar a floración no se deshace: la planta ya recibió 12/12.'
+      : 'Volver a vegetativo REVEGETA las plantas que están florando y reinicia el contador de días de fase.',
+    '',
+    'Si lo que querés es mover estos lotes y no revegetarlos, cancelá y usá "Mover lotes".',
+  ]
+
+  return confirm({
+    title: 'Esto cambia de fase a los lotes de la sala',
+    message: lineas.join('\n'),
+    variant: 'danger',
+    confirmText: aFloracion ? 'Pasar a floración' : 'Revegetar igual',
+  })
 }
 
 const salaAcciones = computed(() => {
@@ -1403,7 +1441,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           </div>
           <div class="sd__modal-footer">
             <button class="sd__btn-ghost" :disabled="savingEditSala" @click="showEditSala = false">Cancelar</button>
-            <button class="sd__btn-primary" :disabled="savingEditSala" @click="saveEditSala">
+            <button class="sd__btn-primary" :disabled="savingEditSala" @click="saveEditSala()">
               <DsSpinner v-if="savingEditSala" :size="14" />
               <i v-else class="bi bi-check-lg"></i>Guardar cambios
             </button>

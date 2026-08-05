@@ -17,23 +17,26 @@
         <div class="mcp-body">
 
           <!-- Sin plantas -->
-          <div v-if="!plantasEnFloracion.length" class="mcp-empty">
+          <div v-if="!plantasEnFloracion.length && !sinPlantasIndividuales" class="mcp-empty">
             No hay plantas en floración en este lote. No hay nada para cosechar.
           </div>
 
           <!-- ── PASO 1 — Total o parcial ── -->
           <template v-else-if="paso === 1">
-            <p class="mcp-paso-hint">{{ plantasEnFloracion.length }} plantas en floración. ¿Qué querés cosechar?</p>
+            <p class="mcp-paso-hint">
+              {{ sinPlantasIndividuales ? lote.plants_count : plantasEnFloracion.length }} plantas en floración.
+              ¿Qué querés cosechar?
+            </p>
             <div class="mcp-choices">
               <button type="button" class="mcp-choice" @click="elegir('total')">
                 <span class="mcp-choice-ico">🌾</span>
                 <span class="mcp-choice-tit">Cosechar todo el lote</span>
-                <span class="mcp-choice-sub">Las {{ plantasEnFloracion.length }} plantas en floración</span>
+                <span class="mcp-choice-sub">Las {{ sinPlantasIndividuales ? lote.plants_count : plantasEnFloracion.length }} plantas en floración</span>
               </button>
               <button type="button" class="mcp-choice" @click="elegir('parcial')">
                 <span class="mcp-choice-ico">✂️</span>
                 <span class="mcp-choice-tit">Cosechar algunas plantas</span>
-                <span class="mcp-choice-sub">Elegís cuáles (cosecha escalonada)</span>
+                <span class="mcp-choice-sub">{{ sinPlantasIndividuales ? 'Indicás cuántas (cosecha escalonada)' : 'Elegís cuáles (cosecha escalonada)' }}</span>
               </button>
             </div>
           </template>
@@ -42,8 +45,22 @@
           <template v-else>
             <button class="mcp-back" type="button" @click="volverPaso1">← Cambiar</button>
 
+            <!-- Sin registro individual: se declara la cantidad -->
+            <div v-if="sinPlantasIndividuales" class="mcp-field">
+              <label class="mcp-label">
+                ¿Cuántas plantas cosechás?
+                <span class="mcp-hint">de {{ lote.plants_count }}</span>
+              </label>
+              <div class="mcp-input-wrap">
+                <input v-model.number="cantidadSinDetalle" type="number" min="1" :max="lote.plants_count"
+                       class="mcp-input" :placeholder="String(lote.plants_count)" />
+                <span class="mcp-unit">plantas</span>
+              </div>
+              <span class="mcp-help">Este lote no tiene cargada cada planta por separado, solo el total.</span>
+            </div>
+
             <!-- Selección de plantas (solo parcial) -->
-            <div v-if="modo === 'parcial'" class="mcp-field">
+            <div v-else-if="modo === 'parcial'" class="mcp-field">
               <label class="mcp-label">
                 Plantas a cosechar
                 <span class="mcp-hint">{{ seleccionadas.size }} de {{ plantasEnFloracion.length }}</span>
@@ -77,7 +94,7 @@
             </div>
 
             <!-- Identificador de corte -->
-            <div class="mcp-field">
+            <div v-if="pidePasada" class="mcp-field">
               <label class="mcp-label">
                 Identificar corte
                 <span class="mcp-help-ico" title="Si cosechás el lote en varias tandas (cosecha escalonada), cada tanda es un 'corte'. Sirve para diferenciar pesadas y trazar cada parte por separado.">
@@ -106,11 +123,11 @@
             </div>
 
             <!-- Resumen -->
-            <div v-if="seleccionadas.size > 0" class="mcp-resumen">
+            <div v-if="cantidadACosechar > 0" class="mcp-resumen">
               <span class="mcp-resumen-ico">📋</span>
               <span>
-                <strong>{{ seleccionadas.size }} planta{{ seleccionadas.size !== 1 ? 's' : '' }}</strong>
-                se cosechan en el corte <strong>{{ pasada }}</strong>
+                <strong>{{ cantidadACosechar }} planta{{ cantidadACosechar !== 1 ? 's' : '' }}</strong>
+                se cosechan<span v-if="pidePasada"> en el corte <strong>{{ pasada }}</strong></span>
                 <span v-if="pesoHumedo"> · {{ pesoHumedo }}g bruto</span>
               </span>
             </div>
@@ -125,11 +142,11 @@
             v-if="paso === 2"
             class="mcp-btn-submit"
             type="button"
-            :disabled="!seleccionadas.size || guardando"
+            :disabled="!cantidadACosechar || guardando"
             @click="guardar"
           >
             <DsSpinner v-if="guardando" :size="14" />
-            <span v-else>🌿 Cosechar {{ seleccionadas.size || '' }} planta{{ seleccionadas.size !== 1 ? 's' : '' }}</span>
+            <span v-else>🌿 Cosechar {{ cantidadACosechar || '' }} planta{{ cantidadACosechar !== 1 ? 's' : '' }}</span>
           </button>
         </div>
 
@@ -140,7 +157,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { cosecharPlantas } from '../../lib/api.js'
+import { cosecharPlantas, transicionarLote } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
@@ -161,12 +178,29 @@ const error         = ref('')
 
 const plantasEnFloracion = computed(() => props.plantas.filter(p => p.state === 'floracion'))
 
+// Hay lotes que llevan sólo un CONTADOR de plantas, sin registro individual de cada una.
+// Antes esos abrían un formulario completamente distinto; ahora es el mismo modal, con un
+// número en lugar de la grilla. Lo único que cambia es por dónde se registra.
+const sinPlantasIndividuales = computed(() =>
+  plantasEnFloracion.value.length === 0 && Number(props.lote.plants_count) > 0)
+const cantidadSinDetalle = ref(null)
+
+// Cuántas plantas se van a cosechar, venga de la grilla o del contador.
+const cantidadACosechar = computed(() =>
+  sinPlantasIndividuales.value ? Number(cantidadSinDetalle.value) || 0 : seleccionadas.value.size)
+
+// La letra de corte sólo tiene sentido si el lote se cosecha en tandas. Cosechando todo de
+// una y sin cortes previos, siempre es "A": preguntarlo es ruido.
+const pidePasada = computed(() => modo.value === 'parcial' || props.pasadasUsadas.length > 0)
+
 function elegir(m) {
   modo.value = m
   if (m === 'total') {
     seleccionadas.value = new Set(plantasEnFloracion.value.map(p => p.id))
+    cantidadSinDetalle.value = props.lote.plants_count || null
   } else {
     seleccionadas.value = new Set()
+    cantidadSinDetalle.value = null
   }
   paso.value = 2
 }
@@ -193,15 +227,25 @@ function toggleAll() {
 }
 
 async function guardar() {
-  if (!seleccionadas.value.size) return
+  if (!cantidadACosechar.value) return
   guardando.value = true
   error.value = ''
   try {
-    const { data } = await cosecharPlantas(props.lote.id, {
-      plantas_ids:  Array.from(seleccionadas.value),
-      peso_total_g: pesoHumedo.value || null,
-      pasada:       pasada.value,
-    })
+    // Sin plantas individuales no hay IDs que mandar: la cosecha se registra como
+    // transición del lote con la cantidad declarada.
+    const { data } = sinPlantasIndividuales.value
+      ? await transicionarLote(props.lote.id, {
+          nueva_fase: 'cosecha',
+          pesada: {
+            plantas_cosechadas: cantidadACosechar.value,
+            peso_humedo_g:      pesoHumedo.value || null,
+          },
+        })
+      : await cosecharPlantas(props.lote.id, {
+          plantas_ids:  Array.from(seleccionadas.value),
+          peso_total_g: pesoHumedo.value || null,
+          pasada:       pasada.value,
+        })
     emit('cosechado', data)
   } catch (e) {
     error.value = e?.response?.data?.error || 'Error al registrar la cosecha'

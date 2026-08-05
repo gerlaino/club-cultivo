@@ -12,7 +12,6 @@ class LotesController < ApplicationController
 
     if current_user.cultivador?
       salas_ids = current_user.salas_ids_asignadas
-      salas_ids = current_user.club.salas.where(kind: %w[vegetativo floracion]).ids if salas_ids.empty?
       if params[:cosechados].present?
         mis_lotes_cosechados = LoteEvento.where(
           club_id:      current_user.club_id,
@@ -1079,7 +1078,6 @@ class LotesController < ApplicationController
     scope = current_user.club.lotes
     if current_user.cultivador?
       salas_ids = current_user.salas_ids_asignadas
-      salas_ids = current_user.club.salas.where(kind: %w[vegetativo floracion]).ids if salas_ids.empty?
       mis_cosechados = LoteEvento.where(
         club_id:      current_user.club_id,
         user_id:      current_user.id,

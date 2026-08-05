@@ -48,10 +48,20 @@ export const PLAGAS_META = {
   severa:   { color: '#dc2626', emoji: '🚨' },
 }
 
+// El volumen y nada más: "vaso", "maceta" o "pote" son el envase, no el dato. Lo que gobierna el
+// riego, la frecuencia y cuándo toca trasplantar son los litros — y 0,335 L y 0,5 L no son lo mismo
+// aunque los dos se llamen "vaso".
 export const MACETA_LABELS = {
-  '0.5': 'Vaso (0.5L)', '1': '1 litro', '3': '3 litros', '5': '5 litros',
-  '7': '7 litros', '10': '10 litros', '12': '12 litros', '15': '15 litros', 'otro': 'Otro',
+  '0.335': '0,335 L', '0.5': '0,5 L', '1': '1 litro', '3': '3 litros', '5': '5 litros',
+  '7': '7 litros', '10': '10 litros', '12': '12 litros', '15': '15 litros', '20': '20 litros',
+  'otro': 'Otro',
 }
+
+// Fuente ÚNICA de las opciones de maceta. Estaba copiada en cinco archivos (dos de ellos con
+// valores distintos), así que agregar un tamaño obligaba a acordarse de los cinco.
+export const MACETA_OPCIONES = Object.entries(MACETA_LABELS)
+  .filter(([v]) => v !== 'otro')
+  .map(([v, l]) => ({ v, l }))
 
 export const TAREAS_LOTE = [
   { key: 'riego',                label: 'Riego',               emoji: '💧' },
@@ -136,15 +146,6 @@ export function desglosarCiclo(diasPorEstado = {}) {
 
 export function em(e)  { return ESTADO_META[e]       || { label: e || '—', color: '#64748b', bg: '#f1f5f9', emoji: '•' } }
 
-// Estado + MACETA, que es como se lee un lote en el pasillo: "Vegetativo · 0,5L". Va el número real
-// y no una etiqueta tipo "en vaso": 0,33L y 0,5L no son lo mismo, y el volumen cambia el riego, la
-// frecuencia y cuándo toca trasplantar.
-// Reusa macetaLabel, que ya existe más abajo en este archivo.
-export function estadoConMaceta(estado, litros) {
-  const base = em(estado).label
-  if (litros == null || litros === '' || !(Number(litros) > 0)) return base
-  return ['vegetativo', 'floracion'].includes(estado) ? `${base} · ${macetaLabel(litros)}` : base
-}
 export function pm(s)  { return PLANT_STATE_META[s]  || { label: s || '—', color: '#64748b', emoji: '🌿' } }
 export function sm(s)  { return ESTADO_SALUD_META[s] || { color: '#94a3b8', emoji: '⚪' } }
 export function pgm(p) { return PLAGAS_META[p]       || { color: '#94a3b8', emoji: '—' } }

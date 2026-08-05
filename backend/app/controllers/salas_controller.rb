@@ -19,20 +19,8 @@ class SalasController < ApplicationController
                         .includes(:sede, :lotes, :created_by)
                         .order(:nombre)
 
-    if current_user.cultivador?
-      ids = current_user.salas_ids_asignadas
-      if ids.any?
-        salas = salas.where(id: ids)
-      else
-        salas = salas.where(kind: %w[vegetativo floracion])
-      end
-    elsif current_user.manicura?
-      ids = current_user.salas_ids_asignadas
-      if ids.any?
-        salas = salas.where(id: ids)
-      else
-        salas = salas.where(kind: 'manicura')
-      end
+    if current_user.cultivador? || current_user.manicura?
+      salas = salas.where(id: current_user.salas_ids_asignadas)
     elsif current_user.supervisor?
       salas = salas.where(sede_id: current_user.sedes_ids_asignadas)
     end
@@ -61,6 +49,33 @@ class SalasController < ApplicationController
 
   def update
     kind_antes = @sala.kind
+    kind_nuevo = sala_params[:kind]
+
+    # Cambiar la fase de la sala ARRASTRA a sus lotes: pasar una sala de floración a vegetativo
+    # revegeta todo lo que esté florando adentro y les reinicia el contador de días de fase.
+    # Mover lotes a otra sala ya pedía confirmación lote por lote; esta puerta no pedía nada.
+    # Sin `confirmar_cambio_fase` no se guarda: devuelve qué lotes se verían afectados.
+    # Misma protección que la acción "Cambiar fase": en 12/12 un esqueje sin raíz no prende.
+    # Editando el `kind` se podía saltear esa guarda por la puerta de atrás.
+    if kind_nuevo == 'floracion' && kind_antes != 'floracion'
+      enraizando = @sala.lotes.enraizando
+      if enraizando.exists?
+        return render json: {
+          error: "Esta sala tiene lotes enraizando (#{enraizando.limit(5).pluck(:codigo).join(', ')}). " \
+                 'En floración (12/12) los esquejes no prenden: movelos a otra sala antes.',
+        }, status: :unprocessable_entity
+      end
+    end
+
+    afectados = lotes_afectados_por_cambio_de_fase(kind_antes, kind_nuevo)
+    if afectados.any? && params[:confirmar_cambio_fase].blank?
+      return render json: {
+        error: "Cambiar la sala a #{kind_nuevo} cambia de fase a #{afectados.size} lote(s) que están adentro.",
+        requiere_confirmacion: true,
+        lotes_afectados: afectados.map { |l| serialize_lote_afectado(l, kind_nuevo) },
+      }, status: :unprocessable_entity
+    end
+
     if @sala.update(sala_params)
       cascade_kind_a_lotes(kind_antes) if kind_cambio_veg_flo?(kind_antes)
       render json: serialize_sala_detail(@sala.reload)
@@ -266,20 +281,8 @@ class SalasController < ApplicationController
 
   def set_sala
     scope = current_user.club.salas
-    if current_user.cultivador?
-      ids = current_user.salas_ids_asignadas
-      if ids.any?
-        scope = scope.where(id: ids)
-      else
-        scope = scope.where(kind: %w[vegetativo floracion])
-      end
-    elsif current_user.manicura?
-      ids = current_user.salas_ids_asignadas
-      if ids.any?
-        scope = scope.where(id: ids)
-      else
-        scope = scope.where(kind: 'manicura')
-      end
+    if current_user.cultivador? || current_user.manicura?
+      scope = scope.where(id: current_user.salas_ids_asignadas)
     elsif current_user.supervisor?
       scope = scope.where(sede_id: current_user.sedes_ids_asignadas)
     end
@@ -299,6 +302,31 @@ class SalasController < ApplicationController
 
   def kind_cambio_veg_flo?(kind_antes)
     KINDS_VEG_FLO.include?(kind_antes) && KINDS_VEG_FLO.include?(@sala.kind) && kind_antes != @sala.kind
+  end
+
+  # Los lotes que el cascade tocaría: los que están en la fase vieja de esta sala.
+  def lotes_afectados_por_cambio_de_fase(kind_antes, kind_nuevo)
+    return Lote.none if kind_nuevo.blank? || kind_antes == kind_nuevo
+    return Lote.none unless KINDS_VEG_FLO.include?(kind_antes) && KINDS_VEG_FLO.include?(kind_nuevo)
+
+    @sala.lotes.where(estado: kind_antes)
+  end
+
+  # Cuántos días lleva el lote en la fase que está por perder. Sale del último cambio de estado,
+  # igual que `dias_en_estado` del serializer — el cascade crea un evento nuevo y lo reinicia.
+  def serialize_lote_afectado(lote, kind_nuevo)
+    desde = lote.lote_eventos
+                .where(tipo: 'cambio_estado', estado_nuevo: lote.estado)
+                .order(registrado_en: :desc).first&.registrado_en&.to_date
+
+    {
+      id:              lote.id,
+      codigo:          lote.codigo,
+      estado_actual:   lote.estado,
+      estado_nuevo:    kind_nuevo,
+      plantas:         lote.plants.where.not(state: %w[descartada cosechado]).count,
+      dias_en_fase:    desde ? (Date.current - desde).to_i : nil,
+    }
   end
 
   def cascade_kind_a_lotes(kind_antes)

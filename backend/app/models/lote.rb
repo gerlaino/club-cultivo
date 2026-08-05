@@ -92,6 +92,22 @@ class Lote < ApplicationRecord
   scope :por_sala,    ->(sala_id) { where(sala_id: sala_id) }
   scope :recientes,   -> { order(created_at: :desc) }
 
+  # Qué lotes alcanza un cultivador o un supervisor. Filtrar sólo por `sala_id` deja afuera todo
+  # lo post-cosecha: al cosechar, el lote suelta la sala para liberar el slot (`avanzar_fase!`) y
+  # se queda con la sede. Sin esta segunda condición, las plantas de un lote cosechado o en
+  # manicura no le aparecen NUNCA —ni en la lista ni en los KPIs—, aunque él lo haya cosechado.
+  scope :al_alcance_de, ->(user) {
+    next all unless %w[cultivador supervisor].include?(user.role)
+
+    salas_ids = user.cultivador? ? user.salas_ids_asignadas : user.salas_ids_en_sedes_asignadas
+    sedes_ids = user.sedes_ids_asignadas
+
+    post_cosecha = where(sala_id: nil, estado: POST_COSECHA)
+    post_cosecha = post_cosecha.where(sede_id: sedes_ids) if sedes_ids.any?
+
+    where(sala_id: salas_ids).or(post_cosecha)
+  }
+
   def soft_delete!
     transaction do
       # OJO: update_column saltea callbacks Y los `dependent:` de las asociaciones. Los hijos

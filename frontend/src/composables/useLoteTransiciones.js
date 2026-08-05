@@ -4,6 +4,7 @@ import { useLotesStore } from '../stores/lotes'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore } from '../stores/auth'
 import { transicionarLote, avanzarFaseLote } from '../lib/api'
+import { MACETA_OPCIONES } from '../lib/loteHelpers'
 
 const ESTADO_META = {
   enraizado:            { label: 'Enraizado',          emoji: '🌱' },
@@ -39,11 +40,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
   // Maceta a la que va el esqueje que prendió. Solo se pide en enraizado → vegetativo: es el
   // trasplante que define riego, frecuencia y cuándo toca el próximo cambio de maceta.
   const avanzarMaceta = ref('')
-  const MACETAS = [
-    { v: '0.335', l: 'Maceta 0,335 L' }, { v: '0.5', l: 'Vaso (0,5 L)' }, { v: '1', l: '1 litro' }, { v: '3', l: '3 litros' },
-    { v: '5',   l: '5 litros' },     { v: '7', l: '7 litros' },  { v: '10', l: '10 litros' },
-    { v: '12',  l: '12 litros' },    { v: '15', l: '15 litros' },{ v: '20', l: '20 litros' },
-  ]
+  const MACETAS = MACETA_OPCIONES
   const faltaMaceta = computed(() =>
     lotes.current?.estado === 'enraizado' && !avanzarMaceta.value)
 
@@ -108,21 +105,21 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     const lote = lotes.current
     if (lote?.proxima_fase_posible === 'cosecha') {
       // La cosecha ya no requiere una sala de cosecha: es un evento → post-cosecha.
+      // Un solo modal, tenga o no plantas individuales cargadas: antes se abrían dos
+      // formularios distintos según un dato que el cultivador no eligió ni ve.
       if (!plants.itemsByLote[String(loteId)]) {
         try { await plants.fetchByLote(loteId) } catch {}
       }
-      const plantList = plants.byLote(loteId)
-      if (plantList.length > 0) {
-        showCosechaPartialModal.value = true
+      showCosechaPartialModal.value = true
+    } else if (lote?.estado === 'cosecha') {
+      // Cosecha → manicura: la asigna el admin. Al cultivador se le dice eso, en vez de
+      // dejarlo caer en el modal de avanzar sala y que el backend le tire
+      // "Lote no puede transicionar en este estado".
+      if (canAdmin.value) {
+        showIniciarManicuraModal.value = true
       } else {
-        cosechaForm.value  = { plantas_cosechadas: lote.plants_count || null, notas: '' }
-        cosechaError.value = null
-        cosechaSalaId.value = lote?.sala_id ?? null
-        showCosechaModal.value = true
+        toast.info('El lote ya está cosechado. La asignación a manicura la hace el admin.')
       }
-    } else if (lote?.estado === 'cosecha' && canAdmin.value) {
-      // Cosecha → manicura: se asigna un responsable (no hay fase 'secado').
-      showIniciarManicuraModal.value = true
     } else if (isCultivador.value) {
       avanzarSalaId.value = lote?.sala_id ?? null
       avanzarMaceta.value = macetaPrecargada(lote)
