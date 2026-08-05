@@ -76,9 +76,17 @@ app.directive('click-outside', {
 app.mount("#app");
 
 // Bootstrap en segundo plano (sesión + preferencias del club).
+//
+// VA POR ensureBootstrapped, NO por fetchMe directo. Dos razones, y las dos rompían el login:
+//   1. `fetchMe()` sin `silent` levanta `auth.loading`, que es el flag con el que el formulario
+//      de login deshabilita su botón y muestra el spinner. Como esto corre en CADA arranque,
+//      el botón quedaba trabado hasta que /me contestara — y con el backend dormido, eso es
+//      "no puedo iniciar sesión".
+//   2. El router también dispara el bootstrap: por dos caminos distintos salían dos /me en
+//      paralelo. `ensureBootstrapped` está memoizado y comparte una sola request.
 const auth = useAuthStore()
 const club = useClubStore()
-auth.fetchMe?.()
+auth.ensureBootstrapped()
   .then(() => { if (auth.user) club.fetch() })
   .catch(() => {})
 

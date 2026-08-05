@@ -44,6 +44,24 @@ describe('bootstrap de sesión', () => {
     await pendiente.promesa
   })
 
+  // main.js hacía `auth.fetchMe()` directo en cada arranque, y eso levantaba `loading`:
+  // el botón de login quedaba deshabilitado con spinner sin que nadie lo hubiera tocado.
+  // Ni llamándolo a mano puede bloquear el formulario.
+  it('fetchMe NUNCA bloquea el formulario, ni llamado directo', async () => {
+    const pendiente = diferido()
+    mocks.me.mockReturnValue(pendiente.promesa)
+    const auth = useAuthStore()
+
+    auth.fetchMe()
+    await Promise.resolve()
+
+    expect(auth.loading).toBe(false)
+
+    pendiente.resolver({ data: { id: 1 } })
+    await pendiente.promesa
+    expect(auth.loading).toBe(false)
+  })
+
   // AC: dos navegaciones seguidas antes de que resuelva la primera = UNA sola request.
   it('no dispara dos /me en paralelo', async () => {
     const pendiente = diferido()

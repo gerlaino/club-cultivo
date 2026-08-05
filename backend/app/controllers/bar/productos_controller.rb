@@ -6,9 +6,9 @@ module Bar
     before_action :authenticate_user!
     before_action :require_feature_bar!
     before_action :set_bar
-    before_action :require_operador, only: [:index, :reponer, :movimientos]
+    before_action :require_operador, only: [:index, :reponer, :movimientos, :codigo_barras]
     before_action :require_admin_bar, only: [:create, :update, :destroy, :comprar, :ajustar]
-    before_action :set_producto, only: [:update, :destroy, :reponer, :comprar, :ajustar, :movimientos]
+    before_action :set_producto, only: [:update, :destroy, :reponer, :comprar, :ajustar, :movimientos, :codigo_barras]
 
     # GET /bares/:bar_id/productos
     def index
@@ -43,6 +43,20 @@ module Bar
     # PATCH /bares/:bar_id/productos/:id
     def update
       if @producto.update(producto_params)
+        render json: serialize(@producto)
+      else
+        render json: { errors: @producto.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+
+    # PATCH /bares/:bar_id/productos/:id/codigo_barras  { codigo_barras }
+    # El dispensador puede asignar o corregir el código de barras: es el que está en el
+    # mostrador con el producto y el lector. Deliberadamente NO pasa por `producto_params`,
+    # que permite precio, costo y stock — esos siguen siendo del admin.
+    def codigo_barras
+      valor = params[:codigo_barras].to_s.strip.presence
+
+      if @producto.update(codigo_barras: valor)
         render json: serialize(@producto)
       else
         render json: { errors: @producto.errors.full_messages }, status: :unprocessable_entity

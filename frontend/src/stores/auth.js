@@ -51,13 +51,13 @@ export const useAuthStore = defineStore("auth", {
     },
   },
   actions: {
-    // `silent`: no toca `loading`. `loading` es el estado del BOTÓN de login; el bootstrap
-    // (traer /me al arrancar) es otra cosa y corre en paralelo. Compartiendo el flag, un /me
-    // lento dejaba el botón de "Ingresar" deshabilitado con spinner sin que el usuario hubiera
-    // apretado nada — parecía que el login estaba colgado.
-    async fetchMe({ silent = false } = {}) {
+    // `loading` es EXCLUSIVO del formulario de login: es el flag con el que deshabilita su
+    // botón y muestra el spinner. fetchMe NO lo toca, a propósito y sin opción de hacerlo.
+    // Traer /me es algo que la app hace sola al arrancar y en cada cambio de ruta; si eso
+    // levantara `loading`, el botón de "Ingresar" aparecería trabado sin que el usuario haya
+    // apretado nada. Fue exactamente el bug que dejó a la PWA sin poder iniciar sesión.
+    async fetchMe() {
       const epoch = authEpoch;
-      if (!silent) this.loading = true;
       this.error = null;
       try {
         const { data } = await me();
@@ -66,7 +66,6 @@ export const useAuthStore = defineStore("auth", {
         // Una respuesta vieja no borra una sesión nueva.
         if (epoch === authEpoch) this.user = null;
       } finally {
-        if (!silent) this.loading = false;
         this.bootstrapped = true;
       }
     },
@@ -81,7 +80,7 @@ export const useAuthStore = defineStore("auth", {
     // había sesión, el /me que llegue tarde igual completa el user.
     async ensureBootstrapped() {
       if (this.bootstrapped) return;
-      bootstrapPromise ||= this.fetchMe({ silent: true }).finally(() => { bootstrapPromise = null; });
+      bootstrapPromise ||= this.fetchMe().finally(() => { bootstrapPromise = null; });
       return Promise.race([
         bootstrapPromise,
         new Promise((resolve) => setTimeout(resolve, BOOTSTRAP_TIMEOUT_MS)),
@@ -96,7 +95,7 @@ export const useAuthStore = defineStore("auth", {
       this.loggingOut = false;
       try {
         await signIn(email, password);
-        await this.fetchMe({ silent: true });
+        await this.fetchMe();
 
         if (!this.user) {
           this.error = "No se pudo obtener el usuario. Intentá de nuevo.";

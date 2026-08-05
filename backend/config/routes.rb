@@ -417,6 +417,9 @@ Rails.application.routes.draw do
           post :comprar
           post :ajustar
           get  :movimientos
+          # Acotado a propósito: pegarle el código a un producto es tarea de mostrador (el que
+          # tiene el envase y el lector en la mano), pero no habilita a tocar precio ni costo.
+          patch :codigo_barras
         end
       end
       resources :ventas, controller: 'bar/ventas', only: [:index, :create, :destroy]

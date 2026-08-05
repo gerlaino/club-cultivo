@@ -9,7 +9,7 @@ import { useBarStore } from '../../stores/bar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
-import { listCategoriasProducto, comprarBarProducto, createCategoriaProducto, updateCategoriaProducto, deleteCategoriaProducto } from '../../lib/api.js'
+import { listCategoriasProducto, comprarBarProducto, createCategoriaProducto, updateCategoriaProducto, deleteCategoriaProducto, setCodigoBarrasProducto } from '../../lib/api.js'
 import BarNav from './BarNav.vue'
 import BarcodeScanner from '../../components/BarcodeScanner.vue'
 
@@ -36,7 +36,7 @@ onMounted(async () => {
 const productos = computed(() => {
   const q = busqueda.value.trim().toLowerCase()
   return store.productos
-    .filter(p => !q || p.nombre.toLowerCase().includes(q))
+    .filter(p => !q || p.nombre.toLowerCase().includes(q) || (p.codigo_barras || '').toLowerCase().includes(q))
     .sort((a, b) => (a.categoria_producto_nombre || '').localeCompare(b.categoria_producto_nombre || '') || a.nombre.localeCompare(b.nombre))
 })
 const valorizado = computed(() => store.productos.reduce((a, p) => a + (p.stock * (p.costo_ars || 0)), 0))
@@ -44,6 +44,30 @@ const valorizado = computed(() => store.productos.reduce((a, p) => a + (p.stock 
 // ── Alta / edición de producto (sin stock inicial: el stock entra por Comprar, con costo) ──
 const prodForm = ref(null)
 const escaneandoProd = ref(false) // scan-to-fill del código de barras en el form
+
+// ── Código de barras suelto (lo puede hacer el dispensador) ──────────────────
+const codigoProd   = ref(null)   // { id, nombre, codigo_barras }
+const escaneandoCB = ref(false)
+const guardandoCB  = ref(false)
+
+function abrirCodigo(p) {
+  codigoProd.value = { id: p.id, nombre: p.nombre, codigo_barras: p.codigo_barras || '' }
+}
+
+async function guardarCodigo() {
+  if (!codigoProd.value) return
+  guardandoCB.value = true
+  try {
+    await setCodigoBarrasProducto(barId, codigoProd.value.id, codigoProd.value.codigo_barras.trim())
+    await store.fetchProductos(barId)
+    toast.success('Código guardado')
+    codigoProd.value = null
+  } catch (e) {
+    toast.error(e?.response?.data?.errors?.[0] || 'No se pudo guardar el código')
+  } finally {
+    guardandoCB.value = false
+  }
+}
 // Los productos nuevos se compran desde Nuevo Movimiento; acá solo se EDITAN los existentes.
 function editar(p) { prodForm.value = { id: p.id, nombre: p.nombre, categoria_producto_id: p.categoria_producto_id, precio_ars: p.precio_ars, stock_minimo: p.stock_minimo ?? 0, codigo_barras: p.codigo_barras || '', vendible: p.vendible } }
 function onCodigoDecoded(code) { if (prodForm.value) { prodForm.value.codigo_barras = String(code || '').trim(); toast.success('Código cargado') } }
@@ -120,8 +144,8 @@ async function borrarCat(c) {
 
     <div class="bs__search">
       <i class="bi bi-search"></i>
-      <input v-model.trim="busqueda" type="text" placeholder="Buscar producto por nombre…" />
-      <span class="bs__scan">⌗ código de barras (pronto)</span>
+      <input v-model.trim="busqueda" type="text" placeholder="Buscar por nombre o código de barras…" />
+      <span class="bs__scan">⌗ escaneá con el lector</span>
     </div>
 
     <!-- Form alta/edición -->
@@ -148,7 +172,7 @@ async function borrarCat(c) {
             <th>Producto</th><th>Categoría</th><th class="r">Precio</th>
             <template v-if="esGestion"><th class="r">Costo</th><th class="r">Margen</th></template>
             <th class="r">Stock</th>
-            <th v-if="esGestion"></th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -161,13 +185,20 @@ async function borrarCat(c) {
               <td class="r"><span v-if="margen(p) != null" class="mg" :class="margen(p) >= 50 ? 'hi' : 'mid'">{{ margen(p) }}%</span><span v-else class="mut">—</span></td>
             </template>
             <td class="r num" :class="{ low: p.stock_bajo }">{{ p.stock }}</td>
-            <td v-if="esGestion" class="r rowact">
-              <button class="lnk" @click="abrirCompra(p)">Comprar</button>
-              <button class="lnk" @click="editar(p)">Editar</button>
-              <button class="lnk lnk--danger" @click="borrar(p)">Borrar</button>
+            <td class="r rowact">
+              <!-- El código de barras lo puede poner cualquiera del mostrador: es el que tiene
+                   el envase y el lector. No abre precio ni costo (endpoint aparte). -->
+              <button class="lnk" :title="p.codigo_barras || 'Sin código'" @click="abrirCodigo(p)">
+                ⌗ {{ p.codigo_barras ? 'Código' : 'Sin código' }}
+              </button>
+              <template v-if="esGestion">
+                <button class="lnk" @click="abrirCompra(p)">Comprar</button>
+                <button class="lnk" @click="editar(p)">Editar</button>
+                <button class="lnk lnk--danger" @click="borrar(p)">Borrar</button>
+              </template>
             </td>
           </tr>
-          <tr v-if="!productos.length"><td :colspan="esGestion ? 7 : 4" class="bs__empty">{{ busqueda ? 'Sin resultados.' : 'Sin productos. Se compran desde Contabilidad → Nuevo movimiento.' }}</td></tr>
+          <tr v-if="!productos.length"><td :colspan="esGestion ? 8 : 5" class="bs__empty">{{ busqueda ? 'Sin resultados.' : 'Sin productos. Se compran desde Contabilidad → Nuevo movimiento.' }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -212,6 +243,31 @@ async function borrarCat(c) {
     </Teleport>
 
     <BarcodeScanner v-if="escaneandoProd" una-vez titulo="Escaneá el código del producto" @decoded="onCodigoDecoded" @close="escaneandoProd = false" />
+
+    <!-- Asignar/corregir el código de barras, sin abrir el resto de la ficha -->
+    <Teleport to="body">
+      <div v-if="codigoProd" class="bs__ov" @click.self="codigoProd = null">
+        <div class="bs__cb">
+          <h3 class="bs__cb-tit">Código de barras</h3>
+          <p class="bs__cb-prod">{{ codigoProd.nombre }}</p>
+          <div class="bs__cb-row">
+            <input v-model.trim="codigoProd.codigo_barras" class="inp" maxlength="60"
+                   placeholder="Escaneá con el lector o escribilo" autofocus
+                   @keyup.enter="guardarCodigo" />
+            <button class="btn btn--icon" type="button" title="Escanear con la cámara" @click="escaneandoCB = true">📷</button>
+          </div>
+          <div class="bs__cb-acc">
+            <button class="btn" :disabled="guardandoCB" @click="codigoProd = null">Cancelar</button>
+            <button class="btn btn--brand" :disabled="guardandoCB" @click="guardarCodigo">
+              {{ guardandoCB ? 'Guardando…' : 'Guardar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+    <BarcodeScanner v-if="escaneandoCB" una-vez titulo="Escaneá el código del producto"
+                    @decoded="(c) => { if (codigoProd) codigoProd.codigo_barras = String(c || '').trim() }"
+                    @close="escaneandoCB = false" />
   </div>
 </template>
 
@@ -223,6 +279,13 @@ async function borrarCat(c) {
 .bs__actions { display: flex; align-items: center; gap: 1rem; }
 .bs__val { font-size: .8rem; color: #64748b; } .bs__val b { color: #0f172a; font-weight: 750; }
 .bs__note { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: #334155; background: #eaf3ea; border: 1px solid #cfe3d0; border-radius: 10px; padding: .55rem .8rem; margin: .9rem 0; }
+.bs__ov { position: fixed; inset: 0; z-index: 1200; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.bs__cb { background: #fff; border-radius: 14px; padding: 18px; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 10px; }
+.bs__cb-tit { margin: 0; font-size: 16px; font-weight: 700; }
+.bs__cb-prod { margin: 0; font-size: 13px; color: #64748b; }
+.bs__cb-row { display: flex; gap: 8px; align-items: center; }
+.bs__cb-row .inp { flex: 1; }
+.bs__cb-acc { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 .bs__search { display: flex; align-items: center; gap: .6rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 11px; padding: .6rem .85rem; margin-bottom: 1rem; color: #94a3b8; }
 .bs__search:focus-within { border-color: #9a5b34; }
 .bs__search input { flex: 1; border: none; outline: none; background: none; font-size: .9rem; color: #0f172a; min-width: 0; }
