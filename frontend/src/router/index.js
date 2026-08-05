@@ -997,8 +997,12 @@ router.beforeEach(async (to) => {
   // La raíz hace de puerta comercial: sin sesión muestra la landing en vez de mandar a
   // un formulario de login, que no le dice nada a quien llega por primera vez.
   // Con sesión, "/" sigue siendo el dashboard de siempre.
+  //
+  // EXCEPCIÓN: la PWA instalada arranca en "/" y ahí el usuario ya sabe qué es esto — viene a
+  // trabajar, no a que le vendan la plataforma. Mandarlo a la landing le mete una pantalla de
+  // más entre el ícono y su sesión.
   if (to.path === '/' && !auth.isAuthenticated) {
-    return { name: "landing" };
+    return usePWA().isPWA() ? { name: 'login' } : { name: 'landing' };
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {

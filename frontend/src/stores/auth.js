@@ -3,6 +3,14 @@ import { signIn, signOut, me, clearAuthToken } from "../lib/api";
 import { useClubStore } from "../stores/club.js";
 import { usePlan } from '../composables/usePlan.js'
 
+// Promesa del bootstrap en vuelo. Fuera del state a propósito: no es dato de la app, es un
+// candado para que dos navegaciones seguidas no disparen dos /me.
+let bootstrapPromise = null;
+
+// Cuánto espera el arranque por /me antes de seguir de largo. Si el backend está dormido,
+// más vale mostrar el login que dejar la pantalla colgada.
+const BOOTSTRAP_TIMEOUT_MS = 8000;
+
 export const useAuthStore = defineStore("auth", {
   state: () => ({
     user: null,
@@ -36,8 +44,12 @@ export const useAuthStore = defineStore("auth", {
     },
   },
   actions: {
-    async fetchMe() {
-      this.loading = true;
+    // `silent`: no toca `loading`. `loading` es el estado del BOTÓN de login; el bootstrap
+    // (traer /me al arrancar) es otra cosa y corre en paralelo. Compartiendo el flag, un /me
+    // lento dejaba el botón de "Ingresar" deshabilitado con spinner sin que el usuario hubiera
+    // apretado nada — parecía que el login estaba colgado.
+    async fetchMe({ silent = false } = {}) {
+      if (!silent) this.loading = true;
       this.error = null;
       try {
         const { data } = await me();
@@ -45,15 +57,26 @@ export const useAuthStore = defineStore("auth", {
       } catch {
         this.user = null;
       } finally {
-        this.loading = false;
+        if (!silent) this.loading = false;
         this.bootstrapped = true;
       }
     },
 
+    // Memoizada: el guard corre en cada navegación y puede entrar dos veces antes de que la
+    // primera termine (p. ej. landing → login con el backend despertando). Sin esto se
+    // disparaban dos /me en paralelo peleándose el estado.
+    //
+    // Con techo de tiempo: el guard hace `await` de esto, así que un /me colgado —el free tier
+    // de Render tarda en despertar— dejaba la app entera trabada en la pantalla de arranque,
+    // sin siquiera llegar a mostrar el login. Pasados los 8s seguimos como "sin sesión": si
+    // había sesión, el /me que llegue tarde igual completa el user.
     async ensureBootstrapped() {
-      if (!this.bootstrapped) {
-        await this.fetchMe();
-      }
+      if (this.bootstrapped) return;
+      bootstrapPromise ||= this.fetchMe({ silent: true }).finally(() => { bootstrapPromise = null; });
+      return Promise.race([
+        bootstrapPromise,
+        new Promise((resolve) => setTimeout(resolve, BOOTSTRAP_TIMEOUT_MS)),
+      ]);
     },
 
     async login(email, password, redirect = null) {
@@ -62,7 +85,7 @@ export const useAuthStore = defineStore("auth", {
       this.loggingOut = false;
       try {
         await signIn(email, password);
-        await this.fetchMe();
+        await this.fetchMe({ silent: true });
 
         if (!this.user) {
           this.error = "No se pudo obtener el usuario. Intentá de nuevo.";
