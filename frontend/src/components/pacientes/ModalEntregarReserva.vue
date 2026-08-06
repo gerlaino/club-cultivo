@@ -72,7 +72,7 @@
               <div v-else-if="!deliveryUsers.length" class="mer__warn">No hay usuarios delivery.</div>
               <select v-else v-model.number="deliveryId" class="mer__input">
                 <option :value="null" disabled>Seleccioná un delivery…</option>
-                <option v-for="u in deliveryUsers" :key="u.id" :value="u.id">{{ u.first_name || u.nombre || u.email }}</option>
+                <option v-for="u in deliveryUsers" :key="u.id" :value="u.id">{{ u.nombre || u.email }}</option>
               </select>
             </div>
 

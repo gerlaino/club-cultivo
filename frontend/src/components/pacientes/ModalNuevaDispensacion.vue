@@ -53,6 +53,7 @@ const loadingStocks   = ref(false)
 const saving          = ref(false)
 const formError       = ref(null)
 const deliveryUsers   = ref([])
+const deliveryError   = ref(null)
 const loadingDelivery = ref(false)
 
 const today = new Date().toISOString().split('T')[0]
@@ -189,10 +190,18 @@ function quitarItem(i) { items.value.splice(i, 1) }
 async function cargarDeliveryUsers() {
   if (deliveryUsers.value.length) return
   loadingDelivery.value = true
+  deliveryError.value = null
   try {
     const { data } = await listEntregadores()
     deliveryUsers.value = data.data || data.usuarios || data || []
-  } catch { deliveryUsers.value = [] }
+  } catch (e) {
+    // Tragarse el error y mostrar "no hay delivery" es mentirle al usuario: puede haberlos
+    // y ser un problema de permisos o de red.
+    deliveryUsers.value = []
+    deliveryError.value = e?.response?.status === 403
+      ? 'No tenés permiso para ver la lista de entregadores. Avisale a un administrador.'
+      : 'No se pudo cargar la lista de entregadores. Reintentá.'
+  }
   finally { loadingDelivery.value = false }
 }
 
@@ -827,13 +836,17 @@ async function handleSubmit() {
             <div v-if="!form.es_reserva" class="mnd__field">
               <label class="mnd__label">Delivery asignado <span class="mnd__req">*</span></label>
               <div v-if="loadingDelivery" class="mnd__loading-inline"><DsSpinner :size="13" /> Cargando…</div>
+              <div v-else-if="deliveryError" class="mnd__warn-box">
+                <i class="bi bi-exclamation-triangle"></i> {{ deliveryError }}
+                <button type="button" class="mnd__warn-retry" @click="cargarDeliveryUsers">Reintentar</button>
+              </div>
               <div v-else-if="!deliveryUsers.length" class="mnd__warn-box">
-                <i class="bi bi-exclamation-triangle"></i> No hay usuarios delivery disponibles
+                <i class="bi bi-exclamation-triangle"></i> No hay nadie con rol delivery, admin o supervisor para asignar
               </div>
               <select v-else v-model.number="form.delivery_id" class="mnd__input">
                 <option :value="null" disabled>Seleccioná un delivery…</option>
                 <option v-for="u in deliveryUsers" :key="u.id" :value="u.id">
-                  {{ u.first_name || u.nombre || u.email }}
+                  {{ u.nombre || u.first_name || u.email }}<template v-if="u.role && u.role !== 'delivery'"> · {{ u.role }}</template>
                 </option>
               </select>
             </div>
@@ -986,6 +999,7 @@ async function handleSubmit() {
 .mnd__cart-precio-input { width: 72px; padding: .25rem .4rem; border: 1.5px solid #86efac; border-radius: 6px; font-size: .8rem; color: #0f172a; background: #fff; outline: none; }
 .mnd__cart-precio-input:focus { border-color: #15803d; }
 .mnd__cart-guardar { display: inline-flex; align-items: center; gap: .2rem; font-size: .68rem; color: #15803d; cursor: pointer; white-space: nowrap; }
+.mnd__warn-retry { margin-left: .5rem; background: none; border: none; color: #b45309; font-weight: 700; font-size: .75rem; text-decoration: underline; cursor: pointer; padding: 0; }
 .mnd__cart-detalle { font-size: .72rem; color: #64748b; font-style: italic; }
 .mnd__cart-qty { font-size: .75rem; font-family: monospace; color: #15803d; font-weight: 700; }
 .mnd__cart-sub { font-size: .8rem; font-weight: 700; color: #166534; font-family: monospace; white-space: nowrap; }

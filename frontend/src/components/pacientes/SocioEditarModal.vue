@@ -8,7 +8,8 @@
             <button class="sem__close" @click="emit('update:open', false)"><X :size="18" /></button>
           </div>
           <div class="sem__body">
-            <div class="sem__grid">
+            <div v-if="cargando" class="sem__loading"><DsSpinner :size="18" /> Cargando paciente…</div>
+            <div v-else class="sem__grid">
               <div class="sem__field">
                 <label class="sem__label">Nombre</label>
                 <input v-model="editForm.nombre" class="sem__input" type="text" />
@@ -118,11 +119,13 @@
 </template>
 
 <script setup>
-import { watch, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { X, Save } from 'lucide-vue-next'
 import { useSocioEditar, REPROCANN_ESTADOS } from '../../composables/useSocioEditar.js'
 import { useAuthStore } from '../../stores/auth.js'
+import { usePacientesStore } from '../../stores/pacientes'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   open:    { type: Boolean, default: false },
@@ -130,12 +133,26 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:open', 'saved'])
 
-const { editForm, editSaving, editError, openEdit, saveEdit } = useSocioEditar(props.socioId)
+// Getter, no valor: desde la lista de pacientes el modal se reusa para distintos pacientes.
+const { editForm, editSaving, editError, openEdit, saveEdit } = useSocioEditar(() => props.socioId)
+const store = usePacientesStore()
 
 const auth    = useAuthStore()
 const isAdmin = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
 
-watch(() => props.open, (v) => { if (v) openEdit() })
+// El modal se abre tanto desde la ficha (donde el paciente ya está cargado) como desde la
+// lista (donde no): se asegura de tener los datos completos antes de poblar el formulario.
+const cargando = ref(false)
+// `immediate`: desde la lista el componente se MONTA ya abierto (aparece recién cuando hay
+// un paciente elegido), así que si sólo se escuchara el cambio, el formulario saldría vacío.
+watch(() => props.open, async (v) => {
+  if (!v) return
+  if (store.current?.id !== props.socioId) {
+    cargando.value = true
+    try { await store.fetchOne(props.socioId) } finally { cargando.value = false }
+  }
+  openEdit()
+}, { immediate: true })
 
 async function doSave() {
   await saveEdit()
@@ -154,6 +171,7 @@ async function doSave() {
 .sem__close { background: none; border: none; color: #94a3b8; cursor: pointer; padding: .25rem; border-radius: 6px; display: flex; transition: all .15s; }
 .sem__close:hover { background: #f1f5f9; color: #0f172a; }
 .sem__body { padding: 1.5rem; flex: 1; }
+.sem__loading { display: flex; align-items: center; gap: .5rem; justify-content: center; padding: 2rem; color: #64748b; font-size: .85rem; }
 .sem__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 480px) { .sem__grid { grid-template-columns: 1fr; } }
 .sem__field { display: flex; flex-direction: column; gap: .4rem; }

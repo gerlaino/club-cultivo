@@ -273,6 +273,7 @@ Rails.application.routes.draw do
         get  :mis_paquetes
         get  :mi_historial   # lo que el repartidor ya cerró (entregado/fallido)
         get  :export_csv
+        get  :entregadores   # a quién se le puede asignar un envío (no requiere ser admin)
         patch :iniciar_viaje
       end
       member do

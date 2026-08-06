@@ -3,7 +3,7 @@ class DispensacionesController < ApplicationController
 
   before_action :authenticate_user!
   before_action :require_dispensaciones_role!
-  before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :mi_historial, :export_csv]
+  before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :mi_historial, :export_csv, :entregadores]
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
   before_action :set_dispensacion, only: [:show, :update, :destroy, :entregar, :reportar_fallo, :reprogramar, :cancelar_entrega]
@@ -430,6 +430,24 @@ class DispensacionesController < ApplicationController
   end
 
   # GET /dispensaciones/export_csv
+  # GET /dispensaciones/entregadores
+  #
+  # A quién se le puede asignar un envío. Existe aparte de GET /usuarios porque ese índice
+  # es sólo de admin (expone emails y roles de todo el club) y el dispensador necesita esta
+  # lista para poder despachar: sin ella el modal decía "no hay delivery disponibles" cuando
+  # sí los había —se comía el 403—. Devuelve lo mínimo: a quién asignar y cómo se llama.
+  ROLES_ENTREGA = %w[delivery admin supervisor].freeze
+
+  def entregadores
+    users = User.where(club_id: current_user.club_id, role: ROLES_ENTREGA)
+                .order(:role, :first_name)
+
+    render json: { data: users.map { |u|
+      { id: u.id, role: u.role,
+        nombre: [u.first_name, u.last_name].compact_blank.join(' ').presence || u.email }
+    } }
+  end
+
   def export_csv
     unless current_user.admin? || current_user.dispensador?
       return render json: { error: 'No autorizado' }, status: :forbidden

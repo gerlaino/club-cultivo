@@ -247,7 +247,9 @@ export const reportarFallo    = (id, motivoFallo)   => api.patch(`/dispensacione
 export const reprogramarPaquete = (id)             => api.patch(`/dispensaciones/${id}/reprogramar`)
 export const cancelarEntregaDispensacion = (id, motivo) => api.patch(`/dispensaciones/${id}/cancelar_entrega`, { motivo })
 export const listDeliveryUsers  = ()                => api.get('/usuarios', { params: { role: 'delivery' } })
-export const listEntregadores   = ()                => api.get('/usuarios', { params: { roles: ['delivery', 'admin', 'supervisor'] } })
+// Endpoint propio (no /usuarios, que es sólo de admin): el dispensador necesita esta lista
+// para poder despachar y no puede leer el índice de usuarios del club.
+export const listEntregadores   = ()                => api.get('/dispensaciones/entregadores')
 export const listDespachos     = (params = {})      => api.get('/dispensaciones', { params: { con_envio: 'true', ...params } })
 export const getRutaEntrega    = (params = {})      => api.get('/rutas_entrega', { params })
 export const ordenarRuta       = (payload)          => api.post('/rutas_entrega/ordenar', payload)

@@ -340,7 +340,7 @@ function deliveryNombre(d) {
 }
 
 function entregadorLabel(u) {
-  const nombre = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
+  const nombre = u.nombre || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
   if (u.role !== 'delivery') return `${nombre} (${ROLE_LABEL[u.role] || u.role})`
   return nombre
 }
@@ -794,12 +794,12 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
                 <option value="">— Sin asignar —</option>
                 <optgroup v-if="deliveryUsers.filter(u => u.role === 'delivery').length" label="Repartidores">
                   <option v-for="u in deliveryUsers.filter(u => u.role === 'delivery')" :key="u.id" :value="String(u.id)">
-                    {{ [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email }}
+                    {{ u.nombre || u.email }}
                   </option>
                 </optgroup>
                 <optgroup v-if="deliveryUsers.filter(u => u.role !== 'delivery').length" label="Admin / Supervisor">
                   <option v-for="u in deliveryUsers.filter(u => u.role !== 'delivery')" :key="u.id" :value="String(u.id)">
-                    {{ [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email }}
+                    {{ u.nombre || u.email }}
                   </option>
                 </optgroup>
               </select>

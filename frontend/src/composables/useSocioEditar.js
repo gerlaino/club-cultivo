@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, toValue } from 'vue'
 import { useToast } from './useToast.js'
 import { usePacientesStore } from '../stores/pacientes'
 import { updatePaciente } from '../lib/api.js'
@@ -10,7 +10,10 @@ export const REPROCANN_ESTADOS = [
   { value: 'inactivo',     label: 'Inactivo',             color: '#dc2626', bg: '#fef2f2' },
 ]
 
-export function useSocioEditar(socioId) {
+// `socioIdRef` puede ser un número o un getter/ref: desde la LISTA de pacientes el id cambia
+// según a quién se edite, y capturarlo por valor guardaba los cambios en el paciente anterior.
+export function useSocioEditar(socioIdRef) {
+  const socioIdActual = () => toValue(socioIdRef)
   const { success: toastOk, error: toastErr } = useToast()
   const store = usePacientesStore()
 
@@ -58,8 +61,9 @@ export function useSocioEditar(socioId) {
     }
     editSaving.value = true
     try {
-      await updatePaciente(socioId, editForm.value)
-      await store.fetchOne(socioId)
+      const id = socioIdActual()
+      await updatePaciente(id, editForm.value)
+      await store.fetchOne(id)
       editOpen.value = false
       toastOk('Paciente actualizado')
     } catch (e) {

@@ -8,6 +8,7 @@ import { useConfirm } from '../composables/useConfirm.js'
 import { exportPacientesCSV } from '../lib/api.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import SocioEditarModal from '../components/pacientes/SocioEditarModal.vue'
 import { reprocannBadge, reprocannCategoria } from '../composables/useReprocann.js'
 
 const store  = usePacientesStore()
@@ -21,8 +22,6 @@ const { confirm } = useConfirm()
 const search       = ref('')
 const searchTimer  = ref(null)
 const showModal    = ref(false)
-const editing      = ref(false)
-const formError    = ref(null)
 const page         = ref(1)
 const perPage      = 50
 
@@ -41,45 +40,10 @@ watch(filterEstado, (val) => {
   router.replace({ query: { ...route.query, reprocann: REPRO_URL_REVERSE[val] || 'todos' } })
 })
 
-function emptyForm() {
-  return {
-    id: null, nombre: '', apellido: '', dni: '',
-    email: '', telefono: '', fecha_nacimiento: '',
-    reprocann_numero: '', reprocann_vencimiento: '',
-    es_paciente: true,
-  }
-}
-const form       = ref(emptyForm())
-const formErrors = ref({})
-
-function validate() {
-  const e = {}
-  if (!form.value.nombre.trim())   e.nombre           = 'El nombre es obligatorio'
-  if (!form.value.apellido.trim())  e.apellido          = 'El apellido es obligatorio'
-  if (!form.value.dni.trim())       e.dni               = 'El DNI es obligatorio'
-  if (!form.value.fecha_nacimiento) e.fecha_nacimiento  = 'La fecha de nacimiento es obligatoria'
-  if (form.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email))
-    e.email = 'Email inválido'
-  formErrors.value = e
-  return !Object.keys(e).length
-}
+const editandoId = ref(null)
 
 function openEdit(s) {
-  editing.value = true
-  form.value = {
-    id:                    s.id,
-    nombre:                s.nombre     || '',
-    apellido:              s.apellido   || '',
-    dni:                   s.dni        || '',
-    email:                 s.email      || '',
-    telefono:              s.telefono   || '',
-    fecha_nacimiento:      s.fecha_nacimiento?.toString().slice(0, 10) || '',
-    reprocann_numero:      s.reprocann_numero      || '',
-    reprocann_vencimiento: s.reprocann_vencimiento?.toString().slice(0, 10) || '',
-    es_paciente:           s.es_paciente ?? true,
-  }
-  formErrors.value = {}
-  formError.value  = null
+  editandoId.value = s.id
   showModal.value  = true
 }
 
@@ -103,20 +67,6 @@ async function doSearch() {
 function onSearchInput() {
   clearTimeout(searchTimer.value)
   searchTimer.value = setTimeout(doSearch, 400)
-}
-
-async function save() {
-  if (!validate()) return
-  formError.value = null
-  try {
-    const payload = { ...form.value }
-    delete payload.id
-    Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k] })
-    await store.update(form.value.id, payload)
-    showModal.value = false
-  } catch (e) {
-    formError.value = store.error || 'Error al guardar'
-  }
 }
 
 
@@ -298,6 +248,7 @@ async function exportarCSV() {
             <th>Paciente</th>
             <th>DNI</th>
             <th>Edad</th>
+            <th>Estado</th>
             <th>REPROCANN</th>
             <th>Última dispensa</th>
             <th>Email</th>
@@ -328,12 +279,16 @@ async function exportarCSV() {
             </td>
             <td>
               <div class="sv-pac-nombre">{{ s.nombre }} {{ s.apellido }}</div>
-              <span v-if="!s.es_paciente" class="sv-inactivo-tag">Inactivo</span>
             </td>
             <td><span class="sv-mono">{{ s.dni }}</span></td>
             <td>
               <span v-if="edad(s.fecha_nacimiento)" class="sv-edad">{{ edad(s.fecha_nacimiento) }}a</span>
               <span v-else class="sv-empty">—</span>
+            </td>
+            <td>
+              <span class="sv-estado" :class="s.es_paciente ? 'sv-estado--on' : 'sv-estado--off'">
+                {{ s.es_paciente ? 'Activo' : 'Inactivo' }}
+              </span>
             </td>
             <td>
               <template v-if="s.reprocann_vencimiento">
@@ -379,87 +334,9 @@ async function exportarCSV() {
       </div>
     </div>
 
-    <!-- Modal Editar -->
-    <Teleport to="body">
-      <div v-if="showModal" class="sp-overlay" @click.self="showModal=false">
-        <div class="sp-modal">
-          <div class="sp-modal__header">
-            <div>
-              <h2 class="sp-modal__title">Editar paciente</h2>
-              <p class="sp-modal__sub">Actualizá los datos del paciente</p>
-            </div>
-            <button class="sp-modal__close" @click="showModal=false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="sp-modal__body">
-            <div v-if="formError" class="sp-alert"><i class="bi bi-exclamation-triangle-fill"></i> {{ formError }}</div>
-            <div class="sp-section-title"><i class="bi bi-person-vcard"></i> Datos personales</div>
-            <div class="sp-grid">
-              <div class="sp-field">
-                <label class="sp-label">Nombre <span class="sp-req">*</span></label>
-                <input v-model.trim="form.nombre" class="sp-input" :class="{ 'sp-input--err': formErrors.nombre }" />
-                <span v-if="formErrors.nombre" class="sp-err">{{ formErrors.nombre }}</span>
-              </div>
-              <div class="sp-field">
-                <label class="sp-label">Apellido <span class="sp-req">*</span></label>
-                <input v-model.trim="form.apellido" class="sp-input" :class="{ 'sp-input--err': formErrors.apellido }" />
-                <span v-if="formErrors.apellido" class="sp-err">{{ formErrors.apellido }}</span>
-              </div>
-              <div class="sp-field">
-                <label class="sp-label">DNI <span class="sp-req">*</span></label>
-                <input v-model.trim="form.dni" class="sp-input" :class="{ 'sp-input--err': formErrors.dni }" />
-                <span v-if="formErrors.dni" class="sp-err">{{ formErrors.dni }}</span>
-              </div>
-              <div class="sp-field">
-                <label class="sp-label">Fecha de nacimiento <span class="sp-req">*</span></label>
-                <AppDatePicker v-model="form.fecha_nacimiento" />
-                <span v-if="formErrors.fecha_nacimiento" class="sp-err">{{ formErrors.fecha_nacimiento }}</span>
-              </div>
-              <div class="sp-field">
-                <label class="sp-label">Teléfono</label>
-                <input v-model.trim="form.telefono" class="sp-input" placeholder="+54 9 11 1234-5678" />
-              </div>
-              <div class="sp-field">
-                <label class="sp-label">Email</label>
-                <input v-model.trim="form.email" type="email" class="sp-input" :class="{ 'sp-input--err': formErrors.email }" />
-                <span v-if="formErrors.email" class="sp-err">{{ formErrors.email }}</span>
-              </div>
-            </div>
-            <div class="sp-section-title sp-section-title--mt">
-              <i class="bi bi-patch-check-fill" style="color:#15803d"></i> Autorización REPROCANN
-            </div>
-            <div class="sp-grid">
-              <div class="sp-field">
-                <label class="sp-label">Número de certificado</label>
-                <input v-model.trim="form.reprocann_numero" class="sp-input" />
-              </div>
-              <div class="sp-field">
-                <label class="sp-label">Fecha de vencimiento</label>
-                <AppDatePicker v-model="form.reprocann_vencimiento" />
-              </div>
-            </div>
-            <div class="sp-section-title sp-section-title--mt">
-              <i class="bi bi-heart-pulse" style="color:#0369a1"></i> Estado clínico
-            </div>
-            <label class="sp-toggle">
-              <input v-model="form.es_paciente" type="checkbox" class="sp-toggle__input" />
-              <div class="sp-toggle__track"><div class="sp-toggle__thumb"></div></div>
-              <div>
-                <div class="sp-toggle__label">Paciente activo en tratamiento</div>
-                <div class="sp-toggle__hint">Los pacientes inactivos no aparecen en la lista principal</div>
-              </div>
-            </label>
-          </div>
-          <div class="sp-modal__footer">
-            <button class="sp-btn-ghost" :disabled="store.saving" @click="showModal=false">Cancelar</button>
-            <button class="sp-btn-primary" :disabled="store.saving" @click="save">
-              <DsSpinner v-if="store.saving" :size="15" />
-              <i v-else class="bi bi-check-lg"></i>
-              Guardar cambios
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- Edición: el MISMO modal que se usa desde la ficha del paciente, para que los
+         campos y las validaciones sean unos solos. -->
+    <SocioEditarModal v-if="editandoId" v-model:open="showModal" :socio-id="editandoId" @saved="store.fetch()" />
 
 
   </div>
@@ -530,7 +407,9 @@ async function exportarCSV() {
 .sv-ind--none    { background: #e2e8f0; }
 
 .sv-pac-nombre { font-weight: 700; color: #0f172a; font-size: .875rem; }
-.sv-inactivo-tag { display: inline-block; font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: #f1f5f9; color: #64748b; padding: .1em .45em; border-radius: 4px; margin-top: .2rem; }
+.sv-estado { display: inline-block; font-size: .7rem; font-weight: 700; padding: .15em .55em; border-radius: 999px; white-space: nowrap; }
+.sv-estado--on  { background: #f0fdf4; color: #15803d; }
+.sv-estado--off { background: #f1f5f9; color: #64748b; }
 .sv-mono  { font-family: monospace; font-size: .82rem; color: #374151; }
 .sv-edad  { font-size: .82rem; color: #64748b; }
 .sv-empty { color: #cbd5e1; font-size: .82rem; }
@@ -560,44 +439,4 @@ async function exportarCSV() {
 .sv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: var(--brand-primary, #1b5e20); color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s, transform .1s; text-decoration: none; white-space: nowrap; }
 .sv__btn-primary:hover { background: #144a18; transform: translateY(-1px); }
 
-.sp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1055; padding: 1rem; backdrop-filter: blur(3px); }
-.sp-modal { background: #fff; border-radius: 18px; width: 100%; max-width: 620px; max-height: 92vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,.15); }
-.sp-modal__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.5rem 1.5rem 1.1rem; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: #fff; z-index: 1; }
-.sp-modal__title { font-size: 1.2rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; letter-spacing: -.02em; }
-.sp-modal__title--danger { color: #dc2626; }
-.sp-modal__sub { font-size: .8rem; color: #64748b; margin: 0; }
-.sp-modal__close { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b; flex-shrink: 0; transition: all .15s; }
-.sp-modal__close:hover { background: #e2e8f0; color: #0f172a; }
-.sp-modal__body { padding: 1.4rem 1.5rem; flex: 1; }
-.sp-modal__footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1rem 1.5rem; border-top: 1px solid #f1f5f9; position: sticky; bottom: 0; background: #fff; }
-.sp-section-title { display: flex; align-items: center; gap: .5rem; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #475569; padding-bottom: .6rem; border-bottom: 1px solid #f1f5f9; margin-bottom: 1rem; }
-.sp-section-title--mt { margin-top: 1.5rem; }
-.sp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-@media (max-width: 520px) { .sp-grid { grid-template-columns: 1fr; } }
-.sp-field { display: flex; flex-direction: column; gap: .35rem; }
-.sp-label { font-size: .78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
-.sp-req { color: #dc2626; }
-.sp-input { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .65rem .9rem; font-size: .875rem; color: #0f172a; width: 100%; box-sizing: border-box; transition: border .15s, box-shadow .15s; }
-.sp-input:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); background: #fff; }
-.sp-input--err { border-color: #dc2626; }
-.sp-err { font-size: .72rem; color: #dc2626; font-weight: 600; }
-.sp-alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .75rem 1rem; border-radius: 9px; font-size: .85rem; margin-bottom: 1.25rem; display: flex; gap: .5rem; align-items: flex-start; }
-.sp-toggle { display: flex; align-items: flex-start; gap: .875rem; cursor: pointer; padding: 1rem 1.1rem; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; transition: border .15s; }
-.sp-toggle:hover { border-color: #1b5e20; }
-.sp-toggle__input { display: none; }
-.sp-toggle__track { width: 44px; height: 24px; background: #cbd5e1; border-radius: 999px; position: relative; transition: background .2s; flex-shrink: 0; margin-top: .15rem; }
-.sp-toggle__input:checked + .sp-toggle__track { background: #1b5e20; }
-.sp-toggle__thumb { position: absolute; width: 18px; height: 18px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
-.sp-toggle__input:checked + .sp-toggle__track .sp-toggle__thumb { left: 22px; }
-.sp-toggle__label { font-size: .9rem; font-weight: 700; color: #0f172a; margin-bottom: .3rem; }
-.sp-toggle__hint  { font-size: .78rem; color: #64748b; line-height: 1.5; }
-.sp-btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: var(--brand-primary, #1b5e20); color: #fff; border: none; padding: .65rem 1.4rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s, transform .1s; }
-.sp-btn-primary:hover:not(:disabled) { background: #144a18; transform: translateY(-1px); }
-.sp-btn-primary:disabled { opacity: .6; cursor: not-allowed; }
-.sp-btn-ghost { background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; padding: .65rem 1.2rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; }
-.sp-btn-ghost:hover:not(:disabled) { background: #f8fafc; color: #0f172a; }
-.sp-btn-ghost:disabled { opacity: .6; cursor: not-allowed; }
-.sp-btn-danger { display: inline-flex; align-items: center; gap: .4rem; background: #b91c1c; color: #fff; border: none; padding: .65rem 1.4rem; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background .15s; }
-.sp-btn-danger:hover:not(:disabled) { background: #991b1b; }
-.sp-btn-danger:disabled { opacity: .6; cursor: not-allowed; }
 </style>
