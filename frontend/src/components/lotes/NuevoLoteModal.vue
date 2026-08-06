@@ -291,6 +291,16 @@ const esCosechado = computed(() => tipoCreacion.value === 'existente' && heredad
 // viene de una fase previa, así que se carga como existente (heredado) y se piden los días.
 const salaVieneDeAntes = computed(() => ['floracion', 'cosecha'].includes(effectiveSala.value?.kind))
 
+const form          = ref(emptyForm())
+const errors        = ref({})
+const apiError      = ref(null)
+const saving        = ref(false)
+const tipoCreacion  = ref('nuevo')
+const proximoCodigo = ref('')
+const loadingCodigo = ref(false)
+const heredadoEstado = ref('enraizado')
+const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 })
+
 // Qué salas se le pueden ofrecer a este lote. Un lote NUEVO arranca enraizando y va a una sala
 // de vegetativo: en floración (12/12) no germina ni prende nada, así que esa sala no es una
 // opción. Un lote existente sólo puede entrar donde su fase actual pueda vivir. Las salas
@@ -319,16 +329,6 @@ const sedeFiltro = ref('')
 watch([estadoObjetivo, sedeFiltro], () => {
   if (salaId.value && !salasOfrecidas.value.some(s => s.id === salaId.value)) salaId.value = ''
 })
-
-const form          = ref(emptyForm())
-const errors        = ref({})
-const apiError      = ref(null)
-const saving        = ref(false)
-const tipoCreacion  = ref('nuevo')
-const proximoCodigo = ref('')
-const loadingCodigo = ref(false)
-const heredadoEstado = ref('enraizado')
-const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 })
 const geneticas      = ref([])
 const plantasMadre   = ref([])
 const loadingMadres  = ref(false)
