@@ -125,6 +125,9 @@ services:
     name: club-cultivo-staging-redis
     plan: free
     maxmemoryPolicy: noeviction   # Sidekiq NO tolera que Redis descarte claves
+    # Lista vacía = SÓLO se llega desde la red privada de Render. El Redis no tiene por qué
+    # ser accesible desde internet: guarda las colas de trabajo y la caché de sesión.
+    ipAllowList: []
 
   # ── BACKUP DE PRODUCCIÓN ──────────────────────────────────────────────────
   - type: cron
