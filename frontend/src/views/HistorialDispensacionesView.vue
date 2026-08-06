@@ -3,7 +3,7 @@ import { ref, watch, computed, onMounted } from 'vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, deleteDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode, Truck, ChevronRight } from 'lucide-vue-next'
 import { useEtiquetaDispensa } from '../composables/useEtiquetaDispensa.js'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
@@ -117,6 +117,13 @@ const filtroSocio     = ref(null) // { id, nombre }
 const sedes = ref([])
 onMounted(async () => {
   try { const { data } = await listSedes(); sedes.value = data ?? [] } catch {}
+
+  // Se entró desde "Nueva dispensación": se abre el flujo sin pedir un segundo click.
+  // La query se limpia para que recargar la página no lo vuelva a abrir solo.
+  if (route.query.nueva) {
+    router.replace({ query: { ...route.query, nueva: undefined } })
+    abrirNuevaDispensacion()
+  }
 })
 
 const hayFiltrosActivos = computed(() =>
@@ -252,6 +259,7 @@ function itemsDe(d) { return d.items?.length ? d.items : [] }
 // Click en la fila → detalle de la dispensa. No navega si el click fue sobre un control
 // interactivo de la propia fila (links de paciente, botones de acción).
 const router = useRouter()
+const route  = useRoute()
 function verDetalle(d, ev) {
   if (ev?.target?.closest?.('a, button')) return
   router.push({ name: 'dispensacion-detalle', params: { id: d.id } })

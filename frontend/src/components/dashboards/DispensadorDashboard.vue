@@ -6,7 +6,9 @@
         <h1 class="dd__title">{{ saludo }}, {{ auth.user?.first_name || auth.displayName }}</h1>
         <p class="dd__subtitle">{{ fechaHoy }}</p>
       </div>
-      <RouterLink to="/historial" class="dd__cta">
+      <!-- ?nueva=1: abre el flujo directo. Sin esto llevaba al historial y había que apretar
+           "Nueva dispensación" otra vez — dos clicks para lo que este rol hace todo el día. -->
+      <RouterLink to="/historial?nueva=1" class="dd__cta">
         <PackagePlus :size="16" :stroke-width="1.75" />
         Nueva dispensación
       </RouterLink>
