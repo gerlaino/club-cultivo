@@ -11,7 +11,12 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   end
 
   def create
-    club = Club.new(club_params)
+    attrs = club_params.to_h
+    # Un club nuevo nace con las suites y los add-ons terminados, salvo que el alta mande otra
+    # cosa: crearlo con features vacío significaría, con el gating real, un club que no puede
+    # hacer nada.
+    attrs['features'] = Club::FEATURES_POR_DEFECTO.merge(attrs['features'] || {})
+    club = Club.new(attrs)
     if club.save
       roles    = Array(params[:roles_a_crear]).map(&:to_s).presence || Club::ROLES_DEFAULT
       password = params[:password_inicial].presence || Club::PASSWORD_DEFAULT
@@ -142,7 +147,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
       :smtp_from, :smtp_from_name,
       :ia_tier, :ia_limite_hora,
-      features: Club::FEATURES_POR_DEFECTO.dup
+      features: {}
     )
   end
 

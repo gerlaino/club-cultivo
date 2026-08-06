@@ -26,13 +26,22 @@ const form = ref({
   plan:              'semilla',
   plan_trial:        true,
   plan_activo_hasta: '',
-  features:          {},
+  features:          { cultivo: true, produccion_dispensa: true, bar: true, medico: true },
 })
+
+const haySuite = computed(() => SUITES.some(x => form.value.features[x.value] === true))
 
 const PAISES    = ['Argentina', 'Uruguay', 'Colombia', 'España', 'Alemania', 'Canadá', 'Estados Unidos', 'México', 'Chile', 'Brasil', 'Otro']
 const TIMEZONES = ['America/Argentina/Buenos_Aires', 'America/Montevideo', 'America/Bogota', 'America/Santiago', 'Europe/Berlin', 'America/Toronto', 'America/New_York']
 
 // ── Plan ──────────────────────────────────────────────────────────────
+// Lo que se vende son SUITES, no planes por tamaño: un club contrata "cultivo", "producción
+// y dispensa", o las dos. Los add-ons se suman arriba.
+const SUITES = [
+  { value: 'cultivo',             label: 'Cultivo',                desc: 'Genéticas, lotes, plantas, salas, cosecha y tareas' },
+  { value: 'produccion_dispensa', label: 'Producción y dispensa',  desc: 'Pacientes, stock, dispensaciones, cuenta corriente y contabilidad' },
+]
+
 const PLANES = [
   { value: 'semilla',    label: 'Semilla',    color: '#64748b', bg: '#f1f5f9', desc: '1 sede · 50 plantas · 30 socios' },
   { value: 'brote',      label: 'Brote',      color: '#15803d', bg: '#dcfce7', desc: '2 sedes · 150 plantas · 100 socios' },
@@ -40,20 +49,19 @@ const PLANES = [
   { value: 'federacion', label: 'Federación', color: '#7c3aed', bg: '#ede9fe', desc: 'Todo ilimitado — federaciones' },
 ]
 
-// ── Feature flags ─────────────────────────────────────────────────────
+// ── Add-ons ───────────────────────────────────────────────────────────
+// Mismos que Club::ADDONS en el backend. Los marcados `incompleto` existen pero todavía no
+// están terminados: se dejan apagados y se avisa por qué.
 const FEATURE_META = {
-  ia_analisis:      { label: 'Análisis IA',      desc: 'IA aplicada a lotes y plantas',  icon: '🔬' },
-  ia_voz:           { label: 'Asistente de voz', desc: 'Registro por voz con IA',         icon: '🎙️' },
-  web_publica:      { label: 'Web pública',       desc: 'Sitio web del club',              icon: '🌐' },
-  mailer:           { label: 'Correo',            desc: 'Emails a socios',                 icon: '✉️' },
-  iot:              { label: 'IoT / Sensores',    desc: 'Sensores ambientales',            icon: '📡' },
-  alertas:          { label: 'Alertas',           desc: 'Alertas por sala y lote',         icon: '🔔' },
-  ariccame:         { label: 'ARICCAME',          desc: 'Reportes ARICCAME',               icon: '📋' },
-  cuenta_corriente: { label: 'Cuenta corriente', desc: 'Saldo y movimientos por socio',   icon: '💳' },
-  analytics:        { label: 'Analytics',         desc: 'Dashboard analítico avanzado',    icon: '📊' },
-  multi_sede:       { label: 'Multi-sede',        desc: 'Múltiples sedes/ubicaciones',     icon: '🏢' },
-  insumos:          { label: 'Insumos',           desc: 'Depósito + costo real por lote',  icon: '🧪' },
-  bar:              { label: 'Buffet',            desc: 'POS y tablero del buffet',        icon: '🍺' },
+  bar:         { label: 'Buffet',         desc: 'Punto de venta, caja y stock del salón',  icon: '🍺' },
+  medico:      { label: 'Módulo médico',  desc: 'Turnos, historia clínica e indicaciones', icon: '🩺' },
+  iot:         { label: 'Ambiente / IoT', desc: 'Sensores y reglas ambientales',           icon: '📡', requiere: 'Hardware del club o import CSV' },
+  ia:          { label: 'Asistente IA',   desc: 'Análisis de lote, plan de trabajo y voz', icon: '🤖' },
+  mailer:      { label: 'Correo',         desc: 'Mails al paciente desde su ficha',        icon: '✉️', requiere: 'SMTP del club' },
+  whatsapp:    { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp',          icon: '💬', requiere: 'Cuenta Twilio del club' },
+  eventos:     { label: 'Eventos',        desc: 'Fiestas y catas del Buffet',              icon: '🎉', incompleto: true },
+  web_publica: { label: 'Web pública',    desc: 'Sitio público del club',                  icon: '🌐', incompleto: true },
+  ariccame:    { label: 'ARICCAME',       desc: 'Reporte regulatorio a ANMAT',             icon: '📋', incompleto: true },
 }
 const FEATURES_ORDER = Object.keys(FEATURE_META)
 
@@ -247,27 +255,32 @@ async function handleSubmit() {
         <div class="cnv__panel-header">
           <div class="cnv__panel-ico cnv__panel-ico--purple"><Zap :size="18" :stroke-width="1.75" /></div>
           <div>
-            <div class="cnv__panel-title">Suscripción & funcionalidades</div>
-            <div class="cnv__panel-sub">Plan y módulos habilitados para este club</div>
+            <div class="cnv__panel-title">Qué contrata este club</div>
+            <div class="cnv__panel-sub">Las suites definen a qué accede; los módulos se suman arriba</div>
           </div>
         </div>
         <div class="cnv__panel-body">
 
-          <!-- Planes -->
-          <div class="cnv__section-label">Plan</div>
-          <div class="cnv__planes">
+          <!-- Suites: lo que realmente se vende. Un club puede tomar una, la otra o las dos. -->
+          <div class="cnv__section-label">Suites</div>
+          <div class="cnv__suites">
             <button
-              v-for="p in PLANES" :key="p.value"
+              v-for="s in SUITES" :key="s.value"
               type="button"
-              class="cnv__plan-btn"
-              :class="{ 'cnv__plan-btn--active': form.plan === p.value }"
-              :style="form.plan === p.value ? { borderColor: p.color, background: p.color + '10', color: p.color } : {}"
-              @click="form.plan = p.value"
+              class="cnv__suite"
+              :class="{ 'cnv__suite--on': form.features[s.value] }"
+              @click="form.features[s.value] = !form.features[s.value]"
             >
-              <span class="cnv__plan-name">{{ p.label }}</span>
-              <span class="cnv__plan-desc">{{ p.desc }}</span>
+              <span class="cnv__suite-check">{{ form.features[s.value] ? '✓' : '' }}</span>
+              <span class="cnv__suite-txt">
+                <span class="cnv__suite-name">{{ s.label }}</span>
+                <span class="cnv__suite-desc">{{ s.desc }}</span>
+              </span>
             </button>
           </div>
+          <p v-if="!haySuite" class="cnv__warn">
+            Sin ninguna suite, el club entra pero no puede operar. Elegí al menos una.
+          </p>
 
           <div class="cnv__row-2" style="margin-top:1rem">
             <div class="cnv__field">
@@ -291,7 +304,7 @@ async function handleSubmit() {
             <label
               v-for="key in FEATURES_ORDER" :key="key"
               class="cnv__feat-toggle"
-              :class="{ 'cnv__feat-toggle--on': form.features[key] }"
+              :class="{ 'cnv__feat-toggle--on': form.features[key], 'cnv__feat-toggle--warn': FEATURE_META[key].incompleto }"
             >
               <div class="cnv__feat-left">
                 <span class="cnv__feat-ico">{{ FEATURE_META[key].icon }}</span>
@@ -483,6 +496,24 @@ async function handleSubmit() {
 }
 
 /* Planes */
+.cnv__suites { display: flex; flex-direction: column; gap: 10px; }
+.cnv__suite {
+  display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
+  padding: 14px 16px; border-radius: 12px; border: 1.5px solid #e2e8f0; background: #fff;
+  transition: all .15s;
+}
+.cnv__suite--on { border-color: var(--c-leaf-500, #5A8A72); background: var(--c-leaf-50, #F4F8F5); }
+.cnv__suite-check {
+  width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+  border: 1.5px solid #cbd5e1; display: grid; place-items: center;
+  font-size: 13px; color: #fff; font-weight: 700;
+}
+.cnv__suite--on .cnv__suite-check { background: var(--c-leaf-800, #1A3D2E); border-color: var(--c-leaf-800, #1A3D2E); }
+.cnv__suite-txt { display: flex; flex-direction: column; gap: 2px; }
+.cnv__suite-name { font-size: 15px; font-weight: 700; color: #0f172a; }
+.cnv__suite-desc { font-size: 12px; color: #64748b; line-height: 1.4; }
+.cnv__warn { margin: 10px 0 0; font-size: 12px; color: #b45309; }
+.cnv__feat-toggle--warn { border-color: #fcd34d; }
 .cnv__planes { display: grid; grid-template-columns: repeat(4,1fr); gap: .5rem; }
 @media (max-width: 700px) { .cnv__planes { grid-template-columns: 1fr 1fr; } }
 .cnv__plan-btn {
