@@ -32,7 +32,8 @@ para trabajar**.
    crash-loop: `DEVISE_JWT_SECRET_KEY` y las tres `ACTIVE_RECORD_ENCRYPTION_*`. Es a
    propósito (sin ellas la app "andaría" sin poder leer datos clínicos), pero si un
    servicio nuevo no arranca, empezá mirando esas cuatro.
- Podés reusar los de producción **salvo estos dos**:
+
+   Podés reusar los valores de producción **salvo estos dos**:
    - **`S3_BUCKET`** → uno propio. Compartir el de prod significa que una prueba
      puede pisar o borrar archivos reales de un club.
    - Las **claves de encriptación** (`ACTIVE_RECORD_ENCRYPTION_*`) → si usás las
