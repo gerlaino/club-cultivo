@@ -68,3 +68,43 @@ namespace :sidekiq do
     puts
   end
 end
+
+namespace :sidekiq do
+  # Vaciar las colas ANTES de levantar un worker que estuvo caído mucho tiempo.
+  #
+  # Sin esto, al arrancar se ejecutan de una todos los jobs acumulados: mails a pacientes,
+  # push, y alertas de vencimientos que ya pasaron hace meses. El daño no es técnico —es que
+  # el club recibe una avalancha de avisos viejos y pierde la confianza en los que sí importan.
+  #
+  # Perder estos jobs no cuesta nada: los cron vuelven a generarlos en su próxima corrida
+  # (los vencimientos se recalculan todos los días desde el estado actual, no desde la cola).
+  #
+  #   rake sidekiq:purge              # muestra qué hay, NO borra
+  #   rake sidekiq:purge CONFIRMAR=1  # vacía
+  desc 'Vacía las colas acumuladas (usar antes de revivir un worker caído)'
+  task purge: :environment do
+    require 'sidekiq/api'
+
+    colas = Sidekiq::Queue.all
+    total = colas.sum(&:size)
+
+    if total.zero?
+      puts 'Las colas están vacías: nada que hacer.'
+      next
+    end
+
+    puts "\nHay #{total} jobs encolados:"
+    colas.each { |q| puts format('  %-14s %5d  (el más viejo, hace %.1f días)', q.name, q.size, q.latency / 86_400.0) }
+
+    if ENV['CONFIRMAR'].blank?
+      puts "\nNo se borró nada. Para vaciarlas: rake sidekiq:purge CONFIRMAR=1"
+      puts 'Los cron los vuelven a generar en su próxima corrida.'
+      next
+    end
+
+    colas.each { |q| puts "  vaciando #{q.name} (#{q.size})…"; q.clear }
+    Sidekiq::RetrySet.new.clear
+    Sidekiq::ScheduledSet.new.clear
+    puts "\n✓ Colas vaciadas. Ahora sí, levantá el worker."
+  end
+end
