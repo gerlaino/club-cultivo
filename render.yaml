@@ -46,11 +46,10 @@ services:
         fromDatabase:
           name: club-cultivo-staging-db
           property: connectionString
+      # El Redis de prod, pero en la base /1 (prod usa la /0): claves separadas, cero costo.
+      # Se carga a mano porque hay que agregarle el /1 al final.
       - key: REDIS_URL
-        fromService:
-          type: redis
-          name: club-cultivo-staging-redis
-          property: connectionString
+        sync: false
       - key: RAILS_MAX_THREADS
         value: "3"
       # Secretos: se cargan a mano en el dashboard, una sola vez.
@@ -99,12 +98,9 @@ services:
         fromDatabase:
           name: club-cultivo-staging-db
           property: connectionString
-      # MISMO Redis que su web: los cron se registran acá y las colas se comparten.
+      # MISMO valor que su web (base /1): los cron se registran acá y las colas se comparten.
       - key: REDIS_URL
-        fromService:
-          type: redis
-          name: club-cultivo-staging-redis
-          property: connectionString
+        sync: false
       - key: RAILS_MASTER_KEY
         sync: false
       - key: SECRET_KEY_BASE
@@ -121,15 +117,9 @@ services:
       - key: ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT
         sync: false
 
-  - type: redis
-    name: club-cultivo-staging-redis
-    plan: free
-    maxmemoryPolicy: noeviction   # Sidekiq NO tolera que Redis descarte claves
-    # Lista vacía = SÓLO se llega desde la red privada de Render. El Redis no tiene por qué
-    # ser accesible desde internet: guarda las colas de trabajo y la caché de sesión.
-    ipAllowList: []
-
   # ── BACKUP DE PRODUCCIÓN ──────────────────────────────────────────────────
+  # OJO: si ya existe un cron de backup creado a mano con OTRO nombre, este crea un SEGUNDO
+  # que corre en paralelo. Con el mismo nombre, Render lo adopta en vez de duplicarlo.
   - type: cron
     name: db-backup-diario
     runtime: ruby

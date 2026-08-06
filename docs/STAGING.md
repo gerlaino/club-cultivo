@@ -11,7 +11,7 @@ para trabajar**.
 |---|---|---|
 | `club-cultivo-staging` | `staging` | La app completa, contra su propia base |
 | `club-cultivo-staging-worker` | `staging` | Sidekiq: sin esto los cron no corren |
-| `club-cultivo-staging-redis` | — | Colas y caché de staging |
+| *(sin Redis propio)* | — | Usa el de producción en la base `/1` — ver abajo |
 | `club-cultivo-staging-db` | — | Base propia. **Nunca datos reales de un club** |
 
 ## Levantarlo (una vez)
@@ -43,7 +43,24 @@ para trabajar**.
      bin/rails db:encryption:init
      ```
 
-4. **Poblarlo**
+4. **`REDIS_URL`: el de producción, con `/1` al final.** Render sólo permite un Key Value
+   gratis por cuenta y ese lugar lo ocupa prod, así que en vez de pagar un segundo Redis,
+   staging usa **otra base numerada del mismo**: Redis tiene 16 bases lógicas aisladas entre
+   sí. Prod está en la `/0`, staging va en la `/1`.
+
+   ```
+   REDIS_URL = redis://red-d8672svdl75s739h912g:6379/1
+                                                    ↑ esto es lo único que cambia
+   ```
+
+   Va igual en el web de staging y en su worker. Las claves quedan separadas: staging no ve
+   las colas de prod ni al revés.
+
+   **Lo que sí comparten es la memoria** (25 MB del plan free). Con el volumen de hoy sobra,
+   pero si algún día staging encola miles de jobs, puede apretar a prod. El día que moleste,
+   se le pone un Redis propio de pago.
+
+5. **Poblarlo**
    ```bash
    bundle exec rails db:migrate
    bundle exec rake club:demo PASSWORD="LoQueQuieras"
