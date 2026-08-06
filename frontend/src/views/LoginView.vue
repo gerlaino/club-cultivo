@@ -141,7 +141,9 @@
         </div>
 
         <RouterLink to="/bienvenida" class="lv__back">Conocé la plataforma →</RouterLink>
-        <div class="lv__ver">v0.1.0 beta</div>
+        <!-- Qué build está corriendo. Es la forma de saber, sin adivinar, si el dispositivo
+             tiene la última versión o una cacheada. -->
+        <div class="lv__ver" :title="`Build ${BUILD} · ${BUILD_AT}`">v0.1.0 beta · {{ BUILD }}</div>
       </div>
     </div>
   </div>
@@ -161,6 +163,8 @@ const showPass   = ref(false)
 const focusEmail = ref(false)
 const focusPass  = ref(false)
 const yr = new Date().getFullYear()
+const BUILD    = __APP_BUILD__
+const BUILD_AT = __APP_BUILD_AT__
 const retrying     = ref(false)
 const lastSubmitAt = ref(0)
 const COOLDOWN_MS  = 600

@@ -1,8 +1,22 @@
 import { defineConfig } from "vite"
+import { execSync } from "node:child_process"
+
+// Identificador del build: qué commit está corriendo. Sin esto no hay forma de saber si lo que
+// ves en pantalla es la última versión o una cacheada — y se pierde tiempo discutiendo si un
+// cambio "se hizo" cuando en realidad no llegó al dispositivo.
+const BUILD_ID = (() => {
+  try { return execSync("git rev-parse --short HEAD").toString().trim() }
+  catch { return "dev" }
+})()
+const BUILD_AT = new Date().toISOString().slice(0, 16).replace("T", " ")
 import vue from "@vitejs/plugin-vue"
 import { VitePWA } from "vite-plugin-pwa"
 
 export default defineConfig({
+  define: {
+    __APP_BUILD__: JSON.stringify(BUILD_ID),
+    __APP_BUILD_AT__: JSON.stringify(BUILD_AT),
+  },
   plugins: [
     vue(),
     VitePWA({
