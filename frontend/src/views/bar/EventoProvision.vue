@@ -505,7 +505,7 @@ async function confirmarCierre(finalizar) {
 .pv__chk { display: flex; align-items: center; gap: .45rem; font-size: .82rem; color: #475569; margin: .5rem 0 .2rem; cursor: pointer; }
 
 .ov { position: fixed; inset: 0; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1000; padding: 1rem; }
-.modal { background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 420px; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
+.modal { position: relative; z-index: 1; background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 420px; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
 .modal--wide { max-width: 460px; }
 .modal__title { margin: 0 0 .25rem; font-size: 1.05rem; font-weight: 750; }
 .modal__hint { color: #64748b; font-size: .82rem; margin: 0 0 .8rem; }

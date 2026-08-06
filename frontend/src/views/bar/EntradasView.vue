@@ -196,7 +196,7 @@ async function anular(e) {
 .lnk--danger:hover { color: #dc2626; }
 
 .ov { position: fixed; inset: 0; background: rgba(20,20,20,.5); display: grid; place-items: center; z-index: 1000; padding: 16px; }
-.modal { background: var(--c-paper, #fff); border-radius: var(--r-lg, 14px); padding: var(--sp-5, 20px); width: 100%; max-width: 320px; text-align: center; box-shadow: var(--sh-3, 0 20px 50px rgba(0,0,0,.25)); }
+.modal { position: relative; z-index: 1; background: var(--c-paper, #fff); border-radius: var(--r-lg, 14px); padding: var(--sp-5, 20px); width: 100%; max-width: 320px; text-align: center; box-shadow: var(--sh-3, 0 20px 50px rgba(0,0,0,.25)); }
 .modal h3 { margin: 0; font-size: var(--fs-18, 18px); color: #0f172a; }
 .modal__hint { color: #64748b; font-size: var(--fs-13, 13px); margin: 4px 0 var(--sp-3, 12px); }
 .qrimg { width: 220px; height: 220px; border-radius: var(--r-md, 10px); }

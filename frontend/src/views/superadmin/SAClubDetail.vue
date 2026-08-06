@@ -93,8 +93,15 @@ const FEATURE_META = {
   insumos:          { label: 'Insumos',           desc: 'Depósito de insumos y costo real por lote',    icon: '🧪' },
   bar:              { label: 'Buffet',            desc: 'Punto de venta y tablero del buffet',          icon: '🍺' },
 }
-const FEATURES_ORDER = Object.keys(FEATURE_META)
-const iaActiva = computed(() => featuresForm.value.ia_analisis || featuresForm.value.ia_voz)
+// El catálogo lo manda el backend (Club::SUITES / Club::ADDONS): así no hay dos listas que
+// se contradigan cuando se agrega o completa un módulo.
+const suites = ref([])
+const addons = ref([])
+const ADDON_ICO = {
+  bar: '🍺', medico: '🩺', iot: '📡', ia: '🤖',
+  mailer: '✉️', whatsapp: '💬', web_publica: '🌐', ariccame: '📋',
+}
+const iaActiva = computed(() => featuresForm.value.ia === true)
 
 const PLAN_META = {
   semilla:    { label: 'Semilla',    color: '#64748b', bg: '#f1f5f9' },
@@ -137,6 +144,8 @@ async function cargar() {
     const features = { ...(data.features || {}) }
     if (features.web_publica === undefined) features.web_publica = data.web_activa || false
     featuresForm.value = features
+    suites.value = data.suites || []
+    addons.value = data.addons || []
     iaTier.value       = data.ia_tier        || 'basico'
     iaLimiteHora.value = data.ia_limite_hora || 20
   } finally {
@@ -489,16 +498,42 @@ onMounted(cargar)
           </button>
         </div>
         <div class="scd__feat-body">
+          <!-- Las SUITES son lo que se vende: un club compra una, la otra o las dos. -->
+          <div class="scd__suites">
+            <label v-for="s in suites" :key="s.clave" class="scd__suite" :class="{ 'scd__suite--on': featuresForm[s.clave] }">
+              <input v-model="featuresForm[s.clave]" type="checkbox" class="scd__chk" />
+              <div class="scd__suite-txt">
+                <div class="scd__suite-name">{{ s.label }}</div>
+                <div class="scd__suite-desc">{{ s.desc }}</div>
+              </div>
+              <div class="scd__track"><div class="scd__thumb"></div></div>
+            </label>
+          </div>
+
+          <div class="scd__divider"><span>Módulos adicionales</span></div>
+
           <div class="scd__feat-grid">
-            <label v-for="key in FEATURES_ORDER" :key="key" class="scd__feat-toggle" :class="{ 'scd__feat-toggle--on': featuresForm[key] }">
+            <label
+              v-for="a in addons" :key="a.clave"
+              class="scd__feat-toggle"
+              :class="{ 'scd__feat-toggle--on': featuresForm[a.clave], 'scd__feat-toggle--warn': a.incompleto }"
+            >
               <div class="scd__feat-left">
-                <span class="scd__feat-ico">{{ FEATURE_META[key].icon }}</span>
+                <span class="scd__feat-ico">{{ ADDON_ICO[a.clave] || '🧩' }}</span>
                 <div>
-                  <div class="scd__feat-name">{{ FEATURE_META[key].label }}</div>
-                  <div class="scd__feat-desc">{{ FEATURE_META[key].desc }}</div>
+                  <div class="scd__feat-name">
+                    {{ a.label }}
+                    <span v-if="a.incompleto" class="scd__feat-badge">incompleto</span>
+                  </div>
+                  <div class="scd__feat-desc">{{ a.desc }}</div>
+                  <!-- De qué depende para funcionar DE VERDAD. Prenderlo sin esto deja al club
+                       creyendo que tiene algo que no va a pasar. -->
+                  <div v-if="a.requiere" class="scd__feat-req" :class="{ 'scd__feat-req--warn': a.incompleto }">
+                    {{ a.requiere }}
+                  </div>
                 </div>
               </div>
-              <input v-model="featuresForm[key]" type="checkbox" class="scd__chk" />
+              <input v-model="featuresForm[a.clave]" type="checkbox" class="scd__chk" />
               <div class="scd__track"><div class="scd__thumb"></div></div>
             </label>
           </div>
@@ -799,6 +834,26 @@ onMounted(cargar)
 
 /* Features */
 .scd__feat-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+/* Suites: lo que se vende, con más peso visual que los add-ons */
+.scd__suites { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+.scd__suite {
+  display: flex; align-items: center; gap: 14px; cursor: pointer;
+  padding: 14px 16px; border-radius: 12px;
+  border: 1.5px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03);
+  transition: all .15s;
+}
+.scd__suite--on { border-color: #4ade80; background: rgba(74,222,128,.08); }
+.scd__suite-txt { flex: 1; }
+.scd__suite-name { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+.scd__suite-desc { font-size: 12px; color: #94a3b8; margin-top: 2px; line-height: 1.45; }
+.scd__feat-badge {
+  margin-left: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; padding: 1px 6px; border-radius: 4px;
+  background: rgba(217,119,6,.2); color: #fbbf24;
+}
+.scd__feat-req { font-size: 11px; color: #64748b; margin-top: 3px; line-height: 1.4; }
+.scd__feat-req--warn { color: #fbbf24; }
+.scd__feat-toggle--warn { border-color: rgba(217,119,6,.35); }
 .scd__feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: .4rem; }
 .scd__feat-toggle {
   display: flex; align-items: center; gap: .65rem; padding: .65rem .875rem;

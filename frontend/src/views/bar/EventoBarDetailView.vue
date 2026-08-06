@@ -254,7 +254,10 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
     <section class="card ed__entradas">
       <div class="card__head">
         <h2>Entradas <span class="mut">· {{ e.entradas_vendidas }} vendidas · {{ fmt(e.recaudacion_entradas) }}</span></h2>
-        <button class="btn btn--sm btn--primary" @click="nuevoTipo">+ Tipo</button>
+        <!-- Sólo cuando YA hay un tipo cargado (para sumar VIP a General, por ejemplo). Sin
+             ninguno manda la pregunta "¿Cobrás entrada?" de abajo: tener las dos puertas a la
+             vez hacía que el botón apareciera antes de que se decidiera si se cobra. -->
+        <button v-if="e.tipos_entrada?.length" class="btn btn--sm btn--primary" @click="nuevoTipo">+ Tipo</button>
       </div>
       <form v-if="tipoForm" class="cform" @submit.prevent="guardarTipo">
         <input v-model.trim="tipoForm.nombre" class="inp" placeholder="Nombre (ej: General)" maxlength="50" />
@@ -427,9 +430,10 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 .tlist li:last-child { border-bottom: none; }
 
 .tlist li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: var(--fs-14, 14px); }
-.tlist li.done .tlist__t { text-decoration: line-through; color: #94a3b8; }
+.tlist li.done .tlist__t { text-decoration: line-through; font-style: italic; color: #94a3b8; }
+.tlist li.done { opacity: .6; }
 .box { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid #e2e8f0; background: var(--c-paper, #fff); cursor: pointer; font-size: .7rem; color: #fff; flex-shrink: 0; }
-.box.on { background: #1b5e20; border-color: #1b5e20; }
+.box.on { background: var(--c-leaf-800, #1A3D2E); border-color: var(--c-leaf-800, #1A3D2E); }
 .tlist__t { flex: 1; color: #1e293b; }
 .tlist__v { color: #94a3b8; font-size: var(--fs-12, 12px); }
 
@@ -446,7 +450,7 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 .ttrow__q { font-size: var(--fs-13, 13px); color: #475569; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .ov { position: fixed; inset: 0; background: rgba(20,20,20,.45); display: grid; place-items: center; z-index: 1000; padding: 16px; }
-.modal { background: var(--c-paper, #fff); border-radius: var(--r-lg, 14px); padding: var(--sp-5, 20px); width: 100%; max-width: 360px; box-shadow: var(--sh-3, 0 20px 50px rgba(0,0,0,.25)); }
+.modal { position: relative; z-index: 1; background: var(--c-paper, #fff); border-radius: var(--r-lg, 14px); padding: var(--sp-5, 20px); width: 100%; max-width: 360px; box-shadow: var(--sh-3, 0 20px 50px rgba(0,0,0,.25)); }
 .modal--wide { max-width: 440px; }
 .ed__edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .modal h3 { margin: 0 0 4px; font-size: var(--fs-18, 18px); color: #0f172a; }
