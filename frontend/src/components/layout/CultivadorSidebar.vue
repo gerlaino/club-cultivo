@@ -4,7 +4,7 @@
 
 <script setup>
 import AppSidebar from './AppSidebar.vue'
-import { Home, LayoutGrid, PackageCheck, History, Layers, Leaf, CalendarClock } from 'lucide-vue-next'
+import { Home, LayoutGrid, PackageCheck, History, Layers, Leaf, CalendarClock, CheckSquare } from 'lucide-vue-next'
 
 const NAV_LINKS = [
   { to: '/',                     icon: Home,         label: 'Inicio' },
@@ -12,6 +12,9 @@ const NAV_LINKS = [
   { to: '/lotes',                icon: Layers,       label: 'Lotes' },
   { to: '/plantas',              icon: Leaf,         label: 'Plantas' },
   { to: '/cosechado',            icon: PackageCheck, label: 'Cosechado' },
+  // El cultivador ya tenía permiso completo sobre tareas, pero no el link: la vista con
+  // filtros y selección múltiple (marcar varias como hechas) le quedaba inalcanzable.
+  { to: '/tareas',               icon: CheckSquare,  label: 'Tareas' },
   { to: '/mis-horas',            icon: CalendarClock, label: 'Mis horas' },
   { to: '/historial-cultivador', icon: History,      label: 'Historial' },
 ]

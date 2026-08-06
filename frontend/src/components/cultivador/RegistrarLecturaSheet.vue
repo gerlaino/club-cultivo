@@ -6,36 +6,29 @@
 
           <!-- Header -->
           <div class="rls__header">
-            <h2 class="rls__title">Registrar lectura ambiental</h2>
+            <div>
+              <h2 class="rls__title">Registrar ambiente</h2>
+              <p v-if="salaNombre" class="rls__subtitle">{{ salaNombre }}</p>
+            </div>
             <button class="rls__close" @click="open = false"><i class="bi bi-x-lg"></i></button>
           </div>
 
           <!-- Body -->
           <div class="rls__body">
 
-            <!-- Sala selector -->
-            <div class="rls__field">
+            <!-- La sala solo se elige si NO se entró desde una: viniendo de su card, ya está
+                 decidida. Y el LOTE no se pregunta: el ambiente es del cuarto, no de un lote —
+                 el backend lo aplica a todos los lotes activos de la sala. -->
+            <div v-if="!salaFijada" class="rls__field">
               <label class="rls__label">Sala</label>
-              <select class="rls__select" v-model="salaId" @change="onSalaChange">
+              <select class="rls__select" v-model="salaId">
                 <option value="" disabled>Seleccioná una sala</option>
                 <option v-for="s in salas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
               </select>
             </div>
 
-            <!-- Lote selector (solo si hay más de uno) -->
-            <div v-if="lotesEnSala.length > 1" class="rls__field">
-              <label class="rls__label">Lote</label>
-              <select class="rls__select" v-model="loteId">
-                <option value="" disabled>Seleccioná un lote</option>
-                <option v-for="l in lotesEnSala" :key="l.id" :value="l.id">{{ l.codigo }}</option>
-              </select>
-            </div>
-            <div v-else-if="salaId && lotesEnSala.length === 0" class="rls__empty">
-              Esta sala no tiene lotes activos.
-            </div>
-
             <!-- Inputs de lectura -->
-            <div v-if="loteId" class="rls__grid">
+            <div v-if="salaId" class="rls__grid">
               <div class="rls__field">
                 <label class="rls__label">Temperatura (°C)</label>
                 <input class="rls__input" type="number" step="0.1" v-model="form.temperatura" placeholder="23.5" inputmode="decimal" />
@@ -76,7 +69,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import DsSpinner   from '../../design-system/components/Spinner.vue'
 import { useSalasStore } from '../../stores/salas.js'
 import { useLotesStore } from '../../stores/lotes.js'
-import { registrarLecturaOffline } from '../../lib/offlineApi.js'
+import { registrarSala } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
@@ -95,31 +88,16 @@ const lotesStore = useLotesStore()
 const toast      = useToast()
 
 const salaId  = ref('')
-const loteId  = ref('')
 const guardando = ref(false)
 const form = ref({ temperatura: '', humedad: '', co2: '', ppfd: '' })
 
-const salas = computed(() => salasStore.items.filter(s => s.state === 'activa'))
-
-const lotesEnSala = computed(() =>
-  lotesStore.items.filter(l =>
-    String(l.sala_id) === String(salaId.value) &&
-    ['vegetativo', 'floracion'].includes(l.estado)
-  )
-)
-
-function onSalaChange() {
-  loteId.value = ''
-  if (!lotesStore.items.length) lotesStore.fetch()
-  if (lotesEnSala.value.length === 1) loteId.value = lotesEnSala.value[0].id
-}
-
-watch(lotesEnSala, (lotes) => {
-  if (lotes.length === 1) loteId.value = lotes[0].id
-})
+const salas      = computed(() => salasStore.items.filter(s => s.state === 'activa'))
+const salaFijada = computed(() => !!props.salaIdInicial)
+const salaNombre = computed(() =>
+  salasStore.items.find(s => String(s.id) === String(salaId.value))?.nombre || '')
 
 const canSubmit = computed(() =>
-  loteId.value &&
+  salaId.value &&
   (form.value.temperatura || form.value.humedad || form.value.co2 || form.value.ppfd)
 )
 
@@ -132,13 +110,12 @@ async function guardar() {
     if (form.value.humedad)     payload.humedad     = parseFloat(form.value.humedad)
     if (form.value.co2)         payload.co2         = parseFloat(form.value.co2)
     if (form.value.ppfd)        payload.ppfd        = parseFloat(form.value.ppfd)
-    const res = await registrarLecturaOffline({ loteId: loteId.value, payload })
-    const salaNombre = salas.value.find(s => String(s.id) === String(salaId.value))?.nombre || 'la sala'
-    if (res?.queued) {
-      toast.warning(`Sin conexión — lectura guardada localmente, se enviará al reconectarse`)
-    } else {
-      toast.success(`Lectura registrada en ${salaNombre}`)
-    }
+    // registrar_sala aplica la lectura a TODOS los lotes activos de la sala (los que enraízan
+    // van por su propia puerta: viven en un propagador con otro microclima).
+    const { data } = await registrarSala(salaId.value, payload)
+    const n = data?.lotes_afectados ?? data?.registros?.length
+    toast.success(n ? `Ambiente registrado en ${salaNombre.value} · ${n} lote(s)`
+                    : `Ambiente registrado en ${salaNombre.value}`)
     open.value = false
     resetForm()
   } catch (e) {
@@ -150,8 +127,7 @@ async function guardar() {
 
 function resetForm() {
   form.value = { temperatura: '', humedad: '', co2: '', ppfd: '' }
-  salaId.value = ''
-  loteId.value = ''
+  if (!salaFijada.value) salaId.value = ''
 }
 
 watch(() => props.modelValue, (isOpen) => {
@@ -187,7 +163,7 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 /* Modal */
 .rls__modal {
   background: var(--c-paper);
-  border-radius: var(--r-2xl);
+  border-radius: var(--r-xl);
   width: 100%;
   max-width: 460px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .2);
@@ -204,6 +180,11 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
   padding: var(--sp-5) var(--sp-6);
   border-bottom: 1px solid var(--c-ink-100);
   flex-shrink: 0;
+}
+.rls__subtitle {
+  margin: 2px 0 0;
+  font-size: var(--fs-13);
+  color: var(--c-ink-500);
 }
 .rls__title {
   font-family: var(--font-display);
@@ -267,8 +248,8 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
   background: var(--c-leaf-50);
   border: 1.5px solid var(--c-ink-300);
   border-radius: var(--r-lg);
-  font-family: var(--font-mono);
-  font-size: var(--fs-15);
+  font-family: var(--font-ui);
+  font-size: var(--fs-16);
   color: var(--c-ink-900);
   box-sizing: border-box;
   transition: border-color var(--t-fast);
