@@ -109,6 +109,11 @@ services:
         sync: false
       - key: SECRET_KEY_BASE
         sync: false
+      # Estas CUATRO cortan el arranque si faltan (application.rb:55 y devise.rb:326).
+      # No hay fallback a propósito: sin ellas la app "arrancaría" sin poder leer datos
+      # clínicos. Si el worker crashea al bootear, es casi seguro que falta alguna.
+      - key: DEVISE_JWT_SECRET_KEY
+        sync: false
       - key: ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY
         sync: false
       - key: ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY
@@ -175,4 +180,12 @@ services:
   #     - key: REDIS_URL         # el MISMO Redis que el web service
   #       sync: false
   #     - key: RAILS_MASTER_KEY
+  #       sync: false
+  #     - key: DEVISE_JWT_SECRET_KEY
+  #       sync: false
+  #     - key: ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY
+  #       sync: false
+  #     - key: ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY
+  #       sync: false
+  #     - key: ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT
   #       sync: false
