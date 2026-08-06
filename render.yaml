@@ -28,7 +28,7 @@ services:
   # Copia fiel de producción contra su propia base. Se puebla con
   # `rake club:demo`, NUNCA con datos reales de un club.
   - type: web
-    name: club-cultivo-staging
+    name: club-cultivo-stg
     runtime: ruby
     plan: starter
     branch: staging          # merge a `staging` → deploy acá; a `master` → prod
@@ -83,7 +83,7 @@ services:
         sync: false
 
   - type: worker
-    name: club-cultivo-staging-worker
+    name: club-cultivo-stg-worker
     runtime: ruby
     plan: starter
     branch: staging
