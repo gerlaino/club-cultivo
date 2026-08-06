@@ -222,6 +222,18 @@ class Club < ApplicationRecord
     'medico'              => true,
   }.freeze
 
+  # Features tal como las ve el frontend: las guardadas MÁS las claves viejas derivadas.
+  # `multi_sede`, `analytics`, `insumos`, `alertas` y `cuenta_corriente` dejaron de existir
+  # como bandera propia (son núcleo de sus suites), pero hay vistas que las consultan por
+  # nombre para decidir qué sección mostrar.
+  def features_expandidas
+    base = features.dup
+    FEATURES_LEGACY.each do |viejo, nuevo|
+      base[viejo] = true if base[nuevo] == true
+    end
+    base
+  end
+
   def suite?(key)
     features[key.to_s] == true
   end

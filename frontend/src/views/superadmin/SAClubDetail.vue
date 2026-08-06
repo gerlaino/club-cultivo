@@ -79,20 +79,9 @@ const IA_TIERS = [
   { value: 'pro',        label: 'Pro',        desc: '60 calls/h · Voz + alertas proactivas',      color: '#0891b2' },
   { value: 'enterprise', label: 'Enterprise', desc: '200 calls/h · Voz + alertas + predicciones', color: '#7c3aed' },
 ]
-const FEATURE_META = {
-  ia_analisis:      { label: 'Análisis IA',      desc: 'Análisis de lotes, plantas y alertas por IA', icon: '🔬' },
-  ia_voz:           { label: 'Asistente de voz', desc: 'Registro y consultas por voz con IA',          icon: '🎙️' },
-  web_publica:      { label: 'Web pública',       desc: 'Sitio web público del club',                   icon: '🌐' },
-  mailer:           { label: 'Correo',            desc: 'Envío de correos a socios',                    icon: '✉️' },
-  iot:              { label: 'IoT / Sensores',    desc: 'Integración de sensores ambientales',           icon: '📡' },
-  alertas:          { label: 'Alertas',           desc: 'Alertas automáticas por sala y lote',          icon: '🔔' },
-  ariccame:         { label: 'ARICCAME',          desc: 'Reportes para el registro ARICCAME',           icon: '📋' },
-  cuenta_corriente: { label: 'Cuenta corriente', desc: 'Saldo y movimientos por socio',                icon: '💳' },
-  analytics:        { label: 'Analytics',         desc: 'Dashboard de analítica avanzada',              icon: '📊' },
-  multi_sede:       { label: 'Multi-sede',        desc: 'Múltiples sedes/ubicaciones',                  icon: '🏢' },
-  insumos:          { label: 'Insumos',           desc: 'Depósito de insumos y costo real por lote',    icon: '🧪' },
-  bar:              { label: 'Buffet',            desc: 'Punto de venta y tablero del buffet',          icon: '🍺' },
-}
+// El catálogo real lo manda el backend (suites/addons). Esto sólo queda para el ícono de
+// las claves viejas que puedan seguir guardadas en algún club.
+const FEATURE_META = {}
 // El catálogo lo manda el backend (Club::SUITES / Club::ADDONS): así no hay dos listas que
 // se contradigan cuando se agrega o completa un módulo.
 const suites = ref([])

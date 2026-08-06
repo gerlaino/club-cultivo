@@ -85,6 +85,27 @@ RSpec.describe 'Gating por módulo', type: :request do
     end
   end
 
+  # Al reagrupar, `multi_sede` dejó de existir como bandera y la sección Sedes desapareció
+  # del menú: el frontend la consulta por nombre. La app expone las claves viejas derivadas.
+  describe 'features expandidas (compatibilidad del frontend)' do
+    it 'un club con la suite de cultivo sigue viendo multi_sede, insumos y analytics' do
+      features!('cultivo' => true)
+
+      expandidas = club.reload.features_expandidas
+
+      expect(expandidas['multi_sede']).to be(true)
+      expect(expandidas['insumos']).to be(true)
+      expect(expandidas['analytics']).to be(true)
+      expect(expandidas['alertas']).to be(true)
+    end
+
+    it 'sin la suite, tampoco aparecen' do
+      features!({})
+
+      expect(club.reload.features_expandidas['multi_sede']).to be_nil
+    end
+  end
+
   describe 'un club sin nada habilitado' do
     it 'no habilita ningún add-on' do
       features!({})
